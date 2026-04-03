@@ -726,6 +726,29 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 Error "Virtual register in ArgMoves"
             | LIR.StackSlot offset ->
                 Ok [X86_64.MOV_load (destX86, X86_64.RSP, int32 (offset * 8))]
+            | LIR.StringSymbol value ->
+                // Create heap string from literal, put pointer in dest
+                let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
+                let len = strBytes.Length
+                let totalSize = ((len + 16) + 7) &&& (~~~7)
+                let alloc = [X86_64.MOV_reg (destX86, heapPtr); X86_64.ADD_imm (heapPtr, int32 totalSize)]
+                let storeLen = loadImm64 scratch (int64 len) @ [X86_64.MOV_store (destX86, 0, scratch)]
+                let copyBytes =
+                    let chunks = (len + 7) / 8
+                    [0 .. chunks - 1]
+                    |> List.collect (fun i ->
+                        let offset = 8 + i * 8
+                        let chunkLen = min 8 (len - i * 8)
+                        let v = [0..chunkLen-1] |> List.fold (fun acc j ->
+                            let bi = i * 8 + j
+                            if bi < strBytes.Length then acc ||| (int64 strBytes.[bi] <<< (j * 8)) else acc) 0L
+                        loadImm64 scratch v @ [X86_64.MOV_store (destX86, int32 offset, scratch)])
+                let storeRC =
+                    let rcOff = 8 + ((len + 7) &&& (~~~7))
+                    loadImm64 scratch 1L @ [X86_64.MOV_store (destX86, int32 rcOff, scratch)]
+                Ok (alloc @ storeLen @ copyBytes @ storeRC)
+            | LIR.FuncAddr funcName ->
+                Ok [X86_64.LEA_rip (destX86, funcName)]
             | _ -> Error $"Unsupported ArgMoves operand: {srcOp}"
         let rec genMoves acc remaining =
             match remaining with
