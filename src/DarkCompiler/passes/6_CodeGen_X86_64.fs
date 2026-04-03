@@ -508,7 +508,10 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
 
     | LIR.And (dest, left, right) ->
         resolveReg dest |> Result.bind (fun d -> resolveReg left |> Result.bind (fun l -> resolveReg right |> Result.map (fun r ->
-            (if d <> l then [X86_64.MOV_reg (d, l)] else []) @ [X86_64.AND_reg (d, r)])))
+            if d = r && d <> l then
+                [X86_64.AND_reg (d, l)]  // AND is commutative
+            else
+                (if d <> l then [X86_64.MOV_reg (d, l)] else []) @ [X86_64.AND_reg (d, r)])))
 
     | LIR.And_imm (dest, src, imm) ->
         resolveReg dest |> Result.bind (fun d -> resolveReg src |> Result.map (fun s ->
@@ -517,11 +520,13 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
 
     | LIR.Orr (dest, left, right) ->
         resolveReg dest |> Result.bind (fun d -> resolveReg left |> Result.bind (fun l -> resolveReg right |> Result.map (fun r ->
-            (if d <> l then [X86_64.MOV_reg (d, l)] else []) @ [X86_64.OR_reg (d, r)])))
+            if d = r && d <> l then [X86_64.OR_reg (d, l)]  // OR is commutative
+            else (if d <> l then [X86_64.MOV_reg (d, l)] else []) @ [X86_64.OR_reg (d, r)])))
 
     | LIR.Eor (dest, left, right) ->
         resolveReg dest |> Result.bind (fun d -> resolveReg left |> Result.bind (fun l -> resolveReg right |> Result.map (fun r ->
-            (if d <> l then [X86_64.MOV_reg (d, l)] else []) @ [X86_64.XOR_reg (d, r)])))
+            if d = r && d <> l then [X86_64.XOR_reg (d, l)]  // XOR is commutative
+            else (if d <> l then [X86_64.MOV_reg (d, l)] else []) @ [X86_64.XOR_reg (d, r)])))
 
     | LIR.Lsl_imm (dest, src, shift) ->
         resolveReg dest |> Result.bind (fun d -> resolveReg src |> Result.map (fun s ->
