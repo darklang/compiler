@@ -4,6 +4,41 @@
 
 module X86_64CodeGenTests
 
+/// Build and run a LIR program, returning exit code and stdout
+let private runLIRProgramFull (program: LIR.Program) : Result<int * string, string> =
+    match CodeGen_X86_64.translateProgram program with
+    | Error e -> Error $"Codegen error: {e}"
+    | Ok instrs ->
+        match X86_64_Resolve.resolveAndEncode instrs with
+        | Error e -> Error $"Resolve error: {e}"
+        | Ok machineCode ->
+            let binary =
+                Binary_Generation_ELF_X86_64.createExecutableWithPools
+                    machineCode LiteralPool.emptyStringPool LiteralPool.emptyFloatPool false
+            let tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString("N"))
+            try
+                do
+                    use stream = new System.IO.FileStream(tempPath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None)
+                    stream.Write(binary, 0, binary.Length)
+                    stream.Flush(true)
+                let permissions = System.IO.File.GetUnixFileMode(tempPath)
+                System.IO.File.SetUnixFileMode(tempPath, permissions ||| System.IO.UnixFileMode.UserExecute)
+                let psi =
+                    match Platform.detectArch () with
+                    | Ok Platform.X86_64 -> System.Diagnostics.ProcessStartInfo(tempPath)
+                    | _ -> System.Diagnostics.ProcessStartInfo("qemu-x86_64-static", tempPath)
+                psi.UseShellExecute <- false
+                psi.RedirectStandardOutput <- true
+                psi.RedirectStandardError <- true
+                use proc = System.Diagnostics.Process.Start(psi)
+                let stdout = proc.StandardOutput.ReadToEnd()
+                proc.WaitForExit(10000) |> ignore
+                Ok (proc.ExitCode, stdout)
+            with ex -> Error $"Execution failed: {ex.Message}"
+            |> fun result ->
+                try System.IO.File.Delete(tempPath) with _ -> ()
+                result
+
 /// Build and run a LIR program, returning the exit code
 let private runLIRProgram (program: LIR.Program) : Result<int, string> =
     match CodeGen_X86_64.translateProgram program with
@@ -163,10 +198,52 @@ let testBranch () : Result<unit, string> =
         if exitCode = 42 then Ok ()
         else Error $"Expected exit code 42, got {exitCode}"
 
+/// Test: PrintInt64 outputs correct string
+let testPrintInt64 () : Result<unit, string> =
+    let program = makeSimpleProgram
+                    [LIR.Mov (LIR.Physical LIR.X0, LIR.Imm 42L)
+                     LIR.PrintInt64 (LIR.Physical LIR.X0)]
+                    LIR.Ret
+    match runLIRProgramFull program with
+    | Error e -> Error e
+    | Ok (exitCode, stdout) ->
+        if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}"
+        elif stdout.Trim() <> "42" then Error $"Expected stdout '42', got '{stdout.Trim()}'"
+        else Ok ()
+
+/// Test: PrintInt64 with negative number
+let testPrintInt64Negative () : Result<unit, string> =
+    let program = makeSimpleProgram
+                    [LIR.Mov (LIR.Physical LIR.X0, LIR.Imm -123L)
+                     LIR.PrintInt64 (LIR.Physical LIR.X0)]
+                    LIR.Ret
+    match runLIRProgramFull program with
+    | Error e -> Error e
+    | Ok (exitCode, stdout) ->
+        if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}"
+        elif stdout.Trim() <> "-123" then Error $"Expected stdout '-123', got '{stdout.Trim()}'"
+        else Ok ()
+
+/// Test: PrintInt64 with zero
+let testPrintInt64Zero () : Result<unit, string> =
+    let program = makeSimpleProgram
+                    [LIR.Mov (LIR.Physical LIR.X0, LIR.Imm 0L)
+                     LIR.PrintInt64 (LIR.Physical LIR.X0)]
+                    LIR.Ret
+    match runLIRProgramFull program with
+    | Error e -> Error e
+    | Ok (exitCode, stdout) ->
+        if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}"
+        elif stdout.Trim() <> "0" then Error $"Expected stdout '0', got '{stdout.Trim()}'"
+        else Ok ()
+
 let tests : (string * (unit -> Result<unit, string>)) list = [
     ("LIR MOV + Exit", testMovAndExit)
     ("LIR ADD immediate", testAddImm)
     ("LIR SUB", testSub)
     ("LIR MUL", testMul)
     ("LIR conditional branch", testBranch)
+    ("LIR PrintInt64", testPrintInt64)
+    ("LIR PrintInt64 negative", testPrintInt64Negative)
+    ("LIR PrintInt64 zero", testPrintInt64Zero)
 ]
