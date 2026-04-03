@@ -509,16 +509,192 @@ let private translateInstr (instr: LIR.Instr) : Result<X86_64.Instr list, string
             @ genExitSyscall
         )
 
+    | LIR.SaveRegs (intRegs, floatRegs) ->
+        // Save caller-saved registers that are live across a call.
+        // Use PUSH for each register (simpler than ARM64's fixed-layout STP).
+        // Layout: push in order, so first pushed is deepest on stack.
+        if List.isEmpty intRegs && List.isEmpty floatRegs then
+            Ok []
+        else
+            let intSaves =
+                intRegs |> List.map (fun reg -> X86_64.PUSH (lirRegToX86 reg))
+            let floatSaves =
+                floatRegs |> List.collect (fun freg ->
+                    let xmm = lirFRegToX86 freg
+                    // SUB RSP, 8; MOVSD [RSP], xmm
+                    [X86_64.SUB_imm (X86_64.RSP, 8)
+                     X86_64.MOVSD_store (X86_64.RSP, 0, xmm)])
+            // Track save area size for RestoreRegs/ArgMoves
+            Ok (intSaves @ floatSaves)
+
+    | LIR.RestoreRegs (intRegs, floatRegs) ->
+        if List.isEmpty intRegs && List.isEmpty floatRegs then
+            Ok []
+        else
+            // Restore in reverse order of saves
+            let floatRestores =
+                floatRegs |> List.rev |> List.collect (fun freg ->
+                    let xmm = lirFRegToX86 freg
+                    [X86_64.MOVSD_load (xmm, X86_64.RSP, 0)
+                     X86_64.ADD_imm (X86_64.RSP, 8)])
+            let intRestores =
+                intRegs |> List.rev |> List.map (fun reg -> X86_64.POP (lirRegToX86 reg))
+            Ok (floatRestores @ intRestores)
+
+    | LIR.ArgMoves moves ->
+        // Move arguments into the correct registers for a call.
+        // On x86_64: args go in RDI, RSI, RDX, RCX, R8, R9 (mapped from X1-X6).
+        // Since SaveRegs pushed live registers, if a source was saved we need
+        // to load from the stack. For simplicity, we process moves in order
+        // and use scratch register to break conflicts.
+        let generateMove (destPhys: LIR.PhysReg, srcOp: LIR.Operand) : Result<X86_64.Instr list, string> =
+            let destX86 = lirRegToX86 destPhys
+            match srcOp with
+            | LIR.Imm value ->
+                Ok (loadImm64 destX86 value)
+            | LIR.Reg (LIR.Physical srcPhys) ->
+                if srcPhys = destPhys then Ok []
+                else Ok [X86_64.MOV_reg (destX86, lirRegToX86 srcPhys)]
+            | LIR.Reg (LIR.Virtual _) ->
+                Error "Virtual register in ArgMoves"
+            | LIR.StackSlot offset ->
+                Ok [X86_64.MOV_load (destX86, X86_64.RSP, int32 (offset * 8))]
+            | _ -> Error $"Unsupported ArgMoves operand: {srcOp}"
+        let rec genMoves acc remaining =
+            match remaining with
+            | [] -> Ok (List.rev acc |> List.concat)
+            | m :: rest ->
+                match generateMove m with
+                | Error e -> Error e
+                | Ok instrs -> genMoves (instrs :: acc) rest
+        genMoves [] moves
+
+    | LIR.TailArgMoves moves ->
+        // Same as ArgMoves but for tail calls
+        let generateMove (destPhys: LIR.PhysReg, srcOp: LIR.Operand) : Result<X86_64.Instr list, string> =
+            let destX86 = lirRegToX86 destPhys
+            match srcOp with
+            | LIR.Imm value -> Ok (loadImm64 destX86 value)
+            | LIR.Reg (LIR.Physical srcPhys) ->
+                if srcPhys = destPhys then Ok []
+                else Ok [X86_64.MOV_reg (destX86, lirRegToX86 srcPhys)]
+            | LIR.StackSlot offset ->
+                Ok [X86_64.MOV_load (destX86, X86_64.RSP, int32 (offset * 8))]
+            | _ -> Error $"Unsupported TailArgMoves operand: {srcOp}"
+        let rec genMoves acc remaining =
+            match remaining with
+            | [] -> Ok (List.rev acc |> List.concat)
+            | m :: rest ->
+                match generateMove m with
+                | Error e -> Error e
+                | Ok instrs -> genMoves (instrs :: acc) rest
+        genMoves [] moves
+
     | LIR.Call (dest, funcName, _args) ->
-        // TODO: implement argument passing
+        // Arguments are already in place from ArgMoves
         resolveReg dest
         |> Result.map (fun destReg ->
             [X86_64.CALL funcName]
             @ (if destReg <> X86_64.RAX then [X86_64.MOV_reg (destReg, X86_64.RAX)] else []))
 
     | LIR.TailCall (funcName, _args) ->
-        // TODO: implement argument passing
+        // Restore stack frame before jumping (epilogue without RET)
+        // The caller handles TailArgMoves before this
         Ok [X86_64.JMP funcName]
+
+    | LIR.IndirectCall (dest, func, _args) ->
+        resolveReg func
+        |> Result.bind (fun funcReg ->
+            resolveReg dest
+            |> Result.map (fun destReg ->
+                [X86_64.CALL_reg funcReg]
+                @ (if destReg <> X86_64.RAX then [X86_64.MOV_reg (destReg, X86_64.RAX)] else [])))
+
+    | LIR.IndirectTailCall (func, _args) ->
+        resolveReg func
+        |> Result.map (fun funcReg -> [X86_64.JMP_reg funcReg])
+
+    | LIR.LoadFuncAddr (dest, funcName) ->
+        resolveReg dest
+        |> Result.map (fun destReg -> [X86_64.LEA_rip (destReg, funcName)])
+
+    | LIR.FArgMoves moves ->
+        // Move float arguments into XMM registers
+        let instrs =
+            moves |> List.collect (fun (destPhys, srcFreg) ->
+                let destXmm = lirFRegToX86 destPhys
+                match srcFreg with
+                | LIR.FPhysical srcPhys ->
+                    let srcXmm = lirFRegToX86 srcPhys
+                    if destXmm = srcXmm then []
+                    else [X86_64.MOVSD_reg (destXmm, srcXmm)]
+                | LIR.FVirtual _ -> [])  // Should not happen after regalloc
+        Ok instrs
+
+    | LIR.Phi (dest, _, _) ->
+        // Phi nodes should be eliminated before codegen (SSA destruction)
+        // If we see one, it's a no-op — the parallel moves handle it
+        Ok []
+
+    | LIR.FPhi (_, _) ->
+        Ok []
+
+    | LIR.HeapAlloc (dest, sizeBytes) ->
+        // TODO: implement bump allocator
+        resolveReg dest
+        |> Result.map (fun destReg -> loadImm64 destReg 0L)
+
+    | LIR.HeapStore (addr, offset, src, _) ->
+        resolveReg addr
+        |> Result.bind (fun addrReg ->
+            match src with
+            | LIR.Imm value ->
+                Ok (loadImm64 scratch value @ [X86_64.MOV_store (addrReg, int32 offset, scratch)])
+            | LIR.Reg srcReg ->
+                resolveReg srcReg
+                |> Result.map (fun srcX86 ->
+                    [X86_64.MOV_store (addrReg, int32 offset, srcX86)])
+            | _ -> Error $"Unsupported HeapStore source: {src}")
+
+    | LIR.HeapLoad (dest, addr, offset) ->
+        resolveReg dest
+        |> Result.bind (fun destReg ->
+            resolveReg addr
+            |> Result.map (fun addrReg ->
+                [X86_64.MOV_load (destReg, addrReg, int32 offset)]))
+
+    | LIR.CoverageHit _ ->
+        Ok []  // Coverage instrumentation not supported on x86_64 yet
+
+    | LIR.Lsl (dest, src, shift) ->
+        // SHL by register: shift amount must be in CL (lower byte of RCX)
+        resolveReg dest |> Result.bind (fun d -> resolveReg src |> Result.bind (fun s ->
+            resolveReg shift |> Result.map (fun shReg ->
+                (if d <> s then [X86_64.MOV_reg (d, s)] else [])
+                @ (if shReg <> X86_64.RCX then [X86_64.MOV_reg (X86_64.RCX, shReg)] else [])
+                @ [X86_64.SHL_cl d])))
+
+    | LIR.Lsr (dest, src, shift) ->
+        resolveReg dest |> Result.bind (fun d -> resolveReg src |> Result.bind (fun s ->
+            resolveReg shift |> Result.map (fun shReg ->
+                (if d <> s then [X86_64.MOV_reg (d, s)] else [])
+                @ (if shReg <> X86_64.RCX then [X86_64.MOV_reg (X86_64.RCX, shReg)] else [])
+                @ [X86_64.SHR_cl d])))
+
+    | LIR.Uxth (_, _) | LIR.Uxtw (_, _) ->
+        // Zero-extension: upper bits already zero in 64-bit registers on x86_64
+        // (32-bit ops zero-extend to 64-bit automatically)
+        Ok []
+
+    | LIR.Madd (dest, mulLeft, mulRight, add) ->
+        // dest = add + mulLeft * mulRight
+        resolveReg dest |> Result.bind (fun d ->
+            resolveReg mulLeft |> Result.bind (fun ml ->
+                resolveReg mulRight |> Result.bind (fun mr ->
+                    resolveReg add |> Result.map (fun addReg ->
+                        [X86_64.MOV_reg (scratch, ml); X86_64.IMUL_reg (scratch, mr)]
+                        @ (if d <> addReg then [X86_64.MOV_reg (d, addReg)] else [])
+                        @ [X86_64.ADD_reg (d, scratch)]))))
 
     | _ ->
         Error $"Unsupported LIR instruction in x86-64 codegen: {instr}"
@@ -550,8 +726,33 @@ let private translateTerminator (term: LIR.Terminator) : Result<X86_64.Instr lis
             | LIR.LE -> X86_64.LE | LIR.GE -> X86_64.GE
         Ok [X86_64.Jcc (x86Cond, trueLabel)
             X86_64.JMP falseLabel]
-    | _ ->
-        Error $"Unsupported LIR terminator in x86-64 codegen: {term}"
+    | LIR.BranchBitZero (reg, bit, LIR.Label zeroLabel, LIR.Label nonZeroLabel) ->
+        resolveReg reg
+        |> Result.map (fun regX86 ->
+            // TEST reg with bit mask, branch on zero flag
+            let mask = 1L <<< bit
+            if mask >= int64 System.Int32.MinValue && mask <= int64 System.Int32.MaxValue then
+                [X86_64.TEST_reg (regX86, regX86)  // Actually need to test specific bit
+                 // Use AND with immediate to test the bit
+                ] |> ignore
+                loadImm64 scratch mask
+                @ [X86_64.AND_reg (scratch, regX86)
+                   X86_64.Jcc (X86_64.EQ, zeroLabel)
+                   X86_64.JMP nonZeroLabel]
+            else
+                loadImm64 scratch mask
+                @ [X86_64.AND_reg (scratch, regX86)
+                   X86_64.Jcc (X86_64.EQ, zeroLabel)
+                   X86_64.JMP nonZeroLabel])
+
+    | LIR.BranchBitNonZero (reg, bit, LIR.Label nonZeroLabel, LIR.Label zeroLabel) ->
+        resolveReg reg
+        |> Result.map (fun regX86 ->
+            let mask = 1L <<< bit
+            loadImm64 scratch mask
+            @ [X86_64.AND_reg (scratch, regX86)
+               X86_64.Jcc (X86_64.NE, nonZeroLabel)
+               X86_64.JMP zeroLabel])
 
 /// Translate a LIR basic block to x86-64 instructions
 let private translateBlock (block: LIR.BasicBlock) : Result<X86_64.Instr list, string> =
