@@ -47,6 +47,7 @@
     <Compile Include="passes/7_ARM64_Resolve.fs" />
     <Compile Include="passes/7_ARM64_Encoding.fs" />
     <Compile Include="passes/7_X86_64_Encoding.fs" />
+    <Compile Include="passes/7_X86_64_Resolve.fs" />
     <Compile Include="Binary.fs" />
     <Compile Include="Binary_ELF.fs" />
     <Compile Include="passes/8_Binary_Generation_MachO.fs" />

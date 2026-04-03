@@ -60,6 +60,7 @@
     <Compile Include="compiler-passes/SyntaxRoundtripCorpusTests.fs" />
     <Compile Include="compiler-passes/X86_64EncodingTests.fs" />
     <Compile Include="compiler-passes/X86_64BinaryTests.fs" />
+    <Compile Include="compiler-passes/X86_64ResolveTests.fs" />
 
     <!-- Optimization tests -->
     <Compile Include="optimizations/MIROptimizeTests.fs" />
