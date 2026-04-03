@@ -58,6 +58,7 @@
     <Compile Include="compiler-passes/LambdaLiftingTests.fs" />
     <Compile Include="compiler-passes/SyntaxInteropTests.fs" />
     <Compile Include="compiler-passes/SyntaxRoundtripCorpusTests.fs" />
+    <Compile Include="compiler-passes/X86_64EncodingTests.fs" />
 
     <!-- Optimization tests -->
     <Compile Include="optimizations/MIROptimizeTests.fs" />
