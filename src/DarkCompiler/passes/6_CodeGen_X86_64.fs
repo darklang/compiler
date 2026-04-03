@@ -438,9 +438,8 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
 
     | LIR.Sdiv (dest, left, right) ->
         // x86_64 IDIV: RDX:RAX / src → RAX=quotient, RDX=remainder
-        // IDIV clobbers both RAX and RDX. RDX is mapped to X7 (rarely used
-        // for values that survive across divisions). We save/restore RDX
-        // conservatively to avoid corruption.
+        // IDIV clobbers both RAX and RDX. Save/restore RDX using the
+        // red zone (below RSP) to avoid changing RSP.
         resolveReg dest
         |> Result.bind (fun destReg ->
             resolveReg left
@@ -457,12 +456,13 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     let moveLeft =
                         if leftReg <> X86_64.RAX then [X86_64.MOV_reg (X86_64.RAX, leftReg)]
                         else []
+                    // Save RDX to red zone [RSP - 8] (no RSP adjustment needed)
                     saveDivisor
                     @ moveLeft
-                    @ [X86_64.PUSH X86_64.RDX]
+                    @ [X86_64.MOV_store (X86_64.RSP, -8, X86_64.RDX)]
                     @ [X86_64.CQO; X86_64.IDIV divisor]
                     @ (if destReg <> X86_64.RAX then [X86_64.MOV_reg (destReg, X86_64.RAX)] else [])
-                    @ [X86_64.POP X86_64.RDX])))
+                    @ [X86_64.MOV_load (X86_64.RDX, X86_64.RSP, -8)])))
 
     | LIR.Msub (dest, mulLeft, mulRight, sub) ->
         // dest = sub - mulLeft * mulRight
