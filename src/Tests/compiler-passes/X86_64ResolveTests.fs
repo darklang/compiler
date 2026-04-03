@@ -77,45 +77,29 @@ let testUndefinedLabel () : Result<unit, string> =
 
 /// Test: generate and execute a program with a forward call
 let testCallAndExecute () : Result<unit, string> =
-    match Platform.detectArch () with
-    | Ok Platform.X86_64 ->
-        // main: call func; mov rax,60; xor rdi,rdi; syscall
-        // func: mov rdi,42; ret
-        // Result: exit(42)
-        let instructions = [
-            CALL "func"
-            // func sets RDI to 42, then returns here
-            MOV_imm32 (RAX, 60)     // sys_exit
-            SYSCALL
-            Label "func"
-            MOV_imm32 (RDI, 42)     // exit code
-            RET
-        ]
-        match X86_64_Resolve.resolveAndEncode instructions with
-        | Error err -> Error $"Resolution failed: {err}"
-        | Ok machineCode ->
-            let binary =
-                Binary_Generation_ELF_X86_64.createExecutableWithPools
-                    machineCode LiteralPool.emptyStringPool LiteralPool.emptyFloatPool false
-            let tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString("N"))
-            try
-                do
-                    use stream = new System.IO.FileStream(tempPath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None)
-                    stream.Write(binary, 0, binary.Length)
-                    stream.Flush(true)
-                let permissions = System.IO.File.GetUnixFileMode(tempPath)
-                System.IO.File.SetUnixFileMode(tempPath, permissions ||| System.IO.UnixFileMode.UserExecute)
-                let psi = System.Diagnostics.ProcessStartInfo(tempPath)
-                psi.UseShellExecute <- false
-                psi.RedirectStandardOutput <- true
-                psi.RedirectStandardError <- true
-                use proc = System.Diagnostics.Process.Start(psi)
-                proc.WaitForExit(5000) |> ignore
-                if proc.ExitCode = 42 then Ok ()
-                else Error $"Expected exit code 42, got {proc.ExitCode}"
-            finally
-                try System.IO.File.Delete(tempPath) with _ -> ()
-    | _ -> Ok ()  // Skip on non-x86_64
+    // main: call func; mov rax,60; syscall
+    // func: mov rdi,42; ret
+    // Result: exit(42)
+    let instructions = [
+        CALL "func"
+        // func sets RDI to 42, then returns here
+        MOV_imm32 (RAX, 60)     // sys_exit
+        SYSCALL
+        Label "func"
+        MOV_imm32 (RDI, 42)     // exit code
+        RET
+    ]
+    match X86_64_Resolve.resolveAndEncode instructions with
+    | Error err -> Error $"Resolution failed: {err}"
+    | Ok machineCode ->
+        let binary =
+            Binary_Generation_ELF_X86_64.createExecutableWithPools
+                machineCode LiteralPool.emptyStringPool LiteralPool.emptyFloatPool false
+        match X86_64BinaryTests.runElfBinary binary with
+        | Error err -> Error err
+        | Ok exitCode ->
+            if exitCode = 42 then Ok ()
+            else Error $"Expected exit code 42, got {exitCode}"
 
 let tests : (string * (unit -> Result<unit, string>)) list = [
     ("Forward JMP", testForwardJump)

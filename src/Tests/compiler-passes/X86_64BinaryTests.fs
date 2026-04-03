@@ -47,50 +47,55 @@ let testGenerateElf () : Result<unit, string> =
     else
         Ok ()
 
-/// Test that the generated binary executes correctly (only on x86-64 hosts)
+/// Run an ELF binary, using qemu-user-static if on a different architecture.
+/// Returns the exit code.
+let internal runElfBinary (binary: byte array) : Result<int, string> =
+    let tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString("N"))
+    try
+        do
+            use stream = new System.IO.FileStream(tempPath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None)
+            stream.Write(binary, 0, binary.Length)
+            stream.Flush(true)
+
+        let permissions = System.IO.File.GetUnixFileMode(tempPath)
+        System.IO.File.SetUnixFileMode(tempPath, permissions ||| System.IO.UnixFileMode.UserExecute)
+
+        // On non-x86_64 hosts, use qemu-x86_64-static to run the binary
+        let psi =
+            match Platform.detectArch () with
+            | Ok Platform.X86_64 ->
+                System.Diagnostics.ProcessStartInfo(tempPath)
+            | _ ->
+                let p = System.Diagnostics.ProcessStartInfo("qemu-x86_64-static", tempPath)
+                p
+        psi.UseShellExecute <- false
+        psi.RedirectStandardOutput <- true
+        psi.RedirectStandardError <- true
+
+        use proc = System.Diagnostics.Process.Start(psi)
+        proc.WaitForExit(10000) |> ignore
+        Ok proc.ExitCode
+    with ex ->
+        Error $"Failed to execute binary: {ex.Message}"
+    |> fun result ->
+        try System.IO.File.Delete(tempPath) with _ -> ()
+        result
+
+/// Test that the generated binary executes correctly
 let testExecuteElf () : Result<unit, string> =
-    match Platform.detectArch () with
-    | Ok Platform.X86_64 ->
-        let machineCode = exitProgram 42
-        let binary =
-            Binary_Generation_ELF_X86_64.createExecutableWithPools
-                machineCode
-                LiteralPool.emptyStringPool
-                LiteralPool.emptyFloatPool
-                false
+    let machineCode = exitProgram 42
+    let binary =
+        Binary_Generation_ELF_X86_64.createExecutableWithPools
+            machineCode
+            LiteralPool.emptyStringPool
+            LiteralPool.emptyFloatPool
+            false
 
-        // Write to temp file and execute
-        let tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString("N"))
-        try
-            do
-                use stream = new System.IO.FileStream(tempPath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None)
-                stream.Write(binary, 0, binary.Length)
-                stream.Flush(true)
-
-            let permissions = System.IO.File.GetUnixFileMode(tempPath)
-            System.IO.File.SetUnixFileMode(tempPath, permissions ||| System.IO.UnixFileMode.UserExecute)
-
-            let psi = System.Diagnostics.ProcessStartInfo(tempPath)
-            psi.UseShellExecute <- false
-            psi.RedirectStandardOutput <- true
-            psi.RedirectStandardError <- true
-
-            use proc = System.Diagnostics.Process.Start(psi)
-            proc.WaitForExit(5000) |> ignore
-
-            if proc.ExitCode = 42 then
-                Ok ()
-            else
-                Error $"Expected exit code 42, got {proc.ExitCode}"
-        finally
-            try System.IO.File.Delete(tempPath) with _ -> ()
-
-    | Ok Platform.ARM64 ->
-        // Skip on ARM64 — the binary won't run natively (could use qemu-user-static
-        // but that's tested separately via binfmt_misc in the E2E suite)
-        Ok ()
-    | Error err ->
-        Error $"Could not detect architecture: {err}"
+    match runElfBinary binary with
+    | Error err -> Error err
+    | Ok exitCode ->
+        if exitCode = 42 then Ok ()
+        else Error $"Expected exit code 42, got {exitCode}"
 
 let tests : (string * (unit -> Result<unit, string>)) list = [
     ("Generate x86-64 ELF", testGenerateElf)
