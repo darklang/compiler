@@ -269,8 +269,38 @@ let private genPrintBoolAndExit (srcReg: X86_64.Reg) : X86_64.Instr list =
 // LIR Instruction Translation
 // ============================================================================
 
+let private alignedStackSize (stackSlots: int) (numCalleeSaved: int) : int =
+    let returnAddr = 8
+    let pushes = numCalleeSaved * 8
+    let rawStack = stackSlots * 8
+    let total = returnAddr + pushes + rawStack
+    let aligned = ((total + 15) / 16) * 16
+    aligned - returnAddr - pushes
+
+let private genPrologue (stackSize: int) (usedCalleeSaved: LIR.PhysReg list) : X86_64.Instr list =
+    let saves = usedCalleeSaved |> List.map (fun reg -> X86_64.PUSH (lirRegToX86 reg))
+    let alignedSize = alignedStackSize stackSize (List.length usedCalleeSaved)
+    let stackAlloc =
+        if alignedSize > 0 then [X86_64.SUB_imm (X86_64.RSP, int32 alignedSize)]
+        else []
+    saves @ stackAlloc
+
+let private genEpilogue (stackSize: int) (usedCalleeSaved: LIR.PhysReg list) : X86_64.Instr list =
+    let alignedSize = alignedStackSize stackSize (List.length usedCalleeSaved)
+    let stackDealloc =
+        if alignedSize > 0 then [X86_64.ADD_imm (X86_64.RSP, int32 alignedSize)]
+        else []
+    let restores = usedCalleeSaved |> List.rev |> List.map (fun reg -> X86_64.POP (lirRegToX86 reg))
+    stackDealloc @ restores
+
+/// Function context for instructions that need stack frame info (TailCall, etc.)
+type private FuncCtx = {
+    StackSize: int
+    UsedCalleeSaved: LIR.PhysReg list
+}
+
 /// Translate a single LIR instruction to x86-64 instructions
-let private translateInstr (instr: LIR.Instr) : Result<X86_64.Instr list, string> =
+let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Instr list, string> =
     match instr with
 
     | LIR.Mov (dest, src) ->
@@ -734,8 +764,7 @@ let private translateInstr (instr: LIR.Instr) : Result<X86_64.Instr list, string
 
     | LIR.TailCall (funcName, _args) ->
         // Restore stack frame before jumping (epilogue without RET)
-        // The caller handles TailArgMoves before this
-        Ok [X86_64.JMP funcName]
+        Ok (genEpilogue ctx.StackSize ctx.UsedCalleeSaved @ [X86_64.JMP funcName])
 
     | LIR.IndirectCall (dest, func, _args) ->
         resolveReg func
@@ -747,7 +776,9 @@ let private translateInstr (instr: LIR.Instr) : Result<X86_64.Instr list, string
 
     | LIR.IndirectTailCall (func, _args) ->
         resolveReg func
-        |> Result.map (fun funcReg -> [X86_64.JMP_reg funcReg])
+        |> Result.map (fun funcReg ->
+            genEpilogue ctx.StackSize ctx.UsedCalleeSaved
+            @ [X86_64.JMP_reg funcReg])
 
     | LIR.LoadFuncAddr (dest, funcName) ->
         resolveReg dest
@@ -1109,37 +1140,6 @@ let private translateInstr (instr: LIR.Instr) : Result<X86_64.Instr list, string
 /// Calculate aligned stack allocation size.
 /// After CALL pushes 8-byte return address, each PUSH adds 8 bytes.
 /// We need total to be 16-byte aligned for System V ABI compliance.
-let private alignedStackSize (stackSlots: int) (numCalleeSaved: int) : int =
-    let returnAddr = 8
-    let pushes = numCalleeSaved * 8
-    let rawStack = stackSlots * 8
-    let total = returnAddr + pushes + rawStack
-    let aligned = ((total + 15) / 16) * 16
-    aligned - returnAddr - pushes
-
-/// Generate function prologue (stack frame setup, callee-saved register saves)
-let private genPrologue (stackSize: int) (usedCalleeSaved: LIR.PhysReg list) : X86_64.Instr list =
-    let saves =
-        usedCalleeSaved
-        |> List.map (fun reg -> X86_64.PUSH (lirRegToX86 reg))
-    let alignedSize = alignedStackSize stackSize (List.length usedCalleeSaved)
-    let stackAlloc =
-        if alignedSize > 0 then [X86_64.SUB_imm (X86_64.RSP, int32 alignedSize)]
-        else []
-    saves @ stackAlloc
-
-/// Generate function epilogue (stack frame teardown, callee-saved register restores)
-let private genEpilogue (stackSize: int) (usedCalleeSaved: LIR.PhysReg list) : X86_64.Instr list =
-    let alignedSize = alignedStackSize stackSize (List.length usedCalleeSaved)
-    let stackDealloc =
-        if alignedSize > 0 then [X86_64.ADD_imm (X86_64.RSP, int32 alignedSize)]
-        else []
-    let restores =
-        usedCalleeSaved
-        |> List.rev
-        |> List.map (fun reg -> X86_64.POP (lirRegToX86 reg))
-    stackDealloc @ restores
-
 /// Translate a LIR terminator to x86-64 instructions
 let private translateTerminator (epilogueLabel: string) (term: LIR.Terminator) : Result<X86_64.Instr list, string> =
     match term with
@@ -1197,7 +1197,7 @@ let private translateTerminator (epilogueLabel: string) (term: LIR.Terminator) :
                X86_64.JMP zeroLabel])
 
 /// Translate a LIR basic block to x86-64 instructions
-let private translateBlock (epilogueLabel: string) (block: LIR.BasicBlock) : Result<X86_64.Instr list, string> =
+let private translateBlock (ctx: FuncCtx) (epilogueLabel: string) (block: LIR.BasicBlock) : Result<X86_64.Instr list, string> =
     let (LIR.Label labelName) = block.Label
     let labelInstr = [X86_64.Label labelName]
 
@@ -1205,7 +1205,7 @@ let private translateBlock (epilogueLabel: string) (block: LIR.BasicBlock) : Res
         match remaining with
         | [] -> Ok (List.rev acc |> List.concat)
         | instr :: rest ->
-            match translateInstr instr with
+            match translateInstr ctx instr with
             | Error e -> Error e
             | Ok instrs -> translateInstrs (instrs :: acc) rest
 
@@ -1239,7 +1239,8 @@ let translateFunction (func: LIR.Function) : Result<X86_64.Instr list, string> =
         match remaining with
         | [] -> Ok (List.rev acc |> List.concat)
         | block :: rest ->
-            match translateBlock epilogueLabel block with
+            let ctx : FuncCtx = { StackSize = func.StackSize; UsedCalleeSaved = func.UsedCalleeSaved }
+            match translateBlock ctx epilogueLabel block with
             | Error e -> Error e
             | Ok instrs -> translateBlocks (instrs :: acc) rest
 
