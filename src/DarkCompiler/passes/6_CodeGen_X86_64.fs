@@ -977,37 +977,132 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         Ok []
 
     | LIR.StringConcat (dest, left, right) ->
-        // String concatenation stub: allocates result string with correct length
-        // but doesn't copy data (returns string with garbage content).
-        // Prevents crashes in tests that use string concat but don't inspect content.
-        // TODO: implement byte-by-byte copy loops
+        // String concat: dest = left ++ right
+        // Heap string: [length:8][data:N][refcount:8]
+        // Strategy: load both strings' info, allocate result, copy bytes with loops.
+        // Register plan (no PUSH/POP in loops):
+        //   RDI = left data ptr, RSI = left len
+        //   R8  = right data ptr, R9 = right len
+        //   R10 = loop counter, R11(scratch) = temp byte
+        //   destReg = result ptr, RCX = dest write ptr
         resolveReg dest
         |> Result.bind (fun destReg ->
-            let loadLen (op: LIR.Operand) (lenDest: X86_64.Reg) : Result<X86_64.Instr list, string> =
+            let loadInfo (op: LIR.Operand) (addrDest: X86_64.Reg) (lenDest: X86_64.Reg) : Result<X86_64.Instr list, string> =
                 match op with
                 | LIR.Reg reg ->
                     resolveReg reg
-                    |> Result.map (fun srcReg -> [X86_64.MOV_load (lenDest, srcReg, 0)])
-                | LIR.Imm v -> Ok (loadImm64 lenDest v)
-                | _ -> Ok (loadImm64 lenDest 0L)
-            loadLen left X86_64.RDI
+                    |> Result.map (fun srcReg ->
+                        [X86_64.MOV_load (lenDest, srcReg, 0)
+                         X86_64.LEA (addrDest, srcReg, 8)])
+                | LIR.StringSymbol value ->
+                    // Create literal string on heap, then point to its data
+                    let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
+                    let len = strBytes.Length
+                    let totalSize = ((len + 16) + 7) &&& (~~~7)
+                    // Allocate on heap
+                    let tempReg = addrDest  // reuse addrDest as temp for heap ptr
+                    let alloc = [
+                        X86_64.MOV_reg (tempReg, heapPtr)
+                        X86_64.ADD_imm (heapPtr, int32 totalSize)
+                    ]
+                    // Store length
+                    let storeLen = loadImm64 scratch (int64 len) @ [X86_64.MOV_store (tempReg, 0, scratch)]
+                    // Copy string bytes inline
+                    let copyBytes =
+                        let chunks = (len + 7) / 8
+                        [0 .. chunks - 1]
+                        |> List.collect (fun i ->
+                            let offset = 8 + i * 8
+                            let chunkLen = min 8 (len - i * 8)
+                            let value =
+                                [0 .. chunkLen - 1]
+                                |> List.fold (fun acc j ->
+                                    let byteIdx = i * 8 + j
+                                    if byteIdx < strBytes.Length then
+                                        acc ||| (int64 strBytes.[byteIdx] <<< (j * 8))
+                                    else acc) 0L
+                            loadImm64 scratch value @ [X86_64.MOV_store (tempReg, int32 offset, scratch)])
+                    // Now set addrDest = data start, lenDest = length
+                    let setResults =
+                        loadImm64 lenDest (int64 len)
+                        @ [X86_64.LEA (addrDest, tempReg, 8)]
+                    Ok (alloc @ storeLen @ copyBytes @ setResults)
+                | _ -> Ok (loadImm64 lenDest 0L @ loadImm64 addrDest 0L)
+
+            let copy1 = freshLabel "strcat_c1"
+            let done1 = freshLabel "strcat_d1"
+            let copy2 = freshLabel "strcat_c2"
+            let done2 = freshLabel "strcat_d2"
+
+            // Load left info first, save on stack, then load right info
+            loadInfo left X86_64.RDI X86_64.RSI
             |> Result.bind (fun leftInstrs ->
-                loadLen right X86_64.RSI
+                // Save left info before loading right (right might clobber regs)
+                let saveLeft = [X86_64.PUSH X86_64.RDI; X86_64.PUSH X86_64.RSI]
+                loadInfo right X86_64.R8 X86_64.R9
                 |> Result.map (fun rightInstrs ->
-                    leftInstrs @ rightInstrs
-                    @ [X86_64.MOV_reg (scratch, X86_64.RDI)
-                       X86_64.ADD_reg (scratch, X86_64.RSI)]   // scratch = total length
-                    // Allocate: totalLen + 16, 8-byte aligned
-                    @ [X86_64.MOV_reg (destReg, heapPtr)
-                       X86_64.MOV_reg (X86_64.R10, scratch)
-                       X86_64.ADD_imm (X86_64.R10, 23)        // +16 for header+rc, +7 for alignment
-                       X86_64.AND_imm (X86_64.R10, -8)        // 8-byte align
+                    leftInstrs @ saveLeft @ rightInstrs
+                    // Restore left info
+                    @ [X86_64.POP X86_64.RSI; X86_64.POP X86_64.RDI]
+
+                    // Total length in RCX
+                    @ [X86_64.MOV_reg (X86_64.RCX, X86_64.RSI)
+                       X86_64.ADD_reg (X86_64.RCX, X86_64.R9)]
+
+                    // Allocate: use RBX to hold result ptr (callee-saved, safe across loops)
+                    // Save RBX first
+                    @ [X86_64.PUSH X86_64.RBX]
+                    @ [X86_64.MOV_reg (X86_64.RBX, heapPtr)
+                       X86_64.MOV_reg (X86_64.R10, X86_64.RCX)
+                       X86_64.ADD_imm (X86_64.R10, 23)
+                       X86_64.AND_imm (X86_64.R10, -8)
                        X86_64.ADD_reg (heapPtr, X86_64.R10)]
-                    // Store total length
-                    @ [X86_64.MOV_store (destReg, 0, scratch)]
-                    // Store refcount = 1 (at offset 8 + aligned(totalLen))
-                    // For now, skip byte copy — content will be garbage
-                    )))
+
+                    // Store total length at [RBX]
+                    @ [X86_64.MOV_store (X86_64.RBX, 0, X86_64.RCX)]
+
+                    // Copy left bytes: RBX[8+i] = left[i]
+                    @ loadImm64 X86_64.R10 0L
+                    @ [X86_64.Label copy1
+                       X86_64.CMP_reg (X86_64.R10, X86_64.RSI)
+                       X86_64.Jcc (X86_64.GE, done1)
+                       X86_64.MOV_reg (scratch, X86_64.RDI)
+                       X86_64.ADD_reg (scratch, X86_64.R10)
+                       X86_64.MOV_load_byte (scratch, scratch, 0)
+                       X86_64.LEA (X86_64.RCX, X86_64.RBX, 8)
+                       X86_64.ADD_reg (X86_64.RCX, X86_64.R10)
+                       X86_64.MOV_store_byte (X86_64.RCX, 0, scratch)
+                       X86_64.ADD_imm (X86_64.R10, 1)
+                       X86_64.JMP copy1
+                       X86_64.Label done1]
+
+                    // Copy right bytes: RBX[8+leftLen+i] = right[i]
+                    @ [X86_64.LEA (X86_64.RCX, X86_64.RBX, 8)
+                       X86_64.ADD_reg (X86_64.RCX, X86_64.RSI)]
+                    @ loadImm64 X86_64.R10 0L
+                    @ [X86_64.Label copy2
+                       X86_64.CMP_reg (X86_64.R10, X86_64.R9)
+                       X86_64.Jcc (X86_64.GE, done2)
+                       X86_64.MOV_reg (scratch, X86_64.R8)
+                       X86_64.ADD_reg (scratch, X86_64.R10)
+                       X86_64.MOV_load_byte (scratch, scratch, 0)
+                       X86_64.MOV_reg (X86_64.RDI, X86_64.RCX)
+                       X86_64.ADD_reg (X86_64.RDI, X86_64.R10)
+                       X86_64.MOV_store_byte (X86_64.RDI, 0, scratch)
+                       X86_64.ADD_imm (X86_64.R10, 1)
+                       X86_64.JMP copy2
+                       X86_64.Label done2]
+
+                    // Store refcount = 1
+                    @ [X86_64.MOV_load (X86_64.RCX, X86_64.RBX, 0)
+                       X86_64.ADD_imm (X86_64.RCX, 8 + 7)
+                       X86_64.AND_imm (X86_64.RCX, -8)
+                       X86_64.ADD_reg (X86_64.RCX, X86_64.RBX)]
+                    @ loadImm64 scratch 1L
+                    @ [X86_64.MOV_store (X86_64.RCX, 0, scratch)]
+                    // Move result to destReg, restore RBX
+                    @ [X86_64.MOV_reg (destReg, X86_64.RBX)
+                       X86_64.POP X86_64.RBX])))
 
     | LIR.CoverageHit _ ->
         Ok []  // Coverage instrumentation not supported on x86_64 yet
