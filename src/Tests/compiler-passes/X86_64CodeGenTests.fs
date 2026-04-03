@@ -11,10 +11,10 @@ let private runLIRProgramFull (program: LIR.Program) : Result<int * string, stri
     | Ok instrs ->
         match X86_64_Resolve.resolveAndEncode instrs with
         | Error e -> Error $"Resolve error: {e}"
-        | Ok machineCode ->
+        | Ok resolveResult ->
             let binary =
                 Binary_Generation_ELF_X86_64.createExecutableWithPools
-                    machineCode LiteralPool.emptyStringPool LiteralPool.emptyFloatPool false
+                    resolveResult.MachineCode LiteralPool.emptyStringPool LiteralPool.emptyFloatPool false 0
             let tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString("N"))
             try
                 do
@@ -46,10 +46,10 @@ let private runLIRProgram (program: LIR.Program) : Result<int, string> =
     | Ok instrs ->
         match X86_64_Resolve.resolveAndEncode instrs with
         | Error e -> Error $"Resolve error: {e}"
-        | Ok machineCode ->
+        | Ok resolveResult ->
             let binary =
                 Binary_Generation_ELF_X86_64.createExecutableWithPools
-                    machineCode LiteralPool.emptyStringPool LiteralPool.emptyFloatPool false
+                    resolveResult.MachineCode LiteralPool.emptyStringPool LiteralPool.emptyFloatPool false 0
             X86_64BinaryTests.runElfBinary binary
 
 /// Create a minimal LIR function with a single basic block

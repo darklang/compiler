@@ -25,8 +25,14 @@ type private Fixup = {
 }
 
 /// Encode a list of x86-64 instructions with label resolution.
-/// Returns the final machine code bytes.
-let resolveAndEncode (instructions: Instr list) : Result<byte array, string> =
+/// Result of resolving and encoding
+type ResolveResult = {
+    MachineCode: byte array
+    LabelPositions: Map<string, int>
+}
+
+/// Returns the final machine code bytes and label positions.
+let resolveAndEncode (instructions: Instr list) : Result<ResolveResult, string> =
     // Pass 1: encode all instructions, collect label positions and fixups
     let mutable labelPositions : Map<string, int> = Map.empty
     let mutable fixups : Fixup list = []
@@ -96,6 +102,6 @@ let resolveAndEncode (instructions: Instr list) : Result<byte array, string> =
             result.[fixup.PatchOffset + 3] <- relBytes.[3]
 
     if errors.IsEmpty then
-        Ok result
+        Ok { MachineCode = result; LabelPositions = labelPositions }
     else
         Error (String.concat "\n" (List.rev errors))

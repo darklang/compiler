@@ -17,7 +17,7 @@ let testForwardJump () : Result<unit, string> =
     ]
     match X86_64_Resolve.resolveAndEncode instructions with
     | Error err -> Error $"Resolution failed: {err}"
-    | Ok bytes ->
+    | Ok { MachineCode = bytes } ->
         // JMP offset should be +3 (skip the 3-byte MOV)
         // rel32 = target(8) - nextInstr(5) = 3
         if bytes.[0] <> 0xE9uy then
@@ -36,7 +36,7 @@ let testBackwardJump () : Result<unit, string> =
     ]
     match X86_64_Resolve.resolveAndEncode instructions with
     | Error err -> Error $"Resolution failed: {err}"
-    | Ok bytes ->
+    | Ok { MachineCode = bytes } ->
         // JMP offset: target(0) - nextInstr(12) = -12 = 0xFFFFFFF4
         let rel = int bytes.[8] ||| (int bytes.[9] <<< 8) ||| (int bytes.[10] <<< 16) ||| (int bytes.[11] <<< 24)
         if rel <> -12 then
@@ -55,7 +55,7 @@ let testCallForward () : Result<unit, string> =
     ]
     match X86_64_Resolve.resolveAndEncode instructions with
     | Error err -> Error $"Resolution failed: {err}"
-    | Ok bytes ->
+    | Ok { MachineCode = bytes } ->
         // CALL offset: target(6) - nextInstr(5) = 1
         if bytes.[0] <> 0xE8uy then
             Error $"Expected E8 (CALL), got {bytes.[0]:X2}"
@@ -91,10 +91,10 @@ let testCallAndExecute () : Result<unit, string> =
     ]
     match X86_64_Resolve.resolveAndEncode instructions with
     | Error err -> Error $"Resolution failed: {err}"
-    | Ok machineCode ->
+    | Ok { MachineCode = machineCode } ->
         let binary =
             Binary_Generation_ELF_X86_64.createExecutableWithPools
-                machineCode LiteralPool.emptyStringPool LiteralPool.emptyFloatPool false
+                machineCode LiteralPool.emptyStringPool LiteralPool.emptyFloatPool false 0
         match X86_64BinaryTests.runElfBinary binary with
         | Error err -> Error err
         | Ok exitCode ->

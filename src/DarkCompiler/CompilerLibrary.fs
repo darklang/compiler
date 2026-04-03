@@ -560,11 +560,15 @@ let private generateBinary
             let emitStart = sw.Elapsed.TotalMilliseconds
             match X86_64_Resolve.resolveAndEncode x86Instructions with
             | Error err -> Error $"x86-64 resolve error: {err}"
-            | Ok machineCode ->
+            | Ok resolveResult ->
+                let entryOffset =
+                    match Map.tryFind "_start" resolveResult.LabelPositions with
+                    | Some offset -> offset
+                    | None -> 0
                 let binary =
                     Binary_Generation_ELF_X86_64.createExecutableWithPools
-                        machineCode LiteralPool.emptyStringPool LiteralPool.emptyFloatPool
-                        options.EnableLeakCheck
+                        resolveResult.MachineCode LiteralPool.emptyStringPool LiteralPool.emptyFloatPool
+                        options.EnableLeakCheck entryOffset
                 let emitElapsed = sw.Elapsed.TotalMilliseconds - emitStart
                 recordPassTiming passTimingRecorder "x86-64 Emit" emitElapsed
                 if verbosity >= 2 then

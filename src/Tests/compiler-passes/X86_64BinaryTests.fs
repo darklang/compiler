@@ -30,7 +30,7 @@ let testGenerateElf () : Result<unit, string> =
             machineCode
             LiteralPool.emptyStringPool
             LiteralPool.emptyFloatPool
-            false
+            false 0
 
     // Verify ELF magic
     if binary.[0] <> 0x7Fuy || binary.[1] <> byte 'E' || binary.[2] <> byte 'L' || binary.[3] <> byte 'F' then
@@ -89,7 +89,7 @@ let testExecuteElf () : Result<unit, string> =
             machineCode
             LiteralPool.emptyStringPool
             LiteralPool.emptyFloatPool
-            false
+            false 0
 
     match runElfBinary binary with
     | Error err -> Error err

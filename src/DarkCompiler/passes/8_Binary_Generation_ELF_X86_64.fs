@@ -9,12 +9,14 @@
 
 module Binary_Generation_ELF_X86_64
 
-/// Create an x86-64 ELF executable with float and string data
+/// Create an x86-64 ELF executable with float and string data.
+/// entryOffset: byte offset of _start within machineCode (default 0).
 let createExecutableWithPools
     (machineCode: byte array)
     (stringPool: LiteralPool.StringPool)
     (floatPool: LiteralPool.FloatPool)
     (enableLeakCheck: bool)
+    (entryOffset: int)
     : byte array =
 
     // Create float data (goes after code, before strings)
@@ -46,7 +48,7 @@ let createExecutableWithPools
 
     // Code starts right after headers
     let codeFileOffset = elfHeaderSize + (uint64 numProgramHeaders * programHeaderSize)
-    let codeVAddr = baseVAddr + codeFileOffset
+    let entryVAddr = baseVAddr + codeFileOffset + uint64 entryOffset
 
     // Create ELF identification bytes
     let ident = Array.create 16 0uy
@@ -64,7 +66,7 @@ let createExecutableWithPools
         Type = Binary_ELF.ET_EXEC
         Machine = Binary_ELF.EM_X86_64
         Version = 1u
-        Entry = codeVAddr
+        Entry = entryVAddr
         PhOff = elfHeaderSize
         ShOff = 0UL
         Flags = 0u
