@@ -461,6 +461,54 @@ let private translateInstr (instr: LIR.Instr) : Result<X86_64.Instr list, string
             // TODO: implement bool printing without exit
             [])
 
+    | LIR.PrintString str ->
+        // Write a literal string to stdout and exit(0)
+        let bytes = System.Text.Encoding.UTF8.GetBytes(str + "\n")
+        let len = bytes.Length
+        let padded = ((len + 7) / 8) * 8
+        let paddedBytes = (bytes |> Array.toList) @ List.replicate (padded - len) 0uy
+        let pushInstrs =
+            paddedBytes
+            |> List.chunkBySize 8
+            |> List.rev
+            |> List.collect (fun chunk ->
+                let value = chunk |> List.mapi (fun i b -> int64 b <<< (i * 8)) |> List.fold (|||) 0L
+                loadImm64 scratch value @ [X86_64.PUSH scratch])
+        Ok (
+            pushInstrs
+            @ [X86_64.MOV_imm32 (X86_64.RDI, 1)]  // fd = stdout
+            @ [X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)]
+            @ loadImm64 X86_64.RDX (int64 len)
+            @ genWriteSyscall
+            @ [X86_64.ADD_imm (X86_64.RSP, int32 padded)]
+            @ loadImm64 X86_64.RDI 0L
+            @ genExitSyscall
+        )
+
+    | LIR.RuntimeError msg ->
+        // Write error message to stderr (fd=2) and exit(1)
+        let bytes = System.Text.Encoding.UTF8.GetBytes(msg + "\n")
+        let len = bytes.Length
+        let padded = ((len + 7) / 8) * 8
+        let paddedBytes = (bytes |> Array.toList) @ List.replicate (padded - len) 0uy
+        let pushInstrs =
+            paddedBytes
+            |> List.chunkBySize 8
+            |> List.rev
+            |> List.collect (fun chunk ->
+                let value = chunk |> List.mapi (fun i b -> int64 b <<< (i * 8)) |> List.fold (|||) 0L
+                loadImm64 scratch value @ [X86_64.PUSH scratch])
+        Ok (
+            pushInstrs
+            @ [X86_64.MOV_imm32 (X86_64.RDI, 2)]  // fd = stderr
+            @ [X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)]
+            @ loadImm64 X86_64.RDX (int64 len)
+            @ genWriteSyscall
+            @ [X86_64.ADD_imm (X86_64.RSP, int32 padded)]
+            @ loadImm64 X86_64.RDI 1L
+            @ genExitSyscall
+        )
+
     | LIR.Call (dest, funcName, _args) ->
         // TODO: implement argument passing
         resolveReg dest
