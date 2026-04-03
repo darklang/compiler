@@ -275,8 +275,12 @@ let private translateInstr (instr: LIR.Instr) : Result<X86_64.Instr list, string
                 | LIR.Reg rightReg ->
                     resolveReg rightReg
                     |> Result.map (fun rightX86 ->
-                        let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
-                        setup @ [X86_64.ADD_reg (destReg, rightX86)])
+                        if destReg = rightX86 && destReg <> leftReg then
+                            // dest is right operand: ADD is commutative, so just swap
+                            [X86_64.ADD_reg (destReg, leftReg)]
+                        else
+                            let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
+                            setup @ [X86_64.ADD_reg (destReg, rightX86)])
                 | LIR.StackSlot offset ->
                     let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
                     Ok (setup @ [X86_64.MOV_load (scratch, X86_64.RSP, int32 (offset * 8)); X86_64.ADD_reg (destReg, scratch)])
@@ -297,8 +301,14 @@ let private translateInstr (instr: LIR.Instr) : Result<X86_64.Instr list, string
                 | LIR.Reg rightReg ->
                     resolveReg rightReg
                     |> Result.map (fun rightX86 ->
-                        let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
-                        setup @ [X86_64.SUB_reg (destReg, rightX86)])
+                        if destReg = rightX86 && destReg <> leftReg then
+                            // dest is right operand: SUB is NOT commutative, use scratch
+                            [X86_64.MOV_reg (scratch, leftReg)
+                             X86_64.SUB_reg (scratch, rightX86)
+                             X86_64.MOV_reg (destReg, scratch)]
+                        else
+                            let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
+                            setup @ [X86_64.SUB_reg (destReg, rightX86)])
                 | _ -> Error $"Unsupported Sub right operand: {right}"))
 
     | LIR.Mul (dest, left, right) ->
