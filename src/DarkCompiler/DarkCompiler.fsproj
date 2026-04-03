@@ -42,6 +42,7 @@
     <Compile Include="X86_64.fs" />
     <Compile Include="ARM64Symbolic.fs" />
     <Compile Include="Platform.fs" />
+    <Compile Include="ArchConfig.fs" />
     <Compile Include="Runtime.fs" />
     <Compile Include="passes/6_CodeGen.fs" />
     <Compile Include="passes/7_ARM64_Resolve.fs" />
