@@ -1034,16 +1034,18 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             let copy2 = freshLabel "strcat_c2"
             let done2 = freshLabel "strcat_d2"
 
-            // Load left info first, save on stack, then load right info
-            loadInfo left X86_64.RDI X86_64.RSI
-            |> Result.bind (fun leftInstrs ->
-                // Save left info before loading right (right might clobber regs)
-                let saveLeft = [X86_64.PUSH X86_64.RDI; X86_64.PUSH X86_64.RSI]
-                loadInfo right X86_64.R8 X86_64.R9
-                |> Result.map (fun rightInstrs ->
-                    leftInstrs @ saveLeft @ rightInstrs
-                    // Restore left info
-                    @ [X86_64.POP X86_64.RSI; X86_64.POP X86_64.RDI]
+            // Load RIGHT first (if Reg, no allocation needed), then LEFT
+            // (which might allocate for StringSymbol). This avoids clobbering
+            // the right source register during left's heap allocation.
+            loadInfo right X86_64.R8 X86_64.R9
+            |> Result.bind (fun rightInstrs ->
+                // Save right info before loading left (left might clobber R8/R9)
+                let saveRight = [X86_64.PUSH X86_64.R8; X86_64.PUSH X86_64.R9]
+                loadInfo left X86_64.RDI X86_64.RSI
+                |> Result.map (fun leftInstrs ->
+                    rightInstrs @ saveRight @ leftInstrs
+                    // Restore right info
+                    @ [X86_64.POP X86_64.R9; X86_64.POP X86_64.R8]
 
                     // Total length in RCX
                     @ [X86_64.MOV_reg (X86_64.RCX, X86_64.RSI)
@@ -1101,8 +1103,13 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     @ loadImm64 scratch 1L
                     @ [X86_64.MOV_store (X86_64.RCX, 0, scratch)]
                     // Move result to destReg, restore RBX
-                    @ [X86_64.MOV_reg (destReg, X86_64.RBX)
-                       X86_64.POP X86_64.RBX])))
+                    // If destReg IS RBX, we need to save result elsewhere first
+                    @ (if destReg = X86_64.RBX then
+                           // Result is already in RBX. Pop saved RBX to scratch, keep result.
+                           [X86_64.ADD_imm (X86_64.RSP, 8)]  // discard saved RBX
+                       else
+                           [X86_64.MOV_reg (destReg, X86_64.RBX)
+                            X86_64.POP X86_64.RBX]))))
 
     | LIR.CoverageHit _ ->
         Ok []  // Coverage instrumentation not supported on x86_64 yet
