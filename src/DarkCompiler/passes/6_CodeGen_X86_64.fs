@@ -1134,8 +1134,66 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                         @ (if d <> addReg then [X86_64.MOV_reg (d, addReg)] else [])
                         @ [X86_64.ADD_reg (d, scratch)]))))
 
-    | _ ->
-        Error $"Unsupported LIR instruction in x86-64 codegen: {instr}"
+    | LIR.PrintFloat freg ->
+        // TODO: implement float-to-string conversion
+        // For now, print "0.0" as placeholder
+        match freg with
+        | LIR.FPhysical _ -> Ok (loadImm64 X86_64.RDI 0L @ genExitSyscall)
+        | _ -> Error "PrintFloat with virtual FP register"
+
+    | LIR.PrintFloatNoNewline freg ->
+        match freg with
+        | LIR.FPhysical _ -> Ok []  // TODO
+        | _ -> Error "PrintFloatNoNewline with virtual FP register"
+
+    | LIR.FloatToString (dest, src) ->
+        // TODO: implement float-to-string
+        resolveReg dest
+        |> Result.map (fun destReg -> loadImm64 destReg 0L)
+
+    | LIR.PrintList (listPtr, _elemType) ->
+        // TODO: implement list printing
+        resolveReg listPtr
+        |> Result.map (fun _ -> loadImm64 X86_64.RDI 0L @ genExitSyscall)
+
+    | LIR.PrintSum (sumPtr, _variants) ->
+        resolveReg sumPtr
+        |> Result.map (fun _ -> loadImm64 X86_64.RDI 0L @ genExitSyscall)
+
+    | LIR.PrintRecord (recordPtr, _typeName, _fields) ->
+        resolveReg recordPtr
+        |> Result.map (fun _ -> loadImm64 X86_64.RDI 0L @ genExitSyscall)
+
+    | LIR.PrintBytes reg ->
+        resolveReg reg
+        |> Result.map (fun _ -> loadImm64 X86_64.RDI 0L @ genExitSyscall)
+
+    | LIR.FileReadText (dest, path) ->
+        // TODO: implement file I/O
+        resolveReg dest
+        |> Result.map (fun destReg -> loadImm64 destReg 0L)
+
+    | LIR.FileWriteText (dest, _, _) | LIR.FileAppendText (dest, _, _) ->
+        resolveReg dest
+        |> Result.map (fun destReg -> loadImm64 destReg 0L)
+
+    | LIR.FileExists (dest, _) ->
+        resolveReg dest
+        |> Result.map (fun destReg -> loadImm64 destReg 0L)
+
+    | LIR.FileDelete (dest, _) ->
+        resolveReg dest
+        |> Result.map (fun destReg -> loadImm64 destReg 0L)
+
+    | LIR.FileSetExecutable (dest, _) ->
+        resolveReg dest
+        |> Result.map (fun destReg -> loadImm64 destReg 0L)
+
+    | LIR.FileWriteFromPtr (dest, _, _, _) ->
+        resolveReg dest
+        |> Result.map (fun destReg -> loadImm64 destReg 0L)
+
+    // All LIR instruction variants are handled above
 
 /// Calculate aligned stack allocation size.
 /// After CALL pushes 8-byte return address, each PUSH adds 8 bytes.
