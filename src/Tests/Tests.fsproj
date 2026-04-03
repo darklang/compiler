@@ -61,6 +61,7 @@
     <Compile Include="compiler-passes/X86_64EncodingTests.fs" />
     <Compile Include="compiler-passes/X86_64BinaryTests.fs" />
     <Compile Include="compiler-passes/X86_64ResolveTests.fs" />
+    <Compile Include="compiler-passes/X86_64CodeGenTests.fs" />
 
     <!-- Optimization tests -->
     <Compile Include="optimizations/MIROptimizeTests.fs" />
