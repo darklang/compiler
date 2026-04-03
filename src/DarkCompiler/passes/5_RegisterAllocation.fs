@@ -990,13 +990,21 @@ let callerSavedRegs = [
     LIR.X6; LIR.X7
 ]
 
-/// Callee-saved registers (X19-X26) - used when caller-saved exhausted
+/// Callee-saved registers - used when caller-saved exhausted
 /// These must be saved/restored in function prologue/epilogue
-/// Note: X27 and X28 are reserved for free list base and heap pointer respectively
-let calleeSavedRegs = [
-    LIR.X19; LIR.X20; LIR.X21; LIR.X22; LIR.X23
-    LIR.X24; LIR.X25; LIR.X26
-]
+/// Note: X27 reserved for free list base (ARM64) / unused (x86_64)
+/// On x86_64, X22→R14 and X23→R15 are reserved for heap/free list pointers
+let calleeSavedRegs =
+    let arch = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture
+    let isX86_64 = (arch = System.Runtime.InteropServices.Architecture.X64)
+    if isX86_64 then
+        // x86_64: X22 (R14) = heap ptr, X23 (R15) = free list — not allocatable
+        // X24-X26 have no x86_64 equivalents
+        [LIR.X19; LIR.X20; LIR.X21]
+    else
+        // ARM64: X27/X28 reserved, X19-X26 allocatable
+        [LIR.X19; LIR.X20; LIR.X21; LIR.X22; LIR.X23
+         LIR.X24; LIR.X25; LIR.X26]
 
 /// Check if an instruction is a non-tail call (requires SaveRegs/RestoreRegs)
 let isNonTailCall (instr: LIR.Instr) : bool =
