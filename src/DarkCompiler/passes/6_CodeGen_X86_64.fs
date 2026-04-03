@@ -24,11 +24,11 @@ let lirRegToX86 (reg: LIR.PhysReg) : X86_64.Reg =
     | LIR.X0  -> X86_64.RAX   // Return value
     | LIR.X1  -> X86_64.RDI   // Arg 1
     | LIR.X2  -> X86_64.RSI   // Arg 2
-    | LIR.X3  -> X86_64.RDX   // Arg 3
-    | LIR.X4  -> X86_64.RCX   // Arg 4
-    | LIR.X5  -> X86_64.R8    // Arg 5
-    | LIR.X6  -> X86_64.R9    // Arg 6
-    | LIR.X7  -> X86_64.R10   // Caller-saved
+    | LIR.X3  -> X86_64.RCX   // Arg 3 (NOT RDX — RDX is reserved for IDIV)
+    | LIR.X4  -> X86_64.R8    // Arg 4
+    | LIR.X5  -> X86_64.R9    // Arg 5
+    | LIR.X6  -> X86_64.R10   // Arg 6 / caller-saved
+    | LIR.X7  -> X86_64.RDX   // Caller-saved (only used when IDIV isn't active)
     | LIR.X8  -> X86_64.R11   // Scratch
     | LIR.X9  -> X86_64.R11   // Scratch (shared)
     | LIR.X10 -> X86_64.R11
@@ -438,17 +438,15 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
 
     | LIR.Sdiv (dest, left, right) ->
         // x86_64 IDIV: RDX:RAX / src → RAX=quotient, RDX=remainder
-        // IDIV clobbers both RAX and RDX. If other LIR values live in RDX,
-        // we must save/restore it. Since the register allocator doesn't know
-        // about x86_64 implicit clobbers, we conservatively save RDX.
+        // IDIV clobbers both RAX and RDX. RDX is mapped to X7 (rarely used
+        // for values that survive across divisions). We save/restore RDX
+        // conservatively to avoid corruption.
         resolveReg dest
         |> Result.bind (fun destReg ->
             resolveReg left
             |> Result.bind (fun leftReg ->
                 resolveReg right
                 |> Result.map (fun rightReg ->
-                    // IDIV clobbers RDX. Save it before, restore after.
-                    // Save divisor to scratch if in RAX/RDX (they get clobbered)
                     let divisor =
                         if rightReg = X86_64.RAX || rightReg = X86_64.RDX then scratch
                         else rightReg
@@ -456,13 +454,12 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                         if rightReg = X86_64.RAX || rightReg = X86_64.RDX then
                             [X86_64.MOV_reg (scratch, rightReg)]
                         else []
-                    // Save leftReg to RAX before saving RDX (in case leftReg IS RDX)
                     let moveLeft =
                         if leftReg <> X86_64.RAX then [X86_64.MOV_reg (X86_64.RAX, leftReg)]
                         else []
                     saveDivisor
                     @ moveLeft
-                    @ [X86_64.PUSH X86_64.RDX]   // Save RDX (will be clobbered by CQO+IDIV)
+                    @ [X86_64.PUSH X86_64.RDX]
                     @ [X86_64.CQO; X86_64.IDIV divisor]
                     @ (if destReg <> X86_64.RAX then [X86_64.MOV_reg (destReg, X86_64.RAX)] else [])
                     @ [X86_64.POP X86_64.RDX])))
