@@ -14,6 +14,11 @@ type OS =
     | MacOS
     | Linux
 
+/// Supported CPU architectures
+type Arch =
+    | ARM64
+    | X86_64
+
 /// Platform-specific syscall numbers and register conventions
 type SyscallNumbers = {
     Write: uint16
@@ -40,7 +45,14 @@ let detectOS () : Result<OS, string> =
     elif System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux) then
         Ok Linux
     else
-        Error "Unsupported operating system. Only macOS and Linux ARM64 are supported."
+        Error "Unsupported operating system. Only macOS and Linux are supported."
+
+/// Get the current CPU architecture
+let detectArch () : Result<Arch, string> =
+    match System.Runtime.InteropServices.RuntimeInformation.OSArchitecture with
+    | System.Runtime.InteropServices.Architecture.Arm64 -> Ok ARM64
+    | System.Runtime.InteropServices.Architecture.X64 -> Ok X86_64
+    | arch -> Error $"Unsupported architecture: {arch}. Only ARM64 and x86_64 are supported."
 
 /// Get syscall numbers for the current platform
 let getSyscallNumbers (os: OS) : SyscallNumbers =

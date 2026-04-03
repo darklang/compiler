@@ -39,6 +39,7 @@
     <Compile Include="passes/5.5_FunctionTreeShaking.fs" />
     <Compile Include="passes/5_RegisterAllocation.fs" />
     <Compile Include="ARM64.fs" />
+    <Compile Include="X86_64.fs" />
     <Compile Include="ARM64Symbolic.fs" />
     <Compile Include="Platform.fs" />
     <Compile Include="Runtime.fs" />
