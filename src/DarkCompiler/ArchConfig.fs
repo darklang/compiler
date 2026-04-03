@@ -52,8 +52,9 @@ let x86_64 : Config = {
     FPArgRegs = [LIR.D0; LIR.D1; LIR.D2; LIR.D3; LIR.D4; LIR.D5; LIR.D6; LIR.D7]
     ReturnReg = LIR.X0
     CallerSavedRegs = [LIR.X1; LIR.X2; LIR.X3; LIR.X4; LIR.X5; LIR.X6; LIR.X7]
-    CalleeSavedRegs = [LIR.X19; LIR.X20; LIR.X21; LIR.X22; LIR.X23]
+    CalleeSavedRegs = [LIR.X19; LIR.X20; LIR.X21]
     ScratchRegs = [LIR.X9; LIR.X10]
+    // Note: X22→R14 and X23→R15 are reserved for heap pointer and free list base
 }
 
 /// Get the architecture config for the given architecture
