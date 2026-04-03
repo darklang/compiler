@@ -408,23 +408,34 @@ let private translateInstr (instr: LIR.Instr) : Result<X86_64.Instr list, string
 
     | LIR.Sdiv (dest, left, right) ->
         // x86_64 IDIV: RDX:RAX / src → RAX=quotient, RDX=remainder
-        // Need to: MOV RAX, left; CQO; IDIV right; MOV dest, RAX
+        // IDIV clobbers both RAX and RDX. If other LIR values live in RDX,
+        // we must save/restore it. Since the register allocator doesn't know
+        // about x86_64 implicit clobbers, we conservatively save RDX.
         resolveReg dest
         |> Result.bind (fun destReg ->
             resolveReg left
             |> Result.bind (fun leftReg ->
                 resolveReg right
                 |> Result.map (fun rightReg ->
-                    let rightSrc =
+                    // IDIV clobbers RDX. Save it before, restore after.
+                    // Save divisor to scratch if in RAX/RDX (they get clobbered)
+                    let divisor =
+                        if rightReg = X86_64.RAX || rightReg = X86_64.RDX then scratch
+                        else rightReg
+                    let saveDivisor =
                         if rightReg = X86_64.RAX || rightReg = X86_64.RDX then
-                            // Divisor can't be in RAX or RDX (we clobber them)
                             [X86_64.MOV_reg (scratch, rightReg)]
                         else []
-                    let divisor = if rightReg = X86_64.RAX || rightReg = X86_64.RDX then scratch else rightReg
-                    (if leftReg <> X86_64.RAX then [X86_64.MOV_reg (X86_64.RAX, leftReg)] else [])
-                    @ rightSrc
+                    // Save leftReg to RAX before saving RDX (in case leftReg IS RDX)
+                    let moveLeft =
+                        if leftReg <> X86_64.RAX then [X86_64.MOV_reg (X86_64.RAX, leftReg)]
+                        else []
+                    saveDivisor
+                    @ moveLeft
+                    @ [X86_64.PUSH X86_64.RDX]   // Save RDX (will be clobbered by CQO+IDIV)
                     @ [X86_64.CQO; X86_64.IDIV divisor]
-                    @ (if destReg <> X86_64.RAX then [X86_64.MOV_reg (destReg, X86_64.RAX)] else []))))
+                    @ (if destReg <> X86_64.RAX then [X86_64.MOV_reg (destReg, X86_64.RAX)] else [])
+                    @ [X86_64.POP X86_64.RDX])))
 
     | LIR.Msub (dest, mulLeft, mulRight, sub) ->
         // dest = sub - mulLeft * mulRight
