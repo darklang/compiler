@@ -824,6 +824,9 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 resolveReg srcReg
                 |> Result.map (fun srcX86 ->
                     [X86_64.MOV_store (addrReg, int32 offset, srcX86)])
+            | LIR.FuncAddr funcName ->
+                Ok [X86_64.LEA_rip (scratch, funcName)
+                    X86_64.MOV_store (addrReg, int32 offset, scratch)]
             | _ -> Error $"Unsupported HeapStore source: {src}")
 
     | LIR.HeapLoad (dest, addr, offset) ->
@@ -1162,20 +1165,27 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             Ok (alloc @ storeRC @ storeFunc @ storeCaptures))
 
     | LIR.ClosureCall (dest, closure, _args) ->
-        // Load function pointer from closure[0], call it
+        // The closure register contains the function pointer
+        // (LIR does HeapLoad to extract func_ptr before ClosureCall)
         resolveReg closure
         |> Result.bind (fun closureReg ->
             resolveReg dest
             |> Result.map (fun destReg ->
-                [X86_64.MOV_load (scratch, closureReg, 0)  // scratch = func_ptr
-                 X86_64.CALL_reg scratch]
+                // Move to R10 if in scratch (R11) to avoid conflicts
+                let callReg = if closureReg = scratch then X86_64.R10 else closureReg
+                let setup = if callReg <> closureReg then [X86_64.MOV_reg (callReg, closureReg)] else []
+                setup
+                @ [X86_64.CALL_reg callReg]
                 @ (if destReg <> X86_64.RAX then [X86_64.MOV_reg (destReg, X86_64.RAX)] else [])))
 
     | LIR.ClosureTailCall (closure, _args) ->
         resolveReg closure
         |> Result.map (fun closureReg ->
-            [X86_64.MOV_load (scratch, closureReg, 0)
-             X86_64.JMP_reg scratch])
+            let callReg = if closureReg = scratch then X86_64.R10 else closureReg
+            let setup = if callReg <> closureReg then [X86_64.MOV_reg (callReg, closureReg)] else []
+            setup
+            @ genEpilogue ctx.StackSize ctx.UsedCalleeSaved
+            @ [X86_64.JMP_reg callReg])
 
     | LIR.RawAlloc (dest, numBytes) ->
         resolveReg dest
