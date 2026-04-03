@@ -82,7 +82,7 @@ let private generateHeapOverflowTrapBody () : ARM64Symbolic.Instr list =
     runtimeInstrs (Runtime.generatePrintCharsToStderr messageBytes)
     @ [
         ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)  // exit code = 1
-        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Exit, 0)
+        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Exit, 0)
         ARM64Symbolic.SVC syscalls.SvcImmediate
     ]
 
@@ -855,7 +855,7 @@ let convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symbolic
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
                     ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP)
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0)
-                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Write, 0)
+                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
                     ARM64Symbolic.SVC syscalls.SvcImmediate
                     ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
                 ]
@@ -870,7 +870,7 @@ let convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symbolic
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
                     ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP)
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 2us, 0)
-                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Write, 0)
+                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
                     ARM64Symbolic.SVC syscalls.SvcImmediate
                     ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
                 ]
@@ -903,7 +903,7 @@ let convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symbolic
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
                     ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP)
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0)
-                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Write, 0)
+                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
                     ARM64Symbolic.SVC syscalls.SvcImmediate
                     ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
                 ]
@@ -923,7 +923,7 @@ let convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symbolic
             ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0);          // fd = stdout
             ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP);    // buffer
             ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0);         // len = 1
-            ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Write, 0);
+            ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0);
             ARM64Symbolic.SVC syscalls.SvcImmediate;
             ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
         ]
@@ -941,7 +941,7 @@ let convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symbolic
             ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0);
             ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP);
             ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 2us, 0);
-            ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Write, 0);
+            ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0);
             ARM64Symbolic.SVC syscalls.SvcImmediate;
             ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
         ]
@@ -986,7 +986,7 @@ let convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symbolic
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0);
                     ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP);
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 2us, 0);
-                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Write, 0);
+                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0);
                     ARM64Symbolic.SVC syscalls.SvcImmediate;
                     ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
                 ]
@@ -998,7 +998,7 @@ let convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symbolic
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0);
                     ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP);
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0);
-                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Write, 0);
+                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0);
                     ARM64Symbolic.SVC syscalls.SvcImmediate;
                     ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
                 ]
@@ -1434,7 +1434,7 @@ let convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symbolic
                     [ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0);
                      ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP);
                      ARM64Symbolic.MOVZ (ARM64Symbolic.X2, uint16 bytes.Length, 0);
-                     ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Write, 0);
+                     ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0);
                      ARM64Symbolic.SVC syscalls.SvcImmediate;
                      ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 alignedSize)]
 
@@ -1561,7 +1561,7 @@ let convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symbolic
                     [ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0);
                      ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP);
                      ARM64Symbolic.MOVZ (ARM64Symbolic.X2, uint16 bytes.Length, 0);
-                     ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Write, 0);
+                     ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0);
                      ARM64Symbolic.SVC syscalls.SvcImmediate;
                      ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 alignedSize)]
 
@@ -2169,7 +2169,7 @@ let convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symbolic
             runtimeInstrs (Runtime.generatePrintCharsToStderr messageBytes)
             @ [
                 ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)  // exit code = 1
-                ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Exit, 0)
+                ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Exit, 0)
                 ARM64Symbolic.SVC syscalls.SvcImmediate
             ]
         )
@@ -3541,7 +3541,7 @@ let generateHeapInit () : ARM64Symbolic.Instr list =
         ARM64Symbolic.MOVZ (ARM64Symbolic.X4, 0us, 0)              // X4 = 0
         ARM64Symbolic.MVN (ARM64Symbolic.X4, ARM64Symbolic.X4)             // X4 = ~0 = -1 (fd)
         ARM64Symbolic.MOVZ (ARM64Symbolic.X5, 0us, 0)              // offset = 0
-        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Mmap, 0)
+        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Mmap, 0)
         ARM64Symbolic.SVC syscalls.SvcImmediate
         // Check for mmap failure (returns -1 on error)
         ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 0us, 0)             // X15 = 0
@@ -3549,7 +3549,7 @@ let generateHeapInit () : ARM64Symbolic.Instr list =
         ARM64Symbolic.CMP_reg (ARM64Symbolic.X0, ARM64Symbolic.X15)        // Compare X0 with -1
         ARM64Symbolic.B_cond (ARM64Symbolic.NE, 3)                 // Skip exit if not error (+3 instructions)
         ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)              // exit code = 1
-        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Exit, 0)
+        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Exit, 0)
         ARM64Symbolic.SVC syscalls.SvcImmediate
         // X0 now contains mmap result (valid address)
         ARM64Symbolic.MOV_reg (ARM64Symbolic.X27, ARM64Symbolic.X0)        // X27 = free list heads base
