@@ -906,8 +906,11 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             let d = lirFRegToX86 dp
             let l = lirFRegToX86 lp
             let r = lirFRegToX86 rp
-            let setup = if d <> l then [X86_64.MOVSD_reg (d, l)] else []
-            Ok (setup @ [X86_64.ADDSD (d, r)])
+            if d = r && d <> l then
+                Ok [X86_64.ADDSD (d, l)]  // commutative: swap operands
+            else
+                let setup = if d <> l then [X86_64.MOVSD_reg (d, l)] else []
+                Ok (setup @ [X86_64.ADDSD (d, r)])
         | _ -> Error "FAdd with virtual FP register"
 
     | LIR.FSub (dest, left, right) ->
@@ -916,8 +919,14 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             let d = lirFRegToX86 dp
             let l = lirFRegToX86 lp
             let r = lirFRegToX86 rp
-            let setup = if d <> l then [X86_64.MOVSD_reg (d, l)] else []
-            Ok (setup @ [X86_64.SUBSD (d, r)])
+            if d = r && d <> l then
+                // NOT commutative: use XMM15 as temp
+                Ok [X86_64.MOVSD_reg (X86_64.XMM15, l)
+                    X86_64.SUBSD (X86_64.XMM15, r)
+                    X86_64.MOVSD_reg (d, X86_64.XMM15)]
+            else
+                let setup = if d <> l then [X86_64.MOVSD_reg (d, l)] else []
+                Ok (setup @ [X86_64.SUBSD (d, r)])
         | _ -> Error "FSub with virtual FP register"
 
     | LIR.FMul (dest, left, right) ->
@@ -926,8 +935,11 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             let d = lirFRegToX86 dp
             let l = lirFRegToX86 lp
             let r = lirFRegToX86 rp
-            let setup = if d <> l then [X86_64.MOVSD_reg (d, l)] else []
-            Ok (setup @ [X86_64.MULSD (d, r)])
+            if d = r && d <> l then
+                Ok [X86_64.MULSD (d, l)]  // commutative: swap operands
+            else
+                let setup = if d <> l then [X86_64.MOVSD_reg (d, l)] else []
+                Ok (setup @ [X86_64.MULSD (d, r)])
         | _ -> Error "FMul with virtual FP register"
 
     | LIR.FDiv (dest, left, right) ->
@@ -936,8 +948,14 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             let d = lirFRegToX86 dp
             let l = lirFRegToX86 lp
             let r = lirFRegToX86 rp
-            let setup = if d <> l then [X86_64.MOVSD_reg (d, l)] else []
-            Ok (setup @ [X86_64.DIVSD (d, r)])
+            if d = r && d <> l then
+                // NOT commutative: use XMM15 as temp
+                Ok [X86_64.MOVSD_reg (X86_64.XMM15, l)
+                    X86_64.DIVSD (X86_64.XMM15, r)
+                    X86_64.MOVSD_reg (d, X86_64.XMM15)]
+            else
+                let setup = if d <> l then [X86_64.MOVSD_reg (d, l)] else []
+                Ok (setup @ [X86_64.DIVSD (d, r)])
         | _ -> Error "FDiv with virtual FP register"
 
     | LIR.FNeg (dest, src) ->
@@ -1462,9 +1480,9 @@ let translateFunction (func: LIR.Function) : Result<X86_64.Instr list, string> =
     let epilogueLabel = "_epilogue_" + func.Name
     let prologue = genPrologue func.StackSize func.UsedCalleeSaved
 
-    // Note: Parameter setup (moving from X0 to allocated param registers) is
-    // handled by the LIR entry block itself (e.g., "X20 <- Mov(Reg X0)").
-    // No extra param setup needed here — the LIR already contains the moves.
+    // Float parameter setup: the register allocator inserts FMov instructions
+    // at the start of the entry block (e.g., "D1 <- FMov(D0)"). These are
+    // handled by the FMov case in translateInstr. No extra codegen needed.
 
     // Translate all blocks in order (entry first)
     let entryBlock = Map.find func.CFG.Entry func.CFG.Blocks
