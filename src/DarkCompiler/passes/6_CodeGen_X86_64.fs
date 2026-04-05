@@ -709,11 +709,13 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             Ok (floatRestores @ intRestores)
 
     | LIR.ArgMoves moves ->
-        // Move arguments into the correct registers for a call.
-        // On x86_64: args go in RDI, RSI, RDX, RCX, R8, R9 (mapped from X1-X6).
-        // Since SaveRegs pushed live registers, if a source was saved we need
-        // to load from the stack. For simplicity, we process moves in order
-        // and use scratch register to break conflicts.
+        // Parallel move resolution for function arguments.
+        // Must handle case where a source register is also a destination of another
+        // move (e.g., X1 <- X21; X4 <- X1 — second move must read ORIGINAL X1).
+        //
+        // Strategy: save all source registers that will be clobbered to scratch stack,
+        // then perform all moves using saved values where needed.
+        let destRegs = moves |> List.choose (fun (d, _) -> Some d) |> Set.ofList
         let generateMove (destPhys: LIR.PhysReg, srcOp: LIR.Operand) : Result<X86_64.Instr list, string> =
             let destX86 = lirRegToX86 destPhys
             match srcOp with
@@ -721,7 +723,11 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 Ok (loadImm64 destX86 value)
             | LIR.Reg (LIR.Physical srcPhys) ->
                 if srcPhys = destPhys then Ok []
-                else Ok [X86_64.MOV_reg (destX86, lirRegToX86 srcPhys)]
+                else
+                    // If source will be clobbered by an earlier move, we need the
+                    // saved value. For simplicity, we use a two-pass approach:
+                    // all moves from Reg sources that ARE destinations get saved first.
+                    Ok [X86_64.MOV_reg (destX86, lirRegToX86 srcPhys)]
             | LIR.Reg (LIR.Virtual _) ->
                 Error "Virtual register in ArgMoves"
             | LIR.StackSlot offset ->
@@ -750,14 +756,55 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             | LIR.FuncAddr funcName ->
                 Ok [X86_64.LEA_rip (destX86, funcName)]
             | _ -> Error $"Unsupported ArgMoves operand: {srcOp}"
+        // Two-pass approach to handle parallel move conflicts:
+        // 1. Find source registers that are also destinations (will be clobbered)
+        // 2. Save those to the red zone before any moves
+        // 3. Do all moves, using red zone values for clobbered sources
+        let destRegSet = moves |> List.map fst |> Set.ofList
+        let clobberedSources =
+            moves
+            |> List.choose (fun (_, srcOp) ->
+                match srcOp with
+                | LIR.Reg (LIR.Physical srcPhys) ->
+                    if Set.contains srcPhys destRegSet then Some srcPhys
+                    else None
+                | _ -> None)
+            |> List.distinct
+
+        // Save clobbered sources to red zone (below RSP, no RSP adjustment)
+        // Use offsets -16, -24, -32, etc. (-8 is used by IDIV)
+        let saveInstrs =
+            clobberedSources
+            |> List.mapi (fun i reg ->
+                let offset = -16 - (i * 8)
+                X86_64.MOV_store (X86_64.RSP, int32 offset, lirRegToX86 reg))
+
+        // Build a map from clobbered source to red zone offset
+        let clobberedOffsets =
+            clobberedSources
+            |> List.mapi (fun i reg -> (reg, -16 - (i * 8)))
+            |> Map.ofList
+
+        // Generate moves, using red zone for clobbered sources
+        let generateMoveWithSave (destPhys: LIR.PhysReg, srcOp: LIR.Operand) : Result<X86_64.Instr list, string> =
+            let destX86 = lirRegToX86 destPhys
+            match srcOp with
+            | LIR.Reg (LIR.Physical srcPhys) when Map.containsKey srcPhys clobberedOffsets ->
+                if srcPhys = destPhys then Ok []
+                else
+                    let offset = clobberedOffsets.[srcPhys]
+                    Ok [X86_64.MOV_load (destX86, X86_64.RSP, int32 offset)]
+            | _ -> generateMove (destPhys, srcOp)
+
         let rec genMoves acc remaining =
             match remaining with
             | [] -> Ok (List.rev acc |> List.concat)
             | m :: rest ->
-                match generateMove m with
+                match generateMoveWithSave m with
                 | Error e -> Error e
                 | Ok instrs -> genMoves (instrs :: acc) rest
         genMoves [] moves
+        |> Result.map (fun moveInstrs -> saveInstrs @ moveInstrs)
 
     | LIR.TailArgMoves moves ->
         // Same as ArgMoves but for tail calls
