@@ -42,6 +42,11 @@ type Condition =
     | GT   // Greater than (signed: ZF=0 and SF=OF)
     | LE   // Less than or equal (signed: ZF=1 or SF!=OF)
     | GE   // Greater than or equal (signed: SF=OF)
+    // Unsigned/float conditions (for use after UCOMISD):
+    | B    // Below (CF=1) — float less than
+    | A    // Above (CF=0 and ZF=0) — float greater than
+    | BE   // Below or equal (CF=1 or ZF=1) — float less or equal
+    | AE   // Above or equal (CF=0) — float greater or equal
 
 /// Operand size for instructions that need explicit sizing
 type Size =

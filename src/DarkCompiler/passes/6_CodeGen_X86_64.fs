@@ -299,6 +299,10 @@ type private FuncCtx = {
     UsedCalleeSaved: LIR.PhysReg list
 }
 
+/// Track whether the last comparison was FCmp (float) for correct condition codes.
+/// UCOMISD sets CF/ZF differently from CMP which sets SF/OF/ZF.
+let mutable private lastCompWasFloat = false
+
 /// Translate a single LIR instruction to x86-64 instructions
 let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Instr list, string> =
     match instr with
@@ -480,6 +484,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                         @ [X86_64.SUB_reg (destReg, scratch)]))))
 
     | LIR.Cmp (left, right) ->
+        lastCompWasFloat <- false
         resolveReg left
         |> Result.bind (fun leftReg ->
             match right with
@@ -496,11 +501,20 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         resolveReg dest
         |> Result.map (fun destReg ->
             let x86Cond =
-                match cond with
-                | LIR.EQ -> X86_64.EQ | LIR.NE -> X86_64.NE
-                | LIR.LT -> X86_64.LT | LIR.GT -> X86_64.GT
-                | LIR.LE -> X86_64.LE | LIR.GE -> X86_64.GE
-            // SETcc sets low byte; MOVZX clears upper bits
+                if lastCompWasFloat then
+                    // After UCOMISD: use CF/ZF-based (unsigned) condition codes
+                    match cond with
+                    | LIR.EQ -> X86_64.EQ  // ZF=1 (same for int/float)
+                    | LIR.NE -> X86_64.NE  // ZF=0 (same for int/float)
+                    | LIR.LT -> X86_64.B   // CF=1 (below)
+                    | LIR.GT -> X86_64.A   // CF=0 and ZF=0 (above)
+                    | LIR.LE -> X86_64.BE  // CF=1 or ZF=1 (below or equal)
+                    | LIR.GE -> X86_64.AE  // CF=0 (above or equal)
+                else
+                    match cond with
+                    | LIR.EQ -> X86_64.EQ | LIR.NE -> X86_64.NE
+                    | LIR.LT -> X86_64.LT | LIR.GT -> X86_64.GT
+                    | LIR.LE -> X86_64.LE | LIR.GE -> X86_64.GE
             [X86_64.SETcc (x86Cond, destReg); X86_64.MOVZX_byte (destReg, destReg)])
 
     | LIR.And (dest, left, right) ->
@@ -1023,13 +1037,16 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         | LIR.FPhysical dp, LIR.FPhysical sp ->
             let d = lirFRegToX86 dp
             let s = lirFRegToX86 sp
-            // Abs by AND with ~sign bit
-            Ok (loadImm64 scratch 0x7FFFFFFFFFFFFFFFL
-                @ [X86_64.MOVQ_from_gp (X86_64.XMM15, scratch)
-                   X86_64.MOVSD_reg (d, s)
-                   // Use ANDPD via XORPD trick — actually need ANDPD which we don't have
-                   // Simpler: if negative, negate
-                   ])
+            // Abs: clear sign bit using ANDPD with 0x7FFFFFFFFFFFFFFF mask.
+            // We don't have ANDPD in our ISA, but we can use the GP trick:
+            // 1. Move float to GP register
+            // 2. AND with 0x7FFFFFFFFFFFFFFF
+            // 3. Move back to float register
+            // Move float bits to GP, AND with mask to clear sign bit, move back
+            Ok ([X86_64.MOVQ_to_gp (scratch, s)]
+                @ loadImm64 X86_64.RCX 0x7FFFFFFFFFFFFFFFL
+                @ [X86_64.AND_reg (scratch, X86_64.RCX)
+                   X86_64.MOVQ_from_gp (d, scratch)])
         | _ -> Error "FAbs with virtual FP register"
 
     | LIR.FSqrt (dest, src) ->
@@ -1039,6 +1056,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         | _ -> Error "FSqrt with virtual FP register"
 
     | LIR.FCmp (left, right) ->
+        lastCompWasFloat <- true
         match left, right with
         | LIR.FPhysical lp, LIR.FPhysical rp ->
             Ok [X86_64.UCOMISD (lirFRegToX86 lp, lirFRegToX86 rp)]
@@ -1501,10 +1519,16 @@ let private translateTerminator (epilogueLabel: string) (term: LIR.Terminator) :
              X86_64.JMP nonZeroLabel])
     | LIR.CondBranch (cond, LIR.Label trueLabel, LIR.Label falseLabel) ->
         let x86Cond =
-            match cond with
-            | LIR.EQ -> X86_64.EQ | LIR.NE -> X86_64.NE
-            | LIR.LT -> X86_64.LT | LIR.GT -> X86_64.GT
-            | LIR.LE -> X86_64.LE | LIR.GE -> X86_64.GE
+            if lastCompWasFloat then
+                match cond with
+                | LIR.EQ -> X86_64.EQ | LIR.NE -> X86_64.NE
+                | LIR.LT -> X86_64.B  | LIR.GT -> X86_64.A
+                | LIR.LE -> X86_64.BE | LIR.GE -> X86_64.AE
+            else
+                match cond with
+                | LIR.EQ -> X86_64.EQ | LIR.NE -> X86_64.NE
+                | LIR.LT -> X86_64.LT | LIR.GT -> X86_64.GT
+                | LIR.LE -> X86_64.LE | LIR.GE -> X86_64.GE
         Ok [X86_64.Jcc (x86Cond, trueLabel)
             X86_64.JMP falseLabel]
     | LIR.BranchBitZero (reg, bit, LIR.Label zeroLabel, LIR.Label nonZeroLabel) ->

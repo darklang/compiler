@@ -116,10 +116,14 @@ let private condCode (cond: Condition) : byte =
     match cond with
     | EQ -> 0x04uy  // ZF=1
     | NE -> 0x05uy  // ZF=0
-    | LT -> 0x0Cuy  // SF!=OF
-    | GE -> 0x0Duy  // SF=OF
-    | LE -> 0x0Euy  // ZF=1 or SF!=OF
-    | GT -> 0x0Fuy  // ZF=0 and SF=OF
+    | LT -> 0x0Cuy  // SF!=OF (signed)
+    | GE -> 0x0Duy  // SF=OF (signed)
+    | LE -> 0x0Euy  // ZF=1 or SF!=OF (signed)
+    | GT -> 0x0Fuy  // ZF=0 and SF=OF (signed)
+    | B  -> 0x02uy  // CF=1 (unsigned/float below)
+    | AE -> 0x03uy  // CF=0 (unsigned/float above or equal)
+    | BE -> 0x06uy  // CF=1 or ZF=1 (unsigned/float below or equal)
+    | A  -> 0x07uy  // CF=0 and ZF=0 (unsigned/float above)
 
 /// Encode a single x86-64 instruction to bytes
 let encodeInstruction (instr: Instr) : byte array =
