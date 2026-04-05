@@ -1383,21 +1383,54 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                         @ [X86_64.ADD_reg (d, scratch)]))))
 
     | LIR.PrintFloat freg ->
-        // TODO: implement float-to-string conversion
-        // For now, print "0.0" as placeholder
+        // Call Stdlib.Float.toString(D0), print result as heap string, exit(0)
         match freg with
-        | LIR.FPhysical _ -> Ok (loadImm64 X86_64.RDI 0L @ genExitSyscall)
+        | LIR.FPhysical fp ->
+            let xmm = lirFRegToX86 fp
+            Ok ((if xmm <> X86_64.XMM0 then [X86_64.MOVSD_reg (X86_64.XMM0, xmm)] else [])
+                @ [X86_64.CALL "Stdlib.Float.toString"]
+                // RAX now has heap string pointer
+                @ [X86_64.MOV_load (X86_64.RDX, X86_64.RAX, 0)     // length
+                   X86_64.LEA (X86_64.RSI, X86_64.RAX, 8)           // data
+                   X86_64.MOV_imm32 (X86_64.RDI, 1)]                // stdout
+                @ genWriteSyscall
+                // Print newline
+                @ [X86_64.SUB_imm (X86_64.RSP, 8)]
+                @ loadImm64 scratch 10L
+                @ [X86_64.MOV_store (X86_64.RSP, 0, scratch)
+                   X86_64.MOV_imm32 (X86_64.RDI, 1)
+                   X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)
+                   X86_64.MOV_imm32 (X86_64.RDX, 1)]
+                @ genWriteSyscall
+                @ [X86_64.ADD_imm (X86_64.RSP, 8)]
+                @ loadImm64 X86_64.RDI 0L
+                @ genExitSyscall)
         | _ -> Error "PrintFloat with virtual FP register"
 
     | LIR.PrintFloatNoNewline freg ->
+        // Call Stdlib.Float.toString(D0), print result without newline
         match freg with
-        | LIR.FPhysical _ -> Ok []  // TODO
+        | LIR.FPhysical fp ->
+            let xmm = lirFRegToX86 fp
+            Ok ((if xmm <> X86_64.XMM0 then [X86_64.MOVSD_reg (X86_64.XMM0, xmm)] else [])
+                @ [X86_64.CALL "Stdlib.Float.toString"]
+                @ [X86_64.MOV_load (X86_64.RDX, X86_64.RAX, 0)
+                   X86_64.LEA (X86_64.RSI, X86_64.RAX, 8)
+                   X86_64.MOV_imm32 (X86_64.RDI, 1)]
+                @ genWriteSyscall)
         | _ -> Error "PrintFloatNoNewline with virtual FP register"
 
     | LIR.FloatToString (dest, src) ->
-        // TODO: implement float-to-string
-        resolveReg dest
-        |> Result.map (fun destReg -> loadImm64 destReg 0L)
+        // Call Stdlib.Float.toString(D0)
+        match src with
+        | LIR.FPhysical fp ->
+            let xmm = lirFRegToX86 fp
+            resolveReg dest
+            |> Result.map (fun destReg ->
+                (if xmm <> X86_64.XMM0 then [X86_64.MOVSD_reg (X86_64.XMM0, xmm)] else [])
+                @ [X86_64.CALL "Stdlib.Float.toString"]
+                @ (if destReg <> X86_64.RAX then [X86_64.MOV_reg (destReg, X86_64.RAX)] else []))
+        | _ -> Error "FloatToString with virtual FP register"
 
     | LIR.PrintList (listPtr, _elemType) ->
         // TODO: implement list printing
