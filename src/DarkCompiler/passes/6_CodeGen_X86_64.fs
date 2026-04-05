@@ -821,11 +821,26 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         |> Result.map (fun moveInstrs -> saveInstrs @ moveInstrs)
 
     | LIR.TailArgMoves moves ->
-        // Same as ArgMoves but for tail calls
+        // Same parallel move resolution as ArgMoves
+        let destRegSet = moves |> List.map fst |> Set.ofList
+        let clobberedSources =
+            moves |> List.choose (fun (_, srcOp) ->
+                match srcOp with
+                | LIR.Reg (LIR.Physical srcPhys) when Set.contains srcPhys destRegSet -> Some srcPhys
+                | _ -> None)
+            |> List.distinct
+        let saveInstrs =
+            clobberedSources |> List.mapi (fun i reg ->
+                X86_64.MOV_store (X86_64.RSP, int32 (-16 - i * 8), lirRegToX86 reg))
+        let clobberedOffsets =
+            clobberedSources |> List.mapi (fun i reg -> (reg, -16 - i * 8)) |> Map.ofList
         let generateMove (destPhys: LIR.PhysReg, srcOp: LIR.Operand) : Result<X86_64.Instr list, string> =
             let destX86 = lirRegToX86 destPhys
             match srcOp with
             | LIR.Imm value -> Ok (loadImm64 destX86 value)
+            | LIR.Reg (LIR.Physical srcPhys) when Map.containsKey srcPhys clobberedOffsets ->
+                if srcPhys = destPhys then Ok []
+                else Ok [X86_64.MOV_load (destX86, X86_64.RSP, int32 clobberedOffsets.[srcPhys])]
             | LIR.Reg (LIR.Physical srcPhys) ->
                 if srcPhys = destPhys then Ok []
                 else Ok [X86_64.MOV_reg (destX86, lirRegToX86 srcPhys)]
@@ -859,6 +874,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 | Error e -> Error e
                 | Ok instrs -> genMoves (instrs :: acc) rest
         genMoves [] moves
+        |> Result.map (fun moveInstrs -> saveInstrs @ moveInstrs)
 
     | LIR.Call (dest, funcName, _args) ->
         // Arguments are already in place from ArgMoves
