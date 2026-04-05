@@ -946,6 +946,30 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             | LIR.FuncAddr funcName ->
                 Ok [X86_64.LEA_rip (scratch, funcName)
                     X86_64.MOV_store (addrReg, int32 offset, scratch)]
+            | LIR.StringSymbol value ->
+                // Create heap string from literal, store pointer
+                let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
+                let len = strBytes.Length
+                let totalSize = ((len + 16) + 7) &&& (~~~7)
+                // Save addrReg if it might be clobbered by heap allocation
+                let useTemp = (addrReg = heapPtr)
+                let alloc = [X86_64.MOV_reg (scratch, heapPtr); X86_64.ADD_imm (heapPtr, int32 totalSize)]
+                let storeLen = loadImm64 X86_64.RCX (int64 len) @ [X86_64.MOV_store (scratch, 0, X86_64.RCX)]
+                let copyBytes =
+                    let chunks = (len + 7) / 8
+                    [0 .. chunks - 1] |> List.collect (fun i ->
+                        let off = 8 + i * 8
+                        let chunkLen = min 8 (len - i * 8)
+                        let v = [0..chunkLen-1] |> List.fold (fun acc j ->
+                            let bi = i * 8 + j
+                            if bi < strBytes.Length then acc ||| (int64 strBytes.[bi] <<< (j * 8)) else acc) 0L
+                        loadImm64 X86_64.RCX v @ [X86_64.MOV_store (scratch, int32 off, X86_64.RCX)])
+                let storeRC =
+                    let rcOff = 8 + ((len + 7) &&& (~~~7))
+                    loadImm64 X86_64.RCX 1L @ [X86_64.MOV_store (scratch, int32 rcOff, X86_64.RCX)]
+                // Store the string pointer into the record field
+                Ok (alloc @ storeLen @ copyBytes @ storeRC
+                    @ [X86_64.MOV_store (addrReg, int32 offset, scratch)])
             | _ -> Error $"Unsupported HeapStore source: {src}")
 
     | LIR.HeapLoad (dest, addr, offset) ->
