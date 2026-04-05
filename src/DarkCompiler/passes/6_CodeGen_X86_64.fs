@@ -361,8 +361,10 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 Ok (alloc @ storeLen @ copyBytes @ storeRefCount)
             | LIR.FuncAddr funcName ->
                 Ok [X86_64.LEA_rip (destReg, funcName)]
-            | _ ->
-                Error $"Unsupported Mov source in x86-64 codegen: {src}")
+            | LIR.FloatImm value | LIR.FloatSymbol value ->
+                // Store float bits in GP register
+                let bits = System.BitConverter.DoubleToInt64Bits(value)
+                Ok (loadImm64 destReg bits))
 
     | LIR.Store (stackSlot, src) ->
         resolveReg src
@@ -767,6 +769,9 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     let rcOff = 8 + ((len + 7) &&& (~~~7))
                     loadImm64 scratch 1L @ [X86_64.MOV_store (destX86, int32 rcOff, scratch)]
                 Ok (alloc @ storeLen @ copyBytes @ storeRC)
+            | LIR.FloatSymbol value ->
+                let bits = System.BitConverter.DoubleToInt64Bits(value)
+                Ok (loadImm64 destX86 bits)  // Store float bits in GP register (for passing as arg)
             | LIR.FuncAddr funcName ->
                 Ok [X86_64.LEA_rip (destX86, funcName)]
             | _ -> Error $"Unsupported ArgMoves operand: {srcOp}"
@@ -863,6 +868,9 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                         loadImm64 scratch v @ [X86_64.MOV_store (destX86, int32 offset, scratch)])
                 let storeRC = let rcOff = 8 + ((len + 7) &&& (~~~7)) in loadImm64 scratch 1L @ [X86_64.MOV_store (destX86, int32 rcOff, scratch)]
                 Ok (alloc @ storeLen @ copyBytes @ storeRC)
+            | LIR.FloatSymbol value ->
+                let bits = System.BitConverter.DoubleToInt64Bits(value)
+                Ok (loadImm64 destX86 bits)
             | LIR.FuncAddr funcName ->
                 Ok [X86_64.LEA_rip (destX86, funcName)]
             | _ -> Error $"Unsupported TailArgMoves operand: {srcOp}"
@@ -946,6 +954,10 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             | LIR.FuncAddr funcName ->
                 Ok [X86_64.LEA_rip (scratch, funcName)
                     X86_64.MOV_store (addrReg, int32 offset, scratch)]
+            | LIR.FloatSymbol value ->
+                // Store float bits as 8-byte integer value at the heap offset
+                let bits = System.BitConverter.DoubleToInt64Bits(value)
+                Ok (loadImm64 scratch bits @ [X86_64.MOV_store (addrReg, int32 offset, scratch)])
             | LIR.StringSymbol value ->
                 // Create heap string from literal, store pointer
                 let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
