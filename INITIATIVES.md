@@ -4,16 +4,22 @@
 
 Goal: reach ARM64 test parity (4486/4530 E2E tests) then merge to main.
 
-Current: 3311/4530 (73%). Gap: ~1175 tests.
+Current: 3323/4530 (73%). Gap: ~1207 tests.
+
+Recently fixed:
+- ArgMoves parallel move conflicts (red zone save for clobbered sources)
+- Float.toString now works for ALL fractions (0.14, 3.14, etc.)
+- String.take/slice work correctly
+- PrintFloat calls Stdlib.Float.toString instead of being a stub
 
 Remaining work (in priority order):
-1. Fix Float.toString for multi-digit fractions (~170 tests) — null bytes in
-   `__getFracDigits` recursion, likely another two-operand conflict in deeper
-   register allocation pattern or in `__stripZeros` string manipulation
-2. Fix stdlib string operations (~90 tests) — comparison, substring, indexOf
-3. Fix dict operations (~60 tests) — depends on string ops
-4. Fix remaining list operations (~60 tests) — list printing, comparison
-5. Fix remaining segfaults (~97 tests) — various causes
+1. Investigate why float E2E tests still fail despite correct output (~179 tests)
+   — `./dark -r -e "1.0"` prints "1.0" correctly but E2E runner says "Value mismatch"
+   — May be output format, newline, or E2E runner capture issue
+2. Fix remaining string operations (~92 tests) — comparison, indexOf
+3. Fix remaining segfaults (~146 tests) — various causes
+4. Fix dict operations (~63 tests) — depends on string ops
+5. Fix remaining list operations (~58 tests) — list printing, comparison
 6. Fix remaining closures (~19 tests) — edge cases with captures
 7. Fix 128-bit integer types (~13 tests)
 8. Implement file I/O syscalls
