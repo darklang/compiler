@@ -2125,6 +2125,14 @@ let loadSpilled (allocation: AllocationResult) (reg: LIR.Reg) (tempReg: LIR.Phys
             (LIR.Physical tempReg, [loadInstr])
         | None -> (LIR.Physical tempReg, [])
 
+/// On x86_64, X8-X17 all alias to R11 (scratch). Using X12 and X13 as distinct
+/// scratch registers for loading two spilled operands simultaneously will clobber
+/// the first load when the second executes. On x86_64, the second operand of binary
+/// ops uses applyToOperandNoLoad to keep it as a StackSlot, and the codegen handles
+/// loading it into R11 after the first operand has been moved to the destination.
+let private isX86_64Arch =
+    System.Runtime.InteropServices.RuntimeInformation.OSArchitecture = System.Runtime.InteropServices.Architecture.X64
+
 /// Apply allocation to an instruction
 let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list =
     match instr with
@@ -2155,7 +2163,9 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
     | LIR.Add (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
         let (leftReg, leftLoads) = loadSpilled mapping left LIR.X12
-        let (rightOp, rightLoads) = applyToOperand mapping right LIR.X13
+        let (rightOp, rightLoads) =
+            if isX86_64Arch then (applyToOperandNoLoad mapping right, [])
+            else applyToOperand mapping right LIR.X13
         let addInstr = LIR.Add (destReg, leftReg, rightOp)
         let storeInstrs =
             match destAlloc with
@@ -2166,7 +2176,9 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
     | LIR.Sub (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
         let (leftReg, leftLoads) = loadSpilled mapping left LIR.X12
-        let (rightOp, rightLoads) = applyToOperand mapping right LIR.X13
+        let (rightOp, rightLoads) =
+            if isX86_64Arch then (applyToOperandNoLoad mapping right, [])
+            else applyToOperand mapping right LIR.X13
         let subInstr = LIR.Sub (destReg, leftReg, rightOp)
         let storeInstrs =
             match destAlloc with
@@ -2222,7 +2234,9 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Cmp (left, right) ->
         let (leftReg, leftLoads) = loadSpilled mapping left LIR.X12
-        let (rightOp, rightLoads) = applyToOperand mapping right LIR.X13
+        let (rightOp, rightLoads) =
+            if isX86_64Arch then (applyToOperandNoLoad mapping right, [])
+            else applyToOperand mapping right LIR.X13
         leftLoads @ rightLoads @ [LIR.Cmp (leftReg, rightOp)]
 
     | LIR.Cset (dest, cond) ->
@@ -2626,7 +2640,9 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.HeapStore (addr, offset, src, vt) ->
         let (addrReg, addrLoads) = loadSpilled mapping addr LIR.X12
-        let (srcOp, srcLoads) = applyToOperand mapping src LIR.X13
+        let (srcOp, srcLoads) =
+            if isX86_64Arch then (applyToOperandNoLoad mapping src, [])
+            else applyToOperand mapping src LIR.X13
         addrLoads @ srcLoads @ [LIR.HeapStore (addrReg, offset, srcOp, vt)]
 
     | LIR.HeapLoad (dest, addr, offset) ->
@@ -2650,7 +2666,9 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
     | LIR.StringConcat (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
         let (leftOp, leftLoads) = applyToOperand mapping left LIR.X12
-        let (rightOp, rightLoads) = applyToOperand mapping right LIR.X13
+        let (rightOp, rightLoads) =
+            if isX86_64Arch then (applyToOperandNoLoad mapping right, [])
+            else applyToOperand mapping right LIR.X13
         let concatInstr = LIR.StringConcat (destReg, leftOp, rightOp)
         let storeInstrs =
             match destAlloc with
@@ -2694,7 +2712,9 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
     | LIR.FileWriteText (dest, path, content) ->
         let (destReg, destAlloc) = applyToReg mapping dest
         let (pathOp, pathLoads) = applyToOperand mapping path LIR.X12
-        let (contentOp, contentLoads) = applyToOperand mapping content LIR.X13
+        let (contentOp, contentLoads) =
+            if isX86_64Arch then (applyToOperandNoLoad mapping content, [])
+            else applyToOperand mapping content LIR.X13
         let fileInstr = LIR.FileWriteText (destReg, pathOp, contentOp)
         let storeInstrs =
             match destAlloc with
@@ -2705,7 +2725,9 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
     | LIR.FileAppendText (dest, path, content) ->
         let (destReg, destAlloc) = applyToReg mapping dest
         let (pathOp, pathLoads) = applyToOperand mapping path LIR.X12
-        let (contentOp, contentLoads) = applyToOperand mapping content LIR.X13
+        let (contentOp, contentLoads) =
+            if isX86_64Arch then (applyToOperandNoLoad mapping content, [])
+            else applyToOperand mapping content LIR.X13
         let fileInstr = LIR.FileAppendText (destReg, pathOp, contentOp)
         let storeInstrs =
             match destAlloc with

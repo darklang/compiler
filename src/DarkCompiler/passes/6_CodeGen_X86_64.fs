@@ -400,8 +400,15 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
                     Ok (setup @ [X86_64.ADD_imm (destReg, int32 value)])
                 | LIR.Imm value ->
-                    let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
-                    Ok (setup @ loadImm64 scratch value @ [X86_64.ADD_reg (destReg, scratch)])
+                    if destReg = scratch then
+                        // dest is R11: can't use scratch for imm. Use PUSH/POP RCX.
+                        Ok ([X86_64.PUSH X86_64.RCX]
+                            @ loadImm64 X86_64.RCX value
+                            @ [X86_64.ADD_reg (destReg, X86_64.RCX)
+                               X86_64.POP X86_64.RCX])
+                    else
+                        let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
+                        Ok (setup @ loadImm64 scratch value @ [X86_64.ADD_reg (destReg, scratch)])
                 | LIR.Reg rightReg ->
                     resolveReg rightReg
                     |> Result.map (fun rightX86 ->
@@ -412,8 +419,16 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                             let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
                             setup @ [X86_64.ADD_reg (destReg, rightX86)])
                 | LIR.StackSlot offset ->
-                    let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
-                    Ok (setup @ [X86_64.MOV_load (scratch, X86_64.RBP, int32 (adjustStackOffset ctx offset)); X86_64.ADD_reg (destReg, scratch)])
+                    let adjOff = int32 (adjustStackOffset ctx offset)
+                    if destReg = scratch && leftReg = scratch then
+                        // Both dest and left are R11: use PUSH/POP to avoid clobbering
+                        Ok ([X86_64.PUSH X86_64.RCX
+                             X86_64.MOV_load (X86_64.RCX, X86_64.RBP, adjOff)
+                             X86_64.ADD_reg (destReg, X86_64.RCX)
+                             X86_64.POP X86_64.RCX])
+                    else
+                        let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
+                        Ok (setup @ [X86_64.MOV_load (scratch, X86_64.RBP, adjOff); X86_64.ADD_reg (destReg, scratch)])
                 | _ -> Error $"Unsupported Add right operand: {right}"))
 
     | LIR.Sub (dest, left, right) ->
@@ -426,19 +441,42 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
                     Ok (setup @ [X86_64.SUB_imm (destReg, int32 value)])
                 | LIR.Imm value ->
-                    let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
-                    Ok (setup @ loadImm64 scratch value @ [X86_64.SUB_reg (destReg, scratch)])
+                    if destReg = scratch then
+                        Ok ([X86_64.PUSH X86_64.RCX]
+                            @ loadImm64 X86_64.RCX value
+                            @ [X86_64.SUB_reg (destReg, X86_64.RCX)
+                               X86_64.POP X86_64.RCX])
+                    else
+                        let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
+                        Ok (setup @ loadImm64 scratch value @ [X86_64.SUB_reg (destReg, scratch)])
                 | LIR.Reg rightReg ->
                     resolveReg rightReg
                     |> Result.map (fun rightX86 ->
                         if destReg = rightX86 && destReg <> leftReg then
-                            // dest is right operand: SUB is NOT commutative, use scratch
-                            [X86_64.MOV_reg (scratch, leftReg)
-                             X86_64.SUB_reg (scratch, rightX86)
-                             X86_64.MOV_reg (destReg, scratch)]
+                            if destReg = scratch then
+                                // dest=right=R11, left is different: use PUSH/POP
+                                [X86_64.PUSH X86_64.RCX
+                                 X86_64.MOV_reg (X86_64.RCX, leftReg)
+                                 X86_64.SUB_reg (X86_64.RCX, rightX86)
+                                 X86_64.MOV_reg (destReg, X86_64.RCX)
+                                 X86_64.POP X86_64.RCX]
+                            else
+                                [X86_64.MOV_reg (scratch, leftReg)
+                                 X86_64.SUB_reg (scratch, rightX86)
+                                 X86_64.MOV_reg (destReg, scratch)]
                         else
                             let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
                             setup @ [X86_64.SUB_reg (destReg, rightX86)])
+                | LIR.StackSlot offset ->
+                    let adjOff = int32 (adjustStackOffset ctx offset)
+                    if destReg = scratch && leftReg = scratch then
+                        Ok ([X86_64.PUSH X86_64.RCX
+                             X86_64.MOV_load (X86_64.RCX, X86_64.RBP, adjOff)
+                             X86_64.SUB_reg (destReg, X86_64.RCX)
+                             X86_64.POP X86_64.RCX])
+                    else
+                        let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
+                        Ok (setup @ [X86_64.MOV_load (scratch, X86_64.RBP, adjOff); X86_64.SUB_reg (destReg, scratch)])
                 | _ -> Error $"Unsupported Sub right operand: {right}"))
 
     | LIR.Mul (dest, left, right) ->
@@ -451,11 +489,13 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 resolveReg right
                 |> Result.map (fun rightReg ->
                     if destReg = rightReg && destReg <> leftReg then
-                        // dest is the right operand: use scratch to avoid clobbering
-                        // dest = left * right → scratch = left; scratch *= right; dest = scratch
-                        [X86_64.MOV_reg (scratch, leftReg)
-                         X86_64.IMUL_reg (scratch, rightReg)
-                         X86_64.MOV_reg (destReg, scratch)]
+                        if destReg = scratch then
+                            // dest=right=R11, left different: MUL is commutative, swap
+                            [X86_64.IMUL_reg (destReg, leftReg)]
+                        else
+                            [X86_64.MOV_reg (scratch, leftReg)
+                             X86_64.IMUL_reg (scratch, rightReg)
+                             X86_64.MOV_reg (destReg, scratch)]
                     else
                         let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
                         setup @ [X86_64.IMUL_reg (destReg, rightReg)])))
@@ -511,10 +551,30 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             | LIR.Imm value when value >= int64 System.Int32.MinValue && value <= int64 System.Int32.MaxValue ->
                 Ok [X86_64.CMP_imm (leftReg, int32 value)]
             | LIR.Imm value ->
-                Ok (loadImm64 scratch value @ [X86_64.CMP_reg (leftReg, scratch)])
+                if leftReg = scratch then
+                    Ok ([X86_64.PUSH X86_64.RCX]
+                        @ loadImm64 X86_64.RCX value
+                        @ [X86_64.CMP_reg (leftReg, X86_64.RCX)
+                           X86_64.POP X86_64.RCX])
+                else
+                    Ok (loadImm64 scratch value @ [X86_64.CMP_reg (leftReg, scratch)])
             | LIR.Reg rightReg ->
                 resolveReg rightReg
-                |> Result.map (fun rightX86 -> [X86_64.CMP_reg (leftReg, rightX86)])
+                |> Result.map (fun rightX86 ->
+                    if leftReg = scratch && rightX86 = scratch then
+                        // Both are R11 - always equal, just emit CMP R11, R11
+                        [X86_64.CMP_reg (scratch, scratch)]
+                    else
+                        [X86_64.CMP_reg (leftReg, rightX86)])
+            | LIR.StackSlot offset ->
+                let adjOff = int32 (adjustStackOffset ctx offset)
+                if leftReg = scratch then
+                    Ok ([X86_64.PUSH X86_64.RCX
+                         X86_64.MOV_load (X86_64.RCX, X86_64.RBP, adjOff)
+                         X86_64.CMP_reg (leftReg, X86_64.RCX)
+                         X86_64.POP X86_64.RCX])
+                else
+                    Ok [X86_64.MOV_load (scratch, X86_64.RBP, adjOff); X86_64.CMP_reg (leftReg, scratch)]
             | _ -> Error $"Unsupported Cmp right operand: {right}")
 
     | LIR.Cset (dest, cond) ->
