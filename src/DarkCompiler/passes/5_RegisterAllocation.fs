@@ -2133,6 +2133,48 @@ let loadSpilled (allocation: AllocationResult) (reg: LIR.Reg) (tempReg: LIR.Phys
 let private isX86_64Arch =
     System.Runtime.InteropServices.RuntimeInformation.OSArchitecture = System.Runtime.InteropServices.Architecture.X64
 
+/// On x86_64, when loading two spilled Reg-typed operands, the first must go to a
+/// register that won't be clobbered by the second load (into X12=R11). This function
+/// picks a safe register by checking what physical register the right operand uses.
+/// If both left and right are spilled to stack, loads left into dest register
+/// (unless dest conflicts with right's allocated register).
+let private loadSpilledPair (mapping: AllocationResult) (left: LIR.Reg) (right: LIR.Reg) (destReg: LIR.Reg)
+    : (LIR.Reg * LIR.Instr list) * (LIR.Reg * LIR.Instr list) =
+    if not isX86_64Arch then
+        (loadSpilled mapping left LIR.X12, loadSpilled mapping right LIR.X13)
+    else
+        // Check if left is actually spilled (StackSlot)
+        let leftIsSpilled =
+            match left with
+            | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
+            | _ -> false
+        let rightIsSpilled =
+            match right with
+            | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
+            | _ -> false
+        if leftIsSpilled && rightIsSpilled then
+            // Both spilled: load left into dest, right into X12
+            let destPhys = match destReg with LIR.Physical p -> p | _ -> LIR.X12
+            // Check that dest doesn't also alias R11
+            let leftTemp =
+                if destPhys <> LIR.X11 && destPhys <> LIR.X8 && destPhys <> LIR.X9 && destPhys <> LIR.X10
+                   && destPhys <> LIR.X12 && destPhys <> LIR.X13 && destPhys <> LIR.X14
+                   && destPhys <> LIR.X15 && destPhys <> LIR.X16 && destPhys <> LIR.X17
+                then destPhys
+                else LIR.X12  // fallback - both will be R11, but this is rare
+            (loadSpilled mapping left leftTemp, loadSpilled mapping right LIR.X12)
+        elif leftIsSpilled then
+            // Only left spilled: check if right occupies the same register as X12
+            let rightPhys =
+                match right with
+                | LIR.Physical p -> Some p
+                | LIR.Virtual id -> match tryAllocation mapping id with Some (PhysReg p) -> Some p | _ -> None
+            // If right is in a real register, use X12 for left (no conflict with right)
+            (loadSpilled mapping left LIR.X12, loadSpilled mapping right LIR.X12)
+        else
+            // Right spilled or neither: use X12 for left, X12 for right (OK since left isn't spilled)
+            (loadSpilled mapping left LIR.X12, loadSpilled mapping right LIR.X12)
+
 /// Apply allocation to an instruction
 let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list =
     match instr with
@@ -2188,8 +2230,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Mul (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let (leftReg, leftLoads) = loadSpilled mapping left LIR.X12
-        let (rightReg, rightLoads) = loadSpilled mapping right LIR.X13
+        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair mapping left right destReg
         let mulInstr = LIR.Mul (destReg, leftReg, rightReg)
         let storeInstrs =
             match destAlloc with
@@ -2199,8 +2240,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Sdiv (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let (leftReg, leftLoads) = loadSpilled mapping left LIR.X12
-        let (rightReg, rightLoads) = loadSpilled mapping right LIR.X13
+        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair mapping left right destReg
         let divInstr = LIR.Sdiv (destReg, leftReg, rightReg)
         let storeInstrs =
             match destAlloc with
@@ -2250,8 +2290,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.And (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let (leftReg, leftLoads) = loadSpilled mapping left LIR.X12
-        let (rightReg, rightLoads) = loadSpilled mapping right LIR.X13
+        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair mapping left right destReg
         let andInstr = LIR.And (destReg, leftReg, rightReg)
         let storeInstrs =
             match destAlloc with
@@ -2271,8 +2310,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Orr (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let (leftReg, leftLoads) = loadSpilled mapping left LIR.X12
-        let (rightReg, rightLoads) = loadSpilled mapping right LIR.X13
+        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair mapping left right destReg
         let orrInstr = LIR.Orr (destReg, leftReg, rightReg)
         let storeInstrs =
             match destAlloc with
@@ -2282,8 +2320,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Eor (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let (leftReg, leftLoads) = loadSpilled mapping left LIR.X12
-        let (rightReg, rightLoads) = loadSpilled mapping right LIR.X13
+        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair mapping left right destReg
         let eorInstr = LIR.Eor (destReg, leftReg, rightReg)
         let storeInstrs =
             match destAlloc with
@@ -2293,8 +2330,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Lsl (dest, src, shift) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let (srcReg, srcLoads) = loadSpilled mapping src LIR.X12
-        let (shiftReg, shiftLoads) = loadSpilled mapping shift LIR.X13
+        let ((srcReg, srcLoads), (shiftReg, shiftLoads)) = loadSpilledPair mapping src shift destReg
         let lslInstr = LIR.Lsl (destReg, srcReg, shiftReg)
         let storeInstrs =
             match destAlloc with
@@ -2304,8 +2340,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Lsr (dest, src, shift) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let (srcReg, srcLoads) = loadSpilled mapping src LIR.X12
-        let (shiftReg, shiftLoads) = loadSpilled mapping shift LIR.X13
+        let ((srcReg, srcLoads), (shiftReg, shiftLoads)) = loadSpilledPair mapping src shift destReg
         let lsrInstr = LIR.Lsr (destReg, srcReg, shiftReg)
         let storeInstrs =
             match destAlloc with
@@ -2783,8 +2818,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.RawGet (dest, ptr, byteOffset) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X12
-        let (offsetReg, offsetLoads) = loadSpilled mapping byteOffset LIR.X13
+        let ((ptrReg, ptrLoads), (offsetReg, offsetLoads)) = loadSpilledPair mapping ptr byteOffset destReg
         let getInstr = LIR.RawGet (destReg, ptrReg, offsetReg)
         let storeInstrs =
             match destAlloc with
@@ -2794,8 +2828,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.RawGetByte (dest, ptr, byteOffset) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X12
-        let (offsetReg, offsetLoads) = loadSpilled mapping byteOffset LIR.X13
+        let ((ptrReg, ptrLoads), (offsetReg, offsetLoads)) = loadSpilledPair mapping ptr byteOffset destReg
         let getInstr = LIR.RawGetByte (destReg, ptrReg, offsetReg)
         let storeInstrs =
             match destAlloc with
