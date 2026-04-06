@@ -64,6 +64,14 @@ let lirFRegToX86 (freg: LIR.PhysFPReg) : X86_64.FReg =
     | LIR.D12 -> X86_64.XMM12 | LIR.D13 -> X86_64.XMM13
     | LIR.D14 -> X86_64.XMM14 | LIR.D15 -> X86_64.XMM15
 
+/// Resolve a LIR.FReg to x86-64 XMM register.
+/// FVirtual 2000 is used as a temp for parallel float move resolution.
+let private resolveFreg (freg: LIR.FReg) : X86_64.FReg =
+    match freg with
+    | LIR.FPhysical fp -> lirFRegToX86 fp
+    | LIR.FVirtual 2000 -> X86_64.XMM15
+    | LIR.FVirtual _ -> X86_64.XMM15
+
 /// Resolve a LIR.Reg (Physical or Virtual) to x86-64 register.
 let resolveReg (reg: LIR.Reg) : Result<X86_64.Reg, string> =
     match reg with
@@ -272,8 +280,7 @@ let private genPrintBoolAndExit (srcReg: X86_64.Reg) : X86_64.Instr list =
 let private alignedStackSize (stackSlots: int) (numCalleeSaved: int) : int =
     let returnAddr = 8
     let pushes = numCalleeSaved * 8
-    let rawStack = stackSlots * 8
-    let total = returnAddr + pushes + rawStack
+    let total = returnAddr + pushes + stackSlots  // StackSize is already in bytes from regalloc
     let aligned = ((total + 15) / 16) * 16
     aligned - returnAddr - pushes
 
@@ -303,6 +310,12 @@ type private FuncCtx = {
     UsedCalleeSaved: LIR.PhysReg list
 }
 
+/// Adjust a stack slot offset to account for callee-saved registers pushed after RBP.
+/// LIR stack slots are byte offsets from FP (e.g., -8, -16), but callee-saved pushes
+/// occupy [RBP-8] through [RBP-N*8], so spill slots must be shifted past them.
+let private adjustStackOffset (ctx: FuncCtx) (offset: int) : int =
+    offset - (List.length ctx.UsedCalleeSaved * 8)
+
 /// Track whether the last comparison was FCmp (float) for correct condition codes.
 /// UCOMISD sets CF/ZF differently from CMP which sets SF/OF/ZF.
 let mutable private lastCompWasFloat = false
@@ -323,7 +336,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     if destReg = srcX86 then []
                     else [X86_64.MOV_reg (destReg, srcX86)])
             | LIR.StackSlot offset ->
-                Ok [X86_64.MOV_load (destReg, X86_64.RBP, int32 (offset * 8))]
+                Ok [X86_64.MOV_load (destReg, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
             | LIR.StringSymbol value ->
                 // Allocate heap string from literal: [length:8][data:N][refcount:8]
                 let len = System.Text.Encoding.UTF8.GetByteCount(value)
@@ -371,12 +384,10 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 Ok (loadImm64 destReg bits))
 
     | LIR.Store (stackSlot, src) ->
-        // Stack slots are accessed relative to RBP (frame pointer).
-        // Positive slots: [RBP - slot*8 - 8] (below saved RBP)
-        // Negative slots: [RBP + (-slot)*8] (above RBP, i.e., incoming stack args)
+        // Stack slots are byte offsets from FP, adjusted past callee-saved pushes
         resolveReg src
         |> Result.map (fun srcReg ->
-            [X86_64.MOV_store (X86_64.RBP, int32 (stackSlot * 8), srcReg)])
+            [X86_64.MOV_store (X86_64.RBP, int32 (adjustStackOffset ctx stackSlot), srcReg)])
 
     | LIR.Add (dest, left, right) ->
         resolveReg dest
@@ -402,7 +413,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                             setup @ [X86_64.ADD_reg (destReg, rightX86)])
                 | LIR.StackSlot offset ->
                     let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
-                    Ok (setup @ [X86_64.MOV_load (scratch, X86_64.RBP, int32 (offset * 8)); X86_64.ADD_reg (destReg, scratch)])
+                    Ok (setup @ [X86_64.MOV_load (scratch, X86_64.RBP, int32 (adjustStackOffset ctx offset)); X86_64.ADD_reg (destReg, scratch)])
                 | _ -> Error $"Unsupported Add right operand: {right}"))
 
     | LIR.Sub (dest, left, right) ->
@@ -754,7 +765,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             | LIR.Reg (LIR.Virtual _) ->
                 Error "Virtual register in ArgMoves"
             | LIR.StackSlot offset ->
-                Ok [X86_64.MOV_load (destX86, X86_64.RBP, int32 (offset * 8))]
+                Ok [X86_64.MOV_load (destX86, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
             | LIR.StringSymbol value ->
                 // Create heap string from literal, put pointer in dest
                 let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
@@ -857,7 +868,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 if srcPhys = destPhys then Ok []
                 else Ok [X86_64.MOV_reg (destX86, lirRegToX86 srcPhys)]
             | LIR.StackSlot offset ->
-                Ok [X86_64.MOV_load (destX86, X86_64.RBP, int32 (offset * 8))]
+                Ok [X86_64.MOV_load (destX86, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
             | LIR.StringSymbol value ->
                 let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
                 let len = strBytes.Length
@@ -1170,8 +1181,19 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         //   R8  = right data ptr, R9 = right len
         //   R10 = loop counter, R11(scratch) = temp byte
         //   destReg = result ptr, RCX = dest write ptr
+        //
+        // IMPORTANT: This operation clobbers RDI, RSI, RCX, R8, R9, R10.
+        // Save/restore all caller-saved registers except those used as operands,
+        // since the register allocator doesn't model these clobbers.
         resolveReg dest
         |> Result.bind (fun destReg ->
+            // Clobbered registers (RDI=X1, RSI=X2, RCX=X3, R8=X4, R9=X5, R10=X6)
+            // Save all except the dest reg (caller may still need operand regs after this)
+            let clobbered = [X86_64.RDI; X86_64.RSI; X86_64.RCX; X86_64.R8; X86_64.R9; X86_64.R10]
+            let toSave = clobbered |> List.filter (fun r -> r <> destReg)
+            let saveInstrs = toSave |> List.map (fun r -> X86_64.PUSH r)
+            let restoreInstrs = toSave |> List.rev |> List.map (fun r -> X86_64.POP r)
+
             let loadInfo (op: LIR.Operand) (addrDest: X86_64.Reg) (lenDest: X86_64.Reg) : Result<X86_64.Instr list, string> =
                 match op with
                 | LIR.Reg reg ->
@@ -1228,7 +1250,8 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 let saveRight = [X86_64.PUSH X86_64.R8; X86_64.PUSH X86_64.R9]
                 loadInfo left X86_64.RDI X86_64.RSI
                 |> Result.map (fun leftInstrs ->
-                    rightInstrs @ saveRight @ leftInstrs
+                    saveInstrs
+                    @ rightInstrs @ saveRight @ leftInstrs
                     // Restore right info
                     @ [X86_64.POP X86_64.R9; X86_64.POP X86_64.R8]
 
@@ -1294,7 +1317,8 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                            [X86_64.ADD_imm (X86_64.RSP, 8)]  // discard saved RBX
                        else
                            [X86_64.MOV_reg (destReg, X86_64.RBX)
-                            X86_64.POP X86_64.RBX]))))
+                            X86_64.POP X86_64.RBX])
+                    @ restoreInstrs)))
 
     | LIR.CoverageHit _ ->
         Ok []  // Coverage instrumentation not supported on x86_64 yet
