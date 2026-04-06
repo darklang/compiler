@@ -4,7 +4,7 @@
 
 Goal: reach ARM64 test parity (4486/4530 E2E tests) then merge to main.
 
-Current: 4039/4530 (89%). Gap: ~447 tests.
+Current: 4104/4530 (90.6%). Gap: ~382 tests.
 
 Recently fixed:
 - ArgMoves parallel move conflicts (red zone save for clobbered sources)
@@ -13,16 +13,17 @@ Recently fixed:
 - PrintFloat calls Stdlib.Float.toString instead of being a stub
 
 Remaining work (in priority order):
-1. Investigate why float E2E tests still fail despite correct output (~179 tests)
-   — `./dark -r -e "1.0"` prints "1.0" correctly but E2E runner says "Value mismatch"
-   — May be output format, newline, or E2E runner capture issue
-2. Fix remaining string operations (~92 tests) — comparison, indexOf
-3. Fix remaining segfaults (~146 tests) — various causes
-4. Fix dict operations (~63 tests) — depends on string ops
-5. Fix remaining list operations (~58 tests) — list printing, comparison
-6. Fix remaining closures (~19 tests) — edge cases with captures
-7. Fix 128-bit integer types (~13 tests)
-8. Implement file I/O syscalls
+1. Fix stack slot addressing for functions with spilled values + negative offsets
+   — Positive offsets (local spills) use `[RBP + offset*8]`
+   — Negative offsets (Stack -8, -16) are incoming stack args, need `[RBP + offset]` (raw bytes)
+   — Need to distinguish the two cases; currently `* 8` is applied to all
+   — This causes ~100 segfaults in complex stdlib functions (fingertree, List.push, etc.)
+2. Fix remaining dict operations (~47 tests) — depends on fingertree fixes
+3. Fix remaining list operations (~52 tests) — most depend on fingertree
+4. Fix remaining floats (~21 tests) — edge cases
+5. Fix remaining tailcall (~10 tests)
+6. Fix 128-bit integer types (~13 tests)
+7. Implement file I/O syscalls
 
 Approach: TDD — pick a failing E2E test, write the smallest fix, run full suite.
 See CLAUDE.md for x86_64 architecture decisions and known patterns.
