@@ -272,8 +272,7 @@ let private genPrintBoolAndExit (srcReg: X86_64.Reg) : X86_64.Instr list =
 let private alignedStackSize (stackSlots: int) (numCalleeSaved: int) : int =
     let returnAddr = 8
     let pushes = numCalleeSaved * 8
-    let rawStack = stackSlots * 8
-    let total = returnAddr + pushes + rawStack
+    let total = returnAddr + pushes + stackSlots  // StackSize from LIR is already in bytes
     let aligned = ((total + 15) / 16) * 16
     aligned - returnAddr - pushes
 
@@ -323,7 +322,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     if destReg = srcX86 then []
                     else [X86_64.MOV_reg (destReg, srcX86)])
             | LIR.StackSlot offset ->
-                Ok [X86_64.MOV_load (destReg, X86_64.RBP, int32 (offset * 8))]
+                Ok [X86_64.MOV_load (destReg, X86_64.RBP, int32 offset)]
             | LIR.StringSymbol value ->
                 // Allocate heap string from literal: [length:8][data:N][refcount:8]
                 let len = System.Text.Encoding.UTF8.GetByteCount(value)
@@ -376,7 +375,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         // Negative slots: [RBP + (-slot)*8] (above RBP, i.e., incoming stack args)
         resolveReg src
         |> Result.map (fun srcReg ->
-            [X86_64.MOV_store (X86_64.RBP, int32 (stackSlot * 8), srcReg)])
+            [X86_64.MOV_store (X86_64.RBP, int32 stackSlot, srcReg)])
 
     | LIR.Add (dest, left, right) ->
         resolveReg dest
@@ -402,7 +401,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                             setup @ [X86_64.ADD_reg (destReg, rightX86)])
                 | LIR.StackSlot offset ->
                     let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
-                    Ok (setup @ [X86_64.MOV_load (scratch, X86_64.RBP, int32 (offset * 8)); X86_64.ADD_reg (destReg, scratch)])
+                    Ok (setup @ [X86_64.MOV_load (scratch, X86_64.RBP, int32 offset); X86_64.ADD_reg (destReg, scratch)])
                 | _ -> Error $"Unsupported Add right operand: {right}"))
 
     | LIR.Sub (dest, left, right) ->
@@ -754,7 +753,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             | LIR.Reg (LIR.Virtual _) ->
                 Error "Virtual register in ArgMoves"
             | LIR.StackSlot offset ->
-                Ok [X86_64.MOV_load (destX86, X86_64.RBP, int32 (offset * 8))]
+                Ok [X86_64.MOV_load (destX86, X86_64.RBP, int32 offset)]
             | LIR.StringSymbol value ->
                 // Create heap string from literal, put pointer in dest
                 let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
@@ -857,7 +856,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 if srcPhys = destPhys then Ok []
                 else Ok [X86_64.MOV_reg (destX86, lirRegToX86 srcPhys)]
             | LIR.StackSlot offset ->
-                Ok [X86_64.MOV_load (destX86, X86_64.RBP, int32 (offset * 8))]
+                Ok [X86_64.MOV_load (destX86, X86_64.RBP, int32 offset)]
             | LIR.StringSymbol value ->
                 let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
                 let len = strBytes.Length
