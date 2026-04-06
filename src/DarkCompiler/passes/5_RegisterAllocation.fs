@@ -2443,8 +2443,13 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (destReg, destAlloc) = applyToReg mapping dest
         let allocatedArgs =
             args |> List.mapi (fun i arg ->
-                let tempReg = if i = 0 then LIR.X12 else LIR.X13
-                applyToOperand mapping arg tempReg
+                if isX86_64Arch then
+                    // On x86_64, X12/X13 both map to R11. Use applyToOperandNoLoad
+                    // to keep spilled args as StackSlots - ArgMoves handles loading them.
+                    (applyToOperandNoLoad mapping arg, [])
+                else
+                    let tempReg = if i = 0 then LIR.X12 else LIR.X13
+                    applyToOperand mapping arg tempReg
             )
         let argLoads = allocatedArgs |> List.collect snd
         let argOps = allocatedArgs |> List.map fst
@@ -2459,8 +2464,10 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         // Tail calls have no destination - just apply allocation to args
         let allocatedArgs =
             args |> List.mapi (fun i arg ->
-                let tempReg = if i = 0 then LIR.X12 else LIR.X13
-                applyToOperand mapping arg tempReg
+                if isX86_64Arch then (applyToOperandNoLoad mapping arg, [])
+                else
+                    let tempReg = if i = 0 then LIR.X12 else LIR.X13
+                    applyToOperand mapping arg tempReg
             )
         let argLoads = allocatedArgs |> List.collect snd
         let argOps = allocatedArgs |> List.map fst
@@ -2472,8 +2479,10 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (funcReg, funcLoads) = loadSpilled mapping func LIR.X14
         let allocatedArgs =
             args |> List.mapi (fun i arg ->
-                let tempReg = if i = 0 then LIR.X12 else LIR.X13
-                applyToOperand mapping arg tempReg
+                if isX86_64Arch then (applyToOperandNoLoad mapping arg, [])
+                else
+                    let tempReg = if i = 0 then LIR.X12 else LIR.X13
+                    applyToOperand mapping arg tempReg
             )
         let argLoads = allocatedArgs |> List.collect snd
         let argOps = allocatedArgs |> List.map fst
@@ -2489,8 +2498,10 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (funcReg, funcLoads) = loadSpilled mapping func LIR.X14
         let allocatedArgs =
             args |> List.mapi (fun i arg ->
-                let tempReg = if i = 0 then LIR.X12 else LIR.X13
-                applyToOperand mapping arg tempReg
+                if isX86_64Arch then (applyToOperandNoLoad mapping arg, [])
+                else
+                    let tempReg = if i = 0 then LIR.X12 else LIR.X13
+                    applyToOperand mapping arg tempReg
             )
         let argLoads = allocatedArgs |> List.collect snd
         let argOps = allocatedArgs |> List.map fst
@@ -2501,8 +2512,10 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (destReg, destAlloc) = applyToReg mapping dest
         let allocatedCaptures =
             captures |> List.mapi (fun i cap ->
-                let tempReg = if i = 0 then LIR.X12 else LIR.X13
-                applyToOperand mapping cap tempReg
+                if isX86_64Arch then (applyToOperandNoLoad mapping cap, [])
+                else
+                    let tempReg = if i = 0 then LIR.X12 else LIR.X13
+                    applyToOperand mapping cap tempReg
             )
         let capLoads = allocatedCaptures |> List.collect snd
         let capOps = allocatedCaptures |> List.map fst
@@ -2518,8 +2531,10 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (closureReg, closureLoads) = loadSpilled mapping closure LIR.X14
         let allocatedArgs =
             args |> List.mapi (fun i arg ->
-                let tempReg = if i = 0 then LIR.X12 else LIR.X13
-                applyToOperand mapping arg tempReg
+                if isX86_64Arch then (applyToOperandNoLoad mapping arg, [])
+                else
+                    let tempReg = if i = 0 then LIR.X12 else LIR.X13
+                    applyToOperand mapping arg tempReg
             )
         let argLoads = allocatedArgs |> List.collect snd
         let argOps = allocatedArgs |> List.map fst
@@ -2535,8 +2550,10 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (closureReg, closureLoads) = loadSpilled mapping closure LIR.X14
         let allocatedArgs =
             args |> List.mapi (fun i arg ->
-                let tempReg = if i = 0 then LIR.X12 else LIR.X13
-                applyToOperand mapping arg tempReg
+                if isX86_64Arch then (applyToOperandNoLoad mapping arg, [])
+                else
+                    let tempReg = if i = 0 then LIR.X12 else LIR.X13
+                    applyToOperand mapping arg tempReg
             )
         let argLoads = allocatedArgs |> List.collect snd
         let argOps = allocatedArgs |> List.map fst
