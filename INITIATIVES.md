@@ -4,7 +4,7 @@
 
 Goal: reach ARM64 test parity (4486/4530 E2E tests) then merge to main.
 
-Current: 4104/4530 (90.6%). Gap: ~382 tests.
+Current: 4145/4530 (91.5%). Gap: ~341 tests.
 
 Recently fixed:
 - ArgMoves parallel move conflicts (red zone save for clobbered sources)
