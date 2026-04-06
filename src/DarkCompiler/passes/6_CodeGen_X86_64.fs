@@ -1429,36 +1429,74 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         resolveReg dest |> Result.bind (fun d ->
             resolveReg ptr |> Result.bind (fun p ->
                 resolveReg byteOffset |> Result.map (fun o ->
-                    [X86_64.ADD_reg (scratch, p)  // scratch might clobber, use LEA
-                    ] |> ignore
-                    // ptr + byteOffset → load 8 bytes
-                    [X86_64.MOV_reg (scratch, p)
-                     X86_64.ADD_reg (scratch, o)
-                     X86_64.MOV_load (d, scratch, 0)])))
+                    if o = scratch && p <> scratch then
+                        // Offset is R11: MOV scratch,p would clobber offset.
+                        // Swap: compute p + o by loading o first, adding p.
+                        [X86_64.ADD_reg (scratch, p)
+                         X86_64.MOV_load (d, scratch, 0)]
+                    elif p = scratch && o <> scratch then
+                        // Ptr is R11: MOV is no-op, just add offset
+                        [X86_64.ADD_reg (scratch, o)
+                         X86_64.MOV_load (d, scratch, 0)]
+                    elif p = scratch && o = scratch then
+                        // Both are R11 (same virtual reg): scratch = scratch + scratch
+                        [X86_64.ADD_reg (scratch, scratch)
+                         X86_64.MOV_load (d, scratch, 0)]
+                    else
+                        [X86_64.MOV_reg (scratch, p)
+                         X86_64.ADD_reg (scratch, o)
+                         X86_64.MOV_load (d, scratch, 0)])))
 
     | LIR.RawGetByte (dest, ptr, byteOffset) ->
         resolveReg dest |> Result.bind (fun d ->
             resolveReg ptr |> Result.bind (fun p ->
                 resolveReg byteOffset |> Result.map (fun o ->
-                    [X86_64.MOV_reg (scratch, p)
-                     X86_64.ADD_reg (scratch, o)
-                     X86_64.MOV_load_byte (d, scratch, 0)])))
+                    if o = scratch && p <> scratch then
+                        [X86_64.ADD_reg (scratch, p)
+                         X86_64.MOV_load_byte (d, scratch, 0)]
+                    elif p = scratch then
+                        [X86_64.ADD_reg (scratch, o)
+                         X86_64.MOV_load_byte (d, scratch, 0)]
+                    else
+                        [X86_64.MOV_reg (scratch, p)
+                         X86_64.ADD_reg (scratch, o)
+                         X86_64.MOV_load_byte (d, scratch, 0)])))
 
     | LIR.RawSet (ptr, byteOffset, value, _) ->
         resolveReg ptr |> Result.bind (fun p ->
             resolveReg byteOffset |> Result.bind (fun o ->
                 resolveReg value |> Result.map (fun v ->
-                    [X86_64.MOV_reg (scratch, p)
-                     X86_64.ADD_reg (scratch, o)
-                     X86_64.MOV_store (scratch, 0, v)])))
+                    if v = scratch || o = scratch then
+                        // An operand is R11 (scratch) which we need for address computation.
+                        // Use RCX as an extra temp (save/restore if needed).
+                        let tempReg = X86_64.RCX
+                        [X86_64.PUSH tempReg
+                         X86_64.MOV_reg (tempReg, v)   // save value in temp
+                         X86_64.MOV_reg (scratch, p)
+                         X86_64.ADD_reg (scratch, o)
+                         X86_64.MOV_store (scratch, 0, tempReg)
+                         X86_64.POP tempReg]
+                    else
+                        [X86_64.MOV_reg (scratch, p)
+                         X86_64.ADD_reg (scratch, o)
+                         X86_64.MOV_store (scratch, 0, v)])))
 
     | LIR.RawSetByte (ptr, byteOffset, value) ->
         resolveReg ptr |> Result.bind (fun p ->
             resolveReg byteOffset |> Result.bind (fun o ->
                 resolveReg value |> Result.map (fun v ->
-                    [X86_64.MOV_reg (scratch, p)
-                     X86_64.ADD_reg (scratch, o)
-                     X86_64.MOV_store_byte (scratch, 0, v)])))
+                    if v = scratch || o = scratch then
+                        let tempReg = X86_64.RCX
+                        [X86_64.PUSH tempReg
+                         X86_64.MOV_reg (tempReg, v)
+                         X86_64.MOV_reg (scratch, p)
+                         X86_64.ADD_reg (scratch, o)
+                         X86_64.MOV_store_byte (scratch, 0, tempReg)
+                         X86_64.POP tempReg]
+                    else
+                        [X86_64.MOV_reg (scratch, p)
+                         X86_64.ADD_reg (scratch, o)
+                         X86_64.MOV_store_byte (scratch, 0, v)])))
 
     | LIR.RandomInt64 dest ->
         // getrandom(buf, 8, 0) syscall
