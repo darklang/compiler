@@ -1719,9 +1719,86 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         resolveReg dest
         |> Result.map (fun destReg -> loadImm64 destReg 0L)
 
-    | LIR.FileExists (dest, _) ->
+    | LIR.FileExists (dest, path) ->
         resolveReg dest
-        |> Result.map (fun destReg -> loadImm64 destReg 0L)
+        |> Result.bind (fun destReg ->
+            let resolvePathToR10 =
+                match path with
+                | LIR.Reg reg ->
+                    resolveReg reg |> Result.map (fun srcReg ->
+                        if srcReg = X86_64.R10 then [] else [X86_64.MOV_reg (X86_64.R10, srcReg)])
+                | LIR.StackSlot offset ->
+                    Ok [X86_64.MOV_load (X86_64.R10, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
+                | LIR.StringSymbol value ->
+                    // Create heap string on heap, put pointer in R10
+                    let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
+                    let len = strBytes.Length
+                    let totalSize = ((len + 16) + 7) &&& (~~~7)
+                    let alloc = [X86_64.MOV_reg (X86_64.R10, heapPtr); X86_64.ADD_imm (heapPtr, int32 totalSize)]
+                    let storeLen = loadImm64 scratch (int64 len) @ [X86_64.MOV_store (X86_64.R10, 0, scratch)]
+                    let copyBytes =
+                        let chunks = (len + 7) / 8
+                        [0 .. chunks - 1] |> List.collect (fun i ->
+                            let off = 8 + i * 8
+                            let chunkLen = min 8 (len - i * 8)
+                            let v = [0..chunkLen-1] |> List.fold (fun acc j ->
+                                let bi = i * 8 + j
+                                if bi < strBytes.Length then acc ||| (int64 strBytes.[bi] <<< (j * 8)) else acc) 0L
+                            loadImm64 scratch v @ [X86_64.MOV_store (X86_64.R10, int32 off, scratch)])
+                    Ok (alloc @ storeLen @ copyBytes)
+                | _ -> Ok (loadImm64 X86_64.R10 0L)
+            let copyLabel = freshLabel "fe_copy"
+            let doneLabel = freshLabel "fe_done"
+            resolvePathToR10 |> Result.map (fun pathSetup ->
+                let accessSyscall = int64 syscalls.Access
+                // Save clobbered registers (access syscall uses RDI, RSI, RAX + copy uses RCX, R10)
+                let saves = [X86_64.PUSH X86_64.RDI; X86_64.PUSH X86_64.RSI; X86_64.PUSH X86_64.RCX; X86_64.PUSH X86_64.R10]
+                let restores = [X86_64.POP X86_64.R10; X86_64.POP X86_64.RCX; X86_64.POP X86_64.RSI; X86_64.POP X86_64.RDI]
+                pathSetup @ saves
+                // Allocate 264 bytes on stack for null-terminated path
+                @ [X86_64.SUB_imm (X86_64.RSP, 264)]
+                // R10 = heap string ptr. [R10] = length, R10+8 = data
+                // RSI = string data addr, RDI = stack buf, RCX = length, R11 = counter
+                @ [X86_64.MOV_load (X86_64.RCX, X86_64.R10, 0)   // RCX = length
+                   X86_64.LEA (X86_64.RSI, X86_64.R10, 8)         // RSI = data ptr
+                   X86_64.MOV_reg (X86_64.RDI, X86_64.RSP)]       // RDI = stack buf
+                // Copy loop using R11 (scratch) as counter
+                @ loadImm64 X86_64.R10 0L  // R10 = counter (reuse R10 since string ptr no longer needed)
+                @ [X86_64.Label copyLabel
+                   X86_64.CMP_reg (X86_64.R10, X86_64.RCX)
+                   X86_64.Jcc (X86_64.GE, doneLabel)
+                   // scratch = [RSI + R10]
+                   X86_64.MOV_reg (scratch, X86_64.RSI)
+                   X86_64.ADD_reg (scratch, X86_64.R10)
+                   X86_64.MOV_load_byte (scratch, scratch, 0)
+                   // [RDI + R10] = byte
+                   X86_64.PUSH X86_64.R8
+                   X86_64.MOV_reg (X86_64.R8, X86_64.RDI)
+                   X86_64.ADD_reg (X86_64.R8, X86_64.R10)
+                   X86_64.MOV_store_byte (X86_64.R8, 0, scratch)
+                   X86_64.POP X86_64.R8
+                   X86_64.ADD_imm (X86_64.R10, 1)
+                   X86_64.JMP copyLabel
+                   X86_64.Label doneLabel]
+                // Null-terminate: [RDI + RCX] = 0
+                @ [X86_64.MOV_reg (scratch, X86_64.RDI)
+                   X86_64.ADD_reg (scratch, X86_64.RCX)]
+                @ loadImm64 X86_64.R10 0L
+                @ [X86_64.MOV_store_byte (scratch, 0, X86_64.R10)]
+                // syscall: access(path=RSP, mode=F_OK=0)
+                @ [X86_64.MOV_reg (X86_64.RDI, X86_64.RSP)]
+                @ loadImm64 X86_64.RSI 0L
+                @ loadImm64 X86_64.RAX accessSyscall
+                @ [X86_64.SYSCALL
+                   // RAX = 0 if exists, negative otherwise
+                   // Convert to boolean in R10 (safe temp, will be popped later but unused)
+                   X86_64.CMP_imm (X86_64.RAX, 0)
+                   X86_64.SETcc (X86_64.EQ, X86_64.RAX)
+                   X86_64.MOVZX_byte (X86_64.RAX, X86_64.RAX)
+                   X86_64.ADD_imm (X86_64.RSP, 264)]
+                @ restores
+                // Move result to destReg after restoring saved registers
+                @ [X86_64.MOV_reg (destReg, X86_64.RAX)]))
 
     | LIR.FileDelete (dest, _) ->
         resolveReg dest
