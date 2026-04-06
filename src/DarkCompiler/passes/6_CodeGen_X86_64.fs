@@ -964,11 +964,24 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         |> Result.bind (fun addrReg ->
             match src with
             | LIR.Imm value ->
-                Ok (loadImm64 scratch value @ [X86_64.MOV_store (addrReg, int32 offset, scratch)])
+                if addrReg = scratch then
+                    // Address is R11 - can't use scratch for the immediate value
+                    Ok ([X86_64.PUSH X86_64.RCX]
+                        @ loadImm64 X86_64.RCX value
+                        @ [X86_64.MOV_store (addrReg, int32 offset, X86_64.RCX)
+                           X86_64.POP X86_64.RCX])
+                else
+                    Ok (loadImm64 scratch value @ [X86_64.MOV_store (addrReg, int32 offset, scratch)])
             | LIR.Reg srcReg ->
                 resolveReg srcReg
                 |> Result.map (fun srcX86 ->
-                    [X86_64.MOV_store (addrReg, int32 offset, srcX86)])
+                    if addrReg = scratch && srcX86 = scratch then
+                        // Both addr and src are R11 - store R11 at [R11 + offset]
+                        [X86_64.MOV_store (scratch, int32 offset, scratch)]
+                    else if addrReg = scratch then
+                        [X86_64.MOV_store (scratch, int32 offset, srcX86)]
+                    else
+                        [X86_64.MOV_store (addrReg, int32 offset, srcX86)])
             | LIR.FuncAddr funcName ->
                 Ok [X86_64.LEA_rip (scratch, funcName)
                     X86_64.MOV_store (addrReg, int32 offset, scratch)]
