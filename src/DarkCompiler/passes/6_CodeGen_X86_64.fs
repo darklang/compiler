@@ -1073,6 +1073,16 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 // Store the string pointer into the record field
                 Ok (alloc @ storeLen @ copyBytes @ storeRC
                     @ [X86_64.MOV_store (addrReg, int32 offset, scratch)])
+            | LIR.StackSlot stackOffset ->
+                let adjOff = adjustStackOffset ctx stackOffset
+                if addrReg = scratch then
+                    Ok ([X86_64.PUSH X86_64.RCX
+                         X86_64.MOV_load (X86_64.RCX, X86_64.RBP, int32 adjOff)
+                         X86_64.MOV_store (addrReg, int32 offset, X86_64.RCX)
+                         X86_64.POP X86_64.RCX])
+                else
+                    Ok [X86_64.MOV_load (scratch, X86_64.RBP, int32 adjOff)
+                        X86_64.MOV_store (addrReg, int32 offset, scratch)]
             | _ -> Error $"Unsupported HeapStore source: {src}")
 
     | LIR.HeapLoad (dest, addr, offset) ->
@@ -1471,6 +1481,10 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                         match resolveReg reg with
                         | Ok srcReg -> [X86_64.MOV_store (destReg, int32 offset, srcReg)]
                         | Error _ -> []
+                    | LIR.StackSlot stackOffset ->
+                        let adjOff = adjustStackOffset ctx stackOffset
+                        [X86_64.MOV_load (scratch, X86_64.RBP, int32 adjOff)
+                         X86_64.MOV_store (destReg, int32 offset, scratch)]
                     | _ -> [])
             Ok (alloc @ storeRC @ storeFunc @ storeCaptures))
 
