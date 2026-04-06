@@ -278,20 +278,24 @@ let private alignedStackSize (stackSlots: int) (numCalleeSaved: int) : int =
     aligned - returnAddr - pushes
 
 let private genPrologue (stackSize: int) (usedCalleeSaved: LIR.PhysReg list) : X86_64.Instr list =
+    // Push RBP and set up frame pointer for stack slot access.
+    // Stack slots use [RBP - offset] which is stable across SaveRegs PUSHes.
+    let setupFP = [X86_64.PUSH X86_64.RBP; X86_64.MOV_reg (X86_64.RBP, X86_64.RSP)]
     let saves = usedCalleeSaved |> List.map (fun reg -> X86_64.PUSH (lirRegToX86 reg))
-    let alignedSize = alignedStackSize stackSize (List.length usedCalleeSaved)
+    let alignedSize = alignedStackSize stackSize (List.length usedCalleeSaved + 1)  // +1 for RBP push
     let stackAlloc =
         if alignedSize > 0 then [X86_64.SUB_imm (X86_64.RSP, int32 alignedSize)]
         else []
-    saves @ stackAlloc
+    setupFP @ saves @ stackAlloc
 
 let private genEpilogue (stackSize: int) (usedCalleeSaved: LIR.PhysReg list) : X86_64.Instr list =
-    let alignedSize = alignedStackSize stackSize (List.length usedCalleeSaved)
+    let alignedSize = alignedStackSize stackSize (List.length usedCalleeSaved + 1)
     let stackDealloc =
         if alignedSize > 0 then [X86_64.ADD_imm (X86_64.RSP, int32 alignedSize)]
         else []
     let restores = usedCalleeSaved |> List.rev |> List.map (fun reg -> X86_64.POP (lirRegToX86 reg))
-    stackDealloc @ restores
+    let restoreFP = [X86_64.POP X86_64.RBP]
+    stackDealloc @ restores @ restoreFP
 
 /// Function context for instructions that need stack frame info (TailCall, etc.)
 type private FuncCtx = {
@@ -319,7 +323,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     if destReg = srcX86 then []
                     else [X86_64.MOV_reg (destReg, srcX86)])
             | LIR.StackSlot offset ->
-                Ok [X86_64.MOV_load (destReg, X86_64.RSP, int32 (offset * 8))]
+                Ok [X86_64.MOV_load (destReg, X86_64.RBP, int32 (offset * 8))]
             | LIR.StringSymbol value ->
                 // Allocate heap string from literal: [length:8][data:N][refcount:8]
                 let len = System.Text.Encoding.UTF8.GetByteCount(value)
@@ -367,9 +371,12 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 Ok (loadImm64 destReg bits))
 
     | LIR.Store (stackSlot, src) ->
+        // Stack slots are accessed relative to RBP (frame pointer).
+        // Positive slots: [RBP - slot*8 - 8] (below saved RBP)
+        // Negative slots: [RBP + (-slot)*8] (above RBP, i.e., incoming stack args)
         resolveReg src
         |> Result.map (fun srcReg ->
-            [X86_64.MOV_store (X86_64.RSP, int32 (stackSlot * 8), srcReg)])
+            [X86_64.MOV_store (X86_64.RBP, int32 (stackSlot * 8), srcReg)])
 
     | LIR.Add (dest, left, right) ->
         resolveReg dest
@@ -395,7 +402,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                             setup @ [X86_64.ADD_reg (destReg, rightX86)])
                 | LIR.StackSlot offset ->
                     let setup = if destReg <> leftReg then [X86_64.MOV_reg (destReg, leftReg)] else []
-                    Ok (setup @ [X86_64.MOV_load (scratch, X86_64.RSP, int32 (offset * 8)); X86_64.ADD_reg (destReg, scratch)])
+                    Ok (setup @ [X86_64.MOV_load (scratch, X86_64.RBP, int32 (offset * 8)); X86_64.ADD_reg (destReg, scratch)])
                 | _ -> Error $"Unsupported Add right operand: {right}"))
 
     | LIR.Sub (dest, left, right) ->
@@ -747,7 +754,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             | LIR.Reg (LIR.Virtual _) ->
                 Error "Virtual register in ArgMoves"
             | LIR.StackSlot offset ->
-                Ok [X86_64.MOV_load (destX86, X86_64.RSP, int32 (offset * 8))]
+                Ok [X86_64.MOV_load (destX86, X86_64.RBP, int32 (offset * 8))]
             | LIR.StringSymbol value ->
                 // Create heap string from literal, put pointer in dest
                 let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
@@ -850,7 +857,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 if srcPhys = destPhys then Ok []
                 else Ok [X86_64.MOV_reg (destX86, lirRegToX86 srcPhys)]
             | LIR.StackSlot offset ->
-                Ok [X86_64.MOV_load (destX86, X86_64.RSP, int32 (offset * 8))]
+                Ok [X86_64.MOV_load (destX86, X86_64.RBP, int32 (offset * 8))]
             | LIR.StringSymbol value ->
                 let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
                 let len = strBytes.Length
