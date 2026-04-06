@@ -1272,8 +1272,18 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 | LIR.Reg reg ->
                     resolveReg reg
                     |> Result.map (fun srcReg ->
-                        [X86_64.MOV_load (lenDest, srcReg, 0)
-                         X86_64.LEA (addrDest, srcReg, 8)])
+                        if srcReg = lenDest then
+                            // srcReg == lenDest: LEA first so MOV_load doesn't clobber pointer
+                            [X86_64.LEA (addrDest, srcReg, 8)
+                             X86_64.MOV_load (lenDest, srcReg, 0)]
+                        elif srcReg = addrDest then
+                            // srcReg == addrDest: save pointer in scratch before LEA clobbers it
+                            [X86_64.MOV_reg (scratch, srcReg)
+                             X86_64.MOV_load (lenDest, srcReg, 0)
+                             X86_64.LEA (addrDest, scratch, 8)]
+                        else
+                            [X86_64.MOV_load (lenDest, srcReg, 0)
+                             X86_64.LEA (addrDest, srcReg, 8)])
                 | LIR.StringSymbol value ->
                     // Create literal string on heap, then point to its data
                     let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
