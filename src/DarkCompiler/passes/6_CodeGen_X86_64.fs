@@ -1001,15 +1001,16 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
     // --- Floating-point operations ---
 
     | LIR.FMov (dest, src) ->
-        match dest with
-        | LIR.FPhysical dp ->
-            match src with
-            | LIR.FPhysical sp ->
-                let d = lirFRegToX86 dp
-                let s = lirFRegToX86 sp
-                Ok (if d = s then [] else [X86_64.MOVSD_reg (d, s)])
-            | _ -> Error "FMov with virtual FP register"
-        | _ -> Error "FMov with virtual FP register"
+        // Handle both physical and virtual FP registers.
+        // FVirtual 2000 is used as a temp for parallel float move resolution.
+        let resolveF (freg: LIR.FReg) : X86_64.FReg =
+            match freg with
+            | LIR.FPhysical fp -> lirFRegToX86 fp
+            | LIR.FVirtual 2000 -> X86_64.XMM15  // Parallel move temp (like ARM64's D16)
+            | LIR.FVirtual _ -> X86_64.XMM15     // Fallback for any virtual FP reg
+        let d = resolveF dest
+        let s = resolveF src
+        Ok (if d = s then [] else [X86_64.MOVSD_reg (d, s)])
 
     | LIR.FLoad (dest, value) ->
         match dest with
