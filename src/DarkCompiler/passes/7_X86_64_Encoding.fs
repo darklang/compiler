@@ -124,6 +124,8 @@ let private condCode (cond: Condition) : byte =
     | AE -> 0x03uy  // CF=0 (unsigned/float above or equal)
     | BE -> 0x06uy  // CF=1 or ZF=1 (unsigned/float below or equal)
     | A  -> 0x07uy  // CF=0 and ZF=0 (unsigned/float above)
+    | P  -> 0x0Auy  // PF=1 (parity/unordered - NaN)
+    | NP -> 0x0Buy  // PF=0 (no parity/ordered - not NaN)
 
 /// Encode a single x86-64 instruction to bytes
 let encodeInstruction (instr: Instr) : byte array =

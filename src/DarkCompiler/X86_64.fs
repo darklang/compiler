@@ -47,6 +47,8 @@ type Condition =
     | A    // Above (CF=0 and ZF=0) — float greater than
     | BE   // Below or equal (CF=1 or ZF=1) — float less or equal
     | AE   // Above or equal (CF=0) — float greater or equal
+    | P    // Parity set (PF=1) — unordered (NaN)
+    | NP   // Parity not set (PF=0) — ordered (not NaN)
 
 /// Operand size for instructions that need explicit sizing
 type Size =

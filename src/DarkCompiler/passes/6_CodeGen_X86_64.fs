@@ -580,22 +580,35 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
     | LIR.Cset (dest, cond) ->
         resolveReg dest
         |> Result.map (fun destReg ->
-            let x86Cond =
-                if lastCompWasFloat then
-                    // After UCOMISD: use CF/ZF-based (unsigned) condition codes
-                    match cond with
-                    | LIR.EQ -> X86_64.EQ  // ZF=1 (same for int/float)
-                    | LIR.NE -> X86_64.NE  // ZF=0 (same for int/float)
-                    | LIR.LT -> X86_64.B   // CF=1 (below)
-                    | LIR.GT -> X86_64.A   // CF=0 and ZF=0 (above)
-                    | LIR.LE -> X86_64.BE  // CF=1 or ZF=1 (below or equal)
-                    | LIR.GE -> X86_64.AE  // CF=0 (above or equal)
-                else
+            if lastCompWasFloat then
+                match cond with
+                | LIR.EQ ->
+                    // Float EQ: ordered AND equal (ZF=1 AND PF=0)
+                    // SETE + SETNP, then AND
+                    [X86_64.SETcc (X86_64.EQ, destReg)
+                     X86_64.MOVZX_byte (destReg, destReg)
+                     X86_64.SETcc (X86_64.NP, scratch)
+                     X86_64.MOVZX_byte (scratch, scratch)
+                     X86_64.AND_reg (destReg, scratch)]
+                | LIR.NE ->
+                    // Float NE: unordered OR not equal (ZF=0 OR PF=1)
+                    // SETNE + SETP, then OR
+                    [X86_64.SETcc (X86_64.NE, destReg)
+                     X86_64.MOVZX_byte (destReg, destReg)
+                     X86_64.SETcc (X86_64.P, scratch)
+                     X86_64.MOVZX_byte (scratch, scratch)
+                     X86_64.OR_reg (destReg, scratch)]
+                | LIR.LT -> [X86_64.SETcc (X86_64.B, destReg); X86_64.MOVZX_byte (destReg, destReg)]
+                | LIR.GT -> [X86_64.SETcc (X86_64.A, destReg); X86_64.MOVZX_byte (destReg, destReg)]
+                | LIR.LE -> [X86_64.SETcc (X86_64.BE, destReg); X86_64.MOVZX_byte (destReg, destReg)]
+                | LIR.GE -> [X86_64.SETcc (X86_64.AE, destReg); X86_64.MOVZX_byte (destReg, destReg)]
+            else
+                let x86Cond =
                     match cond with
                     | LIR.EQ -> X86_64.EQ | LIR.NE -> X86_64.NE
                     | LIR.LT -> X86_64.LT | LIR.GT -> X86_64.GT
                     | LIR.LE -> X86_64.LE | LIR.GE -> X86_64.GE
-            [X86_64.SETcc (x86Cond, destReg); X86_64.MOVZX_byte (destReg, destReg)])
+                [X86_64.SETcc (x86Cond, destReg); X86_64.MOVZX_byte (destReg, destReg)])
 
     | LIR.And (dest, left, right) ->
         resolveReg dest |> Result.bind (fun d -> resolveReg left |> Result.bind (fun l -> resolveReg right |> Result.map (fun r ->
