@@ -4,26 +4,25 @@
 
 Goal: reach ARM64 test parity (4486/4530 E2E tests) then merge to main.
 
-Current: 4145/4530 (91.5%). Gap: ~341 tests.
+Current: 4267/4530 (94.2%). Gap: ~263 tests.
 
 Recently fixed:
-- ArgMoves parallel move conflicts (red zone save for clobbered sources)
-- Float.toString now works for ALL fractions (0.14, 3.14, etc.)
-- String.take/slice work correctly
-- PrintFloat calls Stdlib.Float.toString instead of being a stub
+- **x86_64 spill scratch register aliasing** — X8-X17 all map to R11; the register
+  allocator used X12/X13 as distinct scratch registers for loading spilled operands,
+  but both are R11 on x86_64. Fixed Add/Sub/Cmp via StackSlot approach in codegen,
+  and Mul/And/Or/RawGet via loadSpilledPair (loads left into dest register instead).
+- HeapStore R11 conflict, RawGet/RawSet R11 conflicts
+- Lsl/Lsr RCX clobbering, StringConcat register clobbering
 
 Remaining work (in priority order):
-1. Fix stack slot addressing for functions with spilled values + negative offsets
-   — Positive offsets (local spills) use `[RBP + offset*8]`
-   — Negative offsets (Stack -8, -16) are incoming stack args, need `[RBP + offset]` (raw bytes)
-   — Need to distinguish the two cases; currently `* 8` is applied to all
-   — This causes ~100 segfaults in complex stdlib functions (fingertree, List.push, etc.)
-2. Fix remaining dict operations (~47 tests) — depends on fingertree fixes
-3. Fix remaining list operations (~52 tests) — most depend on fingertree
-4. Fix remaining floats (~21 tests) — edge cases
-5. Fix remaining tailcall (~10 tests)
-6. Fix 128-bit integer types (~13 tests)
-7. Implement file I/O syscalls
+1. Fix remaining stdlib segfaults (~148 tests) — likely from register mapping issues
+   in complex stdlib functions (String.prepend, Bytes.fromList, Crypto, etc.)
+   Root cause: bad pointer values in byte copy loops, possibly from incorrect
+   argument passing or spill-related corruption
+2. Fix File I/O syscalls (~22 tests) — FileExists etc. are stubbed to return 0
+3. Fix remaining Dict operations (~48 tests) — depends on list/fingertree fixes
+4. Fix UInt32/UInt16 negate (6 tests) — needs 32-bit masking
+5. Fix remaining floats (~3 tests) — edge cases
 
 Approach: TDD — pick a failing E2E test, write the smallest fix, run full suite.
 See CLAUDE.md for x86_64 architecture decisions and known patterns.
