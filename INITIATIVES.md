@@ -4,7 +4,7 @@
 
 Goal: reach ARM64 test parity (4486/4530 E2E tests) then merge to main.
 
-Current: 4279/4530 (94.5%). Gap: ~251 tests.
+Current: 4356/4530 (96.2%). Gap: ~174 tests.
 
 Recently fixed:
 - **x86_64 spill scratch register aliasing** — X8-X17 all map to R11; the register
@@ -15,14 +15,15 @@ Recently fixed:
 - Lsl/Lsr RCX clobbering, StringConcat register clobbering
 
 Remaining work (in priority order):
-1. Fix remaining stdlib segfaults (~148 tests) — likely from register mapping issues
-   in complex stdlib functions (String.prepend, Bytes.fromList, Crypto, etc.)
-   Root cause: bad pointer values in byte copy loops, possibly from incorrect
-   argument passing or spill-related corruption
-2. Fix File I/O syscalls (~22 tests) — FileExists etc. are stubbed to return 0
-3. Fix remaining Dict operations (~48 tests) — depends on list/fingertree fixes
-4. Fix UInt32/UInt16 negate (6 tests) — needs 32-bit masking
-5. Fix remaining floats (~3 tests) — edge cases
+1. Fix Bytes/Crypto operations (~55+66 tests) — Bytes.fromList segfaults in larger lists,
+   Crypto depends on Bytes
+2. Fix Dict operations (~48 tests) — Dict.size returns 0, likely hash function or
+   comparison function issue on x86_64  
+3. Fix File I/O syscalls (~17 tests) — FileReadText/WriteText/AppendText not implemented
+4. Fix remaining List edge cases (~10 tests) — large list matching, spread ops
+5. Fix Base64 (~10 tests) — depends on Bytes
+6. Fix UInt32/UInt16 negate (6 tests) — needs 32-bit masking
+7. Fix String.split edge cases (4 tests) — segfaults with repeated single-char separator
 
 Approach: TDD — pick a failing E2E test, write the smallest fix, run full suite.
 See CLAUDE.md for x86_64 architecture decisions and known patterns.
