@@ -1437,11 +1437,20 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 let needSaveRCX = shReg <> X86_64.RCX && d <> X86_64.RCX
                 let save = if needSaveRCX then [X86_64.PUSH X86_64.RCX] else []
                 let restore = if needSaveRCX then [X86_64.POP X86_64.RCX] else []
-                save
-                @ (if d <> s then [X86_64.MOV_reg (d, s)] else [])
-                @ (if shReg <> X86_64.RCX then [X86_64.MOV_reg (X86_64.RCX, shReg)] else [])
-                @ [X86_64.SHL_cl d]
-                @ restore)))
+                if d = shReg && d <> s then
+                    // dest == shift register: moving src to dest would clobber shift.
+                    // Move shift to RCX first, then move src to dest.
+                    save
+                    @ (if shReg <> X86_64.RCX then [X86_64.MOV_reg (X86_64.RCX, shReg)] else [])
+                    @ [X86_64.MOV_reg (d, s)]
+                    @ [X86_64.SHL_cl d]
+                    @ restore
+                else
+                    save
+                    @ (if d <> s then [X86_64.MOV_reg (d, s)] else [])
+                    @ (if shReg <> X86_64.RCX then [X86_64.MOV_reg (X86_64.RCX, shReg)] else [])
+                    @ [X86_64.SHL_cl d]
+                    @ restore)))
 
     | LIR.Lsr (dest, src, shift) ->
         resolveReg dest |> Result.bind (fun d -> resolveReg src |> Result.bind (fun s ->
@@ -1449,11 +1458,19 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 let needSaveRCX = shReg <> X86_64.RCX && d <> X86_64.RCX
                 let save = if needSaveRCX then [X86_64.PUSH X86_64.RCX] else []
                 let restore = if needSaveRCX then [X86_64.POP X86_64.RCX] else []
-                save
-                @ (if d <> s then [X86_64.MOV_reg (d, s)] else [])
-                @ (if shReg <> X86_64.RCX then [X86_64.MOV_reg (X86_64.RCX, shReg)] else [])
-                @ [X86_64.SHR_cl d]
-                @ restore)))
+                if d = shReg && d <> s then
+                    // dest == shift: move shift to RCX first to avoid clobbering
+                    save
+                    @ (if shReg <> X86_64.RCX then [X86_64.MOV_reg (X86_64.RCX, shReg)] else [])
+                    @ [X86_64.MOV_reg (d, s)]
+                    @ [X86_64.SHR_cl d]
+                    @ restore
+                else
+                    save
+                    @ (if d <> s then [X86_64.MOV_reg (d, s)] else [])
+                    @ (if shReg <> X86_64.RCX then [X86_64.MOV_reg (X86_64.RCX, shReg)] else [])
+                    @ [X86_64.SHR_cl d]
+                    @ restore)))
 
     | LIR.Uxth (_, _) | LIR.Uxtw (_, _) ->
         // Zero-extension: upper bits already zero in 64-bit registers on x86_64
