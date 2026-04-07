@@ -1610,12 +1610,27 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                         // An operand is R11 (scratch) which we need for address computation.
                         // Use RCX as an extra temp (save/restore if needed).
                         let tempReg = X86_64.RCX
-                        [X86_64.PUSH tempReg
-                         X86_64.MOV_reg (tempReg, v)   // save value in temp
-                         X86_64.MOV_reg (scratch, p)
-                         X86_64.ADD_reg (scratch, o)
-                         X86_64.MOV_store (scratch, 0, tempReg)
-                         X86_64.POP tempReg]
+                        if p = tempReg then
+                            // ptr is RCX: can't use RCX as temp without saving ptr first.
+                            // Use two pushes: save ptr, save value, compute address, store.
+                            [X86_64.PUSH tempReg             // save ptr (RCX)
+                             X86_64.PUSH scratch              // save value/offset (R11)
+                             // Stack: [R11] [RCX] ...
+                             // Compute address: R11 = ptr + offset
+                             X86_64.MOV_load (scratch, X86_64.RSP, 8) // R11 = saved ptr (RCX)
+                             X86_64.ADD_reg (scratch, o)      // R11 = ptr + offset
+                             // Get value
+                             X86_64.MOV_load (tempReg, X86_64.RSP, 0) // RCX = saved R11 (value)
+                             X86_64.MOV_store (scratch, 0, tempReg) // [addr] = value
+                             X86_64.POP scratch               // restore R11
+                             X86_64.POP tempReg]              // restore RCX
+                        else
+                            [X86_64.PUSH tempReg
+                             X86_64.MOV_reg (tempReg, v)   // save value in temp
+                             X86_64.MOV_reg (scratch, p)
+                             X86_64.ADD_reg (scratch, o)
+                             X86_64.MOV_store (scratch, 0, tempReg)
+                             X86_64.POP tempReg]
                     else
                         [X86_64.MOV_reg (scratch, p)
                          X86_64.ADD_reg (scratch, o)
