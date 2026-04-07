@@ -4,7 +4,7 @@
 
 Goal: reach ARM64 test parity (4486/4530 E2E tests) then merge to main.
 
-Current: 4430/4530 (97.8%). Gap: ~100 tests.
+Current: 4430/4530 (97.8%). Gap: 100 tests.
 
 Recently fixed:
 - **x86_64 spill scratch register aliasing** — X8-X17 all map to R11; the register
@@ -15,15 +15,15 @@ Recently fixed:
 - Lsl/Lsr RCX clobbering, StringConcat register clobbering
 
 Remaining work (in priority order):
-1. Fix Bytes/Crypto operations (~55+66 tests) — Bytes.fromList segfaults in larger lists,
-   Crypto depends on Bytes
-2. Fix Dict operations (~48 tests) — Dict.size returns 0, likely hash function or
-   comparison function issue on x86_64  
+1. Fix FingerTree tail for 9+ element lists — tail(popFront) on trees with 
+   non-empty middle crashes. Likely a register conflict in explodeNodeToFront
+   or rebuildFrom. Blocks ~30 crypto/bytes tests.
+2. Fix Dict operations with String keys (~25 tests) — Int64 keys work, String keys
+   don't. Second set causes first entry to vanish. Hash function issue?
 3. Fix File I/O syscalls (~17 tests) — FileReadText/WriteText/AppendText not implemented
-4. Fix remaining List edge cases (~10 tests) — large list matching, spread ops
-5. Fix Base64 (~10 tests) — depends on Bytes
-6. Fix UInt32/UInt16 negate (6 tests) — needs 32-bit masking
-7. Fix String.split edge cases (4 tests) — segfaults with repeated single-char separator
+4. Fix Base64 (~10 tests) — depends on Bytes
+5. Fix UInt negate printing (6 tests) — computation correct, display as signed not unsigned
+6. Fix other edge cases (~12 tests)
 
 Approach: TDD — pick a failing E2E test, write the smallest fix, run full suite.
 See CLAUDE.md for x86_64 architecture decisions and known patterns.
