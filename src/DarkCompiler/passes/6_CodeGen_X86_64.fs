@@ -1133,19 +1133,31 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     else
                         [X86_64.MOV_store (addrReg, int32 offset, srcX86)])
             | LIR.FuncAddr funcName ->
-                Ok [X86_64.LEA_rip (scratch, funcName)
-                    X86_64.MOV_store (addrReg, int32 offset, scratch)]
+                if addrReg = scratch then
+                    // Address is R11 - use RCX to hold the function address
+                    Ok [X86_64.PUSH X86_64.RCX
+                        X86_64.LEA_rip (X86_64.RCX, funcName)
+                        X86_64.MOV_store (addrReg, int32 offset, X86_64.RCX)
+                        X86_64.POP X86_64.RCX]
+                else
+                    Ok [X86_64.LEA_rip (scratch, funcName)
+                        X86_64.MOV_store (addrReg, int32 offset, scratch)]
             | LIR.FloatSymbol value ->
                 // Store float bits as 8-byte integer value at the heap offset
                 let bits = System.BitConverter.DoubleToInt64Bits(value)
-                Ok (loadImm64 scratch bits @ [X86_64.MOV_store (addrReg, int32 offset, scratch)])
+                if addrReg = scratch then
+                    // Address is R11 - can't use scratch for the immediate value
+                    Ok ([X86_64.PUSH X86_64.RCX]
+                        @ loadImm64 X86_64.RCX bits
+                        @ [X86_64.MOV_store (addrReg, int32 offset, X86_64.RCX)
+                           X86_64.POP X86_64.RCX])
+                else
+                    Ok (loadImm64 scratch bits @ [X86_64.MOV_store (addrReg, int32 offset, scratch)])
             | LIR.StringSymbol value ->
                 // Create heap string from literal, store pointer
                 let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
                 let len = strBytes.Length
                 let totalSize = ((len + 16) + 7) &&& (~~~7)
-                // Save addrReg if it might be clobbered by heap allocation
-                let useTemp = (addrReg = heapPtr)
                 let alloc = [X86_64.MOV_reg (scratch, heapPtr); X86_64.ADD_imm (heapPtr, int32 totalSize)]
                 let storeLen = loadImm64 X86_64.RCX (int64 len) @ [X86_64.MOV_store (scratch, 0, X86_64.RCX)]
                 let copyBytes =
@@ -1160,9 +1172,17 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 let storeRC =
                     let rcOff = 8 + ((len + 7) &&& (~~~7))
                     loadImm64 X86_64.RCX 1L @ [X86_64.MOV_store (scratch, int32 rcOff, X86_64.RCX)]
-                // Store the string pointer into the record field
-                Ok (alloc @ storeLen @ copyBytes @ storeRC
-                    @ [X86_64.MOV_store (addrReg, int32 offset, scratch)])
+                if addrReg = scratch || addrReg = X86_64.RCX then
+                    // String alloc clobbers R11 (scratch) and init clobbers RCX.
+                    // Push addr before alloc, pop into RCX after string is built.
+                    Ok ([X86_64.PUSH addrReg]
+                        @ alloc @ storeLen @ copyBytes @ storeRC
+                        @ [X86_64.POP X86_64.RCX
+                           X86_64.MOV_store (X86_64.RCX, int32 offset, scratch)])
+                else
+                    // Store the string pointer into the record field
+                    Ok (alloc @ storeLen @ copyBytes @ storeRC
+                        @ [X86_64.MOV_store (addrReg, int32 offset, scratch)])
             | LIR.StackSlot stackOffset ->
                 let adjOff = adjustStackOffset ctx stackOffset
                 if addrReg = scratch then
