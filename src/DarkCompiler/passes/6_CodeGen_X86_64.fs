@@ -1445,6 +1445,13 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     @ [X86_64.MOV_reg (d, s)]
                     @ [X86_64.SHL_cl d]
                     @ restore
+                elif d = X86_64.RCX && shReg <> X86_64.RCX then
+                    // dest is RCX: MOV d,s then MOV RCX,shReg would clobber src in d.
+                    // Use scratch to hold value, shift there, move result back.
+                    [X86_64.MOV_reg (scratch, s)
+                     X86_64.MOV_reg (X86_64.RCX, shReg)
+                     X86_64.SHL_cl scratch
+                     X86_64.MOV_reg (X86_64.RCX, scratch)]
                 else
                     save
                     @ (if d <> s then [X86_64.MOV_reg (d, s)] else [])
@@ -1465,6 +1472,12 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     @ [X86_64.MOV_reg (d, s)]
                     @ [X86_64.SHR_cl d]
                     @ restore
+                elif d = X86_64.RCX && shReg <> X86_64.RCX then
+                    // dest is RCX: use scratch to avoid clobbering
+                    [X86_64.MOV_reg (scratch, s)
+                     X86_64.MOV_reg (X86_64.RCX, shReg)
+                     X86_64.SHR_cl scratch
+                     X86_64.MOV_reg (X86_64.RCX, scratch)]
                 else
                     save
                     @ (if d <> s then [X86_64.MOV_reg (d, s)] else [])
