@@ -4,7 +4,7 @@
 
 Goal: reach ARM64 test parity (4486/4530 E2E tests) then merge to main.
 
-Current: 4484/4530 (99.0%). Gap: 46 tests.
+Current: 4485/4530 (99.0%). Gap: 45 tests.
 
 Recently fixed:
 - **Lsl/Lsr dest==shift && src==RCX** — setBit computed bit<<bit instead of 1<<bit,
