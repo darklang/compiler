@@ -504,12 +504,16 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         // x86_64 IDIV: RDX:RAX / src → RAX=quotient, RDX=remainder
         // IDIV clobbers both RAX and RDX. Save/restore RDX using the
         // red zone (below RSP) to avoid changing RSP.
+        // Special case: INT64_MIN / -1 causes #DE (SIGFPE) on x86_64.
+        // ARM64 SDIV returns INT64_MIN (wraps), so we match that behavior.
         resolveReg dest
         |> Result.bind (fun destReg ->
             resolveReg left
             |> Result.bind (fun leftReg ->
                 resolveReg right
                 |> Result.map (fun rightReg ->
+                    let overflowLabel = freshLabel "idiv_overflow"
+                    let doneLabel = freshLabel "idiv_done"
                     let divisor =
                         if rightReg = X86_64.RAX || rightReg = X86_64.RDX then scratch
                         else rightReg
@@ -520,13 +524,34 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     let moveLeft =
                         if leftReg <> X86_64.RAX then [X86_64.MOV_reg (X86_64.RAX, leftReg)]
                         else []
-                    // Save RDX to red zone [RSP - 8] (no RSP adjustment needed)
+                    // Check for INT64_MIN / -1 overflow
                     saveDivisor
                     @ moveLeft
+                    @ [X86_64.CMP_imm (divisor, -1)]
+                    @ [X86_64.Jcc (X86_64.NE, doneLabel)]
+                    // divisor is -1, check if dividend is INT64_MIN
+                    @ loadImm64 scratch System.Int64.MinValue
+                    @ [X86_64.CMP_reg (X86_64.RAX, scratch)]
+                    @ [X86_64.Jcc (X86_64.EQ, overflowLabel)]
+                    // Normal IDIV path
+                    @ [X86_64.Label doneLabel]
+                    // Restore divisor if it was moved to scratch for the CMP
+                    @ (if rightReg = X86_64.RAX || rightReg = X86_64.RDX then
+                           [X86_64.MOV_reg (scratch, divisor)]  // re-setup (was clobbered by INT64_MIN load)
+                       else [])
+                    @ (if (rightReg = X86_64.RAX || rightReg = X86_64.RDX) then
+                           [X86_64.MOV_reg (scratch, rightReg)]
+                       else [])
+                    @ (if leftReg <> X86_64.RAX then [X86_64.MOV_reg (X86_64.RAX, leftReg)] else [])
                     @ [X86_64.MOV_store (X86_64.RSP, -8, X86_64.RDX)]
                     @ [X86_64.CQO; X86_64.IDIV divisor]
                     @ (if destReg <> X86_64.RAX then [X86_64.MOV_reg (destReg, X86_64.RAX)] else [])
-                    @ [X86_64.MOV_load (X86_64.RDX, X86_64.RSP, -8)])))
+                    @ [X86_64.MOV_load (X86_64.RDX, X86_64.RSP, -8)
+                       X86_64.JMP (overflowLabel + "_end")]
+                    // Overflow path: return INT64_MIN
+                    @ [X86_64.Label overflowLabel]
+                    @ loadImm64 destReg System.Int64.MinValue
+                    @ [X86_64.Label (overflowLabel + "_end")])))
 
     | LIR.Msub (dest, mulLeft, mulRight, sub) ->
         // dest = sub - mulLeft * mulRight
