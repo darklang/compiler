@@ -111,6 +111,37 @@ let private genWriteSyscall : X86_64.Instr list =
 let private genExitSyscall : X86_64.Instr list =
     loadImm64 X86_64.RAX (int64 syscalls.Exit) @ [X86_64.SYSCALL]
 
+/// Label for shared OOM handler (set per-program, not per-function)
+let mutable private oomHandlerLabel = "__heap_oom"
+
+/// Generate a jump to the shared OOM handler
+let private genOomJump () : X86_64.Instr list =
+    [X86_64.JMP oomHandlerLabel]
+
+/// Generate the shared OOM handler code (placed once at end of program)
+let private genOomHandler () : X86_64.Instr list =
+    let msg = "Out of heap memory\n"
+    let bytes = System.Text.Encoding.UTF8.GetBytes(msg)
+    let len = bytes.Length
+    let padded = ((len + 7) / 8) * 8
+    let paddedBytes = (bytes |> Array.toList) @ List.replicate (padded - len) 0uy
+    let pushInstrs =
+        paddedBytes
+        |> List.chunkBySize 8
+        |> List.rev
+        |> List.collect (fun chunk ->
+            let value = chunk |> List.mapi (fun i b -> int64 b <<< (i * 8)) |> List.fold (|||) 0L
+            loadImm64 scratch value @ [X86_64.PUSH scratch])
+    [X86_64.Label oomHandlerLabel]
+    @ pushInstrs
+    @ [X86_64.MOV_imm32 (X86_64.RDI, 2)]  // fd = stderr
+    @ [X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)]
+    @ loadImm64 X86_64.RDX (int64 len)
+    @ genWriteSyscall
+    @ [X86_64.ADD_imm (X86_64.RSP, int32 padded)]
+    @ loadImm64 X86_64.RDI 1L
+    @ genExitSyscall
+
 /// Mutable counter for generating unique labels within a compilation
 let mutable private labelCounter = 0
 let private freshLabel (prefix: string) : string =
@@ -1051,11 +1082,32 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         Ok []
 
     | LIR.HeapAlloc (dest, sizeBytes) ->
-        // Bump allocator: dest = heapPtr; heapPtr += sizeBytes
+        // Bump allocator with bounds check: dest = heapPtr; heapPtr += sizeBytes
+        // Check that heapPtr + sizeBytes doesn't exceed heap end (freeListBase + heapMmapSize)
+        let oomLabel = freshLabel "heap_oom"
+        let okLabel = freshLabel "heap_ok"
         resolveReg dest
         |> Result.map (fun destReg ->
+            // Bump allocator: dest = heapPtr; heapPtr += sizeBytes
             [X86_64.MOV_reg (destReg, heapPtr)
-             X86_64.ADD_imm (heapPtr, int32 sizeBytes)])
+             X86_64.ADD_imm (heapPtr, int32 sizeBytes)]
+            // Bounds check: use PUSH/POP to save a temp if dest == scratch
+            @ (if destReg = scratch then
+                // dest is R11, can't use scratch for bounds check.
+                // Use PUSH/CMP/POP pattern to avoid clobbering dest.
+                [X86_64.PUSH X86_64.RAX
+                 X86_64.MOV_reg (X86_64.RAX, heapPtr)
+                 X86_64.SUB_reg (X86_64.RAX, freeListBase)
+                 X86_64.CMP_imm (X86_64.RAX, int32 heapMmapSizeBytes)
+                 X86_64.POP X86_64.RAX
+                 X86_64.Jcc (X86_64.LE, okLabel)]
+               else
+                [X86_64.MOV_reg (scratch, heapPtr)
+                 X86_64.SUB_reg (scratch, freeListBase)
+                 X86_64.CMP_imm (scratch, int32 heapMmapSizeBytes)
+                 X86_64.Jcc (X86_64.LE, okLabel)])
+            @ genOomJump ()
+            @ [X86_64.Label okLabel])
 
     | LIR.HeapStore (addr, offset, src, _) ->
         resolveReg addr
@@ -1614,25 +1666,42 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             @ [X86_64.JMP_reg callReg])
 
     | LIR.RawAlloc (dest, numBytes) ->
+        let okLabel = freshLabel "rawalloc_ok"
         resolveReg dest
         |> Result.bind (fun destReg ->
             resolveReg numBytes
             |> Result.map (fun sizeReg ->
-                if destReg = sizeReg then
-                    // dest == size: MOV dest, heapPtr would clobber the size value.
-                    // Save size to scratch first, then bump heapPtr.
-                    [X86_64.MOV_reg (scratch, sizeReg)
-                     X86_64.MOV_reg (destReg, heapPtr)
-                     X86_64.ADD_reg (heapPtr, scratch)
-                     X86_64.ADD_imm (heapPtr, 7)
-                     X86_64.AND_imm (heapPtr, -8)]
-                else
-                    [X86_64.MOV_reg (destReg, heapPtr)
-                     X86_64.ADD_reg (heapPtr, sizeReg)
-                     // Align heapPtr to 8 bytes: heapPtr = (heapPtr + 7) & ~7
-                     // This ensures pointer tagging (low 3 bits) works correctly.
-                     X86_64.ADD_imm (heapPtr, 7)
-                     X86_64.AND_imm (heapPtr, -8)]))
+                let allocInstrs =
+                    if destReg = sizeReg then
+                        [X86_64.MOV_reg (scratch, sizeReg)
+                         X86_64.MOV_reg (destReg, heapPtr)
+                         X86_64.ADD_reg (heapPtr, scratch)
+                         X86_64.ADD_imm (heapPtr, 7)
+                         X86_64.AND_imm (heapPtr, -8)]
+                    else
+                        [X86_64.MOV_reg (destReg, heapPtr)
+                         X86_64.ADD_reg (heapPtr, sizeReg)
+                         X86_64.ADD_imm (heapPtr, 7)
+                         X86_64.AND_imm (heapPtr, -8)]
+                // Bounds check: heapPtr - freeListBase <= heapMmapSize
+                // Use RAX temp if dest or size uses scratch (R11)
+                let useScratch = destReg <> scratch && sizeReg <> scratch
+                let boundsCheck =
+                    if useScratch then
+                        [X86_64.MOV_reg (scratch, heapPtr)
+                         X86_64.SUB_reg (scratch, freeListBase)
+                         X86_64.CMP_imm (scratch, int32 heapMmapSizeBytes)
+                         X86_64.Jcc (X86_64.LE, okLabel)]
+                    else
+                        [X86_64.PUSH X86_64.RAX
+                         X86_64.MOV_reg (X86_64.RAX, heapPtr)
+                         X86_64.SUB_reg (X86_64.RAX, freeListBase)
+                         X86_64.CMP_imm (X86_64.RAX, int32 heapMmapSizeBytes)
+                         X86_64.POP X86_64.RAX
+                         X86_64.Jcc (X86_64.LE, okLabel)]
+                    @ genOomJump ()
+                    @ [X86_64.Label okLabel]
+                allocInstrs @ boundsCheck))
 
     | LIR.RawFree _ ->
         Ok []  // No-op (no free in bump allocator)
@@ -2379,3 +2448,4 @@ let translateProgram (LIR.Program functions) : Result<X86_64.Instr list, string>
             | Ok instrs -> translateFuncs (instrs :: acc) rest
 
     translateFuncs [] functions
+    |> Result.map (fun allInstrs -> allInstrs @ genOomHandler ())
