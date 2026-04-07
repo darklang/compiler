@@ -1375,13 +1375,40 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             // Load RIGHT first (if Reg, no allocation needed), then LEFT
             // (which might allocate for StringSymbol). This avoids clobbering
             // the right source register during left's heap allocation.
+            //
+            // BUG FIX: If left is in R8 or R9, loading right will clobber left's
+            // register. Save left to scratch (R11) first, then load from scratch.
+            let leftConflictReg =
+                match left with
+                | LIR.Reg reg ->
+                    match resolveReg reg with
+                    | Ok r when r = X86_64.R8 || r = X86_64.R9 -> Some r
+                    | _ -> None
+                | _ -> None
+
             loadInfo right X86_64.R8 X86_64.R9
             |> Result.bind (fun rightInstrs ->
                 // Save right info before loading left (left might clobber R8/R9)
                 let saveRight = [X86_64.PUSH X86_64.R8; X86_64.PUSH X86_64.R9]
-                loadInfo left X86_64.RDI X86_64.RSI
+
+                let preserveLeft =
+                    match leftConflictReg with
+                    | Some r -> [X86_64.MOV_reg (scratch, r)]
+                    | None -> []
+
+                let loadLeft =
+                    match leftConflictReg with
+                    | Some _ ->
+                        // Left was saved in scratch before right clobbered its register
+                        Ok [X86_64.MOV_load (X86_64.RSI, scratch, 0)
+                            X86_64.LEA (X86_64.RDI, scratch, 8)]
+                    | None ->
+                        loadInfo left X86_64.RDI X86_64.RSI
+
+                loadLeft
                 |> Result.map (fun leftInstrs ->
                     saveInstrs
+                    @ preserveLeft
                     @ rightInstrs @ saveRight @ leftInstrs
                     // Restore right info
                     @ [X86_64.POP X86_64.R9; X86_64.POP X86_64.R8]
