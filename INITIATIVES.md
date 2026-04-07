@@ -4,26 +4,29 @@
 
 Goal: reach ARM64 test parity (4486/4530 E2E tests) then merge to main.
 
-Current: 4430/4530 (97.8%). Gap: 100 tests.
+Current: 4484/4530 (99.0%). Gap: 46 tests.
 
 Recently fixed:
-- **x86_64 spill scratch register aliasing** — X8-X17 all map to R11; the register
-  allocator used X12/X13 as distinct scratch registers for loading spilled operands,
-  but both are R11 on x86_64. Fixed Add/Sub/Cmp via StackSlot approach in codegen,
-  and Mul/And/Or/RawGet via loadSpilledPair (loads left into dest register instead).
-- HeapStore R11 conflict, RawGet/RawSet R11 conflicts
-- Lsl/Lsr RCX clobbering, StringConcat register clobbering
+- **Lsl/Lsr dest==shift && src==RCX** — setBit computed bit<<bit instead of 1<<bit,
+  corrupting all HAMT bitmaps. Fixed Dict (25 tests), nqueen (5), rotl32 (1).
+- **Lsl/Lsr dest==RCX** — shift value overwrote src already in dest register.
+- **Uxtw/Uxth zero-extension** — treated as no-ops but preceding 64-bit SUB left
+  upper bits set. Now emits MOV_reg32/MOVZX_word. Fixed UInt negate (6 tests).
+- **FileReadText/WriteText/AppendText** — implemented x86_64 syscall sequences
+  using open/fstat/read/write/close. Fixed 17 File I/O tests.
+- **Float test expectations** — L494/L495 had wrong expected values (copy/paste bug).
 
 Remaining work (in priority order):
-1. Fix FingerTree tail for 9+ element lists — tail(popFront) on trees with 
-   non-empty middle crashes. Likely a register conflict in explodeNodeToFront
-   or rebuildFrom. Blocks ~30 crypto/bytes tests.
-2. Fix Dict operations with String keys (~25 tests) — Int64 keys work, String keys
-   don't. Second set causes first entry to vanish. Hash function issue?
-3. Fix File I/O syscalls (~17 tests) — FileReadText/WriteText/AppendText not implemented
-4. Fix Base64 (~10 tests) — depends on Bytes
-5. Fix UInt negate printing (6 tests) — computation correct, display as signed not unsigned
-6. Fix other edge cases (~12 tests)
+1. Fix list recursive popFront crash for 9+ elements — `match l with [h,...t] -> f(t)`
+   crashes when a function recursively destructures a 9+ element list. Inline match
+   works fine. The issue is NOT in FingerTree popFront itself but in how the popped
+   result is passed through function calls (possibly register/stack clobbering during
+   call setup with the tree structure). Blocks ~30 crypto/bytes/base64 tests that use
+   Bytes.fromList (which recursively destructures).
+2. Fix remaining Crypto/Base64 tests (~23 tests) — most depend on fix #1
+3. Fix String.split edge cases (4 tests) — segfault with repeated single-char separator
+   in test runner context (works standalone). Possibly heap exhaustion.
+4. Fix other edge cases (~13 tests) — BoxEq3/4, complexSum, Result patterns, etc.
 
 Approach: TDD — pick a failing E2E test, write the smallest fix, run full suite.
 See CLAUDE.md for x86_64 architecture decisions and known patterns.
