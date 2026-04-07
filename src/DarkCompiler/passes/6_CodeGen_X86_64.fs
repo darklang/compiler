@@ -1529,12 +1529,21 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         |> Result.bind (fun destReg ->
             resolveReg numBytes
             |> Result.map (fun sizeReg ->
-                [X86_64.MOV_reg (destReg, heapPtr)
-                 X86_64.ADD_reg (heapPtr, sizeReg)
-                 // Align heapPtr to 8 bytes: heapPtr = (heapPtr + 7) & ~7
-                 // This ensures pointer tagging (low 3 bits) works correctly.
-                 X86_64.ADD_imm (heapPtr, 7)
-                 X86_64.AND_imm (heapPtr, -8)]))
+                if destReg = sizeReg then
+                    // dest == size: MOV dest, heapPtr would clobber the size value.
+                    // Save size to scratch first, then bump heapPtr.
+                    [X86_64.MOV_reg (scratch, sizeReg)
+                     X86_64.MOV_reg (destReg, heapPtr)
+                     X86_64.ADD_reg (heapPtr, scratch)
+                     X86_64.ADD_imm (heapPtr, 7)
+                     X86_64.AND_imm (heapPtr, -8)]
+                else
+                    [X86_64.MOV_reg (destReg, heapPtr)
+                     X86_64.ADD_reg (heapPtr, sizeReg)
+                     // Align heapPtr to 8 bytes: heapPtr = (heapPtr + 7) & ~7
+                     // This ensures pointer tagging (low 3 bits) works correctly.
+                     X86_64.ADD_imm (heapPtr, 7)
+                     X86_64.AND_imm (heapPtr, -8)]))
 
     | LIR.RawFree _ ->
         Ok []  // No-op (no free in bump allocator)
