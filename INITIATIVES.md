@@ -4,9 +4,12 @@
 
 Goal: reach ARM64 test parity (4486/4530 E2E tests) then merge to main.
 
-Current: **4495/4530 (99.2%)**. Already exceeds ARM64 baseline (4486). **35 failures remain.**
+Current: **4496/4530 (99.3%)**. Already exceeds ARM64 baseline (4486). **34 failures remain.**
 
 Recently fixed:
+- **Heap bounds checking** (commit e0069b1) — HeapAlloc/RawAlloc now check against
+  512MB mmap limit and exit(1) with "Out of heap memory" instead of SIGSEGV.
+  Shared OOM handler avoids code bloat. Fixes rawptr.e2e L15.
 - **StringConcat left operand in R8/R9** (commit 73be36a) — `loadInfo right` clobbered
   R8/R9 before `loadInfo left` could read from them. Fix: save left to scratch (R11)
   before loading right. Fixed all 10 Base64 tests.
@@ -16,47 +19,41 @@ Recently fixed:
 - **Uxtw/Uxth zero-extension** — preceding 64-bit SUB left upper bits set.
 - **FileReadText/WriteText/AppendText** — implemented x86_64 syscall sequences.
 
-### Remaining 35 failures (grouped by root cause)
+### Remaining 34 failures (grouped by root cause)
 
-#### 1. FingerTree `__rebuildFrom` crash (THE BIG ONE — blocks ~20 tests)
+#### 1. Callee-saved register corruption (THE BIG ONE — blocks ~25 tests)
 
-**Symptom:** Iterating a 9+ element LITERAL list via recursive `match [b,...rest] -> f(rest)`
-crashes with SIGSEGV. The crash produces a garbage pointer with valid heap offset in low
-bits but corrupted high bits (e.g., `0xC00175_XX_XX_00140`).
+**Symptom:** Complex FingerTree operations (list equality, tail on two different lists,
+recursive list iteration) crash with SIGSEGV or produce wrong results. Callee-saved
+registers RBX (X19) and R12 (X20) get corrupted to small values like 1.
 
-**What works:** getAt, head, pushBack, non-recursive iteration, cons-built lists of ANY size.
-Only LITERAL lists (compiled to direct FingerTree construction) of 9+ elements trigger the
-bug when iterated in a self-recursive function.
+**Root cause (narrowed down):** MIR copy propagation changes register allocation in a way
+that exposes a latent x86_64 codegen bug. Disabling `--disable-opt-mir-copy-prop` makes
+the FingerTree crashes deterministically disappear (0/30 crashes) but causes 8 float
+tailcall test regressions, so it's not a viable workaround.
 
-**Root cause investigation so far:**
-- The crash happens inside `__rebuildFrom_i64` which is called from `tail_i64` when the
-  middle tree is a DEEP node (line 507-514 of `__FingerTree.dark`)
-- `__rebuildFrom` iterates via getAt + pushBack. Both work correctly individually.
-- Valgrind shows NO prior memory writes to invalid addresses — the garbage pointer is
-  **computed**, not read from corrupted memory
-- Hardware watchpoints on callee-saved register save locations ([RBP-16], etc.) show the
-  saved values are NOT overwritten on the stack
-- The corrupted return value has pattern: valid heap address in low ~36 bits, garbage in
-  upper bits. This strongly suggests a **64-bit arithmetic bug** — possibly an IMUL that
-  produces extra high bits, or a register that isn't properly zero-extended after a 32-bit op.
-- Attempted fix: replace `__rebuildFrom` with proper FingerTree node manipulation. This
-  avoids the crash but regresses 42 other tests (the replacement had its own bugs). Reverted.
+**Key evidence:**
+- Crash is **non-deterministic** (ASLR-dependent): sometimes works, sometimes SIGSEGV
+- Valgrind shows NO memory errors (address mapping neutralizes the bug)
+- Copy-prop reduces `tail_i64`'s spill slots from 400 to 48 bytes (different register
+  assignments expose the bug)
+- Stack padding doesn't fix it — corruption is in registers, not stack overflow
+- Both RBX and R12 get corrupted to value 1 (TAG_SINGLE, refcount, or element value)
+- The MIR for `tail_i64` is **identical** with/without copy-prop; only the pre-regalloc
+  LIR differs (fewer intermediate copies → different register allocation)
 
 **Suggested next steps:**
-1. **Use `--dump-lir` on `__rebuildFrom_i64`** and trace the exact register allocation for
-   the recursive call's ArgMoves. Check for parallel-move conflicts where a source register
-   is overwritten before being read.
-2. **Compare the IMUL results** in the crashing binary vs a working binary. The crash
-   value's high bits may come from a multiplication that should have been masked to 32 bits
-   (FingerTree uses `index * 8` for offsets — if `index` is in a register that has garbage
-   in its upper 32 bits, `imul r11, rcx` would amplify the garbage).
-3. **Check if `And_imm` or `Orr` operations properly clear upper bits.** On x86_64, 32-bit
-   operations zero-extend, but 64-bit `AND` does not clear bits above the result.
+1. **Binary diff**: disassemble `__FingerTree.tail_i64` with and without copy-prop,
+   diff the x86 instructions to find the exact instruction that corrupts RBX/R12
+2. **GDB hardware watchpoint**: break at tail_i64 entry, set hw watchpoint on the
+   stack location where R12 is saved ([RBP-16]), continue to find what overwrites it
+3. **Check TailCall + epilogue interaction**: tail_i64 has multiple TailCall paths
+   — verify each one correctly restores callee-saved registers before JMP
 
-**Affected tests:** lists.e2e L295/L297, benchmarks.e2e L354, equality.e2e L125/L126,
-dict.e2e L307, crypto.e2e L12/L293/L296/L299/L302 + most other crypto tests (which
-internally use Bytes.fromList which does recursive list iteration),
-benchmarks.e2e L475 (complexSum).
+**Affected tests:** lists.e2e L295/L297, benchmarks.e2e L354/L475,
+equality.e2e L125/L126, dict.e2e L87/L307, elet.dark L51/L55/L60/L65/L69,
+crypto.e2e L12/L164/L167/L170/L211/L214/L293/L296/L299/L302,
+string.e2e L384/L392/L393/L394 (crash in test runner context)
 
 #### 2. Crypto hash wrong values (3-5 tests, independent of #1)
 
@@ -79,12 +76,11 @@ list iteration) since List.map iterates.
 
 **Affected:** result.e2e — various tests with `List.map_v0 [...] (fun x -> match ...)`
 
-#### 5. Independent small issues (4 tests)
+#### 5. Independent small issues (3 tests)
 
-- **rawptr OOM** (rawptr.e2e L15): `__raw_alloc(600MB)` should exit(1) not SIGSEGV
 - **refcount leak_check** (refcounting.e2e L5): output mismatch (refcounting not implemented on x86)
-- **memReclaimBurn** (benchmarks.e2e L234): memory reclamation stress test, 1.59s runtime
-- **Dict string keys** (dict.e2e L87): Dict.fromList with string keys fails
+- **memReclaimBurn** (benchmarks.e2e L234): memory reclamation stress test, needs refcounting
+- **Dict string keys** (dict.e2e L87): Dict.fromList with string keys crashes (likely #1)
 
 ### Diagnostic tools
 
