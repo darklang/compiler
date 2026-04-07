@@ -4,7 +4,7 @@
 
 Goal: reach ARM64 test parity (4486/4530 E2E tests) then merge to main.
 
-Current: 4356/4530 (96.2%). Gap: ~174 tests.
+Current: 4430/4530 (97.8%). Gap: ~100 tests.
 
 Recently fixed:
 - **x86_64 spill scratch register aliasing** — X8-X17 all map to R11; the register
