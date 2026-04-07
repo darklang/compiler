@@ -1642,12 +1642,23 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 resolveReg value |> Result.map (fun v ->
                     if v = scratch || o = scratch then
                         let tempReg = X86_64.RCX
-                        [X86_64.PUSH tempReg
-                         X86_64.MOV_reg (tempReg, v)
-                         X86_64.MOV_reg (scratch, p)
-                         X86_64.ADD_reg (scratch, o)
-                         X86_64.MOV_store_byte (scratch, 0, tempReg)
-                         X86_64.POP tempReg]
+                        if p = tempReg then
+                            // ptr is RCX: save both before clobbering
+                            [X86_64.PUSH tempReg
+                             X86_64.PUSH scratch
+                             X86_64.MOV_load (scratch, X86_64.RSP, 8)  // R11 = saved ptr
+                             X86_64.ADD_reg (scratch, o)
+                             X86_64.MOV_load (tempReg, X86_64.RSP, 0)  // RCX = saved value/offset
+                             X86_64.MOV_store_byte (scratch, 0, tempReg)
+                             X86_64.POP scratch
+                             X86_64.POP tempReg]
+                        else
+                            [X86_64.PUSH tempReg
+                             X86_64.MOV_reg (tempReg, v)
+                             X86_64.MOV_reg (scratch, p)
+                             X86_64.ADD_reg (scratch, o)
+                             X86_64.MOV_store_byte (scratch, 0, tempReg)
+                             X86_64.POP tempReg]
                     else
                         [X86_64.MOV_reg (scratch, p)
                          X86_64.ADD_reg (scratch, o)
