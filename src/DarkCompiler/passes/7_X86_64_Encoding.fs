@@ -147,6 +147,14 @@ let encodeInstruction (instr: Instr) : byte array =
         // REX.W + 89 /r (MOV r/m64, r64)
         encodeRegReg 0x89uy dest src
 
+    | MOV_reg32 (dest, src) ->
+        // 89 /r (MOV r/m32, r32) — no REX.W, 32-bit write zero-extends to 64-bit
+        let (destEnc, destExt) = regEncoding dest
+        let (srcEnc, srcExt) = regEncoding src
+        let needsRex = destExt || srcExt
+        let rexByte = if needsRex then [| 0x40uy ||| (if srcExt then 0x04uy else 0x00uy) ||| (if destExt then 0x01uy else 0x00uy) |] else [||]
+        Array.concat [| rexByte; [| 0x89uy; modRM 3 srcEnc destEnc |] |]
+
     | MOV_load (dest, baseAddr, offset) ->
         // REX.W + 8B /r (MOV r64, r/m64)
         let (destEnc, destExt) = regEncoding dest
@@ -434,6 +442,14 @@ let encodeInstruction (instr: Instr) : byte array =
         let needsRex = destExt || srcExt || srcEnc >= 4
         let rexByte = if needsRex then [| 0x40uy ||| (if destExt then 0x04uy else 0x00uy) ||| (if srcExt then 0x01uy else 0x00uy) |] else [||]
         Array.concat [| rexByte; [| 0x0Fuy; 0xB6uy; modRM 3 destEnc srcEnc |] |]
+
+    | MOVZX_word (dest, src) ->
+        // 0F B7 /r (MOVZX r32, r/m16) — implicitly zero-extends to 64-bit
+        let (destEnc, destExt) = regEncoding dest
+        let (srcEnc, srcExt) = regEncoding src
+        let needsRex = destExt || srcExt
+        let rexByte = if needsRex then [| 0x40uy ||| (if destExt then 0x04uy else 0x00uy) ||| (if srcExt then 0x01uy else 0x00uy) |] else [||]
+        Array.concat [| rexByte; [| 0x0Fuy; 0xB7uy; modRM 3 destEnc srcEnc |] |]
 
     | MOVSX_byte (dest, src) ->
         // REX.W + 0F BE /r (MOVSX r64, r/m8)

@@ -65,7 +65,9 @@ type Instr =
     | MOV_reg of dest:Reg * src:Reg                       // MOV reg, reg
     | MOV_load of dest:Reg * baseAddr:Reg * offset:int32  // MOV reg, [base + offset]
     | MOV_store of baseAddr:Reg * offset:int32 * src:Reg  // MOV [base + offset], reg
+    | MOV_reg32 of dest:Reg * src:Reg                      // MOV r32, r32 (zero-extends to 64-bit)
     | MOVZX_byte of dest:Reg * src:Reg                    // MOVZX reg, reg8 (zero-extend byte)
+    | MOVZX_word of dest:Reg * src:Reg                    // MOVZX reg, reg16 (zero-extend word)
     | MOVSX_byte of dest:Reg * src:Reg                    // MOVSX reg, reg8 (sign-extend byte)
     | MOVSX_word of dest:Reg * src:Reg                    // MOVSX reg, reg16 (sign-extend word)
     | MOVSXD of dest:Reg * src:Reg                        // MOVSXD reg64, reg32 (sign-extend dword)

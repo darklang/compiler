@@ -1472,10 +1472,14 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     @ [X86_64.SHR_cl d]
                     @ restore)))
 
-    | LIR.Uxth (_, _) | LIR.Uxtw (_, _) ->
-        // Zero-extension: upper bits already zero in 64-bit registers on x86_64
-        // (32-bit ops zero-extend to 64-bit automatically)
-        Ok []
+    | LIR.Uxth (dest, src) ->
+        resolveReg dest |> Result.bind (fun d -> resolveReg src |> Result.map (fun s ->
+            [X86_64.MOVZX_word (d, s)]))
+
+    | LIR.Uxtw (dest, src) ->
+        // 32-bit MOV zero-extends to 64-bit on x86_64
+        resolveReg dest |> Result.bind (fun d -> resolveReg src |> Result.map (fun s ->
+            [X86_64.MOV_reg32 (d, s)]))
 
     | LIR.ClosureAlloc (dest, funcName, captures) ->
         // Allocate closure on heap: [func_ptr, cap1, cap2, ...][refcount]
