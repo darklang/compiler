@@ -1439,10 +1439,12 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 let restore = if needSaveRCX then [X86_64.POP X86_64.RCX] else []
                 if d = shReg && d <> s then
                     // dest == shift register: moving src to dest would clobber shift.
-                    // Move shift to RCX first, then move src to dest.
+                    // Use scratch to save src, then move shift to RCX, then put src in dest.
+                    // This handles the case where s = RCX (which MOV RCX,shReg would clobber).
                     save
+                    @ [X86_64.MOV_reg (scratch, s)]
                     @ (if shReg <> X86_64.RCX then [X86_64.MOV_reg (X86_64.RCX, shReg)] else [])
-                    @ [X86_64.MOV_reg (d, s)]
+                    @ [X86_64.MOV_reg (d, scratch)]
                     @ [X86_64.SHL_cl d]
                     @ restore
                 elif d = X86_64.RCX && shReg <> X86_64.RCX then
@@ -1466,10 +1468,11 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 let save = if needSaveRCX then [X86_64.PUSH X86_64.RCX] else []
                 let restore = if needSaveRCX then [X86_64.POP X86_64.RCX] else []
                 if d = shReg && d <> s then
-                    // dest == shift: move shift to RCX first to avoid clobbering
+                    // dest == shift: save src via scratch to avoid clobbering when s=RCX
                     save
+                    @ [X86_64.MOV_reg (scratch, s)]
                     @ (if shReg <> X86_64.RCX then [X86_64.MOV_reg (X86_64.RCX, shReg)] else [])
-                    @ [X86_64.MOV_reg (d, s)]
+                    @ [X86_64.MOV_reg (d, scratch)]
                     @ [X86_64.SHR_cl d]
                     @ restore
                 elif d = X86_64.RCX && shReg <> X86_64.RCX then
