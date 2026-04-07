@@ -50,21 +50,42 @@ IDIV saves/restores RDX via the red zone `[RSP-8]`.
 2. **String comparison**: stdlib string ops not fully working on x86_64.
 3. **GCD/modulo**: complex modulo in loops can produce wrong results.
 
-### Running Tests
+### Running Commands — Use the Devcontainer
+
+All build/test commands require .NET 10 (`dotnet`), which lives inside the
+`compiler-dev` Docker container. **Always run commands via `docker exec`.**
+
+The host repo parent directory is bind-mounted to `/workspace` inside the
+container. You must pass `-w /workspace/<repo-dir-name>` to set the correct
+working directory (the container's default `working_dir` is `/workspace/main`,
+which is for a different worktree).
 
 ```bash
-# All tests (includes E2E with stdlib)
-./run-tests
+# The -w flag sets the working directory inside the container.
+# Replace "darklang-compiler" with the actual repo directory name if different.
+DEXEC="docker exec -w /workspace/darklang-compiler compiler-dev"
 
-# x86_64-specific unit tests only
-./run-tests --filter=x86
+# Build and run all tests
+$DEXEC ./run-tests
+
+# Run filtered tests
+$DEXEC ./run-tests --filter=x86
+$DEXEC ./run-tests --filter=list --quiet
 
 # Quick expression test
-./dark -r -e "2 + 3"
+$DEXEC ./dark -r -e "2 + 3"
+
+# Arbitrary dotnet commands
+$DEXEC dotnet build --verbosity quiet
 ```
 
-### Development in Docker
+**Fallback order:**
+1. `docker exec -w /workspace/darklang-compiler compiler-dev <cmd>` — preferred
+2. Run `<cmd>` directly on host — only if .NET 10 SDK is installed locally
+3. If both fail, tell the user to start the devcontainer
+   (`docker compose up -d` in the repo root) or install .NET 10 on the host
 
-The devcontainer and Docker setup work on any architecture:
+### Docker Architecture Notes
+
 - ARM64 hosts: everything native
 - x86_64 hosts: compiler builds natively, ARM64 test binaries run via qemu-user-static
