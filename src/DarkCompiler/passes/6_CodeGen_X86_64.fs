@@ -2,10 +2,10 @@
 //
 // Transforms LIR into x86-64 instructions.
 //
-// Maps LIR physical registers to x86-64 registers using ArchConfig.x86_64:
-//   X0→RAX, X1→RDI, X2→RSI, X3→RDX, X4→RCX, X5→R8, X6→R9,
-//   X7→R10, X8→R11, X9→scratch, X10→scratch,
-//   X19→RBX, X20→R12, X21→R13, X22→R14, X23→R15
+// Maps LIR physical registers to x86-64 registers:
+//   X0→RAX, X1→RDI, X2→RSI, X3→RCX, X4→R8, X5→R9,
+//   X6→R10, X7→RDX, X8-X17→R11(scratch),
+//   X19→RBX, X20→R12, X21→R13, X22→R14(heap), X23→R15(freelist)
 //
 // Key x86_64 differences from ARM64:
 // - CISC: most instructions modify destination in-place (dest = dest OP src)
@@ -66,11 +66,11 @@ let lirFRegToX86 (freg: LIR.PhysFPReg) : X86_64.FReg =
 
 /// Resolve a LIR.FReg to x86-64 XMM register.
 /// FVirtual 2000 is used as a temp for parallel float move resolution.
-let private resolveFreg (freg: LIR.FReg) : X86_64.FReg =
+let private resolveFreg (freg: LIR.FReg) : Result<X86_64.FReg, string> =
     match freg with
-    | LIR.FPhysical fp -> lirFRegToX86 fp
-    | LIR.FVirtual 2000 -> X86_64.XMM15
-    | LIR.FVirtual _ -> X86_64.XMM15
+    | LIR.FPhysical fp -> Ok (lirFRegToX86 fp)
+    | LIR.FVirtual 2000 -> Ok X86_64.XMM15
+    | LIR.FVirtual id -> Error $"Unresolved virtual float register f{id} in x86-64 codegen"
 
 /// Resolve a LIR.Reg (Physical or Virtual) to x86-64 register.
 let resolveReg (reg: LIR.Reg) : Result<X86_64.Reg, string> =
@@ -98,6 +98,9 @@ let private freeListBase = X86_64.R15
 
 /// Size of free list heads area (32 size classes × 8 bytes = 256 bytes)
 let private freeListSize = 256
+
+/// Max payload size class for free list reuse (freeListSize - 8)
+let private maxFreeListPayload = freeListSize - 8
 
 /// Heap size for mmap (512 MB)
 let private heapMmapSizeBytes = 512L * 1024L * 1024L
@@ -1570,7 +1573,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     let srcXmm = lirFRegToX86 srcPhys
                     if destXmm = srcXmm then []
                     else [X86_64.MOVSD_reg (destXmm, srcXmm)]
-                | LIR.FVirtual _ -> [])  // Should not happen after regalloc
+                | LIR.FVirtual id -> failwith $"Unresolved virtual float register f{id} in FArgMoves")
         Ok instrs
 
     | LIR.Phi (dest, _, _) ->
@@ -1724,14 +1727,16 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
     | LIR.FMov (dest, src) ->
         // Handle both physical and virtual FP registers.
         // FVirtual 2000 is used as a temp for parallel float move resolution.
-        let resolveF (freg: LIR.FReg) : X86_64.FReg =
+        let resolveF (freg: LIR.FReg) : Result<X86_64.FReg, string> =
             match freg with
-            | LIR.FPhysical fp -> lirFRegToX86 fp
-            | LIR.FVirtual 2000 -> X86_64.XMM15  // Parallel move temp (like ARM64's D16)
-            | LIR.FVirtual _ -> X86_64.XMM15     // Fallback for any virtual FP reg
-        let d = resolveF dest
-        let s = resolveF src
-        Ok (if d = s then [] else [X86_64.MOVSD_reg (d, s)])
+            | LIR.FPhysical fp -> Ok (lirFRegToX86 fp)
+            | LIR.FVirtual 2000 -> Ok X86_64.XMM15  // Parallel move temp (like ARM64's D16)
+            | LIR.FVirtual id -> Error $"Unresolved virtual float register f{id} in x86-64 codegen"
+        resolveF dest
+        |> Result.bind (fun d ->
+            resolveF src
+            |> Result.map (fun s ->
+                if d = s then [] else [X86_64.MOVSD_reg (d, s)]))
 
     | LIR.FLoad (dest, value) ->
         match dest with
@@ -2328,7 +2333,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                      X86_64.CMP_imm (temp1, 8)
                      X86_64.Jcc (X86_64.LE, bumpLabel)
                      X86_64.SUB_imm (temp1, 8)           // temp1 = payload_class
-                     X86_64.CMP_imm (temp1, 248)
+                     X86_64.CMP_imm (temp1, maxFreeListPayload)
                      X86_64.Jcc (X86_64.GT, bumpLabel)
                      // Compute free list slot address: &freeList[payload_class]
                      X86_64.MOV_reg (temp2, freeListBase)
@@ -2638,8 +2643,8 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 let restores = [X86_64.POP X86_64.R9; X86_64.POP X86_64.R8; X86_64.POP X86_64.R10
                                 X86_64.POP X86_64.RCX; X86_64.POP X86_64.RSI; X86_64.POP X86_64.RDI]
                 pathSetup @ saves
-                // Allocate stack: 264 bytes for path + 144 bytes for stat buf = 408, round to 416
-                @ [X86_64.SUB_imm (X86_64.RSP, 416)]
+                // Allocate stack: 4096 bytes for path (PATH_MAX) + 144 bytes for stat buf = 4240
+                @ [X86_64.SUB_imm (X86_64.RSP, 4240)]
                 // Copy heap string to null-terminated C string on stack
                 // R10 = heap string ptr, [R10] = length, R10+8 = data
                 @ [X86_64.MOV_load (X86_64.RCX, X86_64.R10, 0)    // RCX = length
@@ -2652,11 +2657,9 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                    X86_64.MOV_reg (scratch, X86_64.RSI)
                    X86_64.ADD_reg (scratch, X86_64.R10)
                    X86_64.MOV_load_byte (scratch, scratch, 0)
-                   X86_64.PUSH X86_64.R8
                    X86_64.MOV_reg (X86_64.R8, X86_64.RDI)
                    X86_64.ADD_reg (X86_64.R8, X86_64.R10)
                    X86_64.MOV_store_byte (X86_64.R8, 0, scratch)
-                   X86_64.POP X86_64.R8
                    X86_64.ADD_imm (X86_64.R10, 1)
                    X86_64.JMP copyLabel
                    X86_64.Label doneLabel]
@@ -2740,7 +2743,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                    X86_64.MOV_reg (X86_64.RAX, scratch)]
                 // === Cleanup ===
                 @ [X86_64.Label cleanupLabel
-                   X86_64.ADD_imm (X86_64.RSP, 416)]
+                   X86_64.ADD_imm (X86_64.RSP, 4240)]
                 @ restores
                 @ [X86_64.MOV_reg (destReg, X86_64.RAX)]))
 
@@ -2813,8 +2816,8 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     let restores = [X86_64.POP X86_64.R9; X86_64.POP X86_64.R8; X86_64.POP X86_64.R10
                                     X86_64.POP X86_64.RCX; X86_64.POP X86_64.RSI; X86_64.POP X86_64.RDI]
                     pathSetup @ contentSetup @ saves
-                    // Allocate 264 bytes on stack for path
-                    @ [X86_64.SUB_imm (X86_64.RSP, 272)]
+                    // Allocate 4096 bytes on stack for path (PATH_MAX)
+                    @ [X86_64.SUB_imm (X86_64.RSP, 4096)]
                     // Copy path to null-terminated stack buffer
                     @ [X86_64.MOV_load (X86_64.RCX, X86_64.R10, 0)
                        X86_64.LEA (X86_64.RSI, X86_64.R10, 8)
@@ -2826,11 +2829,9 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                        X86_64.MOV_reg (scratch, X86_64.RSI)
                        X86_64.ADD_reg (scratch, X86_64.R10)
                        X86_64.MOV_load_byte (scratch, scratch, 0)
-                       X86_64.PUSH X86_64.R8
                        X86_64.MOV_reg (X86_64.R8, X86_64.RDI)
                        X86_64.ADD_reg (X86_64.R8, X86_64.R10)
                        X86_64.MOV_store_byte (X86_64.R8, 0, scratch)
-                       X86_64.POP X86_64.R8
                        X86_64.ADD_imm (X86_64.R10, 1)
                        X86_64.JMP copyLabel
                        X86_64.Label doneLabel]
@@ -2852,9 +2853,9 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     // write(fd, content_data, content_len)
                     // R9 = content heap string (saved by PUSH above, load from stack)
                     // R9 was pushed at position 5 (index from top after SUB): need to recalculate
-                    // After pushes (6 * 8 = 48) + SUB 272 = 320 bytes below original RSP
-                    // R9 was the last push, so at [RSP + 272 + 0] = [RSP + 272]
-                    @ [X86_64.MOV_load (X86_64.R9, X86_64.RSP, 272)]  // reload R9 (content)
+                    // After pushes (6 * 8 = 48) + SUB 4096 = 4144 bytes below original RSP
+                    // R9 was the last push, so at [RSP + 4096 + 0] = [RSP + 4096]
+                    @ [X86_64.MOV_load (X86_64.R9, X86_64.RSP, 4096)]  // reload R9 (content)
                     @ [X86_64.MOV_reg (X86_64.RDI, X86_64.R8)]        // fd
                     @ [X86_64.LEA (X86_64.RSI, X86_64.R9, 8)]         // content data
                     @ [X86_64.MOV_load (X86_64.RDX, X86_64.R9, 0)]    // content length
@@ -2894,7 +2895,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                        X86_64.MOV_reg (X86_64.RAX, scratch)]
                     // === Cleanup ===
                     @ [X86_64.Label cleanupLabel
-                       X86_64.ADD_imm (X86_64.RSP, 272)]
+                       X86_64.ADD_imm (X86_64.RSP, 4096)]
                     @ restores
                     @ [X86_64.MOV_reg (destReg, X86_64.RAX)])))
 
@@ -2934,8 +2935,8 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 let saves = [X86_64.PUSH X86_64.RDI; X86_64.PUSH X86_64.RSI; X86_64.PUSH X86_64.RCX; X86_64.PUSH X86_64.R10]
                 let restores = [X86_64.POP X86_64.R10; X86_64.POP X86_64.RCX; X86_64.POP X86_64.RSI; X86_64.POP X86_64.RDI]
                 pathSetup @ saves
-                // Allocate 264 bytes on stack for null-terminated path
-                @ [X86_64.SUB_imm (X86_64.RSP, 264)]
+                // Allocate 4096 bytes on stack for null-terminated path (PATH_MAX)
+                @ [X86_64.SUB_imm (X86_64.RSP, 4096)]
                 // R10 = heap string ptr. [R10] = length, R10+8 = data
                 // RSI = string data addr, RDI = stack buf, RCX = length, R11 = counter
                 @ [X86_64.MOV_load (X86_64.RCX, X86_64.R10, 0)   // RCX = length
@@ -2974,7 +2975,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                    X86_64.CMP_imm (X86_64.RAX, 0)
                    X86_64.SETcc (X86_64.EQ, X86_64.RAX)
                    X86_64.MOVZX_byte (X86_64.RAX, X86_64.RAX)
-                   X86_64.ADD_imm (X86_64.RSP, 264)]
+                   X86_64.ADD_imm (X86_64.RSP, 4096)]
                 @ restores
                 // Move result to destReg after restoring saved registers
                 @ [X86_64.MOV_reg (destReg, X86_64.RAX)]))
