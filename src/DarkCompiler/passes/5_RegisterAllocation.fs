@@ -2250,27 +2250,64 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Msub (dest, mulLeft, mulRight, sub) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let (mulLeftReg, mulLeftLoads) = loadSpilled mapping mulLeft LIR.X12
-        let (mulRightReg, mulRightLoads) = loadSpilled mapping mulRight LIR.X13
-        let (subReg, subLoads) = loadSpilled mapping sub LIR.X14
-        let msubInstr = LIR.Msub (destReg, mulLeftReg, mulRightReg, subReg)
-        let storeInstrs =
-            match destAlloc with
-            | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
-            | _ -> []
-        mulLeftLoads @ mulRightLoads @ subLoads @ [msubInstr] @ storeInstrs
+        if isX86_64Arch then
+            // On x86_64, X12/X13/X14 all alias R11. Use loadSpilledPair for mul
+            // operands (uses dest as safe temp), and X3 (RCX) for sub if it would
+            // conflict with mulRight in R11.
+            let ((mulLeftReg, mulLeftLoads), (mulRightReg, mulRightLoads)) =
+                loadSpilledPair mapping mulLeft mulRight destReg
+            let subIsSpilled =
+                match sub with
+                | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
+                | _ -> false
+            let mulRightIsR11 = (mulRightReg = LIR.Physical LIR.X12 || mulRightReg = LIR.Physical LIR.X11)
+            let subTemp = if subIsSpilled && mulRightIsR11 then LIR.X3 else LIR.X12
+            let (subReg, subLoads) = loadSpilled mapping sub subTemp
+            let msubInstr = LIR.Msub (destReg, mulLeftReg, mulRightReg, subReg)
+            let storeInstrs =
+                match destAlloc with
+                | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
+                | _ -> []
+            mulLeftLoads @ mulRightLoads @ subLoads @ [msubInstr] @ storeInstrs
+        else
+            let (mulLeftReg, mulLeftLoads) = loadSpilled mapping mulLeft LIR.X12
+            let (mulRightReg, mulRightLoads) = loadSpilled mapping mulRight LIR.X13
+            let (subReg, subLoads) = loadSpilled mapping sub LIR.X14
+            let msubInstr = LIR.Msub (destReg, mulLeftReg, mulRightReg, subReg)
+            let storeInstrs =
+                match destAlloc with
+                | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
+                | _ -> []
+            mulLeftLoads @ mulRightLoads @ subLoads @ [msubInstr] @ storeInstrs
 
     | LIR.Madd (dest, mulLeft, mulRight, add) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let (mulLeftReg, mulLeftLoads) = loadSpilled mapping mulLeft LIR.X12
-        let (mulRightReg, mulRightLoads) = loadSpilled mapping mulRight LIR.X13
-        let (addReg, addLoads) = loadSpilled mapping add LIR.X14
-        let maddInstr = LIR.Madd (destReg, mulLeftReg, mulRightReg, addReg)
-        let storeInstrs =
-            match destAlloc with
-            | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
-            | _ -> []
-        mulLeftLoads @ mulRightLoads @ addLoads @ [maddInstr] @ storeInstrs
+        if isX86_64Arch then
+            let ((mulLeftReg, mulLeftLoads), (mulRightReg, mulRightLoads)) =
+                loadSpilledPair mapping mulLeft mulRight destReg
+            let addIsSpilled =
+                match add with
+                | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
+                | _ -> false
+            let mulRightIsR11 = (mulRightReg = LIR.Physical LIR.X12 || mulRightReg = LIR.Physical LIR.X11)
+            let addTemp = if addIsSpilled && mulRightIsR11 then LIR.X3 else LIR.X12
+            let (addReg, addLoads) = loadSpilled mapping add addTemp
+            let maddInstr = LIR.Madd (destReg, mulLeftReg, mulRightReg, addReg)
+            let storeInstrs =
+                match destAlloc with
+                | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
+                | _ -> []
+            mulLeftLoads @ mulRightLoads @ addLoads @ [maddInstr] @ storeInstrs
+        else
+            let (mulLeftReg, mulLeftLoads) = loadSpilled mapping mulLeft LIR.X12
+            let (mulRightReg, mulRightLoads) = loadSpilled mapping mulRight LIR.X13
+            let (addReg, addLoads) = loadSpilled mapping add LIR.X14
+            let maddInstr = LIR.Madd (destReg, mulLeftReg, mulRightReg, addReg)
+            let storeInstrs =
+                match destAlloc with
+                | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
+                | _ -> []
+            mulLeftLoads @ mulRightLoads @ addLoads @ [maddInstr] @ storeInstrs
 
     | LIR.Cmp (left, right) ->
         let (leftReg, leftLoads) = loadSpilled mapping left LIR.X12
@@ -2810,14 +2847,24 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
     | LIR.FileWriteFromPtr (dest, path, ptr, length) ->
         let (destReg, destAlloc) = applyToReg mapping dest
         let (pathOp, pathLoads) = applyToOperand mapping path LIR.X12
-        let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X13
-        let (lengthReg, lengthLoads) = loadSpilled mapping length LIR.X14
-        let fileInstr = LIR.FileWriteFromPtr (destReg, pathOp, ptrReg, lengthReg)
-        let storeInstrs =
-            match destAlloc with
-            | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
-            | _ -> []
-        pathLoads @ ptrLoads @ lengthLoads @ [fileInstr] @ storeInstrs
+        if isX86_64Arch then
+            let ((ptrReg, ptrLoads), (lengthReg, lengthLoads)) =
+                loadSpilledPair mapping ptr length destReg
+            let fileInstr = LIR.FileWriteFromPtr (destReg, pathOp, ptrReg, lengthReg)
+            let storeInstrs =
+                match destAlloc with
+                | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
+                | _ -> []
+            pathLoads @ ptrLoads @ lengthLoads @ [fileInstr] @ storeInstrs
+        else
+            let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X13
+            let (lengthReg, lengthLoads) = loadSpilled mapping length LIR.X14
+            let fileInstr = LIR.FileWriteFromPtr (destReg, pathOp, ptrReg, lengthReg)
+            let storeInstrs =
+                match destAlloc with
+                | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
+                | _ -> []
+            pathLoads @ ptrLoads @ lengthLoads @ [fileInstr] @ storeInstrs
 
     | LIR.RawAlloc (dest, numBytes) ->
         let (destReg, destAlloc) = applyToReg mapping dest
@@ -2854,16 +2901,66 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         ptrLoads @ offsetLoads @ [getInstr] @ storeInstrs
 
     | LIR.RawSet (ptr, byteOffset, value, valueType) ->
-        let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X12
-        let (offsetReg, offsetLoads) = loadSpilled mapping byteOffset LIR.X13
-        let (valueReg, valueLoads) = loadSpilled mapping value LIR.X14
-        ptrLoads @ offsetLoads @ valueLoads @ [LIR.RawSet (ptrReg, offsetReg, valueReg, valueType)]
+        if isX86_64Arch then
+            // On x86_64, X12/X13/X14 all alias R11. When both ptr and value are
+            // spilled, loading both into R11 clobbers one. Save X3 (RCX) via
+            // push/pop and use it as a non-R11 temp for ptr. The codegen already
+            // handles ptr=RCX when value=R11(scratch).
+            let ptrSpilled =
+                match ptr with
+                | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
+                | _ -> false
+            let valueSpilled =
+                match value with
+                | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
+                | _ -> false
+            if ptrSpilled && valueSpilled then
+                let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X3
+                let (offsetReg, offsetLoads) = loadSpilled mapping byteOffset LIR.X12
+                let (valueReg, valueLoads) = loadSpilled mapping value LIR.X12
+                [LIR.SaveRegs ([LIR.X3], [])]
+                @ ptrLoads @ offsetLoads @ valueLoads
+                @ [LIR.RawSet (ptrReg, offsetReg, valueReg, valueType)]
+                @ [LIR.RestoreRegs ([LIR.X3], [])]
+            else
+                let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X12
+                let (offsetReg, offsetLoads) = loadSpilled mapping byteOffset LIR.X12
+                let (valueReg, valueLoads) = loadSpilled mapping value LIR.X12
+                ptrLoads @ offsetLoads @ valueLoads @ [LIR.RawSet (ptrReg, offsetReg, valueReg, valueType)]
+        else
+            let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X12
+            let (offsetReg, offsetLoads) = loadSpilled mapping byteOffset LIR.X13
+            let (valueReg, valueLoads) = loadSpilled mapping value LIR.X14
+            ptrLoads @ offsetLoads @ valueLoads @ [LIR.RawSet (ptrReg, offsetReg, valueReg, valueType)]
 
     | LIR.RawSetByte (ptr, byteOffset, value) ->
-        let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X12
-        let (offsetReg, offsetLoads) = loadSpilled mapping byteOffset LIR.X13
-        let (valueReg, valueLoads) = loadSpilled mapping value LIR.X14
-        ptrLoads @ offsetLoads @ valueLoads @ [LIR.RawSetByte (ptrReg, offsetReg, valueReg)]
+        if isX86_64Arch then
+            let ptrSpilled =
+                match ptr with
+                | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
+                | _ -> false
+            let valueSpilled =
+                match value with
+                | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
+                | _ -> false
+            if ptrSpilled && valueSpilled then
+                let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X3
+                let (offsetReg, offsetLoads) = loadSpilled mapping byteOffset LIR.X12
+                let (valueReg, valueLoads) = loadSpilled mapping value LIR.X12
+                [LIR.SaveRegs ([LIR.X3], [])]
+                @ ptrLoads @ offsetLoads @ valueLoads
+                @ [LIR.RawSetByte (ptrReg, offsetReg, valueReg)]
+                @ [LIR.RestoreRegs ([LIR.X3], [])]
+            else
+                let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X12
+                let (offsetReg, offsetLoads) = loadSpilled mapping byteOffset LIR.X12
+                let (valueReg, valueLoads) = loadSpilled mapping value LIR.X12
+                ptrLoads @ offsetLoads @ valueLoads @ [LIR.RawSetByte (ptrReg, offsetReg, valueReg)]
+        else
+            let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X12
+            let (offsetReg, offsetLoads) = loadSpilled mapping byteOffset LIR.X13
+            let (valueReg, valueLoads) = loadSpilled mapping value LIR.X14
+            ptrLoads @ offsetLoads @ valueLoads @ [LIR.RawSetByte (ptrReg, offsetReg, valueReg)]
 
     | LIR.RefCountIncString str ->
         let (strOp, strLoads) = applyToOperand mapping str LIR.X12
