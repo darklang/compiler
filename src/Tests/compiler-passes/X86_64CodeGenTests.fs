@@ -6,7 +6,7 @@ module X86_64CodeGenTests
 
 /// Build and run a LIR program, returning exit code and stdout
 let private runLIRProgramFull (program: LIR.Program) : Result<int * string, string> =
-    match CodeGen_X86_64.translateProgram program with
+    match CodeGen_X86_64.translateProgram program false with
     | Error e -> Error $"Codegen error: {e}"
     | Ok instrs ->
         match X86_64_Resolve.resolveAndEncode instrs with
@@ -41,7 +41,7 @@ let private runLIRProgramFull (program: LIR.Program) : Result<int * string, stri
 
 /// Build and run a LIR program, returning the exit code
 let private runLIRProgram (program: LIR.Program) : Result<int, string> =
-    match CodeGen_X86_64.translateProgram program with
+    match CodeGen_X86_64.translateProgram program false with
     | Error e -> Error $"Codegen error: {e}"
     | Ok instrs ->
         match X86_64_Resolve.resolveAndEncode instrs with

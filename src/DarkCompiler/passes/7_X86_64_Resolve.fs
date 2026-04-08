@@ -15,7 +15,7 @@ module X86_64_Resolve
 open X86_64
 
 /// A fixup records where a rel32 placeholder needs to be patched
-type private Fixup = {
+type Fixup = {
     /// Byte offset in the output where the rel32 starts
     PatchOffset: int
     /// Byte offset of the instruction AFTER this one (where PC will be when executing)
@@ -29,6 +29,8 @@ type private Fixup = {
 type ResolveResult = {
     MachineCode: byte array
     LabelPositions: Map<string, int>
+    /// Fixups deferred for data labels resolved after code size is known
+    DeferredFixups: Fixup list
 }
 
 /// Returns the final machine code bytes and label positions.
@@ -81,12 +83,12 @@ let resolveAndEncode (instructions: Instr list) : Result<ResolveResult, string> 
     // Concatenate all encoded chunks
     let result = encodedChunks |> List.rev |> Array.concat
 
-    // Pass 2: apply fixups
-    let mutable errors : string list = []
+    // Pass 2: apply fixups (defer unknown labels for data label patching later)
+    let mutable deferred : Fixup list = []
     for fixup in fixups do
         match Map.tryFind fixup.TargetLabel labelPositions with
         | None ->
-            errors <- $"Undefined label: {fixup.TargetLabel}" :: errors
+            deferred <- fixup :: deferred
         | Some targetOffset ->
             // rel32 = target - nextInstr
             let rel = targetOffset - fixup.NextInstrOffset
@@ -101,7 +103,30 @@ let resolveAndEncode (instructions: Instr list) : Result<ResolveResult, string> 
             result.[fixup.PatchOffset + 2] <- relBytes.[2]
             result.[fixup.PatchOffset + 3] <- relBytes.[3]
 
+    Ok { MachineCode = result; LabelPositions = labelPositions; DeferredFixups = List.rev deferred }
+
+/// Patch deferred fixups with data label positions.
+/// dataLabels maps label names to file offsets. codeFileOffset is where code starts in the file.
+let patchDataLabels (result: ResolveResult) (dataLabels: Map<string, int>) (codeFileOffset: int) : Result<ResolveResult, string> =
+    let mutable errors : string list = []
+    for fixup in result.DeferredFixups do
+        match Map.tryFind fixup.TargetLabel dataLabels with
+        | None ->
+            errors <- $"Undefined label: {fixup.TargetLabel}" :: errors
+        | Some fileOffset ->
+            let targetCodeOffset = fileOffset - codeFileOffset
+            let rel = targetCodeOffset - fixup.NextInstrOffset
+            let relBytes = [|
+                byte (uint32 rel &&& 0xFFu)
+                byte ((uint32 rel >>> 8) &&& 0xFFu)
+                byte ((uint32 rel >>> 16) &&& 0xFFu)
+                byte ((uint32 rel >>> 24) &&& 0xFFu)
+            |]
+            result.MachineCode.[fixup.PatchOffset] <- relBytes.[0]
+            result.MachineCode.[fixup.PatchOffset + 1] <- relBytes.[1]
+            result.MachineCode.[fixup.PatchOffset + 2] <- relBytes.[2]
+            result.MachineCode.[fixup.PatchOffset + 3] <- relBytes.[3]
     if errors.IsEmpty then
-        Ok { MachineCode = result; LabelPositions = labelPositions }
+        Ok { result with DeferredFixups = [] }
     else
         Error (String.concat "\n" (List.rev errors))

@@ -540,7 +540,7 @@ let private generateBinary
         // x86-64 backend
         if verbosity >= 1 then println codegenLabel
         let codegenStart = sw.Elapsed.TotalMilliseconds
-        let codegenResult = CodeGen_X86_64.translateProgram allocatedProgram
+        let codegenResult = CodeGen_X86_64.translateProgram allocatedProgram options.EnableLeakCheck
         match codegenResult with
         | Error err -> Error $"x86-64 code generation error: {err}"
         | Ok x86Instructions ->
@@ -561,6 +561,23 @@ let private generateBinary
             match X86_64_Resolve.resolveAndEncode x86Instructions with
             | Error err -> Error $"x86-64 resolve error: {err}"
             | Ok resolveResult ->
+                // Patch data labels (e.g., leak counter) if there are deferred fixups
+                let patchedResult =
+                    if List.isEmpty resolveResult.DeferredFixups then
+                        Ok resolveResult
+                    else
+                        let elfHeaderSize = 64
+                        let programHeaderSize = 56
+                        let codeFileOffset = elfHeaderSize + programHeaderSize
+                        let codeSize = resolveResult.MachineCode.Length
+                        let alignedDataStart = (codeFileOffset + codeSize + 7) &&& (~~~7)
+                        // Leak counter is at start of data section (no float/string pools on x86_64)
+                        let leakCounterFileOffset = alignedDataStart
+                        let dataLabels = Map.ofList [("_leak_count", leakCounterFileOffset)]
+                        X86_64_Resolve.patchDataLabels resolveResult dataLabels codeFileOffset
+                match patchedResult with
+                | Error err -> Error $"x86-64 data label error: {err}"
+                | Ok resolveResult ->
                 let entryOffset =
                     match Map.tryFind "_start" resolveResult.LabelPositions with
                     | Some offset -> offset

@@ -339,7 +339,171 @@ let private genEpilogue (stackSize: int) (usedCalleeSaved: LIR.PhysReg list) : X
 type private FuncCtx = {
     StackSize: int
     UsedCalleeSaved: LIR.PhysReg list
+    EnableLeakCheck: bool
 }
+
+// ============================================================================
+// Leak Counter (data label _leak_count in ELF data section)
+// ============================================================================
+
+/// Increment the leak counter (called on every heap allocation)
+let private genLeakCounterInc (ctx: FuncCtx) : X86_64.Instr list =
+    if not ctx.EnableLeakCheck then []
+    else
+        // LEA R11, [RIP + _leak_count]; INC [R11]
+        [X86_64.PUSH scratch
+         X86_64.PUSH X86_64.RCX
+         X86_64.LEA_rip (scratch, "_leak_count")
+         X86_64.MOV_load (X86_64.RCX, scratch, 0)
+         X86_64.ADD_imm (X86_64.RCX, 1)
+         X86_64.MOV_store (scratch, 0, X86_64.RCX)
+         X86_64.POP X86_64.RCX
+         X86_64.POP scratch]
+
+/// Decrement the leak counter (called when refcount hits zero and block is freed)
+let private genLeakCounterDec (ctx: FuncCtx) : X86_64.Instr list =
+    if not ctx.EnableLeakCheck then []
+    else
+        [X86_64.PUSH scratch
+         X86_64.PUSH X86_64.RCX
+         X86_64.LEA_rip (scratch, "_leak_count")
+         X86_64.MOV_load (X86_64.RCX, scratch, 0)
+         X86_64.SUB_imm (X86_64.RCX, 1)
+         X86_64.MOV_store (scratch, 0, X86_64.RCX)
+         X86_64.POP X86_64.RCX
+         X86_64.POP scratch]
+
+/// Reverse bytes at [RSP..RSP+RCX-1] in place
+let private genReverseBytes () : X86_64.Instr list =
+    let loopLabel = freshLabel "rev_loop"
+    let doneLabel = freshLabel "rev_done"
+    [X86_64.MOV_reg (X86_64.RDI, X86_64.RSP)
+     X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)
+     X86_64.ADD_reg (X86_64.RSI, X86_64.RCX)
+     X86_64.SUB_imm (X86_64.RSI, 1)
+     X86_64.Label loopLabel
+     X86_64.CMP_reg (X86_64.RDI, X86_64.RSI)
+     X86_64.Jcc (X86_64.GE, doneLabel)
+     X86_64.MOV_load_byte (X86_64.RAX, X86_64.RDI, 0)
+     X86_64.MOV_load_byte (X86_64.RDX, X86_64.RSI, 0)
+     X86_64.MOV_store_byte (X86_64.RDI, 0, X86_64.RDX)
+     X86_64.MOV_store_byte (X86_64.RSI, 0, X86_64.RAX)
+     X86_64.ADD_imm (X86_64.RDI, 1)
+     X86_64.SUB_imm (X86_64.RSI, 1)
+     X86_64.JMP loopLabel
+     X86_64.Label doneLabel]
+
+/// Print an int64 value to stderr followed by newline
+let private genPrintInt64ToStderr (srcReg: X86_64.Reg) : X86_64.Instr list =
+    let loopLabel = freshLabel "print_i64_stderr_loop"
+    let writeLabel = freshLabel "print_i64_stderr_write"
+    [X86_64.SUB_imm (X86_64.RSP, 24)
+     X86_64.MOV_imm32 (X86_64.RCX, 0)
+     X86_64.TEST_reg (srcReg, srcReg)
+     X86_64.Jcc (X86_64.NE, loopLabel)
+     X86_64.MOV_imm32 (scratch, 48)
+     X86_64.MOV_store_byte (X86_64.RSP, 0, scratch)
+     X86_64.MOV_imm32 (X86_64.RCX, 1)
+     X86_64.JMP writeLabel
+     X86_64.Label loopLabel
+     X86_64.TEST_reg (srcReg, srcReg)
+     X86_64.Jcc (X86_64.EQ, writeLabel)]
+    @ loadImm64 scratch 10L
+    @ [X86_64.PUSH X86_64.RDX
+       X86_64.MOV_reg (X86_64.RAX, srcReg)
+       X86_64.XOR_reg (X86_64.RDX, X86_64.RDX)
+       X86_64.IDIV scratch
+       X86_64.ADD_imm (X86_64.RDX, 48)
+       X86_64.MOV_reg (scratch, X86_64.RSP)
+       X86_64.ADD_imm (scratch, 8)
+       X86_64.ADD_reg (scratch, X86_64.RCX)
+       X86_64.MOV_store_byte (scratch, 0, X86_64.RDX)
+       X86_64.ADD_imm (X86_64.RCX, 1)
+       X86_64.MOV_reg (srcReg, X86_64.RAX)
+       X86_64.POP X86_64.RDX
+       X86_64.JMP loopLabel
+       X86_64.Label writeLabel]
+    @ genReverseBytes ()
+    @ [X86_64.MOV_imm32 (X86_64.RDI, 2)
+       X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)
+       X86_64.MOV_reg (scratch, X86_64.RSP)
+       X86_64.ADD_reg (scratch, X86_64.RCX)
+       X86_64.MOV_imm32 (X86_64.RAX, 10)
+       X86_64.MOV_store_byte (scratch, 0, X86_64.RAX)
+       X86_64.LEA (X86_64.RDX, X86_64.RCX, 1)]
+    @ loadImm64 X86_64.RAX (int64 syscalls.Write)
+    @ [X86_64.SYSCALL
+       X86_64.ADD_imm (X86_64.RSP, 24)]
+
+/// Generate leak check report at exit: if _leak_count > 0, print "leaks: N\n" to stderr
+let private genLeakCheckReport () : X86_64.Instr list =
+    let noLeaksLabel = freshLabel "no_leaks"
+    [X86_64.LEA_rip (scratch, "_leak_count")
+     X86_64.MOV_load (X86_64.RAX, scratch, 0)
+     X86_64.TEST_reg (X86_64.RAX, X86_64.RAX)
+     X86_64.Jcc (X86_64.EQ, noLeaksLabel)
+     X86_64.PUSH X86_64.RAX
+     X86_64.SUB_imm (X86_64.RSP, 8)]
+    @ loadImm64 scratch 0x203A736B61656CL   // "leaks: " little-endian
+    @ [X86_64.MOV_store (X86_64.RSP, 0, scratch)
+       X86_64.MOV_imm32 (X86_64.RDI, 2)
+       X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)
+       X86_64.MOV_imm32 (X86_64.RDX, 7)]
+    @ loadImm64 X86_64.RAX (int64 syscalls.Write)
+    @ [X86_64.SYSCALL
+       X86_64.ADD_imm (X86_64.RSP, 8)
+       X86_64.POP X86_64.RAX]
+    @ genPrintInt64ToStderr X86_64.RAX
+    @ [X86_64.Label noLeaksLabel]
+
+// ============================================================================
+// Reference Counting Helpers
+// ============================================================================
+
+/// Generic RefCountDec: decrement refcount at [addr + payloadSize].
+/// If zero, free block to free list and optionally decrement leak counter.
+/// Uses PUSH/POP to preserve both RCX and RDX as temps, keeping addr safe.
+let private genRefCountDecGeneric (ctx: FuncCtx) (addrReg: X86_64.Reg) (payloadSize: int) : X86_64.Instr list =
+    let skipLabel = freshLabel "rc_dec_skip"
+    let noFreeLabel = freshLabel "rc_dec_nofree"
+    let leakDec = genLeakCounterDec ctx
+    // Use RDX as temp for addr (saved/restored), RCX as temp for refcount
+    // This avoids conflicts when addrReg is RCX or R11
+    [X86_64.TEST_reg (addrReg, addrReg)
+     X86_64.Jcc (X86_64.EQ, skipLabel)
+     X86_64.PUSH X86_64.RDX
+     X86_64.PUSH X86_64.RCX
+     X86_64.MOV_reg (X86_64.RDX, addrReg)            // RDX = addr (safe copy)
+     // Load refcount, decrement, store back
+     X86_64.MOV_load (X86_64.RCX, X86_64.RDX, payloadSize)
+     X86_64.SUB_imm (X86_64.RCX, 1)
+     X86_64.MOV_store (X86_64.RDX, payloadSize, X86_64.RCX)
+     X86_64.TEST_reg (X86_64.RCX, X86_64.RCX)
+     X86_64.Jcc (X86_64.NE, noFreeLabel)]
+    // Refcount hit zero — free to free list (only for valid payload sizes)
+    @ (if payloadSize >= 0 && payloadSize < freeListSize then
+        [X86_64.MOV_load (X86_64.RCX, freeListBase, payloadSize)
+         X86_64.MOV_store (X86_64.RDX, 0, X86_64.RCX)
+         X86_64.MOV_store (freeListBase, payloadSize, X86_64.RDX)]
+       else [])
+    @ leakDec
+    @ [X86_64.Label noFreeLabel
+       X86_64.POP X86_64.RCX
+       X86_64.POP X86_64.RDX
+       X86_64.Label skipLabel]
+
+/// Generic RefCountInc: increment refcount at [addr + payloadSize].
+let private genRefCountIncGeneric (addrReg: X86_64.Reg) (payloadSize: int) : X86_64.Instr list =
+    let skipLabel = freshLabel "rc_inc_skip"
+    [X86_64.TEST_reg (addrReg, addrReg)
+     X86_64.Jcc (X86_64.EQ, skipLabel)
+     X86_64.PUSH X86_64.RDX
+     X86_64.MOV_reg (X86_64.RDX, addrReg)
+     X86_64.MOV_load (X86_64.RDX, X86_64.RDX, payloadSize)
+     X86_64.ADD_imm (X86_64.RDX, 1)
+     X86_64.MOV_store (addrReg, payloadSize, X86_64.RDX)
+     X86_64.POP X86_64.RDX
+     X86_64.Label skipLabel]
 
 /// Adjust a stack slot offset to account for callee-saved registers pushed after RBP.
 /// LIR stack slots are byte offsets from FP (e.g., -8, -16), but callee-saved pushes
@@ -745,7 +909,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
 
     | LIR.PrintInt64 reg ->
         resolveReg reg
-        |> Result.map (fun srcReg -> genPrintInt64AndExit srcReg)
+        |> Result.map (fun srcReg -> genPrintInt64 srcReg true)
 
     | LIR.PrintInt64NoNewline reg ->
         resolveReg reg
@@ -753,7 +917,28 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
 
     | LIR.PrintBool reg ->
         resolveReg reg
-        |> Result.map (fun srcReg -> genPrintBoolAndExit srcReg)
+        |> Result.map (fun srcReg ->
+            // Print "true\n" or "false\n" without exiting (Ret handles exit)
+            let trueLabel = freshLabel "bool_true"
+            let writeLabel = freshLabel "bool_write"
+            [X86_64.TEST_reg (srcReg, srcReg)
+             X86_64.Jcc (X86_64.NE, trueLabel)
+             X86_64.SUB_imm (X86_64.RSP, 8)]
+            @ loadImm64 scratch 0x0A65736C6166L  // "false\n"
+            @ [X86_64.MOV_store (X86_64.RSP, 0, scratch)
+               X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)
+               X86_64.MOV_imm32 (X86_64.RDX, 6)
+               X86_64.JMP writeLabel
+               X86_64.Label trueLabel
+               X86_64.SUB_imm (X86_64.RSP, 8)]
+            @ loadImm64 scratch 0x0A65757274L  // "true\n"
+            @ [X86_64.MOV_store (X86_64.RSP, 0, scratch)
+               X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)
+               X86_64.MOV_imm32 (X86_64.RDX, 5)
+               X86_64.Label writeLabel
+               X86_64.MOV_imm32 (X86_64.RDI, 1)]
+            @ genWriteSyscall
+            @ [X86_64.ADD_imm (X86_64.RSP, 8)])
 
     | LIR.PrintBoolNoNewline reg ->
         resolveReg reg
@@ -763,25 +948,21 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
 
     | LIR.PrintHeapString reg ->
         // Heap string format: [length:8][data:N][refcount:8]
-        // Print data + newline, then exit(0)
+        // Print data + newline (exit handled by subsequent Ret → epilogue)
         resolveReg reg
         |> Result.map (fun srcReg ->
-            // Load length into RDX, data address into RSI
-            [X86_64.MOV_load (X86_64.RDX, srcReg, 0)     // RDX = length
-             X86_64.LEA (X86_64.RSI, srcReg, 8)           // RSI = data (skip length)
-             X86_64.MOV_imm32 (X86_64.RDI, 1)]            // fd = stdout
+            [X86_64.MOV_load (X86_64.RDX, srcReg, 0)
+             X86_64.LEA (X86_64.RSI, srcReg, 8)
+             X86_64.MOV_imm32 (X86_64.RDI, 1)]
             @ genWriteSyscall
-            // Print newline
             @ [X86_64.SUB_imm (X86_64.RSP, 8)]
-            @ loadImm64 scratch 10L  // '\n'
+            @ loadImm64 scratch 10L
             @ [X86_64.MOV_store (X86_64.RSP, 0, scratch)
                X86_64.MOV_imm32 (X86_64.RDI, 1)
                X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)
                X86_64.MOV_imm32 (X86_64.RDX, 1)]
             @ genWriteSyscall
-            @ [X86_64.ADD_imm (X86_64.RSP, 8)]
-            @ loadImm64 X86_64.RDI 0L
-            @ genExitSyscall)
+            @ [X86_64.ADD_imm (X86_64.RSP, 8)])
 
     | LIR.PrintHeapStringNoNewline reg ->
         resolveReg reg
@@ -1082,19 +1263,35 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         Ok []
 
     | LIR.HeapAlloc (dest, sizeBytes) ->
-        // Bump allocator with bounds check: dest = heapPtr; heapPtr += sizeBytes
-        // Check that heapPtr + sizeBytes doesn't exceed heap end (freeListBase + heapMmapSize)
-        let oomLabel = freshLabel "heap_oom"
+        // Bump allocator with free list reuse + bounds check
         let okLabel = freshLabel "heap_ok"
         resolveReg dest
         |> Result.map (fun destReg ->
-            // Bump allocator: dest = heapPtr; heapPtr += sizeBytes
-            [X86_64.MOV_reg (destReg, heapPtr)
-             X86_64.ADD_imm (heapPtr, int32 sizeBytes)]
-            // Bounds check: use PUSH/POP to save a temp if dest == scratch
+            // Check free list for this size class (if valid)
+            let freeListAlloc =
+                if sizeBytes >= 0 && sizeBytes < freeListSize then
+                    let bumpLabel = freshLabel "heap_bump"
+                    let freeListDoneLabel = freshLabel "heap_fl_done"
+                    [X86_64.PUSH X86_64.RCX
+                     X86_64.MOV_load (X86_64.RCX, freeListBase, sizeBytes)
+                     X86_64.TEST_reg (X86_64.RCX, X86_64.RCX)
+                     X86_64.Jcc (X86_64.EQ, bumpLabel)
+                     // Free list hit: dest = block, update head to next
+                     X86_64.MOV_reg (destReg, X86_64.RCX)
+                     X86_64.MOV_load (X86_64.RCX, X86_64.RCX, 0)     // next ptr
+                     X86_64.MOV_store (freeListBase, sizeBytes, X86_64.RCX)
+                     X86_64.POP X86_64.RCX
+                     X86_64.JMP freeListDoneLabel
+                     X86_64.Label bumpLabel
+                     X86_64.POP X86_64.RCX], [X86_64.Label freeListDoneLabel]
+                else [], []
+            let (freeListPre, freeListPost) = freeListAlloc
+            freeListPre
+            // Bump allocator path
+            @ [X86_64.MOV_reg (destReg, heapPtr)
+               X86_64.ADD_imm (heapPtr, int32 sizeBytes)]
+            // Bounds check
             @ (if destReg = scratch then
-                // dest is R11, can't use scratch for bounds check.
-                // Use PUSH/CMP/POP pattern to avoid clobbering dest.
                 [X86_64.PUSH X86_64.RAX
                  X86_64.MOV_reg (X86_64.RAX, heapPtr)
                  X86_64.SUB_reg (X86_64.RAX, freeListBase)
@@ -1107,7 +1304,8 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                  X86_64.CMP_imm (scratch, int32 heapMmapSizeBytes)
                  X86_64.Jcc (X86_64.LE, okLabel)])
             @ genOomJump ()
-            @ [X86_64.Label okLabel])
+            @ [X86_64.Label okLabel]
+            @ freeListPost)
 
     | LIR.HeapStore (addr, offset, src, _) ->
         resolveReg addr
@@ -1361,9 +1559,93 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             |> Result.map (fun destReg -> [X86_64.MOVQ_to_gp (destReg, lirFRegToX86 sp)])
         | _ -> Error "FloatToBits with virtual FP register"
 
-    | LIR.RefCountInc _ | LIR.RefCountDec _ | LIR.RefCountIncString _ | LIR.RefCountDecString _ ->
-        // TODO: implement ref counting. For now, leak memory (programs still work).
-        Ok []
+    | LIR.RefCountInc (addr, payloadSize, kind) ->
+        resolveReg addr
+        |> Result.map (fun addrReg ->
+            match kind with
+            | LIR.TaggedList ->
+                // Tagged list refcount inc requires recursive traversal — no-op for now.
+                []
+            | _ ->
+                // Generic refcount inc — no-op for now (needs more testing)
+                [])
+
+    | LIR.RefCountDec (addr, payloadSize, kind) ->
+        resolveReg addr
+        |> Result.map (fun addrReg ->
+            match kind with
+            | _ ->
+                // Refcount dec — no-op for now (needs complete implementation)
+                [])
+
+    | LIR.RefCountIncString str ->
+        match str with
+        | LIR.StringSymbol _ -> Ok []  // Literal string - no refcount
+        | LIR.Reg reg ->
+            resolveReg reg
+            |> Result.map (fun addrReg ->
+                // Heap string: [length:8][data:N][padding:P][refcount:8]
+                // refcount offset = 8 + ((length + 7) & ~7)
+                // Sentinel value INT64_MAX means literal (read-only)
+                let skipLabel = freshLabel "rcinc_str_skip"
+                let literalLabel = freshLabel "rcinc_str_lit"
+                [X86_64.PUSH X86_64.RCX
+                 X86_64.PUSH X86_64.RDX
+                 // Compute refcount address
+                 X86_64.MOV_load (X86_64.RCX, addrReg, 0)    // RCX = length
+                 X86_64.ADD_imm (X86_64.RCX, 7)               // RCX = length + 7
+                 X86_64.AND_imm (X86_64.RCX, -8)              // RCX = aligned(length)
+                 X86_64.ADD_imm (X86_64.RCX, 8)               // RCX = 8 + aligned(length)
+                 X86_64.ADD_reg (X86_64.RCX, addrReg)         // RCX = addr + refcount offset
+                 // Load refcount, check sentinel
+                 X86_64.MOV_load (X86_64.RDX, X86_64.RCX, 0) // RDX = refcount
+                ]
+                @ loadImm64 scratch 0x7FFFFFFFFFFFFFFFL        // scratch = INT64_MAX
+                @ [X86_64.CMP_reg (X86_64.RDX, scratch)
+                   X86_64.Jcc (X86_64.EQ, literalLabel)        // skip if literal
+                   X86_64.ADD_imm (X86_64.RDX, 1)
+                   X86_64.MOV_store (X86_64.RCX, 0, X86_64.RDX)
+                   X86_64.Label literalLabel
+                   X86_64.POP X86_64.RDX
+                   X86_64.POP X86_64.RCX
+                   X86_64.Label skipLabel])
+        | _ -> Error "RefCountIncString requires StringSymbol or Reg operand"
+
+    | LIR.RefCountDecString str ->
+        match str with
+        | LIR.StringSymbol _ -> Ok []  // Literal string - no refcount
+        | LIR.Reg reg ->
+            resolveReg reg
+            |> Result.map (fun addrReg ->
+                let skipLabel = freshLabel "rcdec_str_skip"
+                let literalLabel = freshLabel "rcdec_str_lit"
+                let noFreeLabel = freshLabel "rcdec_str_nofree"
+                let leakDec = genLeakCounterDec ctx
+                [X86_64.PUSH X86_64.RCX
+                 X86_64.PUSH X86_64.RDX
+                 // Compute refcount address
+                 X86_64.MOV_load (X86_64.RCX, addrReg, 0)    // RCX = length
+                 X86_64.ADD_imm (X86_64.RCX, 7)
+                 X86_64.AND_imm (X86_64.RCX, -8)
+                 X86_64.ADD_imm (X86_64.RCX, 8)
+                 X86_64.ADD_reg (X86_64.RCX, addrReg)         // RCX = refcount addr
+                 X86_64.MOV_load (X86_64.RDX, X86_64.RCX, 0) // RDX = refcount
+                ]
+                @ loadImm64 scratch 0x7FFFFFFFFFFFFFFFL
+                @ [X86_64.CMP_reg (X86_64.RDX, scratch)
+                   X86_64.Jcc (X86_64.EQ, literalLabel)
+                   X86_64.SUB_imm (X86_64.RDX, 1)
+                   X86_64.MOV_store (X86_64.RCX, 0, X86_64.RDX)
+                   X86_64.TEST_reg (X86_64.RDX, X86_64.RDX)
+                   X86_64.Jcc (X86_64.NE, noFreeLabel)]
+                // String refcount hit zero - decrement leak counter
+                @ leakDec
+                @ [X86_64.Label noFreeLabel
+                   X86_64.Label literalLabel
+                   X86_64.POP X86_64.RDX
+                   X86_64.POP X86_64.RCX
+                   X86_64.Label skipLabel])
+        | _ -> Error "RefCountDecString requires StringSymbol or Reg operand"
 
     | LIR.StringConcat (dest, left, right) ->
         // String concat: dest = left ++ right
@@ -1540,6 +1822,8 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                        X86_64.ADD_reg (X86_64.RCX, X86_64.RBX)]
                     @ loadImm64 scratch 1L
                     @ [X86_64.MOV_store (X86_64.RCX, 0, scratch)]
+                    // Leak counter increment for string allocation
+                    @ genLeakCounterInc ctx
                     // Move result to destReg, restore RBX
                     // If destReg IS RBX, we need to save result elsewhere first
                     @ (if destReg = X86_64.RBX then
@@ -1861,18 +2145,16 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                         @ [X86_64.ADD_reg (d, scratch)]))))
 
     | LIR.PrintFloat freg ->
-        // Call Stdlib.Float.toString(D0), print result as heap string, exit(0)
+        // Call Stdlib.Float.toString(D0), print result as heap string
         match freg with
         | LIR.FPhysical fp ->
             let xmm = lirFRegToX86 fp
             Ok ((if xmm <> X86_64.XMM0 then [X86_64.MOVSD_reg (X86_64.XMM0, xmm)] else [])
                 @ [X86_64.CALL "Stdlib.Float.toString"]
-                // RAX now has heap string pointer
-                @ [X86_64.MOV_load (X86_64.RDX, X86_64.RAX, 0)     // length
-                   X86_64.LEA (X86_64.RSI, X86_64.RAX, 8)           // data
-                   X86_64.MOV_imm32 (X86_64.RDI, 1)]                // stdout
+                @ [X86_64.MOV_load (X86_64.RDX, X86_64.RAX, 0)
+                   X86_64.LEA (X86_64.RSI, X86_64.RAX, 8)
+                   X86_64.MOV_imm32 (X86_64.RDI, 1)]
                 @ genWriteSyscall
-                // Print newline
                 @ [X86_64.SUB_imm (X86_64.RSP, 8)]
                 @ loadImm64 scratch 10L
                 @ [X86_64.MOV_store (X86_64.RSP, 0, scratch)
@@ -1880,9 +2162,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                    X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)
                    X86_64.MOV_imm32 (X86_64.RDX, 1)]
                 @ genWriteSyscall
-                @ [X86_64.ADD_imm (X86_64.RSP, 8)]
-                @ loadImm64 X86_64.RDI 0L
-                @ genExitSyscall)
+                @ [X86_64.ADD_imm (X86_64.RSP, 8)])
         | _ -> Error "PrintFloat with virtual FP register"
 
     | LIR.PrintFloatNoNewline freg ->
@@ -2411,7 +2691,7 @@ let private translateBlock (ctx: FuncCtx) (epilogueLabel: string) (block: LIR.Ba
             labelInstr @ bodyInstrs @ termInstrs)
 
 /// Translate a LIR function to x86-64 instructions
-let translateFunction (func: LIR.Function) : Result<X86_64.Instr list, string> =
+let translateFunction (enableLeakCheck: bool) (func: LIR.Function) : Result<X86_64.Instr list, string> =
     let epilogueLabel = "_epilogue_" + func.Name
     let prologue = genPrologue func.StackSize func.UsedCalleeSaved
 
@@ -2433,7 +2713,7 @@ let translateFunction (func: LIR.Function) : Result<X86_64.Instr list, string> =
         match remaining with
         | [] -> Ok (List.rev acc |> List.concat)
         | block :: rest ->
-            let ctx : FuncCtx = { StackSize = func.StackSize; UsedCalleeSaved = func.UsedCalleeSaved }
+            let ctx : FuncCtx = { StackSize = func.StackSize; UsedCalleeSaved = func.UsedCalleeSaved; EnableLeakCheck = enableLeakCheck }
             match translateBlock ctx epilogueLabel block with
             | Error e -> Error e
             | Ok instrs -> translateBlocks (instrs :: acc) rest
@@ -2447,23 +2727,29 @@ let translateFunction (func: LIR.Function) : Result<X86_64.Instr list, string> =
             else []
 
         let funcLabel = [X86_64.Label func.Name]
+        // Generate leak check report for _start exit
+        let leakReport =
+            if func.Name = "_start" && enableLeakCheck then
+                genLeakCheckReport ()
+            else []
+
         let epilogue =
             [X86_64.Label epilogueLabel]
             @ genEpilogue func.StackSize func.UsedCalleeSaved
             @ (if func.Name = "_start" then
-                   // _start exits instead of returning
-                   loadImm64 X86_64.RDI 0L @ genExitSyscall
+                   // _start: report leaks then exit(0)
+                   leakReport @ loadImm64 X86_64.RDI 0L @ genExitSyscall
                else
                    [X86_64.RET])
         Ok (funcLabel @ prologue @ heapInit @ blockInstrs @ epilogue)
 
 /// Translate a complete LIR program to x86-64 instructions
-let translateProgram (LIR.Program functions) : Result<X86_64.Instr list, string> =
+let translateProgram (LIR.Program functions) (enableLeakCheck: bool) : Result<X86_64.Instr list, string> =
     let rec translateFuncs acc remaining =
         match remaining with
         | [] -> Ok (List.rev acc |> List.concat)
         | func :: rest ->
-            match translateFunction func with
+            match translateFunction enableLeakCheck func with
             | Error e -> Error e
             | Ok instrs -> translateFuncs (instrs :: acc) rest
 

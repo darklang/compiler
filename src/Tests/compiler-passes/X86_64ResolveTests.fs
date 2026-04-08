@@ -64,16 +64,17 @@ let testCallForward () : Result<unit, string> =
         else
             Ok ()
 
-/// Test undefined label produces error
+/// Test undefined label is deferred (not an error) for data label patching
 let testUndefinedLabel () : Result<unit, string> =
     let instructions = [
         JMP "nonexistent"
     ]
     match X86_64_Resolve.resolveAndEncode instructions with
-    | Ok _ -> Error "Expected error for undefined label"
-    | Error msg ->
-        if msg.Contains("nonexistent") then Ok ()
-        else Error $"Error message doesn't mention the label: {msg}"
+    | Error msg -> Error $"Unexpected error: {msg}"
+    | Ok result ->
+        if List.length result.DeferredFixups = 1
+           && result.DeferredFixups.[0].TargetLabel = "nonexistent" then Ok ()
+        else Error $"Expected 1 deferred fixup for 'nonexistent', got {result.DeferredFixups}"
 
 /// Test: generate and execute a program with a forward call
 let testCallAndExecute () : Result<unit, string> =
