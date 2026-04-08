@@ -45,10 +45,16 @@ IDIV saves/restores RDX via the red zone `[RSP-8]`.
 
 ### Known Issues
 
-1. **Float.toString multi-digit fractions**: `0.5` works, `0.14` produces null bytes.
-   Root cause likely in stdlib's `__getFracDigits` recursion or `__stripZeros`.
-2. **String comparison**: stdlib string ops not fully working on x86_64.
-3. **GCD/modulo**: complex modulo in loops can produce wrong results.
+1. **Refcounting not implemented**: Heap memory is never reclaimed. Programs that
+   allocate heavily (e.g., 10K iterations creating lists) will exhaust the 512MB heap.
+   This affects 2 of 4530 tests (leak_check, memReclaimBurn).
+
+### Critical x86_64 Register Aliasing
+
+X8-X17 all map to R11 (scratch). The register allocator must never load multiple
+spilled operands into these registers simultaneously. For instructions with 3+
+operands (RawSet, Msub, Madd), use SaveRegs/RestoreRegs to push/pop a non-R11
+register (X3/RCX) as a safe temp when multiple operands are spilled.
 
 ### Running Commands — Use the Devcontainer
 

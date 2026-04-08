@@ -4,14 +4,17 @@
 
 Goal: reach ARM64 test parity (4486/4530 E2E tests) then merge to main.
 
-Current: **4503/4530 (99.4%)**. Already exceeds ARM64 baseline (4486). **27 failures remain.**
+Current: **4528/4530 (99.96%)**. Already exceeds ARM64 baseline (4486). **2 failures remain.**
 
 Recently fixed:
-- **HeapStore register clobbering** — `HeapStore(addr, offset, StringSymbol)` clobbered
-  the addr register (R11 or RCX) during inline string allocation. The string init uses
-  R11 for the allocation pointer and RCX for temporary values, so if the addr register was
-  either of these, the final store wrote to the wrong address. Also fixed FuncAddr and
-  FloatSymbol variants for R11 clobbering. Fixed equality, list, result, and dict tests.
+- **RawSet register aliasing (25 tests)** — X12/X13/X14 all map to R11 on x86_64
+  but register allocator loaded spilled RawSet operands into them as if distinct.
+  When both ptr and value were spilled, loading both into R11 clobbered the ptr,
+  causing stores to wrong addresses (corrupt FingerTree nodes, null pointers).
+  Fix: save/restore X3 (RCX) via push/pop and use as non-R11 temp for ptr.
+  Fixed all elet shadowing, String.split, Dict, partial_application, crypto, benchmarks.
+- **HeapStore register clobbering (7 tests)** — `HeapStore(addr, offset, StringSymbol)` clobbered
+  the addr register (R11 or RCX) during inline string allocation.
 - **Heap bounds checking** (commit e0069b1) — HeapAlloc/RawAlloc now check against
   512MB mmap limit and exit(1) with "Out of heap memory" instead of SIGSEGV.
 - **StringConcat left operand in R8/R9** (commit 73be36a) — `loadInfo right` clobbered
@@ -22,43 +25,10 @@ Recently fixed:
 - **Uxtw/Uxth zero-extension** — preceding 64-bit SUB left upper bits set.
 - **FileReadText/WriteText/AppendText** — implemented x86_64 syscall sequences.
 
-### Remaining 27 failures (grouped by root cause)
+### Remaining 2 failures (refcounting-dependent)
 
-#### 1. Heap exhaustion in test suites (~20 tests)
-
-Tests that pass standalone but crash (exit 139) when run as part of their suite because
-earlier tests have consumed the heap and refcounting/GC is not implemented.
-
-**Affected:** elet.dark L51/L55/L60/L65/L69, string.e2e L384/L392/L393/L394,
-crypto.e2e L12/L167/L170/L211/L214/L293/L296/L299/L302, benchmarks.e2e L475
-
-**Fix:** Implement refcounting, or reset heap between tests in the test runner.
-
-#### 2. Crypto hash wrong values (5 tests)
-
-SHA1 for short input (3 bytes) produces wrong hash. MD5 for short input is correct.
-SHA256/SHA384 have similar issues. These are pure-Dark implementations.
-
-**Affected tests:** crypto.e2e L26 (sha1), L39 (sha256), L49/L52 (sha384)
-
-#### 3. Dict.fromList with list values (1 test)
-
-`Dict.fromList([(1, [10]), (2, [20, 30])])` crashes standalone. Works with 1-2 entries
-but crashes with 3+. Likely a FingerTree operation bug when handling complex nested values.
-
-**Affected:** dict.e2e L307
-
-#### 4. Partial application / multi-arg lambda (1 test)
-
-`List.map (fun x y -> x)` then `List.map (fun l -> l 1L)` crashes. Involves partial
-application creating closures from multi-arg lambdas.
-
-**Affected:** eapply.dark L10
-
-#### 5. Refcounting-dependent (2 tests)
-
-- **refcount leak_check** (refcounting.e2e L5): output mismatch (refcounting not implemented on x86)
-- **memReclaimBurn** (benchmarks.e2e L234): memory reclamation stress test, needs refcounting
+- **refcount leak_check** (refcounting.e2e L5): needs leak detection infrastructure in x86_64 codegen
+- **memReclaimBurn** (list.e2e L234): creates 10,000×400-element lists, needs refcounting to reclaim memory
 
 ### Diagnostic tools
 
