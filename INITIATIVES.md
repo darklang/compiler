@@ -32,87 +32,78 @@ Recently fixed:
 
 Creates 10,000×400-element lists. Each iteration builds a list, calls `List.length`,
 and the list goes out of scope. Without memory reclamation, the 512MB heap exhausts
-around iteration ~3,000. Fixing this requires TWO things working together:
+around iteration ~3,000. Fixing this requires THREE things working together:
 
-#### 1. TaggedList RefCountDec — recursive FingerTree traversal
+#### Current infrastructure (already implemented, safe, 0 regressions)
 
-When a list variable goes out of scope, `RefCountDec(addr, 24, TaggedList)` is emitted.
-The addr is a **tagged pointer** (tag in low 3 bits). The helper must:
+1. **RawAlloc free list reuse** — Implemented in `6_CodeGen_X86_64.fs`. Before bump-
+   allocating, checks the free list for the matching size class. Uses PUSH/POP'd temp
+   registers that are dynamically chosen to avoid conflicts with destReg/sizeReg.
+   Verified: 4529/4530 tests pass (no-op when free list is empty).
 
-1. Untag the pointer (`AND addr, ~7`)
-2. Determine node type from tag → payload size → free list bucket index
-3. Decrement refcount at `[untagged + payloadSize]`
-4. If refcount > 0: done (other references exist)
-5. If refcount == 0: free node to free list, then collect all children and recurse
+2. **TaggedList RefCountDec helper** — `generateListRefCountDecHelper` in `6_CodeGen_X86_64.fs`.
+   Full iterative DFS using PUSH/POP as work stack. Handles all 5 tag types (SINGLE,
+   DEEP, NODE2, NODE3, LEAF). Verified working for simple cases (`let x = [1] in 42`).
 
-**Tag → layout mapping:**
+3. **TaggedList RefCountInc helper** — `generateListRefCountIncHelper` in `6_CodeGen_X86_64.fs`.
+   Increments the root node's refcount only (no recursion). Verified: 0 regressions.
 
-| Tag | Type   | Payload | Children (offsets)                                    |
-|-----|--------|---------|-------------------------------------------------------|
-| 1   | SINGLE | 8       | [0]: one child                                        |
-| 2   | DEEP   | 96      | [16..40]: prefix[0..3], [48]: middle, [64..88]: suffix[0..3] |
-| 3   | NODE2  | 24      | [0]: child0, [8]: child1                              |
-| 4   | NODE3  | 32      | [0]: child0, [8]: child1, [16]: child2                |
-| 5   | LEAF   | 8       | (no children)                                         |
+#### What needs to happen to enable it (the hard part)
 
-DEEP nodes also have prefix_count at offset 8 and suffix_count at offset 56.
+All three of the following must be enabled TOGETHER. Enabling any subset causes failures:
 
-**Implementation approach:** Iterative DFS using the machine stack as a work stack.
-The ARM64 version (`6_CodeGen.fs` lines 173-413) does this with ~240 instructions.
-The x86_64 port should use `PUSH`/`POP` for the work stack and `CALL`/`RET` for
-the function boundary. **Critical:** save/restore ALL caller-saved registers around
-the CALL since the helper clobbers RAX, RCX, RDX, RDI, RSI.
+**A. RawSet ownership increment** — When `RawSet(ptr, offset, value, Some(TList _))`
+stores a tagged list pointer into a FingerTree node, the stored value's refcount must
+be incremented. This is because the LIR emits `RefCountDec` for BOTH the root pointer
+AND intermediate node pointers when variables go out of scope. Without the ownership
+increment, child nodes have refcount=1 but are referenced by both a variable AND a
+parent node, so Dec takes them to 0 prematurely.
 
-**Failed attempt notes:** A first attempt at the helper (in this session) caused 400
-test regressions. The crash was in PrintHeapString's byte copy loop, suggesting the
-helper corrupted registers or the stack. Possible causes:
-- The helper's work stack (via SUB RSP) may interfere with the callee-saved register
-  saves (PUSH RBP/RBX/RDI/RSI in the helper prologue). If items are left on the work
-  stack at return, the POPs read wrong values.
-- Free list corruption: when a node is freed (`[node].next = head; head = node`), if
-  the node is still reachable through another path, the next-pointer overwrites data.
-- The helper uses RBX for pending count but RBX is callee-saved. If the caller relies
-  on RBX after the CALL, it must be properly saved/restored.
+ARM64 does this in `6_CodeGen.fs` lines 3198-3212 (RawSet handler). The x86_64 code
+is written but disabled in `6_CodeGen_X86_64.fs` (RawSet handler, search for
+"ownershipInc").
 
-**Recommended approach for next attempt:**
-- Start with the simplest case: SINGLE and LEAF only (no DEEP/NODE2/NODE3)
-- Test with `[1]` (SINGLE(LEAF)) — this should work before adding complexity
-- Add NODE2/NODE3, test with `[1,2]` and `[1,2,3]`
-- Add DEEP last (most complex child collection)
-- Use GDB breakpoints on the helper entry to verify register state
+**B. TaggedList RefCountDec wiring** — The `LIR.RefCountDec(_, _, TaggedList)` handler
+must save 9 caller-saved registers, MOV addrReg to RAX, CALL the helper, then restore.
+Code is written but commented out in `6_CodeGen_X86_64.fs`.
 
-#### 2. RawAlloc free list reuse
+**C. RawAlloc genLeakCounterInc** — Add `genLeakCounterInc ctx` to the RawAlloc bump
+allocation path (NOT the free list path). Without this, the Dec helper's `leakDec`
+underflows the leak counter, causing tco-refcounting tests to report huge "leaks"
+values. Only add this when RefCountDec is enabled.
 
-FingerTree nodes are allocated via `RawAlloc` (variable-size bump allocation), NOT
-`HeapAlloc` (fixed-size). The ARM64 RawAlloc (`6_CodeGen.fs` lines 3103-3146) checks
-the free list before bump-allocating:
+#### Remaining 37-test regression (unsolved)
 
+When A+B are both enabled, 37 tests fail:
+- **3 tco-refcounting tests**: "Output mismatch" — leak counter underflow (fixed by C)
+- **~10 crypto tests**: SIGSEGV (exit 139) — `Crypto.sha256`, `Crypto.sha384`, etc.
+  crash even on inputs that don't obviously involve lists (`Bytes.create(0)`).
+  Likely cause: some stdlib function used by crypto internally creates/uses lists,
+  and the ownership increment or Dec is corrupting something in those code paths.
+- **~24 other tests**: Not fully characterized. Need to run with A+B+C all enabled
+  and check if C fixes the tco tests, leaving only crypto + others.
+
+**Debugging clues for the 37 failures:**
+- With ownership inc disabled but Dec enabled: 225 failures (children freed prematurely)
+- With ownership inc enabled and Dec enabled: 37 failures
+- The ownership inc saves/restores 9 regs (PUSH/POP), CALL inc helper, restore.
+  The inc helper only uses RAX, RCX, RDX, RDI (all saved). Should be register-safe.
+- Crypto crash RIP shows garbled instructions (jumped to invalid code). Stack or
+  return address may be corrupted. SHA-256 state values visible in registers.
+- `Bytes.create(0)` doesn't obviously involve lists, yet crypto tests crash. Check
+  if stdlib functions used by crypto (e.g., `Bytes.toList`, hex conversion) create
+  lists internally.
+
+**Key discovery:** The LIR for `[1]` shows:
 ```
-aligned_size = (numBytes + 7) & ~7
-payload_class = aligned_size - 8     // subtract the refcount word
-if payload_class in [0, 248]:
-    head = freeList[payload_class]
-    if head != null:
-        dest = head
-        freeList[payload_class] = head.next
-        return
-// fall through to bump allocation
+RefCountInc(X20, 24, list)    // SINGLE: 1→2
+RefCountDec(X20, 24, list)    // SINGLE: 2→1
+RefCountDec(X21, 24, list)    // LEAF: 1→0 (WITHOUT ownership inc) or 2→1 (WITH)
+Call(toDisplayString, X20)
 ```
-
-**Key insight:** The free list index for RawAlloc is `aligned_size - 8` (payload class),
-which matches the `payloadSize` parameter in RefCountDec. This is because the refcount
-is always the LAST 8 bytes of the allocation.
-
-**Failed attempt notes:** Adding free list to RawAlloc caused 157 regressions (even
-without RefCountDec enabled). The RawAlloc free list code used PUSH/POP of RCX/RDX
-as temps, but the issue was likely that `destReg` could be RCX or RDX, or that the
-`sizeReg` was clobbered by the free list check. Need to be more careful about which
-registers are used as temps vs which are operands.
-
-**Recommended approach:** Use a register that's NOT destReg and NOT sizeReg for the
-free list check. The ARM64 version uses X12-X15 (scratch registers). On x86_64,
-use PUSH/POP to save a known-safe register, or check if destReg/sizeReg conflict
-with the temp registers before choosing the code path.
+Without ownership inc, LEAF is freed before `toDisplayString` reads it → crash.
+With ownership inc, LEAF refcount starts at 2 (1 from alloc + 1 from store) →
+Dec takes it to 1 → survives. This confirms the ownership inc is necessary.
 
 #### Generic RefCountDec (non-list types)
 

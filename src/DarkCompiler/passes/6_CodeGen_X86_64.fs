@@ -505,6 +505,325 @@ let private genRefCountIncGeneric (addrReg: X86_64.Reg) (payloadSize: int) : X86
      X86_64.POP X86_64.RDX
      X86_64.Label skipLabel]
 
+// ============================================================================
+// TaggedList RefCountDec Helper (FingerTree recursive DFS)
+// ============================================================================
+
+/// Label for the shared list refcount dec helper function
+let private listRefCountDecHelperLabel = "__dark_list_rc_dec_helper"
+
+/// Generate the TaggedList RefCountDec helper function.
+/// Called via CALL with the tagged list pointer in RAX.
+/// Uses iterative DFS with the machine stack as a work stack.
+/// Clobbers all caller-saved registers. Caller must save/restore.
+///
+/// Register usage inside the helper:
+///   RAX = current node (tagged pointer, iterative work item)
+///   RCX = pending work count (number of items pushed on stack)
+///   RDX = tag bits
+///   RDI = untagged node address
+///   RSI = payload size
+///   R8  = refcount address, then child pointer for addChild
+///   R9  = refcount value, old free list head, bounds check temp
+///   R10 = prefix/suffix count
+///   R14 = heap pointer (upper bound, read-only)
+///   R15 = free list base (read-only)
+let private generateListRefCountDecHelper (enableLeakCheck: bool) : X86_64.Instr list =
+    let label name = $"__dark_list_rc_dec_{name}"
+
+    let leakDec =
+        if enableLeakCheck then
+            [X86_64.PUSH scratch
+             X86_64.PUSH X86_64.RCX
+             X86_64.LEA_rip (scratch, "_leak_count")
+             X86_64.MOV_load (X86_64.RCX, scratch, 0)
+             X86_64.SUB_imm (X86_64.RCX, 1)
+             X86_64.MOV_store (scratch, 0, X86_64.RCX)
+             X86_64.POP X86_64.RCX
+             X86_64.POP scratch]
+        else []
+
+    /// Inline helper: process child pointer in R8.
+    /// If R8 is a valid tagged list pointer:
+    ///   - If RAX == 0: set RAX = R8 (use as next work item)
+    ///   - Else: PUSH R8 and increment RCX (add to work stack)
+    let addChild (suffix: string) : X86_64.Instr list =
+        let doneLabel = label $"child_done_{suffix}"
+        let pushLabel = label $"child_push_{suffix}"
+        [// Skip null
+         X86_64.TEST_reg (X86_64.R8, X86_64.R8)
+         X86_64.Jcc (X86_64.EQ, doneLabel)
+         // Check tag is in [1,5]
+         X86_64.MOV_reg (X86_64.R9, X86_64.R8)
+         X86_64.AND_imm (X86_64.R9, 7)
+         X86_64.TEST_reg (X86_64.R9, X86_64.R9)
+         X86_64.Jcc (X86_64.EQ, doneLabel)
+         X86_64.CMP_imm (X86_64.R9, 5)
+         X86_64.Jcc (X86_64.GT, doneLabel)
+         // Bounds check untagged address
+         X86_64.MOV_reg (X86_64.R9, X86_64.R8)
+         X86_64.AND_imm (X86_64.R9, -8)
+         X86_64.CMP_reg (X86_64.R9, freeListBase)
+         X86_64.Jcc (X86_64.B, doneLabel)
+         X86_64.CMP_reg (X86_64.R9, heapPtr)
+         X86_64.Jcc (X86_64.AE, doneLabel)
+         // Valid child: add to work
+         X86_64.TEST_reg (X86_64.RAX, X86_64.RAX)
+         X86_64.Jcc (X86_64.NE, pushLabel)
+         X86_64.MOV_reg (X86_64.RAX, X86_64.R8)
+         X86_64.JMP doneLabel
+         X86_64.Label pushLabel
+         X86_64.PUSH X86_64.R8
+         X86_64.ADD_imm (X86_64.RCX, 1)
+         X86_64.Label doneLabel]
+
+    let loopCheck = label "loop_check"
+    let popOrRet = label "pop_or_ret"
+    let helperRet = label "ret"
+    let size8 = label "size_8"
+    let size24 = label "size_24"
+    let size32 = label "size_32"
+    let size96 = label "size_96"
+    let haveSize = label "have_size"
+    let collectSingle = label "collect_single"
+    let collectDeep = label "collect_deep"
+    let collectNode2 = label "collect_node2"
+    let collectNode3 = label "collect_node3"
+    let collectLeaf = label "collect_leaf"
+    let afterPrefix = label "after_prefix"
+    let afterSuffix = label "after_suffix"
+    let freeNode = label "free_node"
+
+    [X86_64.Label listRefCountDecHelperLabel
+     // RAX = tagged list pointer, init pending count
+     X86_64.XOR_reg (X86_64.RCX, X86_64.RCX)  // pending = 0
+     X86_64.JMP loopCheck
+
+     X86_64.Label loopCheck
+     X86_64.TEST_reg (X86_64.RAX, X86_64.RAX)
+     X86_64.Jcc (X86_64.EQ, popOrRet)
+     // Extract tag
+     X86_64.MOV_reg (X86_64.RDX, X86_64.RAX)
+     X86_64.AND_imm (X86_64.RDX, 7)
+     X86_64.TEST_reg (X86_64.RDX, X86_64.RDX)
+     X86_64.Jcc (X86_64.EQ, popOrRet)
+     // Untag: RDI = RAX & ~7
+     X86_64.MOV_reg (X86_64.RDI, X86_64.RAX)
+     X86_64.AND_imm (X86_64.RDI, -8)
+     // Bounds check
+     X86_64.CMP_reg (X86_64.RDI, freeListBase)
+     X86_64.Jcc (X86_64.B, popOrRet)
+     X86_64.CMP_reg (X86_64.RDI, heapPtr)
+     X86_64.Jcc (X86_64.AE, popOrRet)
+
+     // Resolve payload size from tag
+     X86_64.CMP_imm (X86_64.RDX, 1)
+     X86_64.Jcc (X86_64.EQ, size8)       // SINGLE → 8
+     X86_64.CMP_imm (X86_64.RDX, 2)
+     X86_64.Jcc (X86_64.EQ, size96)      // DEEP → 96
+     X86_64.CMP_imm (X86_64.RDX, 3)
+     X86_64.Jcc (X86_64.EQ, size24)      // NODE2 → 24
+     X86_64.CMP_imm (X86_64.RDX, 4)
+     X86_64.Jcc (X86_64.EQ, size32)      // NODE3 → 32
+     X86_64.CMP_imm (X86_64.RDX, 5)
+     X86_64.Jcc (X86_64.EQ, size8)       // LEAF → 8
+     X86_64.JMP popOrRet
+
+     X86_64.Label size8
+     X86_64.MOV_imm32 (X86_64.RSI, 8)
+     X86_64.JMP haveSize
+     X86_64.Label size24
+     X86_64.MOV_imm32 (X86_64.RSI, 24)
+     X86_64.JMP haveSize
+     X86_64.Label size32
+     X86_64.MOV_imm32 (X86_64.RSI, 32)
+     X86_64.JMP haveSize
+     X86_64.Label size96
+     X86_64.MOV_imm32 (X86_64.RSI, 96)
+
+     // RSI = payload size, RDI = untagged address, RDX = tag
+     X86_64.Label haveSize
+     // Refcount at [RDI + RSI]
+     X86_64.MOV_reg (X86_64.R8, X86_64.RDI)
+     X86_64.ADD_reg (X86_64.R8, X86_64.RSI)      // R8 = &refcount
+     X86_64.MOV_load (X86_64.R9, X86_64.R8, 0)   // R9 = refcount
+     X86_64.SUB_imm (X86_64.R9, 1)
+     X86_64.MOV_store (X86_64.R8, 0, X86_64.R9)  // store decremented
+     X86_64.TEST_reg (X86_64.R9, X86_64.R9)
+     X86_64.Jcc (X86_64.NE, popOrRet)             // refcount > 0, done
+
+     // Refcount zero: collect children then free
+     X86_64.CMP_imm (X86_64.RDX, 1)
+     X86_64.Jcc (X86_64.EQ, collectSingle)
+     X86_64.CMP_imm (X86_64.RDX, 2)
+     X86_64.Jcc (X86_64.EQ, collectDeep)
+     X86_64.CMP_imm (X86_64.RDX, 3)
+     X86_64.Jcc (X86_64.EQ, collectNode2)
+     X86_64.CMP_imm (X86_64.RDX, 4)
+     X86_64.Jcc (X86_64.EQ, collectNode3)
+     X86_64.CMP_imm (X86_64.RDX, 5)
+     X86_64.Jcc (X86_64.EQ, collectLeaf)
+     X86_64.JMP freeNode]
+
+    // --- SINGLE (tag 1): one child at offset 0 ---
+    @ [X86_64.Label collectSingle
+       X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+       X86_64.MOV_load (X86_64.R8, X86_64.RDI, 0)]
+    @ addChild "single_0"
+    @ [X86_64.JMP freeNode]
+
+    // --- NODE2 (tag 3): two children at offsets 0, 8 ---
+    @ [X86_64.Label collectNode2
+       X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+       X86_64.MOV_load (X86_64.R8, X86_64.RDI, 0)]
+    @ addChild "node2_0"
+    @ [X86_64.MOV_load (X86_64.R8, X86_64.RDI, 8)]
+    @ addChild "node2_1"
+    @ [X86_64.JMP freeNode]
+
+    // --- NODE3 (tag 4): three children at offsets 0, 8, 16 ---
+    @ [X86_64.Label collectNode3
+       X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+       X86_64.MOV_load (X86_64.R8, X86_64.RDI, 0)]
+    @ addChild "node3_0"
+    @ [X86_64.MOV_load (X86_64.R8, X86_64.RDI, 8)]
+    @ addChild "node3_1"
+    @ [X86_64.MOV_load (X86_64.R8, X86_64.RDI, 16)]
+    @ addChild "node3_2"
+    @ [X86_64.JMP freeNode]
+
+    // --- DEEP (tag 2): prefix[0..3], middle, suffix[0..3] ---
+    @ [X86_64.Label collectDeep
+       X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+       // Prefix: count at offset 8, children at offsets 16,24,32,40
+       X86_64.MOV_load (X86_64.R10, X86_64.RDI, 8)     // prefix_count
+       X86_64.TEST_reg (X86_64.R10, X86_64.R10)
+       X86_64.Jcc (X86_64.LE, afterPrefix)
+       X86_64.MOV_load (X86_64.R8, X86_64.RDI, 16)]
+    @ addChild "deep_p0"
+    @ [X86_64.CMP_imm (X86_64.R10, 1)
+       X86_64.Jcc (X86_64.LE, afterPrefix)
+       X86_64.MOV_load (X86_64.R8, X86_64.RDI, 24)]
+    @ addChild "deep_p1"
+    @ [X86_64.CMP_imm (X86_64.R10, 2)
+       X86_64.Jcc (X86_64.LE, afterPrefix)
+       X86_64.MOV_load (X86_64.R8, X86_64.RDI, 32)]
+    @ addChild "deep_p2"
+    @ [X86_64.CMP_imm (X86_64.R10, 3)
+       X86_64.Jcc (X86_64.LE, afterPrefix)
+       X86_64.MOV_load (X86_64.R8, X86_64.RDI, 40)]
+    @ addChild "deep_p3"
+    @ [X86_64.Label afterPrefix
+       // Middle tree at offset 48
+       X86_64.MOV_load (X86_64.R8, X86_64.RDI, 48)]
+    @ addChild "deep_middle"
+    @ [// Suffix: count at offset 56, children at offsets 64,72,80,88
+       X86_64.MOV_load (X86_64.R10, X86_64.RDI, 56)     // suffix_count
+       X86_64.TEST_reg (X86_64.R10, X86_64.R10)
+       X86_64.Jcc (X86_64.LE, afterSuffix)
+       X86_64.MOV_load (X86_64.R8, X86_64.RDI, 64)]
+    @ addChild "deep_s0"
+    @ [X86_64.CMP_imm (X86_64.R10, 1)
+       X86_64.Jcc (X86_64.LE, afterSuffix)
+       X86_64.MOV_load (X86_64.R8, X86_64.RDI, 72)]
+    @ addChild "deep_s1"
+    @ [X86_64.CMP_imm (X86_64.R10, 2)
+       X86_64.Jcc (X86_64.LE, afterSuffix)
+       X86_64.MOV_load (X86_64.R8, X86_64.RDI, 80)]
+    @ addChild "deep_s2"
+    @ [X86_64.CMP_imm (X86_64.R10, 3)
+       X86_64.Jcc (X86_64.LE, afterSuffix)
+       X86_64.MOV_load (X86_64.R8, X86_64.RDI, 88)]
+    @ addChild "deep_s3"
+    @ [X86_64.Label afterSuffix
+       X86_64.JMP freeNode]
+
+    // --- LEAF (tag 5): no children ---
+    @ [X86_64.Label collectLeaf
+       X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)]
+
+    // --- Free node to free list by payload size class ---
+    @ [X86_64.Label freeNode
+       // freeList[RSI] = node; node.next = old_head
+       X86_64.MOV_reg (X86_64.R8, freeListBase)
+       X86_64.ADD_reg (X86_64.R8, X86_64.RSI)             // R8 = &freeList[payload_class]
+       X86_64.MOV_load (X86_64.R9, X86_64.R8, 0)          // R9 = old head
+       X86_64.MOV_store (X86_64.RDI, 0, X86_64.R9)        // node.next = old head
+       X86_64.MOV_store (X86_64.R8, 0, X86_64.RDI)]       // freeList[class] = node
+    @ leakDec
+    @ [X86_64.JMP loopCheck]
+
+    // --- Pop from work stack or return ---
+    @ [X86_64.Label popOrRet
+       X86_64.TEST_reg (X86_64.RCX, X86_64.RCX)
+       X86_64.Jcc (X86_64.EQ, helperRet)
+       X86_64.POP X86_64.RAX
+       X86_64.SUB_imm (X86_64.RCX, 1)
+       X86_64.JMP loopCheck
+
+       X86_64.Label helperRet
+       X86_64.RET]
+
+// ============================================================================
+// TaggedList RefCountInc Helper (increment root node refcount only)
+// ============================================================================
+
+/// Label for the shared list refcount inc helper function
+let private listRefCountIncHelperLabel = "__dark_list_rc_inc_helper"
+
+/// Generate the TaggedList RefCountInc helper function.
+/// Called via CALL with the tagged list pointer in RAX.
+/// Just increments the refcount of the root node (no recursion).
+/// Clobbers RCX, RDX, RDI. Caller must save/restore.
+let private generateListRefCountIncHelper () : X86_64.Instr list =
+    let label name = $"__dark_list_rc_inc_{name}"
+    let helperRet = label "ret"
+    let size24 = label "size_24"
+    let size32 = label "size_32"
+    let size96 = label "size_96"
+    let haveSize = label "have_size"
+
+    [X86_64.Label listRefCountIncHelperLabel
+     // RAX = tagged list pointer (or 0)
+     X86_64.TEST_reg (X86_64.RAX, X86_64.RAX)
+     X86_64.Jcc (X86_64.EQ, helperRet)
+     // Extract tag
+     X86_64.MOV_reg (X86_64.RCX, X86_64.RAX)
+     X86_64.AND_imm (X86_64.RCX, 7)
+     X86_64.TEST_reg (X86_64.RCX, X86_64.RCX)
+     X86_64.Jcc (X86_64.EQ, helperRet)
+     X86_64.CMP_imm (X86_64.RCX, 5)
+     X86_64.Jcc (X86_64.GT, helperRet)
+     // Untag: RDI = RAX & ~7
+     X86_64.MOV_reg (X86_64.RDI, X86_64.RAX)
+     X86_64.AND_imm (X86_64.RDI, -8)
+     // Resolve payload size from tag
+     X86_64.CMP_imm (X86_64.RCX, 2)
+     X86_64.Jcc (X86_64.EQ, size96)
+     X86_64.CMP_imm (X86_64.RCX, 3)
+     X86_64.Jcc (X86_64.EQ, size24)
+     X86_64.CMP_imm (X86_64.RCX, 4)
+     X86_64.Jcc (X86_64.EQ, size32)
+     // Tags 1 (SINGLE) and 5 (LEAF): payload = 8
+     X86_64.MOV_imm32 (X86_64.RDX, 8)
+     X86_64.JMP haveSize
+     X86_64.Label size24
+     X86_64.MOV_imm32 (X86_64.RDX, 24)
+     X86_64.JMP haveSize
+     X86_64.Label size32
+     X86_64.MOV_imm32 (X86_64.RDX, 32)
+     X86_64.JMP haveSize
+     X86_64.Label size96
+     X86_64.MOV_imm32 (X86_64.RDX, 96)
+     // RDX = payload size, RDI = untagged address
+     X86_64.Label haveSize
+     X86_64.ADD_reg (X86_64.RDI, X86_64.RDX)       // RDI = &refcount
+     X86_64.MOV_load (X86_64.RDX, X86_64.RDI, 0)   // RDX = refcount
+     X86_64.ADD_imm (X86_64.RDX, 1)
+     X86_64.MOV_store (X86_64.RDI, 0, X86_64.RDX)  // store incremented
+     X86_64.Label helperRet
+     X86_64.RET]
+
 /// Adjust a stack slot offset to account for callee-saved registers pushed after RBP.
 /// LIR stack slots are byte offsets from FP (e.g., -8, -16), but callee-saved pushes
 /// occupy [RBP-8] through [RBP-N*8], so spill slots must be shifted past them.
@@ -1564,7 +1883,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         |> Result.map (fun addrReg ->
             match kind with
             | LIR.TaggedList ->
-                // Tagged list refcount inc requires recursive traversal — no-op for now.
+                // No-op until RefCountDec is enabled (see notes there).
                 []
             | _ ->
                 // Generic refcount inc — no-op for now (needs more testing)
@@ -1574,8 +1893,20 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         resolveReg addr
         |> Result.map (fun addrReg ->
             match kind with
+            | LIR.TaggedList ->
+                // TaggedList RefCountDec: calls the recursive FingerTree DFS helper.
+                // NOTE: Currently disabled. When enabled, this frees nodes whose refcounts
+                // reach 0. But this REQUIRES the RawSet ownership increment (above) to be
+                // active, otherwise child nodes are freed while still referenced by parents.
+                // Enable both together once the 37-test regression is fixed.
+                []
+                // When ready to enable:
+                // let saveRegs = [X86_64.RAX; X86_64.RCX; X86_64.RDX; X86_64.RDI; X86_64.RSI; X86_64.R8; X86_64.R9; X86_64.R10; scratch]
+                // let saves = saveRegs |> List.map X86_64.PUSH
+                // let restores = saveRegs |> List.rev |> List.map X86_64.POP
+                // saves @ [X86_64.MOV_reg (X86_64.RAX, addrReg); X86_64.CALL listRefCountDecHelperLabel] @ restores
             | _ ->
-                // Refcount dec — no-op for now (needs complete implementation)
+                // Generic refcount dec — no-op for now (payloadSize mismatch risk)
                 [])
 
     | LIR.RefCountIncString str ->
@@ -1975,6 +2306,48 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
         |> Result.bind (fun destReg ->
             resolveReg numBytes
             |> Result.map (fun sizeReg ->
+                // --- Free list reuse ---
+                // Before bump-allocating, check if the free list has a block of the right size class.
+                // aligned_size = (numBytes + 7) & ~7; payload_class = aligned_size - 8
+                // If freeList[payload_class] is non-null, pop from free list and skip bump alloc.
+                let bumpLabel = freshLabel "rawalloc_bump"
+                let doneLabel = freshLabel "rawalloc_done"
+                // Pick two temp registers that don't conflict with destReg or sizeReg
+                let candidates = [X86_64.RAX; X86_64.RCX; X86_64.RDX; X86_64.RDI; X86_64.RSI]
+                let available = candidates |> List.filter (fun r -> r <> destReg && r <> sizeReg)
+                let temp1 = available.[0]  // holds aligned_size → payload_class → head → next
+                let temp2 = available.[1]  // holds &freeList[payload_class]
+                let freeListCheck =
+                    [X86_64.PUSH temp1
+                     X86_64.PUSH temp2
+                     // Compute aligned size
+                     X86_64.MOV_reg (temp1, sizeReg)
+                     X86_64.ADD_imm (temp1, 7)
+                     X86_64.AND_imm (temp1, -8)         // temp1 = aligned_size
+                     // Need at least 16 bytes (8 payload + 8 refcount) for free list
+                     X86_64.CMP_imm (temp1, 8)
+                     X86_64.Jcc (X86_64.LE, bumpLabel)
+                     X86_64.SUB_imm (temp1, 8)           // temp1 = payload_class
+                     X86_64.CMP_imm (temp1, 248)
+                     X86_64.Jcc (X86_64.GT, bumpLabel)
+                     // Compute free list slot address: &freeList[payload_class]
+                     X86_64.MOV_reg (temp2, freeListBase)
+                     X86_64.ADD_reg (temp2, temp1)       // temp2 = &freeList[payload_class]
+                     // Load free list head
+                     X86_64.MOV_load (temp1, temp2, 0)   // temp1 = head
+                     X86_64.TEST_reg (temp1, temp1)
+                     X86_64.Jcc (X86_64.EQ, bumpLabel)
+                     // Pop from free list: dest = head, freeList[class] = head->next
+                     X86_64.MOV_reg (destReg, temp1)     // dest = free block
+                     X86_64.MOV_load (temp1, temp1, 0)   // temp1 = next ptr
+                     X86_64.MOV_store (temp2, 0, temp1)  // update head
+                     X86_64.POP temp2
+                     X86_64.POP temp1
+                     X86_64.JMP doneLabel
+                     X86_64.Label bumpLabel
+                     X86_64.POP temp2
+                     X86_64.POP temp1]
+                // --- Bump allocation (existing) ---
                 let allocInstrs =
                     if destReg = sizeReg then
                         [X86_64.MOV_reg (scratch, sizeReg)
@@ -2005,7 +2378,9 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                          X86_64.Jcc (X86_64.LE, okLabel)]
                     @ genOomJump ()
                     @ [X86_64.Label okLabel]
-                allocInstrs @ boundsCheck))
+                // NOTE: genLeakCounterInc should be added here when RefCountDec is enabled,
+                // so that alloc/free counts balance for the leak checker.
+                freeListCheck @ allocInstrs @ boundsCheck @ [X86_64.Label doneLabel]))
 
     | LIR.RawFree _ ->
         Ok []  // No-op (no free in bump allocator)
@@ -2047,39 +2422,52 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                          X86_64.ADD_reg (scratch, o)
                          X86_64.MOV_load_byte (d, scratch, 0)])))
 
-    | LIR.RawSet (ptr, byteOffset, value, _) ->
+    | LIR.RawSet (ptr, byteOffset, value, valueType) ->
         resolveReg ptr |> Result.bind (fun p ->
             resolveReg byteOffset |> Result.bind (fun o ->
                 resolveReg value |> Result.map (fun v ->
-                    if v = scratch || o = scratch then
-                        // An operand is R11 (scratch) which we need for address computation.
-                        // Use RCX as an extra temp (save/restore if needed).
-                        let tempReg = X86_64.RCX
-                        if p = tempReg then
-                            // ptr is RCX: can't use RCX as temp without saving ptr first.
-                            // Use two pushes: save ptr, save value, compute address, store.
-                            [X86_64.PUSH tempReg             // save ptr (RCX)
-                             X86_64.PUSH scratch              // save value/offset (R11)
-                             // Stack: [R11] [RCX] ...
-                             // Compute address: R11 = ptr + offset
-                             X86_64.MOV_load (scratch, X86_64.RSP, 8) // R11 = saved ptr (RCX)
-                             X86_64.ADD_reg (scratch, o)      // R11 = ptr + offset
-                             // Get value
-                             X86_64.MOV_load (tempReg, X86_64.RSP, 0) // RCX = saved R11 (value)
-                             X86_64.MOV_store (scratch, 0, tempReg) // [addr] = value
-                             X86_64.POP scratch               // restore R11
-                             X86_64.POP tempReg]              // restore RCX
+                    // Ownership increment: when storing a tagged list pointer into a node,
+                    // increment the stored value's refcount (the parent now owns that edge).
+                    // ARM64 does this in 6_CodeGen.fs (RawSet handler). Without this, RefCountDec
+                    // for child nodes will free them even though the parent still references them.
+                    // NOTE: Currently disabled because it causes 37 test regressions.
+                    // Root cause: unclear — crypto tests SIGSEGV, tco-refcounting leak counter mismatch.
+                    let ownershipInc : X86_64.Instr list =
+                        ignore valueType
+                        []
+
+                    let storeInstrs =
+                        if v = scratch || o = scratch then
+                            // An operand is R11 (scratch) which we need for address computation.
+                            // Use RCX as an extra temp (save/restore if needed).
+                            let tempReg = X86_64.RCX
+                            if p = tempReg then
+                                // ptr is RCX: can't use RCX as temp without saving ptr first.
+                                // Use two pushes: save ptr, save value, compute address, store.
+                                [X86_64.PUSH tempReg             // save ptr (RCX)
+                                 X86_64.PUSH scratch              // save value/offset (R11)
+                                 // Stack: [R11] [RCX] ...
+                                 // Compute address: R11 = ptr + offset
+                                 X86_64.MOV_load (scratch, X86_64.RSP, 8) // R11 = saved ptr (RCX)
+                                 X86_64.ADD_reg (scratch, o)      // R11 = ptr + offset
+                                 // Get value
+                                 X86_64.MOV_load (tempReg, X86_64.RSP, 0) // RCX = saved R11 (value)
+                                 X86_64.MOV_store (scratch, 0, tempReg) // [addr] = value
+                                 X86_64.POP scratch               // restore R11
+                                 X86_64.POP tempReg]              // restore RCX
+                            else
+                                [X86_64.PUSH tempReg
+                                 X86_64.MOV_reg (tempReg, v)   // save value in temp
+                                 X86_64.MOV_reg (scratch, p)
+                                 X86_64.ADD_reg (scratch, o)
+                                 X86_64.MOV_store (scratch, 0, tempReg)
+                                 X86_64.POP tempReg]
                         else
-                            [X86_64.PUSH tempReg
-                             X86_64.MOV_reg (tempReg, v)   // save value in temp
-                             X86_64.MOV_reg (scratch, p)
+                            [X86_64.MOV_reg (scratch, p)
                              X86_64.ADD_reg (scratch, o)
-                             X86_64.MOV_store (scratch, 0, tempReg)
-                             X86_64.POP tempReg]
-                    else
-                        [X86_64.MOV_reg (scratch, p)
-                         X86_64.ADD_reg (scratch, o)
-                         X86_64.MOV_store (scratch, 0, v)])))
+                             X86_64.MOV_store (scratch, 0, v)]
+
+                    ownershipInc @ storeInstrs)))
 
     | LIR.RawSetByte (ptr, byteOffset, value) ->
         resolveReg ptr |> Result.bind (fun p ->
@@ -2753,5 +3141,34 @@ let translateProgram (LIR.Program functions) (enableLeakCheck: bool) : Result<X8
             | Error e -> Error e
             | Ok instrs -> translateFuncs (instrs :: acc) rest
 
+    // Check if any function uses TaggedList RefCountDec or RefCountInc
+    let needsListRcDecHelper =
+        functions
+        |> List.exists (fun func ->
+            func.CFG.Blocks
+            |> Map.exists (fun _ block ->
+                block.Instrs
+                |> List.exists (function
+                    | LIR.RefCountDec (_, _, LIR.TaggedList) -> true
+                    | _ -> false)))
+
+    let needsListRcIncHelper =
+        functions
+        |> List.exists (fun func ->
+            func.CFG.Blocks
+            |> Map.exists (fun _ block ->
+                block.Instrs
+                |> List.exists (function
+                    | LIR.RefCountInc (_, _, LIR.TaggedList) -> true
+                    | LIR.RawSet (_, _, _, Some (AST.TList _)) -> true
+                    | _ -> false)))
+
     translateFuncs [] functions
-    |> Result.map (fun allInstrs -> allInstrs @ genOomHandler ())
+    |> Result.map (fun allInstrs ->
+        let listIncHelper =
+            if needsListRcIncHelper then generateListRefCountIncHelper ()
+            else []
+        let listDecHelper =
+            if needsListRcDecHelper then generateListRefCountDecHelper enableLeakCheck
+            else []
+        allInstrs @ listIncHelper @ listDecHelper @ genOomHandler ())
