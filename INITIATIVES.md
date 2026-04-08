@@ -4,9 +4,12 @@
 
 Goal: reach ARM64 test parity (4486/4530 E2E tests) then merge to main.
 
-Current: **4528/4530 (99.96%)**. Already exceeds ARM64 baseline (4486). **2 failures remain.**
+Current: **4529/4530 (99.98%)**. Already exceeds ARM64 baseline (4486). **1 failure remains.**
 
 Recently fixed:
+- **Leak check + string refcounting (1 test)** — Implemented leak counter via data label
+  with RIP-relative addressing, string RefCountInc/Dec with sentinel detection, and
+  leak report at _start exit. Fixed Print instructions to not bypass epilogue.
 - **RawSet register aliasing (25 tests)** — X12/X13/X14 all map to R11 on x86_64
   but register allocator loaded spilled RawSet operands into them as if distinct.
   When both ptr and value were spilled, loading both into R11 clobbered the ptr,
@@ -25,10 +28,12 @@ Recently fixed:
 - **Uxtw/Uxth zero-extension** — preceding 64-bit SUB left upper bits set.
 - **FileReadText/WriteText/AppendText** — implemented x86_64 syscall sequences.
 
-### Remaining 2 failures (refcounting-dependent)
+### Remaining 1 failure
 
-- **refcount leak_check** (refcounting.e2e L5): needs leak detection infrastructure in x86_64 codegen
-- **memReclaimBurn** (list.e2e L234): creates 10,000×400-element lists, needs refcounting to reclaim memory
+- **memReclaimBurn** (list.e2e L234): creates 10,000×400-element lists, exhausts 512MB heap.
+  Needs recursive FingerTree RefCountDec (a ~240 instruction helper that traverses tagged
+  tree nodes and frees each to the appropriate free list size class) PLUS free list reuse
+  in RawAlloc. The ARM64 backend has this (`__dark_list_refcount_dec_helper`); needs porting.
 
 ### Diagnostic tools
 
