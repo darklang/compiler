@@ -994,14 +994,13 @@ let callerSavedRegs = [
 /// These must be saved/restored in function prologue/epilogue
 /// Note: X27 reserved for free list base (ARM64) / unused (x86_64)
 /// On x86_64, X22→R14 and X23→R15 are reserved for heap/free list pointers
-let calleeSavedRegs =
-    let arch = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture
-    let isX86_64 = (arch = System.Runtime.InteropServices.Architecture.X64)
-    if isX86_64 then
+let calleeSavedRegsFor (arch: Platform.Arch) =
+    match arch with
+    | Platform.X86_64 ->
         // x86_64: X22 (R14) = heap ptr, X23 (R15) = free list — not allocatable
         // X24-X26 have no x86_64 equivalents
         [LIR.X19; LIR.X20; LIR.X21]
-    else
+    | Platform.ARM64 ->
         // ARM64: X27/X28 reserved, X19-X26 allocatable
         [LIR.X19; LIR.X20; LIR.X21; LIR.X22; LIR.X23
          LIR.X24; LIR.X25; LIR.X26]
@@ -1022,13 +1021,12 @@ let hasNonTailCalls (blocks: LIR.BasicBlock array) : bool =
 /// Get the optimal register allocation order based on calling pattern
 /// - Functions with non-tail calls: prefer callee-saved (save once in prologue/epilogue)
 /// - Leaf functions / tail-call-only: prefer caller-saved (no prologue/epilogue overhead)
-let getAllocatableRegs (blocks: LIR.BasicBlock array) : LIR.PhysReg list =
+let getAllocatableRegs (arch: Platform.Arch) (blocks: LIR.BasicBlock array) : LIR.PhysReg list =
+    let calleeSaved = calleeSavedRegsFor arch
     if hasNonTailCalls blocks then
-        // Callee-saved first for call-heavy functions
-        calleeSavedRegs @ callerSavedRegs
+        calleeSaved @ callerSavedRegs
     else
-        // Caller-saved first for leaf/tail-call-only functions
-        callerSavedRegs @ calleeSavedRegs
+        callerSavedRegs @ calleeSaved
 
 // ============================================================================
 // Chordal Graph Coloring Register Allocation
@@ -2130,17 +2128,17 @@ let loadSpilled (allocation: AllocationResult) (reg: LIR.Reg) (tempReg: LIR.Phys
 /// the first load when the second executes. On x86_64, the second operand of binary
 /// ops uses applyToOperandNoLoad to keep it as a StackSlot, and the codegen handles
 /// loading it into R11 after the first operand has been moved to the destination.
-let private isX86_64Arch =
-    System.Runtime.InteropServices.RuntimeInformation.OSArchitecture = System.Runtime.InteropServices.Architecture.X64
+let private isX86_64 (arch: Platform.Arch) =
+    match arch with Platform.X86_64 -> true | Platform.ARM64 -> false
 
 /// On x86_64, when loading two spilled Reg-typed operands, the first must go to a
 /// register that won't be clobbered by the second load (into X12=R11). This function
 /// picks a safe register by checking what physical register the right operand uses.
 /// If both left and right are spilled to stack, loads left into dest register
 /// (unless dest conflicts with right's allocated register).
-let private loadSpilledPair (mapping: AllocationResult) (left: LIR.Reg) (right: LIR.Reg) (destReg: LIR.Reg)
+let private loadSpilledPair (arch: Platform.Arch) (mapping: AllocationResult) (left: LIR.Reg) (right: LIR.Reg) (destReg: LIR.Reg)
     : (LIR.Reg * LIR.Instr list) * (LIR.Reg * LIR.Instr list) =
-    if not isX86_64Arch then
+    if not (isX86_64 arch) then
         (loadSpilled mapping left LIR.X12, loadSpilled mapping right LIR.X13)
     else
         // Check if left is actually spilled (StackSlot)
@@ -2176,7 +2174,7 @@ let private loadSpilledPair (mapping: AllocationResult) (left: LIR.Reg) (right: 
             (loadSpilled mapping left LIR.X12, loadSpilled mapping right LIR.X12)
 
 /// Apply allocation to an instruction
-let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list =
+let applyToInstr (arch: Platform.Arch) (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list =
     match instr with
     | LIR.Phi _ ->
         // Phi nodes are handled specially by resolvePhiNodes after allocation.
@@ -2206,7 +2204,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (destReg, destAlloc) = applyToReg mapping dest
         let (leftReg, leftLoads) = loadSpilled mapping left LIR.X12
         let (rightOp, rightLoads) =
-            if isX86_64Arch then (applyToOperandNoLoad mapping right, [])
+            if isX86_64 arch then (applyToOperandNoLoad mapping right, [])
             else applyToOperand mapping right LIR.X13
         let addInstr = LIR.Add (destReg, leftReg, rightOp)
         let storeInstrs =
@@ -2219,7 +2217,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (destReg, destAlloc) = applyToReg mapping dest
         let (leftReg, leftLoads) = loadSpilled mapping left LIR.X12
         let (rightOp, rightLoads) =
-            if isX86_64Arch then (applyToOperandNoLoad mapping right, [])
+            if isX86_64 arch then (applyToOperandNoLoad mapping right, [])
             else applyToOperand mapping right LIR.X13
         let subInstr = LIR.Sub (destReg, leftReg, rightOp)
         let storeInstrs =
@@ -2230,7 +2228,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Mul (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair mapping left right destReg
+        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair arch mapping left right destReg
         let mulInstr = LIR.Mul (destReg, leftReg, rightReg)
         let storeInstrs =
             match destAlloc with
@@ -2240,7 +2238,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Sdiv (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair mapping left right destReg
+        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair arch mapping left right destReg
         let divInstr = LIR.Sdiv (destReg, leftReg, rightReg)
         let storeInstrs =
             match destAlloc with
@@ -2250,12 +2248,12 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Msub (dest, mulLeft, mulRight, sub) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        if isX86_64Arch then
+        if isX86_64 arch then
             // On x86_64, X12/X13/X14 all alias R11. Use loadSpilledPair for mul
             // operands (uses dest as safe temp), and X3 (RCX) for sub if it would
             // conflict with mulRight in R11.
             let ((mulLeftReg, mulLeftLoads), (mulRightReg, mulRightLoads)) =
-                loadSpilledPair mapping mulLeft mulRight destReg
+                loadSpilledPair arch mapping mulLeft mulRight destReg
             let subIsSpilled =
                 match sub with
                 | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
@@ -2282,9 +2280,9 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Madd (dest, mulLeft, mulRight, add) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        if isX86_64Arch then
+        if isX86_64 arch then
             let ((mulLeftReg, mulLeftLoads), (mulRightReg, mulRightLoads)) =
-                loadSpilledPair mapping mulLeft mulRight destReg
+                loadSpilledPair arch mapping mulLeft mulRight destReg
             let addIsSpilled =
                 match add with
                 | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
@@ -2312,7 +2310,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
     | LIR.Cmp (left, right) ->
         let (leftReg, leftLoads) = loadSpilled mapping left LIR.X12
         let (rightOp, rightLoads) =
-            if isX86_64Arch then (applyToOperandNoLoad mapping right, [])
+            if isX86_64 arch then (applyToOperandNoLoad mapping right, [])
             else applyToOperand mapping right LIR.X13
         leftLoads @ rightLoads @ [LIR.Cmp (leftReg, rightOp)]
 
@@ -2327,7 +2325,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.And (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair mapping left right destReg
+        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair arch mapping left right destReg
         let andInstr = LIR.And (destReg, leftReg, rightReg)
         let storeInstrs =
             match destAlloc with
@@ -2347,7 +2345,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Orr (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair mapping left right destReg
+        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair arch mapping left right destReg
         let orrInstr = LIR.Orr (destReg, leftReg, rightReg)
         let storeInstrs =
             match destAlloc with
@@ -2357,7 +2355,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Eor (dest, left, right) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair mapping left right destReg
+        let ((leftReg, leftLoads), (rightReg, rightLoads)) = loadSpilledPair arch mapping left right destReg
         let eorInstr = LIR.Eor (destReg, leftReg, rightReg)
         let storeInstrs =
             match destAlloc with
@@ -2367,7 +2365,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Lsl (dest, src, shift) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let ((srcReg, srcLoads), (shiftReg, shiftLoads)) = loadSpilledPair mapping src shift destReg
+        let ((srcReg, srcLoads), (shiftReg, shiftLoads)) = loadSpilledPair arch mapping src shift destReg
         let lslInstr = LIR.Lsl (destReg, srcReg, shiftReg)
         let storeInstrs =
             match destAlloc with
@@ -2377,7 +2375,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.Lsr (dest, src, shift) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let ((srcReg, srcLoads), (shiftReg, shiftLoads)) = loadSpilledPair mapping src shift destReg
+        let ((srcReg, srcLoads), (shiftReg, shiftLoads)) = loadSpilledPair arch mapping src shift destReg
         let lsrInstr = LIR.Lsr (destReg, srcReg, shiftReg)
         let storeInstrs =
             match destAlloc with
@@ -2480,7 +2478,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (destReg, destAlloc) = applyToReg mapping dest
         let allocatedArgs =
             args |> List.mapi (fun i arg ->
-                if isX86_64Arch then
+                if isX86_64 arch then
                     // On x86_64, X12/X13 both map to R11. Use applyToOperandNoLoad
                     // to keep spilled args as StackSlots - ArgMoves handles loading them.
                     (applyToOperandNoLoad mapping arg, [])
@@ -2501,7 +2499,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         // Tail calls have no destination - just apply allocation to args
         let allocatedArgs =
             args |> List.mapi (fun i arg ->
-                if isX86_64Arch then (applyToOperandNoLoad mapping arg, [])
+                if isX86_64 arch then (applyToOperandNoLoad mapping arg, [])
                 else
                     let tempReg = if i = 0 then LIR.X12 else LIR.X13
                     applyToOperand mapping arg tempReg
@@ -2516,7 +2514,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (funcReg, funcLoads) = loadSpilled mapping func LIR.X14
         let allocatedArgs =
             args |> List.mapi (fun i arg ->
-                if isX86_64Arch then (applyToOperandNoLoad mapping arg, [])
+                if isX86_64 arch then (applyToOperandNoLoad mapping arg, [])
                 else
                     let tempReg = if i = 0 then LIR.X12 else LIR.X13
                     applyToOperand mapping arg tempReg
@@ -2535,7 +2533,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (funcReg, funcLoads) = loadSpilled mapping func LIR.X14
         let allocatedArgs =
             args |> List.mapi (fun i arg ->
-                if isX86_64Arch then (applyToOperandNoLoad mapping arg, [])
+                if isX86_64 arch then (applyToOperandNoLoad mapping arg, [])
                 else
                     let tempReg = if i = 0 then LIR.X12 else LIR.X13
                     applyToOperand mapping arg tempReg
@@ -2549,7 +2547,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (destReg, destAlloc) = applyToReg mapping dest
         let allocatedCaptures =
             captures |> List.mapi (fun i cap ->
-                if isX86_64Arch then (applyToOperandNoLoad mapping cap, [])
+                if isX86_64 arch then (applyToOperandNoLoad mapping cap, [])
                 else
                     let tempReg = if i = 0 then LIR.X12 else LIR.X13
                     applyToOperand mapping cap tempReg
@@ -2568,7 +2566,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (closureReg, closureLoads) = loadSpilled mapping closure LIR.X14
         let allocatedArgs =
             args |> List.mapi (fun i arg ->
-                if isX86_64Arch then (applyToOperandNoLoad mapping arg, [])
+                if isX86_64 arch then (applyToOperandNoLoad mapping arg, [])
                 else
                     let tempReg = if i = 0 then LIR.X12 else LIR.X13
                     applyToOperand mapping arg tempReg
@@ -2587,7 +2585,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (closureReg, closureLoads) = loadSpilled mapping closure LIR.X14
         let allocatedArgs =
             args |> List.mapi (fun i arg ->
-                if isX86_64Arch then (applyToOperandNoLoad mapping arg, [])
+                if isX86_64 arch then (applyToOperandNoLoad mapping arg, [])
                 else
                     let tempReg = if i = 0 then LIR.X12 else LIR.X13
                     applyToOperand mapping arg tempReg
@@ -2730,7 +2728,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
     | LIR.HeapStore (addr, offset, src, vt) ->
         let (addrReg, addrLoads) = loadSpilled mapping addr LIR.X12
         let (srcOp, srcLoads) =
-            if isX86_64Arch then (applyToOperandNoLoad mapping src, [])
+            if isX86_64 arch then (applyToOperandNoLoad mapping src, [])
             else applyToOperand mapping src LIR.X13
         addrLoads @ srcLoads @ [LIR.HeapStore (addrReg, offset, srcOp, vt)]
 
@@ -2756,7 +2754,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (destReg, destAlloc) = applyToReg mapping dest
         let (leftOp, leftLoads) = applyToOperand mapping left LIR.X12
         let (rightOp, rightLoads) =
-            if isX86_64Arch then (applyToOperandNoLoad mapping right, [])
+            if isX86_64 arch then (applyToOperandNoLoad mapping right, [])
             else applyToOperand mapping right LIR.X13
         let concatInstr = LIR.StringConcat (destReg, leftOp, rightOp)
         let storeInstrs =
@@ -2802,7 +2800,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (destReg, destAlloc) = applyToReg mapping dest
         let (pathOp, pathLoads) = applyToOperand mapping path LIR.X12
         let (contentOp, contentLoads) =
-            if isX86_64Arch then (applyToOperandNoLoad mapping content, [])
+            if isX86_64 arch then (applyToOperandNoLoad mapping content, [])
             else applyToOperand mapping content LIR.X13
         let fileInstr = LIR.FileWriteText (destReg, pathOp, contentOp)
         let storeInstrs =
@@ -2815,7 +2813,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         let (destReg, destAlloc) = applyToReg mapping dest
         let (pathOp, pathLoads) = applyToOperand mapping path LIR.X12
         let (contentOp, contentLoads) =
-            if isX86_64Arch then (applyToOperandNoLoad mapping content, [])
+            if isX86_64 arch then (applyToOperandNoLoad mapping content, [])
             else applyToOperand mapping content LIR.X13
         let fileInstr = LIR.FileAppendText (destReg, pathOp, contentOp)
         let storeInstrs =
@@ -2847,9 +2845,9 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
     | LIR.FileWriteFromPtr (dest, path, ptr, length) ->
         let (destReg, destAlloc) = applyToReg mapping dest
         let (pathOp, pathLoads) = applyToOperand mapping path LIR.X12
-        if isX86_64Arch then
+        if isX86_64 arch then
             let ((ptrReg, ptrLoads), (lengthReg, lengthLoads)) =
-                loadSpilledPair mapping ptr length destReg
+                loadSpilledPair arch mapping ptr length destReg
             let fileInstr = LIR.FileWriteFromPtr (destReg, pathOp, ptrReg, lengthReg)
             let storeInstrs =
                 match destAlloc with
@@ -2882,7 +2880,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.RawGet (dest, ptr, byteOffset) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let ((ptrReg, ptrLoads), (offsetReg, offsetLoads)) = loadSpilledPair mapping ptr byteOffset destReg
+        let ((ptrReg, ptrLoads), (offsetReg, offsetLoads)) = loadSpilledPair arch mapping ptr byteOffset destReg
         let getInstr = LIR.RawGet (destReg, ptrReg, offsetReg)
         let storeInstrs =
             match destAlloc with
@@ -2892,7 +2890,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
 
     | LIR.RawGetByte (dest, ptr, byteOffset) ->
         let (destReg, destAlloc) = applyToReg mapping dest
-        let ((ptrReg, ptrLoads), (offsetReg, offsetLoads)) = loadSpilledPair mapping ptr byteOffset destReg
+        let ((ptrReg, ptrLoads), (offsetReg, offsetLoads)) = loadSpilledPair arch mapping ptr byteOffset destReg
         let getInstr = LIR.RawGetByte (destReg, ptrReg, offsetReg)
         let storeInstrs =
             match destAlloc with
@@ -2901,7 +2899,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
         ptrLoads @ offsetLoads @ [getInstr] @ storeInstrs
 
     | LIR.RawSet (ptr, byteOffset, value, valueType) ->
-        if isX86_64Arch then
+        if isX86_64 arch then
             // On x86_64, X12/X13/X14 all alias R11. When both ptr and value are
             // spilled, loading both into R11 clobbers one. Save X3 (RCX) via
             // push/pop and use it as a non-R11 temp for ptr. The codegen already
@@ -2934,7 +2932,7 @@ let applyToInstr (mapping: AllocationResult) (instr: LIR.Instr) : LIR.Instr list
             ptrLoads @ offsetLoads @ valueLoads @ [LIR.RawSet (ptrReg, offsetReg, valueReg, valueType)]
 
     | LIR.RawSetByte (ptr, byteOffset, value) ->
-        if isX86_64Arch then
+        if isX86_64 arch then
             let ptrSpilled =
                 match ptr with
                 | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
@@ -3069,6 +3067,7 @@ let applyToTerminator (mapping: AllocationResult) (term: LIR.Terminator)
 
 /// Apply allocation to a basic block with liveness-aware SaveRegs/RestoreRegs population
 let applyToBlockWithLiveness
+    (arch: Platform.Arch)
     (mapping: AllocationResult)
     (floatAllocation: FAllocationResult)
     (liveOut: BitSet)
@@ -3108,7 +3107,7 @@ let applyToBlockWithLiveness
                 let liveCallerSavedFloat = getLiveCallerSavedFloatRegs floatLiveAfter floatAllocation
                 // Push onto stack for matching RestoreRegs
                 savedRegsStack <- (liveCallerSaved, liveCallerSavedFloat) :: savedRegsStack
-                applyToInstr mapping (LIR.SaveRegs (liveCallerSaved, liveCallerSavedFloat))
+                applyToInstr arch mapping (LIR.SaveRegs (liveCallerSaved, liveCallerSavedFloat))
             | LIR.RestoreRegs ([], []) ->
                 // Pop the matching SaveRegs registers
                 let (liveCallerSaved, liveCallerSavedFloat) =
@@ -3118,9 +3117,9 @@ let applyToBlockWithLiveness
                         (intRegs, floatRegs)
                     | [] ->
                         Crash.crash "Unmatched RestoreRegs: SaveRegs stack is empty"
-                applyToInstr mapping (LIR.RestoreRegs (liveCallerSaved, liveCallerSavedFloat))
+                applyToInstr arch mapping (LIR.RestoreRegs (liveCallerSaved, liveCallerSavedFloat))
             | _ ->
-                applyToInstr mapping instr)
+                applyToInstr arch mapping instr)
 
     let (termLoads, allocatedTerm) = applyToTerminator mapping block.Terminator
     { Label = block.Label
@@ -3129,6 +3128,7 @@ let applyToBlockWithLiveness
 
 /// Apply allocation to CFG with liveness info
 let applyToCFGWithLiveness
+    (arch: Platform.Arch)
     (blocks: LIR.BasicBlock array)
     (mapping: AllocationResult)
     (floatAllocation: FAllocationResult)
@@ -3142,7 +3142,7 @@ let applyToCFGWithLiveness
         let floatBlockLiveness =
             if idx < floatLiveness.Length then floatLiveness.[idx]
             else { LiveIn = emptyFloat; LiveOut = emptyFloat }
-        applyToBlockWithLiveness mapping floatAllocation blockLiveness.LiveOut floatBlockLiveness.LiveOut block)
+        applyToBlockWithLiveness arch mapping floatAllocation blockLiveness.LiveOut floatBlockLiveness.LiveOut block)
 
 // ============================================================================
 // Float Move Generation (used by both phi resolution and param copies)
@@ -3501,6 +3501,7 @@ let private timePhase
         (result, appendTiming phase elapsedMs timings)
 
 let private allocateRegistersInternal
+    (arch: Platform.Arch)
     (swOpt: System.Diagnostics.Stopwatch option)
     (func: LIR.Function)
     : LIR.Function * RegisterAllocationTiming list =
@@ -3579,12 +3580,12 @@ let private allocateRegistersInternal
         match swOpt with
         | None ->
             timePhase swOpt "RegAlloc: Coloring" timings (fun () ->
-                let regs = getAllocatableRegs blocks
+                let regs = getAllocatableRegs arch blocks
                 let colorResult = chordalGraphColor graph [] (List.length regs) preferences movePairs
                 coloringToAllocation colorResult regs)
         | Some sw ->
             let start = sw.Elapsed.TotalMilliseconds
-            let regs = getAllocatableRegs blocks
+            let regs = getAllocatableRegs arch blocks
             let (colorResult, colorTiming) =
                 chordalGraphColorWithTiming sw graph [] (List.length regs) preferences movePairs
             let result = coloringToAllocation colorResult regs
@@ -3733,7 +3734,7 @@ let private allocateRegistersInternal
     let (allocatedBlocks, timings) =
         timePhase swOpt "RegAlloc: Apply Allocation" timings (fun () ->
             let allocatedBlocks =
-                applyToCFGWithLiveness blocksWithPhiResolved result floatAllocation livenessBits floatLiveness
+                applyToCFGWithLiveness arch blocksWithPhiResolved result floatAllocation livenessBits floatLiveness
             applyFloatAllocationToBlocks floatAllocation allocatedBlocks)
 
     let ((cfgWithParamCopies, allocatedTypedParams), timings) =
@@ -3778,12 +3779,13 @@ let private allocateRegistersInternal
     (allocatedFunc, timings)
 
 /// Allocate registers for a function
-let allocateRegisters (func: LIR.Function) : LIR.Function =
-    allocateRegistersInternal None func |> fst
+let allocateRegisters (arch: Platform.Arch) (func: LIR.Function) : LIR.Function =
+    allocateRegistersInternal arch None func |> fst
 
 /// Allocate registers for a function and collect phase timings
 let allocateRegistersWithTiming
+    (arch: Platform.Arch)
     (func: LIR.Function)
     : LIR.Function * RegisterAllocationTiming list =
     let sw = System.Diagnostics.Stopwatch.StartNew()
-    allocateRegistersInternal (Some sw) func
+    allocateRegistersInternal arch (Some sw) func
