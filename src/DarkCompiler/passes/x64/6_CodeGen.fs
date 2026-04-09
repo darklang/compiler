@@ -1548,7 +1548,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                     let srcXmm = lirFRegToX86 srcPhys
                     if destXmm = srcXmm then []
                     else [X86_64.MOVSD_reg (destXmm, srcXmm)]
-                | LIR.FVirtual id -> failwith $"Unresolved virtual float register f{id} in FArgMoves")
+                | LIR.FVirtual id -> Crash.crash $"Unresolved virtual float register f{id} in FArgMoves")
         Ok instrs
 
     | LIR.Phi (dest, _, _) ->
