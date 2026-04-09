@@ -20,6 +20,22 @@ type Arch =
     | ARM64
     | X86_64
 
+/// Get the current operating system
+let detectOS () : Result<OS, string> =
+    if System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX) then
+        Ok MacOS
+    elif System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux) then
+        Ok Linux
+    else
+        Error "Unsupported operating system. Only macOS and Linux are supported."
+
+/// Get the current CPU architecture
+let detectArch () : Result<Arch, string> =
+    match System.Runtime.InteropServices.RuntimeInformation.OSArchitecture with
+    | System.Runtime.InteropServices.Architecture.Arm64 -> Ok ARM64
+    | System.Runtime.InteropServices.Architecture.X64 -> Ok X86_64
+    | arch -> Error $"Unsupported architecture: {arch}. Only ARM64 and x86_64 are supported."
+
 /// OS-specific syscall numbers (independent of CPU architecture).
 /// On Linux, ARM64 and x86_64 use different numbering schemes.
 type SyscallNumbers = {
@@ -43,22 +59,6 @@ type ARM64SyscallConfig = {
     SvcImmediate: uint16         // SVC instruction immediate value
     SyscallRegister: ARM64.Reg   // Register to hold syscall number (X16 macOS, X8 Linux)
 }
-
-/// Get the current operating system
-let detectOS () : Result<OS, string> =
-    if System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX) then
-        Ok MacOS
-    elif System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux) then
-        Ok Linux
-    else
-        Error "Unsupported operating system. Only macOS and Linux are supported."
-
-/// Get the current CPU architecture
-let detectArch () : Result<Arch, string> =
-    match System.Runtime.InteropServices.RuntimeInformation.OSArchitecture with
-    | System.Runtime.InteropServices.Architecture.Arm64 -> Ok ARM64
-    | System.Runtime.InteropServices.Architecture.X64 -> Ok X86_64
-    | arch -> Error $"Unsupported architecture: {arch}. Only ARM64 and x86_64 are supported."
 
 /// Get syscall numbers for macOS ARM64
 let private macOSSyscallNumbers : SyscallNumbers = {
