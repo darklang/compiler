@@ -102,6 +102,52 @@ let private freeListSize = 256
 /// Max payload size class for free list reuse (freeListSize - 8)
 let private maxFreeListPayload = freeListSize - 8
 
+/// Emit inline 8-byte-at-a-time copy of a UTF-8 byte array to heap memory.
+/// Stores bytes starting at [destReg + 8] (after the 8-byte length prefix).
+let private emitStringByteCopy (destReg: X86_64.Reg) (strBytes: byte array) : X86_64.Instr list =
+    let len = strBytes.Length
+    if len = 0 then []
+    else
+        let chunks = (len + 7) / 8
+        [0 .. chunks - 1]
+        |> List.collect (fun i ->
+            let offset = 8 + i * 8
+            let chunkLen = min 8 (len - i * 8)
+            let value =
+                [0 .. chunkLen - 1]
+                |> List.fold (fun acc j ->
+                    let byteIdx = i * 8 + j
+                    if byteIdx < strBytes.Length then
+                        acc ||| (int64 strBytes.[byteIdx] <<< (j * 8))
+                    else acc) 0L
+            loadImm64 scratch value
+            @ [X86_64.MOV_store (destReg, int32 offset, scratch)])
+
+/// Allocate a heap string from a literal value: [length:8][data:N][padding][refcount:8].
+/// Bump-allocates from heapPtr, stores length, copies bytes, sets refcount=1.
+/// Returns instructions that leave destReg pointing to the new string.
+let private emitStringLiteral (destReg: X86_64.Reg) (value: string) : X86_64.Instr list =
+    let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
+    let len = strBytes.Length
+    let totalSize = ((len + 16) + 7) &&& (~~~7)
+    let alloc = [X86_64.MOV_reg (destReg, heapPtr); X86_64.ADD_imm (heapPtr, int32 totalSize)]
+    let storeLen = loadImm64 scratch (int64 len) @ [X86_64.MOV_store (destReg, 0, scratch)]
+    let copyBytes = emitStringByteCopy destReg strBytes
+    let rcOffset = 8 + ((len + 7) &&& (~~~7))
+    let storeRefCount = loadImm64 scratch 1L @ [X86_64.MOV_store (destReg, int32 rcOffset, scratch)]
+    alloc @ storeLen @ copyBytes @ storeRefCount
+
+/// Allocate a heap string without refcount (for file-op path buffers).
+/// Layout: [length:8][data:N]. Returns instructions with destReg = string ptr.
+let private emitStringLiteralNoRefCount (destReg: X86_64.Reg) (value: string) : X86_64.Instr list =
+    let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
+    let len = strBytes.Length
+    let totalSize = ((len + 16) + 7) &&& (~~~7)
+    let alloc = [X86_64.MOV_reg (destReg, heapPtr); X86_64.ADD_imm (heapPtr, int32 totalSize)]
+    let storeLen = loadImm64 scratch (int64 len) @ [X86_64.MOV_store (destReg, 0, scratch)]
+    let copyBytes = emitStringByteCopy destReg strBytes
+    alloc @ storeLen @ copyBytes
+
 /// Heap size for mmap (512 MB)
 let private heapMmapSizeBytes = 512L * 1024L * 1024L
 
@@ -855,44 +901,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             | LIR.StackSlot offset ->
                 Ok [X86_64.MOV_load (destReg, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
             | LIR.StringSymbol value ->
-                // Allocate heap string from literal: [length:8][data:N][refcount:8]
-                let len = System.Text.Encoding.UTF8.GetByteCount(value)
-                let totalSize = ((len + 16) + 7) &&& (~~~7)  // 8-byte aligned
-                let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
-                // Bump allocate
-                let alloc = [
-                    X86_64.MOV_reg (destReg, heapPtr)
-                    X86_64.ADD_imm (heapPtr, int32 totalSize)
-                ]
-                // Store length
-                let storeLen =
-                    loadImm64 scratch (int64 len)
-                    @ [X86_64.MOV_store (destReg, 0, scratch)]
-                // Copy bytes (inline for small strings, loop for large)
-                let copyBytes =
-                    if len = 0 then []
-                    else
-                        // Copy 8 bytes at a time
-                        let chunks = (len + 7) / 8
-                        [0 .. chunks - 1]
-                        |> List.collect (fun i ->
-                            let offset = 8 + i * 8  // After length prefix
-                            let chunkLen = min 8 (len - i * 8)
-                            let value =
-                                [0 .. chunkLen - 1]
-                                |> List.fold (fun acc j ->
-                                    let byteIdx = i * 8 + j
-                                    if byteIdx < strBytes.Length then
-                                        acc ||| (int64 strBytes.[byteIdx] <<< (j * 8))
-                                    else acc) 0L
-                            loadImm64 scratch value
-                            @ [X86_64.MOV_store (destReg, int32 offset, scratch)])
-                // Store refcount = 1
-                let storeRefCount =
-                    let rcOffset = 8 + ((len + 7) &&& (~~~7))  // After length + aligned data
-                    loadImm64 scratch 1L
-                    @ [X86_64.MOV_store (destReg, int32 rcOffset, scratch)]
-                Ok (alloc @ storeLen @ copyBytes @ storeRefCount)
+                Ok (emitStringLiteral destReg value)
             | LIR.FuncAddr funcName ->
                 Ok [X86_64.LEA_rip (destReg, funcName)]
             | LIR.FloatImm value | LIR.FloatSymbol value ->
@@ -1399,26 +1408,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             | LIR.StackSlot offset ->
                 Ok [X86_64.MOV_load (destX86, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
             | LIR.StringSymbol value ->
-                // Create heap string from literal, put pointer in dest
-                let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
-                let len = strBytes.Length
-                let totalSize = ((len + 16) + 7) &&& (~~~7)
-                let alloc = [X86_64.MOV_reg (destX86, heapPtr); X86_64.ADD_imm (heapPtr, int32 totalSize)]
-                let storeLen = loadImm64 scratch (int64 len) @ [X86_64.MOV_store (destX86, 0, scratch)]
-                let copyBytes =
-                    let chunks = (len + 7) / 8
-                    [0 .. chunks - 1]
-                    |> List.collect (fun i ->
-                        let offset = 8 + i * 8
-                        let chunkLen = min 8 (len - i * 8)
-                        let v = [0..chunkLen-1] |> List.fold (fun acc j ->
-                            let bi = i * 8 + j
-                            if bi < strBytes.Length then acc ||| (int64 strBytes.[bi] <<< (j * 8)) else acc) 0L
-                        loadImm64 scratch v @ [X86_64.MOV_store (destX86, int32 offset, scratch)])
-                let storeRC =
-                    let rcOff = 8 + ((len + 7) &&& (~~~7))
-                    loadImm64 scratch 1L @ [X86_64.MOV_store (destX86, int32 rcOff, scratch)]
-                Ok (alloc @ storeLen @ copyBytes @ storeRC)
+                Ok (emitStringLiteral destX86 value)
             | LIR.FloatSymbol value ->
                 let bits = System.BitConverter.DoubleToInt64Bits(value)
                 Ok (loadImm64 destX86 bits)  // Store float bits in GP register (for passing as arg)
@@ -1502,22 +1492,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
             | LIR.StackSlot offset ->
                 Ok [X86_64.MOV_load (destX86, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
             | LIR.StringSymbol value ->
-                let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
-                let len = strBytes.Length
-                let totalSize = ((len + 16) + 7) &&& (~~~7)
-                let alloc = [X86_64.MOV_reg (destX86, heapPtr); X86_64.ADD_imm (heapPtr, int32 totalSize)]
-                let storeLen = loadImm64 scratch (int64 len) @ [X86_64.MOV_store (destX86, 0, scratch)]
-                let copyBytes =
-                    let chunks = (len + 7) / 8
-                    [0 .. chunks - 1] |> List.collect (fun i ->
-                        let offset = 8 + i * 8
-                        let chunkLen = min 8 (len - i * 8)
-                        let v = [0..chunkLen-1] |> List.fold (fun acc j ->
-                            let bi = i * 8 + j
-                            if bi < strBytes.Length then acc ||| (int64 strBytes.[bi] <<< (j * 8)) else acc) 0L
-                        loadImm64 scratch v @ [X86_64.MOV_store (destX86, int32 offset, scratch)])
-                let storeRC = let rcOff = 8 + ((len + 7) &&& (~~~7)) in loadImm64 scratch 1L @ [X86_64.MOV_store (destX86, int32 rcOff, scratch)]
-                Ok (alloc @ storeLen @ copyBytes @ storeRC)
+                Ok (emitStringLiteral destX86 value)
             | LIR.FloatSymbol value ->
                 let bits = System.BitConverter.DoubleToInt64Bits(value)
                 Ok (loadImm64 destX86 bits)
@@ -2023,38 +1998,10 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                             [X86_64.MOV_load (lenDest, srcReg, 0)
                              X86_64.LEA (addrDest, srcReg, 8)])
                 | LIR.StringSymbol value ->
-                    // Create literal string on heap, then point to its data
-                    let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
-                    let len = strBytes.Length
-                    let totalSize = ((len + 16) + 7) &&& (~~~7)
-                    // Allocate on heap
-                    let tempReg = addrDest  // reuse addrDest as temp for heap ptr
-                    let alloc = [
-                        X86_64.MOV_reg (tempReg, heapPtr)
-                        X86_64.ADD_imm (heapPtr, int32 totalSize)
-                    ]
-                    // Store length
-                    let storeLen = loadImm64 scratch (int64 len) @ [X86_64.MOV_store (tempReg, 0, scratch)]
-                    // Copy string bytes inline
-                    let copyBytes =
-                        let chunks = (len + 7) / 8
-                        [0 .. chunks - 1]
-                        |> List.collect (fun i ->
-                            let offset = 8 + i * 8
-                            let chunkLen = min 8 (len - i * 8)
-                            let value =
-                                [0 .. chunkLen - 1]
-                                |> List.fold (fun acc j ->
-                                    let byteIdx = i * 8 + j
-                                    if byteIdx < strBytes.Length then
-                                        acc ||| (int64 strBytes.[byteIdx] <<< (j * 8))
-                                    else acc) 0L
-                            loadImm64 scratch value @ [X86_64.MOV_store (tempReg, int32 offset, scratch)])
-                    // Now set addrDest = data start, lenDest = length
-                    let setResults =
-                        loadImm64 lenDest (int64 len)
-                        @ [X86_64.LEA (addrDest, tempReg, 8)]
-                    Ok (alloc @ storeLen @ copyBytes @ setResults)
+                    let len = System.Text.Encoding.UTF8.GetByteCount(value)
+                    let instrs = emitStringLiteralNoRefCount addrDest value
+                    let setResults = loadImm64 lenDest (int64 len) @ [X86_64.LEA (addrDest, addrDest, 8)]
+                    Ok (instrs @ setResults)
                 | _ -> Ok (loadImm64 lenDest 0L @ loadImm64 addrDest 0L)
 
             let copy1 = freshLabel "strcat_c1"
@@ -2612,21 +2559,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 | LIR.StackSlot offset ->
                     Ok [X86_64.MOV_load (X86_64.R10, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
                 | LIR.StringSymbol value ->
-                    let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
-                    let len = strBytes.Length
-                    let totalSize = ((len + 16) + 7) &&& (~~~7)
-                    let alloc = [X86_64.MOV_reg (X86_64.R10, heapPtr); X86_64.ADD_imm (heapPtr, int32 totalSize)]
-                    let storeLen = loadImm64 scratch (int64 len) @ [X86_64.MOV_store (X86_64.R10, 0, scratch)]
-                    let copyBytes =
-                        let chunks = (len + 7) / 8
-                        [0 .. chunks - 1] |> List.collect (fun i ->
-                            let off = 8 + i * 8
-                            let chunkLen = min 8 (len - i * 8)
-                            let v = [0..chunkLen-1] |> List.fold (fun acc j ->
-                                let bi = i * 8 + j
-                                if bi < strBytes.Length then acc ||| (int64 strBytes.[bi] <<< (j * 8)) else acc) 0L
-                            loadImm64 scratch v @ [X86_64.MOV_store (X86_64.R10, int32 off, scratch)])
-                    Ok (alloc @ storeLen @ copyBytes)
+                    Ok (emitStringLiteralNoRefCount X86_64.R10 value)
                 | _ -> Ok (loadImm64 X86_64.R10 0L)
             let copyLabel = freshLabel "fr_copy"
             let doneLabel = freshLabel "fr_done"
@@ -2760,21 +2693,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 | LIR.StackSlot offset ->
                     Ok [X86_64.MOV_load (X86_64.R10, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
                 | LIR.StringSymbol value ->
-                    let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
-                    let len = strBytes.Length
-                    let totalSize = ((len + 16) + 7) &&& (~~~7)
-                    let alloc = [X86_64.MOV_reg (X86_64.R10, heapPtr); X86_64.ADD_imm (heapPtr, int32 totalSize)]
-                    let storeLen = loadImm64 scratch (int64 len) @ [X86_64.MOV_store (X86_64.R10, 0, scratch)]
-                    let copyBytes =
-                        let chunks = (len + 7) / 8
-                        [0 .. chunks - 1] |> List.collect (fun i ->
-                            let off = 8 + i * 8
-                            let chunkLen = min 8 (len - i * 8)
-                            let v = [0..chunkLen-1] |> List.fold (fun acc j ->
-                                let bi = i * 8 + j
-                                if bi < strBytes.Length then acc ||| (int64 strBytes.[bi] <<< (j * 8)) else acc) 0L
-                            loadImm64 scratch v @ [X86_64.MOV_store (X86_64.R10, int32 off, scratch)])
-                    Ok (alloc @ storeLen @ copyBytes)
+                    Ok (emitStringLiteralNoRefCount X86_64.R10 value)
                 | _ -> Ok (loadImm64 X86_64.R10 0L)
             let resolveContentToR9 =
                 match content with
@@ -2784,21 +2703,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 | LIR.StackSlot offset ->
                     Ok [X86_64.MOV_load (X86_64.R9, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
                 | LIR.StringSymbol value ->
-                    let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
-                    let len = strBytes.Length
-                    let totalSize = ((len + 16) + 7) &&& (~~~7)
-                    let alloc = [X86_64.MOV_reg (X86_64.R9, heapPtr); X86_64.ADD_imm (heapPtr, int32 totalSize)]
-                    let storeLen = loadImm64 scratch (int64 len) @ [X86_64.MOV_store (X86_64.R9, 0, scratch)]
-                    let copyBytes =
-                        let chunks = (len + 7) / 8
-                        [0 .. chunks - 1] |> List.collect (fun i ->
-                            let off = 8 + i * 8
-                            let chunkLen = min 8 (len - i * 8)
-                            let v = [0..chunkLen-1] |> List.fold (fun acc j ->
-                                let bi = i * 8 + j
-                                if bi < strBytes.Length then acc ||| (int64 strBytes.[bi] <<< (j * 8)) else acc) 0L
-                            loadImm64 scratch v @ [X86_64.MOV_store (X86_64.R9, int32 off, scratch)])
-                    Ok (alloc @ storeLen @ copyBytes)
+                    Ok (emitStringLiteralNoRefCount X86_64.R9 value)
                 | _ -> Ok (loadImm64 X86_64.R9 0L)
             let copyLabel = freshLabel "fw_copy"
             let doneLabel = freshLabel "fw_done"
@@ -2910,22 +2815,7 @@ let private translateInstr (ctx: FuncCtx) (instr: LIR.Instr) : Result<X86_64.Ins
                 | LIR.StackSlot offset ->
                     Ok [X86_64.MOV_load (X86_64.R10, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
                 | LIR.StringSymbol value ->
-                    // Create heap string on heap, put pointer in R10
-                    let strBytes = System.Text.Encoding.UTF8.GetBytes(value)
-                    let len = strBytes.Length
-                    let totalSize = ((len + 16) + 7) &&& (~~~7)
-                    let alloc = [X86_64.MOV_reg (X86_64.R10, heapPtr); X86_64.ADD_imm (heapPtr, int32 totalSize)]
-                    let storeLen = loadImm64 scratch (int64 len) @ [X86_64.MOV_store (X86_64.R10, 0, scratch)]
-                    let copyBytes =
-                        let chunks = (len + 7) / 8
-                        [0 .. chunks - 1] |> List.collect (fun i ->
-                            let off = 8 + i * 8
-                            let chunkLen = min 8 (len - i * 8)
-                            let v = [0..chunkLen-1] |> List.fold (fun acc j ->
-                                let bi = i * 8 + j
-                                if bi < strBytes.Length then acc ||| (int64 strBytes.[bi] <<< (j * 8)) else acc) 0L
-                            loadImm64 scratch v @ [X86_64.MOV_store (X86_64.R10, int32 off, scratch)])
-                    Ok (alloc @ storeLen @ copyBytes)
+                    Ok (emitStringLiteralNoRefCount X86_64.R10 value)
                 | _ -> Ok (loadImm64 X86_64.R10 0L)
             let copyLabel = freshLabel "fe_copy"
             let doneLabel = freshLabel "fe_done"
