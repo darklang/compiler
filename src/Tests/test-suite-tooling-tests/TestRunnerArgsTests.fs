@@ -32,8 +32,13 @@ let testCodegenProfileJsonParsesPath () : TestResult =
 
 let testE2EBatchSizeParsesBoundedSize () : TestResult =
     match parseE2EBatchSizeArg [| "--e2e-batch-size=8192" |] with
-    | Ok value -> expectEqual (Some 8192) value
+    | Ok value -> expectEqual 8192 value
     | Error msg -> Error $"Expected valid E2E batch size, got error: {msg}"
+
+let testE2EBatchSizeDefaultsToBatching () : TestResult =
+    match parseE2EBatchSizeArg [||] with
+    | Ok value -> expectEqual TestDSL.E2ETestRunner.maxSupportedBatchSize value
+    | Error msg -> Error $"Expected default E2E batch size, got error: {msg}"
 
 let testE2EBatchSizeRejectsInvalidValues () : TestResult =
     let results =
@@ -47,5 +52,6 @@ let tests = [
     ("timings JSON rejects empty path", testTimingsJsonRejectsEmptyPath)
     ("codegen profile JSON parses path", testCodegenProfileJsonParsesPath)
     ("E2E batch size parses a bounded size", testE2EBatchSizeParsesBoundedSize)
+    ("E2E batch size defaults to batching", testE2EBatchSizeDefaultsToBatching)
     ("E2E batch size rejects invalid values", testE2EBatchSizeRejectsInvalidValues)
 ]

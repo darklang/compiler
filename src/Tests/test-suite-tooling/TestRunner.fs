@@ -31,7 +31,7 @@ let printHelp () =
     println "  --parser-pretty-roundtrip  Legacy no-op (parser/pretty corpus roundtrip runs by default)"
     println "  --roundtrip-all-dark  Include all upstream .dark files in parser/pretty corpus roundtrip"
     println "  --all-test-timings  Print timing for every test in final timing summary"
-    println "  --e2e-batch-size=N  Compile up to N compatible E2E checks together (default 1; max 8192)"
+    println "  --e2e-batch-size=N  Compile up to N compatible E2E checks together (default/max 8192; 1 disables)"
     println "  --timings-json=PATH  Write machine-readable timing data to PATH"
     println "  --codegen-profile-json=PATH  Write opt-in per-function ARM64 codegen metrics"
     println "  --quiet            Quiet mode: print 'success' or list failed tests"
@@ -235,7 +235,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
 
     let e2eBatchSize =
         match parseE2EBatchSizeArg args with
-        | Ok size -> Option.defaultValue 1 size
+        | Ok size -> size
         | Error msg -> Crash.crash msg
 
     println $"{Colors.bold}{Colors.cyan}🧪 Running DSL-based Tests{Colors.reset}"

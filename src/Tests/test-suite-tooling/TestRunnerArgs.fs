@@ -59,14 +59,19 @@ let parseCodegenProfileJsonArg (args: string array) : Result<string option, stri
     | Some path when path.Trim() = "" -> Error "--codegen-profile-json requires a non-empty path"
     | Some path -> Ok (Some path)
 
+// By default, place every compatible contiguous E2E check in the same process.
+// A finite runner bound still protects explicit command-line input and future
+// corpus growth from producing an arbitrarily large compiler input.
+let defaultE2EBatchSize = TestDSL.E2ETestRunner.maxSupportedBatchSize
+
 // Parse --e2e-batch-size=N. One preserves singular execution for comparison;
 // larger values batch compatible value-equality tests.
-let parseE2EBatchSizeArg (args: string array) : Result<int option, string> =
+let parseE2EBatchSizeArg (args: string array) : Result<int, string> =
     match parsePrefixedArg "--e2e-batch-size=" args with
-    | None -> Ok None
+    | None -> Ok defaultE2EBatchSize
     | Some value ->
         match System.Int32.TryParse value with
-        | true, size when size >= 1 && size <= TestDSL.E2ETestRunner.maxSupportedBatchSize -> Ok (Some size)
+        | true, size when size >= 1 && size <= TestDSL.E2ETestRunner.maxSupportedBatchSize -> Ok size
         | _ -> Error "--e2e-batch-size requires an integer from 1 through 8192"
 
 // Check if a test name matches the filter (case-insensitive substring match)
