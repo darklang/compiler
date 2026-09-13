@@ -10,99 +10,99 @@
     "measurement_policy": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs"
   },
   "contract_sha256": "2f4e8d149d0eb7a5bbbbea471086afae5bb34d6a687e7d102256a0cde0fcfcc8",
-  "generated_at": "2026-09-13T16:53:34+00:00",
+  "generated_at": "2026-09-13T17:30:22+00:00",
   "compiler": {
-    "commit": "7b5d4ce0990c44bfafc3e19fd8542f7b75d52332",
-    "subject": "Lower canonical string equality directly"
+    "commit": "24e4e7c8e4cb7b457af2b7674e823f7869d94409",
+    "subject": "Inline trivial stdlib helpers"
   },
   "benchmarks": [
     {
       "name": "ackermann",
-      "instructions": 9303383850
+      "instructions": 9303382264
     },
     {
       "name": "binary_trees",
-      "instructions": 537697536
+      "instructions": 537695950
     },
     {
       "name": "collatz",
-      "instructions": 70195750
+      "instructions": 70194957
     },
     {
       "name": "edigits",
-      "instructions": 3364447789
+      "instructions": 3364446203
     },
     {
       "name": "factorial",
-      "instructions": 66275
+      "instructions": 64689
     },
     {
       "name": "fasta",
-      "instructions": 458940924
+      "instructions": 458940131
     },
     {
       "name": "fib",
-      "instructions": 388196114
+      "instructions": 388195321
     },
     {
       "name": "huffman",
-      "instructions": 1922782076
+      "instructions": 1922458560
     },
     {
       "name": "leibniz",
-      "instructions": 850008517
+      "instructions": 850007724
     },
     {
       "name": "mandelbrot",
-      "instructions": 15229851
+      "instructions": 15228265
     },
     {
       "name": "matmul",
-      "instructions": 931351187
+      "instructions": 931350394
     },
     {
       "name": "merkletrees",
-      "instructions": 193342587
+      "instructions": 193341001
     },
     {
       "name": "nbody",
-      "instructions": 883008816
+      "instructions": 883008023
     },
     {
       "name": "nqueen",
-      "instructions": 207723037
+      "instructions": 207722244
     },
     {
       "name": "pisum",
-      "instructions": 40026509
+      "instructions": 40024923
     },
     {
       "name": "primes",
-      "instructions": 1469710
+      "instructions": 1468917
     },
     {
       "name": "quicksort",
-      "instructions": 179365061
+      "instructions": 179363475
     },
     {
       "name": "spectral_norm",
-      "instructions": 63963626
+      "instructions": 63962040
     },
     {
       "name": "string_equality",
-      "instructions": 58063451
+      "instructions": 58061865
     },
     {
       "name": "sum_to_n",
-      "instructions": 64497
+      "instructions": 62911
     },
     {
       "name": "tak",
-      "instructions": 48021585
+      "instructions": 48018413
     },
     {
       "name": "tinytemplate",
-      "instructions": 1066875529
+      "instructions": 1022685005
     }
   ]
 }
