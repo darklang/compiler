@@ -30,3 +30,32 @@ let s = "a" ++ "b" in __raw_get<Int64>(__string_to_rawptr(s), 0L) = 2L
 let b = Stdlib.Blob.__createZeroed(3L) in __raw_get<Int64>(__blob_to_rawptr(b), 0L) = 3L
 let p = __raw_alloc(24L) in let _ = __raw_write_word(p, 0L, 1L) in let _ = __raw_write_byte(p, 8L, 90L) in let _ = __raw_write_word(p, 16L, 1L) in Stdlib.String.getByteAt(__rawptr_to_string(p), 0L) = 90L
 let p = __raw_alloc(24L) in let _ = __raw_write_word(p, 0L, 1L) in let _ = __raw_write_byte(p, 8L, 91L) in let _ = __raw_write_word(p, 16L, 1L) in Stdlib.Blob.__getByte(__rawptr_to_blob(p), 0L) = 91L
+
+// A Blob-backed mutable bitmap supports allocation-bounded internal workloads.
+let isSieveComposite(bitmap: RawPtr, index: Int64) : Bool =
+    let byte = __raw_get_byte(bitmap, index / 8L + 8L) in
+    (byte & (1L << (index % 8L))) != 0L
+
+let setSieveComposite(bitmap: RawPtr, index: Int64) : Unit =
+    let offset = index / 8L + 8L in
+    let byte = __raw_get_byte(bitmap, offset) in
+    __raw_write_byte(bitmap, offset, Stdlib.Int64.bitwiseOr(byte, 1L << (index % 8L)))
+
+let markSieveMultiples(j: Int64, step: Int64, n: Int64, bitmap: RawPtr) : Unit =
+    if j > n then ()
+    else let _ = setSieveComposite(bitmap, j) in markSieveMultiples(j + step, step, n, bitmap)
+
+let countSievePrimes(i: Int64, n: Int64, bitmap: RawPtr, count: Int64) : Int64 =
+    if i > n then count
+    else
+        if !isSieveComposite(bitmap, i) then
+            let _ = markSieveMultiples(i + i, i, n, bitmap) in
+            countSievePrimes(i + 1L, n, bitmap, count + 1L)
+        else countSievePrimes(i + 1L, n, bitmap, count)
+
+let countSieve(n: Int64) : Int64 =
+    let bitmap = Stdlib.Blob.__createZeroed((n + 8L) / 8L) in
+    countSievePrimes(2L, n, __blob_to_rawptr(bitmap), 0L)
+
+countSieve(10L) = 4L
+countSieve(100L) = 25L

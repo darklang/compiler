@@ -4,7 +4,7 @@
     "routine": [
       "ackermann", "binary_trees", "collatz", "edigits", "factorial",
       "fannkuch", "fasta", "fib", "huffman", "leibniz", "mandelbrot", "matmul", "merkletrees",
-      "nbody", "nqueen", "pisum", "primes", "quicksort", "spectral_norm",
+      "nbody", "nqueen", "nsieve", "pisum", "primes", "quicksort", "spectral_norm",
       "string_equality", "sum_to_n", "tak", "tinytemplate"
     ],
     "quick": [
@@ -21,7 +21,7 @@
     "collatz": {"routine": {"args": ["100000"], "expected_stdout": "10753840\n"}, "quick": {"args": ["1000"], "expected_stdout": "59542\n"}},
     "edigits": {"routine": {"args": ["10", "1000"], "expected_stdout": "2162278\n"}, "quick": {"args": ["1", "5"], "expected_stdout": "61\n"}},
     "factorial": {"routine": {"args": ["10000", "20"], "expected_stdout": "2432902008176640000\n"}, "quick": {"args": ["100", "20"], "expected_stdout": "2432902008176640000\n"}},
-    "fannkuch": {"routine": {"args": ["8"], "expected_stdout": "22\n"}, "quick": {"args": ["4"], "expected_stdout": "4\n"}},
+    "fannkuch": {"routine": {"args": ["9"], "expected_stdout": "30\n"}, "quick": {"args": ["4"], "expected_stdout": "4\n"}},
     "fasta": {"routine": {"args": ["100000"], "expected_stdout": "830939461\n"}, "quick": {"args": ["100"], "expected_stdout": "19053841\n"}},
     "fib": {"routine": {"args": ["35"], "expected_stdout": "9227465\n"}, "quick": {"args": ["20"], "expected_stdout": "6765\n"}},
     "huffman": {"routine": {"args": ["10000", "42", "30"], "expected_stdout": "58363789\n"}, "quick": {"args": ["200", "42", "2"], "expected_stdout": "300092\n"}},
@@ -31,7 +31,7 @@
     "merkletrees": {"routine": {"args": ["15", "50"], "expected_stdout": "230535876\n"}, "quick": {"args": ["10", "5"], "expected_stdout": "223053589\n"}},
     "nbody": {"routine": {"args": ["500000"], "expected_stdout": "-169096\n"}, "quick": {"args": ["100"], "expected_stdout": "-169050\n"}},
     "nqueen": {"routine": {"args": ["13"], "expected_stdout": "73712\n"}, "quick": {"args": ["9"], "expected_stdout": "352\n"}},
-    "nsieve": {"routine": {"args": ["100000", "1"], "expected_stdout": "9592\n"}, "quick": {"args": ["100", "1"], "expected_stdout": "25\n"}},
+    "nsieve": {"routine": {"args": ["100000", "100"], "expected_stdout": "9592\n"}, "quick": {"args": ["100", "1"], "expected_stdout": "25\n"}},
     "pisum": {"routine": {"args": ["500", "10000"], "expected_stdout": "1644834071848\n"}, "quick": {"args": ["10", "1000"], "expected_stdout": "1643934566681\n"}},
     "primes": {"routine": {"args": ["10000"], "expected_stdout": "1229\n"}, "quick": {"args": ["1000"], "expected_stdout": "168\n"}},
     "quicksort": {"routine": {"args": ["5000", "42"], "expected_stdout": "600660212\n"}, "quick": {"args": ["20", "42"], "expected_stdout": "1312514\n"}},
