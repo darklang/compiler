@@ -10,95 +10,95 @@
     "measurement_policy": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs"
   },
   "contract_sha256": "db2cd8833adfd66c2883d7b7f8e77c89862e90320e23b15c729115ecb5550cdf",
-  "generated_at": "2026-09-13T15:01:50+00:00",
+  "generated_at": "2026-09-13T15:46:36+00:00",
   "compiler": {
-    "commit": "47bc01b4e1d6f386f3e51108a114d3f32c401715",
-    "subject": "Canonicalize parser and syntax tooling"
+    "commit": "a22bd5dd1af2c35fc094ada1130f6f705af45561",
+    "subject": "Enable ANF optimization for stdlib"
   },
   "benchmarks": [
     {
       "name": "ackermann",
-      "instructions": 9303384893
+      "instructions": 9303384465
     },
     {
       "name": "binary_trees",
-      "instructions": 537698640
+      "instructions": 537698160
     },
     {
       "name": "collatz",
-      "instructions": 70196392
+      "instructions": 70196062
     },
     {
       "name": "edigits",
-      "instructions": 3364448919
+      "instructions": 3364448413
     },
     {
       "name": "factorial",
-      "instructions": 67431
+      "instructions": 66899
     },
     {
       "name": "fasta",
-      "instructions": 458941566
+      "instructions": 458941236
     },
     {
       "name": "fib",
-      "instructions": 388196652
+      "instructions": 388196426
     },
     {
       "name": "huffman",
-      "instructions": 1958680466
+      "instructions": 1958359613
     },
     {
       "name": "leibniz",
-      "instructions": 850009237
+      "instructions": 850008829
     },
     {
       "name": "mandelbrot",
-      "instructions": 15230955
+      "instructions": 15230475
     },
     {
       "name": "matmul",
-      "instructions": 931429268
+      "instructions": 931351499
     },
     {
       "name": "merkletrees",
-      "instructions": 193343665
+      "instructions": 193343211
     },
     {
       "name": "nbody",
-      "instructions": 883009458
+      "instructions": 883009128
     },
     {
       "name": "nqueen",
-      "instructions": 207723575
+      "instructions": 207723349
     },
     {
       "name": "pisum",
-      "instructions": 40027691
+      "instructions": 40027133
     },
     {
       "name": "primes",
-      "instructions": 1470326
+      "instructions": 1470022
     },
     {
       "name": "quicksort",
-      "instructions": 179366191
+      "instructions": 179365685
     },
     {
       "name": "spectral_norm",
-      "instructions": 63964730
+      "instructions": 63964250
     },
     {
       "name": "sum_to_n",
-      "instructions": 65679
+      "instructions": 65121
     },
     {
       "name": "tak",
-      "instructions": 48023708
+      "instructions": 48022824
     },
     {
       "name": "tinytemplate",
-      "instructions": 1087365441
+      "instructions": 1067943979
     }
   ]
 }

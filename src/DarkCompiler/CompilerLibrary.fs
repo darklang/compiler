@@ -3096,7 +3096,7 @@ let buildStdlibWithTrace
                         baseFuncNames
                         returnTypes
                 let stdlibFunctions = anfResult.Functions
-                let stdlibOptions = { defaultOptions with DisableANFOpt = true; DisableInlining = true }
+                let stdlibOptions = { defaultOptions with DisableInlining = true }
                 match buildAnf 0 stdlibOptions sw registries Map.empty Set.empty stdlibFunctions false passTimingRecorder with
                 | Error e ->
                     Error e
@@ -3279,7 +3279,7 @@ let buildStdlibSpecializations
                     let varGen = ANF.VarGen 0
                     AST_to_ANF.convertFunctions registries varGen resolvedFunctions
                     |> Result.bind (fun (anfFuncs, _varGen1) ->
-                        let stdlibOptions = { defaultOptions with DisableANFOpt = true; DisableInlining = true }
+                        let stdlibOptions = { defaultOptions with DisableInlining = true }
                         let sw = Stopwatch.StartNew()
                         buildAnf 0 stdlibOptions sw registries Map.empty Set.empty anfFuncs false passTimingRecorder
                         |> Result.bind (fun (anfFunctions, typeMap) ->

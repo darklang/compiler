@@ -519,6 +519,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
         { Name = "Program CLI Tests"; Tests = ProgramCliTests.tests }
         { Name = "ValueSearch Catalog Tests"; Tests = ValueSearchCatalogTests.tests stdlib }
         { Name = "Program Structure Tests"; Tests = ProgramStructureTests.tests stdlib }
+        { Name = "Stdlib Optimization Tests"; Tests = StdlibOptimizationTests.tests stdlib }
         { Name = "Compilation Session Tests"; Tests = CompilationSessionTests.tests stdlib }
         { Name = "JSON Planning Tests"; Tests = JsonPlanningTests.tests stdlib }
         { Name = "IR Symbol Tests"; Tests = IRSymbolTests.tests }
