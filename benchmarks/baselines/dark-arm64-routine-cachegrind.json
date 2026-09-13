@@ -9,11 +9,11 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs"
   },
-  "contract_sha256": "d59bee6ae0fe35109e8c6e812ee94140453a886fecc3255090ea30ac2bb570e9",
-  "generated_at": "2026-09-13T21:48:33+00:00",
+  "contract_sha256": "3ec0fae5931a873cd7e23c62b9fdaccbda63b9851c381de469e16e6765b1d1f8",
+  "generated_at": "2026-09-13T22:31:53+00:00",
   "compiler": {
-    "commit": "935d8c0a5ddf55042acb6d9ee3066bc73ac70cd0",
-    "subject": "Move dynamic buffer refcounts into fixed headers"
+    "commit": "59042c7fea57a6cd8783131ecbd53900d35ad81b",
+    "subject": "Add five runtime application benchmarks"
   },
   "benchmarks": [
     {
@@ -45,6 +45,10 @@
       "instructions": 454539838
     },
     {
+      "name": "fft",
+      "instructions": 4578662331
+    },
+    {
       "name": "fib",
       "instructions": 388194915
     },
@@ -67,6 +71,10 @@
     {
       "name": "merkletrees",
       "instructions": 193340287
+    },
+    {
+      "name": "myers_diff",
+      "instructions": 5100640118
     },
     {
       "name": "nbody",
@@ -93,6 +101,14 @@
       "instructions": 179287842
     },
     {
+      "name": "raytracer",
+      "instructions": 2496915202
+    },
+    {
+      "name": "regex_lite",
+      "instructions": 4399477343
+    },
+    {
       "name": "spectral_norm",
       "instructions": 63961303
     },
@@ -111,6 +127,10 @@
     {
       "name": "tinytemplate",
       "instructions": 1021215184
+    },
+    {
+      "name": "warden",
+      "instructions": 2098952483
     }
   ]
 }

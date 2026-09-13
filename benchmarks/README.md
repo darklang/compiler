@@ -139,7 +139,7 @@ Uses **Valgrind Cachegrind** to count instructions. Slower (~50x) but determinis
 This is the primary way we are tracking performance.
 
 The `routine` profile is the canonical comparable benchmark set and currently
-contains 24 pairs. Fannkuch runs the complete n=9 traversal in both languages,
+contains 29 pairs. Fannkuch runs the complete n=9 traversal in both languages,
 and nsieve runs 100 complete sieves over equivalent mutable flat bitmaps.
 Binary trees uses the same recursive allocation and traversal shape as Rust.
 Full-size quicksort and spectral norm are included. A

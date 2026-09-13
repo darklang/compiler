@@ -1,0 +1,133 @@
+// Small language benchmark with a hand-written lexer and Pratt parser that
+// directly evaluates recursive expressions over an in-memory program.
+
+// Tokens use compact integer tags so the token arena can provide average O(1)
+// indexed access. Number tokens are encoded as 1000 + value.
+type Lexed = { tokens: Dict<Int64>, count: Int64 }
+
+let tokenKey(index: Int64) : String = Stdlib.Int64.toString(index)
+
+let tokenAt(tokens: Dict<Int64>, index: Int64) : Int64 =
+    match Stdlib.Dict.get<Int64>(tokens, tokenKey(index)) with
+    | Some(token) -> token
+    | None -> Builtin.testRuntimeError("missing token in Warden token arena")
+
+let scanNumber(source: String, index: Int64, length: Int64, value: Int64) : (Int64 * Int64) =
+    if index < length then
+        let byte = Stdlib.String.getByteAt(source, index) in
+        if byte >= 48L && byte <= 57L then scanNumber(source, index + 1L, length, value * 10L + byte - 48L)
+        else (value, index)
+    else (value, index)
+
+let scanWord(source: String, index: Int64, length: Int64) : Int64 =
+    if index < length then
+        let byte = Stdlib.String.getByteAt(source, index) in
+        if (byte >= 97L && byte <= 122L) || (byte >= 65L && byte <= 90L) then scanWord(source, index + 1L, length)
+        else index
+    else index
+
+let wordToken(word: String) : Int64 =
+    match word with
+    | "x" -> 10L
+    | "y" -> 11L
+    | _ -> Builtin.testRuntimeError("unknown identifier in Warden program")
+
+let lex(source: String, index: Int64, length: Int64, tokenIndex: Int64, tokens: Dict<Int64>) : Lexed =
+    if index >= length then Lexed { tokens = tokens, count = tokenIndex }
+    else
+        let byte = Stdlib.String.getByteAt(source, index) in
+        if byte == 32L || byte == 10L || byte == 13L || byte == 9L then lex(source, index + 1L, length, tokenIndex, tokens)
+        else if byte >= 48L && byte <= 57L then
+            let number = scanNumber(source, index, length, 0L) in
+            let next = Stdlib.Dict.setOverridingDuplicates<Int64>(tokens, tokenKey(tokenIndex), 1000L + number.0) in
+            lex(source, number.1, length, tokenIndex + 1L, next)
+        else if (byte >= 97L && byte <= 122L) || (byte >= 65L && byte <= 90L) then
+            let afterWord = scanWord(source, index, length) in
+            let token = wordToken(Stdlib.String.__byteSlice(source, index, afterWord)) in
+            let next = Stdlib.Dict.setOverridingDuplicates<Int64>(tokens, tokenKey(tokenIndex), token) in
+            lex(source, afterWord, length, tokenIndex + 1L, next)
+        else
+            let token =
+                match byte with
+                | 43L -> 2L
+                | 45L -> 3L
+                | 42L -> 4L
+                | 47L -> 5L
+                | 60L -> 6L
+                | 40L -> 7L
+                | 41L -> 8L
+                | 59L -> 9L
+                | _ -> Builtin.testRuntimeError("unknown character in Warden program") in
+            let next = Stdlib.Dict.setOverridingDuplicates<Int64>(tokens, tokenKey(tokenIndex), token) in
+            lex(source, index + 1L, length, tokenIndex + 1L, next)
+
+let infix(token: Int64) : Stdlib.Option.Option<(Int64 * Int64)> =
+    match token with
+    | 6L -> Some((4L, 1L))
+    | 2L -> Some((0L, 2L))
+    | 3L -> Some((1L, 2L))
+    | 4L -> Some((2L, 3L))
+    | 5L -> Some((3L, 3L))
+    | _ -> None
+
+let parsePrimary(tokens: Dict<Int64>, count: Int64, index: Int64, x: Int64, y: Int64) : (Int64 * Int64) =
+    if index >= count then Builtin.testRuntimeError("expected expression in Warden program")
+    else
+        let token = tokenAt(tokens, index) in
+        if token >= 1000L then (token - 1000L, index + 1L)
+        else if token == 10L then (x, index + 1L)
+        else if token == 11L then (y, index + 1L)
+        else if token == 7L then
+            let parsed = parseExpression(tokens, count, index + 1L, 0L, x, y) in
+            if parsed.1 < count && tokenAt(tokens, parsed.1) == 8L then (parsed.0, parsed.1 + 1L)
+            else Builtin.testRuntimeError("expected ')' in Warden program")
+        else Builtin.testRuntimeError("expected expression in Warden program")
+
+let parseInfix(tokens: Dict<Int64>, count: Int64, left: Int64, index: Int64, minimumPrecedence: Int64, x: Int64, y: Int64) : (Int64 * Int64) =
+    if index >= count then (left, index)
+    else
+        match infix(tokenAt(tokens, index)) with
+        | Some((operator, precedence)) when precedence >= minimumPrecedence ->
+            let right = parseExpression(tokens, count, index + 1L, precedence + 1L, x, y) in
+            parseInfix(tokens, count, applyOperator(operator, left, right.0), right.1, minimumPrecedence, x, y)
+        | _ -> (left, index)
+
+let parseExpression(tokens: Dict<Int64>, count: Int64, index: Int64, minimumPrecedence: Int64, x: Int64, y: Int64) : (Int64 * Int64) =
+    let primary = parsePrimary(tokens, count, index, x, y) in
+    parseInfix(tokens, count, primary.0, primary.1, minimumPrecedence, x, y)
+
+let applyOperator(operator: Int64, leftValue: Int64, rightValue: Int64) : Int64 =
+    match operator with
+    | 0L -> leftValue + rightValue
+    | 1L -> leftValue - rightValue
+    | 2L -> leftValue * rightValue
+    | 3L -> leftValue / rightValue
+    | 4L -> if leftValue < rightValue then 1L else 0L
+    | _ -> Builtin.testRuntimeError("unknown Warden operator")
+
+let parseAndEvaluate(tokens: Dict<Int64>, count: Int64, index: Int64, iteration: Int64, expressionIndex: Int64, result: Int64) : Int64 =
+    if index >= count then result
+    else
+        let x = (iteration * 17L + expressionIndex * 13L) % 97L + 3L in
+        let y = (iteration * 29L + expressionIndex * 7L) % 89L + 5L in
+        let parsed = parseExpression(tokens, count, index, 0L, x, y) in
+        if parsed.1 >= count || tokenAt(tokens, parsed.1) != 9L then Builtin.testRuntimeError("expected ';' after Warden expression")
+        else parseAndEvaluate(tokens, count, parsed.1 + 1L, iteration, expressionIndex + 1L, (result + parsed.0 * (expressionIndex + 1L)) % 1000000007L)
+
+let run(remaining: Int64, iteration: Int64, tokens: Dict<Int64>, count: Int64, result: Int64) : Int64 =
+    if remaining <= 0L then result
+    else run(remaining - 1L, iteration + 1L, tokens, count, (result + parseAndEvaluate(tokens, count, 0L, iteration, 0L, 0L)) % 1000000007L)
+
+let benchmarkArg(index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64(index) with
+    | Ok(value) -> value
+    | Error(message) -> Builtin.testRuntimeError(message)
+
+let expressionCount = benchmarkArg(0I) in
+let repetitions = benchmarkArg(1I) in
+if expressionCount <= 0L || repetitions <= 0L then Builtin.testRuntimeError("Warden workload arguments must be positive")
+else
+    let statement = "x * x + y * 3 + (x + y) * (x - y) + x / 2;\n" in
+    let source = Stdlib.String.repeat(statement, Stdlib.Int.fromInt64(expressionCount)) in
+    let lexed = lex(source, 0L, Stdlib.String.__byteLength(source), 0L, Stdlib.Dict.empty) in
+    Builtin.printLine(Stdlib.Int64.toString(run(repetitions, 0L, lexed.tokens, lexed.count, 0L)))

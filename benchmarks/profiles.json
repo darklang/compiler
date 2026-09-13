@@ -3,15 +3,16 @@
   "profiles": {
     "routine": [
       "ackermann", "binary_trees", "collatz", "edigits", "factorial",
-      "fannkuch", "fasta", "fib", "huffman", "leibniz", "mandelbrot", "matmul", "merkletrees",
-      "nbody", "nqueen", "nsieve", "pisum", "primes", "quicksort", "spectral_norm",
-      "string_equality", "sum_to_n", "tak", "tinytemplate"
+      "fannkuch", "fasta", "fft", "fib", "huffman", "leibniz", "mandelbrot", "matmul", "merkletrees",
+      "myers_diff", "nbody", "nqueen", "nsieve", "pisum", "primes", "quicksort", "raytracer",
+      "regex_lite", "spectral_norm", "string_equality", "sum_to_n", "tak", "tinytemplate", "warden"
     ],
     "quick": [
       "ackermann", "binary_trees", "collatz", "edigits", "factorial",
-      "fannkuch", "fasta", "fib", "huffman", "leibniz", "mandelbrot", "matmul",
-      "merkletrees", "nbody", "nqueen", "nsieve", "pisum", "primes",
-      "quicksort", "spectral_norm", "string_equality", "sum_to_n", "tak", "tinytemplate"
+      "fannkuch", "fasta", "fft", "fib", "huffman", "leibniz", "mandelbrot", "matmul",
+      "merkletrees", "myers_diff", "nbody", "nqueen", "nsieve", "pisum", "primes",
+      "quicksort", "raytracer", "regex_lite", "spectral_norm", "string_equality",
+      "sum_to_n", "tak", "tinytemplate", "warden"
     ],
     "quick-fast": ["fib", "ackermann", "mandelbrot", "quicksort", "nqueen"]
   },
@@ -23,22 +24,27 @@
     "factorial": {"routine": {"args": ["10000", "20"], "expected_stdout": "2432902008176640000\n"}, "quick": {"args": ["100", "20"], "expected_stdout": "2432902008176640000\n"}},
     "fannkuch": {"routine": {"args": ["9"], "expected_stdout": "30\n"}, "quick": {"args": ["4"], "expected_stdout": "4\n"}},
     "fasta": {"routine": {"args": ["100000"], "expected_stdout": "830939461\n"}, "quick": {"args": ["100"], "expected_stdout": "19053841\n"}},
+    "fft": {"routine": {"args": ["256", "3"], "expected_stdout": "307195865\n"}, "quick": {"args": ["64", "1"], "expected_stdout": "130296319\n"}},
     "fib": {"routine": {"args": ["35"], "expected_stdout": "9227465\n"}, "quick": {"args": ["20"], "expected_stdout": "6765\n"}},
     "huffman": {"routine": {"args": ["10000", "42", "30"], "expected_stdout": "58363789\n"}, "quick": {"args": ["200", "42", "2"], "expected_stdout": "300092\n"}},
     "leibniz": {"routine": {"args": ["100000000"], "expected_stdout": "314159264\n"}, "quick": {"args": ["100000"], "expected_stdout": "314158265\n"}},
     "mandelbrot": {"routine": {"args": ["200", "50"], "expected_stdout": "15909\n"}, "quick": {"args": ["50", "50"], "expected_stdout": "992\n"}},
     "matmul": {"routine": {"args": ["100"], "expected_stdout": "222793267\n"}, "quick": {"args": ["3"], "expected_stdout": "281376\n"}},
     "merkletrees": {"routine": {"args": ["15", "50"], "expected_stdout": "230535876\n"}, "quick": {"args": ["10", "5"], "expected_stdout": "223053589\n"}},
+    "myers_diff": {"routine": {"args": ["20", "3", "2"], "expected_stdout": "233092160\n"}, "quick": {"args": ["4", "2", "1"], "expected_stdout": "71431859\n"}},
     "nbody": {"routine": {"args": ["500000"], "expected_stdout": "-169096\n"}, "quick": {"args": ["100"], "expected_stdout": "-169050\n"}},
     "nqueen": {"routine": {"args": ["13"], "expected_stdout": "73712\n"}, "quick": {"args": ["9"], "expected_stdout": "352\n"}},
     "nsieve": {"routine": {"args": ["100000", "100"], "expected_stdout": "9592\n"}, "quick": {"args": ["100", "1"], "expected_stdout": "25\n"}},
     "pisum": {"routine": {"args": ["500", "10000"], "expected_stdout": "1644834071848\n"}, "quick": {"args": ["10", "1000"], "expected_stdout": "1643934566681\n"}},
     "primes": {"routine": {"args": ["10000"], "expected_stdout": "1229\n"}, "quick": {"args": ["1000"], "expected_stdout": "168\n"}},
     "quicksort": {"routine": {"args": ["5000", "42"], "expected_stdout": "600660212\n"}, "quick": {"args": ["20", "42"], "expected_stdout": "1312514\n"}},
+    "raytracer": {"routine": {"args": ["400", "5"], "expected_stdout": "130082036\n"}, "quick": {"args": ["24", "1"], "expected_stdout": "13555545\n"}},
+    "regex_lite": {"routine": {"args": ["30", "2"], "expected_stdout": "332466470\n"}, "quick": {"args": ["1", "1"], "expected_stdout": "5000717\n"}},
     "spectral_norm": {"routine": {"args": ["100", "10"], "expected_stdout": "1274219991\n"}, "quick": {"args": ["10", "1"], "expected_stdout": "1271768151\n"}},
     "string_equality": {"routine": {"args": ["100000", "314159"], "expected_stdout": "9900000\n"}, "quick": {"args": ["1000", "314159"], "expected_stdout": "99000\n"}},
     "sum_to_n": {"routine": {"args": ["100", "10000"], "expected_stdout": "50005000\n"}, "quick": {"args": ["10", "10000"], "expected_stdout": "50005000\n"}},
     "tak": {"routine": {"args": ["10", "24", "16", "8"], "expected_stdout": "9\n"}, "quick": {"args": ["1", "24", "16", "8"], "expected_stdout": "9\n"}},
-    "tinytemplate": {"routine": {"args": ["12", "1"], "expected_stdout": "76874415\n"}, "quick": {"args": ["12", "1"], "expected_stdout": "76874415\n"}}
+    "tinytemplate": {"routine": {"args": ["12", "1"], "expected_stdout": "76874415\n"}, "quick": {"args": ["12", "1"], "expected_stdout": "76874415\n"}},
+    "warden": {"routine": {"args": ["30", "2"], "expected_stdout": "4338851\n"}, "quick": {"args": ["2", "1"], "expected_stdout": "833\n"}}
   }
 }

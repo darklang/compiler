@@ -1,0 +1,121 @@
+// Deterministic ray-tracing kernel over a fixed in-memory sphere scene.
+// Rendering performs closest-hit intersection, hard shadows, and diffuse lighting.
+
+type Vec3 = { x: Float, y: Float, z: Float }
+type Color = { red: Float, green: Float, blue: Float }
+type Sphere = { center: Vec3, radius: Float, color: Color }
+type Ray = { origin: Vec3, direction: Vec3 }
+type Hit = { distance: Float, sphere: Sphere }
+
+let vector(x: Float, y: Float, z: Float) : Vec3 = Vec3 { x = x, y = y, z = z }
+let color(red: Float, green: Float, blue: Float) : Color = Color { red = red, green = green, blue = blue }
+
+let add(left: Vec3, right: Vec3) : Vec3 =
+    vector(left.x + right.x, left.y + right.y, left.z + right.z)
+
+let subtract(left: Vec3, right: Vec3) : Vec3 =
+    vector(left.x - right.x, left.y - right.y, left.z - right.z)
+
+let scale(value: Vec3, factor: Float) : Vec3 =
+    vector(value.x * factor, value.y * factor, value.z * factor)
+
+let dot(left: Vec3, right: Vec3) : Float =
+    left.x * right.x + left.y * right.y + left.z * right.z
+
+let length(value: Vec3) : Float = Stdlib.Float.sqrt(dot(value, value))
+let normalize(value: Vec3) : Vec3 = scale(value, 1.0 / length(value))
+
+let raySphere(ray: Ray, sphere: Sphere) : Stdlib.Option.Option<Float> =
+    let offset = subtract(ray.origin, sphere.center) in
+    let halfB = dot(offset, ray.direction) in
+    let c = dot(offset, offset) - sphere.radius * sphere.radius in
+    let discriminant = halfB * halfB - c in
+    if discriminant < 0.0 then None
+    else
+        let root = Stdlib.Float.sqrt(discriminant) in
+        let near = -halfB - root in
+        let far = -halfB + root in
+        if near > 0.001 then Some(near)
+        else if far > 0.001 then Some(far)
+        else None
+
+let closestHit(spheres: List<Sphere>, ray: Ray, maximum: Float, closest: Stdlib.Option.Option<Hit>) : Stdlib.Option.Option<Hit> =
+    match spheres with
+    | [] -> closest
+    | sphere :: rest ->
+        match raySphere(ray, sphere) with
+        | Some(distance) when distance < maximum ->
+            closestHit(rest, ray, distance, Some(Hit { distance = distance, sphere = sphere }))
+        | _ -> closestHit(rest, ray, maximum, closest)
+
+let isShadowed(spheres: List<Sphere>, point: Vec3, light: Vec3) : Bool =
+    let towardLight = subtract(light, point) in
+    let lightDistance = length(towardLight) in
+    let shadowRay = Ray { origin = point, direction = scale(towardLight, 1.0 / lightDistance) } in
+    match closestHit(spheres, shadowRay, lightDistance, None) with
+    | None -> false
+    | Some(_) -> true
+
+let shade(spheres: List<Sphere>, ray: Ray, hit: Hit, light: Vec3) : Color =
+    let point = add(ray.origin, scale(ray.direction, hit.distance)) in
+    let normal = normalize(subtract(point, hit.sphere.center)) in
+    let surface = add(point, scale(normal, 0.001)) in
+    let lightDirection = normalize(subtract(light, surface)) in
+    let diffuse = Stdlib.Float.max(0.0, dot(normal, lightDirection)) in
+    let intensity = if isShadowed(spheres, surface, light) then 0.12 else 0.12 + 0.88 * diffuse in
+    color(
+        hit.sphere.color.red * intensity,
+        hit.sphere.color.green * intensity,
+        hit.sphere.color.blue * intensity)
+
+let trace(spheres: List<Sphere>, ray: Ray, light: Vec3) : Color =
+    match closestHit(spheres, ray, 1000000.0, None) with
+    | None ->
+        let blend = 0.5 * (ray.direction.y + 1.0) in
+        color(0.08 + 0.12 * blend, 0.10 + 0.18 * blend, 0.16 + 0.30 * blend)
+    | Some(hit) -> shade(spheres, ray, hit, light)
+
+let pixelColor(spheres: List<Sphere>, light: Vec3, size: Int64, x: Int64, y: Int64) : Color =
+    let denominator = Stdlib.Int64.toFloat(size - 1L) in
+    let screenX = 2.0 * Stdlib.Int64.toFloat(x) / denominator - 1.0 in
+    let screenY = 1.0 - 2.0 * Stdlib.Int64.toFloat(y) / denominator in
+    let camera = vector(0.0, 0.0, -5.0) in
+    let direction = normalize(vector(screenX, screenY, 1.5)) in
+    trace(spheres, Ray { origin = camera, direction = direction }, light)
+
+let addPixel(result: Int64, index: Int64, pixel: Color) : Int64 =
+    let red = Stdlib.Float.toInt(pixel.red * 1000000.0) in
+    let green = Stdlib.Float.toInt(pixel.green * 1000000.0) in
+    let blue = Stdlib.Float.toInt(pixel.blue * 1000000.0) in
+    (result + (red * 3L + green * 5L + blue * 7L) * (index + 1L)) % 1000000007L
+
+let renderRow(spheres: List<Sphere>, light: Vec3, size: Int64, y: Int64, x: Int64, result: Int64) : Int64 =
+    if x >= size then result
+    else
+        let index = y * size + x in
+        renderRow(spheres, light, size, y, x + 1L, addPixel(result, index, pixelColor(spheres, light, size, x, y)))
+
+let render(spheres: List<Sphere>, light: Vec3, size: Int64, y: Int64, result: Int64) : Int64 =
+    if y >= size then result
+    else render(spheres, light, size, y + 1L, renderRow(spheres, light, size, y, 0L, result))
+
+let repeatRender(remaining: Int64, spheres: List<Sphere>, light: Vec3, size: Int64, result: Int64) : Int64 =
+    if remaining <= 0L then result
+    else repeatRender(remaining - 1L, spheres, light, size, (result + render(spheres, light, size, 0L, 0L)) % 1000000007L)
+
+let benchmarkArg(index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64(index) with
+    | Ok(value) -> value
+    | Error(message) -> Builtin.testRuntimeError(message)
+
+let size = benchmarkArg(0I) in
+let repetitions = benchmarkArg(1I) in
+if size < 2L || repetitions <= 0L then Builtin.testRuntimeError("ray tracer size must be at least two and repetitions must be positive")
+else
+    let spheres = [
+        Sphere { center = vector(0.0, 0.0, 0.0), radius = 1.0, color = color(0.90, 0.22, 0.18) };
+        Sphere { center = vector(-1.45, -0.35, 1.3), radius = 0.65, color = color(0.18, 0.72, 0.30) };
+        Sphere { center = vector(1.35, 0.15, 1.0), radius = 0.80, color = color(0.18, 0.38, 0.92) };
+        Sphere { center = vector(0.0, -101.0, 1.5), radius = 100.0, color = color(0.72, 0.70, 0.62) }
+    ] in
+    Builtin.printLine(Stdlib.Int64.toString(repeatRender(repetitions, spheres, vector(-4.0, 5.0, -3.0), size, 0L)))

@@ -57,6 +57,14 @@
         "status": "comparable"
       }
     },
+    "fft": {
+      "status": "comparable",
+      "dark_sha256": "82527275ecac8b3c8f0aa24dff980bc60f56b78ae42cda2509511a80c8317537",
+      "rust_sha256": "441cf2180cb7a4aaf3431fb065468b8240586e0928022c153020c400ac27c737",
+      "quick": {
+        "status": "comparable"
+      }
+    },
     "fib": {
       "status": "comparable",
       "dark_sha256": "02d97c74d2686f58d2445d1952bd5f23280c9b42965a29a6e93c04309d4a1cc6",
@@ -101,6 +109,14 @@
       "status": "comparable",
       "dark_sha256": "b8d186864f457b0fb6827e3a9aa38d62657781e26a3043cf57a1e433c8fc2e8f",
       "rust_sha256": "a007a4dbe2631ec85adf817fb8e762bca26194c33999bb72adbbd246dc44c1e6",
+      "quick": {
+        "status": "comparable"
+      }
+    },
+    "myers_diff": {
+      "status": "comparable",
+      "dark_sha256": "3a027f0a1c3f4d1af481cf34e3bf46e3f4556d2519734f6601c16db340a81b98",
+      "rust_sha256": "ff84da7f1f6c0ef68513522bd306a6368ace18732a036de14bc33108d0651ec9",
       "quick": {
         "status": "comparable"
       }
@@ -153,6 +169,22 @@
         "status": "comparable"
       }
     },
+    "raytracer": {
+      "status": "comparable",
+      "dark_sha256": "25f75437c7007268b1765c267bc9a7e701337712ce10b2fc39fe3dcdf6e24a5f",
+      "rust_sha256": "428dd5e7eed281bc549d9c5df6eed7a64d24edde90186b20f61986e1a7e5d6a0",
+      "quick": {
+        "status": "comparable"
+      }
+    },
+    "regex_lite": {
+      "status": "comparable",
+      "dark_sha256": "d7e420678cde826398c9a278fb84cc6614832751206da62006fddd18f74a7e9c",
+      "rust_sha256": "2e7bcf4ae3faa7702eb023d1c66c6cde07112c9d5cb038d14c270721b5aa4561",
+      "quick": {
+        "status": "comparable"
+      }
+    },
     "spectral_norm": {
       "status": "comparable",
       "dark_sha256": "d75aa027b656bf203309b396ec2d6046bfdcb3b816fedffa5066c3d808bbdeb7",
@@ -190,6 +222,14 @@
       "dark_sha256": "51c47ad2e0c474e6947e9c319580875070d3c9576fccecbdbba9edb442103e6f",
       "rust_sha256": "8d48482f6e4d62cc12b31f79e9d713be8d94f1d392b7088c20eeb95261c474c1",
       "rust_tree_sha256": "227382068ebda723333d617219a416f34759e29d47d5ce12f43fcd093e088c71",
+      "quick": {
+        "status": "comparable"
+      }
+    },
+    "warden": {
+      "status": "comparable",
+      "dark_sha256": "7858b5f756c400eaf971d1fca848c9621723a0f4d4c94161216d208293795f30",
+      "rust_sha256": "17ad09bfe10fdca67ff198740da76504f219d8c9b39bc0e0fc9fec8cad20f0fe",
       "quick": {
         "status": "comparable"
       }

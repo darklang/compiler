@@ -95,7 +95,7 @@ setup once and scales or repeats the hot computation enough to amortize it.
   defects while preserving the standard algorithm and comparable architecture.
   Estimated port difficulty: low.
 
-### The Ray Tracer Challenge — B: promising, needs an independent kernel
+### The Ray Tracer Challenge — A: implemented as an independent kernel
 
 - **Source:** <https://github.com/guimauveb/the-ray-tracer-challenge> at
   `3dd64f18cee419686eeb9bffc652dd06f3918156` (unversioned application).
@@ -119,12 +119,15 @@ setup once and scales or repeats the hot computation enough to amortize it.
 - **Rust-specific code:** const-generic matrices, operator traits, borrowing,
   and enum conversions need ordinary Dark records/functions and sum types.
   There is no unsafe, SIMD, threading, or platform-specific code.
-- **Proposed workload:** independently implement the book's well-known kernel,
-  construct a fixed in-memory scene, render square images selected by argv, and
-  print a quantized RGB checksum. Use tolerant focused geometry tests plus exact
-  cross-language image checksums. Scene/camera construction occurs once; pixel
-  tracing dominates the whole-process measurement. Estimated difficulty:
-  medium-high.
+- **Implemented workload:** the checked-in pair independently implements the
+  book's well-known kernel rather than copying the unlicensed repository. It
+  constructs four colored spheres and a point light in memory, casts one ray
+  per pixel, selects the closest sphere intersection, traces hard shadows, and
+  applies ambient/diffuse lighting. It prints an exact quantized RGB checksum;
+  argv controls square image size and repetitions. The hot work is O(p * o)
+  for p pixels and the fixed o objects. The implementations have identical
+  arithmetic order and contain no image allocation, file output, unsafe code,
+  SIMD, or external dependency.
 
 ### Dissimilar — A: implement after Huffman
 
@@ -147,11 +150,60 @@ setup once and scales or repeats the hot computation enough to amortize it.
   become source identifiers plus offsets/lengths in Dark; vector mutation and
   deque cleanup should remain linear rather than becoming repeated string
   copying. There is no unsafe, SIMD, concurrency, or platform-specific code.
-- **Proposed workload:** generate deterministic ASCII/Unicode document pairs
-  containing long equal regions, clustered edits, insertions/deletions, and
-  repeated substrings. Print a checksum over chunk kinds, offsets, lengths, and
-  contents after verifying reconstruction of both inputs. Generate each pair
-  once and repeat the complete diff. Estimated difficulty: medium-high.
+- **Implemented workload:** `myers_diff` isolates the upstream engine's central
+  shortest-edit-path search rather than porting Dissimilar's borrowed output
+  views and cleanup passes. It generates repeated documents with a deterministic
+  middle insertion, advances Myers diagonal frontiers in hash dictionaries,
+  and prints the edit distance plus a checksum of every frontier endpoint.
+  Both implementations use the same average-O(1) frontier architecture and
+  preserve O((N+M)D) search time. Input construction happens once before the
+  repeated searches.
+
+### Radix-2 FFT — A: implemented as an independent kernel
+
+- **Reference:** <https://github.com/tarcieri/microfft> and the standard
+  Cooley-Tukey radix-2 decomposition. No upstream source is vendored.
+- **Architecture:** a local complex-number type, deterministic trigonometric
+  input, recursive even/odd decomposition, and a linear twiddle-factor combine
+  at each level. Both implementations intentionally use allocating collections
+  rather than an in-place/SIMD specialization because Dark has no public
+  mutable float array in the benchmark surface.
+- **Algorithm and workload:** O(n log n) time and O(n log n) aggregate
+  allocation for power-of-two argv sizes. The transform is repeated over one
+  generated input and reduced to an exact quantized checksum. There are no
+  dependencies, unsafe operations, SIMD intrinsics, or platform-specific code.
+
+### regex-lite-shaped matcher — B: implemented bounded subset
+
+- **Reference:** <https://github.com/rust-lang/regex/tree/master/regex-lite>.
+  The complete crate is substantially larger than a single-file benchmark, so
+  this is an independent compact subset rather than a source port.
+- **Architecture:** a hand-written parser produces alternatives of atom and
+  quantifier records. The matcher propagates possible byte positions instead
+  of recursively backtracking, so ambiguous repetition cannot cause exponential
+  behavior. Supported syntax is literals, `.`, byte ranges, top-level `|`, and
+  `*`, `+`, and `?`.
+- **Workload:** parse one deterministic pattern, scan a repeated mixed-match
+  haystack, and print a match-count/position checksum. Compilation occurs once;
+  argv repetitions exercise matching. Both sources use the same parser grammar,
+  state expansion order, and allocation behavior, with no external dependency.
+
+### Warden-shaped expression language — B: implemented with adaptation
+
+- **Reference:** <https://github.com/Conalh/warden>. The benchmark independently
+  follows its hand-written-lexer and Pratt-parser shape; it does not include
+  the upstream CLI or filesystem-facing policy features.
+- **Architecture:** lexing produces an indexed token arena, Pratt precedence
+  parsing recursively evaluates integer variables, literals, parentheses,
+  arithmetic, comparison, and semicolon-delimited statements. The benchmark
+  repeats a generated in-memory program under deterministic changing bindings
+  and prints a weighted result checksum.
+- **Adaptation:** retaining nested recursive expression values across parser
+  returns currently triggers a reproducible Dark runtime failure. The checked-in
+  pair therefore performs direct evaluation while the Pratt parser unwinds.
+  This preserves linear lexing/parsing and recursive precedence work, but does
+  not yet benchmark retained AST allocation; it should be upgraded when that
+  runtime limitation is removed.
 
 ### Satsuma — C: reject this upstream; reconsider SAT with another reference
 
@@ -163,7 +215,7 @@ setup once and scales or repeats the hot computation enough to amortize it.
   is CLI-only and unnecessary for an in-memory benchmark.
 - **Tests and benchmarks:** one literal-encoding unit test and no benchmarks.
   The source does not build on stable Rust 1.89 because it retains obsolete or
-  removed feature gates. The repository also has no license file.
+  removed feature gates.
 - **Architecture and data:** MiniSat-shaped CDCL solver, packed literals and
   clause references, flat clause database, two-watched-literal hash maps,
   assignment/decision-level vectors, VSIDS-like priority queue, Luby restarts,
@@ -179,6 +231,6 @@ setup once and scales or repeats the hot computation enough to amortize it.
 - **Possible workload elsewhere:** generate fixed planted 3-SAT and pigeonhole
   CNFs in memory, solve satisfiable and unsatisfiable cases separately, validate
   any model against every clause, and print status/model checksums. Generation
-  happens once per process. This exact project is rejected because missing
-  licensing, stale nightly requirements, unsafe-heavy representation, and very
-  weak tests make it a poor auditable baseline. Estimated difficulty: high.
+  happens once per process. This exact project is rejected because stale nightly
+  requirements, unsafe-heavy representation, and very weak tests make it a poor
+  auditable baseline. Estimated difficulty: high.

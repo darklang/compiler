@@ -9,108 +9,128 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs"
   },
-  "contract_sha256": "fe20d9cdb87aade460183399ff0a43ccf06bb8b80bd64f3744711fb8f5dcf3c6",
-  "generated_at": "2026-09-13T16:49:54+00:00",
+  "contract_sha256": "8dd3c96eb65f3fdd2d8030c877b8137870e8968293c6179256e1f71c14ca714a",
+  "generated_at": "2026-09-13T22:26:19+00:00",
   "compiler": {
-    "commit": "7b5d4ce0990c44bfafc3e19fd8542f7b75d52332",
-    "subject": "Lower canonical string equality directly"
+    "commit": "59042c7fea57a6cd8783131ecbd53900d35ad81b",
+    "subject": "Add five runtime application benchmarks"
   },
   "benchmarks": [
     {
       "name": "ackermann",
-      "instructions": 2247239
+      "instructions": 2245077
     },
     {
       "name": "binary_trees",
-      "instructions": 861261
+      "instructions": 859053
     },
     {
       "name": "collatz",
-      "instructions": 404907
+      "instructions": 403754
     },
     {
       "name": "edigits",
-      "instructions": 5268769
+      "instructions": 4555967
     },
     {
       "name": "factorial",
-      "instructions": 16435
+      "instructions": 13905
     },
     {
       "name": "fannkuch",
-      "instructions": 703309
+      "instructions": 589671
     },
     {
       "name": "fasta",
-      "instructions": 1843937
+      "instructions": 1805086
+    },
+    {
+      "name": "fft",
+      "instructions": 414397748
     },
     {
       "name": "fib",
-      "instructions": 291086
+      "instructions": 289956
     },
     {
       "name": "huffman",
-      "instructions": 6559525
+      "instructions": 5696732
     },
     {
       "name": "leibniz",
-      "instructions": 858007
+      "instructions": 856762
     },
     {
       "name": "mandelbrot",
-      "instructions": 964530
+      "instructions": 962368
     },
     {
       "name": "matmul",
-      "instructions": 47968
+      "instructions": 46792
     },
     {
       "name": "merkletrees",
-      "instructions": 617317
+      "instructions": 615017
+    },
+    {
+      "name": "myers_diff",
+      "instructions": 313299302
     },
     {
       "name": "nbody",
-      "instructions": 184886
+      "instructions": 152362
     },
     {
       "name": "nqueen",
-      "instructions": 371217
+      "instructions": 370110
     },
     {
       "name": "nsieve",
-      "instructions": 738162
+      "instructions": 14665
     },
     {
       "name": "pisum",
-      "instructions": 94906
+      "instructions": 92514
     },
     {
       "name": "primes",
-      "instructions": 75672
+      "instructions": 74565
     },
     {
       "name": "quicksort",
-      "instructions": 540623
+      "instructions": 454164
+    },
+    {
+      "name": "raytracer",
+      "instructions": 1797142
+    },
+    {
+      "name": "regex_lite",
+      "instructions": 14690492
     },
     {
       "name": "spectral_norm",
-      "instructions": 347477
+      "instructions": 289958
     },
     {
       "name": "string_equality",
-      "instructions": 642804
+      "instructions": 640040
     },
     {
       "name": "sum_to_n",
-      "instructions": 63877
+      "instructions": 61600
     },
     {
       "name": "tak",
-      "instructions": 48021379
+      "instructions": 48017153
     },
     {
       "name": "tinytemplate",
-      "instructions": 1067016307
+      "instructions": 1021356010
+    },
+    {
+      "name": "warden",
+      "instructions": 13543032
     }
   ]
 }
