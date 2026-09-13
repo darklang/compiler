@@ -10,10 +10,10 @@
     "measurement_policy": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs"
   },
   "contract_sha256": "218650a6c491f640af51e280af9f08cfd9dedff693cf1f3bfeb8cd6e1c418cff",
-  "generated_at": "2026-09-13T19:20:36+00:00",
+  "generated_at": "2026-09-13T21:06:36+00:00",
   "compiler": {
-    "commit": "b2d48df5331c9b2a3a77cd3f5172ee8683d7cb6c",
-    "subject": "Run full fannkuch and include nsieve"
+    "commit": "0d78798e9c5ffbe56f679aa78b2343ee109ba439",
+    "subject": "Reuse unique Float record clone allocations"
   },
   "benchmarks": [
     {
@@ -70,7 +70,7 @@
     },
     {
       "name": "nbody",
-      "instructions": 883008023
+      "instructions": 726507990
     },
     {
       "name": "nqueen",
