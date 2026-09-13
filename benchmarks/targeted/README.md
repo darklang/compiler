@@ -59,8 +59,9 @@ samples and their median when the requested target matches the Linux host
 (`--native-runs`, default 5). These timings include process startup; use the
 repeated workloads, not tiny controls, to assess mapping syscall costs.
 `runtime-unique` and `runtime-shared` construct 256/257-element repeats using
-function-parameter counts. `runtime-small` repeatedly exercises lengths 0–3 to
-expose mapping overhead; `runtime-effects` checks count/value evaluation,
+function-parameter counts. `runtime-small` exercises lengths 0–3 for 10,000
+iterations to expose mapping overhead above process-startup noise;
+`runtime-effects` checks count/value evaluation,
 callback order, and normalization of zero and huge negative counts on both
 targets.
 `mapped-buffer.dark` is a candidate-only internal probe: compile with
