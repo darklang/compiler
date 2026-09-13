@@ -34,7 +34,6 @@ let printHelp () =
     println "  --e2e-batch-size=N  Compile up to N compatible E2E checks together (default 1; max 8192)"
     println "  --timings-json=PATH  Write machine-readable timing data to PATH"
     println "  --codegen-profile-json=PATH  Write opt-in per-function ARM64 codegen metrics"
-    println "  --json-benchmark=PATH  Run the focused JSON benchmark and write JSON results"
     println "  --quiet            Quiet mode: print 'success' or list failed tests"
     println "  --ai               AI mode: compact output with a dot every 250 completed tests"
     println "  --verbose, -v      Print failing tests as soon as they occur"
@@ -1974,21 +1973,14 @@ let private runAiMode (args: string array) : int =
 
 [<EntryPoint>]
 let main args =
-    match parseJsonBenchmarkArg args with
-    | Error message ->
-        Console.Error.WriteLine(message)
-        1
-    | Ok (Some path) ->
-        JsonPerformanceBenchmarks.run path
-    | Ok None ->
-        if hasHelpArg args then
-            printHelp ()
-            0
-        elif hasQuietArg args then
-            captureOutput (fun () -> runTests args)
-            |> printQuietResult
-        elif hasAiArg args then
-            runAiMode args
-        else
-            let result = runTests args
-            result.ExitCode
+    if hasHelpArg args then
+        printHelp ()
+        0
+    elif hasQuietArg args then
+        captureOutput (fun () -> runTests args)
+        |> printQuietResult
+    elif hasAiArg args then
+        runAiMode args
+    else
+        let result = runTests args
+        result.ExitCode

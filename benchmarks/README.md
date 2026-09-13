@@ -66,34 +66,42 @@ the compiler's other Linux target.
   --languages=dark,rust --allow-partial
 ```
 
-## Typed JSON diagnostics
+## Targeted compiler benchmarks
 
-The test executable provides two opt-in JSON diagnostics. Build it first with
-`./run-tests --ai --build-only`, then run:
+Compiler-focused microbenchmarks live under `targeted/`, separate from the
+audited application workloads and canonical profiles. Run the JSON and 128-bit
+integer/UUID suites together with:
+
+```bash
+./benchmarks/targeted/run.sh all /tmp/dark-targeted-benchmarks
+```
+
+See [`targeted/README.md`](targeted/README.md) for individual suite commands and
+measurement details. These diagnostics do not update canonical benchmark
+baselines.
+
+The test executable still provides opt-in JSON compiler profiling. Build it
+first with `./run-tests --ai --build-only`, then run:
 
 ```bash
 bin/Tests/Debug/net10.0/Tests --ai --filter=json \
   --timings-json=/tmp/json-timings.json \
   --codegen-profile-json=/tmp/json-codegen.json
-
-bin/Tests/Debug/net10.0/Tests \
-  --json-benchmark=/tmp/json-benchmark.json
 ```
 
-The timing JSON includes exclusive top-level compiler/test phases plus
+The timing output includes exclusive top-level compiler/test phases plus
 diagnostic overlapping subphases for JSON planning and ARM64 code generation.
 The codegen profile separates metadata analysis, function collection, runtime
 helper generation, instruction-list assembly, and the final symbolic peephole
 pass; it also reports ARM64-function and canonical JSON-plan cache hits.
 Suite-context timings split test/preamble planning from stdlib-specialization
-and preamble-build overhead.
+and preamble-build overhead. The targeted JSON suite measures scalar, 1 KiB
+flat-record, 1 KiB collection, and 64 KiB nested record/sum decodes, executable
+size, and leak behavior.
 
 The codegen profile attributes ARM64 cache misses by function and reports the
 remaining whole-program codegen time separately. Profiling is disabled unless
-the output flag is present. The focused benchmark validates and times scalar,
-1 KiB flat-record, 1 KiB collection, and 64 KiB nested record/sum decodes; it
-also records executable size and performs a separate leak-check build of each
-case. These are diagnostic comparisons and do not replace the canonical
+the output flag is present. These diagnostics do not replace the canonical
 routine benchmark gate.
 
 ## Benchmark Modes

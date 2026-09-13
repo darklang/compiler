@@ -47,17 +47,17 @@ let private median (values: float array) : float =
     else (sorted[middle - 1] + sorted[middle]) / 2.0
 
 let private gitCommit () : string =
-    try
-        let startInfo = ProcessStartInfo("git", "rev-parse HEAD")
-        startInfo.RedirectStandardOutput <- true
-        startInfo.RedirectStandardError <- true
-        startInfo.UseShellExecute <- false
-        use child = Process.Start(startInfo)
-        let output = child.StandardOutput.ReadToEnd().Trim()
-        child.WaitForExit()
-        if child.ExitCode = 0 then output else "unknown"
-    with _ ->
-        "unknown"
+    let startInfo =
+        ProcessStartInfo(
+            "git",
+            "rev-parse HEAD",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false)
+    use child = Process.Start(startInfo)
+    let output = child.StandardOutput.ReadToEnd().Trim()
+    child.WaitForExit()
+    if child.ExitCode = 0 then output else "unknown"
 
 let private darkStringLiteral (value: string) : string =
     JsonSerializer.Serialize(value)
@@ -168,7 +168,7 @@ let private compile
     (enableLeakCheck: bool)
     (name: string)
     (source: string)
-    : Result<CompilerLibrary.CompileReport, string> =
+    : Result<CompilerLibrary.CompileReport * byte array, string> =
     let request : CompilerLibrary.CompileRequest = {
         Context = CompilerLibrary.StdlibOnly stdlib
         Mode = CompilerLibrary.TestExpression
@@ -187,7 +187,7 @@ let private compile
     }
     let report = CompilerLibrary.compile request
     match report.Result with
-    | Ok _ -> Ok report
+    | Ok binary -> Ok (report, binary)
     | Error error -> Error error
 
 let private executeAndValidate
@@ -210,8 +210,7 @@ let private measureCase
     (benchmark: BenchmarkCase)
     : Result<BenchmarkResult, string> =
     compile stdlib session false benchmark.Name (benchmark.Source benchmark.Iterations)
-    |> Result.bind (fun report ->
-        let binary = report.Result |> Result.defaultValue [||]
+    |> Result.bind (fun (report, binary) ->
         let expected = benchmark.Expected benchmark.Iterations
         executeAndValidate report.Target expected binary
         |> Result.bind (fun _ ->
@@ -226,8 +225,7 @@ let private measureCase
             |> Result.bind (fun reversedSamples ->
                 use leakSession = new CompilerLibrary.CompilationSession()
                 compile stdlib leakSession true benchmark.Name (benchmark.Source 1L)
-                |> Result.bind (fun leakReport ->
-                    let leakBinary = leakReport.Result |> Result.defaultValue [||]
+                |> Result.bind (fun (leakReport, leakBinary) ->
                     executeAndValidate leakReport.Target (benchmark.Expected 1L) leakBinary
                     |> Result.map (fun leakExecution ->
                         let samples = reversedSamples |> List.rev |> List.toArray

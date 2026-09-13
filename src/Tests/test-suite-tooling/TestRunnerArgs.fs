@@ -59,13 +59,6 @@ let parseCodegenProfileJsonArg (args: string array) : Result<string option, stri
     | Some path when path.Trim() = "" -> Error "--codegen-profile-json requires a non-empty path"
     | Some path -> Ok (Some path)
 
-// Parse --json-benchmark=PATH option
-let parseJsonBenchmarkArg (args: string array) : Result<string option, string> =
-    match parsePrefixedArg "--json-benchmark=" args with
-    | None -> Ok None
-    | Some path when path.Trim() = "" -> Error "--json-benchmark requires a non-empty path"
-    | Some path -> Ok (Some path)
-
 // Parse --e2e-batch-size=N. One preserves singular execution for comparison;
 // larger values batch compatible value-equality tests.
 let parseE2EBatchSizeArg (args: string array) : Result<int option, string> =
