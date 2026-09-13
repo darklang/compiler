@@ -4,19 +4,19 @@ module Stdlib.X509
 
 let __readLengthBytes(blob: Blob, index: Int64, remaining: Int64, acc: Int64) : Stdlib.Option.Option<(Int64, Int64)> =
     if remaining == 0L then Some((index, acc))
-    else if index >= Stdlib.Bytes.length(blob) then None
+    else if index >= Stdlib.Blob.__byteLength(blob) then None
     else
-        let byte = Stdlib.Bytes.get(blob, index) in
-        let blobLength = Stdlib.Bytes.length(blob) in
+        let byte = Stdlib.Blob.__getByte(blob, index) in
+        let blobLength = Stdlib.Blob.__byteLength(blob) in
         if acc > blobLength then None
         else Stdlib.X509.__readLengthBytes(blob, index + 1L, remaining - 1L, acc * 256L + byte)
 
 // Returns (content offset, content length, end offset).
 let __tlv(blob: Blob, offset: Int64) : Stdlib.Option.Option<(Int64, Int64, Int64)> =
-    let blobLength = Stdlib.Bytes.length(blob) in
+    let blobLength = Stdlib.Blob.__byteLength(blob) in
     if offset < 0L || offset + 2L > blobLength then None
     else
-        let firstLength = Stdlib.Bytes.get(blob, offset + 1L) in
+        let firstLength = Stdlib.Blob.__getByte(blob, offset + 1L) in
         let parsed =
             if firstLength < 128L then Some((offset + 2L, firstLength))
             else
@@ -43,14 +43,14 @@ let __skipFields(blob: Blob, offset: Int64, remaining: Int64) : Stdlib.Option.Op
         | Some(next) -> Stdlib.X509.__skipFields(blob, next, remaining - 1L)
 
 let __subjectPublicKeyInfo(certificate: Blob) : Stdlib.Option.Option<Blob> =
-    if Stdlib.Bytes.length(certificate) < 2L || Stdlib.Bytes.get(certificate, 0L) != 48L then None
+    if Stdlib.Blob.__byteLength(certificate) < 2L || Stdlib.Blob.__getByte(certificate, 0L) != 48L then None
     else
         match Stdlib.X509.__tlv(certificate, 0L) with
         | None -> None
         | Some((certificateContent, _certificateLength, certificateEnd)) ->
-            if certificateEnd != Stdlib.Bytes.length(certificate)
+            if certificateEnd != Stdlib.Blob.__byteLength(certificate)
                || certificateContent >= certificateEnd
-               || Stdlib.Bytes.get(certificate, certificateContent) != 48L then None
+               || Stdlib.Blob.__getByte(certificate, certificateContent) != 48L then None
             else
                 match Stdlib.X509.__tlv(certificate, certificateContent) with
                 | None -> None
@@ -58,7 +58,7 @@ let __subjectPublicKeyInfo(certificate: Blob) : Stdlib.Option.Option<Blob> =
                     if tbsEnd > certificateEnd then None
                     else
                         let fieldsStart =
-                            if tbsContent < tbsEnd && Stdlib.Bytes.get(certificate, tbsContent) == 160L then
+                            if tbsContent < tbsEnd && Stdlib.Blob.__getByte(certificate, tbsContent) == 160L then
                                 Stdlib.X509.__skip(certificate, tbsContent)
                             else Some(tbsContent) in
                         match fieldsStart with
@@ -68,17 +68,17 @@ let __subjectPublicKeyInfo(certificate: Blob) : Stdlib.Option.Option<Blob> =
                             match Stdlib.X509.__skipFields(certificate, firstField, 5L) with
                             | None -> None
                             | Some(spkiStart) ->
-                                if spkiStart >= tbsEnd || Stdlib.Bytes.get(certificate, spkiStart) != 48L then None
+                                if spkiStart >= tbsEnd || Stdlib.Blob.__getByte(certificate, spkiStart) != 48L then None
                                 else
                                     match Stdlib.X509.__tlv(certificate, spkiStart) with
                                     | None -> None
                                     | Some((_content, _length, spkiEnd)) ->
                                         if spkiEnd > tbsEnd then None
                                         else Some(
-                                            Stdlib.Bytes.fromList(
+                                            Stdlib.Blob.__fromInt64List(
                                                 Stdlib.List.take<Int64>(
                                                     Stdlib.List.drop<Int64>(
-                                                        Stdlib.Bytes.toList(certificate),
+                                                        Stdlib.Blob.__toInt64List(certificate),
                                                         Stdlib.Int.fromInt64(spkiStart)),
                                                     Stdlib.Int.fromInt64(spkiEnd - spkiStart))))
 

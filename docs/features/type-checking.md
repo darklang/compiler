@@ -37,8 +37,7 @@ type Type =
 ```
 
 `Blob` is the sole binary type. Blob equality is admitted as handle identity;
-there is no `Bytes` type. `Stdlib.Bytes` is only a legacy function namespace
-whose binary parameters and results are typed `Blob`.
+there is no `Bytes` type or function namespace.
 
 `Stream<'a>` is opaque: it has no constructors or patterns, is never traversed
 by equality, and renders without forcing. Equality and inequality compare

@@ -91,26 +91,26 @@ let __encodeHelper(b: Blob, index: Int64, len: Int64, urlSafe: Bool, acc: String
     if remaining <= 0L then
         acc
     else if remaining >= 3L then
-        let b0 = Stdlib.Bytes.get(b, index) in
-        let b1 = Stdlib.Bytes.get(b, index + 1L) in
-        let b2 = Stdlib.Bytes.get(b, index + 2L) in
+        let b0 = Stdlib.Blob.__getByte(b, index) in
+        let b1 = Stdlib.Blob.__getByte(b, index + 1L) in
+        let b2 = Stdlib.Blob.__getByte(b, index + 2L) in
         let chunk = Stdlib.Base64.__encode3Bytes(b0, b1, b2, urlSafe) in
         Stdlib.Base64.__encodeHelper(b, index + 3L, len, urlSafe, acc ++ chunk)
     else if remaining == 2L then
-        let b0 = Stdlib.Bytes.get(b, index) in
-        let b1 = Stdlib.Bytes.get(b, index + 1L) in
+        let b0 = Stdlib.Blob.__getByte(b, index) in
+        let b1 = Stdlib.Blob.__getByte(b, index + 1L) in
         acc ++ Stdlib.Base64.__encode2Bytes(b0, b1, urlSafe)
     else
-        let b0 = Stdlib.Bytes.get(b, index) in
+        let b0 = Stdlib.Blob.__getByte(b, index) in
         acc ++ Stdlib.Base64.__encode1Byte(b0, urlSafe)
 
 // Encode bytes to standard base64 string
 let encode(bytes: Blob) : String =
-    Stdlib.Base64.__encodeHelper(bytes, 0L, Stdlib.Bytes.length(bytes), false, "")
+    Stdlib.Base64.__encodeHelper(bytes, 0L, Stdlib.Blob.__byteLength(bytes), false, "")
 
 // Encode bytes to URL-safe base64 string
 let urlEncode(bytes: Blob) : String =
-    Stdlib.Base64.__encodeHelper(bytes, 0L, Stdlib.Bytes.length(bytes), true, "")
+    Stdlib.Base64.__encodeHelper(bytes, 0L, Stdlib.Blob.__byteLength(bytes), true, "")
 
 // Decode 4 base64 characters to up to 3 bytes
 // Returns (bytes list, error flag)
@@ -172,7 +172,7 @@ let decode(s: String) : Stdlib.Result.Result<Blob, String> =
     let len = Stdlib.String.__byteLength(s) in
     let remainder = len % 4L in
     if len == 0L then
-        Ok(Stdlib.Bytes.create(0L))
+        Ok(Stdlib.Blob.__createZeroed(0L))
     else if remainder == 1L then
         Error("Not a valid base64 string")
     else
@@ -182,7 +182,7 @@ let decode(s: String) : Stdlib.Result.Result<Blob, String> =
             else if remainder == 3L then s ++ "="
             else s in
         match Stdlib.Base64.__decodeHelper(padded, 0L, Stdlib.String.__byteLength(padded), []) with
-        | Ok(byteList) -> Ok(Stdlib.Bytes.fromList(byteList))
+        | Ok(byteList) -> Ok(Stdlib.Blob.__fromInt64List(byteList))
         | Error(_) -> Error("Not a valid base64 string")
 
 // Decode URL-safe base64 string to bytes (same decoder handles both)

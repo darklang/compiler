@@ -144,11 +144,11 @@ type ComparisonRecordB = { value: Int64 }
 true < false = error="Cannot perform numeric operation on Bool and Bool"
 "a" >= "b" = error="Cannot perform numeric operation on String and String"
 1L < 1.0 = error="Cannot perform numeric operation on Int64 and Float"
-Stdlib.Bytes.create(0L) != Stdlib.Bytes.create(0L) = true
-let blob = Stdlib.Bytes.create(0L) in blob == blob = true
-Stdlib.equals<Blob>(Stdlib.Bytes.create(0L), Stdlib.Bytes.create(0L)) = false
-let publicBlob = Stdlib.Bytes.create(0L) in Stdlib.equals<Blob>(publicBlob, publicBlob) = true
-Stdlib.notEquals<Blob>(Stdlib.Bytes.create(0L), Stdlib.Bytes.create(0L)) = true
+Stdlib.Blob.fromList([]) != Stdlib.Blob.fromList([]) = true
+let blob = Stdlib.Blob.fromList([]) in blob == blob = true
+Stdlib.equals<Blob>(Stdlib.Blob.fromList([]), Stdlib.Blob.fromList([])) = false
+let publicBlob = Stdlib.Blob.fromList([]) in Stdlib.equals<Blob>(publicBlob, publicBlob) = true
+Stdlib.notEquals<Blob>(Stdlib.Blob.fromList([]), Stdlib.Blob.fromList([])) = true
 
 // Public wrapper calls retain the compiler's intentional AOT mismatch timing.
 Stdlib.equals('a', "a") = error="Type variable a$0 has conflicting inferences: Char vs String"

@@ -59,7 +59,7 @@ let typeReferenceToString(typ: Darklang.LanguageTools.RuntimeTypes.TypeReference
     | TString -> "String"
     | TUuid -> "Uuid"
     | TDateTime -> "DateTime"
-    | TBlob -> "Bytes"
+    | TBlob -> "Blob"
     | TStream(inner) -> "Stream<" ++ Darklang.LanguageTools.RuntimeTypes.typeReferenceToString(inner) ++ ">"
     | TTuple(first, second, rest) ->
         let all =

@@ -164,8 +164,8 @@ its base character.
 ### 3.1 Blob-family parity
 
 The revision-pinned Blob, Base64, Crypto, and X509 public divergence table is
-empty. The retained `Bytes`, `Base64.urlDecode`, `Crypto.sha1`,
-`Crypto.bytesToHex`, and `Crypto.debug*` names are explicitly compiler-only
+empty. The retained `Base64.urlDecode`, `Crypto.sha1`, `Crypto.bytesToHex`,
+and `Crypto.debug*` names are explicitly compiler-only
 extensions over Blob, not alternate parity behavior. See
 [blob-parity.md](blob-parity.md).
 

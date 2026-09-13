@@ -5,6 +5,7 @@ Stdlib.Float.sqrt(4.0) = 2.0
 
 // The compiler no longer inserts an implicit Stdlib qualifier.
 Float.sqrt(4.0) = error="Unresolved callable name: Float.sqrt"
+Stdlib.Bytes.create(0L) = error="Unresolved callable name: Stdlib.Bytes.create"
 
 // Lexical callable values shadow a same-spelled top-level function.
 let shadowed(x: Int64): Int64 = x + 10L let shadowed = fun x -> x + 20L in shadowed(1L) = 21L

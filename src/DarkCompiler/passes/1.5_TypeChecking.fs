@@ -8698,7 +8698,6 @@ let private checkProgramInternalWithTrace
             "Stdlib.String.replace"; "Stdlib.String.equals"
             "Stdlib.Float.abs"; "Stdlib.Float.toInt"; "Stdlib.Float.toBits"
             "Stdlib.Math.e"; "Stdlib.Math.abs"; "Stdlib.Math.sqrt"; "Stdlib.Math.truncate"; "Stdlib.Math.floor"; "Stdlib.Math.ceiling"; "Stdlib.Math.round"
-            "Stdlib.Bytes.create"; "Stdlib.Bytes.fromList"; "Stdlib.Bytes.get"; "Stdlib.Bytes.hexEncode"; "Stdlib.Bytes.length"; "Stdlib.Bytes.set"; "Stdlib.Bytes.toList"
             "Stdlib.Base64.urlDecode"; "Stdlib.Crypto.sha1"; "Stdlib.Crypto.bytesToHex"
             "Stdlib.File.readText"; "Stdlib.File.exists"; "Stdlib.File.writeText"; "Stdlib.File.appendText"; "Stdlib.File.delete"; "Stdlib.File.setExecutable"; "Stdlib.File.writeFromPtr" ]
     let isCompilerImplementationCandidate (candidate: NameResolution.Candidate) =

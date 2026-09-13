@@ -384,7 +384,7 @@ class SyntaxConverter:
         'Tuple2': 'Stdlib.Tuple2',
         'Tuple3': 'Stdlib.Tuple3',
         'Math': 'Stdlib.Math',
-        'Bytes': 'Stdlib.Bytes',
+        'Blob': 'Stdlib.Blob',
         'Base64': 'Stdlib.Base64',
         'Uuid': 'Stdlib.Uuid',
     }
@@ -997,7 +997,7 @@ class Validator:
         # Custom types/enums (not defined in the test itself)
         allowed_modules = {'Int64', 'Int32', 'Int16', 'Int8', 'UInt64', 'UInt32', 'UInt16', 'UInt8',
                           'Float', 'String', 'List', 'Dict', 'Option', 'Result', 'Bool', 'Char',
-                          'Tuple2', 'Tuple3', 'Math', 'Bytes', 'Base64', 'Uuid', 'Stdlib', 'Some', 'None', 'Ok', 'Error'}
+                          'Tuple2', 'Tuple3', 'Math', 'Blob', 'Base64', 'Uuid', 'Stdlib', 'Some', 'None', 'Ok', 'Error'}
         pascal_matches = re.findall(r'\b([A-Z][a-z]+[A-Za-z]*)\b', expr)
         for pascal_name in pascal_matches:
             if pascal_name not in allowed_modules:

@@ -507,24 +507,24 @@ let fromBlob(blob: Blob) : Stdlib.Option.Option<String> =
     | Error(_) -> None
 
 let __decodeBlobWithReplacement(blob: Blob, index: Int64, acc: List<Int64>) : List<Int64> =
-    let length = Stdlib.Bytes.length(blob) in
+    let length = Stdlib.Blob.__byteLength(blob) in
     if index >= length then Stdlib.List.reverse<Int64>(acc)
     else
-        let b0 = Stdlib.Bytes.get(blob, index) in
+        let b0 = Stdlib.Blob.__getByte(blob, index) in
         if b0 <= 127L then Stdlib.String.__decodeBlobWithReplacement(blob, index + 1L, Stdlib.List.push<Int64>(acc, b0))
-        else if b0 >= 194L && b0 <= 223L && index + 1L < length && Stdlib.Blob.__isContinuation(Stdlib.Bytes.get(blob, index + 1L)) then
-            let b1 = Stdlib.Bytes.get(blob, index + 1L) in
+        else if b0 >= 194L && b0 <= 223L && index + 1L < length && Stdlib.Blob.__isContinuation(Stdlib.Blob.__getByte(blob, index + 1L)) then
+            let b1 = Stdlib.Blob.__getByte(blob, index + 1L) in
             Stdlib.String.__decodeBlobWithReplacement(blob, index + 2L, Stdlib.List.push<Int64>(acc, ((b0 & 31L) << 6L) ^ (b1 & 63L)))
         else if b0 >= 224L && b0 <= 239L && index + 2L < length then
-            let b1 = Stdlib.Bytes.get(blob, index + 1L) in
-            let b2 = Stdlib.Bytes.get(blob, index + 2L) in
+            let b1 = Stdlib.Blob.__getByte(blob, index + 1L) in
+            let b2 = Stdlib.Blob.__getByte(blob, index + 2L) in
             if Stdlib.Blob.__isContinuation(b1) && Stdlib.Blob.__isContinuation(b2) && !(b0 == 224L && b1 < 160L) && !(b0 == 237L && b1 >= 160L) then
                 Stdlib.String.__decodeBlobWithReplacement(blob, index + 3L, Stdlib.List.push<Int64>(acc, ((b0 & 15L) << 12L) ^ ((b1 & 63L) << 6L) ^ (b2 & 63L)))
             else Stdlib.String.__decodeBlobWithReplacement(blob, index + 1L, Stdlib.List.push<Int64>(acc, 65533L))
         else if b0 >= 240L && b0 <= 244L && index + 3L < length then
-            let b1 = Stdlib.Bytes.get(blob, index + 1L) in
-            let b2 = Stdlib.Bytes.get(blob, index + 2L) in
-            let b3 = Stdlib.Bytes.get(blob, index + 3L) in
+            let b1 = Stdlib.Blob.__getByte(blob, index + 1L) in
+            let b2 = Stdlib.Blob.__getByte(blob, index + 2L) in
+            let b3 = Stdlib.Blob.__getByte(blob, index + 3L) in
             if Stdlib.Blob.__isContinuation(b1) && Stdlib.Blob.__isContinuation(b2) && Stdlib.Blob.__isContinuation(b3) && !(b0 == 240L && b1 < 144L) && !(b0 == 244L && b1 >= 144L) then
                 Stdlib.String.__decodeBlobWithReplacement(blob, index + 4L, Stdlib.List.push<Int64>(acc, ((b0 & 7L) << 18L) ^ ((b1 & 63L) << 12L) ^ ((b2 & 63L) << 6L) ^ (b3 & 63L)))
             else Stdlib.String.__decodeBlobWithReplacement(blob, index + 1L, Stdlib.List.push<Int64>(acc, 65533L))

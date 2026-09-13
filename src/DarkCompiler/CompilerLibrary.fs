@@ -3000,7 +3000,6 @@ let private loadStdlib () : Result<AST.Program, string> =
         "stdlib/ValueSearch.dark"
         "stdlib/DateTime.dark"
         "stdlib/Duration.dark"
-        "stdlib/Bytes.dark"
         "stdlib/Blob.dark"
         "stdlib/Stream.dark"
         "stdlib/Html.dark"

@@ -26,14 +26,14 @@ let __string_eq(s1: String, s2: String) : Bool =
 // FNV-1a hash over Blob payloads. Identity equality may produce collisions for
 // distinct handles with equal payloads, which the HAMT resolves with equality.
 let __blob_hash(value: Blob) : Int64 =
-    let len = Stdlib.Bytes.length(value) in
+    let len = Stdlib.Blob.__byteLength(value) in
     __blob_hash_loop(value, 0L, len, __hash_offset())
 
 let __blob_hash_loop(value: Blob, idx: Int64, len: Int64, acc: Int64) : Int64 =
     if idx >= len then
         acc
     else
-        let byte = Stdlib.Bytes.get(value, idx) in
+        let byte = Stdlib.Blob.__getByte(value, idx) in
         let next = (acc ^ byte) * __hash_prime() in
         __blob_hash_loop(value, idx + 1L, len, next)
 

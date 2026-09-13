@@ -3,8 +3,8 @@
 // structural values, and frozen quirks absent from those fixtures.
 
 // Blob bridge preserves UTF-8 bytes and the public empty module value.
-Stdlib.Bytes.toList(Stdlib.String.toBlob("Aé😀")) = [65L, 195L, 169L, 240L, 159L, 152L, 128L]
-Stdlib.Bytes.length(Stdlib.Blob.empty) = 0L
+Stdlib.Blob.toList(Stdlib.String.toBlob("Aé😀")) = [65uy, 195uy, 169uy, 240uy, 159uy, 152uy, 128uy]
+Stdlib.Blob.length(Stdlib.Blob.empty) = 0I
 
 // Canonical record and recursive sum constructors are public. Constructor calls
 // throughout this file also exercise the alias-typed Attributes parameters.
@@ -47,11 +47,11 @@ let r = Stdlib.Http.success(Stdlib.String.toBlob("yes")) in (r.statusCode, Stdli
 let r = Stdlib.Http.responseWithHtml("<b>x</b>", 203I) in (r.statusCode, r.headers, Stdlib.Blob.toString(r.body)) = (203I, [("Content-Type", "text/html; charset=utf-8")], Stdlib.Result.Result.Ok("<b>x</b>"))
 let r = Stdlib.Http.responseWithText("hello", 204I) in (r.statusCode, r.headers, Stdlib.Blob.toString(r.body)) = (204I, [("Content-Type", "text/plain; charset=utf-8")], Stdlib.Result.Result.Ok("hello"))
 let r = Stdlib.Http.responseWithJson("{\"already\":true}", 205I) in (r.statusCode, r.headers, Stdlib.Blob.toString(r.body)) = (205I, [("Content-Type", "application/json")], Stdlib.Result.Result.Ok("{\"already\":true}"))
-let r = Stdlib.Http.redirectTo("bad url") in (r.statusCode, r.headers, Stdlib.Bytes.length(r.body)) = (302I, [("Location", "bad url")], 0L)
+let r = Stdlib.Http.redirectTo("bad url") in (r.statusCode, r.headers, Stdlib.Blob.length(r.body)) = (302I, [("Location", "bad url")], 0I)
 let r = Stdlib.Http.badRequest("bad") in (r.statusCode, Stdlib.Blob.toString(r.body)) = (400I, Stdlib.Result.Result.Ok("bad"))
-let r = Stdlib.Http.notFound() in (r.statusCode, r.headers, Stdlib.Bytes.length(r.body)) = (404I, [], 0L)
-let r = Stdlib.Http.unauthorized() in (r.statusCode, Stdlib.Bytes.length(r.body)) = (401I, 0L)
-let r = Stdlib.Http.forbidden() in (r.statusCode, Stdlib.Bytes.length(r.body)) = (403I, 0L)
+let r = Stdlib.Http.notFound() in (r.statusCode, r.headers, Stdlib.Blob.length(r.body)) = (404I, [], 0I)
+let r = Stdlib.Http.unauthorized() in (r.statusCode, Stdlib.Blob.length(r.body)) = (401I, 0I)
+let r = Stdlib.Http.forbidden() in (r.statusCode, Stdlib.Blob.length(r.body)) = (403I, 0I)
 let r = Stdlib.Http.serverError("boom") in (r.statusCode, Stdlib.Blob.toString(r.body)) = (500I, Stdlib.Result.Result.Ok("boom"))
 
 // Cookie is a structural value only at the pinned revision.

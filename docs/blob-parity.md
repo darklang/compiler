@@ -65,8 +65,9 @@ process-local address.
 
 ## Implementation boundary
 
-The legacy `Bytes`, `Base64.urlDecode`, and compiler diagnostic Crypto helpers
-are not source APIs. Blob parity operations use private byte-layout helpers.
+The legacy `Base64.urlDecode` and compiler diagnostic Crypto helpers are not
+source APIs. Blob parity operations use private byte-layout helpers within the
+Blob module; there is no separate Bytes type or namespace.
 
 ## Source evidence and probes
 
@@ -85,8 +86,7 @@ Compiler type/value registration is in `src/DarkCompiler/AST.fs` and
 `passes/1.5_TypeChecking.fs`; value lowering, structural equality, and Blob
 ownership flow through `passes/2_AST_to_ANF.fs`, ANF/MIR/LIR, reference-count
 insertion, and both native backends. Public implementations are
-`stdlib/Blob.dark`, `Base64.dark`, `Crypto.dark`, and `X509.dark`; the retained
-bridge is `stdlib/Bytes.dark`.
+`stdlib/Blob.dark`, `Base64.dark`, `Crypto.dark`, and `X509.dark`.
 
 The focused executable probes live in `src/Tests/e2e/blob.e2e`, `x509.e2e`,
 the migrated local suites, and the activated pinned

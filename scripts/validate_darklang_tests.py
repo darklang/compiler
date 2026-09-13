@@ -21,8 +21,17 @@ def test_public_lambda_syntax_is_unchanged():
     assert actual == expected, f"expected {expected!r}, got {actual!r}"
 
 
+def test_blob_module_uses_interpreter_namespace():
+    module = load_validate_darklang_module()
+    converter = module.SyntaxConverter()
+    actual = converter.convert("Blob.fromList([72uy])")
+    expected = "Stdlib.Blob.fromList [72uy]"
+    assert actual == expected, f"expected {expected!r}, got {actual!r}"
+
+
 def main():
     test_public_lambda_syntax_is_unchanged()
+    test_blob_module_uses_interpreter_namespace()
 
 
 if __name__ == "__main__":

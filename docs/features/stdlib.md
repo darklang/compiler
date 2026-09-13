@@ -32,7 +32,6 @@ The stdlib provides built-in modules available to all Dark programs:
 | `Stdlib.Dict` | Hash map (HAMT) |
 | `Stdlib.Blob` | Immutable binary values and public codecs |
 | `Stdlib.Stream` | Lazy single-consumer resource-backed streams |
-| `Stdlib.Bytes` | Legacy compiler-only Int64 bridge over Blob |
 | `Stdlib.Html` | Structural HTML nodes, serialization, attributes, and tag constructors |
 | `Stdlib.Http` | Structural requests/responses/cookies, parsers, and response helpers |
 | `Stdlib.Char` | Character helpers |

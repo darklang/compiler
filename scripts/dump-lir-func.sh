@@ -7,7 +7,7 @@
 #
 # Examples:
 #   ./scripts/dump-lir-func.sh "iter([1,2,3], 0)" iter
-#   ./scripts/dump-lir-func.sh "Base64.encode(Bytes.fromList([72]))" tail_i64
+#   ./scripts/dump-lir-func.sh "Base64.encode(Blob.fromList([72uy]))" tail_i64
 #
 # Shows both pre- and post-register-allocation LIR for the named function.
 

@@ -11,6 +11,7 @@ let jsonParityError<'a>(result: Stdlib.Result.Result<a, Stdlib.Json.ParseError.P
     | Ok(_) -> "unexpected success"
     | Error(error) -> Stdlib.Json.ParseError.toString("ignored-aot-branch", error)
 
+Darklang.LanguageTools.RuntimeTypes.typeReferenceToString(Darklang.LanguageTools.RuntimeTypes.TypeReference.TBlob) = "Blob"
 Stdlib.Json.serialize<Unit>(()) = "null"
 Stdlib.Json.parse<Bool>(" true ") = Stdlib.Result.Result.Ok(true)
 Stdlib.Json.serialize<String>("snowman ☃ and quote \"") = "\"snowman ☃ and quote \\\"\""

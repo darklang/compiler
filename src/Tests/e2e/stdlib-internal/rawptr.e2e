@@ -27,6 +27,6 @@ let p = __raw_alloc(16L) in let s = dynamicString("a") in let _ = __raw_slot_ini
 
 // Structured values expose RawPtr views without routing through Stdlib.Int64.
 let s = "a" ++ "b" in __raw_get<Int64>(__string_to_rawptr(s), 0L) = 2L
-let b = Stdlib.Bytes.create(3L) in __raw_get<Int64>(__blob_to_rawptr(b), 0L) = 3L
+let b = Stdlib.Blob.__createZeroed(3L) in __raw_get<Int64>(__blob_to_rawptr(b), 0L) = 3L
 let p = __raw_alloc(24L) in let _ = __raw_write_word(p, 0L, 1L) in let _ = __raw_write_byte(p, 8L, 90L) in let _ = __raw_write_word(p, 16L, 1L) in Stdlib.String.getByteAt(__rawptr_to_string(p), 0L) = 90L
-let p = __raw_alloc(24L) in let _ = __raw_write_word(p, 0L, 1L) in let _ = __raw_write_byte(p, 8L, 91L) in let _ = __raw_write_word(p, 16L, 1L) in Stdlib.Bytes.get(__rawptr_to_blob(p), 0L) = 91L
+let p = __raw_alloc(24L) in let _ = __raw_write_word(p, 0L, 1L) in let _ = __raw_write_byte(p, 8L, 91L) in let _ = __raw_write_word(p, 16L, 1L) in Stdlib.Blob.__getByte(__rawptr_to_blob(p), 0L) = 91L

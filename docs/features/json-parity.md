@@ -118,7 +118,7 @@ is intentionally unused by native code.
 
 ## Intentional AOT differences
 
-Function, Stream, Bytes/Blob, RawPtr, RuntimeError, unresolved variables,
+Function, Stream, Blob, RawPtr, RuntimeError, unresolved variables,
 non-String Dict keys, and other unsupported runtime shapes are rejected during type
 checking. The interpreter can reach corresponding failures at runtime; earlier
 AOT diagnostic timing is intentional and prevents runtime type dispatch.
