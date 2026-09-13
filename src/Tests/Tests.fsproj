@@ -67,6 +67,7 @@
     <Compile Include="compiler-passes/ProgramCliTests.fs" />
     <Compile Include="compiler-passes/ValueSearchCatalogTests.fs" />
     <Compile Include="compiler-passes/ProgramStructureTests.fs" />
+    <Compile Include="compiler-passes/StdlibOptimizationTests.fs" />
     <Compile Include="compiler-passes/CompilationSessionTests.fs" />
     <Compile Include="compiler-passes/JsonPlanningTests.fs" />
     <Compile Include="compiler-passes/IRSymbolTests.fs" />
