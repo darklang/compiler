@@ -2686,12 +2686,20 @@ let private applyCSEWithEffectFreeCallsAndTopology
                 | Mov _
                 | Phi _ ->
                     (instr :: instrs, exprMap, exported, ch)
-                | FloatSqrt _ ->
-                    // Square root cannot affect memory, so exact scalar loads
-                    // remain reusable locally. Preserve the existing conservative
-                    // boundary for calls, and do not lengthen live ranges into
-                    // dominated blocks.
+                | FloatSqrt _
+                | FloatAbs _
+                | Int64ToFloat _
+                | FloatToInt64 _
+                | FloatToBits _ ->
+                    // Pure scalar instructions cannot affect memory, so exact
+                    // scalar loads remain reusable locally. Preserve the bounded
+                    // direct-call and cross-block live-range policy.
                     (instr :: instrs, clearDirectCallAvailability exprMap, emptyExprAvailability, ch)
+                | FloatNeg _ ->
+                    // FloatNeg is memory-transparent, but retaining unrelated
+                    // loads across the long negated reductions in nbody exceeds
+                    // the current non-spilling float-register allocator.
+                    (instr :: instrs, clearHeapLoadAndDirectCallAvailability exprMap, emptyExprAvailability, ch)
                 | _ ->
                     // Do not extend a new cross-block live range across calls,
                     // allocations, memory operations, or other runtime lowering.

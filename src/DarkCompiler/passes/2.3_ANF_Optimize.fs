@@ -440,8 +440,10 @@ let private canForwardTupleElement (context: OptimizeContext) (typeEnv: TypeEnv)
         Map.tryFind tid typeEnv
         |> Option.exists (typeNeedsTypedAtomDceProtection context >> not)
 
-/// Check if a CExpr has side effects
-let hasSideEffects (context: OptimizeContext) (cexpr: CExpr) : bool =
+/// Whether evaluating a CExpr must be retained when its result is unused.
+/// This is deliberately weaker than CSE eligibility: allocations and mutable
+/// reads can be discarded, but two executions cannot necessarily be merged.
+let private mustPreserveEvaluation (context: OptimizeContext) (cexpr: CExpr) : bool =
     match cexpr with
     | Atom _ -> false
     | TypedAtom (_, typ) ->
@@ -513,7 +515,7 @@ let hasSideEffects (context: OptimizeContext) (cexpr: CExpr) : bool =
     | DateTimeNow -> true       // Reads current time (syscall)
     | Sleep _ -> true           // Blocks the current process
     | CliNative _ -> true
-    | FloatToString _ -> false  // Pure conversion (but allocates - maybe should be true?)
+    | FloatToString _ -> false  // Its allocation is unobservable when the result is unused
     | RuntimeError _ -> true
     | RuntimeErrorString _ -> true
 
@@ -902,7 +904,23 @@ type OptimizeAExprResult = {
     Uses: Set<TempId>
 }
 
-type CSEnv = Map<CExpr, TempId>
+type private ScalarUnaryCSEOp =
+    | PrimitiveUnary of UnaryOp
+    | FloatSqrtOp
+    | FloatAbsOp
+    | FloatNegOp
+    | Int64ToFloatOp
+    | FloatToInt64Op
+    | FloatToBitsOp
+
+type private CSEKey =
+    | BinaryValue of BinOp * Atom * Atom
+    | UnaryValue of ScalarUnaryCSEOp * Atom
+    | ConditionalValue of cond:Atom * thenValue:Atom * elseValue:Atom
+    | TupleProjection of tuple:Atom * index:int
+    | RecordProjection of descriptor:RecordDescriptor * record:Atom * index:int
+
+type private CSEnv = Map<CSEKey, TempId>
 
 let private isCommutativeBinOp (op: BinOp) : bool =
     match op with
@@ -925,29 +943,120 @@ let private isCommutativeBinOp (op: BinOp) : bool =
     | Shl
     | Shr -> false
 
-let private cseKey (cexpr: CExpr) : CExpr =
-    match cexpr with
+let private binaryCSEKey (op: BinOp) (left: Atom) (right: Atom) : CSEKey =
+    match op with
     // Canonicalize relational comparisons to their less-than spelling so
     // reversing both the operator and operands produces the same CSE key.
-    | Prim (Gt, left, right) -> Prim (Lt, right, left)
-    | Prim (Gte, left, right) -> Prim (Lte, right, left)
-    | Prim (op, left, right) when isCommutativeBinOp op && compare right left < 0 ->
-        Prim (op, right, left)
-    | _ -> cexpr
+    | Gt -> BinaryValue (Lt, right, left)
+    | Gte -> BinaryValue (Lte, right, left)
+    | _ when isCommutativeBinOp op && compare right left < 0 ->
+        BinaryValue (op, right, left)
+    | _ -> BinaryValue (op, left, right)
 
-let private isCSEEligible (cexpr: CExpr) : bool =
+let private isRecordProjectionCSEType (fieldType: AST.Type) : bool =
+    match fieldType with
+    | AST.TInt64 | AST.TInt32 | AST.TInt16 | AST.TInt8
+    | AST.TUInt64 | AST.TUInt32 | AST.TUInt16 | AST.TUInt8
+    | AST.TBool | AST.TChar | AST.TDateTime -> true
+    | AST.TInt128 | AST.TInt
+    | AST.TUInt128
+    | AST.TFloat64
+    | AST.TString
+    | AST.TBlob
+    | AST.TUnit
+    | AST.TRuntimeError
+    | AST.TFunction _
+    | AST.TTuple _
+    | AST.TEnumFields _
+    | AST.TRecord _
+    | AST.TSum _
+    | AST.TList _
+    | AST.TStream _
+    | AST.TVar _
+    | AST.TRawPtr
+    | AST.TDict _ -> false
+
+/// Return a value-numbering key only when merging two evaluations preserves
+/// allocation identity, mutable-memory observations, and ownership semantics.
+/// Keep this match exhaustive so every new CExpr case requires an explicit CSE
+/// decision instead of silently falling through a permissive purity test.
+let private tryCSEKey (cexpr: CExpr) : CSEKey option =
     match cexpr with
-    | Prim _
-    | UnaryPrim _
-    | IfValue _
-    | FloatNeg _
-    | FloatAbs _
-    | FloatToBits _
-    | FloatSqrt _
-    | TupleGet _
-    | Int64ToFloat _
-    | FloatToInt64 _ -> true
-    | _ -> false
+    | Prim (op, left, right) -> Some (binaryCSEKey op left right)
+    | UnaryPrim (op, atom) -> Some (UnaryValue (PrimitiveUnary op, atom))
+    | IfValue (cond, thenValue, elseValue) ->
+        Some (ConditionalValue (cond, thenValue, elseValue))
+    | FloatSqrt atom -> Some (UnaryValue (FloatSqrtOp, atom))
+    | FloatAbs atom -> Some (UnaryValue (FloatAbsOp, atom))
+    | FloatNeg atom -> Some (UnaryValue (FloatNegOp, atom))
+    | Int64ToFloat atom -> Some (UnaryValue (Int64ToFloatOp, atom))
+    | FloatToInt64 atom -> Some (UnaryValue (FloatToInt64Op, atom))
+    | FloatToBits atom -> Some (UnaryValue (FloatToBitsOp, atom))
+    | TupleGet (tuple, index) -> Some (TupleProjection (tuple, index))
+    | RecordGet (descriptor, record, index) ->
+        match List.tryItem index descriptor.Fields with
+        | Some (_, fieldType) when isRecordProjectionCSEType fieldType ->
+            Some (RecordProjection (descriptor, record, index))
+        | Some _ -> None
+        | None ->
+            Crash.crash
+                $"ANF CSE: invalid field index {index} for record {descriptor.RuntimeTypeName}"
+    | Atom _
+    | TypedAtom _
+    | Call _
+    | BorrowedCall _
+    | TailCall _
+    | IndirectCall _
+    | IndirectTailCall _
+    | ClosureAlloc _
+    | ClosureCall _
+    | ClosureTailCall _
+    | TupleAlloc _
+    | RecordAlloc _
+    | RecordClone _
+    | StringConcat _
+    | CanonicalBufferEq _
+    | RefCountInc _
+    | RefCountDec _
+    | Print _
+    | StdoutWrite _
+    | StdinReadLine
+    | RuntimeError _
+    | RuntimeErrorString _
+    | FileReadText _
+    | FileExists _
+    | FileWriteText _
+    | FileAppendText _
+    | FileDelete _
+    | FileSetExecutable _
+    | FileWriteFromPtr _
+    | RawAlloc _
+    | MappedAlloc _
+    | RawFree _
+    | MappedFree _
+    | RawGet _
+    | RawTake _
+    | RawGetByte _
+    | RawWriteWord _
+    | RawWriteByte _
+    | RawSlotInit _
+    | StringToRawPtr _
+    | RawPtrToString _
+    | BlobToRawPtr _
+    | RawPtrToBlob _
+    | DictToRawPtr _
+    | RawPtrToDict _
+    | ListToRawPtr _
+    | RawPtrToList _
+    | RefCountIncString _
+    | RefCountDecString _
+    | RefCountIncBlob _
+    | RefCountDecBlob _
+    | RandomInt64
+    | DateTimeNow
+    | Sleep _
+    | CliNative _
+    | FloatToString _ -> None
 
 let private tryAbsorbedAtom (outer: Atom) (nestedLeft: Atom) (nestedRight: Atom) : Atom option =
     if outer = nestedLeft || outer = nestedRight then Some outer
@@ -984,13 +1093,14 @@ let rec private replaceTempUses (sourceTid: TempId) (replacement: Atom) (expr: A
             replaceTempUses sourceTid replacement elseBranch
         )
 
-let rec private aExprHasSideEffects (context: OptimizeContext) (expr: AExpr) : bool =
+let rec private aExprMustPreserveEvaluation (context: OptimizeContext) (expr: AExpr) : bool =
     match expr with
     | Return _ -> false
     | Let (_, cexpr, body) ->
-        hasSideEffects context cexpr || aExprHasSideEffects context body
+        mustPreserveEvaluation context cexpr || aExprMustPreserveEvaluation context body
     | If (_, thenBranch, elseBranch) ->
-        aExprHasSideEffects context thenBranch || aExprHasSideEffects context elseBranch
+        aExprMustPreserveEvaluation context thenBranch
+        || aExprMustPreserveEvaluation context elseBranch
 
 /// Hoist before the binding that computes a local condition so the shared
 /// expression does not separate a comparison from its branch during lowering.
@@ -1024,10 +1134,10 @@ let private tryHoistSharedLeadingBranchBinding
           )
             when ifCondTid = condTid
                  && thenCExpr = elseCExpr
-                 && not (hasSideEffects context condCExpr)
-                 && not (hasSideEffects context thenCExpr)
-                 && not (aExprHasSideEffects context thenBody)
-                 && not (aExprHasSideEffects context elseBody)
+                 && not (mustPreserveEvaluation context condCExpr)
+                 && not (mustPreserveEvaluation context thenCExpr)
+                 && not (aExprMustPreserveEvaluation context thenBody)
+                 && not (aExprMustPreserveEvaluation context elseBody)
                  && not (cexprUsesTemp condTid thenCExpr) ->
             let conditional = sharedIf (Var condTid) thenTid thenBody elseTid elseBody
             Some (Let (thenTid, thenCExpr, Let (condTid, condCExpr, conditional)))
@@ -1264,18 +1374,19 @@ and private optimizeAExprWithoutBranchHoisting
         // Optimize the CExpr
         let (cexpr', cexprChanged) = optimizeCExpr options env typeEnv tupleEnv cexpr
         let (cexpr'', cseChanged, cseEnv') =
-            if options.EnableCSE && isCSEEligible cexpr' then
-                let key = cseKey cexpr'
-                match Map.tryFind key cseEnv with
-                | Some existingTid -> (Atom (Var existingTid), true, cseEnv)
-                | None -> (cexpr', false, Map.add key tid cseEnv)
-            else
-                (cexpr', false, cseEnv)
+            if options.EnableCSE then
+                match tryCSEKey cexpr' with
+                | Some key ->
+                    match Map.tryFind key cseEnv with
+                    | Some existingTid -> (Atom (Var existingTid), true, cseEnv)
+                    | None -> (cexpr', false, Map.add key tid cseEnv)
+                | None -> (cexpr', false, cseEnv)
+            else (cexpr', false, cseEnv)
 
         // Check for copy propagation: if cexpr is just an Atom, substitute it
         let (env', skipBinding) =
             match cexpr'' with
-            | Atom a when options.EnableCopyProp && not (hasSideEffects context cexpr'') ->
+            | Atom a when options.EnableCopyProp && not (mustPreserveEvaluation context cexpr'') ->
                 // Copy propagation: don't emit binding, just substitute
                 (Map.add tid a env, true)
             | Atom (IntLiteral _ | BoolLiteral _ | FloatLiteral _ | StringLiteral _ | UnitLiteral as constAtom)
@@ -1303,9 +1414,13 @@ and private optimizeAExprWithoutBranchHoisting
 
         let bodyResult = optimizeAExprWithUses context options env' typeEnv tupleEnv' cseEnv' body
 
-        // Dead code elimination: if tid is not used in body and cexpr has no side effects
+        // Dead code elimination: discard an unused binding only when evaluating
+        // it is not required for effects or ownership bookkeeping.
         let usesInBody = bodyResult.Uses
-        let isDead = options.EnableDCE && not (Set.contains tid usesInBody) && not (hasSideEffects context cexpr'')
+        let isDead =
+            options.EnableDCE
+            && not (Set.contains tid usesInBody)
+            && not (mustPreserveEvaluation context cexpr'')
         let usesInBodyWithoutTid = Set.remove tid usesInBody
 
         let adjacentSimplification =

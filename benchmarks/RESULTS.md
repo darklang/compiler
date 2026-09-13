@@ -2,12 +2,12 @@
 
 Best-known compatible routine-profile Dark performance vs audited Rust references (instruction counts).
 
-**Snapshot timestamp:** 2026-09-13T18:16:29+00:00
+**Snapshot timestamp:** 2026-09-13T18:53:50+00:00
 **Architecture:** `arm64`
 **Profile:** `routine` (schema 2)
 **Measurement policy:** `cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs`
 **Workload contract:** `2f4e8d149d0eb7a5bbbbea471086afae5bb34d6a687e7d102256a0cde0fcfcc8`
-**Compiler commit:** `3853e9e7b94c8012208ccc23ccceb1801d6f27d0` - Add conservative ANF escape analysis
+**Compiler commit:** `f8f6bfa72c8a97f7d9d4d2a40628e0f64931244f` - Generalize CSE value classification
 
 | Benchmark | Dark (3.12x) | Rust |
 |---|---:|---:|
@@ -32,4 +32,4 @@ Best-known compatible routine-profile Dark performance vs audited Rust reference
 | string_equality | 58,061,865 (0.96x) | 60,769,629 |
 | sum_to_n | 62,911 (0.24x) | 260,484 |
 | tak | 48,018,413 (0.12x) | 391,110,892 |
-| tinytemplate | 1,022,670,840 (1647x) | 620,865 |
+| tinytemplate | 1,022,670,136 (1647x) | 620,865 |

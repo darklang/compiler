@@ -561,83 +561,97 @@ let testCseDoesNotExportNonScalarBinaryTypes () : TestResult =
     else
         Error "Expected a binary expression with the non-scalar TUnit type to remain block-local"
 
-let testCseKeepsScalarHeapLoadsAvailableAcrossFloatSqrt () : TestResult =
-    let entry = Label "entry"
-    let block: BasicBlock = {
-        Label = entry
-        Instrs = [
-            HeapLoad (VReg 1, VReg 0, 8, Some AST.TFloat64)
-            FloatSqrt (VReg 2, Register (VReg 1))
-            HeapLoad (VReg 3, VReg 0, 8, Some AST.TFloat64)
-        ]
-        Terminator = Ret (Register (VReg 3))
-    }
-    let cfg: CFG = {
-        Entry = entry
-        Blocks = Map.ofList [(entry, block)]
-    }
+let private pureScalarInstructionCases = [
+    ("FloatSqrt", fun dest src -> FloatSqrt (dest, src))
+    ("FloatAbs", fun dest src -> FloatAbs (dest, src))
+    ("Int64ToFloat", fun dest src -> Int64ToFloat (dest, src))
+    ("FloatToInt64", fun dest src -> FloatToInt64 (dest, src))
+    ("FloatToBits", fun dest src -> FloatToBits (dest, src))
+]
 
-    let (optimized, changed) = applyCSE cfg
-    let expected = {
-        block with
+let testCseKeepsScalarHeapLoadsAvailableAcrossPureScalarInstructions () : TestResult =
+    let entry = Label "entry"
+    pureScalarInstructionCases
+    |> List.tryPick (fun (name, scalarInstr) ->
+        let block: BasicBlock = {
+            Label = entry
             Instrs = [
                 HeapLoad (VReg 1, VReg 0, 8, Some AST.TFloat64)
-                FloatSqrt (VReg 2, Register (VReg 1))
-                Mov (VReg 3, Register (VReg 1), Some AST.TFloat64)
+                scalarInstr (VReg 2) (Register (VReg 1))
+                HeapLoad (VReg 3, VReg 0, 8, Some AST.TFloat64)
             ]
-    }
+            Terminator = Ret (Register (VReg 3))
+        }
+        let cfg: CFG = {
+            Entry = entry
+            Blocks = Map.ofList [(entry, block)]
+        }
+        let (optimized, changed) = applyCSE cfg
+        let expected = {
+            block with
+                Instrs = [
+                    HeapLoad (VReg 1, VReg 0, 8, Some AST.TFloat64)
+                    scalarInstr (VReg 2) (Register (VReg 1))
+                    Mov (VReg 3, Register (VReg 1), Some AST.TFloat64)
+                ]
+        }
 
-    match Map.tryFind entry optimized.Blocks with
-    | Some actual when changed && actual = expected -> Ok ()
-    | _ -> Error "Expected FloatSqrt to preserve exact scalar heap-load availability"
+        match Map.tryFind entry optimized.Blocks with
+        | Some actual when changed && actual = expected -> None
+        | _ -> Some $"Expected {name} to preserve exact scalar heap-load availability")
+    |> function | Some error -> Error error | None -> Ok ()
 
-let testCseDoesNotExportScalarHeapLoadsAcrossFloatSqrt () : TestResult =
+let testCseDoesNotExportScalarHeapLoadsAcrossPureScalarInstructions () : TestResult =
     let entry = Label "entry"
     let child = Label "child"
-    let entryBlock: BasicBlock = {
-        Label = entry
-        Instrs = [
-            HeapLoad (VReg 1, VReg 0, 8, Some AST.TFloat64)
-            FloatSqrt (VReg 2, Register (VReg 1))
-        ]
-        Terminator = Jump child
-    }
-    let childBlock: BasicBlock = {
-        Label = child
-        Instrs = [HeapLoad (VReg 3, VReg 0, 8, Some AST.TFloat64)]
-        Terminator = Ret (Register (VReg 3))
-    }
-    let cfg: CFG = {
-        Entry = entry
-        Blocks = Map.ofList [(entry, entryBlock); (child, childBlock)]
-    }
+    pureScalarInstructionCases
+    |> List.tryPick (fun (name, scalarInstr) ->
+        let entryBlock: BasicBlock = {
+            Label = entry
+            Instrs = [
+                HeapLoad (VReg 1, VReg 0, 8, Some AST.TFloat64)
+                scalarInstr (VReg 2) (Register (VReg 1))
+            ]
+            Terminator = Jump child
+        }
+        let childBlock: BasicBlock = {
+            Label = child
+            Instrs = [HeapLoad (VReg 3, VReg 0, 8, Some AST.TFloat64)]
+            Terminator = Ret (Register (VReg 3))
+        }
+        let cfg: CFG = {
+            Entry = entry
+            Blocks = Map.ofList [(entry, entryBlock); (child, childBlock)]
+        }
+        let (optimized, changed) = applyCSE cfg
 
-    let (optimized, changed) = applyCSE cfg
+        if not changed && optimized = cfg then None
+        else Some $"Expected {name} to stop scalar heap-load availability at the block boundary")
+    |> function | Some error -> Error error | None -> Ok ()
 
-    if not changed && optimized = cfg then Ok ()
-    else Error "Expected FloatSqrt to stop scalar heap-load availability at the block boundary"
-
-let testCseDoesNotKeepDirectCallsAvailableAcrossFloatSqrt () : TestResult =
+let testCseDoesNotKeepDirectCallsAvailableAcrossPureScalarInstructions () : TestResult =
     let entry = Label "entry"
-    let block: BasicBlock = {
-        Label = entry
-        Instrs = [
-            Call (VReg 1, "pure", [], [], AST.TFloat64)
-            FloatSqrt (VReg 2, Register (VReg 1))
-            Call (VReg 3, "pure", [], [], AST.TFloat64)
-        ]
-        Terminator = Ret (Register (VReg 3))
-    }
-    let cfg: CFG = {
-        Entry = entry
-        Blocks = Map.ofList [(entry, block)]
-    }
+    pureScalarInstructionCases
+    |> List.tryPick (fun (name, scalarInstr) ->
+        let block: BasicBlock = {
+            Label = entry
+            Instrs = [
+                Call (VReg 1, "pure", [], [], AST.TFloat64)
+                scalarInstr (VReg 2) (Register (VReg 1))
+                Call (VReg 3, "pure", [], [], AST.TFloat64)
+            ]
+            Terminator = Ret (Register (VReg 3))
+        }
+        let cfg: CFG = {
+            Entry = entry
+            Blocks = Map.ofList [(entry, block)]
+        }
+        let (optimized, changed) =
+            applyCSEWithEffectFreeCalls (Set.singleton "pure") cfg
 
-    let (optimized, changed) =
-        applyCSEWithEffectFreeCalls (Set.singleton "pure") cfg
-
-    if not changed && optimized = cfg then Ok ()
-    else Error "Expected FloatSqrt to retain the conservative direct-call CSE boundary"
+        if not changed && optimized = cfg then None
+        else Some $"Expected {name} to retain the conservative direct-call CSE boundary")
+    |> function | Some error -> Error error | None -> Ok ()
 
 let testDceRemovesSelfReferentialDeadPhi () : TestResult =
     let entry = Label "entry"
@@ -1355,9 +1369,9 @@ let tests = [
     ("MIR CSE invalidates expressions at reference-count decrements", testCseDoesNotReuseExpressionsAcrossRefCountDecrement)
     ("MIR CSE does not extend expressions across calls", testCseDoesNotExtendExpressionsAcrossCalls)
     ("MIR CSE does not export non-scalar binary types", testCseDoesNotExportNonScalarBinaryTypes)
-    ("MIR CSE keeps scalar heap loads available across FloatSqrt", testCseKeepsScalarHeapLoadsAvailableAcrossFloatSqrt)
-    ("MIR CSE does not export scalar heap loads across FloatSqrt", testCseDoesNotExportScalarHeapLoadsAcrossFloatSqrt)
-    ("MIR CSE does not keep direct calls available across FloatSqrt", testCseDoesNotKeepDirectCallsAvailableAcrossFloatSqrt)
+    ("MIR CSE keeps scalar heap loads available across pure scalar instructions", testCseKeepsScalarHeapLoadsAvailableAcrossPureScalarInstructions)
+    ("MIR CSE does not export scalar heap loads across pure scalar instructions", testCseDoesNotExportScalarHeapLoadsAcrossPureScalarInstructions)
+    ("MIR CSE does not keep direct calls available across pure scalar instructions", testCseDoesNotKeepDirectCallsAvailableAcrossPureScalarInstructions)
     ("MIR optimize removes dead self-referential phi", testDceRemovesSelfReferentialDeadPhi)
     ("MIR optimize removes ret-phi join blocks", testCfgSimplifyRemovesRetPhiJoin)
     ("MIR optimize collapses copy-wrapped ret-phi chains", testCfgSimplifyCollapsesCopyWrappedRetPhiChain)

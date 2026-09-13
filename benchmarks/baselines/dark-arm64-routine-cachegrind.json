@@ -10,10 +10,10 @@
     "measurement_policy": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs"
   },
   "contract_sha256": "2f4e8d149d0eb7a5bbbbea471086afae5bb34d6a687e7d102256a0cde0fcfcc8",
-  "generated_at": "2026-09-13T18:16:29+00:00",
+  "generated_at": "2026-09-13T18:53:50+00:00",
   "compiler": {
-    "commit": "3853e9e7b94c8012208ccc23ccceb1801d6f27d0",
-    "subject": "Add conservative ANF escape analysis"
+    "commit": "f8f6bfa72c8a97f7d9d4d2a40628e0f64931244f",
+    "subject": "Generalize CSE value classification"
   },
   "benchmarks": [
     {
@@ -102,7 +102,7 @@
     },
     {
       "name": "tinytemplate",
-      "instructions": 1022670840
+      "instructions": 1022670136
     }
   ]
 }

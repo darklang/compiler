@@ -23,10 +23,9 @@ from Git history.
 - **Strength reduction:** integer self-addition, Float multiplication by two,
   and signed/unsigned multiplication, division, and modulo by powers of two.
 - **Common-subexpression elimination:** dominator-scoped MIR scalar reuse,
-  effect-free direct-call reuse, barrier-aware scalar heap-load reuse,
-  FloatSqrt-transparent loads, duplicate `IfValue`, tuple projection, scalar
-  conversion and Float unary operations, commutative ANF operations, and
-  reversed relational comparisons.
+  effect-free direct-call reuse, barrier-aware scalar heap-load reuse through
+  supported pure scalar operations, and ANF pure-value reuse with commutative
+  and reversed-relational canonicalization.
 - **Interprocedural and aggregate work:** uniform literal direct-parameter
   propagation, bounded scalar-literal cloning, ownership-safe tuple projection
   forwarding, projection-only scalar tuple and record replacement, and unused
@@ -55,9 +54,10 @@ from Git history.
 - conditional simplification, negated-condition folding, integer
   reassociation/cancellation/factorization, and safe multiplication/division
   strength reduction;
-- common-subexpression reuse for conditional values, tuple projections,
-  scalar conversions, float unary operations, commutative operations, and
-  reversed relational comparisons;
+- common-subexpression reuse through a dedicated, exhaustive value key for
+  conditional values, tuple projections, non-owning non-Float scalar record
+  projections, scalar conversions, Float unary operations, commutative
+  operations, and reversed relational comparisons;
 - ownership-safe local tuple projection forwarding and unused-binding
   elimination; and
 - shared leading conditional binding hoisting and capture-free local closure
@@ -65,8 +65,9 @@ from Git history.
 
 Floating-point rewrites retain NaN, signed-zero, rounding, overflow, and
 evaluation-order restrictions. Managed-value forwarding retains ownership
-restrictions. Focused negative fixtures are part of each transformation's
-contract.
+restrictions. Allocations, mutable-memory observations, managed and Float
+record projections, calls, and ownership operations are not merged. Focused
+negative fixtures are part of each transformation's contract.
 
 ## Direct-call specialization
 
@@ -96,8 +97,9 @@ projection, alias, clone, and branch shapes plus each conservative boundary.
 `passes/3.5_MIR_Optimize.fs` and `src/Tests/optimization/mir.opt` own:
 
 - dominator-scoped scalar and effect-free-call common-subexpression reuse;
-- barrier-aware exact scalar heap-load reuse, including transparency through
-  operations proven memory-neutral;
+- barrier-aware exact scalar heap-load reuse through `FloatSqrt`, `FloatAbs`,
+  `Int64ToFloat`, `FloatToInt64`, and `FloatToBits` locally, without exporting
+  availability into dominated blocks;
 - bounded recursive-loop unrolling, tail recursion modulo wrapping Int64
   addition or multiplication, effect-free call hoisting, affine induction
   reduction, and narrow counted-loop unrolling;
@@ -105,7 +107,9 @@ projection, alias, clone, and branch shapes plus each conservative boundary.
 - linear basic-block merging with typed phi repair.
 
 Memory, allocation, ownership, unknown-call, managed-result, and aliasing
-barriers remain conservative unless a focused proof says otherwise.
+barriers remain conservative unless a focused proof says otherwise. `FloatNeg`
+remains a load-availability boundary because extending loads across long
+negated reductions exceeds the current non-spilling Float register allocator.
 
 ## LIR, allocation, and backend optimization
 

@@ -2122,6 +2122,68 @@ let TempId 7 = f(t6)
 return t7
 
 ---NAME---
+cse_reuses_duplicate_record_get
+---INPUT---
+type CseRecord = { value: Int64 }
+
+let f(record: CseRecord) : Int64 =
+  let a = record.value in
+  let b = record.value in
+  a + b
+---EXPECTED---
+Function f:
+let TempId 1 = RecordGet(CseRecord, t0, 0)
+let TempId 5 = t1 + t1
+return t5
+
+---NAME---
+cse_does_not_extend_float_record_projection_live_ranges
+---INPUT---
+type CseFloatRecord = { value: Float }
+
+let f(record: CseFloatRecord) : Float =
+  let a = record.value in
+  let b = record.value in
+  a + b
+---EXPECTED---
+Function f:
+let TempId 1 = RecordGet(CseFloatRecord, t0, 0)
+let TempId 3 = RecordGet(CseFloatRecord, t0, 0)
+let TempId 5 = t1 + t3
+return t5
+
+---NAME---
+cse_does_not_merge_managed_record_get
+---INPUT---
+type CseInner = { value: Int64 }
+type CseOuter = { inner: CseInner }
+
+let f(record: CseOuter) : (CseInner, CseInner) =
+  let a = record.inner in
+  let b = record.inner in
+  (a, b)
+---EXPECTED---
+Function f:
+let TempId 1 = RecordGet(CseOuter, t0, 0)
+let TempId 3 = RecordGet(CseOuter, t0, 0)
+let TempId 5 = (t1, t3)
+return t5
+
+---NAME---
+cse_does_not_merge_allocations
+---INPUT---
+let f(x: Int64) : ((Int64, Int64), (Int64, Int64)) =
+  let first = (x, 1L) in
+  let second = (x, 1L) in
+  (first, second)
+---EXPECTED---
+Function f:
+let TempId 1 = (t0, 1)
+let TempId 3 = (t0, 1)
+let TempId 5 = (t1, t3)
+return t5
+
+---NAME---
 tuple_get_from_local_tuple_alloc
 ---INPUT---
 let f(x: Int64, y: Int64) : Int64 =
