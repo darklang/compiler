@@ -3,13 +3,13 @@
   "profiles": {
     "routine": [
       "ackermann", "binary_trees", "collatz", "edigits", "factorial",
-      "fasta", "fib", "leibniz", "mandelbrot", "matmul", "merkletrees",
+      "fasta", "fib", "huffman", "leibniz", "mandelbrot", "matmul", "merkletrees",
       "nbody", "nqueen", "pisum", "primes", "quicksort", "spectral_norm",
       "sum_to_n", "tak", "tinytemplate"
     ],
     "quick": [
       "ackermann", "binary_trees", "collatz", "edigits", "factorial",
-      "fannkuch", "fasta", "fib", "leibniz", "mandelbrot", "matmul",
+      "fannkuch", "fasta", "fib", "huffman", "leibniz", "mandelbrot", "matmul",
       "merkletrees", "nbody", "nqueen", "nsieve", "pisum", "primes",
       "quicksort", "spectral_norm", "sum_to_n", "tak", "tinytemplate"
     ],
@@ -24,6 +24,7 @@
     "fannkuch": {"routine": {"args": ["8"], "expected_stdout": "22\n"}, "quick": {"args": ["4"], "expected_stdout": "4\n"}},
     "fasta": {"routine": {"args": ["100000"], "expected_stdout": "830939461\n"}, "quick": {"args": ["100"], "expected_stdout": "19053841\n"}},
     "fib": {"routine": {"args": ["35"], "expected_stdout": "9227465\n"}, "quick": {"args": ["20"], "expected_stdout": "6765\n"}},
+    "huffman": {"routine": {"args": ["10000", "42", "30"], "expected_stdout": "58363789\n"}, "quick": {"args": ["200", "42", "2"], "expected_stdout": "300092\n"}},
     "leibniz": {"routine": {"args": ["100000000"], "expected_stdout": "314159264\n"}, "quick": {"args": ["100000"], "expected_stdout": "314158265\n"}},
     "mandelbrot": {"routine": {"args": ["200", "50"], "expected_stdout": "15909\n"}, "quick": {"args": ["50", "50"], "expected_stdout": "992\n"}},
     "matmul": {"routine": {"args": ["100"], "expected_stdout": "222793267\n"}, "quick": {"args": ["3"], "expected_stdout": "281376\n"}},

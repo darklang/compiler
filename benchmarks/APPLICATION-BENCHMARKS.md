@@ -47,3 +47,138 @@ Future additions should prefer another pinned real codebase with a different
 shape—such as a parser, serializer, or persistent-data application—before
 adding more template workloads. A Dark self-hosting or multi-package compile
 corpus should supersede synthetic compiler-throughput proxies once available.
+
+## Algorithm-workload audit (2026-09-13)
+
+Physical line counts below include comments and blank lines but exclude test,
+example, and benchmark files where they can be separated. The build observations
+use stable Rust 1.89.0. The benchmark runner measures the whole executable, so a
+port cannot literally exclude setup from Cachegrind; each proposed workload does
+setup once and scales or repeats the hot computation enough to amortize it.
+
+### Huffman codec — A: implement
+
+- **Source:** <https://github.com/libreamartists/huffman-codec> at
+  `5bbc197d41e55d949040d8c8404f3969f8b574eb` (`Cargo.toml` version 0.1.6;
+  the manifest points at the repository's former `4meta5` owner).
+- **Size and dependencies:** 232 production lines before its test module, one
+  library module, and no external dependencies. The crate uses `alloc` while
+  remaining `no_std`.
+- **Tests and benchmarks:** four library tests plus one file-based round-trip
+  test cover frequency counting, missing symbols, iterator APIs, and round trips.
+  Four nightly `#[bench]` functions cover small/medium encode/decode. The crate
+  no longer builds unchanged: it enables the removed
+  `const_in_array_repeat_expressions` feature.
+- **Architecture and data:** `Codec` owns an ASCII vector/non-ASCII `BTreeMap`
+  code dictionary; frequency counting uses `BTreeMap`; tree construction uses
+  `BinaryHeap<Rc<Tree>>`; codes and encoded bits use `Vec<u8>`.
+- **Algorithm:** frequency counting plus priority-queue tree construction and
+  recursive code traversal. A standard implementation is O(n + k log k + b)
+  for n symbols, k distinct symbols, and b encoded bits. The upstream heap is
+  accidentally a max-heap, however, so it produces prefix codes rather than an
+  optimal Huffman tree. Its published decode benchmark also passes source bytes
+  rather than encoded bits.
+- **Rust-specific code:** four unchecked vector/slice accesses are local
+  bounds-check elisions and are not algorithmic. There is no SIMD or
+  platform-specific code. `Rc`, iterators, and the split ASCII dictionary do not
+  need literal Dark equivalents.
+- **Dark workload:** deterministically generate a skewed 32-symbol stream from
+  a fixed LCG seed, build a correct min-priority Huffman tree, encode and decode
+  it, verify the decoded checksum, and print a checksum incorporating encoded
+  length and contents. Quick uses 200 symbols and two round trips; routine uses
+  10,000 symbols and 30 round trips. Generation and codec construction happen
+  once per whole-process measurement.
+- **Adaptation:** both checked-in implementations use a deterministic sorted
+  priority queue, making construction O(k²); k is explicitly capped at 32, so
+  scaling remains linear in n and b. Dark packs each code's bits and length into
+  an `Int64`; Rust uses the same representation. This corrects the upstream
+  defects while preserving the standard algorithm and comparable architecture.
+  Estimated port difficulty: low.
+
+### The Ray Tracer Challenge — B: promising, needs an independent kernel
+
+- **Source:** <https://github.com/guimauveb/the-ray-tracer-challenge> at
+  `3dd64f18cee419686eeb9bffc652dd06f3918156` (unversioned application).
+- **Size and dependencies:** about 3,065 core production lines, or 3,794 with
+  drawing programs and the CLI; standard library only. The repository contains
+  no license file, so its code must not be vendored or closely copied without
+  permission.
+- **Tests and benchmarks:** 191 tests in about 2,390 lines give excellent
+  chapter-by-chapter coverage of tuples, matrices, rays, objects, materials,
+  patterns, worlds, cameras, reflection, and refraction. There is no benchmark.
+  Stable Rust cannot build the source because `main.rs` enables
+  `generic_const_exprs`.
+- **Architecture and data:** separate tuple, float, and renderer modules;
+  fixed-size generic matrices; point/vector/color records; enum-dispatched
+  shapes and patterns; vectors of intersections, objects, and pixels; recursive
+  reflection/refraction capped at depth six.
+- **Algorithm:** one primary ray per pixel, O(p * o log o) for p pixels and o
+  object intersections as written, plus bounded recursive secondary rays.
+  Matrix inversion, intersection sorting, Phong lighting, shadows, patterns,
+  reflection, and refraction supply the floating-point work.
+- **Rust-specific code:** const-generic matrices, operator traits, borrowing,
+  and enum conversions need ordinary Dark records/functions and sum types.
+  There is no unsafe, SIMD, threading, or platform-specific code.
+- **Proposed workload:** independently implement the book's well-known kernel,
+  construct a fixed in-memory scene, render square images selected by argv, and
+  print a quantized RGB checksum. Use tolerant focused geometry tests plus exact
+  cross-language image checksums. Scene/camera construction occurs once; pixel
+  tracing dominates the whole-process measurement. Estimated difficulty:
+  medium-high.
+
+### Dissimilar — A: implement after Huffman
+
+- **Source:** <https://github.com/dtolnay/dissimilar> at
+  `cab43ff3c3a0c3d59f743baac8a02872372776e2` (`Cargo.toml` version 1.0.11).
+- **Size and dependencies:** 1,301 production lines across `lib`, `range`, and
+  `find`; no runtime dependencies. Criterion 0.8 is benchmark-only and
+  libFuzzer is confined to a separate fuzz workspace, so neither is needed.
+- **Tests and benchmarks:** 11 unit/integration tests plus one doctest pass on
+  stable Rust and cover bisect, cleanup, Unicode boundaries, formatting, and
+  reconstruction invariants. The fuzz target reconstructs both inputs from the
+  diff. One Criterion benchmark diffs two embedded documents.
+- **Architecture and data:** `Range` views over `Vec<char>`, internal
+  equal/delete/insert ranges, public borrowed string chunks, `VecDeque` cleanup
+  passes, a Myers bisect, and a generic Two-Way substring search.
+- **Algorithm:** Myers divide-and-conquer diff is O((N+M)D) time with linear
+  auxiliary space in the intended cases and quadratic worst-case work, followed
+  by boundary, semantic, and merge cleanups. Two-Way substring search is linear.
+- **Rust-specific code:** borrowed output slices and mutable range views should
+  become source identifiers plus offsets/lengths in Dark; vector mutation and
+  deque cleanup should remain linear rather than becoming repeated string
+  copying. There is no unsafe, SIMD, concurrency, or platform-specific code.
+- **Proposed workload:** generate deterministic ASCII/Unicode document pairs
+  containing long equal regions, clustered edits, insertions/deletions, and
+  repeated substrings. Print a checksum over chunk kinds, offsets, lengths, and
+  contents after verifying reconstruction of both inputs. Generate each pair
+  once and repeat the complete diff. Estimated difficulty: medium-high.
+
+### Satsuma — C: reject this upstream; reconsider SAT with another reference
+
+- **Source:** <https://github.com/JulianKnodt/satsuma> at
+  `b4f3c4a4759551c829ab16ad8e3eda8911d1b0e5` (unreleased 0.1.0).
+- **Size and dependencies:** 1,149 core production lines, 1,186 including its
+  CLI. `priority-queue`, `rustc-hash`, and `hashbrown` are central performance
+  containers but replaceable by standard-library heaps/maps; optional `clap`
+  is CLI-only and unnecessary for an in-memory benchmark.
+- **Tests and benchmarks:** one literal-encoding unit test and no benchmarks.
+  The source does not build on stable Rust 1.89 because it retains obsolete or
+  removed feature gates. The repository also has no license file.
+- **Architecture and data:** MiniSat-shaped CDCL solver, packed literals and
+  clause references, flat clause database, two-watched-literal hash maps,
+  assignment/decision-level vectors, VSIDS-like priority queue, Luby restarts,
+  statistics, and a DIMACS parser.
+- **Algorithm:** watched-literal propagation, conflict analysis, clause
+  learning, non-chronological backtracking, activity-based branching, database
+  compaction, and restarts; worst-case solving remains exponential.
+- **Rust-specific code:** nine unsafe sites cover unchecked indexing and raw
+  slice construction over the packed database. They are performance shortcuts,
+  not algorithm requirements, but the port would also need extensive mutable
+  random-access state and careful watch-list invariants. There is no SIMD or
+  platform-specific code.
+- **Possible workload elsewhere:** generate fixed planted 3-SAT and pigeonhole
+  CNFs in memory, solve satisfiable and unsatisfiable cases separately, validate
+  any model against every clause, and print status/model checksums. Generation
+  happens once per process. This exact project is rejected because missing
+  licensing, stale nightly requirements, unsafe-heavy representation, and very
+  weak tests make it a poor auditable baseline. Estimated difficulty: high.

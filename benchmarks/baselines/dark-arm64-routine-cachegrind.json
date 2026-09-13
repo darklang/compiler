@@ -9,11 +9,11 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs"
   },
-  "contract_sha256": "b4e6ba180a5f68f107005cf8867371144b93d3ed5326517cea45284c74fa6cc2",
-  "generated_at": "2026-09-12T06:53:55+00:00",
+  "contract_sha256": "db2cd8833adfd66c2883d7b7f8e77c89862e90320e23b15c729115ecb5550cdf",
+  "generated_at": "2026-09-13T15:01:50+00:00",
   "compiler": {
-    "commit": "648f7e2392aa78c202c4e014312d5039880998f3",
-    "subject": "Integrate archived multiply-subtract loop copy-back optimization"
+    "commit": "47bc01b4e1d6f386f3e51108a114d3f32c401715",
+    "subject": "Canonicalize parser and syntax tooling"
   },
   "benchmarks": [
     {
@@ -43,6 +43,10 @@
     {
       "name": "fib",
       "instructions": 388196652
+    },
+    {
+      "name": "huffman",
+      "instructions": 1958680466
     },
     {
       "name": "leibniz",

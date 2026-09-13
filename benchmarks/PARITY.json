@@ -65,6 +65,14 @@
         "status": "comparable"
       }
     },
+    "huffman": {
+      "status": "comparable",
+      "dark_sha256": "e4eb68e72e8644cbbbda1943a8ac7c4c8c0c245526aa9636463090d5e40cf32d",
+      "rust_sha256": "835d1d3aacd307c5db4f2a5f9df603dbc64a247a9188ac63b37ffd910e749579",
+      "quick": {
+        "status": "comparable"
+      }
+    },
     "leibniz": {
       "status": "comparable",
       "dark_sha256": "3c0d1f5c7ce2037217f9724930cde8cb89117d6d2f043793df1783cee4105313",
