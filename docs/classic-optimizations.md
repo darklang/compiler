@@ -549,6 +549,20 @@ Persistent backlog for audit-driven classic compiler optimization work.
 - Priority/rationale: Small, low-risk extension of ANF CSE for a pure floating-point operation; avoids repeating the same square-root computation before MIR lowering.
 - Notes: Implemented for repeated `FloatSqrt(atom)` expressions in `src/DarkCompiler/passes/2.3_ANF_Optimize.fs` during Bounded Autonomous sandbox testing. Covered by `cse_reuses_duplicate_float_sqrt` in `src/Tests/optimization/anf.opt`; existing float-heavy benchmark programs provide regression coverage but do not isolate this micro-pattern.
 
+### Commutative ANF CSE
+
+- Optimization name: Commutative ANF CSE
+- Taxonomy category: Common subexpression elimination
+- Priority/rationale: Small, canonical extension of existing ANF CSE that reuses equivalent pure binary expressions when only commutative operand order differs.
+- Notes: Implemented for commutative `Prim` operations in `src/DarkCompiler/passes/2.3_ANF_Optimize.fs` during Bounded Autonomous sandbox testing. Covered by `cse_reuses_commuted_integer_add` in `src/Tests/optimization/anf.opt`; existing integer-heavy benchmarks provide regression coverage but do not isolate this micro-pattern.
+
+### Reversed relational comparison reuse
+
+- Optimization name: Reversed relational comparison reuse
+- Taxonomy category: Common subexpression elimination
+- Priority/rationale: Small, low-risk extension of ANF CSE that removes duplicate relational comparisons when both the operator and operand order are reversed.
+- Notes: Implemented by canonicalizing `b > a` to the same CSE key as `a < b`, and `b >= a` to the same key as `a <= b`, in `src/DarkCompiler/passes/2.3_ANF_Optimize.fs`. Covered by `cse_reuses_reversed_strict_comparison` and `cse_reuses_reversed_inclusive_comparison` in `src/Tests/optimization/anf.opt`; existing comparison-heavy benchmarks provide regression coverage but do not isolate this micro-pattern.
+
 ## Interprocedural optimization
 
 ### Uniform literal direct-parameter propagation
@@ -670,22 +684,6 @@ Persistent backlog for audit-driven classic compiler optimization work.
 - Taxonomy category: Control-flow simplification
 - Priority/rationale: Canonical CFG cleanup that removes unconditional jumps and exposes a combined instruction stream to existing block-local optimizations with low implementation risk.
 - Notes: Implemented for MIR blocks that jump to a non-entry successor with exactly one predecessor. Successor phis become typed copies and outgoing phi source labels are rewritten to the retained predecessor label. Direct MIR tests cover the structural before/after form, phi correctness, and newly exposed local CSE; MIR/LIR snapshots cover pipeline effects. The routine performance ratio improved from 7.99x to 7.84x with no benchmark regressions; `leibniz` improved from 1,100,000,144 to 1,000,000,143 instructions (9.09%), `factorial` improved from 4,420,203 to 4,030,203 (8.82%), and `fib` improved from 686,796,263 to 642,005,209 (6.52%).
-
-## Common subexpression elimination
-
-### Commutative ANF CSE
-
-- Optimization name: Commutative ANF CSE
-- Taxonomy category: Common subexpression elimination
-- Priority/rationale: Small, canonical extension of existing ANF CSE that reuses equivalent pure binary expressions when only commutative operand order differs.
-- Notes: Implemented for commutative `Prim` operations in `src/DarkCompiler/passes/2.3_ANF_Optimize.fs` during Bounded Autonomous sandbox testing. Covered by `cse_reuses_commuted_integer_add` in `src/Tests/optimization/anf.opt`; existing integer-heavy benchmarks provide regression coverage but do not isolate this micro-pattern.
-
-### Reversed relational comparison reuse
-
-- Optimization name: Reversed relational comparison reuse
-- Taxonomy category: Common subexpression elimination
-- Priority/rationale: Small, low-risk extension of ANF CSE that removes duplicate relational comparisons when both the operator and operand order are reversed.
-- Notes: Implemented by canonicalizing `b > a` to the same CSE key as `a < b`, and `b >= a` to the same key as `a <= b`, in `src/DarkCompiler/passes/2.3_ANF_Optimize.fs`. Covered by `cse_reuses_reversed_strict_comparison` and `cse_reuses_reversed_inclusive_comparison` in `src/Tests/optimization/anf.opt`; existing comparison-heavy benchmarks provide regression coverage but do not isolate this micro-pattern.
 
 ## Instruction combining
 
