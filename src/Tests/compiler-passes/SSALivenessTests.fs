@@ -51,7 +51,7 @@ let isLiveIn
     (vregId: int)
     : bool =
     match RegisterAllocation.blockLivenessForLabel blockIndex liveness label with
-    | Some bl -> RegisterAllocation.bitsetContains domain bl.LiveIn vregId
+    | Some bl -> RegisterAllocation.vregBitsContains domain bl.LiveIn vregId
     | None -> false
 
 /// Check if a VReg is in the LiveOut set
@@ -63,7 +63,7 @@ let isLiveOut
     (vregId: int)
     : bool =
     match RegisterAllocation.blockLivenessForLabel blockIndex liveness label with
-    | Some bl -> RegisterAllocation.bitsetContains domain bl.LiveOut vregId
+    | Some bl -> RegisterAllocation.vregBitsContains domain bl.LiveOut vregId
     | None -> false
 
 /// Check if an FVirtual is in the LiveIn set
@@ -75,7 +75,7 @@ let isFloatLiveIn
     (fregId: int)
     : bool =
     match RegisterAllocation.blockLivenessForLabel blockIndex liveness label with
-    | Some bl -> RegisterAllocation.bitsetContains domain bl.LiveIn fregId
+    | Some bl -> RegisterAllocation.vregBitsContains domain bl.LiveIn fregId
     | None -> false
 
 /// Check if an FVirtual is in the LiveOut set
@@ -87,7 +87,7 @@ let isFloatLiveOut
     (fregId: int)
     : bool =
     match RegisterAllocation.blockLivenessForLabel blockIndex liveness label with
-    | Some bl -> RegisterAllocation.bitsetContains domain bl.LiveOut fregId
+    | Some bl -> RegisterAllocation.vregBitsContains domain bl.LiveOut fregId
     | None -> false
 
 // =============================================================================

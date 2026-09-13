@@ -130,7 +130,7 @@ let private buildVRegDomain (ids: int list) : VRegDomain =
             | _ -> unique (Some head) tail (head :: acc)
     let ordered = unique None sorted []
     let idsArray = ordered |> List.toArray
-    let wordCount = (idsArray.Length + 63) / 64
+    let wordCount = Bitset.wordCount idsArray.Length
     match ordered with
     | [] ->
         { Ids = idsArray; IndexOf = [||]; IndexOffset = 0; WordCount = 0 }
@@ -156,50 +156,20 @@ let private tryIndexOf (domain: VRegDomain) (value: int) : int option =
             let mapped = domain.IndexOf.[idx]
             if mapped >= 0 then Some mapped else None
 
-let private bitsetEmpty (wordCount: int) : BitSet =
-    Bitset.empty wordCount
-
-let private bitsetClone (bits: BitSet) : BitSet =
-    Bitset.clone bits
-
-let private bitsetIsEmpty (bits: BitSet) : bool =
-    Bitset.isEmpty bits
-
-let private bitsetEqual (left: BitSet) (right: BitSet) : bool =
-    Bitset.equal left right
-
-let private bitsetUnion (left: BitSet) (right: BitSet) : BitSet =
-    Bitset.union left right
-
-let private bitsetDiff (left: BitSet) (right: BitSet) : BitSet =
-    Bitset.diff left right
-
-let bitsetContains (domain: VRegDomain) (bits: BitSet) (value: int) : bool =
+let vregBitsContains (domain: VRegDomain) (bits: BitSet) (value: int) : bool =
     match tryIndexOf domain value with
     | Some idx -> Bitset.containsIndex idx bits
     | None -> false
 
-let private bitsetAddInPlace (domain: VRegDomain) (value: int) (bits: BitSet) : unit =
+let private vregBitsAddInPlace (domain: VRegDomain) (value: int) (bits: BitSet) : unit =
     match tryIndexOf domain value with
     | Some idx -> Bitset.addIndexInPlace idx bits
     | None -> Crash.crash $"RegisterAllocation: missing vreg {value} in bitset domain"
 
-let private bitsetRemoveInPlace (domain: VRegDomain) (value: int) (bits: BitSet) : unit =
+let private vregBitsRemoveInPlace (domain: VRegDomain) (value: int) (bits: BitSet) : unit =
     match tryIndexOf domain value with
     | Some idx -> Bitset.removeIndexInPlace idx bits
     | None -> Crash.crash $"RegisterAllocation: missing vreg {value} in bitset domain"
-
-let private bitsetAddIndexInPlace (idx: int) (bits: BitSet) : unit =
-    Bitset.addIndexInPlace idx bits
-
-let private bitsetRemoveIndexInPlace (idx: int) (bits: BitSet) : unit =
-    Bitset.removeIndexInPlace idx bits
-
-let private bitsetContainsIndex (idx: int) (bits: BitSet) : bool =
-    Bitset.containsIndex idx bits
-
-let private bitsetUnionInPlace (left: BitSet) (right: BitSet) : unit =
-    Bitset.unionInPlace left right
 
 type private BitSetUnionAccumulator =
     | NoUnionBits
@@ -212,14 +182,14 @@ let private bitsetAccumulateUnion
     (accumulator: BitSetUnionAccumulator)
     (bits: BitSet)
     : BitSetUnionAccumulator =
-    if bitsetIsEmpty bits then
+    if Bitset.isEmpty bits then
         accumulator
     else
         match accumulator with
         | NoUnionBits -> BorrowedUnionBits bits
-        | BorrowedUnionBits existing -> OwnedUnionBits (bitsetUnion existing bits)
+        | BorrowedUnionBits existing -> OwnedUnionBits (Bitset.union existing bits)
         | OwnedUnionBits result ->
-            bitsetUnionInPlace result bits
+            Bitset.unionInPlace result bits
             accumulator
 
 let private bitsetFinishUnion
@@ -231,20 +201,9 @@ let private bitsetFinishUnion
     | BorrowedUnionBits bits
     | OwnedUnionBits bits -> bits
 
-let private bitsetIntersects (left: BitSet) (right: BitSet) : bool =
-    Bitset.intersects left right
-
-let private bitsetIter (domain: VRegDomain) (bits: BitSet) (f: int -> unit) : unit =
-    Bitset.iterIndices bits (fun idx ->
-        if idx < domain.Ids.Length then
-            f domain.Ids.[idx])
-
-let private bitsetIterIndices (bits: BitSet) (f: int -> unit) : unit =
-    Bitset.iterIndices bits f
-
-let private bitsetFromList (domain: VRegDomain) (values: int list) : BitSet =
+let private vregBitsFromList (domain: VRegDomain) (values: int list) : BitSet =
     if List.isEmpty values then
-        bitsetEmpty domain.WordCount
+        Bitset.empty domain.WordCount
     else
         let bits = Bitset.empty domain.WordCount
         for value in values do
@@ -255,23 +214,6 @@ let private bitsetFromList (domain: VRegDomain) (values: int list) : BitSet =
                 Crash.crash $"BitSet: Missing vreg {value} in domain"
         bits
 
-let private bitsetDiffInPlace (left: BitSet) (right: BitSet) : unit =
-    Bitset.diffInPlace left right
-
-let private bitsetCount (bits: BitSet) : int =
-    Bitset.count bits
-
-let private bitsetIndicesToList (bits: BitSet) : int list =
-    Bitset.indicesToList bits
-
-let private bitsetToList (domain: VRegDomain) (bits: BitSet) : int list =
-    bits
-    |> bitsetIndicesToList
-    |> List.choose (fun idx ->
-        if idx < domain.Ids.Length then
-            Some domain.Ids.[idx]
-        else
-            None)
 
 let private tryLabelIndex (labels: LIR.Label array) (label: LIR.Label) : int option =
     if labels.Length = 0 then
@@ -352,22 +294,22 @@ let buildInterferenceGraphFromEdges (vertices: int list) (edges: (int * int) lis
     let domain = buildVRegDomain vertices
     let n = domain.Ids.Length
     let wordCount = domain.WordCount
-    let neighbors = Array.init n (fun _ -> bitsetEmpty wordCount)
-    let present = bitsetEmpty wordCount
+    let neighbors = Array.init n (fun _ -> Bitset.empty wordCount)
+    let present = Bitset.empty wordCount
 
     for v in vertices do
         match tryIndexOf domain v with
-        | Some idx -> bitsetAddIndexInPlace idx present
+        | Some idx -> Bitset.addIndexInPlace idx present
         | None -> Crash.crash $"Interference graph missing vertex {v}"
 
     for (u, v) in edges do
         if u <> v then
             match tryIndexOf domain u, tryIndexOf domain v with
             | Some idxU, Some idxV ->
-                bitsetAddIndexInPlace idxU present
-                bitsetAddIndexInPlace idxV present
-                bitsetAddIndexInPlace idxV neighbors.[idxU]
-                bitsetAddIndexInPlace idxU neighbors.[idxV]
+                Bitset.addIndexInPlace idxU present
+                Bitset.addIndexInPlace idxV present
+                Bitset.addIndexInPlace idxV neighbors.[idxU]
+                Bitset.addIndexInPlace idxU neighbors.[idxV]
             | _ ->
                 Crash.crash $"Interference graph missing edge endpoint {u} or {v}"
 
@@ -375,20 +317,20 @@ let buildInterferenceGraphFromEdges (vertices: int list) (edges: (int * int) lis
 
 /// Check if a graph contains a vertex.
 let graphHasVertex (graph: InterferenceGraph) (vregId: int) : bool =
-    bitsetContains graph.Domain graph.Vertices vregId
+    vregBitsContains graph.Domain graph.Vertices vregId
 
 /// Get neighbors of a vertex in the interference graph.
 let graphNeighbors (graph: InterferenceGraph) (vregId: int) : int list =
     match tryIndexOf graph.Domain vregId with
     | None -> []
     | Some idx ->
-        if not (bitsetContainsIndex idx graph.Vertices) then
+        if not (Bitset.containsIndex idx graph.Vertices) then
             []
         else
             graph.Neighbors.[idx]
-            |> bitsetIndicesToList
+            |> Bitset.indicesToList
             |> List.choose (fun nidx ->
-                if bitsetContainsIndex nidx graph.Vertices then
+                if Bitset.containsIndex nidx graph.Vertices then
                     Some graph.Domain.Ids.[nidx]
                 else
                     None)
@@ -402,12 +344,12 @@ let colorOf (result: ColoringResult) (vregId: int) : int option =
 /// Check if a vertex was spilled.
 let isSpill (result: ColoringResult) (vregId: int) : bool =
     match tryIndexOf result.Domain vregId with
-    | Some idx -> bitsetContainsIndex idx result.Spills
+    | Some idx -> Bitset.containsIndex idx result.Spills
     | None -> false
 
 /// Count spilled vertices.
 let spillCount (result: ColoringResult) : int =
-    bitsetCount result.Spills
+    Bitset.count result.Spills
 
 /// Count colored vertices.
 let coloredCount (result: ColoringResult) : int =
@@ -776,12 +718,12 @@ let private addPhiUse
     let rec insert remaining =
         match remaining with
         | [] ->
-            let bits = bitsetEmpty domain.WordCount
-            bitsetAddInPlace domain vregId bits
+            let bits = Bitset.empty domain.WordCount
+            vregBitsAddInPlace domain vregId bits
             [ (predIdx, bits) ]
         | (idx, bits) :: rest ->
             if idx = predIdx then
-                bitsetAddInPlace domain vregId bits
+                vregBitsAddInPlace domain vregId bits
                 remaining
             else
                 (idx, bits) :: insert rest
@@ -829,24 +771,24 @@ let private computeGenKillFromFacts
     (blockFacts: ClassifiedBlock)
     : BitSet * BitSet =
     // Process instructions in forward order
-    let gen = bitsetEmpty domain.WordCount
-    let kill = bitsetEmpty domain.WordCount
+    let gen = Bitset.empty domain.WordCount
+    let kill = Bitset.empty domain.WordCount
 
     for facts in blockFacts.InstrFacts do
         // Add to GEN if used and not already killed (defined earlier in block)
         for u in facts.IntUses do
-            if not (bitsetContains domain kill u) then
-                bitsetAddInPlace domain u gen
+            if not (vregBitsContains domain kill u) then
+                vregBitsAddInPlace domain u gen
 
         // Add to KILL if defined
         match facts.IntDef with
-        | Some d -> bitsetAddInPlace domain d kill
+        | Some d -> vregBitsAddInPlace domain d kill
         | None -> ()
 
     // Also add terminator uses to GEN
     for u in blockFacts.TerminatorUses do
-        if not (bitsetContains domain kill u) then
-            bitsetAddInPlace domain u gen
+        if not (vregBitsContains domain kill u) then
+            vregBitsAddInPlace domain u gen
 
     (gen, kill)
 
@@ -880,16 +822,16 @@ let private computeFloatGenKillFromFacts
     (domain: VRegDomain)
     (blockFacts: ClassifiedBlock)
     : BitSet * BitSet =
-    let gen = bitsetEmpty domain.WordCount
-    let kill = bitsetEmpty domain.WordCount
+    let gen = Bitset.empty domain.WordCount
+    let kill = Bitset.empty domain.WordCount
 
     for facts in blockFacts.InstrFacts do
         for u in facts.FloatUses do
-            if not (bitsetContains domain kill u) then
-                bitsetAddInPlace domain u gen
+            if not (vregBitsContains domain kill u) then
+                vregBitsAddInPlace domain u gen
 
         match facts.FloatDef with
-        | Some d -> bitsetAddInPlace domain d kill
+        | Some d -> vregBitsAddInPlace domain d kill
         | None -> ()
 
     (gen, kill)
@@ -928,8 +870,8 @@ let private computeCombinedLivenessBitsFromFacts
     : VRegDomain * BlockLiveness array * VRegDomain * BlockLiveness array =
     let intDomain = buildVRegDomain (collectVRegIdsFromFacts classifiedBlocks @ intExtraIds)
     let floatDomain = buildVRegDomain (collectFVRegIdsFromFacts classifiedBlocks @ floatExtraIds)
-    let emptyIntBits = bitsetEmpty intDomain.WordCount
-    let emptyFloatBits = bitsetEmpty floatDomain.WordCount
+    let emptyIntBits = Bitset.empty intDomain.WordCount
+    let emptyFloatBits = Bitset.empty floatDomain.WordCount
     let intGenKillBits =
         Array.init classifiedBlocks.Length (fun idx ->
             computeGenKillFromFacts intDomain classifiedBlocks.[idx])
@@ -1004,20 +946,20 @@ let private computeCombinedLivenessBitsFromFacts
         let (intGen, intKill) = intGenKillBits.[blockIdx]
         let oldIntLiveness = intLiveness.[blockIdx]
         let newIntLiveOut = bitsetFinishUnion emptyIntBits intLiveOutAccumulator
-        let newIntLiveIn = bitsetClone newIntLiveOut
-        bitsetDiffInPlace newIntLiveIn intKill
-        bitsetUnionInPlace newIntLiveIn intGen
-        let intLiveInChanged = not (bitsetEqual newIntLiveIn oldIntLiveness.LiveIn)
-        if intLiveInChanged || not (bitsetEqual newIntLiveOut oldIntLiveness.LiveOut) then
+        let newIntLiveIn = Bitset.clone newIntLiveOut
+        Bitset.diffInPlace newIntLiveIn intKill
+        Bitset.unionInPlace newIntLiveIn intGen
+        let intLiveInChanged = not (Bitset.equal newIntLiveIn oldIntLiveness.LiveIn)
+        if intLiveInChanged || not (Bitset.equal newIntLiveOut oldIntLiveness.LiveOut) then
             intLiveness.[blockIdx] <- { LiveIn = newIntLiveIn; LiveOut = newIntLiveOut }
         let (floatGen, floatKill) = floatGenKillBits.[blockIdx]
         let oldFloatLiveness = floatLiveness.[blockIdx]
         let newFloatLiveOut = bitsetFinishUnion emptyFloatBits floatLiveOutAccumulator
-        let newFloatLiveIn = bitsetClone newFloatLiveOut
-        bitsetDiffInPlace newFloatLiveIn floatKill
-        bitsetUnionInPlace newFloatLiveIn floatGen
-        let floatLiveInChanged = not (bitsetEqual newFloatLiveIn oldFloatLiveness.LiveIn)
-        if floatLiveInChanged || not (bitsetEqual newFloatLiveOut oldFloatLiveness.LiveOut) then
+        let newFloatLiveIn = Bitset.clone newFloatLiveOut
+        Bitset.diffInPlace newFloatLiveIn floatKill
+        Bitset.unionInPlace newFloatLiveIn floatGen
+        let floatLiveInChanged = not (Bitset.equal newFloatLiveIn oldFloatLiveness.LiveIn)
+        if floatLiveInChanged || not (Bitset.equal newFloatLiveOut oldFloatLiveness.LiveOut) then
             floatLiveness.[blockIdx] <- { LiveIn = newFloatLiveIn; LiveOut = newFloatLiveOut }
         if intLiveInChanged || floatLiveInChanged then
             for predIdx in predecessorIndices.[blockIdx] do
@@ -1070,11 +1012,11 @@ let private computeSaveRegsPreparation
     (intLiveOut: BitSet)
     (floatLiveOut: BitSet)
     : (BitSet * BitSet) list * LIR.PhysReg list list =
-    let intLive = bitsetClone intLiveOut
-    let floatLive = bitsetClone floatLiveOut
+    let intLive = Bitset.clone intLiveOut
+    let floatLive = Bitset.clone floatLiveOut
 
     getTerminatorUsedVRegs block.Terminator
-    |> List.iter (fun id -> bitsetAddInPlace intDomain id intLive)
+    |> List.iter (fun id -> vregBitsAddInPlace intDomain id intLive)
 
     let sourcePhysReg (operand: LIR.Operand) : LIR.PhysReg option =
         match operand with
@@ -1141,7 +1083,7 @@ let private computeSaveRegsPreparation
                 | LIR.RestoreRegs ([], []) ->
                     if trackArgMoveBacking && not (List.isEmpty pendingRestores) then
                         Crash.crash "Nested SaveRegs while computing argument-move backing"
-                    let snapshot = (bitsetClone intLive, bitsetClone floatLive)
+                    let snapshot = (Bitset.clone intLive, Bitset.clone floatLive)
                     ((snapshot, Array.create 7 false) :: pendingRestores, snapshots, backingRegs)
                 | LIR.ArgMoves moves when trackArgMoveBacking ->
                     match pendingRestores with
@@ -1158,16 +1100,16 @@ let private computeSaveRegsPreparation
                 | _ -> (pendingRestores, snapshots, backingRegs)
 
             match facts.IntDef with
-            | Some id -> bitsetRemoveInPlace intDomain id intLive
+            | Some id -> vregBitsRemoveInPlace intDomain id intLive
             | None -> ()
             facts.IntUses
-            |> List.iter (fun id -> bitsetAddInPlace intDomain id intLive)
+            |> List.iter (fun id -> vregBitsAddInPlace intDomain id intLive)
 
             match facts.FloatDef with
-            | Some id -> bitsetRemoveInPlace floatDomain id floatLive
+            | Some id -> vregBitsRemoveInPlace floatDomain id floatLive
             | None -> ()
             facts.FloatUses
-            |> List.iter (fun id -> bitsetAddInPlace floatDomain id floatLive)
+            |> List.iter (fun id -> vregBitsAddInPlace floatDomain id floatLive)
 
             walkBackwards (instrIdx - 1) pendingRestores snapshots backingRegs
 
@@ -1241,11 +1183,11 @@ let private buildInterferenceGraphBitsetFastWithLivenessInternal
     : InterferenceGraph =
     let n = domain.Ids.Length
     let wordCount = domain.WordCount
-    let adjacency = Array.init n (fun _ -> bitsetEmpty wordCount)
-    let present = bitsetEmpty wordCount
+    let adjacency = Array.init n (fun _ -> Bitset.empty wordCount)
+    let present = Bitset.empty wordCount
     let markPresentIdx (idx: int) =
         if idx >= 0 && idx < n then
-            bitsetAddIndexInPlace idx present
+            Bitset.addIndexInPlace idx present
 
     let markPresentValue (value: int) =
         match tryIndexOf domain value with
@@ -1253,21 +1195,21 @@ let private buildInterferenceGraphBitsetFastWithLivenessInternal
         | None -> ()
 
     let addEdgesToLive (defIdx: int) (live: BitSet) =
-        bitsetUnionInPlace adjacency.[defIdx] live
-        bitsetRemoveIndexInPlace defIdx adjacency.[defIdx]
-        bitsetIterIndices live (fun idx ->
+        Bitset.unionInPlace adjacency.[defIdx] live
+        Bitset.removeIndexInPlace defIdx adjacency.[defIdx]
+        Bitset.iterIndices live (fun idx ->
             if idx <> defIdx then
-                bitsetAddIndexInPlace defIdx adjacency.[idx])
+                Bitset.addIndexInPlace defIdx adjacency.[idx])
 
     for blockIdx in 0 .. classifiedBlocks.Length - 1 do
         let blockFacts = classifiedBlocks.[blockIdx]
         let blockLiveness = liveness.[blockIdx]
-        let mutable live = bitsetClone blockLiveness.LiveOut
+        let mutable live = Bitset.clone blockLiveness.LiveOut
 
         for v in blockFacts.TerminatorUses do
-            bitsetAddInPlace domain v live
+            vregBitsAddInPlace domain v live
 
-        bitsetIterIndices live markPresentIdx
+        Bitset.iterIndices live markPresentIdx
 
         for instrIdx in blockFacts.InstrFacts.Length - 1 .. -1 .. 0 do
             let facts = blockFacts.InstrFacts.[instrIdx]
@@ -1281,15 +1223,15 @@ let private buildInterferenceGraphBitsetFastWithLivenessInternal
                 match tryIndexOf domain d with
                 | Some defIdx -> addEdgesToLive defIdx live
                 | None -> ()
-                bitsetRemoveInPlace domain d live
+                vregBitsRemoveInPlace domain d live
             | None -> ()
 
             for u in facts.IntUses do
-                bitsetAddInPlace domain u live
+                vregBitsAddInPlace domain u live
 
         if blockIdx = blockIndex.EntryIndex then
-            bitsetIterIndices entryDefs (fun defIdx ->
-                if bitsetContainsIndex defIdx live then
+            Bitset.iterIndices entryDefs (fun defIdx ->
+                if Bitset.containsIndex defIdx live then
                     markPresentIdx defIdx
                     addEdgesToLive defIdx live)
 
@@ -1313,7 +1255,7 @@ let buildInterferenceGraphBitsetFast
     let (blockIndex, blocks) = buildBlockIndex cfg
     let classifiedBlocks = classifyBlocks blocks
     let (domain, liveness) = computeLivenessBitsFromFacts blockIndex classifiedBlocks entryDefs
-    let entryBits = bitsetFromList domain entryDefs
+    let entryBits = vregBitsFromList domain entryDefs
     buildInterferenceGraphBitsetWithLiveness blockIndex classifiedBlocks domain liveness entryBits
 
 /// Build interference graph from CFG using bitset liveness
@@ -1334,12 +1276,12 @@ let private buildFloatInterferenceGraphBitsetWithLiveness
     let ids = domain.Ids
     let n = ids.Length
     let wordCount = domain.WordCount
-    let adjacency = Array.init n (fun _ -> bitsetEmpty wordCount)
-    let present = bitsetEmpty wordCount
+    let adjacency = Array.init n (fun _ -> Bitset.empty wordCount)
+    let present = Bitset.empty wordCount
 
     let markPresentIdx (idx: int) =
         if idx >= 0 && idx < n then
-            bitsetAddIndexInPlace idx present
+            Bitset.addIndexInPlace idx present
 
     let markPresentValue (value: int) =
         match tryIndexOf domain value with
@@ -1347,17 +1289,17 @@ let private buildFloatInterferenceGraphBitsetWithLiveness
         | None -> ()
 
     let addEdgesToLive (defIdx: int) (live: BitSet) =
-        bitsetUnionInPlace adjacency.[defIdx] live
-        bitsetRemoveIndexInPlace defIdx adjacency.[defIdx]
-        bitsetIterIndices live (fun idx ->
+        Bitset.unionInPlace adjacency.[defIdx] live
+        Bitset.removeIndexInPlace defIdx adjacency.[defIdx]
+        Bitset.iterIndices live (fun idx ->
             if idx <> defIdx then
-                bitsetAddIndexInPlace defIdx adjacency.[idx])
+                Bitset.addIndexInPlace defIdx adjacency.[idx])
 
     for blockIdx in 0 .. classifiedBlocks.Length - 1 do
         let blockFacts = classifiedBlocks.[blockIdx]
         let blockLiveness = liveness.[blockIdx]
-        let mutable live = bitsetClone blockLiveness.LiveOut
-        bitsetIterIndices live markPresentIdx
+        let mutable live = Bitset.clone blockLiveness.LiveOut
+        Bitset.iterIndices live markPresentIdx
 
         for instrIdx in blockFacts.InstrFacts.Length - 1 .. -1 .. 0 do
             let facts = blockFacts.InstrFacts.[instrIdx]
@@ -1371,15 +1313,15 @@ let private buildFloatInterferenceGraphBitsetWithLiveness
                 match tryIndexOf domain d with
                 | Some defIdx -> addEdgesToLive defIdx live
                 | None -> ()
-                bitsetRemoveInPlace domain d live
+                vregBitsRemoveInPlace domain d live
             | None -> ()
 
             for u in facts.FloatUses do
-                bitsetAddInPlace domain u live
+                vregBitsAddInPlace domain u live
 
         if blockIdx = blockIndex.EntryIndex then
-            bitsetIterIndices entryDefs (fun defIdx ->
-                if bitsetContainsIndex defIdx live then
+            Bitset.iterIndices entryDefs (fun defIdx ->
+                if Bitset.containsIndex defIdx live then
                     markPresentIdx defIdx
                     addEdgesToLive defIdx live)
 
@@ -1489,13 +1431,13 @@ let private maximumCardinalitySearchCore
     : int list * McsProfile =
     let domain = graph.Domain
     let n = domain.Ids.Length
-    let vertexCount = bitsetCount graph.Vertices
+    let vertexCount = Bitset.count graph.Vertices
     if vertexCount = 0 then
         let profile = { VertexCount = 0; SelectionChecks = 0; WeightUpdates = 0; BucketSkips = 0 }
         ([], profile)
     else
         let inGraph = Array.create n false
-        bitsetIterIndices graph.Vertices (fun idx -> inGraph.[idx] <- true)
+        Bitset.iterIndices graph.Vertices (fun idx -> inGraph.[idx] <- true)
 
         // Track weights and ordered status
         let weights = Array.zeroCreate<int> n
@@ -1553,7 +1495,7 @@ let private maximumCardinalitySearchCore
             ordered.[idx] <- true
             ordering <- domain.Ids.[idx] :: ordering
 
-            bitsetIterIndices graph.Neighbors.[idx] (fun nidx ->
+            Bitset.iterIndices graph.Neighbors.[idx] (fun nidx ->
                 if inGraph.[nidx] && not ordered.[nidx] then
                     let oldWeight = weights.[nidx]
                     removeFromBucket nidx oldWeight
@@ -1597,30 +1539,30 @@ let private coalesceGraphFast
     let domain = graph.Domain
     let n = domain.Ids.Length
     let wordCount = domain.WordCount
-    if bitsetIsEmpty graph.Vertices then
+    if Bitset.isEmpty graph.Vertices then
         { Graph = graph
           RepOfIndex = Array.init n id
-          RepMembers = Array.init n (fun _ -> bitsetEmpty wordCount)
-          Preferences = Array.init n (fun _ -> bitsetEmpty wordCount)
+          RepMembers = Array.init n (fun _ -> Bitset.empty wordCount)
+          Preferences = Array.init n (fun _ -> Bitset.empty wordCount)
           Precolored = Array.create n None }
     else
         let inGraph = Array.create n false
-        bitsetIterIndices graph.Vertices (fun idx -> inGraph.[idx] <- true)
+        Bitset.iterIndices graph.Vertices (fun idx -> inGraph.[idx] <- true)
 
         let parent = Array.init n id
         let sizes = Array.create n 0
-        let members = Array.init n (fun _ -> bitsetEmpty wordCount)
-        let neighbors = Array.init n (fun _ -> bitsetEmpty wordCount)
+        let members = Array.init n (fun _ -> Bitset.empty wordCount)
+        let neighbors = Array.init n (fun _ -> Bitset.empty wordCount)
         let precolor = Array.create n None
         let repId = Array.create n 0
 
         for idx in 0 .. n - 1 do
             if inGraph.[idx] then
                 sizes.[idx] <- 1
-                let bits = bitsetEmpty wordCount
-                bitsetAddIndexInPlace idx bits
+                let bits = Bitset.empty wordCount
+                Bitset.addIndexInPlace idx bits
                 members.[idx] <- bits
-                neighbors.[idx] <- bitsetClone graph.Neighbors.[idx]
+                neighbors.[idx] <- Bitset.clone graph.Neighbors.[idx]
                 repId.[idx] <- domain.Ids.[idx]
             else
                 repId.[idx] <- domain.Ids.[idx]
@@ -1646,10 +1588,10 @@ let private coalesceGraphFast
                 match precolor.[rootA], precolor.[rootB] with
                 | Some c1, Some c2 when c1 <> c2 -> false
                 | _ ->
-                    if bitsetIntersects neighbors.[rootA] members.[rootB] then
+                    if Bitset.intersects neighbors.[rootA] members.[rootB] then
                         false
                     else
-                        not (bitsetIntersects neighbors.[rootB] members.[rootA])
+                        not (Bitset.intersects neighbors.[rootB] members.[rootA])
 
         let union rootA rootB =
             let ra, rb =
@@ -1659,9 +1601,9 @@ let private coalesceGraphFast
                     (rootA, rootB)
             parent.[rb] <- ra
             sizes.[ra] <- sizes.[ra] + sizes.[rb]
-            bitsetUnionInPlace members.[ra] members.[rb]
-            bitsetUnionInPlace neighbors.[ra] neighbors.[rb]
-            bitsetDiffInPlace neighbors.[ra] members.[ra]
+            Bitset.unionInPlace members.[ra] members.[rb]
+            Bitset.unionInPlace neighbors.[ra] neighbors.[rb]
+            Bitset.diffInPlace neighbors.[ra] members.[ra]
             match precolor.[ra], precolor.[rb] with
             | None, Some color -> precolor.[ra] <- Some color
             | _ -> ()
@@ -1696,13 +1638,13 @@ let private coalesceGraphFast
                     Crash.crash $"coalesceGraphFast: Missing rep for {domain.Ids.[idx]}"
                 repOfIndex.[idx] <- repIdx
 
-        let repMembers = Array.init n (fun _ -> bitsetEmpty wordCount)
-        let repVertices = bitsetEmpty wordCount
+        let repMembers = Array.init n (fun _ -> Bitset.empty wordCount)
+        let repVertices = Bitset.empty wordCount
         for idx in 0 .. n - 1 do
             if inGraph.[idx] then
                 let repIdx = repOfIndex.[idx]
-                bitsetAddIndexInPlace idx repMembers.[repIdx]
-                bitsetAddIndexInPlace repIdx repVertices
+                Bitset.addIndexInPlace idx repMembers.[repIdx]
+                Bitset.addIndexInPlace repIdx repVertices
 
         let repPrecolored = Array.create n None
         for idx in 0 .. n - 1 do
@@ -1712,29 +1654,29 @@ let private coalesceGraphFast
                 | Some color -> repPrecolored.[repIdx] <- Some color
                 | None -> ()
 
-        let repPreferences = Array.init n (fun _ -> bitsetEmpty wordCount)
+        let repPreferences = Array.init n (fun _ -> Bitset.empty wordCount)
         for (u, v) in preferencePairs do
             match tryIndexOf domain u, tryIndexOf domain v with
             | Some idxU, Some idxV when inGraph.[idxU] && inGraph.[idxV] ->
                 let repU = repOfIndex.[idxU]
                 let repV = repOfIndex.[idxV]
                 if repU <> repV && repU >= 0 && repV >= 0 then
-                    bitsetAddIndexInPlace repV repPreferences.[repU]
-                    bitsetAddIndexInPlace repU repPreferences.[repV]
+                    Bitset.addIndexInPlace repV repPreferences.[repU]
+                    Bitset.addIndexInPlace repU repPreferences.[repV]
             | _ -> ()
 
-        let repNeighbors = Array.init n (fun _ -> bitsetEmpty wordCount)
+        let repNeighbors = Array.init n (fun _ -> Bitset.empty wordCount)
         for idx in 0 .. n - 1 do
             if inGraph.[idx] && parent.[idx] = idx then
                 let repIdx = repIndexOfRoot.[idx]
-                bitsetIterIndices neighbors.[idx] (fun nidx ->
+                Bitset.iterIndices neighbors.[idx] (fun nidx ->
                     if inGraph.[nidx] then
                         let rootN = rootOfIdx.[nidx]
                         if rootN <> idx then
                             let repN = repIndexOfRoot.[rootN]
                             if repIdx <> repN && repIdx >= 0 && repN >= 0 then
-                                bitsetAddIndexInPlace repN repNeighbors.[repIdx]
-                                bitsetAddIndexInPlace repIdx repNeighbors.[repN])
+                                Bitset.addIndexInPlace repN repNeighbors.[repIdx]
+                                Bitset.addIndexInPlace repIdx repNeighbors.[repN])
 
         let repGraph = { Domain = domain; Vertices = repVertices; Neighbors = repNeighbors }
 
@@ -1748,17 +1690,17 @@ let private expandColoring (result: ColoringResult) (repMembers: BitSet array) :
     let domain = result.Domain
     let n = domain.Ids.Length
     let expandedColors = Array.create n None
-    let expandedSpills = bitsetEmpty domain.WordCount
+    let expandedSpills = Bitset.empty domain.WordCount
 
     for repIdx in 0 .. n - 1 do
         match result.Colors.[repIdx] with
         | Some color ->
-            bitsetIterIndices repMembers.[repIdx] (fun memberIdx ->
+            Bitset.iterIndices repMembers.[repIdx] (fun memberIdx ->
                 expandedColors.[memberIdx] <- Some color)
         | None -> ()
 
-    bitsetIterIndices result.Spills (fun repIdx ->
-        bitsetUnionInPlace expandedSpills repMembers.[repIdx])
+    Bitset.iterIndices result.Spills (fun repIdx ->
+        Bitset.unionInPlace expandedSpills repMembers.[repIdx])
 
     { Domain = domain
       Colors = expandedColors
@@ -1768,7 +1710,7 @@ let private expandColoring (result: ColoringResult) (repMembers: BitSet array) :
 let private emptyColoringResult (domain: VRegDomain) : ColoringResult =
     { Domain = domain
       Colors = Array.create domain.Ids.Length None
-      Spills = bitsetEmpty domain.WordCount
+      Spills = Bitset.empty domain.WordCount
       ChromaticNumber = 0 }
 
 /// Build the inputs needed by greedy coloring when there are no move or phi
@@ -1782,10 +1724,10 @@ let private uncoalescedColoringInputs
     let precolored = Array.create domain.Ids.Length None
     for (vregId, color) in precoloredPairs do
         match tryIndexOf domain vregId with
-        | Some idx when bitsetContainsIndex idx graph.Vertices ->
+        | Some idx when Bitset.containsIndex idx graph.Vertices ->
             precolored.[idx] <- Some color
         | _ -> ()
-    let emptyPreferences = bitsetEmpty domain.WordCount
+    let emptyPreferences = Bitset.empty domain.WordCount
     let preferences = Array.create domain.Ids.Length emptyPreferences
     (precolored, preferences)
 
@@ -1805,7 +1747,7 @@ let greedyColorReverse
     let n = domain.Ids.Length
     let wordCount = domain.WordCount
     let colors = Array.create n None
-    let spills = bitsetEmpty wordCount
+    let spills = Bitset.empty wordCount
     let mutable maxColor = -1
 
     // Apply pre-colored vertices
@@ -1817,7 +1759,7 @@ let greedyColorReverse
         | None -> ()
 
     let inGraph = Array.create n false
-    bitsetIterIndices graph.Vertices (fun idx -> inGraph.[idx] <- true)
+    Bitset.iterIndices graph.Vertices (fun idx -> inGraph.[idx] <- true)
 
     let peoIndices =
         peo
@@ -1827,7 +1769,7 @@ let greedyColorReverse
             | None -> Crash.crash $"Greedy coloring missing vertex {v}")
 
     let markUsedColors (idx: int) (used: bool array) : unit =
-        bitsetIterIndices graph.Neighbors.[idx] (fun nidx ->
+        Bitset.iterIndices graph.Neighbors.[idx] (fun nidx ->
             if inGraph.[nidx] then
                 match colors.[nidx] with
                 | Some c when c >= 0 && c < numColors -> used.[c] <- true
@@ -1839,7 +1781,7 @@ let greedyColorReverse
             markUsedColors idx used
 
             let mutable prefColor = None
-            bitsetIterIndices preferences.[idx] (fun pidx ->
+            Bitset.iterIndices preferences.[idx] (fun pidx ->
                 match colors.[pidx] with
                 | Some c when prefColor.IsNone && c >= 0 && c < numColors && not used.[c] ->
                     prefColor <- Some c
@@ -1858,23 +1800,23 @@ let greedyColorReverse
                         assignColor c
                         assigned <- true
                 if not assigned then
-                    bitsetAddIndexInPlace idx spills
+                    Bitset.addIndexInPlace idx spills
 
     let hasUncoloredPartners (idx: int) : bool =
         let mutable found = false
-        bitsetIterIndices preferences.[idx] (fun pidx ->
+        Bitset.iterIndices preferences.[idx] (fun pidx ->
             if not found && inGraph.[pidx] && colors.[pidx].IsNone then
                 found <- true)
         found
 
     let interferes (idx1: int) (idx2: int) : bool =
-        bitsetContainsIndex idx2 graph.Neighbors.[idx1]
+        Bitset.containsIndex idx2 graph.Neighbors.[idx1]
 
     let colorVertexWithPartners (idx: int) : unit =
         if colors.[idx].IsNone then
             let candidates =
                 let mutable acc = []
-                bitsetIterIndices preferences.[idx] (fun pidx ->
+                Bitset.iterIndices preferences.[idx] (fun pidx ->
                     if inGraph.[pidx] && colors.[pidx].IsNone && not (interferes idx pidx) then
                         acc <- pidx :: acc)
                 List.rev acc
@@ -1905,18 +1847,18 @@ let greedyColorReverse
                     assigned <- true
 
             if not assigned then
-                bitsetAddIndexInPlace idx spills
+                Bitset.addIndexInPlace idx spills
 
-    let deferred = bitsetEmpty wordCount
+    let deferred = Bitset.empty wordCount
     for idx in List.rev peoIndices do
         if colors.[idx].IsNone then
             if hasUncoloredPartners idx then
-                bitsetAddIndexInPlace idx deferred
+                Bitset.addIndexInPlace idx deferred
             else
                 colorVertex idx
 
     for idx in List.rev peoIndices do
-        if bitsetContainsIndex idx deferred && colors.[idx].IsNone then
+        if Bitset.containsIndex idx deferred && colors.[idx].IsNone then
             colorVertexWithPartners idx
 
     { Domain = domain
@@ -1932,7 +1874,7 @@ let chordalGraphColor
     (preferencePairs: (int * int) list)
     (movePairs: (int * int) list)
     : ColoringResult =
-    if bitsetIsEmpty graph.Vertices then
+    if Bitset.isEmpty graph.Vertices then
         emptyColoringResult graph.Domain
     elif List.isEmpty movePairs && List.isEmpty preferencePairs then
         let (precolored, preferences) =
@@ -1953,7 +1895,7 @@ let private chordalGraphColorWithTiming
     (preferencePairs: (int * int) list)
     (movePairs: (int * int) list)
     : ColoringResult * ChordalColoringTiming =
-    if bitsetIsEmpty graph.Vertices then
+    if Bitset.isEmpty graph.Vertices then
         (emptyColoringResult graph.Domain,
          { CoalesceMs = 0.0
            McsMs = 0.0
@@ -2027,7 +1969,7 @@ let coloringToAllocation (colorResult: ColoringResult) (registers: LIR.PhysReg l
         | None -> ()
 
     // Map spilled vertices to stack slots
-    bitsetIterIndices colorResult.Spills (fun idx ->
+    Bitset.iterIndices colorResult.Spills (fun idx ->
         if allocations.[idx].IsNone then
             allocations.[idx] <- Some (StackSlot nextStackSlot)
             nextStackSlot <- nextStackSlot - 8)
@@ -2132,8 +2074,8 @@ let private chordalFloatAllocationWithLiveness
             additionalVRegs
     // Add additional VRegs (like float params) as isolated vertices if not already in graph
     let graphWithParams : InterferenceGraph =
-        { graph with Vertices = bitsetUnion graph.Vertices additionalVRegs }
-    if bitsetIsEmpty graphWithParams.Vertices then
+        { graph with Vertices = Bitset.union graph.Vertices additionalVRegs }
+    if Bitset.isEmpty graphWithParams.Vertices then
         // No float registers used - return empty allocation
         { Domain = domain
           Allocations = Array.create domain.Ids.Length None
@@ -2168,7 +2110,7 @@ let chordalFloatAllocation (cfg: LIR.CFG) (additionalVRegs: int list) : FAllocat
     let classifiedBlocks = classifyBlocks blocks
     let (domain, livenessBits) =
         computeFloatLivenessBitsFromFacts blockIndex classifiedBlocks additionalVRegs
-    let additionalBits = bitsetFromList domain additionalVRegs
+    let additionalBits = vregBitsFromList domain additionalVRegs
     chordalFloatAllocationWithLiveness
         allocatableFloatRegs
         blockIndex
@@ -2286,7 +2228,7 @@ let private tryFloatAllocation (floatAllocation: FAllocationResult) (fvregId: in
 /// Get the caller-saved physical registers that contain live values
 let getLiveCallerSavedRegs (allocation: AllocationResult) (liveVRegs: BitSet) : LIR.PhysReg list =
     let used = Array.create 7 false
-    bitsetIterIndices liveVRegs (fun idx ->
+    Bitset.iterIndices liveVRegs (fun idx ->
         match allocation.Allocations.[idx] with
         | Some (PhysReg LIR.X1) -> used.[0] <- true
         | Some (PhysReg LIR.X2) -> used.[1] <- true
@@ -2308,7 +2250,7 @@ let getLiveCallerSavedFloatRegs
     : LIR.PhysFPReg list =
     let callerSaved = floatCallerSavedRegsFor arch
     let used = Array.create 16 false
-    bitsetIterIndices liveFVRegs (fun idx ->
+    Bitset.iterIndices liveFVRegs (fun idx ->
         match floatAllocation.Allocations.[idx] with
         | Some reg -> used.[physFPRegToInt reg] <- true
         | None -> ())
@@ -3574,7 +3516,7 @@ let private prepareCFGAllocation
     (floatLiveness: BlockLiveness array)
     (classifiedBlocks: ClassifiedBlock array)
     : BlockAllocationPreparation array =
-    let emptyFloat = bitsetEmpty floatAllocation.Domain.WordCount
+    let emptyFloat = Bitset.empty floatAllocation.Domain.WordCount
     Array.init blocks.Length (fun idx ->
         let blockLiveness = liveness.[idx]
         let floatBlockLiveness =
@@ -3722,7 +3664,7 @@ let resolvePhiNodes
     let n = neededDomain.Ids.Length
     let wordCount = neededDomain.WordCount
 
-    let phiSources = Array.init n (fun _ -> bitsetEmpty wordCount)
+    let phiSources = Array.init n (fun _ -> Bitset.empty wordCount)
     blocks
     |> Array.iter (fun block ->
         block.Instrs
@@ -3736,14 +3678,14 @@ let resolvePhiNodes
                         match src with
                         | LIR.Reg (LIR.Virtual srcId) ->
                             match tryIndexOf neededDomain srcId with
-                            | Some srcIdx -> bitsetAddIndexInPlace srcIdx phiSources.[destIdx]
+                            | Some srcIdx -> Bitset.addIndexInPlace srcIdx phiSources.[destIdx]
                             | None -> ()
                         | _ -> ())
                 | None -> ()
             | _ -> ()))
 
     let collectNonPhiUses (blocks: LIR.BasicBlock array) : BitSet =
-        let uses = bitsetEmpty wordCount
+        let uses = Bitset.empty wordCount
         blocks
         |> Array.iter (fun block ->
             block.Instrs
@@ -3753,13 +3695,13 @@ let resolvePhiNodes
                 | LIR.FPhi _ -> ()
                 | _ ->
                     getUsedVRegs instr
-                    |> List.iter (fun id -> bitsetAddInPlace neededDomain id uses))
+                    |> List.iter (fun id -> vregBitsAddInPlace neededDomain id uses))
             getTerminatorUsedVRegs block.Terminator
-            |> List.iter (fun id -> bitsetAddInPlace neededDomain id uses))
+            |> List.iter (fun id -> vregBitsAddInPlace neededDomain id uses))
         uses
 
     let collectPhysicalPhiSources (blocks: LIR.BasicBlock array) : BitSet =
-        let uses = bitsetEmpty wordCount
+        let uses = Bitset.empty wordCount
         blocks
         |> Array.iter (fun block ->
             block.Instrs
@@ -3770,33 +3712,33 @@ let resolvePhiNodes
                     |> List.iter (fun (src, _) ->
                         match src with
                         | LIR.Reg (LIR.Virtual srcId) ->
-                            bitsetAddInPlace neededDomain srcId uses
+                            vregBitsAddInPlace neededDomain srcId uses
                         | _ -> ())
                 | _ -> ()))
         uses
 
     let computeNeededVRegs (blocks: LIR.BasicBlock array) : BitSet =
         let rootUses = collectNonPhiUses blocks
-        bitsetUnionInPlace rootUses (collectPhysicalPhiSources blocks)
+        Bitset.unionInPlace rootUses (collectPhysicalPhiSources blocks)
         let rec expand (needed: BitSet) (worklist: int list) : BitSet =
             match worklist with
             | [] -> needed
             | vIdx :: rest ->
                 let sources = phiSources.[vIdx]
-                let newSources = bitsetDiff sources needed
-                if bitsetIsEmpty newSources then
+                let newSources = Bitset.diff sources needed
+                if Bitset.isEmpty newSources then
                     expand needed rest
                 else
-                    bitsetUnionInPlace needed newSources
-                    let worklist' = (bitsetIndicesToList newSources) @ rest
+                    Bitset.unionInPlace needed newSources
+                    let worklist' = (Bitset.indicesToList newSources) @ rest
                     expand needed worklist'
-        expand rootUses (bitsetIndicesToList rootUses)
+        expand rootUses (Bitset.indicesToList rootUses)
 
     let neededVRegs = computeNeededVRegs blocks
 
     let phiDestNeeded (dest: LIR.Reg) : bool =
         match dest with
-        | LIR.Virtual id -> bitsetContains neededDomain neededVRegs id
+        | LIR.Virtual id -> vregBitsContains neededDomain neededVRegs id
         | LIR.Physical _ -> true
 
     // Get the allocation for a virtual register (register or stack slot)
@@ -4032,7 +3974,7 @@ let private allocateRegistersInternal
                     intParamVRegIds
                     floatParamFVirtualIds
             (classifiedBlocks, domain, livenessBits, floatDomain, floatLiveness))
-    let intParamBits = bitsetFromList domain intParamVRegIds
+    let intParamBits = vregBitsFromList domain intParamVRegIds
 
     // Step 2: Build interference graph
     let (graph, timings) =
@@ -4084,7 +4026,7 @@ let private allocateRegistersInternal
 
     // Step 3c: Run float register allocation. Its liveness was solved with the
     // integer domain above, including float parameters absent from the CFG.
-    let floatParamBits = bitsetFromList floatDomain floatParamFVirtualIds
+    let floatParamBits = vregBitsFromList floatDomain floatParamFVirtualIds
     let (floatAllocation, timings) =
         timePhase swOpt "RegAlloc: Float Allocation" timings (fun () ->
             chordalFloatAllocationWithLiveness
