@@ -43,6 +43,11 @@ Each IR is designed to make specific transformations easier:
 
 ### ANF (A-Normal Form)
 
+Closed scalar-list regions pass through typed collection/storage/ownership
+stages before ordinary ANF lowering. See
+[compiler-selected list arrays](runtime/list-array-reuse.md) for the supported
+boundary, storage contract, and remaining general HIR migration.
+
 - All intermediate values have names (no nested expressions)
 - Evaluation order is explicit
 - Enables:

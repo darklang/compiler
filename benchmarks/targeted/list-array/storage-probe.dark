@@ -1,0 +1,25 @@
+// storage-probe.dark - Allocator reuse evidence for the three-element region.
+let seedArrayBlock() : RawPtr =
+    let p = __raw_alloc(56L) in
+    let _ = __raw_write_word(p, 0L, 40L) in
+    let _ = __raw_write_word(p, 40L, 999L) in
+    let _ = __raw_write_word(p, 48L, 1L) in
+    let s = __rawptr_to_string(p) in
+    let _ = Stdlib.String.__byteLength(s) in p
+
+let arrayPipeline() : Int64 =
+    let xs = [1L, 2L, 3L] in
+    let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + 1L) in
+    let zs = Stdlib.List.reverse<Int64>(ys) in
+    Stdlib.List.fold<Int64, Int64>(zs, 0L, fun acc x -> acc * 10L + x)
+
+let inspectRecycledArray() : Int64 =
+    let p = __raw_alloc(56L) in
+    let _ = __raw_write_word(p, 0L, 40L) in
+    let _ = __raw_write_word(p, 48L, 1L) in
+    let s = __rawptr_to_string(p) in
+    __raw_get<Int64>(__string_to_rawptr(s), 40L)
+
+let _ = seedArrayBlock() in
+let result = arrayPipeline() in
+result + inspectRecycledArray()

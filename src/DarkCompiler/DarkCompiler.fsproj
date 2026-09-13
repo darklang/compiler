@@ -31,6 +31,7 @@
     <!-- Pass 2: AST -> ANF -->
     <Compile Include="ANF.fs" />
     <Compile Include="passes/ANFDeadCodeElimination.fs" />
+    <Compile Include="ListHIR.fs" />
     <Compile Include="passes/2_AST_to_ANF.fs" />
     <Compile Include="passes/2.3_ANF_Optimize.fs" />
     <Compile Include="passes/2.4_ANF_Inlining.fs" />

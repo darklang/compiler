@@ -81,6 +81,7 @@
     <Compile Include="compiler-passes/PhiResolutionTests.fs" />
     <Compile Include="compiler-passes/ChordalGraphTests.fs" />
     <Compile Include="compiler-passes/ASTToANFTests.fs" />
+    <Compile Include="compiler-passes/ListHIRTests.fs" />
     <Compile Include="compiler-passes/MonomorphizationTests.fs" />
     <Compile Include="compiler-passes/RefCountInsertionTests.fs" />
     <Compile Include="compiler-passes/TailCallDetectionTests.fs" />

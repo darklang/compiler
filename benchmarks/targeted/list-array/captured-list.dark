@@ -1,0 +1,6 @@
+// captured-list.dark - Persistent fallback when a callback retains the input.
+let captured(xs: List<Int64>) : Int64 =
+    let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + Stdlib.List.getAtOrDefault<Int64>(xs, 0L, 0L)) in
+    Stdlib.List.fold<Int64, Int64>(ys, 0L, fun acc x -> acc + x)
+
+captured([1L, 2L, 3L])

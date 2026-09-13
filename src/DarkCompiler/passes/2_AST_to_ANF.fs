@@ -5240,6 +5240,16 @@ let rec private letPatternAcceptsType
 /// variantLookup maps variant names to (type name, tag index)
 /// funcReg maps function names to their return types
 let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen) (env: VarEnv) (typeReg: TypeRegistry) (variantLookup: VariantLookup) (funcReg: FunctionRegistry) (moduleRegistry: AST.ModuleRegistry) : Result<ANF.AExpr * ANF.VarGen, string> =
+    let infer localTypes value =
+        let types = Map.fold (fun types name typ -> Map.add name typ types) (typeEnvFromVarEnv env) localTypes
+        inferTypeCore sumTypeNames value types typeReg variantLookup funcReg moduleRegistry
+    match ListHIR.tryExtract infer (fun value -> freeVars value Set.empty) expr with
+    | Some region ->
+        let lower value vg environment = toANFUnplannedCore sumTypeNames value vg environment typeReg variantLookup funcReg moduleRegistry
+        region |> ListHIR.selectStorage |> ListHIR.elaborateOwnership |> ListHIR.lower lower env varGen
+    | None -> toANFUnplannedCore sumTypeNames expr varGen env typeReg variantLookup funcReg moduleRegistry
+
+and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen) (env: VarEnv) (typeReg: TypeRegistry) (variantLookup: VariantLookup) (funcReg: FunctionRegistry) (moduleRegistry: AST.ModuleRegistry) : Result<ANF.AExpr * ANF.VarGen, string> =
     match expr with
     | AST.RecursiveLet _ -> Error "RecursiveLet must be lowered during lambda lifting"
     | AST.DictLiteral (_, []) ->

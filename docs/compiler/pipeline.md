@@ -19,6 +19,7 @@ The Dark compiler transforms source code through a series of passes, each with a
 | 1    | Parser                  | `passes/1_Parser.fs`                             | Source → AST                                  |
 | 1.5  | Type checking           | `passes/1.5_TypeChecking.fs`                                | AST → Typed AST                               |
 | 2    | AST → ANF               | `passes/2_AST_to_ANF.fs`                                    | AST → ANF                                     |
+| 2 (regions) | List representation and ownership | `ListHIR.fs`, called by AST → ANF | Closed semantic lists → storage → owned arrays → ANF |
 | 2.3  | ANF optimizations       | `passes/2.3_ANF_Optimize.fs`                                | ANF → ANF                                     |
 | 2.4  | ANF inlining            | `passes/2.4_ANF_Inlining.fs`                                | ANF → ANF                                     |
 | 2.4.4 | Known closure specialization | `passes/2.4.4_ANF_HigherOrderSpecialization.fs`       | ANF → ANF                                     |

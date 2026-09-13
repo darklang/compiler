@@ -27,3 +27,30 @@ bitwise operations, decimal parsing/formatting, UUID parsing/formatting,
 generation and equality, and collection storage/copying. It is intended to
 capture the current decimal-buffer implementation before migrating `Int128` and
 `UInt128` to direct 128-bit values.
+
+## Closed-list array diagnostics
+
+The independent `list-array` comparison uses built Debug compilers from two
+worktrees and pinned QEMU instruction counts. It checks unique reuse, surviving
+old versions, and a captured-list persistent fallback. Both compilers receive
+the exact same source files. Each case also runs with leak checking. Reports
+include source/assembly hashes, commit and dirty-state attribution, instruction
+counts, compile times, and executable sizes. They do not update canonical
+snapshots; single compile-time samples are diagnostic, not a timing gate.
+
+```bash
+python3 benchmarks/targeted/list-array/compare.py \
+  --baseline=/path/to/baseline-worktree --candidate=/path/to/candidate-worktree \
+  --target=arm64 --output=/tmp/list-array-arm64.json
+# Repeat with --target=x86_64 and a different output file.
+```
+
+The separate allocator probe must print `434` with no leak report on a compiler
+supporting this storage class. It deliberately inspects allocator contents and
+is not a source-semantics benchmark. On the persistent baseline it prints `1431`.
+
+```bash
+./dark --allow-internal --emit-result --leak-check --disable-opt-inline \
+  benchmarks/targeted/list-array/storage-probe.dark -o /tmp/list-array-probe
+/tmp/list-array-probe
+```
