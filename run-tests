@@ -6,7 +6,23 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-. "$SCRIPT_DIR/scripts/test-common.sh"
+build_tests() {
+    local build_args=(
+        --verbosity quiet
+        -m:1
+        /nodeReuse:false
+        --disable-build-servers
+        --configfile "$SCRIPT_DIR/NuGet.Config"
+    )
+
+    echo "Building..."
+    if ! timeout 120 dotnet build "${build_args[@]}" 2>&1; then
+        echo "Build failed!"
+        return 1
+    fi
+    echo "Build complete."
+    echo ""
+}
 
 BUILD_ONLY=false
 QUIET_BUILD=false
@@ -39,7 +55,7 @@ done
 if [ "$AI_BUILD" = true ]; then
     echo "building"
     BUILD_OUTPUT="$(mktemp)"
-    if ! build_tests "$SCRIPT_DIR" "$SCRIPT_DIR/NuGet.Config" > "$BUILD_OUTPUT" 2>&1; then
+    if ! build_tests > "$BUILD_OUTPUT" 2>&1; then
         echo "build failed"
         cat "$BUILD_OUTPUT"
         rm -f "$BUILD_OUTPUT"
@@ -48,12 +64,12 @@ if [ "$AI_BUILD" = true ]; then
     rm -f "$BUILD_OUTPUT"
     echo "build complete"
 elif [ "$QUIET_BUILD" = true ]; then
-    if ! build_tests "$SCRIPT_DIR" "$SCRIPT_DIR/NuGet.Config" > /dev/null 2>&1; then
+    if ! build_tests > /dev/null 2>&1; then
         echo "build failed"
         exit 1
     fi
 else
-    build_tests "$SCRIPT_DIR" "$SCRIPT_DIR/NuGet.Config"
+    build_tests
 fi
 
 if [ "$BUILD_ONLY" = true ]; then
@@ -63,7 +79,12 @@ if [ "$BUILD_ONLY" = true ]; then
     exit 0
 fi
 
-TEST_EXE="$(find_test_exe "$SCRIPT_DIR" "Try running the build first.")"
+TEST_EXE="$SCRIPT_DIR/bin/Tests/Debug/net10.0/Tests"
+if [ ! -f "$TEST_EXE" ]; then
+    echo "Error: Test executable not found at $TEST_EXE"
+    echo "Try running the build first."
+    exit 1
+fi
 # Expected-error cases can terminate either the test host or generated native
 # programs abnormally. Keep OS crash dumps from dirtying the worktree.
 ulimit -c 0

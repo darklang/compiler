@@ -1,6 +1,6 @@
-// ScriptHelperTests.fs - Unit tests for shared test script helpers
+// ScriptHelperTests.fs - Repository policy tests for compiler and shell tooling
 //
-// Ensures the test runner scripts rely on scripts/test-common.sh helpers.
+// Enforces selected source and script invariants that are cheap to check structurally.
 
 module ScriptHelperTests
 
