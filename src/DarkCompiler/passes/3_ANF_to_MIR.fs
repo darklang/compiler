@@ -242,7 +242,9 @@ let maxTempIdInCExpr (cexpr: ANF.CExpr) : int =
     | ANF.FileSetExecutable path -> maxTempIdInAtom path
     | ANF.FileWriteFromPtr (path, ptr, length) -> max (maxTempIdInAtom path) (max (maxTempIdInAtom ptr) (maxTempIdInAtom length))
     | ANF.RawAlloc numBytes -> maxTempIdInAtom numBytes
+    | ANF.MappedAlloc numBytes -> maxTempIdInAtom numBytes
     | ANF.RawFree ptr -> maxTempIdInAtom ptr
+    | ANF.MappedFree ptr -> maxTempIdInAtom ptr
     | ANF.RawGet (ptr, offset, _)
     | ANF.RawTake (ptr, offset, _) -> max (maxTempIdInAtom ptr) (maxTempIdInAtom offset)
     | ANF.RawGetByte (ptr, offset) -> max (maxTempIdInAtom ptr) (maxTempIdInAtom offset)
@@ -631,7 +633,9 @@ let cexprDescription (cexpr: ANF.CExpr) : string =
     | ANF.FloatToInt64 _ -> "FloatToInt64"
     | ANF.FloatToBits _ -> "FloatToBits"
     | ANF.RawAlloc _ -> "RawAlloc"
+    | ANF.MappedAlloc _ -> "MappedAlloc"
     | ANF.RawFree _ -> "RawFree"
+    | ANF.MappedFree _ -> "MappedFree"
     | ANF.RawGet _ -> "RawGet"
     | ANF.RawTake _ -> "RawTake"
     | ANF.RawGetByte _ -> "RawGetByte"
@@ -1187,9 +1191,15 @@ let rec convertExpr
                 | ANF.RawAlloc numBytesAtom ->
                     atomToOperand builder numBytesAtom
                     |> Result.map (fun numBytesOp -> [MIR.RawAlloc (destReg, numBytesOp)])
+                | ANF.MappedAlloc numBytesAtom ->
+                    atomToOperand builder numBytesAtom
+                    |> Result.map (fun numBytesOp -> [MIR.MappedAlloc (destReg, numBytesOp)])
                 | ANF.RawFree ptrAtom ->
                     atomToOperand builder ptrAtom
                     |> Result.map (fun ptrOp -> [MIR.RawFree ptrOp])
+                | ANF.MappedFree ptrAtom ->
+                    atomToOperand builder ptrAtom
+                    |> Result.map (fun ptrOp -> [MIR.MappedFree ptrOp])
                 | ANF.RawGet (ptrAtom, offsetAtom, valueType) ->
                     atomToOperand builder ptrAtom
                     |> Result.bind (fun ptrOp ->
@@ -1879,9 +1889,15 @@ and convertExprToOperand
                 | ANF.RawAlloc numBytesAtom ->
                     atomToOperand builder numBytesAtom
                     |> Result.map (fun numBytesOp -> [MIR.RawAlloc (destReg, numBytesOp)])
+                | ANF.MappedAlloc numBytesAtom ->
+                    atomToOperand builder numBytesAtom
+                    |> Result.map (fun numBytesOp -> [MIR.MappedAlloc (destReg, numBytesOp)])
                 | ANF.RawFree ptrAtom ->
                     atomToOperand builder ptrAtom
                     |> Result.map (fun ptrOp -> [MIR.RawFree ptrOp])
+                | ANF.MappedFree ptrAtom ->
+                    atomToOperand builder ptrAtom
+                    |> Result.map (fun ptrOp -> [MIR.MappedFree ptrOp])
                 | ANF.RawGet (ptrAtom, offsetAtom, valueType) ->
                     atomToOperand builder ptrAtom
                     |> Result.bind (fun ptrOp ->

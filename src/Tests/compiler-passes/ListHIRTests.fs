@@ -75,7 +75,7 @@ let tests = [
     "List HIR supports the largest recyclable array", checkSummary (fold (reverse (values 28))) { Allocations = 1; AllocatedBytes = 256; Copies = 0; ReusedTransforms = 1; Releases = 1 }
     "List HIR preserves native allocation budget", testLoweredBudget
     "List HIR rejects escaping lists", rejects (bind "xs" (values 3) (AST.Var "xs"))
-    "List HIR rejects oversized arrays", rejects (fold (reverse (values 29)))
+    "List HIR reclaims arrays beyond the fixed heap classes", checkSummary (fold (reverse (values 29))) { Allocations = 1; AllocatedBytes = 272; Copies = 0; ReusedTransforms = 1; Releases = 1 }
     "List HIR rejects borrowed input lists", rejects (fold (reverse (AST.Var "external")))
     "List HIR rejects managed elements", rejects (bind "xs" (AST.ListLiteral [AST.StringLiteral "a"]) (AST.Int64Literal 0L))
     "List HIR rejects callbacks capturing region lists", rejects (bind "xs" (values 3) (fold (call "Stdlib.List.map_i64_i64" [AST.Var "xs"; AST.Closure ("mapCallback", [AST.Var "xs"])])))

@@ -69,7 +69,9 @@ let hasSideEffects (instr: Instr) : bool =
     | FileSetExecutable _ -> true
     | FileWriteFromPtr _ -> true  // File I/O
     | RawAlloc _ -> true  // Allocates memory
+    | MappedAlloc _ -> true  // Allocates memory
     | RawFree _ -> true   // Frees memory
+    | MappedFree _ -> true   // Frees memory
     | RawGet _ -> false   // Pure memory read
     | RawGetByte _ -> false  // Pure memory read (byte)
     | RawWriteWord _ -> true    // Writes to memory
@@ -198,6 +200,7 @@ let getInstrDest (instr: Instr) : VReg option =
     | FileWriteFromPtr (dest, _, _, _) -> Some dest
     | Phi (dest, _, _) -> Some dest
     | RawAlloc (dest, _) -> Some dest
+    | MappedAlloc (dest, _) -> Some dest
     | RawGet (dest, _, _, _) -> Some dest
     | RawGetByte (dest, _, _) -> Some dest
     | StringToRawPtr (dest, _) -> Some dest
@@ -220,6 +223,7 @@ let getInstrDest (instr: Instr) : VReg option =
     | Print _ -> None
     | StdoutWrite _ -> None
     | RawFree _ -> None
+    | MappedFree _ -> None
     | RawWriteWord _ -> None
     | RawWriteByte _ -> None
     | RawSlotInit _ -> None
@@ -276,7 +280,9 @@ let foldInstrUses (folder: 'State -> VReg -> 'State) (state: 'State) (instr: Ins
     | FileDelete (_, src)
     | FileSetExecutable (_, src)
     | RawAlloc (_, src)
+    | MappedAlloc (_, src)
     | RawFree src
+    | MappedFree src
     | StringToRawPtr (_, src)
     | RawPtrToString (_, src)
     | BlobToRawPtr (_, src)
@@ -1848,7 +1854,9 @@ let propagateCopyInstr (copies: CopyMap) (instr: Instr) : Instr =
     // sources represent values flowing from specific predecessor blocks
     | Phi (dest, sources, valueType) -> Phi (dest, sources, valueType)
     | RawAlloc (dest, numBytes) -> RawAlloc (dest, p numBytes)
+    | MappedAlloc (dest, numBytes) -> MappedAlloc (dest, p numBytes)
     | RawFree ptr -> RawFree (p ptr)
+    | MappedFree ptr -> MappedFree (p ptr)
     | RawGet (dest, ptr, byteOffset, valueType) -> RawGet (dest, p ptr, p byteOffset, valueType)
     | RawGetByte (dest, ptr, byteOffset) -> RawGetByte (dest, p ptr, p byteOffset)
     | StringToRawPtr (dest, value) -> StringToRawPtr (dest, p value)
@@ -2666,7 +2674,8 @@ let private applyCSEWithEffectFreeCallsAndTopology
                 | RefCountDec _
                 | RefCountDecString _
                 | RefCountDecBlob _
-                | RawFree _ ->
+                | RawFree _
+                | MappedFree _ ->
                     // A previously computed raw address can outlive its managed
                     // owner if reuse removes the later use that kept it alive.
                     (instr :: instrs, emptyExprAvailability, emptyExprAvailability, ch)

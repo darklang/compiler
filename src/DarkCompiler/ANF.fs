@@ -584,7 +584,9 @@ type CExpr =
     | FloatToBits of Atom                     // Copy Float64 bits to UInt64
     // Raw memory intrinsics (internal, for HAMT implementation)
     | RawAlloc of numBytes:Atom               // Allocate raw bytes (no header), returns RawPtr
+    | MappedAlloc of numBytes:Atom             // Independent mapping, private size prefix, explicit lifetime
     | RawFree of ptr:Atom                     // Manually free raw memory
+    | MappedFree of ptr:Atom                   // Unmap exactly one MappedAlloc payload; never a heap pointer
     | RawGet of ptr:Atom * byteOffset:Atom * valueType:AST.Type option  // Read 8 bytes at offset, valueType for float
     | RawTake of ptr:Atom * byteOffset:Atom * valueType:AST.Type option // Transfer a typed slot edge to the result
     | RawGetByte of ptr:Atom * byteOffset:Atom  // Read 1 byte at offset, returns Int64 (zero-extended)

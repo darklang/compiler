@@ -305,7 +305,10 @@ let private normalizeMirFunctionRegisterOffset
                 MIR.FloatToBits (shiftReg dest, shiftOperand src)
             | MIR.RawAlloc (dest, numBytes) ->
                 MIR.RawAlloc (shiftReg dest, shiftOperand numBytes)
+            | MIR.MappedAlloc (dest, numBytes) ->
+                MIR.MappedAlloc (shiftReg dest, shiftOperand numBytes)
             | MIR.RawFree ptr -> MIR.RawFree (shiftOperand ptr)
+            | MIR.MappedFree ptr -> MIR.MappedFree (shiftOperand ptr)
             | MIR.RawGet (dest, ptr, byteOffset, valueType) ->
                 MIR.RawGet (
                     shiftReg dest,
@@ -3050,6 +3053,7 @@ let private loadStdlib () : Result<AST.Program, string> =
         "stdlib/Crypto.dark"
         "stdlib/Math.dark"
         "stdlib/__SkewList.dark"
+        "stdlib/__ListArray.dark"
         "stdlib/CliColor.dark"
         "stdlib/CliLog.dark"
         "stdlib/CliProgress.dark"

@@ -10,20 +10,23 @@ ownership annotation, public list type, or external calling convention changes.
 a supported list operation after monomorphization and lambda lifting, before
 AST-to-ANF lowering destroys collection semantics. Supported operations are
 `List.map<Int64, Int64>`, `List.reverse<Int64>`, and
-`List.fold<Int64, Int64>`. Literals contain at most 28 elements. Scalar bindings
-and region results have type `Int64` or `Bool`.
+`List.fold<Int64, Int64>`. Literal lengths are no longer restricted to the
+small allocator's 28-element limit. Scalar bindings and region results have
+type `Int64` or `Bool`.
 
 Callbacks must be known closure constructions or function references. Captures
 are restricted to immediate scalar values and static code addresses. External
 list parameters, escaping lists, unknown callback values, unsupported
-operations, managed elements/captures, and larger literals retain the existing
+operations and managed elements/captures retain the existing
 persistent skew-list implementation. This is a supported representation
 choice, not a conversion shim. There are no array/skew conversions.
 
 The initial selection rule is an eligibility rule, not an interprocedural cost
-model. Operations are unrolled within the fixed 28-element bound. This favors
-small local computations; it does not yet optimize large collections or growing
-builders.
+model. Operations on arrays of up to 28 elements are unrolled; larger arrays use
+shared tail-recursive kernels in `stdlib/__ListArray.dark`, compiled into loops.
+Literal initialization still emits work proportional to the source literal.
+Lengths must fit the existing signed 32-bit layout offsets; this is not yet a
+runtime-sized constructor or growing-builder implementation.
 
 ## Typed stages and ownership
 
@@ -56,9 +59,10 @@ at the region level: element expressions run first in source order, then the
 compiler allocates and initializes the buffer before exposing its identity.
 Map callbacks execute in list order; fold callbacks execute in traversal order.
 
-`allocationSummary` reports exact region allocation counts/bytes, copies,
+`allocationSummary` reports exact region allocation counts/requested bytes, copies,
 reused transformations, and releases, excluding work inside scalar expressions
-and callbacks. Pass tests check these budgets and the resulting native-memory
+and callbacks. Requested bytes include the mapped allocator's private prefix,
+but exclude OS page rounding. Pass tests check these budgets and the resulting native-memory
 ANF operations. `--dump-anf` exposes allocations, stores, calls, and cleanup.
 
 ## Storage contract
@@ -68,11 +72,32 @@ with 8-byte words. Capacity equals the statically known length. Allocation size
 is `32 + 8 * length`, including the refcount word. Empty regions use a 32-byte
 allocation; there is no special null-array representation.
 
-The largest supported allocation is 256 bytes, whose 248-byte payload is in
-the existing allocator's recyclable size classes on both native backends.
-Cleanup uses the existing fixed-block release plan with no child destructors.
+Storage selection produces either `RecycledArray` or `MappedArray`. Allocations
+through 256 bytes use the existing allocator's recyclable size classes on both
+native backends. Their cleanup uses the fixed-block release plan with no child
+destructors. Larger arrays own an independent mapping and explicitly unmap it
+at their verified final release. The common array header and RC word remain
+uniform; mapped-region lifetime is controlled by the ownership plan, not RC.
 The compiler never tags array storage as a source-level list, reinterprets it
 as a Blob/String, or uses the 8-byte-only `RawFree` primitive to reclaim it.
+
+`MappedAlloc` and `MappedFree` remain distinct effects through ANF, MIR, and
+LIR. The allocator uses `mmap`/`munmap`, with an 8-byte private mapping-length
+prefix before the returned word-aligned pointer. Size checks reject negatives
+and prefix-addition overflow before entering the kernel. Zero requested bytes
+still produce a releasable allocation. Syscall failure uses the existing fatal
+allocation-error path. Syscall operands and live caller registers are protected
+by ordinary LIR caller-save boundaries; an allocation result is moved out of
+the result register only after restoration. Leak accounting counts mappings
+only after successful allocation and decrements only after successful release.
+
+These mappings favor simple, auditable reclamation over a pooled large-buffer
+allocator: every new large physical buffer incurs a mapping syscall, and every
+release incurs an unmapping syscall. Consumed transformations reuse the mapping
+without either syscall. Copying preserves the source and allocates one new
+mapping. Native wall-time evidence is therefore required alongside instruction
+counts when evaluating these workloads. Growing, pooled, and escaped buffers
+remain separate future work.
 
 The internal allocator test seeds an exact-size block, runs the list pipeline,
 reacquires a block, and observes transformed contents. It also checks leak
@@ -91,8 +116,9 @@ binaries retain their previous layout.
 This is the first end-to-end region slice, not a replacement for the entire
 ANF pipeline or a complete Perceus implementation. The next boundaries are:
 
-1. A reclaiming allocator for variable/larger buffers, growth and overflow
-   policy, and loop-based array kernels rather than fixed-size unrolling.
+1. Runtime-sized collection constructors and builders, a growth policy, and
+   profitable pooling for larger buffers. Independent variable-byte mappings
+   and loop-based kernels now provide the reclamation/execution foundation.
 2. A general semantic HIR and primitive effect/alias/ownership contracts;
    layout/destruction metadata independent of ANF; stage verifiers throughout
    the pipeline. Generated printing must precede general ownership elaboration.

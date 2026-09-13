@@ -22,6 +22,7 @@ The compiler currently has these managed or partially managed runtime shapes:
 | Closures | `[func_ptr][captures...][refcount:8]` | Closure root RC and recursive capture release for the covered capture shapes |
 | Streams | `[lifecycle][step closure][disposer closure][refcount:8]` | Stream-specific root RC; last release performs idempotent close, releases producer state/captures, and reuses the shell |
 | Raw pointers | raw addresses | Unmanaged except for the internal 8-byte producer-state cell, whose explicit `RawFree` balances accounting and reuses its size class |
+| Compiler-owned array mappings | private mapping-size prefix followed by the internal array layout | Verified closed-region ownership; explicit `MappedFree` unmaps large buffers, while small arrays retain fixed-block RC cleanup |
 
 Primitive scalars are immediate and do not participate in RC.
 

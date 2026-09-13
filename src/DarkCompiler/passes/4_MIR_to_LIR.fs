@@ -1419,12 +1419,27 @@ let selectInstr
         | Ok (loadInstrs, numBytesReg, nextState) ->
             Ok (loadInstrs @ [LIR.RawAlloc (lirDest, numBytesReg)], nextState)
 
+    | MIR.MappedAlloc (dest, numBytes) ->
+        let lirDest = vregToLIRReg dest
+        // numBytes must be in a register for LIR
+        match ensureInRegister numBytes state with
+        | Error err -> Error err
+        | Ok (loadInstrs, numBytesReg, nextState) ->
+            Ok (loadInstrs @ [LIR.SaveRegs ([], []); LIR.MappedAlloc (LIR.Physical LIR.X0, numBytesReg); LIR.RestoreRegs ([], []); LIR.Mov (lirDest, LIR.Reg (LIR.Physical LIR.X0))], nextState)
+
     | MIR.RawFree ptr ->
         // ptr must be in a register
         match ensureInRegister ptr state with
         | Error err -> Error err
         | Ok (loadInstrs, ptrReg, nextState) ->
             Ok (loadInstrs @ [LIR.RawFree ptrReg], nextState)
+
+    | MIR.MappedFree ptr ->
+        // ptr must be in a register
+        match ensureInRegister ptr state with
+        | Error err -> Error err
+        | Ok (loadInstrs, ptrReg, nextState) ->
+            Ok (loadInstrs @ [LIR.SaveRegs ([], []); LIR.MappedFree ptrReg; LIR.RestoreRegs ([], [])], nextState)
 
     | MIR.RawGet (dest, ptr, byteOffset, valueType) ->
         // Both ptr and byteOffset must be in registers
@@ -1827,6 +1842,7 @@ let maxVRegIdFromInstr (instr: MIR.Instr) (currentMax: int) : int =
     | MIR.FloatToInt64 (dest, src)
     | MIR.FloatToBits (dest, src)
     | MIR.RawAlloc (dest, src)
+    | MIR.MappedAlloc (dest, src)
     | MIR.StringToRawPtr (dest, src)
     | MIR.RawPtrToString (dest, src)
     | MIR.BlobToRawPtr (dest, src)
@@ -1836,6 +1852,7 @@ let maxVRegIdFromInstr (instr: MIR.Instr) (currentMax: int) : int =
     | MIR.FloatToString (dest, src) ->
         currentMax |> maxVRegId dest |> maxVRegIdFromOperand src
     | MIR.RawFree ptr
+    | MIR.MappedFree ptr
     | MIR.RefCountIncString ptr
     | MIR.RefCountDecString ptr
     | MIR.RefCountIncBlob ptr

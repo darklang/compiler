@@ -988,6 +988,7 @@ let private foldRegUses folder state (instr: Instr) =
     | Int64ToFloat (_, src)
     | GpToFp (_, src)
     | RawFree src
+    | MappedFree src
     | FloatToString (src, _) ->
         folder state src
     | Add (_, left, right)
@@ -1007,6 +1008,8 @@ let private foldRegUses folder state (instr: Instr) =
     | RawGetByte (_, left, right) ->
         folder (folder state left) right
     | RawAlloc (_, numBytes) ->
+        folder state numBytes
+    | MappedAlloc (_, numBytes) ->
         folder state numBytes
     | FileWriteFromPtr (_, path, ptr, length) ->
         foldOperandRegUse folder state path |> fun acc -> folder (folder acc ptr) length

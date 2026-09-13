@@ -73,7 +73,9 @@ let private extractFromCExpr (cexpr: ANF.CExpr) : string list =
     | ANF.FloatToInt64 atom -> extractFromAtom atom
     | ANF.FloatToBits atom -> extractFromAtom atom
     | ANF.RawAlloc numBytes -> extractFromAtom numBytes
+    | ANF.MappedAlloc numBytes -> extractFromAtom numBytes
     | ANF.RawFree ptr -> extractFromAtom ptr
+    | ANF.MappedFree ptr -> extractFromAtom ptr
     | ANF.RawGet (ptr, offset, _) ->
         extractFromAtom ptr @ extractFromAtom offset
     | ANF.RawTake (ptr, offset, _) ->

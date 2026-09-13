@@ -6147,6 +6147,48 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                             @ generateLeakCounterIncIfResultError ctx destReg)
                     | _ -> Error "FileWriteFromPtr requires string path operand")))
 
+    | LIR.MappedAlloc (dest, numBytes) ->
+        lirRegToARM64Reg dest |> Result.bind (fun destReg ->
+            lirRegToARM64Reg numBytes |> Result.map (fun sizeReg ->
+                let syscalls = ARM64.targetSyscalls ctx.Target
+                let os = ARM64.targetOS ctx.Target
+                let flags = if os = Platform.MacOS then 0x1002us else 0x22us
+                // The mapping length lives before the returned, word-aligned
+                // payload. Preserve it across the syscall, not in a volatile reg.
+                [ ARM64Symbolic.CMP_imm (sizeReg, 0us)
+                  ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, ctx.HeapOverflowLabel)
+                  ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, sizeReg, 8us)
+                  ARM64Symbolic.CMP_imm (ARM64Symbolic.X1, 0us)
+                  ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, ctx.HeapOverflowLabel)
+                  ARM64Symbolic.STP_pre (ARM64Symbolic.X1, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
+                  ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
+                  ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 3us, 0)
+                  ARM64Symbolic.MOVZ (ARM64Symbolic.X3, flags, 0)
+                  ARM64Symbolic.MOVZ (ARM64Symbolic.X4, 0us, 0)
+                  ARM64Symbolic.MVN (ARM64Symbolic.X4, ARM64Symbolic.X4)
+                  ARM64Symbolic.MOVZ (ARM64Symbolic.X5, 0us, 0)
+                  ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Mmap, 0)
+                  ARM64Symbolic.SVC syscalls.SvcImmediate ]
+                @ (if os = Platform.MacOS then
+                       [ARM64Symbolic.B_cond_label (ARM64Symbolic.HS, ctx.HeapOverflowLabel)]
+                   else
+                       [ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us); ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, ctx.HeapOverflowLabel)])
+                @ [ ARM64Symbolic.LDP_post (ARM64Symbolic.X1, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X1, ARM64Symbolic.X0, 0s)
+                    ARM64Symbolic.ADD_imm (destReg, ARM64Symbolic.X0, 8us) ]
+                @ generateLeakCounterInc ctx))
+
+    | LIR.MappedFree ptr ->
+        lirRegToARM64Reg ptr |> Result.map (fun ptrReg ->
+            let syscalls = ARM64.targetSyscalls ctx.Target
+            [ ARM64Symbolic.SUB_imm (ARM64Symbolic.X0, ptrReg, 8us)
+              ARM64Symbolic.LDR (ARM64Symbolic.X1, ARM64Symbolic.X0, 0s)
+              ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Munmap, 0)
+              ARM64Symbolic.SVC syscalls.SvcImmediate
+              ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+              ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, ctx.HeapOverflowLabel) ]
+            @ generateLeakCounterDec ctx)
+
     | LIR.RawAlloc (dest, numBytes) ->
         // Raw allocation: free-list reuse for small aligned size classes, else bump allocation.
         // This path is used by skew-list nodes, so freed raw blocks must be reused to avoid OOM.
@@ -7212,6 +7254,7 @@ let convertFunction
             |> List.exists (function
                 | LIR.HeapAlloc _ -> true
                 | LIR.RawAlloc _ -> true
+                | LIR.MappedAlloc _ | LIR.MappedFree _ -> true
                 | _ -> false))
 
     // Create function-specific context with stack info for tail call epilogue generation

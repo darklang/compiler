@@ -482,7 +482,9 @@ let hasSideEffects (context: OptimizeContext) (cexpr: CExpr) : bool =
     | FileSetExecutable _ -> true
     | FileWriteFromPtr _ -> true  // File I/O
     | RawAlloc _ -> true  // Allocates memory
+    | MappedAlloc _ -> true  // Allocates memory
     | RawFree _ -> true   // Frees memory
+    | MappedFree _ -> true   // Frees memory
     | RawGet _ -> false   // Pure memory read
     | RawTake _ -> true   // Ownership transfer; paired with clearing the source slot
     | RawGetByte _ -> false  // Pure memory read (byte)
@@ -575,7 +577,9 @@ let private addCExprUses (cexpr: CExpr) (uses: Set<TempId>) : Set<TempId> =
     | FileWriteFromPtr (path, ptr, length) ->
         uses |> addAtomUse path |> addAtomUse ptr |> addAtomUse length
     | RawAlloc numBytes -> addAtomUse numBytes uses
+    | MappedAlloc numBytes -> addAtomUse numBytes uses
     | RawFree ptr -> addAtomUse ptr uses
+    | MappedFree ptr -> addAtomUse ptr uses
     | RawGet (ptr, byteOffset, _) -> uses |> addAtomUse ptr |> addAtomUse byteOffset
     | RawTake (ptr, byteOffset, _) -> uses |> addAtomUse ptr |> addAtomUse byteOffset
     | RawGetByte (ptr, byteOffset) -> uses |> addAtomUse ptr |> addAtomUse byteOffset
@@ -630,7 +634,9 @@ let cexprUsesTemp (tid: TempId) (cexpr: CExpr) : bool =
     | FileDelete atom
     | FileSetExecutable atom
     | RawAlloc atom
+    | MappedAlloc atom
     | RawFree atom
+    | MappedFree atom
     | StringToRawPtr atom
     | RawPtrToString atom
     | BlobToRawPtr atom
@@ -765,7 +771,9 @@ let private substCExprValue (env: Map<TempId, Atom>) (cexpr: CExpr) : CExpr =
     | FileSetExecutable path -> FileSetExecutable (s path)
     | FileWriteFromPtr (path, ptr, length) -> FileWriteFromPtr (s path, s ptr, s length)
     | RawAlloc numBytes -> RawAlloc (s numBytes)
+    | MappedAlloc numBytes -> MappedAlloc (s numBytes)
     | RawFree ptr -> RawFree (s ptr)
+    | MappedFree ptr -> MappedFree (s ptr)
     | RawGet (ptr, byteOffset, valueType) -> RawGet (s ptr, s byteOffset, valueType)
     | RawTake (ptr, byteOffset, valueType) -> RawTake (s ptr, s byteOffset, valueType)
     | RawGetByte (ptr, byteOffset) -> RawGetByte (s ptr, s byteOffset)

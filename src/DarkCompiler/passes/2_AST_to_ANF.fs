@@ -412,8 +412,12 @@ let tryRawMemoryIntrinsic
     match funcName, args with
     | "__raw_alloc", [numBytesAtom] ->
         Some (ANF.RawAlloc numBytesAtom)
+    | "__mapped_alloc", [numBytesAtom] ->
+        Some (ANF.MappedAlloc numBytesAtom)
     | "__raw_free", [ptrAtom] ->
         Some (ANF.RawFree ptrAtom)
+    | "__mapped_free", [ptrAtom] ->
+        Some (ANF.MappedFree ptrAtom)
     | "__raw_get_byte", [ptrAtom; offsetAtom] ->
         // Read single byte at offset, returns Int64 (zero-extended)
         // IMPORTANT: Must come before the generic __raw_get_* pattern

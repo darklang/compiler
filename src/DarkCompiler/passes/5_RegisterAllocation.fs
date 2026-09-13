@@ -473,7 +473,11 @@ let getUsedVRegs (instr: LIR.Instr) : int list =
         @ (regToVReg length |> Option.toList)
     | LIR.RawAlloc (_, numBytes) ->
         regToVReg numBytes |> Option.toList
+    | LIR.MappedAlloc (_, numBytes) ->
+        regToVReg numBytes |> Option.toList
     | LIR.RawFree ptr ->
+        regToVReg ptr |> Option.toList
+    | LIR.MappedFree ptr ->
         regToVReg ptr |> Option.toList
     | LIR.RawGet (_, ptr, byteOffset) ->
         (regToVReg ptr |> Option.toList) @ (regToVReg byteOffset |> Option.toList)
@@ -561,9 +565,11 @@ let getDefinedVReg (instr: LIR.Instr) : int option =
     | LIR.FileSetExecutable (dest, _) -> regToVReg dest
     | LIR.FileWriteFromPtr (dest, _, _, _) -> regToVReg dest
     | LIR.RawAlloc (dest, _) -> regToVReg dest
+    | LIR.MappedAlloc (dest, _) -> regToVReg dest
     | LIR.RawGet (dest, _, _) -> regToVReg dest
     | LIR.RawGetByte (dest, _, _) -> regToVReg dest
     | LIR.RawFree _ -> None
+    | LIR.MappedFree _ -> None
     | LIR.RawWriteWord _ -> None
     | LIR.RawWriteByte _ -> None
     | LIR.RawSlotInit _ -> None
@@ -1153,6 +1159,7 @@ let calleeSavedRegsFor (arch: Platform.Arch) =
 /// Check if an instruction is a non-tail call (requires SaveRegs/RestoreRegs)
 let isNonTailCall (instr: LIR.Instr) : bool =
     match instr with
+    | LIR.MappedAlloc _ | LIR.MappedFree _ -> true
     | LIR.Call _ | LIR.IndirectCall _ | LIR.ClosureCall _ | LIR.Sleep _ | LIR.CliNative _ -> true
     | _ -> false
 
@@ -3165,9 +3172,23 @@ let applyToInstr (arch: Platform.Arch) (mapping: AllocationResult) (instr: LIR.I
             | _ -> []
         numBytesLoads @ [allocInstr] @ storeInstrs
 
+    | LIR.MappedAlloc (dest, numBytes) ->
+        let (destReg, destAlloc) = applyToReg mapping dest
+        let (numBytesReg, numBytesLoads) = loadSpilled mapping numBytes LIR.X12
+        let allocInstr = LIR.MappedAlloc (destReg, numBytesReg)
+        let storeInstrs =
+            match destAlloc with
+            | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
+            | _ -> []
+        numBytesLoads @ [allocInstr] @ storeInstrs
+
     | LIR.RawFree ptr ->
         let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X12
         ptrLoads @ [LIR.RawFree ptrReg]
+
+    | LIR.MappedFree ptr ->
+        let (ptrReg, ptrLoads) = loadSpilled mapping ptr LIR.X12
+        ptrLoads @ [LIR.MappedFree ptrReg]
 
     | LIR.RawGet (dest, ptr, byteOffset) ->
         let (destReg, destAlloc) = applyToReg mapping dest

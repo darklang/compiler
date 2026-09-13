@@ -79,7 +79,9 @@ let private analyzeCExpr (cexpr: CExpr) (analysis: ProgramAnalysis) : ProgramAna
     | FloatToInt64 atom
     | FloatToBits atom
     | RawAlloc atom
+    | MappedAlloc atom
     | RawFree atom
+    | MappedFree atom
     | RawGetByte (atom, _)
     | StringToRawPtr atom
     | RawPtrToString atom
@@ -288,7 +290,9 @@ let private rewriteCExpr
     | FloatToInt64 atom -> FloatToInt64 (rewrite atom)
     | FloatToBits atom -> FloatToBits (rewrite atom)
     | RawAlloc atom -> RawAlloc (rewrite atom)
+    | MappedAlloc atom -> MappedAlloc (rewrite atom)
     | RawFree atom -> RawFree (rewrite atom)
+    | MappedFree atom -> MappedFree (rewrite atom)
     | RawGet (ptr, offset, typ) -> RawGet (rewrite ptr, rewrite offset, typ)
     | RawTake (ptr, offset, typ) -> RawTake (rewrite ptr, rewrite offset, typ)
     | RawGetByte (ptr, offset) -> RawGetByte (rewrite ptr, offset)

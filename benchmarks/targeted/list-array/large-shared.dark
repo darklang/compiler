@@ -1,0 +1,13 @@
+// large-shared.dark - Repeated large-array kernels with observable traversal order.
+let pipeline(seed: Int64) : Int64 =
+    let xs = [seed + 0L, seed + 1L, seed + 2L, seed + 3L, seed + 4L, seed + 5L, seed + 6L, seed + 7L, seed + 8L, seed + 9L, seed + 10L, seed + 11L, seed + 12L, seed + 13L, seed + 14L, seed + 15L, seed + 16L, seed + 17L, seed + 18L, seed + 19L, seed + 20L, seed + 21L, seed + 22L, seed + 23L, seed + 24L, seed + 25L, seed + 26L, seed + 27L, seed + 28L, seed + 29L, seed + 30L, seed + 31L, seed + 32L, seed + 33L, seed + 34L, seed + 35L, seed + 36L, seed + 37L, seed + 38L, seed + 39L, seed + 40L, seed + 41L, seed + 42L, seed + 43L, seed + 44L, seed + 45L, seed + 46L, seed + 47L, seed + 48L, seed + 49L, seed + 50L, seed + 51L, seed + 52L, seed + 53L, seed + 54L, seed + 55L, seed + 56L, seed + 57L, seed + 58L, seed + 59L, seed + 60L, seed + 61L, seed + 62L, seed + 63L] in
+    let alias = xs in
+    let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + 1L) in
+    let old = Stdlib.List.fold<Int64, Int64>(alias, 0L, fun acc x -> x - acc) in
+    let fresh = Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>(ys), 0L, fun acc x -> x - acc) in
+    old * 1000L + fresh
+
+let loop(n: Int64, acc: Int64) : Int64 =
+    if n == 0L then acc else loop(n - 1L, acc + pipeline(n))
+
+loop(1000L, 0L)

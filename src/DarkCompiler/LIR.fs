@@ -183,7 +183,9 @@ type Instr =
     | FileSetExecutable of dest:Reg * path:Operand
     | FileWriteFromPtr of dest:Reg * path:Operand * ptr:Reg * length:Reg
     | RawAlloc of dest:Reg * numBytes:Reg
+    | MappedAlloc of dest:Reg * numBytes:Reg
     | RawFree of ptr:Reg
+    | MappedFree of ptr:Reg
     | RawGet of dest:Reg * ptr:Reg * byteOffset:Reg
     | RawGetByte of dest:Reg * ptr:Reg * byteOffset:Reg
     | RawWriteWord of ptr:Reg * byteOffset:Reg * value:Reg

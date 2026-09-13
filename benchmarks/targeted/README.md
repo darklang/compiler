@@ -50,6 +50,14 @@ python3 benchmarks/targeted/list-array/compare.py \
 # Repeat with --target=x86_64 and a different output file.
 ```
 
+`large-unique` and `large-shared` exercise the mapped-array loop kernels with
+64-element source literals. The report includes individual native wall-time
+samples and their median when the requested target matches the Linux host
+(`--native-runs`, default 5). These timings include process startup; use the
+repeated workloads, not tiny controls, to assess mapping syscall costs.
+`mapped-buffer.dark` is a candidate-only internal probe: compile with
+`--allow-internal --emit-result --leak-check` and expect `5376` with no leaks.
+
 The separate allocator probe must print `434` with no leak report on a compiler
 supporting this storage class. It deliberately inspects allocator contents and
 is not a source-semantics benchmark. On the persistent baseline it prints `1431`.

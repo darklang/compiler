@@ -77,6 +77,7 @@ type SyscallNumbers = {
     Write: uint16
     Exit: uint16
     Mmap: uint16  // Memory map syscall for heap allocation
+    Munmap: uint16 // Release an independently mapped buffer
     // File I/O syscalls
     Open: uint16      // Open file (or openat on Linux with AT_FDCWD)
     Read: uint16      // Read from file descriptor
@@ -94,6 +95,7 @@ let macOSARM64SyscallNumbers : SyscallNumbers = {
     Write = 4us
     Exit = 1us
     Mmap = 197us
+    Munmap = 73us
     Open = 5us
     Read = 3us
     Close = 6us
@@ -110,6 +112,7 @@ let linuxARM64SyscallNumbers : SyscallNumbers = {
     Write = 64us
     Exit = 93us
     Mmap = 222us
+    Munmap = 215us
     Open = 56us
     Read = 63us
     Close = 57us
@@ -126,6 +129,7 @@ let linuxX86_64SyscallNumbers : SyscallNumbers = {
     Write = 1us
     Exit = 60us
     Mmap = 9us
+    Munmap = 11us
     Open = 2us      // open (not openat)
     Read = 0us
     Close = 3us

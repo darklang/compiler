@@ -254,7 +254,9 @@ let getBlockDefs (block: BasicBlock) : Set<VReg> =
         | FileWriteFromPtr (dest, _, _, _) -> Set.add dest defs
         | Phi (dest, _, _) -> Set.add dest defs
         | RawAlloc (dest, _) -> Set.add dest defs
+        | MappedAlloc (dest, _) -> Set.add dest defs
         | RawFree _ -> defs
+        | MappedFree _ -> defs
         | RawGet (dest, _, _, _) -> Set.add dest defs
         | RawGetByte (dest, _, _) -> Set.add dest defs
         | StringToRawPtr (dest, _) -> Set.add dest defs
@@ -365,7 +367,9 @@ let getBlockUses (block: BasicBlock) : Set<VReg> =
             | Phi (_, sources, _) ->
                 sources |> List.fold (fun u (src, _) -> addOperandUse src u) uses
             | RawAlloc (_, numBytes) -> addOperandUse numBytes uses
+            | MappedAlloc (_, numBytes) -> addOperandUse numBytes uses
             | RawFree ptr -> addOperandUse ptr uses
+            | MappedFree ptr -> addOperandUse ptr uses
             | RawGet (_, ptr, offset, _) ->
                 uses |> addOperandUse ptr |> addOperandUse offset
             | RawGetByte (_, ptr, offset) ->
@@ -899,9 +903,18 @@ let renameInstr (state: RenamingState) (instr: Instr) : Instr * RenamingState =
         let (_, newDest, state') = newVersion state dest
         (RawAlloc (newDest, numBytes'), state')
 
+    | MappedAlloc (dest, numBytes) ->
+        let numBytes' = renameOperand state numBytes
+        let (_, newDest, state') = newVersion state dest
+        (MappedAlloc (newDest, numBytes'), state')
+
     | RawFree ptr ->
         let ptr' = renameOperand state ptr
         (RawFree ptr', state)
+
+    | MappedFree ptr ->
+        let ptr' = renameOperand state ptr
+        (MappedFree ptr', state)
 
     | RawGet (dest, ptr, byteOffset, valueType) ->
         let ptr' = renameOperand state ptr

@@ -1,0 +1,40 @@
+// __ListArray.dark - Borrowing loop kernels for compiler-owned Int64 arrays.
+// Bounds and physical uniqueness are established by ListHIR, not by these
+// internal RawPtr entry points. Kernels neither allocate nor release buffers.
+
+module Stdlib.Internal.ListArray
+
+let map(buffer: RawPtr, index: Int64, length: Int64, fn: (Int64) -> Int64) : Unit =
+    if index >= length then ()
+    else
+        let offset = 24L + index * 8L in
+        let value = __raw_get<Int64>(buffer, offset) in
+        let mapped = fn(value) in
+        let _ = __raw_write_word(buffer, offset, mapped) in
+        Stdlib.Internal.ListArray.map(buffer, index + 1L, length, fn)
+
+let reverse(buffer: RawPtr, left: Int64, right: Int64) : Unit =
+    if left >= right then ()
+    else
+        let leftOffset = 24L + left * 8L in
+        let rightOffset = 24L + right * 8L in
+        let a = __raw_get<Int64>(buffer, leftOffset) in
+        let b = __raw_get<Int64>(buffer, rightOffset) in
+        let _ = __raw_write_word(buffer, leftOffset, b) in
+        let _ = __raw_write_word(buffer, rightOffset, a) in
+        Stdlib.Internal.ListArray.reverse(buffer, left + 1L, right - 1L)
+
+let copy(source: RawPtr, destination: RawPtr, index: Int64, length: Int64) : Unit =
+    if index >= length then ()
+    else
+        let offset = 24L + index * 8L in
+        let value = __raw_get<Int64>(source, offset) in
+        let _ = __raw_write_word(destination, offset, value) in
+        Stdlib.Internal.ListArray.copy(source, destination, index + 1L, length)
+
+let fold(buffer: RawPtr, index: Int64, length: Int64, acc: Int64, fn: (Int64, Int64) -> Int64) : Int64 =
+    if index >= length then acc
+    else
+        let value = __raw_get<Int64>(buffer, 24L + index * 8L) in
+        let next = fn(acc, value) in
+        Stdlib.Internal.ListArray.fold(buffer, index + 1L, length, next, fn)

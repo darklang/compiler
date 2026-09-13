@@ -150,8 +150,12 @@ let private prettyPrintANFCExpr = function
         $"FileWriteFromPtr({prettyPrintANFAtom path}, {prettyPrintANFAtom ptr}, {prettyPrintANFAtom length})"
     | ANF.RawAlloc numBytes ->
         $"RawAlloc({prettyPrintANFAtom numBytes})"
+    | ANF.MappedAlloc numBytes ->
+        $"MappedAlloc({prettyPrintANFAtom numBytes})"
     | ANF.RawFree ptr ->
         $"RawFree({prettyPrintANFAtom ptr})"
+    | ANF.MappedFree ptr ->
+        $"MappedFree({prettyPrintANFAtom ptr})"
     | ANF.RawGet (ptr, byteOffset, valueType) ->
         let baseText = $"RawGet({prettyPrintANFAtom ptr}, {prettyPrintANFAtom byteOffset})"
         appendTypeSuffix valueType baseText
@@ -388,8 +392,12 @@ let private prettyPrintMIRInstr (instr: MIR.Instr) : string =
         $"{prettyPrintMIRVReg dest} <- FloatToBits({prettyPrintMIROperand src})"
     | MIR.RawAlloc (dest, numBytes) ->
         $"{prettyPrintMIRVReg dest} <- RawAlloc({prettyPrintMIROperand numBytes})"
+    | MIR.MappedAlloc (dest, numBytes) ->
+        $"{prettyPrintMIRVReg dest} <- MappedAlloc({prettyPrintMIROperand numBytes})"
     | MIR.RawFree ptr ->
         $"RawFree({prettyPrintMIROperand ptr})"
+    | MIR.MappedFree ptr ->
+        $"MappedFree({prettyPrintMIROperand ptr})"
     | MIR.RawGet (dest, ptr, byteOffset, valueType) ->
         let baseText = $"{prettyPrintMIRVReg dest} <- RawGet({prettyPrintMIROperand ptr}, {prettyPrintMIROperand byteOffset})"
         appendTypeSuffix valueType baseText
@@ -749,8 +757,12 @@ let private prettyPrintLIRInstr (instr: LIR.Instr) : string =
         $"{prettyPrintLIRReg dest} <- FileWriteFromPtr({prettyPrintLIROperand path}, {prettyPrintLIRReg ptr}, {prettyPrintLIRReg length})"
     | LIR.RawAlloc (dest, numBytes) ->
         $"{prettyPrintLIRReg dest} <- RawAlloc({prettyPrintLIRReg numBytes})"
+    | LIR.MappedAlloc (dest, numBytes) ->
+        $"{prettyPrintLIRReg dest} <- MappedAlloc({prettyPrintLIRReg numBytes})"
     | LIR.RawFree ptr ->
         $"RawFree({prettyPrintLIRReg ptr})"
+    | LIR.MappedFree ptr ->
+        $"MappedFree({prettyPrintLIRReg ptr})"
     | LIR.RawGet (dest, ptr, byteOffset) ->
         $"{prettyPrintLIRReg dest} <- RawGet({prettyPrintLIRReg ptr}, {prettyPrintLIRReg byteOffset})"
     | LIR.RawGetByte (dest, ptr, byteOffset) ->

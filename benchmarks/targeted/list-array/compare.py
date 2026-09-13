@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import platform
 import re
+import statistics
 import subprocess
 import tempfile
 import time
@@ -14,6 +15,7 @@ import time
 CASES = {
     "main": "8205000\n", "shared": "360000\n", "captured-list": "9\n",
     "edge-cases": "0\n", "effect-order": "1\n2\n3\n4\n3\n2\n9\n",
+    "large-unique": "-32000\n", "large-shared": "31968000\n",
 }
 
 
@@ -24,7 +26,7 @@ def checked(command, cwd):
     return result
 
 
-def measure(repository, source, expected, target, output):
+def measure(repository, source, expected, target, output, native_runs):
     compiler = repository / "dark"
     # The CLI supports an explicit x86_64 target; ARM64 uses the host target.
     if target == "arm64" and (platform.system() != "Linux" or platform.machine() not in ("aarch64", "arm64")):
@@ -42,11 +44,22 @@ def measure(repository, source, expected, target, output):
     if len(counts) != 1 or int(counts[0]) <= 0:
         raise RuntimeError(f"Expected one positive instruction count: {execution.stderr}")
     binary_bytes = output.stat().st_size
+    native_ms = []
+    host_arch = {"aarch64": "arm64", "arm64": "arm64", "x86_64": "x86_64"}.get(platform.machine())
+    if platform.system() == "Linux" and host_arch == target:
+        for _ in range(native_runs):
+            start = time.monotonic()
+            native = checked([str(output)], repository)
+            native_ms.append((time.monotonic() - start) * 1000)
+            if native.stdout != expected:
+                raise RuntimeError(f"{source.name}: native output mismatch: {native.stdout!r}")
     checked(command + ["--leak-check"], repository)
     leak = subprocess.run([str(counter), target, str(output)], cwd=repository, text=True, capture_output=True, timeout=30)
     leak_passed = leak.returncode == 0 and leak.stdout == expected and "leaks:" not in leak.stderr
     return {
         "instructions": int(counts[0]), "compile_ms": compile_ms, "binary_bytes": binary_bytes,
+        "native_wall_ms": native_ms,
+        "native_median_ms": statistics.median(native_ms) if native_ms else None,
         "leak_check_passed": leak_passed, "leak_check_exit_code": leak.returncode,
         "leak_check_stdout": leak.stdout, "leak_check_stderr": leak.stderr,
     }
@@ -59,7 +72,10 @@ def main():
     parser.add_argument("--target", choices=["arm64", "x86_64"], required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--cases", choices=list(CASES), nargs="+", default=list(CASES))
+    parser.add_argument("--native-runs", type=int, default=5)
     args = parser.parse_args()
+    if args.native_runs < 1:
+        parser.error("--native-runs must be positive")
     roots = {"baseline": args.baseline.resolve(), "candidate": args.candidate.resolve()}
     sources = Path(__file__).resolve().parent
     report = {"target": args.target, "compilers": {}, "workloads": {}}
@@ -74,7 +90,7 @@ def main():
             expected = CASES[name]
             source = sources / f"{name}.dark"
             measurements = {
-                label: measure(repository, source, expected, args.target, Path(temporary) / f"{label}-{name}")
+                label: measure(repository, source, expected, args.target, Path(temporary) / f"{label}-{name}", args.native_runs)
                 for label, repository in roots.items()
             }
             measurements["source_sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()

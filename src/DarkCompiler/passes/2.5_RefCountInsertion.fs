@@ -431,7 +431,9 @@ let inferCExprType (ctx: TypeContext) (cexpr: CExpr) : AST.Type option =
     | FileWriteFromPtr _ -> Some AST.TBool  // Returns Bool (success/failure)
     // Raw memory intrinsics (no ref counting - manually managed)
     | RawAlloc _ -> Some AST.TRawPtr  // Returns raw pointer
+    | MappedAlloc _ -> Some AST.TRawPtr  // Returns raw pointer
     | RawFree _ -> Some AST.TUnit  // Returns unit
+    | MappedFree _ -> Some AST.TUnit  // Returns unit
     | RawGet (_, _, valueType) -> valueType
     | RawTake (_, _, valueType) -> valueType
     | RawGetByte _ -> Some AST.TInt64  // Returns 1-byte value (zero-extended)

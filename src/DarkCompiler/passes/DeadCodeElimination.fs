@@ -118,7 +118,9 @@ let private addCallsFromInstr (instr: LIR.Instr) (calls: Set<string>) : Set<stri
     | LIR.PrintHeapString _
     | LIR.FileWriteFromPtr _
     | LIR.RawAlloc _
+    | LIR.MappedAlloc _
     | LIR.RawFree _
+    | LIR.MappedFree _
     | LIR.RawGet _
     | LIR.RawGetByte _
     | LIR.RawWriteWord _

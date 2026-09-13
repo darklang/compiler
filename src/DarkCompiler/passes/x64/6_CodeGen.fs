@@ -4332,6 +4332,42 @@ let private translateInstr
             @ genEpilogue ctx.StackSize ctx.UsedCalleeSaved
             @ [X86_64.JMP_reg callReg])
 
+    | LIR.MappedAlloc (dest, numBytes) ->
+        resolveReg dest |> Result.bind (fun destReg ->
+            resolveReg numBytes |> Result.map (fun sizeReg ->
+                // Syscall-clobbered registers are protected by LIR caller saves.
+                // Keep the exact mapping length in a private allocation prefix.
+                [ X86_64.CMP_imm (sizeReg, 0)
+                  X86_64.Jcc (X86_64.LT, oomHandlerLabel)
+                  X86_64.MOV_reg (X86_64.RSI, sizeReg)
+                  X86_64.ADD_imm (X86_64.RSI, 8)
+                  X86_64.CMP_imm (X86_64.RSI, 0)
+                  X86_64.Jcc (X86_64.LE, oomHandlerLabel)
+                  X86_64.PUSH X86_64.RSI ]
+                @ loadImm64 X86_64.RDI 0L
+                @ loadImm64 X86_64.RDX 3L
+                @ loadImm64 X86_64.R10 0x22L
+                @ loadImm64 X86_64.R8 -1L
+                @ loadImm64 X86_64.R9 0L
+                @ loadImm64 X86_64.RAX (int64 syscalls.Mmap)
+                @ [ X86_64.SYSCALL
+                    X86_64.CMP_imm (X86_64.RAX, 0)
+                    X86_64.Jcc (X86_64.LT, oomHandlerLabel)
+                    X86_64.POP scratch
+                    X86_64.MOV_store (X86_64.RAX, 0, scratch)
+                    X86_64.LEA (destReg, X86_64.RAX, 8) ]
+                @ genLeakCounterInc ctx))
+
+    | LIR.MappedFree ptr ->
+        resolveReg ptr |> Result.map (fun ptrReg ->
+            [ X86_64.LEA (X86_64.RDI, ptrReg, -8)
+              X86_64.MOV_load (X86_64.RSI, X86_64.RDI, 0) ]
+            @ loadImm64 X86_64.RAX (int64 syscalls.Munmap)
+            @ [ X86_64.SYSCALL
+                X86_64.CMP_imm (X86_64.RAX, 0)
+                X86_64.Jcc (X86_64.NE, oomHandlerLabel) ]
+            @ genLeakCounterDec ctx)
+
     | LIR.RawAlloc (dest, numBytes) ->
         let okLabel = freshLabel "rawalloc_ok"
         resolveReg dest

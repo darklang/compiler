@@ -131,7 +131,9 @@ type Instr =
     | FloatToBits of dest:VReg * src:Operand     // Copy Float64 bits to UInt64
     // Raw memory intrinsics (internal, for HAMT implementation)
     | RawAlloc of dest:VReg * numBytes:Operand    // Allocate raw bytes (no header), returns RawPtr
+    | MappedAlloc of dest:VReg * numBytes:Operand // Checked independent mapping with a private size prefix
     | RawFree of ptr:Operand                      // Manually free raw memory
+    | MappedFree of ptr:Operand                  // Release an independent mapping, not a heap block
     | RawGet of dest:VReg * ptr:Operand * byteOffset:Operand * valueType:AST.Type option  // Read 8 bytes at offset, valueType for float
     | RawGetByte of dest:VReg * ptr:Operand * byteOffset:Operand  // Read 1 byte at offset (zero-extended)
     | RawWriteWord of ptr:Operand * byteOffset:Operand * value:Operand  // Write 8 unmanaged bytes at offset

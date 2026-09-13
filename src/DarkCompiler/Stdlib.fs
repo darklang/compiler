@@ -113,6 +113,9 @@ let packageCatalogModule : ModuleDef = {
 /// These functions bypass the type system and should only be used in stdlib code
 /// The names start with __ to indicate they are internal
 let rawMemoryIntrinsics : ModuleFunc list = [
+    // Mapped buffers have a private length prefix and must be explicitly unmapped.
+    { Name = "__mapped_alloc"; TypeParams = []; ParamTypes = [TInt64]; ReturnType = TRawPtr }
+    { Name = "__mapped_free"; TypeParams = []; ParamTypes = [TRawPtr]; ReturnType = TUnit }
     // __raw_alloc : (Int64) -> RawPtr - allocate raw bytes
     { Name = "__raw_alloc"; TypeParams = []; ParamTypes = [TInt64]; ReturnType = TRawPtr }
     // __raw_free : (RawPtr) -> Unit - free an internal 8-byte raw cell
