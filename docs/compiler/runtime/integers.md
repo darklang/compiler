@@ -28,9 +28,11 @@ after every operation. Arithmetic is implemented in the internal target-neutral
 ## Int128 and UInt128
 
 `Q` and `Z` literals select signed and unsigned 128-bit values. They use the
-same canonical managed-buffer representation as `Int`, but normalize every
-arithmetic and bitwise result modulo 2^128. Signed values reinterpret that
-residue through the interval -2^127 through 2^127-1. Their modules provide the
+same immutable fixed-block representation: a low `UInt64` limb, a high
+`UInt64` limb, and a following reference count. Arithmetic and bitwise results
+normalize modulo 2^128. Signed values reinterpret that residue through the
+interval -2^127 through 2^127-1. Decimal buffers are created only for text and
+arbitrary-precision conversion boundaries. Their modules provide the
 interpreter-declared arithmetic, remainder/modulus, comparison, formatting,
 parsing, Float conversion, aggregation, checked conversions, bitwise
 operations, and masked shifts.

@@ -123,8 +123,6 @@ type UnaryOp =
 type CanonicalBufferKind =
     | Utf8String
     | GraphemeCluster
-    | SignedInt128
-    | UnsignedInt128
 
 /// Reference-count operation kind
 type RcKind =
@@ -599,6 +597,8 @@ type CExpr =
     | RawPtrToString of ptr:Atom                // Reinterpret raw allocation as owned String
     | BlobToRawPtr of value:Atom               // Borrow raw backing pointer from Blob
     | RawPtrToBlob of ptr:Atom                 // Reinterpret raw allocation as owned Blob
+    | RawPtrToInt128 of ptr:Atom               // Adopt an initialized fixed Int128 block
+    | RawPtrToUInt128 of ptr:Atom              // Adopt an initialized fixed UInt128 block
     | DictToRawPtr of dict:Atom                 // Strip Dict tag bits, returning RawPtr
     | RawPtrToDict of ptr:Atom * tag:Atom * dictType:AST.Type  // Re-tag RawPtr as Dict
     | ListToRawPtr of list:Atom                 // Strip List tag bits, returning RawPtr
@@ -677,13 +677,12 @@ let rec rcShapeOfType (typeReg: Map<string, (string * AST.Type) list>) (t: AST.T
     | AST.TRuntimeError
     | AST.TVar _ ->
         Immediate
-    // Int, Int128 and UInt128 use canonical decimal dynamic buffers.  Their
-    // typed conversion views are ownership-neutral, but values themselves
-    // participate in RC exactly like String at every aggregate boundary.
-    | AST.TInt
+    // Arbitrary Int remains a canonical decimal dynamic buffer. Fixed-width
+    // 128-bit values are immutable two-limb blocks with the refcount following
+    // their 16-byte payload.
+    | AST.TInt -> DynamicString
     | AST.TInt128
-    | AST.TUInt128 ->
-        DynamicString
+    | AST.TUInt128 -> FixedBlock (16, [])
     | AST.TTuple elemTypes ->
         let fieldShapes = elemTypes |> List.map (rcShapeOfType typeReg)
         FixedBlock (List.length elemTypes * 8, fieldShapes)
@@ -711,10 +710,7 @@ let rec rcShapeOfType (typeReg: Map<string, (string * AST.Type) list>) (t: AST.T
     | AST.TDict (keyType, valueType) ->
         DictRoot (rcShapeOfType typeReg keyType, rcShapeOfType typeReg valueType)
     | AST.TString
-    | AST.TChar
-    | AST.TInt
-    | AST.TInt128
-    | AST.TUInt128 ->
+    | AST.TChar ->
         DynamicString
     | AST.TBlob ->
         DynamicBlob
@@ -900,10 +896,11 @@ let rcShapeOfTypeWithSums
             ClosureShape []
         | AST.TString
         | AST.TChar
-        | AST.TInt
+        | AST.TInt ->
+            DynamicString
         | AST.TInt128
         | AST.TUInt128 ->
-            DynamicString
+            FixedBlock (16, [])
         | AST.TBlob ->
             DynamicBlob
         | AST.TRawPtr ->

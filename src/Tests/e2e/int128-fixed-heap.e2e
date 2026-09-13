@@ -1,0 +1,14 @@
+// Exercise cross-limb arithmetic and collection ownership for fixed-block Int128/UInt128 values.
+Stdlib.Int128.add(170141183460469231731687303715884105727Q, 1Q) = -170141183460469231731687303715884105728Q
+Stdlib.UInt128.multiply(18446744073709551615Z, 18446744073709551615Z) = 340282366920938463426481119284349108225Z
+Stdlib.UInt128.bitwiseNot(0Z) = 340282366920938463463374607431768211455Z
+Stdlib.Int128.toString(-170141183460469231731687303715884105728Q) = "-170141183460469231731687303715884105728"
+Stdlib.UInt128.parse("340282366920938463463374607431768211455") = Ok(340282366920938463463374607431768211455Z)
+let build(remaining: Int64, value: UInt128, values: List<UInt128>) : List<UInt128> =
+    if remaining <= 0L then values
+    else build(remaining - 1L, Stdlib.UInt128.add(value, 1Z), Stdlib.List.push<UInt128>(values, value))
+let consume(values: List<UInt128>, checksum: Int64) : Int64 =
+    match values with
+    | [] -> checksum
+    | value :: tail -> consume(tail, checksum + (if value == 0Z then 1L else 2L))
+let values = build(10L, 0Z, []) in consume(values, 0L) = 19L

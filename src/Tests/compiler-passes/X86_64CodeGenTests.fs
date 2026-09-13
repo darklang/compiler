@@ -380,14 +380,35 @@ let testHeapAllocReusesBlockIntoX3 () : Result<unit, string> =
               LIR.HeapStore (LIR.Physical LIR.X3, 0, LIR.Imm 1L, None)
               LIR.HeapStore (LIR.Physical LIR.X3, 8, LIR.Imm 2L, None)
               LIR.HeapStore (LIR.Physical LIR.X3, 16, LIR.Imm 0x3234L, None)
-              LIR.PrintHeapStringNoNewline (LIR.Physical LIR.X3) ]
+              LIR.PrintHeapStringNoNewline (LIR.Physical LIR.X3)
+              LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X3)) ]
             LIR.Ret
 
-    match runLIRProgramFullWithOptions program false with
+    match runLIRProgramFullWithOptions program true with
     | Error error -> Error error
     | Ok (exitCode, stdout, stderr) ->
         if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}: {stderr}"
         elif stdout <> "42" then Error $"Expected reused X3 block to contain '42', got '{stdout}'"
+        elif stderr.Trim() <> "" then Error $"Expected reused HeapAlloc block to balance leak accounting, got '{stderr.Trim()}'"
+        else Ok ()
+
+/// RawAlloc uses the same size-class free lists as typed HeapAlloc. Reusing a
+/// raw block must create a new live allocation for leak accounting purposes.
+let testRawAllocReuseBalancesLeakCounter () : Result<unit, string> =
+    let program =
+        makeSimpleProgram
+            [ LIR.Mov (LIR.Physical LIR.X1, LIR.Imm 8L)
+              LIR.RawAlloc (LIR.Physical LIR.X2, LIR.Physical LIR.X1)
+              LIR.RawFree (LIR.Physical LIR.X2)
+              LIR.RawAlloc (LIR.Physical LIR.X3, LIR.Physical LIR.X1)
+              LIR.RawFree (LIR.Physical LIR.X3) ]
+            LIR.Ret
+
+    match runLIRProgramFullWithOptions program true with
+    | Error error -> Error error
+    | Ok (exitCode, _, stderr) ->
+        if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}: {stderr}"
+        elif stderr.Trim() <> "" then Error $"Expected reused RawAlloc block to balance leak accounting, got '{stderr.Trim()}'"
         else Ok ()
 
 /// String RC lowering must support an X3/RCX string pointer while accessing the
@@ -5731,6 +5752,7 @@ let tests : (string * (unit -> Result<unit, string>)) list = [
     ("LIR CLI host operations execute under x64", testCliHostOperationsExecute)
     ("LIR CLI native call preserves live x64 caller register", testCliNativePreservesLiveCallerRegister)
     ("LIR HeapAlloc x64 reuses a block into X3", testHeapAllocReusesBlockIntoX3)
+    ("LIR RawAlloc x64 reuse balances leak counter", testRawAllocReuseBalancesLeakCounter)
     ("LIR string x64 refcount supports X3", testStringRefCountSupportsX3)
     ("LIR string x64 refcount supports X12", testStringRefCountSupportsX12)
     ("LIR string literal x64 supports X12 destination", testStringLiteralSupportsX12Destination)

@@ -202,7 +202,9 @@ let private slotInitRootRetainTarget
             | ANF.FixedBlock (payloadSize, _) ->
                 match valueType with
                 | AST.TTuple _
-                | AST.TRecord _ -> Some (LIR.SlotInitGenericRootRetain payloadSize)
+                | AST.TRecord _
+                | AST.TInt128
+                | AST.TUInt128 -> Some (LIR.SlotInitGenericRootRetain payloadSize)
                 | _ -> None
             | ANF.StreamRoot -> Some (LIR.SlotInitGenericRootRetain 24)
             | ANF.BoxedSum (payloadSize, _, _) ->

@@ -76,8 +76,6 @@ let private prettyPrintANFRcKind = function
 let private prettyPrintCanonicalBufferKind = function
     | ANF.Utf8String -> "utf8-string"
     | ANF.GraphemeCluster -> "grapheme-cluster"
-    | ANF.SignedInt128 -> "signed-int128"
-    | ANF.UnsignedInt128 -> "unsigned-int128"
 
 /// Pretty-print ANF complex expression
 let private prettyPrintANFCExpr = function
@@ -182,6 +180,10 @@ let private prettyPrintANFCExpr = function
         $"BlobToRawPtr({prettyPrintANFAtom value})"
     | ANF.RawPtrToBlob ptr ->
         $"RawPtrToBlob({prettyPrintANFAtom ptr})"
+    | ANF.RawPtrToInt128 ptr ->
+        $"RawPtrToInt128({prettyPrintANFAtom ptr})"
+    | ANF.RawPtrToUInt128 ptr ->
+        $"RawPtrToUInt128({prettyPrintANFAtom ptr})"
     | ANF.DictToRawPtr dict ->
         $"DictToRawPtr({prettyPrintANFAtom dict})"
     | ANF.RawPtrToDict (ptr, tag, dictType) ->

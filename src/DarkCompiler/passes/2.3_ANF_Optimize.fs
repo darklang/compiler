@@ -498,6 +498,8 @@ let private mustPreserveEvaluation (context: OptimizeContext) (cexpr: CExpr) : b
     | RawPtrToString _ -> false
     | BlobToRawPtr _ -> false
     | RawPtrToBlob _ -> false
+    | RawPtrToInt128 _ -> false
+    | RawPtrToUInt128 _ -> false
     | DictToRawPtr _ -> false
     | RawPtrToDict _ -> false
     | ListToRawPtr _ -> false
@@ -597,6 +599,8 @@ let private addCExprUses (cexpr: CExpr) (uses: Set<TempId>) : Set<TempId> =
     | RawPtrToString ptr -> addAtomUse ptr uses
     | BlobToRawPtr value -> addAtomUse value uses
     | RawPtrToBlob ptr -> addAtomUse ptr uses
+    | RawPtrToInt128 ptr -> addAtomUse ptr uses
+    | RawPtrToUInt128 ptr -> addAtomUse ptr uses
     | DictToRawPtr dict -> addAtomUse dict uses
     | RawPtrToDict (ptr, tag, _) -> uses |> addAtomUse ptr |> addAtomUse tag
     | ListToRawPtr list -> addAtomUse list uses
@@ -645,6 +649,8 @@ let cexprUsesTemp (tid: TempId) (cexpr: CExpr) : bool =
     | RawPtrToString atom
     | BlobToRawPtr atom
     | RawPtrToBlob atom
+    | RawPtrToInt128 atom
+    | RawPtrToUInt128 atom
     | DictToRawPtr atom
     | ListToRawPtr atom
     | FloatSqrt atom
@@ -791,6 +797,8 @@ let private substCExprValue (env: Map<TempId, Atom>) (cexpr: CExpr) : CExpr =
     | RawPtrToString ptr -> RawPtrToString (s ptr)
     | BlobToRawPtr value -> BlobToRawPtr (s value)
     | RawPtrToBlob ptr -> RawPtrToBlob (s ptr)
+    | RawPtrToInt128 ptr -> RawPtrToInt128 (s ptr)
+    | RawPtrToUInt128 ptr -> RawPtrToUInt128 (s ptr)
     | DictToRawPtr dict -> DictToRawPtr (s dict)
     | RawPtrToDict (ptr, tag, dictType) -> RawPtrToDict (s ptr, s tag, dictType)
     | ListToRawPtr list -> ListToRawPtr (s list)
@@ -1048,6 +1056,8 @@ let private tryCSEKey (cexpr: CExpr) : CSEKey option =
     | RawSlotInit _
     | StringToRawPtr _
     | RawPtrToString _
+    | RawPtrToInt128 _
+    | RawPtrToUInt128 _
     | BlobToRawPtr _
     | RawPtrToBlob _
     | DictToRawPtr _

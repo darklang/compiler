@@ -1175,10 +1175,9 @@ let selectInstr
                      LIR.PrintFloat (LIR.FPhysical LIR.D0)]
             | _ ->
                 Error "Internal error: unexpected operand type for float print"
-        | AST.TString | AST.TChar | AST.TInt | AST.TInt128 | AST.TUInt128 ->
+        | AST.TString | AST.TChar | AST.TInt ->
             // String/Char printing uses PrintString for pool strings, PrintHeapString for heap strings.
             // Char is stored as a string at runtime (single EGC).
-            // Int128/UInt128 are lowered as canonical decimal strings.
             match src with
             | MIR.StringSymbol value ->
                 finishPrint [LIR.PrintString value]
@@ -1188,6 +1187,8 @@ let selectInstr
                 finishPrint [LIR.PrintHeapString lirReg]
             | other ->
                 Error $"Print: Unexpected operand type for string: {other}"
+        | AST.TInt128 | AST.TUInt128 ->
+            Error "128-bit values must be rendered to String before print lowering"
         | AST.TEnumFields _ ->
             Crash.crash "TEnumFields is declaration metadata and cannot be printed as a standalone value"
 

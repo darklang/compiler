@@ -447,6 +447,8 @@ let inferCExprType (ctx: TypeContext) (cexpr: CExpr) : AST.Type option =
     | RawPtrToString _ -> Some AST.TString
     | BlobToRawPtr _ -> Some AST.TRawPtr
     | RawPtrToBlob _ -> Some AST.TBlob
+    | RawPtrToInt128 _ -> Some AST.TInt128
+    | RawPtrToUInt128 _ -> Some AST.TUInt128
     | DictToRawPtr _ -> Some AST.TRawPtr
     | RawPtrToDict (_, _, dictType) -> Some dictType
     | ListToRawPtr _ -> Some AST.TRawPtr

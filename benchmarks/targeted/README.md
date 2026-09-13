@@ -25,8 +25,8 @@ cost where applicable, and leak-check status.
 The `integer128` suite covers signed and unsigned arithmetic, comparisons and
 bitwise operations, decimal parsing/formatting, UUID parsing/formatting,
 generation and equality, and collection storage/copying. It is intended to
-capture the current decimal-buffer implementation before migrating `Int128` and
-`UInt128` to direct 128-bit values.
+measure the fixed-block `Int128` and `UInt128` representation and guard its
+arithmetic, textual-boundary, UUID, ownership, and collection costs.
 
 ## Closed-list array diagnostics
 

@@ -111,23 +111,22 @@ let __xDigits(s: String) : Stdlib.Option.Option<String> =
         Stdlib.Uuid.__xFields(compact, 1L, 0L, "")
     else None
 
-let __hexDigit(byte: Int64) : Int =
-    if byte >= 48L && byte <= 57L then Stdlib.Int.fromInt64(byte - 48L)
-    else if byte >= 65L && byte <= 70L then Stdlib.Int.fromInt64(byte - 55L)
-    else Stdlib.Int.fromInt64(byte - 87L)
+let __hexDigitUInt64(byte: Int64) : UInt64 =
+    match byte with
+    | 48L -> 0UL | 49L -> 1UL | 50L -> 2UL | 51L -> 3UL | 52L -> 4UL
+    | 53L -> 5UL | 54L -> 6UL | 55L -> 7UL | 56L -> 8UL | 57L -> 9UL
+    | 65L -> 10UL | 66L -> 11UL | 67L -> 12UL | 68L -> 13UL | 69L -> 14UL | 70L -> 15UL
+    | 97L -> 10UL | 98L -> 11UL | 99L -> 12UL | 100L -> 13UL | 101L -> 14UL | 102L -> 15UL
+    | _ -> Builtin.crash("Internal UUID hexadecimal digit invariant failed")
 
-let __hexToIntAt(digits: String, index: Int64, value: Int) : Int =
-    if index == 32L then value
-    else
-        Stdlib.Uuid.__hexToIntAt(
-            digits,
-            index + 1L,
-            Stdlib.Int.add(Stdlib.Int.multiply(value, 16I), Stdlib.Uuid.__hexDigit(Stdlib.String.getByteAt(digits, index))) )
+let __hexWordAt(digits: String, index: Int64, endIndex: Int64, value: UInt64) : UInt64 =
+    if index == endIndex then value
+    else Stdlib.Uuid.__hexWordAt(digits, index + 1L, endIndex, (value << 4UL) + Stdlib.Uuid.__hexDigitUInt64(Stdlib.String.getByteAt(digits, index)))
 
 let __parseDigits(digits: String) : Stdlib.Result.Result<Uuid, Stdlib.Uuid.ParseError> =
-    match Stdlib.Int.toUInt128(Stdlib.Uuid.__hexToIntAt(digits, 0L, 0I)) with
-    | Some(value) -> Ok(UUID(value))
-    | None -> Builtin.testRuntimeError("UUID hex value exceeded UInt128")
+    let high = Stdlib.Uuid.__hexWordAt(digits, 0L, 16L, 0UL) in
+    let low = Stdlib.Uuid.__hexWordAt(digits, 16L, 32L, 0UL) in
+    Ok(UUID(Stdlib.UInt128.__fromWords(low, high)))
 
 let parse(value: String) : Stdlib.Result.Result<Uuid, Stdlib.Uuid.ParseError> =
     let s = Stdlib.String.trim(value) in
@@ -151,6 +150,14 @@ let __nibbleToHex(n: Int64) : String =
     | 12L -> "c" | 13L -> "d" | 14L -> "e" | 15L -> "f"
     | _ -> Builtin.testRuntimeError("Invalid UUID hex nibble")
 
+let __nibbleToHexUInt64(n: UInt64) : String =
+    match n with
+    | 0UL -> "0" | 1UL -> "1" | 2UL -> "2" | 3UL -> "3"
+    | 4UL -> "4" | 5UL -> "5" | 6UL -> "6" | 7UL -> "7"
+    | 8UL -> "8" | 9UL -> "9" | 10UL -> "a" | 11UL -> "b"
+    | 12UL -> "c" | 13UL -> "d" | 14UL -> "e" | 15UL -> "f"
+    | _ -> Builtin.crash("Internal UUID hexadecimal nibble invariant failed")
+
 // Helper: convert byte (from int64 at shift position) to 2 hex chars
 let __byteToHex(value: Int64, shift: Int64) : String =
     let byte = (value >> shift) & 255L in
@@ -158,25 +165,15 @@ let __byteToHex(value: Int64, shift: Int64) : String =
     let lo = byte & 15L in
     Stdlib.Uuid.__nibbleToHex(hi) ++ Stdlib.Uuid.__nibbleToHex(lo)
 
-let __intToHex(value: Int, acc: String) : String =
-    if value == 0I then acc
-    else
-        match Stdlib.Int.remainder(value, 16I) with
-        | Ok(remainder) ->
-            match Stdlib.Int.toInt64(remainder) with
-            | Some(nibble) -> Stdlib.Uuid.__intToHex(Stdlib.Int.divide(value, 16I), Stdlib.Uuid.__nibbleToHex(nibble) ++ acc)
-            | None -> Builtin.testRuntimeError("UUID remainder was not an Int64")
-        | Error(message) -> Builtin.testRuntimeError(message)
-
-let __padHex(value: String) : String =
-    let remaining = 32L - Stdlib.String.__byteLength(value) in
-    if remaining == 0L then value else Stdlib.String.repeat("0", Stdlib.Int.fromInt64(remaining)) ++ value
+let __wordToHex(value: UInt64, remaining: Int64, acc: String) : String =
+    if remaining == 0L then acc
+    else Stdlib.Uuid.__wordToHex(value >> 4UL, remaining - 1L, Stdlib.Uuid.__nibbleToHexUInt64(value & 15UL) ++ acc)
 
 /// Stringify UUID values as 8-4-4-4-12 lower-case hexadecimal digits.
 let toString(uuid: Uuid) : String =
     match uuid with
     | UUID(value) ->
-        let hex = Stdlib.Uuid.__padHex(Stdlib.Uuid.__intToHex(Stdlib.Int.fromUInt128(value), "")) in
+        let hex = Stdlib.Uuid.__wordToHex(Stdlib.UInt128.__high(value), 16L, "") ++ Stdlib.Uuid.__wordToHex(Stdlib.UInt128.__low(value), 16L, "") in
         Stdlib.String.__byteSlice(hex, 0L, 8L) ++ "-" ++ Stdlib.String.__byteSlice(hex, 8L, 12L) ++ "-" ++
         Stdlib.String.__byteSlice(hex, 12L, 16L) ++ "-" ++ Stdlib.String.__byteSlice(hex, 16L, 20L) ++ "-" ++
         Stdlib.String.__byteSlice(hex, 20L, 32L)

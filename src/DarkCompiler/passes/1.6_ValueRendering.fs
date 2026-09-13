@@ -258,7 +258,8 @@ and private renderBody
     | TUInt16 -> (call "Stdlib.UInt16.toString" [value], state)
     | TUInt32 -> (call "Stdlib.UInt32.toString" [value], state)
     | TUInt64 -> (call "Stdlib.UInt64.toString" [value], state)
-    // The current compiler stores supported 128-bit results as canonical decimal strings.
+    // Fixed-block 128-bit values cross the textual boundary through their
+    // limb-based decimal formatters.
     | TInt128 -> (call "Stdlib.Int128.toString" [value], state)
     | TUInt128 -> (call "Stdlib.UInt128.toString" [value], state)
     | TFloat64 -> (call "Stdlib.Float.toString" [value], state)

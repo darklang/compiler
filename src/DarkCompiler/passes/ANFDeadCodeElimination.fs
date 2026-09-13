@@ -93,6 +93,8 @@ let private extractFromCExpr (cexpr: ANF.CExpr) : string list =
     | ANF.RawPtrToString ptr -> extractFromAtom ptr
     | ANF.BlobToRawPtr value -> extractFromAtom value
     | ANF.RawPtrToBlob ptr -> extractFromAtom ptr
+    | ANF.RawPtrToInt128 ptr -> extractFromAtom ptr
+    | ANF.RawPtrToUInt128 ptr -> extractFromAtom ptr
     | ANF.DictToRawPtr dict -> extractFromAtom dict
     | ANF.RawPtrToDict (ptr, tag, _) ->
         extractFromAtom ptr @ extractFromAtom tag

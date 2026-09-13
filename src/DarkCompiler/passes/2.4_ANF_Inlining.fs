@@ -357,6 +357,8 @@ let renameCExpr (mapping: Map<TempId, TempId>) (cexpr: CExpr) : CExpr =
     | RawPtrToString ptr -> RawPtrToString (r ptr)
     | BlobToRawPtr value -> BlobToRawPtr (r value)
     | RawPtrToBlob ptr -> RawPtrToBlob (r ptr)
+    | RawPtrToInt128 ptr -> RawPtrToInt128 (r ptr)
+    | RawPtrToUInt128 ptr -> RawPtrToUInt128 (r ptr)
     | DictToRawPtr dict -> DictToRawPtr (r dict)
     | RawPtrToDict (ptr, tag, dictType) -> RawPtrToDict (r ptr, r tag, dictType)
     | ListToRawPtr list -> ListToRawPtr (r list)

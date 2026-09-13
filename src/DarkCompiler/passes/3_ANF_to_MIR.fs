@@ -257,6 +257,8 @@ let maxTempIdInCExpr (cexpr: ANF.CExpr) : int =
     | ANF.RawPtrToString ptr -> maxTempIdInAtom ptr
     | ANF.BlobToRawPtr value -> maxTempIdInAtom value
     | ANF.RawPtrToBlob ptr -> maxTempIdInAtom ptr
+    | ANF.RawPtrToInt128 ptr -> maxTempIdInAtom ptr
+    | ANF.RawPtrToUInt128 ptr -> maxTempIdInAtom ptr
     | ANF.DictToRawPtr dict -> maxTempIdInAtom dict
     | ANF.RawPtrToDict (ptr, tag, _) -> max (maxTempIdInAtom ptr) (maxTempIdInAtom tag)
     | ANF.ListToRawPtr list -> maxTempIdInAtom list
@@ -566,6 +568,8 @@ let private inferSimpleCExprDestType
     | ANF.ListToRawPtr _ -> Some AST.TRawPtr
     | ANF.RawPtrToString _ -> Some AST.TString
     | ANF.RawPtrToBlob _ -> Some AST.TBlob
+    | ANF.RawPtrToInt128 _ -> Some AST.TInt128
+    | ANF.RawPtrToUInt128 _ -> Some AST.TUInt128
     | ANF.RawPtrToDict (_, _, dictType) -> Some dictType
     | ANF.RawPtrToList (_, _, listType) -> Some listType
     | ANF.FloatSqrt _
@@ -650,6 +654,8 @@ let cexprDescription (cexpr: ANF.CExpr) : string =
     | ANF.RawPtrToString _ -> "RawPtrToString"
     | ANF.BlobToRawPtr _ -> "BlobToRawPtr"
     | ANF.RawPtrToBlob _ -> "RawPtrToBlob"
+    | ANF.RawPtrToInt128 _ -> "RawPtrToInt128"
+    | ANF.RawPtrToUInt128 _ -> "RawPtrToUInt128"
     | ANF.DictToRawPtr _ -> "DictToRawPtr"
     | ANF.RawPtrToDict _ -> "RawPtrToDict"
     | ANF.ListToRawPtr _ -> "ListToRawPtr"
@@ -1275,6 +1281,12 @@ let rec convertExpr
                 | ANF.RawPtrToBlob ptrAtom ->
                     atomToOperand builder ptrAtom
                     |> Result.map (fun ptrOp -> [MIR.RawPtrToBlob (destReg, ptrOp)])
+                | ANF.RawPtrToInt128 ptrAtom ->
+                    atomToOperand builder ptrAtom
+                    |> Result.map (fun ptrOp -> [MIR.Mov (destReg, ptrOp, Some AST.TInt128)])
+                | ANF.RawPtrToUInt128 ptrAtom ->
+                    atomToOperand builder ptrAtom
+                    |> Result.map (fun ptrOp -> [MIR.Mov (destReg, ptrOp, Some AST.TUInt128)])
                 | ANF.DictToRawPtr dictAtom ->
                     atomToOperand builder dictAtom
                     |> Result.map (fun dictOp -> [MIR.DictToRawPtr (destReg, dictOp)])
@@ -1990,6 +2002,12 @@ and convertExprToOperand
                 | ANF.RawPtrToBlob ptrAtom ->
                     atomToOperand builder ptrAtom
                     |> Result.map (fun ptrOp -> [MIR.RawPtrToBlob (destReg, ptrOp)])
+                | ANF.RawPtrToInt128 ptrAtom ->
+                    atomToOperand builder ptrAtom
+                    |> Result.map (fun ptrOp -> [MIR.Mov (destReg, ptrOp, Some AST.TInt128)])
+                | ANF.RawPtrToUInt128 ptrAtom ->
+                    atomToOperand builder ptrAtom
+                    |> Result.map (fun ptrOp -> [MIR.Mov (destReg, ptrOp, Some AST.TUInt128)])
                 | ANF.DictToRawPtr dictAtom ->
                     atomToOperand builder dictAtom
                     |> Result.map (fun dictOp -> [MIR.DictToRawPtr (destReg, dictOp)])

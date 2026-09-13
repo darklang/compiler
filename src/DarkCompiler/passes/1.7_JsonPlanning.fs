@@ -468,8 +468,8 @@ and private serializeBody env typ value writer state : Result<Expr * State, stri
     | TUInt16 -> Ok (writerRaw writer (call "Stdlib.UInt16.toString" [value]), state)
     | TUInt32 -> Ok (writerRaw writer (call "Stdlib.UInt32.toString" [value]), state)
     | TUInt64 -> Ok (writerRaw writer (call "Stdlib.UInt64.toString" [value]), state)
-    // The native representation of 128-bit values is already canonical text.
-    | TInt128 | TUInt128 -> Ok (writerRaw writer value, state)
+    | TInt128 -> Ok (writerRaw writer (call "Stdlib.Int128.toString" [value]), state)
+    | TUInt128 -> Ok (writerRaw writer (call "Stdlib.UInt128.toString" [value]), state)
     | TFloat64 -> Ok (writerRaw writer (call "Stdlib.Json.__serializeFloat" [value]), state)
     | TString | TChar -> Ok (writerString writer value, state)
     | TSum ("Uuid", []) -> Ok (writerString writer (call "Stdlib.Uuid.toString" [value]), state)

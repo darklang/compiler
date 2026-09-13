@@ -51,11 +51,11 @@ let testRcShapeClassifiesPrimitivesAsImmediate () : TestResult =
     | Some typ -> Error $"Expected primitive type {typ} to classify as Immediate"
 
 let testRcShapeClassifiesManagedIntegerBuffers () : TestResult =
-    let managedIntegerTypes = [AST.TInt; AST.TInt128; AST.TUInt128]
+    let samples = [AST.TInt, DynamicString; AST.TInt128, FixedBlock (16, []); AST.TUInt128, FixedBlock (16, [])]
 
-    match managedIntegerTypes |> List.tryFind (fun typ -> rcShapeOfType Map.empty typ <> DynamicString) with
+    match samples |> List.tryFind (fun (typ, expected) -> rcShapeOfType Map.empty typ <> expected) with
     | None -> Ok ()
-    | Some typ -> Error $"Expected integer buffer type {typ} to classify as DynamicString"
+    | Some (typ, expected) -> Error $"Expected integer buffer type {typ} to classify as {expected}"
 
 let testRcShapeClassifiesTuplesAndRecordsAsFixedBlocks () : TestResult =
     let typeReg =

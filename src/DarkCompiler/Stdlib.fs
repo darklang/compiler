@@ -157,6 +157,13 @@ let rawMemoryIntrinsics : ModuleFunc list = [
     // Int uses the same canonical decimal dynamic-buffer representation as String.
     { Name = "__int_to_string"; TypeParams = []; ParamTypes = [TInt]; ReturnType = TString }
     { Name = "__string_to_int"; TypeParams = []; ParamTypes = [TString]; ReturnType = TInt }
+    // Int128 and UInt128 are immutable fixed blocks containing low/high UInt64 limbs.
+    // These representation views are ownership-neutral; the RawPtr-to-value views
+    // adopt a fully initialized owned allocation.
+    { Name = "__int128_to_rawptr"; TypeParams = []; ParamTypes = [TInt128]; ReturnType = TRawPtr }
+    { Name = "__rawptr_to_int128"; TypeParams = []; ParamTypes = [TRawPtr]; ReturnType = TInt128 }
+    { Name = "__uint128_to_rawptr"; TypeParams = []; ParamTypes = [TUInt128]; ReturnType = TRawPtr }
+    { Name = "__rawptr_to_uint128"; TypeParams = []; ParamTypes = [TRawPtr]; ReturnType = TUInt128 }
     { Name = "__int128_to_int"; TypeParams = []; ParamTypes = [TInt128]; ReturnType = TInt }
     { Name = "__uint128_to_int"; TypeParams = []; ParamTypes = [TUInt128]; ReturnType = TInt }
     { Name = "__int_to_int128"; TypeParams = []; ParamTypes = [TInt]; ReturnType = TInt128 }

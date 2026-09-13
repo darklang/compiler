@@ -34,19 +34,22 @@ truncating and Result-valued. Modulus requires a positive divisor. Division by
 zero, invalid modulus, negative powers, failed Float conversion, and parse and
 conversion bounds use the interpreter's values and failure text.
 
-`Int128` and `UInt128` are operational managed values. Arithmetic and bitwise
+`Int128` and `UInt128` are operational managed values backed by immutable
+fixed blocks containing low and high `UInt64` limbs. Arithmetic and bitwise
 results normalize through two's-complement residue modulo 2^128. The signed
 boundary `170141183460469231731687303715884105726Q + 4Q` therefore produces
 `-170141183460469231731687303715884105726Q`; unsigned maximum plus one produces
 zero. Their public modules intentionally have no random function, matching the
 pinned interpreter.
 
-The target-neutral implementation is in
+The arbitrary-width implementation is in
 `src/DarkCompiler/stdlib/__Integer.dark`; public wrappers are in `Int.dark`, the
-eight fixed-width module files, `Int128.dark`, and `UInt128.dark`. Typed
-representation views are ownership-neutral, while newly computed canonical
-buffers are owned. `ANF.fs` classifies Int, Int128, and UInt128 as managed
-dynamic values, including when nested in closures and heap shapes. Fixed-width
+eight fixed-width module files, `Int128.dark`, and `UInt128.dark`. The 128-bit
+modules perform limb arithmetic directly and use arbitrary-width values only
+at operations and conversions that require them. Typed representation views
+are ownership-neutral, while newly computed fixed blocks are owned. `ANF.fs`
+classifies `Int` as a managed dynamic value and both 128-bit types as managed
+16-byte fixed blocks, including when nested in closures and heap shapes. Fixed-width
 shifts and arithmetic lower in `4_MIR_to_LIR.fs`; signed right shift is
 arithmetic, unsigned right shift is logical, and counts use the interpreter's
 machine-width masks on both ARM64 and x86-64.

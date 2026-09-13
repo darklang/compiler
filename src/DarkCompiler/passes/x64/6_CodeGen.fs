@@ -924,7 +924,9 @@ let private slotInitRootRetainTarget
             | ANF.FixedBlock (payloadSize, _) ->
                 match valueType with
                 | AST.TTuple _
-                | AST.TRecord _ -> Some (SlotInitGenericRootRetain payloadSize)
+                | AST.TRecord _
+                | AST.TInt128
+                | AST.TUInt128 -> Some (SlotInitGenericRootRetain payloadSize)
                 | _ -> None
             | ANF.StreamRoot -> Some (SlotInitGenericRootRetain 24)
             | ANF.BoxedSum (payloadSize, _, _) ->
@@ -3610,6 +3612,8 @@ let private translateInstr
                  X86_64.Jcc (X86_64.LE, okLabel)])
             @ genOomJump ()
             @ [X86_64.Label okLabel]
+            // A free-list hit jumps to freeListPost, so place the join before
+            // leak accounting. Both allocation paths create one live root.
             @ freeListPost
             @ genLeakCounterInc ctx)
 
