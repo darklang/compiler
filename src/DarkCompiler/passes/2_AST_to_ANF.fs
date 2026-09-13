@@ -194,13 +194,14 @@ let tryCliIntrinsic (funcName: string) (args: ANF.Atom list) : ANF.CExpr option 
             match funcName with
             | "Stdlib.Cli.__execute" -> Some ANF.Execute
             | "Stdlib.Cli.__hostOSCode" -> Some ANF.HostOS
+            | "Stdlib.Cli.__hostArchitectureCode" -> Some ANF.HostArchitecture
+            | "Stdlib.Cli.__hostname" -> Some ANF.Hostname
             | "Stdlib.Cli.__getenv" -> Some ANF.GetEnv
             | "Stdlib.Cli.__argv" -> Some ANF.GetArgv
             | "Stdlib.Cli.__kill" -> Some ANF.Kill
             | "Stdlib.Cli.__getpid" -> Some ANF.GetPid
             | "Stdlib.Cli.__getuid" -> Some ANF.GetUid
             | "Stdlib.Cli.__cpuCount" -> Some ANF.CpuCount
-            | "Stdlib.Cli.__currentUser" -> Some ANF.CurrentUser
             | "Stdlib.Cli.__spawnProcess" -> Some ANF.SpawnProcess
             | "Stdlib.Cli.__processIO" -> Some ANF.ProcessIO
             | "Stdlib.Cli.__terminateProcess" -> Some ANF.TerminateProcess

@@ -44,16 +44,25 @@ let cliIntrinsicModule : ModuleDef = {
     Functions = [
         { Name = "__execute"; TypeParams = []; ParamTypes = [TString]; ReturnType = TRecord ("Stdlib.Cli.NativeOutput", []) }
         { Name = "__hostOSCode"; TypeParams = []; ParamTypes = []; ReturnType = TInt64 }
+        { Name = "__hostArchitectureCode"; TypeParams = []; ParamTypes = []; ReturnType = TInt64 }
+        { Name = "__hostname"; TypeParams = []; ParamTypes = []; ReturnType = TSum ("Stdlib.Result.Result", [TString; TRecord ("Stdlib.Cli.NativePosixError", [])]) }
         { Name = "__getenv"; TypeParams = []; ParamTypes = [TString]; ReturnType = TSum ("Stdlib.Option.Option", [TString]) }
         { Name = "__kill"; TypeParams = []; ParamTypes = [TInt64; TInt64]; ReturnType = TSum ("Stdlib.Result.Result", [TUnit; TRecord ("Stdlib.Cli.NativePosixError", [])]) }
         { Name = "__sleep"; TypeParams = []; ParamTypes = [TFloat64]; ReturnType = TUnit }
         { Name = "__getpid"; TypeParams = []; ParamTypes = []; ReturnType = TInt64 }
         { Name = "__getuid"; TypeParams = []; ParamTypes = []; ReturnType = TInt64 }
         { Name = "__cpuCount"; TypeParams = []; ParamTypes = []; ReturnType = TInt64 }
-        { Name = "__currentUser"; TypeParams = []; ParamTypes = []; ReturnType = TSum ("Stdlib.Option.Option", [TString]) }
         { Name = "__spawnProcess"; TypeParams = []; ParamTypes = [TString]; ReturnType = TInt64 }
         { Name = "__processIO"; TypeParams = []; ParamTypes = [TInt64; TString]; ReturnType = TRecord ("Stdlib.Cli.NativeOutput", []) }
         { Name = "__terminateProcess"; TypeParams = []; ParamTypes = [TInt64]; ReturnType = TRecord ("Stdlib.Cli.NativeOutput", []) }
+    ]
+}
+
+/// Compiler-only file effects used by portable stdlib implementations.
+let fileIntrinsicModule : ModuleDef = {
+    Name = "Stdlib.File"
+    Functions = [
+        { Name = "readText"; TypeParams = []; ParamTypes = [TString]; ReturnType = resultType TString }
     ]
 }
 
@@ -207,6 +216,7 @@ let allModules : ModuleDef list = [
     int64IntrinsicModule
     floatIntrinsicModule
     cliIntrinsicModule
+    fileIntrinsicModule
     randomModule
     dateTimeModule
     builtinPresentationModule

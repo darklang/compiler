@@ -515,13 +515,14 @@ type ReturnOwnership =
 type CliOperation =
     | Execute
     | HostOS
+    | HostArchitecture
+    | Hostname
     | GetEnv
     | GetArgv
     | Kill
     | GetPid
     | GetUid
     | CpuCount
-    | CurrentUser
     | SpawnProcess
     | ProcessIO
     | TerminateProcess

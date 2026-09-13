@@ -121,13 +121,14 @@ let convertCliOperation (operation: ANF.CliOperation) : MIR.CliOperation =
     match operation with
     | ANF.Execute -> MIR.Execute
     | ANF.HostOS -> MIR.HostOS
+    | ANF.HostArchitecture -> MIR.HostArchitecture
+    | ANF.Hostname -> MIR.Hostname
     | ANF.GetEnv -> MIR.GetEnv
     | ANF.GetArgv -> MIR.GetArgv
     | ANF.Kill -> MIR.Kill
     | ANF.GetPid -> MIR.GetPid
     | ANF.GetUid -> MIR.GetUid
     | ANF.CpuCount -> MIR.CpuCount
-    | ANF.CurrentUser -> MIR.CurrentUser
     | ANF.SpawnProcess -> MIR.SpawnProcess
     | ANF.ProcessIO -> MIR.ProcessIO
     | ANF.TerminateProcess -> MIR.TerminateProcess

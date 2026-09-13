@@ -579,6 +579,137 @@ let private generateCliArgvHelper (enableLeakCheck: bool) : X86_64.Instr list =
     @ leakInc
     @ [ X86_64.RET ]
 
+/// Look up a managed name in the original process environment and return a
+/// boxed Option<String>. This walks _start's native envp directly; no libc or
+/// child process is involved.
+let private generateCliGetEnvHelper (enableLeakCheck: bool) : X86_64.Instr list =
+    let label = "__dark_cli_getenv"
+    let rootLabel = $"{label}_find_root"
+    let rootFoundLabel = $"{label}_root_found"
+    let argvEndLabel = $"{label}_find_argv_end"
+    let nextEntryLabel = $"{label}_next_entry"
+    let compareLabel = $"{label}_compare"
+    let nameMatchedLabel = $"{label}_name_matched"
+    let lengthLabel = $"{label}_length"
+    let lengthDoneLabel = $"{label}_length_done"
+    let copyLabel = $"{label}_copy"
+    let copyDoneLabel = $"{label}_copy_done"
+    let stringHeapOkLabel = $"{label}_string_heap_ok"
+    let missingLabel = $"{label}_missing"
+    let boxLabel = $"{label}_box"
+    let boxHeapOkLabel = $"{label}_box_heap_ok"
+    let leakInc =
+        if enableLeakCheck then
+            [ X86_64.LEA_rip (X86_64.R11, "_leak_count")
+              X86_64.MOV_load (X86_64.RDX, X86_64.R11, 0)
+              X86_64.ADD_imm (X86_64.RDX, 1)
+              X86_64.MOV_store (X86_64.R11, 0, X86_64.RDX) ]
+        else []
+    let checkHeapBounds okLabel =
+        [ X86_64.MOV_reg (X86_64.R11, heapPtr)
+          X86_64.SUB_reg (X86_64.R11, freeListBase)
+          X86_64.CMP_imm (X86_64.R11, int32 heapMmapSizeBytes)
+          X86_64.Jcc (X86_64.LE, okLabel)
+          X86_64.JMP oomHandlerLabel
+          X86_64.Label okLabel ]
+
+    [ X86_64.Label label
+      X86_64.MOV_reg (X86_64.RAX, X86_64.RBP)
+      X86_64.Label rootLabel
+      X86_64.MOV_load (X86_64.RDX, X86_64.RAX, 0)
+      X86_64.CMP_imm (X86_64.RDX, 0)
+      X86_64.Jcc (X86_64.EQ, rootFoundLabel)
+      X86_64.MOV_reg (X86_64.RAX, X86_64.RDX)
+      X86_64.JMP rootLabel
+      X86_64.Label rootFoundLabel
+      X86_64.ADD_imm (X86_64.RAX, 16)
+      X86_64.Label argvEndLabel
+      X86_64.MOV_load (X86_64.RDX, X86_64.RAX, 0)
+      X86_64.ADD_imm (X86_64.RAX, 8)
+      X86_64.CMP_imm (X86_64.RDX, 0)
+      X86_64.Jcc (X86_64.NE, argvEndLabel)
+      X86_64.MOV_load (X86_64.RCX, X86_64.RDI, 0)
+      X86_64.Label nextEntryLabel
+      X86_64.MOV_load (X86_64.R8, X86_64.RAX, 0)
+      X86_64.ADD_imm (X86_64.RAX, 8)
+      X86_64.CMP_imm (X86_64.R8, 0)
+      X86_64.Jcc (X86_64.EQ, missingLabel)
+      X86_64.XOR_reg (X86_64.R9, X86_64.R9)
+      X86_64.Label compareLabel
+      X86_64.CMP_reg (X86_64.R9, X86_64.RCX)
+      X86_64.Jcc (X86_64.GE, nameMatchedLabel)
+      X86_64.MOV_reg (X86_64.R10, X86_64.RDI)
+      X86_64.ADD_imm (X86_64.R10, 8)
+      X86_64.ADD_reg (X86_64.R10, X86_64.R9)
+      X86_64.MOV_load_byte (X86_64.RDX, X86_64.R10, 0)
+      X86_64.MOV_reg (X86_64.R10, X86_64.R8)
+      X86_64.ADD_reg (X86_64.R10, X86_64.R9)
+      X86_64.MOV_load_byte (X86_64.R11, X86_64.R10, 0)
+      X86_64.CMP_reg (X86_64.RDX, X86_64.R11)
+      X86_64.Jcc (X86_64.NE, nextEntryLabel)
+      X86_64.ADD_imm (X86_64.R9, 1)
+      X86_64.JMP compareLabel
+      X86_64.Label nameMatchedLabel
+      X86_64.MOV_reg (X86_64.R10, X86_64.R8)
+      X86_64.ADD_reg (X86_64.R10, X86_64.RCX)
+      X86_64.MOV_load_byte (X86_64.RDX, X86_64.R10, 0)
+      X86_64.CMP_imm (X86_64.RDX, 61)
+      X86_64.Jcc (X86_64.NE, nextEntryLabel)
+      X86_64.ADD_imm (X86_64.R10, 1)
+      X86_64.MOV_reg (X86_64.R8, X86_64.R10)
+      X86_64.XOR_reg (X86_64.RCX, X86_64.RCX)
+      X86_64.Label lengthLabel
+      X86_64.MOV_load_byte (X86_64.RDX, X86_64.R10, 0)
+      X86_64.CMP_imm (X86_64.RDX, 0)
+      X86_64.Jcc (X86_64.EQ, lengthDoneLabel)
+      X86_64.ADD_imm (X86_64.RCX, 1)
+      X86_64.ADD_imm (X86_64.R10, 1)
+      X86_64.JMP lengthLabel
+      X86_64.Label lengthDoneLabel
+      X86_64.MOV_reg (X86_64.R10, heapPtr)
+      X86_64.MOV_reg (X86_64.R11, X86_64.RCX)
+      X86_64.ADD_imm (X86_64.R11, 7)
+      X86_64.AND_imm (X86_64.R11, -8)
+      X86_64.ADD_imm (X86_64.R11, 16)
+      X86_64.ADD_reg (heapPtr, X86_64.R11) ]
+    @ checkHeapBounds stringHeapOkLabel
+    @ [ X86_64.MOV_store (X86_64.R10, 0, X86_64.RCX)
+        X86_64.LEA (X86_64.R9, X86_64.R10, 8)
+        X86_64.MOV_reg (X86_64.RAX, X86_64.RCX)
+        X86_64.Label copyLabel
+        X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.EQ, copyDoneLabel)
+        X86_64.MOV_load_byte (X86_64.RDX, X86_64.R8, 0)
+        X86_64.MOV_store_byte (X86_64.R9, 0, X86_64.RDX)
+        X86_64.ADD_imm (X86_64.R8, 1)
+        X86_64.ADD_imm (X86_64.R9, 1)
+        X86_64.SUB_imm (X86_64.RAX, 1)
+        X86_64.JMP copyLabel
+        X86_64.Label copyDoneLabel
+        X86_64.MOV_reg (X86_64.R11, X86_64.RCX)
+        X86_64.ADD_imm (X86_64.R11, 7)
+        X86_64.AND_imm (X86_64.R11, -8)
+        X86_64.LEA (X86_64.R9, X86_64.R10, 8)
+        X86_64.ADD_reg (X86_64.R9, X86_64.R11)
+        X86_64.MOV_imm32 (X86_64.RDX, 1)
+        X86_64.MOV_store (X86_64.R9, 0, X86_64.RDX) ]
+    @ leakInc
+    @ [ X86_64.XOR_reg (X86_64.R8, X86_64.R8)
+        X86_64.JMP boxLabel
+        X86_64.Label missingLabel
+        X86_64.MOV_imm32 (X86_64.R8, 1)
+        X86_64.XOR_reg (X86_64.R10, X86_64.R10)
+        X86_64.Label boxLabel
+        X86_64.MOV_reg (X86_64.RAX, heapPtr)
+        X86_64.ADD_imm (heapPtr, 24) ]
+    @ checkHeapBounds boxHeapOkLabel
+    @ [ X86_64.MOV_store (X86_64.RAX, 0, X86_64.R8)
+        X86_64.MOV_store (X86_64.RAX, 8, X86_64.R10)
+        X86_64.MOV_imm32 (X86_64.RDX, 1)
+        X86_64.MOV_store (X86_64.RAX, 16, X86_64.RDX) ]
+    @ leakInc
+    @ [ X86_64.RET ]
+
 /// Function context for instructions that need stack frame info (TailCall, etc.)
 type private FuncCtx = {
     FunctionName: string
@@ -4725,6 +4856,88 @@ let private translateInstr
         |> Result.map (fun destReg ->
             match operation with
             | LIR.HostOS -> loadImm64 destReg 1L
+            | LIR.HostArchitecture -> loadImm64 destReg 1L
+            | LIR.Hostname ->
+                let failureLabel = freshLabel $"hostname_{ctx.FunctionName}_failure"
+                let lengthLabel = freshLabel $"hostname_{ctx.FunctionName}_length"
+                let lengthDoneLabel = freshLabel $"hostname_{ctx.FunctionName}_length_done"
+                let copyLabel = freshLabel $"hostname_{ctx.FunctionName}_copy"
+                let copyDoneLabel = freshLabel $"hostname_{ctx.FunctionName}_copy_done"
+                let completeLabel = freshLabel $"hostname_{ctx.FunctionName}_complete"
+                [ X86_64.SUB_imm (X86_64.RSP, 400)
+                  X86_64.MOV_reg (X86_64.RDI, X86_64.RSP) ]
+                @ loadImm64 X86_64.RAX 63L
+                @ [ X86_64.SYSCALL
+                    X86_64.CMP_imm (X86_64.RAX, 0)
+                    X86_64.Jcc (X86_64.LT, failureLabel)
+                    X86_64.LEA (X86_64.R8, X86_64.RSP, 65)
+                    X86_64.XOR_reg (X86_64.RCX, X86_64.RCX)
+                    X86_64.MOV_reg (X86_64.R9, X86_64.R8)
+                    X86_64.Label lengthLabel
+                    X86_64.MOV_load_byte (X86_64.RDX, X86_64.R9, 0)
+                    X86_64.CMP_imm (X86_64.RDX, 0)
+                    X86_64.Jcc (X86_64.EQ, lengthDoneLabel)
+                    X86_64.ADD_imm (X86_64.RCX, 1)
+                    X86_64.ADD_imm (X86_64.R9, 1)
+                    X86_64.JMP lengthLabel
+                    X86_64.Label lengthDoneLabel
+                    X86_64.MOV_reg (X86_64.R10, heapPtr)
+                    X86_64.MOV_reg (X86_64.R11, X86_64.RCX)
+                    X86_64.ADD_imm (X86_64.R11, 7)
+                    X86_64.AND_imm (X86_64.R11, -8)
+                    X86_64.ADD_imm (X86_64.R11, 16)
+                    X86_64.ADD_reg (heapPtr, X86_64.R11)
+                    X86_64.MOV_store (X86_64.R10, 0, X86_64.RCX)
+                    X86_64.LEA (X86_64.R9, X86_64.R10, 8)
+                    X86_64.MOV_reg (X86_64.RAX, X86_64.RCX)
+                    X86_64.Label copyLabel
+                    X86_64.CMP_imm (X86_64.RAX, 0)
+                    X86_64.Jcc (X86_64.EQ, copyDoneLabel)
+                    X86_64.MOV_load_byte (X86_64.RDX, X86_64.R8, 0)
+                    X86_64.MOV_store_byte (X86_64.R9, 0, X86_64.RDX)
+                    X86_64.ADD_imm (X86_64.R8, 1)
+                    X86_64.ADD_imm (X86_64.R9, 1)
+                    X86_64.SUB_imm (X86_64.RAX, 1)
+                    X86_64.JMP copyLabel
+                    X86_64.Label copyDoneLabel
+                    X86_64.MOV_reg (X86_64.R11, X86_64.RCX)
+                    X86_64.ADD_imm (X86_64.R11, 7)
+                    X86_64.AND_imm (X86_64.R11, -8)
+                    X86_64.LEA (X86_64.R9, X86_64.R10, 8)
+                    X86_64.ADD_reg (X86_64.R9, X86_64.R11)
+                    X86_64.MOV_imm32 (X86_64.RDX, 1)
+                    X86_64.MOV_store (X86_64.R9, 0, X86_64.RDX)
+                    X86_64.ADD_imm (X86_64.RSP, 400) ]
+                @ genLeakCounterInc ctx
+                @ [ X86_64.MOV_reg (destReg, heapPtr)
+                    X86_64.ADD_imm (heapPtr, 24)
+                    X86_64.XOR_reg (X86_64.R8, X86_64.R8)
+                    X86_64.MOV_store (destReg, 0, X86_64.R8)
+                    X86_64.MOV_store (destReg, 8, X86_64.R10)
+                    X86_64.MOV_imm32 (X86_64.R8, 1)
+                    X86_64.MOV_store (destReg, 16, X86_64.R8) ]
+                @ genLeakCounterInc ctx
+                @ [ X86_64.JMP completeLabel
+                    X86_64.Label failureLabel
+                    X86_64.NEG X86_64.RAX
+                    X86_64.MOV_reg (X86_64.RDX, X86_64.RAX)
+                    X86_64.ADD_imm (X86_64.RSP, 400) ]
+                @ emitStringLiteral X86_64.R9 "POSIX error"
+                @ [ X86_64.MOV_reg (X86_64.R8, heapPtr)
+                    X86_64.ADD_imm (heapPtr, 24)
+                    X86_64.MOV_store (X86_64.R8, 0, X86_64.RDX)
+                    X86_64.MOV_store (X86_64.R8, 8, X86_64.R9)
+                    X86_64.MOV_imm32 (X86_64.R10, 1)
+                    X86_64.MOV_store (X86_64.R8, 16, X86_64.R10) ]
+                @ genLeakCounterInc ctx
+                @ [ X86_64.MOV_reg (destReg, heapPtr)
+                    X86_64.ADD_imm (heapPtr, 24)
+                    X86_64.MOV_imm32 (X86_64.R10, 1)
+                    X86_64.MOV_store (destReg, 0, X86_64.R10)
+                    X86_64.MOV_store (destReg, 8, X86_64.R8)
+                    X86_64.MOV_store (destReg, 16, X86_64.R10) ]
+                @ genLeakCounterInc ctx
+                @ [X86_64.Label completeLabel]
             | LIR.GetPid ->
                 loadImm64 X86_64.RAX 39L
                 @ [X86_64.SYSCALL]
@@ -4733,7 +4946,52 @@ let private translateInstr
                 loadImm64 X86_64.RAX 102L
                 @ [X86_64.SYSCALL]
                 @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)])
-            | LIR.CpuCount -> loadImm64 destReg 1L
+            | LIR.CpuCount ->
+                let byteLoop = freshLabel $"cpu_count_{ctx.FunctionName}_byte"
+                let bitLoop = freshLabel $"cpu_count_{ctx.FunctionName}_bit"
+                let nextByte = freshLabel $"cpu_count_{ctx.FunctionName}_next"
+                let doneLabel = freshLabel $"cpu_count_{ctx.FunctionName}_done"
+                let fallbackLabel = freshLabel $"cpu_count_{ctx.FunctionName}_fallback"
+                let completeLabel = freshLabel $"cpu_count_{ctx.FunctionName}_complete"
+                let zeroMask =
+                    [0 .. 15]
+                    |> List.map (fun index -> X86_64.MOV_store (X86_64.RSP, int32 (index * 8), X86_64.R10))
+                [ X86_64.SUB_imm (X86_64.RSP, 128)
+                  X86_64.XOR_reg (X86_64.R10, X86_64.R10) ]
+                @ zeroMask
+                @ loadImm64 X86_64.RDI 0L
+                @ loadImm64 X86_64.RSI 128L
+                @ [ X86_64.MOV_reg (X86_64.RDX, X86_64.RSP) ]
+                @ loadImm64 X86_64.RAX 204L
+                @ [ X86_64.SYSCALL
+                    X86_64.CMP_imm (X86_64.RAX, 0)
+                    X86_64.Jcc (X86_64.LT, fallbackLabel)
+                    X86_64.XOR_reg (X86_64.R8, X86_64.R8)
+                    X86_64.XOR_reg (X86_64.R9, X86_64.R9)
+                    X86_64.Label byteLoop
+                    X86_64.CMP_imm (X86_64.R8, 128)
+                    X86_64.Jcc (X86_64.GE, doneLabel)
+                    X86_64.MOV_reg (X86_64.R10, X86_64.RSP)
+                    X86_64.ADD_reg (X86_64.R10, X86_64.R8)
+                    X86_64.MOV_load_byte (X86_64.R10, X86_64.R10, 0)
+                    X86_64.Label bitLoop
+                    X86_64.CMP_imm (X86_64.R10, 0)
+                    X86_64.Jcc (X86_64.EQ, nextByte)
+                    X86_64.MOV_reg (X86_64.R11, X86_64.R10)
+                    X86_64.AND_imm (X86_64.R11, 1)
+                    X86_64.ADD_reg (X86_64.R9, X86_64.R11)
+                    X86_64.SHR_imm (X86_64.R10, 1)
+                    X86_64.JMP bitLoop
+                    X86_64.Label nextByte
+                    X86_64.ADD_imm (X86_64.R8, 1)
+                    X86_64.JMP byteLoop
+                    X86_64.Label doneLabel
+                    X86_64.MOV_reg (destReg, X86_64.R9)
+                    X86_64.JMP completeLabel
+                    X86_64.Label fallbackLabel
+                    X86_64.MOV_imm32 (destReg, 1)
+                    X86_64.Label completeLabel
+                    X86_64.ADD_imm (X86_64.RSP, 128) ]
             | LIR.GetArgv ->
                 match args with
                 | [LIR.Imm index] when index >= 0L ->
@@ -4747,6 +5005,74 @@ let private translateInstr
                          X86_64.CALL "__dark_cli_argv"]
                         @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)])
                     | Error _ -> loadImm64 destReg 0L
+                | _ -> loadImm64 destReg 0L
+            | LIR.GetEnv ->
+                let loadName =
+                    match args with
+                    | [LIR.Reg name] ->
+                        match resolveReg name with
+                        | Ok nameReg when nameReg = X86_64.RDI -> []
+                        | Ok nameReg -> [X86_64.MOV_reg (X86_64.RDI, nameReg)]
+                        | Error _ -> []
+                    | [LIR.StringSymbol name] -> emitStringLiteral X86_64.RDI name
+                    | [LIR.StackSlot offset] ->
+                        [X86_64.MOV_load (X86_64.RDI, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
+                    | _ -> []
+                loadName
+                @ [X86_64.CALL "__dark_cli_getenv"]
+                @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)])
+            | LIR.Kill ->
+                let successLabel = freshLabel $"kill_{ctx.FunctionName}_success"
+                let completeLabel = freshLabel $"kill_{ctx.FunctionName}_complete"
+                let pushOperand operand =
+                    match operand with
+                    | LIR.Imm value -> loadImm64 X86_64.RAX value @ [X86_64.PUSH X86_64.RAX]
+                    | LIR.Reg reg ->
+                        match resolveReg reg with
+                        | Ok source -> [X86_64.PUSH source]
+                        | Error _ -> []
+                    | LIR.StackSlot offset ->
+                        [ X86_64.MOV_load (X86_64.RAX, X86_64.RBP, int32 (adjustStackOffset ctx offset))
+                          X86_64.PUSH X86_64.RAX ]
+                    | _ -> []
+                match args with
+                | [pid; signal] ->
+                    pushOperand pid
+                    @ pushOperand signal
+                    @ [ X86_64.POP X86_64.RSI
+                        X86_64.POP X86_64.RDI ]
+                    @ loadImm64 X86_64.RAX 62L
+                    @ [ X86_64.SYSCALL
+                        X86_64.CMP_imm (X86_64.RAX, 0)
+                        X86_64.Jcc (X86_64.GE, successLabel)
+                        X86_64.NEG X86_64.RAX
+                        X86_64.MOV_reg (X86_64.RDX, X86_64.RAX) ]
+                    @ emitStringLiteral X86_64.R9 "POSIX error"
+                    @ [ X86_64.MOV_reg (X86_64.R8, heapPtr)
+                        X86_64.ADD_imm (heapPtr, 24)
+                        X86_64.MOV_store (X86_64.R8, 0, X86_64.RDX)
+                        X86_64.MOV_store (X86_64.R8, 8, X86_64.R9)
+                        X86_64.MOV_imm32 (X86_64.R10, 1)
+                        X86_64.MOV_store (X86_64.R8, 16, X86_64.R10) ]
+                    @ genLeakCounterInc ctx
+                    @ [ X86_64.MOV_reg (destReg, heapPtr)
+                        X86_64.ADD_imm (heapPtr, 24)
+                        X86_64.MOV_imm32 (X86_64.R10, 1)
+                        X86_64.MOV_store (destReg, 0, X86_64.R10)
+                        X86_64.MOV_store (destReg, 8, X86_64.R8)
+                        X86_64.MOV_store (destReg, 16, X86_64.R10) ]
+                    @ genLeakCounterInc ctx
+                    @ [ X86_64.JMP completeLabel
+                        X86_64.Label successLabel
+                        X86_64.MOV_reg (destReg, heapPtr)
+                        X86_64.ADD_imm (heapPtr, 24)
+                        X86_64.XOR_reg (X86_64.R10, X86_64.R10)
+                        X86_64.MOV_store (destReg, 0, X86_64.R10)
+                        X86_64.MOV_store (destReg, 8, X86_64.R10)
+                        X86_64.MOV_imm32 (X86_64.R10, 1)
+                        X86_64.MOV_store (destReg, 16, X86_64.R10) ]
+                    @ genLeakCounterInc ctx
+                    @ [X86_64.Label completeLabel]
                 | _ -> loadImm64 destReg 0L
             | LIR.Execute | LIR.ProcessIO | LIR.TerminateProcess ->
                 let errorMessage =
@@ -4762,7 +5088,6 @@ let private translateInstr
                    X86_64.MOV_store (destReg, 16, X86_64.R9)]
                 @ loadImm64 X86_64.RCX 1L
                 @ [X86_64.MOV_store (destReg, 24, X86_64.RCX)]
-            | LIR.GetEnv | LIR.CurrentUser | LIR.Kill -> loadImm64 destReg 0L
             | LIR.SpawnProcess -> loadImm64 destReg 1L)
 
     | LIR.Madd (dest, mulLeft, mulRight, add) ->
@@ -5360,6 +5685,15 @@ type private RcHelperRequirements = {
 /// Translate a complete LIR program to x86-64 instructions
 let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry)) (enableLeakCheck: bool) : Result<X86_64.Instr list, string> =
     let sumShapeRegistry = rcSumShapeRegistryFromVariantRegistry variantRegistry
+    let needsCliGetEnvHelper =
+        functions
+        |> List.exists (fun func ->
+            func.CFG.Blocks
+            |> Map.exists (fun _ block ->
+                block.Instrs
+                |> List.exists (function
+                    | LIR.CliNative (_, LIR.GetEnv, _) -> true
+                    | _ -> false)))
 
     let rec translateFuncs acc remaining =
         match remaining with
@@ -6032,4 +6366,4 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry)) 
                 }
             else
                 []
-        allInstrs @ listIncHelper @ listDecHelpers @ dictIncHelper @ plannedDictDecHelpers @ dictDecHelper @ dictDecDynamicKeyHelper @ dictDecDynamicValueHelper @ dictDecDynamicKeyValueHelper @ dictDecDynamicKeyDictValueHelper @ dictDecDynamicKeyDictListValueHelper @ dictDecListValueHelper @ dictDecDictValueHelper @ dictDecDictListValueHelper @ dictDecTupleStringListValueHelper @ dictDecTupleStringListDictValueHelper @ dictDecDynamicKeyTupleStringListDictValueHelper @ dictDecSumStringValueHelper @ closureIncHelper @ closureDecHelper @ streamDecHelper @ recursiveSumRcDecHelpers @ generateCliArgvHelper enableLeakCheck @ genOomHandler ())
+        allInstrs @ listIncHelper @ listDecHelpers @ dictIncHelper @ plannedDictDecHelpers @ dictDecHelper @ dictDecDynamicKeyHelper @ dictDecDynamicValueHelper @ dictDecDynamicKeyValueHelper @ dictDecDynamicKeyDictValueHelper @ dictDecDynamicKeyDictListValueHelper @ dictDecListValueHelper @ dictDecDictValueHelper @ dictDecDictListValueHelper @ dictDecTupleStringListValueHelper @ dictDecTupleStringListDictValueHelper @ dictDecDynamicKeyTupleStringListDictValueHelper @ dictDecSumStringValueHelper @ closureIncHelper @ closureDecHelper @ streamDecHelper @ recursiveSumRcDecHelpers @ generateCliArgvHelper enableLeakCheck @ (if needsCliGetEnvHelper then generateCliGetEnvHelper enableLeakCheck else []) @ genOomHandler ())

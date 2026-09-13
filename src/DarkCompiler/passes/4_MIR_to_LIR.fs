@@ -18,13 +18,14 @@ let convertCliOperation (operation: MIR.CliOperation) : LIR.CliOperation =
     match operation with
     | MIR.Execute -> LIR.Execute
     | MIR.HostOS -> LIR.HostOS
+    | MIR.HostArchitecture -> LIR.HostArchitecture
+    | MIR.Hostname -> LIR.Hostname
     | MIR.GetEnv -> LIR.GetEnv
     | MIR.GetArgv -> LIR.GetArgv
     | MIR.Kill -> LIR.Kill
     | MIR.GetPid -> LIR.GetPid
     | MIR.GetUid -> LIR.GetUid
     | MIR.CpuCount -> LIR.CpuCount
-    | MIR.CurrentUser -> LIR.CurrentUser
     | MIR.SpawnProcess -> LIR.SpawnProcess
     | MIR.ProcessIO -> LIR.ProcessIO
     | MIR.TerminateProcess -> LIR.TerminateProcess
@@ -1651,7 +1652,23 @@ let selectInstr
              nextState))
 
     | MIR.CliNative (dest, operation, args) ->
-        Ok ([LIR.CliNative (vregToLIRReg dest, convertCliOperation operation, List.map convertOperand args)], state)
+        let operation = convertCliOperation operation
+        let args = List.map convertOperand args
+        match operation with
+        | LIR.GetArgv ->
+            // The long-standing argv helper already returns through the
+            // requested destination and is performance-critical at benchmark
+            // startup. Keep its established lowering separate from the new
+            // inline native operations, whose syscall and allocation scratch
+            // registers require explicit caller preservation.
+            Ok ([LIR.CliNative (vregToLIRReg dest, operation, args)], state)
+        | _ ->
+            Ok (
+                [ LIR.SaveRegs ([], [])
+                  LIR.CliNative (LIR.Physical LIR.X0, operation, args)
+                  LIR.RestoreRegs ([], [])
+                  LIR.Mov (vregToLIRReg dest, LIR.Reg (LIR.Physical LIR.X0)) ],
+                state)
 
     | MIR.FloatToString (dest, value) ->
         let lirDest = vregToLIRReg dest

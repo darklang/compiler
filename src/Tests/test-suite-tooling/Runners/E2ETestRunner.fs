@@ -178,6 +178,7 @@ let tryPrepareBatchTest (test: E2ETest) : PreparedE2EBatchTest option =
         && Option.isNone test.ExpectedStdout
         && Option.isNone test.ExpectedStderr
         && List.isEmpty test.Arguments
+        && List.isEmpty test.Environment
         && test.Stdin = TestDSL.E2EFormat.Closed
         && test.ExpectedExitCode = 0
         && not test.ExpectCompileError
@@ -1020,6 +1021,7 @@ let private buildCompilerOptions (test: E2ETest)
 let private tryExecuteBinary
     (target: Platform.Target)
     (arguments: string list)
+    (environment: (string * string) list)
     (stdin: TestDSL.E2EFormat.TestStdin)
     (binary: byte array)
     : Result<CompilerLibrary.ExecutionOutput, string> =
@@ -1028,11 +1030,12 @@ let private tryExecuteBinary
         | TestDSL.E2EFormat.Closed -> CompilerLibrary.Closed
         | TestDSL.E2EFormat.Bytes value ->
             value |> System.Text.Encoding.UTF8.GetBytes |> CompilerLibrary.Bytes
-    try Ok (CompilerLibrary.executeCapturedWithArguments target 0 arguments input binary)
+    try Ok (CompilerLibrary.executeCapturedWithArgumentsAndEnvironment target 0 arguments environment input binary)
     with ex -> Error ex.Message
 
 let private compileAndRun
     (arguments: string list)
+    (environment: (string * string) list)
     (stdin: TestDSL.E2EFormat.TestStdin)
     (request: CompilerLibrary.CompileRequest)
     : E2ERun =
@@ -1041,7 +1044,7 @@ let private compileAndRun
     | Error err ->
         CompileFailed (1, err, compileReport.CompileTime)
     | Ok binary ->
-        match tryExecuteBinary compileReport.Target arguments stdin binary with
+        match tryExecuteBinary compileReport.Target arguments environment stdin binary with
         | Ok execResult ->
             Ran (execResult.ExitCode, execResult.Stdout, execResult.Stderr, compileReport.CompileTime, execResult.RuntimeTime)
         | Error err ->
@@ -1241,7 +1244,7 @@ let runE2ETestBatchWithPreambleContext
             Session = session
         }
         let aggregateRun =
-            compileAndRun [] TestDSL.E2EFormat.Closed request
+            compileAndRun [] [] TestDSL.E2EFormat.Closed request
 
         let results =
             match aggregateRun with
@@ -1342,7 +1345,7 @@ let private runE2ETestSourceWithPreambleContext
         PassTimingRecorder = passTimingRecorder
         Session = session
     }
-    let run = compileAndRun test.Arguments test.Stdin request
+    let run = compileAndRun test.Arguments test.Environment test.Stdin request
     let primaryResult = evaluateExpectations test run
 
     let shouldTryRawPreambleFallback =
@@ -1377,7 +1380,7 @@ let private runE2ETestSourceWithPreambleContext
             PassTimingRecorder = passTimingRecorder
             Session = session
         }
-        let fallbackRun = compileAndRun test.Arguments test.Stdin fallbackRequest
+        let fallbackRun = compileAndRun test.Arguments test.Environment test.Stdin fallbackRequest
         match evaluateExpectations test fallbackRun with
         | Ok _ as success ->
             success

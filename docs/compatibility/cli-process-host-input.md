@@ -46,6 +46,22 @@ process-handle and pending-terminal roots are allocator-independent runtime
 state. Backends construct normal managed Int/String/Result/record/tuple values,
 so ordinary reference counting owns their lifetimes.
 
+Host and account discovery do not launch Unix command-line utilities. `Env.get`
+walks the original `envp` and copies the exact value, including trailing spaces
+and newlines. Architecture and operating-system values are fixed by the compile
+target. Hostname, PID, UID, signals, and online CPU count use the target kernel
+ABI directly: Linux counts the `sched_getaffinity` mask, while macOS reads
+`HW_AVAILCPU` through `sysctl`. `Sys.currentUser` preserves LOGNAME/USER
+precedence and otherwise matches the native UID in `/etc/passwd` through the
+compiler's existing file intrinsic. These paths therefore do not depend on
+`PATH`, a configured shell, utility output wording, or text trimming.
+
+This native-host boundary is separate from APIs whose purpose is to execute a
+command. `Cli.execute` and `Process.shellPipeline` intentionally accept shell
+language. The current portable `Process.runIn`, environment, timeout, and pipe
+conveniences are also implemented through the process-launch surface; they are
+not used for host, environment, account, architecture, or signal discovery.
+
 The sleep portion of this boundary was separately revalidated from compiler
 baseline HEAD `7e08aa752a123ba6094ce6f6aafac6dfd2c8a4a9` against the same exact
 darklang/dark revision above. `Stdlib.Cli.Posix.sleep` now calls the internal
@@ -81,7 +97,9 @@ The registry is `src/DarkCompiler/Stdlib.fs`; typed lowering starts in
 `passes/2_AST_to_ANF.fs`, passes through `ANF.fs`, `MIR.fs`, and `LIR.fs`, and
 ends in both architecture code generators. Focused native evidence is
 `src/Tests/e2e/cli_process_host_input.e2e` plus the enabled pinned
-`src/Tests/e2e/upstream/stdlib/cli-process.dark` corpus.
+`src/Tests/e2e/upstream/stdlib/cli-process.dark` corpus. Target-ABI coverage is
+in `ARM64CodeGenTests.fs`, and executable Linux x86_64 coverage runs the native
+operations under QEMU in `X86_64CodeGenTests.fs`.
 
 ## Verification record
 

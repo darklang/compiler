@@ -549,6 +549,54 @@ let testCliArgvReturnsManagedOptionString () : Result<unit, string> =
         elif stdout <> "hello" then Error $"Expected Some(hello), got '{stdout}'"
         else Ok ()
 
+/// Run the x64 kernel boundary under QEMU: hostname and environment values
+/// must be managed strings, CPU affinity must be counted, and kill(2) must
+/// preserve EINVAL without consulting a command-line utility.
+let testCliHostOperationsExecute () : Result<unit, string> =
+    let program =
+        makeSimpleProgram
+            [ LIR.CliNative (LIR.Physical LIR.X0, LIR.CpuCount, [])
+              LIR.PrintInt64 (LIR.Physical LIR.X0)
+              LIR.CliNative (LIR.Physical LIR.X0, LIR.Hostname, [])
+              LIR.HeapLoad (LIR.Physical LIR.X1, LIR.Physical LIR.X0, 8)
+              LIR.PrintHeapString (LIR.Physical LIR.X1)
+              LIR.CliNative (LIR.Physical LIR.X0, LIR.GetEnv, [LIR.StringSymbol "PATH"])
+              LIR.HeapLoad (LIR.Physical LIR.X1, LIR.Physical LIR.X0, 8)
+              LIR.PrintHeapString (LIR.Physical LIR.X1)
+              LIR.CliNative (LIR.Physical LIR.X0, LIR.GetPid, [])
+              LIR.CliNative (LIR.Physical LIR.X0, LIR.Kill, [LIR.Reg (LIR.Physical LIR.X0); LIR.Imm 99999L])
+              LIR.HeapLoad (LIR.Physical LIR.X1, LIR.Physical LIR.X0, 8)
+              LIR.HeapLoad (LIR.Physical LIR.X2, LIR.Physical LIR.X1, 0)
+              LIR.PrintInt64 (LIR.Physical LIR.X2) ]
+            LIR.Ret
+
+    match runLIRProgramFullWithOptions program false with
+    | Error error -> Error error
+    | Ok (exitCode, stdout, stderr) ->
+        match stdout.Split('\n') |> Array.toList with
+        | cpuCount :: hostname :: path :: errno :: _ ->
+            match System.Int64.TryParse cpuCount, System.Int64.TryParse errno with
+            | (true, count), (true, 22L)
+                when exitCode = 0 && count > 0L && hostname <> "" && path <> "" && stderr = "" -> Ok ()
+            | _ -> Error $"Unexpected x64 CLI host output: exit={exitCode}, stdout='{stdout}', stderr='{stderr}'"
+        | _ -> Error $"Incomplete x64 CLI host output: exit={exitCode}, stdout='{stdout}', stderr='{stderr}'"
+
+let testCliNativePreservesLiveCallerRegister () : Result<unit, string> =
+    let program =
+        makeSimpleProgram
+            [ LIR.Mov (LIR.Physical LIR.X3, LIR.Imm 42L)
+              LIR.SaveRegs ([LIR.X3], [])
+              LIR.CliNative (LIR.Physical LIR.X0, LIR.CpuCount, [])
+              LIR.RestoreRegs ([LIR.X3], [])
+              LIR.Mov (LIR.Physical LIR.X0, LIR.Reg (LIR.Physical LIR.X3))
+              LIR.PrintInt64 (LIR.Physical LIR.X0) ]
+            LIR.Ret
+    match runLIRProgramFullWithOptions program false with
+    | Error error -> Error error
+    | Ok (exitCode, stdout, stderr) ->
+        if exitCode = 0 && stdout = "42\n" && stderr = "" then Ok ()
+        else Error $"CLI native call corrupted a live x64 caller register: exit={exitCode}, stdout='{stdout}', stderr='{stderr}'"
+
 /// The host is ARM64, so inspect the x64 syscall lowering directly. DateTime
 /// clock values retain nanosecond-derived precision as 100ns Unix ticks.
 let testDateTimeNowLowersTo100nsUnixTicks () : Result<unit, string> =
@@ -5655,6 +5703,8 @@ let tests : (string * (unit -> Result<unit, string>)) list = [
     ("x64 branch false edge falls through", testBranchFalseEdgeFallsThrough)
     ("LIR CLI argv x64 helper resolves as code label", testCliArgvHelperResolvesAsCodeLabel)
     ("LIR CLI argv x64 returns managed Option String", testCliArgvReturnsManagedOptionString)
+    ("LIR CLI host operations execute under x64", testCliHostOperationsExecute)
+    ("LIR CLI native call preserves live x64 caller register", testCliNativePreservesLiveCallerRegister)
     ("LIR HeapAlloc x64 reuses a block into X3", testHeapAllocReusesBlockIntoX3)
     ("LIR string x64 refcount supports X3", testStringRefCountSupportsX3)
     ("LIR string literal x64 supports X12 destination", testStringLiteralSupportsX12Destination)

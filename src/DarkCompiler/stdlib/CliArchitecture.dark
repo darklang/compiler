@@ -13,14 +13,7 @@ let __fromName(arch: String) : Stdlib.Result.Result<Stdlib.Cli.Architecture.Arch
     else Error("Unsupported architecture")
 
 let getArchitecture() : Stdlib.Result.Result<Stdlib.Cli.Architecture.Architecture, String> =
-    match Stdlib.Cli.OS.getOS() with
-    | Error(error) -> Error(error)
-    | Ok(Linux) ->
-        let result = Stdlib.Cli.execute("uname -m") in
-        if result.exitCode == 0I then Stdlib.Cli.Architecture.__fromName(Stdlib.String.trim(result.stdout))
-        else Error(result.stderr)
-    | Ok(MacOS) ->
-        let result = Stdlib.Cli.execute("uname -m") in
-        if result.exitCode == 0I then Stdlib.Cli.Architecture.__fromName(Stdlib.String.trim(result.stdout))
-        else Error(result.stderr)
-    | Ok(Windows) -> Error("Unsupported architecture")
+    if Stdlib.Cli.__hostArchitectureCode() == 1L then Ok(Stdlib.Cli.Architecture.Architecture.X86_64)
+    else if Stdlib.Cli.__hostArchitectureCode() == 2L then Ok(Stdlib.Cli.Architecture.Architecture.Aarch64)
+    else if Stdlib.Cli.__hostArchitectureCode() == 3L then Ok(Stdlib.Cli.Architecture.Architecture.Arm64)
+    else Error("Unsupported architecture")

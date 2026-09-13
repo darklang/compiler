@@ -39,6 +39,8 @@ type E2ETest = {
     ExpectedStderr: string option
     /// Positional command-line arguments supplied to the native process.
     Arguments: string list
+    /// Environment variables overridden for the native process.
+    Environment: (string * string) list
     Stdin: TestStdin
     OutputMatch: OutputMatch
     ExpectedExitCode: int
@@ -99,6 +101,7 @@ type private OptFlags = {
     DisableFunctionTreeShaking: bool
     DisableLeakCheck: bool
     Arguments: string list
+    Environment: (string * string) list
     Stdin: TestStdin
     OutputMatch: OutputMatch
 }
@@ -125,6 +128,7 @@ let private defaultOptFlags = {
     DisableFunctionTreeShaking = false
     DisableLeakCheck = false
     Arguments = []
+    Environment = []
     Stdin = Closed
     OutputMatch = NormalizedText
 }
@@ -349,6 +353,7 @@ let private isAttributeKey (key: string) : bool =
     | "stdout"
     | "stderr"
     | "arg"
+    | "env"
     | "skip"
     | "no_free_list"
     | "disable_leak_check"
@@ -754,6 +759,17 @@ let private parseTestLineWithPreamble (line: string) (lineNumber: int) (filePath
                                                         Arguments = optFlags.Arguments @ [argument]
                                                 }
                                             | Error e -> errors <- $"Invalid argument: {e}" :: errors
+                                        | "env" ->
+                                            match parseStringLiteral value with
+                                            | Error e -> errors <- $"Invalid environment override: {e}" :: errors
+                                            | Ok assignment ->
+                                                match assignment.Split([|'='|], 2) with
+                                                | [| name; envValue |] when name <> "" ->
+                                                    optFlags <- {
+                                                        optFlags with
+                                                            Environment = optFlags.Environment @ [(name, envValue)]
+                                                    }
+                                                | _ -> errors <- "Environment override must be NAME=value" :: errors
                                         | "skip" ->
                                             sawRuntimeExpectationAttribute <- true
                                             match parseStringLiteral value with
@@ -908,6 +924,7 @@ let private parseTestLineWithPreamble (line: string) (lineNumber: int) (filePath
                 ExpectedStdout = stdout
                 ExpectedStderr = stderr
                 Arguments = optFlags.Arguments
+                Environment = optFlags.Environment
                 Stdin = optFlags.Stdin
                 OutputMatch = optFlags.OutputMatch
                 ExpectedExitCode = exitCode

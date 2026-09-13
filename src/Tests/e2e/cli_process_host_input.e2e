@@ -7,7 +7,12 @@ Stdlib.Cli.Process.shellQuote("it's ready") = "'it'\\''s ready'"
 match Stdlib.Cli.OS.getOS() with | Ok(Linux) -> true | Ok(MacOS) -> true | _ -> false = true
 
 Stdlib.Cli.Sys.cpuCount() > 0I = true
+Stdlib.Cli.Sys.cpuCount() > 1I = true // test hosts expose more than one CPU; the intrinsic must not return its old constant
 Stdlib.Cli.Sys.currentPid() > 0I = true
+
+// POSIX failures must preserve the kernel errno instead of inferring it from
+// localized command-line utility output.
+match Stdlib.Cli.Posix.kill(Stdlib.Cli.Sys.currentPid(), 99999I) with | Error(error) -> (error.errno, error.message) | Ok(()) -> (0I, "unexpected") = (22I, "Invalid argument")
 
 match Stdlib.Cli.Process.exec("printf", ["%s", "direct execution"]) with | Ok(output) -> output | Error(message) -> message = "direct execution"
 
@@ -24,6 +29,12 @@ let key = Stdlib.Cli.Stdin.KeyRead.KeyRead { key = Stdlib.Cli.Stdin.Key.Key.A, m
 let key = Stdlib.Cli.Stdin.readKey() in (Stdlib.Cli.Stdin.Key.toString(key.key), key.keyChar, key.repeat) = ("Escape", "", 1I)
 
 match Stdlib.Cli.Env.get("PATH") with | Some(path) -> Stdlib.String.length(path) > 0I | None -> false = true
+
+Stdlib.Cli.Env.get("DARK_NATIVE_ENV_PROBE") = Some("value  \n") env="DARK_NATIVE_ENV_PROBE=value  \n"
+
+match Stdlib.Cli.Sys.hostname() with | Ok(hostname) -> Stdlib.String.length(hostname) > 0I | Error(_) -> false = true env="PATH="
+
+match Stdlib.Cli.Sys.currentUser() with | Some(user) -> user | None -> "missing" = "native user  " env="USER=native user  " env="PATH="
 
 // Arguments are positional (excluding the executable name) and parsing errors
 // are values, so command-line programs must handle absent or invalid input.

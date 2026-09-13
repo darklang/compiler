@@ -4633,10 +4633,11 @@ let compile (request: CompileRequest) : CompileReport =
 
 /// Execute a compiled binary with positional arguments and finite stdin while
 /// capturing both output streams.
-let executeCapturedWithArguments
+let executeCapturedWithArgumentsAndEnvironment
     (target: Platform.Target)
     (verbosity: int)
     (arguments: string list)
+    (environment: (string * string) list)
     (input: ExecutionInput)
     (binary: byte array)
     : ExecutionOutput =
@@ -4712,6 +4713,8 @@ let executeCapturedWithArguments
                 execInfo.RedirectStandardInput <- true
                 execInfo.UseShellExecute <- false
                 arguments |> List.iter execInfo.ArgumentList.Add
+                environment
+                |> List.iter (fun (name, value) -> execInfo.Environment.[name] <- value)
 
                 // Retry up to 3 times with small delay if we get "Text file busy"
                 let rec startWithRetry attempts =
@@ -4754,6 +4757,15 @@ let executeCapturedWithArguments
             // Cleanup - ignore deletion errors
             tryDeleteFile tempPath
     result
+
+let executeCapturedWithArguments
+    (target: Platform.Target)
+    (verbosity: int)
+    (arguments: string list)
+    (input: ExecutionInput)
+    (binary: byte array)
+    : ExecutionOutput =
+    executeCapturedWithArgumentsAndEnvironment target verbosity arguments [] input binary
 
 /// Execute a compiled binary with finite stdin while capturing both output streams.
 let executeCaptured
