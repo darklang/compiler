@@ -1783,12 +1783,27 @@ let private buildConversionResult
         ModuleRegistry = registries.ModuleRegistry
     }
 
+// The stdlib contains enough mutually connected helpers that the general user
+// program policy causes excessive compile-time and ANF growth. This policy is
+// deliberately limited to shallow, very small ordinary helpers; the other
+// specialized inlining modes remain available to user programs.
+let private stdlibInliningConfig : ANF_Inlining.InliningConfig = {
+    MaxFunctionSize = 1
+    MaxInlineDepth = 1
+    MaxExternalInlineSites = 0
+    MaxBoundedLoopIterations = 0
+    MaxBoundedLoopExpansion = 0
+    MaxProjectedTupleInlineSize = 0
+    MaxProjectedTupleInlineSites = 0
+}
+
 /// Run ANF optimization + RC insertion, returning a final ANF function list and type map
 let private buildAnf
     (verbosity: int)
     (options: CompilerOptions)
     (sw: Stopwatch)
     (registries: AST_to_ANF.Registries)
+    (inliningConfig: ANF_Inlining.InliningConfig)
     (externalInlineCandidates: Map<string, ANF_Inlining.FunctionInfo>)
     (nonInlineableFunctionNames: Set<string>)
     (functions: ANF.Function list)
@@ -1837,7 +1852,7 @@ let private buildAnf
             anfOptimized
         else
             ANF_Inlining.inlineProgramWithExternalCandidatesAndExclusions
-                ANF_Inlining.defaultConfig
+                inliningConfig
                 externalInlineCandidates
                 nonInlineableFunctionNames
                 anfOptimized
@@ -3101,8 +3116,8 @@ let buildStdlibWithTrace
                         baseFuncNames
                         returnTypes
                 let stdlibFunctions = anfResult.Functions
-                let stdlibOptions = { defaultOptions with DisableInlining = true }
-                match buildAnf 0 stdlibOptions sw registries Map.empty Set.empty stdlibFunctions false passTimingRecorder with
+                let stdlibOptions = defaultOptions
+                match buildAnf 0 stdlibOptions sw registries stdlibInliningConfig Map.empty Set.empty stdlibFunctions false passTimingRecorder with
                 | Error e ->
                     Error e
                 | Ok (anfFunctions, typeMap) ->
@@ -3284,9 +3299,9 @@ let buildStdlibSpecializations
                     let varGen = ANF.VarGen 0
                     AST_to_ANF.convertFunctions registries varGen resolvedFunctions
                     |> Result.bind (fun (anfFuncs, _varGen1) ->
-                        let stdlibOptions = { defaultOptions with DisableInlining = true }
+                        let stdlibOptions = defaultOptions
                         let sw = Stopwatch.StartNew()
-                        buildAnf 0 stdlibOptions sw registries Map.empty Set.empty anfFuncs false passTimingRecorder
+                        buildAnf 0 stdlibOptions sw registries stdlibInliningConfig Map.empty Set.empty anfFuncs false passTimingRecorder
                         |> Result.bind (fun (anfFunctions, typeMap) ->
                             let tcoFunctions = applyTco 0 stdlibOptions sw registries.RecursiveMembers anfFunctions passTimingRecorder
                             let newAnfFuncMap =
@@ -3947,6 +3962,7 @@ let private compileUserWithPlan (plan: UserCompilePlan) : CompileReport =
                                 plan.Options
                                 sw
                                 userRegistries
+                                ANF_Inlining.defaultConfig
                                 plan.ExternalInlineCandidates
                                 userOnly.NonInlineableFunctionNames
                                 dependencyFunctions
@@ -4007,6 +4023,7 @@ let private compileUserWithPlan (plan: UserCompilePlan) : CompileReport =
                                     plan.Options
                                     sw
                                     userRegistries
+                                    ANF_Inlining.defaultConfig
                                     plan.ExternalInlineCandidates
                                     userOnly.NonInlineableFunctionNames
                                     (programEntry :: programFunctions)
@@ -4086,6 +4103,7 @@ let private compileUserWithPlan (plan: UserCompilePlan) : CompileReport =
                                         plan.Options
                                         sw
                                         startRegistries
+                                        ANF_Inlining.defaultConfig
                                         Map.empty
                                         Set.empty
                                         [startFunction]
@@ -4363,7 +4381,7 @@ let buildPreambleContext
                             preambleRegistries
                             baseFuncNames
                             preambleReturnTypes
-                    match buildAnf 0 preambleOptions sw preambleRegistries Map.empty Set.empty preambleUserOnly.Functions false passTimingRecorder with
+                    match buildAnf 0 preambleOptions sw preambleRegistries ANF_Inlining.defaultConfig Map.empty Set.empty preambleUserOnly.Functions false passTimingRecorder with
                     | Error err ->
                         let rcPrefix = "Reference count insertion error: "
                         let msg =
@@ -4480,7 +4498,7 @@ let buildPreambleContextFromAnalysis
                 preambleRegistries
                 baseFuncNames
                 preambleReturnTypes
-        match buildAnf 0 preambleOptions sw preambleRegistries Map.empty Set.empty preambleUserOnly.Functions false passTimingRecorder with
+        match buildAnf 0 preambleOptions sw preambleRegistries ANF_Inlining.defaultConfig Map.empty Set.empty preambleUserOnly.Functions false passTimingRecorder with
         | Error err ->
             let rcPrefix = "Reference count insertion error: "
             let msg =
@@ -4871,7 +4889,7 @@ let getReachableStdlibFunctionsFromStdlib (stdlib: StdlibResult) (source: string
                     ModuleRegistry = userOnly.ModuleRegistry
                     RecursiveMembers = userOnly.RecursiveMembers
                 }
-                match buildAnf 0 coverageOptions sw userRegistries Map.empty userOnly.NonInlineableFunctionNames (entryFunction :: userOnly.UserFunctions) false None with
+                match buildAnf 0 coverageOptions sw userRegistries ANF_Inlining.defaultConfig Map.empty userOnly.NonInlineableFunctionNames (entryFunction :: userOnly.UserFunctions) false None with
                 | Error err -> Error err
                 | Ok (userFunctions, _typeMap) ->
                     match PrintInsertion.insertPrintInEntry "_start" boundaryProgramType userFunctions with
