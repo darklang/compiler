@@ -1,0 +1,38 @@
+// Primitive literal scalar decoding and normalization parity.
+
+---NAME---
+surrogate scalar escape is rejected
+---SOURCE---
+"\uD800"
+---EXPECT-ERROR---
+Invalid Unicode scalar escape: \uD800
+
+---NAME---
+uppercase surrogate scalar escape is rejected
+---SOURCE---
+"\XDFFF"
+---EXPECT-ERROR---
+Invalid Unicode scalar escape: \XDFFF
+
+---NAME---
+out of range scalar escape is rejected
+---SOURCE---
+"\U00110000"
+---EXPECT-ERROR---
+Invalid Unicode scalar escape: \U00110000
+
+---NAME---
+raw strings normalize to NFC
+---SOURCE---
+"""é"""
+---EXPECTED---
+"é"
+---ROUNDTRIP---
+
+---NAME---
+interpolated text normalizes to NFC
+---SOURCE---
+$"é {value}"
+---EXPECTED---
+$"é {value}"
+---ROUNDTRIP---

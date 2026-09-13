@@ -206,6 +206,64 @@ let private materializeIndentedListSeparators (input: string) : string =
 
 /// Lexer: convert string to list of tokens
 let lex (input: string) : Result<Token list, string> =
+    let decodeEscape (chars: char list) : Result<string * char list, string> =
+        let takeHex length remaining =
+            let rec take count reversed rest =
+                if count = 0 then
+                    Ok (System.String(List.rev reversed |> List.toArray), rest)
+                else
+                    match rest with
+                    | c :: tail -> take (count - 1) (c :: reversed) tail
+                    | [] -> Error (System.String(List.rev reversed |> List.toArray))
+
+            take length [] remaining
+
+        let parseHex length remaining =
+            takeHex length remaining
+            |> Result.bind (fun (text, rest) ->
+                match System.Int32.TryParse(text, System.Globalization.NumberStyles.HexNumber, null) with
+                | true, value -> Ok (value, text, rest)
+                | false, _ -> Error text)
+
+        let scalar kind length remaining =
+            parseHex length remaining
+            |> Result.mapError (fun text -> $"Invalid Unicode scalar escape: \\{kind}{text}")
+            |> Result.bind (fun (value, text, rest) ->
+                if value > 0x10FFFF || (value >= 0xD800 && value <= 0xDFFF) then
+                    Error $"Invalid Unicode scalar escape: \\{kind}{text}"
+                else
+                    Ok (System.Char.ConvertFromUtf32 value, rest))
+
+        match chars with
+        | 'n' :: remaining -> Ok ("\n", remaining)
+        | 't' :: remaining -> Ok ("\t", remaining)
+        | 'r' :: remaining -> Ok ("\r", remaining)
+        | 'a' :: remaining -> Ok (string (char 7), remaining)
+        | 'b' :: remaining -> Ok (string (char 8), remaining)
+        | 'v' :: remaining -> Ok (string (char 11), remaining)
+        | 'f' :: remaining -> Ok (string (char 12), remaining)
+        | '\\' :: remaining -> Ok ("\\", remaining)
+        | '"' :: remaining -> Ok ("\"", remaining)
+        | '\'' :: remaining -> Ok ("'", remaining)
+        | '/' :: remaining -> Ok ("/", remaining)
+        | '0' :: remaining -> Ok ("\000", remaining)
+        | '{' :: remaining -> Ok ("{", remaining)
+        | '}' :: remaining -> Ok ("}", remaining)
+        | 'x' :: remaining ->
+            parseHex 2 remaining
+            |> Result.mapError (fun text -> $"Invalid hex escape sequence: \\x{text}")
+            |> Result.map (fun (value, _, rest) -> (string (char value), rest))
+        | ('u' | 'X') as kind :: remaining -> scalar kind 4 remaining
+        | 'U' :: remaining -> scalar 'U' 8 remaining
+        | c :: _ -> Error $"Unknown escape sequence: \\{c}"
+        | [] -> Error "Unterminated escape sequence"
+
+    let prependDecoded (decoded: string) (chars: char list) : char list =
+        decoded |> Seq.fold (fun accumulated ch -> ch :: accumulated) chars
+
+    let normalize (text: string) =
+        text.Normalize(System.Text.NormalizationForm.FormC)
+
     let rec lexHelper (chars: char list) (acc: Token list) : Result<Token list, string> =
         match chars with
         | [] -> Ok (List.rev (TEOF :: acc))
@@ -481,31 +539,6 @@ let lex (input: string) : Result<Token list, string> =
                 | '"' :: '"' :: remaining -> (true, remaining)
                 | _ -> (false, rest)
 
-            // Helper to parse escape sequences (same as regular strings)
-            let parseEscape (cs: char list) : Result<char * char list, string> =
-                match cs with
-                | 'n' :: remaining -> Ok ('\n', remaining)
-                | 't' :: remaining -> Ok ('\t', remaining)
-                | 'r' :: remaining -> Ok ('\r', remaining)
-                | '\\' :: remaining -> Ok ('\\', remaining)
-                | '"' :: remaining -> Ok ('"', remaining)
-                | '\'' :: remaining -> Ok ('\'', remaining)
-                | '0' :: remaining -> Ok ('\000', remaining)
-                | '{' :: remaining -> Ok ('{', remaining)  // Escape { as \{
-                | '}' :: remaining -> Ok ('}', remaining)  // Escape } as \}
-                | 'x' :: h1 :: h2 :: remaining ->
-                    let hexStr = System.String([| h1; h2 |])
-                    match System.Int32.TryParse(hexStr, System.Globalization.NumberStyles.HexNumber, null) with
-                    | (true, value) -> Ok (char value, remaining)
-                    | (false, _) -> Error $"Invalid hex escape sequence: \\x{hexStr}"
-                | 'u' :: h1 :: h2 :: h3 :: h4 :: remaining ->
-                    let hexStr = System.String([| h1; h2; h3; h4 |])
-                    match System.Int32.TryParse(hexStr, System.Globalization.NumberStyles.HexNumber, null) with
-                    | (true, value) -> Ok (char value, remaining)
-                    | (false, _) -> Error $"Invalid unicode escape sequence: \\u{hexStr}"
-                | c :: _ -> Error $"Unknown escape sequence: \\{c}"
-                | [] -> Error "Unterminated escape sequence"
-
             // Helper to collect characters until { or closing "
             let rec collectLiteralPart (cs: char list) (chars: char list) : Result<string * char list, string> =
                 match cs with
@@ -523,8 +556,9 @@ let lex (input: string) : Result<Token list, string> =
                     let str = System.String(List.rev chars |> List.toArray)
                     Ok (str, '{' :: remaining)  // Put { back for caller to detect expression
                 | '\\' :: escRest when not isTripleQuoted ->
-                    match parseEscape escRest with
-                    | Ok (c, remaining) -> collectLiteralPart remaining (c :: chars)
+                    match decodeEscape escRest with
+                    | Ok (decoded, remaining) ->
+                        collectLiteralPart remaining (prependDecoded decoded chars)
                     | Error err -> Error err
                 | c :: remaining ->
                     collectLiteralPart remaining (c :: chars)
@@ -581,7 +615,7 @@ let lex (input: string) : Result<Token list, string> =
                         if str = "" then
                             parseInterpParts afterLit parts
                         else
-                            parseInterpParts afterLit (InterpText str :: parts)
+                            parseInterpParts afterLit (InterpText (normalize str) :: parts)
                     | Error err -> Error err
 
             match parseInterpParts contentStart [] with
@@ -595,7 +629,7 @@ let lex (input: string) : Result<Token list, string> =
                 match cs with
                 | [] -> Error "Unterminated triple-quoted string literal"
                 | '"' :: '"' :: '"' :: remaining ->
-                    let str = System.String(List.rev chars |> List.toArray)
+                    let str = System.String(List.rev chars |> List.toArray) |> normalize
                     Ok (str, remaining)
                 | c :: remaining ->
                     parseTripleString remaining (c :: chars)
@@ -625,28 +659,11 @@ let lex (input: string) : Result<Token list, string> =
                                 Ok (normalized, remaining)
                         else
                             Error "Empty char literal"
-                | '\\' :: 'n' :: remaining ->
-                    parseCharContent remaining ('\n' :: chars)
-                | '\\' :: 't' :: remaining ->
-                    parseCharContent remaining ('\t' :: chars)
-                | '\\' :: 'r' :: remaining ->
-                    parseCharContent remaining ('\r' :: chars)
-                | '\\' :: '\\' :: remaining ->
-                    parseCharContent remaining ('\\' :: chars)
-                | '\\' :: '\'' :: remaining ->
-                    parseCharContent remaining ('\'' :: chars)
-                | '\\' :: '0' :: remaining ->
-                    parseCharContent remaining ('\000' :: chars)
-                | '\\' :: 'x' :: h1 :: h2 :: remaining ->
-                    // Hex escape: \xNN
-                    let hexStr = System.String([| h1; h2 |])
-                    match System.Int32.TryParse(hexStr, System.Globalization.NumberStyles.HexNumber, null) with
-                    | (true, value) ->
-                        parseCharContent remaining (char value :: chars)
-                    | (false, _) ->
-                        Error $"Invalid hex escape sequence: \\x{hexStr}"
-                | '\\' :: c :: _ ->
-                    Error $"Unknown escape sequence: \\{c}"
+                | '\\' :: escaped ->
+                    match decodeEscape escaped with
+                    | Ok (decoded, remaining) ->
+                        parseCharContent remaining (prependDecoded decoded chars)
+                    | Error err -> Error err
                 | c :: remaining ->
                     parseCharContent remaining (c :: chars)
 
@@ -696,45 +713,18 @@ let lex (input: string) : Result<Token list, string> =
                 | [] -> Error "Unterminated string literal"
                 | '"' :: remaining ->
                     // End of string
-                    let str = System.String(List.rev chars |> List.toArray)
+                    let str = System.String(List.rev chars |> List.toArray) |> normalize
                     Ok (str, remaining)
-                | '\\' :: 'n' :: remaining ->
-                    parseString remaining ('\n' :: chars)
-                | '\\' :: 't' :: remaining ->
-                    parseString remaining ('\t' :: chars)
-                | '\\' :: 'r' :: remaining ->
-                    parseString remaining ('\r' :: chars)
-                | '\\' :: '\\' :: remaining ->
-                    parseString remaining ('\\' :: chars)
-                | '\\' :: '"' :: remaining ->
-                    parseString remaining ('"' :: chars)
-                | '\\' :: '\'' :: remaining ->
-                    parseString remaining ('\'' :: chars)
-                | '\\' :: '0' :: remaining ->
-                    parseString remaining ('\000' :: chars)
-                | '\\' :: 'x' :: h1 :: h2 :: remaining ->
-                    // Hex escape: \xNN
-                    let hexStr = System.String([| h1; h2 |])
-                    match System.Int32.TryParse(hexStr, System.Globalization.NumberStyles.HexNumber, null) with
-                    | (true, value) ->
-                        parseString remaining (char value :: chars)
-                    | (false, _) ->
-                        Error $"Invalid hex escape sequence: \\x{hexStr}"
-                | '\\' :: 'u' :: h1 :: h2 :: h3 :: h4 :: remaining ->
-                    // Unicode escape: \uNNNN
-                    let hexStr = System.String([| h1; h2; h3; h4 |])
-                    match System.Int32.TryParse(hexStr, System.Globalization.NumberStyles.HexNumber, null) with
-                    | (true, value) ->
-                        parseString remaining (char value :: chars)
-                    | (false, _) ->
-                        Error $"Invalid unicode escape sequence: \\u{hexStr}"
-                | '\\' :: c :: _ ->
-                    Error $"Unknown escape sequence: \\{c}"
+                | '\\' :: escaped ->
+                    match decodeEscape escaped with
+                    | Ok (decoded, remaining) ->
+                        parseString remaining (prependDecoded decoded chars)
+                    | Error err -> Error err
                 | c :: remaining ->
                     parseString remaining (c :: chars)
 
             match parseString rest [] with
-            | Ok (str, remaining) -> lexHelper remaining (TStringLit str :: acc)
+            | Ok (str, remaining) -> lexHelper remaining (TStringLit (normalize str) :: acc)
             | Error err -> Error err
         | c :: _ ->
             Error $"Unexpected character: {c}"

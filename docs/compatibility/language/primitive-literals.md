@@ -19,19 +19,17 @@ The compiler parser now uses one scalar-aware decoder for regular String, Char,
 and interpolated literal text. It accepts the interpreter escape alphabet,
 including control escapes, slash, and scalar escapes; rejects surrogates and
 out-of-range scalars; and supports raw triple strings and raw triple
-interpolation. Escaped interpolation braces use doubled braces.
+interpolation. All literal text is normalized to NFC before it enters the AST.
+Focused acceptance and invalid-scalar coverage is in
+`src/Tests/e2e/literal_parity.e2e` and `src/Tests/syntax/literals.syntax`.
 
 Literal lowering remains in 2_AST_to_ANF.fs:5084-5136. The existing
 1.6_ValueRendering.fs and 2.6_PrintInsertion.fs paths remain the only
-eval-boundary rendering implementation. Focused coverage is in
-src/Tests/e2e/literal_parity.e2e.
+eval-boundary rendering implementation.
 
 ## Retained divergences
 
-Bare decimal literals still lower to Int64 while the interpreter default is
-arbitrary-precision Int. The compiler I suffix is retained as an intentional
-AOT extension: changing the default requires a separate migration of the
-maintained fixed-width stdlib and its literal patterns. Int128/UInt128
-decimal-string lowering is also an AOT representation divergence. Static type
-checking remains intentionally compile-time rather than interpreter runtime
-dispatch.
+Bare decimal literals lower to arbitrary-precision Int, matching the
+interpreter. Int128/UInt128 decimal-string lowering remains an AOT
+representation divergence. Static type checking remains intentionally
+compile-time rather than interpreter runtime dispatch.

@@ -4,9 +4,19 @@
 // Existing arbitrary-precision Int values retain their suffix spelling.
 let identityInt(value: Int) : Int = value identityInt(9223372036854775808I) = 9223372036854775808I
 
-// Interpreter string literals represent non-BMP Unicode scalars as UTF-16 escapes.
-"\uD83D\uDE00" = "😀"
+// Interpreter string literals represent non-BMP Unicode as one scalar escape.
+"\U0001F600" = "😀"
 """line\nraw""" = "line\\nraw"
+
+// Strings, chars, and interpolated text share the interpreter escape alphabet.
+"\a\b\v\f\/\X0041\U0001F600" = "\x07\x08\x0B\x0C/A😀"
+'\U0001F600' = '😀'
+let value = "ok" in $"\a\b\v\f\/\X0041\U0001F600 {value}" = "\x07\x08\x0B\x0C/A😀 ok"
+
+// Every literal form normalizes text to NFC.
+"é" = "é"
+"""é""" = "é"
+let value = "é" in $"""{value} é""" = "é é"
 
 // Raw interpolation preserves escape text while evaluating expressions.
 let value = "ok" in $"""raw\n{value}""" = "raw\\nok"
