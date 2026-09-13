@@ -43,7 +43,7 @@
     },
     "fannkuch": {
       "status": "comparable",
-      "dark_sha256": "01c411da3c58696c2d7e9d4ced1cb7d56978227fa0cb3f7a691e71dd484538fe",
+      "dark_sha256": "ec9876dda9fa06523c236e29d6b3dec915a6beb2f594c1634c5a5a440bf40d01",
       "rust_sha256": "0daca8dcb4fce6b905442af1246a545d06a44d62a68aba3c9832dc4f778ae719",
       "quick": {
         "status": "comparable"

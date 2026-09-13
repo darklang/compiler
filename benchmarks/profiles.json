@@ -3,7 +3,7 @@
   "profiles": {
     "routine": [
       "ackermann", "binary_trees", "collatz", "edigits", "factorial",
-      "fasta", "fib", "huffman", "leibniz", "mandelbrot", "matmul", "merkletrees",
+      "fannkuch", "fasta", "fib", "huffman", "leibniz", "mandelbrot", "matmul", "merkletrees",
       "nbody", "nqueen", "pisum", "primes", "quicksort", "spectral_norm",
       "string_equality", "sum_to_n", "tak", "tinytemplate"
     ],

@@ -136,9 +136,10 @@ Uses **Valgrind Cachegrind** to count instructions. Slower (~50x) but determinis
 This is the primary way we are tracking performance.
 
 The `routine` profile is the canonical comparable benchmark set and currently
-contains 22 pairs. It excludes incomparable nsieve and the reduced Dark
-fannkuch workload. Binary trees now uses the same recursive allocation and
-traversal shape as Rust. Full-size quicksort and spectral norm are included. A
+contains 22 pairs. It excludes incomparable nsieve. Fannkuch runs the complete
+n=8 traversal in both languages, the largest shared workload that fits Dark's
+fixed heap. Binary trees uses the same recursive allocation and traversal shape
+as Rust. Full-size quicksort and spectral norm are included. A
 completed routine Cachegrind run records its measurements in
 the architecture-specific canonical JSON snapshot and `HISTORY.md`; targeted
 runs and `all` are diagnostic and do not update canonical files. `RESULTS.md` is

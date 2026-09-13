@@ -304,7 +304,7 @@ let edigitsChecksum(numDigits: Int64) : Int64 =
     let digits = computeEDigits(numDigits) in
     computeChecksum(digits, 0L, 0L, numDigits)
 
-// edigitsChecksum(5) = 61 - BROKEN
+edigitsChecksum(5L) = 61L
 
 
 // ===================================================================
