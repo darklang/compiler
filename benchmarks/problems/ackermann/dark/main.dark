@@ -4,16 +4,16 @@
 // The Ackermann function is a classic recursion stress test.
 // A(3, n) creates exponentially many recursive calls.
 
-let ackermann(m: Int64, n: Int64) : Int64 =
+let ackermann (m: Int64) (n: Int64) : Int64 =
     if m == 0L then n + 1L
-    else if n == 0L then ackermann(m - 1L, 1L)
-    else ackermann(m - 1L, ackermann(m, n - 1L))
+    else if n == 0L then ackermann (m - 1L) (1L)
+    else ackermann (m - 1L) (ackermann (m) (n - 1L))
 
 // A(3, 12) = 32765
 // This creates millions of recursive calls
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-Builtin.printLine(Stdlib.Int64.toString(ackermann(benchmarkArg(0I), benchmarkArg(1I))))
+Builtin.printLine (Stdlib.Int64.toString (ackermann (benchmarkArg (0)) (benchmarkArg (1))))

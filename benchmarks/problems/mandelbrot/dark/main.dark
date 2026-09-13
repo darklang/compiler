@@ -10,7 +10,7 @@
 
 // Check if point (cr, ci) is in the Mandelbrot set
 // Returns 1 if point stays bounded (in set), 0 if it escapes
-let iterate(cr: Float, ci: Float, zr: Float, zi: Float, iter: Int64, maxIter: Int64) : Int64 =
+let iterate (cr: Float) (ci: Float) (zr: Float) (zi: Float) (iter: Int64) (maxIter: Int64) : Int64 =
     if iter >= maxIter then
         1L  // Point stayed bounded - in the set
     else
@@ -22,34 +22,34 @@ let iterate(cr: Float, ci: Float, zr: Float, zi: Float, iter: Int64, maxIter: In
             // z = z^2 + c
             let newZr = zr2 - zi2 + cr in
             let newZi = 2.0 * zr * zi + ci in
-            iterate(cr, ci, newZr, newZi, iter + 1L, maxIter)
+            iterate (cr) (ci) (newZr) (newZi) (iter + 1L) (maxIter)
 
 // Count points in the set in a row from x=startX to x=endX-1
-let countRow(y: Int64, startX: Int64, endX: Int64, size: Int64, maxIter: Int64, count: Int64) : Int64 =
+let countRow (y: Int64) (startX: Int64) (endX: Int64) (size: Int64) (maxIter: Int64) (count: Int64) : Int64 =
     if startX >= endX then
         count
     else
-        let sizeF = Stdlib.Int64.toFloat(size) in
-        let xf = Stdlib.Int64.toFloat(startX) in
-        let yf = Stdlib.Int64.toFloat(y) in
+        let sizeF = Stdlib.Int64.toFloat (size) in
+        let xf = Stdlib.Int64.toFloat (startX) in
+        let yf = Stdlib.Int64.toFloat (y) in
         let cr = 2.0 * xf / sizeF - 1.5 in
         let ci = 2.0 * yf / sizeF - 1.0 in
-        let inSet = iterate(cr, ci, 0.0, 0.0, 0L, maxIter) in
-        countRow(y, startX + 1L, endX, size, maxIter, count + inSet)
+        let inSet = iterate (cr) (ci) (0.0) (0.0) (0L) (maxIter) in
+        countRow (y) (startX + 1L) (endX) (size) (maxIter) (count + inSet)
 
 // Count points in the set in all rows from y=startY to y=endY-1
-let countAll(startY: Int64, endY: Int64, size: Int64, maxIter: Int64, count: Int64) : Int64 =
+let countAll (startY: Int64) (endY: Int64) (size: Int64) (maxIter: Int64) (count: Int64) : Int64 =
     if startY >= endY then
         count
     else
-        let rowCount = countRow(startY, 0L, size, size, maxIter, 0L) in
-        countAll(startY + 1L, endY, size, maxIter, count + rowCount)
+        let rowCount = countRow (startY) (0L) (size) (size) (maxIter) (0L) in
+        countAll (startY + 1L) (endY) (size) (maxIter) (count + rowCount)
 
 // Full benchmark: size=200, maxIter=50
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-let size = benchmarkArg(0I) in
-Builtin.printLine(Stdlib.Int64.toString(countAll(0L, size, size, benchmarkArg(1I), 0L)))
+let size = benchmarkArg (0) in
+Builtin.printLine (Stdlib.Int64.toString (countAll (0L) (size) (size) (benchmarkArg (1)) (0L)))

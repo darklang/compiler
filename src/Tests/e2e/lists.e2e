@@ -3,7 +3,7 @@
 // === Empty List ===
 
 // Empty list should not default to Int64 element type
-Stdlib.List.length(if true then [] else [true]) = 0I
+Stdlib.List.length (if true then [] else [true]) = 0
 // Top-level char lists use the recursive interpreter value renderer.
 ['a', 'b'] = stdout="['a', 'b']\n"
 
@@ -244,28 +244,28 @@ match [] with | t -> 1L = 1L
 match [1L] with | t -> 1L = 1L
 
 // Recursive length using cons pattern
-let length(xs: List<Int64>) : Int64 = match xs with | [] -> 0L | _ :: t -> 1L + length(t); length([1L, 2L, 3L, 4L, 5L]) = 5L
+let length (xs: List<Int64>) : Int64 = match xs with | [] -> 0L | _ :: t -> 1L + length (t); length ([1L, 2L, 3L, 4L, 5L]) = 5L
 
 // Recursive sum using cons pattern
-let sum(xs: List<Int64>) : Int64 = match xs with | [] -> 0L | h :: t -> h + sum(t); sum([1L, 2L, 3L, 4L, 5L]) = 15L
+let sum (xs: List<Int64>) : Int64 = match xs with | [] -> 0L | h :: t -> h + sum (t); sum ([1L, 2L, 3L, 4L, 5L]) = 15L
 
 // =====================================================
 // Stdlib.List Function Tests
 // =====================================================
 
 // Stdlib.List.isEmpty
-Stdlib.List.isEmpty<Int64>([]) = true
-Stdlib.List.isEmpty([1L]) = false
-Stdlib.List.isEmpty([1L, 2L, 3L]) = false
+Stdlib.List.isEmpty<Int64> ([]) = true
+Stdlib.List.isEmpty ([1L]) = false
+Stdlib.List.isEmpty ([1L, 2L, 3L]) = false
 
 // Stdlib.List.length
-Stdlib.List.length<Int64>([]) = 0I
-Stdlib.List.length([1L]) = 1I
-Stdlib.List.length([1L, 2L]) = 2I
-Stdlib.List.length([1L, 2L, 3L]) = 3I
-Stdlib.List.length([1L, 2L, 3L, 4L, 5L]) = 5I
+Stdlib.List.length<Int64> ([]) = 0
+Stdlib.List.length ([1L]) = 1
+Stdlib.List.length ([1L, 2L]) = 2
+Stdlib.List.length ([1L, 2L, 3L]) = 3
+Stdlib.List.length ([1L, 2L, 3L, 4L, 5L]) = 5
 // Stdlib.List.length with different types
-Stdlib.List.length([true, false, true]) = 3I
+Stdlib.List.length ([true, false, true]) = 3
 // =====================================================
 // Large List Literal Tests (6-50 elements)
 // =====================================================
@@ -273,23 +273,23 @@ Stdlib.List.length([true, false, true]) = 3I
 // Int lists (6+)
 match [1L, 2L, 3L, 4L, 5L, 6L] with | [a, b, c, d, e, f] -> a + f | _ -> 0L = 7L
 match [10L, 11L, 12L, 13L, 14L, 15L, 16L] with | [a, b, c, d, e, f, g] -> g - a | _ -> 0L = 6L
-Stdlib.Option.withDefault(Stdlib.List.getAt([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L], 7I), 0L) = 8L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L]) (7)) (0L) = 8L
 match [1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L] with | [a, b, c, d, e, f, g, h, i, j, k, l] -> k + l | _ -> 0L = 23L
-Stdlib.Option.withDefault(Stdlib.List.getAt([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L], 10I), 0L) = 11L
-Stdlib.Option.withDefault(Stdlib.List.getAt([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L], 18I), 0L) = 19L
-Stdlib.Option.withDefault(Stdlib.List.getAt([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 26L, 27L, 28L, 29L, 30L], 25I), 0L) = 26L
-Stdlib.Option.withDefault(Stdlib.List.getAt([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 26L, 27L, 28L, 29L, 30L, 31L, 32L, 33L, 34L, 35L, 36L, 37L, 38L, 39L, 40L, 41L, 42L, 43L, 44L, 45L, 46L, 47L, 48L, 49L, 50L], 49I), 0L) = 50L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L]) (10)) (0L) = 11L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L]) (18)) (0L) = 19L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 26L, 27L, 28L, 29L, 30L]) (25)) (0L) = 26L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 26L, 27L, 28L, 29L, 30L, 31L, 32L, 33L, 34L, 35L, 36L, 37L, 38L, 39L, 40L, 41L, 42L, 43L, 44L, 45L, 46L, 47L, 48L, 49L, 50L]) (49)) (0L) = 50L
 
 // Bool lists (6+)
 match [true, false, true, false, true, false] with | [a, b, c, d, e, f] -> if f then 1L else 0L | _ -> -1L = 0L
 match [false, false, false, false, true, true, true, true] with | [a, b, c, d, e, f, g, h] -> if e && h then 1L else 0L | _ -> -1L = 1L
-Stdlib.Option.withDefault(Stdlib.List.getAt([true, false, true, false, true, false, true, false, true, false, true, false], 10I), false) = true
-Stdlib.List.length([true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false]) = 16I
+Stdlib.Option.withDefault (Stdlib.List.getAt ([true, false, true, false, true, false, true, false, true, false, true, false]) (10)) (false) = true
+Stdlib.List.length ([true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false]) = 16
 // String lists (6+)
 match ["a", "b", "c", "d", "e", "f"] with | [a, b, c, d, e, f] -> a ++ f | _ -> "" = "af"
-Stdlib.Option.withDefault(Stdlib.List.getAt(["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"], 9I), "") = "s10"
-Stdlib.Option.withDefault(Stdlib.List.getAt(["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12"], 11I), "") = "s12"
-Stdlib.Option.withDefault(Stdlib.List.getAt(["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14", "t15", "t16", "t17", "t18", "t19", "t20"], 15I), "") = "t16"
+Stdlib.Option.withDefault (Stdlib.List.getAt (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"]) (9)) ("") = "s10"
+Stdlib.Option.withDefault (Stdlib.List.getAt (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12"]) (11)) ("") = "s12"
+Stdlib.Option.withDefault (Stdlib.List.getAt (["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14", "t15", "t16", "t17", "t18", "t19", "t20"]) (15)) ("") = "t16"
 
 // Record lists (6+)
 type Item = { id: Int64, name: String } match [Item { id = 1L, name = "one" }, Item { id = 2L, name = "two" }, Item { id = 3L, name = "three" }, Item { id = 4L, name = "four" }, Item { id = 5L, name = "five" }, Item { id = 6L, name = "six" }] with | [a, b, c, d, e, f] -> f.name | _ -> "" = "six"
@@ -301,13 +301,13 @@ type Item = { id: Int64, name: String } match [Item { id = 1L, name = "one" }, I
 // =====================================================
 
 // Basic spread construction - prepend single element
-let x = [2L, 3L] in Stdlib.List.length([1L] @ x) = 3I
+let x = [2L, 3L] in Stdlib.List.length ([1L] @ x) = 3
 // Prepend multiple elements
-let x = [3L, 4L] in Stdlib.List.length([1L, 2L] @ x) = 4I
+let x = [3L, 4L] in Stdlib.List.length ([1L, 2L] @ x) = 4
 // Empty spread - just return tail
-let x = [1L, 2L, 3L] in Stdlib.List.length(x) = 3I
+let x = [1L, 2L, 3L] in Stdlib.List.length (x) = 3
 // Spread with empty tail (use function to get typed empty list)
-let emptyList() : List<Int64> = []; Stdlib.List.length<Int64>([1L, 2L] @ emptyList()) = 2I
+let emptyList () : List<Int64> = []; Stdlib.List.length<Int64> ([1L, 2L] @ emptyList ()) = 2
 // Verify element values with pattern matching
 let x = [2L, 3L] in match [1L] @ x with | [a, b, c] -> a + b + c | _ -> 0L = 6L
 
@@ -315,12 +315,12 @@ let x = [2L, 3L] in match [1L] @ x with | [a, b, c] -> a + b + c | _ -> 0L = 6L
 let x = [2L, 3L] in match [10L + 1L] @ x with | [a, b, c] -> a | _ -> 0L = 11L
 
 // Use in match case body
-match [1L, 2L, 3L] with | h :: rest -> Stdlib.List.length([h] @ rest) | [] -> 0I = 3I
+match [1L, 2L, 3L] with | h :: rest -> Stdlib.List.length ([h] @ rest) | [] -> 0 = 3
 // Rebuild list with modified head
 match [1L, 2L, 3L] with | h :: rest -> match [h + 10L] @ rest with | [a, b, c] -> a + b + c | _ -> 0L | [] -> 0L = 16L
 
 // Chain of spreads
-let a = [3L] in let b = [2L] @ a in Stdlib.List.length([1L] @ b) = 3I
+let a = [3L] in let b = [2L] @ a in Stdlib.List.length ([1L] @ b) = 3
 // =====================================================
 // Lists of Floats
 // =====================================================
@@ -348,13 +348,13 @@ match [(2L, 3L), (4L, 5L)] with | [t1, t2] -> t1.0 * t1.1 + t2.0 * t2.1 | _ -> 0
 match [(10L, 20L)] with | [t] -> t.0 + t.1 | _ -> 0L = 30L
 
 // Recursive list construction with tuple elements
-let makePairs(n: Int64) : List<(Int64, Int64)> =
+let makePairs (n: Int64) : List<(Int64 * Int64)> =
     if n <= 0L then
         []
     else
-        Stdlib.List.push<(Int64, Int64)>(makePairs(n - 1L), (n, n + 1L))
+        Stdlib.List.push<(Int64 * Int64)> (makePairs (n - 1L)) ((n, n + 1L))
 
-let pairs = makePairs(1L) in match pairs with | [(a, b)] -> a + b | _ -> 999L = 3L
+let pairs = makePairs (1L) in match pairs with | [(a, b)] -> a + b | _ -> 999L = 3L
 
 // Tuple pattern destructuring in list with non-commutative operation
 // This test ensures tuple element indices are extracted correctly (kills mutation #61)
@@ -374,7 +374,7 @@ match [(1.0, 2.5), (3.5, 4.0)] with | [t1, t2] -> t1.0 + t1.1 + t2.0 + t2.1 | _ 
 match [("a", 0.5)] with | [t] -> if t.1 < 0.6 then 1L else 0L | _ -> 0L = 1L
 
 // Cumulative float tuple selection in list
-let makeCumulative(table: List<(Int64, Float)>, running: Float) : List<(Int64, Float)> = match Stdlib.List.head<(Int64, Float)>(table) with | None -> [] | Some(item) -> let c = Stdlib.Tuple2.first<Int64, Float>(item) in let p = Stdlib.Tuple2.second<Int64, Float>(item) in let newRunning = running + p in match Stdlib.List.tail<(Int64, Float)>(table) with | None -> [(c, newRunning)] | Some(rest) -> Stdlib.List.push<(Int64, Float)>(makeCumulative(rest, newRunning), (c, newRunning)) let selectRandom(table: List<(Int64, Float)>, r: Float, idx: Int) : Int64 = match Stdlib.List.getAt(table, idx) with | None -> 0L | Some(item) -> let c = Stdlib.Tuple2.first(item) in let p = Stdlib.Tuple2.second(item) in if r < p then c else if idx + 1I >= Stdlib.List.length(table) then c else selectRandom(table, r, idx + 1I) let table = [(97L, 0.27), (99L, 0.12), (103L, 0.12), (116L, 0.27)] in let cumulative = makeCumulative(table, 0.0) in let newSeed = (1L * 3877L + 29573L) % 139968L in let r = Stdlib.Int64.toFloat(newSeed) / 139968.0 in selectRandom(cumulative, r, 0I) = 97L
+let makeCumulative (table: List<(Int64 * Float)>) (running: Float) : List<(Int64 * Float)> = match Stdlib.List.head<(Int64 * Float)> (table) with | None -> [] | Some (item) -> let c = Stdlib.Tuple2.first<Int64, Float> (item) in let p = Stdlib.Tuple2.second<Int64, Float> (item) in let newRunning = running + p in match Stdlib.List.tail<(Int64 * Float)> (table) with | None -> [(c, newRunning)] | Some (rest) -> Stdlib.List.push<(Int64 * Float)> (makeCumulative (rest) (newRunning)) ((c, newRunning)) let selectRandom (table: List<(Int64 * Float)>) (r: Float) (idx: Int) : Int64 = match Stdlib.List.getAt (table) (idx) with | None -> 0L | Some (item) -> let c = Stdlib.Tuple2.first (item) in let p = Stdlib.Tuple2.second (item) in if r < p then c else if idx + 1 >= Stdlib.List.length (table) then c else selectRandom (table) (r) (idx + 1) let table = [(97L, 0.27), (99L, 0.12), (103L, 0.12), (116L, 0.27)] in let cumulative = makeCumulative (table) (0.0) in let newSeed = (1L * 3877L + 29573L) % 139968L in let r = Stdlib.Int64.toFloat (newSeed) / 139968.0 in selectRandom (cumulative) (r) (0) = 97L
 // =====================================================
 // Lists of Strings
 // =====================================================
@@ -406,8 +406,8 @@ match [true, false] with | [a, b] -> if a && b then 1L else 0L | _ -> -1L = 0L
 let sumFloats(xs: List<Float>) : Float = match xs with | [] -> 0.0 | h :: t -> h + sumFloats(t); sumFloats([1.0, 2.0, 3.0, 4.0]) = 10.0
 
 // Concatenate list of strings
-let concatStrings(xs: List<String>) : String = match xs with | [] -> "" | h :: t -> h ++ concatStrings(t)
-concatStrings(["a", "b", "c"]) = "abc"
+let concatStrings (xs: List<String>) : String = match xs with | [] -> "" | h :: t -> h ++ concatStrings (t)
+concatStrings (["a", "b", "c"]) = "abc"
 
 // =====================================================
 // Middle Spine Access Tests (6+ element lists)
@@ -417,10 +417,10 @@ concatStrings(["a", "b", "c"]) = "abc"
 // calculated for navigating to middle elements.
 
 // Access element at index 2 (first element in middle NODE2)
-Stdlib.Option.withDefault(Stdlib.List.getAt([1L, 2L, 3L, 4L, 5L, 6L], 2I), 0L) = 3L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L]) (2)) (0L) = 3L
 
 // Access element at index 3 (second element in middle NODE2)
-Stdlib.Option.withDefault(Stdlib.List.getAt([1L, 2L, 3L, 4L, 5L, 6L], 3I), 0L) = 4L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L]) (3)) (0L) = 4L
 
 // =====================================================
 // DEEP node element extraction offset tests (kills mutation #69)
@@ -553,7 +553,7 @@ match [(1000L, 100L, 10L, 1L), (500L, 50L, 5L, 0L)] with | [(_, _, c, d), (_, _,
 // If - 4 were changed to + 4, groupSizes would return [2, 2, 3, 3]
 // expecting 10 nodes but only having 4, causing incorrect tree construction.
 // The 8th element (at index 7) would not be accessible if tree is malformed.
-Stdlib.Option.withDefault(Stdlib.List.getAt([10L, 20L, 30L, 40L, 50L, 60L, 70L, 80L], 7I), 0L) = 80L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([10L, 20L, 30L, 40L, 50L, 60L, 70L, 80L]) (7)) (0L) = 80L
 
 // =====================================================
 // groupSizes nodeCount % 3 == 2 test (kills mutation #91)
@@ -565,7 +565,7 @@ Stdlib.Option.withDefault(Stdlib.List.getAt([10L, 20L, 30L, 40L, 50L, 60L, 70L, 
 // If - 2 were changed to + 2, groupSizes would return [2, 3, 3]
 // expecting 8 nodes but only having 5, causing incorrect tree construction.
 // The 9th element (at index 8) would not be accessible if tree is malformed.
-Stdlib.Option.withDefault(Stdlib.List.getAt([10L, 20L, 30L, 40L, 50L, 60L, 70L, 80L, 90L], 8I), 0L) = 90L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([10L, 20L, 30L, 40L, 50L, 60L, 70L, 80L, 90L]) (8)) (0L) = 90L
 
 // =====================================================
 // Nested list pattern element extraction test (kills mutation #92)
@@ -577,7 +577,7 @@ Stdlib.Option.withDefault(Stdlib.List.getAt([10L, 20L, 30L, 40L, 50L, 60L, 70L, 
 // If idx - 1 were changed to idx + 1, the second element onwards would
 // be extracted from wrong offsets (e.g., idx=1 would read s2 instead of s0).
 type WrappedList = NoList | WrapList of List<Int64>
-match WrapList([100L, 200L, 300L, 400L]) with | WrapList([a, b, c, d]) -> c - d | NoList -> 999L = -100L
+match WrapList ([100L, 200L, 300L, 400L]) with | WrapList ([a, b, c, d]) -> c - d | NoList -> 999L = -100L
 
 // =====================================================
 // Nested list offset multiplication test (kills mutation #105)
@@ -595,7 +595,7 @@ match WrapList([100L, 200L, 300L, 400L]) with | WrapList([a, b, c, d]) -> c - d 
 // Sum of c+d+e with correct offsets: 30+40+50 = 120
 // Sum of c+d+e with / mutation: 20+20+20 = 60 (all read from s0)
 type WrappedList5 = NoList5 | WrapList5 of List<Int64>
-match WrapList5([10L, 20L, 30L, 40L, 50L]) with | WrapList5([a, b, c, d, e]) -> c + d + e | NoList5 -> 999L = 120L
+match WrapList5 ([10L, 20L, 30L, 40L, 50L]) with | WrapList5 ([a, b, c, d, e]) -> c + d + e | NoList5 -> 999L = 120L
 
 // =====================================================
 // groupSizes nodeCount % 3 == 0 test (kills mutation #108)
@@ -607,7 +607,7 @@ match WrapList5([10L, 20L, 30L, 40L, 50L]) with | WrapList5([a, b, c, d, e]) -> 
 // If / were changed to *, groupSizes would return [3, 3, 3, 3, 3, 3, 3, 3, 3]
 // expecting 27 nodes but only having 3, causing incorrect tree construction.
 // The 7th element (at index 6) would not be accessible if tree is malformed.
-Stdlib.Option.withDefault(Stdlib.List.getAt([10L, 20L, 30L, 40L, 50L, 60L, 70L], 6I), 0L) = 70L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([10L, 20L, 30L, 40L, 50L, 60L, 70L]) (6)) (0L) = 70L
 
 // =====================================================
 // groupSizes nodeCount % 3 == 0 in toAtom (kills mutation #109)
@@ -618,7 +618,7 @@ Stdlib.Option.withDefault(Stdlib.List.getAt([10L, 20L, 30L, 40L, 50L, 60L, 70L],
 // If / were changed to *, the list construction would fail trying to
 // create 9 groups of 3 from only 3 middle nodes.
 // Uses a variable to ensure the list is compiled via toAtom as an argument.
-let xs = [10L, 20L, 30L, 40L, 50L, 60L, 70L] in Stdlib.Option.withDefault(Stdlib.List.getAt(xs, 6I), 0L) = 70L
+let xs = [10L, 20L, 30L, 40L, 50L, 60L, 70L] in Stdlib.Option.withDefault (Stdlib.List.getAt (xs) (6)) (0L) = 70L
 
 // =====================================================
 // Single-element list cons pattern empty check (kills mutation #119)
@@ -631,19 +631,19 @@ let xs = [10L, 20L, 30L, 40L, 50L, 60L, 70L] in Stdlib.Option.withDefault(Stdlib
 //
 // Key test: A single-element list matched with h :: t should extract h,
 // not fall through to the empty list case.
-let checkSingle119(xs: List<Int64>) : Int64 =
+let checkSingle119 (xs: List<Int64>) : Int64 =
     match xs with
     | [] -> 0L
     | h :: t -> h + 1000L
 
 // Single-element list should match h :: t, returning head + 1000
-checkSingle119([42L]) = 1042L
+checkSingle119 ([42L]) = 1042L
 
 // Empty list should match [], returning 0
-checkSingle119([]) = 0L
+checkSingle119 ([]) = 0L
 
 // Multi-element list should also match h :: t
-checkSingle119([10L, 20L, 30L]) = 1010L
+checkSingle119 ([10L, 20L, 30L]) = 1010L
 
 // =====================================================
 // List cons pattern guard check (kills mutation #120)
@@ -661,30 +661,30 @@ checkSingle119([10L, 20L, 30L]) = 1010L
 
 // Test with multiple match cases where cons pattern is NOT the first case
 // This ensures the guard check is properly evaluated
-let checkGuard120(xs: List<Int64>) : Int64 =
+let checkGuard120 (xs: List<Int64>) : Int64 =
     match xs with
     | [] -> 100L
     | h :: t -> h + 200L
 
 // Non-empty list should match cons pattern, returning head + 200
-checkGuard120([50L]) = 250L
-checkGuard120([1L, 2L, 3L]) = 201L
+checkGuard120 ([50L]) = 250L
+checkGuard120 ([1L, 2L, 3L]) = 201L
 
 // Empty list should match [], returning 100
-checkGuard120([]) = 100L
+checkGuard120 ([]) = 100L
 
 // Test with cons pattern as first alternative to exercise guard check path
-let checkGuardFirst120(xs: List<Int64>) : Int64 =
+let checkGuardFirst120 (xs: List<Int64>) : Int64 =
     match xs with
     | h :: t -> h + 300L
     | [] -> 400L
 
 // Non-empty list should match cons pattern
-checkGuardFirst120([99L]) = 399L
-checkGuardFirst120([5L, 10L, 15L]) = 305L
+checkGuardFirst120 ([99L]) = 399L
+checkGuardFirst120 ([5L, 10L, 15L]) = 305L
 
 // Empty list should fall through to [] pattern
-checkGuardFirst120([]) = 400L
+checkGuardFirst120 ([]) = 400L
 
 // =====================================================
 // Variable used only in list cons tail (kills mutation #141)
@@ -703,19 +703,19 @@ let xs = [42L] in match [1L] @ xs with | [a, b] -> a + b | _ -> 0L = 43L
 
 // List<Float> cons destructuring must preserve the floating-point representation
 // for heads extracted from both singleton and multi-element skew lists.
-let sumFloatList(xs: List<Float>) : Float =
+let sumFloatList (xs: List<Float>) : Float =
     match xs with
     | [] -> 0.0
-    | head :: tail -> head + sumFloatList(tail)
+    | head :: tail -> head + sumFloatList (tail)
 
-Stdlib.Float.toInt(sumFloatList([1.5, 2.25]) * 100.0) = 375L
+Stdlib.Float.toInt (sumFloatList ([1.5, 2.25]) * 100.0) = 375L
 
 // Exercise the exact-list and nested-pattern lowering paths, which unwrap the
 // same leaf representation independently from list-cons lowering.
-match [1.5] with | [value] -> Stdlib.Float.toInt(value * 100.0) | _ -> 0L = 150L
+match [1.5] with | [value] -> Stdlib.Float.toInt (value * 100.0) | _ -> 0L = 150L
 
 type WrappedFloatList = WrappedFloatList of List<Float>
-match WrappedFloatList([1.5]) with | WrappedFloatList([value]) -> Stdlib.Float.toInt(value * 100.0) = 150L
+match WrappedFloatList ([1.5]) with | WrappedFloatList ([value]) -> Stdlib.Float.toInt (value * 100.0) = 150L
 
 // =====================================================
 // List head type tracking test (kills mutation #167)
@@ -730,8 +730,8 @@ match WrappedFloatList([1.5]) with | WrappedFloatList([value]) -> Stdlib.Float.t
 // This test creates a List<Int64> via a function and accesses the head.
 // If the head is incorrectly typed as Float64, the integer bit pattern
 // would be interpreted as a float, giving a wrong result.
-let makeIntList167() : List<Int64> = [42L, 84L, 126L]
-match makeIntList167() with | h :: t -> h + 100L | [] -> 999L = 142L
+let makeIntList167 () : List<Int64> = [42L, 84L, 126L]
+match makeIntList167 () with | h :: t -> h + 100L | [] -> 999L = 142L
 
 // =====================================================
 // List head type tracking via TFunction test (kills mutation #168)
@@ -748,7 +748,7 @@ match makeIntList167() with | h :: t -> h + 100L | [] -> 999L = 142L
 // This test creates a function that returns List<Int64>, stores it as a
 // first-class function value, calls it, and accesses the head. This exercises
 // the TFunction path in TypeMap lookup.
-let makeList168(n: Int64) : List<Int64> = [55L + n, 110L, 165L] let f = makeList168 in match f(0L) with | h :: t -> h + 200L | [] -> 999L = stdout="255\n"
+let makeList168 (n: Int64) : List<Int64> = [55L + n, 110L, 165L] let f = makeList168 in match f (0L) with | h :: t -> h + 200L | [] -> 999L = stdout="255\n"
 
 // =====================================================
 // List head type tracking in convertExprToOperand (kills mutation #169)
@@ -765,12 +765,12 @@ let makeList168(n: Int64) : List<Int64> = [55L + n, 110L, 165L] let f = makeList
 //
 // This test places the list pattern match inside an if-then branch to exercise
 // the convertExprToOperand code path rather than the convertExpr path.
-let testListInBranch169(flag: Bool) : Int64 =
+let testListInBranch169 (flag: Bool) : Int64 =
     if flag then
         let xs = [55L, 110L, 165L] in match xs with | h :: t -> h | [] -> 0L
     else
         999L
-testListInBranch169(true) = 55L
+testListInBranch169 (true) = 55L
 
 // =====================================================
 // List head type tracking via TFunction in convertExprToOperand (kills mutation #170)
@@ -786,7 +786,7 @@ testListInBranch169(true) = 55L
 //
 // This test combines the closure pattern from #168 with the branch context
 // from #169 to exercise the TFunction->TList case in convertExprToOperand.
-let makeList170(n: Int64) : List<Int64> = [77L + n, 154L, 231L] let testBranch170(flag: Bool) : Int64 = if flag then let f = makeList170 in match f(0L) with | h :: t -> h | [] -> 0L else 999L testBranch170(true) = 77L
+let makeList170 (n: Int64) : List<Int64> = [77L + n, 154L, 231L] let testBranch170 (flag: Bool) : Int64 = if flag then let f = makeList170 in match f (0L) with | h :: t -> h | [] -> 0L else 999L testBranch170 (true) = 77L
 
 // Compound list elements use the same recursive value renderer.
 [(1L, 2L)] = stdout="[(1, 2)]\n"

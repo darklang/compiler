@@ -2,5 +2,5 @@
 
 module Stdlib.Cli.Posix.Error
 
-let toString(error: Stdlib.Cli.Posix.Error) : String =
+let toString (error: Stdlib.Cli.Posix.Error) : String =
     error.message

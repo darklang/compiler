@@ -3,7 +3,7 @@
 
 module Unicode.Data
 
-let __categoryFromCode(value: Int64) : Unicode.Data.GeneralCategory =
+let __categoryFromCode (value: Int64) : Unicode.Data.GeneralCategory =
     if value == 0L then Unicode.Data.GeneralCategory.Lu
     else if value == 1L then Unicode.Data.GeneralCategory.Ll
     else if value == 2L then Unicode.Data.GeneralCategory.Lt
@@ -35,22 +35,22 @@ let __categoryFromCode(value: Int64) : Unicode.Data.GeneralCategory =
     else if value == 28L then Unicode.Data.GeneralCategory.Co
     else Unicode.Data.GeneralCategory.Cn
 
-let __generalCategoryLookupGroup5(codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Unicode.Data.__lookupRangeIn(Unicode.Data.Table35.__generalCategoryChunk20(), 0L, codepoint, 14L) with
-    | Some(value) -> Some(value)
+let __generalCategoryLookupGroup5 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__lookupRangeIn (Unicode.Data.Table35.__generalCategoryChunk20 ()) (0L) (codepoint) (14L) with
+    | Some (value) -> Some (value)
     | None ->
-        match Unicode.Data.__lookupRangeIn(Unicode.Data.Table36.__generalCategoryChunk21(), 0L, codepoint, 14L) with
-        | Some(value) -> Some(value)
+        match Unicode.Data.__lookupRangeIn (Unicode.Data.Table36.__generalCategoryChunk21 ()) (0L) (codepoint) (14L) with
+        | Some (value) -> Some (value)
         | None ->
-            match Unicode.Data.__lookupRangeIn(Unicode.Data.Table37.__generalCategoryChunk22(), 0L, codepoint, 14L) with
-            | Some(value) -> Some(value)
+            match Unicode.Data.__lookupRangeIn (Unicode.Data.Table37.__generalCategoryChunk22 ()) (0L) (codepoint) (14L) with
+            | Some (value) -> Some (value)
             | None ->
-                match Unicode.Data.__lookupRangeIn(Unicode.Data.Table38.__generalCategoryChunk23(), 0L, codepoint, 14L) with
-                | Some(value) -> Some(value)
+                match Unicode.Data.__lookupRangeIn (Unicode.Data.Table38.__generalCategoryChunk23 ()) (0L) (codepoint) (14L) with
+                | Some (value) -> Some (value)
                 | None ->
                     None
 
-let sourceHashes() : List<(String * String)> =
+let sourceHashes () : List<(String * String)> =
     [
         ("CompositionExclusions.txt", "2f239196ef3b5b61db5cc476e9bd80f534d15aa1b74e1be1dea5d042a344c85f"),
         ("DerivedCoreProperties.txt", "24c7fed1195c482faaefd5c1e7eb821c5ee1fb6de07ecdbaa64b56a99da22c08"),
@@ -61,7 +61,7 @@ let sourceHashes() : List<(String * String)> =
         ("emoji-data.txt", "2cb2bb9455cda83e8481541ecf5b6dfda66a3bb89efa3fa7c5297eccf607b72b")
     ]
 
-let tableCounts() : List<(String * Int64)> =
+let tableCounts () : List<(String * Int64)> =
     [
         ("canonicalCompositions", 965L),
         ("canonicalDecompositions", 2081L),
@@ -79,16 +79,16 @@ let tableCounts() : List<(String * Int64)> =
         ("whiteSpaceRanges", 11L)
     ]
 
-let __whiteSpaceLookupGroup0(codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Unicode.Data.__lookupRangeIn(Unicode.Data.Table42.__whiteSpaceChunk0(), 0L, codepoint, 14L) with
-    | Some(value) -> Some(value)
+let __whiteSpaceLookupGroup0 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__lookupRangeIn (Unicode.Data.Table42.__whiteSpaceChunk0 ()) (0L) (codepoint) (14L) with
+    | Some (value) -> Some (value)
     | None ->
         None
 
-let __whiteSpaceLookup(codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Unicode.Data.__whiteSpaceLookupGroup0(codepoint) with
-    | Some(value) -> Some(value)
+let __whiteSpaceLookup (codepoint: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__whiteSpaceLookupGroup0 (codepoint) with
+    | Some (value) -> Some (value)
     | None ->
         None
 
-let lookupUppercaseAt(codepoint: Int64, index: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__uppercaseLookup(codepoint, index)
+let lookupUppercaseAt (codepoint: Int64) (index: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__uppercaseLookup (codepoint) (index)

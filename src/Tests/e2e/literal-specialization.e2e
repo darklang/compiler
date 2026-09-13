@@ -2,8 +2,8 @@
 
 // Differing invariant modes create reduced-signature recursive clones while
 // the changing counter and accumulator retain their original evaluation order.
-let specializedLoop(n: Int64, mode: Int64, acc: Int64) : Int64 =
+let specializedLoop (n: Int64) (mode: Int64) (acc: Int64) : Int64 =
     if n <= 0L then acc
-    else specializedLoop(n - 1L, mode, acc + mode)
+    else specializedLoop (n - 1L) (mode) (acc + mode)
 
-specializedLoop(5L, 2L, 0L) + specializedLoop(5L, 3L, 0L) = 25L
+specializedLoop (5L) (2L) (0L) + specializedLoop (5L) (3L) (0L) = 25L

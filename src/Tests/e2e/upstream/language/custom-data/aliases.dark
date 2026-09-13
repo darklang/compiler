@@ -115,8 +115,8 @@ module RecordWithRecursiveTypeArgs =
 
   type Alias<'x> = Inner<'x>
 
-  Inner { a = 5L; b = Stdlib.Result.Result.Ok(Inner { a = 6L; b = Stdlib.Result.Result.Ok(Inner { a = 7L; b = Stdlib.Result.Result.Error "test" }) }) } =
-    (Alias { a = 5L; b = Stdlib.Result.Result.Ok(Alias { a = 6L; b = Stdlib.Result.Result.Ok(Alias { a = 7L; b = Stdlib.Result.Result.Error "test" }) }) })
+  Inner { a = 5L; b = Stdlib.Result.Result.Ok (Inner { a = 6L; b = Stdlib.Result.Result.Ok (Inner { a = 7L; b = Stdlib.Result.Result.Error "test" }) }) } =
+    (Alias { a = 5L; b = Stdlib.Result.Result.Ok (Alias { a = 6L; b = Stdlib.Result.Result.Ok (Alias { a = 7L; b = Stdlib.Result.Result.Error "test" }) }) })
 
 
 module MultiNestedRecordAlias =
@@ -184,5 +184,5 @@ module EnumWithRecursiveTypeArgs =
 
   type Alias<'x> = Inner<'x>
 
-  Alias.B(Stdlib.Result.Result.Ok(Alias.A 5L)) =
-    Inner.B(Stdlib.Result.Result.Ok(Inner.A 5L))
+  Alias.B (Stdlib.Result.Result.Ok (Alias.A 5L)) =
+    Inner.B (Stdlib.Result.Result.Ok (Inner.A 5L))

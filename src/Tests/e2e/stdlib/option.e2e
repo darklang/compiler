@@ -7,63 +7,63 @@
 // Stdlib.Option.isSome - Returns true if the option is Some
 // ===================================================================
 
-Stdlib.Option.isSome(Stdlib.Option.Option.Some(5L)) = true
+Stdlib.Option.isSome (Stdlib.Option.Option.Some (5L)) = true
 // Unresolved type variable is preserved during monomorphization
-Stdlib.Option.isSome(Stdlib.Option.Option.None) = false
+Stdlib.Option.isSome (Stdlib.Option.Option.None) = false
 
 // ===================================================================
 // Stdlib.Option.isNone - Returns true if the option is None
 // ===================================================================
 
-Stdlib.Option.isNone(Stdlib.Option.Option.Some(5L)) = false
+Stdlib.Option.isNone (Stdlib.Option.Option.Some (5L)) = false
 // Unresolved type variable is preserved during monomorphization
-Stdlib.Option.isNone(Stdlib.Option.Option.None) = true
+Stdlib.Option.isNone (Stdlib.Option.Option.None) = true
 
 // ===================================================================
 // Stdlib.Option.withDefault - Returns the value or a default
 // ===================================================================
 
-Stdlib.Option.withDefault(Stdlib.Option.Option.Some(5L), 0L) = 5L
-Stdlib.Option.withDefault(Stdlib.Option.Option.None, 42L) = 42L
+Stdlib.Option.withDefault (Stdlib.Option.Option.Some (5L)) (0L) = 5L
+Stdlib.Option.withDefault (Stdlib.Option.Option.None) (42L) = 42L
 
 // ===================================================================
 // Stdlib.Option.map - Apply a function to the value if Some
 // ===================================================================
 
-Stdlib.Option.withDefault(Stdlib.Option.map<Int64, Int64>(Stdlib.Option.Option.Some(5L), fun x -> x + 1L), 0L) = 6L
-Stdlib.Option.isNone(Stdlib.Option.map<Int64, Int64>(Stdlib.Option.Option.None, fun x -> x + 1L)) = true
+Stdlib.Option.withDefault (Stdlib.Option.map<Int64, Int64> (Stdlib.Option.Option.Some (5L)) (fun x -> x + 1L)) (0L) = 6L
+Stdlib.Option.isNone (Stdlib.Option.map<Int64, Int64> (Stdlib.Option.Option.None) (fun x -> x + 1L)) = true
 
 // ===================================================================
 // Stdlib.Option.andThen - Chain Option computations
 // ===================================================================
 
-Stdlib.Option.withDefault(Stdlib.Option.andThen<Int64, Int64>(Stdlib.Option.Option.Some(5L), fun x -> Stdlib.Option.Option.Some(x * 2L)), 0L) = 10L
-Stdlib.Option.isNone(Stdlib.Option.andThen<Int64, Int64>(Stdlib.Option.Option.None, fun x -> Stdlib.Option.Option.Some(x * 2L))) = true
+Stdlib.Option.withDefault (Stdlib.Option.andThen<Int64, Int64> (Stdlib.Option.Option.Some (5L)) (fun x -> Stdlib.Option.Option.Some (x * 2L))) (0L) = 10L
+Stdlib.Option.isNone (Stdlib.Option.andThen<Int64, Int64> (Stdlib.Option.Option.None) (fun x -> Stdlib.Option.Option.Some (x * 2L))) = true
 // NOTE: Needs type params because the lambda returns None which doesn't constrain the output type
-Stdlib.Option.isNone(Stdlib.Option.andThen<Int64, Int64>(Stdlib.Option.Option.Some(5L), fun x -> Stdlib.Option.Option.None)) = true
+Stdlib.Option.isNone (Stdlib.Option.andThen<Int64, Int64> (Stdlib.Option.Option.Some (5L)) (fun x -> Stdlib.Option.Option.None)) = true
 
 // ===================================================================
 // Stdlib.Option.or - Return the first Some, or fall back to the second option
 // ===================================================================
 
-Stdlib.Option.or<Int64>(Stdlib.Option.Option.Some(6L), Stdlib.Option.Option.Some(5L)) = Stdlib.Option.Option.Some(6L)
-Stdlib.Option.or<Int64>(Stdlib.Option.Option.Some(6L), Stdlib.Option.Option.None) = Stdlib.Option.Option.Some(6L)
-Stdlib.Option.or<Int64>(Stdlib.Option.Option.None, Stdlib.Option.Option.Some(5L)) = Stdlib.Option.Option.Some(5L)
-Stdlib.Option.or<Int64>(Stdlib.Option.Option.None, Stdlib.Option.Option.None) = Stdlib.Option.Option.None
+Stdlib.Option.or<Int64> (Stdlib.Option.Option.Some (6L)) (Stdlib.Option.Option.Some (5L)) = Stdlib.Option.Option.Some (6L)
+Stdlib.Option.or<Int64> (Stdlib.Option.Option.Some (6L)) (Stdlib.Option.Option.None) = Stdlib.Option.Option.Some (6L)
+Stdlib.Option.or<Int64> (Stdlib.Option.Option.None) (Stdlib.Option.Option.Some (5L)) = Stdlib.Option.Option.Some (5L)
+Stdlib.Option.or<Int64> (Stdlib.Option.Option.None) (Stdlib.Option.Option.None) = Stdlib.Option.Option.None
 
 // ===================================================================
 // Stdlib.Option.toList - Convert to a list
 // ===================================================================
 
-Stdlib.List.length(Stdlib.Option.toList(Stdlib.Option.Option.Some(42L))) = 1I
-Stdlib.List.isEmpty(Stdlib.Option.toList(Stdlib.Option.Option.None)) = true
+Stdlib.List.length (Stdlib.Option.toList (Stdlib.Option.Option.Some (42L))) = 1
+Stdlib.List.isEmpty (Stdlib.Option.toList (Stdlib.Option.Option.None)) = true
 
 // ===================================================================
 // Pipe operator with Option functions
 // ===================================================================
 
-Stdlib.Option.Option.Some(42L) |> Stdlib.Option.isSome() = true
-Stdlib.Option.Option.Some(10L) |> Stdlib.Option.map<Int64, Int64>(fun x -> x * 2L) |> Stdlib.Option.withDefault(0L) = 20L
+Stdlib.Option.Option.Some (42L) |> Stdlib.Option.isSome () = true
+Stdlib.Option.Option.Some (10L) |> Stdlib.Option.map<Int64, Int64> (fun x -> x * 2L) |> Stdlib.Option.withDefault (0L) = 20L
 
 // ===================================================================
 // Unresolved type variable resolved later by context
@@ -71,55 +71,55 @@ Stdlib.Option.Option.Some(10L) |> Stdlib.Option.map<Int64, Int64>(fun x -> x * 2
 // ===================================================================
 
 // Int64
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault(x, 42L) = 42L
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault (x) (42L) = 42L
 
 // String
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault(x, "hello") = "hello"
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault (x) ("hello") = "hello"
 
 // Bool
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault(x, true) = true
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault (x) (true) = true
 
 // Float64
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault(x, 3.14) = 3.14
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault (x) (3.14) = 3.14
 
 // Char
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault(x, 'a') = 'a'
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault (x) ('a') = 'a'
 
 // Unit
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault<Unit>(x, ()) = ()
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault<Unit> (x) () = ()
 
 // Int8
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault(x, 42y) = 42y
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault (x) (42y) = 42y
 
 // Int16
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault(x, 42s) = 42s
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault (x) (42s) = 42s
 
 // Int32
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault(x, 42l) = 42l
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault (x) (42l) = 42l
 
 // UInt8
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault(x, 42uy) = 42uy
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault (x) (42uy) = 42uy
 
 // UInt16
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault(x, 42us) = 42us
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault (x) (42us) = 42us
 
 // UInt32
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault(x, 42ul) = 42ul
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault (x) (42ul) = 42ul
 
 // UInt64
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault(x, 42UL) = 42UL
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault (x) (42UL) = 42UL
 
 // Tuple
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault<(Int64, Int64)>(x, (1L, 2L)) = (1L, 2L)
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault<(Int64 * Int64)> (x) ((1L, 2L)) = (1L, 2L)
 
 // Tuple3
-let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault<(Int64, Int64, Int64)>(x, (1L, 2L, 3L)) = (1L, 2L, 3L)
+let x = Stdlib.Option.Option.None in Stdlib.Option.withDefault<(Int64 * Int64 * Int64)> (x) ((1L, 2L, 3L)) = (1L, 2L, 3L)
 
 // List
-let x = Stdlib.Option.Option.None in Stdlib.List.length(Stdlib.Option.withDefault(x, [1L, 2L, 3L])) = 3I
+let x = Stdlib.Option.Option.None in Stdlib.List.length (Stdlib.Option.withDefault (x) ([1L, 2L, 3L])) = 3
 
 // Nested Option (Option<Option<Int64>>)
-let x = Stdlib.Option.Option.None in Stdlib.Option.isSome(Stdlib.Option.withDefault<Stdlib.Option.Option<Int64>>(x, Stdlib.Option.Option.Some(42L))) = true
+let x = Stdlib.Option.Option.None in Stdlib.Option.isSome (Stdlib.Option.withDefault<Stdlib.Option.Option<Int64>> (x) (Stdlib.Option.Option.Some (42L))) = true
 
 // Result
-let x = Stdlib.Option.Option.None in Stdlib.Result.isOk(Stdlib.Option.withDefault<Stdlib.Result.Result<Int64, String>>(x, Stdlib.Result.Result.Ok(42L))) = true
+let x = Stdlib.Option.Option.None in Stdlib.Result.isOk (Stdlib.Option.withDefault<Stdlib.Result.Result<Int64, String>> (x) (Stdlib.Result.Result.Ok (42L))) = true

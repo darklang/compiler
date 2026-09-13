@@ -9,72 +9,55 @@ type DiffLine =
 
 // Safely index a two-dimensional table. Invalid public Int indices retain the
 // interpreter's out-of-range default through the canonical List.getAt boundary.
-let tableGet(table: List<List<Int>>, row: Int, col: Int) : Int =
-    let selectedRow = Stdlib.Option.withDefault<List<Int>>(Stdlib.List.getAt<List<Int>>(table, row), []) in
-    Stdlib.Option.withDefault<Int>(Stdlib.List.getAt<Int>(selectedRow, col), 0I)
+let tableGet (table: List<List<Int>>) (row: Int) (col: Int) : Int =
+    let selectedRow = Stdlib.Option.withDefault<List<Int>> (Stdlib.List.getAt<List<Int>> (table) (row)) ([]) in
+    Stdlib.Option.withDefault<Int> (Stdlib.List.getAt<Int> (selectedRow) (col)) (0)
 
 // Build the LCS length table. Equality deliberately chooses the upper cell.
-let buildTable(oldLines: List<String>, newLines: List<String>) : List<List<Int>> =
+let buildTable (oldLines: List<String>) (newLines: List<String>) : List<List<Int>> =
     let zeroRow =
-        Stdlib.List.map<Int, Int>(
-            Stdlib.List.range(0I, Stdlib.List.length<String>(oldLines)),
-            fun _i -> 0I) in
-    Stdlib.List.fold<String, List<List<Int>>>(newLines, [zeroRow], fun table newLine ->
-        let prevRow = Stdlib.Option.withDefault<List<Int>>(Stdlib.List.last<List<Int>>(table), []) in
-        let pairs = Stdlib.List.indexedMap<String, (Int * String)>(oldLines, fun i oldLine -> (i, oldLine)) in
+        Stdlib.List.map<Int, Int> (Stdlib.List.range (0) (Stdlib.List.length<String> (oldLines))) (fun _i -> 0) in
+    Stdlib.List.fold<String, List<List<Int>>> (newLines) ([zeroRow]) (fun table newLine ->
+        let prevRow = Stdlib.Option.withDefault<List<Int>> (Stdlib.List.last<List<Int>> (table)) ([]) in
+        let pairs = Stdlib.List.indexedMap<String, (Int * String)> (oldLines) (fun i oldLine -> (i, oldLine)) in
         let nextRow =
-            Stdlib.List.fold<(Int * String), List<Int>>(pairs, [0I], fun row pair ->
+            Stdlib.List.fold<(Int * String), List<Int>> (pairs) ([0]) (fun row pair ->
                 let (i, oldLine) = pair in
-                let above = Stdlib.Option.withDefault<Int>(Stdlib.List.getAt<Int>(prevRow, i + 1I), 0I) in
-                let diag = Stdlib.Option.withDefault<Int>(Stdlib.List.getAt<Int>(prevRow, i), 0I) in
-                let left = Stdlib.Option.withDefault<Int>(Stdlib.List.last<Int>(row), 0I) in
+                let above = Stdlib.Option.withDefault<Int> (Stdlib.List.getAt<Int> (prevRow) (i + 1)) (0) in
+                let diag = Stdlib.Option.withDefault<Int> (Stdlib.List.getAt<Int> (prevRow) (i)) (0) in
+                let left = Stdlib.Option.withDefault<Int> (Stdlib.List.last<Int> (row)) (0) in
                 let cell =
-                    if oldLine == newLine then diag + 1I
+                    if oldLine == newLine then diag + 1
                     else if above >= left then above
                     else left in
-                Stdlib.List.append<Int>(row, [cell])) in
-        Stdlib.List.append<List<Int>>(table, [nextRow]))
+                Stdlib.List.append<Int> (row) ([cell])) in
+        Stdlib.List.append<List<Int>> (table) ([nextRow]))
 
 // Walk the table backwards and append each classified line in source order.
-let trace(oldLines: List<String>, newLines: List<String>, table: List<List<Int>>, i: Int, j: Int) : List<Darklang.Stdlib.Diff.DiffLine> =
-    if i == 0I && j == 0I then
+let trace (oldLines: List<String>) (newLines: List<String>) (table: List<List<Int>>) (i: Int) (j: Int) : List<Darklang.Stdlib.Diff.DiffLine> =
+    if i == 0 && j == 0 then
         []
-    else if i > 0I && j > 0I then
-        let oldLine = Stdlib.Option.withDefault<String>(Stdlib.List.getAt<String>(oldLines, i - 1I), "") in
-        let newLine = Stdlib.Option.withDefault<String>(Stdlib.List.getAt<String>(newLines, j - 1I), "") in
+    else if i > 0 && j > 0 then
+        let oldLine = Stdlib.Option.withDefault<String> (Stdlib.List.getAt<String> (oldLines) (i - 1)) ("") in
+        let newLine = Stdlib.Option.withDefault<String> (Stdlib.List.getAt<String> (newLines) (j - 1)) ("") in
         if oldLine == newLine then
-            Stdlib.List.append<Darklang.Stdlib.Diff.DiffLine>(
-                Darklang.Stdlib.Diff.trace(oldLines, newLines, table, i - 1I, j - 1I),
-                [Darklang.Stdlib.Diff.DiffLine.Same(oldLine)])
+            Stdlib.List.append<Darklang.Stdlib.Diff.DiffLine> (Darklang.Stdlib.Diff.trace (oldLines) (newLines) (table) (i - 1) (j - 1)) ([Darklang.Stdlib.Diff.DiffLine.Same (oldLine)])
         else
-            let up = Darklang.Stdlib.Diff.tableGet(table, j - 1I, i) in
-            let left = Darklang.Stdlib.Diff.tableGet(table, j, i - 1I) in
+            let up = Darklang.Stdlib.Diff.tableGet (table) (j - 1) (i) in
+            let left = Darklang.Stdlib.Diff.tableGet (table) (j) (i - 1) in
             if up >= left then
-                Stdlib.List.append<Darklang.Stdlib.Diff.DiffLine>(
-                    Darklang.Stdlib.Diff.trace(oldLines, newLines, table, i, j - 1I),
-                    [Darklang.Stdlib.Diff.DiffLine.Added(newLine)])
+                Stdlib.List.append<Darklang.Stdlib.Diff.DiffLine> (Darklang.Stdlib.Diff.trace (oldLines) (newLines) (table) (i) (j - 1)) ([Darklang.Stdlib.Diff.DiffLine.Added (newLine)])
             else
-                Stdlib.List.append<Darklang.Stdlib.Diff.DiffLine>(
-                    Darklang.Stdlib.Diff.trace(oldLines, newLines, table, i - 1I, j),
-                    [Darklang.Stdlib.Diff.DiffLine.Removed(oldLine)])
-    else if j > 0I then
-        let newLine = Stdlib.Option.withDefault<String>(Stdlib.List.getAt<String>(newLines, j - 1I), "") in
-        Stdlib.List.append<Darklang.Stdlib.Diff.DiffLine>(
-            Darklang.Stdlib.Diff.trace(oldLines, newLines, table, i, j - 1I),
-            [Darklang.Stdlib.Diff.DiffLine.Added(newLine)])
+                Stdlib.List.append<Darklang.Stdlib.Diff.DiffLine> (Darklang.Stdlib.Diff.trace (oldLines) (newLines) (table) (i - 1) (j)) ([Darklang.Stdlib.Diff.DiffLine.Removed (oldLine)])
+    else if j > 0 then
+        let newLine = Stdlib.Option.withDefault<String> (Stdlib.List.getAt<String> (newLines) (j - 1)) ("") in
+        Stdlib.List.append<Darklang.Stdlib.Diff.DiffLine> (Darklang.Stdlib.Diff.trace (oldLines) (newLines) (table) (i) (j - 1)) ([Darklang.Stdlib.Diff.DiffLine.Added (newLine)])
     else
-        let oldLine = Stdlib.Option.withDefault<String>(Stdlib.List.getAt<String>(oldLines, i - 1I), "") in
-        Stdlib.List.append<Darklang.Stdlib.Diff.DiffLine>(
-            Darklang.Stdlib.Diff.trace(oldLines, newLines, table, i - 1I, j),
-            [Darklang.Stdlib.Diff.DiffLine.Removed(oldLine)])
+        let oldLine = Stdlib.Option.withDefault<String> (Stdlib.List.getAt<String> (oldLines) (i - 1)) ("") in
+        Stdlib.List.append<Darklang.Stdlib.Diff.DiffLine> (Darklang.Stdlib.Diff.trace (oldLines) (newLines) (table) (i - 1) (j)) ([Darklang.Stdlib.Diff.DiffLine.Removed (oldLine)])
 
-let lines(oldText: String, newText: String) : List<Darklang.Stdlib.Diff.DiffLine> =
-    let oldLines = Stdlib.String.split(oldText, "\n") in
-    let newLines = Stdlib.String.split(newText, "\n") in
-    let table = Darklang.Stdlib.Diff.buildTable(oldLines, newLines) in
-    Darklang.Stdlib.Diff.trace(
-        oldLines,
-        newLines,
-        table,
-        Stdlib.List.length<String>(oldLines),
-        Stdlib.List.length<String>(newLines))
+let lines (oldText: String) (newText: String) : List<Darklang.Stdlib.Diff.DiffLine> =
+    let oldLines = Stdlib.String.split (oldText) ("\n") in
+    let newLines = Stdlib.String.split (newText) ("\n") in
+    let table = Darklang.Stdlib.Diff.buildTable (oldLines) (newLines) in
+    Darklang.Stdlib.Diff.trace (oldLines) (newLines) (table) (Stdlib.List.length<String> (oldLines)) (Stdlib.List.length<String> (newLines))

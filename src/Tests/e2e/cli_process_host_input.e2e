@@ -2,77 +2,77 @@
 // 04fbe9dcc995c6188757d583e273cbd30a3e2d3d. Compiler work began at
 // cce6860f02b13d416295ff342341eeeae997f49f.
 
-Stdlib.Cli.Process.shellQuote("it's ready") = "'it'\\''s ready'"
+Stdlib.Cli.Process.shellQuote ("it's ready") = "'it'\\''s ready'"
 
-match Stdlib.Cli.OS.getOS() with | Ok(Linux) -> true | Ok(MacOS) -> true | _ -> false = true
+match Stdlib.Cli.OS.getOS () with | Ok (Linux) -> true | Ok (MacOS) -> true | _ -> false = true
 
-Stdlib.Cli.Sys.cpuCount() > 0I = true
-Stdlib.Cli.Sys.cpuCount() > 1I = true // test hosts expose more than one CPU; the intrinsic must not return its old constant
-Stdlib.Cli.Sys.currentPid() > 0I = true
+Stdlib.Cli.Sys.cpuCount () > 0 = true
+Stdlib.Cli.Sys.cpuCount () > 1 = true // test hosts expose more than one CPU; the intrinsic must not return its old constant
+Stdlib.Cli.Sys.currentPid () > 0 = true
 
 // POSIX failures must preserve the kernel errno instead of inferring it from
 // localized command-line utility output.
-match Stdlib.Cli.Posix.kill(Stdlib.Cli.Sys.currentPid(), 99999I) with | Error(error) -> (error.errno, error.message) | Ok(()) -> (0I, "unexpected") = (22I, "Invalid argument")
+match Stdlib.Cli.Posix.kill (Stdlib.Cli.Sys.currentPid ()) (99999) with | Error (error) -> (error.errno) (error.message) | Ok (()) -> (0) ("unexpected") = (22, "Invalid argument")
 
-match Stdlib.Cli.Process.exec("printf", ["%s", "direct execution"]) with | Ok(output) -> output | Error(message) -> message = "direct execution"
+match Stdlib.Cli.Process.exec ("printf") (["%s", "direct execution"]) with | Ok (output) -> output | Error (message) -> message = "direct execution"
 
-match Stdlib.Cli.Process.run("/definitely/missing/cli-parity", []) with | Error(error) -> (error.errno, error.message) | Ok(_) -> (0I, "unexpected") = (2I, "No such file or directory")
+match Stdlib.Cli.Process.run ("/definitely/missing/cli-parity") ([]) with | Error (error) -> (error.errno) (error.message) | Ok (_) -> (0) ("unexpected") = (2, "No such file or directory")
 
-let outcome = Stdlib.Cli.execute("printf 'stdout'; printf 'stderr' >&2; exit 7") in (outcome.exitCode, outcome.stdout, outcome.stderr) = (7I, "stdout", "stderr")
+let outcome = Stdlib.Cli.execute ("printf 'stdout'; printf 'stderr' >&2; exit 7") in (outcome.exitCode, outcome.stdout, outcome.stderr) = (7, "stdout", "stderr")
 
-let outcome = Stdlib.Cli.execute("printf 'x\\n\\n'") in outcome.stdout = "x\n\n"
+let outcome = Stdlib.Cli.execute ("printf 'x\\n\\n'") in outcome.stdout = "x\n\n"
 
-let outcome = Stdlib.Cli.execute("head -c 100000 /dev/zero; head -c 100000 /dev/zero >&2") in (Stdlib.String.length(outcome.stdout), Stdlib.String.length(outcome.stderr)) = (100000I, 100000I)
+let outcome = Stdlib.Cli.execute ("head -c 100000 /dev/zero; head -c 100000 /dev/zero >&2") in (Stdlib.String.length (outcome.stdout), Stdlib.String.length (outcome.stderr)) = (100000, 100000)
 
-let key = Stdlib.Cli.Stdin.KeyRead.KeyRead { key = Stdlib.Cli.Stdin.Key.Key.A, modifiers = Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = true, ctrl = true, shift = true }, keyChar = "A", repeat = 2I } in Stdlib.Cli.Stdin.KeyRead.toString(key) = stdout="\"ALT+CTRL+SHIFT+A\"\n" stderr=""
+let key = Stdlib.Cli.Stdin.KeyRead.KeyRead { key = Stdlib.Cli.Stdin.Key.Key.A, modifiers = Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = true, ctrl = true, shift = true }, keyChar = "A", repeat = 2 } in Stdlib.Cli.Stdin.KeyRead.toString (key) = stdout="\"ALT+CTRL+SHIFT+A\"\n" stderr=""
 
-let key = Stdlib.Cli.Stdin.readKey() in (Stdlib.Cli.Stdin.Key.toString(key.key), key.keyChar, key.repeat) = ("Escape", "", 1I)
+let key = Stdlib.Cli.Stdin.readKey () in (Stdlib.Cli.Stdin.Key.toString (key.key), key.keyChar, key.repeat) = ("Escape", "", 1)
 
-match Stdlib.Cli.Env.get("PATH") with | Some(path) -> Stdlib.String.length(path) > 0I | None -> false = true
+match Stdlib.Cli.Env.get ("PATH") with | Some (path) -> Stdlib.String.length (path) > 0 | None -> false = true
 
-Stdlib.Cli.Env.get("DARK_NATIVE_ENV_PROBE") = Some("value  \n") env="DARK_NATIVE_ENV_PROBE=value  \n"
+Stdlib.Cli.Env.get ("DARK_NATIVE_ENV_PROBE") = Some ("value  \n") env="DARK_NATIVE_ENV_PROBE=value  \n"
 
-match Stdlib.Cli.Sys.hostname() with | Ok(hostname) -> Stdlib.String.length(hostname) > 0I | Error(_) -> false = true env="PATH="
+match Stdlib.Cli.Sys.hostname () with | Ok (hostname) -> Stdlib.String.length (hostname) > 0 | Error (_) -> false = true env="PATH="
 
-match Stdlib.Cli.Sys.currentUser() with | Some(user) -> user | None -> "missing" = "native user  " env="USER=native user  " env="PATH="
+match Stdlib.Cli.Sys.currentUser () with | Some (user) -> user | None -> "missing" = "native user  " env="USER=native user  " env="PATH="
 
 // Arguments are positional (excluding the executable name) and parsing errors
 // are values, so command-line programs must handle absent or invalid input.
-match Stdlib.Cli.Args.int64(999I) with | Error(message) -> Stdlib.String.length(message) > 0I | Ok(_) -> false = true
+match Stdlib.Cli.Args.int64 (999) with | Error (message) -> Stdlib.String.length (message) > 0 | Ok (_) -> false = true
 
-let benchmarkArgForCleanup(index: Int): Int64 = match Stdlib.Cli.Args.int64(index) with | Ok(value) -> value | Error(message) -> Builtin.testRuntimeError(message) let result = benchmarkArgForCleanup(0I) + benchmarkArgForCleanup(1I) in Builtin.printLine(Stdlib.Int64.toString(result)) = stdout="10100\n" arg="100" arg="10000" // inlined successful integer arguments survive cleanup
+let benchmarkArgForCleanup (index: Int): Int64 = match Stdlib.Cli.Args.int64 (index) with | Ok (value) -> value | Error (message) -> Builtin.testRuntimeError (message) let result = benchmarkArgForCleanup (0) + benchmarkArgForCleanup (1) in Builtin.printLine (Stdlib.Int64.toString (result)) = stdout="10100\n" arg="100" arg="10000" // inlined successful integer arguments survive cleanup
 
-match (Stdlib.Cli.Args.int64(0I), Stdlib.Cli.Args.int64(1I)) with | (Ok(maximum), Ok(minimum)) -> maximum == 9223372036854775807L && minimum == -9223372036854775808L | _ -> false = true arg="9223372036854775807" arg="-9223372036854775808" // Int64 argv fast path accepts both bounds
+match (Stdlib.Cli.Args.int64 (0), Stdlib.Cli.Args.int64 (1)) with | (Ok (maximum), Ok (minimum)) -> maximum == 9223372036854775807L && minimum == -9223372036854775808L | _ -> false = true arg="9223372036854775807" arg="-9223372036854775808" // Int64 argv fast path accepts both bounds
 
-match (Stdlib.Cli.Args.int64(0I), Stdlib.Cli.Args.int64(1I)) with | (Ok(positive), Ok(negative)) -> positive == 42L && negative == -17L | _ -> false = true arg=" +42 " arg=" -17 " // Int64 argv preserves trimmed-input fallback
+match (Stdlib.Cli.Args.int64 (0), Stdlib.Cli.Args.int64 (1)) with | (Ok (positive), Ok (negative)) -> positive == 42L && negative == -17L | _ -> false = true arg=" +42 " arg=" -17 " // Int64 argv preserves trimmed-input fallback
 
-match Stdlib.Cli.Args.int64(0I) with | Error(message) -> message == "invalid Int64 command-line argument at index 0: twelve" | Ok(_) -> false = true arg="twelve" // invalid Int64 argv preserves its diagnostic
+match Stdlib.Cli.Args.int64 (0) with | Error (message) -> message == "invalid Int64 command-line argument at index 0: twelve" | Ok (_) -> false = true arg="twelve" // invalid Int64 argv preserves its diagnostic
 
-match Stdlib.Cli.Args.int64(0I) with | Error(message) -> message == "Int64 command-line argument is out of range at index 0" | Ok(_) -> false = true arg="9223372036854775808" // overflowing Int64 argv preserves its diagnostic
+match Stdlib.Cli.Args.int64 (0) with | Error (message) -> message == "Int64 command-line argument is out of range at index 0" | Ok (_) -> false = true arg="9223372036854775808" // overflowing Int64 argv preserves its diagnostic
 
 // CLI argument lookup must work from a nested non-tail frame: argv is process
 // state, rather than state held in an allocator-visible register.
-let argvMissingFromNestedFrame(depth: Int64): Bool =
+let argvMissingFromNestedFrame (depth: Int64): Bool =
     if depth == 0L then
-        match Stdlib.Cli.Args.int64(999I) with | Error(_) -> true | Ok(_) -> false
+        match Stdlib.Cli.Args.int64 (999) with | Error (_) -> true | Ok (_) -> false
     else
-        let retained = depth in argvMissingFromNestedFrame(depth - 1L) && retained > 0L
-argvMissingFromNestedFrame(3L) = true
+        let retained = depth in argvMissingFromNestedFrame (depth - 1L) && retained > 0L
+argvMissingFromNestedFrame (3L) = true
 
-match Stdlib.Cli.Process.runIn("/", "pwd", []) with | Ok(output) -> Stdlib.String.trimEnd(output.stdout) | Error(error) -> error.message = "/"
+match Stdlib.Cli.Process.runIn ("/") ("pwd") ([]) with | Ok (output) -> Stdlib.String.trimEnd (output.stdout) | Error (error) -> error.message = "/"
 
-match Stdlib.Cli.Process.runWithEnv("/bin/sh", ["-c", "printf %s \"$CLI_PARITY_VALUE\""], [("CLI_PARITY_VALUE", "inherited")]) with | Ok(output) -> output.stdout | Error(error) -> error = "inherited"
+match Stdlib.Cli.Process.runWithEnv ("/bin/sh") (["-c", "printf %s \"$CLI_PARITY_VALUE\""]) ([("CLI_PARITY_VALUE", "inherited")]) with | Ok (output) -> output.stdout | Error (error) -> error = "inherited"
 
-match Stdlib.Cli.Process.pipe("printf", ["abc"], "tr", ["a-z", "A-Z"]) with | Ok(output) -> output.stdout | Error(error) -> error.message = "ABC"
+match Stdlib.Cli.Process.pipe ("printf") (["abc"]) ("tr") (["a-z", "A-Z"]) with | Ok (output) -> output.stdout | Error (error) -> error.message = "ABC"
 
-match Stdlib.Cli.Process.runWithTimeout(0I, "true", []) with | Error(error) -> error | Ok(_) -> "unexpected" = "timeoutMs must be positive"
+match Stdlib.Cli.Process.runWithTimeout (0) ("true") ([]) with | Error (error) -> error | Ok (_) -> "unexpected" = "timeoutMs must be positive"
 
-match Stdlib.Cli.Process.runWithTimeout(5I, "/bin/sh", ["-c", "sleep 1"]) with | Error(error) -> error | Ok(_) -> "unexpected" = "Process timed out"
+match Stdlib.Cli.Process.runWithTimeout (5) ("/bin/sh") (["-c", "sleep 1"]) with | Error (error) -> error | Ok (_) -> "unexpected" = "Process timed out"
 
-let handle = Stdlib.Cli.Process.spawn("") in let result = Stdlib.Cli.Process.communicate(handle, "") in (result.exitCode, result.stderr) = (-1I, "Invalid process handle")
+let handle = Stdlib.Cli.Process.spawn ("") in let result = Stdlib.Cli.Process.communicate (handle) ("") in (result.exitCode, result.stderr) = (-1, "Invalid process handle")
 
-match Stdlib.Cli.Host.getRuntimeHost() with | Ok(_) -> true | Error(_) -> false = true
+match Stdlib.Cli.Host.getRuntimeHost () with | Ok (_) -> true | Error (_) -> false = true
 
-match (Stdlib.Cli.Sys.hostname(), Stdlib.Cli.Sys.os(), Stdlib.Cli.Sys.arch()) with | (Ok(hostname), Ok(os), Ok(arch)) -> Stdlib.String.length(hostname) > 0I && Stdlib.String.length(os) > 0I && Stdlib.String.length(arch) > 0I | _ -> false = true
+match (Stdlib.Cli.Sys.hostname (), Stdlib.Cli.Sys.os (), Stdlib.Cli.Sys.arch ()) with | (Ok (hostname), Ok (os), Ok (arch)) -> Stdlib.String.length (hostname) > 0 && Stdlib.String.length (os) > 0 && Stdlib.String.length (arch) > 0 | _ -> false = true
 
-match Stdlib.Cli.Sys.currentUser() with | Some(user) -> Stdlib.String.length(user) > 0I | None -> false = true
+match Stdlib.Cli.Sys.currentUser () with | Some (user) -> Stdlib.String.length (user) > 0 | None -> false = true

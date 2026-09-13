@@ -2,9 +2,9 @@
 //
 // Double-underscore functions should not be callable from user code.
 
-__raw_alloc(8L) = error="Internal identifier not allowed in user code: __raw_alloc"
-Stdlib.Dict.__getTag(Dict { }) = error="Internal identifier not allowed in user code: Stdlib.Dict.__getTag"
-Stdlib.List.__empty<Int64>() = error="Internal identifier not allowed in user code: Stdlib.List.__empty"
-Stdlib.List.__arrayCopy(0L, 0L, 0L, 0L) = error="Internal identifier not allowed in user code: Stdlib.List.__arrayCopy"
-Stdlib.Internal.SkewList.empty<Int64>() = error="Unresolved callable name: Stdlib.Internal.SkewList.empty"
-Stdlib.Internal.ListArray.copy(0L, 0L, 0L, 0L) = error="Unresolved callable name: Stdlib.Internal.ListArray.copy"
+__raw_alloc (8L) = error="Internal identifier not allowed in user code: __raw_alloc"
+Stdlib.Dict.__getTag (Dict { }) = error="Internal identifier not allowed in user code: Stdlib.Dict.__getTag"
+Stdlib.List.__empty<Int64> () = error="Internal identifier not allowed in user code: Stdlib.List.__empty"
+Stdlib.List.__arrayCopy (0L) (0L) (0L) (0L) = error="Internal identifier not allowed in user code: Stdlib.List.__arrayCopy"
+Stdlib.Internal.SkewList.empty<Int64> () = error="Unresolved callable name: Stdlib.Internal.SkewList.empty"
+Stdlib.Internal.ListArray.copy (0L) (0L) (0L) (0L) = error="Unresolved callable name: Stdlib.Internal.ListArray.copy"

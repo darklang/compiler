@@ -4,4 +4,4 @@
 
 module Stdlib.Fun
 
-let identity<'t>(value: t) : t = value
+let identity<'t> (value: t) : t = value

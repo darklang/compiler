@@ -180,10 +180,10 @@
 (255L & ~~~255L) = 0L
 
 // Property: x OR ~~~x = -1 (all bits set)
-Stdlib.Int64.bitwiseOr(0L, ~~~0L) = -1L
-Stdlib.Int64.bitwiseOr(1L, ~~~1L) = -1L
-Stdlib.Int64.bitwiseOr(42L, ~~~42L) = -1L
-Stdlib.Int64.bitwiseOr(255L, ~~~255L) = -1L
+Stdlib.Int64.bitwiseOr (0L) (~~~0L) = -1L
+Stdlib.Int64.bitwiseOr (1L) (~~~1L) = -1L
+Stdlib.Int64.bitwiseOr (42L) (~~~42L) = -1L
+Stdlib.Int64.bitwiseOr (255L) (~~~255L) = -1L
 
 // Combined with shifts
 ~~~(1L << 0L) = -2L// Clear bit 0 (inverted)
@@ -196,7 +196,7 @@ Stdlib.Int64.bitwiseOr(255L, ~~~255L) = -1L
 
 // De Morgan's Law: ~~~(a & b) = (~~~a) | (~~~b)
 ~~~(12L & 10L) = -9L// ~~~8 = -9
-Stdlib.Int64.bitwiseOr(~~~12L, ~~~10L) = -9L
+Stdlib.Int64.bitwiseOr (~~~12L) (~~~10L) = -9L
 
 // Constant folding verification (in variables)
 let x = 42L in ~~~x = -43L
@@ -277,28 +277,28 @@ let avail = 20L in let pos = avail & (0L - avail) in pos = 4L// 20 = 0b10100, lo
 // ===================================================================
 
 // Stdlib.Int64.bitwiseAnd
-Stdlib.Int64.bitwiseAnd(12L, 10L) = 8L
-Stdlib.Int64.bitwiseAnd(255L, 15L) = 15L
-Stdlib.Int64.bitwiseAnd(0L, 255L) = 0L
+Stdlib.Int64.bitwiseAnd (12L) (10L) = 8L
+Stdlib.Int64.bitwiseAnd (255L) (15L) = 15L
+Stdlib.Int64.bitwiseAnd (0L) (255L) = 0L
 
 // Stdlib.Int64.bitwiseXor
-Stdlib.Int64.bitwiseXor(12L, 10L) = 6L
-Stdlib.Int64.bitwiseXor(42L, 42L) = 0L
-Stdlib.Int64.bitwiseXor(170L, 85L) = 255L
+Stdlib.Int64.bitwiseXor (12L) (10L) = 6L
+Stdlib.Int64.bitwiseXor (42L) (42L) = 0L
+Stdlib.Int64.bitwiseXor (170L) (85L) = 255L
 
 // Stdlib.Int64.shiftLeft
-Stdlib.Int64.shiftLeft(1L, 4L) = 16L
-Stdlib.Int64.shiftLeft(1L, 10L) = 1024L
-Stdlib.Int64.shiftLeft(5L, 3L) = 40L
+Stdlib.Int64.shiftLeft (1L) (4L) = 16L
+Stdlib.Int64.shiftLeft (1L) (10L) = 1024L
+Stdlib.Int64.shiftLeft (5L) (3L) = 40L
 
 // Stdlib.Int64.shiftRight
-Stdlib.Int64.shiftRight(16L, 4L) = 1L
-Stdlib.Int64.shiftRight(1024L, 10L) = 1L
-Stdlib.Int64.shiftRight(256L, 4L) = 16L
+Stdlib.Int64.shiftRight (16L) (4L) = 1L
+Stdlib.Int64.shiftRight (1024L) (10L) = 1L
+Stdlib.Int64.shiftRight (256L) (4L) = 16L
 
 // Stdlib.Int64.bitwiseNot
-Stdlib.Int64.bitwiseNot(0L) = -1L
-Stdlib.Int64.bitwiseNot(1L) = -2L
-Stdlib.Int64.bitwiseNot(-1L) = 0L
-Stdlib.Int64.bitwiseNot(255L) = -256L
-Stdlib.Int64.bitwiseNot(42L) = -43L
+Stdlib.Int64.bitwiseNot (0L) = -1L
+Stdlib.Int64.bitwiseNot (1L) = -2L
+Stdlib.Int64.bitwiseNot (-1L) = 0L
+Stdlib.Int64.bitwiseNot (255L) = -256L
+Stdlib.Int64.bitwiseNot (42L) = -43L

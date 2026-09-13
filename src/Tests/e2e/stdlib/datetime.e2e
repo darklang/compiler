@@ -1,11 +1,11 @@
 // Supplemental clock and full-range cases beyond the pinned interpreter corpus.
 
-Stdlib.DateTime.toMilliseconds(Stdlib.DateTime.now()) > 1000000000000I = true
-Stdlib.DateTime.atStartOfDay(Stdlib.DateTime.today()) = Stdlib.DateTime.today()
-Stdlib.DateTime.hour(Stdlib.DateTime.today()) = 0I
-Stdlib.DateTime.toMilliseconds(Stdlib.DateTime.fromMilliseconds(-377673580800000I)) = -377673580800000I
-Stdlib.DateTime.toMilliseconds(Stdlib.DateTime.fromMilliseconds(253402300799999I)) = 253402300799999I
-Stdlib.DateTime.fromMilliseconds(-377673580800001I) = error="Encountered out-of-range value for type of Int"
-Stdlib.DateTime.fromMilliseconds(253402300800000I) = error="Encountered out-of-range value for type of Int"
-Stdlib.DateTime.addMilliseconds(Stdlib.DateTime.fromMilliseconds(253402300799999I), 1I) = error="Encountered out-of-range value for type of Int"
-Stdlib.DateTime.subtractMilliseconds(Stdlib.DateTime.fromMilliseconds(-377673580800000I), 1I) = error="Encountered out-of-range value for type of Int"
+Stdlib.DateTime.toMilliseconds (Stdlib.DateTime.now ()) > 1000000000000 = true
+Stdlib.DateTime.atStartOfDay (Stdlib.DateTime.today ()) = Stdlib.DateTime.today ()
+Stdlib.DateTime.hour (Stdlib.DateTime.today ()) = 0
+Stdlib.DateTime.toMilliseconds (Stdlib.DateTime.fromMilliseconds (-377673580800000)) = -377673580800000
+Stdlib.DateTime.toMilliseconds (Stdlib.DateTime.fromMilliseconds (253402300799999)) = 253402300799999
+Stdlib.DateTime.fromMilliseconds (-377673580800001) = error="Encountered out-of-range value for type of Int"
+Stdlib.DateTime.fromMilliseconds (253402300800000) = error="Encountered out-of-range value for type of Int"
+Stdlib.DateTime.addMilliseconds (Stdlib.DateTime.fromMilliseconds (253402300799999)) (1) = error="Encountered out-of-range value for type of Int"
+Stdlib.DateTime.subtractMilliseconds (Stdlib.DateTime.fromMilliseconds (-377673580800000)) (1) = error="Encountered out-of-range value for type of Int"

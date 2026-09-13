@@ -162,11 +162,11 @@ let private canEmbedBatchEqualitySource
         |> Array.map (fun line -> $"    {line}")
         |> String.concat "\n"
     let probe =
-        "let e2eBatchEligibilityCheck(seed: Int64): Bool =\n"
+        "let e2eBatchEligibilityCheck (seed: Int64) : Bool =\n"
         + $"  let e2eBatchEligibilityResult =\n{body} in\n"
         + "  let e2eBatchEligibilityFence = fun value -> if seed == 0L then value else false in\n"
-        + "  e2eBatchEligibilityFence(e2eBatchEligibilityResult)\n\n"
-        + "e2eBatchEligibilityCheck(0L)"
+        + "  e2eBatchEligibilityFence (e2eBatchEligibilityResult)\n\n"
+        + "e2eBatchEligibilityCheck (0L)"
     CompilerLibrary.parseProgram allowInternal probe |> Result.isOk
 
 /// Only value-equality tests with no process contract can share a process. The
@@ -1094,12 +1094,12 @@ let buildBatchSource (tests: PreparedE2EBatchTest list) : string =
     let checkFunctions =
         tests
         |> List.mapi (fun index prepared ->
-            $"let {prefix}Check{index}(seed: Int64): Bool =\n  let {prefix}CheckResult{index} =\n{indentBatchBody (indentBatchBody prepared.EqualitySource)} in\n  let {prefix}Fence{index} = fun value -> if seed == 0L then value else false in\n  {prefix}Fence{index}({prefix}CheckResult{index})")
+            $"let {prefix}Check{index} (seed: Int64) : Bool =\n  let {prefix}CheckResult{index} =\n{indentBatchBody (indentBatchBody prepared.EqualitySource)} in\n  let {prefix}Fence{index} = fun value -> if seed == 0L then value else false in\n  {prefix}Fence{index} ({prefix}CheckResult{index})")
         |> String.concat "\n\n"
     let resultBindings =
         tests
         |> List.mapi (fun index _ ->
-            $"let {prefix}Result{index} = {prefix}Check{index}(0L) in")
+            $"let {prefix}Result{index} = {prefix}Check{index} (0L) in")
         |> String.concat "\n"
     let masks =
         tests

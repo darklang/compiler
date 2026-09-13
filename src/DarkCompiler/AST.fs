@@ -413,7 +413,7 @@ and Expr =
     | UInt32Literal of uint32               // 32-bit unsigned: 42ul
     | UInt64Literal of uint64               // 64-bit unsigned: 42UL
     | UInt128Literal of System.UInt128      // 42Z
-    | BigIntLiteral of System.Numerics.BigInteger // Arbitrary-precision Int: 42I
+    | BigIntLiteral of System.Numerics.BigInteger // Arbitrary-precision unsuffixed Int
     | BoolLiteral of bool
     | StringLiteral of string
     | CharLiteral of string   // Single Extended Grapheme Cluster stored as UTF-8 string

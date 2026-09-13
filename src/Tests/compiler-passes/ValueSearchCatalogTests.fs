@@ -123,19 +123,19 @@ let private compile
 let testCatalogParity (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
     let source =
         $"""
-        let target = Darklang.LanguageTools.ProgramTypes.Hash.Hash("type-error") in
-        let all = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error>("branch-main", "", target) in
-        let nested = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error>("branch-main", "Owner.Nested", target) in
-        let deep = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error>("branch-main", "Owner.Nested.Deep", target) in
-        let other = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error>("branch-main", "", Darklang.LanguageTools.ProgramTypes.Hash.Hash("type-other")) in
-        let branch = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error>("branch-other", "", target) in
+        let target = Darklang.LanguageTools.ProgramTypes.Hash.Hash ("type-error") in
+        let all = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error> ("branch-main") ("") (target) in
+        let nested = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error> ("branch-main") ("Owner.Nested") (target) in
+        let deep = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error> ("branch-main") ("Owner.Nested.Deep") (target) in
+        let other = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error> ("branch-main") ("") (Darklang.LanguageTools.ProgramTypes.Hash.Hash ("type-other")) in
+        let branch = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error> ("branch-other") ("") (target) in
         let allMatches =
             match all with
             | [first, second, multiple, alternate] ->
-                first.path == "Owner.Nested.first" && first.value.errno == 1I && first.value.message == "first" &&
-                second.path == "Owner.Nested.Deep.second" && second.value.errno == 2I && second.value.message == "second" &&
-                multiple.path == "Owner.Nested.short" && multiple.value.errno == 3I && multiple.value.message == "multiple" &&
-                alternate.path == "Owner.selected" && alternate.value.errno == 4I && alternate.value.message == "alternate"
+                first.path == "Owner.Nested.first" && first.value.errno == 1 && first.value.message == "first" &&
+                second.path == "Owner.Nested.Deep.second" && second.value.errno == 2 && second.value.message == "second" &&
+                multiple.path == "Owner.Nested.short" && multiple.value.errno == 3 && multiple.value.message == "multiple" &&
+                alternate.path == "Owner.selected" && alternate.value.errno == 4 && alternate.value.message == "alternate"
             | _ -> false in
         let nestedMatches =
             match nested with
@@ -146,17 +146,17 @@ let testCatalogParity (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
             | _ -> false in
         let deepMatches =
             match deep with
-            | [value] -> value.path == "Owner.Nested.Deep.second" && value.value.errno == 2I
+            | [value] -> value.path == "Owner.Nested.Deep.second" && value.value.errno == 2
             | _ -> false in
         let otherMatches =
             match other with
-            | [value] -> value.path == "Owner.other" && value.value.errno == 20I
+            | [value] -> value.path == "Owner.other" && value.value.errno == 20
             | _ -> false in
         let branchMatches =
             match branch with
-            | [value] -> value.path == "Other.Nested.branchValue" && value.value.errno == 8I
+            | [value] -> value.path == "Other.Nested.branchValue" && value.value.errno == 8
             | _ -> false in
-        Builtin.printLine(Stdlib.Bool.toString(allMatches && nestedMatches && deepMatches && otherMatches && branchMatches))
+        Builtin.printLine (Stdlib.Bool.toString (allMatches && nestedMatches && deepMatches && otherMatches && branchMatches))
         """
     let report = compile stdlib parityCatalog source
     match report.Result with

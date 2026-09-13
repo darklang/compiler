@@ -3,22 +3,22 @@
 ---NAME---
 def rec private and internal are ordinary identifiers
 ---SOURCE---
-let def(rec: Int64, private: Int64, internal: Int64) : Int64 = rec
-def(1, 2, 3)
+let def (rec: Int64) (private: Int64) (internal: Int64) : Int64 = rec
+def (1) (2) (3)
 ---ROUNDTRIP---
 
 ---NAME---
 quoted reserved identifiers roundtrip
 ---SOURCE---
-let ``let``(``val``: Int64, ``elif``: Int64, ``fun``: Int64) : Int64 = ``val``
-``let``(1, 2, 3)
+let ``let`` (``val``: Int64) (``elif``: Int64) (``fun``: Int64) : Int64 = ``val``
+``let`` (1) (2) (3)
 ---ROUNDTRIP---
 
 ---NAME---
 identifier apostrophe suffix roundtrips bare
 ---SOURCE---
-let next'(value': Int64) : Int64 = value'
-next'(1)
+let next' (value': Int64) : Int64 = value'
+next' (1)
 ---ROUNDTRIP---
 
 ---NAME---
@@ -32,7 +32,7 @@ blank spelling roundtrips canonically
 ---SOURCE---
 let ___ = 1 in 2
 ---EXPECTED---
-let ___ = 1I in 2I
+let ___ = 1 in 2
 ---ROUNDTRIP---
 
 ---NAME---
@@ -72,28 +72,28 @@ invalid number literal: 1.5abc
 ---NAME---
 public function declaration uses let and apostrophe parameters
 ---SOURCE---
-let identity<'a>(value: 'a) : 'a = value
-identity<Int64>(1)
+let identity<'a> (value: 'a) : 'a = value
+identity<Int64> (1)
 ---ROUNDTRIP---
 
 ---NAME---
 legacy def declaration is removed
 ---SOURCE---
-def old(value: Int64) : Int64 = value
+def old (value: Int64) : Int64 = value
 ---EXPECT-ERROR---
 Expected ')', ',', or ';' in tuple/parenthesized expression
 
 ---NAME---
 qualified declaration name is removed
 ---SOURCE---
-let A.f(value: Int64) : Int64 = value
+let A.f (value: Int64) : Int64 = value
 ---EXPECT-ERROR---
 Expected a let binding pattern
 
 ---NAME---
 bare declaration type parameter is removed
 ---SOURCE---
-let identity<a>(value: a) : a = value
+let identity<a> (value: a) : a = value
 ---EXPECT-ERROR---
 Dark type parameters require an apostrophe: 'a
 
@@ -106,14 +106,14 @@ let module = 1 in module
 ---NAME---
 all reserved spellings work when quoted
 ---SOURCE---
-let names(``let``: Int64, ``val``: Int64, ``in``: Int64, ``if``: Int64, ``elif``: Int64, ``then``: Int64, ``else``: Int64, ``type``: Int64, ``of``: Int64, ``match``: Int64, ``with``: Int64, ``fun``: Int64, ``when``: Int64, ``true``: Int64, ``false``: Int64, ``_``: Int64) : Int64 = ``let``
-names(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
+let names (``let``: Int64) (``val``: Int64) (``in``: Int64) (``if``: Int64) (``elif``: Int64) (``then``: Int64) (``else``: Int64) (``type``: Int64) (``of``: Int64) (``match``: Int64) (``with``: Int64) (``fun``: Int64) (``when``: Int64) (``true``: Int64) (``false``: Int64) (``_``: Int64) : Int64 = ``let``
+names (1) (2) (3) (4) (5) (6) (7) (8) (9) (10) (11) (12) (13) (14) (15) (16)
 ---ROUNDTRIP---
 
 ---NAME---
 spaced declaration generic is not adjacent
 ---SOURCE---
-let identity <'a>(value: a) : a = value
+let identity <'a> (value: a) : a = value
 ---EXPECT-ERROR---
 Expected '=' after let binding pattern
 
@@ -121,7 +121,7 @@ Expected '=' after let binding pattern
 comment-separated declaration generic is not adjacent
 ---SOURCE---
 let identity// comment breaks adjacency
-<'a>(value: a) : a = value
+<'a> (value: a) : a = value
 ---EXPECT-ERROR---
 Expected '=' after let binding pattern
 
@@ -129,7 +129,7 @@ Expected '=' after let binding pattern
 module header normalizes public declarations
 ---SOURCE---
 module Example
-let identity<'a>(value: a) : a = value
+let identity<'a> (value: a) : a = value
 ---ROUNDTRIP---
 
 ---NAME---
@@ -137,7 +137,7 @@ nested module blocks normalize public declarations
 ---SOURCE---
 module Outer =
   module Inner =
-    let identity<'a>(value: a) : a = value
+    let identity<'a> (value: a) : a = value
 ---ROUNDTRIP---
 
 ---NAME---

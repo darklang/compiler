@@ -14,7 +14,7 @@ module FilterMap =
       if value == "y" then
         Stdlib.Option.Option.None
       else
-        Stdlib.Option.Option.Some(key ++ value))
+        Stdlib.Option.Option.Some (key ++ value))
   ) = (Dict { c = "cz"; a = "ax" })
 
   // CLEANUP figure out why this isn't failing on the `false` not being an option
@@ -52,16 +52,16 @@ module FromListOverwritingDuplicates =
   Stdlib.Dict.fromListOverwritingDuplicates_v0 [ (1L, 2L) ] = error="Type mismatch in integer literal: expected String, got Int64"
   Stdlib.Dict.fromListOverwritingDuplicates_v0 [ 1L ] = error="Type mismatch in integer literal: expected (String, v$0), got Int64"
 module FromList =
-  Stdlib.Dict.fromList_v0 [] = Stdlib.Option.Option.Some(Dict { })
+  Stdlib.Dict.fromList_v0 [] = Stdlib.Option.Option.Some (Dict { })
 
   Stdlib.Dict.fromList_v0<Int64> [ ("a", 1L); ("b", 2L); ("c", 3L) ] =
-    Stdlib.Option.Option.Some(Dict { c = 3L; b = 2L; a = 1L })
+    Stdlib.Option.Option.Some (Dict { c = 3L; b = 2L; a = 1L })
 
   // CLEANUP this test feels surprising - should it error or something?
   Stdlib.Dict.fromList_v0 [ ("duplicate_key", 1L); ("b", 2L); ("duplicate_key", 3L) ] = Stdlib.Option.Option.None
 
   Stdlib.Dict.fromList_v0 [ ("Content-Length", "0"); ("Server", "dark") ] =
-    Stdlib.Option.Option.Some(Dict { ``Content-Length`` = "0"; Server = "dark" })
+    Stdlib.Option.Option.Some (Dict { ``Content-Length`` = "0"; Server = "dark" })
 
   Stdlib.Dict.fromList_v0 [ Builtin.testRuntimeError "err" ] = error="Uncaught exception: err"
   // CLEANUP improve the error message to
@@ -153,8 +153,8 @@ module Singleton =
 
 
 module Size =
-  Stdlib.Dict.size_v0 (Dict { a = 3L; b = 1L; c = 1L }) = 3I
-  Stdlib.Dict.size_v0 (Dict { }) = 0I
+  Stdlib.Dict.size_v0 (Dict { a = 3L; b = 1L; c = 1L }) = 3
+  Stdlib.Dict.size_v0 (Dict { }) = 0
 
 
 module ToList =

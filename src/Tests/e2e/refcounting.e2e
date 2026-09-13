@@ -48,21 +48,21 @@ type Point3 = { x: Int64, y: Int64, z: Int64 } let p = Point3 { x = 1L, y = 2L, 
 
 // Displaying managed final values should release the printed value after output
 type DisplayRecordLeak = { name: String, age: Int64 } DisplayRecordLeak { name = "record", age = 42L } = stdout="DisplayRecordLeak { age: 42, name: \"record\" }\n" stderr=""
-type DisplaySumLeak = SumList of List<Int64> | SumString of String let items = [1L, 2L, 3L] in SumList(items) = stdout="DisplaySumLeak.SumList([1, 2, 3])\n" stderr=""
-Stdlib.Blob.fromList([65uy, 66uy, 67uy]) = stdout="<Blob: ephemeral>\n" stderr=""
+type DisplaySumLeak = SumList of List<Int64> | SumString of String let items = [1L, 2L, 3L] in SumList (items) = stdout="DisplaySumLeak.SumList([1, 2, 3])\n" stderr=""
+Stdlib.Blob.fromList ([65uy, 66uy, 67uy]) = stdout="<Blob: ephemeral>\n" stderr=""
 
 // ===================================================================
 // Function calls with heap values
 // ===================================================================
 
 // Tuple passed to function and returned - ownership transfer
-let identity(t: Int64) : Int64 = t; identity(42L) = 42L
+let identity (t: Int64) : Int64 = t; identity (42L) = 42L
 
 // Tuple created in function and returned
-let make_value() : Int64 = 42L make_value() = 42L
+let make_value () : Int64 = 42L make_value () = 42L
 
 // Multiple function calls
-let add1(x: Int64) : Int64 = x + 1L let a = add1(1L) in let b = add1(10L) in a + b = 13L
+let add1 (x: Int64) : Int64 = x + 1L let a = add1 (1L) in let b = add1 (10L) in a + b = 13L
 
 // ===================================================================
 // Records (also heap-allocated)
@@ -106,4 +106,4 @@ let xs = [1L, 2L] in match xs with | [a, b] -> a + b | _ -> 0L = 3L
 
 // 5000 allocations of 24-byte tuples = 120KB, but heap is 64KB
 // This succeeds only when released tuple storage is reused.
-let allocOne() : Int64 = let t = (1L, 1L) in t.0 + t.1; let reuseLoop(n: Int64, acc: Int64) : Int64 = if n < 1L then acc else reuseLoop(n - 1L, acc + allocOne()); reuseLoop(5000L, 0L) = 10000L
+let allocOne () : Int64 = let t = (1L, 1L) in t.0 + t.1; let reuseLoop (n: Int64) (acc: Int64) : Int64 = if n < 1L then acc else reuseLoop (n - 1L) (acc + allocOne ()); reuseLoop (5000L) (0L) = 10000L

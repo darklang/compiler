@@ -4,6 +4,6 @@ module Stdlib.AltJson.ParseError
 
 type ParseError = | NotJson
 
-let toString(error: Stdlib.AltJson.ParseError.ParseError) : String =
+let toString (error: Stdlib.AltJson.ParseError.ParseError) : String =
     match error with
     | NotJson -> "Not JSON"

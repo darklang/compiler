@@ -3,15 +3,15 @@
 ---NAME---
 canonical Int syntax formats explicitly
 ---SOURCE---
-let x = 5 in Stdlib.Int64.add(x, 1)
+let x = 5 in Stdlib.Int64.add (x) (1)
 ---EXPECTED---
-let x = 5I in Stdlib.Int64.add x 1I
+let x = 5 in Stdlib.Int64.add x 1
 ---ROUNDTRIP---
 
 ---NAME---
 formatting parenthesizes nested call arguments
 ---SOURCE---
-Builtin.unwrap(Stdlib.List.head(xs))
+Builtin.unwrap (Stdlib.List.head (xs))
 ---EXPECTED---
 Builtin.unwrap (Stdlib.List.head xs)
 ---ROUNDTRIP---
@@ -53,7 +53,7 @@ does not use '=>'
 ---NAME---
 public Dict type rejects a key type argument
 ---SOURCE---
-let badDictArity(dict: Dict<String, Int64>): Int64 = 0
+let badDictArity (dict: Dict<String, Int64>): Int64 = 0
 ---EXPECT-ERROR---
 Dict expects exactly one type argument
 

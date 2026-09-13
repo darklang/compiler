@@ -2,39 +2,39 @@
 // Counts primes up to n using Dict as sparse composite set
 
 // Mark all multiples of prime as composite
-let markMultiples(j: Int64, step: Int64, n: Int64, composites: Dict<Bool>) : Dict<Bool> =
+let markMultiples (j: Int64) (step: Int64) (n: Int64) (composites: Dict<Bool>) : Dict<Bool> =
     if j > n then composites
-    else markMultiples(j + step, step, n, Stdlib.Dict.setOverridingDuplicates<Bool>(composites, Stdlib.Int64.toString(j), true))
+    else markMultiples (j + step) (step) (n) (Stdlib.Dict.setOverridingDuplicates<Bool> (composites) (Stdlib.Int64.toString (j)) (true))
 
 // Run sieve for numbers from i to n
-let sieveLoop(i: Int64, n: Int64, composites: Dict<Bool>) : Dict<Bool> =
+let sieveLoop (i: Int64) (n: Int64) (composites: Dict<Bool>) : Dict<Bool> =
     if i > n then composites
     else
         let newComposites =
-            if Stdlib.Dict.member<Bool>(composites, Stdlib.Int64.toString(i)) then composites
-            else markMultiples(i + i, i, n, composites)
+            if Stdlib.Dict.member<Bool> (composites) (Stdlib.Int64.toString (i)) then composites
+            else markMultiples (i + i) (i) (n) (composites)
         in
-        sieveLoop(i + 1L, n, newComposites)
+        sieveLoop (i + 1L) (n) (newComposites)
 
 // Count primes (numbers not in composites set)
-let countPrimes(i: Int64, n: Int64, composites: Dict<Bool>, count: Int64) : Int64 =
+let countPrimes (i: Int64) (n: Int64) (composites: Dict<Bool>) (count: Int64) : Int64 =
     if i > n then count
     else
-        let newCount = if Stdlib.Dict.member<Bool>(composites, Stdlib.Int64.toString(i)) then count else count + 1L in
-        countPrimes(i + 1L, n, composites, newCount)
+        let newCount = if Stdlib.Dict.member<Bool> (composites) (Stdlib.Int64.toString (i)) then count else count + 1L in
+        countPrimes (i + 1L) (n) (composites) (newCount)
 
-let nsieve(n: Int64) : Int64 =
-    let composites = sieveLoop(2L, n, Stdlib.Dict.empty) in
-    countPrimes(2L, n, composites, 0L)
+let nsieve (n: Int64) : Int64 =
+    let composites = sieveLoop (2L) (n) (Stdlib.Dict.empty) in
+    countPrimes (2L) (n) (composites) (0L)
 
 // The routine profile runs one full-size sieve in both Dark and Rust.
-let repeat(remaining: Int64, n: Int64, result: Int64) : Int64 =
+let repeat (remaining: Int64) (n: Int64) (result: Int64) : Int64 =
     if remaining <= 0L then result
-    else repeat(remaining - 1L, n, nsieve(n))
+    else repeat (remaining - 1L) (n) (nsieve (n))
 
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-Builtin.printLine(Stdlib.Int64.toString(repeat(benchmarkArg(1I), benchmarkArg(0I), 0L)))
+Builtin.printLine (Stdlib.Int64.toString (repeat (benchmarkArg (1)) (benchmarkArg (0)) (0L)))

@@ -2,5 +2,5 @@
 
 module Stdlib.Cli.Env
 
-let get(name: String) : Stdlib.Option.Option<String> =
-    Stdlib.Cli.__getenv(name)
+let get (name: String) : Stdlib.Option.Option<String> =
+    Stdlib.Cli.__getenv (name)

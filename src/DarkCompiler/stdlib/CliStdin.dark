@@ -4,17 +4,17 @@ module Stdlib.Cli.Stdin.Key
 
 type Key = None | Backspace | Tab | Clear | Enter | Pause | Escape | Spacebar | PageUp | PageDown | End | Home | LeftArrow | UpArrow | RightArrow | DownArrow | Select | Print | Execute | PrintScreen | Insert | Delete | Help | D0 | D1 | D2 | D3 | D4 | D5 | D6 | D7 | D8 | D9 | A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X | Y | Z | LeftWindows | RightWindows | Applications | Sleep | NumPad0 | NumPad1 | NumPad2 | NumPad3 | NumPad4 | NumPad5 | NumPad6 | NumPad7 | NumPad8 | NumPad9 | Multiply | Add | Separator | Subtract | Decimal | Divide | F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8 | F9 | F10 | F11 | F12 | F13 | F14 | F15 | F16 | F17 | F18 | F19 | F20 | F21 | F22 | F23 | F24 | BrowserBack | BrowserForward | BrowserRefresh | BrowserStop | BrowserSearch | BrowserFavorites | BrowserHome | VolumeMute | VolumeDown | VolumeUp | MediaNext | MediaPrevious | MediaStop | MediaPlay | LaunchMail | LaunchMediaSelect | LaunchApp1 | LaunchApp2 | Oem1 | OemPlus | OemComma | OemMinus | OemPeriod | Oem2 | Oem3 | Oem4 | Oem5 | Oem6 | Oem7 | Oem8 | Oem102 | Process | Packet | Attention | CrSel | ExSel | EraseEndOfFile | Play | Zoom | NoName | Pa1 | OemClear
 
-let isTextual(key: Stdlib.Cli.Stdin.Key.Key) : Bool =
+let isTextual (key: Stdlib.Cli.Stdin.Key.Key) : Bool =
     match key with
     | A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X | Y | Z | D0 | D1 | D2 | D3 | D4 | D5 | D6 | D7 | D8 | D9 | Spacebar | OemComma | OemPeriod | OemMinus | OemPlus | Oem1 | Oem2 | Oem3 | Oem4 | Oem5 | Oem6 | Oem7 | Oem8 -> true
     | _ -> false
 
-let isControl(key: Stdlib.Cli.Stdin.Key.Key) : Bool =
+let isControl (key: Stdlib.Cli.Stdin.Key.Key) : Bool =
     match key with
     | Enter | Escape | Backspace | Tab | LeftArrow | RightArrow | UpArrow | DownArrow | Home | End | PageUp | PageDown | F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8 | F9 | F10 | F11 | F12 | Delete | Insert -> true
     | _ -> false
 
-let toString(key: Stdlib.Cli.Stdin.Key.Key) : String =
+let toString (key: Stdlib.Cli.Stdin.Key.Key) : String =
     match key with
     | Backspace -> "Backspace"
     | Tab -> "Tab"

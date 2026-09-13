@@ -14,14 +14,14 @@ let err
   (v: Stdlib.Result.Result<'a, Stdlib.Json.ParseError.ParseError>)
   : Result<'a, String> =
   match v with
-  | Ok(value) -> Stdlib.Result.Result.Ok value
-  | Error(error) ->
+  | Ok (value) -> Stdlib.Result.Result.Ok value
+  | Error (error) ->
     Stdlib.Result.Result.Error
       (Stdlib.Json.ParseError.toString Darklang.SCM.Branch.mainBranchId error)
 
 module Unit =
   Stdlib.Json.serialize<Unit> () = "null"
-  Stdlib.Json.parse<Unit> "null" = Stdlib.Result.Result.Ok()
+  Stdlib.Json.parse<Unit> "null" = Stdlib.Result.Result.Ok ()
 
   module Errors =
     (Stdlib.Json.parse<Int64> "()") |> err = Stdlib.Result.Result.Error "Not JSON"
@@ -76,39 +76,39 @@ module Bool =
 
 module Int =
   module Basic =
-    Stdlib.Json.serialize<Int> 0I = "0"
-    Stdlib.Json.serialize<Int> 12345I = "12345"
-    Stdlib.Json.serialize<Int> -12345I = "-12345"
-    Stdlib.Json.parse<Int> "0" = Stdlib.Result.Result.Ok 0I
-    Stdlib.Json.parse<Int> "12345" = Stdlib.Result.Result.Ok 12345I
-    Stdlib.Json.parse<Int> "-12345" = Stdlib.Result.Result.Ok(-12345I)
+    Stdlib.Json.serialize<Int> 0 = "0"
+    Stdlib.Json.serialize<Int> 12345 = "12345"
+    Stdlib.Json.serialize<Int> -12345 = "-12345"
+    Stdlib.Json.parse<Int> "0" = Stdlib.Result.Result.Ok 0
+    Stdlib.Json.parse<Int> "12345" = Stdlib.Result.Result.Ok 12345
+    Stdlib.Json.parse<Int> "-12345" = Stdlib.Result.Result.Ok (-12345)
 
   module Huge =
     // arbitrary precision: well past Int64, exact round-trip
-    Stdlib.Json.serialize<Int> 123456789012345678901234567890I = "123456789012345678901234567890"
-    Stdlib.Json.parse<Int> "123456789012345678901234567890" = Stdlib.Result.Result.Ok 123456789012345678901234567890I
-    Stdlib.Json.parse<Int> "-123456789012345678901234567890" = Stdlib.Result.Result.Ok(-123456789012345678901234567890I)
-    (Stdlib.Json.parse<Int> (Stdlib.Json.serialize<Int> 99999999999999999999999999999999I)) = Stdlib.Result.Result.Ok 99999999999999999999999999999999I
+    Stdlib.Json.serialize<Int> 123456789012345678901234567890 = "123456789012345678901234567890"
+    Stdlib.Json.parse<Int> "123456789012345678901234567890" = Stdlib.Result.Result.Ok 123456789012345678901234567890
+    Stdlib.Json.parse<Int> "-123456789012345678901234567890" = Stdlib.Result.Result.Ok (-123456789012345678901234567890)
+    (Stdlib.Json.parse<Int> (Stdlib.Json.serialize<Int> 99999999999999999999999999999999)) = Stdlib.Result.Result.Ok 99999999999999999999999999999999
 
   module PastInt64 =
     // Int is unbounded: it serializes/parses values that overflow Stdlib.Int64.
     // Compare the Int64Limits module above, which *errors* on these exact values.
-    Stdlib.Json.serialize<Int> 9223372036854775808I = "9223372036854775808"
-    Stdlib.Json.parse<Int> "9223372036854775808" = Stdlib.Result.Result.Ok 9223372036854775808I
-    Stdlib.Json.parse<Int> "-9223372036854775809" = Stdlib.Result.Result.Ok(-9223372036854775809I)
+    Stdlib.Json.serialize<Int> 9223372036854775808 = "9223372036854775808"
+    Stdlib.Json.parse<Int> "9223372036854775808" = Stdlib.Result.Result.Ok 9223372036854775808
+    Stdlib.Json.parse<Int> "-9223372036854775809" = Stdlib.Result.Result.Ok (-9223372036854775809)
     // a float-form just above the Int64 max (Int64 rejects "9.3E18")
-    Stdlib.Json.parse<Int> "9.3E18" = Stdlib.Result.Result.Ok 9300000000000000000I
+    Stdlib.Json.parse<Int> "9.3E18" = Stdlib.Result.Result.Ok 9300000000000000000
 
   module IntegerValuedFloatForms =
     // integer-valued decimal/exponent forms are accepted, parsed EXACTLY
     // (the same forms the fixed-width int parsers accept)
-    Stdlib.Json.parse<Int> "0.0" = Stdlib.Result.Result.Ok 0I
-    Stdlib.Json.parse<Int> "-1.0" = Stdlib.Result.Result.Ok(-1I)
-    Stdlib.Json.parse<Int> "1.2E2" = Stdlib.Result.Result.Ok 120I
-    Stdlib.Json.parse<Int> "1.2E+2" = Stdlib.Result.Result.Ok 120I
-    Stdlib.Json.parse<Int> "1200E-1" = Stdlib.Result.Result.Ok 120I
+    Stdlib.Json.parse<Int> "0.0" = Stdlib.Result.Result.Ok 0
+    Stdlib.Json.parse<Int> "-1.0" = Stdlib.Result.Result.Ok (-1)
+    Stdlib.Json.parse<Int> "1.2E2" = Stdlib.Result.Result.Ok 120
+    Stdlib.Json.parse<Int> "1.2E+2" = Stdlib.Result.Result.Ok 120
+    Stdlib.Json.parse<Int> "1200E-1" = Stdlib.Result.Result.Ok 120
     // exact even past 2^53 — guards the precision-loss regression
-    Stdlib.Json.parse<Int> "9007199254740993.0" = Stdlib.Result.Result.Ok 9007199254740993I
+    Stdlib.Json.parse<Int> "9007199254740993.0" = Stdlib.Result.Result.Ok 9007199254740993
 
   module Errors =
     // genuinely fractional values are rejected, never rounded
@@ -122,7 +122,7 @@ module Int =
     (Stdlib.Json.parse<Int> "1e-2147483647") |> err = Stdlib.Result.Result.Error "Can't parse JSON `1e-2147483647` as type `Int` at path: `root`"
     (Stdlib.Json.parse<Int> "1e-2147483648") |> err = Stdlib.Result.Result.Error "Can't parse JSON `1e-2147483648` as type `Int` at path: `root`"
     // ...but zero with an extreme negative exponent is still exactly zero
-    Stdlib.Json.parse<Int> "0e-2147483648" = Stdlib.Result.Result.Ok 0I
+    Stdlib.Json.parse<Int> "0e-2147483648" = Stdlib.Result.Result.Ok 0
 
 
 module Int64 =
@@ -133,7 +133,7 @@ module Int64 =
     Stdlib.Json.parse<Int64> "0" = Stdlib.Result.Result.Ok 0L
     Stdlib.Json.parse<Int64> "0.0" = Stdlib.Result.Result.Ok 0L
     Stdlib.Json.parse<Int64> "-0.0" = Stdlib.Result.Result.Ok 0L
-    Stdlib.Json.parse<Int64> "-1.0" = Stdlib.Result.Result.Ok(-1L)
+    Stdlib.Json.parse<Int64> "-1.0" = Stdlib.Result.Result.Ok (-1L)
     Stdlib.Json.parse<Int64> "1.2E2" = Stdlib.Result.Result.Ok 120L
     Stdlib.Json.parse<Int64> "1.2E+2" = Stdlib.Result.Result.Ok 120L
     Stdlib.Json.parse<Int64> "1200E-1" = Stdlib.Result.Result.Ok 120L
@@ -177,7 +177,7 @@ module Int64 =
       "-9223372036854775808"
 
     Stdlib.Json.parse<Int64> "-9223372036854775808" =
-      Stdlib.Result.Result.Ok(-9223372036854775808L)
+      Stdlib.Result.Result.Ok (-9223372036854775808L)
 
 
   module Errors =
@@ -551,7 +551,7 @@ module Int128 =
     Stdlib.Json.parse<Int128> "0" = Stdlib.Result.Result.Ok 0Q
     Stdlib.Json.parse<Int128> "0.0" = Stdlib.Result.Result.Ok 0Q
     Stdlib.Json.parse<Int128> "-0.0" = Stdlib.Result.Result.Ok 0Q
-    Stdlib.Json.parse<Int128> "-1.0" = Stdlib.Result.Result.Ok(-1Q)
+    Stdlib.Json.parse<Int128> "-1.0" = Stdlib.Result.Result.Ok (-1Q)
     Stdlib.Json.parse<Int128> "1.2E2" = Stdlib.Result.Result.Ok 120Q
     Stdlib.Json.parse<Int128> "1.2E+2" = Stdlib.Result.Result.Ok 120Q
     Stdlib.Json.parse<Int128> "1200E-1" = Stdlib.Result.Result.Ok 120Q
@@ -741,11 +741,11 @@ module Float =
 
   module Values =
     Stdlib.Json.serialize<Float> (-1.0 / 0.0) = "\"-Infinity\""
-    Stdlib.Json.parse<Float> "\"-Infinity\"" = Stdlib.Result.Result.Ok(-1.0 / 0.0)
+    Stdlib.Json.parse<Float> "\"-Infinity\"" = Stdlib.Result.Result.Ok (-1.0 / 0.0)
     Stdlib.Json.serialize<Float> (1.0 / 0.0) = "\"Infinity\""
-    Stdlib.Json.parse<Float> "\"Infinity\"" = Stdlib.Result.Result.Ok(1.0 / 0.0)
+    Stdlib.Json.parse<Float> "\"Infinity\"" = Stdlib.Result.Result.Ok (1.0 / 0.0)
     Stdlib.Json.serialize<Float> Builtin.testNan_v0 = "\"NaN\""
-    (match Stdlib.Json.parse<Float> "\"NaN\"" with | Ok(value) -> value != value | Error(_) -> false) = true
+    (match Stdlib.Json.parse<Float> "\"NaN\"" with | Ok (value) -> value != value | Error (_) -> false) = true
 
 
 
@@ -783,18 +783,18 @@ module Char =
   module SimpleEmoji =
     Stdlib.Json.serialize<Char> ("😂" |> charFromString) = "\"\\uD83D\\uDE02\""
 
-    Stdlib.Json.parse<Char> "\"😂\"" = Stdlib.Result.Result.Ok(charFromString "😂")
-    Stdlib.Json.parse<Char> "\"\\uD83D\\uDE02\"" = Stdlib.Result.Result.Ok(charFromString "😂")
+    Stdlib.Json.parse<Char> "\"😂\"" = Stdlib.Result.Result.Ok (charFromString "😂")
+    Stdlib.Json.parse<Char> "\"\\uD83D\\uDE02\"" = Stdlib.Result.Result.Ok (charFromString "😂")
 
   module ComplexEmoji =
     Stdlib.Json.serialize<Char> (charFromString "👩‍👩‍👧‍👦") = "\"\\uD83D\\uDC69‍\\uD83D\\uDC69‍\\uD83D\\uDC67‍\\uD83D\\uDC66\""
 
     Stdlib.Json.parse<Char>
-      "\"\\uD83D\\uDC69‍\\uD83D\\uDC69‍\\uD83D\\uDC67‍\\uD83D\\uDC66\"" = Stdlib.Result.Result.Ok(
+      "\"\\uD83D\\uDC69‍\\uD83D\\uDC69‍\\uD83D\\uDC67‍\\uD83D\\uDC66\"" = Stdlib.Result.Result.Ok (
       charFromString "👩‍👩‍👧‍👦"
     )
 
-    Stdlib.Json.parse<Char> "\"👩‍👩‍👧‍👦\"" = Stdlib.Result.Result.Ok(
+    Stdlib.Json.parse<Char> "\"👩‍👩‍👧‍👦\"" = Stdlib.Result.Result.Ok (
       "👩‍👩‍👧‍👦" |> charFromString
     )
 
@@ -841,11 +841,11 @@ module String =
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed non risus. Suspendisse lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, dolor."
 
 
-  Stdlib.Json.serialize<String> (Stdlib.String.repeat "a" 100I) = "\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""
+  Stdlib.Json.serialize<String> (Stdlib.String.repeat "a" 100) = "\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""
 
   Stdlib.Json.parse<String>
     "\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"" = Stdlib.Result.Result
-    .Ok(Stdlib.String.repeat "a" 100I)
+    .Ok (Stdlib.String.repeat "a" 100)
 
 
 module DateTime =
@@ -855,28 +855,28 @@ module DateTime =
   // now-ish
   Stdlib.Json.serialize<DateTime> (d "2023-07-28T22:42:36Z") = "\"2023-07-28T22:42:36Z\""
 
-  Stdlib.Json.parse<DateTime> "\"2023-07-28T22:42:36Z\"" = Stdlib.Result.Result.Ok(
+  Stdlib.Json.parse<DateTime> "\"2023-07-28T22:42:36Z\"" = Stdlib.Result.Result.Ok (
     d "2023-07-28T22:42:36Z"
   )
 
   // epoch
   Stdlib.Json.serialize<DateTime> (d "1969-07-28T22:42:36Z") = "\"1969-07-28T22:42:36Z\""
 
-  Stdlib.Json.parse<DateTime> "\"1969-07-28T22:42:36Z\"" = Stdlib.Result.Result.Ok(
+  Stdlib.Json.parse<DateTime> "\"1969-07-28T22:42:36Z\"" = Stdlib.Result.Result.Ok (
     d "1969-07-28T22:42:36Z"
   )
 
   // before epoch
   Stdlib.Json.serialize<DateTime> (d "1402-07-28T22:42:36Z") = "\"1402-07-28T22:42:36Z\""
 
-  Stdlib.Json.parse<DateTime> "\"1402-07-28T22:42:36Z\"" = Stdlib.Result.Result.Ok(
+  Stdlib.Json.parse<DateTime> "\"1402-07-28T22:42:36Z\"" = Stdlib.Result.Result.Ok (
     d "1402-07-28T22:42:36Z"
   )
 
   // far in future
   Stdlib.Json.serialize<DateTime> (d "3023-07-28T22:42:36Z") = "\"3023-07-28T22:42:36Z\""
 
-  Stdlib.Json.parse<DateTime> "\"3023-07-28T22:42:36Z\"" = Stdlib.Result.Result.Ok(
+  Stdlib.Json.parse<DateTime> "\"3023-07-28T22:42:36Z\"" = Stdlib.Result.Result.Ok (
     d "3023-07-28T22:42:36Z"
   )
 
@@ -898,20 +898,20 @@ module Uuid =
   // empty
   Stdlib.Json.serialize<Uuid> (uuid "00000000-0000-0000-0000-000000000000") = "\"00000000-0000-0000-0000-000000000000\""
 
-  Stdlib.Json.parse<Uuid> "\"00000000-0000-0000-0000-000000000000\"" = Stdlib.Result.Result.Ok(
+  Stdlib.Json.parse<Uuid> "\"00000000-0000-0000-0000-000000000000\"" = Stdlib.Result.Result.Ok (
     uuid "00000000-0000-0000-0000-000000000000"
   )
 
   // normal
   Stdlib.Json.serialize<Uuid> (uuid "3700adbc-7a46-4ff4-81d3-45afb03f6e2d") = "\"3700adbc-7a46-4ff4-81d3-45afb03f6e2d\""
 
-  Stdlib.Json.parse<Uuid> "\"3700adbc-7a46-4ff4-81d3-45afb03f6e2d\"" = Stdlib.Result.Result.Ok(
+  Stdlib.Json.parse<Uuid> "\"3700adbc-7a46-4ff4-81d3-45afb03f6e2d\"" = Stdlib.Result.Result.Ok (
     uuid "3700adbc-7a46-4ff4-81d3-45afb03f6e2d"
   )
 
   Stdlib.Json.serialize<Uuid> (uuid "11111111-2222-3333-4444-555555555555") = "\"11111111-2222-3333-4444-555555555555\""
 
-  Stdlib.Json.parse<Uuid> "\"11111111-2222-3333-4444-555555555555\"" = Stdlib.Result.Result.Ok(
+  Stdlib.Json.parse<Uuid> "\"11111111-2222-3333-4444-555555555555\"" = Stdlib.Result.Result.Ok (
     uuid "11111111-2222-3333-4444-555555555555"
   )
 
@@ -994,7 +994,7 @@ module List =
 module Tuples =
   (1L, "two", 3L) |> Stdlib.Json.serialize<Int64 * String * Int64> = "[1,\"two\",3]"
 
-  Stdlib.Json.parse<Int64 * String * Int64> "[1,\"two\",3]" = Stdlib.Result.Result.Ok(
+  Stdlib.Json.parse<Int64 * String * Int64> "[1,\"two\",3]" = Stdlib.Result.Result.Ok (
     (1L, "two", 3L)
   )
 
@@ -1008,7 +1008,7 @@ module Tuples =
   ) |> Stdlib.Json.serialize<List<Int64> * List<Person>> = "[[1,2,3],[{\"Age\":42,\"Name\":\"Alice\"}]]"
 
   Stdlib.Json.parse<List<Int64> * List<Person>>
-    "[[1,2,3],[{\"Age\":42,\"Name\":\"Alice\"}]]" = Stdlib.Result.Result.Ok(
+    "[[1,2,3],[{\"Age\":42,\"Name\":\"Alice\"}]]" = Stdlib.Result.Result.Ok (
     ([ 1L; 2L; 3L ], [ Person { Name = "Alice"; Age = 42L } ])
   )
 
@@ -1019,7 +1019,7 @@ module Tuples =
   ) |> Stdlib.Json.serialize<(Int64 * String) * (Person * Dict<String>)> = "[[1,\"two\"],[{\"Age\":42,\"Name\":\"Alice\"},{\"a\":\"b\"}]]"
 
   Stdlib.Json.parse<(Int64 * String) * (Person * Dict<String>)>
-    "[[1,\"two\"],[{\"Age\":42,\"Name\":\"Alice\"},{\"a\":\"b\"}]]" = Stdlib.Result.Result.Ok(
+    "[[1,\"two\"],[{\"Age\":42,\"Name\":\"Alice\"},{\"a\":\"b\"}]]" = Stdlib.Result.Result.Ok (
     ((1L, "two"),
      (Person { Name = "Alice"; Age = 42L }, Stdlib.Dict.singleton "a" "b"))
   )
@@ -1032,7 +1032,7 @@ module Tuples =
 
   Stdlib.Json.parse<(List<Int64 * String> * List<UInt8>) * (Person * Dict<String>)>
     "[[[[1,\"two\"],[3,\"four\"]],[]],[{\"Age\":42,\"Name\":\"Alice\"},{\"a\":\"b\"}]]" = Stdlib.Result.Result
-    .Ok(
+    .Ok (
       (([ (1L, "two"); (3L, "four") ], []),
        (Person { Name = "Alice"; Age = 42L }, Stdlib.Dict.singleton "a" "b"))
     )
@@ -1044,7 +1044,7 @@ module Tuples =
   ) |> Stdlib.Json.serialize<Person * Option<Int64>> = "[{\"Age\":42,\"Name\":\"Alice\"},{\"Some\":[1]}]"
 
   Stdlib.Json.parse<Person * Option<Int64>>
-    "[{\"Age\":42,\"Name\":\"Alice\"},{\"Some\":[1]}]" = Stdlib.Result.Result.Ok(
+    "[{\"Age\":42,\"Name\":\"Alice\"},{\"Some\":[1]}]" = Stdlib.Result.Result.Ok (
     (Person { Name = "Alice"; Age = 42L }, Stdlib.Option.Option.Some 1L)
   )
 
@@ -1055,17 +1055,17 @@ module Tuples =
   ) |> Stdlib.Json.serialize<Option<Int64> * Result<Int64, String>> = "[{\"Some\":[1]},{\"Ok\":[2]}]"
 
   Stdlib.Json.parse<Option<Int64> * Result<Int64, String>>
-    "[{\"Some\":[1]},{\"Ok\":[2]}]" = Stdlib.Result.Result.Ok((Stdlib.Option.Option.Some 1L, Stdlib.Result.Result.Ok 2L))
+    "[{\"Some\":[1]},{\"Ok\":[2]}]" = Stdlib.Result.Result.Ok ((Stdlib.Option.Option.Some 1L, Stdlib.Result.Result.Ok 2L))
 
 
   ('a', true) |> Stdlib.Json.serialize<Char * Bool> = "[\"a\",true]"
-  Stdlib.Json.parse<Char * Bool> "[\"a\",true]" = Stdlib.Result.Result.Ok(('a', true))
+  Stdlib.Json.parse<Char * Bool> "[\"a\",true]" = Stdlib.Result.Result.Ok (('a', true))
 
 
   (match Stdlib.Json.parse<DateTime * Uuid>
       "[\"2023-07-28T22:42:36Z\",\"3700adbc-7a46-4ff4-81d3-45afb03f6e2d\"]" with
-   | Ok(value) -> Stdlib.Json.serialize<DateTime * Uuid> value
-   | Error(_) -> "unexpected error") = "[\"2023-07-28T22:42:36Z\",\"3700adbc-7a46-4ff4-81d3-45afb03f6e2d\"]"
+   | Ok (value) -> Stdlib.Json.serialize<DateTime * Uuid> value
+   | Error (_) -> "unexpected error") = "[\"2023-07-28T22:42:36Z\",\"3700adbc-7a46-4ff4-81d3-45afb03f6e2d\"]"
 
 
   module Errors =
@@ -1099,7 +1099,7 @@ module Option =
   Stdlib.Json.serialize<Option<Int64>> Stdlib.Option.Option.None = "{\"None\":[]}"
   Stdlib.Json.parse<Option<Int64>> "{\"None\":[]}" = Stdlib.Result.Result.Ok Stdlib.Option.Option.None
   Stdlib.Json.serialize<Option<Int64>> (Stdlib.Option.Option.Some 1L) = "{\"Some\":[1]}"
-  Stdlib.Json.parse<Option<Int64>> "{\"Some\":[1]}" = Stdlib.Result.Result.Ok(Stdlib.Option.Option.Some 1L)
+  Stdlib.Json.parse<Option<Int64>> "{\"Some\":[1]}" = Stdlib.Result.Result.Ok (Stdlib.Option.Option.Some 1L)
 
   module Errors =
     // TODO: these might make good candidates for more ergonmic parsing
@@ -1117,12 +1117,12 @@ module Option =
 module Result =
   Stdlib.Json.serialize<Result<Int64, String>> (Stdlib.Result.Result.Ok 1L) = "{\"Ok\":[1]}"
 
-  Stdlib.Json.parse<Result<Int64, String>> "{\"Ok\":[1]}" = Stdlib.Result.Result.Ok(Stdlib.Result.Result.Ok 1L)
+  Stdlib.Json.parse<Result<Int64, String>> "{\"Ok\":[1]}" = Stdlib.Result.Result.Ok (Stdlib.Result.Result.Ok 1L)
 
   Stdlib.Json.serialize<Result<Int64, String>> (Stdlib.Result.Result.Error "err message") = "{\"Error\":[\"err message\"]}"
 
   Stdlib.Json.parse<Result<Int64, String>> "{\"Error\":[\"err message\"]}" = Stdlib.Result.Result
-    .Ok(Stdlib.Result.Result.Error "err message")
+    .Ok (Stdlib.Result.Result.Error "err message")
 
   Stdlib.Json.serialize<Result<List<Dict<String> * Option<Int64>>, String>> (
     Stdlib.Result.Result.Ok
@@ -1131,37 +1131,37 @@ module Result =
   ) = "{\"Ok\":[[[{\"a\":\"b\"},{\"Some\":[1]}],[{\"c\":\"d\"},{\"None\":[]}]]]}"
 
   Stdlib.Json.parse<Result<List<Dict<String> * Option<Int64>>, String>>"{\"Ok\":[[[{\"a\":\"b\"},{\"Some\":[1]}],[{\"c\":\"d\"},{\"None\":[]}]]]}" =
-    Stdlib.Result.Result.Ok(Stdlib.Result.Result.Ok [ (Stdlib.Dict.singleton "a" "b", Stdlib.Option.Option.Some 1L); (Stdlib.Dict.singleton "c" "d", Stdlib.Option.Option.None) ])
+    Stdlib.Result.Result.Ok (Stdlib.Result.Result.Ok [ (Stdlib.Dict.singleton "a" "b", Stdlib.Option.Option.Some 1L); (Stdlib.Dict.singleton "c" "d", Stdlib.Option.Option.None) ])
 
   Stdlib.Json.serialize<Result<Result<Int64, String>, String>> (
-    Stdlib.Result.Result.Ok(Stdlib.Result.Result.Ok 1L)
+    Stdlib.Result.Result.Ok (Stdlib.Result.Result.Ok 1L)
   ) = "{\"Ok\":[{\"Ok\":[1]}]}"
 
   Stdlib.Json.serialize<Result<Result<Int64, String>, String>> (
-    Stdlib.Result.Result.Ok(Stdlib.Result.Result.Error "err message")
+    Stdlib.Result.Result.Ok (Stdlib.Result.Result.Error "err message")
   ) = "{\"Ok\":[{\"Error\":[\"err message\"]}]}"
 
   Stdlib.Json.parse<Result<Result<Int64, String>, String>> "{\"Ok\":[{\"Ok\":[1]}]}" =
-    Stdlib.Result.Result.Ok(Stdlib.Result.Result.Ok(Stdlib.Result.Result.Ok 1L))
+    Stdlib.Result.Result.Ok (Stdlib.Result.Result.Ok (Stdlib.Result.Result.Ok 1L))
 
   Stdlib.Json.parse<Result<Result<Int64, String>, String>> "{\"Ok\":[{\"Error\":[\"err message\"]}]}" =
-    Stdlib.Result.Result.Ok(Stdlib.Result.Result.Ok(Stdlib.Result.Result.Error "err message"))
+    Stdlib.Result.Result.Ok (Stdlib.Result.Result.Ok (Stdlib.Result.Result.Error "err message"))
 
   Stdlib.Json.serialize<Result<Result<Option<Result<Int64, String>>, String>, String>> (
-    Stdlib.Result.Result.Ok(Stdlib.Result.Result.Ok(Stdlib.Option.Option.Some(Stdlib.Result.Result.Ok 1L)))
+    Stdlib.Result.Result.Ok (Stdlib.Result.Result.Ok (Stdlib.Option.Option.Some (Stdlib.Result.Result.Ok 1L)))
   ) = "{\"Ok\":[{\"Ok\":[{\"Some\":[{\"Ok\":[1]}]}]}]}"
 
   Stdlib.Json.parse<Result<Result<Option<Result<Int64, String>>, String>, String>>
-    "{\"Ok\":[{\"Ok\":[{\"Some\":[{\"Ok\":[1]}]}]}]}" = Stdlib.Result.Result.Ok(
-    Stdlib.Result.Result.Ok(Stdlib.Result.Result.Ok(Stdlib.Option.Option.Some(Stdlib.Result.Result.Ok 1L)))
+    "{\"Ok\":[{\"Ok\":[{\"Some\":[{\"Ok\":[1]}]}]}]}" = Stdlib.Result.Result.Ok (
+    Stdlib.Result.Result.Ok (Stdlib.Result.Result.Ok (Stdlib.Option.Option.Some (Stdlib.Result.Result.Ok 1L)))
   )
 
 module Dict =
   Stdlib.Json.serialize<Dict<String>> (Stdlib.Dict.singleton "a" "b") = """{"a":"b"}"""
-  Stdlib.Json.parse<Dict<String>> """{"a":"b"}""" = Stdlib.Result.Result.Ok(Stdlib.Dict.singleton "a" "b")
+  Stdlib.Json.parse<Dict<String>> """{"a":"b"}""" = Stdlib.Result.Result.Ok (Stdlib.Dict.singleton "a" "b")
 
   Stdlib.Json.serialize<Dict<String>> (Dict { a = "b"; c = "d" }) = """{"a":"b","c":"d"}"""
-  Stdlib.Json.parse<Dict<String>> """{"a":"b","c":"d"}""" = Stdlib.Result.Result.Ok(Dict { a = "b"; c = "d" })
+  Stdlib.Json.parse<Dict<String>> """{"a":"b","c":"d"}""" = Stdlib.Result.Result.Ok (Dict { a = "b"; c = "d" })
 
   module Errors =
     (Stdlib.Json.parse<Dict<Int64>> """{1:"b",2:"d"}""") |> err = Stdlib.Result.Result.Error "Not JSON"
@@ -1182,25 +1182,25 @@ module UserDefinedEnums =
 
   Stdlib.Json.parse<PrettyLikely> "{\"Yeah\":[]}" = Stdlib.Result.Result.Ok PrettyLikely.Yeah
 
-  Stdlib.Json.serialize<PrettyLikely> (PrettyLikely.Enh("printer broke", 7L)) = "{\"Enh\":[\"printer broke\",7]}"
+  Stdlib.Json.serialize<PrettyLikely> (PrettyLikely.Enh ("printer broke") (7L)) = "{\"Enh\":[\"printer broke\",7]}"
 
-  Stdlib.Json.parse<PrettyLikely> "{\"Enh\":[\"printer broke\",7]}" = Stdlib.Result.Result.Ok(
-    PrettyLikely.Enh("printer broke", 7L)
+  Stdlib.Json.parse<PrettyLikely> "{\"Enh\":[\"printer broke\",7]}" = Stdlib.Result.Result.Ok (
+    PrettyLikely.Enh ("printer broke") (7L)
   )
 
   Stdlib.Json.serialize<PrettyLikely2> (PrettyLikely2.PrettyLikely PrettyLikely.Yeah) = "{\"PrettyLikely\":[{\"Yeah\":[]}]}"
 
-  Stdlib.Json.parse<PrettyLikely2> "{\"PrettyLikely\":[{\"Yeah\":[]}]}" = Stdlib.Result.Result.Ok(
+  Stdlib.Json.parse<PrettyLikely2> "{\"PrettyLikely\":[{\"Yeah\":[]}]}" = Stdlib.Result.Result.Ok (
     PrettyLikely2.PrettyLikely PrettyLikely.Yeah
   )
 
   Stdlib.Json.serialize<PrettyLikely2> (
-    PrettyLikely2.PrettyLikely(PrettyLikely.Enh("printer broke", 7L))
+    PrettyLikely2.PrettyLikely (PrettyLikely.Enh ("printer broke") (7L))
   ) = "{\"PrettyLikely\":[{\"Enh\":[\"printer broke\",7]}]}"
 
   Stdlib.Json.parse<PrettyLikely2>
-    "{\"PrettyLikely\":[{\"Enh\":[\"printer broke\",7]}]}" = Stdlib.Result.Result.Ok(
-    PrettyLikely2.PrettyLikely(PrettyLikely.Enh("printer broke", 7L))
+    "{\"PrettyLikely\":[{\"Enh\":[\"printer broke\",7]}]}" = Stdlib.Result.Result.Ok (
+    PrettyLikely2.PrettyLikely (PrettyLikely.Enh ("printer broke") (7L))
   )
 
   module Errors =
@@ -1241,13 +1241,13 @@ module UserDefinedRecords =
 
   Stdlib.Json.serialize<Person> (Person { Name = "Bob"; Age = 42L }) = """{"Age":42,"Name":"Bob"}"""
 
-  Stdlib.Json.parse<Person> """{ "Name": "Bob", "Age": 42 }""" = Stdlib.Result.Result.Ok(
+  Stdlib.Json.parse<Person> """{ "Name": "Bob", "Age": 42 }""" = Stdlib.Result.Result.Ok (
     Person { Name = "Bob"; Age = 42L }
   )
 
   // can parse even if the JSON has _extra_ fields
   Stdlib.Json.parse<Person> """{ "Name": "Bob", "Age": 42, "Height": "6 ft" }""" = Stdlib.Result.Result
-    .Ok(Person { Name = "Bob"; Age = 42L })
+    .Ok (Person { Name = "Bob"; Age = 42L })
 
   (let personMaybe = Stdlib.Json.parse<Person> """{ "Name": "Bob", "Age": 42 }"""
 
@@ -1270,7 +1270,7 @@ module UserDefinedRecords =
 
   Stdlib.Json.parse<People>
     """{"GroupName":"Two Georges","People":[{"Age":27,"Name":"George A"},{"Age":42,"Name":"George B"}]}""" = Stdlib.Result.Result
-    .Ok(
+    .Ok (
       People
         { GroupName = "Two Georges"
           People =
@@ -1297,7 +1297,7 @@ module UserDefinedRecords =
 
   Stdlib.Json.parse<Combo<Person, Combo<People, Int64>>>
     """{"e1":{"Age":42,"Name":"Bob"},"e2":{"e1":{"GroupName":"Two Georges","People":[{"Age":27,"Name":"George A"},{"Age":42,"Name":"George B"}]},"e2":5}}""" = Stdlib.Result.Result
-    .Ok(
+    .Ok (
       Combo
         { e1 = Person { Name = "Bob"; Age = 42L }
           e2 =
@@ -1325,8 +1325,8 @@ module UserDefinedRecords =
               e2 = 5L } })
     |> Stdlib.Json.serialize<Combo<Person, Combo<People, Int64>>>
     |> Stdlib.Json.parse<Combo<Person, Combo<People, Int64>>> with
-   | Ok(value) -> value
-   | Error(_) -> Combo { e1 = Person { Name = "unexpected"; Age = 0L }; e2 = Combo { e1 = People { GroupName = ""; People = [] }; e2 = 0L } }) = (Combo
+   | Ok (value) -> value
+   | Error (_) -> Combo { e1 = Person { Name = "unexpected"; Age = 0L }; e2 = Combo { e1 = People { GroupName = ""; People = [] }; e2 = 0L } }) = (Combo
     { e1 = Person { Name = "Bob"; Age = 42L }
       e2 =
         Combo
@@ -1365,18 +1365,18 @@ module UserDefinedAliases =
 
   Stdlib.Json.serialize<MyPerson> (Person { Name = "Bob"; Age = 42L }) = """{"Age":42,"Name":"Bob"}"""
 
-  Stdlib.Json.parse<MyPerson> """{ "Name": "Bob", "Age": 42 }""" = Stdlib.Result.Result.Ok(
+  Stdlib.Json.parse<MyPerson> """{ "Name": "Bob", "Age": 42 }""" = Stdlib.Result.Result.Ok (
     Person { Name = "Bob"; Age = 42L }
   )
 
   type MyPrettyLikely = PrettyLikely
 
   Stdlib.Json.serialize<MyPrettyLikely> (
-    PrettyLikely.Enh("printer broke", 7L)
+    PrettyLikely.Enh ("printer broke") (7L)
   ) = "{\"Enh\":[\"printer broke\",7]}"
 
-  Stdlib.Json.parse<MyPrettyLikely> "{\"Enh\":[\"printer broke\",7]}" = Stdlib.Result.Result.Ok(
-    PrettyLikely.Enh("printer broke", 7L)
+  Stdlib.Json.parse<MyPrettyLikely> "{\"Enh\":[\"printer broke\",7]}" = Stdlib.Result.Result.Ok (
+    PrettyLikely.Enh ("printer broke") (7L)
   )
 
 
@@ -1403,10 +1403,10 @@ module Package =
 
   Stdlib.Json.serialize<Result<Int64, String>> (Stdlib.Result.Result.Error "err message") = "{\"Error\":[\"err message\"]}"
 
-  Stdlib.Json.parse<Result<Int64, String>> "{\"Ok\":[1]}" = Stdlib.Result.Result.Ok(Stdlib.Result.Result.Ok 1L)
+  Stdlib.Json.parse<Result<Int64, String>> "{\"Ok\":[1]}" = Stdlib.Result.Result.Ok (Stdlib.Result.Result.Ok 1L)
 
   Stdlib.Json.parse<Result<Int64, String>> "{\"Error\":[\"err message\"]}" = Stdlib.Result.Result
-    .Ok(Stdlib.Result.Result.Error "err message")
+    .Ok (Stdlib.Result.Result.Error "err message")
 
   Stdlib.Json.serialize<Darklang.LanguageTools.ID> 42L = "42"
   Stdlib.Json.parse<Darklang.LanguageTools.ID> "42" = Stdlib.Result.Result.Ok 42L

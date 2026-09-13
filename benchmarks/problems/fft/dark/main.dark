@@ -3,94 +3,79 @@
 
 type Complex = { real: Float, imaginary: Float }
 
-let add(left: Complex, right: Complex) : Complex =
+let add (left: Complex) (right: Complex) : Complex =
     Complex { real = left.real + right.real, imaginary = left.imaginary + right.imaginary }
 
-let subtract(left: Complex, right: Complex) : Complex =
+let subtract (left: Complex) (right: Complex) : Complex =
     Complex { real = left.real - right.real, imaginary = left.imaginary - right.imaginary }
 
-let multiply(left: Complex, right: Complex) : Complex =
+let multiply (left: Complex) (right: Complex) : Complex =
     Complex {
         real = left.real * right.real - left.imaginary * right.imaginary,
         imaginary = left.real * right.imaginary + left.imaginary * right.real
     }
 
-let split(values: List<Complex>, takeEven: Bool, evens: List<Complex>, odds: List<Complex>) : (List<Complex> * List<Complex>) =
+let split (values: List<Complex>) (takeEven: Bool) (evens: List<Complex>) (odds: List<Complex>) : (List<Complex> * List<Complex>) =
     match values with
-    | [] -> (Stdlib.List.reverse<Complex>(evens), Stdlib.List.reverse<Complex>(odds))
+    | [] -> (Stdlib.List.reverse<Complex> (evens), Stdlib.List.reverse<Complex> (odds))
     | value :: rest ->
-        if takeEven then split(rest, false, Stdlib.List.push<Complex>(evens, value), odds)
-        else split(rest, true, evens, Stdlib.List.push<Complex>(odds, value))
+        if takeEven then split (rest) (false) (Stdlib.List.push<Complex> (evens) (value)) (odds)
+        else split (rest) (true) (evens) (Stdlib.List.push<Complex> (odds) (value))
 
-let combine(
-    evens: List<Complex>,
-    odds: List<Complex>,
-    index: Int64,
-    size: Int64,
-    lower: List<Complex>,
-    upper: List<Complex>
-) : List<Complex> =
+let combine (evens: List<Complex>) (odds: List<Complex>) (index: Int64) (size: Int64) (lower: List<Complex>) (upper: List<Complex>) : List<Complex> =
     match (evens, odds) with
     | ([], []) ->
-        Stdlib.List.append<Complex>(
-            Stdlib.List.reverse<Complex>(lower),
-            Stdlib.List.reverse<Complex>(upper))
+        Stdlib.List.append<Complex> (Stdlib.List.reverse<Complex> (lower)) (Stdlib.List.reverse<Complex> (upper))
     | (even :: evenRest, odd :: oddRest) ->
-        let angle = -6.283185307179586 * Stdlib.Int64.toFloat(index) / Stdlib.Int64.toFloat(size) in
-        let twiddle = Complex { real = Stdlib.Math.cos(angle), imaginary = Stdlib.Math.sin(angle) } in
-        let product = multiply(twiddle, odd) in
-        combine(
-            evenRest,
-            oddRest,
-            index + 1L,
-            size,
-            Stdlib.List.push<Complex>(lower, add(even, product)),
-            Stdlib.List.push<Complex>(upper, subtract(even, product)))
-    | _ -> Builtin.testRuntimeError("FFT halves had different lengths")
+        let angle = -6.283185307179586 * Stdlib.Int64.toFloat (index) / Stdlib.Int64.toFloat (size) in
+        let twiddle = Complex { real = Stdlib.Math.cos (angle), imaginary = Stdlib.Math.sin (angle) } in
+        let product = multiply (twiddle) (odd) in
+        combine (evenRest) (oddRest) (index + 1L) (size) (Stdlib.List.push<Complex> (lower) (add (even) (product))) (Stdlib.List.push<Complex> (upper) (subtract (even) (product)))
+    | _ -> Builtin.testRuntimeError ("FFT halves had different lengths")
 
-let fft(values: List<Complex>, size: Int64) : List<Complex> =
+let fft (values: List<Complex>) (size: Int64) : List<Complex> =
     if size <= 1L then values
     else
-        let halves = split(values, true, [], []) in
-        let evens = fft(halves.0, size / 2L) in
-        let odds = fft(halves.1, size / 2L) in
-        combine(evens, odds, 0L, size, [], [])
+        let halves = split (values) (true) ([]) ([]) in
+        let evens = fft (halves.0) (size / 2L) in
+        let odds = fft (halves.1) (size / 2L) in
+        combine (evens) (odds) (0L) (size) ([]) ([])
 
-let generateInput(remaining: Int64, index: Int64, reversed: List<Complex>) : List<Complex> =
-    if remaining <= 0L then Stdlib.List.reverse<Complex>(reversed)
+let generateInput (remaining: Int64) (index: Int64) (reversed: List<Complex>) : List<Complex> =
+    if remaining <= 0L then Stdlib.List.reverse<Complex> (reversed)
     else
-        let x = Stdlib.Int64.toFloat(index) in
+        let x = Stdlib.Int64.toFloat (index) in
         let value = Complex {
-            real = Stdlib.Math.sin(x * 0.017) + Stdlib.Math.cos(x * 0.031),
-            imaginary = Stdlib.Math.cos(x * 0.013) - Stdlib.Math.sin(x * 0.007)
+            real = Stdlib.Math.sin (x * 0.017) + Stdlib.Math.cos (x * 0.031),
+            imaginary = Stdlib.Math.cos (x * 0.013) - Stdlib.Math.sin (x * 0.007)
         } in
-        generateInput(remaining - 1L, index + 1L, Stdlib.List.push<Complex>(reversed, value))
+        generateInput (remaining - 1L) (index + 1L) (Stdlib.List.push<Complex> (reversed) (value))
 
-let checksum(values: List<Complex>, index: Int64, result: Int64) : Int64 =
+let checksum (values: List<Complex>) (index: Int64) (result: Int64) : Int64 =
     match values with
     | [] -> result
     | value :: rest ->
-        let quantized = Stdlib.Float.toInt((value.real * 3.0 + value.imaginary * 5.0) * 1000000.0) in
-        checksum(rest, index + 1L, (result + quantized * (index + 1L)) % 1000000007L)
+        let quantized = Stdlib.Float.toInt ((value.real * 3.0 + value.imaginary * 5.0) * 1000000.0) in
+        checksum (rest) (index + 1L) ((result + quantized * (index + 1L)) % 1000000007L)
 
-let run(remaining: Int64, input: List<Complex>, size: Int64, result: Int64) : Int64 =
+let run (remaining: Int64) (input: List<Complex>) (size: Int64) (result: Int64) : Int64 =
     if remaining <= 0L then result
     else
-        let transformed = fft(input, size) in
-        run(remaining - 1L, input, size, (result + checksum(transformed, 0L, 0L)) % 1000000007L)
+        let transformed = fft (input) (size) in
+        run (remaining - 1L) (input) (size) ((result + checksum (transformed) (0L) (0L)) % 1000000007L)
 
-let isPowerOfTwo(value: Int64) : Bool =
-    value > 0L && Stdlib.Int64.bitwiseAnd(value, value - 1L) == 0L
+let isPowerOfTwo (value: Int64) : Bool =
+    value > 0L && Stdlib.Int64.bitwiseAnd (value) (value - 1L) == 0L
 
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-let size = benchmarkArg(0I) in
-let repetitions = benchmarkArg(1I) in
-if !isPowerOfTwo(size) || repetitions <= 0L then
-    Builtin.testRuntimeError("FFT size must be a positive power of two and repetitions must be positive")
+let size = benchmarkArg (0) in
+let repetitions = benchmarkArg (1) in
+if !isPowerOfTwo (size) || repetitions <= 0L then
+    Builtin.testRuntimeError ("FFT size must be a positive power of two and repetitions must be positive")
 else
-    let input = generateInput(size, 0L, []) in
-    Builtin.printLine(Stdlib.Int64.toString(run(repetitions, input, size, 0L)))
+    let input = generateInput (size) (0L) ([]) in
+    Builtin.printLine (Stdlib.Int64.toString (run (repetitions) (input) (size) (0L)))

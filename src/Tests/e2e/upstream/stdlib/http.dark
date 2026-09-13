@@ -20,61 +20,61 @@
 
 (let response = Stdlib.Http.badRequest_v0 "Your request resulted in an error" in
  (response.statusCode, response.headers, Stdlib.Blob.toString response.body)) =
-  (400I, [], Stdlib.Result.Result.Ok "Your request resulted in an error")
+  (400, [], Stdlib.Result.Result.Ok "Your request resulted in an error")
 
-(let response = Stdlib.Http.response (Stdlib.String.toBlob "test") 200I in
+(let response = Stdlib.Http.response (Stdlib.String.toBlob "test") 200 in
  (response.statusCode, response.headers, Stdlib.Blob.toString response.body)) =
-  (200I, [], Stdlib.Result.Result.Ok "test")
+  (200, [], Stdlib.Result.Result.Ok "test")
 
 (let response =
    Stdlib.Http.responseWithHeaders
      (Stdlib.String.toBlob "test")
      [ ("Content-Type", "text/html; charset=utf-8") ]
-     200I in
+     200 in
  (response.statusCode, response.headers, Stdlib.Blob.toString response.body)) =
-  (200I,
+  (200,
    [ ("Content-Type", "text/html; charset=utf-8") ],
    Stdlib.Result.Result.Ok "test")
 
-Stdlib.Http.notFound () = Stdlib.Http.response Stdlib.Blob.empty 404I
+Stdlib.Http.notFound () = Stdlib.Http.response Stdlib.Blob.empty 404
 
-Stdlib.Http.unauthorized () = Stdlib.Http.response Stdlib.Blob.empty 401I
+Stdlib.Http.unauthorized () = Stdlib.Http.response Stdlib.Blob.empty 401
 
-Stdlib.Http.forbidden () = Stdlib.Http.response Stdlib.Blob.empty 403I
+Stdlib.Http.forbidden () = Stdlib.Http.response Stdlib.Blob.empty 403
 
 (let response = Stdlib.Http.success (Stdlib.String.toBlob "test") in
  (response.statusCode, response.headers, Stdlib.Blob.toString response.body)) =
-  (200I, [], Stdlib.Result.Result.Ok "test")
+  (200, [], Stdlib.Result.Result.Ok "test")
 
-(let response = Stdlib.Http.responseWithHtml "test" 200I in
+(let response = Stdlib.Http.responseWithHtml "test" 200 in
  (response.statusCode, response.headers, Stdlib.Blob.toString response.body)) =
-  (200I,
+  (200,
    [ ("Content-Type", "text/html; charset=utf-8") ],
    Stdlib.Result.Result.Ok "test")
 
-(let response = Stdlib.Http.responseWithText "test" 200I in
+(let response = Stdlib.Http.responseWithText "test" 200 in
  (response.statusCode, response.headers, Stdlib.Blob.toString response.body)) =
-  (200I,
+  (200,
    [ ("Content-Type", "text/plain; charset=utf-8") ],
    Stdlib.Result.Result.Ok "test")
 
-(let response = Stdlib.Http.responseWithJson "test" 200I in
+(let response = Stdlib.Http.responseWithJson "test" 200 in
  (response.statusCode, response.headers, Stdlib.Blob.toString response.body)) =
-  (200I,
+  (200,
    [ ("Content-Type", "application/json") ],
    Stdlib.Result.Result.Ok "test")
 
 (Stdlib.Http.redirectTo "") =
-  Stdlib.Http.responseWithHeaders Stdlib.Blob.empty [ ("Location", "") ] 302I
+  Stdlib.Http.responseWithHeaders Stdlib.Blob.empty [ ("Location", "") ] 302
 
 (Stdlib.Http.redirectTo "bad url") =
-  Stdlib.Http.responseWithHeaders Stdlib.Blob.empty [ ("Location", "bad url") ] 302I
+  Stdlib.Http.responseWithHeaders Stdlib.Blob.empty [ ("Location", "bad url") ] 302
 
 (Stdlib.Http.redirectTo_v0 "http://someothersite.com") =
-  Stdlib.Http.responseWithHeaders Stdlib.Blob.empty [ ("Location", "http://someothersite.com") ] 302I
+  Stdlib.Http.responseWithHeaders Stdlib.Blob.empty [ ("Location", "http://someothersite.com") ] 302
 
 (Stdlib.Http.redirectTo_v0 "/relativeUrl") =
-  Stdlib.Http.responseWithHeaders Stdlib.Blob.empty [ ("Location", "/relativeUrl") ] 302I
+  Stdlib.Http.responseWithHeaders Stdlib.Blob.empty [ ("Location", "/relativeUrl") ] 302
 
 
 // parseQueryString: ports the old _middleware.dark fixture.

@@ -1,31 +1,31 @@
 // Sum type (ADT) tests with payloads for Phase 7 Milestone 4
 
 // None case - verify through pattern matching
-type MyOption = MyNone | MySome of Int64 match MyNone with | MyNone -> 0L | MySome(x) -> 1L = 0L
+type MyOption = MyNone | MySome of Int64 match MyNone with | MyNone -> 0L | MySome (x) -> 1L = 0L
 
 // Unsuffixed literals are interpreter Ints and must work in literal patterns.
 match 42L with | 42L -> true | _ -> false = true
 
 // Err case - verify through pattern matching
-type MyResult = MyOk of Int64 | MyErr match MyErr with | MyErr -> 1L | MyOk(x) -> 0L = 1L
+type MyResult = MyOk of Int64 | MyErr match MyErr with | MyErr -> 1L | MyOk (x) -> 0L = 1L
 
 // Variant ordering - A is first variant
-type Three = A | B of Int64 | C match A with | A -> 0L | B(x) -> 1L | C -> 2L = 0L
+type Three = A | B of Int64 | C match A with | A -> 0L | B (x) -> 1L | C -> 2L = 0L
 
 // C is third variant
-type Three = A | B of Int64 | C match C with | A -> 0L | B(x) -> 1L | C -> 2L = 2L
+type Three = A | B of Int64 | C match C with | A -> 0L | B (x) -> 1L | C -> 2L = 2L
 
 // Multiple payload types in let binding
-type MyOption = MyNone | MySome of Int64 let n = MyNone in match n with | MyNone -> 0L | MySome(x) -> x = 0L
+type MyOption = MyNone | MySome of Int64 let n = MyNone in match n with | MyNone -> 0L | MySome (x) -> x = 0L
 
 // Verify MySome(42) returns payload
-type MyOption = MyNone | MySome of Int64 match MySome(42L) with | MyNone -> 0L | MySome(x) -> x = 42L
+type MyOption = MyNone | MySome of Int64 match MySome (42L) with | MyNone -> 0L | MySome (x) -> x = 42L
 
 // Verify MyOk(100) returns payload
-type MyResult = MyOk of Int64 | MyErr match MyOk(100L) with | MyOk(v) -> v | MyErr -> 0L = 100L
+type MyResult = MyOk of Int64 | MyErr match MyOk (100L) with | MyOk (v) -> v | MyErr -> 0L = 100L
 
 // Verify B(77) returns payload
-type Three = A | B of Int64 | C match B(77L) with | A -> 0L | B(x) -> x | C -> 0L = 77L
+type Three = A | B of Int64 | C match B (77L) with | A -> 0L | B (x) -> x | C -> 0L = 77L
 
 // ===================================================================
 // Sum Types with String Payloads
@@ -33,12 +33,12 @@ type Three = A | B of Int64 | C match B(77L) with | A -> 0L | B(x) -> x | C -> 0
 
 // Sum type with string payload
 type Message = NoMessage | Text of String
-match Text("hello") with | Text(s) -> s | NoMessage -> "none" = "hello"
-match NoMessage with | Text(s) -> s | NoMessage -> "none" = "none"
+match Text ("hello") with | Text (s) -> s | NoMessage -> "none" = "hello"
+match NoMessage with | Text (s) -> s | NoMessage -> "none" = "none"
 
 // String payload in let binding
 type Msg = NoMsg | Msg of String
-let m = Msg("world") in match m with | Msg(s) -> s | NoMsg -> "" = "world"
+let m = Msg ("world") in match m with | Msg (s) -> s | NoMsg -> "" = "world"
 
 // ===================================================================
 // Sum Types with Float Payloads
@@ -46,12 +46,12 @@ let m = Msg("world") in match m with | Msg(s) -> s | NoMsg -> "" = "world"
 
 // Sum type with float payload
 type MaybeFloat = NoFloat | SomeFloat of Float
-match SomeFloat(3.14) with | SomeFloat(f) -> f | NoFloat -> 0.0 = 3.14
-match NoFloat with | SomeFloat(f) -> f | NoFloat -> 0.0 = 0.0
+match SomeFloat (3.14) with | SomeFloat (f) -> f | NoFloat -> 0.0 = 3.14
+match NoFloat with | SomeFloat (f) -> f | NoFloat -> 0.0 = 0.0
 
 // Float payload with arithmetic
 type OptFloat = NoneF | JustF of Float
-match JustF(2.5) with | JustF(f) -> f * 2.0 | NoneF -> 0.0 = 5.0
+match JustF (2.5) with | JustF (f) -> f * 2.0 | NoneF -> 0.0 = 5.0
 
 // ===================================================================
 // Sum Types with Bool Payloads
@@ -59,21 +59,21 @@ match JustF(2.5) with | JustF(f) -> f * 2.0 | NoneF -> 0.0 = 5.0
 
 // Sum type with bool payload
 type MaybeBool = NoBool | SomeBool of Bool
-match SomeBool(true) with | SomeBool(b) -> if b then 1L else 0L | NoBool -> -1L = 1L
-match SomeBool(false) with | SomeBool(b) -> if b then 1L else 0L | NoBool -> -1L = 0L
+match SomeBool (true) with | SomeBool (b) -> if b then 1L else 0L | NoBool -> -1L = 1L
+match SomeBool (false) with | SomeBool (b) -> if b then 1L else 0L | NoBool -> -1L = 0L
 
 // ===================================================================
 // Sum Types with Tuple Payloads
 // ===================================================================
 
 // Sum type with tuple payload
-type Pair = NoPair | MkPair of (Int64, Int64)
-match MkPair((10L, 20L)) with | MkPair(t) -> t.0 + t.1 | NoPair -> 0L = 30L
-match NoPair with | MkPair(t) -> t.0 | NoPair -> 99L = 99L
+type Pair = NoPair | MkPair of (Int64 * Int64)
+match MkPair ((10L, 20L)) with | MkPair (t) -> t.0 + t.1 | NoPair -> 0L = 30L
+match NoPair with | MkPair (t) -> t.0 | NoPair -> 99L = 99L
 
 // Tuple payload with 3 elements
-type Triple = NoTriple | MkTriple of (Int64, Int64, Int64)
-match MkTriple((1L, 2L, 3L)) with | MkTriple(t) -> t.0 + t.1 + t.2 | NoTriple -> 0L = 6L
+type Triple = NoTriple | MkTriple of (Int64 * Int64 * Int64)
+match MkTriple ((1L, 2L, 3L)) with | MkTriple (t) -> t.0 + t.1 + t.2 | NoTriple -> 0L = 6L
 
 // ===================================================================
 // Sum Types with Record Payloads
@@ -82,7 +82,7 @@ match MkTriple((1L, 2L, 3L)) with | MkTriple(t) -> t.0 + t.1 + t.2 | NoTriple ->
 // Match payload returned as record, then access field
 type Point = { x: Int64 }
 type WrappedPoint = WrapPoint of Point | NoPoint
-let p = match WrapPoint(Point { x = 5L }) with | WrapPoint(p) -> p | NoPoint -> Point { x = 0L } in p.x = 5L
+let p = match WrapPoint (Point { x = 5L }) with | WrapPoint (p) -> p | NoPoint -> Point { x = 0L } in p.x = 5L
 
 // ===================================================================
 // Multiple Payload Variants
@@ -90,8 +90,8 @@ let p = match WrapPoint(Point { x = 5L }) with | WrapPoint(p) -> p | NoPoint -> 
 
 // Multiple variants with payloads
 type Value = VInt of Int64 | VString of String | VBool of Bool
-match VInt(42L) with | VInt(n) -> n | VString(s) -> 0L | VBool(b) -> 0L = 42L
-match VBool(true) with | VInt(n) -> 0L | VString(s) -> 0L | VBool(b) -> if b then 1L else 0L = 1L
+match VInt (42L) with | VInt (n) -> n | VString (s) -> 0L | VBool (b) -> 0L = 42L
+match VBool (true) with | VInt (n) -> 0L | VString (s) -> 0L | VBool (b) -> if b then 1L else 0L = 1L
 
 // ===================================================================
 // Result-like Types with Different Payloads
@@ -99,12 +99,12 @@ match VBool(true) with | VInt(n) -> 0L | VString(s) -> 0L | VBool(b) -> if b the
 
 // Result with int ok and string error
 type IntResult = IntOk of Int64 | IntErr of String
-match IntOk(42L) with | IntOk(n) -> n | IntErr(s) -> 0L = 42L
+match IntOk (42L) with | IntOk (n) -> n | IntErr (s) -> 0L = 42L
 
 // Result with both string payloads
 type StrResult = StrOk of String | StrErr of String
-match StrOk("success") with | StrOk(s) -> s | StrErr(e) -> e = "success"
-match StrErr("failed") with | StrOk(s) -> s | StrErr(e) -> e = "failed"
+match StrOk ("success") with | StrOk (s) -> s | StrErr (e) -> e = "success"
+match StrErr ("failed") with | StrOk (s) -> s | StrErr (e) -> e = "failed"
 
 // ===================================================================
 // Type Aliases to Primitive Types (must NOT be parsed as sum types)
@@ -116,15 +116,15 @@ match StrErr("failed") with | StrOk(s) -> s | StrErr(e) -> e = "failed"
 
 // Test that Int64 is recognized as a primitive type, not a variant name
 type IntAlias = Int64
-let useInt64(x: Int64): Int64 = x + 1L
-useInt64(41L) = 42L
+let useInt64 (x: Int64): Int64 = x + 1L
+useInt64 (41L) = 42L
 
 // Test that String is recognized as a primitive type, not a variant name
 type StrAlias = String
-let useString(s: String): String = s
-useString("hello") = "hello"
+let useString (s: String): String = s
+useString ("hello") = "hello"
 
 // Test that Bool is recognized as a primitive type, not a variant name
 type BoolAlias = Bool
-let useBool(b: Bool): Int64 = if b then 1L else 0L
-useBool(true) = 1L
+let useBool (b: Bool): Int64 = if b then 1L else 0L
+useBool (true) = 1L

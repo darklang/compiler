@@ -11,16 +11,16 @@ module Stdlib.Uuid.Compatibility
 // is BadFormat; it never substitutes for canonical Uuid.parse.
 type ParseError = | BadFormat | UnsupportedUuidParseError
 
-let __isHexByte(byte: Int64) : Bool =
+let __isHexByte (byte: Int64) : Bool =
     (byte >= 48L && byte <= 57L) || (byte >= 65L && byte <= 70L) || (byte >= 97L && byte <= 102L)
 
-let __hasValidFormatAt(s: String, index: Int64) : Bool =
+let __hasValidFormatAt (s: String) (index: Int64) : Bool =
     if index == 36L then true
     else
-        let byte = Stdlib.String.getByteAt(s, index) in
-        if index == 8L || index == 13L || index == 18L || index == 23L then byte == 45L && Stdlib.Uuid.Compatibility.__hasValidFormatAt(s, index + 1L)
-        else Stdlib.Uuid.Compatibility.__isHexByte(byte) && Stdlib.Uuid.Compatibility.__hasValidFormatAt(s, index + 1L)
+        let byte = Stdlib.String.getByteAt (s) (index) in
+        if index == 8L || index == 13L || index == 18L || index == 23L then byte == 45L && Stdlib.Uuid.Compatibility.__hasValidFormatAt (s) (index + 1L)
+        else Stdlib.Uuid.Compatibility.__isHexByte (byte) && Stdlib.Uuid.Compatibility.__hasValidFormatAt (s) (index + 1L)
 
-let parse_v0(s: String) : Stdlib.Result.Result<String, Stdlib.Uuid.Compatibility.ParseError> =
-    if Stdlib.String.__byteLength(s) == 36L && Stdlib.Uuid.Compatibility.__hasValidFormatAt(s, 0L) then Ok(s)
-    else Error(Stdlib.Uuid.Compatibility.ParseError.BadFormat)
+let parse_v0 (s: String) : Stdlib.Result.Result<String, Stdlib.Uuid.Compatibility.ParseError> =
+    if Stdlib.String.__byteLength (s) == 36L && Stdlib.Uuid.Compatibility.__hasValidFormatAt (s) (0L) then Ok (s)
+    else Error (Stdlib.Uuid.Compatibility.ParseError.BadFormat)

@@ -1,20 +1,20 @@
 // Leibniz Pi Benchmark
 // Computes pi using Leibniz formula: pi/4 = 1 - 1/3 + 1/5 - 1/7 + ...
 
-let leibnizLoop(i: Int64, n: Int64, sum: Float, sign: Float) : Float =
+let leibnizLoop (i: Int64) (n: Int64) (sum: Float) (sign: Float) : Float =
     if i >= n then sum * 4.0
     else
-        let term = sign / Stdlib.Int64.toFloat(2L * i + 1L) in
-        leibnizLoop(i + 1L, n, sum + term, Stdlib.Float.negate(sign))
+        let term = sign / Stdlib.Int64.toFloat (2L * i + 1L) in
+        leibnizLoop (i + 1L) (n) (sum + term) (Stdlib.Float.negate (sign))
 
-let leibnizPi(n: Int64) : Float =
-    leibnizLoop(0L, n, 0.0, 1.0)
+let leibnizPi (n: Int64) : Float =
+    leibnizLoop (0L) (n) (0.0) (1.0)
 
 // Use 100 million iterations for timing
 // Output as integer (multiply by large factor for precision)
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-Builtin.printLine(Stdlib.Int64.toString(Stdlib.Float.toInt(leibnizPi(benchmarkArg(0I)) * 100000000.0)))
+Builtin.printLine (Stdlib.Int64.toString (Stdlib.Float.toInt (leibnizPi (benchmarkArg (0)) * 100000000.0)))

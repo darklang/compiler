@@ -36,11 +36,11 @@ type Y = { z: Z }
 type X = { y: Y }
 
 (let x = X { y = Y { z = Z { a = [ 1L; 2L; 3L; 4L; 5L ] } } }
- (x.y.z.a |> Stdlib.List.length_v0)) = 5I
+ (x.y.z.a |> Stdlib.List.length_v0)) = 5
 
 type MyEnum = | A of Int64 * Int64 * Int64
 (33L |> MyEnum.A 21L 42L) = MyEnum.A 33L 21L 42L
-(33L |> MyEnum.A(21L, 42L)) = MyEnum.A(33L, 21L, 42L)
+(33L |> MyEnum.A (21L, 42L)) = MyEnum.A (33L, 21L, 42L)
 
 (3L |> Stdlib.Result.Result.Ok) = Stdlib.Result.Result.Ok 3L
 
@@ -73,12 +73,12 @@ type MyEnum = | A of Int64 * Int64 * Int64
 (let x =
   fun x ->
     Stdlib.Option.andThen_v0 (Stdlib.Option.Option.Some x) (fun x ->
-      Stdlib.Option.Option.Some(1L + x))
+      Stdlib.Option.Option.Some (1L + x))
 
  3L |> x) = Stdlib.Option.Option.Some 4L
 
 (let x =
-  fun x -> Stdlib.Option.andThen_v0 x (fun x -> Stdlib.Option.Option.Some(1L + x))
+  fun x -> Stdlib.Option.andThen_v0 x (fun x -> Stdlib.Option.Option.Some (1L + x))
 
  3L |> Stdlib.Option.Option.Some |> x) = Stdlib.Option.Option.Some 4L
 

@@ -27,7 +27,7 @@ type InterpPart =
 and Token =
     | TInt64 of int64       // Default integer (Int64)
     | TInt128 of System.Int128  // 128-bit signed: 1Q
-    | TBigInt of System.Numerics.BigInteger // arbitrary-precision signed Int: 1I
+    | TBigInt of System.Numerics.BigInteger // unsuffixed arbitrary-precision signed Int
     | TInt8 of sbyte        // 8-bit signed: 1y
     | TInt16 of int16       // 16-bit signed: 1s
     | TInt32 of int32       // 32-bit signed: 1l
@@ -48,6 +48,7 @@ and Token =
     | TStar
     | TSlash
     | TLParen
+    | TAdjacentLParen // `name(`, retained only to diagnose removed call/declaration syntax
     | TRParen
     | TLet
     | TVal
@@ -204,8 +205,58 @@ let private materializeIndentedListSeparators (input: string) : string =
 
     input |> Seq.toList |> scan Normal 0 [] None []
 
+type private AdjacencyScanMode =
+    | AdjacencyNormal
+    | AdjacencyQuoted of escaped: bool
+    | AdjacencyTripleQuoted
+    | AdjacencyLineComment
+
+/// Preserve the otherwise lexically invisible difference between canonical
+/// tuple/group application (`f (a, b)`) and the retired comma-call spelling
+/// (`f(a, b)`). The marker is private lexer input and never reaches the AST.
+let private markAdjacentParentheses (input: string) : char list =
+    let canEndCallee c =
+        NameSyntax.isContinueCharacter c || c = ')' || c = '>' || c = '`'
+
+    let rec scan mode previous reversed chars =
+        match mode, chars with
+        | _, [] -> List.rev reversed
+        | AdjacencyLineComment, (('\n' | '\r') as c) :: rest ->
+            scan AdjacencyNormal (Some c) (c :: reversed) rest
+        | AdjacencyLineComment, c :: rest ->
+            scan AdjacencyLineComment (Some c) (c :: reversed) rest
+        | AdjacencyQuoted escaped, c :: rest ->
+            let nextMode =
+                if escaped then AdjacencyQuoted false
+                elif c = '\\' then AdjacencyQuoted true
+                elif c = '"' then AdjacencyNormal
+                else AdjacencyQuoted false
+            scan nextMode (Some c) (c :: reversed) rest
+        | AdjacencyTripleQuoted, '"' :: '"' :: '"' :: rest ->
+            scan AdjacencyNormal (Some '"') ('"' :: '"' :: '"' :: reversed) rest
+        | AdjacencyTripleQuoted, c :: rest ->
+            scan AdjacencyTripleQuoted (Some c) (c :: reversed) rest
+        | AdjacencyNormal, '/' :: '/' :: rest ->
+            scan AdjacencyLineComment (Some '/') ('/' :: '/' :: reversed) rest
+        | AdjacencyNormal, '"' :: '"' :: '"' :: rest ->
+            scan AdjacencyTripleQuoted (Some '"') ('"' :: '"' :: '"' :: reversed) rest
+        | AdjacencyNormal, '"' :: rest ->
+            scan (AdjacencyQuoted false) (Some '"') ('"' :: reversed) rest
+        | AdjacencyNormal, '\'' :: '(' :: '\'' :: rest ->
+            scan AdjacencyNormal (Some '\'') ('\'' :: '(' :: '\'' :: reversed) rest
+        | AdjacencyNormal, '(' :: rest ->
+            match previous with
+            | Some c when canEndCallee c ->
+                scan AdjacencyNormal (Some '(') ('(' :: '\u0001' :: reversed) rest
+            | _ ->
+                scan AdjacencyNormal (Some '(') ('(' :: reversed) rest
+        | AdjacencyNormal, c :: rest ->
+            scan AdjacencyNormal (Some c) (c :: reversed) rest
+
+    input |> Seq.toList |> scan AdjacencyNormal None []
+
 /// Lexer: convert string to list of tokens
-let lex (input: string) : Result<Token list, string> =
+let rec lex (input: string) : Result<Token list, string> =
     let decodeEscape (chars: char list) : Result<string * char list, string> =
         let takeHex length remaining =
             let rec take count reversed rest =
@@ -295,6 +346,7 @@ let lex (input: string) : Result<Token list, string> =
             | '<' :: remaining -> lexHelper remaining (TSpacedLt :: acc)
             | remaining -> lexHelper remaining acc
         | '/' :: rest -> lexHelper rest (TSlash :: acc)
+        | '\u0001' :: '(' :: rest -> lexHelper rest (TAdjacentLParen :: acc)
         | '(' :: rest -> lexHelper rest (TLParen :: acc)
         | ')' :: rest -> lexHelper rest (TRParen :: acc)
         | '{' :: rest -> lexHelper rest (TLBrace :: acc)
@@ -485,8 +537,6 @@ let lex (input: string) : Result<Token list, string> =
                         | (false, _) -> Error $"Integer literal out of range for UInt128: {numStr}"
 
                     match afterInt with
-                    | 'I' :: rest ->
-                        parseBigIntOrError rest
                     | 'L' :: rest ->
                         parseInt64OrError rest
                     | 'Q' :: rest ->
@@ -602,7 +652,7 @@ let lex (input: string) : Result<Token list, string> =
                     | Ok (exprChars, afterExpr) ->
                         let exprStr = System.String(exprChars |> List.toArray)
                         // Lex the expression
-                        match lexHelper (exprStr |> Seq.toList) [] with
+                        match lex exprStr with
                         | Ok tokens ->
                             let tokens' = tokens |> List.filter (fun t -> t <> TEOF)
                             parseInterpParts afterExpr (InterpTokens tokens' :: parts)
@@ -731,28 +781,11 @@ let lex (input: string) : Result<Token list, string> =
 
     input
     |> materializeIndentedListSeparators
-    |> Seq.toList
+    |> markAdjacentParentheses
     |> fun cs -> lexHelper cs []
 
-/// Parse parenthesized type entries for function and tuple forms.
-/// Entries may be comma- or star-separated, and each entry can be a full type expression.
-let rec parseFunctionTypeParams (typeParams: Set<string>) (tokens: Token list) (acc: Type list) : Result<Type list * Token list, string> =
-    match tokens with
-    | TRParen :: rest ->
-        // End of parameter list
-        Ok (List.rev acc, rest)
-    | _ ->
-        // Parse a type expression (allows nested function/tuple types)
-        parseTypeWithContext typeParams tokens
-        |> Result.bind (fun (ty, remaining) ->
-            match remaining with
-            | TRParen :: rest -> Ok (List.rev (ty :: acc), rest)
-            | TComma :: rest -> parseFunctionTypeParams typeParams rest (ty :: acc)
-            | TStar :: rest -> parseFunctionTypeParams typeParams rest (ty :: acc)
-            | _ -> Error "Expected ',', '*', or ')' in function type parameters")
-
 /// Base type parser (no function types - used to parse function type components)
-and parseTypeBase (typeParams: Set<string>) (tokens: Token list) : Result<Type * Token list, string> =
+let rec parseTypeBase (typeParams: Set<string>) (tokens: Token list) : Result<Type * Token list, string> =
     match tokens with
     | TIdent "Int8" :: rest -> Ok (AST.TInt8, rest)
     | TIdent "Int16" :: rest -> Ok (AST.TInt16, rest)
@@ -856,34 +889,16 @@ and parseTypeBase (typeParams: Set<string>) (tokens: Token list) : Result<Type *
             // Simple type without type arguments
             Ok (TRecord (fullTypeName, []), afterTypeName)
     | TLParen :: rest ->
-        // Could be a function type: (int, int) -> bool
-        // Or a tuple/grouped type: (int, int) or (Person -> Bool)
-        parseFunctionTypeParams typeParams rest []
-        |> Result.bind (fun (paramTypes, afterParams) ->
-            match afterParams with
-            | TArrow :: returnRest ->
-                // Function type: (params) -> return
-                parseTypeWithContext typeParams returnRest
-                |> Result.map (fun (returnType, remaining) ->
-                    (TFunction (paramTypes, returnType), remaining))
-            | _ ->
-                // Parenthesized single type or tuple type.
-                match paramTypes with
-                | [] ->
-                    Error "Parenthesized type cannot be empty"
-                | [single] ->
-                    Ok (single, afterParams)
-                | _ ->
-                    Ok (TTuple paramTypes, afterParams))
+        parseTypeWithContext typeParams rest
+        |> Result.bind (fun (innerType, remaining) ->
+            match remaining with
+            | TRParen :: afterParen -> Ok (innerType, afterParen)
+            | TComma :: _ -> Error "Function types use curried arrows; tuple types use '*'"
+            | _ -> Error "Expected ')' after parenthesized type")
     | _ -> Error "Expected type annotation (Int64, Bool, String, Float, TypeName, type variable, or function type)"
 
 /// Parse a type annotation with context for type parameters in scope
 and parseTypeWithContext (typeParams: Set<string>) (tokens: Token list) : Result<Type * Token list, string> =
-    let asFunctionParamTypes (ty: Type) : Type list =
-        match ty with
-        | TTuple elements -> elements
-        | _ -> [ty]
-
     let rec parseTupleTail (acc: Type list) (remaining: Token list) : Result<Type * Token list, string> =
         match remaining with
         | TStar :: rest ->
@@ -903,7 +918,11 @@ and parseTypeWithContext (typeParams: Set<string>) (tokens: Token list) : Result
             | TArrow :: returnRest ->
                 parseTypeWithContext typeParams returnRest
                 |> Result.map (fun (returnType, remaining') ->
-                    (TFunction (asFunctionParamTypes parsedType, returnType), remaining'))
+                    match returnType with
+                    | TFunction (remainingParams, finalReturn) ->
+                        (TFunction (parsedType :: remainingParams, finalReturn), remaining')
+                    | _ ->
+                        (TFunction ([parsedType], returnType), remaining'))
             | _ ->
                 Ok (parsedType, afterType)))
 
@@ -982,9 +1001,8 @@ let rec parseParamsWithContext (typeParams: Set<string>) (tokens: Token list) (a
         parseParamWithContext typeParams tokens
         |> Result.bind (fun (param, remaining) ->
             match remaining with
-            | TComma :: rest ->
-                // More parameters
-                parseParamsWithContext typeParams rest (param :: acc)
+            | TComma :: _ ->
+                Error "Function parameters use separate parenthesized groups"
             | TRParen :: _ ->
                 // End of parameters
                 Ok (List.rev (param :: acc), remaining)
@@ -1250,6 +1268,8 @@ let parseFunctionDef (tokens: Token list) (parseExpr: Token list -> Result<Expr 
                 else
                 let typeParamsSet = Set.ofList typeParams
                 match afterTypeParams with
+                | TAdjacentLParen :: _ ->
+                    Error "Function parameters require whitespace before '('"
                 | TLParen :: paramsStart ->
                     // Parse parameters with type params in scope
                     let paramsResult =
@@ -1333,6 +1353,8 @@ let parseFunctionDef (tokens: Token list) (parseExpr: Token list -> Result<Expr 
                                     (funcDef, remaining''))
                             | _ -> Error "Expected '=' after function return type")
                     | _ -> Error "Expected ':' after function parameters"))
+        | TAdjacentLParen :: _ ->
+            Error "Function parameters require whitespace before '('"
         | _ -> Error $"Expected '<' or '(' after function name '{name}'"
     | _ -> Error "Expected function declaration (let name(params) : type = body)"
 
@@ -1655,9 +1677,7 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
         | Var funcName -> Call (funcName, NonEmptyList.singleton argExpr)
         | Call (funcName, args) -> Call (funcName, NonEmptyList.snoc args argExpr)
         | TypeApp (funcName, typeArgs, args) ->
-            match NonEmptyList.toList args with
-            | [UnitLiteral] -> TypeApp (funcName, typeArgs, NonEmptyList.singleton argExpr)
-            | _ -> TypeApp (funcName, typeArgs, NonEmptyList.snoc args argExpr)
+            TypeApp (funcName, typeArgs, NonEmptyList.snoc args argExpr)
         | Constructor (typeName, variantName, None) -> Constructor (typeName, variantName, Some argExpr)
         | Constructor (typeName, variantName, Some (TupleLiteral existingFields)) ->
             Constructor (typeName, variantName, Some (TupleLiteral (existingFields @ [argExpr])))
@@ -1764,6 +1784,9 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
         match toks with
         | TSemicolon :: rest ->
             parseExpr rest
+        | TLet :: TIdent _ :: TAdjacentLParen :: _ ->
+            Error "Function parameters require whitespace before '('"
+
         | TLet :: TIdent firstName :: TLParen :: rest ->
             // Nested function declaration:
             // let name(args) : ReturnType = fnBody body
@@ -2143,12 +2166,13 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
         |> Result.bind (fun (expr, remaining) ->
             parsePostfix false expr remaining
             |> Result.bind (fun (postfixExpr, remaining', endsWithParenthesizedCall) ->
-                parseApplication postfixExpr remaining' (not endsWithParenthesizedCall)))
+                parseApplication postfixExpr remaining' (not endsWithParenthesizedCall) false))
 
     and parseApplication
         (callee: Expr)
         (toks: Token list)
         (mayStartNegativeNumericArg: bool)
+        (hasAppliedArgument: bool)
         : Result<Expr * Token list, string> =
         let negativeNumericArg =
             mayStartNegativeNumericArg
@@ -2171,21 +2195,16 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
             parseOneArg ()
             |> Result.bind (fun (argExpr, afterArg) ->
                 let applied =
-                    match toks, callee with
-                    | TLParen :: _, Var funcName ->
-                        Call (funcName, NonEmptyList.singleton argExpr)
-                    | TLParen :: _, TypeApp (_, _, existingArgs)
-                        when NonEmptyList.toList existingArgs = [UnitLiteral] ->
-                        appendCallArg callee argExpr
-                    | TLParen :: _, _ ->
-                        Apply (callee, NonEmptyList.singleton argExpr)
+                    match callee, hasAppliedArgument with
+                    | TypeApp (funcName, typeArgs, { Head = UnitLiteral; Tail = [] }), false ->
+                        TypeApp (funcName, typeArgs, NonEmptyList.singleton argExpr)
                     | _ ->
                         appendCallArg callee argExpr
                 let mayStartNextNegativeNumericArg =
                     match toks with
                     | TLParen :: _ -> false
                     | _ -> true
-                parseApplication applied afterArg mayStartNextNegativeNumericArg)
+                parseApplication applied afterArg mayStartNextNegativeNumericArg true)
         else
             Ok (callee, toks)
 
@@ -2382,7 +2401,7 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
         | TLParen :: TRParen :: rest ->
             // Unit literal: ()
             Ok (UnitLiteral, rest)
-        | TLParen :: rest ->
+        | (TLParen | TAdjacentLParen) :: rest ->
             // Could be parenthesized expression, tuple literal, or operator section
             // Check for operator section: (&&), (||), (+), (-), (*), (/), etc.
             let parsePipeOperatorSection
@@ -2635,86 +2654,28 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
             // Record field access
             let accessExpr = RecordAccess (expr, fieldName)
             parsePostfix false accessExpr rest
-        | TLParen :: rest ->
-            // Optional call syntax for interpreter compatibility:
-            // f(a, b), g(), (fun x -> x)(1)
-            // Keep existing `f (x)` behavior for single parenthesized args.
-            let rec hasTopLevelComma (depth: int) (ts: Token list) : bool =
-                match ts with
+        | TAdjacentLParen :: rest ->
+            let rec hasTopLevelComma depth remaining =
+                match remaining with
                 | [] -> false
                 | TComma :: _ when depth = 0 -> true
-                | TLParen :: more -> hasTopLevelComma (depth + 1) more
+                | (TLParen | TAdjacentLParen) :: tail -> hasTopLevelComma (depth + 1) tail
                 | TRParen :: _ when depth = 0 -> false
-                | TRParen :: more -> hasTopLevelComma (depth - 1) more
-                | _ :: more -> hasTopLevelComma depth more
-            let hasComma = hasTopLevelComma 0 rest
-            let shouldUseCallSyntax =
-                match rest with
-                | TRParen :: _ -> true
-                | _ ->
-                    // Constructors remain compatible with the established
-                    // parenthesized payload spelling (`Some(value)`). Regular
-                    // functions retain space application for a
-                    // single parenthesized argument.
-                    match expr with
-                    | Constructor _ -> true
-                    | _ -> hasComma
-            if shouldUseCallSyntax then
-                match expr with
-                | Var _ when not hasComma ->
-                    // Keep `f (x)` as application with a parenthesized argument.
-                    Ok (expr, toks, endsWithParenthesizedCall)
-                | _ ->
-                    parseCallArgs rest []
-                    |> Result.bind (fun (args, remaining) ->
-                        let appliedExpr =
-                            match expr with
-                            | Var funcName ->
-                                Call (funcName, args)
-                            | Call (funcName, existingArgs) ->
-                                Call (funcName, NonEmptyList.appendList existingArgs (NonEmptyList.toList args))
-                            | TypeApp (funcName, typeArgs, existingArgs) ->
-                                match NonEmptyList.toList existingArgs with
-                                | [UnitLiteral] ->
-                                    TypeApp (funcName, typeArgs, args)
-                                | _ ->
-                                    TypeApp (
-                                        funcName,
-                                        typeArgs,
-                                        NonEmptyList.appendList existingArgs (NonEmptyList.toList args)
-                                    )
-                            | Constructor (typeName, variantName, None) ->
-                                match NonEmptyList.toList args with
-                                | [singleArg] ->
-                                    Constructor (typeName, variantName, Some singleArg)
-                                | fields ->
-                                    Constructor (typeName, variantName, Some (TupleLiteral fields))
-                            | _ ->
-                                Apply (expr, args)
-                        parsePostfix true appliedExpr remaining)
-            else
-                Ok (expr, toks, endsWithParenthesizedCall)
-        | _ -> Ok (expr, toks, endsWithParenthesizedCall)
+                | TRParen :: tail -> hasTopLevelComma (depth - 1) tail
+                | _ :: tail -> hasTopLevelComma depth tail
 
-    and parseCallArgs (toks: Token list) (acc: Expr list) : Result<NonEmptyList<Expr> * Token list, string> =
-        match toks with
-        | TRParen :: rest ->
-            // End of argument list (including zero-arg calls).
-            let reversed = List.rev acc
-            let normalizedArgs =
-                match reversed with
-                | [] -> NonEmptyList.singleton UnitLiteral
-                | _ -> NonEmptyList.fromList reversed
-            Ok (normalizedArgs, rest)
-        | _ ->
-            parseExpr toks
-            |> Result.bind (fun (argExpr, remaining) ->
-                match remaining with
-                | TComma :: rest ->
-                    parseCallArgs rest (argExpr :: acc)
-                | TRParen :: rest ->
-                    Ok (NonEmptyList.fromList (List.rev (argExpr :: acc)), rest)
-                | _ -> Error "Expected ',' or ')' after function argument")
+            match rest with
+            | TRParen :: _ ->
+                Error "Parenthesized call syntax is not supported; use 'f ()'"
+            | _ when hasTopLevelComma 0 rest ->
+                Error "Parenthesized call syntax is not supported; use 'f a b'"
+            | _ ->
+                // Adjacency is immaterial for a single grouped argument.
+                Ok (expr, TLParen :: rest, endsWithParenthesizedCall)
+        | TLParen :: rest ->
+            // A spaced parenthesis is one grouped or tuple argument.
+            Ok (expr, toks, endsWithParenthesizedCall)
+        | _ -> Ok (expr, toks, endsWithParenthesizedCall)
 
     // Parse top-level elements (functions or expressions)
     let rec parseTopLevels
@@ -2752,6 +2713,9 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
         | TFunctionDeclaration :: _ ->
             Error "Legacy 'def' declarations are not supported; use 'let'"
 
+        | TLet :: TIdent _ :: TAdjacentLParen :: _ ->
+            Error "Function parameters require whitespace before '('"
+
         | TLet :: TIdent firstName :: TLParen :: rest ->
             // Top-level function definition:
             // let name(args) : ReturnType = body
@@ -2786,31 +2750,13 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
             // Parse expression
             parseExpr toks
             |> Result.bind (fun (expr, remaining) ->
-                // Support bare tuple syntax at top level: `1L, 2L, 3L`.
-                // Commas inside other contexts (calls/records/lists) are already
-                // consumed before we reach this point.
-                let rec parseTupleTail (tupleItemsRev: Expr list) (toks': Token list) : Result<Expr * Token list, string> =
-                    match toks' with
-                    | TComma :: rest ->
-                        parseExpr rest
-                        |> Result.bind (fun (nextExpr, remaining') ->
-                            parseTupleTail (nextExpr :: tupleItemsRev) remaining')
-                    | _ ->
-                        let finalExpr =
-                            match tupleItemsRev with
-                            | [] -> expr
-                            | _ -> TupleLiteral (expr :: List.rev tupleItemsRev)
-                        Ok (finalExpr, toks')
-
-                parseTupleTail [] remaining
-                |> Result.bind (fun (finalExpr, remaining') ->
-                    match remaining' with
+                match remaining with
                     | TEOF :: [] ->
                         // Single expression program
-                        Ok (NameSyntax.SourceDeclarations (NonEmptyList.fromList (List.rev (NameSyntax.SourceExpression finalExpr :: acc))))
+                        Ok (NameSyntax.SourceDeclarations (NonEmptyList.fromList (List.rev (NameSyntax.SourceExpression expr :: acc))))
                     | _ ->
                         // More top-level definitions after expression not allowed for now
-                        Error "Unexpected tokens after expression (only function definitions can be followed by more definitions)"))
+                        Error "Unexpected tokens after expression (only function definitions can be followed by more definitions)")
 
     parseTopLevels tokens []
 

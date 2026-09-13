@@ -6,28 +6,28 @@
 // FIXED: "let t = (a, b) in t" pattern now works
 // =====================================================
 
-let test(a: Int64) : (Int64, Int64) = let t = (a, a * 2L) in t
-let r = test(5L) in r.0 = 5L
+let test (a: Int64) : (Int64 * Int64) = let t = (a, a * 2L) in t
+let r = test (5L) in r.0 = 5L
 
-let makeNext(t: (Int64, Int64)) : (Int64, Int64) = let next = (t.0+1L, t.1+2L) in next
-let r2 = makeNext((0L, 0L)) in r2.0 = 1L
+let makeNext (t: (Int64 * Int64)) : (Int64 * Int64) = let next = (t.0+1L, t.1+2L) in next
+let r2 = makeNext ((0L, 0L)) in r2.0 = 1L
 
 // =====================================================
 // Direct tuple return without let binding
 // =====================================================
-let addToTupleDirect(t: (Int64, Int64)) : (Int64, Int64) = (t.0 + 1L, t.1 + 2L)
+let addToTupleDirect (t: (Int64 * Int64)) : (Int64 * Int64) = (t.0 + 1L, t.1 + 2L)
 
-let r3 = addToTupleDirect((5L, 10L)) in r3.0 + r3.1 = 18L
+let r3 = addToTupleDirect ((5L, 10L)) in r3.0 + r3.1 = 18L
 
-let r4 = addToTupleDirect((0L, 0L)) in r4.0 = 1L
+let r4 = addToTupleDirect ((0L, 0L)) in r4.0 = 1L
 
-let r5 = addToTupleDirect((0L, 0L)) in r5.1 = 2L
+let r5 = addToTupleDirect ((0L, 0L)) in r5.1 = 2L
 
 // =====================================================
 // Accessing tuple elements inside the function
 // =====================================================
-let getFirst(a: Int64) : Int64 = let t = (a, a * 2L) in t.0
-getFirst(5L) = 5L
+let getFirst (a: Int64) : Int64 = let t = (a, a * 2L) in t.0
+getFirst (5L) = 5L
 
-let getSecond(a: Int64) : Int64 = let t = (a, a * 2L) in t.1
-getSecond(5L) = 10L
+let getSecond (a: Int64) : Int64 = let t = (a, a * 2L) in t.1
+getSecond (5L) = 10L

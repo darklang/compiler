@@ -3,127 +3,127 @@
 
 module Stdlib.Cli.Path
 
-let stripTrailing(path: String) : String =
-    if Stdlib.String.__byteLength(path) > 1L && Stdlib.String.endsWith(path, "/") then
-        Stdlib.Cli.Path.stripTrailing(Stdlib.String.__byteTake(path, Stdlib.String.__byteLength(path) - 1L))
+let stripTrailing (path: String) : String =
+    if Stdlib.String.__byteLength (path) > 1L && Stdlib.String.endsWith (path) ("/") then
+        Stdlib.Cli.Path.stripTrailing (Stdlib.String.__byteTake (path) (Stdlib.String.__byteLength (path) - 1L))
     else path
 
-let __join(parts: List<String>, acc: String) : String =
+let __join (parts: List<String>) (acc: String) : String =
     match parts with
     | [] -> acc
     | part :: rest ->
         let next =
             if part == "" then acc
-            else if Stdlib.String.startsWith(part, "/") then part
+            else if Stdlib.String.startsWith (part) ("/") then part
             else if acc == "" then part
-            else Stdlib.Cli.Path.stripTrailing(acc) ++ "/" ++ part in
-        Stdlib.Cli.Path.__join(rest, next)
+            else Stdlib.Cli.Path.stripTrailing (acc) ++ "/" ++ part in
+        Stdlib.Cli.Path.__join (rest) (next)
 
-let join(parts: List<String>) : String =
-    Stdlib.Cli.Path.__join(parts, "")
+let join (parts: List<String>) : String =
+    Stdlib.Cli.Path.__join (parts) ("")
 
-let __lastSeparator(path: String, index: Int64, found: Int64) : Int64 =
-    if index >= Stdlib.String.__byteLength(path) then found
-    else if Stdlib.String.getByteAt(path, index) == 47L then
-        Stdlib.Cli.Path.__lastSeparator(path, index + 1L, index)
+let __lastSeparator (path: String) (index: Int64) (found: Int64) : Int64 =
+    if index >= Stdlib.String.__byteLength (path) then found
+    else if Stdlib.String.getByteAt (path) (index) == 47L then
+        Stdlib.Cli.Path.__lastSeparator (path) (index + 1L) (index)
     else
-        Stdlib.Cli.Path.__lastSeparator(path, index + 1L, found)
+        Stdlib.Cli.Path.__lastSeparator (path) (index + 1L) (found)
 
-let __lastDot(path: String, index: Int64, found: Int64) : Int64 =
-    if index >= Stdlib.String.__byteLength(path) then found
-    else if Stdlib.String.getByteAt(path, index) == 46L then
-        Stdlib.Cli.Path.__lastDot(path, index + 1L, index)
+let __lastDot (path: String) (index: Int64) (found: Int64) : Int64 =
+    if index >= Stdlib.String.__byteLength (path) then found
+    else if Stdlib.String.getByteAt (path) (index) == 46L then
+        Stdlib.Cli.Path.__lastDot (path) (index + 1L) (index)
     else
-        Stdlib.Cli.Path.__lastDot(path, index + 1L, found)
+        Stdlib.Cli.Path.__lastDot (path) (index + 1L) (found)
 
-let parent(path: String) : String =
-    let p = Stdlib.Cli.Path.stripTrailing(path) in
-    let separator = Stdlib.Cli.Path.__lastSeparator(p, 0L, -1L) in
+let parent (path: String) : String =
+    let p = Stdlib.Cli.Path.stripTrailing (path) in
+    let separator = Stdlib.Cli.Path.__lastSeparator (p) (0L) (-1L) in
     if separator == 0L then "/"
-    else if separator > 0L then Stdlib.String.__byteSlice(p, 0L, separator)
+    else if separator > 0L then Stdlib.String.__byteSlice (p) (0L) (separator)
     else "."
 
-let basename(path: String) : String =
-    let p = Stdlib.Cli.Path.stripTrailing(path) in
-    let separator = Stdlib.Cli.Path.__lastSeparator(p, 0L, -1L) in
-    if separator >= 0L then Stdlib.String.__byteDrop(p, separator + 1L)
+let basename (path: String) : String =
+    let p = Stdlib.Cli.Path.stripTrailing (path) in
+    let separator = Stdlib.Cli.Path.__lastSeparator (p) (0L) (-1L) in
+    if separator >= 0L then Stdlib.String.__byteDrop (p) (separator + 1L)
     else p
 
-let extension(path: String) : Stdlib.Option.Option<String> =
-    let name = Stdlib.Cli.Path.basename(path) in
-    let dot = Stdlib.Cli.Path.__lastDot(name, 0L, -1L) in
-    if dot > 0L then Some(Stdlib.String.__byteDrop(name, dot)) else None
+let extension (path: String) : Stdlib.Option.Option<String> =
+    let name = Stdlib.Cli.Path.basename (path) in
+    let dot = Stdlib.Cli.Path.__lastDot (name) (0L) (-1L) in
+    if dot > 0L then Some (Stdlib.String.__byteDrop (name) (dot)) else None
 
-let withExtension(path: String, extension: String) : String =
-    let dir = Stdlib.Cli.Path.parent(path) in
-    let name = Stdlib.Cli.Path.basename(path) in
-    let dot = Stdlib.Cli.Path.__lastDot(name, 0L, -1L) in
-    let stem = if dot > 0L then Stdlib.String.__byteSlice(name, 0L, dot) else name in
+let withExtension (path: String) (extension: String) : String =
+    let dir = Stdlib.Cli.Path.parent (path) in
+    let name = Stdlib.Cli.Path.basename (path) in
+    let dot = Stdlib.Cli.Path.__lastDot (name) (0L) (-1L) in
+    let stem = if dot > 0L then Stdlib.String.__byteSlice (name) (0L) (dot) else name in
     let newName = stem ++ extension in
-    if dir == "." then newName else Stdlib.Cli.Path.join([dir, newName])
+    if dir == "." then newName else Stdlib.Cli.Path.join ([dir, newName])
 
-let isAbsolute(path: String) : Bool =
-    Stdlib.String.startsWith(path, "/")
+let isAbsolute (path: String) : Bool =
+    Stdlib.String.startsWith (path) ("/")
 
-let __normalizeParts(parts: List<String>, absolute: Bool, acc: List<String>) : List<String> =
+let __normalizeParts (parts: List<String>) (absolute: Bool) (acc: List<String>) : List<String> =
     match parts with
     | [] -> acc
     | part :: rest ->
         if part == "" || part == "." then
-            Stdlib.Cli.Path.__normalizeParts(rest, absolute, acc)
+            Stdlib.Cli.Path.__normalizeParts (rest) (absolute) (acc)
         else if part == ".." then
-            match Stdlib.List.last<String>(acc) with
-            | Some(previous) ->
+            match Stdlib.List.last<String> (acc) with
+            | Some (previous) ->
                 if previous == ".." then
-                    Stdlib.Cli.Path.__normalizeParts(rest, absolute, Stdlib.List.append<String>(acc, [".."]))
+                    Stdlib.Cli.Path.__normalizeParts (rest) (absolute) (Stdlib.List.append<String> (acc) ([".."]))
                 else
-                    Stdlib.Cli.Path.__normalizeParts(rest, absolute, Stdlib.List.dropLast<String>(acc))
+                    Stdlib.Cli.Path.__normalizeParts (rest) (absolute) (Stdlib.List.dropLast<String> (acc))
             | None ->
-                if absolute then Stdlib.Cli.Path.__normalizeParts(rest, absolute, [])
-                else Stdlib.Cli.Path.__normalizeParts(rest, absolute, [".."])
+                if absolute then Stdlib.Cli.Path.__normalizeParts (rest) (absolute) ([])
+                else Stdlib.Cli.Path.__normalizeParts (rest) (absolute) ([".."])
         else
-            Stdlib.Cli.Path.__normalizeParts(rest, absolute, Stdlib.List.append<String>(acc, [part]))
+            Stdlib.Cli.Path.__normalizeParts (rest) (absolute) (Stdlib.List.append<String> (acc) ([part]))
 
-let normalize(path: String) : String =
-    let absolute = Stdlib.Cli.Path.isAbsolute(path) in
-    let parts = Stdlib.Cli.Path.__normalizeParts(Stdlib.String.split(path, "/"), absolute, []) in
-    let joined = Stdlib.String.join(parts, "/") in
+let normalize (path: String) : String =
+    let absolute = Stdlib.Cli.Path.isAbsolute (path) in
+    let parts = Stdlib.Cli.Path.__normalizeParts (Stdlib.String.split (path) ("/")) (absolute) ([]) in
+    let joined = Stdlib.String.join (parts) ("/") in
     if absolute then "/" ++ joined else if joined == "" then "." else joined
 
 // Absolute paths do not consult process state. Relative-path resolution is
 // implemented by the native POSIX layer added with the remaining CLI effects.
-let resolve(path: String) : Stdlib.Result.Result<String, Stdlib.Cli.Posix.Error> =
-    if Stdlib.Cli.Path.isAbsolute(path) then Ok(Stdlib.Cli.Path.normalize(path))
-    else Error(Stdlib.Cli.Posix.Error { errno = -1I, message = "getcwd is unavailable" })
+let resolve (path: String) : Stdlib.Result.Result<String, Stdlib.Cli.Posix.Error> =
+    if Stdlib.Cli.Path.isAbsolute (path) then Ok (Stdlib.Cli.Path.normalize (path))
+    else Error (Stdlib.Cli.Posix.Error { errno = -1, message = "getcwd is unavailable" })
 
-let resolveToAbsolute(path: String) : Stdlib.Result.Result<String, Stdlib.Cli.Posix.Error> =
-    Stdlib.Cli.Path.resolve(path)
+let resolveToAbsolute (path: String) : Stdlib.Result.Result<String, Stdlib.Cli.Posix.Error> =
+    Stdlib.Cli.Path.resolve (path)
 
-let __commonPrefixLength(left: List<String>, right: List<String>, count: Int) : Int =
+let __commonPrefixLength (left: List<String>) (right: List<String>) (count: Int) : Int =
     match (left, right) with
     | (leftHead :: leftTail, rightHead :: rightTail) ->
-        if leftHead == rightHead then Stdlib.Cli.Path.__commonPrefixLength(leftTail, rightTail, count + 1I)
+        if leftHead == rightHead then Stdlib.Cli.Path.__commonPrefixLength (leftTail) (rightTail) (count + 1)
         else count
     | _ -> count
 
-let __nonEmpty(parts: List<String>) : List<String> =
+let __nonEmpty (parts: List<String>) : List<String> =
     match parts with
     | [] -> []
     | part :: rest ->
-        if part == "" then Stdlib.Cli.Path.__nonEmpty(rest)
-        else Stdlib.List.push<String>(Stdlib.Cli.Path.__nonEmpty(rest), part)
+        if part == "" then Stdlib.Cli.Path.__nonEmpty (rest)
+        else Stdlib.List.push<String> (Stdlib.Cli.Path.__nonEmpty (rest)) (part)
 
-let relativeTo(fromPath: String, toPath: String) : Stdlib.Result.Result<String, Stdlib.Cli.Posix.Error> =
-    match (Stdlib.Cli.Path.resolveToAbsolute(fromPath), Stdlib.Cli.Path.resolveToAbsolute(toPath)) with
-    | (Ok(absFrom), Ok(absTo)) ->
-        let fromParts = Stdlib.Cli.Path.__nonEmpty(Stdlib.String.split(absFrom, "/")) in
-        let toParts = Stdlib.Cli.Path.__nonEmpty(Stdlib.String.split(absTo, "/")) in
-        let commonLength = Stdlib.Cli.Path.__commonPrefixLength(fromParts, toParts, 0I) in
-        let upCount = Stdlib.List.length<String>(fromParts) - commonLength in
-        let ups = Stdlib.List.repeatUnsafe<String>(upCount, "..") in
-        let tail = Stdlib.List.drop<String>(toParts, commonLength) in
-        let parts = Stdlib.List.append<String>(ups, tail) in
-        if Stdlib.List.length<String>(parts) == 0I then Ok(".")
-        else Ok(Stdlib.String.join(parts, "/"))
-    | (Error(error), _) -> Error(error)
-    | (_, Error(error)) -> Error(error)
+let relativeTo (fromPath: String) (toPath: String) : Stdlib.Result.Result<String, Stdlib.Cli.Posix.Error> =
+    match (Stdlib.Cli.Path.resolveToAbsolute (fromPath), Stdlib.Cli.Path.resolveToAbsolute (toPath)) with
+    | (Ok (absFrom), Ok (absTo)) ->
+        let fromParts = Stdlib.Cli.Path.__nonEmpty (Stdlib.String.split (absFrom) ("/")) in
+        let toParts = Stdlib.Cli.Path.__nonEmpty (Stdlib.String.split (absTo) ("/")) in
+        let commonLength = Stdlib.Cli.Path.__commonPrefixLength (fromParts) (toParts) (0) in
+        let upCount = Stdlib.List.length<String> (fromParts) - commonLength in
+        let ups = Stdlib.List.repeatUnsafe<String> (upCount) ("..") in
+        let tail = Stdlib.List.drop<String> (toParts) (commonLength) in
+        let parts = Stdlib.List.append<String> (ups) (tail) in
+        if Stdlib.List.length<String> (parts) == 0 then Ok (".")
+        else Ok (Stdlib.String.join (parts) ("/"))
+    | (Error (error), _) -> Error (error)
+    | (_, Error (error)) -> Error (error)

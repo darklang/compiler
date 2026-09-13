@@ -4,84 +4,69 @@
 
 type DiffResult = { distance: Int64, work: Int64 }
 
-let diagonalKey(value: Int64) : String = Stdlib.Int64.toString(value)
+let diagonalKey (value: Int64) : String = Stdlib.Int64.toString (value)
 
-let frontierGet(frontier: Dict<Int64>, diagonal: Int64) : Int64 =
-    match Stdlib.Dict.get<Int64>(frontier, diagonalKey(diagonal)) with
-    | Some(value) -> value
-    | None -> Builtin.testRuntimeError("missing Myers frontier diagonal " ++ diagonalKey(diagonal))
+let frontierGet (frontier: Dict<Int64>) (diagonal: Int64) : Int64 =
+    match Stdlib.Dict.get<Int64> (frontier) (diagonalKey (diagonal)) with
+    | Some (value) -> value
+    | None -> Builtin.testRuntimeError ("missing Myers frontier diagonal " ++ diagonalKey (diagonal))
 
-let snake(left: String, right: String, leftLength: Int64, rightLength: Int64, x: Int64, y: Int64) : (Int64 * Int64) =
-    if x < leftLength && y < rightLength && Stdlib.String.getByteAt(left, x) == Stdlib.String.getByteAt(right, y) then
-        snake(left, right, leftLength, rightLength, x + 1L, y + 1L)
+let snake (left: String) (right: String) (leftLength: Int64) (rightLength: Int64) (x: Int64) (y: Int64) : (Int64 * Int64) =
+    if x < leftLength && y < rightLength && Stdlib.String.getByteAt (left) (x) == Stdlib.String.getByteAt (right) (y) then
+        snake (left) (right) (leftLength) (rightLength) (x + 1L) (y + 1L)
     else (x, y)
 
-let search(
-    leftText: String,
-    rightText: String,
-    d: Int64,
-    k: Int64,
-    previous: Dict<Int64>,
-    current: Dict<Int64>,
-    outcome: (Bool * Int64)
-) : DiffResult =
+let search (leftText: String) (rightText: String) (d: Int64) (k: Int64) (previous: Dict<Int64>) (current: Dict<Int64>) (outcome: (Bool * Int64)) : DiffResult =
     if k > d then
         if outcome.0 then DiffResult { distance = d, work = outcome.1 }
-        else if d >= Stdlib.String.codepointLength(leftText) + Stdlib.String.codepointLength(rightText) then
-            Builtin.testRuntimeError("Myers search exceeded maximum edit distance")
-        else search(leftText, rightText, d + 1L, -(d + 1L), current, Stdlib.Dict.empty, (false, outcome.1))
+        else if d >= Stdlib.String.codepointLength (leftText) + Stdlib.String.codepointLength (rightText) then
+            Builtin.testRuntimeError ("Myers search exceeded maximum edit distance")
+        else search (leftText) (rightText) (d + 1L) (-(d + 1L)) (current) (Stdlib.Dict.empty) ((false, outcome.1))
     else
-        let leftLength = Stdlib.String.codepointLength(leftText) in
-        let rightLength = Stdlib.String.codepointLength(rightText) in
+        let leftLength = Stdlib.String.codepointLength (leftText) in
+        let rightLength = Stdlib.String.codepointLength (rightText) in
         let choice =
-            if k == -d then frontierGet(previous, k + 1L)
-            else if k == d then frontierGet(previous, k - 1L) + 1L
+            if k == -d then frontierGet (previous) (k + 1L)
+            else if k == d then frontierGet (previous) (k - 1L) + 1L
             else
-                let previousLeft = frontierGet(previous, k - 1L) in
-                let previousRight = frontierGet(previous, k + 1L) in
+                let previousLeft = frontierGet (previous) (k - 1L) in
+                let previousRight = frontierGet (previous) (k + 1L) in
                 if previousLeft < previousRight then previousRight else previousLeft + 1L in
-        let endpoint = snake(leftText, rightText, leftLength, rightLength, choice, choice - k) in
-        let next = Stdlib.Dict.setOverridingDuplicates<Int64>(current, diagonalKey(k), endpoint.0) in
+        let endpoint = snake (leftText) (rightText) (leftLength) (rightLength) (choice) (choice - k) in
+        let next = Stdlib.Dict.setOverridingDuplicates<Int64> (current) (diagonalKey (k)) (endpoint.0) in
         let nextWork = (outcome.1 + (endpoint.0 + 1L) * (endpoint.1 + 3L) + (k + d + 1L) * 17L) % 1000000007L in
-        search(
-            leftText,
-            rightText,
-            d,
-            k + 2L,
-            previous,
-            next,
-            (outcome.0 || (endpoint.0 >= leftLength && endpoint.1 >= rightLength), nextWork))
+        search (leftText) (rightText) (d) (k + 2L) (previous) (next) ((outcome.0 || (endpoint.0 >= leftLength && endpoint.1 >= rightLength), nextWork))
 
-let myers(leftText: String, rightText: String) : DiffResult =
-    let leftLength = Stdlib.String.codepointLength(leftText) in
-    let rightLength = Stdlib.String.codepointLength(rightText) in
-    let start = snake(leftText, rightText, leftLength, rightLength, 0L, 0L) in
+let myers (leftText: String) (rightText: String) : DiffResult =
+    let leftLength = Stdlib.String.codepointLength (leftText) in
+    let rightLength = Stdlib.String.codepointLength (rightText) in
+    let start = snake (leftText) (rightText) (leftLength) (rightLength) (0L) (0L) in
     let initialWork = (start.0 + 1L) * (start.1 + 3L) in
     if start.0 >= leftLength && start.1 >= rightLength then DiffResult { distance = 0L, work = initialWork }
     else
-        let frontier = Stdlib.Dict.setOverridingDuplicates<Int64>(Stdlib.Dict.empty, diagonalKey(0L), start.0) in
-        search(leftText, rightText, 1L, -1L, frontier, Stdlib.Dict.empty, (false, initialWork))
+        let frontier = Stdlib.Dict.setOverridingDuplicates<Int64> (Stdlib.Dict.empty) (diagonalKey (0L)) (start.0) in
+        search (leftText) (rightText) (1L) (-1L) (frontier) (Stdlib.Dict.empty) ((false, initialWork))
 
-let run(remaining: Int64, leftText: String, rightText: String, result: Int64) : Int64 =
+let run (remaining: Int64) (leftText: String) (rightText: String) (result: Int64) : Int64 =
     if remaining <= 0L then result
     else
-        let diff = myers(leftText, rightText) in
-        run(remaining - 1L, leftText, rightText, (result + diff.distance * 1000003L + diff.work) % 1000000007L)
+        let diff = myers (leftText) (rightText) in
+        run (remaining - 1L) (leftText) (rightText) ((result + diff.distance * 1000003L + diff.work) % 1000000007L)
 
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-let blocks = benchmarkArg(0I) in
-let insertions = benchmarkArg(1I) in
-let repetitions = benchmarkArg(2I) in
-if blocks <= 0L || insertions <= 0L || repetitions <= 0L then Builtin.testRuntimeError("Myers workload arguments must be positive")
+let blocks = benchmarkArg (0) in
+let insertions = benchmarkArg (1) in
+let repetitions = benchmarkArg (2) in
+if blocks <= 0L || insertions <= 0L || repetitions <= 0L then Builtin.testRuntimeError ("Myers workload arguments must be positive")
 else
     let unit = "darklang compiler benchmark: persistent values and recursive paths.\n" in
-    let prefix = Stdlib.String.repeat(unit, Stdlib.Int.fromInt64(blocks)) in
-    let suffix = Stdlib.String.repeat(unit, Stdlib.Int.fromInt64(blocks + 1L)) in
-    let insertion = Stdlib.String.repeat("<changed-block>", Stdlib.Int.fromInt64(insertions)) in
+    let prefix = Stdlib.String.repeat (unit) (Stdlib.Int.fromInt64 (blocks)) in
+    let suffix = Stdlib.String.repeat (unit) (Stdlib.Int.fromInt64 (blocks + 1L)) in
+    let insertion = Stdlib.String.repeat ("<changed-block>") (Stdlib.Int.fromInt64 (insertions)) in
     let leftText = prefix ++ suffix in
     let rightText = prefix ++ insertion ++ suffix in
-    Builtin.printLine(Stdlib.Int64.toString(run(repetitions, leftText, rightText, 0L)))
+    Builtin.printLine (Stdlib.Int64.toString (run (repetitions) (leftText) (rightText) (0L)))

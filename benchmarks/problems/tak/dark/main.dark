@@ -4,18 +4,18 @@
 // The Takeuchi function creates deeply nested recursive calls.
 // tak(24, 16, 8) makes millions of calls.
 
-let tak(x: Int64, y: Int64, z: Int64) : Int64 =
+let tak (x: Int64) (y: Int64) (z: Int64) : Int64 =
     if x <= y then z
-    else tak(tak(x - 1L, y, z), tak(y - 1L, z, x), tak(z - 1L, x, y))
+    else tak (tak (x - 1L) (y) (z)) (tak (y - 1L) (z) (x)) (tak (z - 1L) (x) (y))
 
 // Repeat multiple times for meaningful measurement
-let repeat(n: Int64, x: Int64, y: Int64, z: Int64, acc: Int64) : Int64 =
+let repeat (n: Int64) (x: Int64) (y: Int64) (z: Int64) (acc: Int64) : Int64 =
     if n <= 0L then acc
-    else repeat(n - 1L, x, y, z, tak(x, y, z))
+    else repeat (n - 1L) (x) (y) (z) (tak (x) (y) (z))
 
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-Builtin.printLine(Stdlib.Int64.toString(repeat(benchmarkArg(0I), benchmarkArg(1I), benchmarkArg(2I), benchmarkArg(3I), 0L)))
+Builtin.printLine (Stdlib.Int64.toString (repeat (benchmarkArg (0)) (benchmarkArg (1)) (benchmarkArg (2)) (benchmarkArg (3)) (0L)))

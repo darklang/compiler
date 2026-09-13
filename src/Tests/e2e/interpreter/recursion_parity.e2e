@@ -5,14 +5,14 @@
 // 04fbe9dcc995c6188757d583e273cbd30a3e2d3d.
 
 // Canonical top-level self recursion and two-/three-member dependency groups.
-let parityFactorial(n: Int64) : Int64 = if n <= 1L then 1L else n * parityFactorial(n - 1L)
+let parityFactorial (n: Int64) : Int64 = if n <= 1L then 1L else n * parityFactorial (n - 1L)
 
-let parityEven(n: Int64) : Bool = if n == 0L then true else parityOdd(n - 1L)
-let parityOdd(n: Int64) : Bool = if n == 0L then false else parityEven(n - 1L)
+let parityEven (n: Int64) : Bool = if n == 0L then true else parityOdd (n - 1L)
+let parityOdd (n: Int64) : Bool = if n == 0L then false else parityEven (n - 1L)
 
-let parityFirst(n: Int64) : Int64 = if n == 0L then 1L else paritySecond(n - 1L)
-let paritySecond(n: Int64) : Int64 = if n == 0L then 2L else parityThird(n - 1L)
-let parityThird(n: Int64) : Int64 = if n == 0L then 3L else parityFirst(n - 1L)
+let parityFirst (n: Int64) : Int64 = if n == 0L then 1L else paritySecond (n - 1L)
+let paritySecond (n: Int64) : Int64 = if n == 0L then 2L else parityThird (n - 1L)
+let parityThird (n: Int64) : Int64 = if n == 0L then 3L else parityFirst (n - 1L)
 
 parityFactorial 5L = 120L
 parityEven 8L = true
@@ -50,15 +50,15 @@ parityFirst 3L = 1L
 
 // A source package function with the same visible name makes nested self
 // selection ambiguous instead of choosing by spelling.
-let collidingSumDown(x: Int64) : Int64 = x + 100L
+let collidingSumDown (x: Int64) : Int64 = x + 100L
 
 ((let collidingSumDown (n: Int64) : Int64 =
    if n <= 0L then 0L else n + (collidingSumDown (n - 1L)) in
  collidingSumDown 3L)) = error="Nested function name 'collidingSumDown' is ambiguous"
 
 // A completed top-level group may be referenced from a later independent group.
-let completedDouble(x: Int64) : Int64 = x * 2L
-let laterQuadruple(x: Int64) : Int64 = (completedDouble x) * 2L
+let completedDouble (x: Int64) : Int64 = x * 2L
+let laterQuadruple (x: Int64) : Int64 = (completedDouble x) * 2L
 
 laterQuadruple 3L = 12L
 

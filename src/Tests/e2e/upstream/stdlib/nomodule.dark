@@ -282,8 +282,8 @@ module Equals =
   (Stdlib.Option.Option.None != Stdlib.Option.Option.Some Stdlib.Option.Option.None) = true
   (Stdlib.Option.Option.Some 5L == Stdlib.Option.Option.Some 5L) = true
   (Stdlib.Option.Option.Some 5L != Stdlib.Option.Option.Some 6L) = true
-  (Stdlib.Option.Option.Some(Stdlib.Option.Option.Some 0L) != Stdlib.Option.Option.Some(Stdlib.Option.Option.Some 1L)) = true
-  (Stdlib.Option.Option.Some(Stdlib.Option.Option.Some 0L) == Stdlib.Option.Option.Some(Stdlib.Option.Option.Some 0L)) = true
+  (Stdlib.Option.Option.Some (Stdlib.Option.Option.Some 0L) != Stdlib.Option.Option.Some (Stdlib.Option.Option.Some 1L)) = true
+  (Stdlib.Option.Option.Some (Stdlib.Option.Option.Some 0L) == Stdlib.Option.Option.Some (Stdlib.Option.Option.Some 0L)) = true
 
   (Stdlib.Result.Result.Error 0L == Stdlib.Result.Result.Error 0L) = true
   (Stdlib.Result.Result.Ok 0L == Stdlib.Result.Result.Ok 0L) = true

@@ -47,9 +47,9 @@ module Polymorphism =
   (MyRecord { col1 = (); col2 = 1L }).col2 = 1L
 
   (MyRecord
-    { col1 = Stdlib.Option.Option.Some(Stdlib.Result.Result.Ok 1L)
+    { col1 = Stdlib.Option.Option.Some (Stdlib.Result.Result.Ok 1L)
       col2 = 1L })
-    .col1 = Stdlib.Option.Option.Some(Stdlib.Result.Result.Ok 1L)
+    .col1 = Stdlib.Option.Option.Some (Stdlib.Result.Result.Ok 1L)
 
 
 module Nested =

@@ -7,14 +7,14 @@ ownership_transfer_non_recursive_record
 type OwnedInnerRecord = { value: Int64 }
 type OwnedOuterRecord = { inner: OwnedInnerRecord }
 
-let makeOwnedInner(value: Int64) : OwnedInnerRecord =
+let makeOwnedInner (value: Int64) : OwnedInnerRecord =
     if value <= 0L then OwnedInnerRecord { value = 0L }
-    else makeOwnedInner(value - 1L)
+    else makeOwnedInner (value - 1L)
 
-let wrapOwnedInner(value: Int64) : OwnedOuterRecord =
-    OwnedOuterRecord { inner = makeOwnedInner(value) }
+let wrapOwnedInner (value: Int64) : OwnedOuterRecord =
+    OwnedOuterRecord { inner = makeOwnedInner (value) }
 
-wrapOwnedInner(1L)
+wrapOwnedInner (1L)
 ---EXPECTED---
 makeOwnedInner:
   StackSize: 0
@@ -65,15 +65,15 @@ _start:
 ---NAME---
 ownership_transfer_nested_record_suffix
 ---INPUT---
-type TransferTree = TransferLeaf of Int64 | TransferNode of (TransferTree, TransferTree)
-type TransferEnvelope = { pair: (TransferTree, TransferTree) }
+type TransferTree = TransferLeaf of Int64 | TransferNode of (TransferTree * TransferTree)
+type TransferEnvelope = { pair: (TransferTree * TransferTree) }
 
-let makeTransferChild(depth: Int64) : TransferTree =
-    if depth <= 0L then TransferLeaf(1L)
-    else makeTransferChild(depth - 1L)
+let makeTransferChild (depth: Int64) : TransferTree =
+    if depth <= 0L then TransferLeaf (1L)
+    else makeTransferChild (depth - 1L)
 
-let makeTransferEnvelope(depth: Int64) : TransferEnvelope =
-    TransferEnvelope { pair = (makeTransferChild(depth), makeTransferChild(depth + 1L)) }
+let makeTransferEnvelope (depth: Int64) : TransferEnvelope =
+    TransferEnvelope { pair = (makeTransferChild (depth), makeTransferChild (depth + 1L)) }
 ---EXPECTED---
 makeTransferChild:
   StackSize: 0
@@ -120,14 +120,14 @@ makeTransferEnvelope:
 ---NAME---
 ownership_transfer_duplicate_child_reuses_owned_edge
 ---INPUT---
-type DuplicateTransferTree = DuplicateTransferLeaf of Int64 | DuplicateTransferNode of (DuplicateTransferTree, DuplicateTransferTree)
+type DuplicateTransferTree = DuplicateTransferLeaf of Int64 | DuplicateTransferNode of (DuplicateTransferTree * DuplicateTransferTree)
 
-let makeDuplicateTransferChild(depth: Int64) : DuplicateTransferTree =
-    if depth <= 0L then DuplicateTransferLeaf(1L)
-    else makeDuplicateTransferChild(depth - 1L)
+let makeDuplicateTransferChild (depth: Int64) : DuplicateTransferTree =
+    if depth <= 0L then DuplicateTransferLeaf (1L)
+    else makeDuplicateTransferChild (depth - 1L)
 
-let makeDuplicateTransferPair(depth: Int64) : (DuplicateTransferTree, DuplicateTransferTree) =
-    let child = makeDuplicateTransferChild(depth) in
+let makeDuplicateTransferPair (depth: Int64) : (DuplicateTransferTree * DuplicateTransferTree) =
+    let child = makeDuplicateTransferChild (depth) in
     (child, child)
 ---EXPECTED---
 makeDuplicateTransferChild:
@@ -168,14 +168,14 @@ makeDuplicateTransferPair:
 ---NAME---
 ownership_transfer_retains_cross_level_reuse
 ---INPUT---
-type ReusedTransferTree = ReusedTransferLeaf of Int64 | ReusedTransferNode of (ReusedTransferTree, ReusedTransferTree)
+type ReusedTransferTree = ReusedTransferLeaf of Int64 | ReusedTransferNode of (ReusedTransferTree * ReusedTransferTree)
 
-let makeReusedTransferChild(depth: Int64) : ReusedTransferTree =
-    if depth <= 0L then ReusedTransferLeaf(1L)
-    else makeReusedTransferChild(depth - 1L)
+let makeReusedTransferChild (depth: Int64) : ReusedTransferTree =
+    if depth <= 0L then ReusedTransferLeaf (1L)
+    else makeReusedTransferChild (depth - 1L)
 
-let makeReusedTransferNested(depth: Int64) : ((ReusedTransferTree, Int64), ReusedTransferTree) =
-    let child = makeReusedTransferChild(depth) in
+let makeReusedTransferNested (depth: Int64) : ((ReusedTransferTree * Int64) * ReusedTransferTree) =
+    let child = makeReusedTransferChild (depth) in
     let inner = (child, 1L) in
     (inner, child)
 ---EXPECTED---
@@ -220,9 +220,9 @@ makeReusedTransferNested:
 ---NAME---
 counted_loop_unroll_by_two_generated_code
 ---INPUT---
-let loop(i: Int64, limit: Int64, sum: Float, sign: Float) : Float =
+let loop (i: Int64) (limit: Int64) (sum: Float) (sign: Float) : Float =
     if i >= limit then sum
-    else loop(i + 1L, limit, sum + sign, Stdlib.Float.negate(sign))
+    else loop (i + 1L) (limit) (sum + sign) (Stdlib.Float.negate (sign))
 ---EXPECTED---
 loop:
   StackSize: 0
@@ -261,7 +261,7 @@ loop:
 
 direct_integer_negation
 ---INPUT---
-let negate(value: Int64) : Int64 =
+let negate (value: Int64) : Int64 =
     0L - value
 ---EXPECTED---
 negate:
@@ -275,7 +275,7 @@ negate:
 ---NAME---
 positive_constant_modulo_skips_dynamic_sign_checks
 ---INPUT---
-let reduce(value: Int64) : Int64 =
+let reduce (value: Int64) : Int64 =
     value % 10L
 ---EXPECTED---
 reduce:
@@ -294,7 +294,7 @@ reduce:
 ---NAME---
 retarget_dead_float_arithmetic_move
 ---INPUT---
-let add(left: Float, right: Float) : Float =
+let add (left: Float) (right: Float) : Float =
     left + right
 ---EXPECTED---
 add:
@@ -307,9 +307,9 @@ add:
 ---NAME---
 retarget_dead_float_add_across_independent_move
 ---INPUT---
-let sum(n: Int64, acc: Float) : Float =
+let sum (n: Int64) (acc: Float) : Float =
     if n == 0L then acc
-    else sum(n - 1L, acc + 1.5)
+    else sum (n - 1L) (acc + 1.5)
 ---EXPECTED---
 sum:
   StackSize: 0
@@ -333,10 +333,10 @@ sum:
 ---NAME---
 licm_hoist_loop_constant
 ---INPUT---
-let collatzSteps(n: Int64, steps: Int64) : Int64 =
+let collatzSteps (n: Int64) (steps: Int64) : Int64 =
     if n == 1L then steps
-    else if n % 2L == 0L then collatzSteps(n / 2L, steps + 1L)
-    else collatzSteps(3L * n + 1L, steps + 1L)
+    else if n % 2L == 0L then collatzSteps (n / 2L) (steps + 1L)
+    else collatzSteps (3L * n + 1L) (steps + 1L)
 ---EXPECTED---
 collatzSteps:
   StackSize: 0
@@ -372,9 +372,9 @@ collatzSteps:
 ---NAME---
 licm_hoist_loop_float_constant
 ---INPUT---
-let sum(n: Int64, acc: Float) : Float =
+let sum (n: Int64) (acc: Float) : Float =
     if n == 0L then acc
-    else sum(n - 1L, acc + 1.5)
+    else sum (n - 1L) (acc + 1.5)
 ---EXPECTED---
 sum:
   StackSize: 0
@@ -398,7 +398,7 @@ sum:
 ---NAME---
 licm_skip_loop_with_call
 ---INPUT---
-let helper(x: Int64) : Int64 =
+let helper (x: Int64) : Int64 =
     let a0 = x + 1L in
     let a1 = a0 + 1L in
     let a2 = a1 + 1L in
@@ -426,9 +426,9 @@ let helper(x: Int64) : Int64 =
     let a24 = a23 + 1L in
     a24
 
-let loop(n: Int64, acc: Int64) : Int64 =
+let loop (n: Int64) (acc: Int64) : Int64 =
     if n == 0L then acc
-    else loop(n - 1L, helper(3L * acc))
+    else loop (n - 1L) (helper (3L * acc))
 ---EXPECTED---
 helper:
   StackSize: 0
@@ -466,7 +466,7 @@ loop:
 ---NAME---
 fuse_multiply_subtract
 ---INPUT---
-let multiplySubtract(minuend: Int64, left: Int64, right: Int64) : Int64 =
+let multiplySubtract (minuend: Int64) (left: Int64) (right: Int64) : Int64 =
     minuend - (left * right)
 ---EXPECTED---
 multiplySubtract:
@@ -484,16 +484,16 @@ type ExhaustiveChoice = First | Second of Int64 | Third
 
 type PartialChoice = FirstPartial | SecondPartial of Int64
 
-let choose(value: ExhaustiveChoice) : Int64 =
+let choose (value: ExhaustiveChoice) : Int64 =
     match value with
     | First -> 1L
-    | Second(n) -> n
+    | Second (n) -> n
     | Third -> 3L
 
-let choosePartial(value: PartialChoice) : Int64 =
+let choosePartial (value: PartialChoice) : Int64 =
     match value with
     | FirstPartial -> 1L
-    | SecondPartial(n) -> n
+    | SecondPartial (n) -> n
 ---EXPECTED---
 choose:
   StackSize: 0
@@ -531,9 +531,9 @@ choosePartial:
 ---NAME---
 closure_devirtualization_capture_free_generated_code
 ---INPUT---
-let applyOnce(value: Int64) : Int64 =
+let applyOnce (value: Int64) : Int64 =
   let increment = fun x -> x + 1L in
-  increment(value)
+  increment (value)
 ---EXPECTED---
 __closure_0:
   StackSize: 0
@@ -555,9 +555,9 @@ applyOnce:
 ---NAME---
 closure_devirtualization_captured_generated_code
 ---INPUT---
-let addOffset(value: Int64, offset: Int64) : Int64 =
+let addOffset (value: Int64) (offset: Int64) : Int64 =
   let add = fun x -> x + offset in
-  add(value)
+  add (value)
 ---EXPECTED---
 __closure_0:
   StackSize: 0
@@ -589,7 +589,7 @@ addOffset:
 ---NAME---
 closure_devirtualization_preserves_escaping_generated_code
 ---INPUT---
-let makeIncrement() : (Int64) -> Int64 =
+let makeIncrement () : (Int64) -> Int64 =
   let increment = fun x -> x + 1L in
   increment
 ---EXPECTED---
@@ -621,10 +621,10 @@ makeIncrement:
 ---NAME---
 closure_devirtualization_reuses_local_generated_code
 ---INPUT---
-let applyTwice(value: Int64) : Int64 =
+let applyTwice (value: Int64) : Int64 =
   let increment = fun x -> x + 1L in
-  let once = increment(value) in
-  increment(once)
+  let once = increment (value) in
+  increment (once)
 ---EXPECTED---
 __closure_0:
   StackSize: 0

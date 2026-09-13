@@ -7,125 +7,125 @@
 // Stdlib.Int16.add - Add two integers
 // ===================================================================
 
-Stdlib.Int16.add(0s, 0s) = 0s
-Stdlib.Int16.add(-5s, 5s) = 0s
-Stdlib.Int16.add(100s, 200s) = 300s
+Stdlib.Int16.add (0s) (0s) = 0s
+Stdlib.Int16.add (-5s) (5s) = 0s
+Stdlib.Int16.add (100s) (200s) = 300s
 
 // ===================================================================
 // Stdlib.Int16.subtract - Subtract two integers
 // ===================================================================
 
-Stdlib.Int16.subtract(0s, 0s) = 0s
-Stdlib.Int16.subtract(100s, 50s) = 50s
-Stdlib.Int16.subtract(5s, 10s) = -5s
+Stdlib.Int16.subtract (0s) (0s) = 0s
+Stdlib.Int16.subtract (100s) (50s) = 50s
+Stdlib.Int16.subtract (5s) (10s) = -5s
 
 // ===================================================================
 // Stdlib.Int16.multiply - Multiply two integers
 // ===================================================================
 
-Stdlib.Int16.multiply(0s, 100s) = 0s
-Stdlib.Int16.multiply(-5s, 5s) = -25s
-Stdlib.Int16.multiply(100s, 100s) = 10000s
+Stdlib.Int16.multiply (0s) (100s) = 0s
+Stdlib.Int16.multiply (-5s) (5s) = -25s
+Stdlib.Int16.multiply (100s) (100s) = 10000s
 
 // ===================================================================
 // Stdlib.Int16.divide - Divide two integers
 // ===================================================================
 
-Stdlib.Int16.divide(10s, 3s) = 3s
-Stdlib.Int16.divide(100s, 10s) = 10s
-Stdlib.Int16.divide(-10s, 2s) = -5s
+Stdlib.Int16.divide (10s) (3s) = 3s
+Stdlib.Int16.divide (100s) (10s) = 10s
+Stdlib.Int16.divide (-10s) (2s) = -5s
 
 // ===================================================================
 // Stdlib.Int16.mod - Modulo operation
 // ===================================================================
 
-Stdlib.Int16.mod(15s, 6s) = 3s
-Stdlib.Int16.mod(10s, 3s) = 1s
-Stdlib.Int16.mod(100s, 7s) = 2s
-Stdlib.Int16.mod(-10s, 3s) = 2s
+Stdlib.Int16.mod (15s) (6s) = 3s
+Stdlib.Int16.mod (10s) (3s) = 1s
+Stdlib.Int16.mod (100s) (7s) = 2s
+Stdlib.Int16.mod (-10s) (3s) = 2s
 
 // ===================================================================
 // Stdlib.Int16.max - Maximum of two integers
 // ===================================================================
 
-Stdlib.Int16.max(6s, 5s) = 6s
-Stdlib.Int16.max(-5s, -10s) = -5s
-Stdlib.Int16.max(0s, 0s) = 0s
+Stdlib.Int16.max (6s) (5s) = 6s
+Stdlib.Int16.max (-5s) (-10s) = -5s
+Stdlib.Int16.max (0s) (0s) = 0s
 
 // ===================================================================
 // Stdlib.Int16.min - Minimum of two integers
 // ===================================================================
 
-Stdlib.Int16.min(6s, 5s) = 5s
-Stdlib.Int16.min(-5s, -10s) = -10s
-Stdlib.Int16.min(0s, 0s) = 0s
+Stdlib.Int16.min (6s) (5s) = 5s
+Stdlib.Int16.min (-5s) (-10s) = -10s
+Stdlib.Int16.min (0s) (0s) = 0s
 
 // ===================================================================
 // Stdlib.Int16.absoluteValue - Absolute value
 // ===================================================================
 
-Stdlib.Int16.absoluteValue(0s) = 0s
-Stdlib.Int16.absoluteValue(-100s) = 100s
+Stdlib.Int16.absoluteValue (0s) = 0s
+Stdlib.Int16.absoluteValue (-100s) = 100s
 
 // ===================================================================
 // Stdlib.Int16.negate - Negate an integer
 // ===================================================================
 
-Stdlib.Int16.negate(100s) = -100s
+Stdlib.Int16.negate (100s) = -100s
 
 // ===================================================================
 // Stdlib.Int16.power - Raise to a power
 // ===================================================================
 
-Stdlib.Int16.power(8s, 4s) = 4096s
-Stdlib.Int16.power(2s, 10s) = 1024s
-Stdlib.Int16.power(5s, 0s) = 1s
-Stdlib.Int16.power(5s, 1s) = 5s
-Stdlib.Int16.power(2s, 8s) = 256s
+Stdlib.Int16.power (8s) (4s) = 4096s
+Stdlib.Int16.power (2s) (10s) = 1024s
+Stdlib.Int16.power (5s) (0s) = 1s
+Stdlib.Int16.power (5s) (1s) = 5s
+Stdlib.Int16.power (2s) (8s) = 256s
 
 // ===================================================================
 // Stdlib.Int16.clamp - Clamp value between limits
 // ===================================================================
 
-Stdlib.Int16.clamp(1s, 0s, 5s) = 1s
-Stdlib.Int16.clamp(10s, 5s, 15s) = 10s
-Stdlib.Int16.clamp(0s, 5s, 10s) = 5s
+Stdlib.Int16.clamp (1s) (0s) (5s) = 1s
+Stdlib.Int16.clamp (10s) (5s) (15s) = 10s
+Stdlib.Int16.clamp (0s) (5s) (10s) = 5s
 
 // ===================================================================
 // Stdlib.Int16.greaterThan - Greater than comparison
 // ===================================================================
 
-Stdlib.Int16.greaterThan(1s, 20s) = false
-Stdlib.Int16.greaterThan(5s, 5s) = false
+Stdlib.Int16.greaterThan (1s) (20s) = false
+Stdlib.Int16.greaterThan (5s) (5s) = false
 
 // ===================================================================
 // Stdlib.Int16.greaterThanOrEqualTo - Greater than or equal comparison
 // ===================================================================
 
-Stdlib.Int16.greaterThanOrEqualTo(1s, 6s) = false
-Stdlib.Int16.greaterThanOrEqualTo(5s, 5s) = true
+Stdlib.Int16.greaterThanOrEqualTo (1s) (6s) = false
+Stdlib.Int16.greaterThanOrEqualTo (5s) (5s) = true
 
 // ===================================================================
 // Stdlib.Int16.lessThan - Less than comparison
 // ===================================================================
 
-Stdlib.Int16.lessThan(8s, 6s) = false
-Stdlib.Int16.lessThan(5s, 5s) = false
+Stdlib.Int16.lessThan (8s) (6s) = false
+Stdlib.Int16.lessThan (5s) (5s) = false
 
 // ===================================================================
 // Stdlib.Int16.lessThanOrEqualTo - Less than or equal comparison
 // ===================================================================
 
-Stdlib.Int16.lessThanOrEqualTo(8s, 6s) = false
-Stdlib.Int16.lessThanOrEqualTo(5s, 5s) = true
+Stdlib.Int16.lessThanOrEqualTo (8s) (6s) = false
+Stdlib.Int16.lessThanOrEqualTo (5s) (5s) = true
 
 // ===================================================================
 // Stdlib.Int16.toString - Convert integer to string
 // ===================================================================
 
-Stdlib.Int16.toString(42s) = "42"
-Stdlib.Int16.toString(-5s) = "-5"
-Stdlib.Int16.toString(12345s) = "12345"
+Stdlib.Int16.toString (42s) = "42"
+Stdlib.Int16.toString (-5s) = "-5"
+Stdlib.Int16.toString (12345s) = "12345"
 
 // ===================================================================
 // Stdlib.Int16.isEven - Check if integer is even
@@ -141,11 +141,11 @@ Stdlib.Int16.toString(12345s) = "12345"
 // Stdlib.Int16.sum - Sum all integers in a list
 // ===================================================================
 
-Stdlib.Int16.sum([1s, 2s, 3s, 4s, 5s]) = 15s
-Stdlib.Int16.sum([]) = 0s
-Stdlib.Int16.sum([100s]) = 100s
-Stdlib.Int16.sum([1s, -1s, 2s, -2s]) = 0s
-Stdlib.Int16.sum([10s, 20s, 30s]) = 60s
+Stdlib.Int16.sum ([1s, 2s, 3s, 4s, 5s]) = 15s
+Stdlib.Int16.sum ([]) = 0s
+Stdlib.Int16.sum ([100s]) = 100s
+Stdlib.Int16.sum ([1s, -1s, 2s, -2s]) = 0s
+Stdlib.Int16.sum ([10s, 20s, 30s]) = 60s
 
 // ===================================================================
 // NOTE: Candidate functions not covered in this module

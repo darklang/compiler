@@ -11,194 +11,194 @@
 // Fibonacci (fib)
 // ===================================================================
 
-let fib(n: Int64) : Int64 =
+let fib (n: Int64) : Int64 =
     if n <= 1L then n
-    else fib(n - 1L) + fib(n - 2L)
+    else fib (n - 1L) + fib (n - 2L)
 
 // Tail recursion modulo addition must retain wrapping Int64 arithmetic and the
 // original base-case result, including inputs below the recursive range.
-let wrappingSiblingRecursion(n: Int64) : Int64 =
+let wrappingSiblingRecursion (n: Int64) : Int64 =
     if n <= 0L then 9223372036854775807L
-    else wrappingSiblingRecursion(n - 1L) + wrappingSiblingRecursion(n - 1L)
+    else wrappingSiblingRecursion (n - 1L) + wrappingSiblingRecursion (n - 1L)
 
-fib(0L) = 0L
-fib(1L) = 1L
-fib(5L) = 5L
-fib(10L) = 55L
-wrappingSiblingRecursion(-1L) = 9223372036854775807L
-wrappingSiblingRecursion(2L) = -4L
+fib (0L) = 0L
+fib (1L) = 1L
+fib (5L) = 5L
+fib (10L) = 55L
+wrappingSiblingRecursion (-1L) = 9223372036854775807L
+wrappingSiblingRecursion (2L) = -4L
 
 
 // ===================================================================
 // Factorial (factorial)
 // ===================================================================
 
-let factorial(n: Int64) : Int64 =
+let factorial (n: Int64) : Int64 =
     if n <= 1L then 1L
-    else n * factorial(n - 1L)
+    else n * factorial (n - 1L)
 
-factorial(0L) = 1L
-factorial(1L) = 1L
-factorial(5L) = 120L
-factorial(6L) = 720L
+factorial (0L) = 1L
+factorial (1L) = 1L
+factorial (5L) = 120L
+factorial (6L) = 720L
 // Wrapping Int64 multiplication must be unchanged by the accumulator helper.
-factorial(21L) = -4249290049419214848L
+factorial (21L) = -4249290049419214848L
 
 
 // ===================================================================
 // Sum to N (sum_to_n) - tail recursive accumulator version
 // ===================================================================
 
-let sumTo(n: Int64, acc: Int64) : Int64 =
+let sumTo (n: Int64) (acc: Int64) : Int64 =
     if n <= 0L then acc
-    else sumTo(n - 1L, acc + n)
+    else sumTo (n - 1L) (acc + n)
 
-sumTo(1L, 0L) = 1L
-sumTo(5L, 0L) = 15L
-sumTo(10L, 0L) = 55L
-sumTo(100L, 0L) = 5050L
+sumTo (1L) (0L) = 1L
+sumTo (5L) (0L) = 15L
+sumTo (10L) (0L) = 55L
+sumTo (100L) (0L) = 5050L
 
 
 // ===================================================================
 // Ackermann (ackermann)
 // ===================================================================
 
-let ackermann(m: Int64, n: Int64) : Int64 =
+let ackermann (m: Int64) (n: Int64) : Int64 =
     if m == 0L then n + 1L
-    else if n == 0L then ackermann(m - 1L, 1L)
-    else ackermann(m - 1L, ackermann(m, n - 1L))
+    else if n == 0L then ackermann (m - 1L) (1L)
+    else ackermann (m - 1L) (ackermann (m) (n - 1L))
 
-ackermann(0L, 0L) = 1L
-ackermann(0L, 5L) = 6L
-ackermann(1L, 0L) = 2L
-ackermann(1L, 5L) = 7L
-ackermann(2L, 3L) = 9L
-ackermann(3L, 3L) = 61L
+ackermann (0L) (0L) = 1L
+ackermann (0L) (5L) = 6L
+ackermann (1L) (0L) = 2L
+ackermann (1L) (5L) = 7L
+ackermann (2L) (3L) = 9L
+ackermann (3L) (3L) = 61L
 
 
 // ===================================================================
 // Binary Trees (binary_trees) - construct and traverse a complete binary tree
 // ===================================================================
 
-type BenchmarkTree<'a> = BenchmarkLeaf of a | BenchmarkNode of (BenchmarkTree<a>, BenchmarkTree<a>)
+type BenchmarkTree<'a> = BenchmarkLeaf of a | BenchmarkNode of (BenchmarkTree<a> * BenchmarkTree<a>)
 
-let makeBenchmarkTree(depth: Int64) : BenchmarkTree<Int64> =
-    if depth <= 0L then BenchmarkLeaf(1L)
-    else BenchmarkNode((makeBenchmarkTree(depth - 1L), makeBenchmarkTree(depth - 1L)))
+let makeBenchmarkTree (depth: Int64) : BenchmarkTree<Int64> =
+    if depth <= 0L then BenchmarkLeaf (1L)
+    else BenchmarkNode ((makeBenchmarkTree (depth - 1L), makeBenchmarkTree (depth - 1L)))
 
-let countBenchmarkTree(tree: BenchmarkTree<Int64>) : Int64 =
+let countBenchmarkTree (tree: BenchmarkTree<Int64>) : Int64 =
     match tree with
-    | BenchmarkLeaf(_) -> 1L
-    | BenchmarkNode((left, right)) -> 1L + countBenchmarkTree(left) + countBenchmarkTree(right)
+    | BenchmarkLeaf (_) -> 1L
+    | BenchmarkNode ((left, right)) -> 1L + countBenchmarkTree (left) + countBenchmarkTree (right)
 
-countBenchmarkTree(makeBenchmarkTree(0L)) = 1L
-countBenchmarkTree(makeBenchmarkTree(1L)) = 3L
-countBenchmarkTree(makeBenchmarkTree(2L)) = 7L
-countBenchmarkTree(makeBenchmarkTree(3L)) = 15L
-countBenchmarkTree(makeBenchmarkTree(4L)) = 31L
+countBenchmarkTree (makeBenchmarkTree (0L)) = 1L
+countBenchmarkTree (makeBenchmarkTree (1L)) = 3L
+countBenchmarkTree (makeBenchmarkTree (2L)) = 7L
+countBenchmarkTree (makeBenchmarkTree (3L)) = 15L
+countBenchmarkTree (makeBenchmarkTree (4L)) = 31L
 
 
 // ===================================================================
 // Collatz (collatz) - count steps in Collatz sequence
 // ===================================================================
 
-let collatzSteps(n: Int64, steps: Int64) : Int64 =
+let collatzSteps (n: Int64) (steps: Int64) : Int64 =
     if n == 1L then steps
-    else if n % 2L == 0L then collatzSteps(n / 2L, steps + 1L)
-    else collatzSteps(3L * n + 1L, steps + 1L)
+    else if n % 2L == 0L then collatzSteps (n / 2L) (steps + 1L)
+    else collatzSteps (3L * n + 1L) (steps + 1L)
 
-collatzSteps(1L, 0L) = 0L
-collatzSteps(2L, 0L) = 1L
-collatzSteps(4L, 0L) = 2L
-collatzSteps(6L, 0L) = 8L
-collatzSteps(7L, 0L) = 16L
+collatzSteps (1L) (0L) = 0L
+collatzSteps (2L) (0L) = 1L
+collatzSteps (4L) (0L) = 2L
+collatzSteps (6L) (0L) = 8L
+collatzSteps (7L) (0L) = 16L
 
 // Sum of Collatz steps for range 1..n
-let sumCollatzRange(i: Int64, limit: Int64, total: Int64) : Int64 =
+let sumCollatzRange (i: Int64) (limit: Int64) (total: Int64) : Int64 =
     if i > limit then total
-    else sumCollatzRange(i + 1L, limit, total + collatzSteps(i, 0L))
+    else sumCollatzRange (i + 1L) (limit) (total + collatzSteps (i) (0L))
 
-sumCollatzRange(1L, 5L, 0L) = 15L
+sumCollatzRange (1L) (5L) (0L) = 15L
 
 
 // ===================================================================
 // Primes (primes) - count primes up to n using trial division
 // ===================================================================
 
-let isqrt(n: Int64, guess: Int64) : Int64 =
+let isqrt (n: Int64) (guess: Int64) : Int64 =
     if guess * guess > n then guess - 1L
     else if (guess + 1L) * (guess + 1L) > n then guess
-    else isqrt(n, guess + 1L)
+    else isqrt (n) (guess + 1L)
 
-let isDivisible(n: Int64, d: Int64, limit: Int64) : Bool =
+let isDivisible (n: Int64) (d: Int64) (limit: Int64) : Bool =
     if d > limit then false
     else if n - (n / d) * d == 0L then true
-    else isDivisible(n, d + 1L, limit)
+    else isDivisible (n) (d + 1L) (limit)
 
-let isPrime(n: Int64) : Bool =
+let isPrime (n: Int64) : Bool =
     if n < 2L then false
     else if n == 2L then true
     else if n - (n / 2L) * 2L == 0L then false
     else
-        let limit = isqrt(n, 1L) in
-        if isDivisible(n, 3L, limit) then false else true
+        let limit = isqrt (n) (1L) in
+        if isDivisible (n) (3L) (limit) then false else true
 
-let countPrimes(n: Int64, count: Int64) : Int64 =
+let countPrimes (n: Int64) (count: Int64) : Int64 =
     if n <= 1L then count
-    else if isPrime(n) then countPrimes(n - 1L, count + 1L)
-    else countPrimes(n - 1L, count)
+    else if isPrime (n) then countPrimes (n - 1L) (count + 1L)
+    else countPrimes (n - 1L) (count)
 
-countPrimes(2L, 0L) = 1L
-countPrimes(10L, 0L) = 4L
-countPrimes(20L, 0L) = 8L
+countPrimes (2L) (0L) = 1L
+countPrimes (10L) (0L) = 4L
+countPrimes (20L) (0L) = 8L
 
 
 // ===================================================================
 // Tak (tak) - Takeuchi function
 // ===================================================================
 
-let tak(x: Int64, y: Int64, z: Int64) : Int64 =
+let tak (x: Int64) (y: Int64) (z: Int64) : Int64 =
     if x <= y then z
-    else tak(tak(x - 1L, y, z), tak(y - 1L, z, x), tak(z - 1L, x, y))
+    else tak (tak (x - 1L) (y) (z)) (tak (y - 1L) (z) (x)) (tak (z - 1L) (x) (y))
 
-tak(1L, 1L, 1L) = 1L
-tak(3L, 2L, 1L) = 2L
-tak(6L, 4L, 2L) = 3L
-tak(7L, 4L, 2L) = 4L
+tak (1L) (1L) (1L) = 1L
+tak (3L) (2L) (1L) = 2L
+tak (6L) (4L) (2L) = 3L
+tak (7L) (4L) (2L) = 4L
 
 
 // ===================================================================
 // Leibniz Pi (leibniz) - compute pi using Leibniz formula
 // ===================================================================
 
-let leibnizLoop(i: Int64, n: Int64, sum: Float, sign: Float) : Float =
+let leibnizLoop (i: Int64) (n: Int64) (sum: Float) (sign: Float) : Float =
     if i >= n then sum * 4.0
     else
-        let term = sign / Stdlib.Int64.toFloat(2L * i + 1L) in
-        leibnizLoop(i + 1L, n, sum + term, Stdlib.Float.negate(sign))
+        let term = sign / Stdlib.Int64.toFloat (2L * i + 1L) in
+        leibnizLoop (i + 1L) (n) (sum + term) (Stdlib.Float.negate (sign))
 
-let leibnizPi(n: Int64) : Float =
-    leibnizLoop(0L, n, 0.0, 1.0)
+let leibnizPi (n: Int64) : Float =
+    leibnizLoop (0L) (n) (0.0) (1.0)
 
-Stdlib.Float.toInt(leibnizPi(100L) * 100.0) = 313L
-Stdlib.Float.toInt(leibnizPi(1000L) * 1000.0) = 3140L
+Stdlib.Float.toInt (leibnizPi (100L) * 100.0) = 313L
+Stdlib.Float.toInt (leibnizPi (1000L) * 1000.0) = 3140L
 
 
 // ===================================================================
 // Pi Sum (pisum) - partial sum of 1/k^2 series
 // ===================================================================
 
-let innerSum(k: Int64, n: Int64, acc: Float) : Float =
+let innerSum (k: Int64) (n: Int64) (acc: Float) : Float =
     if k > n then acc
     else
-        let kf = Stdlib.Int64.toFloat(k) in
-        innerSum(k + 1L, n, acc + 1.0 / (kf * kf))
+        let kf = Stdlib.Int64.toFloat (k) in
+        innerSum (k + 1L) (n) (acc + 1.0 / (kf * kf))
 
-let pisum(rounds: Int64, n: Int64, lastResult: Float) : Float =
+let pisum (rounds: Int64) (n: Int64) (lastResult: Float) : Float =
     if rounds <= 0L then lastResult
-    else pisum(rounds - 1L, n, innerSum(1L, n, 0.0))
+    else pisum (rounds - 1L) (n) (innerSum (1L) (n) (0.0))
 
-Stdlib.Float.toInt(pisum(1L, 10L, 0.0) * 1000000.0) = 1549767L
+Stdlib.Float.toInt (pisum (1L) (10L) (0.0) * 1000000.0) = 1549767L
 
 
 // ===================================================================
@@ -208,101 +208,101 @@ Stdlib.Float.toInt(pisum(1L, 10L, 0.0) * 1000000.0) = 1549767L
 // Solve N-Queens using bitmasks for columns and diagonals
 // avail: bitmask of available positions to try in current row
 // count: accumulated solution count
-let nqueenSolve(allOnes: Int64, cols: Int64, diag1: Int64, diag2: Int64, avail: Int64, count: Int64) : Int64 =
+let nqueenSolve (allOnes: Int64) (cols: Int64) (diag1: Int64) (diag2: Int64) (avail: Int64) (count: Int64) : Int64 =
     if avail == 0L then count
     else
         let pos = avail & (0L - avail) in
         let newAvail = avail - pos in
-        let newCols = Stdlib.Int64.bitwiseOr(cols, pos) in
+        let newCols = Stdlib.Int64.bitwiseOr (cols) (pos) in
         let subCount =
             if newCols == allOnes then 1L
             else
-                let newDiag1 = (Stdlib.Int64.bitwiseOr(diag1, pos)) << 1L in
-                let newDiag2 = (Stdlib.Int64.bitwiseOr(diag2, pos)) >> 1L in
-                let blocked = Stdlib.Int64.bitwiseOr(Stdlib.Int64.bitwiseOr(newCols, newDiag1), newDiag2) in
+                let newDiag1 = (Stdlib.Int64.bitwiseOr (diag1) (pos)) << 1L in
+                let newDiag2 = (Stdlib.Int64.bitwiseOr (diag2) (pos)) >> 1L in
+                let blocked = Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr (newCols) (newDiag1)) (newDiag2) in
                 let nextRowAvail = allOnes & (~~~blocked) in
-                nqueenSolve(allOnes, newCols, newDiag1, newDiag2, nextRowAvail, 0L) in
-        nqueenSolve(allOnes, cols, diag1, diag2, newAvail, count + subCount)
+                nqueenSolve (allOnes) (newCols) (newDiag1) (newDiag2) (nextRowAvail) (0L) in
+        nqueenSolve (allOnes) (cols) (diag1) (diag2) (newAvail) (count + subCount)
 
-let nqueen(n: Int64) : Int64 =
+let nqueen (n: Int64) : Int64 =
     let allOnes = (1L << n) - 1L in
-    nqueenSolve(allOnes, 0L, 0L, 0L, allOnes, 0L)
+    nqueenSolve (allOnes) (0L) (0L) (0L) (allOnes) (0L)
 
-nqueen(1L) = 1L
-nqueen(4L) = 2L
-nqueen(5L) = 10L
-nqueen(6L) = 4L
-nqueen(7L) = 40L
-nqueen(8L) = 92L
+nqueen (1L) = 1L
+nqueen (4L) = 2L
+nqueen (5L) = 10L
+nqueen (6L) = 4L
+nqueen (7L) = 40L
+nqueen (8L) = 92L
 
 
 // ===================================================================
 // Edigits (edigits) - reduced checksum test
 // ===================================================================
 
-let benchmarkSetAt(list: List<Int64>, index: Int64, value: Int64) : List<Int64> =
-    let target = Stdlib.Int.fromInt64(index) in
-    Stdlib.List.indexedMap<Int64, Int64>(list, fun currentIndex current -> if currentIndex == target then value else current)
+let benchmarkSetAt (list: List<Int64>) (index: Int64) (value: Int64) : List<Int64> =
+    let target = Stdlib.Int.fromInt64 (index) in
+    Stdlib.List.indexedMap<Int64, Int64> (list) (fun currentIndex current -> if currentIndex == target then value else current)
 
-let divideByN(digits: List<Int64>, n: Int64, carry: Int64, idx: Int64, len: Int64) : List<Int64> =
+let divideByN (digits: List<Int64>) (n: Int64) (carry: Int64) (idx: Int64) (len: Int64) : List<Int64> =
     if idx >= len then digits
     else
-        let d = Stdlib.List.getAt<Int64>(digits, Stdlib.Int.fromInt64(idx)) in
+        let d = Stdlib.List.getAt<Int64> (digits) (Stdlib.Int.fromInt64 (idx)) in
         match d with
         | None -> digits
-        | Some(digit) ->
+        | Some (digit) ->
             let current = carry * 10L + digit in
             let newDigit = current / n in
             let newCarry = current % n in
-            let updated = benchmarkSetAt(digits, idx, newDigit) in
-            divideByN(updated, n, newCarry, idx + 1L, len)
+            let updated = benchmarkSetAt (digits) (idx) (newDigit) in
+            divideByN (updated) (n) (newCarry) (idx + 1L) (len)
 
-let addWithCarry(e: List<Int64>, term: List<Int64>, carry: Int64, idx: Int64) : List<Int64> =
+let addWithCarry (e: List<Int64>) (term: List<Int64>) (carry: Int64) (idx: Int64) : List<Int64> =
     if idx < 0L then e
     else
-        let eOpt = Stdlib.List.getAt<Int64>(e, Stdlib.Int.fromInt64(idx)) in
-        let termOpt = Stdlib.List.getAt<Int64>(term, Stdlib.Int.fromInt64(idx)) in
+        let eOpt = Stdlib.List.getAt<Int64> (e) (Stdlib.Int.fromInt64 (idx)) in
+        let termOpt = Stdlib.List.getAt<Int64> (term) (Stdlib.Int.fromInt64 (idx)) in
         match (eOpt, termOpt) with
-        | (Some(eDigit), Some(termDigit)) ->
+        | (Some (eDigit), Some (termDigit)) ->
             let total = eDigit + termDigit + carry in
             let newDigit = total % 10L in
             let newCarry = total / 10L in
-            let updated = benchmarkSetAt(e, idx, newDigit) in
-            addWithCarry(updated, term, newCarry, idx - 1L)
+            let updated = benchmarkSetAt (e) (idx) (newDigit) in
+            addWithCarry (updated) (term) (newCarry) (idx - 1L)
         | _ -> e
 
-let addFactorialTerm(e: List<Int64>, term: List<Int64>, n: Int64, maxN: Int64, len: Int64) : List<Int64> =
+let addFactorialTerm (e: List<Int64>) (term: List<Int64>) (n: Int64) (maxN: Int64) (len: Int64) : List<Int64> =
     if n > maxN then e
     else
-        let newTerm = divideByN(term, n, 0L, 0L, len) in
-        let newE = addWithCarry(e, newTerm, 0L, len - 1L) in
-        addFactorialTerm(newE, newTerm, n + 1L, maxN, len)
+        let newTerm = divideByN (term) (n) (0L) (0L) (len) in
+        let newE = addWithCarry (e) (newTerm) (0L) (len - 1L) in
+        addFactorialTerm (newE) (newTerm) (n + 1L) (maxN) (len)
 
-let zeros(n: Int64) : List<Int64> =
-    Stdlib.List.map<Int, Int64>(Stdlib.List.range(0I, Stdlib.Int.fromInt64(n - 1L)), fun x -> 0L)
+let zeros (n: Int64) : List<Int64> =
+    Stdlib.List.map<Int, Int64> (Stdlib.List.range (0) (Stdlib.Int.fromInt64 (n - 1L))) (fun x -> 0L)
 
-let initDigits(n: Int64) : List<Int64> =
-    benchmarkSetAt(zeros(n), 0L, 1L)
+let initDigits (n: Int64) : List<Int64> =
+    benchmarkSetAt (zeros (n)) (0L) (1L)
 
-let computeEDigits(numDigits: Int64) : List<Int64> =
+let computeEDigits (numDigits: Int64) : List<Int64> =
     let precision = numDigits + 10L in
-    let e = initDigits(precision) in
-    let term = initDigits(precision) in
-    addFactorialTerm(e, term, 1L, 50L, precision)
+    let e = initDigits (precision) in
+    let term = initDigits (precision) in
+    addFactorialTerm (e) (term) (1L) (50L) (precision)
 
-let computeChecksum(digits: List<Int64>, idx: Int64, acc: Int64, numDigits: Int64) : Int64 =
+let computeChecksum (digits: List<Int64>) (idx: Int64) (acc: Int64) (numDigits: Int64) : Int64 =
     if idx >= numDigits then acc
     else
-        let d = Stdlib.List.getAt<Int64>(digits, Stdlib.Int.fromInt64(idx)) in
+        let d = Stdlib.List.getAt<Int64> (digits) (Stdlib.Int.fromInt64 (idx)) in
         match d with
         | None -> acc
-        | Some(digit) ->
+        | Some (digit) ->
             let newAcc = (acc + digit * (idx + 1L)) % 1000000007L in
-            computeChecksum(digits, idx + 1L, newAcc, numDigits)
+            computeChecksum (digits) (idx + 1L) (newAcc) (numDigits)
 
-let edigitsChecksum(numDigits: Int64) : Int64 =
-    let digits = computeEDigits(numDigits) in
-    computeChecksum(digits, 0L, 0L, numDigits)
+let edigitsChecksum (numDigits: Int64) : Int64 =
+    let digits = computeEDigits (numDigits) in
+    computeChecksum (digits) (0L) (0L) (numDigits)
 
 edigitsChecksum(5L) = 61L
 
@@ -311,105 +311,105 @@ edigitsChecksum(5L) = 61L
 // Fasta (fasta) - reduced checksum test
 // ===================================================================
 
-let getAlu(aluBytes: List<Int64>, i: Int64) : Int64 =
-    match Stdlib.List.getAt<Int64>(aluBytes, Stdlib.Int.fromInt64(i % 287L)) with
-    | Some(v) -> v
+let getAlu (aluBytes: List<Int64>) (i: Int64) : Int64 =
+    match Stdlib.List.getAt<Int64> (aluBytes) (Stdlib.Int.fromInt64 (i % 287L)) with
+    | Some (v) -> v
     | None -> 0L
 
-let makeRepeatFasta(aluBytes: List<Int64>, n: Int64, i: Int64, checksum: Int64) : Int64 =
+let makeRepeatFasta (aluBytes: List<Int64>) (n: Int64) (i: Int64) (checksum: Int64) : Int64 =
     if i >= n then checksum
     else
-        let c = getAlu(aluBytes, i) in
+        let c = getAlu (aluBytes) (i) in
         let newChecksum = (checksum + c * (i + 1L)) % 1000000007L in
-        makeRepeatFasta(aluBytes, n, i + 1L, newChecksum)
+        makeRepeatFasta (aluBytes) (n) (i + 1L) (newChecksum)
 
-let makeCumulative(table: List<(Int64, Float)>, running: Float) : List<(Int64, Float)> =
-    match Stdlib.List.head<(Int64, Float)>(table) with
+let makeCumulative (table: List<(Int64 * Float)>) (running: Float) : List<(Int64 * Float)> =
+    match Stdlib.List.head<(Int64 * Float)> (table) with
     | None -> []
-    | Some(item) ->
-        let c = Stdlib.Tuple2.first<Int64, Float>(item) in
-        let p = Stdlib.Tuple2.second<Int64, Float>(item) in
+    | Some (item) ->
+        let c = Stdlib.Tuple2.first<Int64, Float> (item) in
+        let p = Stdlib.Tuple2.second<Int64, Float> (item) in
         let newRunning = running + p in
-        match Stdlib.List.tail<(Int64, Float)>(table) with
+        match Stdlib.List.tail<(Int64 * Float)> (table) with
         | None -> [(c, newRunning)]
-        | Some(rest) ->
-            let restCum = makeCumulative(rest, newRunning) in
-            Stdlib.List.push<(Int64, Float)>(restCum, (c, newRunning))
+        | Some (rest) ->
+            let restCum = makeCumulative (rest) (newRunning) in
+            Stdlib.List.push<(Int64 * Float)> (restCum) ((c, newRunning))
 
-let selectRandom(table: List<(Int64, Float)>, r: Float, idx: Int64) : Int64 =
-    match Stdlib.List.getAt(table, Stdlib.Int.fromInt64(idx)) with
+let selectRandom (table: List<(Int64 * Float)>) (r: Float) (idx: Int64) : Int64 =
+    match Stdlib.List.getAt (table) (Stdlib.Int.fromInt64 (idx)) with
     | None -> 0L
-    | Some(item) ->
-        let c = Stdlib.Tuple2.first(item) in
-        let p = Stdlib.Tuple2.second(item) in
+    | Some (item) ->
+        let c = Stdlib.Tuple2.first (item) in
+        let p = Stdlib.Tuple2.second (item) in
         if r < p then c
         else
-            if Stdlib.Int.fromInt64(idx + 1L) >= Stdlib.List.length(table) then c
-            else selectRandom(table, r, idx + 1L)
+            if Stdlib.Int.fromInt64 (idx + 1L) >= Stdlib.List.length (table) then c
+            else selectRandom (table) (r) (idx + 1L)
 
-let makeRandomFasta(n: Int64, table: List<(Int64, Float)>, seed: Int64, i: Int64, checksum: Int64) : (Int64, Int64) =
+let makeRandomFasta (n: Int64) (table: List<(Int64 * Float)>) (seed: Int64) (i: Int64) (checksum: Int64) : (Int64 * Int64) =
     if i >= n then (checksum, seed)
     else
         let newSeed = (seed * 3877L + 29573L) % 139968L in
-        let r = Stdlib.Int64.toFloat(newSeed) / 139968.0 in
-        let c = selectRandom(table, r, 0L) in
+        let r = Stdlib.Int64.toFloat (newSeed) / 139968.0 in
+        let c = selectRandom (table) (r) (0L) in
         let newChecksum = (checksum + c * (i + 1L)) % 1000000007L in
-        makeRandomFasta(n, table, newSeed, i + 1L, newChecksum)
+        makeRandomFasta (n) (table) (newSeed) (i + 1L) (newChecksum)
 
-let fastaChecksum(n: Int64) : Int64 =
+let fastaChecksum (n: Int64) : Int64 =
     let aluBytes = [71L, 71L, 67L, 67L, 71L, 71L, 71L, 67L, 71L, 67L, 71L, 71L, 84L, 71L, 71L, 67L, 84L, 67L, 65L, 67L, 71L, 67L, 67L, 84L, 71L, 84L, 65L, 65L, 84L, 67L, 67L, 67L, 65L, 71L, 67L, 65L, 67L, 84L, 84L, 84L, 71L, 71L, 71L, 65L, 71L, 71L, 67L, 67L, 71L, 65L, 71L, 71L, 67L, 71L, 71L, 71L, 67L, 71L, 71L, 65L, 84L, 67L, 65L, 67L, 67L, 84L, 71L, 65L, 71L, 71L, 84L, 67L, 65L, 71L, 71L, 65L, 71L, 84L, 84L, 67L, 71L, 65L, 71L, 65L, 67L, 67L, 65L, 71L, 67L, 67L, 84L, 71L, 71L, 67L, 67L, 65L, 65L, 67L, 65L, 84L, 71L, 71L, 84L, 71L, 65L, 65L, 65L, 67L, 67L, 67L, 67L, 71L, 84L, 67L, 84L, 67L, 84L, 65L, 67L, 84L, 65L, 65L, 65L, 65L, 65L, 84L, 65L, 67L, 65L, 65L, 65L, 65L, 65L, 84L, 84L, 65L, 71L, 67L, 67L, 71L, 71L, 71L, 67L, 71L, 84L, 71L, 71L, 84L, 71L, 71L, 67L, 71L, 67L, 71L, 67L, 71L, 67L, 67L, 84L, 71L, 84L, 65L, 65L, 84L, 67L, 67L, 67L, 65L, 71L, 67L, 84L, 65L, 67L, 84L, 67L, 71L, 71L, 71L, 65L, 71L, 71L, 67L, 84L, 71L, 65L, 71L, 71L, 67L, 65L, 71L, 71L, 65L, 71L, 65L, 65L, 84L, 67L, 71L, 67L, 84L, 84L, 71L, 65L, 65L, 67L, 67L, 67L, 71L, 71L, 71L, 65L, 71L, 71L, 67L, 71L, 71L, 65L, 71L, 71L, 84L, 84L, 71L, 67L, 65L, 71L, 84L, 71L, 65L, 71L, 67L, 67L, 71L, 65L, 71L, 65L, 84L, 67L, 71L, 67L, 71L, 67L, 67L, 65L, 67L, 84L, 71L, 67L, 65L, 67L, 84L, 67L, 67L, 65L, 71L, 67L, 67L, 84L, 71L, 71L, 71L, 67L, 71L, 65L, 67L, 65L, 71L, 65L, 71L, 67L, 71L, 65L, 71L, 65L, 67L, 84L, 67L, 67L, 71L, 84L, 67L, 84L, 67L, 65L, 65L, 65L, 65L, 65L] in
     let iub = [(97L, 0.27), (99L, 0.12), (103L, 0.12), (116L, 0.27), (66L, 0.02), (68L, 0.02), (72L, 0.02), (75L, 0.02), (77L, 0.02), (78L, 0.02), (82L, 0.02), (83L, 0.02), (86L, 0.02), (87L, 0.02), (89L, 0.02)] in
     let homosapiens = [(97L, 0.3029549426680), (99L, 0.1979883004921), (103L, 0.1975473066391), (116L, 0.3015094502008)] in
-    let iubCum = makeCumulative(iub, 0.0) in
-    let homoCum = makeCumulative(homosapiens, 0.0) in
-    let c1 = makeRepeatFasta(aluBytes, n * 2L, 0L, 0L) in
-    let result2 = makeRandomFasta(n * 3L, iubCum, 42L, 0L, 0L) in
-    let c2 = Stdlib.Tuple2.first<Int64, Int64>(result2) in
-    let seed2 = Stdlib.Tuple2.second<Int64, Int64>(result2) in
-    let result3 = makeRandomFasta(n * 5L, homoCum, seed2, 0L, 0L) in
-    let c3 = Stdlib.Tuple2.first<Int64, Int64>(result3) in
+    let iubCum = makeCumulative (iub) (0.0) in
+    let homoCum = makeCumulative (homosapiens) (0.0) in
+    let c1 = makeRepeatFasta (aluBytes) (n * 2L) (0L) (0L) in
+    let result2 = makeRandomFasta (n * 3L) (iubCum) (42L) (0L) (0L) in
+    let c2 = Stdlib.Tuple2.first<Int64, Int64> (result2) in
+    let seed2 = Stdlib.Tuple2.second<Int64, Int64> (result2) in
+    let result3 = makeRandomFasta (n * 5L) (homoCum) (seed2) (0L) (0L) in
+    let c3 = Stdlib.Tuple2.first<Int64, Int64> (result3) in
     let total = (c1 + c2 + c3) % 1000000007L in
     total
 
 // Reduced: n=100
-fastaChecksum(100L) = 19053841L
+fastaChecksum (100L) = 19053841L
 
 
 // ===================================================================
 // Spectral Norm (spectral_norm) - reduced 3-vector power iteration
 // ===================================================================
 
-let spectralMatA(i: Int64, j: Int64) : Float =
+let spectralMatA (i: Int64) (j: Int64) : Float =
     let ij = i + j in
     let div = ij * (ij + 1L) / 2L + i + 1L in
-    1.0 / Stdlib.Int64.toFloat(div)
+    1.0 / Stdlib.Int64.toFloat (div)
 
-let spectralGet3(v: (Float, Float, Float), i: Int64) : Float =
+let spectralGet3 (v: (Float * Float * Float)) (i: Int64) : Float =
     if i == 0L then v.0
     else if i == 1L then v.1
     else v.2
 
-let spectralAvRow(i: Int64, j: Int64, n: Int64, v: (Float, Float, Float), acc: Float) : Float =
+let spectralAvRow (i: Int64) (j: Int64) (n: Int64) (v: (Float * Float * Float)) (acc: Float) : Float =
     if j >= n then acc
-    else spectralAvRow(i, j + 1L, n, v, acc + spectralMatA(i, j) * spectralGet3(v, j))
+    else spectralAvRow (i) (j + 1L) (n) (v) (acc + spectralMatA (i) (j) * spectralGet3 (v) (j))
 
-let spectralAtvRow(i: Int64, j: Int64, n: Int64, v: (Float, Float, Float), acc: Float) : Float =
+let spectralAtvRow (i: Int64) (j: Int64) (n: Int64) (v: (Float * Float * Float)) (acc: Float) : Float =
     if j >= n then acc
-    else spectralAtvRow(i, j + 1L, n, v, acc + spectralMatA(j, i) * spectralGet3(v, j))
+    else spectralAtvRow (i) (j + 1L) (n) (v) (acc + spectralMatA (j) (i) * spectralGet3 (v) (j))
 
-let spectralAv3(v: (Float, Float, Float)) : (Float, Float, Float) =
-    (spectralAvRow(0L, 0L, 3L, v, 0.0), spectralAvRow(1L, 0L, 3L, v, 0.0), spectralAvRow(2L, 0L, 3L, v, 0.0))
+let spectralAv3 (v: (Float * Float * Float)) : (Float * Float * Float) =
+    (spectralAvRow (0L) (0L) (3L) (v) (0.0), spectralAvRow (1L) (0L) (3L) (v) (0.0), spectralAvRow (2L) (0L) (3L) (v) (0.0))
 
-let spectralAtv3(v: (Float, Float, Float)) : (Float, Float, Float) =
-    (spectralAtvRow(0L, 0L, 3L, v, 0.0), spectralAtvRow(1L, 0L, 3L, v, 0.0), spectralAtvRow(2L, 0L, 3L, v, 0.0))
+let spectralAtv3 (v: (Float * Float * Float)) : (Float * Float * Float) =
+    (spectralAtvRow (0L) (0L) (3L) (v) (0.0), spectralAtvRow (1L) (0L) (3L) (v) (0.0), spectralAtvRow (2L) (0L) (3L) (v) (0.0))
 
-let spectralAtav3(v: (Float, Float, Float)) : (Float, Float, Float) =
-    spectralAtv3(spectralAv3(v))
+let spectralAtav3 (v: (Float * Float * Float)) : (Float * Float * Float) =
+    spectralAtv3 (spectralAv3 (v))
 
-let spectralDot3(a: (Float, Float, Float), b: (Float, Float, Float)) : Float =
+let spectralDot3 (a: (Float * Float * Float)) (b: (Float * Float * Float)) : Float =
     a.0 * b.0 + a.1 * b.1 + a.2 * b.2
 
-let spectralV = spectralAtav3((1.0, 1.0, 1.0)) in let spectralU = spectralAtav3(spectralV) in Stdlib.Float.toInt(Stdlib.Float.sqrt(spectralDot3(spectralU, spectralV) / spectralDot3(spectralV, spectralV)) * 1000000000.0) = 1233643706L
+let spectralV = spectralAtav3 ((1.0, 1.0, 1.0)) in let spectralU = spectralAtav3 (spectralV) in Stdlib.Float.toInt (Stdlib.Float.sqrt (spectralDot3 (spectralU) (spectralV) / spectralDot3 (spectralV) (spectralV)) * 1000000000.0) = 1233643706L
 
 
 // ===================================================================

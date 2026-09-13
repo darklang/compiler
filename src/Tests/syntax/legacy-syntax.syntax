@@ -1,0 +1,74 @@
+// Rejection coverage for retired compiler-only source spellings.
+
+---NAME---
+parenthesized comma call is rejected
+---SOURCE---
+f(a, b)
+---EXPECT-ERROR---
+Parenthesized call syntax is not supported; use 'f a b'
+
+---NAME---
+parenthesized unit call is rejected
+---SOURCE---
+f()
+---EXPECT-ERROR---
+Parenthesized call syntax is not supported; use 'f ()'
+
+---NAME---
+spaced tuple argument remains canonical
+---SOURCE---
+f (a, b)
+---ROUNDTRIP---
+
+---NAME---
+comma parameter declaration is rejected
+---SOURCE---
+let f (a: A, b: B) : C = a
+---EXPECT-ERROR---
+Function parameters use separate parenthesized groups
+
+---NAME---
+adjacent declaration parameter is rejected
+---SOURCE---
+let f(a: A) : A = a
+---EXPECT-ERROR---
+Function parameters require whitespace before '('
+
+---NAME---
+explicit Int suffix is rejected
+---SOURCE---
+1I
+---EXPECT-ERROR---
+invalid number literal: 1I
+
+---NAME---
+bare top level tuple is rejected
+---SOURCE---
+1L, 2L
+---EXPECT-ERROR---
+Unexpected tokens after expression
+
+---NAME---
+comma function type is rejected
+---SOURCE---
+let apply (f: (A, B) -> C) : C = f a b
+---EXPECT-ERROR---
+Function types use curried arrows
+
+---NAME---
+curried function type remains canonical
+---SOURCE---
+let apply (f: A -> B -> C) : C = f a b
+---ROUNDTRIP---
+
+---NAME---
+tuple argument function type remains canonical
+---SOURCE---
+let apply (f: (A * B) -> C) : C = f (a, b)
+---ROUNDTRIP---
+
+---NAME---
+adjacent comparison grouping remains canonical
+---SOURCE---
+x>(y)
+---ROUNDTRIP---

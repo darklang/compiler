@@ -5,132 +5,113 @@ type Atom = Literal of Int64 | AnyByte | Range of (Int64 * Int64)
 type Quantifier = ExactlyOne | ZeroOrMore | OneOrMore | ZeroOrOne
 type Piece = { atom: Atom, quantifier: Quantifier }
 
-let parseQuantifier(pattern: String, index: Int64, atom: Atom) : (Piece * Int64) =
-    if index >= Stdlib.String.codepointLength(pattern) then (Piece { atom = atom, quantifier = ExactlyOne }, index)
+let parseQuantifier (pattern: String) (index: Int64) (atom: Atom) : (Piece * Int64) =
+    if index >= Stdlib.String.codepointLength (pattern) then (Piece { atom = atom, quantifier = ExactlyOne }, index)
     else
-        match Stdlib.String.getByteAt(pattern, index) with
+        match Stdlib.String.getByteAt (pattern) (index) with
         | 42L -> (Piece { atom = atom, quantifier = ZeroOrMore }, index + 1L)
         | 43L -> (Piece { atom = atom, quantifier = OneOrMore }, index + 1L)
         | 63L -> (Piece { atom = atom, quantifier = ZeroOrOne }, index + 1L)
         | _ -> (Piece { atom = atom, quantifier = ExactlyOne }, index)
 
-let parsePiece(pattern: String, index: Int64) : (Piece * Int64) =
-    let byte = Stdlib.String.getByteAt(pattern, index) in
-    if byte == 46L then parseQuantifier(pattern, index + 1L, AnyByte)
+let parsePiece (pattern: String) (index: Int64) : (Piece * Int64) =
+    let byte = Stdlib.String.getByteAt (pattern) (index) in
+    if byte == 46L then parseQuantifier (pattern) (index + 1L) (AnyByte)
     else if byte == 91L then
-        if index + 4L >= Stdlib.String.codepointLength(pattern)
-           || Stdlib.String.getByteAt(pattern, index + 2L) != 45L
-           || Stdlib.String.getByteAt(pattern, index + 4L) != 93L then
-            Builtin.testRuntimeError("regex range must have form [a-z]")
+        if index + 4L >= Stdlib.String.codepointLength (pattern)
+           || Stdlib.String.getByteAt (pattern) (index + 2L) != 45L
+           || Stdlib.String.getByteAt (pattern) (index + 4L) != 93L then
+            Builtin.testRuntimeError ("regex range must have form [a-z]")
         else
-            parseQuantifier(
-                pattern,
-                index + 5L,
-                Range((Stdlib.String.getByteAt(pattern, index + 1L), Stdlib.String.getByteAt(pattern, index + 3L))))
-    else parseQuantifier(pattern, index + 1L, Literal(byte))
+            parseQuantifier (pattern) (index + 5L) (Range ((Stdlib.String.getByteAt (pattern) (index + 1L), Stdlib.String.getByteAt (pattern) (index + 3L))))
+    else parseQuantifier (pattern) (index + 1L) (Literal (byte))
 
-let parseAlternatives(
-    pattern: String,
-    index: Int64,
-    reversedPieces: List<Piece>,
-    reversedAlternatives: List<List<Piece>>
-) : List<List<Piece>> =
-    if index >= Stdlib.String.codepointLength(pattern) then
-        Stdlib.List.reverse<List<Piece>>(
-            Stdlib.List.push<List<Piece>>(reversedAlternatives, Stdlib.List.reverse<Piece>(reversedPieces)))
-    else if Stdlib.String.getByteAt(pattern, index) == 124L then
-        parseAlternatives(
-            pattern,
-            index + 1L,
-            [],
-            Stdlib.List.push<List<Piece>>(reversedAlternatives, Stdlib.List.reverse<Piece>(reversedPieces)))
+let parseAlternatives (pattern: String) (index: Int64) (reversedPieces: List<Piece>) (reversedAlternatives: List<List<Piece>>) : List<List<Piece>> =
+    if index >= Stdlib.String.codepointLength (pattern) then
+        Stdlib.List.reverse<List<Piece>> (Stdlib.List.push<List<Piece>> (reversedAlternatives) (Stdlib.List.reverse<Piece> (reversedPieces)))
+    else if Stdlib.String.getByteAt (pattern) (index) == 124L then
+        parseAlternatives (pattern) (index + 1L) ([]) (Stdlib.List.push<List<Piece>> (reversedAlternatives) (Stdlib.List.reverse<Piece> (reversedPieces)))
     else
-        let parsed = parsePiece(pattern, index) in
-        parseAlternatives(pattern, parsed.1, Stdlib.List.push<Piece>(reversedPieces, parsed.0), reversedAlternatives)
+        let parsed = parsePiece (pattern) (index) in
+        parseAlternatives (pattern) (parsed.1) (Stdlib.List.push<Piece> (reversedPieces) (parsed.0)) (reversedAlternatives)
 
-let atomMatches(atom: Atom, byte: Int64) : Bool =
+let atomMatches (atom: Atom) (byte: Int64) : Bool =
     match atom with
-    | Literal(expected) -> byte == expected
+    | Literal (expected) -> byte == expected
     | AnyByte -> true
-    | Range((low, high)) -> byte >= low && byte <= high
+    | Range ((low, high)) -> byte >= low && byte <= high
 
-let addStarPositions(atom: Atom, text: String, length: Int64, position: Int64, reversed: List<Int64>) : List<Int64> =
-    let next = Stdlib.List.push<Int64>(reversed, position) in
-    if position < length && atomMatches(atom, Stdlib.String.getByteAt(text, position)) then
-        addStarPositions(atom, text, length, position + 1L, next)
+let addStarPositions (atom: Atom) (text: String) (length: Int64) (position: Int64) (reversed: List<Int64>) : List<Int64> =
+    let next = Stdlib.List.push<Int64> (reversed) (position) in
+    if position < length && atomMatches (atom) (Stdlib.String.getByteAt (text) (position)) then
+        addStarPositions (atom) (text) (length) (position + 1L) (next)
     else next
 
-let advancePositions(
-    positions: List<Int64>,
-    piece: Piece,
-    text: String,
-    length: Int64,
-    reversed: List<Int64>
-) : List<Int64> =
+let advancePositions (positions: List<Int64>) (piece: Piece) (text: String) (length: Int64) (reversed: List<Int64>) : List<Int64> =
     match positions with
     | [] -> reversed
     | position :: rest ->
         match piece.quantifier with
         | ExactlyOne ->
             let next =
-                if position < length && atomMatches(piece.atom, Stdlib.String.getByteAt(text, position)) then
-                    Stdlib.List.push<Int64>(reversed, position + 1L)
+                if position < length && atomMatches (piece.atom) (Stdlib.String.getByteAt (text) (position)) then
+                    Stdlib.List.push<Int64> (reversed) (position + 1L)
                 else reversed in
-            advancePositions(rest, piece, text, length, next)
+            advancePositions (rest) (piece) (text) (length) (next)
         | ZeroOrOne ->
-            let withEmpty = Stdlib.List.push<Int64>(reversed, position) in
+            let withEmpty = Stdlib.List.push<Int64> (reversed) (position) in
             let next =
-                if position < length && atomMatches(piece.atom, Stdlib.String.getByteAt(text, position)) then
-                    Stdlib.List.push<Int64>(withEmpty, position + 1L)
+                if position < length && atomMatches (piece.atom) (Stdlib.String.getByteAt (text) (position)) then
+                    Stdlib.List.push<Int64> (withEmpty) (position + 1L)
                 else withEmpty in
-            advancePositions(rest, piece, text, length, next)
+            advancePositions (rest) (piece) (text) (length) (next)
         | ZeroOrMore ->
-            advancePositions(rest, piece, text, length, addStarPositions(piece.atom, text, length, position, reversed))
+            advancePositions (rest) (piece) (text) (length) (addStarPositions (piece.atom) (text) (length) (position) (reversed))
         | OneOrMore ->
             let next =
-                if position < length && atomMatches(piece.atom, Stdlib.String.getByteAt(text, position)) then
-                    addStarPositions(piece.atom, text, length, position + 1L, reversed)
+                if position < length && atomMatches (piece.atom) (Stdlib.String.getByteAt (text) (position)) then
+                    addStarPositions (piece.atom) (text) (length) (position + 1L) (reversed)
                 else reversed in
-            advancePositions(rest, piece, text, length, next)
+            advancePositions (rest) (piece) (text) (length) (next)
 
-let matchesSequence(pieces: List<Piece>, positions: List<Int64>, text: String, length: Int64) : Bool =
+let matchesSequence (pieces: List<Piece>) (positions: List<Int64>) (text: String) (length: Int64) : Bool =
     match pieces with
-    | [] -> !Stdlib.List.isEmpty<Int64>(positions)
+    | [] -> !Stdlib.List.isEmpty<Int64> (positions)
     | piece :: rest ->
-        let next = advancePositions(positions, piece, text, length, []) in
-        if Stdlib.List.isEmpty<Int64>(next) then false
-        else matchesSequence(rest, next, text, length)
+        let next = advancePositions (positions) (piece) (text) (length) ([]) in
+        if Stdlib.List.isEmpty<Int64> (next) then false
+        else matchesSequence (rest) (next) (text) (length)
 
-let matchesAny(alternatives: List<List<Piece>>, text: String, length: Int64, start: Int64) : Bool =
+let matchesAny (alternatives: List<List<Piece>>) (text: String) (length: Int64) (start: Int64) : Bool =
     match alternatives with
     | [] -> false
     | pieces :: rest ->
-        if matchesSequence(pieces, [start], text, length) then true
-        else matchesAny(rest, text, length, start)
+        if matchesSequence (pieces) ([start]) (text) (length) then true
+        else matchesAny (rest) (text) (length) (start)
 
-let scan(alternatives: List<List<Piece>>, text: String, length: Int64, position: Int64, count: Int64, checksum: Int64) : (Int64 * Int64) =
+let scan (alternatives: List<List<Piece>>) (text: String) (length: Int64) (position: Int64) (count: Int64) (checksum: Int64) : (Int64 * Int64) =
     if position >= length then (count, checksum)
-    else if matchesAny(alternatives, text, length, position) then
-        scan(alternatives, text, length, position + 1L, count + 1L, (checksum + (position + 1L) * (count + 3L)) % 1000000007L)
-    else scan(alternatives, text, length, position + 1L, count, checksum)
+    else if matchesAny (alternatives) (text) (length) (position) then
+        scan (alternatives) (text) (length) (position + 1L) (count + 1L) ((checksum + (position + 1L) * (count + 3L)) % 1000000007L)
+    else scan (alternatives) (text) (length) (position + 1L) (count) (checksum)
 
-let run(remaining: Int64, alternatives: List<List<Piece>>, text: String, result: Int64) : Int64 =
+let run (remaining: Int64) (alternatives: List<List<Piece>>) (text: String) (result: Int64) : Int64 =
     if remaining <= 0L then result
     else
-        let found = scan(alternatives, text, Stdlib.String.codepointLength(text), 0L, 0L, 0L) in
-        run(remaining - 1L, alternatives, text, (result + found.0 * 1000003L + found.1) % 1000000007L)
+        let found = scan (alternatives) (text) (Stdlib.String.codepointLength (text)) (0L) (0L) (0L) in
+        run (remaining - 1L) (alternatives) (text) ((result + found.0 * 1000003L + found.1) % 1000000007L)
 
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-let blocks = benchmarkArg(0I) in
-let repetitions = benchmarkArg(1I) in
-if blocks <= 0L || repetitions <= 0L then Builtin.testRuntimeError("regex workload arguments must be positive")
+let blocks = benchmarkArg (0) in
+let repetitions = benchmarkArg (1) in
+if blocks <= 0L || repetitions <= 0L then Builtin.testRuntimeError ("regex workload arguments must be positive")
 else
     let pattern = "dark[a-z]*lang|compiler[0-9]+|ab[0-9]?" in
-    let alternatives = parseAlternatives(pattern, 0L, [], []) in
+    let alternatives = parseAlternatives (pattern) (0L) ([]) ([]) in
     let unit = "darklang darkxxlang compiler42 compiler ab ab7 nope DARKlang compilerx\n" in
-    let text = Stdlib.String.repeat(unit, Stdlib.Int.fromInt64(blocks)) in
-    Builtin.printLine(Stdlib.Int64.toString(run(repetitions, alternatives, text, 0L)))
+    let text = Stdlib.String.repeat (unit) (Stdlib.Int.fromInt64 (blocks)) in
+    Builtin.printLine (Stdlib.Int64.toString (run (repetitions) (alternatives) (text) (0L)))

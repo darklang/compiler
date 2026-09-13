@@ -31,16 +31,14 @@ type TypeReference =
     | TDB of Darklang.LanguageTools.RuntimeTypes.TypeReference
     | TVariable of String
 
-let __typeReferenceListToString(types: List<Darklang.LanguageTools.RuntimeTypes.TypeReference>) : List<String> =
-    Stdlib.List.map<Darklang.LanguageTools.RuntimeTypes.TypeReference, String>(
-        types,
-        fun typ -> Darklang.LanguageTools.RuntimeTypes.typeReferenceToString(typ))
+let __typeReferenceListToString (types: List<Darklang.LanguageTools.RuntimeTypes.TypeReference>) : List<String> =
+    Stdlib.List.map<Darklang.LanguageTools.RuntimeTypes.TypeReference, String> (types) (fun typ -> Darklang.LanguageTools.RuntimeTypes.typeReferenceToString (typ))
 
-let typeReferenceToString(typ: Darklang.LanguageTools.RuntimeTypes.TypeReference) : String =
+let typeReferenceToString (typ: Darklang.LanguageTools.RuntimeTypes.TypeReference) : String =
     match typ with
     // Payload-bearing terminal cases come first so their borrowed payload is
     // returned directly, rather than threaded through the large match join.
-    | TVariable(name) -> name ++ ""
+    | TVariable (name) -> name ++ ""
     | TUnit -> "Unit"
     | TBool -> "Bool"
     | TInt8 -> "Int8"
@@ -60,20 +58,18 @@ let typeReferenceToString(typ: Darklang.LanguageTools.RuntimeTypes.TypeReference
     | TUuid -> "Uuid"
     | TDateTime -> "DateTime"
     | TBlob -> "Blob"
-    | TStream(inner) -> "Stream<" ++ Darklang.LanguageTools.RuntimeTypes.typeReferenceToString(inner) ++ ">"
-    | TTuple(first, second, rest) ->
+    | TStream (inner) -> "Stream<" ++ Darklang.LanguageTools.RuntimeTypes.typeReferenceToString (inner) ++ ">"
+    | TTuple (first) (second) (rest) ->
         let all =
-            Stdlib.List.push<Darklang.LanguageTools.RuntimeTypes.TypeReference>(
-                Stdlib.List.push<Darklang.LanguageTools.RuntimeTypes.TypeReference>(rest, second),
-                first) in
-        "(" ++ Stdlib.String.join(Darklang.LanguageTools.RuntimeTypes.__typeReferenceListToString(all), " * ") ++ ")"
-    | TList(inner) -> "List<" ++ Darklang.LanguageTools.RuntimeTypes.typeReferenceToString(inner) ++ ">"
-    | TDict(inner) -> "Dict<" ++ Darklang.LanguageTools.RuntimeTypes.typeReferenceToString(inner) ++ ">"
-    | TCustomType(resolution, typeArgs) ->
-        let renderedName = Stdlib.String.join(resolution.originalName, ".") in
+            Stdlib.List.push<Darklang.LanguageTools.RuntimeTypes.TypeReference> (Stdlib.List.push<Darklang.LanguageTools.RuntimeTypes.TypeReference> (rest) (second)) (first) in
+        "(" ++ Stdlib.String.join (Darklang.LanguageTools.RuntimeTypes.__typeReferenceListToString (all)) (" * ") ++ ")"
+    | TList (inner) -> "List<" ++ Darklang.LanguageTools.RuntimeTypes.typeReferenceToString (inner) ++ ">"
+    | TDict (inner) -> "Dict<" ++ Darklang.LanguageTools.RuntimeTypes.typeReferenceToString (inner) ++ ">"
+    | TCustomType (resolution) (typeArgs) ->
+        let renderedName = Stdlib.String.join (resolution.originalName) (".") in
         (match typeArgs with
         | [] -> renderedName
-        | _ -> renderedName ++ "<" ++ Stdlib.String.join(Darklang.LanguageTools.RuntimeTypes.__typeReferenceListToString(typeArgs), ", ") ++ ">")
-    | TFn(parameters, result) ->
-        "(" ++ Stdlib.String.join(Darklang.LanguageTools.RuntimeTypes.__typeReferenceListToString(parameters), ", ") ++ ") -> " ++ Darklang.LanguageTools.RuntimeTypes.typeReferenceToString(result)
-    | TDB(inner) -> "DB<" ++ Darklang.LanguageTools.RuntimeTypes.typeReferenceToString(inner) ++ ">"
+        | _ -> renderedName ++ "<" ++ Stdlib.String.join (Darklang.LanguageTools.RuntimeTypes.__typeReferenceListToString (typeArgs)) (", ") ++ ">")
+    | TFn (parameters) (result) ->
+        "(" ++ Stdlib.String.join (Darklang.LanguageTools.RuntimeTypes.__typeReferenceListToString (parameters)) (", ") ++ ") -> " ++ Darklang.LanguageTools.RuntimeTypes.typeReferenceToString (result)
+    | TDB (inner) -> "DB<" ++ Darklang.LanguageTools.RuntimeTypes.typeReferenceToString (inner) ++ ">"

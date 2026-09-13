@@ -3,50 +3,48 @@
 
 // The Rust reference chooses the middle element and traverses the input once
 // for each of its three partitions. Keep the same source-level work here.
-let getAtOrDefault(list: List<Int64>, index: Int64, default_: Int64) : Int64 =
-    match Stdlib.List.getAt<Int64>(list, Stdlib.Int.fromInt64(index)) with
-    | Some(v) -> v
+let getAtOrDefault (list: List<Int64>) (index: Int64) (default_: Int64) : Int64 =
+    match Stdlib.List.getAt<Int64> (list) (Stdlib.Int.fromInt64 (index)) with
+    | Some (v) -> v
     | None -> default_
 
-let quicksort(arr: List<Int64>) : List<Int64> =
-    let len = Builtin.unwrap(Stdlib.Int.toInt64(Stdlib.List.length<Int64>(arr))) in
+let quicksort (arr: List<Int64>) : List<Int64> =
+    let len = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.List.length<Int64> (arr))) in
     if len <= 1L then arr
     else
-        let pivot = getAtOrDefault(arr, len / 2L, 0L) in
-        let left = Stdlib.List.filter<Int64>(arr, fun x -> x < pivot) in
-        let middle = Stdlib.List.filter<Int64>(arr, fun x -> x == pivot) in
-        let right = Stdlib.List.filter<Int64>(arr, fun x -> x > pivot) in
-        Stdlib.List.append<Int64>(
-            Stdlib.List.append<Int64>(quicksort(left), middle),
-            quicksort(right))
+        let pivot = getAtOrDefault (arr) (len / 2L) (0L) in
+        let left = Stdlib.List.filter<Int64> (arr) (fun x -> x < pivot) in
+        let middle = Stdlib.List.filter<Int64> (arr) (fun x -> x == pivot) in
+        let right = Stdlib.List.filter<Int64> (arr) (fun x -> x > pivot) in
+        Stdlib.List.append<Int64> (Stdlib.List.append<Int64> (quicksort (left)) (middle)) (quicksort (right))
 
 // Generate pseudo-random list using LCG
-let generateListHelper(n: Int64, x: Int64, acc: List<Int64>) : List<Int64> =
-    if n <= 0L then Stdlib.List.reverse<Int64>(acc)
+let generateListHelper (n: Int64) (x: Int64) (acc: List<Int64>) : List<Int64> =
+    if n <= 0L then Stdlib.List.reverse<Int64> (acc)
     else
         let nextX = (x * 1103515245L + 12345L) % 2147483648L in
         let value = nextX % 10000L in
-        generateListHelper(n - 1L, nextX, Stdlib.List.push<Int64>(acc, value))
+        generateListHelper (n - 1L) (nextX) (Stdlib.List.push<Int64> (acc) (value))
 
-let generateList(n: Int64, seed: Int64) : List<Int64> =
-    generateListHelper(n, seed, [])
+let generateList (n: Int64) (seed: Int64) : List<Int64> =
+    generateListHelper (n) (seed) ([])
 
 // Compute checksum with index weighting
-let checksumHelper(arr: List<Int64>, index: Int64, acc: Int64) : Int64 =
+let checksumHelper (arr: List<Int64>) (index: Int64) (acc: Int64) : Int64 =
     match arr with
     | [] -> acc
     | h :: t ->
         let newAcc = (acc + (h * (index + 1L)) % 1000000007L) % 1000000007L in
-        checksumHelper(t, index + 1L, newAcc)
+        checksumHelper (t) (index + 1L) (newAcc)
 
-let checksum(arr: List<Int64>) : Int64 =
-    checksumHelper(arr, 0L, 0L)
+let checksum (arr: List<Int64>) : Int64 =
+    checksumHelper (arr) (0L) (0L)
 
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-let arr = generateList(benchmarkArg(0I), benchmarkArg(1I)) in
-let sortedArr = quicksort(arr) in
-Builtin.printLine(Stdlib.Int64.toString(checksum(sortedArr)))
+let arr = generateList (benchmarkArg (0)) (benchmarkArg (1)) in
+let sortedArr = quicksort (arr) in
+Builtin.printLine (Stdlib.Int64.toString (checksum (sortedArr)))

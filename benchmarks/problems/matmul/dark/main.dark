@@ -3,51 +3,51 @@
 // materializes the product in a Dict before computing its weighted checksum,
 // matching the separate multiplication and checksum stages in Rust.
 
-let nextRand(x: Int64) : Int64 =
+let nextRand (x: Int64) : Int64 =
     (x * 1103515245L + 12345L) % 2147483648L
 
-let generateMatrixValues(remaining: Int64, index: Int64, seed: Int64, values: Dict<Int64>) : Dict<Int64> =
+let generateMatrixValues (remaining: Int64) (index: Int64) (seed: Int64) (values: Dict<Int64>) : Dict<Int64> =
     if remaining <= 0L then values
     else
-        let next = nextRand(seed) in
-        generateMatrixValues(remaining - 1L, index + 1L, next, Stdlib.Dict.setOverridingDuplicates<Int64>(values, Stdlib.Int64.toString(index), next % 100L))
+        let next = nextRand (seed) in
+        generateMatrixValues (remaining - 1L) (index + 1L) (next) (Stdlib.Dict.setOverridingDuplicates<Int64> (values) (Stdlib.Int64.toString (index)) (next % 100L))
 
-let matrixValue(values: Dict<Int64>, index: Int64) : Int64 =
-    match Stdlib.Dict.get<Int64>(values, Stdlib.Int64.toString(index)) with
-    | Some(value) -> value
+let matrixValue (values: Dict<Int64>) (index: Int64) : Int64 =
+    match Stdlib.Dict.get<Int64> (values) (Stdlib.Int64.toString (index)) with
+    | Some (value) -> value
     | None -> 0L
 
-let dotCell(a: Dict<Int64>, b: Dict<Int64>, n: Int64, i: Int64, j: Int64, k: Int64, acc: Int64) : Int64 =
+let dotCell (a: Dict<Int64>) (b: Dict<Int64>) (n: Int64) (i: Int64) (j: Int64) (k: Int64) (acc: Int64) : Int64 =
     if k >= n then acc
     else
-        let aValue = matrixValue(a, i * n + k) in
-        let bValue = matrixValue(b, k * n + j) in
-        dotCell(a, b, n, i, j, k + 1L, acc + aValue * bValue)
+        let aValue = matrixValue (a) (i * n + k) in
+        let bValue = matrixValue (b) (k * n + j) in
+        dotCell (a) (b) (n) (i) (j) (k + 1L) (acc + aValue * bValue)
 
-let multiplyCells(a: Dict<Int64>, b: Dict<Int64>, n: Int64, i: Int64, j: Int64, result: Dict<Int64>) : Dict<Int64> =
+let multiplyCells (a: Dict<Int64>) (b: Dict<Int64>) (n: Int64) (i: Int64) (j: Int64) (result: Dict<Int64>) : Dict<Int64> =
     if i >= n then result
-    else if j >= n then multiplyCells(a, b, n, i + 1L, 0L, result)
+    else if j >= n then multiplyCells (a) (b) (n) (i + 1L) (0L) (result)
     else
-        let cell = dotCell(a, b, n, i, j, 0L, 0L) in
+        let cell = dotCell (a) (b) (n) (i) (j) (0L) (0L) in
         let index = i * n + j in
-        let updated = Stdlib.Dict.setOverridingDuplicates<Int64>(result, Stdlib.Int64.toString(index), cell) in
-        multiplyCells(a, b, n, i, j + 1L, updated)
+        let updated = Stdlib.Dict.setOverridingDuplicates<Int64> (result) (Stdlib.Int64.toString (index)) (cell) in
+        multiplyCells (a) (b) (n) (i) (j + 1L) (updated)
 
-let checksumCells(result: Dict<Int64>, total: Int64, index: Int64, acc: Int64) : Int64 =
+let checksumCells (result: Dict<Int64>) (total: Int64) (index: Int64) (acc: Int64) : Int64 =
     if index >= total then acc
     else
-        let cell = matrixValue(result, index) in
-        checksumCells(result, total, index + 1L, (acc + cell * (index + 1L)) % 1000000007L)
+        let cell = matrixValue (result) (index) in
+        checksumCells (result) (total) (index + 1L) ((acc + cell * (index + 1L)) % 1000000007L)
 
-let matmulChecksum(n: Int64) : Int64 =
-    let a = generateMatrixValues(n * n, 0L, 42L, Stdlib.Dict.empty) in
-    let b = generateMatrixValues(n * n, 0L, 123L, Stdlib.Dict.empty) in
-    let result = multiplyCells(a, b, n, 0L, 0L, Stdlib.Dict.empty) in
-    checksumCells(result, n * n, 0L, 0L)
+let matmulChecksum (n: Int64) : Int64 =
+    let a = generateMatrixValues (n * n) (0L) (42L) (Stdlib.Dict.empty) in
+    let b = generateMatrixValues (n * n) (0L) (123L) (Stdlib.Dict.empty) in
+    let result = multiplyCells (a) (b) (n) (0L) (0L) (Stdlib.Dict.empty) in
+    checksumCells (result) (n * n) (0L) (0L)
 
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-Builtin.printLine(Stdlib.Int64.toString(matmulChecksum(benchmarkArg(0I))))
+Builtin.printLine (Stdlib.Int64.toString (matmulChecksum (benchmarkArg (0))))

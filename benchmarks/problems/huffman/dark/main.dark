@@ -8,123 +8,119 @@ type HuffmanTree =
 
 type Codec = { tree: HuffmanTree, codes: Dict<Int64> }
 
-let symbolKey(symbol: Int64) : String =
-    Stdlib.String.substring("abcdefghijklmnopqrstuvwxyzABCDEF", symbol, symbol + 1L)
+let symbolKey (symbol: Int64) : String =
+    Stdlib.String.substring ("abcdefghijklmnopqrstuvwxyzABCDEF") (symbol) (symbol + 1L)
 
-let treeWeight(tree: HuffmanTree) : Int64 =
+let treeWeight (tree: HuffmanTree) : Int64 =
     match tree with
-    | Leaf((_, weight)) -> weight
-    | Branch(((weight, _), _)) -> weight
+    | Leaf ((_, weight)) -> weight
+    | Branch (((weight, _), _)) -> weight
 
-let treeMinimumSymbol(tree: HuffmanTree) : Int64 =
+let treeMinimumSymbol (tree: HuffmanTree) : Int64 =
     match tree with
-    | Leaf((symbol, _)) -> symbol
-    | Branch(((_, minimumSymbol), _)) -> minimumSymbol
+    | Leaf ((symbol, _)) -> symbol
+    | Branch (((_, minimumSymbol), _)) -> minimumSymbol
 
-let treeComesFirst(left: HuffmanTree, right: HuffmanTree) : Bool =
-    let leftWeight = treeWeight(left) in
-    let rightWeight = treeWeight(right) in
+let treeComesFirst (left: HuffmanTree) (right: HuffmanTree) : Bool =
+    let leftWeight = treeWeight (left) in
+    let rightWeight = treeWeight (right) in
     leftWeight < rightWeight
-    || (leftWeight == rightWeight && treeMinimumSymbol(left) < treeMinimumSymbol(right))
+    || (leftWeight == rightWeight && treeMinimumSymbol (left) < treeMinimumSymbol (right))
 
-let insertTree(tree: HuffmanTree, queue: List<HuffmanTree>) : List<HuffmanTree> =
+let insertTree (tree: HuffmanTree) (queue: List<HuffmanTree>) : List<HuffmanTree> =
     match queue with
     | [] -> [tree]
     | first :: rest ->
-        if treeComesFirst(tree, first) then Stdlib.List.push<HuffmanTree>(queue, tree)
-        else Stdlib.List.push<HuffmanTree>(insertTree(tree, rest), first)
+        if treeComesFirst (tree) (first) then Stdlib.List.push<HuffmanTree> (queue) (tree)
+        else Stdlib.List.push<HuffmanTree> (insertTree (tree) (rest)) (first)
 
-let countFrequencies(data: List<Int64>, frequencies: Dict<Int64>) : Dict<Int64> =
+let countFrequencies (data: List<Int64>) (frequencies: Dict<Int64>) : Dict<Int64> =
     match data with
     | [] -> frequencies
     | symbol :: rest ->
-        let key = symbolKey(symbol) in
-        match Stdlib.Dict.get<Int64>(frequencies, key) with
+        let key = symbolKey (symbol) in
+        match Stdlib.Dict.get<Int64> (frequencies) (key) with
         | None ->
-            countFrequencies(
-                rest,
-                Stdlib.Dict.setOverridingDuplicates<Int64>(frequencies, key, 1L))
-        | Some(count) ->
-            countFrequencies(
-                rest,
-                Stdlib.Dict.setOverridingDuplicates<Int64>(frequencies, key, count + 1L))
+            countFrequencies (rest) (Stdlib.Dict.setOverridingDuplicates<Int64> (frequencies) (key) (1L))
+        | Some (count) ->
+            countFrequencies (rest) (Stdlib.Dict.setOverridingDuplicates<Int64> (frequencies) (key) (count + 1L))
 
-let frequenciesToQueue(symbol: Int64, frequencies: Dict<Int64>, queue: List<HuffmanTree>) : List<HuffmanTree> =
+let frequenciesToQueue (symbol: Int64) (frequencies: Dict<Int64>) (queue: List<HuffmanTree>) : List<HuffmanTree> =
     if symbol >= 32L then queue
     else
-        match Stdlib.Dict.get<Int64>(frequencies, symbolKey(symbol)) with
-        | None -> frequenciesToQueue(symbol + 1L, frequencies, queue)
-        | Some(count) -> frequenciesToQueue(symbol + 1L, frequencies, insertTree(Leaf((symbol, count)), queue))
+        match Stdlib.Dict.get<Int64> (frequencies) (symbolKey (symbol)) with
+        | None -> frequenciesToQueue (symbol + 1L) (frequencies) (queue)
+        | Some (count) -> frequenciesToQueue (symbol + 1L) (frequencies) (insertTree (Leaf ((symbol, count))) (queue))
 
-let mergeMinimumTrees(queue: List<HuffmanTree>) : Stdlib.Option.Option<HuffmanTree> =
+let mergeMinimumTrees (queue: List<HuffmanTree>) : Stdlib.Option.Option<HuffmanTree> =
     match queue with
     | [] -> None
-    | [first] -> Some(first)
+    | [first] -> Some (first)
     | first :: second :: tail ->
         let combined =
-            Branch(((
-                treeWeight(first) + treeWeight(second),
-                Stdlib.Int64.min(treeMinimumSymbol(first), treeMinimumSymbol(second))),
+            Branch (((
+                treeWeight (first) + treeWeight (second),
+                Stdlib.Int64.min (treeMinimumSymbol (first)) (treeMinimumSymbol (second))),
                 (first, second))) in
-        mergeMinimumTrees(insertTree(combined, tail))
+        mergeMinimumTrees (insertTree (combined) (tail))
 
 // Codes pack the bit pattern above its six-bit length so the dictionary holds
 // a primitive value. The benchmark alphabet is capped at 32 symbols.
-let buildCodes(tree: HuffmanTree, bits: Int64, length: Int64, codes: Dict<Int64>) : Dict<Int64> =
+let buildCodes (tree: HuffmanTree) (bits: Int64) (length: Int64) (codes: Dict<Int64>) : Dict<Int64> =
     match tree with
-    | Leaf((symbol, _)) ->
+    | Leaf ((symbol, _)) ->
         let codeLength = if length == 0L then 1L else length in
-        Stdlib.Dict.setOverridingDuplicates<Int64>(codes, symbolKey(symbol), bits * 64L + codeLength)
-    | Branch((_, (left, right))) ->
-        let afterLeft = buildCodes(left, bits * 2L, length + 1L, codes) in
-        buildCodes(right, bits * 2L + 1L, length + 1L, afterLeft)
+        Stdlib.Dict.setOverridingDuplicates<Int64> (codes) (symbolKey (symbol)) (bits * 64L + codeLength)
+    | Branch ((_, (left, right))) ->
+        let afterLeft = buildCodes (left) (bits * 2L) (length + 1L) (codes) in
+        buildCodes (right) (bits * 2L + 1L) (length + 1L) (afterLeft)
 
-let buildCodec(data: List<Int64>) : Stdlib.Option.Option<Codec> =
-    let frequencies = countFrequencies(data, Stdlib.Dict.empty) in
-    let queue = frequenciesToQueue(0L, frequencies, []) in
-    match mergeMinimumTrees(queue) with
+let buildCodec (data: List<Int64>) : Stdlib.Option.Option<Codec> =
+    let frequencies = countFrequencies (data) (Stdlib.Dict.empty) in
+    let queue = frequenciesToQueue (0L) (frequencies) ([]) in
+    match mergeMinimumTrees (queue) with
     | None -> None
-    | Some(tree) -> Some(Codec { tree = tree, codes = buildCodes(tree, 0L, 0L, Stdlib.Dict.empty) })
+    | Some (tree) -> Some (Codec { tree = tree, codes = buildCodes (tree) (0L) (0L) (Stdlib.Dict.empty) })
 
-let prependCodeToReversed(bits: Int64, index: Int64, reversed: List<Int64>) : List<Int64> =
+let prependCodeToReversed (bits: Int64) (index: Int64) (reversed: List<Int64>) : List<Int64> =
     if index < 0L then reversed
     else
-        let bit = Stdlib.Int64.bitwiseAnd(Stdlib.Int64.shiftRight(bits, index), 1L) in
-        prependCodeToReversed(bits, index - 1L, Stdlib.List.push<Int64>(reversed, bit))
+        let bit = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight (bits) (index)) (1L) in
+        prependCodeToReversed (bits) (index - 1L) (Stdlib.List.push<Int64> (reversed) (bit))
 
-let encodeReversed(data: List<Int64>, codes: Dict<Int64>, reversed: List<Int64>) : Stdlib.Result.Result<List<Int64>, String> =
+let encodeReversed (data: List<Int64>) (codes: Dict<Int64>) (reversed: List<Int64>) : Stdlib.Result.Result<List<Int64>, String> =
     match data with
-    | [] -> Ok(Stdlib.List.reverse<Int64>(reversed))
+    | [] -> Ok (Stdlib.List.reverse<Int64> (reversed))
     | symbol :: rest ->
-        match Stdlib.Dict.get<Int64>(codes, symbolKey(symbol)) with
-        | None -> Error("symbol missing from Huffman code table")
-        | Some(code) ->
+        match Stdlib.Dict.get<Int64> (codes) (symbolKey (symbol)) with
+        | None -> Error ("symbol missing from Huffman code table")
+        | Some (code) ->
             let length = code % 64L in
-            encodeReversed(rest, codes, prependCodeToReversed(code / 64L, length - 1L, reversed))
+            encodeReversed (rest) (codes) (prependCodeToReversed (code / 64L) (length - 1L) (reversed))
 
-let encode(data: List<Int64>, codec: Codec) : Stdlib.Result.Result<List<Int64>, String> =
-    encodeReversed(data, codec.codes, [])
+let encode (data: List<Int64>) (codec: Codec) : Stdlib.Result.Result<List<Int64>, String> =
+    encodeReversed (data) (codec.codes) ([])
 
-let decodeLoop(bits: List<Int64>, root: HuffmanTree, current: HuffmanTree, reversed: List<Int64>) : Stdlib.Result.Result<List<Int64>, String> =
+let decodeLoop (bits: List<Int64>) (root: HuffmanTree) (current: HuffmanTree) (reversed: List<Int64>) : Stdlib.Result.Result<List<Int64>, String> =
     match bits with
-    | [] -> Ok(Stdlib.List.reverse<Int64>(reversed))
+    | [] -> Ok (Stdlib.List.reverse<Int64> (reversed))
     | bit :: rest ->
         match current with
-        | Leaf(_) -> Error("decoder reached a leaf before consuming a bit")
-        | Branch((_, (left, right))) ->
+        | Leaf (_) -> Error ("decoder reached a leaf before consuming a bit")
+        | Branch ((_, (left, right))) ->
             let next = if bit == 0L then left else right in
             match next with
-            | Leaf((symbol, _)) ->
-                decodeLoop(rest, root, root, Stdlib.List.push<Int64>(reversed, symbol))
-            | Branch(_) -> decodeLoop(rest, root, next, reversed)
+            | Leaf ((symbol, _)) ->
+                decodeLoop (rest) (root) (root) (Stdlib.List.push<Int64> (reversed) (symbol))
+            | Branch (_) -> decodeLoop (rest) (root) (next) (reversed)
 
-let decode(bits: List<Int64>, codec: Codec) : Stdlib.Result.Result<List<Int64>, String> =
+let decode (bits: List<Int64>) (codec: Codec) : Stdlib.Result.Result<List<Int64>, String> =
     match codec.tree with
-    | Leaf((symbol, _)) ->
-        Ok(Stdlib.List.map<Int64, Int64>(bits, fun _ -> symbol))
-    | Branch(_) -> decodeLoop(bits, codec.tree, codec.tree, [])
+    | Leaf ((symbol, _)) ->
+        Ok (Stdlib.List.map<Int64, Int64> (bits) (fun _ -> symbol))
+    | Branch (_) -> decodeLoop (bits) (codec.tree) (codec.tree) ([])
 
-let chooseSymbol(random: Int64) : Int64 =
+let chooseSymbol (random: Int64) : Int64 =
     let roll = random % 1000L in
     if roll < 300L then 0L
     else if roll < 480L then 1L
@@ -136,49 +132,49 @@ let chooseSymbol(random: Int64) : Int64 =
     else if roll < 940L then 7L
     else 8L + random % 24L
 
-let generateData(remaining: Int64, state: Int64, reversed: List<Int64>) : List<Int64> =
-    if remaining <= 0L then Stdlib.List.reverse<Int64>(reversed)
+let generateData (remaining: Int64) (state: Int64) (reversed: List<Int64>) : List<Int64> =
+    if remaining <= 0L then Stdlib.List.reverse<Int64> (reversed)
     else
         let next = (state * 1103515245L + 12345L) % 2147483648L in
-        generateData(remaining - 1L, next, Stdlib.List.push<Int64>(reversed, chooseSymbol(next)))
+        generateData (remaining - 1L) (next) (Stdlib.List.push<Int64> (reversed) (chooseSymbol (next)))
 
-let checksum(values: List<Int64>, index: Int64, result: Int64) : (Int64 * Int64) =
+let checksum (values: List<Int64>) (index: Int64) (result: Int64) : (Int64 * Int64) =
     match values with
     | [] -> (index, result)
     | value :: rest ->
-        checksum(rest, index + 1L, (result + value * (index + 1L)) % 1000000007L)
+        checksum (rest) (index + 1L) ((result + value * (index + 1L)) % 1000000007L)
 
-let runIterations(remaining: Int64, data: List<Int64>, codec: Codec, expectedChecksum: Int64, result: Int64) : Int64 =
+let runIterations (remaining: Int64) (data: List<Int64>) (codec: Codec) (expectedChecksum: Int64) (result: Int64) : Int64 =
     if remaining <= 0L then result
     else
-        match encode(data, codec) with
-        | Error(message) -> Builtin.testRuntimeError(message)
-        | Ok(bits) ->
-            match decode(bits, codec) with
-            | Error(message) -> Builtin.testRuntimeError(message)
-            | Ok(decoded) ->
-                let bitResult = checksum(bits, 0L, 0L) in
-                let decodedResult = checksum(decoded, 0L, 0L) in
+        match encode (data) (codec) with
+        | Error (message) -> Builtin.testRuntimeError (message)
+        | Ok (bits) ->
+            match decode (bits) (codec) with
+            | Error (message) -> Builtin.testRuntimeError (message)
+            | Ok (decoded) ->
+                let bitResult = checksum (bits) (0L) (0L) in
+                let decodedResult = checksum (decoded) (0L) (0L) in
                 if decodedResult.1 != expectedChecksum then
-                    Builtin.testRuntimeError("Huffman round trip changed the input")
+                    Builtin.testRuntimeError ("Huffman round trip changed the input")
                 else
                     let contribution = (bitResult.0 * 17L + bitResult.1 + decodedResult.1) % 1000000007L in
-                    runIterations(remaining - 1L, data, codec, expectedChecksum, (result + contribution) % 1000000007L)
+                    runIterations (remaining - 1L) (data) (codec) (expectedChecksum) ((result + contribution) % 1000000007L)
 
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-let size = benchmarkArg(0I) in
-let seed = benchmarkArg(1I) in
-let repetitions = benchmarkArg(2I) in
+let size = benchmarkArg (0) in
+let seed = benchmarkArg (1) in
+let repetitions = benchmarkArg (2) in
 if size <= 0L || repetitions <= 0L then
-    Builtin.testRuntimeError("Huffman size and repetitions must be positive")
+    Builtin.testRuntimeError ("Huffman size and repetitions must be positive")
 else
-    let data = generateData(size, seed, []) in
-    let expectedChecksum = checksum(data, 0L, 0L).1 in
-    match buildCodec(data) with
-    | None -> Builtin.testRuntimeError("Huffman codec requires non-empty input")
-    | Some(codec) ->
-        Builtin.printLine(Stdlib.Int64.toString(runIterations(repetitions, data, codec, expectedChecksum, 0L)))
+    let data = generateData (size) (seed) ([]) in
+    let expectedChecksum = (checksum (data) (0L) (0L)).1 in
+    match buildCodec (data) with
+    | None -> Builtin.testRuntimeError ("Huffman codec requires non-empty input")
+    | Some (codec) ->
+        Builtin.printLine (Stdlib.Int64.toString (runIterations (repetitions) (data) (codec) (expectedChecksum) (0L)))

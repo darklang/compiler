@@ -462,7 +462,7 @@ let testParsesEscapedBackslashBeforeNAsLiteralText () : TestResult =
                 Error $"Expected exactly 1 parsed test, got {tests.Length}")
 
 let testParsesRepeatedProcessArgumentsInOrder () : TestResult =
-    let testSource = "Stdlib.Cli.Args.int64(0I) = Ok(100L) arg=\"100\" arg=\"two words\"\n"
+    let testSource = "Stdlib.Cli.Args.int64 0 = Ok (100L) arg=\"100\" arg=\"two words\"\n"
 
     withTempFileNamed "test.e2e" testSource (fun path ->
         match parseE2ETestFile path with
@@ -490,7 +490,7 @@ let testBuildsParseableUniversalBatchSource () : TestResult =
                 let source = buildBatchSource prepared
                 match CompilerLibrary.parseProgram false source with
                 | Error msg -> Error $"Generated batch source did not parse: {msg}\n{source}"
-                | Ok _ when not (source.Contains("_Check0(seed: Int64): Bool =")) ->
+                | Ok _ when not (source.Contains("_Check0 (seed: Int64) : Bool =")) ->
                     Error $"Generated batch did not isolate each check in a function:\n{source}"
                 | Ok _ when not (source.Contains("fun value -> if seed == 0L then value else false")) ->
                     Error $"Generated batch check was not protected from inlining:\n{source}"
@@ -548,7 +548,7 @@ let testRejectsInvalidMultiChunkBatchBitmaskResults () : TestResult =
     | other -> Error $"Expected invalid multi-chunk result vectors to be rejected, got {other}"
 
 let testDoesNotBatchTestsWithProcessInputs () : TestResult =
-    let testSource = "Stdlib.Cli.Args.int64(0I) = Ok(100L) arg=\"100\"\n"
+    let testSource = "Stdlib.Cli.Args.int64 0 = Ok (100L) arg=\"100\"\n"
     withTempFileNamed "ordinary.e2e" testSource (fun path ->
         match parseE2ETestFile path with
         | Ok [test] when Option.isNone (tryPrepareBatchTest test) -> Ok ()
@@ -558,7 +558,7 @@ let testDoesNotBatchTestsWithProcessInputs () : TestResult =
 
 let testBatchesEqualityInsideExplicitResultBinding () : TestResult =
     let testSource =
-        "let identityInt(value: Int) : Int = value identityInt(9223372036854775808I) = 9223372036854775808I\n"
+        "let identityInt (value: Int) : Int = value identityInt 9223372036854775808 = 9223372036854775808\n"
     withTempFileNamed "ordinary.e2e" testSource (fun path ->
         match parseE2ETestFile path with
         | Ok [test] when Option.isSome (tryPrepareBatchTest test) -> Ok ()

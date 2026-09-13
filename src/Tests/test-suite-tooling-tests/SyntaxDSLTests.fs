@@ -16,7 +16,7 @@ canonical formatting
 ---SOURCE---
 let x = 5 in x
 ---EXPECTED---
-let x = 5I in x
+let x = 5 in x
 ---ROUNDTRIP---
 
 ---NAME---
@@ -30,7 +30,7 @@ does not use
     match parseSyntaxFileContent "syntax.syntax" content with
     | Ok [ first; second ]
         when first.Name = "canonical formatting"
-             && first.ExpectedFormat = Some "\nlet x = 5I in x\n"
+             && first.ExpectedFormat = Some "\nlet x = 5 in x\n"
              && first.Roundtrip
              && second.ExpectedError = Some "does not use" ->
         Ok ()
@@ -55,9 +55,9 @@ compiler
 let testRunsFormattingAndRoundtripChecks () : TestResult =
     let testCase =
         { Name = "canonical formatting"
-          Source = "let x = 5 in Stdlib.Int64.add(x, 1)"
+          Source = "let x = 5 in Stdlib.Int64.add x 1"
           ExpectedError = None
-          ExpectedFormat = Some "let x = 5I in Stdlib.Int64.add x 1I"
+          ExpectedFormat = Some "let x = 5 in Stdlib.Int64.add x 1"
           Roundtrip = true
           SourceFile = "syntax.syntax" }
 

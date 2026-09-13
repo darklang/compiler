@@ -76,34 +76,34 @@ let result = "foo" ++ "bar" in result = "foobar"
 // Single digit conversion
 
 // Basic integer to string
-Stdlib.Int64.toString(1L) = "1"
-Stdlib.Int64.toString(9L) = "9"
-Stdlib.Int64.toString(10L) = "10"
-Stdlib.Int64.toString(100L) = "100"
-Stdlib.Int64.toString(999L) = "999"
-Stdlib.Int64.toString(1234L) = "1234"
-Stdlib.Int64.toString(12345L) = "12345"
+Stdlib.Int64.toString (1L) = "1"
+Stdlib.Int64.toString (9L) = "9"
+Stdlib.Int64.toString (10L) = "10"
+Stdlib.Int64.toString (100L) = "100"
+Stdlib.Int64.toString (999L) = "999"
+Stdlib.Int64.toString (1234L) = "1234"
+Stdlib.Int64.toString (12345L) = "12345"
 
 // Negative numbers
-Stdlib.Int64.toString(-1L) = "-1"
-Stdlib.Int64.toString(-42L) = "-42"
-Stdlib.Int64.toString(-100L) = "-100"
-Stdlib.Int64.toString(-12345L) = "-12345"
+Stdlib.Int64.toString (-1L) = "-1"
+Stdlib.Int64.toString (-42L) = "-42"
+Stdlib.Int64.toString (-100L) = "-100"
+Stdlib.Int64.toString (-12345L) = "-12345"
 
 // Large numbers
-Stdlib.Int64.toString(1000000L) = "1000000"
-Stdlib.Int64.toString(2147483647L) = "2147483647"
+Stdlib.Int64.toString (1000000L) = "1000000"
+Stdlib.Int64.toString (2147483647L) = "2147483647"
 
 // Concatenation with toString
-"Value: " ++ Stdlib.Int64.toString(42L) = "Value: 42"
-"Answer is " ++ Stdlib.Int64.toString(42L) ++ "!" = "Answer is 42!"
+"Value: " ++ Stdlib.Int64.toString (42L) = "Value: 42"
+"Answer is " ++ Stdlib.Int64.toString (42L) ++ "!" = "Answer is 42!"
 
 // =============================================================================
 // Stdlib.Bool.toString Tests
 // =============================================================================
 
-"The answer is " ++ Stdlib.Bool.toString(true) = "The answer is true"
-"Flag: " ++ Stdlib.Bool.toString(1L > 0L) = "Flag: true"
+"The answer is " ++ Stdlib.Bool.toString (true) = "The answer is true"
+"Flag: " ++ Stdlib.Bool.toString (1L > 0L) = "Flag: true"
 
 // =============================================================================
 // String Interpolation Tests
@@ -145,132 +145,132 @@ let x = "one" in let y = "two" in $"{x} and {y}" = "one and two"
 // =============================================================================
 
 // Get bytes from ASCII string "abc" = 97, 98, 99
-Stdlib.String.getByteAt("abc", 0L) = 97L
-Stdlib.String.getByteAt("abc", 1L) = 98L
-Stdlib.String.getByteAt("abc", 2L) = 99L
+Stdlib.String.getByteAt ("abc") (0L) = 97L
+Stdlib.String.getByteAt ("abc") (1L) = 98L
+Stdlib.String.getByteAt ("abc") (2L) = 99L
 
 // Get bytes from uppercase "ABC" = 65, 66, 67
-Stdlib.String.getByteAt("ABC", 0L) = 65L
-Stdlib.String.getByteAt("ABC", 1L) = 66L
-Stdlib.String.getByteAt("ABC", 2L) = 67L
+Stdlib.String.getByteAt ("ABC") (0L) = 65L
+Stdlib.String.getByteAt ("ABC") (1L) = 66L
+Stdlib.String.getByteAt ("ABC") (2L) = 67L
 
 // Get byte from single character
-Stdlib.String.getByteAt("x", 0L) = 120L
+Stdlib.String.getByteAt ("x") (0L) = 120L
 
 // Get space character (ASCII 32)
-Stdlib.String.getByteAt(" ", 0L) = 32L
+Stdlib.String.getByteAt (" ") (0L) = 32L
 
 // Get digits
-Stdlib.String.getByteAt("0", 0L) = 48L
-Stdlib.String.getByteAt("9", 0L) = 57L
+Stdlib.String.getByteAt ("0") (0L) = 48L
+Stdlib.String.getByteAt ("9") (0L) = 57L
 
 // =============================================================================
 // Stdlib.String.startsWith Tests
 // =============================================================================
 
 // Basic startsWith
-Stdlib.String.startsWith("hello world", "hello") = true
-Stdlib.String.startsWith("hello world", "world") = false
-Stdlib.String.startsWith("abc", "a") = true
-Stdlib.String.startsWith("abc", "ab") = true
-Stdlib.String.startsWith("abc", "abc") = true
-Stdlib.String.startsWith("abc", "abcd") = false
+Stdlib.String.startsWith ("hello world") ("hello") = true
+Stdlib.String.startsWith ("hello world") ("world") = false
+Stdlib.String.startsWith ("abc") ("a") = true
+Stdlib.String.startsWith ("abc") ("ab") = true
+Stdlib.String.startsWith ("abc") ("abc") = true
+Stdlib.String.startsWith ("abc") ("abcd") = false
 
 // Empty string cases
-Stdlib.String.startsWith("hello", "") = true
-Stdlib.String.startsWith("", "") = true
-Stdlib.String.startsWith("", "a") = false
+Stdlib.String.startsWith ("hello") ("") = true
+Stdlib.String.startsWith ("") ("") = true
+Stdlib.String.startsWith ("") ("a") = false
 
 // =============================================================================
 // Stdlib.String.endsWith Tests
 // =============================================================================
 
 // Basic endsWith
-Stdlib.String.endsWith("hello world", "world") = true
-Stdlib.String.endsWith("hello world", "hello") = false
-Stdlib.String.endsWith("abc", "c") = true
-Stdlib.String.endsWith("abc", "bc") = true
-Stdlib.String.endsWith("abc", "abc") = true
-Stdlib.String.endsWith("abc", "xabc") = false
+Stdlib.String.endsWith ("hello world") ("world") = true
+Stdlib.String.endsWith ("hello world") ("hello") = false
+Stdlib.String.endsWith ("abc") ("c") = true
+Stdlib.String.endsWith ("abc") ("bc") = true
+Stdlib.String.endsWith ("abc") ("abc") = true
+Stdlib.String.endsWith ("abc") ("xabc") = false
 
 // Empty string cases
-Stdlib.String.endsWith("hello", "") = true
-Stdlib.String.endsWith("", "") = true
-Stdlib.String.endsWith("", "a") = false
+Stdlib.String.endsWith ("hello") ("") = true
+Stdlib.String.endsWith ("") ("") = true
+Stdlib.String.endsWith ("") ("a") = false
 
 // =============================================================================
 // Stdlib.String.indexOf Tests
 // =============================================================================
 
 // Basic indexOf
-Stdlib.String.indexOf("hello world", "hello") = Stdlib.Option.Option.Some(0I)
-Stdlib.String.indexOf("hello world", "world") = Stdlib.Option.Option.Some(6I)
-Stdlib.String.indexOf("hello world", "o") = Stdlib.Option.Option.Some(4I)
-Stdlib.String.indexOf("hello world", "o w") = Stdlib.Option.Option.Some(4I)
+Stdlib.String.indexOf ("hello world") ("hello") = Stdlib.Option.Option.Some (0)
+Stdlib.String.indexOf ("hello world") ("world") = Stdlib.Option.Option.Some (6)
+Stdlib.String.indexOf ("hello world") ("o") = Stdlib.Option.Option.Some (4)
+Stdlib.String.indexOf ("hello world") ("o w") = Stdlib.Option.Option.Some (4)
 
 // Not found
-Stdlib.String.indexOf("hello world", "xyz") = Stdlib.Option.Option.None
-Stdlib.String.indexOf("abc", "d") = Stdlib.Option.Option.None
+Stdlib.String.indexOf ("hello world") ("xyz") = Stdlib.Option.Option.None
+Stdlib.String.indexOf ("abc") ("d") = Stdlib.Option.Option.None
 
 // Empty string search
-Stdlib.String.indexOf("hello", "") = Stdlib.Option.Option.Some(0I)
-Stdlib.String.indexOf("", "") = Stdlib.Option.Option.Some(0I)
+Stdlib.String.indexOf ("hello") ("") = Stdlib.Option.Option.Some (0)
+Stdlib.String.indexOf ("") ("") = Stdlib.Option.Option.Some (0)
 
 // =============================================================================
 // Stdlib.String.contains Tests
 // =============================================================================
 
 // Basic contains
-Stdlib.String.contains("hello world", "hello") = true
-Stdlib.String.contains("hello world", "world") = true
-Stdlib.String.contains("hello world", "o w") = true
-Stdlib.String.contains("hello world", "xyz") = false
+Stdlib.String.contains ("hello world") ("hello") = true
+Stdlib.String.contains ("hello world") ("world") = true
+Stdlib.String.contains ("hello world") ("o w") = true
+Stdlib.String.contains ("hello world") ("xyz") = false
 
 // Empty string cases
-Stdlib.String.contains("hello", "") = true
-Stdlib.String.contains("", "") = true
-Stdlib.String.contains("", "a") = false
+Stdlib.String.contains ("hello") ("") = true
+Stdlib.String.contains ("") ("") = true
+Stdlib.String.contains ("") ("a") = false
 
 // =============================================================================
 // Stdlib.String.slice Tests
 // =============================================================================
 
 // Basic slice (start, end exclusive)
-Stdlib.String.slice("hello world", 0I, 5I) = "hello"
-Stdlib.String.slice("hello world", 6I, 11I) = "world"
-Stdlib.String.slice("hello world", 0I, 11I) = "hello world"
+Stdlib.String.slice ("hello world") (0) (5) = "hello"
+Stdlib.String.slice ("hello world") (6) (11) = "world"
+Stdlib.String.slice ("hello world") (0) (11) = "hello world"
 
 // Slice from middle
-Stdlib.String.slice("abcdef", 2I, 5I) = "cde"
+Stdlib.String.slice ("abcdef") (2) (5) = "cde"
 
 // Empty result
-Stdlib.String.slice("hello", 0I, 0I) = ""
-Stdlib.String.slice("hello", 5I, 5I) = ""
+Stdlib.String.slice ("hello") (0) (0) = ""
+Stdlib.String.slice ("hello") (5) (5) = ""
 
 // Clamping behavior
-Stdlib.String.slice("hello", 0I, 100I) = "hello"
-Stdlib.String.slice("hello", 10I, 15I) = ""
-Stdlib.String.slice("hello", 4I, 2I) = ""
+Stdlib.String.slice ("hello") (0) (100) = "hello"
+Stdlib.String.slice ("hello") (10) (15) = ""
+Stdlib.String.slice ("hello") (4) (2) = ""
 
 // =============================================================================
 // Stdlib.String.take and drop Tests
 // =============================================================================
 
 // take
-Stdlib.String.take("hello world", 5L) = "hello"
-Stdlib.String.take("hello", 0L) = ""
-Stdlib.String.take("hello", 100L) = "hello"
-Stdlib.String.take("hello", -1L) = ""
+Stdlib.String.take ("hello world") (5L) = "hello"
+Stdlib.String.take ("hello") (0L) = ""
+Stdlib.String.take ("hello") (100L) = "hello"
+Stdlib.String.take ("hello") (-1L) = ""
 
 // drop
-Stdlib.String.drop("hello world", 6L) = "world"
-Stdlib.String.drop("hello", 0L) = "hello"
-Stdlib.String.drop("hello", 100L) = ""
-Stdlib.String.drop("hello", -1L) = "hello"
+Stdlib.String.drop ("hello world") (6L) = "world"
+Stdlib.String.drop ("hello") (0L) = "hello"
+Stdlib.String.drop ("hello") (100L) = ""
+Stdlib.String.drop ("hello") (-1L) = "hello"
 
 // =============================================================================
 // Stdlib.String.substring Tests
 // =============================================================================
 
-Stdlib.String.substring("hello world", 0L, 5L) = "hello"
-Stdlib.String.substring("hello world", 6L, 11L) = "world"
+Stdlib.String.substring ("hello world") (0L) (5L) = "hello"
+Stdlib.String.substring ("hello world") (6L) (11L) = "world"

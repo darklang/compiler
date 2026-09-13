@@ -29,7 +29,7 @@ Expected a let binding pattern
 ---NAME---
 parenthesized constructor let pattern is rejected
 ---SOURCE---
-let Some(x) = value in x
+let Some (x) = value in x
 ---EXPECT-ERROR---
 Expected parameter
 

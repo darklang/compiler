@@ -593,9 +593,9 @@ module Result =
    | Ok [ 1L; 2L; 3L ] -> "pass"
    | _ -> "fail") = "pass"
 
-  (match Stdlib.Result.Result.Ok((1L, 'a')) with
-   | Ok((2L, 'b')) -> "fail"
-   | Ok((1L, 'a')) -> "pass"
+  (match Stdlib.Result.Result.Ok ((1L, 'a')) with
+   | Ok ((2L, 'b')) -> "fail"
+   | Ok ((1L, 'a')) -> "pass"
    | _ -> "fail") = "pass"
 
   (match Stdlib.Result.Result.Ok 5.0 with
@@ -634,9 +634,9 @@ module Option =
    | Some [ 1L; 2L; 3L ] -> "pass"
    | _ -> "fail") = "pass"
 
-  (match Stdlib.Option.Option.Some((1L, 'a')) with
-   | Some((2L, 'b')) -> "fail"
-   | Some((1L, 'a')) -> "pass"
+  (match Stdlib.Option.Option.Some ((1L, 'a')) with
+   | Some ((2L, 'b')) -> "fail"
+   | Some ((1L, 'a')) -> "pass"
    | _ -> "fail") = "pass"
 
 
@@ -694,7 +694,7 @@ module TypeErrors =
   (match TestType.OneArg 1L with
    | OneArg -> "wrong number") = error="Non-exhaustive match expression"
   // enum with a single wildcard
-  (match TestType.TwoArgs(1L, 2L) with
+  (match TestType.TwoArgs (1L) (2L) with
    | TwoArgs _ -> "wildcards allowed") = "wildcards allowed"
 
 
@@ -732,7 +732,7 @@ module GuardClause =
    | _ -> "fail") = "fail"
 
   (match (5L, "hello") with
-   | (x, y) when x > 0L && Stdlib.String.length y == 5I -> "pass"
+   | (x, y) when x > 0L && Stdlib.String.length y == 5 -> "pass"
    | _ -> "fail") = "pass"
 
   (match -5L with
@@ -779,12 +779,12 @@ module PatternGrouping =
    | [1L;_] | [_;1L] -> "pass"
    | _ -> "fail") = "pass"
 
-  (match Stdlib.Option.Option.Some(1L) with
-   | Some(1L) | None -> "pass"
+  (match Stdlib.Option.Option.Some (1L) with
+   | Some (1L) | None -> "pass"
    | _ -> "fail") = "pass"
 
-  (match ([1L], Stdlib.Option.Option.Some(2L)) with
-   | ([1L], Some(_)) | ([_], Some(2L)) -> "pass"
+  (match ([1L], Stdlib.Option.Option.Some (2L)) with
+   | ([1L], Some (_)) | ([_], Some (2L)) -> "pass"
    | _ -> "fail") = "pass"
 
   (let x = 4L

@@ -7,13 +7,13 @@ module Stdlib.Path
 // Stdlib.Path - Path operations
 
 // Combine two path segments
-let combine(a: String, b: String) : String =
+let combine (a: String) (b: String) : String =
     if a == "/" then
         "/" ++ b
-    else if Stdlib.String.endsWith(a, "/") then
+    else if Stdlib.String.endsWith (a) ("/") then
         a ++ b
     else
         a ++ "/" ++ b
 
 // The portable implementation is deliberately ordinary Dark code.
-let tempDir() : String = "/tmp"
+let tempDir () : String = "/tmp"

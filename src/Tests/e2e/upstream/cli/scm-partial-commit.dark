@@ -5,12 +5,12 @@
 
 module PartialCommitPlanning =
   let fnRef (h: String) : Darklang.LanguageTools.ProgramTypes.Reference =
-    Darklang.LanguageTools.ProgramTypes.Reference.PackageFn(
+    Darklang.LanguageTools.ProgramTypes.Reference.PackageFn (
       Darklang.LanguageTools.ProgramTypes.Hash.Hash h
     )
 
   let typeRef (h: String) : Darklang.LanguageTools.ProgramTypes.Reference =
-    Darklang.LanguageTools.ProgramTypes.Reference.PackageType(
+    Darklang.LanguageTools.ProgramTypes.Reference.PackageType (
       Darklang.LanguageTools.ProgramTypes.Hash.Hash h
     )
 
@@ -22,11 +22,8 @@ module PartialCommitPlanning =
     Darklang.SCM.PackageOps.WipOpEntry
       { id = Builtin.unwrap (Stdlib.Uuid.parse uuid)
         op =
-          Darklang.LanguageTools.ProgramTypes.PackageOp.SetName(
-            Darklang.LanguageTools.ProgramTypes.PackageLocation
-              { owner = "Test"; modules = [ "M" ]; name = name },
-            target
-          )
+          Darklang.LanguageTools.ProgramTypes.PackageOp.SetName (Darklang.LanguageTools.ProgramTypes.PackageLocation
+              { owner = "Test"; modules = [ "M" ]; name = name }) (target)
         propagationId = Stdlib.Option.Option.None }
 
   // WIP set: fn "main", fn "helper", and a type *also* named "main" — so
@@ -80,21 +77,21 @@ module PartialCommitPlanning =
   (Darklang.SCM.PartialCommit.wipHashForLocation
     (wip ())
     (loc "main")
-    Darklang.LanguageTools.ProgramTypes.ItemKind.Fn) = Stdlib.Option.Option.Some(
+    Darklang.LanguageTools.ProgramTypes.ItemKind.Fn) = Stdlib.Option.Option.Some (
     Darklang.LanguageTools.ProgramTypes.Hash.Hash fnHash)
 
   // ...and (loc "main", Type) -> the type's hash.
   (Darklang.SCM.PartialCommit.wipHashForLocation
     (wip ())
     (loc "main")
-    Darklang.LanguageTools.ProgramTypes.ItemKind.Type) = Stdlib.Option.Option.Some(
+    Darklang.LanguageTools.ProgramTypes.ItemKind.Type) = Stdlib.Option.Option.Some (
     Darklang.LanguageTools.ProgramTypes.Hash.Hash typeHash)
 
   // wipLocationForHash is the reverse: helper's hash -> helper's location.
   (Darklang.SCM.PartialCommit.wipLocationForHash
     (wip ())
     (Darklang.LanguageTools.ProgramTypes.Hash.Hash helperHash)
-    Darklang.LanguageTools.ProgramTypes.ItemKind.Fn) = Stdlib.Option.Option.Some(
+    Darklang.LanguageTools.ProgramTypes.ItemKind.Fn) = Stdlib.Option.Option.Some (
     loc "helper")
 
   // A hash bound at a different kind doesn't match (typeHash is a Type, not Fn).
@@ -137,11 +134,7 @@ module PartialCommitPlanning =
     Darklang.SCM.PackageOps.WipOpEntry
       { id = Builtin.unwrap (Stdlib.Uuid.parse uuid)
         op =
-          Darklang.LanguageTools.ProgramTypes.PackageOp.Deprecate(
-            target,
-            Darklang.LanguageTools.ProgramTypes.DeprecationKind.Obsolete,
-            "old"
-          )
+          Darklang.LanguageTools.ProgramTypes.PackageOp.Deprecate (target) (Darklang.LanguageTools.ProgramTypes.DeprecationKind.Obsolete) ("old")
         propagationId = Stdlib.Option.Option.None }
 
   let depWip () : List<Darklang.SCM.PackageOps.WipOpEntry> =
@@ -161,13 +154,10 @@ module PartialCommitPlanning =
     [ Darklang.SCM.PackageOps.WipOpEntry
         { id = Builtin.unwrap (Stdlib.Uuid.parse "00000000-0000-0000-0000-0000000000c1")
           op =
-            Darklang.LanguageTools.ProgramTypes.PackageOp.SetName(
-              Darklang.LanguageTools.ProgramTypes.PackageLocation
-                { owner = "Test"; modules = [ "M" ]; name = "dependent" },
-              fnRef fnHash
-            )
+            Darklang.LanguageTools.ProgramTypes.PackageOp.SetName (Darklang.LanguageTools.ProgramTypes.PackageLocation
+                { owner = "Test"; modules = [ "M" ]; name = "dependent" }) (fnRef fnHash)
           propagationId =
-            Stdlib.Option.Option.Some(
+            Stdlib.Option.Option.Some (
               Builtin.unwrap (Stdlib.Uuid.parse "00000000-0000-0000-0000-0000000000c9")
             ) } ]
 

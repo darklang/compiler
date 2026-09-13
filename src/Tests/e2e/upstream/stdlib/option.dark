@@ -1,6 +1,6 @@
 (Stdlib.Option.andThen_v0
   (Stdlib.Option.Option.Some 5L)
-  (fun x -> Stdlib.Option.Option.Some(1L + x))
+  (fun x -> Stdlib.Option.Option.Some (1L + x))
  ) = Stdlib.Option.Option.Some 6L
 
 (Stdlib.Option.andThen_v0
@@ -19,64 +19,64 @@
  ) = Stdlib.Option.Option.None
 
 Stdlib.Option.andThen_v0 (Stdlib.Option.Option.Some 8L) (fun x ->
-  Stdlib.Option.Option.Some(Stdlib.Int64.divide_v0 x 2L)) =
+  Stdlib.Option.Option.Some (Stdlib.Int64.divide_v0 x 2L)) =
   (Stdlib.Option.Option.Some 4L)
 
 Stdlib.Option.andThen_v0 (Stdlib.Option.Option.Some 8L) (fun x ->
-  Stdlib.Option.Option.Some(Stdlib.Int64.divide_v0 x 0L)) = error="Cannot divide by 0"
+  Stdlib.Option.Option.Some (Stdlib.Int64.divide_v0 x 0L)) = error="Cannot divide by 0"
 
 
 Stdlib.Option.andThen2_v0
   (Stdlib.Option.Option.Some 5L)
   (Stdlib.Option.Option.Some 6L)
-  (fun x y -> Stdlib.Option.Option.Some(x + y)) = Stdlib.Option.Option.Some 11L
+  (fun x y -> Stdlib.Option.Option.Some (x + y)) = Stdlib.Option.Option.Some 11L
 
 Stdlib.Option.andThen2_v0
   (Stdlib.Option.Option.Some 5L)
   Stdlib.Option.Option.None
-  (fun x y -> Stdlib.Option.Option.Some(x + y)) = Stdlib.Option.Option.None
+  (fun x y -> Stdlib.Option.Option.Some (x + y)) = Stdlib.Option.Option.None
 
 Stdlib.Option.andThen2_v0
   Stdlib.Option.Option.None
   (Stdlib.Option.Option.Some 6L)
-  (fun x y -> Stdlib.Option.Option.Some(x + y)) = Stdlib.Option.Option.None
+  (fun x y -> Stdlib.Option.Option.Some (x + y)) = Stdlib.Option.Option.None
 
 Stdlib.Option.andThen2_v0
   Stdlib.Option.Option.None
   Stdlib.Option.Option.None
-  (fun x y -> Stdlib.Option.Option.Some(x + y)) = Stdlib.Option.Option.None
+  (fun x y -> Stdlib.Option.Option.Some (x + y)) = Stdlib.Option.Option.None
 
 
 Stdlib.Option.andThen3_v0
   (Stdlib.Option.Option.Some 5L)
   (Stdlib.Option.Option.Some 6L)
   (Stdlib.Option.Option.Some 7L)
-  (fun x y z -> Stdlib.Option.Option.Some(x + y + z)) = Stdlib.Option.Option.Some 18L
+  (fun x y z -> Stdlib.Option.Option.Some (x + y + z)) = Stdlib.Option.Option.Some 18L
 
 
 Stdlib.Option.andThen3_v0
   Stdlib.Option.Option.None
   (Stdlib.Option.Option.Some 6L)
   (Stdlib.Option.Option.Some 7L)
-  (fun x y z -> Stdlib.Option.Option.Some(x + y + z)) = Stdlib.Option.Option.None
+  (fun x y z -> Stdlib.Option.Option.Some (x + y + z)) = Stdlib.Option.Option.None
 
 Stdlib.Option.andThen3_v0
   (Stdlib.Option.Option.Some 5L)
   Stdlib.Option.Option.None
   (Stdlib.Option.Option.Some 7L)
-  (fun x y z -> Stdlib.Option.Option.Some(x + y + z)) = Stdlib.Option.Option.None
+  (fun x y z -> Stdlib.Option.Option.Some (x + y + z)) = Stdlib.Option.Option.None
 
 Stdlib.Option.andThen3_v0
   (Stdlib.Option.Option.Some 5L)
   (Stdlib.Option.Option.Some 6L)
   Stdlib.Option.Option.None
-  (fun x y z -> Stdlib.Option.Option.Some(x + y + z)) = Stdlib.Option.Option.None
+  (fun x y z -> Stdlib.Option.Option.Some (x + y + z)) = Stdlib.Option.Option.None
 
 Stdlib.Option.andThen3_v0
   Stdlib.Option.Option.None
   Stdlib.Option.Option.None
   Stdlib.Option.Option.None
-  (fun x y z -> Stdlib.Option.Option.Some(x + y + z)) = Stdlib.Option.Option.None
+  (fun x y z -> Stdlib.Option.Option.Some (x + y + z)) = Stdlib.Option.Option.None
 
 
 Stdlib.Option.andThen4_v0
@@ -84,7 +84,7 @@ Stdlib.Option.andThen4_v0
   (Stdlib.Option.Option.Some 6L)
   (Stdlib.Option.Option.Some 7L)
   (Stdlib.Option.Option.Some 8L)
-  (fun x y z w -> Stdlib.Option.Option.Some(x + y + z + w)) = Stdlib.Option.Option.Some
+  (fun x y z w -> Stdlib.Option.Option.Some (x + y + z + w)) = Stdlib.Option.Option.Some
   26L
 
 
@@ -93,35 +93,35 @@ Stdlib.Option.andThen4_v0
   (Stdlib.Option.Option.Some 6L)
   (Stdlib.Option.Option.Some 7L)
   (Stdlib.Option.Option.Some 8L)
-  (fun x y z w -> Stdlib.Option.Option.Some(x + y + z + w)) = Stdlib.Option.Option.None
+  (fun x y z w -> Stdlib.Option.Option.Some (x + y + z + w)) = Stdlib.Option.Option.None
 
 Stdlib.Option.andThen4_v0
   (Stdlib.Option.Option.Some 5L)
   Stdlib.Option.Option.None
   (Stdlib.Option.Option.Some 7L)
   (Stdlib.Option.Option.Some 8L)
-  (fun x y z w -> Stdlib.Option.Option.Some(x + y + z + w)) = Stdlib.Option.Option.None
+  (fun x y z w -> Stdlib.Option.Option.Some (x + y + z + w)) = Stdlib.Option.Option.None
 
 Stdlib.Option.andThen4_v0
   (Stdlib.Option.Option.Some 5L)
   (Stdlib.Option.Option.Some 6L)
   Stdlib.Option.Option.None
   (Stdlib.Option.Option.Some 8L)
-  (fun x y z w -> Stdlib.Option.Option.Some(x + y + z + w)) = Stdlib.Option.Option.None
+  (fun x y z w -> Stdlib.Option.Option.Some (x + y + z + w)) = Stdlib.Option.Option.None
 
 Stdlib.Option.andThen4_v0
   (Stdlib.Option.Option.Some 5L)
   (Stdlib.Option.Option.Some 6L)
   (Stdlib.Option.Option.Some 7L)
   Stdlib.Option.Option.None
-  (fun x y z w -> Stdlib.Option.Option.Some(x + y + z + w)) = Stdlib.Option.Option.None
+  (fun x y z w -> Stdlib.Option.Option.Some (x + y + z + w)) = Stdlib.Option.Option.None
 
 Stdlib.Option.andThen4_v0
   Stdlib.Option.Option.None
   Stdlib.Option.Option.None
   Stdlib.Option.Option.None
   Stdlib.Option.Option.None
-  (fun x y z w -> Stdlib.Option.Option.Some(x + y + z + w)) = Stdlib.Option.Option.None
+  (fun x y z w -> Stdlib.Option.Option.Some (x + y + z + w)) = Stdlib.Option.Option.None
 
 
 Stdlib.Option.map (Stdlib.Option.Option.Some 4L) (fun x ->
@@ -285,16 +285,16 @@ Stdlib.Option.toResult_v0 Stdlib.Option.Option.None "error" =
   Stdlib.Result.Result.Error "error"
 
 
-Stdlib.Option.and_v0<Int64, Int64>(Stdlib.Option.Option.Some(6L), Stdlib.Option.Option.Some(5L)) =
+Stdlib.Option.and_v0<Int64, Int64> (Stdlib.Option.Option.Some (6L)) (Stdlib.Option.Option.Some (5L)) =
   Stdlib.Option.Option.Some 5L
 
-Stdlib.Option.and_v0<Int64, Int64>(Stdlib.Option.Option.Some(6L), Stdlib.Option.Option.None) =
+Stdlib.Option.and_v0<Int64, Int64> (Stdlib.Option.Option.Some (6L)) (Stdlib.Option.Option.None) =
   Stdlib.Option.Option.None
 
-Stdlib.Option.and_v0<Int64, Int64>(Stdlib.Option.Option.None, Stdlib.Option.Option.Some(5L)) =
+Stdlib.Option.and_v0<Int64, Int64> (Stdlib.Option.Option.None) (Stdlib.Option.Option.Some (5L)) =
   Stdlib.Option.Option.None
 
-Stdlib.Option.and_v0<Int64, Int64>(Stdlib.Option.Option.None, Stdlib.Option.Option.None) =
+Stdlib.Option.and_v0<Int64, Int64> (Stdlib.Option.Option.None) (Stdlib.Option.Option.None) =
   Stdlib.Option.Option.None
 
 
@@ -316,10 +316,10 @@ Stdlib.Option.toList_v0 (Stdlib.Option.Option.Some 6L) = [ 6L ]
 Stdlib.Option.toList_v0 Stdlib.Option.Option.None = []
 
 
-Stdlib.Option.join_v0 (Stdlib.Option.Option.Some(Stdlib.Option.Option.Some 6L)) =
+Stdlib.Option.join_v0 (Stdlib.Option.Option.Some (Stdlib.Option.Option.Some 6L)) =
   Stdlib.Option.Option.Some 6L
 
-Stdlib.Option.join_v0 (Stdlib.Option.Option.Some(Stdlib.Option.Option.None)) =
+Stdlib.Option.join_v0 (Stdlib.Option.Option.Some (Stdlib.Option.Option.None)) =
   Stdlib.Option.Option.None
 
 Stdlib.Option.join_v0 Stdlib.Option.Option.None =

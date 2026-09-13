@@ -1,66 +1,66 @@
 // Spectral Norm Benchmark - full-size immutable skew-RAL implementation.
 
-let matA(i: Int64, j: Int64) : Float =
+let matA (i: Int64) (j: Int64) : Float =
     let ij = i + j in
     let div = ij * (ij + 1L) / 2L + i + 1L in
-    1.0 / Stdlib.Int64.toFloat(div)
+    1.0 / Stdlib.Int64.toFloat (div)
 
 // All callers prove the index is within the fixed vector length.
-let getAt(v: List<Float>, i: Int64) : Float =
-    Stdlib.List.getAtOrDefault<Float>(v, i, 0.0)
+let getAt (v: List<Float>) (i: Int64) : Float =
+    Stdlib.List.getAtOrDefault<Float> (v) (i) (0.0)
 
-let setAt(list: List<Float>, index: Int64, value: Float) : List<Float> =
+let setAt (list: List<Float>) (index: Int64) (value: Float) : List<Float> =
     match list with
     | [] -> []
     | head :: tail ->
-        if index == 0L then Stdlib.List.push<Float>(tail, value)
-        else Stdlib.List.push<Float>(setAt(tail, index - 1L, value), head)
+        if index == 0L then Stdlib.List.push<Float> (tail) (value)
+        else Stdlib.List.push<Float> (setAt (tail) (index - 1L) (value)) (head)
 
-let repeat(value: Float, count: Int64) : List<Float> =
-    match Stdlib.List.repeat<Float>(Stdlib.Int.fromInt64(count), value) with
-    | Ok(values) -> values
-    | Error(message) -> Builtin.testRuntimeError(message)
+let repeat (value: Float) (count: Int64) : List<Float> =
+    match Stdlib.List.repeat<Float> (Stdlib.Int.fromInt64 (count)) (value) with
+    | Ok (values) -> values
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-let avRow(i: Int64, j: Int64, n: Int64, v: List<Float>, acc: Float) : Float =
+let avRow (i: Int64) (j: Int64) (n: Int64) (v: List<Float>) (acc: Float) : Float =
     if j >= n then acc
-    else avRow(i, j + 1L, n, v, acc + matA(i, j) * getAt(v, j))
+    else avRow (i) (j + 1L) (n) (v) (acc + matA (i) (j) * getAt (v) (j))
 
-let atvRow(i: Int64, j: Int64, n: Int64, v: List<Float>, acc: Float) : Float =
+let atvRow (i: Int64) (j: Int64) (n: Int64) (v: List<Float>) (acc: Float) : Float =
     if j >= n then acc
-    else atvRow(i, j + 1L, n, v, acc + matA(j, i) * getAt(v, j))
+    else atvRow (i) (j + 1L) (n) (v) (acc + matA (j) (i) * getAt (v) (j))
 
-let avRows(i: Int64, n: Int64, v: List<Float>, out: List<Float>) : List<Float> =
+let avRows (i: Int64) (n: Int64) (v: List<Float>) (out: List<Float>) : List<Float> =
     if i >= n then out
-    else avRows(i + 1L, n, v, setAt(out, i, avRow(i, 0L, n, v, 0.0)))
+    else avRows (i + 1L) (n) (v) (setAt (out) (i) (avRow (i) (0L) (n) (v) (0.0)))
 
-let atvRows(i: Int64, n: Int64, v: List<Float>, out: List<Float>) : List<Float> =
+let atvRows (i: Int64) (n: Int64) (v: List<Float>) (out: List<Float>) : List<Float> =
     if i >= n then out
-    else atvRows(i + 1L, n, v, setAt(out, i, atvRow(i, 0L, n, v, 0.0)))
+    else atvRows (i + 1L) (n) (v) (setAt (out) (i) (atvRow (i) (0L) (n) (v) (0.0)))
 
-let atav(n: Int64, v: List<Float>) : List<Float> =
-    let zeroes = repeat(0.0, n) in
-    atvRows(0L, n, avRows(0L, n, v, zeroes), zeroes)
+let atav (n: Int64) (v: List<Float>) : List<Float> =
+    let zeroes = repeat (0.0) (n) in
+    atvRows (0L) (n) (avRows (0L) (n) (v) (zeroes)) (zeroes)
 
-let iterate(iterations: Int64, n: Int64, u: List<Float>, v: List<Float>) : (List<Float> * List<Float>) =
+let iterate (iterations: Int64) (n: Int64) (u: List<Float>) (v: List<Float>) : (List<Float> * List<Float>) =
     if iterations <= 0L then (u, v)
     else
-        let nextV = atav(n, u) in
-        let nextU = atav(n, nextV) in
-        iterate(iterations - 1L, n, nextU, nextV)
+        let nextV = atav (n) (u) in
+        let nextU = atav (n) (nextV) in
+        iterate (iterations - 1L) (n) (nextU) (nextV)
 
-let dot(i: Int64, n: Int64, a: List<Float>, b: List<Float>, acc: Float) : Float =
+let dot (i: Int64) (n: Int64) (a: List<Float>) (b: List<Float>) (acc: Float) : Float =
     if i >= n then acc
-    else dot(i + 1L, n, a, b, acc + getAt(a, i) * getAt(b, i))
+    else dot (i + 1L) (n) (a) (b) (acc + getAt (a) (i) * getAt (b) (i))
 
-let spectralNorm(n: Int64, iterations: Int64) : Float =
-    let result = iterate(iterations, n, repeat(1.0, n), repeat(0.0, n)) in
+let spectralNorm (n: Int64) (iterations: Int64) : Float =
+    let result = iterate (iterations) (n) (repeat (1.0) (n)) (repeat (0.0) (n)) in
     let u = result.0 in
     let v = result.1 in
-    Stdlib.Float.sqrt(dot(0L, n, u, v, 0.0) / dot(0L, n, v, v, 0.0))
+    Stdlib.Float.sqrt (dot (0L) (n) (u) (v) (0.0) / dot (0L) (n) (v) (v) (0.0))
 
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-Builtin.printLine(Stdlib.Int64.toString(Stdlib.Float.toInt(spectralNorm(benchmarkArg(0I), benchmarkArg(1I)) * 1000000000.0)))
+Builtin.printLine (Stdlib.Int64.toString (Stdlib.Float.toInt (spectralNorm (benchmarkArg (0)) (benchmarkArg (1)) * 1000000000.0)))

@@ -5,11 +5,11 @@
 module AWS
 
 // Check whether a byte is a hexadecimal digit.
-let __isHexDigitByte(b: Int64) : Bool =
+let __isHexDigitByte (b: Int64) : Bool =
     (b >= 48L && b <= 57L) || (b >= 65L && b <= 70L) || (b >= 97L && b <= 102L)
 
 // Check whether a byte is URL-unreserved.
-let __isUnreservedByte(b: Int64) : Bool =
+let __isUnreservedByte (b: Int64) : Bool =
     (b >= 65L && b <= 90L)
     || (b >= 97L && b <= 122L)
     || (b >= 48L && b <= 57L)
@@ -19,93 +19,59 @@ let __isUnreservedByte(b: Int64) : Bool =
     || b == 126L
 
 // Convert nibble (0-15) to uppercase hex digit.
-let __hexDigit(n: Int64) : String =
-    Stdlib.String.__byteSlice("0123456789ABCDEF", n, n + 1L)
+let __hexDigit (n: Int64) : String =
+    Stdlib.String.__byteSlice ("0123456789ABCDEF") (n) (n + 1L)
 
 // Convert a byte (0-255) into two uppercase hex digits.
-let __byteToHex(b: Int64) : String =
+let __byteToHex (b: Int64) : String =
     let hi = b / 16L in
     let lo = b % 16L in
-    AWS.__hexDigit(hi) ++ AWS.__hexDigit(lo)
+    AWS.__hexDigit (hi) ++ AWS.__hexDigit (lo)
 
 // Drop malformed '%' bytes, but preserve valid %HH sequences unchanged.
-let __sanitizePercentSequences(input: String, idx: Int64, len: Int64, acc: String) : String =
+let __sanitizePercentSequences (input: String) (idx: Int64) (len: Int64) (acc: String) : String =
     if idx >= len then
         acc
     else
-        let b0 = Stdlib.String.getByteAt(input, idx) in
+        let b0 = Stdlib.String.getByteAt (input) (idx) in
         if b0 == 37L then
             if idx + 2L < len then
-                let b1 = Stdlib.String.getByteAt(input, idx + 1L) in
-                let b2 = Stdlib.String.getByteAt(input, idx + 2L) in
-                if AWS.__isHexDigitByte(b1) && AWS.__isHexDigitByte(b2) then
-                    AWS.__sanitizePercentSequences(
-                        input,
-                        idx + 3L,
-                        len,
-                        acc ++ Stdlib.String.__byteSlice(input, idx, idx + 3L)
-                    )
+                let b1 = Stdlib.String.getByteAt (input) (idx + 1L) in
+                let b2 = Stdlib.String.getByteAt (input) (idx + 2L) in
+                if AWS.__isHexDigitByte (b1) && AWS.__isHexDigitByte (b2) then
+                    AWS.__sanitizePercentSequences (input) (idx + 3L) (len) (acc ++ Stdlib.String.__byteSlice (input) (idx) (idx + 3L))
                 else
-                    AWS.__sanitizePercentSequences(input, idx + 1L, len, acc)
+                    AWS.__sanitizePercentSequences (input) (idx + 1L) (len) (acc)
             else
-                AWS.__sanitizePercentSequences(input, idx + 1L, len, acc)
+                AWS.__sanitizePercentSequences (input) (idx + 1L) (len) (acc)
         else
-            AWS.__sanitizePercentSequences(
-                input,
-                idx + 1L,
-                len,
-                acc ++ Stdlib.String.__byteSlice(input, idx, idx + 1L)
-            )
+            AWS.__sanitizePercentSequences (input) (idx + 1L) (len) (acc ++ Stdlib.String.__byteSlice (input) (idx) (idx + 1L))
 
 // Percent-encode UTF-8 bytes.
 // keepSlash = true matches historical AWS behavior where '/' is preserved.
-let __urlencodeBytes(input: String, idx: Int64, len: Int64, keepSlash: Bool, acc: String) : String =
+let __urlencodeBytes (input: String) (idx: Int64) (len: Int64) (keepSlash: Bool) (acc: String) : String =
     if idx >= len then
         acc
     else
-        let b0 = Stdlib.String.getByteAt(input, idx) in
+        let b0 = Stdlib.String.getByteAt (input) (idx) in
         if b0 == 37L && idx + 2L < len then
-            let b1 = Stdlib.String.getByteAt(input, idx + 1L) in
-            let b2 = Stdlib.String.getByteAt(input, idx + 2L) in
-            if AWS.__isHexDigitByte(b1) && AWS.__isHexDigitByte(b2) then
-                AWS.__urlencodeBytes(
-                    input,
-                    idx + 3L,
-                    len,
-                    keepSlash,
-                    acc ++ Stdlib.String.__byteSlice(input, idx, idx + 3L)
-                )
+            let b1 = Stdlib.String.getByteAt (input) (idx + 1L) in
+            let b2 = Stdlib.String.getByteAt (input) (idx + 2L) in
+            if AWS.__isHexDigitByte (b1) && AWS.__isHexDigitByte (b2) then
+                AWS.__urlencodeBytes (input) (idx + 3L) (len) (keepSlash) (acc ++ Stdlib.String.__byteSlice (input) (idx) (idx + 3L))
             else
-                AWS.__urlencodeBytes(
-                    input,
-                    idx + 1L,
-                    len,
-                    keepSlash,
-                    acc ++ "%" ++ AWS.__byteToHex(b0)
-                )
-        else if AWS.__isUnreservedByte(b0) || (keepSlash && b0 == 47L) then
-            AWS.__urlencodeBytes(
-                input,
-                idx + 1L,
-                len,
-                keepSlash,
-                acc ++ Stdlib.String.__byteSlice(input, idx, idx + 1L)
-            )
+                AWS.__urlencodeBytes (input) (idx + 1L) (len) (keepSlash) (acc ++ "%" ++ AWS.__byteToHex (b0))
+        else if AWS.__isUnreservedByte (b0) || (keepSlash && b0 == 47L) then
+            AWS.__urlencodeBytes (input) (idx + 1L) (len) (keepSlash) (acc ++ Stdlib.String.__byteSlice (input) (idx) (idx + 1L))
         else
-            AWS.__urlencodeBytes(
-                input,
-                idx + 1L,
-                len,
-                keepSlash,
-                acc ++ "%" ++ AWS.__byteToHex(b0)
-            )
+            AWS.__urlencodeBytes (input) (idx + 1L) (len) (keepSlash) (acc ++ "%" ++ AWS.__byteToHex (b0))
 
-let __urlencode(input: String, keepSlash: Bool) : String =
+let __urlencode (input: String) (keepSlash: Bool) : String =
     let sanitized =
-        AWS.__sanitizePercentSequences(input, 0L, Stdlib.String.__byteLength(input), "")
+        AWS.__sanitizePercentSequences (input) (0L) (Stdlib.String.__byteLength (input)) ("")
     in
-    AWS.__urlencodeBytes(sanitized, 0L, Stdlib.String.__byteLength(sanitized), keepSlash, "")
+    AWS.__urlencodeBytes (sanitized) (0L) (Stdlib.String.__byteLength (sanitized)) (keepSlash) ("")
 
 // Legacy helper used by upstream tests.
-let urlencode_v0(input: String) : String =
-    AWS.__urlencode(input, true)
+let urlencode_v0 (input: String) : String =
+    AWS.__urlencode (input) (true)

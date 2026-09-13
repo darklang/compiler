@@ -11,13 +11,13 @@ module NoInternet =
 
   Stdlib.HttpClient.bearerToken "YWxhZGRpbjpvcGVuc2VzYW1l" = (("authorization", "bearer YWxhZGRpbjpvcGVuc2VzYW1l"))
 
-  Stdlib.HttpClient.basicAuth "username" "password" = Stdlib.Result.Result.Ok(("authorization", "basic dXNlcm5hbWU6cGFzc3dvcmQ="))
-  Stdlib.HttpClient.basicAuth "" "" = Stdlib.Result.Result.Ok(("authorization", "basic Og=="))
-  Stdlib.HttpClient.basicAuth "" "-" = Stdlib.Result.Result.Ok(("authorization", "basic Oi0="))
-  Stdlib.HttpClient.basicAuth ":" "" = Stdlib.Result.Result.Ok(("authorization", "basic Ojo="))
-  Stdlib.HttpClient.basicAuth "" ":" = Stdlib.Result.Result.Ok(("authorization", "basic Ojo="))
-  Stdlib.HttpClient.basicAuth "hello>" "world" = Stdlib.Result.Result.Ok(("authorization", "basic aGVsbG8+Ondvcmxk"))
-  Stdlib.HttpClient.basicAuth "hello" "world?" = Stdlib.Result.Result.Ok(("authorization", "basic aGVsbG86d29ybGQ/"))
+  Stdlib.HttpClient.basicAuth "username" "password" = Stdlib.Result.Result.Ok (("authorization", "basic dXNlcm5hbWU6cGFzc3dvcmQ="))
+  Stdlib.HttpClient.basicAuth "" "" = Stdlib.Result.Result.Ok (("authorization", "basic Og=="))
+  Stdlib.HttpClient.basicAuth "" "-" = Stdlib.Result.Result.Ok (("authorization", "basic Oi0="))
+  Stdlib.HttpClient.basicAuth ":" "" = Stdlib.Result.Result.Ok (("authorization", "basic Ojo="))
+  Stdlib.HttpClient.basicAuth "" ":" = Stdlib.Result.Result.Ok (("authorization", "basic Ojo="))
+  Stdlib.HttpClient.basicAuth "hello>" "world" = Stdlib.Result.Result.Ok (("authorization", "basic aGVsbG8+Ondvcmxk"))
+  Stdlib.HttpClient.basicAuth "hello" "world?" = Stdlib.Result.Result.Ok (("authorization", "basic aGVsbG86d29ybGQ/"))
 
   Stdlib.HttpClient.basicAuth "-" "" = Stdlib.Result.Result.Error "Username cannot contain a hyphen"
 
@@ -29,16 +29,16 @@ module NoInternet =
 let get (url: String) (headers: List<String * String>): Stdlib.Result.Result<Stdlib.HttpClient.Response, Stdlib.HttpClient.RequestError> =
   Stdlib.HttpClient.get url headers
 
-let errInvalidHost = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadUrl(Stdlib.HttpClient.BadUrlDetails.InvalidHost))
-let errInvalidUri = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadUrl(Stdlib.HttpClient.BadUrlDetails.InvalidUri))
-let errInvalidRequest = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadUrl(Stdlib.HttpClient.BadUrlDetails.InvalidRequest))
+let errInvalidHost = Stdlib.Result.Result.Error (Stdlib.HttpClient.RequestError.BadUrl (Stdlib.HttpClient.BadUrlDetails.InvalidHost))
+let errInvalidUri = Stdlib.Result.Result.Error (Stdlib.HttpClient.RequestError.BadUrl (Stdlib.HttpClient.BadUrlDetails.InvalidUri))
+let errInvalidRequest = Stdlib.Result.Result.Error (Stdlib.HttpClient.RequestError.BadUrl (Stdlib.HttpClient.BadUrlDetails.InvalidRequest))
 
-let errNetworkError = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.NetworkError)
+let errNetworkError = Stdlib.Result.Result.Error (Stdlib.HttpClient.RequestError.NetworkError)
 
-let errBadHeaderEmptyKey = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadHeader(Stdlib.HttpClient.BadHeader.EmptyKey))
-let errBadMethod = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadMethod)
+let errBadHeaderEmptyKey = Stdlib.Result.Result.Error (Stdlib.HttpClient.RequestError.BadHeader (Stdlib.HttpClient.BadHeader.EmptyKey))
+let errBadMethod = Stdlib.Result.Result.Error (Stdlib.HttpClient.RequestError.BadMethod)
 
-let errUnsupportedProtocol = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadUrl(Stdlib.HttpClient.BadUrlDetails.UnsupportedProtocol))
+let errUnsupportedProtocol = Stdlib.Result.Result.Error (Stdlib.HttpClient.RequestError.BadUrl (Stdlib.HttpClient.BadUrlDetails.UnsupportedProtocol))
 
 // basic requests work
 // TODO: these tests are flaky – replace httpbin.org call with a local server
@@ -64,11 +64,11 @@ Stdlib.HttpClient.request "put" "file:///etc/passwd" [] Stdlib.Blob.empty = errU
 Stdlib.HttpClient.request "put" "/just-a-path" [] Stdlib.Blob.empty = errUnsupportedProtocol
 
 // totally bogus URLs
-Stdlib.HttpClient.request "get" "" [] Stdlib.Blob.empty = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadUrl(Stdlib.HttpClient.BadUrlDetails.InvalidUri))
-Stdlib.HttpClient.request "post" "{ ] nonsense ^#( :" [] Stdlib.Blob.empty = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadUrl(Stdlib.HttpClient.BadUrlDetails.InvalidUri))
+Stdlib.HttpClient.request "get" "" [] Stdlib.Blob.empty = Stdlib.Result.Result.Error (Stdlib.HttpClient.RequestError.BadUrl (Stdlib.HttpClient.BadUrlDetails.InvalidUri))
+Stdlib.HttpClient.request "post" "{ ] nonsense ^#( :" [] Stdlib.Blob.empty = Stdlib.Result.Result.Error (Stdlib.HttpClient.RequestError.BadUrl (Stdlib.HttpClient.BadUrlDetails.InvalidUri))
 
 // URLs we can't actually communicate with
-Stdlib.HttpClient.request "get" "http://google.com:79" [] Stdlib.Blob.empty = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.Timeout)
+Stdlib.HttpClient.request "get" "http://google.com:79" [] Stdlib.Blob.empty = Stdlib.Result.Result.Error (Stdlib.HttpClient.RequestError.Timeout)
 
 
 // Check for banned urls in the host name

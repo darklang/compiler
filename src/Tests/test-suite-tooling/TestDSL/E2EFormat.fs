@@ -650,7 +650,7 @@ let private parseTestLineWithPreamble (line: string) (lineNumber: int) (filePath
             // Check for "error" keyword (compiler error expected)
             // Supports: error  or  error="message"
             match tokens with
-            | firstToken :: restTokens when firstToken.Equals("error", StringComparison.OrdinalIgnoreCase) ->
+            | firstToken :: restTokens when firstToken = "error" ->
                 parseErrorAttributeFlags restTokens
                 |> Result.map (fun optFlags ->
                     // Expect compilation to fail with exit code 1, no specific message

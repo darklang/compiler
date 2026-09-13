@@ -1,117 +1,117 @@
 // Stdlib.Float tests
 
 // Stdlib.Float.add - IEEE 754 addition
-Stdlib.Float.add(1.2, 1.3) = 2.5
+Stdlib.Float.add (1.2) (1.3) = 2.5
 
 // sqrt - now with full precision
-Stdlib.Float.sqrt(4.0) = 2.0
-Stdlib.Float.sqrt(9.0) = 3.0
-Stdlib.Float.sqrt(2.0) = 1.4142135623730951
-Stdlib.Float.sqrt(0.0) = 0.0
-Stdlib.Float.sqrt(1.0) = 1.0
-Stdlib.Float.sqrt(100.0) = 10.0
+Stdlib.Float.sqrt (4.0) = 2.0
+Stdlib.Float.sqrt (9.0) = 3.0
+Stdlib.Float.sqrt (2.0) = 1.4142135623730951
+Stdlib.Float.sqrt (0.0) = 0.0
+Stdlib.Float.sqrt (1.0) = 1.0
+Stdlib.Float.sqrt (100.0) = 10.0
 
 // abs - now with full precision
-Stdlib.Float.abs(5.5) = 5.5
-Stdlib.Float.abs(-5.5) = 5.5
-Stdlib.Float.abs(0.0) = 0.0
-Stdlib.Float.abs(-0.0) = 0.0
-Stdlib.Float.abs(-123.456) = 123.456
+Stdlib.Float.abs (5.5) = 5.5
+Stdlib.Float.abs (-5.5) = 5.5
+Stdlib.Float.abs (0.0) = 0.0
+Stdlib.Float.abs (-0.0) = 0.0
+Stdlib.Float.abs (-123.456) = 123.456
 
 // negate
-Stdlib.Float.negate(3.14) = -3.14
-Stdlib.Float.negate(-3.14) = 3.14
+Stdlib.Float.negate (3.14) = -3.14
+Stdlib.Float.negate (-3.14) = 3.14
 // Stdlib.Float.negate(0.0) correctly displays as -0.0 (IEEE 754 signed zero)
-Stdlib.Float.negate(0.0) = -0.0
+Stdlib.Float.negate (0.0) = -0.0
 
 // toInt (truncates toward zero)
-Stdlib.Float.toInt(3.2) = 3L
-Stdlib.Float.toInt(-3.7) = -3L
-Stdlib.Float.toInt(-3.2) = -3L
-Stdlib.Float.toInt(0.0) = 0L
-Stdlib.Float.toInt(100.99) = 100L
+Stdlib.Float.toInt (3.2) = 3L
+Stdlib.Float.toInt (-3.7) = -3L
+Stdlib.Float.toInt (-3.2) = -3L
+Stdlib.Float.toInt (0.0) = 0L
+Stdlib.Float.toInt (100.99) = 100L
 
 // Stdlib.Int64.toFloat
-Stdlib.Int64.toFloat(42L) = 42.0
-Stdlib.Int64.toFloat(0L) = 0.0
-Stdlib.Int64.toFloat(-100L) = -100.0
+Stdlib.Int64.toFloat (42L) = 42.0
+Stdlib.Int64.toFloat (0L) = 0.0
+Stdlib.Int64.toFloat (-100L) = -100.0
 
 // Combined operations
-Stdlib.Float.sqrt(Stdlib.Float.abs(-16.0)) = 4.0
-Stdlib.Float.abs(Stdlib.Float.negate(5.0)) = 5.0
-Stdlib.Float.toInt(Stdlib.Float.sqrt(100.0)) = 10L
-Stdlib.Int64.toFloat(Stdlib.Float.toInt(9.99)) = 9.0
+Stdlib.Float.sqrt (Stdlib.Float.abs (-16.0)) = 4.0
+Stdlib.Float.abs (Stdlib.Float.negate (5.0)) = 5.0
+Stdlib.Float.toInt (Stdlib.Float.sqrt (100.0)) = 10L
+Stdlib.Int64.toFloat (Stdlib.Float.toInt (9.99)) = 9.0
 
 // Float comparisons (already work, but good to test with new functions)
-Stdlib.Float.sqrt(4.0) > 1.0 = true
-Stdlib.Float.sqrt(4.0) == 2.0 = true
-Stdlib.Float.abs(-5.0) > 4.0 = true
+Stdlib.Float.sqrt (4.0) > 1.0 = true
+Stdlib.Float.sqrt (4.0) == 2.0 = true
+Stdlib.Float.abs (-5.0) > 4.0 = true
 
 // Stdlib.Float.toBits - IEEE 754 bit representation
 // Note: UInt64 values with high bit set are printed as signed (compiler limitation)
-Stdlib.Float.toBits(1.0) = 4607182418800017408UL
-Stdlib.Float.toBits(-1.0) = 13830554455654793216UL
-Stdlib.Float.toBits(0.0) = 0UL
+Stdlib.Float.toBits (1.0) = 4607182418800017408UL
+Stdlib.Float.toBits (-1.0) = 13830554455654793216UL
+Stdlib.Float.toBits (0.0) = 0UL
 
 // Stdlib.Float.toString - special cases
 // -0.0 correctly displays as "-0.0" (IEEE 754 signed zero)
-Stdlib.Float.toString(0.0) = "0.0"
-Stdlib.Float.toString(-0.0) = "-0.0"
+Stdlib.Float.toString (0.0) = "0.0"
+Stdlib.Float.toString (-0.0) = "-0.0"
 
 // Interpreter parity: arbitrary-precision directed and nearest rounding
-Stdlib.Float.ceiling(1.25) = 2I
-Stdlib.Float.roundUp(-1.25) = -1I
-Stdlib.Float.floor(-1.25) = -2I
-Stdlib.Float.roundDown(1.25) = 1I
-Stdlib.Float.round(2.5) = 2I
-Stdlib.Float.round(3.5) = 4I
-Stdlib.Float.roundTowardsZero(-1.75) = -1I
-Stdlib.Float.truncate(-1.75) = -1I
-Stdlib.Float.ceiling(100000000000000000000.0) = 100000000000000000000I
-Stdlib.Float.ceiling(1.0 / 0.0) = error="Encountered out-of-range value for type of Int"
+Stdlib.Float.ceiling (1.25) = 2
+Stdlib.Float.roundUp (-1.25) = -1
+Stdlib.Float.floor (-1.25) = -2
+Stdlib.Float.roundDown (1.25) = 1
+Stdlib.Float.round (2.5) = 2
+Stdlib.Float.round (3.5) = 4
+Stdlib.Float.roundTowardsZero (-1.75) = -1
+Stdlib.Float.truncate (-1.75) = -1
+Stdlib.Float.ceiling (100000000000000000000.0) = 100000000000000000000
+Stdlib.Float.ceiling (1.0 / 0.0) = error="Encountered out-of-range value for type of Int"
 
 // IEEE classification and clamp deliberately reject only NaN limits
-Stdlib.Float.isNaN(Builtin.testNan) = true
-Stdlib.Float.isNaN(1.0 / 0.0) = false
-Stdlib.Float.clamp(3.0, 2.0, 1.0) = Ok(2.0)
-match Stdlib.Float.clamp(Builtin.testNan, -1.0, 1.0) with | Ok(value) -> Stdlib.Float.isNaN(value) | Error(_) -> false = true
-Stdlib.Float.clamp(0.0, Builtin.testNan, 1.0) = Error("clamp requires arguments to be valid numbers")
+Stdlib.Float.isNaN (Builtin.testNan) = true
+Stdlib.Float.isNaN (1.0 / 0.0) = false
+Stdlib.Float.clamp (3.0) (2.0) (1.0) = Ok (2.0)
+match Stdlib.Float.clamp (Builtin.testNan) (-1.0) (1.0) with | Ok (value) -> Stdlib.Float.isNaN (value) | Error (_) -> false = true
+Stdlib.Float.clamp (0.0) (Builtin.testNan) (1.0) = Error ("clamp requires arguments to be valid numbers")
 
 // Culture-independent runtime parsing, including whitespace and signed zero
-Stdlib.Float.parse(" +.5\t") = Ok(0.5)
-Stdlib.Float.parse("1.0000000000000002") = Ok(1.0000000000000002)
-Stdlib.Float.parse("5e-324") = Ok(5e-324)
-Stdlib.Float.toBits(Stdlib.Result.withDefault<Float, Stdlib.Float.ParseError>(Stdlib.Float.parse("-0"), 1.0)) = 9223372036854775808UL
-Stdlib.Float.parse("") = Error(Stdlib.Float.ParseError.BadFormat)
-Stdlib.Float.parse("1e") = Error(Stdlib.Float.ParseError.BadFormat)
-Stdlib.Float.parse("1.8e308") = Ok(1.0 / 0.0)
-Stdlib.Float.parse("1.00000000000000011102230246251565404236316680908203125") = Ok(1.0)
-Stdlib.Float.parse("2e-324") = Ok(0.0)
-Stdlib.Float.isNaN(Stdlib.Result.withDefault<Float, Stdlib.Float.ParseError>(Stdlib.Float.parse("NaN"), 0.0)) = true
-Stdlib.Float.parse("1.25") = stdout="Stdlib.Result.Result<Float, Stdlib.Float.ParseError>.Ok(1.25)\n"
-Stdlib.Float.parse("bad") = stdout="Stdlib.Result.Result<Float, Stdlib.Float.ParseError>.Error(Stdlib.Float.ParseError.BadFormat)\n"
+Stdlib.Float.parse (" +.5\t") = Ok (0.5)
+Stdlib.Float.parse ("1.0000000000000002") = Ok (1.0000000000000002)
+Stdlib.Float.parse ("5e-324") = Ok (5e-324)
+Stdlib.Float.toBits (Stdlib.Result.withDefault<Float, Stdlib.Float.ParseError> (Stdlib.Float.parse ("-0")) (1.0)) = 9223372036854775808UL
+Stdlib.Float.parse ("") = Error (Stdlib.Float.ParseError.BadFormat)
+Stdlib.Float.parse ("1e") = Error (Stdlib.Float.ParseError.BadFormat)
+Stdlib.Float.parse ("1.8e308") = Ok (1.0 / 0.0)
+Stdlib.Float.parse ("1.00000000000000011102230246251565404236316680908203125") = Ok (1.0)
+Stdlib.Float.parse ("2e-324") = Ok (0.0)
+Stdlib.Float.isNaN (Stdlib.Result.withDefault<Float, Stdlib.Float.ParseError> (Stdlib.Float.parse ("NaN")) (0.0)) = true
+Stdlib.Float.parse ("1.25") = stdout="Stdlib.Result.Result<Float, Stdlib.Float.ParseError>.Ok(1.25)\n"
+Stdlib.Float.parse ("bad") = stdout="Stdlib.Result.Result<Float, Stdlib.Float.ParseError>.Error(Stdlib.Float.ParseError.BadFormat)\n"
 
 // Shortest round-trip formatting is shared by public and aggregate rendering
-Stdlib.Float.toString(0.1) = "0.1"
-Stdlib.Float.toString(1.0000000000000002) = "1.0000000000000002"
-Stdlib.Float.toString(0.0001) = "0.0001"
-Stdlib.Float.toString(0.00001) = "1e-5"
-Stdlib.Float.toString(100000000000.0) = "100000000000.0"
-Stdlib.Float.toString(1000000000000.0) = "1e+12"
-Stdlib.Float.toString(5e-324) = "5e-324"
-Stdlib.Float.toString(1.0 / 0.0) = "Infinity"
-Stdlib.Float.toString(-1.0 / 0.0) = "-Infinity"
-Stdlib.Float.toString(Builtin.testNan) = "NaN"
-Stdlib.Float.toBits(Stdlib.Result.withDefault<Float, Stdlib.Float.ParseError>(Stdlib.Float.parse(Stdlib.Float.toString(1.7976931348623157e308)), 0.0)) = Stdlib.Float.toBits(1.7976931348623157e308)
-Stdlib.Float.toBits(Stdlib.Result.withDefault<Float, Stdlib.Float.ParseError>(Stdlib.Float.parse(Stdlib.Float.toString(5e-324)), 0.0)) = Stdlib.Float.toBits(5e-324)
+Stdlib.Float.toString (0.1) = "0.1"
+Stdlib.Float.toString (1.0000000000000002) = "1.0000000000000002"
+Stdlib.Float.toString (0.0001) = "0.0001"
+Stdlib.Float.toString (0.00001) = "1e-5"
+Stdlib.Float.toString (100000000000.0) = "100000000000.0"
+Stdlib.Float.toString (1000000000000.0) = "1e+12"
+Stdlib.Float.toString (5e-324) = "5e-324"
+Stdlib.Float.toString (1.0 / 0.0) = "Infinity"
+Stdlib.Float.toString (-1.0 / 0.0) = "-Infinity"
+Stdlib.Float.toString (Builtin.testNan) = "NaN"
+Stdlib.Float.toBits (Stdlib.Result.withDefault<Float, Stdlib.Float.ParseError> (Stdlib.Float.parse (Stdlib.Float.toString (1.7976931348623157e308))) (0.0)) = Stdlib.Float.toBits (1.7976931348623157e308)
+Stdlib.Float.toBits (Stdlib.Result.withDefault<Float, Stdlib.Float.ParseError> (Stdlib.Float.parse (Stdlib.Float.toString (5e-324))) (0.0)) = Stdlib.Float.toBits (5e-324)
 [1.0000000000000002] = stdout="[1.0000000000000002]\n"
 (0.1, 1.0000000000000002) = stdout="(0.1, 1.0000000000000002)\n"
 
 // IEEE power behavior
-Stdlib.Float.power(4.0, -0.5) = 0.5
-Stdlib.Float.power(-2.0, 3.0) = -8.0
-Stdlib.Float.isNaN(Stdlib.Float.power(-2.0, 0.5)) = true
-Stdlib.Float.toBits(Stdlib.Float.power(-0.0, 3.0)) = 9223372036854775808UL
-Stdlib.Float.power(1e308, 2.0) = 1.0 / 0.0
-Stdlib.Float.power(1e-300, 2.0) = 0.0
-Stdlib.Float.toBits(Stdlib.Float.power(2.0, 0.5)) = 4609047870845172685UL
+Stdlib.Float.power (4.0) (-0.5) = 0.5
+Stdlib.Float.power (-2.0) (3.0) = -8.0
+Stdlib.Float.isNaN (Stdlib.Float.power (-2.0) (0.5)) = true
+Stdlib.Float.toBits (Stdlib.Float.power (-0.0) (3.0)) = 9223372036854775808UL
+Stdlib.Float.power (1e308) (2.0) = 1.0 / 0.0
+Stdlib.Float.power (1e-300) (2.0) = 0.0
+Stdlib.Float.toBits (Stdlib.Float.power (2.0) (0.5)) = 4609047870845172685UL

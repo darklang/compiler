@@ -7,30 +7,30 @@ type Error = { errno: Int, message: String }
 
 type StatResult = { mode: Int, size: Int, mtimeSec: Int }
 
-let __error(error: Stdlib.Cli.NativePosixError) : Stdlib.Cli.Posix.Error =
-    let errno = Stdlib.Int.fromInt64(error.errno) in
+let __error (error: Stdlib.Cli.NativePosixError) : Stdlib.Cli.Posix.Error =
+    let errno = Stdlib.Int.fromInt64 (error.errno) in
     let message =
-        if errno == 1I then "Operation not permitted"
-        else if errno == 3I then "No such process"
-        else if errno == 22I then "Invalid argument"
+        if errno == 1 then "Operation not permitted"
+        else if errno == 3 then "No such process"
+        else if errno == 22 then "Invalid argument"
         else error.message in
     Stdlib.Cli.Posix.Error { errno = errno, message = message }
 
-let kill(pid: Int, signal: Int) : Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
-    match (Stdlib.Int.toInt64(pid), Stdlib.Int.toInt64(signal)) with
-    | (Some(pid), Some(signal)) ->
-        match Stdlib.Cli.__kill(pid, signal) with
-        | Ok(()) -> Ok(())
-        | Error(error) -> Error(Stdlib.Cli.Posix.__error(error))
-    | _ -> Error(Stdlib.Cli.Posix.Error { errno = 22I, message = "Invalid argument" })
+let kill (pid: Int) (signal: Int) : Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
+    match (Stdlib.Int.toInt64 (pid), Stdlib.Int.toInt64 (signal)) with
+    | (Some (pid), Some (signal)) ->
+        match Stdlib.Cli.__kill (pid) (signal) with
+        | Ok (()) -> Ok (())
+        | Error (error) -> Error (Stdlib.Cli.Posix.__error (error))
+    | _ -> Error (Stdlib.Cli.Posix.Error { errno = 22, message = "Invalid argument" })
 
-let sigterm() : Int = 15I
-let sigkill() : Int = 9I
+let sigterm () : Int = 15
+let sigkill () : Int = 9
 
-let sleep(delayMs: Float) : Unit =
-    Stdlib.Cli.__sleep(delayMs)
+let sleep (delayMs: Float) : Unit =
+    Stdlib.Cli.__sleep (delayMs)
 
-let isProcessRunning(pid: Int) : Bool =
-    match Stdlib.Cli.Posix.kill(pid, 0I) with
-    | Ok(()) -> true
-    | Error(error) -> error.errno == 1I
+let isProcessRunning (pid: Int) : Bool =
+    match Stdlib.Cli.Posix.kill (pid) (0) with
+    | Ok (()) -> true
+    | Error (error) -> error.errno == 1

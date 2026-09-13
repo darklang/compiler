@@ -70,16 +70,16 @@ Stdlib.UInt128.mod 127Z 3Z = 1Z
 
 Stdlib.UInt128.mod 5Z 0Z = error="Cannot evaluate modulus against 0"
 // parses OK
-Stdlib.UInt128.parse "0" = Stdlib.Result.Result.Ok(0Z)
-Stdlib.UInt128.parse "1" = Stdlib.Result.Result.Ok(1Z)
-Stdlib.UInt128.parse " 1" = Stdlib.Result.Result.Ok(1Z)
-Stdlib.UInt128.parse "1 " = Stdlib.Result.Result.Ok(1Z)
-Stdlib.UInt128.parse "+1" = Stdlib.Result.Result.Ok(1Z)
-Stdlib.UInt128.parse " +1 " = Stdlib.Result.Result.Ok(1Z)
-Stdlib.UInt128.parse "078" = Stdlib.Result.Result.Ok(78Z) // "octal" format ignored
+Stdlib.UInt128.parse "0" = Stdlib.Result.Result.Ok (0Z)
+Stdlib.UInt128.parse "1" = Stdlib.Result.Result.Ok (1Z)
+Stdlib.UInt128.parse " 1" = Stdlib.Result.Result.Ok (1Z)
+Stdlib.UInt128.parse "1 " = Stdlib.Result.Result.Ok (1Z)
+Stdlib.UInt128.parse "+1" = Stdlib.Result.Result.Ok (1Z)
+Stdlib.UInt128.parse " +1 " = Stdlib.Result.Result.Ok (1Z)
+Stdlib.UInt128.parse "078" = Stdlib.Result.Result.Ok (78Z) // "octal" format ignored
 
 Stdlib.UInt128.parse "170141183460469231731687303715884105727" =
-  Stdlib.Result.Result.Ok(170141183460469231731687303715884105727Z)
+  Stdlib.Result.Result.Ok (170141183460469231731687303715884105727Z)
 
 
 Stdlib.UInt128.parse "170141183460469231731687303715884105729" =

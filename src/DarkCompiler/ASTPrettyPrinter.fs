@@ -89,8 +89,12 @@ let rec private formatType (typ: Type) : string =
         let argsText = typeArgs |> List.map formatType |> String.concat ", "
         $"{formatIdentifierPath name}<{argsText}>"
     | TFunction (paramTypes, returnType) ->
-        let paramsText = paramTypes |> List.map formatType |> String.concat ", "
-        $"({paramsText}) -> {formatType returnType}"
+        let formatParameter paramType =
+            match paramType with
+            | TFunction _ -> $"({formatType paramType})"
+            | _ -> formatType paramType
+        (paramTypes |> List.map formatParameter) @ [formatType returnType]
+        |> String.concat " -> "
 
 let private formatBinOp (op: BinOp) : string =
     match op with
@@ -359,7 +363,7 @@ let rec private formatExpr (expr: Expr) : string =
     | Int128Literal n ->
         $"{n}Q"
     | BigIntLiteral n ->
-        $"{n}I"
+        $"{n}"
     | Int8Literal n ->
         $"{n}y"
     | Int16Literal n ->
@@ -477,7 +481,7 @@ let rec private formatExpr (expr: Expr) : string =
         let argsList = NonEmptyList.toList args
         let formattedName = formatIdentifierPath funcName
         if isUnitArgumentList args then
-            $"{formattedName}()"
+            $"{formattedName} ()"
         else
             let argsText = argsList |> formatAppArgs |> String.concat " "
             $"{formattedName} {argsText}"
@@ -487,10 +491,10 @@ let rec private formatExpr (expr: Expr) : string =
         let formattedName = formatIdentifierPath funcName
         let head = $"{formattedName}<{typeArgsText}>"
         if isUnitArgumentList args then
-            $"{head}()"
+            $"{head} ()"
         else
-            let argsText = argsList |> List.map formatExpr |> String.concat ", "
-            $"{head}({argsText})"
+            let argsText = argsList |> formatAppArgs |> String.concat " "
+            $"{head} {argsText}"
     | TupleLiteral elements ->
         let elementsText = elements |> List.map formatExpr |> String.concat ", "
         $"({elementsText})"
@@ -611,33 +615,10 @@ let rec private formatExpr (expr: Expr) : string =
             // by printing constructor application in pipe form.
             | Constructor _, [singleArg] ->
                 $"{formatExpr singleArg} |> {formatExpr funcExpr}"
-            | TupleLiteral _, _ ->
-                let funcText = formatExpr funcExpr
-                if isUnitArgumentList args then
-                    $"{funcText}()"
-                elif List.length argsList > 1 then
-                    // Tuple-callee apply requires the parenthesized call-argument
-                    // form: (tupleExpr)(a, b).
-                    let argsText = argsList |> List.map formatExpr |> String.concat ", "
-                    $"{funcText}({argsText})"
-                else
-                    let argsText = argsList |> formatAppArgs |> String.concat " "
-                    $"{funcText} {argsText}"
-            | Lambda _, _ when List.length argsList > 1 ->
-                // Preserve uncurried multi-arg lambda-apply shape.
-                let funcText = parenthesizeIfNeeded funcExpr (formatExpr funcExpr)
-                let argsText = argsList |> List.map formatExpr |> String.concat ", "
-                $"{funcText}({argsText})"
-            | (Apply _ | IndirectApply _), _ when List.length argsList > 1 ->
-                // Preserve grouped argument shape for nested apply chains that
-                // originated from parenthesized multi-arg application.
-                let funcText = formatExpr funcExpr
-                let argsText = argsList |> List.map formatExpr |> String.concat ", "
-                $"{funcText}({argsText})"
             | _ ->
                 let funcText = parenthesizeIfNeeded funcExpr (formatExpr funcExpr)
                 if isUnitArgumentList args then
-                    $"{funcText}()"
+                    $"{funcText} ()"
                 else
                     let argsText = argsList |> formatAppArgs |> String.concat " "
                     $"{funcText} {argsText}"
@@ -660,12 +641,12 @@ let private formatFunctionDef (funcDef: FunctionDef) : string =
         |> NonEmptyList.toList
         |> (fun parameters ->
             if isSyntheticUnitParamList funcDef.Params then
-                ""
+                "()"
             else
                 parameters
-                |> List.map (fun (name, typ) -> $"{formatIdentifierSegment name}: {formatType typ}")
-                |> String.concat ", ")
-    $"let {formatIdentifierSegment funcDef.Name}{typeParamsText}({paramsText}) : {formatType funcDef.ReturnType} = {formatExpr funcDef.Body}"
+                |> List.map (fun (name, typ) -> $"({formatIdentifierSegment name}: {formatType typ})")
+                |> String.concat " ")
+    $"let {formatIdentifierSegment funcDef.Name}{typeParamsText} {paramsText} : {formatType funcDef.ReturnType} = {formatExpr funcDef.Body}"
 
 let private formatTypeDef (typeDef: TypeDef) : string =
     let formatTypeParams (typeParams: string list) : string =
