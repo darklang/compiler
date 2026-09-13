@@ -47,7 +47,15 @@ if [[ ! -x "$qemu" || ! -r "$plugin" ]]; then
     echo "Pinned QEMU $architecture instruction counter is unavailable" >&2
     exit 1
 fi
-if [[ "$($qemu --version | head -n 1)" != "qemu-${qemu_architecture} version 11.1.1" ]]; then
+qemu_banner="$($qemu --version | head -n 1)"
+qemu_version_pattern="^qemu-${qemu_architecture} version ([0-9]+\.[0-9]+\.[0-9]+)( \([^()]+\))?$"
+if [[ "$qemu_banner" =~ $qemu_version_pattern ]]; then
+    qemu_version="${BASH_REMATCH[1]}"
+else
+    echo "Unexpected QEMU $architecture instruction counter version" >&2
+    exit 1
+fi
+if [[ "$qemu_version" != "11.1.1" ]]; then
     echo "Unexpected QEMU $architecture instruction counter version" >&2
     exit 1
 fi

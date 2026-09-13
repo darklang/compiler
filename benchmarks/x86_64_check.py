@@ -36,6 +36,10 @@ from benchmark_profiles import load_invocation, load_profile  # noqa: E402
 SCHEMA_VERSION = 1
 TRACK = TRACKS["x86_64-quick-qemu"]
 TOTAL_PATTERN = re.compile(r"^total insns: ([1-9][0-9]*)$", re.MULTILINE)
+QEMU_VERSION_PATTERN = re.compile(
+    r"^qemu-x86_64 version (?P<version>[0-9]+(?:\.[0-9]+){2})(?: \([^()\r\n]+\))?$"
+)
+PINNED_QEMU_VERSION = "11.1.1"
 
 
 def command_result(arguments: list[str], cwd: Path, timeout: int = 60):
@@ -65,6 +69,12 @@ def tool_version(repository: Path, arguments: list[str]) -> str:
     return lines[0]
 
 
+def validate_qemu_version(banner: str) -> None:
+    match = QEMU_VERSION_PATTERN.fullmatch(banner)
+    if match is None or match.group("version") != PINNED_QEMU_VERSION:
+        raise ValueError(f"expected QEMU {PINNED_QEMU_VERSION}, found {banner}")
+
+
 def toolchains(repository: Path) -> dict[str, str]:
     versions = {
         "dotnet": tool_version(repository, ["dotnet", "--version"]),
@@ -74,8 +84,7 @@ def toolchains(repository: Path) -> dict[str, str]:
     }
     if not versions["rustc"].startswith("rustc 1.89.0 "):
         raise ValueError(f"expected rustc 1.89.0, found {versions['rustc']}")
-    if versions["qemu"] != "qemu-x86_64 version 11.1.1":
-        raise ValueError(f"expected QEMU 11.1.1, found {versions['qemu']}")
+    validate_qemu_version(versions["qemu"])
     return versions
 
 

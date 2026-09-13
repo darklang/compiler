@@ -18,7 +18,28 @@ from benchmark_baseline import (  # noqa: E402
     TRACKS,
     track_dict,
 )
-from x86_64_check import compare, render_results  # noqa: E402
+from x86_64_check import compare, render_results, validate_qemu_version  # noqa: E402
+
+
+class QemuVersionTests(unittest.TestCase):
+    def test_accepts_pinned_version_with_supported_banner_suffixes(self) -> None:
+        for banner in (
+            "qemu-x86_64 version 11.1.1",
+            "qemu-x86_64 version 11.1.1 (v11.1.1)",
+        ):
+            with self.subTest(banner=banner):
+                validate_qemu_version(banner)
+
+    def test_rejects_other_versions_and_malformed_banners(self) -> None:
+        for banner in (
+            "qemu-x86_64 version 11.1.0",
+            "qemu-x86_64 version 11.1.10 (v11.1.1)",
+            "qemu-aarch64 version 11.1.1 (v11.1.1)",
+            "qemu-x86_64 version 11.1.1 unexpected suffix",
+        ):
+            with self.subTest(banner=banner):
+                with self.assertRaisesRegex(ValueError, "expected QEMU 11.1.1"):
+                    validate_qemu_version(banner)
 
 
 class X86_64DecisionTests(unittest.TestCase):

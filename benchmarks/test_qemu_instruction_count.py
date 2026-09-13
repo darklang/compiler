@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for architecture selection in the QEMU instruction counter."""
+"""Tests for architecture and pinned-version checks in the QEMU counter."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ class QemuInstructionCounterTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         (self.root / "libinsn.so").touch()
+        (self.root / "version").write_text("11.1.1 (v11.1.1)\n")
         self.binary = self.root / "guest"
         self.binary.write_text("#!/usr/bin/env bash\nexit 0\n")
         self.binary.chmod(0o755)
@@ -26,7 +27,7 @@ class QemuInstructionCounterTests(unittest.TestCase):
 set -euo pipefail
 architecture="$(basename "$0" | sed 's/qemu-//')"
 if [[ "${1:-}" == "--version" ]]; then
-    echo "qemu-${architecture} version 11.1.1"
+    echo "qemu-${architecture} version $(< "$(dirname "$0")/version")"
     exit 0
 fi
 printf '%s\n' "$@" > "$(dirname "$0")/${architecture}.args"
@@ -75,6 +76,14 @@ echo "total insns: 42" >&2
         result = self.run_counter("riscv64")
         self.assertEqual(result.returncode, 2)
         self.assertIn("Unsupported guest architecture: riscv64", result.stderr)
+
+    def test_other_qemu_version_is_rejected_even_if_suffix_mentions_pin(self) -> None:
+        (self.root / "version").write_text("11.1.10 (v11.1.1)\n")
+
+        result = self.run_counter("x86_64")
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Unexpected QEMU x86_64 instruction counter version", result.stderr)
 
 
 if __name__ == "__main__":
