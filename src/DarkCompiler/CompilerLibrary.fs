@@ -1892,7 +1892,22 @@ let private buildAnf
         let t = System.Math.Round(inlineElapsed, 1)
         println $"        {t}ms"
 
-    let convResult = buildConversionResult anfSpecialized registries
+    if verbosity >= 1 && not options.DisableANFOpt then
+        println "  [2.4.6/7] ANF Escape Analysis..."
+    let escapeAnalysisStart = sw.Elapsed.TotalMilliseconds
+    let anfAfterEscapeAnalysis =
+        if options.DisableANFOpt then
+            anfSpecialized
+        else
+            ANF_EscapeAnalysis.scalarReplaceProgram anfSpecialized
+    let escapeAnalysisElapsed = sw.Elapsed.TotalMilliseconds - escapeAnalysisStart
+    if not options.DisableANFOpt then
+        recordPassTiming passTimingRecorder "ANF Escape Analysis" escapeAnalysisElapsed
+    if verbosity >= 2 && not options.DisableANFOpt then
+        let t = System.Math.Round(escapeAnalysisElapsed, 1)
+        println $"        {t}ms"
+
+    let convResult = buildConversionResult anfAfterEscapeAnalysis registries
 
     if verbosity >= 1 then println "  [2.5/7] Reference Count Insertion..."
     let rcStart = sw.Elapsed.TotalMilliseconds

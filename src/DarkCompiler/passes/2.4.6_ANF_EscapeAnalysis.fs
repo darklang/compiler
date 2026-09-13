@@ -1,0 +1,212 @@
+// 2.4.6_ANF_EscapeAnalysis.fs - Eliminate projection-only scalar aggregates.
+//
+// This deliberately narrow first escape-analysis pass scalar-replaces local
+// tuple and record allocations only when their complete lexical use set is
+// projections, aliases, or the representation-only source of a record clone.
+// Managed and floating-point fields, plus every unmodelled use, retain the
+// ordinary heap allocation. Float scalarization is deferred until the float
+// register allocator can spill the longer live ranges it may create.
+
+module ANF_EscapeAnalysis
+
+open ANF
+
+type private ScalarAggregate = {
+    Fields: Atom list
+}
+
+let private isScalarType (typ: AST.Type) : bool =
+    match typ with
+    | AST.TInt8
+    | AST.TInt16
+    | AST.TInt32
+    | AST.TInt64
+    | AST.TUInt8
+    | AST.TUInt16
+    | AST.TUInt32
+    | AST.TUInt64
+    | AST.TBool
+    | AST.TDateTime
+    | AST.TUnit
+    | AST.TRuntimeError -> true
+    | _ -> false
+
+let private atomIsScalar (scalarTemps: Set<TempId>) (atom: Atom) : bool =
+    match atom with
+    | UnitLiteral
+    | IntLiteral _
+    | BoolLiteral _ -> true
+    | Var id -> Set.contains id scalarTemps
+    | StringLiteral _
+    | FloatLiteral _
+    | FuncRef _ -> false
+
+let private atomsUseTracked (tracked: Set<TempId>) (atoms: Atom list) : bool =
+    tracked
+    |> Set.exists (fun id -> ANF_Optimize.atomsUseTemp id atoms)
+
+let private cexprUsesTracked (tracked: Set<TempId>) (cexpr: CExpr) : bool =
+    tracked
+    |> Set.exists (fun id -> ANF_Optimize.cexprUsesTemp id cexpr)
+
+/// Prove that an allocation and every alias derived from it stay inside the
+/// local projection/clone boundary. Calls and storage are rejected by the
+/// general use check without needing an optimistic effect classification.
+let rec private hasOnlyLocalAggregateUses
+    (tracked: Set<TempId>)
+    (expr: AExpr)
+    : bool =
+    match expr with
+    | Return atom ->
+        not (atomsUseTracked tracked [atom])
+    | Let (boundId, cexpr, body) ->
+        match cexpr with
+        | Atom (Var sourceId)
+        | TypedAtom (Var sourceId, _) when Set.contains sourceId tracked ->
+            hasOnlyLocalAggregateUses (Set.add boundId tracked) body
+        | TupleGet (Var sourceId, _)
+        | RecordGet (_, Var sourceId, _) when Set.contains sourceId tracked ->
+            hasOnlyLocalAggregateUses tracked body
+        | RecordClone (_, Var sourceId, fields) when Set.contains sourceId tracked ->
+            not (atomsUseTracked tracked fields)
+            && hasOnlyLocalAggregateUses tracked body
+        | _ ->
+            not (cexprUsesTracked tracked cexpr)
+            && hasOnlyLocalAggregateUses tracked body
+    | If (condition, thenBranch, elseBranch) ->
+        not (atomsUseTracked tracked [condition])
+        && hasOnlyLocalAggregateUses tracked thenBranch
+        && hasOnlyLocalAggregateUses tracked elseBranch
+
+let private tryField (index: int) (aggregate: ScalarAggregate) : Atom =
+    match List.tryItem index aggregate.Fields with
+    | Some field -> field
+    | None -> Crash.crash $"ANF_EscapeAnalysis: aggregate projection index {index} is out of bounds"
+
+let private rewriteProjection
+    (aggregates: Map<TempId, ScalarAggregate>)
+    (cexpr: CExpr)
+    : CExpr =
+    match cexpr with
+    | TupleGet (Var aggregateId, index)
+    | RecordGet (_, Var aggregateId, index) ->
+        match Map.tryFind aggregateId aggregates with
+        | Some aggregate -> Atom (tryField index aggregate)
+        | None -> cexpr
+    | RecordClone (descriptor, Var aggregateId, fields) ->
+        match Map.tryFind aggregateId aggregates with
+        | Some _ -> RecordAlloc (descriptor, fields)
+        | None -> cexpr
+    | _ -> cexpr
+
+let private cexprProducesScalar
+    (returnTypes: Map<string, AST.Type>)
+    (scalarTemps: Set<TempId>)
+    (cexpr: CExpr)
+    : bool =
+    let scalar = atomIsScalar scalarTemps
+    match cexpr with
+    | Atom atom -> scalar atom
+    | TypedAtom (_, typ) -> isScalarType typ
+    | Prim (_, left, right) -> scalar left && scalar right
+    | UnaryPrim (_, atom) -> scalar atom
+    | IfValue (_, thenValue, elseValue) -> scalar thenValue && scalar elseValue
+    | Call (name, _)
+    | BorrowedCall (name, _)
+    | TailCall (name, _) ->
+        Map.tryFind name returnTypes
+        |> Option.map isScalarType
+        |> Option.defaultValue false
+    | RecordGet (descriptor, _, index) ->
+        descriptor.Fields
+        |> List.tryItem index
+        |> Option.map (snd >> isScalarType)
+        |> Option.defaultValue false
+    | FloatToInt64 _
+    | FloatToBits _
+    | RandomInt64
+    | DateTimeNow
+    | Sleep _ -> true
+    | _ -> false
+
+let private tryScalarAggregate
+    (scalarTemps: Set<TempId>)
+    (cexpr: CExpr)
+    : ScalarAggregate option =
+    let scalarFields fields =
+        if List.forall (atomIsScalar scalarTemps) fields then
+            Some { Fields = fields }
+        else
+            None
+
+    match cexpr with
+    | TupleAlloc fields -> scalarFields fields
+    | RecordAlloc (descriptor, fields)
+    | RecordClone (descriptor, _, fields) ->
+        let hasScalarLayout =
+            List.length descriptor.Fields = List.length fields
+            && descriptor.Fields |> List.forall (snd >> isScalarType)
+        if hasScalarLayout then scalarFields fields else None
+    | _ -> None
+
+let rec private scalarReplaceExpr
+    (returnTypes: Map<string, AST.Type>)
+    (scalarTemps: Set<TempId>)
+    (aggregates: Map<TempId, ScalarAggregate>)
+    (expr: AExpr)
+    : AExpr =
+    match expr with
+    | Return _ -> expr
+    | If (condition, thenBranch, elseBranch) ->
+        If (
+            condition,
+            scalarReplaceExpr returnTypes scalarTemps aggregates thenBranch,
+            scalarReplaceExpr returnTypes scalarTemps aggregates elseBranch
+        )
+    | Let (boundId, Atom (Var sourceId), body) when Map.containsKey sourceId aggregates ->
+        let aggregate = Map.find sourceId aggregates
+        scalarReplaceExpr returnTypes scalarTemps (Map.add boundId aggregate aggregates) body
+    | Let (boundId, TypedAtom (Var sourceId, _), body) when Map.containsKey sourceId aggregates ->
+        let aggregate = Map.find sourceId aggregates
+        scalarReplaceExpr returnTypes scalarTemps (Map.add boundId aggregate aggregates) body
+    | Let (boundId, cexpr, body) ->
+        let rewrittenCExpr = rewriteProjection aggregates cexpr
+        match tryScalarAggregate scalarTemps rewrittenCExpr with
+        | Some aggregate when hasOnlyLocalAggregateUses (Set.singleton boundId) body ->
+            scalarReplaceExpr
+                returnTypes
+                scalarTemps
+                (Map.add boundId aggregate aggregates)
+                body
+        | _ ->
+            let scalarTemps' =
+                if cexprProducesScalar returnTypes scalarTemps rewrittenCExpr then
+                    Set.add boundId scalarTemps
+                else
+                    Set.remove boundId scalarTemps
+            Let (
+                boundId,
+                rewrittenCExpr,
+                scalarReplaceExpr returnTypes scalarTemps' aggregates body
+            )
+
+let private scalarReplaceFunction
+    (returnTypes: Map<string, AST.Type>)
+    (func: Function)
+    : Function =
+    let scalarParams =
+        func.TypedParams
+        |> List.choose (fun param -> if isScalarType param.Type then Some param.Id else None)
+        |> Set.ofList
+    { func with
+        Body = scalarReplaceExpr returnTypes scalarParams Map.empty func.Body }
+
+let scalarReplaceProgram (Program (functions, mainExpr): Program) : Program =
+    let returnTypes =
+        functions
+        |> List.map (fun func -> func.Name, func.ReturnType)
+        |> Map.ofList
+    Program (
+        functions |> List.map (scalarReplaceFunction returnTypes),
+        scalarReplaceExpr returnTypes Set.empty Map.empty mainExpr
+    )

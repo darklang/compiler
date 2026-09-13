@@ -38,6 +38,7 @@
     <Compile Include="passes/2.4_ANF_Inlining.fs" />
     <Compile Include="passes/2.4.4_ANF_HigherOrderSpecialization.fs" />
     <Compile Include="passes/2.4.5_ANF_DirectCallSpecialization.fs" />
+    <Compile Include="passes/2.4.6_ANF_EscapeAnalysis.fs" />
     <Compile Include="passes/2.5_RefCountInsertion.fs" />
     <Compile Include="passes/2.6_PrintInsertion.fs" />
     <Compile Include="passes/2.7_TailCallDetection.fs" />

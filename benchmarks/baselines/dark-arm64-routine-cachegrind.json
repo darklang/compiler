@@ -10,10 +10,10 @@
     "measurement_policy": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs"
   },
   "contract_sha256": "2f4e8d149d0eb7a5bbbbea471086afae5bb34d6a687e7d102256a0cde0fcfcc8",
-  "generated_at": "2026-09-13T17:30:22+00:00",
+  "generated_at": "2026-09-13T18:16:29+00:00",
   "compiler": {
-    "commit": "24e4e7c8e4cb7b457af2b7674e823f7869d94409",
-    "subject": "Inline trivial stdlib helpers"
+    "commit": "3853e9e7b94c8012208ccc23ccceb1801d6f27d0",
+    "subject": "Add conservative ANF escape analysis"
   },
   "benchmarks": [
     {
@@ -30,7 +30,7 @@
     },
     {
       "name": "edigits",
-      "instructions": 3364446203
+      "instructions": 3334771646
     },
     {
       "name": "factorial",
@@ -38,7 +38,7 @@
     },
     {
       "name": "fasta",
-      "instructions": 458940131
+      "instructions": 454540290
     },
     {
       "name": "fib",
@@ -46,7 +46,7 @@
     },
     {
       "name": "huffman",
-      "instructions": 1922458560
+      "instructions": 1922458544
     },
     {
       "name": "leibniz",
@@ -82,7 +82,7 @@
     },
     {
       "name": "quicksort",
-      "instructions": 179363475
+      "instructions": 179288556
     },
     {
       "name": "spectral_norm",
@@ -102,7 +102,7 @@
     },
     {
       "name": "tinytemplate",
-      "instructions": 1022685005
+      "instructions": 1022670840
     }
   ]
 }

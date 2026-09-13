@@ -23,6 +23,8 @@ The Dark compiler transforms source code through a series of passes, each with a
 | 2.3  | ANF optimizations       | `passes/2.3_ANF_Optimize.fs`                                | ANF → ANF                                     |
 | 2.4  | ANF inlining            | `passes/2.4_ANF_Inlining.fs`                                | ANF → ANF                                     |
 | 2.4.4 | Known closure specialization | `passes/2.4.4_ANF_HigherOrderSpecialization.fs`       | ANF → ANF                                     |
+| 2.4.5 | Direct-call specialization | `passes/2.4.5_ANF_DirectCallSpecialization.fs`          | ANF → ANF                                     |
+| 2.4.6 | Escape analysis        | `passes/2.4.6_ANF_EscapeAnalysis.fs`                        | ANF → scalar-replaced ANF                     |
 | 2.5  | Ref count insertion     | `passes/2.5_RefCountInsertion.fs`                           | ANF + memory ops                              |
 | 2.6  | Print insertion         | `passes/2.6_PrintInsertion.fs`                              | ANF → ANF                                     |
 | 2.7  | Tail call detection     | `passes/2.7_TailCallDetection.fs`                           | ANF → ANF                                     |
@@ -168,6 +170,27 @@ Output: let t0 = 2 * 3 in
 - **Clone, do not replace**: Create helper and predicate clones for known calls while retaining the generic closure path for unknown function values
 - **Pass captures directly**: Replace the closure argument with ordinary capture parameters and lower `ClosureCall` to a direct call
 - **Bound transformation size**: Skip large helpers/targets and limit the total number of specialized helper/target pairs
+
+---
+
+## Pass 2.4.6: Escape Analysis (`2.4.6_ANF_EscapeAnalysis.fs`)
+
+**Input**: Specialized ANF
+**Output**: ANF with eligible local aggregates replaced by scalar values
+
+The first escape-analysis scope covers fixed-layout tuple and record
+allocations whose fields are all non-floating immediate scalar values. An allocation is
+removed only when its complete lexical use set consists of field projections,
+local aliases, and representation-only record-clone sources. Returns, calls,
+closure capture, storage, raw-pointer operations, managed fields, and every
+unmodelled use preserve the heap representation. Floating-point aggregates
+also remain allocated because scalar replacement can extend their live ranges,
+and the current floating-point register allocator cannot spill them.
+
+Running before reference-count insertion ensures eliminated aggregates never
+acquire root retain or release operations. Stack allocation, managed-field
+scalar replacement, and interprocedural representation changes are outside the
+current scope.
 
 ---
 

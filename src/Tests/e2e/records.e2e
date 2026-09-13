@@ -201,5 +201,10 @@ let record = AccessDiagnostics { value = 1L } in record.other = error="Tried to 
 
 let nonRecord = 1L in nonRecord.value = error="Attempting to access field 'value' on non-record type Int64"
 
+// Projection-only scalar update chains remain correct when their intermediate
+// record allocations are removed before reference-count insertion.
+type ScalarEscapePoint = { x: Int64; y: Int64 }
+let start = ScalarEscapePoint { x = 10L; y = 20L } in let moved = { start with x = start.x + 5L } in moved.x + moved.y = 35L
+
 type LongRenderedRecord = { alpha: String; beta: String }
 LongRenderedRecord { alpha = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"; beta = "abcdefghijklmnopqrstuvwxyz" } = stdout="LongRenderedRecord {\n  alpha: \"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz\",\n  beta: \"abcdefghijklmnopqrstuvwxyz\"\n}\n" stderr=""

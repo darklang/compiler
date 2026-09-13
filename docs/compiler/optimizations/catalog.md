@@ -29,7 +29,8 @@ from Git history.
   reversed relational comparisons.
 - **Interprocedural and aggregate work:** uniform literal direct-parameter
   propagation, bounded scalar-literal cloning, ownership-safe tuple projection
-  forwarding, and unused ANF binding elimination.
+  forwarding, projection-only scalar tuple and record replacement, and unused
+  ANF binding elimination.
 - **Loops and control flow:** bounded recursive-loop unrolling, tail recursion
   modulo wrapping addition or multiplication, effect-free call and Float-load
   hoisting, affine induction reduction, factor-two counted-loop unrolling,
@@ -75,6 +76,20 @@ It supports uniform literal parameter removal and bounded scalar-literal
 cloning while retaining fallbacks and excluding address-taken, closure, and
 managed-string cases. The focused specialization tests own caps, recursive
 signatures, float-bit identity, indirect-use exclusions, and ownership rules.
+
+## Escape analysis and scalar replacement
+
+`passes/2.4.6_ANF_EscapeAnalysis.fs` removes fixed-layout tuple and record
+allocations whose fields are non-floating immediate scalar values and whose
+complete lexical use set consists only of projections, local aliases, and
+representation-only record-clone sources. Escaping clones retain their own
+allocation even when an eligible source allocation is removed.
+
+Returns, calls, closure capture, storage, raw operations, managed fields,
+floating-point fields, and unknown uses preserve allocation. Float aggregates
+remain excluded because extending their field live ranges can exceed the
+current non-spilling Float register allocator. Focused tests cover the accepted
+projection, alias, clone, and branch shapes plus each conservative boundary.
 
 ## MIR optimization
 
