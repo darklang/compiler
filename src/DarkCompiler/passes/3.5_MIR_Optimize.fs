@@ -112,38 +112,53 @@ let private directCallee instr =
     | TailCall (funcName, _, _, _) -> Some funcName
     | _ -> None
 
+type private FunctionEffectSummary = {
+    Name: string
+    LocallyEffectFree: bool
+    DirectCallees: Set<string>
+}
+
+let private summarizeFunctionEffects (func: Function) : FunctionEffectSummary =
+    let (locallyEffectFree, directCallees) =
+        func.CFG.Blocks
+        |> Map.fold (fun summary _ block ->
+            block.Instrs
+            |> List.fold (fun (isEffectFree, callees) instr ->
+                match directCallee instr with
+                | Some callee -> (isEffectFree, Set.add callee callees)
+                | None -> (isEffectFree && not (hasSideEffects instr), callees)
+            ) summary
+        ) (true, Set.empty)
+    {
+        Name = func.Name
+        LocallyEffectFree = locallyEffectFree
+        DirectCallees = directCallees
+    }
+
 let private directCallees (func: Function) : Set<string> =
-    func.CFG.Blocks
-    |> Map.toList
-    |> List.collect (fun (_, block) -> block.Instrs)
-    |> List.choose directCallee
-    |> Set.ofList
+    (summarizeFunctionEffects func).DirectCallees
 
 let analyzeEffectFreeFunctions (functions: Function list) : Set<string> =
-
-    let locallyEffectFree func =
-        func.CFG.Blocks
-        |> Map.forall (fun _ block ->
-            block.Instrs
-            |> List.forall (fun instr ->
-                match directCallee instr with
-                | Some _ -> true
-                | None -> not (hasSideEffects instr)))
-
-    let candidates = functions |> List.filter locallyEffectFree
+    // The fixed point changes only the proven-name set. MIR and call edges stay
+    // fixed, so retain each function's scan instead of rebuilding it per round.
+    let candidates =
+        functions
+        |> List.map summarizeFunctionEffects
+        |> List.filter (fun summary -> summary.LocallyEffectFree)
 
     let rec removeCallersOfUnprovenFunctions provenNames =
         let next =
             candidates
-            |> List.filter (fun func ->
-                directCallees func |> Set.forall (fun callee -> Set.contains callee provenNames))
-            |> List.map (fun func -> func.Name)
+            |> List.filter (fun summary ->
+                summary.DirectCallees
+                |> Set.forall (fun callee -> Set.contains callee provenNames))
+            |> List.map (fun summary -> summary.Name)
             |> Set.ofList
 
         if next = provenNames then next else removeCallersOfUnprovenFunctions next
 
     candidates
-    |> List.map (fun func -> func.Name)
+    |> List.map (fun summary -> summary.Name)
     |> Set.ofList
     |> removeCallersOfUnprovenFunctions
 
