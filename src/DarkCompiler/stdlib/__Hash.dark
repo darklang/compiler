@@ -19,10 +19,6 @@ let __string_hash_loop(s: String, idx: Int64, len: Int64, acc: Int64) : Int64 =
         let next = (acc ^ byte) * __hash_prime() in
         __string_hash_loop(s, idx + 1L, len, next)
 
-// Byte-wise string equality
-let __string_eq(s1: String, s2: String) : Bool =
-    Stdlib.String.equals(s1, s2)
-
 // FNV-1a hash over Blob payloads. Identity equality may produce collisions for
 // distinct handles with equal payloads, which the HAMT resolves with equality.
 let __blob_hash(value: Blob) : Int64 =
@@ -49,7 +45,7 @@ let __hash_blob(value: Blob) : Int64 = __blob_hash(value)
 // Key equality specializations (monomorphized by compiler)
 let __key_eq_i64(left: Int64, right: Int64) : Bool = left == right
 let __key_eq_bool(left: Bool, right: Bool) : Bool = left == right
-let __key_eq_str(left: String, right: String) : Bool = __string_eq(left, right)
+let __key_eq_str(left: String, right: String) : Bool = Stdlib.String.equals(left, right)
 let __key_eq_blob(left: Blob, right: Blob) : Bool = __blob_eq(left, right)
 
 // Unresolved generic __hash/__key_eq calls are handled in compiler lowering by

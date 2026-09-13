@@ -73,6 +73,12 @@ let private prettyPrintANFRcKind = function
     | ANF.DictHeap -> "dict"
     | ANF.ClosureHeap -> "closure"
 
+let private prettyPrintCanonicalBufferKind = function
+    | ANF.Utf8String -> "utf8-string"
+    | ANF.GraphemeCluster -> "grapheme-cluster"
+    | ANF.SignedInt128 -> "signed-int128"
+    | ANF.UnsignedInt128 -> "unsigned-int128"
+
 /// Pretty-print ANF complex expression
 let private prettyPrintANFCExpr = function
     | ANF.Atom atom -> prettyPrintANFAtom atom
@@ -84,6 +90,8 @@ let private prettyPrintANFCExpr = function
     | ANF.Call (funcName, args) ->
         let argStr = args |> commaSeparated prettyPrintANFAtom
         $"{funcName}({argStr})"
+    | ANF.CanonicalBufferEq (kind, left, right) ->
+        $"CanonicalBufferEq[{prettyPrintCanonicalBufferKind kind}]({prettyPrintANFAtom left}, {prettyPrintANFAtom right})"
     | ANF.BorrowedCall (funcName, args) ->
         let argStr = args |> commaSeparated prettyPrintANFAtom
         $"borrowed {funcName}({argStr})"
@@ -308,6 +316,8 @@ let private prettyPrintMIRInstr (instr: MIR.Instr) : string =
     | MIR.Call (dest, funcName, args, _, _) ->
         let argStr = args |> commaSeparated prettyPrintMIROperand
         $"{prettyPrintMIRVReg dest} <- Call({funcName}, [{argStr}])"
+    | MIR.CanonicalBufferEq (dest, kind, left, right) ->
+        $"{prettyPrintMIRVReg dest} <- CanonicalBufferEq[{prettyPrintCanonicalBufferKind kind}]({prettyPrintMIROperand left}, {prettyPrintMIROperand right})"
     | MIR.TailCall (funcName, args, _, _) ->
         let argStr = args |> commaSeparated prettyPrintMIROperand
         $"TailCall({funcName}, [{argStr}])"
@@ -717,6 +727,8 @@ let private prettyPrintLIRInstr (instr: LIR.Instr) : string =
         $"RefCountDec({prettyPrintLIRReg addr}, {payloadSize}, {prettyPrintLIRRcKind kind})"
     | LIR.StringConcat (dest, left, right) ->
         $"{prettyPrintLIRReg dest} <- StringConcat({prettyPrintLIROperand left}, {prettyPrintLIROperand right})"
+    | LIR.CanonicalBufferEq (dest, kind, left, right) ->
+        $"{prettyPrintLIRReg dest} <- CanonicalBufferEq[{prettyPrintCanonicalBufferKind kind}]({prettyPrintLIROperand left}, {prettyPrintLIROperand right})"
     | LIR.PrintHeapString reg ->
         $"PrintHeapString({prettyPrintLIRReg reg})"
     | LIR.LoadFuncAddr (dest, funcName) ->

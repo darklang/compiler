@@ -104,6 +104,7 @@ type Instr =
     | HeapLoad of dest:VReg * addr:VReg * offset:int * valueType:AST.Type option  // Load from heap[addr+offset]
     // String operations
     | StringConcat of dest:VReg * left:Operand * right:Operand  // Concatenate strings
+    | CanonicalBufferEq of dest:VReg * kind:ANF.CanonicalBufferKind * left:Operand * right:Operand
     // Reference counting operations
     | RefCountInc of addr:VReg * payloadSize:int * kind:RcKind * metadata:ANF.RcMetadata option   // Increment ref count at [addr + payloadSize]
     | RefCountDec of addr:VReg * payloadSize:int * kind:RcKind * metadata:ANF.RcMetadata option   // Decrement ref count, free if zero

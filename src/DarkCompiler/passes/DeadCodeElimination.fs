@@ -143,6 +143,8 @@ let private addCallsFromInstr (instr: LIR.Instr) (calls: Set<string>) : Set<stri
     | LIR.HeapStore (_, _, src, _) -> addCallFromOperand src calls
     | LIR.StringConcat (_, left, right) ->
         calls |> addCallFromOperand left |> addCallFromOperand right
+    | LIR.CanonicalBufferEq (_, _, left, right) ->
+        calls |> addCallFromOperand left |> addCallFromOperand right
     | LIR.LoadFuncAddr (_, funcName) -> Set.add funcName calls
     | LIR.FileReadText (_, path)
     | LIR.FileExists (_, path)

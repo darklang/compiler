@@ -96,6 +96,7 @@ let private analyzeCExpr (cexpr: CExpr) (analysis: ProgramAnalysis) : ProgramAna
     | RuntimeErrorString atom -> analyze atom analysis
     | Prim (_, left, right)
     | StringConcat (left, right)
+    | CanonicalBufferEq (_, left, right)
     | FileWriteText (left, right)
     | FileAppendText (left, right)
     | RawGet (left, right, _)
@@ -266,6 +267,8 @@ let private rewriteCExpr
     | RecordClone (descriptor, record, fields) ->
         RecordClone (descriptor, rewrite record, rewriteMany fields)
     | StringConcat (left, right) -> StringConcat (rewrite left, rewrite right)
+    | CanonicalBufferEq (kind, left, right) ->
+        CanonicalBufferEq (kind, rewrite left, rewrite right)
     | RefCountInc (atom, size, kind, metadata) -> RefCountInc (rewrite atom, size, kind, metadata)
     | RefCountDec (atom, size, kind, metadata) -> RefCountDec (rewrite atom, size, kind, metadata)
     | Print (atom, typ) -> Print (rewrite atom, typ)

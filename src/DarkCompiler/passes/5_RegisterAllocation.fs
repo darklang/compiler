@@ -451,6 +451,8 @@ let getUsedVRegs (instr: LIR.Instr) : int list =
         regToVReg addr |> Option.toList
     | LIR.StringConcat (_, left, right) ->
         (operandToVReg left |> Option.toList) @ (operandToVReg right |> Option.toList)
+    | LIR.CanonicalBufferEq (_, _, left, right) ->
+        (operandToVReg left |> Option.toList) @ (operandToVReg right |> Option.toList)
     | LIR.PrintHeapString reg ->
         regToVReg reg |> Option.toList
     | LIR.FileReadText (_, path) ->
@@ -548,6 +550,7 @@ let getDefinedVReg (instr: LIR.Instr) : int option =
     | LIR.HeapAlloc (dest, _) -> regToVReg dest
     | LIR.HeapLoad (dest, _, _) -> regToVReg dest
     | LIR.StringConcat (dest, _, _) -> regToVReg dest
+    | LIR.CanonicalBufferEq (dest, _, _, _) -> regToVReg dest
     | LIR.StdinReadLine (_, dest) -> regToVReg dest
     | LIR.LoadFuncAddr (dest, _) -> regToVReg dest
     | LIR.FileReadText (dest, _) -> regToVReg dest
@@ -3032,6 +3035,24 @@ let applyToInstr (arch: Platform.Arch) (mapping: AllocationResult) (instr: LIR.I
             | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
             | _ -> []
         leftLoads @ rightLoads @ [concatInstr] @ storeInstrs
+
+    | LIR.CanonicalBufferEq (dest, kind, left, right) ->
+        let (destReg, destAlloc) = applyToReg mapping dest
+        let ((leftOp, leftLoads), (rightOp, rightLoads)) =
+            match left, right with
+            | LIR.Reg leftReg, LIR.Reg rightReg ->
+                let ((allocatedLeft, leftLoads), (allocatedRight, rightLoads)) =
+                    loadSpilledPair arch mapping leftReg rightReg destReg
+                ((LIR.Reg allocatedLeft, leftLoads), (LIR.Reg allocatedRight, rightLoads))
+            | _ ->
+                (applyToOperand mapping left LIR.X12,
+                 applyToOperand mapping right LIR.X13)
+        let eqInstr = LIR.CanonicalBufferEq (destReg, kind, leftOp, rightOp)
+        let storeInstrs =
+            match destAlloc with
+            | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
+            | _ -> []
+        leftLoads @ rightLoads @ [eqInstr] @ storeInstrs
 
     | LIR.PrintHeapString reg ->
         let (regPhys, regLoads) = loadSpilled mapping reg LIR.X12

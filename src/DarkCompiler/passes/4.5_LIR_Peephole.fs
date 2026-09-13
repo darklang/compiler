@@ -1051,6 +1051,7 @@ let private foldRegUses folder state (instr: Instr) =
     | HeapStore (addr, _, src, _) ->
         foldOperandRegUse folder (folder state addr) src
     | StringConcat (_, left, right)
+    | CanonicalBufferEq (_, _, left, right)
     | FileWriteText (_, left, right)
     | FileAppendText (_, left, right) ->
         foldOperandRegUse folder state left |> fun acc -> foldOperandRegUse folder acc right

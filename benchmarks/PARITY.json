@@ -163,6 +163,14 @@
         "status": "comparable"
       }
     },
+    "string_equality": {
+      "status": "comparable",
+      "dark_sha256": "6924148ed15504ce1594e7d83f4923d5af5c92e8310e9897a20a160c63b38bc8",
+      "rust_sha256": "e3647206e0f75b0fe53877a841977aaad39cbc501eb55228e83dfde179b58c62",
+      "quick": {
+        "status": "comparable"
+      }
+    },
     "sum_to_n": {
       "status": "comparable",
       "dark_sha256": "82d6d507c472cf635500876a064422e59ab76d4287f4237bc5ec1144ff188079",

@@ -5706,6 +5706,75 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                 let cbzOffset = List.length inlineDecPath + 1
                 [ARM64Symbolic.CBZ_offset (addrReg, cbzOffset)] @ inlineDecPath)
 
+    | LIR.CanonicalBufferEq (dest, _, left, right) ->
+        // Canonical buffers share the [length:8][data:N] prefix. Compare the
+        // representation directly without allocating or calling stdlib code.
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            let materialize operand target =
+                match operand with
+                | LIR.Reg reg ->
+                    lirRegToARM64Reg reg
+                    |> Result.map (fun source ->
+                        if source = target then [] else [ARM64Symbolic.MOV_reg (target, source)])
+                | LIR.StringSymbol value ->
+                    let labelRef = stringDataLabel value
+                    Ok [ARM64Symbolic.ADRP (target, labelRef)
+                        ARM64Symbolic.ADD_label (target, target, labelRef)]
+                | _ -> Error "CanonicalBufferEq requires StringSymbol or Reg operands"
+
+            let label suffix =
+                $"__canonical_buffer_eq_{ctx.FunctionName}_{ctx.InstructionSite}_{suffix}"
+            let wordLoop = label "words"
+            let byteLoop = label "bytes"
+            let equalLabel = label "equal"
+            let unequalLabel = label "unequal"
+            let doneLabel = label "done"
+
+            materialize left ARM64Symbolic.X8
+            |> Result.bind (fun leftInstrs ->
+                materialize right ARM64Symbolic.X9
+                |> Result.map (fun rightInstrs ->
+                    leftInstrs
+                    @ rightInstrs
+                    @ [ARM64Symbolic.CMP_reg (ARM64Symbolic.X8, ARM64Symbolic.X9)
+                       ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, equalLabel)
+                       ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X8, 0s)
+                       ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X9, 0s)
+                       ARM64Symbolic.CMP_reg (ARM64Symbolic.X10, ARM64Symbolic.X12)
+                       ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, unequalLabel)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X8, ARM64Symbolic.X8, 8us)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 8us)
+                       ARM64Symbolic.Label wordLoop
+                       ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, 8us)
+                       ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, byteLoop)
+                       ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.X8, 0s)
+                       ARM64Symbolic.LDR (ARM64Symbolic.X13, ARM64Symbolic.X9, 0s)
+                       ARM64Symbolic.CMP_reg (ARM64Symbolic.X11, ARM64Symbolic.X13)
+                       ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, unequalLabel)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X8, ARM64Symbolic.X8, 8us)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 8us)
+                       ARM64Symbolic.SUB_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 8us)
+                       ARM64Symbolic.B_label wordLoop
+                       ARM64Symbolic.Label byteLoop
+                       ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, 0us)
+                       ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, equalLabel)
+                       ARM64Symbolic.LDRB_imm (ARM64Symbolic.X11, ARM64Symbolic.X8, 0)
+                       ARM64Symbolic.LDRB_imm (ARM64Symbolic.X13, ARM64Symbolic.X9, 0)
+                       ARM64Symbolic.CMP_reg (ARM64Symbolic.X11, ARM64Symbolic.X13)
+                       ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, unequalLabel)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X8, ARM64Symbolic.X8, 1us)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 1us)
+                       ARM64Symbolic.SUB_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 1us)
+                       ARM64Symbolic.B_label byteLoop
+                       ARM64Symbolic.Label equalLabel
+                       ARM64Symbolic.MOVZ (ARM64Symbolic.X11, 1us, 0)
+                       ARM64Symbolic.B_label doneLabel
+                       ARM64Symbolic.Label unequalLabel
+                       ARM64Symbolic.MOVZ (ARM64Symbolic.X11, 0us, 0)
+                       ARM64Symbolic.Label doneLabel]
+                    @ (if destReg = ARM64Symbolic.X11 then [] else [ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X11)]))))
+
     | LIR.StringConcat (dest, left, right) ->
         // String concatenation:
         // Heap string layout: [length:8][data:N][refcount:8]

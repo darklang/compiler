@@ -16,6 +16,11 @@ contains only rules specific to agents changing this repository.
 ## Change rules
 
 - Create a failing, focused E2E test before fixing a compiler behavior.
+- Test observable language behavior, not incidental compiler structure. Do not
+  add IR or backend tests whose assertion is merely that a particular helper or
+  call is present or absent. Use E2E tests for correctness and benchmarks for
+  performance; add lower-level tests only when they validate independently
+  meaningful backend behavior.
 - Keep comments useful to a senior compiler engineer, including the required
   file-purpose comment.
 - Use command-line flags rather than environment variables; use `python3` for

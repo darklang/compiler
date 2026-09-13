@@ -239,6 +239,7 @@ let getBlockDefs (block: BasicBlock) : Set<VReg> =
         | HeapStore _ -> defs  // No destination register
         | HeapLoad (dest, _, _, _) -> Set.add dest defs
         | StringConcat (dest, _, _) -> Set.add dest defs
+        | CanonicalBufferEq (dest, _, _, _) -> Set.add dest defs
         | RefCountInc _ -> defs
         | RefCountDec _ -> defs
         | Print _ -> defs
@@ -343,7 +344,8 @@ let getBlockUses (block: BasicBlock) : Set<VReg> =
             | HeapStore (addr, _, src, _) ->
                 uses |> Set.add addr |> addOperandUse src
             | HeapLoad (_, addr, _, _) -> Set.add addr uses
-            | StringConcat (_, left, right) ->
+            | StringConcat (_, left, right)
+            | CanonicalBufferEq (_, _, left, right) ->
                 uses |> addOperandUse left |> addOperandUse right
             | RefCountInc (addr, _, _, _) -> Set.add addr uses
             | RefCountDec (addr, _, _, _) -> Set.add addr uses
@@ -821,6 +823,12 @@ let renameInstr (state: RenamingState) (instr: Instr) : Instr * RenamingState =
         let right' = renameOperand state right
         let (_, newDest, state') = newVersion state dest
         (StringConcat (newDest, left', right'), state')
+
+    | CanonicalBufferEq (dest, kind, left, right) ->
+        let left' = renameOperand state left
+        let right' = renameOperand state right
+        let (_, newDest, state') = newVersion state dest
+        (CanonicalBufferEq (newDest, kind, left', right'), state')
 
     | RefCountInc (addr, size, kind, sourceType) ->
         let addr' = getRenamedReg state addr

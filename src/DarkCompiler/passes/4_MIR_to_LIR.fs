@@ -1354,6 +1354,12 @@ let selectInstr
         let lirRight = convertOperand right
         Ok ([LIR.StringConcat (lirDest, lirLeft, lirRight)], state)
 
+    | MIR.CanonicalBufferEq (dest, kind, left, right) ->
+        let lirDest = vregToLIRReg dest
+        let lirLeft = convertOperand left
+        let lirRight = convertOperand right
+        Ok ([LIR.CanonicalBufferEq (lirDest, kind, lirLeft, lirRight)], state)
+
     | MIR.StdoutWrite (effectId, value, appendNewline) ->
         Ok ([LIR.StdoutWrite (effectId, convertOperand value, appendNewline)], state)
 
@@ -1781,6 +1787,11 @@ let maxVRegIdFromInstr (instr: MIR.Instr) (currentMax: int) : int =
     | MIR.HeapLoad (dest, addr, _, _) ->
         currentMax |> maxVRegId dest |> maxVRegId addr
     | MIR.StringConcat (dest, left, right) ->
+        currentMax
+        |> maxVRegId dest
+        |> maxVRegIdFromOperand left
+        |> maxVRegIdFromOperand right
+    | MIR.CanonicalBufferEq (dest, _, left, right) ->
         currentMax
         |> maxVRegId dest
         |> maxVRegIdFromOperand left

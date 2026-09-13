@@ -51,12 +51,18 @@ Higher-level stdlib functions such as `repeat`, `join`, `trim`, `split`,
 `replace`, `first`, `last`, `dropFirst`, `dropLast`, `head`, `padStart`, and
 `padEnd` are implemented in `src/DarkCompiler/stdlib/String.dark`.
 
-String hashing and equality are backend intrinsics:
+String equality is a representation-level compiler operation:
 
 ```fsharp
-| StringHash of dest:Reg * str:Operand
-| StringEq of dest:Reg * left:Operand * right:Operand
+| CanonicalBufferEq of dest:Reg * kind:CanonicalBufferKind * left:Operand * right:Operand
 ```
+
+Equality first checks pointer identity and byte length, then compares full
+machine words followed by any remaining bytes. `CanonicalBufferKind` records
+whether the bytes represent UTF-8 text, a grapheme cluster, or one of the
+currently canonical-buffer-backed fixed-width integer types. Arbitrary-
+precision `Int` keeps its numeric equality path because internal values are not
+guaranteed to have canonical text during intermediate calculations.
 
 ## Reference Counting
 

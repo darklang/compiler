@@ -55,6 +55,7 @@ let hasSideEffects (instr: Instr) : bool =
     | HeapAlloc _ -> true  // Allocates memory
     | HeapStore _ -> true  // Writes to memory
     | StringConcat _ -> true  // Allocates memory
+    | CanonicalBufferEq _ -> false
     | RefCountInc _ -> true
     | RefCountDec _ -> true
     | Print _ -> true
@@ -186,6 +187,7 @@ let getInstrDest (instr: Instr) : VReg option =
     | HeapAlloc (dest, _) -> Some dest
     | HeapLoad (dest, _, _, _) -> Some dest
     | StringConcat (dest, _, _) -> Some dest
+    | CanonicalBufferEq (dest, _, _, _) -> Some dest
     | StdinReadLine dest -> Some dest
     | FileReadText (dest, _) -> Some dest
     | FileExists (dest, _) -> Some dest
@@ -260,6 +262,7 @@ let foldInstrUses (folder: 'State -> VReg -> 'State) (state: 'State) (instr: Ins
     | RefCountInc (addr, _, _, _)
     | RefCountDec (addr, _, _, _) -> folder state addr
     | StringConcat (_, left, right)
+    | CanonicalBufferEq (_, _, left, right)
     | FileWriteText (_, left, right)
     | FileAppendText (_, left, right)
     | RawGet (_, left, right, _)
@@ -1823,6 +1826,8 @@ let propagateCopyInstr (copies: CopyMap) (instr: Instr) : Instr =
         let addr' = match p (Register addr) with Register v -> v | _ -> addr
         HeapLoad (dest, addr', offset, vt)
     | StringConcat (dest, left, right) -> StringConcat (dest, p left, p right)
+    | CanonicalBufferEq (dest, kind, left, right) ->
+        CanonicalBufferEq (dest, kind, p left, p right)
     | RefCountInc (addr, size, kind, sourceType) ->
         let addr' = match p (Register addr) with Register v -> v | _ -> addr
         RefCountInc (addr', size, kind, sourceType)

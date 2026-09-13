@@ -246,6 +246,12 @@ let private normalizeMirFunctionRegisterOffset
                     shiftReg dest,
                     shiftOperand left,
                     shiftOperand right)
+            | MIR.CanonicalBufferEq (dest, kind, left, right) ->
+                MIR.CanonicalBufferEq (
+                    shiftReg dest,
+                    kind,
+                    shiftOperand left,
+                    shiftOperand right)
             | MIR.RefCountInc (addr, payloadSize, kind, metadata) ->
                 MIR.RefCountInc (shiftReg addr, payloadSize, kind, metadata)
             | MIR.RefCountDec (addr, payloadSize, kind, metadata) ->

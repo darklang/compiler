@@ -172,6 +172,7 @@ type Instr =
     | RefCountInc of addr:Reg * payloadSize:int * kind:RcKind * metadata:ANF.RcMetadata option
     | RefCountDec of addr:Reg * payloadSize:int * kind:RcKind * metadata:ANF.RcMetadata option
     | StringConcat of dest:Reg * left:Operand * right:Operand
+    | CanonicalBufferEq of dest:Reg * kind:ANF.CanonicalBufferKind * left:Operand * right:Operand
     | PrintHeapString of Reg
     | LoadFuncAddr of dest:Reg * funcName:string
     | FileReadText of dest:Reg * path:Operand

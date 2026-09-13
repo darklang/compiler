@@ -27,7 +27,6 @@ let private externalReturnTypes : Map<string, AST.Type> =
         ("__key_eq_str", TBool)
         ("__key_eq_bool", TBool)
         ("__string_hash", TInt64)
-        ("__string_eq", TBool)
     ]
 
 let private typeCheckWithStdlib (stdlib: CompilerLibrary.StdlibResult) (ast: AST.Program) : Result<AST.Type * AST.Program, string> =

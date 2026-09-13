@@ -2,33 +2,34 @@
 
 Best-known compatible routine-profile Dark performance vs audited Rust references (instruction counts).
 
-**Snapshot timestamp:** 2026-09-13T15:46:36+00:00
+**Snapshot timestamp:** 2026-09-13T16:53:34+00:00
 **Architecture:** `arm64`
 **Profile:** `routine` (schema 2)
 **Measurement policy:** `cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs`
-**Workload contract:** `db2cd8833adfd66c2883d7b7f8e77c89862e90320e23b15c729115ecb5550cdf`
-**Compiler commit:** `a22bd5dd1af2c35fc094ada1130f6f705af45561` - Enable ANF optimization for stdlib
+**Workload contract:** `2f4e8d149d0eb7a5bbbbea471086afae5bb34d6a687e7d102256a0cde0fcfcc8`
+**Compiler commit:** `7b5d4ce0990c44bfafc3e19fd8542f7b75d52332` - Lower canonical string equality directly
 
-| Benchmark | Dark (3.32x) | Rust |
+| Benchmark | Dark (3.13x) | Rust |
 |---|---:|---:|
-| ackermann | 9,303,384,465 (1.62x) | 5,725,441,814 |
-| binary_trees | 537,698,160 (0.17x) | 3,186,860,117 |
-| collatz | 70,196,062 (0.91x) | 76,735,592 |
-| edigits | 3,364,448,413 (237x) | 14,173,715 |
-| factorial | 66,899 (0.07x) | 970,224 |
-| fasta | 458,941,236 (21.4x) | 21,447,164 |
-| fib | 388,196,426 (1.42x) | 272,529,537 |
-| huffman | 1,958,359,613 (44.9x) | 43,624,109 |
-| leibniz | 850,008,829 (1.21x) | 700,258,771 |
-| mandelbrot | 15,230,475 (1.21x) | 12,557,210 |
-| matmul | 931,351,499 (54.9x) | 16,951,735 |
-| merkletrees | 193,343,211 (1.71x) | 113,310,447 |
-| nbody | 883,009,128 (4.42x) | 199,759,342 |
-| nqueen | 207,723,349 (1.31x) | 158,617,384 |
-| pisum | 40,027,133 (0.88x) | 45,261,710 |
-| primes | 1,470,022 (1.17x) | 1,260,022 |
-| quicksort | 179,365,685 (29.3x) | 6,114,981 |
-| spectral_norm | 63,964,250 (12.5x) | 5,106,472 |
-| sum_to_n | 65,121 (0.25x) | 260,154 |
-| tak | 48,022,824 (0.12x) | 391,109,981 |
-| tinytemplate | 1,067,943,979 (1720x) | 620,727 |
+| ackermann | 9,303,383,850 (1.62x) | 5,725,442,084 |
+| binary_trees | 537,697,536 (0.17x) | 3,186,862,490 |
+| collatz | 70,195,750 (0.91x) | 76,735,880 |
+| edigits | 3,364,447,789 (237x) | 14,174,258 |
+| factorial | 66,275 (0.07x) | 970,494 |
+| fasta | 458,940,924 (21.4x) | 21,447,439 |
+| fib | 388,196,114 (1.42x) | 272,529,792 |
+| huffman | 1,922,782,076 (44.1x) | 43,624,456 |
+| leibniz | 850,008,517 (1.21x) | 700,259,083 |
+| mandelbrot | 15,229,851 (1.21x) | 12,557,502 |
+| matmul | 931,351,187 (54.9x) | 16,952,044 |
+| merkletrees | 193,342,587 (1.71x) | 113,308,384 |
+| nbody | 883,008,816 (4.42x) | 199,759,617 |
+| nqueen | 207,723,037 (1.31x) | 158,617,689 |
+| pisum | 40,026,509 (0.88x) | 45,261,987 |
+| primes | 1,469,710 (1.17x) | 1,260,320 |
+| quicksort | 179,365,061 (29.3x) | 6,115,251 |
+| spectral_norm | 63,963,626 (12.5x) | 5,106,614 |
+| string_equality | 58,063,451 (0.96x) | 60,769,629 |
+| sum_to_n | 64,497 (0.25x) | 260,484 |
+| tak | 48,021,585 (0.12x) | 391,110,892 |
+| tinytemplate | 1,066,875,529 (1718x) | 620,865 |

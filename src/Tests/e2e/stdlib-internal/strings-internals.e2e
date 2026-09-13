@@ -10,5 +10,3 @@ Stdlib.Char.isUppercase('a') = false
 
 __string_hash("") = -3750763034362895579L
 __string_hash("hello") = -6615550055289275125L
-__string_eq("hello", "hello") = true
-__string_eq("hello", "hella") = false

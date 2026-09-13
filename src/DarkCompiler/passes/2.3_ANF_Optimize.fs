@@ -468,6 +468,7 @@ let hasSideEffects (context: OptimizeContext) (cexpr: CExpr) : bool =
     | ClosureCall _ -> true
     | ClosureTailCall _ -> true
     | StringConcat _ -> true  // Allocates memory
+    | CanonicalBufferEq _ -> false
     | RefCountInc _ -> true
     | RefCountDec _ -> true
     | Print _ -> true
@@ -558,7 +559,8 @@ let private addCExprUses (cexpr: CExpr) (uses: Set<TempId>) : Set<TempId> =
     | RecordGet (_, record, _) -> addAtomUse record uses
     | RecordClone (_, record, fields) ->
         uses |> addAtomUse record |> addAtomUses fields
-    | StringConcat (left, right) -> uses |> addAtomUse left |> addAtomUse right
+    | StringConcat (left, right)
+    | CanonicalBufferEq (_, left, right) -> uses |> addAtomUse left |> addAtomUse right
     | RefCountInc (atom, _, _, _) -> addAtomUse atom uses
     | RefCountDec (atom, _, _, _) -> addAtomUse atom uses
     | Print (atom, _) -> addAtomUse atom uses
@@ -650,6 +652,7 @@ let cexprUsesTemp (tid: TempId) (cexpr: CExpr) : bool =
     | StdoutWrite (atom, _) -> used atom
     | Prim (_, left, right)
     | StringConcat (left, right)
+    | CanonicalBufferEq (_, left, right)
     | FileWriteText (left, right)
     | FileAppendText (left, right)
     | RawGet (left, right, _)
@@ -748,6 +751,7 @@ let private substCExprValue (env: Map<TempId, Atom>) (cexpr: CExpr) : CExpr =
     | RecordClone (descriptor, record, fields) ->
         RecordClone (descriptor, s record, substAtoms env fields)
     | StringConcat (left, right) -> StringConcat (s left, s right)
+    | CanonicalBufferEq (kind, left, right) -> CanonicalBufferEq (kind, s left, s right)
     | RefCountInc (atom, size, kind, sourceType) -> RefCountInc (s atom, size, kind, sourceType)
     | RefCountDec (atom, size, kind, sourceType) -> RefCountDec (s atom, size, kind, sourceType)
     | Print (atom, t) -> Print (s atom, t)
@@ -860,9 +864,9 @@ let optimizeCExpr (options: OptimizeOptions) (env: ConstEnv) (typeEnv: TypeEnv) 
                 Map.tryFind tupleTid tupleEnv
                 |> Option.bind (Map.tryFind index)
                 |> Option.map Atom
-            | Call ("__string_eq", [StringLiteral left; StringLiteral right]) ->
+            | CanonicalBufferEq (_, StringLiteral left, StringLiteral right) ->
                 Some (Atom (BoolLiteral (left = right)))
-            | Call ("__string_eq", [Var leftTid; Var rightTid]) when leftTid = rightTid ->
+            | CanonicalBufferEq (_, Var leftTid, Var rightTid) when leftTid = rightTid ->
                 Some (Atom (BoolLiteral true))
             | IfValue (BoolLiteral true, thenVal, _) -> Some (Atom thenVal)
             | IfValue (BoolLiteral false, _, elseVal) -> Some (Atom elseVal)

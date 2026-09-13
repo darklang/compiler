@@ -23,6 +23,23 @@ open Output
 /// bodies until monomorphization has substituted a concrete operand type.
 let private eqHelperDispatchMarker = "__dark_internal_eq_helper_dispatch"
 
+let private canonicalBufferKindForType (typ: AST.Type) : ANF.CanonicalBufferKind option =
+    match typ with
+    | AST.TString -> Some ANF.Utf8String
+    | AST.TChar -> Some ANF.GraphemeCluster
+    | AST.TInt128 -> Some ANF.SignedInt128
+    | AST.TUInt128 -> Some ANF.UnsignedInt128
+    | _ -> None
+
+let private tryCanonicalBufferEqualityIntrinsic
+    (funcName: string)
+    (args: ANF.Atom list)
+    : ANF.CExpr option =
+    match funcName, args with
+    | "Stdlib.String.equals", [left; right] ->
+        Some (ANF.CanonicalBufferEq (ANF.Utf8String, left, right))
+    | _ -> None
+
 let private materializeComparisonPlan (targetType: AST.Type) (args: AST.Expr list) : AST.Expr =
     match args with
     | [leftExpr; rightExpr] ->
@@ -4442,7 +4459,7 @@ let rec generateStructuralEquality
             // structural-equality design boundary.
             let payloadComparison =
                 if typeName = "Uuid" then
-                    ANF.Call ("__string_eq", [ANF.Var leftPayloadVar; ANF.Var rightPayloadVar])
+                    ANF.CanonicalBufferEq (ANF.UnsignedInt128, ANF.Var leftPayloadVar, ANF.Var rightPayloadVar)
                 else
                     ANF.Prim (ANF.Eq, ANF.Var leftPayloadVar, ANF.Var rightPayloadVar)
 
@@ -5543,15 +5560,23 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
                                 else
                                     (eqResultAtom, eqBindings, varGen3)
                             Ok (wrapBindings finalBindings (ANF.Return finalAtom), varGen4)
-                        | Ok AST.TString
-                        | Ok AST.TChar
-                        | Ok AST.TInt
-                        | Ok AST.TInt128
-                        | Ok AST.TUInt128 ->
-                            // String/char/128-bit equality - call __string_eq.
-                            // Int128/UInt128 values are lowered as canonical decimal strings.
+                        | Ok AST.TInt ->
                             let (tempVar, varGen3) = ANF.freshVar varGen2
-                            let cexpr = ANF.Call ("__string_eq", [leftAtom; rightAtom])
+                            let cexpr = ANF.Call ("Stdlib.Internal.Integer.equals", [leftAtom; rightAtom])
+                            let (finalAtom, finalBindings, varGen4) =
+                                if op = AST.Neq then
+                                    let (negVar, vg) = ANF.freshVar varGen3
+                                    let negExpr = ANF.UnaryPrim (ANF.Not, ANF.Var tempVar)
+                                    (ANF.Var negVar, [(tempVar, cexpr); (negVar, negExpr)], vg)
+                                else
+                                    (ANF.Var tempVar, [(tempVar, cexpr)], varGen3)
+                            Ok (wrapBindings finalBindings (ANF.Return finalAtom), varGen4)
+                        | Ok operandType when canonicalBufferKindForType operandType |> Option.isSome ->
+                            let (tempVar, varGen3) = ANF.freshVar varGen2
+                            let kind =
+                                canonicalBufferKindForType operandType
+                                |> Option.defaultWith (fun () -> Crash.crash $"Expected canonical buffer type, got {operandType}")
+                            let cexpr = ANF.CanonicalBufferEq (kind, leftAtom, rightAtom)
                             // For Neq, negate the result
                             let (finalAtom, finalBindings, varGen4) =
                                 if op = AST.Neq then
@@ -5840,6 +5865,13 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
                 // Variable exists but is not a function type
                 Error $"Cannot call '{funcName}' - it has type {varType}, not a function type"
             | None ->
+                // Resolved stdlib equality APIs lower to the representation
+                // operation at the AST boundary, including calls from stdlib.
+                match tryCanonicalBufferEqualityIntrinsic funcName argAtoms with
+                | Some intrinsicExpr ->
+                    let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
+                    Ok (withArgSetups finalExpr, varGen2)
+                | None ->
                 // Not a variable - check explicit presentation effects first.
                 match tryPresentationIntrinsic funcName argAtoms with
                 | Some intrinsicExpr ->
@@ -7309,11 +7341,11 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
                     Ok (Some (ANF.Var cmpVar, [(cmpVar, cmpExpr)], vg1))
                 | AST.PBigInt n ->
                     let (cmpVar, vg1) = ANF.freshVar vg
-                    let cmpExpr = ANF.Call ("__string_eq", [scrutAtom; ANF.StringLiteral (n.ToString())])
+                    let cmpExpr = ANF.Call ("Stdlib.Internal.Integer.equals", [scrutAtom; ANF.StringLiteral (n.ToString())])
                     Ok (Some (ANF.Var cmpVar, [(cmpVar, cmpExpr)], vg1))
                 | AST.PInt128Literal n ->
                     let (cmpVar, vg1) = ANF.freshVar vg
-                    let cmpExpr = ANF.Call ("__string_eq", [scrutAtom; ANF.StringLiteral (int128ToCanonicalString n)])
+                    let cmpExpr = ANF.CanonicalBufferEq (ANF.SignedInt128, scrutAtom, ANF.StringLiteral (int128ToCanonicalString n))
                     Ok (Some (ANF.Var cmpVar, [(cmpVar, cmpExpr)], vg1))
                 | AST.PInt8Literal n ->
                     let (cmpVar, vg1) = ANF.freshVar vg
@@ -7345,7 +7377,7 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
                     Ok (Some (ANF.Var cmpVar, [(cmpVar, cmpExpr)], vg1))
                 | AST.PUInt128Literal n ->
                     let (cmpVar, vg1) = ANF.freshVar vg
-                    let cmpExpr = ANF.Call ("__string_eq", [scrutAtom; ANF.StringLiteral (uint128ToCanonicalString n)])
+                    let cmpExpr = ANF.CanonicalBufferEq (ANF.UnsignedInt128, scrutAtom, ANF.StringLiteral (uint128ToCanonicalString n))
                     Ok (Some (ANF.Var cmpVar, [(cmpVar, cmpExpr)], vg1))
                 | AST.PBool b ->
                     let (cmpVar, vg1) = ANF.freshVar vg
@@ -7354,12 +7386,12 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
                 | AST.PString s ->
                     // String patterns must use byte-wise equality, not pointer equality.
                     let (cmpVar, vg1) = ANF.freshVar vg
-                    let cmpExpr = ANF.Call ("__string_eq", [scrutAtom; ANF.StringLiteral (s.Normalize(System.Text.NormalizationForm.FormC))])
+                    let cmpExpr = ANF.CanonicalBufferEq (ANF.Utf8String, scrutAtom, ANF.StringLiteral (s.Normalize(System.Text.NormalizationForm.FormC)))
                     Ok (Some (ANF.Var cmpVar, [(cmpVar, cmpExpr)], vg1))
                 | AST.PChar c ->
                     // Char values are represented as single-EGC strings at runtime.
                     let (cmpVar, vg1) = ANF.freshVar vg
-                    let cmpExpr = ANF.Call ("__string_eq", [scrutAtom; ANF.StringLiteral (c.Normalize(System.Text.NormalizationForm.FormC))])
+                    let cmpExpr = ANF.CanonicalBufferEq (ANF.GraphemeCluster, scrutAtom, ANF.StringLiteral (c.Normalize(System.Text.NormalizationForm.FormC)))
                     Ok (Some (ANF.Var cmpVar, [(cmpVar, cmpExpr)], vg1))
                 | AST.PFloat f ->
                     if f = 0.0 then
@@ -7974,10 +8006,10 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
                                 let withTagCheck = ANF.If (ANF.Var checkVar, withBindings, elseExpr)
                                 (ANF.Let (tagVar, tagExpr, ANF.Let (checkVar, checkExpr, withTagCheck)), vg7))
 
-                        let compileStringLiteralPattern (literalText: string) =
+                        let compileStringLiteralPattern (kind: ANF.CanonicalBufferKind) (literalText: string) =
                             // Int128/UInt128 list elements are lowered as canonical decimal strings.
                             let (litCheckVar, vg6) = ANF.freshVar vg5'
-                            let litCheckExpr = ANF.Call ("__string_eq", [valueAtom; ANF.StringLiteral literalText])
+                            let litCheckExpr = ANF.CanonicalBufferEq (kind, valueAtom, ANF.StringLiteral literalText)
                             toANFCore sumTypeNames body vg6 currentEnv typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg7) ->
                                 let ifLitExpr = ANF.If (ANF.Var litCheckVar, bodyExpr, elseExpr)
@@ -8025,7 +8057,7 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
                                         let ifExpr = ANF.If (ANF.Var checkVar, withBindings, elseExpr)
                                         (ANF.Let (tagVar, tagExpr, ANF.Let (checkVar, checkExpr, ifExpr)), vg8))))
                         | AST.PInt64 n -> compileLiteralPattern (ANF.Int64 n)
-                        | AST.PInt128Literal n -> compileStringLiteralPattern (int128ToCanonicalString n)
+                        | AST.PInt128Literal n -> compileStringLiteralPattern ANF.SignedInt128 (int128ToCanonicalString n)
                         | AST.PInt8Literal n -> compileLiteralPattern (ANF.Int8 n)
                         | AST.PInt16Literal n -> compileLiteralPattern (ANF.Int16 n)
                         | AST.PInt32Literal n -> compileLiteralPattern (ANF.Int32 n)
@@ -8033,7 +8065,7 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
                         | AST.PUInt16Literal n -> compileLiteralPattern (ANF.UInt16 n)
                         | AST.PUInt32Literal n -> compileLiteralPattern (ANF.UInt32 n)
                         | AST.PUInt64Literal n -> compileLiteralPattern (ANF.UInt64 n)
-                        | AST.PUInt128Literal n -> compileStringLiteralPattern (uint128ToCanonicalString n)
+                        | AST.PUInt128Literal n -> compileStringLiteralPattern ANF.UnsignedInt128 (uint128ToCanonicalString n)
                         | _ ->
                             Error $"Unsupported pattern in single-element list: {pat}"
                     else
@@ -8151,13 +8183,13 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
                                 | AST.PInt128Literal n ->
                                     let (litCheckVar, vg3) = ANF.freshVar vg2'
                                     let litCheckExpr =
-                                        ANF.Call ("__string_eq", [ANF.Var valueVar; ANF.StringLiteral (int128ToCanonicalString n)])
+                                        ANF.CanonicalBufferEq (ANF.SignedInt128, ANF.Var valueVar, ANF.StringLiteral (int128ToCanonicalString n))
                                     let bindingsWithLiteral = newBindings @ [(litCheckVar, litCheckExpr)]
                                     extractElements rest (idx + 1) env bindingsWithLiteral (condAtoms @ [ANF.Var litCheckVar]) vg3
                                 | AST.PUInt128Literal n ->
                                     let (litCheckVar, vg3) = ANF.freshVar vg2'
                                     let litCheckExpr =
-                                        ANF.Call ("__string_eq", [ANF.Var valueVar; ANF.StringLiteral (uint128ToCanonicalString n)])
+                                        ANF.CanonicalBufferEq (ANF.UnsignedInt128, ANF.Var valueVar, ANF.StringLiteral (uint128ToCanonicalString n))
                                     let bindingsWithLiteral = newBindings @ [(litCheckVar, litCheckExpr)]
                                     extractElements rest (idx + 1) env bindingsWithLiteral (condAtoms @ [ANF.Var litCheckVar]) vg3
                                 | _ ->
@@ -8426,12 +8458,12 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
                             | AST.PInt128Literal n ->
                                 let (guardVar, vg4) = ANF.freshVar vg3'
                                 let guardExpr =
-                                    ANF.Call ("__string_eq", [ANF.Var typedHeadVar; ANF.StringLiteral (int128ToCanonicalString n)])
+                                    ANF.CanonicalBufferEq (ANF.SignedInt128, ANF.Var typedHeadVar, ANF.StringLiteral (int128ToCanonicalString n))
                                 Ok (currentEnv, [], vg4, Some (guardVar, guardExpr))
                             | AST.PUInt128Literal n ->
                                 let (guardVar, vg4) = ANF.freshVar vg3'
                                 let guardExpr =
-                                    ANF.Call ("__string_eq", [ANF.Var typedHeadVar; ANF.StringLiteral (uint128ToCanonicalString n)])
+                                    ANF.CanonicalBufferEq (ANF.UnsignedInt128, ANF.Var typedHeadVar, ANF.StringLiteral (uint128ToCanonicalString n))
                                 Ok (currentEnv, [], vg4, Some (guardVar, guardExpr))
                             | _ -> Error $"Unsupported head pattern in list cons: {singleHeadPattern}"
 
@@ -8535,12 +8567,12 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
                             | AST.PInt128Literal n ->
                                 let (guardVar, vg4) = ANF.freshVar vg3'
                                 let guardExpr =
-                                    ANF.Call ("__string_eq", [ANF.Var typedHeadVar; ANF.StringLiteral (int128ToCanonicalString n)])
+                                    ANF.CanonicalBufferEq (ANF.SignedInt128, ANF.Var typedHeadVar, ANF.StringLiteral (int128ToCanonicalString n))
                                 Ok (currentEnv, [], vg4, Some (guardVar, guardExpr))
                             | AST.PUInt128Literal n ->
                                 let (guardVar, vg4) = ANF.freshVar vg3'
                                 let guardExpr =
-                                    ANF.Call ("__string_eq", [ANF.Var typedHeadVar; ANF.StringLiteral (uint128ToCanonicalString n)])
+                                    ANF.CanonicalBufferEq (ANF.UnsignedInt128, ANF.Var typedHeadVar, ANF.StringLiteral (uint128ToCanonicalString n))
                                 Ok (currentEnv, [], vg4, Some (guardVar, guardExpr))
                             | _ -> Error $"Unsupported head pattern in list cons: {singleHeadPattern}"
 
@@ -8660,13 +8692,13 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
                             | AST.PInt128Literal n ->
                                 let (litCheckVar, vg3) = ANF.freshVar vg2''
                                 let litCheckExpr =
-                                    ANF.Call ("__string_eq", [ANF.Var typedHeadVar; ANF.StringLiteral (int128ToCanonicalString n)])
+                                    ANF.CanonicalBufferEq (ANF.SignedInt128, ANF.Var typedHeadVar, ANF.StringLiteral (int128ToCanonicalString n))
                                 let bindingsWithCheck = newBindings @ [(litCheckVar, litCheckExpr)]
                                 extractElements rest typedTailVar env bindingsWithCheck (condAtoms @ [ANF.Var litCheckVar]) vg3
                             | AST.PUInt128Literal n ->
                                 let (litCheckVar, vg3) = ANF.freshVar vg2''
                                 let litCheckExpr =
-                                    ANF.Call ("__string_eq", [ANF.Var typedHeadVar; ANF.StringLiteral (uint128ToCanonicalString n)])
+                                    ANF.CanonicalBufferEq (ANF.UnsignedInt128, ANF.Var typedHeadVar, ANF.StringLiteral (uint128ToCanonicalString n))
                                 let bindingsWithCheck = newBindings @ [(litCheckVar, litCheckExpr)]
                                 extractElements rest typedTailVar env bindingsWithCheck (condAtoms @ [ANF.Var litCheckVar]) vg3
                             | AST.PConstructor _ | AST.PList _ | AST.PListCons _ ->
@@ -9559,15 +9591,24 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                                 (eqResultAtom, eqBindings, varGen3)
                         let allBindings = leftBindings @ rightBindings @ finalBindings
                         Ok (finalAtom, allBindings, varGen4)
-                    | Ok AST.TString
-                    | Ok AST.TChar
-                    | Ok AST.TInt
-                    | Ok AST.TInt128
-                    | Ok AST.TUInt128 ->
-                        // String/char/128-bit equality - call __string_eq.
-                        // Int128/UInt128 values are lowered as canonical decimal strings.
+                    | Ok AST.TInt ->
                         let (tempVar, varGen3) = ANF.freshVar varGen2
-                        let cexpr = ANF.Call ("__string_eq", [leftAtom; rightAtom])
+                        let cexpr = ANF.Call ("Stdlib.Internal.Integer.equals", [leftAtom; rightAtom])
+                        let (finalAtom, finalBindings, varGen4) =
+                            if op = AST.Neq then
+                                let (negVar, vg) = ANF.freshVar varGen3
+                                let negExpr = ANF.UnaryPrim (ANF.Not, ANF.Var tempVar)
+                                (ANF.Var negVar, [(tempVar, cexpr); (negVar, negExpr)], vg)
+                            else
+                                (ANF.Var tempVar, [(tempVar, cexpr)], varGen3)
+                        let allBindings = leftBindings @ rightBindings @ finalBindings
+                        Ok (finalAtom, allBindings, varGen4)
+                    | Ok operandType when canonicalBufferKindForType operandType |> Option.isSome ->
+                        let (tempVar, varGen3) = ANF.freshVar varGen2
+                        let kind =
+                            canonicalBufferKindForType operandType
+                            |> Option.defaultWith (fun () -> Crash.crash $"Expected canonical buffer type, got {operandType}")
+                        let cexpr = ANF.CanonicalBufferEq (kind, leftAtom, rightAtom)
                         // For Neq, negate the result
                         let (finalAtom, finalBindings, varGen4) =
                             if op = AST.Neq then
@@ -9689,6 +9730,13 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                     // Variable exists but is not a function type
                     Error $"Cannot call '{funcName}' - it has type {varType}, not a function type"
                 | None ->
+                    // Resolved stdlib equality APIs lower to the representation
+                    // operation at the AST boundary, including calls from stdlib.
+                    match tryCanonicalBufferEqualityIntrinsic funcName argAtoms with
+                    | Some intrinsicExpr ->
+                        let allBindings = argBindings @ [(tempVar, intrinsicExpr)]
+                        Ok (ANF.Var tempVar, allBindings, varGen2)
+                    | None ->
                     // Not a variable - check explicit presentation effects first.
                     match tryPresentationIntrinsic funcName argAtoms with
                     | Some intrinsicExpr ->

@@ -218,7 +218,8 @@ let maxTempIdInCExpr (cexpr: ANF.CExpr) : int =
     | ANF.RecordAlloc (_, fields) -> maxTempIdInAtoms fields
     | ANF.RecordGet (_, record, _) -> maxTempIdInAtom record
     | ANF.RecordClone (_, record, fields) -> maxTempIdWithAtoms record fields
-    | ANF.StringConcat (left, right) ->
+    | ANF.StringConcat (left, right)
+    | ANF.CanonicalBufferEq (_, left, right) ->
         max (maxTempIdInAtom left) (maxTempIdInAtom right)
     | ANF.RefCountInc (atom, _, _, _) -> maxTempIdInAtom atom
     | ANF.RefCountDec (atom, _, _, _) -> maxTempIdInAtom atom
@@ -533,6 +534,7 @@ let private inferSimpleCExprDestType
         | ANF.Eq | ANF.Neq | ANF.Lt | ANF.Gt | ANF.Lte | ANF.Gte
         | ANF.And | ANF.Or -> Some AST.TBool
         | _ -> Some (binOpType builder leftAtom rightAtom)
+    | ANF.CanonicalBufferEq _ -> Some AST.TBool
     | ANF.UnaryPrim (op, atom) ->
         match op with
         | ANF.Not -> Some AST.TBool
@@ -607,6 +609,7 @@ let cexprDescription (cexpr: ANF.CExpr) : string =
     | ANF.RecordGet (descriptor, _, _) -> System.String.Concat("RecordGet ", descriptor.RuntimeTypeName)
     | ANF.RecordClone (descriptor, _, _) -> System.String.Concat("RecordClone ", descriptor.RuntimeTypeName)
     | ANF.StringConcat _ -> "StringConcat"
+    | ANF.CanonicalBufferEq _ -> "CanonicalBufferEq"
     | ANF.RefCountInc _ -> "RefCountInc"
     | ANF.RefCountDec _ -> "RefCountDec"
     | ANF.Print _ -> "Print"
@@ -1143,6 +1146,12 @@ let rec convertExpr
                         atomToOperand builder rightAtom
                         |> Result.map (fun rightOp ->
                             [MIR.StringConcat (destReg, leftOp, rightOp)]))
+                | ANF.CanonicalBufferEq (kind, leftAtom, rightAtom) ->
+                    atomToOperand builder leftAtom
+                    |> Result.bind (fun leftOp ->
+                        atomToOperand builder rightAtom
+                        |> Result.map (fun rightOp ->
+                            [MIR.CanonicalBufferEq (destReg, kind, leftOp, rightOp)]))
                 | ANF.FileReadText pathAtom ->
                     atomToOperand builder pathAtom
                     |> Result.map (fun pathOp -> [MIR.FileReadText (destReg, pathOp)])
@@ -1829,6 +1838,12 @@ and convertExprToOperand
                         atomToOperand builder rightAtom
                         |> Result.map (fun rightOp ->
                             [MIR.StringConcat (destReg, leftOp, rightOp)]))
+                | ANF.CanonicalBufferEq (kind, leftAtom, rightAtom) ->
+                    atomToOperand builder leftAtom
+                    |> Result.bind (fun leftOp ->
+                        atomToOperand builder rightAtom
+                        |> Result.map (fun rightOp ->
+                            [MIR.CanonicalBufferEq (destReg, kind, leftOp, rightOp)]))
                 | ANF.FileReadText pathAtom ->
                     atomToOperand builder pathAtom
                     |> Result.map (fun pathOp -> [MIR.FileReadText (destReg, pathOp)])

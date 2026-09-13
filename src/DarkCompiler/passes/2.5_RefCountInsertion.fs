@@ -216,6 +216,7 @@ let inferCExprType (ctx: TypeContext) (cexpr: CExpr) : AST.Type option =
             | None, Some r -> Some r
             | None, None -> None
         | Eq | Neq | Lt | Gt | Lte | Gte | And | Or -> Some AST.TBool
+    | CanonicalBufferEq _ -> Some AST.TBool
     | UnaryPrim (op, atom) ->
         match op with
         | Neg ->

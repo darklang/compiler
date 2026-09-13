@@ -23,7 +23,7 @@ architecture.
 | X0 | Return value |
 | X1-X7 | Caller-saved, preferred for allocation |
 | X8 | Excluded (used by StringConcat byte copying) |
-| X9-X10 | Excluded (used by StringHash/StringEq internally) |
+| X9-X10 | Excluded (used by compiler-generated buffer operations) |
 | X11-X13 | Reserved as scratch registers for spill code |
 | X19-X26 | Callee-saved, used when caller-saved exhausted |
 | X27 | Reserved for free list base pointer (heap allocator) |

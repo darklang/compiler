@@ -3905,6 +3905,100 @@ let private translateInstr
                    X86_64.Label skipLabel])
         | _ -> Error "dynamic buffer RefCountDec requires StringSymbol or Reg operand"
 
+    | LIR.CanonicalBufferEq (dest, _, left, right) ->
+        // Canonical buffers share the [length:8][data:N] prefix. Compare the
+        // representation directly without allocating or calling stdlib code.
+        resolveReg dest
+        |> Result.bind (fun destReg ->
+            let leftReg = X86_64.RDI
+            let rightReg = X86_64.RSI
+            let remainingReg = X86_64.RCX
+            let leftWordReg = X86_64.R8
+            let rightWordReg = X86_64.R9
+            let byteReg = X86_64.R10
+            let savedRegs = [leftReg; rightReg; remainingReg; leftWordReg; rightWordReg; byteReg]
+            let saveInstrs = savedRegs |> List.map X86_64.PUSH
+            let restoreInstrs = savedRegs |> List.rev |> List.map X86_64.POP
+
+            let materializeLiteral target value =
+                emitStringLiteralNoRefCount target value
+
+            let prepareOperands =
+                match left, right with
+                | LIR.Reg left, LIR.Reg right ->
+                    resolveReg left
+                    |> Result.bind (fun sourceLeft ->
+                        resolveReg right
+                        |> Result.map (fun sourceRight ->
+                            [X86_64.PUSH sourceLeft
+                             X86_64.PUSH sourceRight
+                             X86_64.POP rightReg
+                             X86_64.POP leftReg]))
+                | LIR.Reg left, LIR.StringSymbol right ->
+                    resolveReg left
+                    |> Result.map (fun sourceLeft ->
+                        [X86_64.PUSH sourceLeft]
+                        @ materializeLiteral rightReg right
+                        @ [X86_64.POP leftReg])
+                | LIR.StringSymbol left, LIR.Reg right ->
+                    resolveReg right
+                    |> Result.map (fun sourceRight ->
+                        [X86_64.PUSH sourceRight]
+                        @ materializeLiteral leftReg left
+                        @ [X86_64.POP rightReg])
+                | LIR.StringSymbol left, LIR.StringSymbol right ->
+                    Ok (materializeLiteral leftReg left @ materializeLiteral rightReg right)
+                | _ -> Error "CanonicalBufferEq requires StringSymbol or Reg operands"
+
+            let wordLoop = freshLabel "canonical_eq_words"
+            let byteLoop = freshLabel "canonical_eq_bytes"
+            let equalLabel = freshLabel "canonical_eq_equal"
+            let unequalLabel = freshLabel "canonical_eq_unequal"
+            let doneLabel = freshLabel "canonical_eq_done"
+
+            prepareOperands
+            |> Result.map (fun operandInstrs ->
+                saveInstrs
+                @ operandInstrs
+                @ [X86_64.CMP_reg (leftReg, rightReg)
+                   X86_64.Jcc (X86_64.EQ, equalLabel)
+                   X86_64.MOV_load (remainingReg, leftReg, 0)
+                   X86_64.MOV_load (rightWordReg, rightReg, 0)
+                   X86_64.CMP_reg (remainingReg, rightWordReg)
+                   X86_64.Jcc (X86_64.NE, unequalLabel)
+                   X86_64.ADD_imm (leftReg, 8)
+                   X86_64.ADD_imm (rightReg, 8)
+                   X86_64.Label wordLoop
+                   X86_64.CMP_imm (remainingReg, 8)
+                   X86_64.Jcc (X86_64.LT, byteLoop)
+                   X86_64.MOV_load (leftWordReg, leftReg, 0)
+                   X86_64.MOV_load (rightWordReg, rightReg, 0)
+                   X86_64.CMP_reg (leftWordReg, rightWordReg)
+                   X86_64.Jcc (X86_64.NE, unequalLabel)
+                   X86_64.ADD_imm (leftReg, 8)
+                   X86_64.ADD_imm (rightReg, 8)
+                   X86_64.SUB_imm (remainingReg, 8)
+                   X86_64.JMP wordLoop
+                   X86_64.Label byteLoop
+                   X86_64.CMP_imm (remainingReg, 0)
+                   X86_64.Jcc (X86_64.EQ, equalLabel)
+                   X86_64.MOV_load_byte (leftWordReg, leftReg, 0)
+                   X86_64.MOV_load_byte (byteReg, rightReg, 0)
+                   X86_64.CMP_reg (leftWordReg, byteReg)
+                   X86_64.Jcc (X86_64.NE, unequalLabel)
+                   X86_64.ADD_imm (leftReg, 1)
+                   X86_64.ADD_imm (rightReg, 1)
+                   X86_64.SUB_imm (remainingReg, 1)
+                   X86_64.JMP byteLoop
+                   X86_64.Label equalLabel
+                   X86_64.MOV_imm32 (scratch, 1)
+                   X86_64.JMP doneLabel
+                   X86_64.Label unequalLabel
+                   X86_64.MOV_imm32 (scratch, 0)
+                   X86_64.Label doneLabel]
+                @ restoreInstrs
+                @ (if destReg = scratch then [] else [X86_64.MOV_reg (destReg, scratch)])))
+
     | LIR.StringConcat (dest, left, right) ->
         // String concat: dest = left ++ right
         // Heap string: [length:8][data:N][refcount:8]

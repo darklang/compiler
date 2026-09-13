@@ -322,6 +322,7 @@ let renameCExpr (mapping: Map<TempId, TempId>) (cexpr: CExpr) : CExpr =
     | RecordClone (descriptor, record, fields) ->
         RecordClone (descriptor, r record, List.map r fields)
     | StringConcat (left, right) -> StringConcat (r left, r right)
+    | CanonicalBufferEq (kind, left, right) -> CanonicalBufferEq (kind, r left, r right)
     | RefCountInc (a, size, kind, sourceType) -> RefCountInc (r a, size, kind, sourceType)
     | RefCountDec (a, size, kind, sourceType) -> RefCountDec (r a, size, kind, sourceType)
     | Print (a, t) -> Print (r a, t)
@@ -410,6 +411,7 @@ let private isSimpleExternalCExpr (cexpr: CExpr) : bool =
     | IfValue _
     | TupleGet _
     | StringConcat _
+    | CanonicalBufferEq _
     | FloatSqrt _
     | FloatAbs _
     | FloatNeg _

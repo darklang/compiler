@@ -116,6 +116,16 @@ type UnaryOp =
     | Not
     | BitNot  // Bitwise NOT: ~~~expr
 
+/// Immutable canonical byte-buffer representations whose semantic equality is
+/// byte equality. The kind preserves the source-level reason that the
+/// representation comparison is valid instead of conflating integers with
+/// strings after lowering.
+type CanonicalBufferKind =
+    | Utf8String
+    | GraphemeCluster
+    | SignedInt128
+    | UnsignedInt128
+
 /// Reference-count operation kind
 type RcKind =
     | GenericHeap
@@ -547,6 +557,7 @@ type CExpr =
     | RecordClone of descriptor:RecordDescriptor * record:Atom * fields:Atom list
     // String operations (heap-allocating)
     | StringConcat of left:Atom * right:Atom    // Concatenate strings: s1 ++ s2
+    | CanonicalBufferEq of kind:CanonicalBufferKind * left:Atom * right:Atom
     // Reference counting operations
     | RefCountInc of Atom * payloadSize:int * kind:RcKind * metadata:RcMetadata option    // Increment ref count of heap value
     | RefCountDec of Atom * payloadSize:int * kind:RcKind * metadata:RcMetadata option    // Decrement ref count, free if zero

@@ -67,12 +67,12 @@ Persistent backlog for audit-driven classic compiler optimization work.
 - Priority/rationale: Small, low-risk canonical fold that removes literal-only unsigned comparisons and exposes constant branches to existing ANF cleanup.
 - Notes: Implemented for literal UInt64 `==`, `!=`, `<`, `>`, `<=`, and `>=` in `src/DarkCompiler/passes/2.3_ANF_Optimize.fs`. Covered by the six `const_fold_uint64_*` before/after ANF snapshots in `src/Tests/optimization/anf.opt`; existing benchmarks do not isolate this micro-pattern.
 
-### Constant internal string equality folding
+### Constant canonical-buffer equality folding
 
-- Optimization name: Constant internal string equality folding
+- Optimization name: Constant canonical-buffer equality folding
 - Taxonomy category: Constant folding
-- Priority/rationale: Small, low-risk canonical fold that removes literal-only internal string equality calls and exposes resolved string-match branches to existing ANF cleanup.
-- Notes: Implemented for `__string_eq(stringLiteral, stringLiteral) -> Bool literal` in `src/DarkCompiler/passes/2.3_ANF_Optimize.fs`. Covered by equal and unequal literal branch-elimination snapshots in `src/Tests/optimization/anf.opt`; existing string tests and benchmarks provide broader coverage but do not isolate this micro-pattern.
+- Priority/rationale: Small, low-risk canonical fold that removes literal-only representation comparisons and exposes resolved string-match branches to existing ANF cleanup.
+- Notes: Implemented for typed `CanonicalBufferEq` expressions in `src/DarkCompiler/passes/2.3_ANF_Optimize.fs`; source equality tests and string benchmarks provide broader coverage.
 
 ### Constant Int64 shift folding
 
@@ -213,8 +213,8 @@ Persistent backlog for audit-driven classic compiler optimization work.
 
 - Optimization name: String self-comparison simplification
 - Taxonomy category: Algebraic simplification
-- Priority/rationale: Small, low-risk canonical simplification that avoids a runtime string equality call when both operands are the same ANF variable.
-- Notes: Implemented only for the internal `__string_eq(x, x) -> true` in `src/DarkCompiler/passes/2.3_ANF_Optimize.fs` during Bounded Autonomous sandbox testing. Source-level `x == x`, `x != x`, and `String.equals(x, x)` remain explicit stdlib calls. Covered by `internal_string_eq_self_comparison`, `source_string_eq_self_not_folded`, `source_string_neq_self_not_folded`, and `stdlib_string_equals_self_not_folded` in `src/Tests/optimization/anf.opt`; existing string benchmark programs provide regression coverage but do not isolate this micro-pattern.
+- Priority/rationale: Small, low-risk canonical simplification that avoids a runtime buffer comparison when both operands are the same ANF variable.
+- Notes: Implemented for typed `CanonicalBufferEq(x, x) -> true` in `src/DarkCompiler/passes/2.3_ANF_Optimize.fs`. Source `==`, `!=`, and `String.equals` all lower through that operation and are covered by focused ANF optimization tests.
 
 ### Empty string concatenation simplification
 

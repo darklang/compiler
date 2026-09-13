@@ -1471,56 +1471,28 @@ Function f:
 return true
 
 ---NAME---
-internal_string_eq_self_comparison
+source_string_eq_self_folded
 ---INPUT---
-let f(x: String) : Bool = __string_eq(x, x)
+let f(x: String) : Bool = x == x
 ---EXPECTED---
 Function f:
 return true
 
 ---NAME---
-const_fold_internal_string_eq_equal_literals
----INPUT---
-let f() : Int64 = if __string_eq("same", "same") then 1L else 2L
----EXPECTED---
-Function f:
-return 1
-
----NAME---
-const_fold_internal_string_eq_unequal_literals
----INPUT---
-let f() : Int64 = if __string_eq("same", "different") then 1L else 2L
----EXPECTED---
-Function f:
-return 2
-
----NAME---
-source_string_eq_self_not_folded
----INPUT---
-let f(x: String) : Bool = x == x
----EXPECTED---
-Function f:
-let TempId 1 = Stdlib.String.equals(t0, t0)
-return t1
-
----NAME---
-source_string_neq_self_not_folded
+source_string_neq_self_folded
 ---INPUT---
 let f(x: String) : Bool = x != x
 ---EXPECTED---
 Function f:
-let TempId 1 = Stdlib.String.equals(t0, t0)
-let TempId 2 = !t1
-return t2
+return false
 
 ---NAME---
-stdlib_string_equals_self_not_folded
+stdlib_string_equals_self_folded
 ---INPUT---
 let f(x: String) : Bool = Stdlib.String.equals(x, x)
 ---EXPECTED---
 Function f:
-let TempId 1 = Stdlib.String.equals(t0, t0)
-return t1
+return true
 
 ---NAME---
 identity_bitwise_double_not
