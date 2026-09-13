@@ -1148,22 +1148,25 @@ let private cfgRegUseCounts (cfg: CFG) : Map<Reg, int> =
         foldTerminatorRegUses addUse instructionUses block.Terminator
     ) Map.empty
 
-/// Check if a value is suitable for multiply-by-constant strength reduction
-/// Returns Some (shift, isAdd) where:
-///   isAdd=true: n = 2^shift + 1 (e.g., 3=2+1, 5=4+1, 9=8+1)
-///   isAdd=false: n = 2^shift - 1 (e.g., 7=8-1, 15=16-1, 31=32-1)
-let tryMulConstantPattern (n: int64) : (int * bool) option =
+/// Describes how a multiplication constant differs from a power of two.
+type MulConstantPattern =
+    | PowerOfTwoPlusOne
+    | PowerOfTwoMinusOne
+
+/// Check if a value is suitable for multiply-by-constant strength reduction.
+/// Returns the shift and whether the constant is one above or below that power of two.
+let tryMulConstantPattern (n: int64) : (int * MulConstantPattern) option =
     match n with
-    | 3L -> Some (1, true)    // 3 = 2 + 1 = (1 << 1) + 1
-    | 5L -> Some (2, true)    // 5 = 4 + 1 = (1 << 2) + 1
-    | 7L -> Some (3, false)   // 7 = 8 - 1 = (1 << 3) - 1
-    | 9L -> Some (3, true)    // 9 = 8 + 1 = (1 << 3) + 1
-    | 15L -> Some (4, false)  // 15 = 16 - 1 = (1 << 4) - 1
-    | 17L -> Some (4, true)   // 17 = 16 + 1 = (1 << 4) + 1
-    | 31L -> Some (5, false)  // 31 = 32 - 1 = (1 << 5) - 1
-    | 33L -> Some (5, true)   // 33 = 32 + 1 = (1 << 5) + 1
-    | 63L -> Some (6, false)  // 63 = 64 - 1 = (1 << 6) - 1
-    | 65L -> Some (6, true)   // 65 = 64 + 1 = (1 << 6) + 1
+    | 3L -> Some (1, PowerOfTwoPlusOne)    // 3 = 2 + 1 = (1 << 1) + 1
+    | 5L -> Some (2, PowerOfTwoPlusOne)    // 5 = 4 + 1 = (1 << 2) + 1
+    | 7L -> Some (3, PowerOfTwoMinusOne)   // 7 = 8 - 1 = (1 << 3) - 1
+    | 9L -> Some (3, PowerOfTwoPlusOne)    // 9 = 8 + 1 = (1 << 3) + 1
+    | 15L -> Some (4, PowerOfTwoMinusOne)  // 15 = 16 - 1 = (1 << 4) - 1
+    | 17L -> Some (4, PowerOfTwoPlusOne)   // 17 = 16 + 1 = (1 << 4) + 1
+    | 31L -> Some (5, PowerOfTwoMinusOne)  // 31 = 32 - 1 = (1 << 5) - 1
+    | 33L -> Some (5, PowerOfTwoPlusOne)   // 33 = 32 + 1 = (1 << 5) + 1
+    | 63L -> Some (6, PowerOfTwoMinusOne)  // 63 = 64 - 1 = (1 << 6) - 1
+    | 65L -> Some (6, PowerOfTwoPlusOne)   // 65 = 64 + 1 = (1 << 6) + 1
     | _ -> None
 
 let private mulByConstantCandidates (instrs: Instr list) : Set<Reg> =
@@ -1195,13 +1198,12 @@ let private tryMulByConstantWithChange (instrs: Instr list) : Instr list * bool 
             | Mov (constReg, Imm n) :: Mul (mulDest, mulLeft, mulRight) :: rest
                 when sameReg constReg mulRight && not (sameReg constReg mulLeft) ->
                 match tryMulConstantPattern n with
-                | Some (shift, isAdd) when not (regUsedAfter lastUses (index + 1) constReg) ->
+                | Some (shift, pattern) when not (regUsedAfter lastUses (index + 1) constReg) ->
                     let shiftInstr = Lsl_imm (constReg, mulLeft, shift)
                     let combineInstr =
-                        if isAdd then
-                            Add (mulDest, mulLeft, Reg constReg)
-                        else
-                            Sub (mulDest, constReg, Reg mulLeft)
+                        match pattern with
+                        | PowerOfTwoPlusOne -> Add (mulDest, mulLeft, Reg constReg)
+                        | PowerOfTwoMinusOne -> Sub (mulDest, constReg, Reg mulLeft)
                     loop (index + 2) (combineInstr :: shiftInstr :: acc) true rest
                 | _ ->
                     loop
@@ -1212,13 +1214,12 @@ let private tryMulByConstantWithChange (instrs: Instr list) : Instr list * bool 
             | Mov (constReg, Imm n) :: Mul (mulDest, mulLeft, mulRight) :: rest
                 when sameReg constReg mulLeft && not (sameReg constReg mulRight) ->
                 match tryMulConstantPattern n with
-                | Some (shift, isAdd) when not (regUsedAfter lastUses (index + 1) constReg) ->
+                | Some (shift, pattern) when not (regUsedAfter lastUses (index + 1) constReg) ->
                     let shiftInstr = Lsl_imm (constReg, mulRight, shift)
                     let combineInstr =
-                        if isAdd then
-                            Add (mulDest, mulRight, Reg constReg)
-                        else
-                            Sub (mulDest, constReg, Reg mulRight)
+                        match pattern with
+                        | PowerOfTwoPlusOne -> Add (mulDest, mulRight, Reg constReg)
+                        | PowerOfTwoMinusOne -> Sub (mulDest, constReg, Reg mulRight)
                     loop (index + 2) (combineInstr :: shiftInstr :: acc) true rest
                 | _ ->
                     loop
