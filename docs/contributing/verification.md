@@ -14,6 +14,11 @@ For compiler repository changes, the default verification commands are:
 ./benchmarks/run_benchmarks.sh --verify routine
 ```
 
+Routine verification keeps terminal output concise so automated callers do not
+consume context on repeated per-workload details. Full build and measurement
+logs, the markdown report, and decision JSON remain in the reported results
+directory. Use `--verbose` when interactive diagnosis needs streamed details.
+
 The E2E runner compiles up to 8192 compatible value-equality checks together by
 default, enough for every compatible contiguous group in the current corpus.
 Each check remains a separately compiled function while the caller and

@@ -1,12 +1,14 @@
 #!/bin/bash
 # Main entry point for running benchmarks
-# Usage: ./benchmarks/run_benchmarks.sh [--hyperfine] [--verify|--verify-fresh] [--skip-smoke] [--reset-dark-baseline] [--refresh-baseline=rust] [--jobs[=N]] [routine|benchmark_name|all]
+# Usage: ./benchmarks/run_benchmarks.sh [--hyperfine] [--verify|--verify-fresh] [--quiet|--verbose] [--skip-smoke] [--reset-dark-baseline] [--refresh-baseline=rust] [--jobs[=N]] [routine|benchmark_name|all]
 #
 # Options:
 #   --help                   Show this help message and exit
 #   --hyperfine              Use hyperfine for timing (default: cachegrind for instruction counts)
 #   --verify                 Read-only routine verification; equal or improved suites pass
 #   --verify-fresh           Read-only integration gate; an unrecorded improvement fails
+#   --quiet                  Print only phase summaries, failures, and result locations
+#   --verbose                Print per-benchmark details (verification is quiet by default)
 #   --skip-smoke             Skip the cache-free smoke gate only when the caller has
 #                            already passed it on the exact unchanged commit
 #   --reset-dark-baseline    Replace Dark routine snapshot from one complete successful run
@@ -50,6 +52,7 @@ JOB_COUNT=""
 SKIP_BENCHMARKS=()
 PROFILE=""
 SKIP_SMOKE=false
+OUTPUT_MODE="default"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -68,6 +71,14 @@ while [[ $# -gt 0 ]]; do
         --verify-fresh)
             VERIFY_RESULTS=true
             VERIFY_FRESH=true
+            shift
+            ;;
+        --quiet)
+            OUTPUT_MODE="quiet"
+            shift
+            ;;
+        --verbose)
+            OUTPUT_MODE="verbose"
             shift
             ;;
         --skip-smoke)
@@ -108,6 +119,20 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+QUIET_MODE=false
+if [ "$OUTPUT_MODE" = "quiet" ] || { [ "$OUTPUT_MODE" = "default" ] && [ "$VERIFY_RESULTS" = true ]; }; then
+    QUIET_MODE=true
+fi
+
+run_quiet_on_success() {
+    local output
+    if output=$("$@" 2>&1); then
+        return 0
+    fi
+    printf '%s\n' "$output" >&2
+    return 1
+}
 
 if [ "$VERIFY_RESULTS" = true ] && [ "$USE_CACHEGRIND" != true ]; then
     pretty_fail "--verify cannot be combined with --hyperfine"
@@ -162,17 +187,24 @@ else
 fi
 
 if [ -n "$PROFILE" ]; then
-    if ! python3 "$SCRIPT_DIR/infrastructure/benchmark_parity.py" check-profile "$PROFILE"; then
+    if [ "$QUIET_MODE" = true ]; then
+        run_quiet_on_success python3 "$SCRIPT_DIR/infrastructure/benchmark_parity.py" check-profile "$PROFILE" || exit 1
+    elif ! python3 "$SCRIPT_DIR/infrastructure/benchmark_parity.py" check-profile "$PROFILE"; then
         exit 1
     fi
 else
-    if ! python3 "$SCRIPT_DIR/infrastructure/benchmark_parity.py" check; then
+    if [ "$QUIET_MODE" = true ]; then
+        run_quiet_on_success python3 "$SCRIPT_DIR/infrastructure/benchmark_parity.py" check || exit 1
+    elif ! python3 "$SCRIPT_DIR/infrastructure/benchmark_parity.py" check; then
         exit 1
     fi
 fi
 
 if [ "$PROFILE" = "routine" ] && [ "$USE_CACHEGRIND" = true ] && [ "$RESET_DARK_BASELINE" = false ] && [ "$LIST_ONLY" = false ]; then
-    if ! python3 "$SCRIPT_DIR/infrastructure/benchmark_baseline.py" validate \
+    if [ "$QUIET_MODE" = true ]; then
+        run_quiet_on_success python3 "$SCRIPT_DIR/infrastructure/benchmark_baseline.py" validate \
+            --benchmarks-dir "$SCRIPT_DIR" --language dark --track "$ROUTINE_TRACK" || exit 1
+    elif ! python3 "$SCRIPT_DIR/infrastructure/benchmark_baseline.py" validate \
         --benchmarks-dir "$SCRIPT_DIR" --language dark --track "$ROUTINE_TRACK"; then
         exit 1
     fi
@@ -216,9 +248,13 @@ fi
 
 OUTPUT_DIR="$SCRIPT_DIR/results/$(date +%Y-%m-%d_%H%M%S)"
 mkdir -p "$OUTPUT_DIR"
+LOG_DIR="$OUTPUT_DIR/logs"
+mkdir -p "$LOG_DIR/build" "$LOG_DIR/measurement"
 
 # Record compiler version
-pretty_info "Recording compiler version..."
+if [ "$QUIET_MODE" != true ]; then
+    pretty_info "Recording compiler version..."
+fi
 git -C "$PROJECT_ROOT" rev-parse HEAD > "$OUTPUT_DIR/compiler_version.txt"
 git -C "$PROJECT_ROOT" log -1 --format="%s" >> "$OUTPUT_DIR/compiler_version.txt"
 date -u -Iseconds > "$OUTPUT_DIR/run_timestamp.txt"
@@ -240,8 +276,16 @@ if [ "$JOB_COUNT" -lt 1 ]; then
     exit 1
 fi
 
-pretty_info "Building current Dark compiler..."
-if ! dotnet build "$PROJECT_ROOT/src/DarkCompiler/DarkCompiler.fsproj" --no-incremental --verbosity quiet; then
+if [ "$QUIET_MODE" != true ]; then
+    pretty_info "Building current Dark compiler..."
+fi
+if [ "$QUIET_MODE" = true ]; then
+    if ! dotnet build "$PROJECT_ROOT/src/DarkCompiler/DarkCompiler.fsproj" --no-incremental --verbosity quiet >"$LOG_DIR/compiler-build.log" 2>&1; then
+        cat "$LOG_DIR/compiler-build.log"
+        pretty_fail "Dark compiler build failed"
+        exit 1
+    fi
+elif ! dotnet build "$PROJECT_ROOT/src/DarkCompiler/DarkCompiler.fsproj" --no-incremental --verbosity quiet; then
     pretty_fail "Dark compiler build failed"
     exit 1
 fi
@@ -249,7 +293,14 @@ fi
 STATUS_DIR="$OUTPUT_DIR/status"
 mkdir -p "$STATUS_DIR"
 
-if [ "$USE_CACHEGRIND" = true ]; then
+if [ "$QUIET_MODE" = true ]; then
+    BENCHMARK_COUNT=${#FILTERED_BENCHMARKS[@]}
+    if [ "$VERIFY_RESULTS" = true ]; then
+        pretty_section "Benchmark verification: $BENCHMARK_COUNT workloads, $JOB_COUNT job(s)"
+    else
+        pretty_section "Benchmark run: $BENCHMARK_COUNT workloads, $JOB_COUNT job(s)"
+    fi
+elif [ "$USE_CACHEGRIND" = true ]; then
     if [ "$REFRESH_BASELINE" = "false" ]; then
         pretty_section "Mode: Cachegrind (instruction counts) - Dark only (use --refresh-baseline for baselines)"
     else
@@ -258,12 +309,14 @@ if [ "$USE_CACHEGRIND" = true ]; then
 else
     pretty_section "Mode: Hyperfine (timing)"
 fi
-pretty_info "Benchmarks to run: $BENCHMARKS"
-pretty_info "Parallel jobs: $JOB_COUNT"
-if [ "${#SKIPPED_BENCHMARKS[@]}" -ne 0 ]; then
-    pretty_warn "Skipping benchmarks: ${SKIPPED_BENCHMARKS[*]}"
+if [ "$QUIET_MODE" != true ]; then
+    pretty_info "Benchmarks to run: $BENCHMARKS"
+    pretty_info "Parallel jobs: $JOB_COUNT"
+    if [ "${#SKIPPED_BENCHMARKS[@]}" -ne 0 ]; then
+        pretty_warn "Skipping benchmarks: ${SKIPPED_BENCHMARKS[*]}"
+    fi
+    echo ""
 fi
-echo ""
 
 JOB_PIDS=()
 
@@ -271,13 +324,19 @@ build_benchmark_job() {
     local bench="$1"
     local status_file="$STATUS_DIR/${bench}.status"
     local dark_binary="$OUTPUT_DIR/binaries/$bench/dark/main"
+    local build_log="$LOG_DIR/build/${bench}.log"
     : > "$status_file"
     local build_args=()
     if [ "$USE_CACHEGRIND" = true ] && [ "$REFRESH_BASELINE" = "false" ]; then
         build_args+=(--skip-baselines)
     fi
     build_args+=(--dark-output="$dark_binary")
-    if ! "$SCRIPT_DIR/infrastructure/build_all.sh" "$bench" "${build_args[@]}"; then
+    if [ "$QUIET_MODE" = true ]; then
+        if ! "$SCRIPT_DIR/infrastructure/build_all.sh" "$bench" "${build_args[@]}" >"$build_log" 2>&1; then
+            echo "BUILD_FAIL" >> "$status_file"
+            pretty_warn "Build failed for $bench (log: $build_log)"
+        fi
+    elif ! "$SCRIPT_DIR/infrastructure/build_all.sh" "$bench" "${build_args[@]}"; then
         echo "BUILD_FAIL" >> "$status_file"
         pretty_warn "Build failed for $bench"
     fi
@@ -288,27 +347,42 @@ run_benchmark_job() {
     local status_file="$STATUS_DIR/${bench}.status"
     local parity_status
     local dark_binary="$OUTPUT_DIR/binaries/$bench/dark/main"
+    local measurement_log="$LOG_DIR/measurement/${bench}.log"
     if ! parity_status=$(python3 "$SCRIPT_DIR/infrastructure/benchmark_parity.py" status "$bench"); then
         echo "RUN_FAIL" >> "$status_file"
         pretty_warn "Parity status unavailable for $bench"
         return
     fi
 
-    pretty_header "Benchmark: $bench"
+    if [ "$QUIET_MODE" != true ]; then
+        pretty_header "Benchmark: $bench"
+    fi
 
     if [ "$USE_CACHEGRIND" = true ]; then
-        if ! "$SCRIPT_DIR/infrastructure/cachegrind_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$REFRESH_BASELINE" "$dark_binary" routine; then
+        if [ "$QUIET_MODE" = true ]; then
+            if ! "$SCRIPT_DIR/infrastructure/cachegrind_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$REFRESH_BASELINE" "$dark_binary" routine >"$measurement_log" 2>&1; then
+                echo "RUN_FAIL" >> "$status_file"
+                pretty_warn "Cachegrind failed for $bench (log: $measurement_log)"
+            fi
+        elif ! "$SCRIPT_DIR/infrastructure/cachegrind_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$REFRESH_BASELINE" "$dark_binary" routine; then
             echo "RUN_FAIL" >> "$status_file"
             pretty_warn "Cachegrind failed for $bench (continuing)"
         fi
     else
-        if ! "$SCRIPT_DIR/infrastructure/hyperfine_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$dark_binary" routine; then
+        if [ "$QUIET_MODE" = true ]; then
+            if ! "$SCRIPT_DIR/infrastructure/hyperfine_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$dark_binary" routine >"$measurement_log" 2>&1; then
+                echo "RUN_FAIL" >> "$status_file"
+                pretty_warn "Hyperfine failed for $bench (log: $measurement_log)"
+            fi
+        elif ! "$SCRIPT_DIR/infrastructure/hyperfine_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$dark_binary" routine; then
             echo "RUN_FAIL" >> "$status_file"
             pretty_warn "Hyperfine failed for $bench (continuing)"
         fi
     fi
 
-    echo ""
+    if [ "$QUIET_MODE" != true ]; then
+        echo ""
+    fi
 }
 
 reap_finished_job() {
@@ -343,7 +417,9 @@ wait_for_all_jobs() {
     JOB_PIDS=()
 }
 
-pretty_section "Build gate"
+if [ "$QUIET_MODE" != true ]; then
+    pretty_section "Build gate"
+fi
 for bench in $BENCHMARKS; do
     build_benchmark_job "$bench"
 done
@@ -361,7 +437,9 @@ if [ ${#BUILD_FAILURES[@]} -ne 0 ]; then
     exit 1
 fi
 
-pretty_section "Measurement gate"
+if [ "$QUIET_MODE" != true ]; then
+    pretty_section "Measurement gate"
+fi
 for bench in $BENCHMARKS; do
     if [ "$JOB_COUNT" -le 1 ]; then
         run_benchmark_job "$bench"
@@ -398,15 +476,21 @@ if [ ${#RUN_FAILURES[@]} -ne 0 ]; then
 fi
 
 # Process results
-pretty_info "Processing results..."
+if [ "$QUIET_MODE" != true ]; then
+    pretty_info "Processing results..."
+fi
     if [ "$USE_CACHEGRIND" = true ]; then
+        PROCESSOR_ARGS=()
+        if [ "$QUIET_MODE" = true ]; then
+            PROCESSOR_ARGS+=(--quiet)
+        fi
         if [ "$REFRESH_BASELINE" = "false" ]; then
-            if ! python3 "$SCRIPT_DIR/infrastructure/cachegrind_processor.py" "$OUTPUT_DIR" --use-baseline; then
+            if ! python3 "$SCRIPT_DIR/infrastructure/cachegrind_processor.py" "$OUTPUT_DIR" --use-baseline "${PROCESSOR_ARGS[@]}"; then
                 PROCESS_FAILURES+=("cachegrind_processor")
                 pretty_warn "cachegrind_processor failed (continuing)"
             fi
         else
-            if ! python3 "$SCRIPT_DIR/infrastructure/cachegrind_processor.py" "$OUTPUT_DIR"; then
+            if ! python3 "$SCRIPT_DIR/infrastructure/cachegrind_processor.py" "$OUTPUT_DIR" "${PROCESSOR_ARGS[@]}"; then
                 PROCESS_FAILURES+=("cachegrind_processor")
                 pretty_warn "cachegrind_processor failed (continuing)"
             fi
@@ -415,6 +499,9 @@ pretty_info "Processing results..."
             VERIFY_ARGS=()
             if [ "$VERIFY_FRESH" = true ]; then
                 VERIFY_ARGS+=(--require-recorded)
+            fi
+            if [ "$QUIET_MODE" = true ]; then
+                VERIFY_ARGS+=(--quiet)
             fi
             if ! python3 "$SCRIPT_DIR/infrastructure/benchmark_verifier.py" "$OUTPUT_DIR" "$PROFILE" "${VERIFY_ARGS[@]}"; then
                 PROCESS_FAILURES+=("benchmark_verifier")

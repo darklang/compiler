@@ -20,6 +20,7 @@ from benchmark_baseline import (
     comparison_dict,
     create_snapshot,
     load_snapshot,
+    print_comparison,
     snapshot_path,
     write_snapshot,
     _quick_command,
@@ -115,6 +116,22 @@ class BenchmarkTrackTests(unittest.TestCase):
         rust = self.snapshot("rust", track.id, (100, 200))
         comparison = compare_implementations(dark, rust)
         self.assertAlmostEqual(comparison.ratio, 2.8284271247461903)
+
+    def test_concise_comparison_omits_baseline_and_per_benchmark_rows(self) -> None:
+        baseline = self.snapshot("dark", "arm64-quick-cachegrind", (100, 200))
+        comparison = compare_implementations(
+            baseline,
+            self.snapshot("rust", "arm64-quick-cachegrind", (100, 200)),
+        )
+
+        output = StringIO()
+        with redirect_stdout(output):
+            print_comparison(comparison, baseline, details=False)
+
+        self.assertEqual(
+            output.getvalue(),
+            "Dark suite: equal; current/baseline geometric ratio 1.000000\n",
+        )
 
     def test_fast_projection_does_not_mutate_canonical_track_identity(self) -> None:
         baseline = self.snapshot("dark", "arm64-quick-cachegrind", (100, 200))

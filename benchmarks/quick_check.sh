@@ -130,20 +130,38 @@ fi
 if [ -n "$BENCHMARK_SELECTION" ]; then
     BENCHMARKS="${BENCHMARK_SELECTION//,/ }"
 fi
-if ! python3 "$SCRIPT_DIR/infrastructure/benchmark_parity.py" check-profile "$PROFILE"; then
+if [ "$QUIET_MODE" = true ]; then
+    if ! PARITY_OUTPUT=$(python3 "$SCRIPT_DIR/infrastructure/benchmark_parity.py" check-profile "$PROFILE" 2>&1); then
+        printf '%s\n' "$PARITY_OUTPUT"
+        pretty_fail "Benchmark parity contract failed"
+        exit 1
+    fi
+elif ! python3 "$SCRIPT_DIR/infrastructure/benchmark_parity.py" check-profile "$PROFILE"; then
     pretty_fail "Benchmark parity contract failed"
     exit 1
 fi
 
 # Fail before expensive work when normal comparison cannot enforce the contract.
 if [ "$SMOKE_MODE" != true ] && [ "$RESET_DARK_BASELINE" = false ]; then
-    if ! python3 "$SCRIPT_DIR/infrastructure/benchmark_baseline.py" validate \
+    if [ "$QUIET_MODE" = true ]; then
+        if ! BASELINE_OUTPUT=$(python3 "$SCRIPT_DIR/infrastructure/benchmark_baseline.py" validate \
+            --benchmarks-dir "$SCRIPT_DIR" --language dark --track "$TRACK" 2>&1); then
+            printf '%s\n' "$BASELINE_OUTPUT"
+            exit 1
+        fi
+    elif ! python3 "$SCRIPT_DIR/infrastructure/benchmark_baseline.py" validate \
         --benchmarks-dir "$SCRIPT_DIR" --language dark --track "$TRACK"; then
         exit 1
     fi
 fi
 
-if ! dotnet build "$PROJECT_ROOT/src/DarkCompiler/DarkCompiler.fsproj" --verbosity quiet; then
+if [ "$QUIET_MODE" = true ]; then
+    if ! COMPILER_BUILD_OUTPUT=$(dotnet build "$PROJECT_ROOT/src/DarkCompiler/DarkCompiler.fsproj" --verbosity quiet 2>&1); then
+        printf '%s\n' "$COMPILER_BUILD_OUTPUT"
+        pretty_fail "Dark compiler build failed"
+        exit 1
+    fi
+elif ! dotnet build "$PROJECT_ROOT/src/DarkCompiler/DarkCompiler.fsproj" --verbosity quiet; then
     pretty_fail "Dark compiler build failed"
     exit 1
 fi

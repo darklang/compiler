@@ -29,6 +29,11 @@ def main() -> int:
         action="store_true",
         help="fail when the run is improved and therefore must be recorded",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="print only the aggregate comparison and snapshot action",
+    )
     args = parser.parse_args()
     results_dir = Path(args.results_dir)
     if not results_dir.is_dir():
@@ -61,7 +66,7 @@ def main() -> int:
         action = "unchanged-equal"
     else:
         action = "preserved-stronger-baseline"
-    print_comparison(comparison, baseline)
+    print_comparison(comparison, baseline, details=not args.quiet)
     print(f"Dark routine snapshot: {action}")
     atomic_write_json(
         results_dir / "dark_suite_decision.json",

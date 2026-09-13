@@ -54,6 +54,9 @@ the compiler's other Linux target.
 # Verify the canonical routine profile without updating tracked files
 ./benchmarks/run_benchmarks.sh --verify routine
 
+# Stream per-workload details when diagnosing a verification run
+./benchmarks/run_benchmarks.sh --verify --verbose routine
+
 # Establish a Dark baseline after an intentional contract/policy reset
 ./benchmarks/run_benchmarks.sh --reset-dark-baseline routine
 ./benchmarks/quick_check.sh --reset-dark-baseline
@@ -147,6 +150,12 @@ presentation regenerated from that routine snapshot plus `BASELINES.md`'s
 audited Rust references. Recording accepts an optional `--machine` ID from
 the registry in `HISTORY.md`; omitted machine metadata is left blank rather than
 guessing the runner's identity. Verification does not update history.
+
+Verification is concise by default: it prints the aggregate decision and result
+locations, while retaining per-workload build and measurement logs plus the full
+markdown and JSON reports in the timestamped results directory. Pass `--verbose`
+to stream those details to the terminal. Other modes retain their detailed output
+unless `--quiet` is passed explicitly.
 
 Dark snapshots live under `baselines/` and contain a schema version, suite and
 profile identity, normalized architecture, measurement-policy identifier,

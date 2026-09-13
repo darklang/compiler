@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
 Process cachegrind benchmark results and generate summary reports.
-Usage: python3 cachegrind_processor.py <results_dir> [--use-baseline]
+Usage: python3 cachegrind_processor.py <results_dir> [--use-baseline] [--quiet]
 
 When --use-baseline is passed, reads the audited Rust baseline from BASELINES.md
 instead of requiring it in the results directory.
 """
 
+import argparse
 import json
 import re
 import sys
@@ -85,7 +86,7 @@ def load_results(results_dir: Path) -> dict:
     return results
 
 
-def generate_summary(results: dict, output_dir: Path):
+def generate_summary(results: dict, output_dir: Path, quiet: bool = False):
     """Generate a markdown summary of cachegrind results."""
     lines = [
         "# Cachegrind Results (Instruction Counts)",
@@ -187,11 +188,11 @@ def generate_summary(results: dict, output_dir: Path):
     summary_path.write_text("\n".join(lines))
     print(f"Cachegrind summary written to: {summary_path}")
 
-    # Print to stdout
-    print("")
-    print("=" * 60)
-    for line in lines:
-        print(line)
+    if not quiet:
+        print("")
+        print("=" * 60)
+        for line in lines:
+            print(line)
 
 
 def load_parity_statuses(benchmarks_dir: Path) -> dict[str, str]:
@@ -221,12 +222,16 @@ def merge_with_baselines(
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python3 cachegrind_processor.py <results_dir> [--use-baseline]")
-        sys.exit(1)
-
-    results_dir = Path(sys.argv[1])
-    use_baseline = "--use-baseline" in sys.argv
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("results_dir")
+    parser.add_argument("--use-baseline", action="store_true")
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="write the complete report without echoing its markdown to stdout",
+    )
+    args = parser.parse_args()
+    results_dir = Path(args.results_dir)
 
     if not results_dir.exists():
         print(f"Error: Results directory not found: {results_dir}")
@@ -241,16 +246,17 @@ def main():
         sys.exit(0)
 
     # If using baseline, merge with the audited Rust row from BASELINES.md.
-    if use_baseline:
+    if args.use_baseline:
         baselines_path = benchmarks_dir / "BASELINES.md"
         baselines = parse_baselines_file(baselines_path)
         if baselines:
-            print(f"  Using cached baselines from BASELINES.md")
+            if not args.quiet:
+                print("  Using cached baselines from BASELINES.md")
             results = merge_with_baselines(
                 results, baselines, load_parity_statuses(benchmarks_dir)
             )
 
-    generate_summary(results, results_dir)
+    generate_summary(results, results_dir, quiet=args.quiet)
     # history_updater.py owns the current-state RESULTS.md and BASELINES.md tables.
 
 

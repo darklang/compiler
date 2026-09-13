@@ -619,17 +619,21 @@ def comparison_dict(
 
 
 def print_comparison(
-    comparison: SuiteComparison, baseline: Snapshot, summary_name: str = "suite"
+    comparison: SuiteComparison,
+    baseline: Snapshot,
+    summary_name: str = "suite",
+    details: bool = True,
 ) -> None:
-    print(
-        f"Dark baseline: commit {baseline.compiler.commit}, contract "
-        f"{baseline.contract_sha256}, track {baseline.track.id}"
-    )
-    for row in comparison.rows:
+    if details:
         print(
-            f"  {row.name}: current {row.current:,}, baseline {row.baseline:,}, "
-            f"delta {row.absolute_delta:+,} ({row.percentage_delta:+.3f}%)"
+            f"Dark baseline: commit {baseline.compiler.commit}, contract "
+            f"{baseline.contract_sha256}, track {baseline.track.id}"
         )
+        for row in comparison.rows:
+            print(
+                f"  {row.name}: current {row.current:,}, baseline {row.baseline:,}, "
+                f"delta {row.absolute_delta:+,} ({row.percentage_delta:+.3f}%)"
+            )
     print(
         f"Dark {summary_name}: {comparison.decision}; current/baseline geometric ratio "
         f"{comparison.ratio:.6f}"
