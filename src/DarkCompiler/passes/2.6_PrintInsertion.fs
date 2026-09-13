@@ -110,6 +110,11 @@ let rec wrapReturnWithPrint (programType: AST.Type) (varGen: VarGen) (expr: AExp
         // Recurse into body
         let (body', varGen') = wrapReturnWithPrint programType varGen body
         (Let (tempId, cexpr, body'), varGen')
+    | Jump _ -> (expr, varGen)
+    | Join (parameter, continuation, entry) ->
+        let continuation', next = wrapReturnWithPrint programType varGen continuation
+        let entry', final = wrapReturnWithPrint programType next entry
+        (Join (parameter, continuation', entry'), final)
     | If (cond, thenBranch, elseBranch) ->
         // Wrap both branches
         let (thenBranch', varGen1) = wrapReturnWithPrint programType varGen thenBranch

@@ -17,20 +17,21 @@ let private pointDescriptor fieldType =
 
 let rec private containsAggregateAllocation (expr: AExpr) : bool =
     match expr with
-    | Return _ -> false
+    | Jump _ | Return _ -> false
     | Let (_, cexpr, body) ->
         match cexpr with
         | TupleAlloc _
         | RecordAlloc _
         | RecordClone _ -> true
         | _ -> containsAggregateAllocation body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         containsAggregateAllocation thenBranch
         || containsAggregateAllocation elseBranch
 
 let rec private aggregateAllocationCount (expr: AExpr) : int =
     match expr with
-    | Return _ -> 0
+    | Jump _ | Return _ -> 0
     | Let (_, cexpr, body) ->
         let current =
             match cexpr with
@@ -40,14 +41,16 @@ let rec private aggregateAllocationCount (expr: AExpr) : int =
             | RecordReuse _ -> 0
             | _ -> 0
         current + aggregateAllocationCount body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         aggregateAllocationCount thenBranch + aggregateAllocationCount elseBranch
 
 let rec private containsRecordReuse (expr: AExpr) : bool =
     match expr with
-    | Return _ -> false
+    | Jump _ | Return _ -> false
     | Let (_, RecordReuse _, _) -> true
     | Let (_, _, body) -> containsRecordReuse body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         containsRecordReuse thenBranch || containsRecordReuse elseBranch
 

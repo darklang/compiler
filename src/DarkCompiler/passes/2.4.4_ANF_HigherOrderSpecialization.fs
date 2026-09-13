@@ -89,7 +89,7 @@ let rec private collectRequests
         | _ -> currentRequests
 
     match expr with
-    | Return _ -> requests
+    | Jump _ | Return _ -> requests
     | Let (boundId, cexpr, body) ->
         let withCall = collectCExpr cexpr requests
         let knownAfter =
@@ -98,6 +98,9 @@ let rec private collectRequests
                 addKnownClosure boundId { TargetName = targetName; Captures = captures } known
             | _ -> known
         collectRequests functions body knownAfter withCall
+    | Join (parameter, continuation, entry) ->
+        collectRequests functions continuation (Map.remove parameter.Id known) requests
+        |> collectRequests functions entry known
     | If (_, thenBranch, elseBranch) ->
         collectRequests functions thenBranch known requests
         |> collectRequests functions elseBranch known
@@ -105,8 +108,9 @@ let rec private collectRequests
 let private countNodes (expr: AExpr) : int =
     let rec count current expr =
         match expr with
-        | Return _ -> current + 1
+        | Jump _ | Return _ -> current + 1
         | Let (_, _, body) -> count (current + 1) body
+        | Join (_, continuation, entry) -> current + 1 + count 0 continuation + count 0 entry
         | If (_, thenBranch, elseBranch) ->
             current + 1 + count 0 thenBranch + count 0 elseBranch
     count 0 expr
@@ -135,9 +139,12 @@ let rec private targetBodyUsesOnlyCaptures
         | _ -> not (ANF_Optimize.cexprUsesTemp closureId cexpr)
 
     match expr with
+    | Jump (_, atom)
     | Return atom -> not (ANF_Optimize.atomUsesTemp closureId atom)
     | Let (_, cexpr, body) ->
         captureAccess cexpr && targetBodyUsesOnlyCaptures closureId captureCount body
+    | Join (_, continuation, entry) ->
+        targetBodyUsesOnlyCaptures closureId captureCount continuation && targetBodyUsesOnlyCaptures closureId captureCount entry
     | If (condition, thenBranch, elseBranch) ->
         not (ANF_Optimize.atomUsesTemp closureId condition)
         && targetBodyUsesOnlyCaptures closureId captureCount thenBranch
@@ -146,13 +153,17 @@ let rec private targetBodyUsesOnlyCaptures
 let private closureCallArity (functionParameterId: TempId) (expr: AExpr) : int option =
     let rec find current =
         match current with
-        | Return _ -> None
+        | Jump _ | Return _ -> None
         | Let (_, cexpr, body) ->
             match cexpr with
             | ClosureCall (Var id, args)
             | ClosureTailCall (Var id, args) when id = functionParameterId ->
                 Some(List.length args)
             | _ -> find body
+        | Join (_, continuation, entry) ->
+            match find entry with
+            | Some arity -> Some arity
+            | None -> find continuation
         | If (_, thenBranch, elseBranch) ->
             match find thenBranch with
             | Some arity -> Some arity
@@ -182,10 +193,13 @@ let rec private helperUsesParameterOnlyForClosureOperations
         | _ -> not (ANF_Optimize.cexprUsesTemp functionParameterId cexpr)
 
     match expr with
+    | Jump (_, atom)
     | Return atom -> not (ANF_Optimize.atomUsesTemp functionParameterId atom)
     | Let (_, cexpr, body) ->
         allowed cexpr
         && helperUsesParameterOnlyForClosureOperations helperName functionParameterId argumentIndex body
+    | Join (_, continuation, entry) ->
+        helperUsesParameterOnlyForClosureOperations helperName functionParameterId argumentIndex continuation && helperUsesParameterOnlyForClosureOperations helperName functionParameterId argumentIndex entry
     | If (condition, thenBranch, elseBranch) ->
         not (ANF_Optimize.atomUsesTemp functionParameterId condition)
         && helperUsesParameterOnlyForClosureOperations helperName functionParameterId argumentIndex thenBranch
@@ -228,6 +242,12 @@ let private requestKey (request: SpecializationRequest) : string * string * int 
 
 let rec private greatestTempId (expr: AExpr) (current: int) : int =
     match expr with
+    | Jump (TempId target, atom) ->
+        let valueId = match atom with Var (TempId id) -> id | _ -> current
+        max current (max target valueId)
+    | Join (parameter, continuation, entry) ->
+        let (TempId id) = parameter.Id
+        greatestTempId entry (greatestTempId continuation (max id current))
     | Return _ -> current
     | Let (TempId boundId, _, body) -> greatestTempId body (max current boundId)
     | If (_, thenBranch, elseBranch) ->
@@ -275,9 +295,11 @@ let rec private rewriteTargetBody
         | _ -> cexpr
 
     match expr with
-    | Return _ -> expr
+    | Jump _ | Return _ -> expr
     | Let (boundId, cexpr, body) ->
         Let (boundId, rewriteCExpr cexpr, rewriteTargetBody closureId captureParameters body)
+    | Join (parameter, continuation, entry) ->
+        Join (parameter, rewriteTargetBody closureId captureParameters continuation, rewriteTargetBody closureId captureParameters entry)
     | If (condition, thenBranch, elseBranch) ->
         If (
             condition,
@@ -326,7 +348,7 @@ let rec private rewriteHelperBody
         | _ -> cexpr
 
     match expr with
-    | Return _ -> expr
+    | Jump _ | Return _ -> expr
     | Let (boundId, cexpr, body) ->
         Let (
             boundId,
@@ -340,6 +362,8 @@ let rec private rewriteHelperBody
                 captureParameters
                 body
         )
+    | Join (parameter, continuation, entry) ->
+        Join (parameter, rewriteHelperBody helperName specializedHelperName specializedTargetName functionParameterId argumentIndex captureParameters continuation, rewriteHelperBody helperName specializedHelperName specializedTargetName functionParameterId argumentIndex captureParameters entry)
     | If (condition, thenBranch, elseBranch) ->
         If (
             condition,
@@ -363,9 +387,12 @@ let rec private rewriteHelperBody
 
 let rec private exprUsesTemp (tempId: TempId) (expr: AExpr) : bool =
     match expr with
+    | Jump (_, atom)
     | Return atom -> ANF_Optimize.atomUsesTemp tempId atom
     | Let (_, cexpr, body) ->
         ANF_Optimize.cexprUsesTemp tempId cexpr || exprUsesTemp tempId body
+    | Join (parameter, continuation, entry) ->
+        exprUsesTemp tempId entry || (parameter.Id <> tempId && exprUsesTemp tempId continuation)
     | If (condition, thenBranch, elseBranch) ->
         ANF_Optimize.atomUsesTemp tempId condition
         || exprUsesTemp tempId thenBranch
@@ -405,7 +432,7 @@ let rec private rewriteKnownCalls
         | _ -> cexpr
 
     match expr with
-    | Return _ -> expr
+    | Jump _ | Return _ -> expr
     | Let (boundId, cexpr, body) ->
         let knownAfter =
             match cexpr with
@@ -418,6 +445,10 @@ let rec private rewriteKnownCalls
             rewrittenBody
         | _ ->
             Let (boundId, rewriteCExpr cexpr, rewrittenBody)
+    | Join (parameter, continuation, entry) ->
+        Join (parameter,
+              rewriteKnownCalls functions specializedNames (Map.remove parameter.Id known) continuation,
+              rewriteKnownCalls functions specializedNames known entry)
     | If (condition, thenBranch, elseBranch) ->
         If (
             condition,

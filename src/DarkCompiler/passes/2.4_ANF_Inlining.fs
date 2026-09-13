@@ -113,6 +113,18 @@ let rec private analyzeExpr (expr: AExpr) : FunctionAnalysis =
         | ClosureCall _ ->
             { letAnalysis with HasClosures = true }
         | _ -> letAnalysis
+    | Jump (TempId target, atom) ->
+        let value = analyzeExpr (Return atom)
+        { value with MaxTempId = max target value.MaxTempId; Size = 1 }
+    | Join (parameter, continuation, entry) ->
+        let body = analyzeExpr continuation
+        let entry' = analyzeExpr entry
+        let (TempId parameterId) = parameter.Id
+        { Calls = Set.union body.Calls entry'.Calls
+          Size = 1 + body.Size + entry'.Size
+          MaxTempId = max parameterId (max body.MaxTempId entry'.MaxTempId)
+          HasClosures = body.HasClosures || entry'.HasClosures
+          HasTailCalls = body.HasTailCalls || entry'.HasTailCalls }
     | Return (Var (TempId tempId)) ->
         { emptyAnalysis with MaxTempId = tempId }
     | Return _ ->
@@ -388,6 +400,15 @@ let rec renameExpr (mapping: Map<TempId, TempId>) (varGen: VarGen) (expr: AExpr)
         // Rename the body (uses new mapping including this binding)
         let (body', varGen'') = renameExpr mapping' varGen' body
         (Let (newTid, cexpr', body'), varGen'')
+    | Jump (target, atom) ->
+        let target' = Map.tryFind target mapping |> Option.defaultValue target
+        (Jump (target', renameAtom mapping atom), varGen)
+    | Join (parameter, continuation, entry) ->
+        let newId, next = freshVar varGen
+        let mapping' = Map.add parameter.Id newId mapping
+        let body, afterBody = renameExpr mapping' next continuation
+        let entry', final = renameExpr mapping' afterBody entry
+        (Join ({ parameter with Id = newId }, body, entry'), final)
     | Return atom ->
         (Return (renameAtom mapping atom), varGen)
     | If (cond, thenBranch, elseBranch) ->
@@ -432,7 +453,7 @@ let rec private isSimpleExternalExpr (expr: AExpr) : bool =
     | Let (_, cexpr, body) ->
         isSimpleExternalCExpr cexpr && isSimpleExternalExpr body
     | Return _ -> true
-    | If _ -> false
+    | Jump _ | Join _ | If _ -> false
 
 let rec private countCallsToNames (names: Set<string>) (expr: AExpr) : int =
     match expr with
@@ -441,7 +462,9 @@ let rec private countCallsToNames (names: Set<string>) (expr: AExpr) : int =
         (if Set.contains name names then 1 else 0) + countCallsToNames names body
     | Let (_, _, body) ->
         countCallsToNames names body
-    | Return _ -> 0
+    | Jump _ | Return _ -> 0
+    | Join (_, continuation, entry) ->
+        countCallsToNames names continuation + countCallsToNames names entry
     | If (_, thenBranch, elseBranch) ->
         countCallsToNames names thenBranch + countCallsToNames names elseBranch
 
@@ -476,6 +499,9 @@ let buildExternalCandidateInfoMap
 /// This replaces `Return atom` with a binding and continues with the rest
 let rec substituteReturn (resultTid: TempId) (continuation: AExpr) (expr: AExpr) : AExpr =
     match expr with
+    | Jump _ -> expr
+    | Join (parameter, body, entry) ->
+        Join (parameter, substituteReturn resultTid continuation body, substituteReturn resultTid continuation entry)
     | Return atom ->
         // Replace return with a binding to resultTid, then continue
         Let (resultTid, Atom atom, continuation)
@@ -537,8 +563,7 @@ let rec private returnedTupleElements (expr: AExpr) : Atom list option =
     | Let (tupleId, TupleAlloc elements, Return (Var returnedId)) when tupleId = returnedId ->
         Some elements
     | Let (_, _, body) -> returnedTupleElements body
-    | Return _
-    | If _ -> None
+    | Jump _ | Join _ | Return _ | If _ -> None
 
 /// Replace immediate, exhaustive projections of an inlined tuple result with
 /// direct bindings to its elements. The explicit bindings preserve ANF order.
@@ -577,8 +602,7 @@ let rec private substituteProjectedTupleReturn
     | Let (id, cexpr, body) ->
         substituteProjectedTupleReturn resultId continuation body
         |> Option.map (fun body' -> Let (id, cexpr, body'))
-    | Return _
-    | If _ -> None
+    | Jump _ | Join _ | Return _ | If _ -> None
 
 let private isProjectedTupleInlineCandidate (info: FunctionInfo) (config: InliningConfig) : bool =
     info.Size <= config.MaxProjectedTupleInlineSize
@@ -599,7 +623,9 @@ let rec private countProjectedTupleCalls
             | _ -> 0
         thisCall + countProjectedTupleCalls funcs body
     | Let (_, _, body) -> countProjectedTupleCalls funcs body
-    | Return _ -> 0
+    | Jump _ | Return _ -> 0
+    | Join (_, continuation, entry) ->
+        countProjectedTupleCalls funcs continuation + countProjectedTupleCalls funcs entry
     | If (_, thenBranch, elseBranch) ->
         countProjectedTupleCalls funcs thenBranch + countProjectedTupleCalls funcs elseBranch
 
@@ -778,9 +804,49 @@ let private tryUnrollBoundedCall
     | None -> None
 
 /// Recursively inline calls in an expression
-let rec inlineInExpr (funcs: Map<string, FunctionInfo>) (config: InliningConfig)
+type InlineScope = FunctionScope | JoinEntryScope
+
+/// Inlining extends callee locals to the caller's cleanup boundary. Entry
+/// boundaries may move relative to the old continuation tree, so only inline
+/// bodies whose newly owned temporaries have structurally inert destruction.
+let private hasInertInlineLifetime (funcs: Map<string, FunctionInfo>) (func: Function) =
+    let inert = SemanticIR.hasInertDestruction
+    let knownCall name =
+        Map.tryFind name funcs |> Option.exists (fun info -> inert info.Func.ReturnType)
+    let operation = function
+        | Atom _ | Prim _ | UnaryPrim _ | IfValue _
+        | TupleAlloc _ | TupleGet _ | ClosureAlloc _
+        | StringConcat _ | CanonicalBufferEq _
+        | FloatSqrt _ | FloatAbs _ | FloatNeg _ | Int64ToFloat _
+        | FloatToInt64 _ | FloatToBits _ | FloatToString _
+        | RawAlloc _ | MappedAlloc _ | RawFree _ | MappedFree _
+        | RawGetByte _ | RawWriteWord _ | RawWriteByte _
+        | StringToRawPtr _ | RawPtrToString _ | BlobToRawPtr _ | RawPtrToBlob _
+        | RefCountInc _ | RefCountDec _ | RefCountIncString _ | RefCountDecString _
+        | RefCountIncBlob _ | RefCountDecBlob _
+        | Print _ | StdoutWrite _ | StdinReadLine
+        | RandomInt64 | DateTimeNow | Sleep _ | RuntimeError _ | RuntimeErrorString _ -> true
+        | TypedAtom (_, typ) | RawGet (_, _, Some typ) | RawTake (_, _, Some typ) -> inert typ
+        | RecordAlloc (descriptor, _) | RecordGet (descriptor, _, _)
+        | RecordClone (descriptor, _, _) | RecordReuse (descriptor, _, _) ->
+            descriptor.Fields |> List.forall (snd >> inert)
+        | Call (name, _) | BorrowedCall (name, _) | TailCall (name, _) -> knownCall name
+        | _ -> false
+    let rec body = function
+        | Return _ | Jump _ -> true
+        | Let (_, value, rest) -> operation value && body rest
+        | If (_, yes, no) -> body yes && body no
+        | Join (_, continuation, entry) -> body continuation && body entry
+    func.TypedParams |> List.forall (fun parameter -> inert parameter.Type)
+    && body func.Body
+
+let rec inlineInExpr (scope: InlineScope) (funcs: Map<string, FunctionInfo>) (config: InliningConfig)
                      (depth: int) (varGen: VarGen) (expr: AExpr)
     : AExpr * VarGen =
+    let lifetimeAllows info =
+        match scope with
+        | FunctionScope -> true
+        | JoinEntryScope -> hasInertInlineLifetime funcs info.Func
     match expr with
     | Let (tid, Call (funcName, args), body) ->
         // Check if this is a regular call (not tail call) to a user function
@@ -788,12 +854,12 @@ let rec inlineInExpr (funcs: Map<string, FunctionInfo>) (config: InliningConfig)
         | Some info when info.IsRecursive ->
             match tryUnrollBoundedCall info config args tid body varGen with
             | Some (expanded, varGen') ->
-                inlineInExpr funcs config (depth + 1) varGen' expanded
+                inlineInExpr scope funcs config (depth + 1) varGen' expanded
             | None ->
-                let (body', varGen') = inlineInExpr funcs config depth varGen body
+                let (body', varGen') = inlineInExpr scope funcs config depth varGen body
                 (Let (tid, Call (funcName, args), body'), varGen')
         | Some info
-            when isProjectedTupleInlineCandidate info config
+            when lifetimeAllows info && isProjectedTupleInlineCandidate info config
                  && countProjectedTupleCalls funcs expr <= config.MaxProjectedTupleInlineSites ->
             // This is deliberately narrower than ordinary inlining: the
             // function's only aggregate result must be consumed immediately
@@ -801,47 +867,52 @@ let rec inlineInExpr (funcs: Map<string, FunctionInfo>) (config: InliningConfig)
             // returned elements preserves evaluation order and avoids forming
             // the otherwise non-escaping tuple, while the site cap bounds code
             // growth in callers such as nbody's unrolled pair-update step.
-            let (body', varGen') = inlineInExpr funcs config depth varGen body
+            let (body', varGen') = inlineInExpr scope funcs config depth varGen body
             let (inlinedBody, varGen'') = inlineCallBody info args varGen'
             match substituteProjectedTupleReturn tid body' inlinedBody with
             | Some specialized ->
-                inlineInExpr funcs config (depth + 1) varGen'' specialized
+                inlineInExpr scope funcs config (depth + 1) varGen'' specialized
             | None ->
                 (Let (tid, Call (funcName, args), body'), varGen'')
-        | Some info when shouldInline info config depth ->
+        | Some info when lifetimeAllows info && shouldInline info config depth ->
             // Only calls inside the callee body increase nesting depth. The
             // continuation remains at the caller's depth, so independent
             // helper calls receive the same size-and-depth cost decision.
             let (body', varGen') =
-                inlineInExpr funcs config depth varGen body
+                inlineInExpr scope funcs config depth varGen body
             let (inlinedBody, varGen'') = inlineCallBody info args varGen'
             let (inlinedBody', varGen''') =
-                inlineInExpr funcs config (depth + 1) varGen'' inlinedBody
+                inlineInExpr scope funcs config (depth + 1) varGen'' inlinedBody
             let result = substituteReturn tid body' inlinedBody'
             (result, varGen''')
         | _ ->
             // Don't inline - continue processing body
-            let (body', varGen') = inlineInExpr funcs config depth varGen body
+            let (body', varGen') = inlineInExpr scope funcs config depth varGen body
             (Let (tid, Call (funcName, args), body'), varGen')
 
     | Let (tid, cexpr, body) ->
         // Not a call, just process the body
-        let (body', varGen') = inlineInExpr funcs config depth varGen body
+        let (body', varGen') = inlineInExpr scope funcs config depth varGen body
         (Let (tid, cexpr, body'), varGen')
 
+    | Jump _ -> (expr, varGen)
+    | Join (parameter, continuation, entry) ->
+        let body, next = inlineInExpr scope funcs config depth varGen continuation
+        let entry', final = inlineInExpr JoinEntryScope funcs config depth next entry
+        (Join (parameter, body, entry'), final)
     | Return atom ->
         (Return atom, varGen)
 
     | If (cond, thenBranch, elseBranch) ->
-        let (thenBranch', varGen') = inlineInExpr funcs config depth varGen thenBranch
-        let (elseBranch', varGen'') = inlineInExpr funcs config depth varGen' elseBranch
+        let (thenBranch', varGen') = inlineInExpr scope funcs config depth varGen thenBranch
+        let (elseBranch', varGen'') = inlineInExpr scope funcs config depth varGen' elseBranch
         (If (cond, thenBranch', elseBranch'), varGen'')
 
 /// Inline in a function body
 let inlineInFunction (funcs: Map<string, FunctionInfo>) (config: InliningConfig)
                      (varGen: VarGen) (func: Function)
     : Function * VarGen =
-    let (body', varGen') = inlineInExpr funcs config 0 varGen func.Body
+    let (body', varGen') = inlineInExpr FunctionScope funcs config 0 varGen func.Body
     ({ func with Body = body' }, varGen')
 
 // ============================================================================
@@ -900,7 +971,7 @@ let inlineProgramWithExternalCandidatesAndExclusions
         ) ([], startVarGen)
 
     // Inline in main expression
-    let (main', _) = inlineInExpr (funcsForBody main) config 0 varGen' main
+    let (main', _) = inlineInExpr FunctionScope (funcsForBody main) config 0 varGen' main
 
     Program (List.rev funcs', main')
 

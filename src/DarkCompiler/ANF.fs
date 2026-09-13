@@ -623,6 +623,11 @@ type AExpr =
     | Let of TempId * CExpr * AExpr
     | Return of Atom
     | If of cond:Atom * thenBranch:AExpr * elseBranch:AExpr
+    /// Nonrecursive lexical continuation with one immediate block argument.
+    /// The parameter identity names the target in entry and binds its value
+    /// only in continuation. The continuation may target enclosing joins.
+    | Join of parameter:TypedParam * continuation:AExpr * entry:AExpr
+    | Jump of target:TempId * value:Atom
 
 /// ANF function definition
 type Function = {

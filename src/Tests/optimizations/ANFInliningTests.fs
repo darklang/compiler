@@ -19,40 +19,54 @@ let private externalCandidates
 
 let rec private containsCall (target: string) (expr: AExpr) : bool =
     match expr with
-    | Return _ -> false
+    | Jump _ | Return _ -> false
     | Let (_, Call (name, _), body) ->
         name = target || containsCall target body
     | Let (_, _, body) ->
         containsCall target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         containsCall target thenBranch || containsCall target elseBranch
 
 let rec private countCalls (target: string) (expr: AExpr) : int =
     match expr with
-    | Return _ -> 0
+    | Jump _ | Return _ -> 0
     | Let (_, Call (name, _), body) ->
         (if name = target then 1 else 0) + countCalls target body
     | Let (_, _, body) ->
         countCalls target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         countCalls target thenBranch + countCalls target elseBranch
 
 let rec private countPrimOps (target: BinOp) (expr: AExpr) : int =
     match expr with
-    | Return _ -> 0
+    | Jump _ | Return _ -> 0
     | Let (_, Prim (op, _, _), body) ->
         (if op = target then 1 else 0) + countPrimOps target body
     | Let (_, _, body) -> countPrimOps target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         countPrimOps target thenBranch + countPrimOps target elseBranch
 
 let rec private hasLiteralLet (expr: AExpr) : bool =
     match expr with
-    | Return _ -> false
+    | Jump _ | Return _ -> false
     | Let (_, Atom (IntLiteral _), _) -> true
     | Let (_, _, body) -> hasLiteralLet body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         hasLiteralLet thenBranch || hasLiteralLet elseBranch
+
+let testJoinInliningFreshensTargets () : TestResult =
+    let parameter = { Id = TempId 1; Type = AST.TInt64 }
+    let body = Join (parameter, Return (Var parameter.Id), Jump (parameter.Id, intAtom 7L))
+    let first, next = ANF_Inlining.renameExpr Map.empty (VarGen 100) body
+    let second, _ = ANF_Inlining.renameExpr Map.empty next body
+    match first, second with
+    | Join (a, Return (Var av), Jump (at, _)), Join (b, Return (Var bv), Jump (bt, _))
+        when a.Id = av && a.Id = at && b.Id = bv && b.Id = bt && a.Id <> b.Id && a.Id <> parameter.Id -> Ok ()
+    | _ -> Error $"Inlining did not consistently freshen join targets: {first}, {second}"
 
 let testInliningWithLiteralArgumentsRemovesCall () : TestResult =
     let param = { Id = TempId 0; Type = AST.TInt64 }
@@ -527,6 +541,7 @@ let testImmediateTupleProjectionsInlineLargeProducer () : TestResult =
         Ok ()
 
 let tests = [
+    "Inlining freshens join targets and values consistently", testJoinInliningFreshensTargets
     ("Inlining literal args removes call", testInliningWithLiteralArgumentsRemovesCall)
     ("Inlining literal args binds literal TempId", testInliningWithLiteralArgumentsBindsTemp)
     ("Inlining underscore-named functions", testInliningUnderscoreFunctionName)

@@ -623,6 +623,9 @@ let private addCExprUses (cexpr: CExpr) (uses: Set<TempId>) : Set<TempId> =
     | RuntimeError _ -> uses
     | RuntimeErrorString atom -> addAtomUse atom uses
 
+/// Complete operand interface for lexical-scope verification.
+let cexprTempUses (cexpr: CExpr) : Set<TempId> = addCExprUses cexpr Set.empty
+
 /// Test whether a CExpr uses a TempId without constructing a liveness set.
 let cexprUsesTemp (tid: TempId) (cexpr: CExpr) : bool =
     let used = atomUsesTemp tid
@@ -1080,6 +1083,9 @@ let private tryAbsorbedAtom (outer: Atom) (nestedLeft: Atom) (nestedRight: Atom)
 
 let rec private aExprUsesTemp (tid: TempId) (expr: AExpr) : bool =
     match expr with
+    | Jump (_, atom) -> atomUsesTemp tid atom
+    | Join (parameter, continuation, entry) ->
+        aExprUsesTemp tid entry || (parameter.Id <> tid && aExprUsesTemp tid continuation)
     | Return atom -> atomUsesTemp tid atom
     | Let (_, cexpr, body) ->
         cexprUsesTemp tid cexpr || aExprUsesTemp tid body
@@ -1095,6 +1101,10 @@ let rec private replaceTempUses (sourceTid: TempId) (replacement: Atom) (expr: A
     let substitution = Map.ofList [(sourceTid, replacement)]
 
     match expr with
+    | Jump (target, atom) -> Jump (target, substAtom substitution atom)
+    | Join (parameter, continuation, entry) ->
+        let body = if parameter.Id = sourceTid then continuation else replaceTempUses sourceTid replacement continuation
+        Join (parameter, body, replaceTempUses sourceTid replacement entry)
     | Return atom -> Return (substAtom substitution atom)
     | Let (tid, cexpr, body) ->
         let cexpr' = substCExpr substitution cexpr
@@ -1111,6 +1121,9 @@ let rec private replaceTempUses (sourceTid: TempId) (replacement: Atom) (expr: A
 
 let rec private aExprMustPreserveEvaluation (context: OptimizeContext) (expr: AExpr) : bool =
     match expr with
+    | Jump _ -> false
+    | Join (_, continuation, entry) ->
+        aExprMustPreserveEvaluation context continuation || aExprMustPreserveEvaluation context entry
     | Return _ -> false
     | Let (_, cexpr, body) ->
         mustPreserveEvaluation context cexpr || aExprMustPreserveEvaluation context body
@@ -1378,6 +1391,15 @@ and private optimizeAExprWithoutBranchHoisting
     (aexpr: AExpr)
     : OptimizeAExprResult =
     match aexpr with
+    | Jump (target, atom) ->
+        let atom' = substAtom env atom
+        { Expr = Jump (target, atom'); Changed = atom' <> atom; Uses = addAtomUse atom' Set.empty }
+    | Join (parameter, continuation, entry) ->
+        let body = optimizeAExprWithUses context options (Map.remove parameter.Id env) (Map.add parameter.Id parameter.Type typeEnv) tupleEnv cseEnv continuation
+        let entry' = optimizeAExprWithUses context options env typeEnv tupleEnv cseEnv entry
+        { Expr = Join (parameter, body.Expr, entry'.Expr)
+          Changed = body.Changed || entry'.Changed
+          Uses = Set.union (Set.remove parameter.Id body.Uses) entry'.Uses }
     | Return atom ->
         let atom' = substAtom env atom
         {
@@ -1548,6 +1570,9 @@ let optimizeToFixedPoint (context: OptimizeContext) (options: OptimizeOptions) (
 
 let rec private collectAExprTempIds (expr: AExpr) (tempIds: Set<TempId>) : Set<TempId> =
     match expr with
+    | Jump (target, atom) -> tempIds |> Set.add target |> addAtomUse atom
+    | Join (parameter, continuation, entry) ->
+        tempIds |> Set.add parameter.Id |> collectAExprTempIds continuation |> collectAExprTempIds entry
     | Return atom -> addAtomUse atom tempIds
     | Let (tid, cexpr, body) ->
         tempIds
@@ -1581,6 +1606,7 @@ let rec private countKnownClosureCalls (closureId: TempId) (expr: AExpr) : int o
             None
 
     match expr with
+    | Jump (_, atom)
     | Return atom ->
         if atomUsesTemp closureId atom then None else Some 0
     | Let (boundId, cexpr, body) ->
@@ -1590,6 +1616,9 @@ let rec private countKnownClosureCalls (closureId: TempId) (expr: AExpr) : int o
         | Some callCount ->
             countKnownClosureCalls closureId body
             |> Option.map (fun bodyCount -> callCount + bodyCount)
+    | Join (parameter, continuation, entry) ->
+        combine (countKnownClosureCalls closureId entry)
+            (if parameter.Id = closureId then Some 0 else countKnownClosureCalls closureId continuation)
     | If (condition, thenBranch, elseBranch) ->
         if atomUsesTemp closureId condition then
             None
@@ -1615,12 +1644,15 @@ let rec private rewriteKnownCaptureFreeCalls
         | _ -> cexpr
 
     match expr with
-    | Return _ -> expr
+    | Jump _ | Return _ -> expr
     | Let (boundId, cexpr, body) ->
         let body' =
             if boundId = closureId then body
             else rewriteKnownCaptureFreeCalls closureId funcName body
         Let (boundId, rewriteCExpr cexpr, body')
+    | Join (parameter, continuation, entry) ->
+        let body = if parameter.Id = closureId then continuation else rewriteKnownCaptureFreeCalls closureId funcName continuation
+        Join (parameter, body, rewriteKnownCaptureFreeCalls closureId funcName entry)
     | If (condition, thenBranch, elseBranch) ->
         If (
             condition,
@@ -1631,7 +1663,7 @@ let rec private rewriteKnownCaptureFreeCalls
 /// set consists of one or more known calls.
 let rec private devirtualizeCaptureFreeClosures (expr: AExpr) : AExpr =
     match expr with
-    | Return _ -> expr
+    | Jump _ | Return _ -> expr
     | Let (closureId, ClosureAlloc (funcName, []), body) ->
         let body' = devirtualizeCaptureFreeClosures body
         match countKnownClosureCalls closureId body' with
@@ -1641,6 +1673,8 @@ let rec private devirtualizeCaptureFreeClosures (expr: AExpr) : AExpr =
             Let (closureId, ClosureAlloc (funcName, []), body')
     | Let (tempId, cexpr, body) ->
         Let (tempId, cexpr, devirtualizeCaptureFreeClosures body)
+    | Join (parameter, continuation, entry) ->
+        Join (parameter, devirtualizeCaptureFreeClosures continuation, devirtualizeCaptureFreeClosures entry)
     | If (condition, thenBranch, elseBranch) ->
         If (
             condition,
@@ -1695,7 +1729,7 @@ let private tryLinearBindings (expr: AExpr) : ((TempId * CExpr) list * Atom) opt
             collect ((tempId, cexpr) :: reversedBindings) body
         | Return atom ->
             Some (List.rev reversedBindings, atom)
-        | If _ ->
+        | Jump _ | Join _ | If _ ->
             None
     collect [] expr
 
@@ -1776,13 +1810,14 @@ let private tryWrappedMultiplication
 let private selfCallCount (funcName: string) (expr: AExpr) : int =
     let rec count expr =
         match expr with
-        | Return _ -> 0
+        | Jump _ | Return _ -> 0
         | Let (_, cexpr, body) ->
             let current =
                 match cexpr with
                 | Call (target, _) when target = funcName -> 1
                 | _ -> 0
             current + count body
+        | Join (_, continuation, entry) -> count continuation + count entry
         | If (_, thenBranch, elseBranch) ->
             count thenBranch + count elseBranch
     count expr
@@ -1793,8 +1828,9 @@ let private siblingAdditionCount (funcName: string) (expr: AExpr) : int =
         | Some _ -> 1
         | None ->
             match expr with
-            | Return _ -> 0
+            | Jump _ | Return _ -> 0
             | Let (_, _, body) -> count body
+            | Join (_, continuation, entry) -> count continuation + count entry
             | If (_, thenBranch, elseBranch) -> count thenBranch + count elseBranch
     count expr
 
@@ -1808,8 +1844,9 @@ let private wrappedMultiplicationCount
         | Some _ -> 1
         | None ->
             match current with
-            | Return _ -> 0
+            | Jump _ | Return _ -> 0
             | Let (_, _, body) -> count body
+            | Join (_, continuation, entry) -> count continuation + count entry
             | If (_, thenBranch, elseBranch) -> count thenBranch + count elseBranch
     count expr
 
@@ -1863,6 +1900,11 @@ let rec private transformAccumulatorBody
         transformSiblingAddition helperName accumulatorId varGen sibling bindings
     | _ ->
         match expr with
+        | Jump _ -> (expr, varGen)
+        | Join (parameter, continuation, entry) ->
+            let body, next = transformAccumulatorBody funcName helperName accumulatorId varGen continuation
+            let entry', final = transformAccumulatorBody funcName helperName accumulatorId next entry
+            (Join (parameter, body, entry'), final)
         | Return atom ->
             let (resultId, varGen') = freshVar varGen
             (Let (resultId, Prim (Add, Var accumulatorId, atom), Return (Var resultId)), varGen')
@@ -1911,6 +1953,11 @@ let rec private transformMultiplicationAccumulatorBody
         transformWrappedMultiplication helperName accumulatorId varGen wrapped bindings
     | _ ->
         match expr with
+        | Jump _ -> (expr, varGen)
+        | Join (parameter, continuation, entry) ->
+            let body, next = transformMultiplicationAccumulatorBody funcName int64Params helperName accumulatorId varGen continuation
+            let entry', final = transformMultiplicationAccumulatorBody funcName int64Params helperName accumulatorId next entry
+            (Join (parameter, body, entry'), final)
         | Return atom ->
             let (resultId, varGen') = freshVar varGen
             (Let (resultId, Prim (Mul, Var accumulatorId, atom), Return (Var resultId)), varGen')
@@ -2035,6 +2082,11 @@ let private transformTailRecursionModuloMultiplication (program: Program) : Prog
 
 let rec private rewriteInvertedBoolLiteralBranches (varGen: VarGen) (expr: AExpr) : AExpr * VarGen =
     match expr with
+    | Jump _ -> (expr, varGen)
+    | Join (parameter, continuation, entry) ->
+        let body, next = rewriteInvertedBoolLiteralBranches varGen continuation
+        let entry', final = rewriteInvertedBoolLiteralBranches next entry
+        (Join (parameter, body, entry'), final)
     | Return _ -> (expr, varGen)
     | Let (tid, cexpr, body) ->
         let (body', varGen') = rewriteInvertedBoolLiteralBranches varGen body

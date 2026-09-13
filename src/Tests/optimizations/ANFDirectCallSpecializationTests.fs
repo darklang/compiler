@@ -23,11 +23,12 @@ let private functionByName (name: string) (functions: Function list) : Function 
 
 let rec private directCallArgs (target: string) (expr: AExpr) : Atom list option =
     match expr with
-    | Return _ -> None
+    | Jump _ | Return _ -> None
     | Let (_, Call (name, args), _) when name = target -> Some args
     | Let (_, BorrowedCall (name, args), _) when name = target -> Some args
     | Let (_, TailCall (name, args), _) when name = target -> Some args
     | Let (_, _, body) -> directCallArgs target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         match directCallArgs target thenBranch with
         | Some args -> Some args
@@ -40,6 +41,8 @@ let rec private containsAtom (expected: Atom) (expr: AExpr) : bool =
         | _ -> false
     match expr with
     | Return atom -> atom = expected
+    | Jump (_, atom) -> atom = expected
+    | Join (_, continuation, entry) -> containsAtom expected continuation || containsAtom expected entry
     | Let (_, cexpr, body) -> cexprContains cexpr || containsAtom expected body
     | If (condition, thenBranch, elseBranch) ->
         condition = expected

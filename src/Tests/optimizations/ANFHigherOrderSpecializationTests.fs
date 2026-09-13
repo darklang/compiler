@@ -17,10 +17,11 @@ let private functionByName (name: string) (functions: Function list) : Function 
 
 let rec private findCall (target: string) (expr: AExpr) : CExpr option =
     match expr with
-    | Return _ -> None
+    | Jump _ | Return _ -> None
     | Let (_, Call (name, _), _) when name = target -> Some(Call (name, []))
     | Let (_, TailCall (name, _), _) when name = target -> Some(TailCall (name, []))
     | Let (_, _, body) -> findCall target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         match findCall target thenBranch with
         | Some call -> Some call
@@ -28,10 +29,11 @@ let rec private findCall (target: string) (expr: AExpr) : CExpr option =
 
 let rec private callArgs (target: string) (expr: AExpr) : Atom list option =
     match expr with
-    | Return _ -> None
+    | Jump _ | Return _ -> None
     | Let (_, Call (name, args), _) when name = target -> Some args
     | Let (_, TailCall (name, args), _) when name = target -> Some args
     | Let (_, _, body) -> callArgs target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         match callArgs target thenBranch with
         | Some args -> Some args
@@ -43,8 +45,9 @@ let rec private containsClosureCall (expr: AExpr) : bool =
         | ClosureCall _ -> true
         | _ -> false
     match expr with
-    | Return _ -> false
+    | Jump _ | Return _ -> false
     | Let (_, cexpr, body) -> cexprContains cexpr || containsClosureCall body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) -> containsClosureCall thenBranch || containsClosureCall elseBranch
 
 let rec private containsClosureAlloc (expr: AExpr) : bool =
@@ -53,8 +56,9 @@ let rec private containsClosureAlloc (expr: AExpr) : bool =
         | ClosureAlloc _ -> true
         | _ -> false
     match expr with
-    | Return _ -> false
+    | Jump _ | Return _ -> false
     | Let (_, cexpr, body) -> cexprContains cexpr || containsClosureAlloc body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) -> containsClosureAlloc thenBranch || containsClosureAlloc elseBranch
 
 let private fixture () : Program =

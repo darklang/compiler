@@ -1,0 +1,28 @@
+// control-flow-exits.e2e - Typed return values across nested terminal branches.
+// Both inner alternatives transfer to the loop; only the outer base case returns.
+let nestedFloatExit (n: Int64) (a: Float) (b: Float) (flag: Bool) : Float =
+    if n > 0L then
+        if flag then nestedFloatExit (n - 1L) (b) (a) (false)
+        else nestedFloatExit (n - 1L) (a + b) (b) (true)
+    else a
+
+nestedFloatExit (3L) (1.5) (2.5) (true) = 1.5
+nestedFloatExit (4L) (1.5) (2.5) (true) = 5.5
+
+// Branch-local scalar selections must not change the enclosing Float result type.
+let scalarSelectionFloatExit (flag: Bool) : Float =
+    let selected = if flag then 1L else 2L in
+    if selected == 1L then 3.5 else 7.25
+
+scalarSelectionFloatExit (true) = 3.5
+scalarSelectionFloatExit (false) = 7.25
+
+// Managed loop-carried values and their cleanup survive both terminal alternatives.
+let nestedStringExit (n: Int64) (a: String) (b: String) (flag: Bool) : String =
+    if n > 0L then
+        if flag then nestedStringExit (n - 1L) (b) (a) (false)
+        else nestedStringExit (n - 1L) (Stdlib.String.append (a) ("!")) (b) (true)
+    else a
+
+nestedStringExit (3L) ("left") ("right") (true) = "left"
+nestedStringExit (4L) ("left") ("right") (true) = "left!"

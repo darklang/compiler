@@ -140,6 +140,8 @@ let rec private analyzeExpr (expr: AExpr) (analysis: ProgramAnalysis) : ProgramA
     match expr with
     | Let (_, cexpr, body) -> analysis |> analyzeCExpr cexpr |> analyzeExpr body
     | Return atom -> analyzeAtom atom analysis
+    | Jump (_, atom) -> analyzeAtom atom analysis
+    | Join (_, continuation, entry) -> analysis |> analyzeExpr continuation |> analyzeExpr entry
     | If (condition, thenBranch, elseBranch) ->
         analysis
         |> analyzeAtom condition
@@ -335,6 +337,9 @@ let rec private rewriteExpr
     | Let (id, cexpr, body) ->
         Let (id, rewriteCExpr rewriteMap substitutions cexpr, rewriteExpr rewriteMap substitutions body)
     | Return atom -> Return (rewriteAtom substitutions atom)
+    | Jump (target, atom) -> Jump (target, rewriteAtom substitutions atom)
+    | Join (parameter, continuation, entry) ->
+        Join (parameter, rewriteExpr rewriteMap (Map.remove parameter.Id substitutions) continuation, rewriteExpr rewriteMap substitutions entry)
     | If (condition, thenBranch, elseBranch) ->
         If (
             rewriteAtom substitutions condition,
@@ -384,7 +389,8 @@ let private literalPatternAt (eligibleIndices: Set<int>) (args: Atom list) : Lit
 
 let rec private directCallsTo (target: string) (expr: AExpr) : Atom list list =
     match expr with
-    | Return _ -> []
+    | Jump _ | Return _ -> []
+    | Join (_, continuation, entry) -> directCallsTo target continuation @ directCallsTo target entry
     | Let (_, cexpr, body) ->
         let current =
             match cexpr with
@@ -520,6 +526,9 @@ let rec private routeExpr
     (expr: AExpr)
     : AExpr =
     match expr with
+    | Jump _ -> expr
+    | Join (parameter, continuation, entry) ->
+        Join (parameter, routeExpr clonesByName continuation, routeExpr clonesByName entry)
     | Let (id, cexpr, body) ->
         Let (id, routeCExpr clonesByName cexpr, routeExpr clonesByName body)
     | Return atom -> Return atom

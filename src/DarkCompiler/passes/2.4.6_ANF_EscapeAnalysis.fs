@@ -53,6 +53,9 @@ let private cexprUsesTracked (tracked: Set<TempId>) (cexpr: CExpr) : bool =
 let rec private exprUsesTracked (tracked: Set<TempId>) (expr: AExpr) : bool =
     match expr with
     | Return atom -> atomsUseTracked tracked [atom]
+    | Jump (_, atom) -> atomsUseTracked tracked [atom]
+    | Join (parameter, continuation, entry) ->
+        exprUsesTracked (Set.remove parameter.Id tracked) continuation || exprUsesTracked tracked entry
     | Let (_, cexpr, body) ->
         cexprUsesTracked tracked cexpr || exprUsesTracked tracked body
     | If (condition, thenBranch, elseBranch) ->
@@ -73,8 +76,7 @@ let rec private reuseUniqueRecordClone
     (expr: AExpr)
     : AExpr option =
     match expr with
-    | Return _ -> None
-    | If _ -> None
+    | Jump _ | Join _ | Return _ | If _ -> None
     | Let (boundId, RecordClone (descriptor, Var cloneSourceId, fields), body)
         when Set.contains cloneSourceId tracked && descriptor = sourceDescriptor ->
         if not (atomsUseTracked tracked fields)
@@ -126,6 +128,10 @@ let rec private hasOnlyLocalAggregateUses
     (expr: AExpr)
     : bool =
     match expr with
+    | Jump (_, atom) -> not (atomsUseTracked tracked [atom])
+    | Join (parameter, continuation, entry) ->
+        hasOnlyLocalAggregateUses (Set.remove parameter.Id tracked) continuation
+        && hasOnlyLocalAggregateUses tracked entry
     | Return atom ->
         not (atomsUseTracked tracked [atom])
     | Let (boundId, cexpr, body) ->
@@ -225,6 +231,14 @@ let rec private scalarReplaceExpr
     (expr: AExpr)
     : AExpr =
     match expr with
+    | Jump _ -> expr
+    | Join (parameter, continuation, entry) ->
+        let bodyScalars =
+            if isScalarType parameter.Type then Set.add parameter.Id scalarTemps
+            else Set.remove parameter.Id scalarTemps
+        Join (parameter,
+              scalarReplaceExpr returnTypes bodyScalars (Map.remove parameter.Id aggregates) continuation,
+              scalarReplaceExpr returnTypes scalarTemps aggregates entry)
     | Return _ -> expr
     | If (condition, thenBranch, elseBranch) ->
         If (

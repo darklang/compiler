@@ -118,6 +118,9 @@ let rec private extractFromAExpr (aexpr: ANF.AExpr) : string list =
     | ANF.Let (_, cexpr, body) ->
         extractFromCExpr cexpr @ extractFromAExpr body
     | ANF.Return atom -> extractFromAtom atom
+    | ANF.Jump (_, atom) -> extractFromAtom atom
+    | ANF.Join (_, continuation, entry) ->
+        extractFromAExpr continuation @ extractFromAExpr entry
     | ANF.If (cond, thenBranch, elseBranch) ->
         extractFromAtom cond @ extractFromAExpr thenBranch @ extractFromAExpr elseBranch
 

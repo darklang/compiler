@@ -23,7 +23,7 @@ let private functions : AST_to_ANF.FunctionRegistry =
 
 let private extract expression =
     let infer types expr = AST_to_ANF.inferTypeCore Set.empty expr types Map.empty Map.empty functions Map.empty
-    ListHIR.tryExtract infer (fun expr -> AST_to_ANF.freeVars expr Set.empty) expression
+    ListHIR.tryExtract (Set.ofList ["mapCallback"; "foldCallback"]) infer (fun expr -> AST_to_ANF.freeVars expr Set.empty) expression
 
 let private checkBudget expression expected () =
     match extract expression with
@@ -53,7 +53,8 @@ let private testLoweredBudget () =
     |> Result.bind (fun (body, _) ->
         let rec counts expression =
             match expression with
-            | ANF.Return _ -> 0, 0
+            | ANF.Jump _ | ANF.Return _ -> 0, 0
+            | ANF.Join (_, yes, no)
             | ANF.If (_, yes, no) -> let a, b = counts yes in let c, d = counts no in a + c, b + d
             | ANF.Let (_, operation, tail) ->
                 let allocations, releases = counts tail
@@ -88,10 +89,34 @@ let private ownedBranch yes no : ListHIR.OwnedOperation =
     { Operation = ListHIR.Branch ("joined", { Expression = AST.BoolLiteral true; Type = AST.TBool }, yes, no); Releases = [] }
 
 let tests = [
-    "List HIR bounds continuation expansion", rejects (manyBranches 5)
-    "List HIR accepts the bounded continuation frontier", (fun () ->
-        match extract (manyBranches 4) with
-        | None -> Error "Expected sixteen-path region"
+    "Scope destruction rejects transitive callers and accepts safe recursive components", (fun () ->
+        let contract local calls : SemanticIR.FunctionScopeContract =
+            { LocalDestruction = local; Calls = Set.ofList calls }
+        let contracts = Map.ofList [
+            "resource", contract SemanticIR.UnprovenScope []
+            "indirect", contract SemanticIR.InertScope ["resource"]
+            "caller", contract SemanticIR.InertScope ["indirect"]
+            "unknown", contract SemanticIR.InertScope ["external"]
+            "left", contract SemanticIR.InertScope ["right"]
+            "right", contract SemanticIR.InertScope ["left"; "Builtin.printLine"]
+        ]
+        let actual = SemanticIR.inertFunctionScopes contracts
+        let expected = Set.ofList ["left"; "right"; "Builtin.print"; "Builtin.printLine"]
+        if actual = expected then Ok () else Error $"Unexpected inert scopes: {actual}")
+    "Scope destruction replacement revokes caller proofs", (fun () ->
+        let safe : SemanticIR.FunctionScopeContract = { LocalDestruction = SemanticIR.InertScope; Calls = Set.empty }
+        let contracts = Map.ofList ["callee", safe; "caller", { safe with Calls = Set.singleton "callee" }]
+        let replaced = Map.add "callee" { safe with LocalDestruction = SemanticIR.UnprovenScope } contracts
+        if Set.contains "caller" (SemanticIR.inertFunctionScopes contracts)
+           && not (Set.contains "caller" (SemanticIR.inertFunctionScopes replaced)) then Ok ()
+        else Error "Replacing a definition did not revoke its transitive scope proof")
+    "Scope destruction does not trust a shadowed primitive", (fun () ->
+        let contracts = Map.ofList ["Builtin.printLine", { SemanticIR.LocalDestruction = SemanticIR.UnprovenScope; SemanticIR.Calls = Set.empty }]
+        if Set.contains "Builtin.printLine" (SemanticIR.inertFunctionScopes contracts) then Error "Shadowed primitive retained its built-in contract"
+        else Ok ())
+    "List HIR accepts deep shared continuations", (fun () ->
+        match extract (manyBranches 64) with
+        | None -> Error "Expected a region with sixty-four scalar joins"
         | Some region -> region |> ListHIR.selectStorage |> ListHIR.elaborateOwnership |> ListHIR.verify)
     "List HIR rejects list-valued branch joins", rejects (bind "xs" (values 3) (bind "selected" (choice (reverse (AST.Var "xs")) (AST.Var "xs")) (fold (AST.Var "selected"))))
     "List HIR rejects branch callbacks hiding aliases", rejects (bind "xs" (values 3) (choice (fold (call "Stdlib.List.map_i64_i64" [AST.Var "xs"; AST.Closure ("mapCallback", [AST.Var "xs"])])) (AST.Int64Literal 7L)))

@@ -20,7 +20,23 @@ independent value contracts. ListHIR uses these for structured collection
 regions, storage selection, and branch-aware ownership elaboration. This is
 not yet the general program IR; see
 [compiler-selected list arrays](runtime/list-array-reuse.md) for its boundary
-and the remaining explicit-join work.
+and the remaining general ownership work.
+
+## ANF shared continuations
+
+ANF has nonrecursive lexical `Join(parameter, continuation, entry)` blocks and
+`Jump(target, value)` transfers. A target is visible only in its entry; its
+parameter value is visible only in its continuation. Both may capture values
+from the enclosing scope. Nested continuations can transfer to enclosing
+targets. ListHIR emits one continuation per scalar branch, without enumerating
+return paths. The supported block arguments are `Int64` and `Bool`.
+
+Inlining freshens block identities along with value identities. Liveness keeps
+continuation captures live; reference counting releases branch-local owners at
+a jump and defers enclosing cleanup to the continuation. The post-RC interface
+verifier checks lexical operands/targets, scalar argument types, and that join
+entries transfer rather than return. Managed block arguments and general
+control-flow ownership interfaces remain future work.
 
 ## Dumping IRs
 
@@ -114,6 +130,15 @@ Key transformations in `3_ANF_to_MIR.fs`:
 2. **If expressions** → Branch + multiple blocks
 3. **Function calls** → Call instruction
 4. **Heap operations** → HeapAlloc/HeapStore/HeapLoad
+
+Expression lowering distinguishes a returned value and its exit block from a
+terminal control transfer. Enclosing conditionals redirect only value exits;
+if both alternatives transfer elsewhere, they have no value continuation.
+Function and branch bodies use the same lowering path. Merge registers carry
+the enclosing function's declared return type, rather than a type inferred
+from a non-returning alternative. ANF joins become shared MIR blocks; jumps
+move the scalar argument into the parameter register and terminate the edge.
+They never fabricate a returned value or duplicate the continuation.
 
 Example:
 ```

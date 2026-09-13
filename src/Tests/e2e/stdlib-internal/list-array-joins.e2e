@@ -1,0 +1,15 @@
+// list-array-joins.e2e - Array reuse through shared continuations beyond sixteen paths.
+// Reacquire a seeded 56-byte block to distinguish inferred arrays from skew lists.
+let seedJoinBlock () : RawPtr = let p = __raw_alloc (56L) in let _ = __raw_write_word (p) (0L) (1L) in let _ = __raw_write_word (p) (8L) (40L) in let _ = __raw_write_word (p) (40L) (999L) in let s = __rawptr_to_string (p) in let _ = Stdlib.String.__byteLength (s) in p
+let inspectJoinBlock () : Int64 = let p = __raw_alloc (56L) in let _ = __raw_write_word (p) (0L) (1L) in let _ = __raw_write_word (p) (8L) (40L) in let s = __rawptr_to_string (p) in __raw_get<Int64> (__string_to_rawptr (s)) (40L)
+let deepJoinArray (flag: Bool) : Int64 = let xs = [1L, 2L, 3L] in let a = if flag then Stdlib.List.fold<Int64, Int64> (xs) (0L) (fun acc x -> acc + x) else 0L in let b = if flag then Stdlib.List.fold<Int64, Int64> (xs) (0L) (fun acc x -> acc + x) else 0L in let c = if flag then Stdlib.List.fold<Int64, Int64> (xs) (0L) (fun acc x -> acc + x) else 0L in let d = if flag then Stdlib.List.fold<Int64, Int64> (xs) (0L) (fun acc x -> acc + x) else 0L in let e = if flag then Stdlib.List.fold<Int64, Int64> (xs) (0L) (fun acc x -> acc + x) else 0L in let total = Stdlib.List.fold<Int64, Int64> (Stdlib.List.map<Int64, Int64> (xs) (fun x -> x + 1L)) (0L) (fun acc x -> acc + x) in a + b + c + d + e + total
+
+let _ = seedJoinBlock () in let result = deepJoinArray (true) in result + inspectJoinBlock () = stdout="43\n" stderr="" disable_opt_inline=true
+let _ = seedJoinBlock () in let result = deepJoinArray (false) in result + inspectJoinBlock () = stdout="13\n" stderr="" disable_opt_inline=true
+
+// The old version survives two nested joins while only the selected path copies.
+let nestedJoinAlias (outer: Bool) (inner: Bool): Int64 = let xs = [1L, 2L, 3L] in let alias = xs in let chosen = if outer then let a = if inner then Stdlib.List.fold<Int64, Int64> (Stdlib.List.map<Int64, Int64> (xs) (fun x -> x + 1L)) (0L) (fun acc x -> acc + x) else Stdlib.List.fold<Int64, Int64> (Stdlib.List.reverse<Int64> (xs)) (0L) (fun acc x -> acc * 10L + x) in a + 1L else 0L in let old = Stdlib.List.fold<Int64, Int64> (alias) (0L) (fun acc x -> acc * 10L + x) in chosen + old
+nestedJoinAlias (true) (true) = stdout="133\n" stderr=""
+nestedJoinAlias (true) (false) = stdout="445\n" stderr=""
+nestedJoinAlias (false) (true) = stdout="123\n" stderr=""
+nestedJoinAlias (true) (false) = stdout="445\n" stderr="" disable_opt_inline=true

@@ -735,7 +735,7 @@ let testMalformedRawGetIntrinsicDoesNotInferInt64 () : TestResult =
 
 let rec private hasDecAfterNonSelfTailCall (funcName: string) (expr: AExpr) : bool =
     match expr with
-    | Return _ ->
+    | Jump _ | Return _ ->
         false
     | Let (_, TailCall (target, _), Let (_, RefCountDec _, _)) when target <> funcName ->
         true
@@ -743,91 +743,99 @@ let rec private hasDecAfterNonSelfTailCall (funcName: string) (expr: AExpr) : bo
         true
     | Let (_, _, body) ->
         hasDecAfterNonSelfTailCall funcName body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         hasDecAfterNonSelfTailCall funcName thenBranch
         || hasDecAfterNonSelfTailCall funcName elseBranch
 
 let rec private hasRefCountIncForTemp (target: TempId) (expr: AExpr) : bool =
     match expr with
-    | Return _ ->
+    | Jump _ | Return _ ->
         false
     | Let (_, RefCountInc (Var tempId, _, _, _), _) when tempId = target ->
         true
     | Let (_, _, body) ->
         hasRefCountIncForTemp target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         hasRefCountIncForTemp target thenBranch
         || hasRefCountIncForTemp target elseBranch
 
 let rec private countRefCountIncsForTemps (targets: Set<TempId>) (expr: AExpr) : int =
     match expr with
-    | Return _ ->
+    | Jump _ | Return _ ->
         0
     | Let (_, RefCountInc (Var tempId, _, _, _), body) ->
         let current = if Set.contains tempId targets then 1 else 0
         current + countRefCountIncsForTemps targets body
     | Let (_, _, body) ->
         countRefCountIncsForTemps targets body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         countRefCountIncsForTemps targets thenBranch
         + countRefCountIncsForTemps targets elseBranch
 
 let rec private hasRefCountDecForTemp (target: TempId) (expr: AExpr) : bool =
     match expr with
-    | Return _ ->
+    | Jump _ | Return _ ->
         false
     | Let (_, RefCountDec (Var tempId, _, _, _), _) when tempId = target ->
         true
     | Let (_, _, body) ->
         hasRefCountDecForTemp target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         hasRefCountDecForTemp target thenBranch
         || hasRefCountDecForTemp target elseBranch
 
 let rec private hasRawSlotInitForValue (target: TempId) (expr: AExpr) : bool =
     match expr with
-    | Return _ ->
+    | Jump _ | Return _ ->
         false
     | Let (_, RawSlotInit (_, _, Var valueId, _), _) when valueId = target ->
         true
     | Let (_, _, body) ->
         hasRawSlotInitForValue target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         hasRawSlotInitForValue target thenBranch
         || hasRawSlotInitForValue target elseBranch
 
 let rec private hasRawWriteWordForValue (target: TempId) (expr: AExpr) : bool =
     match expr with
-    | Return _ ->
+    | Jump _ | Return _ ->
         false
     | Let (_, RawWriteWord (_, _, Var valueId), _) when valueId = target ->
         true
     | Let (_, _, body) ->
         hasRawWriteWordForValue target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         hasRawWriteWordForValue target thenBranch
         || hasRawWriteWordForValue target elseBranch
 
 let rec private hasStringRetainForTemp (target: TempId) (expr: AExpr) : bool =
     match expr with
-    | Return _ ->
+    | Jump _ | Return _ ->
         false
     | Let (_, RefCountIncString (Var tempId), _) when tempId = target ->
         true
     | Let (_, _, body) ->
         hasStringRetainForTemp target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         hasStringRetainForTemp target thenBranch
         || hasStringRetainForTemp target elseBranch
 
 let rec private hasStringReleaseForTemp (target: TempId) (expr: AExpr) : bool =
     match expr with
-    | Return _ ->
+    | Jump _ | Return _ ->
         false
     | Let (_, RefCountDecString (Var tempId), _) when tempId = target ->
         true
     | Let (_, _, body) ->
         hasStringReleaseForTemp target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         hasStringReleaseForTemp target thenBranch
         || hasStringReleaseForTemp target elseBranch
@@ -839,20 +847,26 @@ let private pathHasRetainsBeforeDec
     : bool =
     let required = Set.ofList retainTargets
 
-    let rec loop (seenRetains: Set<TempId>) (expr: AExpr) : bool =
+    let rec loop joins (seenRetains: Set<TempId>) (expr: AExpr) : bool =
         match expr with
         | Return _ ->
             false
+        | Jump (target, _) ->
+            match Map.tryFind target joins with
+            | Some continuation -> loop joins seenRetains continuation
+            | None -> Crash.crash "RC path check: jump target outside lexical scope"
+        | Join (parameter, continuation, entry) ->
+            loop (Map.add parameter.Id continuation joins) seenRetains entry
         | Let (_, RefCountInc (Var tempId, _, _, _), body) ->
-            loop (Set.add tempId seenRetains) body
+            loop joins (Set.add tempId seenRetains) body
         | Let (_, RefCountDec (Var tempId, _, _, _), _) when tempId = decTarget ->
             Set.isSubset required seenRetains
         | Let (_, _, body) ->
-            loop seenRetains body
+            loop joins seenRetains body
         | If (_, thenBranch, elseBranch) ->
-            loop seenRetains thenBranch || loop seenRetains elseBranch
+            loop joins seenRetains thenBranch || loop joins seenRetains elseBranch
 
-    loop Set.empty expr
+    loop Map.empty Set.empty expr
 
 let private rawSlotTransferTestFunction
     (valueType: AST.Type)
@@ -969,12 +983,13 @@ let testRawSlotRetainsFreshStreamValue () : TestResult =
 
 let rec private tryRefCountDecSourceTypeForTemp (target: TempId) (expr: AExpr) : AST.Type option =
     match expr with
-    | Return _ ->
+    | Jump _ | Return _ ->
         None
     | Let (_, RefCountDec (Var tempId, _, _, metadata), _) when tempId = target ->
         metadata |> Option.bind (fun value -> value.SourceType)
     | Let (_, _, body) ->
         tryRefCountDecSourceTypeForTemp target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         match tryRefCountDecSourceTypeForTemp target thenBranch with
         | Some typ -> Some typ
@@ -2689,8 +2704,9 @@ let testProgramRcFreshTempsFollowExistingProgramTemps () : TestResult =
 
     let rec definedTemps (expr: AExpr) : TempId list =
         match expr with
-        | Return _ -> []
+        | Jump _ | Return _ -> []
         | Let (tempId, _, body) -> tempId :: definedTemps body
+        | Join (_, thenBranch, elseBranch)
         | If (_, thenBranch, elseBranch) ->
             definedTemps thenBranch @ definedTemps elseBranch
 
@@ -2763,7 +2779,92 @@ let testBareSumTypeRefsAreCanonicalizedForRcSourceTypes () : TestResult =
     | None ->
         Error "Expected dict binding to receive automatic RefCountDec"
 
+let private verifyJoin body =
+    let ctx : TypeContext = {
+        TypeReg = Map.empty; VariantLookup = Map.empty; SumShapeReg = Map.empty
+        FuncReg = Map.empty; FuncParams = Map.empty; ClosureFuncs = Map.empty
+        TempTypes = Map.ofList [TempId 1, AST.TInt64; TempId 2, AST.TInt64]
+        TypePlanning = createRcTypePlanningContext ()
+    }
+    verifyJoinInterfaces ctx (Program ([], body))
+
+let private rejectsJoin expected body () =
+    match verifyJoin body with
+    | Error message when message.Contains(expected: string) -> Ok ()
+    | result -> Error $"Expected join-interface error '{expected}', got {result}"
+
+let private joinParameter : TypedParam = { Id = TempId 1; Type = AST.TInt64 }
+let private joinValue = IntLiteral (Int64 7L)
+
+let private testJoinCleanupPaths () =
+    let childType = AST.TTuple [AST.TInt64]
+    let ctx : TypeContext = {
+        TypeReg = Map.empty; VariantLookup = Map.empty; SumShapeReg = Map.empty
+        FuncReg = Map.ofList ["observe", AST.TFunction ([AST.TInt64], AST.TUnit)]
+        FuncParams = Map.empty; ClosureFuncs = Map.empty; TempTypes = Map.empty
+        TypePlanning = createRcTypePlanningContext ()
+    }
+    let owner = TempId 10
+    let local = TempId 11
+    let borrowed = TempId 12
+    let flag = TempId 13
+    let target = { Id = TempId 14; Type = AST.TInt64 }
+    let func : Function = {
+        Name = "joinCleanup"; ReturnType = childType; ReturnOwnership = OwnedReturn
+        TypedParams = [{ Id = borrowed; Type = childType }; { Id = flag; Type = AST.TBool }]
+        Body = Let (owner, TupleAlloc [joinValue],
+            Join (target,
+                Let (TempId 15, Call ("observe", [Var target.Id]),
+                    If (Var flag, Return (Var owner), Return (Var borrowed))),
+                Let (local, TupleAlloc [joinValue], Jump (target.Id, joinValue))))
+    }
+    let transformed, _, _ = insertRCInFunction ctx func (VarGen 100)
+    let rec paths joins events expr =
+        match expr with
+        | Return atom -> [List.rev events, atom]
+        | Jump (target, _) ->
+            match Map.tryFind target joins with
+            | Some body -> paths (Map.remove target joins) events body
+            | None -> Crash.crash "RC cleanup test: missing join target"
+        | Join (parameter, continuation, entry) ->
+            paths (Map.add parameter.Id continuation joins) events entry
+        | If (_, yes, no) -> paths joins events yes @ paths joins events no
+        | Let (_, operation, body) ->
+            let event =
+                match operation with
+                | RefCountDec (Var id, _, _, _) -> Some ($"dec:{id}")
+                | RefCountInc (Var id, _, _, _) -> Some ($"inc:{id}")
+                | Call ("observe", _) -> Some "observe"
+                | _ -> None
+            paths joins (match event with Some value -> value :: events | None -> events) body
+    let actual = paths Map.empty [] transformed.Body
+    let expected = [
+        [$"dec:{local}"; "observe"], Var owner
+        [$"dec:{local}"; "observe"; $"dec:{owner}"; $"inc:{borrowed}"], Var borrowed
+    ]
+    if actual = expected then Ok () else Error $"Unexpected join cleanup paths: {actual}"
+
 let tests = [
+    "Join cleanup releases locals at transfer and enclosing owners after continuation", testJoinCleanupPaths
+    "Join verifier accepts enclosing captures and nested outward transfers", (fun () ->
+        verifyJoin (
+            Let (TempId 2, Atom joinValue,
+                Join (joinParameter, Return (Var (TempId 2)),
+                    Join ({ Id = TempId 3; Type = AST.TBool }, Jump (TempId 1, joinValue), Jump (TempId 3, BoolLiteral true))))))
+    "Join verifier rejects branch-local continuation capture", rejectsJoin "outside lexical scope"
+        (Join (joinParameter, Return (Var (TempId 2)), Let (TempId 2, Atom joinValue, Jump (TempId 1, joinValue))))
+    "Join verifier rejects parameter use in entry", rejectsJoin "outside lexical scope"
+        (Join (joinParameter, Return (Var (TempId 1)), Jump (TempId 1, Var (TempId 1))))
+    "Join verifier rejects recursive target", rejectsJoin "target"
+        (Join (joinParameter, Jump (TempId 1, joinValue), Jump (TempId 1, joinValue)))
+    "Join verifier rejects mismatched argument", rejectsJoin "expects"
+        (Join (joinParameter, Return joinValue, Jump (TempId 1, BoolLiteral true)))
+    "Join verifier rejects managed parameter", rejectsJoin "unsupported block argument"
+        (Join ({ joinParameter with Type = AST.TString }, Return joinValue, Jump (TempId 1, StringLiteral "value")))
+    "Join verifier rejects returning entry", rejectsJoin "instead of transferring"
+        (Join (joinParameter, Return joinValue, Return joinValue))
+    "Join verifier rejects target shadowing", rejectsJoin "shadows"
+        (Let (TempId 1, Atom joinValue, Join (joinParameter, Return joinValue, Jump (TempId 1, joinValue))))
     ("RcShape supports structural construction and equality", testRcShapeConstructionAndEquality)
     ("RcShape classifies primitives as immediate", testRcShapeClassifiesPrimitivesAsImmediate)
     ("RcShape classifies managed integer buffers", testRcShapeClassifiesManagedIntegerBuffers)

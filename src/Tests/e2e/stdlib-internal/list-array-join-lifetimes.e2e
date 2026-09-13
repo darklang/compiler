@@ -1,0 +1,26 @@
+// list-array-join-lifetimes.e2e - Preserve observable destruction across scalar joins.
+let lifetimeStep (state: String): Stdlib.Option.Option<(Int64 * String)> = None
+let lifetimeDispose (state: String): Unit = Builtin.printLine (state)
+let lifetimeResource (): Stream<Int64> = Stdlib.Stream.__fromProducer<String, Int64> ("dispose") (lifetimeStep) (lifetimeDispose)
+let lifetimeScalar (): Int64 = let stream = lifetimeResource () in 1L
+let lifetimeTransitive (): Int64 = lifetimeScalar ()
+let lifetimeObserve (value: Int64): Int64 = let _ = Builtin.printLine ("continuation") in value
+let lifetimeCall (flag: Bool): Int64 = let xs = [1L, 2L, 3L] in let chosen = if flag then let seed = lifetimeTransitive () in Stdlib.List.fold<Int64, Int64> (xs) (seed) (fun acc x -> acc + x) else 0L in lifetimeObserve (chosen)
+let lifetimeLocal (flag: Bool): Int64 = let xs = [1L, 2L, 3L] in let chosen = if flag then let seed = (let stream = lifetimeResource () in 1L) in Stdlib.List.fold<Int64, Int64> (xs) (seed) (fun acc x -> acc + x) else 0L in lifetimeObserve (chosen)
+let lifetimeOuter (flag: Bool): Int64 = let stream = lifetimeResource () in let xs = [1L, 2L, 3L] in let chosen = if flag then Stdlib.List.fold<Int64, Int64> (xs) (0L) (fun acc x -> acc + x) else 0L in lifetimeObserve (chosen)
+let lifetimeContainer (flag: Bool): Int64 = let streams = [lifetimeResource (), lifetimeResource ()] in let xs = [1L, 2L, 3L] in let chosen = if flag then Stdlib.List.fold<Int64, Int64> (xs) (0L) (fun acc x -> acc + x) else 0L in lifetimeObserve (chosen)
+let lifetimeCallback (flag: Bool): Int64 = let xs = [1L, 2L, 3L] in let chosen = if flag then Stdlib.List.fold<Int64, Int64> (xs) (0L) (fun acc x -> let stream = lifetimeResource () in acc + x) else 0L in lifetimeObserve (chosen)
+
+lifetimeCall (true) = stdout="continuation\ndispose\n7\n" stderr=""
+lifetimeCall (false) = stdout="continuation\n0\n" stderr=""
+lifetimeCall (true) = stdout="continuation\ndispose\n7\n" stderr="" disable_opt_inline=true
+lifetimeLocal (true) = stdout="continuation\ndispose\n7\n" stderr=""
+lifetimeLocal (true) = stdout="continuation\ndispose\n7\n" stderr="" disable_opt_inline=true
+lifetimeOuter (true) = stdout="continuation\ndispose\n6\n" stderr=""
+lifetimeOuter (false) = stdout="continuation\ndispose\n0\n" stderr=""
+lifetimeOuter (true) = stdout="continuation\ndispose\n6\n" stderr="" disable_opt_inline=true
+lifetimeContainer (true) = stdout="continuation\ndispose\ndispose\n6\n" stderr=""
+lifetimeContainer (false) = stdout="continuation\ndispose\ndispose\n0\n" stderr=""
+lifetimeCallback (true) = stdout="dispose\ndispose\ndispose\ncontinuation\n6\n" stderr=""
+lifetimeCallback (false) = stdout="continuation\n0\n" stderr=""
+lifetimeCallback (true) = stdout="dispose\ndispose\ndispose\ncontinuation\n6\n" stderr="" disable_opt_inline=true

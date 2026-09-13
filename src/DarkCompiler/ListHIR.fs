@@ -127,17 +127,15 @@ let allocationBudget (OwnedRegion (block, layouts)) : AllocationBudget =
                    Releases = summary.Releases + List.length step.Releases } rest
     budget block
 
+type private ScalarLifetime = EnclosingLifetime | JoinEntryLifetime
+
 type private Extraction = {
     Lists: Map<string, ListId>
     Types: Map<string, AST.Type>
     Operations: Operation<Transform, FunctionalBlock> list
     NextId: int
-    Paths: int
+    Lifetime: ScalarLifetime
 }
-
-// ANF is still a continuation tree. Bound duplication until explicit join
-// blocks reach the downstream IR; this limit is on expanded paths, not depth.
-let private maxLoweredPaths = 16
 
 let private immediate = function
     | AST.TInt64 | AST.TBool -> true
@@ -148,17 +146,89 @@ let private listCall = function
     | AST.Call (name, args) -> Some (name, AST.NonEmptyList.toList args)
     | _ -> None
 
+/// Prove scope destruction separately from evaluation effects. Calls use an
+/// explicit contract; nominal payloads and unknown closures remain unproven.
+let private inertExpression infer callIsInert =
+    let inertType = SemanticIR.hasInertDestruction
+    let rec check types expr =
+        let typedInert () =
+            match infer types expr with
+            | Ok typ -> inertType typ
+            | Error _ -> false
+        let recur = check types
+        match expr with
+        | AST.FuncRef _ -> true
+        | AST.Closure (_, captures) -> List.forall recur captures
+        | AST.Let (AST.LPVariable name, value, body) ->
+            // Reject unsupported syntax before inference: declaration overlays
+            // need not contain the pattern/layout metadata of their base context.
+            if not (recur value) then false
+            else
+                match infer types value with
+                | Ok typ when inertType typ -> check (Map.add name typ types) body
+                | _ -> false
+        | AST.Let ((AST.LPUnit | AST.LPWildcard), value, body)
+        | AST.Sequence (value, body) -> recur value && recur body
+        | AST.If (condition, yes, no) -> recur condition && recur yes && recur no
+        | AST.BinOp (_, left, right) -> recur left && recur right
+        | AST.UnaryOp (_, value) | AST.TupleAccess (value, _) -> recur value
+        | AST.Call (name, args) ->
+            callIsInert name && (AST.NonEmptyList.toList args |> List.forall recur) && typedInert ()
+        | AST.TupleLiteral values | AST.ListLiteral values -> List.forall recur values
+        | AST.Var _ -> typedInert ()
+        | AST.UnitLiteral | AST.Int64Literal _ | AST.Int128Literal _
+        | AST.Int8Literal _ | AST.Int16Literal _ | AST.Int32Literal _
+        | AST.UInt8Literal _ | AST.UInt16Literal _ | AST.UInt32Literal _
+        | AST.UInt64Literal _ | AST.UInt128Literal _ | AST.BigIntLiteral _
+        | AST.BoolLiteral _ | AST.StringLiteral _ | AST.CharLiteral _
+        | AST.FloatLiteral _ | AST.RuntimeError _ -> true
+        | _ -> false
+    check
+
+/// Retain dependencies with each local proof so registry composition can revoke
+/// transitive proofs when a definition changes. Recursive components need no
+/// unrolling: the consumer rejects the backwards closure of unproven callees.
+let scopeContracts infer (functions: AST.FunctionDef list) =
+    let rec calls expr =
+        let many expressions = expressions |> List.map calls |> Set.unionMany
+        match expr with
+        | AST.Call (name, args) -> Set.add name (many (AST.NonEmptyList.toList args))
+        | AST.Closure (_, captures) | AST.TupleLiteral captures | AST.ListLiteral captures -> many captures
+        | AST.Let (_, value, body) | AST.Sequence (value, body)
+        | AST.BinOp (_, value, body) -> many [value; body]
+        | AST.If (condition, yes, no) -> many [condition; yes; no]
+        | AST.UnaryOp (_, value) | AST.TupleAccess (value, _) -> calls value
+        | _ -> Set.empty
+    functions |> List.map (fun func ->
+        let parameters = AST.NonEmptyList.toList func.Params
+        let types = Map.ofList parameters
+        let localInert =
+            SemanticIR.hasInertDestruction func.ReturnType
+            && List.forall (snd >> SemanticIR.hasInertDestruction) parameters
+            && inertExpression infer (fun _ -> true) types func.Body
+        func.Name,
+        ({ LocalDestruction = if localInert then SemanticIR.InertScope else SemanticIR.UnprovenScope
+           Calls = calls func.Body }: SemanticIR.FunctionScopeContract))
+    |> Map.ofList
+
 /// A failed recognition is semantic absence, not a compiler failure. The
 /// original checked expression then uses the supported persistent List path.
 let tryExtract
+    (inertScopes: Set<string>)
     (infer: Map<string, AST.Type> -> AST.Expr -> Result<AST.Type, string>)
     (freeVariables: AST.Expr -> Set<string>)
     (expression: AST.Expr)
     : FunctionalRegion option =
+    let inertExpression = inertExpression infer (fun name -> Set.contains name inertScopes)
+
     let operand state accepts expr : Scalar option =
         let referencesList =
             freeVariables expr |> Set.exists (fun name -> Map.containsKey name state.Lists)
-        if referencesList then None
+        let destructionIsInert =
+            match state.Lifetime with
+            | EnclosingLifetime -> true
+            | JoinEntryLifetime -> inertExpression state.Types expr
+        if referencesList || not destructionIsInert then None
         else
             match infer state.Types expr with
             | Ok typ when accepts typ -> Some { Expression = expr; Type = typ }
@@ -167,6 +237,12 @@ let tryExtract
     let scalar state expr = operand state immediate expr
 
     let callback state expected expr : Scalar option =
+        let scopeIsInert =
+            match state.Lifetime, expr with
+            | EnclosingLifetime, _ -> true
+            | JoinEntryLifetime, AST.FuncRef name
+            | JoinEntryLifetime, AST.Closure (name, _) -> Set.contains name inertScopes
+            | JoinEntryLifetime, _ -> false
         // A closure may not hide a region alias or an effectful destructor.
         let capturesAreImmediate =
             match expr with
@@ -176,7 +252,7 @@ let tryExtract
                     | capture -> Option.isSome (scalar state capture))
             | AST.FuncRef _ -> true
             | _ -> false
-        if not capturesAreImmediate then None
+        if not capturesAreImmediate || not scopeIsInert then None
         else
             match infer state.Types expr with
             | Ok typ when typ = expected -> Some { Expression = expr; Type = typ }
@@ -215,15 +291,13 @@ let tryExtract
         | AST.If (condition, yes, no) ->
             operand state ((=) AST.TBool) condition
             |> Option.bind (fun condition ->
-                region name { state with Operations = []; Paths = 1 } yes
-                |> Option.bind (fun (FunctionalBlock yes as yesBlock, afterYes, yesPaths) ->
-                    region name { state with Operations = []; NextId = afterYes; Paths = 1 } no
-                    |> Option.bind (fun (FunctionalBlock no as noBlock, afterNo, noPaths) ->
-                        let paths = state.Paths * (yesPaths + noPaths)
-                        if yes.Result.Type <> no.Result.Type || paths > maxLoweredPaths then None
+                region name { state with Operations = []; Lifetime = JoinEntryLifetime } yes
+                |> Option.bind (fun (FunctionalBlock yes as yesBlock, afterYes) ->
+                    region name { state with Operations = []; NextId = afterYes; Lifetime = JoinEntryLifetime } no
+                    |> Option.bind (fun (FunctionalBlock no as noBlock, afterNo) ->
+                        if yes.Result.Type <> no.Result.Type then None
                         else Some { state with
                                       NextId = afterNo
-                                      Paths = paths
                                       Types = Map.add name yes.Result.Type state.Types
                                       Lists = Map.remove name state.Lists
                                       Operations = Branch (name, condition, yesBlock, noBlock) :: state.Operations })))
@@ -262,7 +336,7 @@ let tryExtract
                 Map.tryFind finalName next.Types
                 |> Option.map (fun typ ->
                     FunctionalBlock { Operations = List.rev next.Operations
-                                      Result = { Expression = AST.Var finalName; Type = typ } }, next.NextId, next.Paths))
+                                      Result = { Expression = AST.Var finalName; Type = typ } }, next.NextId))
 
     let rec collectNames expr =
         match expr with
@@ -287,8 +361,8 @@ let tryExtract
         | _ -> isListOperation expression
     if candidate then
         let finalName = resultName (collectNames expression) 0
-        region finalName { Lists = Map.empty; Types = Map.empty; Operations = []; NextId = 0; Paths = 1 } expression
-        |> Option.bind (fun (block, nextId, _) -> if nextId = 0 then None else Some (FunctionalRegion block))
+        region finalName { Lists = Map.empty; Types = Map.empty; Operations = []; NextId = 0; Lifetime = EnclosingLifetime } expression
+        |> Option.bind (fun (block, nextId) -> if nextId = 0 then None else Some (FunctionalRegion block))
     else None
 
 let private lookup name key map =
@@ -444,6 +518,9 @@ let private word value = ANF.IntLiteral (ANF.Int64 (int64 value))
 let rec private bindReturns expression continuation =
     match expression with
     | ANF.Return atom -> continuation atom
+    | ANF.Jump _ -> expression
+    | ANF.Join (parameter, body, entry) ->
+        ANF.Join (parameter, bindReturns body continuation, bindReturns entry continuation)
     | ANF.Let (id, value, body) -> ANF.Let (id, value, bindReturns body continuation)
     | ANF.If (condition, yes, no) -> ANF.If (condition, bindReturns yes continuation, bindReturns no continuation)
 
@@ -536,8 +613,9 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (block, layouts) as reg
                             let typ = yes.Body.Result.Type
                             lowerRest (Map.add name (joined, typ) env) buffers afterJoin
                             |> Result.map (fun (body, final) ->
-                                let join atom = ANF.Let (joined, ANF.TypedAtom (atom, typ), body)
-                                bindReturns evaluation (fun _ -> ANF.If (condition, bindReturns yesExpr join, bindReturns noExpr join)), final))))
+                                let jump atom = ANF.Jump (joined, atom)
+                                let entry = ANF.If (condition, bindReturns yesExpr jump, bindReturns noExpr jump)
+                                bindReturns evaluation (fun _ -> ANF.Join ({ Id = joined; Type = typ }, body, entry)), final))))
             | ScalarBinding (name, value) ->
                 lowerValue env vg value
                 |> Result.bind (fun (expr, atom, next) ->

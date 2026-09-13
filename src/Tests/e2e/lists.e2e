@@ -748,21 +748,8 @@ match makeIntList167 () with | h :: t -> h + 100L | [] -> 999L = 142L
 // the TFunction path in TypeMap lookup.
 let makeList168 (n: Int64) : List<Int64> = [55L + n, 110L, 165L] let f = makeList168 in match f 0L with | h :: t -> h + 200L | [] -> 999L = stdout="255\n"
 
-// =====================================================
-// List head type tracking in convertExprToOperand (kills mutation #169)
-// =====================================================
-// Tests that the TupleGet handler for TList in convertExprToOperand correctly
-// uses && (not ||) when checking whether to set destType to Float64.
-// The condition at line 1394 is:
-//   if index = 1 && elemType = AST.TFloat64 then destType := AST.TFloat64
-// This path is exercised when a list pattern match occurs inside an if-branch,
-// because the if-branch is processed by convertExprToOperand, not convertExpr.
-// If && were changed to ||, accessing index 1 of a List<Int64> inside a branch
-// would incorrectly mark the result as Float64, causing the integer value to
-// be loaded into a float register and misinterpreted.
-//
-// This test places the list pattern match inside an if-then branch to exercise
-// the convertExprToOperand code path rather than the convertExpr path.
+// Integer list heads extracted inside a branch retain their integer register
+// representation; the payload position alone does not imply a Float element.
 let testListInBranch169 (flag: Bool) : Int64 =
     if flag then
         let xs = [55L, 110L, 165L] in match xs with | h :: t -> h | [] -> 0L
@@ -770,20 +757,8 @@ let testListInBranch169 (flag: Bool) : Int64 =
         999L
 testListInBranch169 true = 55L
 
-// =====================================================
-// List head type tracking via TFunction in convertExprToOperand (kills mutation #170)
-// =====================================================
-// Tests that the TupleGet handler for TFunction returning TList in
-// convertExprToOperand correctly uses && (not ||) when checking whether
-// to set destType to Float64. The condition at line 1398 is:
-//   if index = 1 && elemType = AST.TFloat64 then destType := AST.TFloat64
-// This path is exercised when a closure that returns List<Int64> is stored
-// as a first-class function, called, and pattern matched inside an if-branch.
-// If && were changed to ||, accessing index 1 of a List<Int64> from a
-// closure inside a branch would incorrectly mark the result as Float64.
-//
-// This test combines the closure pattern from #168 with the branch context
-// from #169 to exercise the TFunction->TList case in convertExprToOperand.
+// The same element-type distinction holds for lists returned by a first-class
+// function and immediately pattern matched inside a branch.
 let makeList170 (n: Int64) : List<Int64> = [77L + n, 154L, 231L] let testBranch170 (flag: Bool) : Int64 = if flag then let f = makeList170 in match f 0L with | h :: t -> h | [] -> 0L else 999L testBranch170 true = 77L
 
 // Compound list elements use the same recursive value renderer.

@@ -5344,25 +5344,25 @@ let rec private letPatternAcceptsType
 /// typeReg maps record type names to field definitions
 /// variantLookup maps variant names to (type name, tag index)
 /// funcReg maps function names to their return types
-let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen) (env: VarEnv) (typeReg: TypeRegistry) (variantLookup: VariantLookup) (funcReg: FunctionRegistry) (moduleRegistry: AST.ModuleRegistry) : Result<ANF.AExpr * ANF.VarGen, string> =
+let rec toANFCore (sumTypeNames: Set<string>) (inertScopes: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen) (env: VarEnv) (typeReg: TypeRegistry) (variantLookup: VariantLookup) (funcReg: FunctionRegistry) (moduleRegistry: AST.ModuleRegistry) : Result<ANF.AExpr * ANF.VarGen, string> =
     let infer localTypes value =
         let types = Map.fold (fun types name typ -> Map.add name typ types) (typeEnvFromVarEnv env) localTypes
         inferTypeCore sumTypeNames value types typeReg variantLookup funcReg moduleRegistry
-    match ListHIR.tryExtract infer (fun value -> freeVars value Set.empty) expr with
+    match ListHIR.tryExtract inertScopes infer (fun value -> freeVars value Set.empty) expr with
     | Some region ->
-        let lower value vg environment = toANFUnplannedCore sumTypeNames value vg environment typeReg variantLookup funcReg moduleRegistry
+        let lower value vg environment = toANFUnplannedCore sumTypeNames inertScopes value vg environment typeReg variantLookup funcReg moduleRegistry
         ListHIR.verifyFunctional region |> Result.bind (fun () ->
             region |> ListHIR.selectStorage |> ListHIR.elaborateOwnership |> ListHIR.lower lower env varGen)
-    | None -> toANFUnplannedCore sumTypeNames expr varGen env typeReg variantLookup funcReg moduleRegistry
+    | None -> toANFUnplannedCore sumTypeNames inertScopes expr varGen env typeReg variantLookup funcReg moduleRegistry
 
-and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen) (env: VarEnv) (typeReg: TypeRegistry) (variantLookup: VariantLookup) (funcReg: FunctionRegistry) (moduleRegistry: AST.ModuleRegistry) : Result<ANF.AExpr * ANF.VarGen, string> =
+and private toANFUnplannedCore (sumTypeNames: Set<string>) (inertScopes: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen) (env: VarEnv) (typeReg: TypeRegistry) (variantLookup: VariantLookup) (funcReg: FunctionRegistry) (moduleRegistry: AST.ModuleRegistry) : Result<ANF.AExpr * ANF.VarGen, string> =
     match expr with
     | AST.RecursiveLet _ -> Error "RecursiveLet must be lowered during lambda lifting"
     | AST.DictLiteral (_, []) ->
         Ok (ANF.Return (ANF.IntLiteral (ANF.Int64 0L)), varGen)
     | AST.DictLiteral _ -> Error "Non-empty DictLiteral must be lowered during generic specialization"
     | AST.BoundaryRender (renderer, value) ->
-        toANFCore sumTypeNames value varGen env typeReg variantLookup funcReg moduleRegistry
+        toANFCore sumTypeNames inertScopes value varGen env typeReg variantLookup funcReg moduleRegistry
         |> Result.map (fun (valueExpr, varGen1) ->
             let (renderedVar, varGen2) = ANF.freshVar varGen1
             let renderedExpr =
@@ -5439,6 +5439,16 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
             Ok (ANF.Return (ANF.FloatLiteral System.Double.PositiveInfinity), varGen)
         else if isBuiltinBlobEmptyName name then
             Ok (ANF.Return (ANF.StringLiteral ""), varGen)
+        else if name = "Darklang.LanguageTools.PackageManager.PickContext.empty" then
+            toANFCore sumTypeNames inertScopes
+                (AST.RecordLiteral (
+                    AST.unresolvedRecordReference "Darklang.LanguageTools.PackageManager.PickContext" [],
+                    [("currentModule", AST.ListLiteral [])]
+                ))
+                varGen env typeReg variantLookup funcReg moduleRegistry
+        else if name = "Stdlib.List.empty" || name = "Stdlib.List.empty_v0" then
+             // The empty skew-list is the null pointer with tag zero.
+             Ok (ANF.Return (ANF.IntLiteral (ANF.Int64 0L)), varGen)
         else
             // Variable reference: look up in environment
             match tryLookupResolved name env with
@@ -5475,7 +5485,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
             | AST.FuncRef funcName :: rest ->
                 convertCaptures rest vg ((ANF.FuncRef funcName, []) :: acc)
             | cap :: rest ->
-                toAtomCore sumTypeNames cap vg env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes cap vg env typeReg variantLookup funcReg moduleRegistry
                 |> Result.bind (fun (capAtom, capBindings, vg') ->
                     convertCaptures rest vg' ((capAtom, capBindings) :: acc))
         convertCaptures captures varGen []
@@ -5500,9 +5510,9 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 // Type checking has replaced the continuation with the binding
                 // mismatch error. Preserve every RHS effect, then transition
                 // directly to that error without preparing any projection.
-                toANFCore sumTypeNames value varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes value varGen env typeReg variantLookup funcReg moduleRegistry
                 |> Result.bind (fun (valueExpr, varGen1) ->
-                    toANFCore sumTypeNames body varGen1 env typeReg variantLookup funcReg moduleRegistry
+                    toANFCore sumTypeNames inertScopes body varGen1 env typeReg variantLookup funcReg moduleRegistry
                     |> Result.map (fun (failureExpr, varGen2) ->
                         (bindReturns valueExpr (fun _ -> failureExpr), varGen2)))
             else
@@ -5511,21 +5521,21 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 | AST.LPVariable name ->
                     let (bindingId, varGen2) = ANF.freshVar varGen1
                     let env' = Map.add name (bindingId, valueType) env
-                    toANFCore sumTypeNames body varGen2 env' typeReg variantLookup funcReg moduleRegistry
+                    toANFCore sumTypeNames inertScopes body varGen2 env' typeReg variantLookup funcReg moduleRegistry
                     |> Result.map (fun (bodyExpr, varGen3) ->
                         let transition =
                             ANF.Let (bindingId, ANF.Atom valueAtom, bodyExpr)
                             |> wrapBindings valueBindings
                         (transition, varGen3))
                 | AST.LPUnit | AST.LPWildcard ->
-                    toANFCore sumTypeNames body varGen1 env typeReg variantLookup funcReg moduleRegistry
+                    toANFCore sumTypeNames inertScopes body varGen1 env typeReg variantLookup funcReg moduleRegistry
                     |> Result.map (fun (bodyExpr, varGen2) ->
                         (wrapBindings valueBindings bodyExpr, varGen2))
                 | AST.LPTuple _ ->
                     let (rootId, varGen2) = ANF.freshVar varGen1
                     lowerLetPatternBindings pattern (ANF.Var rootId) valueType env [] varGen2
                     |> Result.bind (fun (env', patternBindingsRev, varGen3) ->
-                        toANFCore sumTypeNames body varGen3 env' typeReg variantLookup funcReg moduleRegistry
+                        toANFCore sumTypeNames inertScopes body varGen3 env' typeReg variantLookup funcReg moduleRegistry
                         |> Result.map (fun (bodyExpr, varGen4) ->
                             let transition =
                                 wrapBindings (List.rev patternBindingsRev) bodyExpr
@@ -5534,23 +5544,26 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                             (transition, varGen4)))
 
               // Try toAtom first; if it fails for complex expressions like Match, use toANF
-              match toAtomCore sumTypeNames value varGen env typeReg variantLookup funcReg moduleRegistry with
+              match toAtomCore sumTypeNames inertScopes value varGen env typeReg variantLookup funcReg moduleRegistry with
               | Ok (valueAtom, valueBindings, varGen1) ->
                   compileContinuation valueAtom valueBindings varGen1
               | Error _ ->
                   // Complex expression (like Match) - compile with toANF and transform returns
-                  toANFCore sumTypeNames value varGen env typeReg variantLookup funcReg moduleRegistry
+                  toANFCore sumTypeNames inertScopes value varGen env typeReg variantLookup funcReg moduleRegistry
                   |> Result.bind (fun (valueExpr, varGen2) ->
                       let (rootId, varGen3) = ANF.freshVar varGen2
                       lowerLetPatternBindings pattern (ANF.Var rootId) valueType env [] varGen3
                       |> Result.bind (fun (env', patternBindingsRev, varGen4) ->
-                          toANFCore sumTypeNames body varGen4 env' typeReg variantLookup funcReg moduleRegistry
+                          toANFCore sumTypeNames inertScopes body varGen4 env' typeReg variantLookup funcReg moduleRegistry
                           |> Result.map (fun (bodyExpr, varGen5) ->
                               let patternContinuation =
                                   wrapBindings (List.rev patternBindingsRev) bodyExpr
                               let rec transformReturns anfExpr =
                                   match anfExpr with
                                   | ANF.Return atom -> ANF.Let (rootId, ANF.Atom atom, patternContinuation)
+                                  | ANF.Jump _ -> anfExpr
+                                  | ANF.Join (parameter, continuation, entry) ->
+                                      ANF.Join (parameter, transformReturns continuation, transformReturns entry)
                                   | ANF.Let (id, cexpr, rest) -> ANF.Let (id, cexpr, transformReturns rest)
                                   | ANF.If (cond, thenBr, elseBr) ->
                                       ANF.If (cond, transformReturns thenBr, transformReturns elseBr)
@@ -5568,7 +5581,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     // Constant-fold negative float literals at compile time
                     Ok (ANF.Return (ANF.FloatLiteral (-f)), varGen)
                 | _ ->
-                    toAtomCore sumTypeNames innerExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes innerExpr varGen env typeReg variantLookup funcReg moduleRegistry
                     |> Result.map (fun (innerAtom, innerBindings, varGen1) ->
                         let (tempVar, varGen2) = ANF.freshVar varGen1
                         let cexpr = ANF.FloatNeg innerAtom
@@ -5583,42 +5596,42 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     Ok (ANF.Return (ANF.IntLiteral (ANF.Int64 System.Int64.MinValue)), varGen)
                 | _ ->
                     let zeroExpr = AST.Int64Literal 0L
-                    toANFCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                    toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TInt ->
-                toANFCore sumTypeNames
+                toANFCore sumTypeNames inertScopes
                     (AST.BinOp (AST.Sub, AST.BigIntLiteral System.Numerics.BigInteger.Zero, innerExpr))
                     varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TInt128 ->
-                toANFCore sumTypeNames (AST.BinOp (AST.Sub, AST.Int128Literal System.Int128.Zero, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, AST.Int128Literal System.Int128.Zero, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TInt32 ->
                 let zeroExpr = AST.Int32Literal 0l
-                toANFCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TInt16 ->
                 let zeroExpr = AST.Int16Literal 0s
-                toANFCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TInt8 ->
                 let zeroExpr = AST.Int8Literal 0y
-                toANFCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TUInt64 ->
                 let zeroExpr = AST.UInt64Literal 0UL
-                toANFCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TUInt32 ->
                 let zeroExpr = AST.UInt32Literal 0ul
-                toANFCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TUInt16 ->
                 let zeroExpr = AST.UInt16Literal 0us
-                toANFCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TUInt8 ->
                 let zeroExpr = AST.UInt8Literal 0uy
-                toANFCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TUInt128 ->
-                toANFCore sumTypeNames (AST.BinOp (AST.Sub, AST.UInt128Literal System.UInt128.Zero, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, AST.UInt128Literal System.UInt128.Zero, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | _ ->
                 Error $"Negation requires numeric operand, got {innerType}")
 
     | AST.UnaryOp (AST.Not, innerExpr) ->
         // Boolean not: convert operand to atom and apply Not
-        toAtomCore sumTypeNames innerExpr varGen env typeReg variantLookup funcReg moduleRegistry |> Result.map (fun (innerAtom, innerBindings, varGen1) ->
+        toAtomCore sumTypeNames inertScopes innerExpr varGen env typeReg variantLookup funcReg moduleRegistry |> Result.map (fun (innerAtom, innerBindings, varGen1) ->
             // Create unary op and bind to fresh variable
             let (tempVar, varGen2) = ANF.freshVar varGen1
             let cexpr = ANF.UnaryPrim (ANF.Not, innerAtom)
@@ -5633,7 +5646,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
         let typeEnv = typeEnvFromVarEnv env
         inferTypeCore sumTypeNames innerExpr typeEnv typeReg variantLookup funcReg moduleRegistry
         |> Result.bind (fun innerType ->
-            toAtomCore sumTypeNames innerExpr varGen env typeReg variantLookup funcReg moduleRegistry
+            toAtomCore sumTypeNames inertScopes innerExpr varGen env typeReg variantLookup funcReg moduleRegistry
             |> Result.map (fun (innerAtom, innerBindings, varGen1) ->
                 let (tempVar, varGen2) = ANF.freshVar varGen1
                 let cexpr =
@@ -5646,9 +5659,9 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 (wrapBindings innerBindings finalExpr, varGen2)))
 
     | AST.BinOp (op, left, right) ->
-        toANFBoundAtomCore sumTypeNames left varGen env typeReg variantLookup funcReg moduleRegistry
+        toANFBoundAtomCore sumTypeNames inertScopes left varGen env typeReg variantLookup funcReg moduleRegistry
         |> Result.bind (fun (leftExpr, leftAtom, varGen1) ->
-            toANFBoundAtomCore sumTypeNames right varGen1 env typeReg variantLookup funcReg moduleRegistry
+            toANFBoundAtomCore sumTypeNames inertScopes right varGen1 env typeReg variantLookup funcReg moduleRegistry
             |> Result.bind (fun (rightExpr, rightAtom, varGen2) ->
                 let typeEnv = typeEnvFromVarEnv env
                 let buildCoreExpr () : Result<ANF.AExpr * ANF.VarGen, string> =
@@ -5744,10 +5757,10 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
     | AST.If (cond, thenBranch, elseBranch) ->
         // If expression: convert condition to atom, both branches to ANF
         // Try toAtom first; if it fails for complex expressions like Match, use toANF
-        match toAtomCore sumTypeNames cond varGen env typeReg variantLookup funcReg moduleRegistry with
+        match toAtomCore sumTypeNames inertScopes cond varGen env typeReg variantLookup funcReg moduleRegistry with
         | Ok (condAtom, condBindings, varGen1) ->
-            toANFCore sumTypeNames thenBranch varGen1 env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (thenExpr, varGen2) ->
-                toANFCore sumTypeNames elseBranch varGen2 env typeReg variantLookup funcReg moduleRegistry |> Result.map (fun (elseExpr, varGen3) ->
+            toANFCore sumTypeNames inertScopes thenBranch varGen1 env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (thenExpr, varGen2) ->
+                toANFCore sumTypeNames inertScopes elseBranch varGen2 env typeReg variantLookup funcReg moduleRegistry |> Result.map (fun (elseExpr, varGen3) ->
                     // Build the expression: condBindings + if condAtom then thenExpr else elseExpr
                     let finalExpr = ANF.If (condAtom, thenExpr, elseExpr)
                     let exprWithBindings = wrapBindings condBindings finalExpr
@@ -5756,17 +5769,20 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
             // Complex condition (like Match) - compile with toANF and transform
             // Create: let condTemp = <cond> in if condTemp then <then> else <else>
             let (condTemp, varGen1) = ANF.freshVar varGen
-            toANFCore sumTypeNames cond varGen1 env typeReg variantLookup funcReg moduleRegistry
+            toANFCore sumTypeNames inertScopes cond varGen1 env typeReg variantLookup funcReg moduleRegistry
             |> Result.bind (fun (condExpr, varGen2) ->
-                toANFCore sumTypeNames thenBranch varGen2 env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes thenBranch varGen2 env typeReg variantLookup funcReg moduleRegistry
                 |> Result.bind (fun (thenExpr, varGen3) ->
-                    toANFCore sumTypeNames elseBranch varGen3 env typeReg variantLookup funcReg moduleRegistry
+                    toANFCore sumTypeNames inertScopes elseBranch varGen3 env typeReg variantLookup funcReg moduleRegistry
                     |> Result.map (fun (elseExpr, varGen4) ->
                         // Transform: replace Returns in condExpr with Let + If
                         let ifExpr = ANF.If (ANF.Var condTemp, thenExpr, elseExpr)
                         let rec transformReturns expr =
                             match expr with
                             | ANF.Return atom -> ANF.Let (condTemp, ANF.Atom atom, ifExpr)
+                            | ANF.Jump _ -> expr
+                            | ANF.Join (parameter, continuation, entry) ->
+                                ANF.Join (parameter, transformReturns continuation, transformReturns entry)
                             | ANF.Let (id, cexpr, rest) -> ANF.Let (id, cexpr, transformReturns rest)
                             | ANF.If (c, t, e) -> ANF.If (c, transformReturns t, transformReturns e)
                         (transformReturns condExpr, varGen4))))
@@ -5774,9 +5790,9 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
     | AST.Sequence (first, next) ->
         // Preserve source order and let the final expression carry the value.
         // bindReturns also prevents the tail from running after a failing head.
-        toANFCore sumTypeNames first varGen env typeReg variantLookup funcReg moduleRegistry
+        toANFCore sumTypeNames inertScopes first varGen env typeReg variantLookup funcReg moduleRegistry
         |> Result.bind (fun (firstExpr, varGen1) ->
-            toANFCore sumTypeNames next varGen1 env typeReg variantLookup funcReg moduleRegistry
+            toANFCore sumTypeNames inertScopes next varGen1 env typeReg variantLookup funcReg moduleRegistry
             |> Result.map (fun (nextExpr, varGen2) ->
                 (bindReturns firstExpr (fun _ -> nextExpr), varGen2)))
 
@@ -5797,7 +5813,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                         Error $"Builtin.unwrap could not find variant tag for {expectedTypeName}.{variantName}"
 
                 let buildUnwrapExpr (successTag: int) (payloadType: AST.Type) (failureMessage: string) : Result<ANF.AExpr * ANF.VarGen, string> =
-                    toAtomCore sumTypeNames argExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes argExpr varGen env typeReg variantLookup funcReg moduleRegistry
                     |> Result.map (fun (argAtom0, argBindings0, vg1) ->
                         let (argAtom, argBindings, vg2) =
                             match argAtom0 with
@@ -5910,7 +5926,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 let runtimeErrorExpr = ANF.RuntimeError fullMessage
                 Ok (ANF.Let (runtimeErrorVar, runtimeErrorExpr, ANF.Return ANF.UnitLiteral), varGen1)
             | None ->
-                toAtomCore sumTypeNames messageExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes messageExpr varGen env typeReg variantLookup funcReg moduleRegistry
                 |> Result.map (fun (messageAtom, messageBindings, varGen1) ->
                     let (fullMessageVar, varGen2) = ANF.freshVar varGen1
                     let (runtimeErrorVar, varGen3) = ANF.freshVar varGen2
@@ -5954,7 +5970,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
             | [] ->
                 Ok (List.rev accExprs, List.rev accAtoms, vg)
             | arg :: rest ->
-                toANFBoundAtomCore sumTypeNames arg vg env typeReg variantLookup funcReg moduleRegistry
+                toANFBoundAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
                 |> Result.bind (fun (argExpr, argAtom, vg') ->
                     // Wrap function references in closures for uniform calling convention.
                     let (wrappedExpr, wrappedAtom, vg'') = wrapFuncRefInClosure argExpr argAtom vg'
@@ -6075,7 +6091,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
             match elems with
             | [] -> Ok (List.rev accExprs, List.rev accAtoms, vg)
             | elem :: rest ->
-                toANFBoundAtomCore sumTypeNames elem vg env typeReg variantLookup funcReg moduleRegistry
+                toANFBoundAtomCore sumTypeNames inertScopes elem vg env typeReg variantLookup funcReg moduleRegistry
                 |> Result.bind (fun (elemExpr, elemAtom, vg') ->
                     convertElements rest vg' (elemExpr :: accExprs) (elemAtom :: accAtoms))
 
@@ -6095,7 +6111,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
 
     | AST.TupleAccess (tupleExpr, index) ->
         // Convert tuple to atom and create TupleGet
-        toAtomCore sumTypeNames tupleExpr varGen env typeReg variantLookup funcReg moduleRegistry
+        toAtomCore sumTypeNames inertScopes tupleExpr varGen env typeReg variantLookup funcReg moduleRegistry
         |> Result.map (fun (tupleAtom, tupleBindings, varGen1) ->
             let (resultVar, varGen2) = ANF.freshVar varGen1
             let getExpr = ANF.TupleGet (tupleAtom, index)
@@ -6117,7 +6133,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
             match remaining with
             | [] -> Ok (List.rev acc, vg)
             | (fieldName, fieldExpr) :: rest ->
-                toANFBoundAtomCore sumTypeNames fieldExpr vg env typeReg variantLookup funcReg moduleRegistry
+                toANFBoundAtomCore sumTypeNames inertScopes fieldExpr vg env typeReg variantLookup funcReg moduleRegistry
                 |> Result.bind (fun (setupExpr, fieldAtom, vg') ->
                     convertFields rest vg' ((fieldName, setupExpr, fieldAtom) :: acc))
 
@@ -6155,13 +6171,13 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 match Map.tryFind typeName typeReg with
                 | Some recordInfo ->
                     let typeFields = recordInfo.Fields
-                    toANFBoundAtomCore sumTypeNames recordExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                    toANFBoundAtomCore sumTypeNames inertScopes recordExpr varGen env typeReg variantLookup funcReg moduleRegistry
                     |> Result.bind (fun (recordSetup, recordAtom, varGen1) ->
                         let rec convertUpdates remaining vg acc =
                             match remaining with
                             | [] -> Ok (List.rev acc, vg)
                             | (fieldName, updateExpr) :: rest ->
-                                toANFBoundAtomCore sumTypeNames updateExpr vg env typeReg variantLookup funcReg moduleRegistry
+                                toANFBoundAtomCore sumTypeNames inertScopes updateExpr vg env typeReg variantLookup funcReg moduleRegistry
                                 |> Result.bind (fun (setupExpr, updateAtom, vg') ->
                                     convertUpdates rest vg' ((fieldName, setupExpr, updateAtom) :: acc))
 
@@ -6239,7 +6255,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 | Some recordInfo ->
                     match List.tryFindIndex (fun (name, _) -> name = fieldName) recordInfo.Fields with
                     | Some index ->
-                        toAtomCore sumTypeNames recordExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                        toAtomCore sumTypeNames inertScopes recordExpr varGen env typeReg variantLookup funcReg moduleRegistry
                         |> Result.map (fun (recordAtom, recordBindings, varGen1) ->
                             let (resultVar, varGen2) = ANF.freshVar varGen1
                             let getExpr =
@@ -6292,7 +6308,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 Ok (finalExpr, varGen1)
             | Some payloadExpr ->
                 // Variant with payload: allocate [tag, payload] on heap
-                toANFBoundAtomCore sumTypeNames payloadExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFBoundAtomCore sumTypeNames inertScopes payloadExpr varGen env typeReg variantLookup funcReg moduleRegistry
                 |> Result.map (fun (payloadSetupExpr, payloadAtom, varGen1) ->
                     let tagAtom = ANF.IntLiteral (ANF.Int64 (int64 tag))
                     // Create TupleAlloc [tag, payload] and bind to fresh variable
@@ -6513,7 +6529,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 | e :: rest ->
                     inferTypeCore sumTypeNames e typeEnv typeReg variantLookup funcReg moduleRegistry
                     |> Result.bind (fun elemType ->
-                        toAtomCore sumTypeNames e vg env typeReg variantLookup funcReg moduleRegistry
+                        toAtomCore sumTypeNames inertScopes e vg env typeReg variantLookup funcReg moduleRegistry
                         |> Result.bind (fun (atom, bindings, vg') ->
                             convertElements rest vg' ((atom, elemType, bindings) :: acc)))
 
@@ -6548,7 +6564,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
         // Compile match to if-else chain
         // First convert scrutinee to a bound atom. This supports effectful/complex
         // scrutinees such as Builtin.testRuntimeError(...) that cannot be lowered via toAtom.
-        toANFBoundAtomCore sumTypeNames scrutinee varGen env typeReg variantLookup funcReg moduleRegistry
+        toANFBoundAtomCore sumTypeNames inertScopes scrutinee varGen env typeReg variantLookup funcReg moduleRegistry
         |> Result.bind (fun (scrutineeExpr, scrutineeAtom, varGen1) ->
             // Check if any pattern needs to access list structure
             // If so, we must ensure scrutinee is a variable (can't TupleGet on literal)
@@ -6648,8 +6664,8 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 match pattern with
                 | AST.POr alternatives ->
                     extractAndCompileBody (AST.NonEmptyList.head alternatives) body scrutAtom scrutType currentEnv vg
-                | AST.PUnit -> toANFCore sumTypeNames body vg currentEnv typeReg variantLookup funcReg moduleRegistry
-                | AST.PWildcard -> toANFCore sumTypeNames body vg currentEnv typeReg variantLookup funcReg moduleRegistry
+                | AST.PUnit -> toANFCore sumTypeNames inertScopes body vg currentEnv typeReg variantLookup funcReg moduleRegistry
+                | AST.PWildcard -> toANFCore sumTypeNames inertScopes body vg currentEnv typeReg variantLookup funcReg moduleRegistry
                 | AST.PInt64 _ | AST.PBigInt _ | AST.PInt128Literal _
                 | AST.PInt8Literal _
                 | AST.PInt16Literal _
@@ -6658,28 +6674,28 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 | AST.PUInt16Literal _
                 | AST.PUInt32Literal _
                 | AST.PUInt64Literal _ | AST.PUInt128Literal _ ->
-                    toANFCore sumTypeNames body vg currentEnv typeReg variantLookup funcReg moduleRegistry
-                | AST.PBool _ -> toANFCore sumTypeNames body vg currentEnv typeReg variantLookup funcReg moduleRegistry
-                | AST.PString _ -> toANFCore sumTypeNames body vg currentEnv typeReg variantLookup funcReg moduleRegistry
-                | AST.PChar _ -> toANFCore sumTypeNames body vg currentEnv typeReg variantLookup funcReg moduleRegistry
-                | AST.PFloat _ -> toANFCore sumTypeNames body vg currentEnv typeReg variantLookup funcReg moduleRegistry
+                    toANFCore sumTypeNames inertScopes body vg currentEnv typeReg variantLookup funcReg moduleRegistry
+                | AST.PBool _ -> toANFCore sumTypeNames inertScopes body vg currentEnv typeReg variantLookup funcReg moduleRegistry
+                | AST.PString _ -> toANFCore sumTypeNames inertScopes body vg currentEnv typeReg variantLookup funcReg moduleRegistry
+                | AST.PChar _ -> toANFCore sumTypeNames inertScopes body vg currentEnv typeReg variantLookup funcReg moduleRegistry
+                | AST.PFloat _ -> toANFCore sumTypeNames inertScopes body vg currentEnv typeReg variantLookup funcReg moduleRegistry
                 | AST.PVar name ->
                     // Bind scrutinee to variable name with the correct type
                     let (tempId, vg1) = ANF.freshVar vg
                     let env' = Map.add name (tempId, scrutType) currentEnv
-                    toANFCore sumTypeNames body vg1 env' typeReg variantLookup funcReg moduleRegistry
+                    toANFCore sumTypeNames inertScopes body vg1 env' typeReg variantLookup funcReg moduleRegistry
                     |> Result.map (fun (bodyExpr, vg2) ->
                         let expr = ANF.Let (tempId, ANF.Atom scrutAtom, bodyExpr)
                         (expr, vg2))
                 | AST.PConstructor (constructorName, payloadPattern) ->
                     match payloadPattern with
-                    | None -> toANFCore sumTypeNames body vg currentEnv typeReg variantLookup funcReg moduleRegistry
+                    | None -> toANFCore sumTypeNames inertScopes body vg currentEnv typeReg variantLookup funcReg moduleRegistry
                     | Some innerPattern ->
                         match tryFindVariantForType constructorName scrutType variantLookup with
                         | Some (_, _, _, None) ->
                             // Constructor arity mismatch behaves as non-matching.
                             // Do not introduce payload bindings in this branch body.
-                            toANFCore sumTypeNames body vg currentEnv typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg currentEnv typeReg variantLookup funcReg moduleRegistry
                         | Some (_, typeParams, _, Some payloadTypeTemplate) ->
                             // Extract payload from heap-allocated variant
                             // Variant layout: [tag:8][payload:8], so payload is at index 1
@@ -6889,7 +6905,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     // Collect all bindings from the tuple pattern, then compile body
                     collectPatternBindings (AST.PTuple patterns) scrutAtom scrutType currentEnv [] vg
                     |> Result.bind (fun (newEnv, bindings, vg1) ->
-                        toANFCore sumTypeNames body vg1 newEnv typeReg variantLookup funcReg moduleRegistry
+                        toANFCore sumTypeNames inertScopes body vg1 newEnv typeReg variantLookup funcReg moduleRegistry
                         |> Result.map (fun (bodyExpr, vg2) ->
                             let finalExpr = wrapBindings (List.rev bindings) bodyExpr
                             (finalExpr, vg2)))
@@ -6966,7 +6982,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     let patternLen = List.length patterns
                     if patternLen = 0 then
                         // Empty pattern - no bindings needed
-                        toANFCore sumTypeNames body vg currentEnv typeReg variantLookup funcReg moduleRegistry
+                        toANFCore sumTypeNames inertScopes body vg currentEnv typeReg variantLookup funcReg moduleRegistry
                     elif patternLen = 1 then
                         // SINGLE node: extract the single element
                         // Untag to get pointer to SINGLE structure
@@ -6987,11 +7003,11 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                         match List.head patterns with
                         | AST.PVar name ->
                             let newEnv = Map.add name (valueVar, elemType) currentEnv
-                            toANFCore sumTypeNames body vg3' newEnv typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg3' newEnv typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg4) ->
                                 (wrapBindings bindings bodyExpr, vg4))
                         | AST.PWildcard ->
-                            toANFCore sumTypeNames body vg3' currentEnv typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg3' currentEnv typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg4) ->
                                 (wrapBindings bindings bodyExpr, vg4))
                         | AST.PInt64 _ | AST.PBigInt _ | AST.PInt128Literal _
@@ -7002,14 +7018,14 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                         | AST.PUInt16Literal _
                         | AST.PUInt32Literal _
                         | AST.PUInt64Literal _ | AST.PUInt128Literal _ ->
-                            toANFCore sumTypeNames body vg3' currentEnv typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg3' currentEnv typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg4) ->
                                 (wrapBindings bindings bodyExpr, vg4))
                         | AST.PTuple innerPatterns ->
                             // elemType is the list element type, use it as tuple type
                             collectTupleBindings innerPatterns valueAtom elemType 0 currentEnv bindings vg3'
                             |> Result.bind (fun (newEnv, newBindings, vg4) ->
-                                toANFCore sumTypeNames body vg4 newEnv typeReg variantLookup funcReg moduleRegistry
+                                toANFCore sumTypeNames inertScopes body vg4 newEnv typeReg variantLookup funcReg moduleRegistry
                                 |> Result.map (fun (bodyExpr, vg5) ->
                                     (wrapBindings newBindings bodyExpr, vg5)))
                         | AST.PConstructor _ | AST.PList _ | AST.PListCons _ ->
@@ -7067,7 +7083,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
 
                         extractElements patterns scrutAtom currentEnv [] vg
                         |> Result.bind (fun (newEnv, bindings, vg2) ->
-                            toANFCore sumTypeNames body vg2 newEnv typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg2 newEnv typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg3) ->
                                 (wrapBindings bindings bodyExpr, vg3)))
                 | AST.PListCons (headPatterns, tailPattern) ->
@@ -7189,14 +7205,14 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                             let (tailVar, vg2) = ANF.freshVar vg1
                             // Tail has the same list type as the scrutinee
                             let newEnv' = Map.add name (tailVar, scrutType) newEnv
-                            toANFCore sumTypeNames body vg2 newEnv' typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg2 newEnv' typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg3) ->
                                 let tailBinding = (tailVar, ANF.TypedAtom (tailAtom, scrutType))
                                 let allBindings = bindings @ [tailBinding]
                                 let finalExpr = wrapBindings allBindings bodyExpr
                                 (finalExpr, vg3))
                         | AST.PWildcard ->
-                            toANFCore sumTypeNames body vg1 newEnv typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg1 newEnv typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg2) ->
                                 let finalExpr = wrapBindings bindings bodyExpr
                                 (finalExpr, vg2))
@@ -7436,10 +7452,10 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     collectBindings pattern scrutAtom scrutType currentEnv [] vg
                     |> Result.bind (fun (newEnv, bindings, vg1) ->
                         // Compile guard expression in the extended environment
-                        toAtomCore sumTypeNames guardExpr vg1 newEnv typeReg variantLookup funcReg moduleRegistry
+                        toAtomCore sumTypeNames inertScopes guardExpr vg1 newEnv typeReg variantLookup funcReg moduleRegistry
                         |> Result.bind (fun (guardAtom, guardBindings, vg2) ->
                             // Compile body expression in the extended environment
-                            toANFCore sumTypeNames body vg2 newEnv typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg2 newEnv typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg3) ->
                                 // Build: if guard then body else elseExpr
                                 let ifExpr = ANF.If (guardAtom, bodyExpr, elseExpr)
@@ -8084,7 +8100,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                         // Empty list: check scrutinee == 0 (EMPTY)
                         let (checkVar, vg1) = ANF.freshVar vg
                         let checkExpr = ANF.Prim (ANF.Eq, listAtom, ANF.IntLiteral (ANF.Int64 0L))
-                        toANFCore sumTypeNames body vg1 currentEnv typeReg variantLookup funcReg moduleRegistry
+                        toANFCore sumTypeNames inertScopes body vg1 currentEnv typeReg variantLookup funcReg moduleRegistry
                         |> Result.map (fun (bodyExpr, vg2) ->
                             let ifExpr = ANF.If (ANF.Var checkVar, bodyExpr, elseExpr)
                             (ANF.Let (checkVar, checkExpr, ifExpr), vg2))
@@ -8117,7 +8133,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                             // Important: bindings must come BEFORE the literal check since they define valueVar
                             let (litCheckVar, vg6) = ANF.freshVar vg5'
                             let litCheckExpr = ANF.Prim (ANF.Eq, valueAtom, ANF.IntLiteral literal)
-                            toANFCore sumTypeNames body vg6 currentEnv typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg6 currentEnv typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg7) ->
                                 // Structure: check tag -> extract value (bindings) -> check literal -> if match then body else else
                                 // Note: We use two nested Ifs because the tag check guards the memory access in bindings
@@ -8130,7 +8146,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
 
                         let compileWideLiteralPattern (litCheckExpr: ANF.CExpr) =
                             let (litCheckVar, vg6) = ANF.freshVar vg5'
-                            toANFCore sumTypeNames body vg6 currentEnv typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg6 currentEnv typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg7) ->
                                 let ifLitExpr = ANF.If (ANF.Var litCheckVar, bodyExpr, elseExpr)
                                 let withLitBinding = ANF.Let (litCheckVar, litCheckExpr, ifLitExpr)
@@ -8141,13 +8157,13 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                         match pat with
                         | AST.PVar name ->
                             let newEnv = Map.add name (valueVar, elemType) currentEnv  // Use element type
-                            toANFCore sumTypeNames body vg5' newEnv typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg5' newEnv typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg6) ->
                                 let withBindings = wrapBindings bindings bodyExpr
                                 let ifExpr = ANF.If (ANF.Var checkVar, withBindings, elseExpr)
                                 (ANF.Let (tagVar, tagExpr, ANF.Let (checkVar, checkExpr, ifExpr)), vg6))
                         | AST.PWildcard ->
-                            toANFCore sumTypeNames body vg5' currentEnv typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg5' currentEnv typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg6) ->
                                 let withBindings = wrapBindings bindings bodyExpr
                                 let ifExpr = ANF.If (ANF.Var checkVar, withBindings, elseExpr)
@@ -8166,7 +8182,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                     | Some (condition, bindings', vg') -> (Some condition, bindings', vg')
                                 collectNestedPatternBindings nestedPattern valueAtom elemType currentEnv [] vg6
                                 |> Result.bind (fun (newEnv, nestedBindings, vg7) ->
-                                    toANFCore sumTypeNames body vg7 newEnv typeReg variantLookup funcReg moduleRegistry
+                                    toANFCore sumTypeNames inertScopes body vg7 newEnv typeReg variantLookup funcReg moduleRegistry
                                     |> Result.map (fun (bodyExpr, vg8) ->
                                         let extractedBody = wrapBindings nestedBindings bodyExpr
                                         let matchedBody =
@@ -8317,7 +8333,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
 
                         extractElements patterns 0 currentEnv [] [] vg6
                         |> Result.bind (fun (newEnv, elemBindings, condAtoms, vg7) ->
-                            toANFCore sumTypeNames body vg7 newEnv typeReg variantLookup funcReg moduleRegistry
+                            toANFCore sumTypeNames inertScopes body vg7 newEnv typeReg variantLookup funcReg moduleRegistry
                             |> Result.map (fun (bodyExpr, vg8) ->
                                 // Build the inner expression based on whether we have extra conditions
                                 let (innerExpr, vg9) =
@@ -8470,12 +8486,12 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     | AST.PVar name ->
                         let (tailVar, vg1) = ANF.freshVar vg
                         let newEnv = Map.add name (tailVar, listType) currentEnv  // Use actual list type
-                        toANFCore sumTypeNames body vg1 newEnv typeReg variantLookup funcReg moduleRegistry
+                        toANFCore sumTypeNames inertScopes body vg1 newEnv typeReg variantLookup funcReg moduleRegistry
                         |> Result.map (fun (bodyExpr, vg2) ->
                             let withTail = ANF.Let (tailVar, ANF.Atom listAtom, bodyExpr)
                             (withTail, vg2))
                     | AST.PWildcard ->
-                        toANFCore sumTypeNames body vg currentEnv typeReg variantLookup funcReg moduleRegistry
+                        toANFCore sumTypeNames inertScopes body vg currentEnv typeReg variantLookup funcReg moduleRegistry
                     | _ -> Error "Tail pattern in list cons must be variable or wildcard"
 
                 | [singleHeadPattern]
@@ -8597,7 +8613,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
 
                             tailEnvResult
                             |> Result.bind (fun (finalEnv, vg5) ->
-                                toANFCore sumTypeNames body vg5 finalEnv typeReg variantLookup funcReg moduleRegistry
+                                toANFCore sumTypeNames inertScopes body vg5 finalEnv typeReg variantLookup funcReg moduleRegistry
                                 |> Result.map (fun (bodyExpr, vg6) ->
                                     let withTupleBindings = bodyExpr
                                     let withTypedTail = ANF.Let (tailVar, tailExpr, withTupleBindings)
@@ -8706,7 +8722,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
 
                             tailEnvResult
                             |> Result.bind (fun (finalEnv, vg5) ->
-                                toANFCore sumTypeNames body vg5 finalEnv typeReg variantLookup funcReg moduleRegistry
+                                toANFCore sumTypeNames inertScopes body vg5 finalEnv typeReg variantLookup funcReg moduleRegistry
                                 |> Result.map (fun (bodyExpr, vg6) ->
                                     let withTupleBindings = bodyExpr
                                     let withTailBinding = wrapBindings tailBindings withTupleBindings
@@ -8884,7 +8900,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                     vg4
                                 |> Result.map (fun (tailBody, vg5) -> (tailBody, [], [], vg5))
                             | AST.PVar name ->
-                                toANFCore sumTypeNames
+                                toANFCore sumTypeNames inertScopes
                                     body
                                     vg4
                                     (Map.add name (finalTailVar, listType) envAfterHeads)
@@ -8894,7 +8910,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                     moduleRegistry
                                 |> Result.map (fun (tailBody, vg5) -> (tailBody, [], [], vg5))
                             | AST.PWildcard ->
-                                toANFCore sumTypeNames body vg4 envAfterHeads typeReg variantLookup funcReg moduleRegistry
+                                toANFCore sumTypeNames inertScopes body vg4 envAfterHeads typeReg variantLookup funcReg moduleRegistry
                                 |> Result.map (fun (tailBody, vg5) -> (tailBody, [], [], vg5))
                             | _ ->
                                 let staticallyCannotMatch =
@@ -8925,7 +8941,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                             Ok (envAfterHeads, [], vg5)
                                     nestedBindingsResult
                                     |> Result.bind (fun (tailEnv, nestedBindings, vg6) ->
-                                        toANFCore sumTypeNames body vg6 tailEnv typeReg variantLookup funcReg moduleRegistry
+                                        toANFCore sumTypeNames inertScopes body vg6 tailEnv typeReg variantLookup funcReg moduleRegistry
                                         |> Result.map (fun (tailBody, vg7) ->
                                             (tailBody, comparisonBindings @ nestedBindings, conditionAtoms, vg7))))
 
@@ -9237,7 +9253,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
             Ok (ANF.Return (ANF.StringLiteral ""), varGen)
         | [single] ->
             // Single part → convert directly
-            toANFCore sumTypeNames (partToExpr single) varGen env typeReg variantLookup funcReg moduleRegistry
+            toANFCore sumTypeNames inertScopes (partToExpr single) varGen env typeReg variantLookup funcReg moduleRegistry
         | first :: rest ->
             // Multiple parts → fold with StringConcat
             let desugared =
@@ -9245,20 +9261,20 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 |> List.fold (fun acc part ->
                     AST.BinOp (AST.StringConcat, acc, partToExpr part))
                     (partToExpr first)
-            toANFCore sumTypeNames desugared varGen env typeReg variantLookup funcReg moduleRegistry
+            toANFCore sumTypeNames inertScopes desugared varGen env typeReg variantLookup funcReg moduleRegistry
 
     | AST.Lambda (_parameters, _, _body) ->
         // Lambda in expression position - closures not yet fully implemented
         Error "Lambda expressions (closures) are not yet fully implemented"
 
     | AST.IndirectApply (func, args) ->
-        toAtomCore sumTypeNames func varGen env typeReg variantLookup funcReg moduleRegistry
+        toAtomCore sumTypeNames inertScopes func varGen env typeReg variantLookup funcReg moduleRegistry
         |> Result.bind (fun (funcAtom, funcBindings, varGen1) ->
             let rec convertArgs remaining vg acc =
                 match remaining with
                 | [] -> Ok (List.rev acc, vg)
                 | arg :: rest ->
-                    toAtomCore sumTypeNames arg vg env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
                     |> Result.bind (fun (argAtom, argBindings, vg') ->
                         convertArgs rest vg' ((argAtom, argBindings) :: acc))
             convertArgs (exprArgsToList args) varGen1 []
@@ -9289,7 +9305,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                         AST.Let (parameter.Pattern, argExpr, buildLets restPs restAs)
                     | _ -> body  // Should not happen due to length check
                 let desugared = buildLets parameterList argsList
-                toANFCore sumTypeNames desugared varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes desugared varGen env typeReg variantLookup funcReg moduleRegistry
         | AST.Var name ->
             // Calling a variable that might hold a closure
             match Map.tryFind name env with
@@ -9299,7 +9315,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     match remaining with
                     | [] -> Ok (List.rev acc, vg)
                     | arg :: rest ->
-                        toAtomCore sumTypeNames arg vg env typeReg variantLookup funcReg moduleRegistry
+                        toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
                         |> Result.bind (fun (argAtom, argBindings, vg') ->
                             convertArgs rest vg' ((argAtom, argBindings) :: acc))
                 convertArgs argsList varGen []
@@ -9361,7 +9377,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                             desugaAll applied restArgLists
 
                 let desugared = desugaAll baseFunc allArgLists
-                toANFCore sumTypeNames desugared varGen env typeReg variantLookup funcReg moduleRegistry
+                toANFCore sumTypeNames inertScopes desugared varGen env typeReg variantLookup funcReg moduleRegistry
 
             | _ ->
                 // Base function is not a lambda - use toAtom which handles nested applies
@@ -9373,14 +9389,14 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                         applyAll (AST.Apply (currentExpr, exprArgsFromList currentArgs)) rest
                 let fullApply = applyAll baseFunc allArgLists
 
-                toAtomCore sumTypeNames fullApply varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes fullApply varGen env typeReg variantLookup funcReg moduleRegistry
                 |> Result.map (fun (resultAtom, bindings, vg) ->
                     (wrapBindings bindings (ANF.Return resultAtom), vg))
 
         | AST.Let (letName, letValue, letBody) ->
             // Apply(let x = v in body, args) → let x = v in Apply(body, args)
             // Float the let binding out
-            toANFCore sumTypeNames (AST.Let (letName, letValue, AST.Apply (letBody, args))) varGen env typeReg variantLookup funcReg moduleRegistry
+            toANFCore sumTypeNames inertScopes (AST.Let (letName, letValue, AST.Apply (letBody, args))) varGen env typeReg variantLookup funcReg moduleRegistry
 
         | AST.Closure (funcName, captures) ->
             // Closure being called directly - convert to ClosureCall
@@ -9391,7 +9407,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 | AST.FuncRef funcName :: rest ->
                     convertCaptures rest vg ((ANF.FuncRef funcName, []) :: acc)
                 | cap :: rest ->
-                    toAtomCore sumTypeNames cap vg env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes cap vg env typeReg variantLookup funcReg moduleRegistry
                     |> Result.bind (fun (capAtom, capBindings, vg') ->
                         convertCaptures rest vg' ((capAtom, capBindings) :: acc))
             convertCaptures captures varGen []
@@ -9430,7 +9446,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
         | _ ->
             // General function-expression application (for example record field access):
             // evaluate function expression to a closure value, then invoke it.
-            toAtomCore sumTypeNames func varGen env typeReg variantLookup funcReg moduleRegistry
+            toAtomCore sumTypeNames inertScopes func varGen env typeReg variantLookup funcReg moduleRegistry
             |> Result.bind (fun (funcAtom, funcBindings, varGen1) ->
                 let rec convertArgs
                     (remaining: AST.Expr list)
@@ -9440,7 +9456,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     match remaining with
                     | [] -> Ok (List.rev acc, vg)
                     | arg :: rest ->
-                        toAtomCore sumTypeNames arg vg env typeReg variantLookup funcReg moduleRegistry
+                        toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
                         |> Result.bind (fun (argAtom, argBindings, vg') ->
                             convertArgs rest vg' ((argAtom, argBindings) :: acc))
 
@@ -9454,7 +9470,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     (wrapBindings allBindings (ANF.Return (ANF.Var resultId)), varGen3)))
 
 /// Convert an AST expression to an atom, introducing let bindings as needed
-and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen) (env: VarEnv) (typeReg: TypeRegistry) (variantLookup: VariantLookup) (funcReg: FunctionRegistry) (moduleRegistry: AST.ModuleRegistry) : Result<ANF.Atom * (ANF.TempId * ANF.CExpr) list * ANF.VarGen, string> =
+and toAtomCore (sumTypeNames: Set<string>) (inertScopes: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen) (env: VarEnv) (typeReg: TypeRegistry) (variantLookup: VariantLookup) (funcReg: FunctionRegistry) (moduleRegistry: AST.ModuleRegistry) : Result<ANF.Atom * (ANF.TempId * ANF.CExpr) list * ANF.VarGen, string> =
     match expr with
     | AST.RecursiveLet _ -> Error "RecursiveLet must be lowered during lambda lifting"
     | AST.DictLiteral (_, []) ->
@@ -9522,6 +9538,15 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
             Ok (ANF.FloatLiteral System.Double.PositiveInfinity, [], varGen)
         else if isBuiltinBlobEmptyName name then
             Ok (ANF.StringLiteral "", [], varGen)
+        else if name = "Darklang.LanguageTools.PackageManager.PickContext.empty" then
+            toAtomCore sumTypeNames inertScopes
+                (AST.RecordLiteral (
+                    AST.unresolvedRecordReference "Darklang.LanguageTools.PackageManager.PickContext" [],
+                    [("currentModule", AST.ListLiteral [])]
+                ))
+                varGen env typeReg variantLookup funcReg moduleRegistry
+         else if name = "Stdlib.List.empty" || name = "Stdlib.List.empty_v0" then
+             Ok (ANF.IntLiteral (ANF.Int64 0L), [], varGen)
         else
             // Variable reference: look up in environment
             match tryLookupResolved name env with
@@ -9557,7 +9582,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
             | AST.FuncRef funcName :: rest ->
                 convertCaptures rest vg ((ANF.FuncRef funcName, []) :: acc)
             | cap :: rest ->
-                toAtomCore sumTypeNames cap vg env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes cap vg env typeReg variantLookup funcReg moduleRegistry
                 |> Result.bind (fun (capAtom, capBindings, vg') ->
                     convertCaptures rest vg' ((capAtom, capBindings) :: acc))
         convertCaptures captures varGen []
@@ -9578,26 +9603,26 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
             if not (letPatternAcceptsType pattern valueType) then
                 Error "Binding mismatch requires control-flow lowering"
             else
-              toAtomCore sumTypeNames value varGen env typeReg variantLookup funcReg moduleRegistry
+              toAtomCore sumTypeNames inertScopes value varGen env typeReg variantLookup funcReg moduleRegistry
             |> Result.bind (fun (valueAtom, valueBindings, varGen1) ->
                 match pattern with
                 | AST.LPVariable name ->
                     let (bindingId, varGen2) = ANF.freshVar varGen1
                     let env' = Map.add name (bindingId, valueType) env
-                    toAtomCore sumTypeNames body varGen2 env' typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes body varGen2 env' typeReg variantLookup funcReg moduleRegistry
                     |> Result.map (fun (bodyAtom, bodyBindings, varGen3) ->
                         (bodyAtom,
                          valueBindings @ [(bindingId, ANF.Atom valueAtom)] @ bodyBindings,
                          varGen3))
                 | AST.LPUnit | AST.LPWildcard ->
-                    toAtomCore sumTypeNames body varGen1 env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes body varGen1 env typeReg variantLookup funcReg moduleRegistry
                     |> Result.map (fun (bodyAtom, bodyBindings, varGen2) ->
                         (bodyAtom, valueBindings @ bodyBindings, varGen2))
                 | AST.LPTuple _ ->
                     let (rootId, varGen2) = ANF.freshVar varGen1
                     lowerLetPatternBindings pattern (ANF.Var rootId) valueType env [] varGen2
                     |> Result.bind (fun (env', patternBindingsRev, varGen3) ->
-                        toAtomCore sumTypeNames body varGen3 env' typeReg variantLookup funcReg moduleRegistry
+                        toAtomCore sumTypeNames inertScopes body varGen3 env' typeReg variantLookup funcReg moduleRegistry
                         |> Result.map (fun (bodyAtom, bodyBindings, varGen4) ->
                             let allBindings =
                                 valueBindings
@@ -9618,7 +9643,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                     // Constant-fold negative float literals at compile time
                     Ok (ANF.FloatLiteral (-f), [], varGen)
                 | _ ->
-                    toAtomCore sumTypeNames innerExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes innerExpr varGen env typeReg variantLookup funcReg moduleRegistry
                     |> Result.map (fun (innerAtom, innerBindings, varGen1) ->
                         let (tempVar, varGen2) = ANF.freshVar varGen1
                         let cexpr = ANF.FloatNeg innerAtom
@@ -9632,42 +9657,42 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                     Ok (ANF.IntLiteral (ANF.Int64 System.Int64.MinValue), [], varGen)
                 | _ ->
                     let zeroExpr = AST.Int64Literal 0L
-                    toAtomCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TInt ->
-                toAtomCore sumTypeNames
+                toAtomCore sumTypeNames inertScopes
                     (AST.BinOp (AST.Sub, AST.BigIntLiteral System.Numerics.BigInteger.Zero, innerExpr))
                     varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TInt128 ->
-                toAtomCore sumTypeNames (AST.BinOp (AST.Sub, AST.Int128Literal System.Int128.Zero, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, AST.Int128Literal System.Int128.Zero, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TInt32 ->
                 let zeroExpr = AST.Int32Literal 0l
-                toAtomCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TInt16 ->
                 let zeroExpr = AST.Int16Literal 0s
-                toAtomCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TInt8 ->
                 let zeroExpr = AST.Int8Literal 0y
-                toAtomCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TUInt64 ->
                 let zeroExpr = AST.UInt64Literal 0UL
-                toAtomCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TUInt32 ->
                 let zeroExpr = AST.UInt32Literal 0ul
-                toAtomCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TUInt16 ->
                 let zeroExpr = AST.UInt16Literal 0us
-                toAtomCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TUInt8 ->
                 let zeroExpr = AST.UInt8Literal 0uy
-                toAtomCore sumTypeNames (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | AST.TUInt128 ->
-                toAtomCore sumTypeNames (AST.BinOp (AST.Sub, AST.UInt128Literal System.UInt128.Zero, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, AST.UInt128Literal System.UInt128.Zero, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
             | _ ->
                 Error $"Negation requires numeric operand, got {innerType}")
 
     | AST.UnaryOp (AST.Not, innerExpr) ->
         // Boolean not: convert operand to atom, create binding
-        toAtomCore sumTypeNames innerExpr varGen env typeReg variantLookup funcReg moduleRegistry |> Result.map (fun (innerAtom, innerBindings, varGen1) ->
+        toAtomCore sumTypeNames inertScopes innerExpr varGen env typeReg variantLookup funcReg moduleRegistry |> Result.map (fun (innerAtom, innerBindings, varGen1) ->
             // Create the operation
             let (tempVar, varGen2) = ANF.freshVar varGen1
             let cexpr = ANF.UnaryPrim (ANF.Not, innerAtom)
@@ -9680,7 +9705,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
         let typeEnv = typeEnvFromVarEnv env
         inferTypeCore sumTypeNames innerExpr typeEnv typeReg variantLookup funcReg moduleRegistry
         |> Result.bind (fun innerType ->
-            toAtomCore sumTypeNames innerExpr varGen env typeReg variantLookup funcReg moduleRegistry
+            toAtomCore sumTypeNames inertScopes innerExpr varGen env typeReg variantLookup funcReg moduleRegistry
             |> Result.map (fun (innerAtom, innerBindings, varGen1) ->
                 let (tempVar, varGen2) = ANF.freshVar varGen1
                 let cexpr =
@@ -9693,8 +9718,8 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
 
     | AST.BinOp (op, left, right) ->
         // Complex expression: convert operands to atoms, create binding
-        toAtomCore sumTypeNames left varGen env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (leftAtom, leftBindings, varGen1) ->
-            toAtomCore sumTypeNames right varGen1 env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (rightAtom, rightBindings, varGen2) ->
+        toAtomCore sumTypeNames inertScopes left varGen env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (leftAtom, leftBindings, varGen1) ->
+            toAtomCore sumTypeNames inertScopes right varGen1 env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (rightAtom, rightBindings, varGen2) ->
                 // Check if this is an equality comparison on compound types
                 let typeEnv = typeEnvFromVarEnv env
                 match op with
@@ -9787,9 +9812,9 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
     | AST.If (condExpr, thenExpr, elseExpr) ->
         // IfValue selects atoms, but any bindings execute before it. Branches
         // with bindings must use full control-flow lowering to remain lazy.
-        toAtomCore sumTypeNames condExpr varGen env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (condAtom, condBindings, varGen1) ->
-            toAtomCore sumTypeNames thenExpr varGen1 env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (thenAtom, thenBindings, varGen2) ->
-                toAtomCore sumTypeNames elseExpr varGen2 env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (elseAtom, elseBindings, varGen3) ->
+        toAtomCore sumTypeNames inertScopes condExpr varGen env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (condAtom, condBindings, varGen1) ->
+            toAtomCore sumTypeNames inertScopes thenExpr varGen1 env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (thenAtom, thenBindings, varGen2) ->
+                toAtomCore sumTypeNames inertScopes elseExpr varGen2 env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (elseAtom, elseBindings, varGen3) ->
                     if List.isEmpty thenBindings && List.isEmpty elseBindings then
                         // Create a temporary for the result
                         let (tempVar, varGen4) = ANF.freshVar varGen3
@@ -9820,7 +9845,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                         varGen1
                     )
                 | None ->
-                    toAtomCore sumTypeNames messageExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes messageExpr varGen env typeReg variantLookup funcReg moduleRegistry
                     |> Result.map (fun (messageAtom, messageBindings, varGen1) ->
                         let (fullMessageVar, varGen2) = ANF.freshVar varGen1
                         let (runtimeErrorVar, varGen3) = ANF.freshVar varGen2
@@ -9842,7 +9867,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                 match argExprs with
                 | [] -> Ok (List.rev accAtoms, accBindings, vg)
                 | arg :: rest ->
-                    toAtomCore sumTypeNames arg vg env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
                     |> Result.bind (fun (argAtom, argBindings, vg') ->
                         convertArgs rest vg' (argAtom :: accAtoms) (accBindings @ argBindings))
 
@@ -9939,7 +9964,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
             match elems with
             | [] -> Ok (List.rev accAtoms, accBindings, vg)
             | elem :: rest ->
-                toAtomCore sumTypeNames elem vg env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes elem vg env typeReg variantLookup funcReg moduleRegistry
                 |> Result.bind (fun (elemAtom, elemBindings, vg') ->
                     convertElements rest vg' (elemAtom :: accAtoms) (accBindings @ elemBindings))
 
@@ -9954,7 +9979,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
 
     | AST.TupleAccess (tupleExpr, index) ->
         // Convert tuple to atom and create TupleGet
-        toAtomCore sumTypeNames tupleExpr varGen env typeReg variantLookup funcReg moduleRegistry
+        toAtomCore sumTypeNames inertScopes tupleExpr varGen env typeReg variantLookup funcReg moduleRegistry
         |> Result.map (fun (tupleAtom, tupleBindings, varGen1) ->
             let (tempVar, varGen2) = ANF.freshVar varGen1
             let getCExpr = ANF.TupleGet (tupleAtom, index)
@@ -9975,7 +10000,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
             match remaining with
             | [] -> Ok (List.rev acc, vg)
             | (fieldName, fieldExpr) :: rest ->
-                toAtomCore sumTypeNames fieldExpr vg env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes fieldExpr vg env typeReg variantLookup funcReg moduleRegistry
                 |> Result.bind (fun (fieldAtom, fieldBindings, vg') ->
                     convertFields rest vg' ((fieldName, fieldAtom, fieldBindings) :: acc))
 
@@ -10014,13 +10039,13 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                 match Map.tryFind typeName typeReg with
                 | Some recordInfo ->
                     let typeFields = recordInfo.Fields
-                    toAtomCore sumTypeNames recordExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes recordExpr varGen env typeReg variantLookup funcReg moduleRegistry
                     |> Result.bind (fun (recordAtom, recordBindings, varGen1) ->
                         let rec convertUpdates remaining vg acc =
                             match remaining with
                             | [] -> Ok (List.rev acc, vg)
                             | (fieldName, updateExpr) :: rest ->
-                                toAtomCore sumTypeNames updateExpr vg env typeReg variantLookup funcReg moduleRegistry
+                                toAtomCore sumTypeNames inertScopes updateExpr vg env typeReg variantLookup funcReg moduleRegistry
                                 |> Result.bind (fun (updateAtom, updateBindings, vg') ->
                                     convertUpdates rest vg' ((fieldName, updateAtom, updateBindings) :: acc))
 
@@ -10093,7 +10118,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                 | Some recordInfo ->
                     match List.tryFindIndex (fun (name, _) -> name = fieldName) recordInfo.Fields with
                     | Some index ->
-                        toAtomCore sumTypeNames recordExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                        toAtomCore sumTypeNames inertScopes recordExpr varGen env typeReg variantLookup funcReg moduleRegistry
                         |> Result.bind (fun (recordAtom, recordBindings, varGen1) ->
                             let (tempVar, varGen2) = ANF.freshVar varGen1
                             let getCExpr =
@@ -10143,7 +10168,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                 Ok (ANF.Var tempVar, [(tempVar, tupleCExpr)], varGen1)
             | Some payloadExpr ->
                 // Variant with payload: allocate [tag, payload] on heap
-                toAtomCore sumTypeNames payloadExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes payloadExpr varGen env typeReg variantLookup funcReg moduleRegistry
                 |> Result.map (fun (payloadAtom, payloadBindings, varGen1) ->
                     let tagAtom = ANF.IntLiteral (ANF.Int64 (int64 tag))
                     // Create TupleAlloc [tag, payload] and bind to fresh variable
@@ -10366,7 +10391,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                 | e :: rest ->
                     inferTypeCore sumTypeNames e typeEnv typeReg variantLookup funcReg moduleRegistry
                     |> Result.bind (fun elemType ->
-                        toAtomCore sumTypeNames e vg env typeReg variantLookup funcReg moduleRegistry
+                        toAtomCore sumTypeNames inertScopes e vg env typeReg variantLookup funcReg moduleRegistry
                         |> Result.bind (fun (atom, bindings, vg') ->
                             convertElements rest vg' ((atom, elemType, bindings) :: acc)))
 
@@ -10400,7 +10425,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
             Ok (ANF.StringLiteral "", [], varGen)
         | [single] ->
             // Single part → convert directly
-            toAtomCore sumTypeNames (partToExpr single) varGen env typeReg variantLookup funcReg moduleRegistry
+            toAtomCore sumTypeNames inertScopes (partToExpr single) varGen env typeReg variantLookup funcReg moduleRegistry
         | first :: rest ->
             // Multiple parts → desugar to StringConcat and convert
             let desugared =
@@ -10408,11 +10433,11 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                 |> List.fold (fun acc part ->
                     AST.BinOp (AST.StringConcat, acc, partToExpr part))
                     (partToExpr first)
-            toAtomCore sumTypeNames desugared varGen env typeReg variantLookup funcReg moduleRegistry
+            toAtomCore sumTypeNames inertScopes desugared varGen env typeReg variantLookup funcReg moduleRegistry
 
     | AST.Match (scrutinee, cases) ->
         // Match in atom position - compile and extract result
-        toANFCore sumTypeNames (AST.Match (scrutinee, cases)) varGen env typeReg variantLookup funcReg moduleRegistry
+        toANFCore sumTypeNames inertScopes (AST.Match (scrutinee, cases)) varGen env typeReg variantLookup funcReg moduleRegistry
         |> Result.bind (fun (matchExpr, varGen1) ->
             // The match compiles to an if-else chain that returns a value
             // We need to extract that value into a temp variable
@@ -10424,13 +10449,13 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
         Error "Lambda expressions (closures) are not yet fully implemented"
 
     | AST.IndirectApply (func, args) ->
-        toAtomCore sumTypeNames func varGen env typeReg variantLookup funcReg moduleRegistry
+        toAtomCore sumTypeNames inertScopes func varGen env typeReg variantLookup funcReg moduleRegistry
         |> Result.bind (fun (funcAtom, funcBindings, varGen1) ->
             let rec convertArgs remaining vg acc =
                 match remaining with
                 | [] -> Ok (List.rev acc, vg)
                 | arg :: rest ->
-                    toAtomCore sumTypeNames arg vg env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
                     |> Result.bind (fun (argAtom, argBindings, vg') ->
                         convertArgs rest vg' ((argAtom, argBindings) :: acc))
             convertArgs (exprArgsToList args) varGen1 []
@@ -10457,7 +10482,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                         AST.Let (parameter.Pattern, argExpr, buildLets restPs restAs)
                     | _ -> body
                 let desugared = buildLets parameterList argsList
-                toAtomCore sumTypeNames desugared varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes desugared varGen env typeReg variantLookup funcReg moduleRegistry
 
         | AST.Apply (innerFunc, innerArgs) ->
             // Nested application in atom position: (fun x -> fun y -> ...)(a)(b)
@@ -10475,16 +10500,16 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                             AST.Let (parameter.Pattern, argExpr, buildLets restPs restAs)
                         | _ -> innerBody
                     let desugaredInner = buildLets innerParamList innerArgsList
-                    toAtomCore sumTypeNames (AST.Apply (desugaredInner, args)) varGen env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes (AST.Apply (desugaredInner, args)) varGen env typeReg variantLookup funcReg moduleRegistry
             | _ ->
                 // Inner is complex - evaluate inner, then call as closure
-                toAtomCore sumTypeNames (AST.Apply (innerFunc, innerArgs)) varGen env typeReg variantLookup funcReg moduleRegistry
+                toAtomCore sumTypeNames inertScopes (AST.Apply (innerFunc, innerArgs)) varGen env typeReg variantLookup funcReg moduleRegistry
                 |> Result.bind (fun (closureAtom, closureBindings, varGen1) ->
                     let rec convertArgs (remaining: AST.Expr list) (vg: ANF.VarGen) (acc: (ANF.Atom * (ANF.TempId * ANF.CExpr) list) list) =
                         match remaining with
                         | [] -> Ok (List.rev acc, vg)
                         | arg :: rest ->
-                            toAtomCore sumTypeNames arg vg env typeReg variantLookup funcReg moduleRegistry
+                            toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
                             |> Result.bind (fun (argAtom, argBindings, vg') ->
                                 convertArgs rest vg' ((argAtom, argBindings) :: acc))
                     convertArgs argsList varGen1 []
@@ -10499,7 +10524,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
         | AST.Let (letName, letValue, letBody) ->
             // Apply(let x = v in body, args) in atom position
             // Float the let out and recurse
-            toAtomCore sumTypeNames (AST.Let (letName, letValue, AST.Apply (letBody, args))) varGen env typeReg variantLookup funcReg moduleRegistry
+            toAtomCore sumTypeNames inertScopes (AST.Let (letName, letValue, AST.Apply (letBody, args))) varGen env typeReg variantLookup funcReg moduleRegistry
 
         | AST.Var name ->
             // Variable call in atom position - treat as closure call
@@ -10509,7 +10534,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                     match remaining with
                     | [] -> Ok (List.rev acc, vg)
                     | arg :: rest ->
-                        toAtomCore sumTypeNames arg vg env typeReg variantLookup funcReg moduleRegistry
+                        toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
                         |> Result.bind (fun (argAtom, argBindings, vg') ->
                             convertArgs rest vg' ((argAtom, argBindings) :: acc))
                 convertArgs argsList varGen []
@@ -10531,7 +10556,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                 | AST.FuncRef funcName :: rest ->
                     convertCaptures rest vg ((ANF.FuncRef funcName, []) :: acc)
                 | cap :: rest ->
-                    toAtomCore sumTypeNames cap vg env typeReg variantLookup funcReg moduleRegistry
+                    toAtomCore sumTypeNames inertScopes cap vg env typeReg variantLookup funcReg moduleRegistry
                     |> Result.bind (fun (capAtom, capBindings, vg') ->
                         convertCaptures rest vg' ((capAtom, capBindings) :: acc))
             convertCaptures captures varGen []
@@ -10544,7 +10569,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                     match remaining with
                     | [] -> Ok (List.rev acc, vg)
                     | arg :: rest ->
-                        toAtomCore sumTypeNames arg vg env typeReg variantLookup funcReg moduleRegistry
+                        toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
                         |> Result.bind (fun (argAtom, argBindings, vg') ->
                             convertArgs rest vg' ((argAtom, argBindings) :: acc))
                 convertArgs argsList varGen2 []
@@ -10558,7 +10583,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
 
         | _ ->
             // General function-expression application in atom position.
-            toAtomCore sumTypeNames func varGen env typeReg variantLookup funcReg moduleRegistry
+            toAtomCore sumTypeNames inertScopes func varGen env typeReg variantLookup funcReg moduleRegistry
             |> Result.bind (fun (funcAtom, funcBindings, varGen1) ->
                 let rec convertArgs
                     (remaining: AST.Expr list)
@@ -10568,7 +10593,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                     match remaining with
                     | [] -> Ok (List.rev acc, vg)
                     | arg :: rest ->
-                        toAtomCore sumTypeNames arg vg env typeReg variantLookup funcReg moduleRegistry
+                        toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
                         |> Result.bind (fun (argAtom, argBindings, vg') ->
                             convertArgs rest vg' ((argAtom, argBindings) :: acc))
 
@@ -10584,6 +10609,9 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
 /// Replace Return sites in an AExpr with a continuation expression.
 and bindReturns (expr: ANF.AExpr) (k: ANF.Atom -> ANF.AExpr) : ANF.AExpr =
     match expr with
+    | ANF.Jump _ -> expr
+    | ANF.Join (parameter, continuation, entry) ->
+        ANF.Join (parameter, bindReturns continuation k, bindReturns entry k)
     | ANF.Return atom ->
         k atom
     | ANF.Let (id, cexpr, rest) ->
@@ -10593,7 +10621,7 @@ and bindReturns (expr: ANF.AExpr) (k: ANF.Atom -> ANF.AExpr) : ANF.AExpr =
 
 /// Convert an expression to an ANF expression that returns a stable atom variable.
 /// Falls back to full toANF when the expression cannot be lowered directly to toAtom.
-and toANFBoundAtomCore (sumTypeNames: Set<string>)
+and toANFBoundAtomCore (sumTypeNames: Set<string>) (inertScopes: Set<string>)
     (expr: AST.Expr)
     (varGen: ANF.VarGen)
     (env: VarEnv)
@@ -10602,14 +10630,14 @@ and toANFBoundAtomCore (sumTypeNames: Set<string>)
     (funcReg: FunctionRegistry)
     (moduleRegistry: AST.ModuleRegistry)
     : Result<ANF.AExpr * ANF.Atom * ANF.VarGen, string> =
-    match toAtomCore sumTypeNames expr varGen env typeReg variantLookup funcReg moduleRegistry with
+    match toAtomCore sumTypeNames inertScopes expr varGen env typeReg variantLookup funcReg moduleRegistry with
     | Ok (atom, bindings, vg1) ->
         // Keep existing atom lowering behavior unchanged when toAtom succeeds:
         // do not introduce extra temp ids in the common path.
         Ok (wrapBindings bindings (ANF.Return atom), atom, vg1)
     | Error _ ->
         let (boundVar, vg1) = ANF.freshVar varGen
-        toANFCore sumTypeNames expr vg1 env typeReg variantLookup funcReg moduleRegistry
+        toANFCore sumTypeNames inertScopes expr vg1 env typeReg variantLookup funcReg moduleRegistry
         |> Result.map (fun (exprA, vg2) ->
             let boundExpr =
                 bindReturns exprA (fun atom ->
@@ -10631,6 +10659,7 @@ let toANF
     : Result<ANF.AExpr * ANF.VarGen, string> =
     toANFCore
         (sumTypeNamesFromVariantLookup variantLookup)
+        (SemanticIR.inertFunctionScopes Map.empty)
         expr
         varGen
         env
@@ -10653,6 +10682,7 @@ let allocateTypedParams
 
 let private convertFunctionWithSumTypeNames
     (sumTypeNames: Set<string>)
+    (inertScopes: Set<string>)
     (funcDef: AST.FunctionDef)
     (varGen: ANF.VarGen)
     (typeReg: TypeRegistry)
@@ -10673,7 +10703,7 @@ let private convertFunctionWithSumTypeNames
         |> Map.ofList
 
     // Convert body
-    toANFCore sumTypeNames funcDef.Body varGen1 paramEnv typeReg variantLookup funcReg moduleRegistry
+    toANFCore sumTypeNames inertScopes funcDef.Body varGen1 paramEnv typeReg variantLookup funcReg moduleRegistry
     |> Result.map (fun (body, varGen2) ->
         ({ Name = funcDef.Name
            TypedParams = typedParams
@@ -10691,6 +10721,7 @@ let convertFunction
     : Result<ANF.Function * ANF.VarGen, string> =
     convertFunctionWithSumTypeNames
         (sumTypeNamesFromVariantLookup variantLookup)
+        (SemanticIR.inertFunctionScopes Map.empty)
         funcDef
         varGen
         typeReg
@@ -10715,6 +10746,7 @@ type ConversionResult = {
 /// Result type for user-only ANF conversion (functions not merged with stdlib)
 /// Used for compiling user code separately from the prebuilt stdlib
 type UserOnlyResult = {
+    ScopeContracts: Map<string, SemanticIR.FunctionScopeContract>
     UserFunctions: ANF.Function list   // Only user functions, not merged with stdlib
     NonInlineableFunctionNames: Set<string> // Late external specializations compiled in this unit
     MainExpr: ANF.AExpr                // User's main expression
@@ -10735,6 +10767,7 @@ type UserOnlyResult = {
 
 /// Registry bundle used during ANF conversion
 type Registries = {
+    ScopeContracts: Map<string, SemanticIR.FunctionScopeContract>
     TypeReg: TypeRegistry
     RecordFieldsReg: Map<string, (string * AST.Type) list>
     RecordTypeParamsReg: Map<string, string list>
@@ -10903,6 +10936,10 @@ let private buildRegistriesInternal
 
     {
         TypeReg = typeReg
+        ScopeContracts =
+            ListHIR.scopeContracts
+                (fun types expr -> inferTypeCore sumTypeNames expr types typeReg variantLookup funcReg moduleRegistry)
+                functions
         RecordFieldsReg = recordFieldsRegistry typeReg
         RecordTypeParamsReg = recordTypeParamsRegistry typeReg
         VariantLookup = variantLookup
@@ -10939,6 +10976,7 @@ let mergeRegistries (baseRegs: Registries) (overlay: Registries) : Registries =
     let mergeMaps m1 m2 = Map.fold (fun acc k v -> Map.add k v acc) m1 m2
     {
         TypeReg = mergeMaps baseRegs.TypeReg overlay.TypeReg
+        ScopeContracts = mergeMaps baseRegs.ScopeContracts overlay.ScopeContracts
         RecordFieldsReg = mergeMaps baseRegs.RecordFieldsReg overlay.RecordFieldsReg
         RecordTypeParamsReg = mergeMaps baseRegs.RecordTypeParamsReg overlay.RecordTypeParamsReg
         VariantLookup = mergeMaps baseRegs.VariantLookup overlay.VariantLookup
@@ -10957,12 +10995,14 @@ let convertFunctions
     (functions: AST.FunctionDef list)
     : Result<ANF.Function list * ANF.VarGen, string> =
     let sumTypeNames = registries.SumTypeNames
+    let inertScopes = SemanticIR.inertFunctionScopes registries.ScopeContracts
     let rec loop funcs vg acc =
         match funcs with
         | [] -> Ok (List.rev acc, vg)
         | func :: rest ->
             convertFunctionWithSumTypeNames
                 sumTypeNames
+                inertScopes
                 func
                 vg
                 registries.TypeReg
@@ -10981,7 +11021,7 @@ let convertExprToAnf
     : Result<ANF.AExpr * ANF.VarGen, string> =
     let emptyEnv : VarEnv = Map.empty
     let sumTypeNames = registries.SumTypeNames
-    toANFCore sumTypeNames expr varGen emptyEnv registries.TypeReg registries.VariantLookup registries.FuncReg registries.ModuleRegistry
+    toANFCore sumTypeNames (SemanticIR.inertFunctionScopes registries.ScopeContracts) expr varGen emptyEnv registries.TypeReg registries.VariantLookup registries.FuncReg registries.ModuleRegistry
 
 /// Synthesize an entrypoint function from a main expression
 let synthesizeEntryFunction (name: string) (returnType: AST.Type) (body: ANF.AExpr) : ANF.Function =

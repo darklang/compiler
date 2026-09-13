@@ -26,13 +26,14 @@ let private isCleanupDec (cexpr: CExpr) : bool =
 
 let rec private hasDecAfterNonSelfTailCall (funcName: string) (expr: AExpr) : bool =
     match expr with
-    | Return _ ->
+    | Jump _ | Return _ ->
         false
     | Let (_, cexpr, Let (_, cleanup, _))
         when isTailCallWithUnreachableCleanup funcName cexpr && isCleanupDec cleanup ->
         true
     | Let (_, _, body) ->
         hasDecAfterNonSelfTailCall funcName body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         hasDecAfterNonSelfTailCall funcName thenBranch
         || hasDecAfterNonSelfTailCall funcName elseBranch

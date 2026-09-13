@@ -467,6 +467,8 @@ type ReturnAnnotatedExpr =
     | RReturn of Atom * Set<TempId>
     | RLet of TempId * CExpr * ReturnAnnotatedExpr * Set<TempId>
     | RIf of Atom * ReturnAnnotatedExpr * ReturnAnnotatedExpr * Set<TempId>
+    | RJoin of TypedParam * ReturnAnnotatedExpr * ReturnAnnotatedExpr * Set<TempId>
+    | RJump of TempId * Atom * Set<TempId>
 
 /// Get the set of returned TempIds for a return-annotated expression
 let returnedSet (expr: ReturnAnnotatedExpr) : Set<TempId> =
@@ -474,6 +476,8 @@ let returnedSet (expr: ReturnAnnotatedExpr) : Set<TempId> =
     | RReturn (_, returned) -> returned
     | RLet (_, _, _, returned) -> returned
     | RIf (_, _, _, returned) -> returned
+    | RJoin (_, _, _, returned) -> returned
+    | RJump (_, _, returned) -> returned
 
 /// Collect the alias chain for a TempId (includes the TempId itself)
 let rec collectAliasChain (aliases: Map<TempId, TempId>) (tempId: TempId) : Set<TempId> =
@@ -496,10 +500,24 @@ let private tryOwnershipPreservingAliasSource (cexpr: CExpr) : TempId option =
 
 /// Analyze return values and track alias chains in a single pass
 let rec analyzeReturns
+    (joins: Map<TempId, Set<TempId>>)
     (aliases: Map<TempId, TempId>)
     (expr: AExpr)
     : ReturnAnnotatedExpr =
     match expr with
+    | Jump (target, atom) ->
+        let returned =
+            match Map.tryFind target joins with
+            | None -> Crash.crash $"Return analysis: join target {target} is not in scope"
+            | Some returned when Set.contains target returned ->
+                let argumentAliases = match atom with Var id -> collectAliasChain aliases id | _ -> Set.empty
+                Set.union (Set.remove target returned) argumentAliases
+            | Some returned -> returned
+        RJump (target, atom, returned)
+    | Join (parameter, continuation, entry) ->
+        let body = analyzeReturns joins (Map.remove parameter.Id aliases) continuation
+        let entryInfo = analyzeReturns (Map.add parameter.Id (returnedSet body) joins) aliases entry
+        RJoin (parameter, body, entryInfo, returnedSet entryInfo)
     | Return atom ->
         let returned =
             match atom with
@@ -511,11 +529,11 @@ let rec analyzeReturns
             match tryOwnershipPreservingAliasSource cexpr with
             | Some sourceId -> Map.add tempId sourceId aliases
             | _ -> aliases
-        let bodyInfo = analyzeReturns aliases' body
+        let bodyInfo = analyzeReturns joins aliases' body
         RLet (tempId, cexpr, bodyInfo, returnedSet bodyInfo)
     | If (cond, thenBranch, elseBranch) ->
-        let thenInfo = analyzeReturns aliases thenBranch
-        let elseInfo = analyzeReturns aliases elseBranch
+        let thenInfo = analyzeReturns joins aliases thenBranch
+        let elseInfo = analyzeReturns joins aliases elseBranch
         let returned = Set.union (returnedSet thenInfo) (returnedSet elseInfo)
         RIf (cond, thenInfo, elseInfo, returned)
 
@@ -569,6 +587,10 @@ let rec private returnAnnotatedExprUsesAnyAlias
 
     match body with
     | RReturn (atom, _) -> atomUsesAnyAlias atom
+    | RJump (_, atom, _) -> atomUsesAnyAlias atom
+    | RJoin (parameter, continuation, entry, _) ->
+        returnAnnotatedExprUsesAnyAlias (Set.remove parameter.Id aliases) continuation
+        || returnAnnotatedExprUsesAnyAlias aliases entry
     | RLet (_, cexpr, nextBody, _) ->
         (aliases |> Set.exists (fun target -> ANF_Optimize.cexprUsesTemp target cexpr))
         || returnAnnotatedExprUsesAnyAlias aliases nextBody
@@ -607,6 +629,7 @@ let rec private aggregateFlowsDirectlyToReturn
                 && aggregateFlowsDirectlyToReturn nextId nextBody
         | RIf (_, thenBranch, elseBranch, _) ->
             loop aliases thenBranch && loop aliases elseBranch
+        | RJoin _ | RJump _ -> false
         | RReturn _ ->
             false
 
@@ -636,6 +659,7 @@ let rec private transfersIntoReturnedAggregate
                     loop aliases nextBody
         | RIf (_, thenBranch, elseBranch, _) ->
             loop aliases thenBranch && loop aliases elseBranch
+        | RJoin _ | RJump _ -> false
         | RReturn _ ->
             false
 
@@ -666,6 +690,7 @@ let rec private transfersIntoRawSlot
                     loop aliases nextBody
         | RIf (_, thenBranch, elseBranch, _) ->
             loop aliases thenBranch && loop aliases elseBranch
+        | RJoin _ | RJump _ -> false
         | RReturn _ ->
             false
 
@@ -930,6 +955,7 @@ let private isInternalRecordTailAccumulator
         (expr: AExpr)
         : bool * bool =
         match expr with
+        | Join _ | Jump _ -> (false, false)
         | Return (Var tempId) ->
             (canonicalAlias aliases tempId = param.Id, false)
         | Return _ ->
@@ -1088,6 +1114,8 @@ let rec private isTempUsedAsSelfTailCallArg
                 | _ -> false)
 
         match expr with
+        | RJump _ -> false
+        | RJoin (_, continuation, entry, _) -> loop aliases continuation || loop aliases entry
         | RReturn _ ->
             false
         | RLet (_, Call (targetFunc, args), _, _)
@@ -1140,6 +1168,9 @@ let rec private collectMovableTailDecPrefix
 
 let rec private moveDecsBeforeNonSelfTailCalls (currentFuncName: string) (expr: AExpr) : AExpr =
     match expr with
+    | Jump _ -> expr
+    | Join (parameter, continuation, entry) ->
+        Join (parameter, moveDecsBeforeNonSelfTailCalls currentFuncName continuation, moveDecsBeforeNonSelfTailCalls currentFuncName entry)
     | Return _ ->
         expr
     | If (cond, thenBranch, elseBranch) ->
@@ -1194,6 +1225,11 @@ let rec private insertOwnedAccumulatorDecsBeforeSelfTailCalls
             (tailExpr, varGen, types)
 
     match expr with
+    | Jump _ -> (expr, varGen, types)
+    | Join (parameter, continuation, entry) ->
+        let body, next, bodyTypes = insertOwnedAccumulatorDecsBeforeSelfTailCalls ctx currentFuncName ownedParamDecs continuation varGen types
+        let entry', final, finalTypes = insertOwnedAccumulatorDecsBeforeSelfTailCalls ctx currentFuncName ownedParamDecs entry next bodyTypes
+        (Join (parameter, body, entry'), final, finalTypes)
     | Return _ ->
         (expr, varGen, types)
     | If (cond, thenBranch, elseBranch) ->
@@ -1227,7 +1263,8 @@ let rec private requiredFunctionCleanups
     (expr: AExpr)
     : bool * bool =
     match expr with
-    | Return _ -> (false, false)
+    | Jump _ | Return _ -> (false, false)
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         let (thenNeedsMapRetain, thenNeedsTailDecMove) =
             requiredFunctionCleanups currentFuncName thenBranch
@@ -1291,6 +1328,11 @@ let rec private insertClosureMapSourceRetainsBeforeHelperCalls
             (callExpr, varGen, types)
 
     match expr with
+    | Jump _ -> (expr, varGen, types)
+    | Join (parameter, continuation, entry) ->
+        let body, next, bodyTypes = insertClosureMapSourceRetainsBeforeHelperCalls ctx currentFuncName continuation varGen types
+        let entry', final, finalTypes = insertClosureMapSourceRetainsBeforeHelperCalls ctx currentFuncName entry next bodyTypes
+        (Join (parameter, body, entry'), final, finalTypes)
     | Return _ ->
         (expr, varGen, types)
     | If (cond, thenBranch, elseBranch) ->
@@ -1317,6 +1359,8 @@ let rec private insertClosureMapSourceRetainsBeforeHelperCalls
 /// Insert reference counting operations using return analysis and a dec stack
 /// Returns (transformed expr, varGen, types defined in this subtree)
 let rec insertRCWithAnalysis
+    (joinScopes: Map<TempId, Set<TempId>>)
+    (inheritedBranchDecs: ReturnDec list)
     (ctx: TypeContext)
     (currentFuncName: string option)
     (expr: ReturnAnnotatedExpr)
@@ -1326,6 +1370,12 @@ let rec insertRCWithAnalysis
     (paramIncs: (TempId * AST.Type * RcShape) list)
     (types: Map<TempId, AST.Type>)
     : AExpr * VarGen * Map<TempId, AST.Type> =
+    let pendingIds = returnDecs |> List.map (fun (id, _, _, _, _) -> id) |> Set.ofList
+    let branchDecs =
+        inheritedBranchDecs
+        |> List.filter (fun (id, _, _, _, _) ->
+            not (Set.contains id (returnedSet expr)) && not (Set.contains id pendingIds))
+    let returnDecs = branchDecs @ returnDecs
     let ctxWithTypes = withTempTypes ctx types
     let functionReturnsNestedRecordListDict =
         let isSingleListDictRecord (name: string) : bool =
@@ -1364,10 +1414,32 @@ let rec insertRCWithAnalysis
         (varGen: VarGen)
         (returnDecs: ReturnDec list)
         (inheritedTransferableOwnership: ReturnDec list)
+        (inheritedBranchDecs: ReturnDec list)
         (frames: LetFrame list)
         (types: Map<TempId, AST.Type>)
         : AExpr * VarGen * Map<TempId, AST.Type> =
         match expr with
+        | RJump (target, atom, _) ->
+            let deferred =
+                match Map.tryFind target joinScopes with
+                | Some ids -> ids
+                | None -> Crash.crash $"RC insertion: join target {target} is not in scope"
+            let localDecs = returnDecs |> List.filter (fun (id, _, _, _, _) -> not (Set.contains id deferred))
+            insertReturnDecs localDecs (Jump (target, atom)) varGen types
+            |> applyLetFrames ctx frames
+
+        | RJoin (parameter, continuation, entry, _) ->
+            let conditional = (frames |> List.choose (fun frame -> frame.BranchDec)) @ inheritedBranchDecs
+            let transferable = (frames |> List.choose (fun frame -> frame.TransferableOwnership)) @ inheritedTransferableOwnership
+            let deferred =
+                conditional @ returnDecs |> List.map (fun (id, _, _, _, _) -> id) |> Set.ofList
+            let continuationTypes = Map.add parameter.Id parameter.Type types
+            let body, afterBody, bodyTypes =
+                insertRCWithAnalysis joinScopes conditional ctx currentFuncName continuation varGen returnDecs transferable paramIncs continuationTypes
+            let entry', final, finalTypes =
+                insertRCWithAnalysis (Map.add parameter.Id deferred joinScopes) conditional ctx currentFuncName entry afterBody returnDecs transferable paramIncs bodyTypes
+            applyLetFrames ctx frames (Join (parameter, body, entry'), final, finalTypes)
+
         | RReturn (atom, returned) ->
             let baseExpr = Return atom
             let (withParamIncs, varGen1, types1) =
@@ -1377,6 +1449,8 @@ let rec insertRCWithAnalysis
             (finalExpr, finalVarGen, finalTypes)
 
         | RIf (cond, thenBranch, elseBranch, _) ->
+            let branchConditionalOwnership =
+                (frames |> List.choose (fun frame -> frame.BranchDec)) @ inheritedBranchDecs
             let branchTransferableOwnership =
                 frames
                 |> List.choose (fun frame -> frame.TransferableOwnership)
@@ -1399,6 +1473,8 @@ let rec insertRCWithAnalysis
                 frameDecs
             let (thenBranch', varGen1, types1) =
                 insertRCWithAnalysis
+                    joinScopes
+                    branchConditionalOwnership
                     ctx
                     currentFuncName
                     thenBranch
@@ -1409,6 +1485,8 @@ let rec insertRCWithAnalysis
                     types
             let (elseBranch', varGen2, types2) =
                 insertRCWithAnalysis
+                    joinScopes
+                    branchConditionalOwnership
                     ctx
                     currentFuncName
                     elseBranch
@@ -1914,10 +1992,11 @@ let rec insertRCWithAnalysis
                 varGen
                 returnDecsAfterTransfers
                 inheritedTransferableOwnershipAfterTransfers
+                (inheritedBranchDecs |> List.filter (fun (id, _, _, _, _) -> not (Set.contains id transferredOwnerIds)))
                 (frame :: framesAfterTransfers)
                 typesWithBinding
 
-    descend ctxWithTypes expr varGen returnDecs inheritedTransferableOwnership [] types
+    descend ctxWithTypes expr varGen returnDecs inheritedTransferableOwnership inheritedBranchDecs [] types
 
 /// Insert reference counting operations into an AExpr
 /// Returns (transformed expr, varGen, accumulated TempTypes)
@@ -1928,8 +2007,8 @@ let private insertRCInternal
     (types: Map<TempId, AST.Type>)
     : AExpr * VarGen * Map<TempId, AST.Type> =
     let ctxWithTypes = withTempTypes ctx types
-    let analyzed = analyzeReturns Map.empty expr
-    insertRCWithAnalysis ctxWithTypes None analyzed varGen [] [] [] types
+    let analyzed = analyzeReturns Map.empty Map.empty expr
+    insertRCWithAnalysis Map.empty [] ctxWithTypes None analyzed varGen [] [] [] types
 
 /// Insert reference counting operations into an AExpr
 /// Returns (transformed expr, varGen, accumulated TempTypes)
@@ -1994,7 +2073,7 @@ let private insertRCInFunctionInternal
     let ctxWithParams = withTempTypes ctx typesWithParams
 
     let (bodyInfo, returnAnalysisMs) =
-        measureFunctionPhase tracePhases (fun () -> analyzeReturns Map.empty func.Body)
+        measureFunctionPhase tracePhases (fun () -> analyzeReturns Map.empty Map.empty func.Body)
     let (parameterInfos, parameterAnalysisMs) =
         measureFunctionPhase tracePhases (fun () ->
             func.TypedParams
@@ -2040,6 +2119,8 @@ let private insertRCInFunctionInternal
     let ((bodyWithRC, varGen', accTypes), bodyInsertionMs) =
         measureFunctionPhase tracePhases (fun () ->
             insertRCWithAnalysis
+                Map.empty
+                []
                 ctxWithParams
                 (Some func.Name)
                 bodyInfo
@@ -2123,10 +2204,13 @@ let rec collectMissingTempIdsInExpr
     (acc: TempId list)
     : TempId list =
     match expr with
-    | Return _ -> acc
+    | Jump _ | Return _ -> acc
     | Let (tempId, _, body) ->
         let acc' = if isTempMissing typeMap tempId then tempId :: acc else acc
         collectMissingTempIdsInExpr typeMap body acc'
+    | Join (parameter, continuation, entry) ->
+        let acc' = if isTempMissing typeMap parameter.Id then parameter.Id :: acc else acc
+        collectMissingTempIdsInExpr typeMap continuation acc' |> collectMissingTempIdsInExpr typeMap entry
     | If (_, thenBranch, elseBranch) ->
         let acc' = collectMissingTempIdsInExpr typeMap thenBranch acc
         collectMissingTempIdsInExpr typeMap elseBranch acc'
@@ -2146,9 +2230,12 @@ let collectMissingTempIdsInFunction
 /// are sufficient to place a fresh-variable generator beyond every use.
 let rec private maxDefinedTempIdInExpr (expr: AExpr) : int =
     match expr with
-    | Return _ -> -1
+    | Jump _ | Return _ -> -1
     | Let (TempId tempId, _, body) ->
         max tempId (maxDefinedTempIdInExpr body)
+    | Join (parameter, continuation, entry) ->
+        let (TempId id) = parameter.Id
+        max id (max (maxDefinedTempIdInExpr continuation) (maxDefinedTempIdInExpr entry))
     | If (_, thenBranch, elseBranch) ->
         max
             (maxDefinedTempIdInExpr thenBranch)
@@ -2179,8 +2266,58 @@ let verifyTypeMapCompleteness (program: ANF.Program) (typeMap: ANF.TypeMap) : Te
         |> collectMissingTempIdsInExpr typeMap mainExpr
     List.rev missing
 
-/// Insert RC operations into a program
-/// Returns (ANF.Program, TypeMap) where TypeMap contains all TempId -> Type mappings
+/// Check immediate join interfaces and lexical captures after type recovery.
+/// Legacy tree-only functions are outside this verifier's migration boundary.
+let verifyJoinInterfaces (ctx: TypeContext) (program: Program) : Result<unit, string> =
+    let rec containsJoin = function
+        | Join _ | Jump _ -> true
+        | Let (_, _, body) -> containsJoin body
+        | If (_, yes, no) -> containsJoin yes || containsJoin no
+        | Return _ -> false
+    let atomUses = function Var id -> Set.singleton id | _ -> Set.empty
+    let checkUses visible uses =
+        let missing = Set.difference uses visible
+        if Set.isEmpty missing then Ok ()
+        else Error $"ANF join interface: operands outside lexical scope: {missing}"
+    let rec check visible joins canReturn expr =
+        match expr with
+        | Return atom ->
+            if canReturn then checkUses visible (atomUses atom)
+            else Error "ANF join interface: entry returns a value instead of transferring control"
+        | Jump (target, atom) ->
+            checkUses visible (atomUses atom) |> Result.bind (fun () ->
+                match Map.tryFind target joins, inferAtomType ctx atom with
+                | None, _ -> Error $"ANF join interface: target {target} is outside lexical scope"
+                | Some expected, Some actual when expected = actual -> Ok ()
+                | Some expected, actual -> Error $"ANF join interface: target {target} expects {expected}, got {actual}")
+        | Let (id, operation, body) ->
+            checkUses visible (ANF_Optimize.cexprTempUses operation)
+            |> Result.bind (fun () ->
+                match operation with
+                | RuntimeError _ | RuntimeErrorString _ -> Ok ()
+                | _ -> check (Set.add id visible) joins canReturn body)
+        | If (condition, yes, no) ->
+            checkUses visible (atomUses condition)
+            |> Result.bind (fun () -> check visible joins canReturn yes)
+            |> Result.bind (fun () -> check visible joins canReturn no)
+        | Join (parameter, continuation, entry) ->
+            if parameter.Type <> AST.TInt64 && parameter.Type <> AST.TBool then
+                Error $"ANF join interface: managed or unsupported block argument {parameter.Type}"
+            elif Set.contains parameter.Id visible || Map.containsKey parameter.Id joins then
+                Error $"ANF join interface: target {parameter.Id} shadows an enclosing identity"
+            else
+                check (Set.add parameter.Id visible) joins canReturn continuation
+                |> Result.bind (fun () -> check visible (Map.add parameter.Id parameter.Type joins) false entry)
+    let verify visible expr =
+        if containsJoin expr then check visible Map.empty true expr else Ok ()
+    let (Program (functions, main)) = program
+    functions
+    |> List.fold (fun result func ->
+        result |> Result.bind (fun () ->
+            verify (func.TypedParams |> List.map (fun parameter -> parameter.Id) |> Set.ofList) func.Body
+            |> Result.mapError (fun error -> $"{func.Name}: {error}"))) (Ok ())
+    |> Result.bind (fun () -> verify Set.empty main)
+
 let private insertRCInProgramInternal
     (phaseRecorder: (string -> float -> unit) option)
     (result: ConversionResult)
@@ -2258,7 +2395,8 @@ let private insertRCInProgramInternal
         let missingStr = missingTypes |> List.map (fun (TempId n) -> $"t{n}") |> String.concat ", "
         Crash.crash $"RefCountInsertion: TypeMap incomplete - missing types for: {missingStr}"
 
-    Ok (program', finalTypeMap)
+    verifyJoinInterfaces (withTempTypes ctx finalTypeMap) program'
+    |> Result.map (fun () -> program', finalTypeMap)
 
 /// Insert RC operations into a program
 /// Returns (ANF.Program, TypeMap) where TypeMap contains all TempId -> Type mappings

@@ -85,20 +85,22 @@ let rec private findCallArgs (funcName: string) (expr: ANF.AExpr) : ANF.Atom lis
         Some args
     | ANF.Let (_, _, rest) ->
         findCallArgs funcName rest
+    | ANF.Join (_, thenBranch, elseBranch)
     | ANF.If (_, thenBranch, elseBranch) ->
         match findCallArgs funcName thenBranch with
         | Some args -> Some args
         | None -> findCallArgs funcName elseBranch
-    | ANF.Return _ ->
+    | ANF.Jump _ | ANF.Return _ ->
         None
 
 let rec private containsCExpr (predicate: ANF.CExpr -> bool) (expr: ANF.AExpr) : bool =
     match expr with
     | ANF.Let (_, cexpr, rest) ->
         predicate cexpr || containsCExpr predicate rest
+    | ANF.Join (_, thenBranch, elseBranch)
     | ANF.If (_, thenBranch, elseBranch) ->
         containsCExpr predicate thenBranch || containsCExpr predicate elseBranch
-    | ANF.Return _ ->
+    | ANF.Jump _ | ANF.Return _ ->
         false
 
 let private lowerTwoElementListPattern (elementType: AST.Type) : Result<ANF.AExpr, string> =

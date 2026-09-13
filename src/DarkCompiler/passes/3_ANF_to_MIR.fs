@@ -286,6 +286,10 @@ let rec maxTempIdInAExpr (expr: ANF.AExpr) : int =
     | ANF.Let (ANF.TempId id, cexpr, body) ->
         max id (max (maxTempIdInCExpr cexpr) (maxTempIdInAExpr body))
     | ANF.Return atom -> maxTempIdInAtom atom
+    | ANF.Jump (ANF.TempId target, atom) -> max target (maxTempIdInAtom atom)
+    | ANF.Join (parameter, continuation, entry) ->
+        let (ANF.TempId id) = parameter.Id
+        max id (max (maxTempIdInAExpr continuation) (maxTempIdInAExpr entry))
     | ANF.If (cond, thenBranch, elseBranch) ->
         max (maxTempIdInAtom cond) (max (maxTempIdInAExpr thenBranch) (maxTempIdInAExpr elseBranch))
 
@@ -385,6 +389,7 @@ let tryGetIntrinsicReturnType (funcName: string) : AST.Type option =
 /// which would cause race conditions in parallel test execution
 type CFGBuilder = {
     Blocks: Map<MIR.Label, MIR.BasicBlock>
+    Joins: Map<ANF.TempId, MIR.Label * AST.Type>
     LabelGen: MIR.LabelGen
     RegGen: MIR.RegGen
     TypeById: AST.Type option array
@@ -770,16 +775,72 @@ let refCountIncForOverlappingArgs
 
     List.rev incsRev
 
-/// Convert ANF expression to CFG
-/// Returns: Result of (final value operand, CFG builder with all blocks)
+/// Only value-producing exits may be redirected into an enclosing value join.
+/// A terminal transfer has no result register or patchable return block.
+type ExprExit =
+    | Returned of value: MIR.Operand * block: MIR.Label
+    | Terminated
+
+/// Redirect a value exit without inspecting a label's spelling or fabricating
+/// an operand for a path that cannot reach the continuation.
+let private redirectReturn resultReg joinLabel exit (builder: CFGBuilder) =
+    match exit with
+    | Terminated -> Ok builder
+    | Returned (operand, label) ->
+        match Map.tryFind label builder.Blocks with
+        | Some ({ Terminator = MIR.Ret _ } as block) ->
+            let operandType = operandType builder operand
+            let redirected = {
+                block with
+                    Instrs = block.Instrs @ [MIR.Mov (resultReg, operand, Some operandType)]
+                    Terminator = MIR.Jump joinLabel
+            }
+            Ok { builder with Blocks = Map.add label redirected builder.Blocks }
+        | Some _ -> Error "ANF to MIR: value exit does not end in a return"
+        | None -> Error "ANF to MIR: value exit block is missing"
+
+/// Convert ANF sequencing to CFG once, whether at function scope or in a branch.
+/// Returned blocks are complete CFG blocks; an enclosing join may redirect only
+/// the returned exit. Terminal transfers are never patched.
 let rec convertExpr
+    (resultType: AST.Type)
     (expr: ANF.AExpr)
     (currentLabel: MIR.Label)
     (currentInstrsRev: MIR.Instr list)
     (builder: CFGBuilder)
-    : Result<MIR.Operand * CFGBuilder, string> =
+    : Result<ExprExit * CFGBuilder, string> =
 
     match expr with
+    | ANF.Jump (target, value) ->
+        match Map.tryFind target builder.Joins with
+        | None -> Error $"ANF to MIR: jump target {target} is not in lexical scope"
+        | Some (label, typ) ->
+            atomToOperand builder value
+            |> Result.map (fun operand ->
+                let block = {
+                    MIR.Label = currentLabel
+                    MIR.Instrs = List.rev currentInstrsRev @ [MIR.Mov (tempToVReg target, operand, Some typ)]
+                    MIR.Terminator = MIR.Jump label
+                }
+                Terminated, { builder with Blocks = Map.add currentLabel block builder.Blocks })
+    | ANF.Join (parameter, continuation, entry) ->
+        let label, labels = MIR.freshLabelWithPrefix builder.FuncName builder.LabelGen
+        let entryBuilder = {
+            builder with
+                LabelGen = labels
+                Joins = Map.add parameter.Id (label, parameter.Type) builder.Joins
+        }
+        convertExpr resultType entry currentLabel currentInstrsRev entryBuilder
+        |> Result.bind (fun (entryExit, afterEntry) ->
+            match entryExit with
+            | Returned _ -> Error "ANF to MIR: a join entry must transfer control, not return a function value"
+            | Terminated ->
+                let continuationBuilder = {
+                    afterEntry with
+                        Joins = builder.Joins
+                        ExtraTypeMap = Map.add parameter.Id parameter.Type afterEntry.ExtraTypeMap
+                }
+                convertExpr resultType continuation label [] continuationBuilder)
     | ANF.Return atom ->
         // Return: end current block with Ret terminator
         atomToOperand builder atom
@@ -790,7 +851,7 @@ let rec convertExpr
                 MIR.Terminator = MIR.Ret operand
             }
             let builder' = { builder with Blocks = Map.add currentLabel block builder.Blocks }
-            Ok (operand, builder'))
+            Ok (Returned (operand, currentLabel), builder'))
 
     // Self-recursive tail call: emit arg capture + cleanup + param update + Jump to loop header
     // This must come before the general Let case to take precedence
@@ -868,8 +929,7 @@ let rec convertExpr
                     MIR.Terminator = MIR.Jump loopLabel
                 }
                 let builder' = { builder with Blocks = Map.add currentLabel block builder.Blocks; RegGen = regGen' }
-                // Return dummy operand since this doesn't return
-                Ok (MIR.Int64Const 0L, builder')))
+                Ok (Terminated, builder')))
 
     | ANF.Let (tempId, cexpr, rest) ->
         // Let binding: handle based on cexpr type
@@ -911,19 +971,19 @@ let rec convertExpr
                         }
 
                         // Determine the type of the if result (then/else should have same type)
-                        let resultType = atomType builderWithCoverage thenAtom
+                        let bindingType = atomType builderWithCoverage thenAtom
 
                         // Then block: assign thenAtom to destReg, jump to join
                         let thenBlock = {
                             MIR.Label = thenLabel
-                            MIR.Instrs = [MIR.Mov (destReg, thenOp, Some resultType)]
+                            MIR.Instrs = [MIR.Mov (destReg, thenOp, Some bindingType)]
                             MIR.Terminator = MIR.Jump joinLabel
                         }
 
                         // Else block: assign elseAtom to destReg, jump to join
                         let elseBlock = {
                             MIR.Label = elseLabel
-                            MIR.Instrs = [MIR.Mov (destReg, elseOp, Some resultType)]
+                            MIR.Instrs = [MIR.Mov (destReg, elseOp, Some bindingType)]
                             MIR.Terminator = MIR.Jump joinLabel
                         }
 
@@ -937,14 +997,14 @@ let rec convertExpr
                         }
                         let (ANF.TempId destId) = tempId
                         let builder' =
-                            if resultType = AST.TFloat64 then
+                            if bindingType = AST.TFloat64 then
                                 { builderWithBlocks with
                                     FloatRegs = Set.add destId builderWithBlocks.FloatRegs }
                             else
                                 builderWithBlocks
 
                         // Continue with rest in join block (no instructions yet)
-                        convertExpr rest joinLabel [] builder')))
+                        convertExpr resultType rest joinLabel [] builder')))
 
         | _ ->
             // Simple CExpr: add instruction(s) to current block, continue
@@ -1375,843 +1435,52 @@ let rec convertExpr
                         { builderWithType with FloatRegs = Set.add destId builderWithType.FloatRegs }
                     | _ ->
                         builderWithType
-                convertExpr rest currentLabel newInstrsRev builder'
+                convertExpr resultType rest currentLabel newInstrsRev builder'
 
     | ANF.If (condAtom, thenBranch, elseBranch) ->
-        // If expression:
-        // 1. End current block with Branch terminator
-        // 2. Create then-block and else-block
-        // 3. Create join-block where both branches meet
-        // 4. Both branches put result in same register and jump to join
-
         atomToOperand builder condAtom
         |> Result.bind (fun condOp ->
-
-        // Generate labels for then, else, and join blocks
-        let (thenLabel, labelGen1) = MIR.freshLabelWithPrefix builder.FuncName builder.LabelGen
-        let (elseLabel, labelGen2) = MIR.freshLabelWithPrefix builder.FuncName labelGen1
-        let (joinLabel, labelGen3) = MIR.freshLabelWithPrefix builder.FuncName labelGen2
-
-        // Create a register to hold the result from both branches
-        let (resultReg, regGen1) = MIR.freshReg builder.RegGen
-
-        // End current block with conditional branch
-        let currentBlock = {
-            MIR.Label = currentLabel
-            MIR.Instrs = List.rev currentInstrsRev
-            MIR.Terminator = MIR.Branch (condOp, thenLabel, elseLabel)
-        }
-
-        let builder1 = {
-            builder with
-                Blocks = Map.add currentLabel currentBlock builder.Blocks
-                LabelGen = labelGen3
-                RegGen = regGen1
-        }
-
-        // Convert then-branch: result goes into resultReg, then jump to join
-        match convertExprToOperand thenBranch thenLabel [] builder1 with
-        | Error err -> Error err
-        | Ok (thenResult, thenJoinOpt, builder2) ->
-
-        // Helper: check if a block is a self-recursive loop-back (jumps to _body label)
-        // Such blocks should NOT be patched as they are terminal control flow
-        let isLoopBackBlock (block: MIR.BasicBlock) =
-            match block.Terminator with
-            | MIR.Jump (MIR.Label label) when label.EndsWith("_body") -> true
-            | _ -> false
-
-        // If then-branch created blocks (nested if), patch its join block
-        // Otherwise, create a simple block that moves result and jumps
-        // EXCEPTION: If the block is a self-recursive loop-back, don't patch it
-        let thenResultType = operandType builder2 thenResult
-        let builder3 =
-            match thenJoinOpt with
-            | Some nestedJoinLabel ->
-                // Patch the nested join block to jump to our join instead of returning
-                match Map.tryFind nestedJoinLabel builder2.Blocks with
-                | Some nestedJoinBlock when isLoopBackBlock nestedJoinBlock ->
-                    // Self-recursive loop-back: don't patch, it's already terminal
-                    builder2
-                | Some nestedJoinBlock ->
-                    let patchedBlock = {
-                        nestedJoinBlock with
-                            Instrs = nestedJoinBlock.Instrs @ [MIR.Mov (resultReg, thenResult, Some thenResultType)]
-                            Terminator = MIR.Jump joinLabel
-                    }
-                    { builder2 with Blocks = Map.add nestedJoinLabel patchedBlock builder2.Blocks }
-                | None -> builder2  // Should not happen
-            | None ->
-                // Simple expression - create block that moves result and jumps
-                let thenBlock = {
-                    MIR.Label = thenLabel
-                    MIR.Instrs = [MIR.Mov (resultReg, thenResult, Some thenResultType)]
-                    MIR.Terminator = MIR.Jump joinLabel
-                }
-                { builder2 with Blocks = Map.add thenLabel thenBlock builder2.Blocks }
-
-        // Convert else-branch: result goes into resultReg, then jump to join
-        match convertExprToOperand elseBranch elseLabel [] builder3 with
-        | Error err -> Error err
-        | Ok (elseResult, elseJoinOpt, builder4) ->
-
-        // Same logic for else-branch
-        let elseResultType = operandType builder4 elseResult
-        let builder5 =
-            match elseJoinOpt with
-            | Some nestedJoinLabel ->
-                match Map.tryFind nestedJoinLabel builder4.Blocks with
-                | Some nestedJoinBlock when isLoopBackBlock nestedJoinBlock ->
-                    // Self-recursive loop-back: don't patch, it's already terminal
-                    builder4
-                | Some nestedJoinBlock ->
-                    let patchedBlock = {
-                        nestedJoinBlock with
-                            Instrs = nestedJoinBlock.Instrs @ [MIR.Mov (resultReg, elseResult, Some elseResultType)]
-                            Terminator = MIR.Jump joinLabel
-                    }
-                    { builder4 with Blocks = Map.add nestedJoinLabel patchedBlock builder4.Blocks }
-                | None -> builder4  // Should not happen
-            | None ->
-                let elseBlock = {
-                    MIR.Label = elseLabel
-                    MIR.Instrs = [MIR.Mov (resultReg, elseResult, Some elseResultType)]
-                    MIR.Terminator = MIR.Jump joinLabel
-                }
-                { builder4 with Blocks = Map.add elseLabel elseBlock builder4.Blocks }
-
-        // Create join block that returns the result
-        let joinBlock = {
-            MIR.Label = joinLabel
-            MIR.Instrs = []
-            MIR.Terminator = MIR.Ret (MIR.Register resultReg)
-        }
-        let builder6 = { builder5 with Blocks = Map.add joinLabel joinBlock builder5.Blocks }
-
-        // Track the result type for nested ifs that return through this register
-        let (MIR.VReg resultId) = resultReg
-        let builder6WithType =
-            { builder6 with ExtraTypeMap = Map.add (ANF.TempId resultId) thenResultType builder6.ExtraTypeMap }
-
-        // Update FloatRegs if the result is a float
-        let builder7 =
-            if thenResultType = AST.TFloat64 || elseResultType = AST.TFloat64 then
-                { builder6WithType with FloatRegs = Set.add resultId builder6WithType.FloatRegs }
-            else
-                builder6WithType
-
-        // Return the result operand
-        let resultOp = MIR.Register resultReg
-        Ok (resultOp, builder7))
-
-/// Helper: convert expression and extract final operand
-/// Returns: Result of (operand, optional join label if blocks were created, builder)
-/// - If join label is Some(label), the expression created blocks ending at that join block
-/// - If join label is None, no blocks were created (simple expression)
-and convertExprToOperand
-    (expr: ANF.AExpr)
-    (startLabel: MIR.Label)
-    (startInstrsRev: MIR.Instr list)
-    (builder: CFGBuilder)
-    : Result<MIR.Operand * MIR.Label option * CFGBuilder, string> =
-
-    match expr with
-    | ANF.Return atom ->
-        // If we have accumulated instructions from Let bindings, create a block
-        // Otherwise just return the operand
-        atomToOperand builder atom
-        |> Result.bind (fun operand ->
-            if List.isEmpty startInstrsRev then
-                Ok (operand, None, builder)
-            else
-                // Create a block with accumulated instructions
-                // Use temporary Ret terminator - caller will patch if needed
-                let block = {
-                    MIR.Label = startLabel
-                    MIR.Instrs = List.rev startInstrsRev
-                    MIR.Terminator = MIR.Ret operand
-                }
-                let builder' = { builder with Blocks = Map.add startLabel block builder.Blocks }
-                Ok (operand, Some startLabel, builder'))
-
-    // Self-recursive tail call: emit arg capture + cleanup + param update + Jump to loop header
-    // This must come before the general Let case to take precedence
-    // Phi nodes carry type info, so this works for both int and float parameters.
-    | ANF.Let (callTempId, ANF.TailCall (funcName, args), rest) when funcName = builder.FuncName ->
-        collectSelfTailCallCleanup builder callTempId rest
-        |> Result.bind (fun cleanupInstrs ->
-            let argTypes = args |> List.map (atomType builder)
-            args
-            |> List.map (atomToOperand builder)
-            |> sequenceResults
-            |> Result.bind (fun argOperands ->
-                let loopLabel = MIR.Label $"{funcName}_body"
-                // To handle register swaps correctly (e.g., swapInt(b, a, n-1)),
-                // we need temps only when an argument directly references a parameter.
-                // (See convertExpr for detailed explanation)
-                let paramSet = builder.ParamRegs |> Set.ofList
-                let argReferencesParam (op: MIR.Operand) =
-                    match op with
-                    | MIR.Register vreg -> Set.contains vreg paramSet
-                    | _ -> false
-                let needsTemps = argOperands |> List.exists argReferencesParam
-
-                let (captureInstrs, assignInstrs, regGen') =
-                    if needsTemps then
-                        // Use temps to avoid swap issues
-                        let (tempRegs, rg) =
-                            argOperands
-                            |> List.fold (fun (tempsRev, rg) _ ->
-                                let (temp, rg') = MIR.freshReg rg
-                                (temp :: tempsRev, rg')
-                            ) ([], builder.RegGen)
-                            |> fun (tempsRev, rg) -> (List.rev tempsRev, rg)
-                        let captures =
-                            List.zip3 tempRegs argOperands argTypes
-                            |> List.map (fun (temp, argOp, argType) ->
-                                MIR.Mov (temp, argOp, Some argType))
-                        let assigns =
-                            List.zip3 builder.ParamRegs tempRegs argTypes
-                            |> List.map (fun (paramReg, temp, argType) ->
-                                MIR.Mov (paramReg, MIR.Register temp, Some argType))
-                        (captures, assigns, rg)
-                    else
-                        // No temps needed - just assign directly
-                        let assigns =
-                            List.zip3 builder.ParamRegs argOperands argTypes
-                            |> List.map (fun (paramReg, argOp, argType) ->
-                                MIR.Mov (paramReg, argOp, Some argType))
-                        ([], assigns, builder.RegGen)
-
-                let overlapArgIncs = refCountIncForOverlappingArgs argOperands cleanupInstrs startInstrsRev
-
-                // Create block with accumulated instructions + arg capture + overlap incs + cleanup + param assignments + Jump
-                let instrsRev =
-                    startInstrsRev
-                    |> appendInstrsRev captureInstrs
-                    |> appendInstrsRev overlapArgIncs
-                    |> appendInstrsRev cleanupInstrs
-                    |> appendInstrsRev assignInstrs
-                let block = {
-                    MIR.Label = startLabel
-                    MIR.Instrs = List.rev instrsRev
-                    MIR.Terminator = MIR.Jump loopLabel
-                }
-                let builder' = { builder with Blocks = Map.add startLabel block builder.Blocks; RegGen = regGen' }
-                // Return Some startLabel to tell the caller we created a block that's terminal
-                // (jumps back to loop header). The caller should not try to patch this block.
-                Ok (MIR.Int64Const 0L, Some startLabel, builder')))
-
-    | ANF.Let (tempId, cexpr, rest) ->
-        let destReg = tempToVReg tempId
-        let tupleGetAliasType =
-            match cexpr, rest with
-            | ANF.TupleGet _, ANF.Let (_, ANF.TypedAtom (ANF.Var sourceId, aliasType), _)
-            | ANF.RecordGet _, ANF.Let (_, ANF.TypedAtom (ANF.Var sourceId, aliasType), _)
-                when sourceId = tempId -> Some aliasType
-            | _ -> None
-
-        match cexpr with
-        | ANF.IfValue (condAtom, thenAtom, elseAtom) ->
-            // IfValue requires control flow - similar to convertExpr version
-            atomToOperand builder condAtom
-            |> Result.bind (fun condOp ->
-                atomToOperand builder thenAtom
-                |> Result.bind (fun thenOp ->
-                    atomToOperand builder elseAtom
-                    |> Result.bind (fun elseOp ->
-                        let (thenLabel, labelGen1) = MIR.freshLabelWithPrefix builder.FuncName builder.LabelGen
-                        let (elseLabel, labelGen2) = MIR.freshLabelWithPrefix builder.FuncName labelGen1
-                        let (joinLabel, labelGen3) = MIR.freshLabelWithPrefix builder.FuncName labelGen2
-
-                        // Current block ends with branch
-                        let startBlock = {
-                            MIR.Label = startLabel
-                            MIR.Instrs = List.rev startInstrsRev
-                            MIR.Terminator = MIR.Branch (condOp, thenLabel, elseLabel)
-                        }
-
-                        // Determine the type of the if result (then/else should have same type)
-                        let resultType = atomType builder thenAtom
-
-                        // Then block: assign thenAtom to destReg, jump to join
-                        let thenBlock = {
-                            MIR.Label = thenLabel
-                            MIR.Instrs = [MIR.Mov (destReg, thenOp, Some resultType)]
-                            MIR.Terminator = MIR.Jump joinLabel
-                        }
-
-                        // Else block: assign elseAtom to destReg, jump to join
-                        let elseBlock = {
-                            MIR.Label = elseLabel
-                            MIR.Instrs = [MIR.Mov (destReg, elseOp, Some resultType)]
-                            MIR.Terminator = MIR.Jump joinLabel
-                        }
-
-                        let builderWithBlocks = {
-                            builder with
-                                Blocks = builder.Blocks
-                                         |> Map.add startLabel startBlock
-                                         |> Map.add thenLabel thenBlock
-                                         |> Map.add elseLabel elseBlock
-                                LabelGen = labelGen3
-                        }
-                        let (ANF.TempId destId) = tempId
-                        let builder' =
-                            if resultType = AST.TFloat64 then
-                                { builderWithBlocks with
-                                    FloatRegs = Set.add destId builderWithBlocks.FloatRegs }
-                            else
-                                builderWithBlocks
-
-                        // Continue with rest in join block (no instructions yet)
-                        convertExprToOperand rest joinLabel [] builder')))
-
-        | _ ->
-            // Simple CExpr: create instruction(s) and accumulate
-            // Track if dest is float type for later builder update
-            let destType = inferSimpleCExprDestType builder tempId tupleGetAliasType cexpr
-            let instrsResult =
-                match cexpr with
-                | ANF.Atom atom ->
-                    let aType = atomType builder atom
-                    atomToOperand builder atom
-                    |> Result.map (fun op -> [MIR.Mov (destReg, op, Some aType)])
-                | ANF.TypedAtom (atom, aType) ->
-                    // Use the explicit type annotation (for pattern matching with correct types)
-                    atomToOperand builder atom
-                    |> Result.map (fun op -> [MIR.Mov (destReg, op, Some aType)])
-                | ANF.Prim (op, leftAtom, rightAtom) ->
-                    let opType = binOpType builder leftAtom rightAtom
-                    // Comparison and boolean ops produce Bool, not the operand type
-                    let resultType =
-                        match op with
-                        | ANF.Eq | ANF.Neq | ANF.Lt | ANF.Gt | ANF.Lte | ANF.Gte
-                        | ANF.And | ANF.Or -> AST.TBool
-                        | _ -> opType
-                    atomToOperand builder leftAtom
-                    |> Result.bind (fun leftOp ->
-                        atomToOperand builder rightAtom
-                        |> Result.map (fun rightOp ->
-                            [MIR.BinOp (destReg, convertBinOp op, leftOp, rightOp, opType)]))
-                | ANF.UnaryPrim (op, atom) ->
-                    let atomTy = atomType builder atom
-                    let resultType =
-                        match op with
-                        | ANF.Not -> AST.TBool
-                        | _ -> atomTy
-                    atomToOperand builder atom
-                    |> Result.map (fun operand ->
-                        match op with
-                        | ANF.Not ->
-                            [MIR.UnaryOp (destReg, convertUnaryOp op, operand)]
-                        | ANF.Neg ->
-                            // Use typed subtraction so sized integers are truncated correctly downstream.
-                            [MIR.BinOp (destReg, MIR.Sub, MIR.Int64Const 0L, operand, atomTy)]
-                        | ANF.BitNot ->
-                            // x XOR -1 is equivalent to bitwise-not and preserves integer width via operandType.
-                            [MIR.BinOp (destReg, MIR.BitXor, operand, MIR.Int64Const -1L, atomTy)])
-                | ANF.Call (funcName, args)
-                | ANF.BorrowedCall (funcName, args) ->
-                    let argTypes = args |> List.map (atomType builder)
-                    let returnType = directCallReturnType builder funcName
-                    args
-                    |> List.map (atomToOperand builder)
-                    |> sequenceResults
-                    |> Result.map (fun argOperands ->
-                        [MIR.Call (destReg, funcName, argOperands, argTypes, returnType)])
-                | ANF.IndirectCall (func, args) ->
-                    let argTypes = args |> List.map (atomType builder)
-                    let returnType =
-                        match atomType builder func with
-                        | AST.TFunction (_, retType) -> retType
-                        | AST.TRawPtr | AST.TInt64 -> AST.TBool
-                        | other -> Crash.crash $"IndirectCall: Expected TFunction type for func, got {other}"
-                    atomToOperand builder func
-                    |> Result.bind (fun funcOp ->
-                        args
-                        |> List.map (atomToOperand builder)
-                        |> sequenceResults
-                        |> Result.map (fun argOperands ->
-                            [MIR.IndirectCall (destReg, funcOp, argOperands, argTypes, returnType)]))
-                | ANF.ClosureAlloc (funcName, captures) ->
-                    // Allocate closure: (func_addr, cap1, cap2, ...)
-                    let numSlots = 1 + List.length captures  // func_ptr + captures
-                    let sizeBytes = numSlots * 8
-                    let allocInstr = MIR.HeapAlloc (destReg, sizeBytes)
-                    // Store function pointer at offset 0 (always int/pointer type)
-                    let storeFuncInstr = MIR.HeapStore (destReg, 0, MIR.FuncAddr funcName, None)
-                    // Store captured values at offsets 8, 16, ... tracking value type for floats
-                    captures
-                    |> List.mapi (fun i cap -> (i, cap))
-                    |> List.map (fun (i, cap) ->
-                        let capType = atomType builder cap
-                        let valueType = if capType = AST.TFloat64 then Some AST.TFloat64 else None
-                        atomToOperand builder cap
-                        |> Result.map (fun op -> MIR.HeapStore (destReg, (i + 1) * 8, op, valueType)))
-                    |> sequenceResults
-                    |> Result.map (fun storeInstrs -> allocInstr :: storeFuncInstr :: storeInstrs)
-                | ANF.ClosureCall (closure, args) ->
-                    // Call through closure: extract func_ptr, call with (closure, args...)
-                    let argTypes = args |> List.map (atomType builder)
-                    let returnType = closureCallReturnType builder tempId closure
-                    atomToOperand builder closure
-                    |> Result.bind (fun closureOp ->
-                        args
-                        |> List.map (atomToOperand builder)
-                        |> sequenceResults
-                        |> Result.map (fun argOperands ->
-                            [MIR.ClosureCall (destReg, closureOp, argOperands, argTypes, returnType)]))
-                | ANF.TailCall (funcName, args) ->
-                    // Non-self-recursive tail call (self-recursive handled specially above)
-                    // Emits TailCall instruction with full epilogue + branch
-                    let argTypes = args |> List.map (atomType builder)
-                    let returnType = directCallReturnType builder funcName
-                    args
-                    |> List.map (atomToOperand builder)
-                    |> sequenceResults
-                    |> Result.map (fun argOperands ->
-                        [MIR.TailCall (funcName, argOperands, argTypes, returnType)])
-                | ANF.IndirectTailCall (func, args) ->
-                    // Indirect tail call: no destination register
-                    let argTypes = args |> List.map (atomType builder)
-                    let returnType =
-                        match atomType builder func with
-                        | AST.TFunction (_, retType) -> retType
-                        | AST.TRawPtr | AST.TInt64 -> AST.TBool
-                        | other -> Crash.crash $"IndirectTailCall: Expected TFunction type for func, got {other}"
-                    atomToOperand builder func
-                    |> Result.bind (fun funcOp ->
-                        args
-                        |> List.map (atomToOperand builder)
-                        |> sequenceResults
-                        |> Result.map (fun argOperands ->
-                            [MIR.IndirectTailCall (funcOp, argOperands, argTypes, returnType)]))
-                | ANF.ClosureTailCall (closure, args) ->
-                    // Closure tail call: no destination register
-                    let argTypes = args |> List.map (atomType builder)
-                    atomToOperand builder closure
-                    |> Result.bind (fun closureOp ->
-                        args
-                        |> List.map (atomToOperand builder)
-                        |> sequenceResults
-                        |> Result.map (fun argOperands ->
-                            [MIR.ClosureTailCall (closureOp, argOperands, argTypes)]))
-                | ANF.TupleAlloc elems ->
-                    // Allocate heap space: 8 bytes per element
-                    let sizeBytes = List.length elems * 8
-                    let allocInstr = MIR.HeapAlloc (destReg, sizeBytes)
-                    // Store each element at its offset, tracking value type for float handling
-                    elems
-                    |> List.mapi (fun i elem -> (i, elem))
-                    |> List.map (fun (i, elem) ->
-                        let elemType = atomType builder elem
-                        let valueType = if elemType = AST.TFloat64 then Some AST.TFloat64 else None
-                        atomToOperand builder elem
-                        |> Result.map (fun op -> MIR.HeapStore (destReg, i * 8, op, valueType)))
-                    |> sequenceResults
-                    |> Result.map (fun storeInstrs -> allocInstr :: storeInstrs)
-                | ANF.TupleGet (tupleAtom, index) ->
-                    // Tuple should always be a variable in ANF
-                    match tupleAtom with
-                    | ANF.Var tid ->
-                        let tupleReg = tempToVReg tid
-                        let loadType =
-                            match destType with
-                            | Some AST.TFloat64 -> Some AST.TFloat64
-                            | _ -> None
-                        Ok [MIR.HeapLoad (destReg, tupleReg, index * 8, loadType)]
-                    | _ ->
-                        Error "Internal error: Tuple access on non-variable (ANF invariant violated)"
-                | ANF.RecordAlloc (descriptor, fields)
-                | ANF.RecordClone (descriptor, _, fields) ->
-                    let allocInstr = MIR.HeapAlloc (destReg, List.length fields * 8)
-                    fields
-                    |> List.mapi (fun index field -> (index, field))
-                    |> List.map (fun (index, field) ->
-                        let fieldType = atomType builder field
-                        let valueType = if fieldType = AST.TFloat64 then Some AST.TFloat64 else None
-                        atomToOperand builder field
-                        |> Result.map (fun operand ->
-                            MIR.HeapStore (destReg, index * 8, operand, valueType)))
-                    |> sequenceResults
-                    |> Result.map (fun stores -> allocInstr :: stores)
-                | ANF.RecordReuse (descriptor, recordAtom, fields) ->
-                    match recordAtom with
-                    | ANF.Var sourceId ->
-                        let recordType = AST.TRecord (descriptor.RuntimeTypeName, descriptor.TypeArgs)
-                        fields
-                        |> List.mapi (fun index field -> (index, field))
-                        |> List.map (fun (index, field) ->
-                            let fieldType = atomType builder field
-                            let valueType = if fieldType = AST.TFloat64 then Some AST.TFloat64 else None
-                            atomToOperand builder field
-                            |> Result.map (fun operand ->
-                                MIR.HeapStore (destReg, index * 8, operand, valueType)))
-                        |> sequenceResults
-                        |> Result.map (fun stores ->
-                            MIR.Mov (destReg, MIR.Register (tempToVReg sourceId), Some recordType) :: stores)
-                    | _ ->
-                        Error "Internal error: Record reuse on non-variable (ANF invariant violated)"
-                | ANF.RecordGet (_, recordAtom, index) ->
-                    match recordAtom with
-                    | ANF.Var tid ->
-                        let recordReg = tempToVReg tid
-                        let loadType =
-                            match destType with
-                            | Some AST.TFloat64 -> Some AST.TFloat64
-                            | _ -> None
-                        Ok [MIR.HeapLoad (destReg, recordReg, index * 8, loadType)]
-                    | _ ->
-                        Error "Internal error: Record access on non-variable (ANF invariant violated)"
-                | ANF.IfValue _ ->
-                    // This case is handled above; reaching here indicates a bug
-                    Error "Internal error: IfValue should have been handled in outer match"
-                | ANF.RefCountInc (atom, payloadSize, kind, sourceType) ->
-                    match atom with
-                    | ANF.Var tid ->
-                        Ok [MIR.RefCountInc (tempToVReg tid, payloadSize, rcKindToMIR kind, sourceType)]
-                    | _ -> Error "Internal error: RefCountInc on non-variable"
-                | ANF.RefCountDec (atom, payloadSize, kind, sourceType) ->
-                    match atom with
-                    | ANF.Var tid ->
-                        Ok [MIR.RefCountDec (tempToVReg tid, payloadSize, rcKindToMIR kind, sourceType)]
-                    | _ -> Error "Internal error: RefCountDec on non-variable"
-                | ANF.Print (atom, valueType) ->
-                    atomToOperand builder atom
-                    |> Result.map (fun op -> [MIR.Print (op, valueType)])
-                | ANF.StdoutWrite (atom, appendNewline) ->
-                    let (MIR.VReg effectId) = destReg
-                    atomToOperand builder atom
-                    |> Result.map (fun op ->
-                        [ MIR.StdoutWrite (effectId, op, appendNewline)
-                          MIR.Mov (destReg, MIR.Int64Const 0L, Some AST.TUnit) ])
-                | ANF.StdinReadLine ->
-                    Ok [MIR.StdinReadLine destReg]
-                | ANF.RuntimeError message ->
-                    Ok [MIR.RuntimeError message]
-                | ANF.RuntimeErrorString message ->
-                    atomToOperand builder message
-                    |> Result.map (fun operand -> [MIR.RuntimeErrorString operand])
-                | ANF.StringConcat (leftAtom, rightAtom) ->
-                    atomToOperand builder leftAtom
-                    |> Result.bind (fun leftOp ->
-                        atomToOperand builder rightAtom
-                        |> Result.map (fun rightOp ->
-                            [MIR.StringConcat (destReg, leftOp, rightOp)]))
-                | ANF.CanonicalBufferEq (kind, leftAtom, rightAtom) ->
-                    atomToOperand builder leftAtom
-                    |> Result.bind (fun leftOp ->
-                        atomToOperand builder rightAtom
-                        |> Result.map (fun rightOp ->
-                            [MIR.CanonicalBufferEq (destReg, kind, leftOp, rightOp)]))
-                | ANF.FileReadText pathAtom ->
-                    atomToOperand builder pathAtom
-                    |> Result.map (fun pathOp -> [MIR.FileReadText (destReg, pathOp)])
-                | ANF.FileExists pathAtom ->
-                    atomToOperand builder pathAtom
-                    |> Result.map (fun pathOp -> [MIR.FileExists (destReg, pathOp)])
-                | ANF.FileWriteText (pathAtom, contentAtom) ->
-                    atomToOperand builder pathAtom
-                    |> Result.bind (fun pathOp ->
-                        atomToOperand builder contentAtom
-                        |> Result.map (fun contentOp ->
-                            [MIR.FileWriteText (destReg, pathOp, contentOp)]))
-                | ANF.FileAppendText (pathAtom, contentAtom) ->
-                    atomToOperand builder pathAtom
-                    |> Result.bind (fun pathOp ->
-                        atomToOperand builder contentAtom
-                        |> Result.map (fun contentOp ->
-                            [MIR.FileAppendText (destReg, pathOp, contentOp)]))
-                | ANF.FileDelete pathAtom ->
-                    atomToOperand builder pathAtom
-                    |> Result.map (fun pathOp -> [MIR.FileDelete (destReg, pathOp)])
-                | ANF.FileSetExecutable pathAtom ->
-                    atomToOperand builder pathAtom
-                    |> Result.map (fun pathOp -> [MIR.FileSetExecutable (destReg, pathOp)])
-                | ANF.FileWriteFromPtr (pathAtom, ptrAtom, lengthAtom) ->
-                    atomToOperand builder pathAtom
-                    |> Result.bind (fun pathOp ->
-                        atomToOperand builder ptrAtom
-                        |> Result.bind (fun ptrOp ->
-                            atomToOperand builder lengthAtom
-                            |> Result.map (fun lengthOp ->
-                                [MIR.FileWriteFromPtr (destReg, pathOp, ptrOp, lengthOp)])))
-                | ANF.RawAlloc numBytesAtom ->
-                    atomToOperand builder numBytesAtom
-                    |> Result.map (fun numBytesOp -> [MIR.RawAlloc (destReg, numBytesOp)])
-                | ANF.MappedAlloc numBytesAtom ->
-                    atomToOperand builder numBytesAtom
-                    |> Result.map (fun numBytesOp -> [MIR.MappedAlloc (destReg, numBytesOp)])
-                | ANF.RawFree ptrAtom ->
-                    atomToOperand builder ptrAtom
-                    |> Result.map (fun ptrOp -> [MIR.RawFree ptrOp])
-                | ANF.MappedFree ptrAtom ->
-                    atomToOperand builder ptrAtom
-                    |> Result.map (fun ptrOp -> [MIR.MappedFree ptrOp])
-                | ANF.RawGet (ptrAtom, offsetAtom, valueType) ->
-                    atomToOperand builder ptrAtom
-                    |> Result.bind (fun ptrOp ->
-                        atomToOperand builder offsetAtom
-                        |> Result.map (fun offsetOp ->
-                            [MIR.RawGet (destReg, ptrOp, offsetOp, valueType)]))
-                | ANF.RawTake (ptrAtom, offsetAtom, valueType) ->
-                    atomToOperand builder ptrAtom
-                    |> Result.bind (fun ptrOp ->
-                        atomToOperand builder offsetAtom
-                        |> Result.map (fun offsetOp ->
-                            [MIR.RawGet (destReg, ptrOp, offsetOp, valueType)]))
-                | ANF.RawGetByte (ptrAtom, offsetAtom) ->
-                    atomToOperand builder ptrAtom
-                    |> Result.bind (fun ptrOp ->
-                        atomToOperand builder offsetAtom
-                        |> Result.map (fun offsetOp ->
-                            [MIR.RawGetByte (destReg, ptrOp, offsetOp)]))
-                | ANF.RawWriteWord (ptrAtom, offsetAtom, valueAtom) ->
-                    atomToOperand builder ptrAtom
-                    |> Result.bind (fun ptrOp ->
-                        atomToOperand builder offsetAtom
-                        |> Result.bind (fun offsetOp ->
-                            atomToOperand builder valueAtom
-                            |> Result.map (fun valueOp ->
-                                [MIR.RawWriteWord (ptrOp, offsetOp, valueOp)])))
-                | ANF.RawWriteByte (ptrAtom, offsetAtom, valueAtom) ->
-                    atomToOperand builder ptrAtom
-                    |> Result.bind (fun ptrOp ->
-                        atomToOperand builder offsetAtom
-                        |> Result.bind (fun offsetOp ->
-                            atomToOperand builder valueAtom
-                            |> Result.map (fun valueOp ->
-                                [MIR.RawWriteByte (ptrOp, offsetOp, valueOp)])))
-                | ANF.RawSlotInit (ptrAtom, offsetAtom, valueAtom, valueType) ->
-                    atomToOperand builder ptrAtom
-                    |> Result.bind (fun ptrOp ->
-                        atomToOperand builder offsetAtom
-                        |> Result.bind (fun offsetOp ->
-                            atomToOperand builder valueAtom
-                            |> Result.map (fun valueOp ->
-                                [MIR.RawSlotInit (ptrOp, offsetOp, valueOp, valueType)])))
-                | ANF.StringToRawPtr valueAtom ->
-                    atomToOperand builder valueAtom
-                    |> Result.map (fun valueOp -> [MIR.StringToRawPtr (destReg, valueOp)])
-                | ANF.RawPtrToString ptrAtom ->
-                    atomToOperand builder ptrAtom
-                    |> Result.map (fun ptrOp -> [MIR.RawPtrToString (destReg, ptrOp)])
-                | ANF.BlobToRawPtr valueAtom ->
-                    atomToOperand builder valueAtom
-                    |> Result.map (fun valueOp -> [MIR.BlobToRawPtr (destReg, valueOp)])
-                | ANF.RawPtrToBlob ptrAtom ->
-                    atomToOperand builder ptrAtom
-                    |> Result.map (fun ptrOp -> [MIR.RawPtrToBlob (destReg, ptrOp)])
-                | ANF.RawPtrToInt128 ptrAtom ->
-                    atomToOperand builder ptrAtom
-                    |> Result.map (fun ptrOp -> [MIR.Mov (destReg, ptrOp, Some AST.TInt128)])
-                | ANF.RawPtrToUInt128 ptrAtom ->
-                    atomToOperand builder ptrAtom
-                    |> Result.map (fun ptrOp -> [MIR.Mov (destReg, ptrOp, Some AST.TUInt128)])
-                | ANF.DictToRawPtr dictAtom ->
-                    atomToOperand builder dictAtom
-                    |> Result.map (fun dictOp -> [MIR.DictToRawPtr (destReg, dictOp)])
-                | ANF.RawPtrToDict (ptrAtom, tagAtom, _dictType) ->
-                    atomToOperand builder ptrAtom
-                    |> Result.bind (fun ptrOp ->
-                        atomToOperand builder tagAtom
-                        |> Result.map (fun tagOp -> [MIR.RawPtrToDict (destReg, ptrOp, tagOp)]))
-                | ANF.ListToRawPtr listAtom ->
-                    atomToOperand builder listAtom
-                    |> Result.map (fun listOp -> [MIR.ListToRawPtr (destReg, listOp)])
-                | ANF.RawPtrToList (ptrAtom, tagAtom, _listType) ->
-                    atomToOperand builder ptrAtom
-                    |> Result.bind (fun ptrOp ->
-                        atomToOperand builder tagAtom
-                        |> Result.map (fun tagOp -> [MIR.RawPtrToList (destReg, ptrOp, tagOp)]))
-                | ANF.FloatSqrt atom ->
-                    atomToOperand builder atom
-                    |> Result.map (fun op -> [MIR.FloatSqrt (destReg, op)])
-                | ANF.FloatAbs atom ->
-                    atomToOperand builder atom
-                    |> Result.map (fun op -> [MIR.FloatAbs (destReg, op)])
-                | ANF.FloatNeg atom ->
-                    atomToOperand builder atom
-                    |> Result.map (fun op -> [MIR.FloatNeg (destReg, op)])
-                | ANF.Int64ToFloat atom ->
-                    atomToOperand builder atom
-                    |> Result.map (fun op -> [MIR.Int64ToFloat (destReg, op)])
-                | ANF.FloatToInt64 atom ->
-                    atomToOperand builder atom
-                    |> Result.map (fun op -> [MIR.FloatToInt64 (destReg, op)])
-                | ANF.FloatToBits atom ->
-                    // FloatToBits copies float bits to UInt64 (produces integer, not float)
-                    atomToOperand builder atom
-                    |> Result.map (fun op -> [MIR.FloatToBits (destReg, op)])
-                | ANF.RefCountIncString strAtom ->
-                    atomToOperand builder strAtom
-                    |> Result.map (fun strOp -> [MIR.RefCountIncString strOp])
-                | ANF.RefCountDecString strAtom ->
-                    atomToOperand builder strAtom
-                    |> Result.map (fun strOp -> [MIR.RefCountDecString strOp])
-                | ANF.RefCountIncBlob bytesAtom ->
-                    atomToOperand builder bytesAtom
-                    |> Result.map (fun bytesOp -> [MIR.RefCountIncBlob bytesOp])
-                | ANF.RefCountDecBlob bytesAtom ->
-                    atomToOperand builder bytesAtom
-                    |> Result.map (fun bytesOp -> [MIR.RefCountDecBlob bytesOp])
-                | ANF.RandomInt64 ->
-                    Ok [MIR.RandomInt64 destReg]
-                | ANF.DateTimeNow ->
-                    Ok [MIR.DateTimeNow destReg]
-                | ANF.Sleep delayMs ->
-                    let (MIR.VReg effectId) = destReg
-                    atomToOperand builder delayMs
-                    |> Result.map (fun delay -> [MIR.Sleep (effectId, destReg, delay)])
-                | ANF.CliNative (operation, args) ->
-                    ResultList.mapResults (atomToOperand builder) args
-                    |> Result.map (fun operands -> [MIR.CliNative (destReg, convertCliOperation operation, operands)])
-                | ANF.FloatToString valueAtom ->
-                    atomToOperand builder valueAtom
-                    |> Result.map (fun valueOp -> [MIR.FloatToString (destReg, valueOp)])
-
-            // Let bindings accumulate instructions, pass through join label
-            match instrsResult with
-            | Error err -> Error err
-            | Ok instrs ->
-                let builderWithClosure =
-                    match cexpr with
-                    | ANF.ClosureAlloc (funcName, _) ->
-                        { builder with ClosureFuncs = Map.add tempId funcName builder.ClosureFuncs }
-                    | _ -> builder
-                // Update FloatRegs if this dest is a float
-                let (MIR.VReg destId) = destReg
-                let builderWithType =
-                    match destType with
-                    | Some typ ->
-                        { builderWithClosure with
-                            ExtraTypeMap = Map.add tempId typ builderWithClosure.ExtraTypeMap }
-                    | None -> builderWithClosure
-                let builder' =
-                    match destType with
-                    | Some AST.TFloat64 ->
-                        { builderWithType with FloatRegs = Set.add destId builderWithType.FloatRegs }
-                    | _ ->
-                        builderWithType
-                let newInstrsRev = appendInstrsRev instrs startInstrsRev
-                convertExprToOperand rest startLabel newInstrsRev builder'
-
-    | ANF.If (condAtom, thenBranch, elseBranch) ->
-        // If expression: creates blocks with branch/jump/join structure
-        atomToOperand builder condAtom
-        |> Result.bind (fun condOp ->
-            let (thenLabel, labelGen1) = MIR.freshLabelWithPrefix builder.FuncName builder.LabelGen
-            let (elseLabel, labelGen2) = MIR.freshLabelWithPrefix builder.FuncName labelGen1
-            let (joinLabel, labelGen3) = MIR.freshLabelWithPrefix builder.FuncName labelGen2
-            let (resultReg, regGen1) = MIR.freshReg builder.RegGen
-
-            let startBlock = {
-                MIR.Label = startLabel
-                MIR.Instrs = List.rev startInstrsRev
+            let thenLabel, labelGen1 = MIR.freshLabelWithPrefix builder.FuncName builder.LabelGen
+            let elseLabel, labelGen2 = MIR.freshLabelWithPrefix builder.FuncName labelGen1
+            let joinLabel, labelGen3 = MIR.freshLabelWithPrefix builder.FuncName labelGen2
+            let resultReg, regGen = MIR.freshReg builder.RegGen
+            let currentBlock = {
+                MIR.Label = currentLabel
+                MIR.Instrs = List.rev currentInstrsRev
                 MIR.Terminator = MIR.Branch (condOp, thenLabel, elseLabel)
             }
-
-            let builder1 = {
+            let branched = {
                 builder with
-                    Blocks = Map.add startLabel startBlock builder.Blocks
+                    Blocks = Map.add currentLabel currentBlock builder.Blocks
                     LabelGen = labelGen3
-                    RegGen = regGen1
+                    RegGen = regGen
             }
-
-            // Helper: check if a block is a self-recursive loop-back (jumps to _body label)
-            // Such blocks should NOT be patched as they are terminal control flow
-            let isLoopBackBlock (block: MIR.BasicBlock) =
-                match block.Terminator with
-                | MIR.Jump (MIR.Label label) when label.EndsWith("_body") -> true
-                | _ -> false
-
-            // Convert then-branch
-            match convertExprToOperand thenBranch thenLabel [] builder1 with
-            | Error err -> Error err
-            | Ok (thenResult, thenJoinOpt, builder2) ->
-
-            // If then-branch created blocks (nested if), patch its join block
-            // Otherwise, create a simple block that moves result and jumps
-            // EXCEPTION: If the block is a self-recursive loop-back, don't patch it
-            let thenResultType = operandType builder2 thenResult
-            let builder3 =
-                match thenJoinOpt with
-                | Some nestedJoinLabel ->
-                    // Patch the nested join block to jump to our join instead of returning
-                    match Map.tryFind nestedJoinLabel builder2.Blocks with
-                    | Some nestedJoinBlock when isLoopBackBlock nestedJoinBlock ->
-                        // Self-recursive loop-back: don't patch, it's already terminal
-                        builder2
-                    | Some nestedJoinBlock ->
-                        let patchedBlock = {
-                            nestedJoinBlock with
-                                Instrs = nestedJoinBlock.Instrs @ [MIR.Mov (resultReg, thenResult, Some thenResultType)]
-                                Terminator = MIR.Jump joinLabel
-                        }
-                        { builder2 with Blocks = Map.add nestedJoinLabel patchedBlock builder2.Blocks }
-                    | None -> builder2  // Should not happen
-                | None ->
-                    // Simple expression - create block that moves result and jumps
-                    let thenBlock = {
-                        MIR.Label = thenLabel
-                        MIR.Instrs = [MIR.Mov (resultReg, thenResult, Some thenResultType)]
-                        MIR.Terminator = MIR.Jump joinLabel
-                    }
-                    { builder2 with Blocks = Map.add thenLabel thenBlock builder2.Blocks }
-
-            // Convert else-branch
-            match convertExprToOperand elseBranch elseLabel [] builder3 with
-            | Error err -> Error err
-            | Ok (elseResult, elseJoinOpt, builder4) ->
-
-            // Same logic for else-branch
-            let elseResultType = operandType builder4 elseResult
-            let builder5 =
-                match elseJoinOpt with
-                | Some nestedJoinLabel ->
-                    match Map.tryFind nestedJoinLabel builder4.Blocks with
-                    | Some nestedJoinBlock when isLoopBackBlock nestedJoinBlock ->
-                        // Self-recursive loop-back: don't patch, it's already terminal
-                        builder4
-                    | Some nestedJoinBlock ->
-                        let patchedBlock = {
-                            nestedJoinBlock with
-                                Instrs = nestedJoinBlock.Instrs @ [MIR.Mov (resultReg, elseResult, Some elseResultType)]
-                                Terminator = MIR.Jump joinLabel
-                        }
-                        { builder4 with Blocks = Map.add nestedJoinLabel patchedBlock builder4.Blocks }
-                    | None -> builder4  // Should not happen
-                | None ->
-                    let elseBlock = {
-                        MIR.Label = elseLabel
-                        MIR.Instrs = [MIR.Mov (resultReg, elseResult, Some elseResultType)]
-                        MIR.Terminator = MIR.Jump joinLabel
-                    }
-                    { builder4 with Blocks = Map.add elseLabel elseBlock builder4.Blocks }
-
-            // Create join block
-            let joinBlock = {
-                MIR.Label = joinLabel
-                MIR.Instrs = []
-                MIR.Terminator = MIR.Ret (MIR.Register resultReg)
-            }
-            let builder6 = { builder5 with Blocks = Map.add joinLabel joinBlock builder5.Blocks }
-
-            // Track the result type for nested ifs that return through this register
-            let (MIR.VReg resultId) = resultReg
-            let builder6WithType =
-                { builder6 with ExtraTypeMap = Map.add (ANF.TempId resultId) thenResultType builder6.ExtraTypeMap }
-
-            // Update FloatRegs if the result is a float
-            let builder7 =
-                if thenResultType = AST.TFloat64 || elseResultType = AST.TFloat64 then
-                    { builder6WithType with FloatRegs = Set.add resultId builder6WithType.FloatRegs }
-                else
-                    builder6WithType
-
-            // Return result register and our join label for potential patching by caller
-            Ok (MIR.Register resultReg, Some joinLabel, builder7))
+            convertExpr resultType thenBranch thenLabel [] branched
+            |> Result.bind (fun (thenExit, afterThen) ->
+                convertExpr resultType elseBranch elseLabel [] afterThen
+                |> Result.bind (fun (elseExit, afterElse) ->
+                    match thenExit, elseExit with
+                    | Terminated, Terminated -> Ok (Terminated, afterElse)
+                    | _ ->
+                        redirectReturn resultReg joinLabel thenExit afterElse
+                        |> Result.bind (redirectReturn resultReg joinLabel elseExit)
+                        |> Result.map (fun redirected ->
+                            let result = MIR.Register resultReg
+                            let joinBlock = {
+                                MIR.Label = joinLabel
+                                MIR.Instrs = []
+                                MIR.Terminator = MIR.Ret result
+                            }
+                            let (MIR.VReg resultId) = resultReg
+                            let joined = {
+                                redirected with
+                                    Blocks = Map.add joinLabel joinBlock redirected.Blocks
+                                    ExtraTypeMap = Map.add (ANF.TempId resultId) resultType redirected.ExtraTypeMap
+                                    FloatRegs =
+                                        if resultType = AST.TFloat64 then Set.add resultId redirected.FloatRegs
+                                        else redirected.FloatRegs
+                            }
+                            Returned (result, joinLabel), joined))))
 
 /// Convert an ANF function to a MIR function
 /// Each function gets its own RegGen starting from (maxTempId + 1) for deterministic VReg assignment.
@@ -2259,6 +1528,7 @@ let convertANFFunction
 
         let initialBuilder = {
             RegGen = regGen
+            Joins = Map.empty
             LabelGen = MIR.initialLabelGen
             Blocks = Map.empty
             TypeById = typeById
@@ -2318,7 +1588,7 @@ let convertANFFunction
         }
 
         // Convert function body to CFG
-        match convertExpr loopBody entryLabel [] initialBuilder with
+        match convertExpr anfFunc.ReturnType loopBody entryLabel [] initialBuilder with
         | Error err -> Error err
         | Ok (_, finalBuilder) ->
 
@@ -2388,6 +1658,7 @@ let toMIR
     let entryLabel = MIR.Label "_start_body"
     let initialBuilder = {
         RegGen = startRegGen
+        Joins = Map.empty
         LabelGen = MIR.initialLabelGen
         Blocks = Map.empty
         TypeById = typeById
@@ -2403,7 +1674,7 @@ let toMIR
         ExprIdGen = ANF.initialExprIdGen
         CoverageMapping = ANF.emptyCoverageMapping
     }
-    match convertExpr mainExpr entryLabel [] initialBuilder with
+    match convertExpr mainExprType mainExpr entryLabel [] initialBuilder with
     | Error err -> Error err
     | Ok (_, finalBuilder) ->
     let cfg = {

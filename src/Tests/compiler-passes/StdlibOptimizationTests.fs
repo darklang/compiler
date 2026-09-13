@@ -10,9 +10,10 @@ let rec private containsBinOp (target: BinOp) (expr: AExpr) : bool =
     match expr with
     | Let (_, Prim (op, _, _), body) -> op = target || containsBinOp target body
     | Let (_, _, body) -> containsBinOp target body
+    | Join (_, thenBranch, elseBranch)
     | If (_, thenBranch, elseBranch) ->
         containsBinOp target thenBranch || containsBinOp target elseBranch
-    | Return _ -> false
+    | Jump _ | Return _ -> false
 
 let private testStdlibANFStrengthReduction
     (stdlib: CompilerLibrary.StdlibResult)

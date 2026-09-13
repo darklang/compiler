@@ -2417,6 +2417,7 @@ let private extractReturnTypes (funcReg: Map<string, AST.Type>) : Map<string, AS
 
 let private emptyRegistries (moduleRegistry: AST.ModuleRegistry) : AST_to_ANF.Registries =
     {
+        ScopeContracts = Map.empty
         TypeReg = Map.empty
         RecordFieldsReg = Map.empty
         RecordTypeParamsReg = Map.empty
@@ -2890,6 +2891,7 @@ let private convertTypedProgramToUserOnlyWithMode
                 |> Result.map (fun (anfExpr, _) ->
                     ({
                         UserFunctions = anfFuncs
+                        ScopeContracts = registries.ScopeContracts
                         NonInlineableFunctionNames = nonInlineableFunctionNames
                         MainExpr = anfExpr
                         TypeReg = registries.TypeReg
@@ -4017,6 +4019,7 @@ let private compileUserWithPlan (plan: UserCompilePlan) : CompileReport =
                             functionsToCompile
                             |> List.exists (fun func -> func.Name = programEntryName)
                         let userRegistries : AST_to_ANF.Registries = {
+                            ScopeContracts = userOnly.ScopeContracts
                             TypeReg = userOnly.TypeReg
                             RecordFieldsReg = userOnly.RecordFieldsReg
                             RecordTypeParamsReg = userOnly.RecordTypeParamsReg
@@ -5046,6 +5049,7 @@ let getReachableStdlibFunctionsFromStdlib (stdlib: StdlibResult) (source: string
                 let entryFunction =
                     AST_to_ANF.synthesizeEntryFunction "_start" boundaryProgramType userOnly.MainExpr
                 let userRegistries : AST_to_ANF.Registries = {
+                    ScopeContracts = userOnly.ScopeContracts
                     TypeReg = userOnly.TypeReg
                     RecordFieldsReg = userOnly.RecordFieldsReg
                     RecordTypeParamsReg = userOnly.RecordTypeParamsReg

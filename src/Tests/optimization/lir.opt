@@ -341,11 +341,11 @@ let collatzSteps (n: Int64) (steps: Int64) : Int64 =
 collatzSteps:
   StackSize: 0
   UsedCalleeSaved: []
-  Label "collatzSteps_L0":
-    X0 <- Mov(Reg v10020)
-    Ret
   Label "collatzSteps_L1":
     BranchBitZero(v10021, #0, Label "collatzSteps_L3", Label "collatzSteps_L4")
+  Label "collatzSteps_L2":
+    X0 <- Mov(Reg v10020)
+    Ret
   Label "collatzSteps_L3":
     v10030 <- Sdiv(v10021, Reg v10034)
     v10031 <- Add(v10020, Imm 1)
@@ -364,7 +364,7 @@ collatzSteps:
     v10020 <- Phi([(Reg v1, collatzSteps_entry), (Reg v10029, collatzSteps_L4), (Reg v10033, collatzSteps_L3)])
     v10021 <- Phi([(Reg v0, collatzSteps_entry), (Reg v10028, collatzSteps_L4), (Reg v10032, collatzSteps_L3)])
     Cmp(v10021, Imm 1)
-    CondBranch(EQ, Label "collatzSteps_L0", Label "collatzSteps_L1")
+    CondBranch(EQ, Label "collatzSteps_L2", Label "collatzSteps_L1")
   Label "collatzSteps_entry":
     v10034 <- Mov(Imm 2)
     Jump(Label "collatzSteps_body")

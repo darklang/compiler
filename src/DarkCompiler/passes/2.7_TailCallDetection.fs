@@ -215,6 +215,13 @@ let rec detectTailCalls
     | Return atom ->
         // Return is always a base case - just return it
         Return atom
+    | Jump _ -> expr
+    | Join (parameter, continuation, entry) ->
+        let continuation' =
+            detectTailCalls currentFuncName isCurrentMember typedParams ownedParams releasedTemps inTailPosition aliasRoots continuation
+        let entry' =
+            detectTailCalls currentFuncName isCurrentMember typedParams ownedParams releasedTemps inTailPosition aliasRoots entry
+        Join (parameter, continuation', entry')
 
     | Let (tempId, cexpr, body) ->
         // Check if this is a tail call pattern:

@@ -106,11 +106,28 @@ These are piecewise budgets, not an affine approximation. Pass tests check them 
 the resulting native-memory ANF operations. `--dump-anf` exposes allocations,
 stores, calls, and cleanup.
 
-The current ANF is a continuation tree, so lowering places a scalar join's
-continuation on each returning path. Region extraction limits paths through
-explicit HIR branches to 16 to bound the additional code duplication; larger regions use the supported persistent
-representation (eligible subregions can still be selected independently).
-Explicit downstream join blocks are needed before lifting that restriction.
+ANF has explicit lexical joins and scalar jumps. Lowering emits each shared
+continuation once; the former sixteen-path eligibility limit is removed.
+Collection ownership stays in the enclosing scope, with explicit edge cleanup
+from ListHIR; scalar jumps do not return or transfer managed values. RC insertion
+releases branch-local owners at jumps and preserves enclosing cleanup for the
+continuation. The post-RC join-interface verifier checks lexical captures,
+target visibility, argument types, and entry control transfers.
+
+Moving a cleanup boundary can be observable even when an expression returns
+an integer. Entry-local scalar expressions and callbacks therefore require
+inert-destruction evidence. `SemanticIR` describes structural destruction and
+function-scope contracts; ListHIR collects local evidence and direct-call
+dependencies from resolved source functions. Unproven scopes and unknown
+callees reject all transitive callers; safe recursive components need no
+unrolling. Registry composition retains dependencies so a replacement definition
+can revoke a caller's proof. Known printing primitives may perform effects but
+have inert destruction: this contract is not purity. Streams, unknown closures,
+and unproven nominal/container payloads retain the persistent representation
+when they could cross an entry boundary. Inlining also checks newly introduced
+entry lifetimes. Enclosing owners keep their existing cleanup order, including
+Streams held in containers. General destruction-effect propagation remains
+outside this conservative slice.
 
 ## Storage contract
 
@@ -175,7 +192,7 @@ ANF pipeline or a complete Perceus implementation. The next boundaries are:
    Checked repeat construction, independent variable-byte mappings and
    loop-based kernels provide the reclamation/execution foundation.
 2. Extend the typed block/value-contract foundation into a general semantic HIR
-   with explicit downstream joins and primitive effect/alias/ownership contracts;
+   with primitive effect/alias/ownership contracts and general block interfaces;
    layout/destruction metadata independent of ANF; stage verifiers throughout
    the pipeline. Generated printing must precede general ownership elaboration.
 3. Function ownership and representation interfaces, bounded specialization,

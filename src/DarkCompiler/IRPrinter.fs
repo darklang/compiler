@@ -246,6 +246,9 @@ let private prettyPrintANFCExpr = function
 /// Pretty-print ANF expression
 let rec private prettyPrintANFExpr = function
     | ANF.Return atom -> $"return {prettyPrintANFAtom atom}"
+    | ANF.Jump (target, atom) -> $"jump {target}({prettyPrintANFAtom atom})"
+    | ANF.Join (parameter, continuation, entry) ->
+        $"join {parameter.Id}: {parameter.Type} =\n{prettyPrintANFExpr continuation}\nin\n{prettyPrintANFExpr entry}"
     | ANF.Let (var, cexpr, body) ->
         let cexprStr = prettyPrintANFCExpr cexpr
         let bodyStr = prettyPrintANFExpr body
