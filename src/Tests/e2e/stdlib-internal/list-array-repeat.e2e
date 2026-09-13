@@ -1,0 +1,29 @@
+// list-array-repeat.e2e - Source-level runtime lengths, aliases, and effect order.
+let runtimeRepeatedPipeline(count: Int, value: Int64) : Int64 = let xs = Stdlib.List.repeatUnsafe<Int64>(count, value) in let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + 1L) in Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>(ys), 9L, fun acc x -> acc + x)
+let sharedRepeatedPipeline(count: Int) : Int64 = let xs = Stdlib.List.repeatUnsafe<Int64>(count, 2L) in let alias = xs in let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + 3L) in let old = Stdlib.List.fold<Int64, Int64>(alias, 0L, fun acc x -> acc + x) in let fresh = Stdlib.List.fold<Int64, Int64>(ys, 0L, fun acc x -> acc + x) in old * 10L + fresh
+let repeatedRuntimePipelines(n: Int64, acc: Int64) : Int64 = if n == 0L then acc else repeatedRuntimePipelines(n - 1L, acc + runtimeRepeatedPipeline(Stdlib.Int.fromInt64(n % 65L), 2L))
+let printedCount() : Int = let _ = Builtin.printLine("count") in 3I
+let printedValue() : Int64 = let _ = Builtin.printLine("value") in 7L
+let capturedRepeatControl(xs: List<Int64>) : Int64 = let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + Stdlib.List.getAtOrDefault<Int64>(xs, 0L, 0L)) in Stdlib.List.fold<Int64, Int64>(ys, 0L, fun acc x -> acc + x)
+
+runtimeRepeatedPipeline(0I, 2L) = stdout="9\n" stderr=""
+runtimeRepeatedPipeline(1I, 2L) = 12L
+runtimeRepeatedPipeline(28I, 2L) = 93L
+runtimeRepeatedPipeline(29I, 2L) = 96L
+runtimeRepeatedPipeline(513I, 2L) = stdout="1548\n" stderr=""
+runtimeRepeatedPipeline(-999999999999999999999999999999I, 2L) = stdout="9\n" stderr=""
+sharedRepeatedPipeline(65I) = stdout="1625\n" stderr=""
+sharedRepeatedPipeline(0I) = stdout="0\n" stderr=""
+sharedRepeatedPipeline(3I) = stdout="75\n" stderr=""
+sharedRepeatedPipeline(28I) = 700L
+sharedRepeatedPipeline(29I) = 725L
+repeatedRuntimePipelines(650L, 0L) = stdout="68250\n" stderr=""
+let count = 3I in let xs = Stdlib.List.repeatUnsafe<Int64>(count, 7L) in let count = 100L in let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + count) in Stdlib.List.fold<Int64, Int64>(ys, 0L, fun acc x -> acc + x) = 321L
+let xs = Stdlib.List.repeatUnsafe<Int64>(printedCount(), printedValue()) in let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> let _ = Builtin.printLine("map") in x + 1L) in Stdlib.List.fold<Int64, Int64>(ys, 0L, fun acc x -> let _ = Builtin.printLine("fold") in acc + x) = stdout="count\nvalue\nmap\nmap\nmap\nfold\nfold\nfold\n24\n" stderr=""
+let xs = Stdlib.List.repeatUnsafe<Int64>(0I, printedValue()) in Stdlib.List.fold<Int64, Int64>(xs, 5L, fun acc x -> let _ = Builtin.printLine("unexpected") in acc + x) = stdout="value\n5\n" stderr=""
+Stdlib.List.repeatUnsafe<Int64>(3I, 7L) = [7L, 7L, 7L]
+capturedRepeatControl(Stdlib.List.repeatUnsafe<Int64>(3I, 7L)) = 42L
+runtimeRepeatedPipeline(1152921504606846971I, 2L) = exit=1 stderr="Uncaught exception: Out of heap memory"
+let xs = Stdlib.List.repeatUnsafe<Int64>(999999999999999999999999999999I, printedValue()) in Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc + x) = exit=1 stdout="value\n" stderr="Uncaught exception: Out of heap memory"
+let xs = Stdlib.List.repeatUnsafe<Int64>(3I, 2L) in let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + 1L) in let zs = Stdlib.List.map<Int64, Int64>(ys, fun x -> x + 2L) in let old = Stdlib.List.fold<Int64, Int64>(ys, 0L, fun acc x -> acc + x) in let fresh = Stdlib.List.fold<Int64, Int64>(zs, 0L, fun acc x -> acc + x) in old * 10L + fresh = 105L
+let xs = Stdlib.List.repeatUnsafe<Int64>(3I, 7L) in let ys = Stdlib.List.repeatUnsafe<Int64>(29I, 2L) in let old = Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc + x) in let fresh = Stdlib.List.fold<Int64, Int64>(ys, 0L, fun acc x -> acc + x) in old * 10L + fresh = 268L

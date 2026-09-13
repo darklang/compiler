@@ -15,24 +15,55 @@ type Transform =
     | Map of callback: Scalar
     | Reverse
 
+type Construction =
+    | Literal of elements: Scalar list
+    | Repeat of count: Scalar * value: Scalar
+
 type Operation<'transform> =
-    | Construct of result: ListId * elements: Scalar list
+    | Construct of result: ListId * construction: Construction
     | Transform of result: ListId * source: ListId * operation: 'transform
     | Fold of name: string * source: ListId * initial: Scalar * callback: Scalar
     | ScalarBinding of name: string * value: Scalar
 
 type FunctionalRegion = private FunctionalRegion of Operation<Transform> list * Scalar
 
-type ArrayLayout = private RecycledArray of length:int | MappedArray of length:int
+/// Runtime extent identity survives aliases and consuming transformations.
+/// It names a construction, never a source variable that could be rebound.
+type ArrayExtent = ConstantLength of int | RuntimeLength of ListId
 
-let capacity = function RecycledArray length | MappedArray length -> length
+type ArrayLayout = private RecycledArray of length:int | MappedArray of length:int | RuntimeArray of origin:ListId
+
+let extent = function
+    | RecycledArray length | MappedArray length -> ConstantLength length
+    | RuntimeArray origin -> RuntimeLength origin
 let elementOffset index = 24 + index * 8
-let payloadSize layout = elementOffset (capacity layout)
-let allocationSize layout = payloadSize layout + 8
-let private unrollLimit = 28
-// Offsets remain representable in the existing signed 32-bit layout metadata.
+let payloadSize length = elementOffset length
+let allocationSize length = payloadSize length + 8
+let private recycledCapacityLimit = 28
+// Literal offsets remain representable in signed 32-bit layout metadata.
+// Runtime extents instead use checked 64-bit arithmetic in the constructor.
 let private maxCapacity = (System.Int32.MaxValue - 40) / 8
-let private requestedBytes layout = allocationSize layout + (match layout with MappedArray _ -> 8 | _ -> 0)
+
+/// Exact piecewise requested-byte budget, excluding OS page rounding.
+/// Each runtime buffer costs 256 bytes for n <= 28, otherwise 40 + 8*n.
+/// Terms count physical buffers with the same validated construction extent.
+type AllocationBytes = {
+    ConstantBytes: int64
+    RuntimeBuffers: Map<ListId, int64>
+}
+
+let private constantBytes value = { ConstantBytes = value; RuntimeBuffers = Map.empty }
+let private requestedBytes = function
+    | RecycledArray length -> constantBytes (int64 (allocationSize length))
+    | MappedArray length -> constantBytes (int64 (allocationSize length) + 8L)
+    | RuntimeArray origin -> { ConstantBytes = 0L; RuntimeBuffers = Map.ofList [origin, 1L] }
+
+let private addBytes left right =
+    let coefficients =
+        Map.fold (fun terms origin coefficient ->
+            Map.change origin (fun current -> Some (coefficient + Option.defaultValue 0L current)) terms)
+            left.RuntimeBuffers right.RuntimeBuffers
+    { ConstantBytes = left.ConstantBytes + right.ConstantBytes; RuntimeBuffers = coefficients }
 
 type StorageRegion = private StorageRegion of FunctionalRegion * Map<ListId, ArrayLayout>
 
@@ -50,7 +81,7 @@ type OwnedRegion = private OwnedRegion of OwnedOperation list * Scalar * Map<Lis
 
 type AllocationSummary = {
     Allocations: int
-    AllocatedBytes: int
+    AllocatedBytes: AllocationBytes
     Copies: int
     ReusedTransforms: int
     Releases: int
@@ -70,14 +101,14 @@ let allocationSummary (OwnedRegion (operations, _, layouts)) : AllocationSummary
                     | Some layout -> layout
                     | None -> Crash.crash "List HIR: missing allocation layout"
                 1, requestedBytes layout, (match step.Operation with Transform _ -> 1 | _ -> 0), 0
-            | Transform (_, _, (_, Consume)) -> 0, 0, 0, 1
-            | _ -> 0, 0, 0, 0
+            | Transform (_, _, (_, Consume)) -> 0, constantBytes 0L, 0, 1
+            | _ -> 0, constantBytes 0L, 0, 0
         { Allocations = summary.Allocations + allocations
-          AllocatedBytes = summary.AllocatedBytes + bytes
+          AllocatedBytes = addBytes summary.AllocatedBytes bytes
           Copies = summary.Copies + copies
           ReusedTransforms = summary.ReusedTransforms + reused
           Releases = summary.Releases + List.length step.Releases })
-        { Allocations = 0; AllocatedBytes = 0; Copies = 0; ReusedTransforms = 0; Releases = 0 }
+        { Allocations = 0; AllocatedBytes = constantBytes 0L; Copies = 0; ReusedTransforms = 0; Releases = 0 }
 
 type private Extraction = {
     Lists: Map<string, ListId>
@@ -102,14 +133,16 @@ let tryExtract
     (freeVariables: AST.Expr -> Set<string>)
     (expression: AST.Expr)
     : FunctionalRegion option =
-    let scalar state expr =
+    let operand state accepts expr =
         let referencesList =
             freeVariables expr |> Set.exists (fun name -> Map.containsKey name state.Lists)
         if referencesList then None
         else
             match infer state.Types expr with
-            | Ok typ when immediate typ -> Some { Expression = expr; Type = typ }
+            | Ok typ when accepts typ -> Some { Expression = expr; Type = typ }
             | _ -> None
+
+    let scalar state expr = operand state immediate expr
 
     let callback state expected expr =
         // A closure may not hide a region alias or an effectful destructor.
@@ -137,10 +170,14 @@ let tryExtract
         | AST.ListLiteral elements when List.length elements <= maxCapacity ->
             let values = elements |> List.map (fun value -> scalar state value |> Option.filter (fun typed -> typed.Type = AST.TInt64))
             if values |> List.forall Option.isSome then
-                Some (addList state (fun output -> Construct (output, List.choose id values)))
+                Some (addList state (fun output -> Construct (output, Literal (List.choose id values))))
             else None
         | _ ->
             match listCall expr with
+            | Some ("Stdlib.List.repeatUnsafe_i64", [count; value]) ->
+                match operand state ((=) AST.TInt) count, operand state ((=) AST.TInt64) value with
+                | Some count, Some value -> Some (addList state (fun output -> Construct (output, Repeat (count, value))))
+                | _ -> None
             | Some ("Stdlib.List.map_i64_i64", [input; fn]) ->
                 list state input
                 |> Option.bind (fun (source, next) ->
@@ -199,6 +236,7 @@ let tryExtract
         match listCall value with
         | Some ("Stdlib.List.map_i64_i64", _)
         | Some ("Stdlib.List.reverse_i64", _)
+        | Some ("Stdlib.List.repeatUnsafe_i64", _)
         | Some ("Stdlib.List.fold_i64_i64", _) -> true
         | _ -> false
     let candidate =
@@ -230,9 +268,10 @@ let selectStorage (FunctionalRegion (operations, _) as region) : StorageRegion =
         operations
         |> List.fold (fun layouts operation ->
             match operation with
-            | Construct (id, elements) ->
+            | Construct (id, Literal elements) ->
                 let length = List.length elements
-                Map.add id (if length <= unrollLimit then RecycledArray length else MappedArray length) layouts
+                Map.add id (if length <= recycledCapacityLimit then RecycledArray length else MappedArray length) layouts
+            | Construct (id, Repeat _) -> Map.add id (RuntimeArray id) layouts
             | Transform (id, input, _) -> Map.add id (lookup "layout" input layouts) layouts
             | Fold _ | ScalarBinding _ -> layouts) Map.empty
     StorageRegion (region, layouts)
@@ -302,9 +341,12 @@ let verifyOwnership (operations: OwnedOperation list) : Result<unit, string> =
 let verify (OwnedRegion (operations, finalValue, layouts)) : Result<unit, string> =
     let typesValid step =
         match step.Operation with
-        | Construct (output, elements) ->
+        | Construct (output, Literal elements) ->
             elements |> List.forall (fun element -> element.Type = AST.TInt64)
-            && capacity (lookup "construction layout" output layouts) = List.length elements
+            && extent (lookup "construction layout" output layouts) = ConstantLength (List.length elements)
+        | Construct (output, Repeat (count, value)) ->
+            count.Type = AST.TInt && value.Type = AST.TInt64
+            && extent (lookup "repeat layout" output layouts) = RuntimeLength output
         | Transform (output, input, (operation, _)) ->
             lookup "output layout" output layouts = lookup "input layout" input layouts
             && (match operation with
@@ -315,8 +357,9 @@ let verify (OwnedRegion (operations, finalValue, layouts)) : Result<unit, string
         | ScalarBinding (_, value) -> immediate value.Type
     if layouts |> Map.exists (fun _ layout ->
         match layout with
-        | RecycledArray length -> length < 0 || length > unrollLimit
-        | MappedArray length -> length <= unrollLimit || length > maxCapacity) then
+        | RecycledArray length -> length < 0 || length > recycledCapacityLimit
+        | MappedArray length -> length <= recycledCapacityLimit || length > maxCapacity
+        | RuntimeArray _ -> false) then
         Error "List HIR: unsupported allocation size"
     elif not (immediate finalValue.Type) || not (List.forall typesValid operations) then
         Error "List HIR: invalid storage operand types"
@@ -332,9 +375,14 @@ let rec private bindReturns expression continuation =
     | ANF.Let (id, value, body) -> ANF.Let (id, value, bindReturns body continuation)
     | ANF.If (condition, yes, no) -> ANF.If (condition, bindReturns yes continuation, bindReturns no continuation)
 
-let private metadata layout : ANF.RcMetadata option =
+let private metadata length : ANF.RcMetadata option =
     Some { ReleasePlanCacheKey = None; SourceType = None
-           ReleasePlan = Some (ANF.RootRelease (payloadSize layout, ANF.GenericHeap, ANF.NoPayloadRelease)) }
+           ReleasePlan = Some (ANF.RootRelease (payloadSize length, ANF.GenericHeap, ANF.NoPayloadRelease)) }
+
+/// The runtime allocator's small branch reserves the entire 256-byte class;
+/// its RC word follows capacity, not the runtime logical length.
+let releaseRuntimeSmall pointer =
+    ANF.RefCountDec (pointer, payloadSize recycledCapacityLimit, ANF.GenericHeap, metadata recycledCapacityLimit)
 
 let private emit value vg =
     let id, next = ANF.freshVar vg
@@ -342,13 +390,18 @@ let private emit value vg =
 
 let private write pointer offset value vg = emit (ANF.RawWriteWord (pointer, word offset, value)) vg
 
-let private allocate layout vg =
-    let size = word (allocationSize layout)
-    let operation = match layout with RecycledArray _ -> ANF.RawAlloc size | MappedArray _ -> ANF.MappedAlloc size
-    let pointer, allocation, next = emit operation vg
-    let header = [0, capacity layout; 8, capacity layout; 16, 0; payloadSize layout, 1]
-    let writes, final = header |> List.mapFold (fun state (offset, value) -> let _, bindings, next = write pointer offset (word value) state in bindings, next) next
-    pointer, allocation @ List.concat writes, final
+type private Buffer = { Pointer: ANF.Atom; Length: ANF.Atom; Layout: ArrayLayout }
+
+let private allocate layout length vg =
+    let allocateConstant count primitive =
+        let pointer, allocation, next = emit (primitive (word (allocationSize count))) vg
+        let header = [0, count; 8, count; 16, 0; payloadSize count, 1]
+        let writes, final = header |> List.mapFold (fun state (offset, value) -> let _, bindings, next = write pointer offset (word value) state in bindings, next) next
+        pointer, allocation @ List.concat writes, final
+    match layout with
+    | RuntimeArray _ -> emit (ANF.Call ("Stdlib.Internal.ListArray.allocate", [length])) vg
+    | RecycledArray count -> allocateConstant count ANF.RawAlloc
+    | MappedArray count -> allocateConstant count ANF.MappedAlloc
 
 let private wrap bindings body = List.foldBack (fun (id, value) tail -> ANF.Let (id, value, tail)) bindings body
 
@@ -361,52 +414,62 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (operations, finalValue
             let id, final = ANF.freshVar next
             bindReturns expr (fun atom -> ANF.Let (id, ANF.TypedAtom (atom, value.Type), ANF.Return (ANF.Var id))), ANF.Var id, final)
 
-    let release pointers values vg =
+    let release buffers values vg =
         values |> List.mapFold (fun state value ->
-            let layout = lookup "release layout" value layouts
-            let pointer = lookup "release pointer" value pointers
+            let buffer = lookup "release buffer" value buffers
             let operation =
-                match layout with
-                | RecycledArray _ -> ANF.RefCountDec (pointer, payloadSize layout, ANF.GenericHeap, metadata layout)
-                | MappedArray _ -> ANF.MappedFree pointer
+                match buffer.Layout with
+                | RecycledArray length -> ANF.RefCountDec (buffer.Pointer, payloadSize length, ANF.GenericHeap, metadata length)
+                | MappedArray _ -> ANF.MappedFree buffer.Pointer
+                | RuntimeArray _ -> ANF.Call ("Stdlib.Internal.ListArray.release", [buffer.Pointer])
             let _, bindings, next = emit operation state
             bindings, next) vg
         |> fun (bindings, next) -> List.concat bindings, next
 
-    let prepareMutation pointer layout ownership vg =
+    let prepareMutation buffer ownership vg =
         match ownership with
-        | Consume -> ANF.Return pointer, vg
+        | Consume -> ANF.Return buffer.Pointer, vg
         | BorrowAndCopy ->
-            let copy, allocations, afterAllocation = allocate layout vg
+            let copy, allocations, afterAllocation = allocate buffer.Layout buffer.Length vg
             let copied, afterCopy =
-                if capacity layout > unrollLimit then
-                    let _, bindings, next = emit (ANF.Call ("Stdlib.Internal.ListArray.copy", [pointer; copy; word 0; word (capacity layout)])) afterAllocation
+                match buffer.Layout with
+                | MappedArray _ | RuntimeArray _ ->
+                    let _, bindings, next = emit (ANF.Call ("Stdlib.Internal.ListArray.copy", [buffer.Pointer; copy; word 0; buffer.Length])) afterAllocation
                     [bindings], next
-                else
-                    [0 .. capacity layout - 1] |> List.mapFold (fun state index ->
-                        let value, loads, next = emit (ANF.RawGet (pointer, word (elementOffset index), Some AST.TInt64)) state
+                | RecycledArray length ->
+                    [0 .. length - 1] |> List.mapFold (fun state index ->
+                        let value, loads, next = emit (ANF.RawGet (buffer.Pointer, word (elementOffset index), Some AST.TInt64)) state
                         let _, stores, final = write copy (elementOffset index) value next
                         loads @ stores, final) afterAllocation
-            let _, initialized, final = write copy 16 (word (capacity layout)) afterCopy
+            let _, initialized, final = write copy 16 buffer.Length afterCopy
             wrap (allocations @ List.concat copied @ initialized) (ANF.Return copy), final
 
-    let rec loop env pointers vg (steps: OwnedOperation list) =
+    let rec loop env buffers vg (steps: OwnedOperation list) =
         match steps with
         | [] -> lowerScalar finalValue.Expression vg env
         | step :: rest ->
-            let lowerRest env pointers vg =
-                let releases, next = release pointers step.Releases vg
-                loop env pointers next rest |> Result.map (fun (body, final) -> wrap releases body, final)
+            let lowerRest env buffers vg =
+                let releases, next = release buffers step.Releases vg
+                loop env buffers next rest |> Result.map (fun (body, final) -> wrap releases body, final)
             match step.Operation with
             | ScalarBinding (name, value) ->
                 lowerValue env vg value
                 |> Result.bind (fun (expr, atom, next) ->
                     match atom with
                     | ANF.Var id ->
-                        lowerRest (Map.add name (id, value.Type) env) pointers next
+                        lowerRest (Map.add name (id, value.Type) env) buffers next
                         |> Result.map (fun (body, final) -> bindReturns expr (fun _ -> body), final)
                     | _ -> Crash.crash "List HIR: scalar lowering must bind its result")
-            | Construct (output, elements) ->
+            | Construct (output, Repeat (count, value)) ->
+                lowerValue env vg count |> Result.bind (fun (countExpr, countAtom, afterCount) ->
+                    lowerValue env afterCount value |> Result.bind (fun (valueExpr, valueAtom, afterValue) ->
+                        let pointer, allocation, afterAllocation = emit (ANF.Call ("Stdlib.Internal.ListArray.repeat", [countAtom; valueAtom])) afterValue
+                        let length, load, afterLoad = emit (ANF.RawGet (pointer, word 0, Some AST.TInt64)) afterAllocation
+                        let buffer = { Pointer = pointer; Length = length; Layout = lookup "construction layout" output layouts }
+                        lowerRest env (Map.add output buffer buffers) afterLoad
+                        |> Result.map (fun (body, final) ->
+                            bindReturns countExpr (fun _ -> bindReturns valueExpr (fun _ -> wrap (allocation @ load) body)), final)))
+            | Construct (output, Literal elements) ->
                 let rec evaluate vg expressions values =
                     match expressions with
                     | [] -> Ok (ANF.Return ANF.UnitLiteral, List.rev values, vg)
@@ -416,45 +479,47 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (operations, finalValue
                             |> Result.map (fun (body, atoms, final) -> bindReturns expr (fun _ -> body), atoms, final))
                 evaluate vg elements [] |> Result.bind (fun (evaluation, atoms, next) ->
                     let layout = lookup "construction layout" output layouts
-                    let pointer, allocation, afterAllocation = allocate layout next
+                    let length = word (List.length elements)
+                    let pointer, allocation, afterAllocation = allocate layout length next
                     let writes, afterWrites = atoms |> List.mapi (fun index atom -> index, atom) |> List.mapFold (fun state (index, atom) -> let _, bindings, next = write pointer (elementOffset index) atom state in bindings, next) afterAllocation
-                    let _, initialized, afterInit = write pointer 16 (word (capacity layout)) afterWrites
-                    lowerRest env (Map.add output pointer pointers) afterInit
+                    let _, initialized, afterInit = write pointer 16 length afterWrites
+                    let buffer = { Pointer = pointer; Length = length; Layout = layout }
+                    lowerRest env (Map.add output buffer buffers) afterInit
                     |> Result.map (fun (body, final) -> bindReturns evaluation (fun _ -> wrap (allocation @ List.concat writes @ initialized) body), final))
             | Transform (output, input, (operation, ownership)) ->
-                let layout = lookup "transform layout" input layouts
-                let pointer = lookup "transform pointer" input pointers
+                let buffer = lookup "transform buffer" input buffers
                 let callback =
                     match operation with
                     | Reverse -> Ok (ANF.Return ANF.UnitLiteral, ANF.UnitLiteral, vg)
                     | Map fn -> lowerValue env vg fn
                 callback |> Result.bind (fun (evaluation, fn, next) ->
-                    let preparation, afterPreparation = prepareMutation pointer layout ownership next
+                    let preparation, afterPreparation = prepareMutation buffer ownership next
                     let destination, afterDestination = ANF.freshVar afterPreparation
                     let target = ANF.Var destination
                     let mutations, afterMutation =
-                        match operation with
-                        | Map _ when capacity layout > unrollLimit ->
-                            let _, bindings, next = emit (ANF.Call ("Stdlib.Internal.ListArray.map", [target; word 0; word (capacity layout); fn])) afterDestination
+                        match operation, buffer.Layout with
+                        | Map _, (MappedArray _ | RuntimeArray _) ->
+                            let _, bindings, next = emit (ANF.Call ("Stdlib.Internal.ListArray.map", [target; word 0; buffer.Length; fn])) afterDestination
                             [bindings], next
-                        | Reverse when capacity layout > unrollLimit ->
-                            let _, bindings, next = emit (ANF.Call ("Stdlib.Internal.ListArray.reverse", [target; word 0; word (capacity layout - 1)])) afterDestination
-                            [bindings], next
-                        | Map _ ->
-                            [0 .. capacity layout - 1] |> List.mapFold (fun state index ->
+                        | Reverse, (MappedArray _ | RuntimeArray _) ->
+                            let last, subtraction, afterLast = emit (ANF.Prim (ANF.Sub, buffer.Length, word 1)) afterDestination
+                            let _, bindings, next = emit (ANF.Call ("Stdlib.Internal.ListArray.reverse", [target; word 0; last])) afterLast
+                            [subtraction @ bindings], next
+                        | Map _, RecycledArray length ->
+                            [0 .. length - 1] |> List.mapFold (fun state index ->
                                 let value, load, next = emit (ANF.RawGet (target, word (elementOffset index), Some AST.TInt64)) state
                                 let mapped, call, afterCall = emit (ANF.ClosureCall (fn, [value])) next
                                 let _, store, final = write target (elementOffset index) mapped afterCall
                                 load @ call @ store, final) afterDestination
-                        | Reverse ->
-                            [0 .. capacity layout / 2 - 1] |> List.mapFold (fun state index ->
-                                let other = capacity layout - 1 - index
+                        | Reverse, RecycledArray length ->
+                            [0 .. length / 2 - 1] |> List.mapFold (fun state index ->
+                                let other = length - 1 - index
                                 let left, leftLoad, next = emit (ANF.RawGet (target, word (elementOffset index), Some AST.TInt64)) state
                                 let right, rightLoad, afterRight = emit (ANF.RawGet (target, word (elementOffset other), Some AST.TInt64)) next
                                 let _, leftWrite, afterLeft = write target (elementOffset index) right afterRight
                                 let _, rightWrite, final = write target (elementOffset other) left afterLeft
                                 leftLoad @ rightLoad @ leftWrite @ rightWrite, final) afterDestination
-                    lowerRest env (Map.add output target pointers) afterMutation
+                    lowerRest env (Map.add output { buffer with Pointer = target } buffers) afterMutation
                     |> Result.map (fun (body, final) ->
                         bindReturns evaluation (fun _ ->
                             bindReturns preparation (fun selected ->
@@ -462,19 +527,19 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (operations, finalValue
             | Fold (name, input, initial, fn) ->
                 lowerValue env vg initial |> Result.bind (fun (initialExpr, accumulator, next) ->
                     lowerValue env next fn |> Result.bind (fun (callbackExpr, callback, afterCallback) ->
-                        let layout = lookup "fold layout" input layouts
-                        let pointer = lookup "fold pointer" input pointers
+                        let buffer = lookup "fold buffer" input buffers
                         let bindings, (value, afterFold) =
-                            if capacity layout > unrollLimit then
-                                let result, calls, next = emit (ANF.Call ("Stdlib.Internal.ListArray.fold", [pointer; word 0; word (capacity layout); accumulator; callback])) afterCallback
+                            match buffer.Layout with
+                            | MappedArray _ | RuntimeArray _ ->
+                                let result, calls, next = emit (ANF.Call ("Stdlib.Internal.ListArray.fold", [buffer.Pointer; word 0; buffer.Length; accumulator; callback])) afterCallback
                                 [calls], (result, next)
-                            else
-                                [0 .. capacity layout - 1] |> List.mapFold (fun (acc, state) index ->
-                                    let element, loads, next = emit (ANF.RawGet (pointer, word (elementOffset index), Some AST.TInt64)) state
+                            | RecycledArray length ->
+                                [0 .. length - 1] |> List.mapFold (fun (acc, state) index ->
+                                    let element, loads, next = emit (ANF.RawGet (buffer.Pointer, word (elementOffset index), Some AST.TInt64)) state
                                     let result, calls, final = emit (ANF.ClosureCall (callback, [acc; element])) next
                                     loads @ calls, (result, final)) (accumulator, afterCallback)
                         let id, afterId = ANF.freshVar afterFold
-                        lowerRest (Map.add name (id, AST.TInt64) env) pointers afterId
+                        lowerRest (Map.add name (id, AST.TInt64) env) buffers afterId
                         |> Result.map (fun (body, final) ->
                             bindReturns initialExpr (fun _ -> bindReturns callbackExpr (fun _ ->
                                 wrap (List.concat bindings) (ANF.Let (id, ANF.TypedAtom (value, AST.TInt64), body)))), final)))

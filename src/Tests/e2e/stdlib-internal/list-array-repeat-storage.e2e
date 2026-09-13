@@ -1,0 +1,15 @@
+// list-array-repeat-storage.e2e - Runtime cardinality, initialization, and release.
+let inspectRepeatCapacity(count: Int) : Int64 = let p = Stdlib.Internal.ListArray.repeat(count, 7L) in let capacity = __raw_get<Int64>(p, 8L) in let rc = __raw_get<Int64>(p, 24L + capacity * 8L) in let _ = Stdlib.Internal.ListArray.release(p) in capacity * 10L + rc
+let inspectRepeatedArray(count: Int) : Int64 = let p = Stdlib.Internal.ListArray.repeat(count, 7L) in let length = __raw_get<Int64>(p, 0L) in let initialized = __raw_get<Int64>(p, 16L) in let last = if length == 0L then 0L else __raw_get<Int64>(p, 24L + (length - 1L) * 8L) in let _ = Stdlib.Internal.ListArray.release(p) in length * 100L + initialized * 10L + last
+
+inspectRepeatedArray(3I) = stdout="337\n" stderr=""
+inspectRepeatedArray(0I) = stdout="0\n" stderr=""
+inspectRepeatedArray(-999999999999999999999999999999I) = stdout="0\n" stderr=""
+inspectRepeatedArray(513I) = stdout="56437\n" stderr=""
+inspectRepeatedArray(1152921504606846971I) = exit=1 stderr="Uncaught exception: Out of heap memory"
+inspectRepeatedArray(999999999999999999999999999999I) = exit=1 stderr="Uncaught exception: Out of heap memory"
+inspectRepeatCapacity(0I) = stdout="281\n" stderr=""
+inspectRepeatCapacity(3I) = 281L
+inspectRepeatCapacity(28I) = stdout="281\n" stderr=""
+inspectRepeatCapacity(29I) = stdout="291\n" stderr=""
+inspectRepeatCapacity(513I) = stdout="5131\n" stderr=""

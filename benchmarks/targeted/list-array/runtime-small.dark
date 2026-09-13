@@ -1,0 +1,11 @@
+// runtime-small.dark - Repeated small dynamic lengths expose allocation overhead.
+let pipeline(count: Int) : Int64 =
+    let xs = Stdlib.List.repeatUnsafe<Int64>(count, 2L) in
+    let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + 1L) in
+    Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>(ys), 0L, fun acc x -> acc + x)
+
+let loop(n: Int64, acc: Int64) : Int64 =
+    if n == 0L then acc
+    else loop(n - 1L, acc + pipeline(Stdlib.Int.fromInt64(n % 4L)))
+
+loop(1000L, 0L)

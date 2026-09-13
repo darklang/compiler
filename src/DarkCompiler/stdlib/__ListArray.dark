@@ -1,8 +1,47 @@
-// __ListArray.dark - Borrowing loop kernels for compiler-owned Int64 arrays.
-// Bounds and physical uniqueness are established by ListHIR, not by these
-// internal RawPtr entry points. Kernels neither allocate nor release buffers.
+// __ListArray.dark - Checked construction and borrowing Int64 array kernels.
+// Constructors establish runtime bounds. ListHIR proves physical uniqueness
+// and owns release; traversal kernels neither allocate nor release buffers.
 
 module Stdlib.Internal.ListArray
+
+// The mapping's private prefix and the common array layout cost 40 bytes.
+// Check before narrowing Int or multiplying a machine-sized length by eight.
+let repeatLength(count: Int) : Int64 =
+    if count <= 0I then 0L
+    else if count > 1152921504606846970I then Builtin.crash("Out of heap memory")
+    else Stdlib.Int.__toInt64Unchecked(count)
+
+let allocate(length: Int64) : RawPtr =
+    if length < 0L || length > 1152921504606846970L then Builtin.crash("Out of heap memory")
+    else
+        let capacity = if length <= 28L then 28L else length in
+        let rcOffset = 24L + capacity * 8L in
+        let buffer = if length <= 28L then __raw_alloc(256L) else __mapped_alloc(rcOffset + 8L) in
+        let _ = __raw_write_word(buffer, 0L, length) in
+        let _ = __raw_write_word(buffer, 8L, capacity) in
+        let _ = __raw_write_word(buffer, 16L, 0L) in
+        let _ = __raw_write_word(buffer, rcOffset, 1L) in
+        buffer
+
+// This boundary keeps conditional cleanup out of each region continuation.
+// ListHIR's intrinsic supplies the exact fixed-block RC release metadata.
+let release(buffer: RawPtr) : Unit =
+    let length = __raw_get<Int64>(buffer, 0L) in
+    if length <= 28L then __list_array_release_small(buffer)
+    else __mapped_free(buffer)
+
+let fill(buffer: RawPtr, index: Int64, length: Int64, value: Int64) : Unit =
+    if index >= length then ()
+    else
+        let _ = __raw_write_word(buffer, 24L + index * 8L, value) in
+        Stdlib.Internal.ListArray.fill(buffer, index + 1L, length, value)
+
+let repeat(count: Int, value: Int64) : RawPtr =
+    let length = Stdlib.Internal.ListArray.repeatLength(count) in
+    let buffer = Stdlib.Internal.ListArray.allocate(length) in
+    let _ = Stdlib.Internal.ListArray.fill(buffer, 0L, length, value) in
+    let _ = __raw_write_word(buffer, 16L, length) in
+    buffer
 
 let map(buffer: RawPtr, index: Int64, length: Int64, fn: (Int64) -> Int64) : Unit =
     if index >= length then ()

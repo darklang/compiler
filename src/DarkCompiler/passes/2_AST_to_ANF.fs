@@ -418,6 +418,8 @@ let tryRawMemoryIntrinsic
         Some (ANF.RawFree ptrAtom)
     | "__mapped_free", [ptrAtom] ->
         Some (ANF.MappedFree ptrAtom)
+    | "__list_array_release_small", [ptrAtom] ->
+        Some (ListHIR.releaseRuntimeSmall ptrAtom)
     | "__raw_get_byte", [ptrAtom; offsetAtom] ->
         // Read single byte at offset, returns Int64 (zero-extended)
         // IMPORTANT: Must come before the generic __raw_get_* pattern

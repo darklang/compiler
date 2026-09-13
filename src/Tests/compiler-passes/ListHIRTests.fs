@@ -8,6 +8,9 @@ let private values count = AST.ListLiteral ([1 .. count] |> List.map (int64 >> A
 let private map input = call "Stdlib.List.map_i64_i64" [input; AST.Closure ("mapCallback", [])]
 let private reverse input = call "Stdlib.List.reverse_i64" [input]
 let private fold input = call "Stdlib.List.fold_i64_i64" [input; AST.Int64Literal 0L; AST.Closure ("foldCallback", [])]
+let private repeat = call "Stdlib.List.repeatUnsafe_i64" [AST.BigIntLiteral 3I; AST.Int64Literal 7L]
+let private bytes constant : ListHIR.AllocationBytes = { ConstantBytes = constant; RuntimeBuffers = Map.empty }
+let private runtimeBytes constant terms : ListHIR.AllocationBytes = { ConstantBytes = constant; RuntimeBuffers = Map.ofList terms }
 
 let private functions : AST_to_ANF.FunctionRegistry =
     Map.ofList [
@@ -65,17 +68,21 @@ let private rejectsOwnership operations () =
 
 let private root = ListHIR.ListId 0
 let private construct releases : ListHIR.OwnedOperation =
-    { Operation = ListHIR.Construct (root, []); Releases = releases }
+    { Operation = ListHIR.Construct (root, ListHIR.Literal []); Releases = releases }
 
 let tests = [
-    "List HIR consumes unique map/reverse storage", checkSummary unique { Allocations = 1; AllocatedBytes = 56; Copies = 0; ReusedTransforms = 2; Releases = 1 }
-    "List HIR copies a surviving source version", checkSummary shared { Allocations = 2; AllocatedBytes = 112; Copies = 1; ReusedTransforms = 0; Releases = 2 }
-    "List HIR normalizes aliases before last-use solving", checkSummary (bind "xs" (values 3) (bind "alias" (AST.Var "xs") (fold (reverse (AST.Var "alias"))))) { Allocations = 1; AllocatedBytes = 56; Copies = 0; ReusedTransforms = 1; Releases = 1 }
-    "List HIR releases unused construction", checkSummary (bind "xs" (values 3) (AST.Int64Literal 1L)) { Allocations = 1; AllocatedBytes = 56; Copies = 0; ReusedTransforms = 0; Releases = 1 }
-    "List HIR supports the largest recyclable array", checkSummary (fold (reverse (values 28))) { Allocations = 1; AllocatedBytes = 256; Copies = 0; ReusedTransforms = 1; Releases = 1 }
+    "List HIR consumes unique map/reverse storage", checkSummary unique { Allocations = 1; AllocatedBytes = bytes 56L; Copies = 0; ReusedTransforms = 2; Releases = 1 }
+    "List HIR copies a surviving source version", checkSummary shared { Allocations = 2; AllocatedBytes = bytes 112L; Copies = 1; ReusedTransforms = 0; Releases = 2 }
+    "List HIR normalizes aliases before last-use solving", checkSummary (bind "xs" (values 3) (bind "alias" (AST.Var "xs") (fold (reverse (AST.Var "alias"))))) { Allocations = 1; AllocatedBytes = bytes 56L; Copies = 0; ReusedTransforms = 1; Releases = 1 }
+    "List HIR releases unused construction", checkSummary (bind "xs" (values 3) (AST.Int64Literal 1L)) { Allocations = 1; AllocatedBytes = bytes 56L; Copies = 0; ReusedTransforms = 0; Releases = 1 }
+    "List HIR supports the largest recyclable array", checkSummary (fold (reverse (values 28))) { Allocations = 1; AllocatedBytes = bytes 256L; Copies = 0; ReusedTransforms = 1; Releases = 1 }
+    "List HIR budgets runtime construction and consuming transforms", checkSummary (fold (reverse (map repeat))) { Allocations = 1; AllocatedBytes = runtimeBytes 0L [root, 1L]; Copies = 0; ReusedTransforms = 2; Releases = 1 }
+    "List HIR budgets runtime copies through aliases", checkSummary (bind "xs" repeat (bind "alias" (AST.Var "xs") (bind "ys" (map (AST.Var "xs")) (bind "old" (fold (AST.Var "alias")) (fold (AST.Var "ys")))))) { Allocations = 2; AllocatedBytes = runtimeBytes 0L [root, 2L]; Copies = 1; ReusedTransforms = 0; Releases = 2 }
+    "List HIR keeps independent runtime extents distinct", checkSummary (bind "xs" repeat (bind "xs" repeat (fold (reverse (AST.Var "xs"))))) { Allocations = 2; AllocatedBytes = runtimeBytes 0L [root, 1L; ListHIR.ListId 1, 1L]; Copies = 0; ReusedTransforms = 1; Releases = 2 }
+    "List HIR retains runtime origin when copying a consumed transform", checkSummary (bind "ys" (map repeat) (bind "zs" (map (AST.Var "ys")) (bind "old" (fold (AST.Var "ys")) (fold (AST.Var "zs"))))) { Allocations = 2; AllocatedBytes = runtimeBytes 0L [root, 2L]; Copies = 1; ReusedTransforms = 1; Releases = 2 }
     "List HIR preserves native allocation budget", testLoweredBudget
     "List HIR rejects escaping lists", rejects (bind "xs" (values 3) (AST.Var "xs"))
-    "List HIR reclaims arrays beyond the fixed heap classes", checkSummary (fold (reverse (values 29))) { Allocations = 1; AllocatedBytes = 272; Copies = 0; ReusedTransforms = 1; Releases = 1 }
+    "List HIR reclaims arrays beyond the fixed heap classes", checkSummary (fold (reverse (values 29))) { Allocations = 1; AllocatedBytes = bytes 272L; Copies = 0; ReusedTransforms = 1; Releases = 1 }
     "List HIR rejects borrowed input lists", rejects (fold (reverse (AST.Var "external")))
     "List HIR rejects managed elements", rejects (bind "xs" (AST.ListLiteral [AST.StringLiteral "a"]) (AST.Int64Literal 0L))
     "List HIR rejects callbacks capturing region lists", rejects (bind "xs" (values 3) (fold (call "Stdlib.List.map_i64_i64" [AST.Var "xs"; AST.Closure ("mapCallback", [AST.Var "xs"])])))

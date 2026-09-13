@@ -116,6 +116,8 @@ let rawMemoryIntrinsics : ModuleFunc list = [
     // Mapped buffers have a private length prefix and must be explicitly unmapped.
     { Name = "__mapped_alloc"; TypeParams = []; ParamTypes = [TInt64]; ReturnType = TRawPtr }
     { Name = "__mapped_free"; TypeParams = []; ParamTypes = [TRawPtr]; ReturnType = TUnit }
+    // Fixed RC layout of the runtime list-array allocator's small branch.
+    { Name = "__list_array_release_small"; TypeParams = []; ParamTypes = [TRawPtr]; ReturnType = TUnit }
     // __raw_alloc : (Int64) -> RawPtr - allocate raw bytes
     { Name = "__raw_alloc"; TypeParams = []; ParamTypes = [TInt64]; ReturnType = TRawPtr }
     // __raw_free : (RawPtr) -> Unit - free an internal 8-byte raw cell

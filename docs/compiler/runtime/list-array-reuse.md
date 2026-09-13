@@ -10,9 +10,11 @@ ownership annotation, public list type, or external calling convention changes.
 a supported list operation after monomorphization and lambda lifting, before
 AST-to-ANF lowering destroys collection semantics. Supported operations are
 `List.map<Int64, Int64>`, `List.reverse<Int64>`, and
-`List.fold<Int64, Int64>`. Literal lengths are no longer restricted to the
-small allocator's 28-element limit. Scalar bindings and region results have
-type `Int64` or `Bool`.
+`List.fold<Int64, Int64>`, plus runtime-sized construction with
+`List.repeatUnsafe<Int64>(count: Int, value: Int64)`. Literal lengths are no
+longer restricted to the small allocator's 28-element limit. Scalar bindings
+and region results have type `Int64` or `Bool`; the repeat count is a
+constructor-specific managed `Int` operand, not a general managed region value.
 
 Callbacks must be known closure constructions or function references. Captures
 are restricted to immediate scalar values and static code addresses. External
@@ -22,11 +24,14 @@ persistent skew-list implementation. This is a supported representation
 choice, not a conversion shim. There are no array/skew conversions.
 
 The initial selection rule is an eligibility rule, not an interprocedural cost
-model. Operations on arrays of up to 28 elements are unrolled; larger arrays use
-shared tail-recursive kernels in `stdlib/__ListArray.dark`, compiled into loops.
+model. Operations on literal arrays of up to 28 elements are unrolled; larger
+and runtime-sized arrays use shared tail-recursive kernels in
+`stdlib/__ListArray.dark`, compiled into loops.
 Literal initialization still emits work proportional to the source literal.
-Lengths must fit the existing signed 32-bit layout offsets; this is not yet a
-runtime-sized constructor or growing-builder implementation.
+Literal lengths must fit the existing signed 32-bit layout offsets. Runtime
+lengths use checked 64-bit byte arithmetic. Runtime lengths through 28 use the
+256-byte recyclable class; larger lengths use independent mappings. Growing
+builders and pooled large buffers are not implemented.
 
 ## Typed stages and ownership
 
@@ -42,7 +47,11 @@ FunctionalRegion: typed scalar operands + semantic collection edges
 The stages share an `Operation<'transform>` family. Only owned transforms carry
 an ownership decision. Collection identities are monotonic and separate from
 ANF temporary identifiers; lexical aliases resolve to the same collection
-identity before use counting. Scalar bindings retain checked types.
+identity before use counting. Runtime extents name their originating
+construction identity, not a lexical count variable; aliases, consuming
+transforms and variable shadowing cannot change this origin. Lowering carries
+the pointer, validated length atom and selected layout together. Scalar bindings
+retain checked types.
 
 A final use transfers the source allocation into the result. If another use
 survives, the transform borrows the source and allocates/copies independent
@@ -58,25 +67,44 @@ operand types, layout agreement, and allocation bounds. Construction is atomic
 at the region level: element expressions run first in source order, then the
 compiler allocates and initializes the buffer before exposing its identity.
 Map callbacks execute in list order; fold callbacks execute in traversal order.
+Repeat evaluates count and value once, in source order, even for nonpositive
+counts. Negative arbitrary-precision counts normalize to zero before narrowing.
+The checked constructor rejects counts above `(Int64.MaxValue - 40) / 8`
+before conversion or multiplication. That rejection uses the stdlib fatal-error
+mechanism (`Uncaught exception: Out of heap memory`); an OS allocation failure
+uses the native allocator's fatal path.
 
 `allocationSummary` reports exact region allocation counts/requested bytes, copies,
 reused transformations, and releases, excluding work inside scalar expressions
 and callbacks. Requested bytes include the mapped allocator's private prefix,
-but exclude OS page rounding. Pass tests check these budgets and the resulting native-memory
-ANF operations. `--dump-anf` exposes allocations, stores, calls, and cleanup.
+but exclude OS page rounding. Byte budgets contain a constant term and physical
+runtime-buffer counts keyed by construction identities. Each runtime buffer
+costs `256` for `n <= 28`, otherwise `40 + 8*n`; copies add another buffer with
+the same extent. Here `n` is the validated, nonnegative array length, not the
+original signed count. Distinct runtime constructors retain distinct terms.
+These are piecewise budgets, not an affine approximation. Pass tests check them and
+the resulting native-memory ANF operations. `--dump-anf` exposes allocations,
+stores, calls, and cleanup.
 
 ## Storage contract
 
 The internal layout is `[length][capacity][initialized count][Int64 elements][RC]`,
-with 8-byte words. Capacity equals the statically known length. Allocation size
-is `32 + 8 * length`, including the refcount word. Empty regions use a 32-byte
-allocation; there is no special null-array representation.
+with 8-byte words. Capacity equals the length except for small runtime buffers,
+whose capacity is 28. Allocation size is `32 + 8 * capacity`, including the
+refcount word. Empty literals use 32 bytes; empty runtime buffers use the same
+256-byte recyclable class as other small runtime buffers. There is no special
+null-array representation.
 
-Storage selection produces either `RecycledArray` or `MappedArray`. Allocations
-through 256 bytes use the existing allocator's recyclable size classes on both
-native backends. Their cleanup uses the fixed-block release plan with no child
-destructors. Larger arrays own an independent mapping and explicitly unmap it
-at their verified final release. The common array header and RC word remain
+Storage selection produces `RecycledArray`, `MappedArray`, or `RuntimeArray`. Statically
+sized allocations through 256 bytes use the existing allocator's recyclable
+size classes on both native backends. Their cleanup uses the fixed-block release
+plan with no child destructors. Runtime allocation and release dispatch on
+the validated length. The small branch has RC at offset 248 and uses the same
+fixed-block release plan, exposed through an internal array-release intrinsic;
+it never disguises the buffer as a source-level managed value. A shared release
+helper keeps conditional cleanup out of initial region continuations.
+Larger arrays own an independent mapping and explicitly unmap it at their verified final release.
+The common array header and RC word remain
 uniform; mapped-region lifetime is controlled by the ownership plan, not RC.
 The compiler never tags array storage as a source-level list, reinterprets it
 as a Blob/String, or uses the 8-byte-only `RawFree` primitive to reclaim it.
@@ -116,9 +144,10 @@ binaries retain their previous layout.
 This is the first end-to-end region slice, not a replacement for the entire
 ANF pipeline or a complete Perceus implementation. The next boundaries are:
 
-1. Runtime-sized collection constructors and builders, a growth policy, and
-   profitable pooling for larger buffers. Independent variable-byte mappings
-   and loop-based kernels now provide the reclamation/execution foundation.
+1. Further runtime-sized constructors (including Result-wrapped `List.repeat`),
+   builders, a growth policy, and profitable pooling for large runtime buffers.
+   Checked repeat construction, independent variable-byte mappings and
+   loop-based kernels provide the reclamation/execution foundation.
 2. A general semantic HIR and primitive effect/alias/ownership contracts;
    layout/destruction metadata independent of ANF; stage verifiers throughout
    the pipeline. Generated printing must precede general ownership elaboration.

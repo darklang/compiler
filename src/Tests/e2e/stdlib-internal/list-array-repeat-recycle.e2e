@@ -1,0 +1,9 @@
+// list-array-repeat-recycle.e2e - Reacquire runtime arrays from the 256-byte class.
+// The probe formats dead raw blocks as strings solely for test reclamation,
+// as in list-array.e2e. Offset 40 records the third transformed element.
+let seedRepeatBlock() : RawPtr = let p = __raw_alloc(256L) in let _ = __raw_write_word(p, 0L, 240L) in let _ = __raw_write_word(p, 40L, 999L) in let _ = __raw_write_word(p, 248L, 1L) in let s = __rawptr_to_string(p) in let _ = Stdlib.String.__byteLength(s) in p
+let recycledRepeatPipeline(count: Int) : Int64 = let xs = Stdlib.List.repeatUnsafe<Int64>(count, 7L) in let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + 1L) in Stdlib.List.fold<Int64, Int64>(ys, 0L, fun acc x -> acc + x)
+let inspectRepeatBlock() : Int64 = let p = __raw_alloc(256L) in let _ = __raw_write_word(p, 0L, 240L) in let _ = __raw_write_word(p, 248L, 1L) in let s = __rawptr_to_string(p) in __raw_get<Int64>(__string_to_rawptr(s), 40L)
+
+let _ = seedRepeatBlock() in let result = recycledRepeatPipeline(3I) in result + inspectRepeatBlock() = stdout="32\n" stderr="" disable_opt_inline=true
+let _ = seedRepeatBlock() in let result = recycledRepeatPipeline(28I) in result + inspectRepeatBlock() = stdout="232\n" stderr="" disable_opt_inline=true

@@ -37,6 +37,9 @@ the exact same source files. Each case also runs with leak checking. Reports
 include source/assembly hashes, commit and dirty-state attribution, instruction
 counts, compile times, and executable sizes. They do not update canonical
 snapshots; single compile-time samples are diagnostic, not a timing gate.
+Build both compilers before starting the comparison; changing either assembly
+during measurement invalidates the run. Completed cases are saved incrementally,
+but only a report with `complete: true` covers all `requested_cases`.
 Normal execution must succeed for both compilers; leak checking must succeed
 for the candidate. Baseline leak-instrumentation failures are reported and
 retained in JSON independently of the ordinary instruction comparison.
@@ -55,6 +58,11 @@ python3 benchmarks/targeted/list-array/compare.py \
 samples and their median when the requested target matches the Linux host
 (`--native-runs`, default 5). These timings include process startup; use the
 repeated workloads, not tiny controls, to assess mapping syscall costs.
+`runtime-unique` and `runtime-shared` construct 256/257-element repeats using
+function-parameter counts. `runtime-small` repeatedly exercises lengths 0–3 to
+expose mapping overhead; `runtime-effects` checks count/value evaluation,
+callback order, and normalization of zero and huge negative counts on both
+targets.
 `mapped-buffer.dark` is a candidate-only internal probe: compile with
 `--allow-internal --emit-result --leak-check` and expect `5376` with no leaks.
 
