@@ -1628,7 +1628,7 @@ let private computeStringLiteralOffsets (codeFileOffset: int) (codeSize: int) (f
         let floatStart = (codeFileOffset + codeSize + 7) &&& (~~~7)
         let startOffset = floatStart + floatPoolSize
 
-        // Each string has format: [length:8][data:N][padding:P][refcount:8]
+        // Each string has format: [refcount:8][length:8][data:N][padding:P]
         // Map.fold visits the pool in index order, preserving its layout
         // without materializing an intermediate ordered list.
         stringPool.Strings
@@ -1640,7 +1640,7 @@ let private computeStringLiteralOffsets (codeFileOffset: int) (codeSize: int) (f
         |> snd
 
 /// Compute the size of the string pool in bytes
-/// Each string has format: [length:8][data:N][padding:P][refcount:8]
+/// Each string has format: [refcount:8][length:8][data:N][padding:P]
 let getStringPoolSize (stringPool: LiteralPool.StringPool) : int =
     stringPool.Strings
     |> Map.fold (fun size _idx (_str, len) ->

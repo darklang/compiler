@@ -114,7 +114,7 @@ let collectStringPool (instructions: Instr list) : LiteralPool.StringPool =
         | _ -> pool) initial
 
 let private stringEntrySize (length: int) : int =
-    8 + ((length + 7) &&& (~~~7)) + 8
+    16 + ((length + 7) &&& (~~~7))
 
 /// Resolve symbolic literal/runtime labels against the data segment layout used
 /// by Binary_Generation_ELF_X86_64.

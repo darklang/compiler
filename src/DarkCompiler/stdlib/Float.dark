@@ -319,10 +319,10 @@ let __decimalProductCarry(value: String, index: Int64, digit: Int64, carry: Int6
 let __writeDecimalProduct(value: String, index: Int64, digit: Int64, carry: Int64, ptr: RawPtr, outputIndex: Int64) : Unit =
     if index < 0L then
         if carry == 0L then ()
-        else __raw_write_byte(ptr, outputIndex + 8L, carry + 48L)
+        else __raw_write_byte(ptr, outputIndex + 16L, carry + 48L)
     else
         let product = (Stdlib.String.getByteAt(value, index) - 48L) * digit + carry in
-        let _ = __raw_write_byte(ptr, outputIndex + 8L, product % 10L + 48L) in
+        let _ = __raw_write_byte(ptr, outputIndex + 16L, product % 10L + 48L) in
         Stdlib.Float.__writeDecimalProduct(value, index - 1L, digit, product / 10L, ptr, outputIndex - 1L)
 
 let __multiplyTextOnce(value: String, digit: Int64) : String =
@@ -331,9 +331,9 @@ let __multiplyTextOnce(value: String, digit: Int64) : String =
     let outputLength = inputLength + (if finalCarry == 0L then 0L else 1L) in
     let dataSize = Stdlib.String.__alignedDataSize(outputLength) in
     let ptr = __raw_alloc(dataSize + 16L) in
-    let _ = __raw_write_word(ptr, 0L, outputLength) in
+    let _ = __raw_write_word(ptr, 0L, 1L) in
+    let _ = __raw_write_word(ptr, 8L, outputLength) in
     let _ = Stdlib.Float.__writeDecimalProduct(value, inputLength - 1L, digit, 0L, ptr, outputLength - 1L) in
-    let _ = __raw_write_word(ptr, dataSize + 8L, 1L) in
     __rawptr_to_string(ptr)
 
 let __multiplyTextByDigit(value: String, digit: Int64, count: Int64) : String =

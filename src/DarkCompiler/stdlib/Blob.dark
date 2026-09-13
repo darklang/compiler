@@ -2,17 +2,17 @@
 
 module Stdlib.Blob
 
-// The native Blob layout is [length:8][data:N][padding to 8][refcount:8].
+// The native Blob layout is [refcount:8][length:8][data:N][padding to 8].
 // These Int64-based helpers are the private storage boundary beneath the
 // interpreter-compatible UInt8/Int public API.
 let __alignedDataSize(size: Int64) : Int64 =
     ((size + 7L) / 8L) * 8L
 
 let __byteLength(blob: Blob) : Int64 =
-    __raw_get<Int64>(__blob_to_rawptr(blob), 0L)
+    __raw_get<Int64>(__blob_to_rawptr(blob), 8L)
 
 let __getByte(blob: Blob, index: Int64) : Int64 =
-    __raw_get_byte(__blob_to_rawptr(blob), index + 8L)
+    __raw_get_byte(__blob_to_rawptr(blob), index + 16L)
 
 let __copyBytes(src: RawPtr, dest: RawPtr, offset: Int64, remaining: Int64) : Unit =
     if remaining <= 0L then ()
@@ -30,11 +30,10 @@ let __zeroBytes(ptr: RawPtr, offset: Int64, remaining: Int64) : Unit =
 let __createZeroed(size: Int64) : Blob =
     let length = if size <= 0L then 0L else size in
     let dataSize = Stdlib.Blob.__alignedDataSize(length) in
-    let refcountOffset = 8L + dataSize in
     let ptr = __raw_alloc(16L + dataSize) in
-    let _ = __raw_write_word(ptr, 0L, length) in
-    let _ = Stdlib.Blob.__zeroBytes(ptr, 8L, length) in
-    let _ = __raw_write_word(ptr, refcountOffset, 1L) in
+    let _ = __raw_write_word(ptr, 0L, 1L) in
+    let _ = __raw_write_word(ptr, 8L, length) in
+    let _ = Stdlib.Blob.__zeroBytes(ptr, 16L, length) in
     __rawptr_to_blob(ptr)
 
 let __writeInt64List(ptr: RawPtr, bytes: List<Int64>, offset: Int64) : Int64 =
@@ -49,11 +48,10 @@ let __fromInt64List(bytes: List<Int64>) : Blob =
     if length == 0L then Stdlib.Blob.__createZeroed(0L)
     else
         let dataSize = Stdlib.Blob.__alignedDataSize(length) in
-        let refcountOffset = 8L + dataSize in
         let ptr = __raw_alloc(16L + dataSize) in
-        let _ = __raw_write_word(ptr, 0L, length) in
-        let _ = Stdlib.Blob.__writeInt64List(ptr, bytes, 8L) in
-        let _ = __raw_write_word(ptr, refcountOffset, 1L) in
+        let _ = __raw_write_word(ptr, 0L, 1L) in
+        let _ = __raw_write_word(ptr, 8L, length) in
+        let _ = Stdlib.Blob.__writeInt64List(ptr, bytes, 16L) in
         __rawptr_to_blob(ptr)
 
 let __toInt64ListHelper(blob: Blob, index: Int64, acc: List<Int64>) : List<Int64> =
@@ -254,9 +252,9 @@ let __copyToString(blob: Blob) : String =
     else
         let dataSize = Stdlib.Blob.__alignedDataSize(length) in
         let ptr = __raw_alloc(16L + dataSize) in
-        let _ = __raw_write_word(ptr, 0L, length) in
-        let _ = Stdlib.Blob.__copyBytes(__blob_to_rawptr(blob), ptr, 8L, length) in
-        let _ = __raw_write_word(ptr, 8L + dataSize, 1L) in
+        let _ = __raw_write_word(ptr, 0L, 1L) in
+        let _ = __raw_write_word(ptr, 8L, length) in
+        let _ = Stdlib.Blob.__copyBytes(__blob_to_rawptr(blob), ptr, 16L, length) in
         __rawptr_to_string(ptr)
 
 let toString(blob: Blob) : Stdlib.Result.Result<String, String> =

@@ -1,7 +1,7 @@
 // Raw pointer internals (stdlib-only)
 // These tests rely on internal runtime helpers.
 
-let __stringRefcount(s: String): Int64 = let len = Stdlib.String.__byteLength(s) in let dataSize = ((len + 7L) / 8L) * 8L in __raw_get<Int64>(__string_to_rawptr(s), 8L + dataSize)
+let __stringRefcount(s: String): Int64 = __raw_get<Int64>(__string_to_rawptr(s), 0L)
 let dynamicString(s: String): String = s ++ "b"
 
 // Raw float load should preserve float type through if-join
@@ -26,18 +26,18 @@ let p = __raw_alloc(8L) in let _ = __raw_slot_init<Float>(p, 0L, 1.5) in let raw
 let p = __raw_alloc(16L) in let s = dynamicString("a") in let _ = __raw_slot_init<String>(p, 0L, s) in __stringRefcount(s) = stdout="2\n" // RawSlotInit<String> retains typed slot edge
 
 // Structured values expose RawPtr views without routing through Stdlib.Int64.
-let s = "a" ++ "b" in __raw_get<Int64>(__string_to_rawptr(s), 0L) = 2L
-let b = Stdlib.Blob.__createZeroed(3L) in __raw_get<Int64>(__blob_to_rawptr(b), 0L) = 3L
-let p = __raw_alloc(24L) in let _ = __raw_write_word(p, 0L, 1L) in let _ = __raw_write_byte(p, 8L, 90L) in let _ = __raw_write_word(p, 16L, 1L) in Stdlib.String.getByteAt(__rawptr_to_string(p), 0L) = 90L
-let p = __raw_alloc(24L) in let _ = __raw_write_word(p, 0L, 1L) in let _ = __raw_write_byte(p, 8L, 91L) in let _ = __raw_write_word(p, 16L, 1L) in Stdlib.Blob.__getByte(__rawptr_to_blob(p), 0L) = 91L
+let s = "a" ++ "b" in __raw_get<Int64>(__string_to_rawptr(s), 8L) = 2L
+let b = Stdlib.Blob.__createZeroed(3L) in __raw_get<Int64>(__blob_to_rawptr(b), 8L) = 3L
+let p = __raw_alloc(24L) in let _ = __raw_write_word(p, 0L, 1L) in let _ = __raw_write_word(p, 8L, 1L) in let _ = __raw_write_byte(p, 16L, 90L) in Stdlib.String.getByteAt(__rawptr_to_string(p), 0L) = 90L
+let p = __raw_alloc(24L) in let _ = __raw_write_word(p, 0L, 1L) in let _ = __raw_write_word(p, 8L, 1L) in let _ = __raw_write_byte(p, 16L, 91L) in Stdlib.Blob.__getByte(__rawptr_to_blob(p), 0L) = 91L
 
 // A Blob-backed mutable bitmap supports allocation-bounded internal workloads.
 let isSieveComposite(bitmap: RawPtr, index: Int64) : Bool =
-    let byte = __raw_get_byte(bitmap, index / 8L + 8L) in
+    let byte = __raw_get_byte(bitmap, index / 8L + 16L) in
     (byte & (1L << (index % 8L))) != 0L
 
 let setSieveComposite(bitmap: RawPtr, index: Int64) : Unit =
-    let offset = index / 8L + 8L in
+    let offset = index / 8L + 16L in
     let byte = __raw_get_byte(bitmap, offset) in
     __raw_write_byte(bitmap, offset, Stdlib.Int64.bitwiseOr(byte, 1L << (index % 8L)))
 

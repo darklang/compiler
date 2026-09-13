@@ -8,9 +8,9 @@ literal-pool entries or heap-allocated dynamic buffers.
 Dynamic strings use an aligned dynamic-buffer layout:
 
 ```text
-offset 0:                 length in bytes, Int64
-offset 8:                 UTF-8 data
-offset 8 + aligned(len):  refcount, Int64
+offset 0:   refcount, Int64
+offset 8:   length in bytes, Int64
+offset 16:  UTF-8 data
 ```
 
 `aligned(len)` rounds the byte length up to the next 8-byte boundary. This is
@@ -31,8 +31,8 @@ accounting when leak checking is enabled.
 
 The stdlib exposes byte-oriented operations directly over this layout:
 
-- `Stdlib.String.length` returns the byte length stored at offset 0.
-- `Stdlib.String.getByteAt` reads a byte from the data region at offset 8.
+- `Stdlib.String.length` returns the byte length stored at offset 8.
+- `Stdlib.String.getByteAt` reads a byte from the data region at offset 16.
 - `startsWith`, `endsWith`, `indexOf`, `contains`, `slice`, `substring`,
   `take`, and `drop` operate on byte offsets.
 
@@ -82,7 +82,7 @@ The IR operations are:
 | RefCountDecString of str:Operand
 ```
 
-Both operations compute the refcount offset as `8 + aligned(length)`.
+Both operations access the refcount directly at the value pointer.
 
 ## Remaining Work
 

@@ -154,13 +154,13 @@ let testMachOConstSectionOffsetPointsToAlignedData () : TestResult =
         readUInt32LE binary (secondSectionOffset + sectionFileOffsetField)
         |> int
 
-    let expectedLengthPrefix = [| 3uy; 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; 0uy |]
-    let actualLengthPrefix = binary.[constFileOffset .. constFileOffset + 7]
+    let expectedRefcount = [| 0xFFuy; 0xFFuy; 0xFFuy; 0xFFuy; 0xFFuy; 0xFFuy; 0xFFuy; 0x7Fuy |]
+    let actualRefcount = binary.[constFileOffset .. constFileOffset + 7]
 
     if constFileOffset % 8 <> 0 then
         Error $"Expected __const section file offset to be 8-byte aligned, got {constFileOffset}"
-    elif actualLengthPrefix <> expectedLengthPrefix then
-        Error $"Expected __const section offset to point at string length prefix, got {actualLengthPrefix}"
+    elif actualRefcount <> expectedRefcount then
+        Error $"Expected __const section offset to point at the string refcount sentinel, got {actualRefcount}"
     else
         Ok ()
 

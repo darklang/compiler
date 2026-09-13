@@ -2,12 +2,12 @@
 // Counts primes up to n using a mutable flat bit-packed bitmap.
 
 let isComposite(bitmap: RawPtr, index: Int64) : Bool =
-    let byte = __raw_get_byte(bitmap, index / 8L + 8L) in
+    let byte = __raw_get_byte(bitmap, index / 8L + 16L) in
     let mask = 1L << (index % 8L) in
     (byte & mask) != 0L
 
 let setComposite(bitmap: RawPtr, index: Int64) : Unit =
-    let offset = index / 8L + 8L in
+    let offset = index / 8L + 16L in
     let byte = __raw_get_byte(bitmap, offset) in
     __raw_write_byte(bitmap, offset, Stdlib.Int64.bitwiseOr(byte, 1L << (index % 8L)))
 

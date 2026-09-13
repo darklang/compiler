@@ -152,7 +152,7 @@ let private freeListSize = 256
 let private maxFreeListPayload = freeListSize - 8
 
 /// Emit inline 8-byte-at-a-time copy of a UTF-8 byte array to heap memory.
-/// Stores bytes starting at [destReg + 8] (after the 8-byte length prefix).
+/// Stores bytes starting after the two-word dynamic-buffer header.
 let private emitStringByteCopy
     (valueReg: X86_64.Reg)
     (destReg: X86_64.Reg)
@@ -164,7 +164,7 @@ let private emitStringByteCopy
         let chunks = (len + 7) / 8
         [0 .. chunks - 1]
         |> List.collect (fun i ->
-            let offset = 8 + i * 8
+            let offset = 16 + i * 8
             let chunkLen = min 8 (len - i * 8)
             let value =
                 [0 .. chunkLen - 1]
@@ -180,7 +180,7 @@ let private emitStringByteCopy
 let private emitStringLiteral (destReg: X86_64.Reg) (value: string) : X86_64.Instr list =
     [X86_64.LEA_rip (destReg, X86_64.stringLiteralLabel value)]
 
-/// File-operation path buffers use the same length-prefixed static layout.
+/// File-operation path buffers use the canonical static buffer layout.
 let private emitStringLiteralNoRefCount (destReg: X86_64.Reg) (value: string) : X86_64.Instr list =
     emitStringLiteral destReg value
 
@@ -532,7 +532,7 @@ let private generateCliArgvHelper (enableLeakCheck: bool) : X86_64.Instr list =
       X86_64.ADD_imm (X86_64.R9, 1)
       X86_64.JMP lengthLabel
       X86_64.Label lengthDoneLabel
-      // Allocate [length][bytes][padding][refcount]. R10 retains the value
+      // Allocate [refcount][length][bytes][padding]. R10 retains the value
       // pointer while R11 holds the aligned byte count.
       X86_64.MOV_reg (X86_64.R10, heapPtr)
       X86_64.MOV_reg (X86_64.R11, X86_64.RCX)
@@ -541,8 +541,10 @@ let private generateCliArgvHelper (enableLeakCheck: bool) : X86_64.Instr list =
       X86_64.ADD_imm (X86_64.R11, 16)
       X86_64.ADD_reg (heapPtr, X86_64.R11) ]
     @ checkHeapBounds stringHeapOkLabel
-    @ [ X86_64.MOV_store (X86_64.R10, 0, X86_64.RCX)
-        X86_64.LEA (X86_64.R9, X86_64.R10, 8)
+    @ [ X86_64.MOV_imm32 (X86_64.RDX, 1)
+        X86_64.MOV_store (X86_64.R10, 0, X86_64.RDX)
+        X86_64.MOV_store (X86_64.R10, 8, X86_64.RCX)
+        X86_64.LEA (X86_64.R9, X86_64.R10, 16)
         X86_64.MOV_reg (X86_64.RAX, X86_64.RCX)
         X86_64.Label copyLabel
         X86_64.CMP_imm (X86_64.RAX, 0)
@@ -553,14 +555,7 @@ let private generateCliArgvHelper (enableLeakCheck: bool) : X86_64.Instr list =
         X86_64.ADD_imm (X86_64.R9, 1)
         X86_64.SUB_imm (X86_64.RAX, 1)
         X86_64.JMP copyLabel
-        X86_64.Label copyDoneLabel
-        X86_64.MOV_reg (X86_64.R11, X86_64.RCX)
-        X86_64.ADD_imm (X86_64.R11, 7)
-        X86_64.AND_imm (X86_64.R11, -8)
-        X86_64.LEA (X86_64.R9, X86_64.R10, 8)
-        X86_64.ADD_reg (X86_64.R9, X86_64.R11)
-        X86_64.MOV_imm32 (X86_64.RDX, 1)
-        X86_64.MOV_store (X86_64.R9, 0, X86_64.RDX) ]
+        X86_64.Label copyDoneLabel ]
     @ leakInc
     @ [ X86_64.XOR_reg (X86_64.R8, X86_64.R8)
         X86_64.JMP boxLabel
@@ -628,7 +623,7 @@ let private generateCliGetEnvHelper (enableLeakCheck: bool) : X86_64.Instr list 
       X86_64.ADD_imm (X86_64.RAX, 8)
       X86_64.CMP_imm (X86_64.RDX, 0)
       X86_64.Jcc (X86_64.NE, argvEndLabel)
-      X86_64.MOV_load (X86_64.RCX, X86_64.RDI, 0)
+      X86_64.MOV_load (X86_64.RCX, X86_64.RDI, 8)
       X86_64.Label nextEntryLabel
       X86_64.MOV_load (X86_64.R8, X86_64.RAX, 0)
       X86_64.ADD_imm (X86_64.RAX, 8)
@@ -639,7 +634,7 @@ let private generateCliGetEnvHelper (enableLeakCheck: bool) : X86_64.Instr list 
       X86_64.CMP_reg (X86_64.R9, X86_64.RCX)
       X86_64.Jcc (X86_64.GE, nameMatchedLabel)
       X86_64.MOV_reg (X86_64.R10, X86_64.RDI)
-      X86_64.ADD_imm (X86_64.R10, 8)
+      X86_64.ADD_imm (X86_64.R10, 16)
       X86_64.ADD_reg (X86_64.R10, X86_64.R9)
       X86_64.MOV_load_byte (X86_64.RDX, X86_64.R10, 0)
       X86_64.MOV_reg (X86_64.R10, X86_64.R8)
@@ -673,8 +668,10 @@ let private generateCliGetEnvHelper (enableLeakCheck: bool) : X86_64.Instr list 
       X86_64.ADD_imm (X86_64.R11, 16)
       X86_64.ADD_reg (heapPtr, X86_64.R11) ]
     @ checkHeapBounds stringHeapOkLabel
-    @ [ X86_64.MOV_store (X86_64.R10, 0, X86_64.RCX)
-        X86_64.LEA (X86_64.R9, X86_64.R10, 8)
+    @ [ X86_64.MOV_imm32 (X86_64.RDX, 1)
+        X86_64.MOV_store (X86_64.R10, 0, X86_64.RDX)
+        X86_64.MOV_store (X86_64.R10, 8, X86_64.RCX)
+        X86_64.LEA (X86_64.R9, X86_64.R10, 16)
         X86_64.MOV_reg (X86_64.RAX, X86_64.RCX)
         X86_64.Label copyLabel
         X86_64.CMP_imm (X86_64.RAX, 0)
@@ -685,14 +682,7 @@ let private generateCliGetEnvHelper (enableLeakCheck: bool) : X86_64.Instr list 
         X86_64.ADD_imm (X86_64.R9, 1)
         X86_64.SUB_imm (X86_64.RAX, 1)
         X86_64.JMP copyLabel
-        X86_64.Label copyDoneLabel
-        X86_64.MOV_reg (X86_64.R11, X86_64.RCX)
-        X86_64.ADD_imm (X86_64.R11, 7)
-        X86_64.AND_imm (X86_64.R11, -8)
-        X86_64.LEA (X86_64.R9, X86_64.R10, 8)
-        X86_64.ADD_reg (X86_64.R9, X86_64.R11)
-        X86_64.MOV_imm32 (X86_64.RDX, 1)
-        X86_64.MOV_store (X86_64.R9, 0, X86_64.RDX) ]
+        X86_64.Label copyDoneLabel ]
     @ leakInc
     @ [ X86_64.XOR_reg (X86_64.R8, X86_64.R8)
         X86_64.JMP boxLabel
@@ -855,18 +845,12 @@ let private genDynamicBufferFieldRelease (ctx: FuncCtx) (fieldOffset: int) : X86
     [X86_64.MOV_load (X86_64.R8, X86_64.RDX, fieldOffset)
      X86_64.TEST_reg (X86_64.R8, X86_64.R8)
      X86_64.Jcc (X86_64.EQ, doneLabel)
-     X86_64.MOV_load (X86_64.R9, X86_64.R8, 0)
-     X86_64.ADD_imm (X86_64.R9, 7)
-     X86_64.AND_imm (X86_64.R9, -8)
-     X86_64.ADD_imm (X86_64.R9, 8)
-     X86_64.MOV_reg (X86_64.R10, X86_64.R8)
-     X86_64.ADD_reg (X86_64.R10, X86_64.R9)
-     X86_64.MOV_load (X86_64.R9, X86_64.R10, 0)]
+     X86_64.MOV_load (X86_64.R9, X86_64.R8, 0)]
     @ loadImm64 scratch 0x7FFFFFFFFFFFFFFFL
     @ [X86_64.CMP_reg (X86_64.R9, scratch)
        X86_64.Jcc (X86_64.EQ, literalLabel)
        X86_64.SUB_imm (X86_64.R9, 1)
-       X86_64.MOV_store (X86_64.R10, 0, X86_64.R9)
+       X86_64.MOV_store (X86_64.R8, 0, X86_64.R9)
        X86_64.TEST_reg (X86_64.R9, X86_64.R9)
        X86_64.Jcc (X86_64.NE, noFreeLabel)]
     @ leakDec
@@ -1626,12 +1610,7 @@ let private generateListRefCountDecHelperWith
             [X86_64.MOV_load (X86_64.R8, X86_64.RDI, 0)
              X86_64.TEST_reg (X86_64.R8, X86_64.R8)
              X86_64.Jcc (X86_64.EQ, leafPayloadDone)
-             X86_64.MOV_load (X86_64.R9, X86_64.R8, 0)
-             X86_64.ADD_imm (X86_64.R9, 7)
-             X86_64.AND_imm (X86_64.R9, -8)
-             X86_64.ADD_imm (X86_64.R9, 8)
              X86_64.MOV_reg (X86_64.R10, X86_64.R8)
-             X86_64.ADD_reg (X86_64.R10, X86_64.R9)
              X86_64.MOV_load (X86_64.R9, X86_64.R10, 0)]
             @ loadImm64 scratch 0x7FFFFFFFFFFFFFFFL
             @ [X86_64.CMP_reg (X86_64.R9, scratch)
@@ -2566,11 +2545,7 @@ let private generateClosureRefCountDecHelper
         [X86_64.MOV_load (X86_64.R9, X86_64.RAX, fieldOffset)
          X86_64.TEST_reg (X86_64.R9, X86_64.R9)
          X86_64.Jcc (X86_64.EQ, doneLabel)
-         X86_64.MOV_load (X86_64.R10, X86_64.R9, 0)
-         X86_64.ADD_imm (X86_64.R10, 7)
-         X86_64.AND_imm (X86_64.R10, -8)
-         X86_64.ADD_imm (X86_64.R10, 8)
-         X86_64.ADD_reg (X86_64.R10, X86_64.R9)
+         X86_64.MOV_reg (X86_64.R10, X86_64.R9)
          X86_64.MOV_load (X86_64.RDX, X86_64.R10, 0)]
         @ loadImm64 scratch 0x7FFFFFFFFFFFFFFFL
         @ [X86_64.CMP_reg (X86_64.RDX, scratch)
@@ -3132,12 +3107,12 @@ let private translateInstr
             [])
 
     | LIR.PrintHeapString reg ->
-        // Heap string format: [length:8][data:N][refcount:8]
+        // Dynamic string format: [refcount:8][length:8][data:N]
         // Print data + newline (exit handled by subsequent Ret → epilogue)
         resolveReg reg
         |> Result.map (fun srcReg ->
-            [X86_64.MOV_load (X86_64.RDX, srcReg, 0)
-             X86_64.LEA (X86_64.RSI, srcReg, 8)
+            [X86_64.MOV_load (X86_64.RDX, srcReg, 8)
+             X86_64.LEA (X86_64.RSI, srcReg, 16)
              X86_64.MOV_imm32 (X86_64.RDI, 1)]
             @ genWriteSyscall
             @ [X86_64.SUB_imm (X86_64.RSP, 8)]
@@ -3152,8 +3127,8 @@ let private translateInstr
     | LIR.PrintHeapStringNoNewline reg ->
         resolveReg reg
         |> Result.map (fun srcReg ->
-            [X86_64.MOV_load (X86_64.RDX, srcReg, 0)
-             X86_64.LEA (X86_64.RSI, srcReg, 8)
+            [X86_64.MOV_load (X86_64.RDX, srcReg, 8)
+             X86_64.LEA (X86_64.RSI, srcReg, 16)
              X86_64.MOV_imm32 (X86_64.RDI, 1)]
             @ genWriteSyscall)
 
@@ -3206,16 +3181,16 @@ let private translateInstr
                 resolveReg reg
                 |> Result.map (fun src ->
                     [ X86_64.MOV_reg (X86_64.R10, src)
-                      X86_64.MOV_load (X86_64.RDX, X86_64.R10, 0)
-                      X86_64.LEA (X86_64.RSI, X86_64.R10, 8) ])
+                      X86_64.MOV_load (X86_64.RDX, X86_64.R10, 8)
+                      X86_64.LEA (X86_64.RSI, X86_64.R10, 16) ])
             | LIR.StackSlot offset ->
                 Ok [ X86_64.MOV_load (X86_64.R10, X86_64.RBP, int32 (adjustStackOffset ctx offset))
-                     X86_64.MOV_load (X86_64.RDX, X86_64.R10, 0)
-                     X86_64.LEA (X86_64.RSI, X86_64.R10, 8) ]
+                     X86_64.MOV_load (X86_64.RDX, X86_64.R10, 8)
+                     X86_64.LEA (X86_64.RSI, X86_64.R10, 16) ]
             | LIR.StringSymbol text ->
                 Ok (emitStringLiteralNoRefCount X86_64.R10 text
-                    @ [ X86_64.MOV_load (X86_64.RDX, X86_64.R10, 0)
-                        X86_64.LEA (X86_64.RSI, X86_64.R10, 8) ])
+                    @ [ X86_64.MOV_load (X86_64.RDX, X86_64.R10, 8)
+                        X86_64.LEA (X86_64.RSI, X86_64.R10, 16) ])
             | _ -> Error "StdoutWrite requires a String operand"
 
         setupValue
@@ -3263,7 +3238,7 @@ let private translateInstr
             @ [ X86_64.MOV_store (X86_64.RSP, 0, X86_64.R10)
                 X86_64.Label readLabel
                 X86_64.MOV_load (X86_64.R10, X86_64.RSP, 0)
-                X86_64.LEA (X86_64.RSI, heapPtr, 8)
+                X86_64.LEA (X86_64.RSI, heapPtr, 16)
                 X86_64.ADD_reg (X86_64.RSI, X86_64.R10)
                 X86_64.XOR_reg (X86_64.RDI, X86_64.RDI)
                 X86_64.MOV_imm32 (X86_64.RDX, 1)
@@ -3286,21 +3261,20 @@ let private translateInstr
                 X86_64.MOV_load (X86_64.R10, X86_64.RSP, 0)
                 X86_64.CMP_imm (X86_64.R10, 0)
                 X86_64.Jcc (X86_64.LE, noCrLabel)
-                X86_64.LEA (X86_64.RSI, heapPtr, 7)
+                X86_64.LEA (X86_64.RSI, heapPtr, 15)
                 X86_64.ADD_reg (X86_64.RSI, X86_64.R10)
                 X86_64.MOV_load_byte (X86_64.R11, X86_64.RSI, 0)
                 X86_64.CMP_imm (X86_64.R11, 13)
                 X86_64.Jcc (X86_64.NE, noCrLabel)
                 X86_64.SUB_imm (X86_64.R10, 1)
                 X86_64.Label noCrLabel
-                X86_64.MOV_store (heapPtr, 0, X86_64.R10)
+                X86_64.MOV_imm32 (X86_64.RAX, 1)
+                X86_64.MOV_store (heapPtr, 0, X86_64.RAX)
+                X86_64.MOV_store (heapPtr, 8, X86_64.R10)
                 X86_64.MOV_reg (X86_64.R11, X86_64.R10)
                 X86_64.ADD_imm (X86_64.R11, 7)
-                X86_64.AND_imm (X86_64.R11, -8)
-                X86_64.LEA (X86_64.RSI, heapPtr, 8)
-                X86_64.ADD_reg (X86_64.RSI, X86_64.R11) ]
-            @ loadImm64 X86_64.RAX 1L
-            @ [ X86_64.MOV_store (X86_64.RSI, 0, X86_64.RAX)
+                X86_64.AND_imm (X86_64.R11, -8) ]
+            @ [
                 X86_64.MOV_store (X86_64.RSP, 8, heapPtr)
                 X86_64.ADD_imm (X86_64.R11, 16)
                 X86_64.ADD_reg (heapPtr, X86_64.R11) ]
@@ -3337,8 +3311,8 @@ let private translateInstr
         resolveReg messageReg
         |> Result.map (fun resolvedMessageReg ->
             [X86_64.MOV_reg (X86_64.R8, resolvedMessageReg)]
-            @ [X86_64.MOV_load (X86_64.RDX, X86_64.R8, 0)
-               X86_64.LEA (X86_64.RSI, X86_64.R8, 8)
+            @ [X86_64.MOV_load (X86_64.RDX, X86_64.R8, 8)
+               X86_64.LEA (X86_64.RSI, X86_64.R8, 16)
                X86_64.MOV_imm32 (X86_64.RDI, 2)]
             @ genWriteSyscall
             @ [X86_64.SUB_imm (X86_64.RSP, 8)]
@@ -3964,35 +3938,33 @@ let private translateInstr
         | LIR.Reg reg ->
             resolveReg reg
             |> Result.map (fun addrReg ->
-                // Heap string: [length:8][data:N][padding:P][refcount:8]
-                // refcount offset = 8 + ((length + 7) & ~7)
+                // Dynamic buffer: [refcount:8][length:8][data:N][padding:P]
                 // Sentinel value INT64_MAX means literal (read-only)
                 let skipLabel = freshLabel "rcinc_str_skip"
                 let literalLabel = freshLabel "rcinc_str_lit"
-                let refAddressReg =
-                    if addrReg = X86_64.RCX then X86_64.RDX else X86_64.RCX
-                let refValueReg =
-                    if refAddressReg = X86_64.RCX then X86_64.RDX else X86_64.RCX
-                [X86_64.PUSH X86_64.RCX
-                 X86_64.PUSH X86_64.RDX
-                 // Compute refcount address
-                 X86_64.MOV_load (refAddressReg, addrReg, 0)
-                 X86_64.ADD_imm (refAddressReg, 7)
-                 X86_64.AND_imm (refAddressReg, -8)
-                 X86_64.ADD_imm (refAddressReg, 8)
-                 X86_64.ADD_reg (refAddressReg, addrReg)
-                 // Load refcount, check sentinel
-                 X86_64.MOV_load (refValueReg, refAddressReg, 0)
-                ]
+                let refAddrReg, refValueReg, preserveRegs, restoreRegs =
+                    if addrReg = scratch then
+                        X86_64.RCX,
+                        X86_64.RDX,
+                        [X86_64.PUSH scratch
+                         X86_64.PUSH X86_64.RCX
+                         X86_64.PUSH X86_64.RDX
+                         X86_64.MOV_reg (X86_64.RCX, addrReg)],
+                        [X86_64.POP X86_64.RDX; X86_64.POP X86_64.RCX; X86_64.POP scratch]
+                    else
+                        let refValueReg =
+                            if addrReg = X86_64.RCX then X86_64.RDX else X86_64.RCX
+                        addrReg, refValueReg, [X86_64.PUSH refValueReg], [X86_64.POP refValueReg]
+                preserveRegs
+                @ [X86_64.MOV_load (refValueReg, refAddrReg, 0)]
                 @ loadImm64 scratch 0x7FFFFFFFFFFFFFFFL        // scratch = INT64_MAX
                 @ [X86_64.CMP_reg (refValueReg, scratch)
                    X86_64.Jcc (X86_64.EQ, literalLabel)        // skip if literal
                    X86_64.ADD_imm (refValueReg, 1)
-                   X86_64.MOV_store (refAddressReg, 0, refValueReg)
-                   X86_64.Label literalLabel
-                   X86_64.POP X86_64.RDX
-                   X86_64.POP X86_64.RCX
-                   X86_64.Label skipLabel])
+                   X86_64.MOV_store (refAddrReg, 0, refValueReg)
+                   X86_64.Label literalLabel]
+                @ restoreRegs
+                @ [X86_64.Label skipLabel])
         | _ -> Error "dynamic buffer RefCountInc requires StringSymbol or Reg operand"
 
     | LIR.RefCountDecString str
@@ -4006,38 +3978,38 @@ let private translateInstr
                 let literalLabel = freshLabel "rcdec_str_lit"
                 let noFreeLabel = freshLabel "rcdec_str_nofree"
                 let leakDec = genLeakCounterDec ctx
-                let refAddressReg =
-                    if addrReg = X86_64.RCX then X86_64.RDX else X86_64.RCX
-                let refValueReg =
-                    if refAddressReg = X86_64.RCX then X86_64.RDX else X86_64.RCX
-                [X86_64.PUSH X86_64.RCX
-                 X86_64.PUSH X86_64.RDX
-                 // Compute refcount address
-                 X86_64.MOV_load (refAddressReg, addrReg, 0)
-                 X86_64.ADD_imm (refAddressReg, 7)
-                 X86_64.AND_imm (refAddressReg, -8)
-                 X86_64.ADD_imm (refAddressReg, 8)
-                 X86_64.ADD_reg (refAddressReg, addrReg)
-                 X86_64.MOV_load (refValueReg, refAddressReg, 0)
-                ]
+                let refAddrReg, refValueReg, preserveRegs, restoreRegs =
+                    if addrReg = scratch then
+                        X86_64.RCX,
+                        X86_64.RDX,
+                        [X86_64.PUSH scratch
+                         X86_64.PUSH X86_64.RCX
+                         X86_64.PUSH X86_64.RDX
+                         X86_64.MOV_reg (X86_64.RCX, addrReg)],
+                        [X86_64.POP X86_64.RDX; X86_64.POP X86_64.RCX; X86_64.POP scratch]
+                    else
+                        let refValueReg =
+                            if addrReg = X86_64.RCX then X86_64.RDX else X86_64.RCX
+                        addrReg, refValueReg, [X86_64.PUSH refValueReg], [X86_64.POP refValueReg]
+                preserveRegs
+                @ [X86_64.MOV_load (refValueReg, refAddrReg, 0)]
                 @ loadImm64 scratch 0x7FFFFFFFFFFFFFFFL
                 @ [X86_64.CMP_reg (refValueReg, scratch)
                    X86_64.Jcc (X86_64.EQ, literalLabel)
                    X86_64.SUB_imm (refValueReg, 1)
-                   X86_64.MOV_store (refAddressReg, 0, refValueReg)
+                   X86_64.MOV_store (refAddrReg, 0, refValueReg)
                    X86_64.TEST_reg (refValueReg, refValueReg)
                    X86_64.Jcc (X86_64.NE, noFreeLabel)]
                 // String refcount hit zero - decrement leak counter
                 @ leakDec
                 @ [X86_64.Label noFreeLabel
-                   X86_64.Label literalLabel
-                   X86_64.POP X86_64.RDX
-                   X86_64.POP X86_64.RCX
-                   X86_64.Label skipLabel])
+                   X86_64.Label literalLabel]
+                @ restoreRegs
+                @ [X86_64.Label skipLabel])
         | _ -> Error "dynamic buffer RefCountDec requires StringSymbol or Reg operand"
 
     | LIR.CanonicalBufferEq (dest, _, left, right) ->
-        // Canonical buffers share the [length:8][data:N] prefix. Compare the
+        // Canonical buffers share [refcount:8][length:8][data:N]. Compare the
         // representation directly without allocating or calling stdlib code.
         resolveReg dest
         |> Result.bind (fun destReg ->
@@ -4093,12 +4065,12 @@ let private translateInstr
                 @ operandInstrs
                 @ [X86_64.CMP_reg (leftReg, rightReg)
                    X86_64.Jcc (X86_64.EQ, equalLabel)
-                   X86_64.MOV_load (remainingReg, leftReg, 0)
-                   X86_64.MOV_load (rightWordReg, rightReg, 0)
+                   X86_64.MOV_load (remainingReg, leftReg, 8)
+                   X86_64.MOV_load (rightWordReg, rightReg, 8)
                    X86_64.CMP_reg (remainingReg, rightWordReg)
                    X86_64.Jcc (X86_64.NE, unequalLabel)
-                   X86_64.ADD_imm (leftReg, 8)
-                   X86_64.ADD_imm (rightReg, 8)
+                   X86_64.ADD_imm (leftReg, 16)
+                   X86_64.ADD_imm (rightReg, 16)
                    X86_64.Label wordLoop
                    X86_64.CMP_imm (remainingReg, 8)
                    X86_64.Jcc (X86_64.LT, byteLoop)
@@ -4132,7 +4104,7 @@ let private translateInstr
 
     | LIR.StringConcat (dest, left, right) ->
         // String concat: dest = left ++ right
-        // Heap string: [length:8][data:N][refcount:8]
+        // Dynamic and literal strings share [refcount:8][length:8][data:N].
         // Strategy: load both strings' info, allocate result, copy bytes with loops.
         // Register plan (no PUSH/POP in loops):
         //   RDI = left data ptr, RSI = left len
@@ -4159,20 +4131,20 @@ let private translateInstr
                     |> Result.map (fun srcReg ->
                         if srcReg = lenDest then
                             // srcReg == lenDest: LEA first so MOV_load doesn't clobber pointer
-                            [X86_64.LEA (addrDest, srcReg, 8)
-                             X86_64.MOV_load (lenDest, srcReg, 0)]
+                            [X86_64.LEA (addrDest, srcReg, 16)
+                             X86_64.MOV_load (lenDest, srcReg, 8)]
                         elif srcReg = addrDest then
                             // srcReg == addrDest: save pointer in scratch before LEA clobbers it
                             [X86_64.MOV_reg (scratch, srcReg)
-                             X86_64.MOV_load (lenDest, srcReg, 0)
-                             X86_64.LEA (addrDest, scratch, 8)]
+                             X86_64.MOV_load (lenDest, srcReg, 8)
+                             X86_64.LEA (addrDest, scratch, 16)]
                         else
-                            [X86_64.MOV_load (lenDest, srcReg, 0)
-                             X86_64.LEA (addrDest, srcReg, 8)])
+                            [X86_64.MOV_load (lenDest, srcReg, 8)
+                             X86_64.LEA (addrDest, srcReg, 16)])
                 | LIR.StringSymbol value ->
                     let len = System.Text.Encoding.UTF8.GetByteCount(value)
                     let instrs = emitStringLiteralNoRefCount addrDest value
-                    let setResults = loadImm64 lenDest (int64 len) @ [X86_64.LEA (addrDest, addrDest, 8)]
+                    let setResults = loadImm64 lenDest (int64 len) @ [X86_64.LEA (addrDest, addrDest, 16)]
                     Ok (instrs @ setResults)
                 | _ -> Ok (loadImm64 lenDest 0L @ loadImm64 addrDest 0L)
 
@@ -4212,8 +4184,8 @@ let private translateInstr
                     | Some _ ->
                         // R8 and R9 were pushed after the preserved left pointer.
                         Ok [X86_64.MOV_load (scratch, X86_64.RSP, 16)
-                            X86_64.MOV_load (X86_64.RSI, scratch, 0)
-                            X86_64.LEA (X86_64.RDI, scratch, 8)]
+                            X86_64.MOV_load (X86_64.RSI, scratch, 8)
+                            X86_64.LEA (X86_64.RDI, scratch, 16)]
                     | None ->
                         loadInfo left X86_64.RDI X86_64.RSI
 
@@ -4250,8 +4222,10 @@ let private translateInstr
                     @ genOomJump ()
                     @ [X86_64.Label doneAllocation]
 
-                    // Store total length at [RBX]
-                    @ [X86_64.MOV_store (X86_64.RBX, 0, X86_64.RCX)]
+                    // Store the fixed header.
+                    @ loadImm64 scratch 1L
+                    @ [X86_64.MOV_store (X86_64.RBX, 0, scratch)
+                       X86_64.MOV_store (X86_64.RBX, 8, X86_64.RCX)]
 
                     // Copy left bytes: RBX[8+i] = left[i]
                     @ loadImm64 X86_64.R10 0L
@@ -4261,7 +4235,7 @@ let private translateInstr
                        X86_64.MOV_reg (scratch, X86_64.RDI)
                        X86_64.ADD_reg (scratch, X86_64.R10)
                        X86_64.MOV_load_byte (scratch, scratch, 0)
-                       X86_64.LEA (X86_64.RCX, X86_64.RBX, 8)
+                       X86_64.LEA (X86_64.RCX, X86_64.RBX, 16)
                        X86_64.ADD_reg (X86_64.RCX, X86_64.R10)
                        X86_64.MOV_store_byte (X86_64.RCX, 0, scratch)
                        X86_64.ADD_imm (X86_64.R10, 1)
@@ -4269,7 +4243,7 @@ let private translateInstr
                        X86_64.Label done1]
 
                     // Copy right bytes: RBX[8+leftLen+i] = right[i]
-                    @ [X86_64.LEA (X86_64.RCX, X86_64.RBX, 8)
+                    @ [X86_64.LEA (X86_64.RCX, X86_64.RBX, 16)
                        X86_64.ADD_reg (X86_64.RCX, X86_64.RSI)]
                     @ loadImm64 X86_64.R10 0L
                     @ [X86_64.Label copy2
@@ -4285,13 +4259,6 @@ let private translateInstr
                        X86_64.JMP copy2
                        X86_64.Label done2]
 
-                    // Store refcount = 1
-                    @ [X86_64.MOV_load (X86_64.RCX, X86_64.RBX, 0)
-                       X86_64.ADD_imm (X86_64.RCX, 8 + 7)
-                       X86_64.AND_imm (X86_64.RCX, -8)
-                       X86_64.ADD_reg (X86_64.RCX, X86_64.RBX)]
-                    @ loadImm64 scratch 1L
-                    @ [X86_64.MOV_store (X86_64.RCX, 0, scratch)]
                     // Leak counter increment for string allocation
                     @ genLeakCounterInc ctx
                     // Move result to destReg, restore RBX
@@ -4682,17 +4649,12 @@ let private translateInstr
                              X86_64.PUSH X86_64.R10
                              X86_64.PUSH scratch
                              X86_64.MOV_reg (X86_64.R10, v)
-                             X86_64.MOV_load (X86_64.RCX, X86_64.R10, 0)
-                             X86_64.ADD_imm (X86_64.RCX, 7)
-                             X86_64.AND_imm (X86_64.RCX, -8)
-                             X86_64.ADD_imm (X86_64.RCX, 8)
-                             X86_64.ADD_reg (X86_64.RCX, X86_64.R10)
-                             X86_64.MOV_load (X86_64.RDX, X86_64.RCX, 0)]
+                             X86_64.MOV_load (X86_64.RDX, X86_64.R10, 0)]
                             @ loadImm64 scratch 0x7FFFFFFFFFFFFFFFL
                             @ [X86_64.CMP_reg (X86_64.RDX, scratch)
                                X86_64.Jcc (X86_64.EQ, literalLabel)
                                X86_64.ADD_imm (X86_64.RDX, 1)
-                               X86_64.MOV_store (X86_64.RCX, 0, X86_64.RDX)
+                               X86_64.MOV_store (X86_64.R10, 0, X86_64.RDX)
                                X86_64.Label literalLabel
                                X86_64.POP scratch
                                X86_64.POP X86_64.R10
@@ -4887,8 +4849,10 @@ let private translateInstr
                     X86_64.AND_imm (X86_64.R11, -8)
                     X86_64.ADD_imm (X86_64.R11, 16)
                     X86_64.ADD_reg (heapPtr, X86_64.R11)
-                    X86_64.MOV_store (X86_64.R10, 0, X86_64.RCX)
-                    X86_64.LEA (X86_64.R9, X86_64.R10, 8)
+                    X86_64.MOV_imm32 (X86_64.RDX, 1)
+                    X86_64.MOV_store (X86_64.R10, 0, X86_64.RDX)
+                    X86_64.MOV_store (X86_64.R10, 8, X86_64.RCX)
+                    X86_64.LEA (X86_64.R9, X86_64.R10, 16)
                     X86_64.MOV_reg (X86_64.RAX, X86_64.RCX)
                     X86_64.Label copyLabel
                     X86_64.CMP_imm (X86_64.RAX, 0)
@@ -4900,13 +4864,6 @@ let private translateInstr
                     X86_64.SUB_imm (X86_64.RAX, 1)
                     X86_64.JMP copyLabel
                     X86_64.Label copyDoneLabel
-                    X86_64.MOV_reg (X86_64.R11, X86_64.RCX)
-                    X86_64.ADD_imm (X86_64.R11, 7)
-                    X86_64.AND_imm (X86_64.R11, -8)
-                    X86_64.LEA (X86_64.R9, X86_64.R10, 8)
-                    X86_64.ADD_reg (X86_64.R9, X86_64.R11)
-                    X86_64.MOV_imm32 (X86_64.RDX, 1)
-                    X86_64.MOV_store (X86_64.R9, 0, X86_64.RDX)
                     X86_64.ADD_imm (X86_64.RSP, 400) ]
                 @ genLeakCounterInc ctx
                 @ [ X86_64.MOV_reg (destReg, heapPtr)
@@ -5107,8 +5064,8 @@ let private translateInstr
             let xmm = lirFRegToX86 fp
             Ok ((if xmm <> X86_64.XMM0 then [X86_64.MOVSD_reg (X86_64.XMM0, xmm)] else [])
                 @ [X86_64.CALL "Stdlib.Float.toString"]
-                @ [X86_64.MOV_load (X86_64.RDX, X86_64.RAX, 0)
-                   X86_64.LEA (X86_64.RSI, X86_64.RAX, 8)
+                @ [X86_64.MOV_load (X86_64.RDX, X86_64.RAX, 8)
+                   X86_64.LEA (X86_64.RSI, X86_64.RAX, 16)
                    X86_64.MOV_imm32 (X86_64.RDI, 1)]
                 @ genWriteSyscall
                 @ [X86_64.SUB_imm (X86_64.RSP, 8)]
@@ -5128,8 +5085,8 @@ let private translateInstr
             let xmm = lirFRegToX86 fp
             Ok ((if xmm <> X86_64.XMM0 then [X86_64.MOVSD_reg (X86_64.XMM0, xmm)] else [])
                 @ [X86_64.CALL "Stdlib.Float.toString"]
-                @ [X86_64.MOV_load (X86_64.RDX, X86_64.RAX, 0)
-                   X86_64.LEA (X86_64.RSI, X86_64.RAX, 8)
+                @ [X86_64.MOV_load (X86_64.RDX, X86_64.RAX, 8)
+                   X86_64.LEA (X86_64.RSI, X86_64.RAX, 16)
                    X86_64.MOV_imm32 (X86_64.RDI, 1)]
                 @ genWriteSyscall)
         | _ -> Error "PrintFloatNoNewline with virtual FP register"
@@ -5196,9 +5153,9 @@ let private translateInstr
                 // Allocate stack: 4096 bytes for path (PATH_MAX) + 144 bytes for stat buf = 4240
                 @ [X86_64.SUB_imm (X86_64.RSP, 4240)]
                 // Copy heap string to null-terminated C string on stack
-                // R10 = heap string ptr, [R10] = length, R10+8 = data
-                @ [X86_64.MOV_load (X86_64.RCX, X86_64.R10, 0)    // RCX = length
-                   X86_64.LEA (X86_64.RSI, X86_64.R10, 8)          // RSI = data ptr
+                // R10 points to [refcount][length][data].
+                @ [X86_64.MOV_load (X86_64.RCX, X86_64.R10, 8)
+                   X86_64.LEA (X86_64.RSI, X86_64.R10, 16)
                    X86_64.LEA (X86_64.RDI, X86_64.RSP, 144)]       // RDI = stack buf (after stat buf)
                 @ loadImm64 X86_64.R10 0L
                 @ [X86_64.Label copyLabel
@@ -5236,27 +5193,23 @@ let private translateInstr
                 @ [X86_64.SYSCALL]
                 // File size is at offset 48 in stat struct (x86_64 Linux)
                 @ [X86_64.MOV_load (X86_64.R9, X86_64.RSP, 48)]  // R9 = file size
-                // Allocate heap string: [len:8][data:N][refcount:8]
+                // Allocate [refcount:8][length:8][data:N].
                 @ [X86_64.MOV_reg (X86_64.R10, heapPtr)]          // R10 = string ptr
                 @ [X86_64.MOV_reg (scratch, X86_64.R9)
                    X86_64.ADD_imm (scratch, 24)                    // size + 24
                    X86_64.ADD_reg (heapPtr, scratch)
                    X86_64.ADD_imm (heapPtr, 7)
                    X86_64.AND_imm (heapPtr, -8)]                  // align
-                // Store length
-                @ [X86_64.MOV_store (X86_64.R10, 0, X86_64.R9)]
+                // Store fixed header
+                @ loadImm64 X86_64.RCX 1L
+                @ [X86_64.MOV_store (X86_64.R10, 0, X86_64.RCX)
+                   X86_64.MOV_store (X86_64.R10, 8, X86_64.R9)]
                 // read(fd, buf, count)
                 @ [X86_64.MOV_reg (X86_64.RDI, X86_64.R8)]        // fd
-                @ [X86_64.LEA (X86_64.RSI, X86_64.R10, 8)]        // buf = string data
+                @ [X86_64.LEA (X86_64.RSI, X86_64.R10, 16)]
                 @ [X86_64.MOV_reg (X86_64.RDX, X86_64.R9)]        // count = file size
                 @ loadImm64 X86_64.RAX readSyscall
                 @ [X86_64.SYSCALL]
-                // Store refcount after data: [R10 + 8 + size]
-                @ [X86_64.MOV_reg (scratch, X86_64.R10)
-                   X86_64.ADD_imm (scratch, 8)
-                   X86_64.ADD_reg (scratch, X86_64.R9)]
-                @ loadImm64 X86_64.RCX 1L
-                @ [X86_64.MOV_store (scratch, 0, X86_64.RCX)]
                 // close(fd)
                 @ [X86_64.MOV_reg (X86_64.RDI, X86_64.R8)]
                 @ loadImm64 X86_64.RAX closeSyscall
@@ -5273,15 +5226,15 @@ let private translateInstr
                    X86_64.JMP cleanupLabel]
                 // === Error path ===
                 @ [X86_64.Label errorLabel]
-                // Allocate error string "Error": [len=5:8]["Error":8][refcount=1:8]
+                // Allocate error string "Error": [refcount=1:8][len=5:8]["Error":8]
                 @ [X86_64.MOV_reg (X86_64.R10, heapPtr)
                    X86_64.ADD_imm (heapPtr, 24)]
-                @ loadImm64 scratch 5L
-                @ [X86_64.MOV_store (X86_64.R10, 0, scratch)]       // length = 5
-                @ loadImm64 scratch 0x726F727245L                    // "Error" in little-endian
-                @ [X86_64.MOV_store (X86_64.R10, 8, scratch)]       // data
                 @ loadImm64 scratch 1L
-                @ [X86_64.MOV_store (X86_64.R10, 16, scratch)]      // refcount
+                @ [X86_64.MOV_store (X86_64.R10, 0, scratch)]
+                @ loadImm64 scratch 5L
+                @ [X86_64.MOV_store (X86_64.R10, 8, scratch)]
+                @ loadImm64 scratch 0x726F727245L                    // "Error" in little-endian
+                @ [X86_64.MOV_store (X86_64.R10, 16, scratch)]
                 // Allocate Result Error: [tag=1:8][payload=error_str:8][refcount=1:8]
                 @ [X86_64.MOV_reg (scratch, heapPtr)
                    X86_64.ADD_imm (heapPtr, 24)]
@@ -5343,8 +5296,8 @@ let private translateInstr
                     // Allocate 4096 bytes on stack for path (PATH_MAX)
                     @ [X86_64.SUB_imm (X86_64.RSP, 4096)]
                     // Copy path to null-terminated stack buffer
-                    @ [X86_64.MOV_load (X86_64.RCX, X86_64.R10, 0)
-                       X86_64.LEA (X86_64.RSI, X86_64.R10, 8)
+                    @ [X86_64.MOV_load (X86_64.RCX, X86_64.R10, 8)
+                       X86_64.LEA (X86_64.RSI, X86_64.R10, 16)
                        X86_64.MOV_reg (X86_64.RDI, X86_64.RSP)]
                     @ loadImm64 X86_64.R10 0L
                     @ [X86_64.Label copyLabel
@@ -5381,8 +5334,8 @@ let private translateInstr
                     // R9 was the last push, so at [RSP + 4096 + 0] = [RSP + 4096]
                     @ [X86_64.MOV_load (X86_64.R9, X86_64.RSP, 4096)]  // reload R9 (content)
                     @ [X86_64.MOV_reg (X86_64.RDI, X86_64.R8)]        // fd
-                    @ [X86_64.LEA (X86_64.RSI, X86_64.R9, 8)]         // content data
-                    @ [X86_64.MOV_load (X86_64.RDX, X86_64.R9, 0)]    // content length
+                    @ [X86_64.LEA (X86_64.RSI, X86_64.R9, 16)]
+                    @ [X86_64.MOV_load (X86_64.RDX, X86_64.R9, 8)]
                     @ loadImm64 X86_64.RAX writeSyscall
                     @ [X86_64.SYSCALL]
                     // close(fd)
@@ -5403,11 +5356,11 @@ let private translateInstr
                     @ [X86_64.Label errorLabel]
                     @ [X86_64.MOV_reg (X86_64.R10, heapPtr)
                        X86_64.ADD_imm (heapPtr, 24)]
-                    @ loadImm64 scratch 5L
-                    @ [X86_64.MOV_store (X86_64.R10, 0, scratch)]
-                    @ loadImm64 scratch 0x726F727245L                    // "Error"
-                    @ [X86_64.MOV_store (X86_64.R10, 8, scratch)]
                     @ loadImm64 scratch 1L
+                    @ [X86_64.MOV_store (X86_64.R10, 0, scratch)]
+                    @ loadImm64 scratch 5L
+                    @ [X86_64.MOV_store (X86_64.R10, 8, scratch)]
+                    @ loadImm64 scratch 0x726F727245L                    // "Error"
                     @ [X86_64.MOV_store (X86_64.R10, 16, scratch)]
                     @ [X86_64.MOV_reg (scratch, heapPtr)
                        X86_64.ADD_imm (heapPtr, 24)]
@@ -5446,10 +5399,10 @@ let private translateInstr
                 pathSetup @ saves
                 // Allocate 4096 bytes on stack for null-terminated path (PATH_MAX)
                 @ [X86_64.SUB_imm (X86_64.RSP, 4096)]
-                // R10 = heap string ptr. [R10] = length, R10+8 = data
+                // R10 points to [refcount][length][data].
                 // RSI = string data addr, RDI = stack buf, RCX = length, R11 = counter
-                @ [X86_64.MOV_load (X86_64.RCX, X86_64.R10, 0)   // RCX = length
-                   X86_64.LEA (X86_64.RSI, X86_64.R10, 8)         // RSI = data ptr
+                @ [X86_64.MOV_load (X86_64.RCX, X86_64.R10, 8)
+                   X86_64.LEA (X86_64.RSI, X86_64.R10, 16)
                    X86_64.MOV_reg (X86_64.RDI, X86_64.RSP)]       // RDI = stack buf
                 // Copy loop using R11 (scratch) as counter
                 @ loadImm64 X86_64.R10 0L  // R10 = counter (reuse R10 since string ptr no longer needed)

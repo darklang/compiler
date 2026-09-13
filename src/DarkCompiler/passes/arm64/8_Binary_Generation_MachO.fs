@@ -291,7 +291,7 @@ let createFloatData (floatPool: LiteralPool.FloatPool) : byte array =
     bytes
 
 /// Create string data bytes and label map from string pool
-/// Format: [length:8][data:N][padding:P][refcount:8] for each string
+/// Format: [refcount:8][length:8][data:N][padding:P] for each string
 /// Returns (string bytes, label map from "_strN" to offset within string section)
 let createStringData (stringPool: LiteralPool.StringPool) : byte array * Map<string, int> =
     let totalSize =
@@ -304,10 +304,10 @@ let createStringData (stringPool: LiteralPool.StringPool) : byte array * Map<str
         stringPool.Strings
         |> Map.fold (fun (offset, labels) idx (str, len) ->
             let alignedLen = align8Int len
-            writeUInt64LittleEndian bytes offset (uint64 len)
-            System.Text.Encoding.UTF8.GetBytes(str, 0, str.Length, bytes, offset + 8)
+            writeUInt64LittleEndian bytes offset 0x7FFFFFFFFFFFFFFFUL
+            writeUInt64LittleEndian bytes (offset + 8) (uint64 len)
+            System.Text.Encoding.UTF8.GetBytes(str, 0, str.Length, bytes, offset + 16)
             |> ignore
-            writeUInt64LittleEndian bytes (offset + 8 + alignedLen) 0x7FFFFFFFFFFFFFFFUL
             let label = "str_" + string idx  // Match label format in CodeGen
             (offset + 16 + alignedLen, Map.add label offset labels))
             (0, Map.empty)

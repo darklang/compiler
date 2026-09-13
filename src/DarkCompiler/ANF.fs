@@ -603,7 +603,7 @@ type CExpr =
     | RawPtrToDict of ptr:Atom * tag:Atom * dictType:AST.Type  // Re-tag RawPtr as Dict
     | ListToRawPtr of list:Atom                 // Strip List tag bits, returning RawPtr
     | RawPtrToList of ptr:Atom * tag:Atom * listType:AST.Type  // Re-tag RawPtr as List
-    // Dynamic buffer reference counting (at offset computed from length)
+    // Dynamic buffer reference counting at the value pointer
     | RefCountIncString of Atom               // Increment string ref count
     | RefCountDecString of Atom               // Decrement string ref count, free if zero
     | RefCountIncBlob of Atom                // Increment bytes ref count

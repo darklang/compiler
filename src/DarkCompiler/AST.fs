@@ -39,7 +39,7 @@ type Type =
     | TBool
     | TFloat64
     | TString
-    | TBlob     // Byte array: [length:8][data:N][refcount:8]
+    | TBlob     // Byte array: [refcount:8][length:8][data:N][padding]
     | TChar      // Extended Grapheme Cluster (single visual character)
     | TDateTime  // Opaque UTC instant stored as signed 100ns Unix ticks
     | TUnit

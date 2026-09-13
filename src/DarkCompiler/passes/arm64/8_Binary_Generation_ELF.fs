@@ -144,7 +144,7 @@ let createFloatData (floatPool: LiteralPool.FloatPool) : byte array =
     bytes
 
 /// Create string data bytes from string pool
-/// Format: [length:8 bytes][data:N bytes][padding:P][refcount:8 bytes] for each string.
+/// Format: [refcount:8 bytes][length:8 bytes][data:N bytes][padding:P] for each string.
 /// Literal strings use INT64_MAX in the refcount slot so shared string RC code can skip them.
 let createStringData (stringPool: LiteralPool.StringPool) : byte array =
     let totalSize =
@@ -156,10 +156,10 @@ let createStringData (stringPool: LiteralPool.StringPool) : byte array =
     stringPool.Strings
     |> Map.fold (fun offset _idx (str, len) ->
         let alignedLen = align8Int len
-        writeUInt64LittleEndian bytes offset (uint64 len)
-        System.Text.Encoding.UTF8.GetBytes(str, 0, str.Length, bytes, offset + 8)
+        writeUInt64LittleEndian bytes offset 0x7FFFFFFFFFFFFFFFUL
+        writeUInt64LittleEndian bytes (offset + 8) (uint64 len)
+        System.Text.Encoding.UTF8.GetBytes(str, 0, str.Length, bytes, offset + 16)
         |> ignore
-        writeUInt64LittleEndian bytes (offset + 8 + alignedLen) 0x7FFFFFFFFFFFFFFFUL
         offset + 16 + alignedLen) 0
     |> ignore
     bytes

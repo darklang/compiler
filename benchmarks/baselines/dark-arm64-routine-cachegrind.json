@@ -9,108 +9,108 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs"
   },
-  "contract_sha256": "218650a6c491f640af51e280af9f08cfd9dedff693cf1f3bfeb8cd6e1c418cff",
-  "generated_at": "2026-09-13T21:06:36+00:00",
+  "contract_sha256": "d59bee6ae0fe35109e8c6e812ee94140453a886fecc3255090ea30ac2bb570e9",
+  "generated_at": "2026-09-13T21:48:33+00:00",
   "compiler": {
-    "commit": "0d78798e9c5ffbe56f679aa78b2343ee109ba439",
-    "subject": "Reuse unique Float record clone allocations"
+    "commit": "935d8c0a5ddf55042acb6d9ee3066bc73ac70cd0",
+    "subject": "Move dynamic buffer refcounts into fixed headers"
   },
   "benchmarks": [
     {
       "name": "ackermann",
-      "instructions": 9303382264
+      "instructions": 9303381642
     },
     {
       "name": "binary_trees",
-      "instructions": 537695950
+      "instructions": 537695282
     },
     {
       "name": "collatz",
-      "instructions": 70194957
+      "instructions": 70194528
     },
     {
       "name": "edigits",
-      "instructions": 3334771646
+      "instructions": 3334770978
     },
     {
       "name": "factorial",
-      "instructions": 64689
+      "instructions": 63745
     },
     {
       "name": "fannkuch",
-      "instructions": 23727526579
+      "instructions": 23681380693
     },
     {
       "name": "fasta",
-      "instructions": 454540290
+      "instructions": 454539838
     },
     {
       "name": "fib",
-      "instructions": 388195321
+      "instructions": 388194915
     },
     {
       "name": "huffman",
-      "instructions": 1922458544
+      "instructions": 1919516505
     },
     {
       "name": "leibniz",
-      "instructions": 850007724
+      "instructions": 850007272
     },
     {
       "name": "mandelbrot",
-      "instructions": 15228265
+      "instructions": 15227643
     },
     {
       "name": "matmul",
-      "instructions": 931350394
+      "instructions": 931349942
     },
     {
       "name": "merkletrees",
-      "instructions": 193341001
+      "instructions": 193340287
     },
     {
       "name": "nbody",
-      "instructions": 726507990
+      "instructions": 726507592
     },
     {
       "name": "nqueen",
-      "instructions": 207722244
+      "instructions": 207721884
     },
     {
       "name": "nsieve",
-      "instructions": 557297189
+      "instructions": 557295690
     },
     {
       "name": "pisum",
-      "instructions": 40024923
+      "instructions": 40024117
     },
     {
       "name": "primes",
-      "instructions": 1468917
+      "instructions": 1468580
     },
     {
       "name": "quicksort",
-      "instructions": 179288556
+      "instructions": 179287842
     },
     {
       "name": "spectral_norm",
-      "instructions": 63962040
+      "instructions": 63961303
     },
     {
       "name": "string_equality",
-      "instructions": 58061865
+      "instructions": 58060641
     },
     {
       "name": "sum_to_n",
-      "instructions": 62911
+      "instructions": 62220
     },
     {
       "name": "tak",
-      "instructions": 48018413
+      "instructions": 48017359
     },
     {
       "name": "tinytemplate",
-      "instructions": 1022670136
+      "instructions": 1021215184
     }
   ]
 }

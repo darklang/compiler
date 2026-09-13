@@ -148,10 +148,10 @@ type Instr =
     | RawPtrToDict of dest:VReg * ptr:Operand * tag:Operand // Re-tag RawPtr as Dict
     | ListToRawPtr of dest:VReg * list:Operand    // Strip List tag bits, returning RawPtr
     | RawPtrToList of dest:VReg * ptr:Operand * tag:Operand // Re-tag RawPtr as List
-    // Dynamic buffer reference counting (at offset computed from length)
-    | RefCountIncString of str:Operand             // Increment string ref count (at [str + 8 + len])
+    // Dynamic buffer reference counting at the value pointer
+    | RefCountIncString of str:Operand             // Increment string ref count at [str]
     | RefCountDecString of str:Operand             // Decrement string ref count, free if zero
-    | RefCountIncBlob of bytes:Operand            // Increment bytes ref count (at [bytes + 8 + len])
+    | RefCountIncBlob of bytes:Operand            // Increment bytes ref count at [bytes]
     | RefCountDecBlob of bytes:Operand            // Decrement bytes ref count, free if zero
     // Random intrinsics
     | RandomInt64 of dest:VReg                     // Get 8 random bytes as Int64

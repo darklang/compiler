@@ -441,12 +441,12 @@ let private generateListRefCountDecHelperWith
             if List.isEmpty leakDec then
                 [
                     ARM64Symbolic.SUB_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 1us)
-                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
                 ]
             else
                 [
                     ARM64Symbolic.SUB_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 1us)
-                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
                     ARM64Symbolic.CBNZ (ARM64Symbolic.X14, leafPayloadDone)
                 ] @ leakDec
         [
@@ -457,13 +457,6 @@ let private generateListRefCountDecHelperWith
             ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X28)
             ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, leafPayloadDone)
             ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
-            ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 7us)
-            ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 3us, 0)
-            ARM64Symbolic.LSR_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X13)
-            ARM64Symbolic.LSL_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X13)
-            ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X12, 8us)
-            ARM64Symbolic.ADD_reg (ARM64Symbolic.X13, ARM64Symbolic.X13, ARM64Symbolic.X14)
-            ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
             ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 0xFFFFus, 0)
             ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0xFFFFus, 16)
             ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0xFFFFus, 32)
@@ -580,12 +573,12 @@ let private generateListRefCountDecHelperWith
             if List.isEmpty leakDec then
                 [
                     ARM64Symbolic.SUB_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 1us)
-                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
                 ]
             else
                 [
                     ARM64Symbolic.SUB_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 1us)
-                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
                     ARM64Symbolic.CBNZ (ARM64Symbolic.X14, fieldDone)
                 ] @ leakDec
         [
@@ -596,13 +589,6 @@ let private generateListRefCountDecHelperWith
             ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X28)
             ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, fieldDone)
             ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
-            ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 7us)
-            ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 3us, 0)
-            ARM64Symbolic.LSR_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X13)
-            ARM64Symbolic.LSL_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X13)
-            ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X12, 8us)
-            ARM64Symbolic.ADD_reg (ARM64Symbolic.X13, ARM64Symbolic.X13, ARM64Symbolic.X14)
-            ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
             ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 0xFFFFus, 0)
             ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0xFFFFus, 16)
             ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0xFFFFus, 32)
@@ -1265,13 +1251,6 @@ let private generateRecursiveSumRefCountDecHelper
                 ARM64Symbolic.CMP_reg (ARM64Symbolic.X0, ARM64Symbolic.X28)
                 ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, doneLabel)
                 ARM64Symbolic.LDR (ARM64Symbolic.X1, ARM64Symbolic.X0, 0s)
-                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 7us)
-                ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 3us, 0)
-                ARM64Symbolic.LSR_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, ARM64Symbolic.X2)
-                ARM64Symbolic.LSL_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, ARM64Symbolic.X2)
-                ARM64Symbolic.ADD_imm (ARM64Symbolic.X2, ARM64Symbolic.X0, 8us)
-                ARM64Symbolic.ADD_reg (ARM64Symbolic.X2, ARM64Symbolic.X2, ARM64Symbolic.X1)
-                ARM64Symbolic.LDR (ARM64Symbolic.X1, ARM64Symbolic.X2, 0s)
                 ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 0xFFFFus, 0)
                 ARM64Symbolic.MOVK (ARM64Symbolic.X3, 0xFFFFus, 16)
                 ARM64Symbolic.MOVK (ARM64Symbolic.X3, 0xFFFFus, 32)
@@ -1279,7 +1258,7 @@ let private generateRecursiveSumRefCountDecHelper
                 ARM64Symbolic.CMP_reg (ARM64Symbolic.X1, ARM64Symbolic.X3)
                 ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, doneLabel)
                 ARM64Symbolic.SUB_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 1us)
-                ARM64Symbolic.STR (ARM64Symbolic.X1, ARM64Symbolic.X2, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X1, ARM64Symbolic.X0, 0s)
             ]
             @ leakRelease
             @ [ARM64Symbolic.Label doneLabel]
@@ -1482,25 +1461,18 @@ let private generateClosureRefCountDecHelper (ctx: CodeGenContext) : ARM64Symbol
             if List.isEmpty leakDec then
                 [
                     ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                 ]
             else
                 [
                     ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                     ARM64Symbolic.CBNZ (ARM64Symbolic.X15, bufferDone)
                 ] @ leakDec
         [
             ARM64Symbolic.LDR (ARM64Symbolic.X12, baseReg, int16 fieldOffset)
             ARM64Symbolic.CBZ (ARM64Symbolic.X12, bufferDone)
             ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
-            ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 7us)
-            ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 3us, 0)
-            ARM64Symbolic.LSR_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-            ARM64Symbolic.LSL_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-            ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X12, 8us)
-            ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)
-            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
             ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
             ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
             ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
@@ -1607,25 +1579,18 @@ let private generateClosureRefCountDecHelper (ctx: CodeGenContext) : ARM64Symbol
             if List.isEmpty leakDec then
                 [
                     ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                 ]
             else
                 [
                     ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                     ARM64Symbolic.CBNZ (ARM64Symbolic.X15, bufferDone)
                 ] @ leakDec
         [
             ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X0, int16 fieldOffset)
             ARM64Symbolic.CBZ (ARM64Symbolic.X12, bufferDone)
             ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
-            ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 7us)
-            ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 3us, 0)
-            ARM64Symbolic.LSR_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-            ARM64Symbolic.LSL_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-            ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X12, 8us)
-            ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)
-            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
             ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
             ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
             ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
@@ -2261,12 +2226,12 @@ let private generateDictRefCountDecHelper
             if List.isEmpty leakDec then
                 [
                     ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                 ]
             else
                 [
                     ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                     ARM64Symbolic.CBNZ (ARM64Symbolic.X15, skipLabel)
                 ] @ leakDec
 
@@ -2280,13 +2245,6 @@ let private generateDictRefCountDecHelper
             ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X28)
             ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, skipLabel)
             ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
-            ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 7us)
-            ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 3us, 0)
-            ARM64Symbolic.LSR_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-            ARM64Symbolic.LSL_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-            ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X12, 8us)
-            ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)
-            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
             ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
             ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
             ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
@@ -2306,12 +2264,12 @@ let private generateDictRefCountDecHelper
             if List.isEmpty leakDec then
                 [
                     ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                 ]
             else
                 [
                     ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                     ARM64Symbolic.CBNZ (ARM64Symbolic.X15, skipLabel)
                 ] @ leakDec
 
@@ -2323,13 +2281,6 @@ let private generateDictRefCountDecHelper
             ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X28)
             ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, skipLabel)
             ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
-            ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 7us)
-            ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 3us, 0)
-            ARM64Symbolic.LSR_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-            ARM64Symbolic.LSL_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-            ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X12, 8us)
-            ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)
-            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
             ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
             ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
             ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
@@ -2675,12 +2626,12 @@ let private generateDictRefCountDecHelper
                 if List.isEmpty bufferLeakDec then
                     [
                         ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                     ]
                 else
                     [
                         ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                         ARM64Symbolic.CBNZ_offset (ARM64Symbolic.X15, 6)
                     ] @ bufferLeakDec
             let tupleLeakDec = leakDec
@@ -2703,15 +2654,8 @@ let private generateDictRefCountDecHelper
                 ARM64Symbolic.CBNZ (ARM64Symbolic.X12, tupleStringListValueDone)
 
                 ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X11, 0s)
-                ARM64Symbolic.CBZ_offset (ARM64Symbolic.X12, 14 + List.length bufferRefcountUpdate)
+                ARM64Symbolic.CBZ_offset (ARM64Symbolic.X12, 7 + List.length bufferRefcountUpdate)
                 ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
-                ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 7us)
-                ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 3us, 0)
-                ARM64Symbolic.LSR_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-                ARM64Symbolic.LSL_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-                ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X12, 8us)
-                ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)
-                ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
                 ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
                 ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
                 ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
@@ -2762,12 +2706,12 @@ let private generateDictRefCountDecHelper
                 if List.isEmpty bufferLeakDec then
                     [
                         ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                     ]
                 else
                     [
                         ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                         ARM64Symbolic.CBNZ (ARM64Symbolic.X15, sumStringBufferDone)
                     ] @ bufferLeakDec
             [
@@ -2790,13 +2734,6 @@ let private generateDictRefCountDecHelper
                 ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X11, 8s)
                 ARM64Symbolic.CBZ (ARM64Symbolic.X12, sumStringBufferDone)
                 ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
-                ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 7us)
-                ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 3us, 0)
-                ARM64Symbolic.LSR_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-                ARM64Symbolic.LSL_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-                ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X12, 8us)
-                ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)
-                ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
                 ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
                 ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
                 ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
@@ -3438,7 +3375,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                 [ARM64Symbolic.FMOV_from_gp (ARM64Symbolic.D0, ARM64Symbolic.X0)] @ runtimeInstrs (Runtime.generatePrintFloatNoNewline ctx.Target)
             | AST.TString | AST.TChar ->
                 // X0 has string address, load len/data and print
-                [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 0s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 8us)] @
+                [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 16us)] @
                 runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target)
             | AST.TTuple elemTypes ->
                 // Print tuple inside list: (elem1, elem2, ...)
@@ -3486,7 +3423,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                             | AST.TFloat64 ->
                                 [ARM64Symbolic.FMOV_from_gp (ARM64Symbolic.D0, ARM64Symbolic.X0)] @ runtimeInstrs (Runtime.generatePrintFloatNoNewline ctx.Target)
                             | AST.TString | AST.TChar ->
-                                [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 0s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 8us)] @
+                                [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 16us)] @
                                 runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target)
                             | _ -> runtimeInstrs (Runtime.generatePrintInt64NoNewline ctx.Target)
                         let comma = if i < List.length elemTypes - 1 then printTupleCommaSpace else []
@@ -3975,15 +3912,15 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
         // Print heap string without newline (for tuple/list elements)
         lirRegToARM64Reg reg
         |> Result.map (fun regARM64 ->
-            // Heap string layout: [len:8 bytes][data:N bytes]
-            let loadInstrs = [ARM64Symbolic.LDR (ARM64Symbolic.X10, regARM64, 0s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, regARM64, 8us)]
+            // Dynamic buffer layout: [refcount:8][length:8][data:N].
+            let loadInstrs = [ARM64Symbolic.LDR (ARM64Symbolic.X10, regARM64, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, regARM64, 16us)]
             let loadAndPrint = loadInstrs @ runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target)
             if regARM64 <> ARM64Symbolic.X9 then
                 loadAndPrint
             else
                 // Need to save the original address first
                 let saveReg = [ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, regARM64)]
-                let loadFromSaved = [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X11, 0s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X11, 8us)]
+                let loadFromSaved = [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X11, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X11, 16us)]
                 saveReg @ loadFromSaved @ runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target))
 
     | LIR.PrintList (listPtr, elemType) ->
@@ -4061,7 +3998,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                                 | AST.TFloat64 ->
                                     [ARM64Symbolic.FMOV_from_gp (ARM64Symbolic.D0, ARM64Symbolic.X0)] @ runtimeInstrs (Runtime.generatePrintFloatNoNewline ctx.Target)
                                 | AST.TString | AST.TChar | AST.TInt128 | AST.TUInt128 ->
-                                    [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 0s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 8us)] @
+                                    [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 16us)] @
                                     runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target)
                                 | AST.TList elemType ->
                                     match ListDisplay.getDisplayStringFunc elemType with
@@ -4069,7 +4006,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                                         let callToDisplay = [ARM64Symbolic.BL funcName]
                                         let saveDisplayString = [ARM64Symbolic.MOV_reg (ARM64Symbolic.X21, ARM64Symbolic.X0)]
                                         let printString =
-                                            [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 0s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 8us)] @
+                                            [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 16us)] @
                                             runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target)
                                         let releaseDisplayString =
                                             match convertInstr ctx (LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X21))) with
@@ -4167,7 +4104,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                             [ARM64Symbolic.FMOV_from_gp (ARM64Symbolic.D0, ARM64Symbolic.X0)] @ runtimeInstrs (Runtime.generatePrintFloatNoNewline ctx.Target)
                         | AST.TString | AST.TChar | AST.TInt128 | AST.TUInt128 ->
                             // String is a pointer: load length, compute data ptr, print
-                            [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 0s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 8us)] @
+                            [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 16us)] @
                             runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target)
                         | t -> Crash.crash $"Unsupported field type in record: {t}"
                     let separator =
@@ -4696,18 +4633,18 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                 lirRegToARM64Reg reg
                 |> Result.map (fun src ->
                     [ ARM64Symbolic.MOV_reg (ARM64Symbolic.X9, src)
-                      ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X9, 0s)
-                      ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X9, 8us) ])
+                      ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X9, 8s)
+                      ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X9, 16us) ])
             | LIR.StackSlot offset ->
                 loadStackSlot ARM64Symbolic.X9 offset
                 |> Result.map (fun load ->
                     load
-                    @ [ ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X9, 0s)
-                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X9, 8us) ])
+                    @ [ ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X9, 8s)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X9, 16us) ])
             | LIR.StringSymbol text ->
                 Ok (loadStringLiteralPointer ARM64Symbolic.X9 text
-                    @ [ ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X9, 0s)
-                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X9, 8us) ])
+                    @ [ ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X9, 8s)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X9, 16us) ])
             | _ -> Error "StdoutWrite requires a String operand"
 
         setupValue
@@ -4781,7 +4718,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                 ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.SP, 144s)
                 ARM64Symbolic.Label readLabel
                 ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.SP, 144s)
-                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X28, 8us)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X28, 16us)
                 ARM64Symbolic.ADD_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, ARM64Symbolic.X10)
                 ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
                 ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0)
@@ -4799,21 +4736,19 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                 ARM64Symbolic.Label finishLabel
                 ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.SP, 144s)
                 ARM64Symbolic.CBZ (ARM64Symbolic.X10, noCrLabel)
-                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X28, 7us)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X28, 15us)
                 ARM64Symbolic.ADD_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, ARM64Symbolic.X10)
                 ARM64Symbolic.LDRB_imm (ARM64Symbolic.X11, ARM64Symbolic.X1, 0)
                 ARM64Symbolic.CMP_imm (ARM64Symbolic.X11, 13us)
                 ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, noCrLabel)
                 ARM64Symbolic.SUB_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 1us)
                 ARM64Symbolic.Label noCrLabel
-                ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.X28, 0s)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
+                ARM64Symbolic.STR (ARM64Symbolic.X0, ARM64Symbolic.X28, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.X28, 8s)
                 ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X10, 7us)
                 ARM64Symbolic.LSR_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 3)
                 ARM64Symbolic.LSL_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 3)
-                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X28, 8us)
-                ARM64Symbolic.ADD_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, ARM64Symbolic.X11)
-                ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
-                ARM64Symbolic.STR (ARM64Symbolic.X0, ARM64Symbolic.X1, 0s)
                 ARM64Symbolic.STR (ARM64Symbolic.X28, ARM64Symbolic.SP, 152s)
                 ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 16us)
                 ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X11) ]
@@ -4843,9 +4778,9 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
             // Preserve the heap String address across the write and newline.
             [ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, resolvedMessageReg)]
             @ [
-                // Heap String layout: [length:8][UTF-8 data:length][refcount:8].
-                ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X11, 0s)
-                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X11, 8us)
+                // Dynamic String layout: [refcount:8][length:8][UTF-8 data:length].
+                ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X11, 8s)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X11, 16us)
                 ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 2us, 0)
                 ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
                 ARM64Symbolic.SVC syscalls.SvcImmediate
@@ -5082,45 +5017,36 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                 Ok [ARM64Symbolic.ADR (tempReg, codeLabel funcName); ARM64Symbolic.STR (tempReg, addrReg, int16 offset)]
             | LIR.StringSymbol value, _ ->
                 // Convert literal string to heap format when storing in tuples/data structures
-                // Heap strings: [length:8][data:N][refcount:8]
-                // Literal data: [length:8][data:N]
+                // Dynamic and literal strings share [refcount:8][length:8][data:N].
                 // We must convert because tuple extraction expects heap format
                 let len = utf8Len value
                 let labelRef = stringDataLabel value
                 let totalSize = ((len + 16) + 7) &&& (~~~7)  // 8-byte aligned
                 Ok ([
                     // Load literal string address into X10
-                    // Literal format [length:8][data:N] - we need the data pointer
+                    // Load the literal data pointer after its two-word header.
                     ARM64Symbolic.ADRP (ARM64Symbolic.X10, labelRef)
                     ARM64Symbolic.ADD_label (ARM64Symbolic.X10, ARM64Symbolic.X10, labelRef)
-                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 8us)  // Skip 8-byte length prefix to point at data
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 16us)
                     // Allocate heap space (bump allocator), store address in X9
                     ARM64Symbolic.MOV_reg (ARM64Symbolic.X9, ARM64Symbolic.X28)  // X9 = current heap pointer (result)
                     ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, uint16 totalSize)  // bump pointer
                     // Store length (known at compile time)
                 ] @ loadImmediate ARM64Symbolic.X11 (int64 len) @ [
-                    ARM64Symbolic.STR (ARM64Symbolic.X11, ARM64Symbolic.X9, 0s)   // Store length at heap[0]
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 1us, 0)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X9, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X11, ARM64Symbolic.X9, 8s)
                     // Copy bytes: counter in X13, limit in X11
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0us, 0)  // X13 = 0
                     // Loop start (if X13 >= len, done)
                     ARM64Symbolic.CMP_reg (ARM64Symbolic.X13, ARM64Symbolic.X11)
                     ARM64Symbolic.B_cond (ARM64Symbolic.GE, 7)  // Skip 7 instructions to exit loop
                     ARM64Symbolic.LDRB (ARM64Symbolic.X15, ARM64Symbolic.X10, ARM64Symbolic.X13)  // X15 = literal[X13]
-                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X9, 8us)  // X14 = heap + 8
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X9, 16us)
                     ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X13)  // X14 = heap + 8 + X13
                     ARM64Symbolic.STRB_reg (ARM64Symbolic.X15, ARM64Symbolic.X14)  // heap_data[X13] = byte
                     ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 1us)  // X13++
                     ARM64Symbolic.B (-7)  // Loop back to CMP
-                    // Store refcount at aligned offset
-                    // aligned(x) = ((x + 7) >> 3) << 3
-                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X11, 7us)        // X14 = len + 7
-                    ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 3us, 0)                   // X15 = 3
-                    ARM64Symbolic.LSR_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)  // X14 = (len + 7) >> 3
-                    ARM64Symbolic.LSL_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)  // X14 = aligned(len)
-                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X9, 8us)         // X15 = heap + 8
-                    ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X15, ARM64Symbolic.X14)  // X14 = heap + 8 + aligned(len)
-                    ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 1us, 0)
-                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)  // refcount = 1
                     // Store heap string address to tuple slot
                     ARM64Symbolic.STR (ARM64Symbolic.X9, addrReg, int16 offset)
                 ] @ generateLeakCounterInc ctx)
@@ -5343,27 +5269,20 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                         if List.isEmpty bufferLeakDec then
                             [
                                 ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                                ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                                ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                             ]
                         else
                             [
                                 ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                                ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                                ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
                                 ARM64Symbolic.CBNZ_offset (ARM64Symbolic.X15, 6)
                             ] @ bufferLeakDec
                     let bcondOffset = List.length refcountUpdate + 1
                     let body =
                         [
                             ARM64Symbolic.LDR (ARM64Symbolic.X12, baseReg, int16 fieldOffset)
-                            ARM64Symbolic.CBZ_offset (ARM64Symbolic.X12, 15 + List.length refcountUpdate)
+                            ARM64Symbolic.CBZ_offset (ARM64Symbolic.X12, 8 + List.length refcountUpdate)
                             ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
-                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 7us)
-                            ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 3us, 0)
-                            ARM64Symbolic.LSR_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-                            ARM64Symbolic.LSL_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X12, 8us)
-                            ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)
-                            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
                             ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
                             ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
                             ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
@@ -5707,7 +5626,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                 [ARM64Symbolic.CBZ_offset (addrReg, cbzOffset)] @ inlineDecPath)
 
     | LIR.CanonicalBufferEq (dest, _, left, right) ->
-        // Canonical buffers share the [length:8][data:N] prefix. Compare the
+        // Canonical buffers share the [refcount:8][length:8][data:N] layout. Compare the
         // representation directly without allocating or calling stdlib code.
         lirRegToARM64Reg dest
         |> Result.bind (fun destReg ->
@@ -5739,12 +5658,12 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                     @ rightInstrs
                     @ [ARM64Symbolic.CMP_reg (ARM64Symbolic.X8, ARM64Symbolic.X9)
                        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, equalLabel)
-                       ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X8, 0s)
-                       ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X9, 0s)
+                       ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X8, 8s)
+                       ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X9, 8s)
                        ARM64Symbolic.CMP_reg (ARM64Symbolic.X10, ARM64Symbolic.X12)
                        ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, unequalLabel)
-                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X8, ARM64Symbolic.X8, 8us)
-                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 8us)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X8, ARM64Symbolic.X8, 16us)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 16us)
                        ARM64Symbolic.Label wordLoop
                        ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, 8us)
                        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, byteLoop)
@@ -5777,8 +5696,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
 
     | LIR.StringConcat (dest, left, right) ->
         // String concatenation:
-        // Heap string layout: [length:8][data:N][refcount:8]
-        // Literal string layout: [length:8][data:N]
+        // Dynamic and literal strings share [refcount:8][length:8][data:N].
         //
         // Register usage:
         // X9  = left data address (for literal: string address, for heap: addr+8)
@@ -5794,10 +5712,9 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
         // 2. Load right address and length into X11, X12
         // 3. Calculate total length: X13 = X10 + X12
         // 4. Allocate: total + 16 bytes using bump allocator
-        // 5. Store total length at [X14]
-        // 6. Copy left bytes to [X14+8]
-        // 7. Copy right bytes to [X14+8+len1]
-        // 8. Store refcount=1 at [X14+8+total]
+        // 5. Store refcount and total length in the fixed header
+        // 6. Copy left bytes to [X14+16]
+        // 7. Copy right bytes after the left bytes
         // 9. Move result to dest
 
         lirRegToARM64Reg dest
@@ -5807,21 +5724,21 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                 match operand with
                 | LIR.StringSymbol value ->
                     // Literal string: address via ADRP+ADD, length from UTF-8 bytes
-                    // Literal format: [length:8][data:N] - skip length prefix to get data address
+                    // Skip the literal's fixed header to get its data address.
                     let len = utf8Len value
                     let labelRef = stringDataLabel value
                     Ok ([
                         ARM64Symbolic.ADRP (addrReg, labelRef)
                         ARM64Symbolic.ADD_label (addrReg, addrReg, labelRef)
-                        ARM64Symbolic.ADD_imm (addrReg, addrReg, 8us)    // Skip 8-byte length prefix
+                        ARM64Symbolic.ADD_imm (addrReg, addrReg, 16us)
                     ] @ loadImmediate lenReg (int64 len))
                 | LIR.Reg reg ->
-                    // Heap string: address in reg, length at [reg], data at [reg+8]
+                    // Dynamic string: length at [reg+8], data at [reg+16].
                     lirRegToARM64Reg reg
                     |> Result.map (fun srcReg ->
                         [
-                            ARM64Symbolic.LDR (lenReg, srcReg, 0s)           // len = [srcReg]
-                            ARM64Symbolic.ADD_imm (addrReg, srcReg, 8us)     // addr = srcReg + 8 (data start)
+                            ARM64Symbolic.LDR (lenReg, srcReg, 8s)
+                            ARM64Symbolic.ADD_imm (addrReg, srcReg, 16us)
                         ])
                 | other -> Error $"StringConcat requires StringSymbol or Reg operand, got: {other}"
 
@@ -5854,10 +5771,13 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                         ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X15) // Bump heap pointer
                     ]
 
-                    // Store total length at [X14]
-                    let storeLen = [ARM64Symbolic.STR (ARM64Symbolic.X13, ARM64Symbolic.X14, 0s)]
+                    let storeHeader = [
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 1us, 0)
+                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X13, ARM64Symbolic.X14, 8s)
+                    ]
 
-                    // Copy left bytes: loop copying X10 bytes from X9 to [X14+8]
+                    // Copy left bytes after the fixed header.
                     // IMPORTANT: Don't use X0-X7 as temps - they may hold function arguments!
                     // Strategy: Use pointer-bumping loops instead of indexed addressing
                     // X15 = source pointer (starts at X9, bumped each iteration)
@@ -5865,7 +5785,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                     // X13 = remaining count (starts at X10, decremented, reused since we stored total already)
                     let copyLeft = [
                         ARM64Symbolic.MOV_reg (ARM64Symbolic.X15, ARM64Symbolic.X9)              // 0: X15 = src ptr
-                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X16, ARM64Symbolic.X14, 8us)        // 1: X16 = dest ptr (X14 + 8)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X16, ARM64Symbolic.X14, 16us)
                         ARM64Symbolic.MOV_reg (ARM64Symbolic.X13, ARM64Symbolic.X10)             // 2: X13 = remaining = len1
                         // Loop: if X13 == 0, done (skip 7 instructions to exit past B at index 9)
                         ARM64Symbolic.CBZ_offset (ARM64Symbolic.X13, 7)                  // 3: Skip 7 instructions if done -> index 10 (past end)
@@ -5895,32 +5815,14 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                         ARM64Symbolic.B (-6)                                     // 8: Loop back to CBZ (index 2)
                     ]
 
-                    // Recompute total length since we clobbered X13
-                    let recomputeTotal = [
-                        ARM64Symbolic.ADD_reg (ARM64Symbolic.X13, ARM64Symbolic.X10, ARM64Symbolic.X12)  // X13 = len1 + len2
-                    ]
-
-                    // Store refcount=1 at [X14+8+aligned(total)]
-                    // where aligned(x) = ((x + 7) >> 3) << 3
-                    let storeRefcount = [
-                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X13, 7us)        // X15 = total + 7
-                        ARM64Symbolic.MOVZ (ARM64Symbolic.X16, 3us, 0)                   // X16 = 3 (shift amount)
-                        ARM64Symbolic.LSR_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X16)  // X15 = (total + 7) >> 3
-                        ARM64Symbolic.LSL_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X16)  // X15 = aligned(total)
-                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X16, ARM64Symbolic.X14, 8us)        // X16 = dest + 8
-                        ARM64Symbolic.ADD_reg (ARM64Symbolic.X15, ARM64Symbolic.X16, ARM64Symbolic.X15)  // X15 = dest + 8 + aligned(total)
-                        ARM64Symbolic.MOVZ (ARM64Symbolic.X16, 1us, 0)                   // X16 = 1
-                        ARM64Symbolic.STR (ARM64Symbolic.X16, ARM64Symbolic.X15, 0s)             // [X15] = 1
-                    ]
-
                     // Move result to dest
                     let moveResult = [ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X14)]
 
-                    leftInstrs @ rightInstrs @ calcTotal @ allocate @ storeLen @ copyLeft @ copyRight @ recomputeTotal @ storeRefcount @ moveResult @ generateLeakCounterInc ctx
+                    leftInstrs @ rightInstrs @ calcTotal @ allocate @ storeHeader @ copyLeft @ copyRight @ moveResult @ generateLeakCounterInc ctx
                 )))
 
     | LIR.PrintHeapString reg ->
-        // Print heap string: layout is [len:8][data:N]
+        // Print a dynamic string with [refcount:8][length:8][data:N].
         // Note: The syscall clobbers X0, X1, X2, X8. If the input register is one
         // of these, we save it to X9 before and restore after so subsequent code
         // can still use it.
@@ -5937,8 +5839,8 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
             let restoreInstrs = if isClobbered then [ARM64Symbolic.MOV_reg (regARM64, ARM64Symbolic.X9)] else []
             [
                 ARM64Symbolic.MOV_reg (ARM64Symbolic.X9, regARM64)           // X9 = input (save in case regARM64 is X0/X1/X2)
-                ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X9, 0s)           // X2 = length
-                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X9, 8us)      // X1 = data pointer (X9 + 8)
+                ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X9, 8s)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X9, 16us)
                 ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)                // X0 = stdout fd
             ]
             @ runtimeInstrs (Runtime.generateWriteSyscall ctx.Target)
@@ -6351,16 +6253,13 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                                 ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 80s)
                             ]
                         | Some LIR.SlotInitDynamicBufferRetain ->
-                            [
-                                ARM64Symbolic.MOV_reg (ARM64Symbolic.X12, valueReg)
-                                ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
-                                ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 7us)
-                                ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 3us, 0)
-                                ARM64Symbolic.LSR_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-                                ARM64Symbolic.LSL_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)
-                                ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X12, 8us)
-                                ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)
-                                ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                            let refAddrReg, preserveAddr =
+                                if valueReg = ARM64Symbolic.X13 || valueReg = ARM64Symbolic.X15 then
+                                    ARM64Symbolic.X12, [ARM64Symbolic.MOV_reg (ARM64Symbolic.X12, valueReg)]
+                                else
+                                    valueReg, []
+                            preserveAddr @ [
+                                ARM64Symbolic.LDR (ARM64Symbolic.X15, refAddrReg, 0s)
                                 ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
                                 ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
                                 ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
@@ -6368,7 +6267,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                                 ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)
                                 ARM64Symbolic.B_cond (ARM64Symbolic.EQ, 3)
                                 ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
-                                ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                                ARM64Symbolic.STR (ARM64Symbolic.X15, refAddrReg, 0s)
                             ]
                         | Some LIR.SlotInitClosureRootRetain ->
                             let closureIncCall = [
@@ -6425,29 +6324,23 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
 
     | LIR.RefCountIncString str
     | LIR.RefCountIncBlob str ->
-        // Increment refcount for a heap string
-        // Heap string layout: [length:8][data:N][padding:P][refcount:8] where P aligns to 8
+        // Increment the leading refcount for a dynamic buffer.
         // Literal strings have refcount = INT64_MAX as sentinel (don't modify read-only memory)
         match str with
         | LIR.StringSymbol _ ->
             // Literal string - no refcount, no-op
             Ok []
         | LIR.Reg reg ->
-            // Heap or literal string - refcount is at [addr + 8 + aligned(length)]
+            // Heap and materialized literal buffers keep the refcount at [addr].
             lirRegToARM64Reg reg
             |> Result.map (fun addrReg ->
-                [
-                    // Save address to X12 in case addrReg is X13/X14/X15 which we clobber
-                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X12, addrReg)               // X12 = string address
-                    ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)             // X15 = length
-                    // Align length: X15 = ((X15 + 7) >> 3) << 3
-                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 7us)        // X15 = length + 7
-                    ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 3us, 0)                   // X13 = 3 (shift amount)
-                    ARM64Symbolic.LSR_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)  // X15 = (length + 7) >> 3
-                    ARM64Symbolic.LSL_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)  // X15 = aligned(length)
-                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X12, 8us)        // X14 = addr + 8
-                    ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)  // X14 = addr + 8 + aligned(length) (refcount addr)
-                    ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)             // X15 = refcount
+                let refAddrReg, preserveAddr =
+                    if addrReg = ARM64Symbolic.X13 || addrReg = ARM64Symbolic.X15 then
+                        ARM64Symbolic.X14, [ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, addrReg)]
+                    else
+                        addrReg, []
+                preserveAddr @ [
+                    ARM64Symbolic.LDR (ARM64Symbolic.X15, refAddrReg, 0s)             // X15 = refcount
                     // Load sentinel value 0x7FFFFFFFFFFFFFFF (INT64_MAX) into X13
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
                     ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
@@ -6456,50 +6349,44 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                     ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)             // Compare with sentinel
                     ARM64Symbolic.B_cond (ARM64Symbolic.EQ, 3)                       // If literal string, skip to end
                     ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)        // X15++
-                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)             // store back
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, refAddrReg, 0s)             // store back
                 ])
         | _ -> Error "dynamic buffer RefCountInc requires StringSymbol or Reg operand"
 
     | LIR.RefCountDecString str
     | LIR.RefCountDecBlob str ->
-        // Decrement refcount for a heap string
-        // Heap string layout: [length:8][data:N][padding:P][refcount:8] where P aligns to 8
+        // Decrement the leading refcount for a dynamic buffer.
         // Literal strings have refcount = INT64_MAX as sentinel (don't modify read-only memory)
         match str with
         | LIR.StringSymbol _ ->
             // Literal string - no refcount, no-op
             Ok []
         | LIR.Reg reg ->
-            // Heap or literal string - refcount is at [addr + 8 + aligned(length)]
+            // Heap and materialized literal buffers keep the refcount at [addr].
             lirRegToARM64Reg reg
             |> Result.map (fun addrReg ->
                 let leakDec = generateLeakCounterDec ctx
+                let refAddrReg, preserveAddr =
+                    if addrReg = ARM64Symbolic.X13 || addrReg = ARM64Symbolic.X15 then
+                        ARM64Symbolic.X14, [ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, addrReg)]
+                    else
+                        addrReg, []
                 let bcondOffset = if List.isEmpty leakDec then 3 else 9
                 let refcountUpdate =
                     if List.isEmpty leakDec then
                         [
                             ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)        // X15--
-                            ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)             // store back
+                            ARM64Symbolic.STR (ARM64Symbolic.X15, refAddrReg, 0s)             // store back
                         ]
                     else
                         [
                             ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)        // X15--
-                            ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)             // store back
+                            ARM64Symbolic.STR (ARM64Symbolic.X15, refAddrReg, 0s)             // store back
                             // If refcount hits 0, update leak counter (string freeing not implemented yet)
                             ARM64Symbolic.CBNZ_offset (ARM64Symbolic.X15, 6)                 // If not zero, skip leak counter
                         ] @ leakDec
-                [
-                    // Save address to X12 in case addrReg is X13/X14/X15 which we clobber
-                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X12, addrReg)               // X12 = string address
-                    ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)             // X15 = length
-                    // Align length: X15 = ((X15 + 7) >> 3) << 3
-                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 7us)        // X15 = length + 7
-                    ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 3us, 0)                   // X13 = 3 (shift amount)
-                    ARM64Symbolic.LSR_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)  // X15 = (length + 7) >> 3
-                    ARM64Symbolic.LSL_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X13)  // X15 = aligned(length)
-                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X12, 8us)        // X14 = addr + 8
-                    ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)  // X14 = addr + 8 + aligned(length) (refcount addr)
-                    ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)             // X15 = refcount
+                preserveAddr @ [
+                    ARM64Symbolic.LDR (ARM64Symbolic.X15, refAddrReg, 0s)             // X15 = refcount
                     // Load sentinel value 0x7FFFFFFFFFFFFFFF (INT64_MAX) into X13
                     ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
                     ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
@@ -6623,13 +6510,15 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                         ARM64Symbolic.B_label lengthLabel
                         ARM64Symbolic.Label lengthDoneLabel
                         ARM64Symbolic.MOV_reg (ARM64Symbolic.X5, ARM64Symbolic.X28)
-                        ARM64Symbolic.STR (ARM64Symbolic.X3, ARM64Symbolic.X5, 0s)
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X8, 1us, 0)
+                        ARM64Symbolic.STR (ARM64Symbolic.X8, ARM64Symbolic.X5, 0s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X3, ARM64Symbolic.X5, 8s)
                         ARM64Symbolic.ADD_imm (ARM64Symbolic.X6, ARM64Symbolic.X3, 7us)
                         ARM64Symbolic.LSR_imm (ARM64Symbolic.X6, ARM64Symbolic.X6, 3)
                         ARM64Symbolic.LSL_imm (ARM64Symbolic.X6, ARM64Symbolic.X6, 3)
                         ARM64Symbolic.ADD_imm (ARM64Symbolic.X7, ARM64Symbolic.X6, 16us)
                         ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X7)
-                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X7, ARM64Symbolic.X5, 8us)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X7, ARM64Symbolic.X5, 16us)
                         ARM64Symbolic.MOV_reg (ARM64Symbolic.X8, ARM64Symbolic.X3)
                         ARM64Symbolic.Label copyLabel
                         ARM64Symbolic.CBZ (ARM64Symbolic.X8, copyDoneLabel)
@@ -6640,10 +6529,6 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                         ARM64Symbolic.SUB_imm (ARM64Symbolic.X8, ARM64Symbolic.X8, 1us)
                         ARM64Symbolic.B_label copyLabel
                         ARM64Symbolic.Label copyDoneLabel
-                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X7, ARM64Symbolic.X5, 8us)
-                        ARM64Symbolic.ADD_reg (ARM64Symbolic.X7, ARM64Symbolic.X7, ARM64Symbolic.X6)
-                        ARM64Symbolic.MOVZ (ARM64Symbolic.X8, 1us, 0)
-                        ARM64Symbolic.STR (ARM64Symbolic.X8, ARM64Symbolic.X7, 0s)
                         ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, stackSize) ]
                     @ generateLeakCounterInc ctx
                     @ [ ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X28)
@@ -6813,7 +6698,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                             ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X1, 0s)
                             ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 8us)
                             ARM64Symbolic.CBNZ (ARM64Symbolic.X2, findArgvEnd)
-                            ARM64Symbolic.LDR (ARM64Symbolic.X3, ARM64Symbolic.X0, 0s)
+                            ARM64Symbolic.LDR (ARM64Symbolic.X3, ARM64Symbolic.X0, 8s)
                             ARM64Symbolic.Label nextEntry
                             ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X1, 0s)
                             ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 8us)
@@ -6822,7 +6707,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                             ARM64Symbolic.Label compareName
                             ARM64Symbolic.CMP_reg (ARM64Symbolic.X4, ARM64Symbolic.X3)
                             ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, nameMatched)
-                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X5, ARM64Symbolic.X0, 8us)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X5, ARM64Symbolic.X0, 16us)
                             ARM64Symbolic.LDRB (ARM64Symbolic.X6, ARM64Symbolic.X5, ARM64Symbolic.X4)
                             ARM64Symbolic.LDRB (ARM64Symbolic.X5, ARM64Symbolic.X2, ARM64Symbolic.X4)
                             ARM64Symbolic.CMP_reg (ARM64Symbolic.X5, ARM64Symbolic.X6)
@@ -6843,13 +6728,15 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                             ARM64Symbolic.B_label findLength
                             ARM64Symbolic.Label lengthFound
                             ARM64Symbolic.MOV_reg (ARM64Symbolic.X7, ARM64Symbolic.X28)
-                            ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X7, 0s)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X11, 1us, 0)
+                            ARM64Symbolic.STR (ARM64Symbolic.X11, ARM64Symbolic.X7, 0s)
+                            ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X7, 8s)
                             ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X9, 7us)
                             ARM64Symbolic.LSR_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 3)
                             ARM64Symbolic.LSL_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 3)
                             ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X13, 16us)
                             ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X14)
-                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X7, 8us)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X7, 16us)
                             ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, ARM64Symbolic.X9)
                             ARM64Symbolic.MOV_reg (ARM64Symbolic.X12, ARM64Symbolic.X8)
                             ARM64Symbolic.Label copyValue
@@ -6860,11 +6747,7 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                             ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 1us)
                             ARM64Symbolic.SUB_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 1us)
                             ARM64Symbolic.B_label copyValue
-                            ARM64Symbolic.Label copyDone
-                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X7, 8us)
-                            ARM64Symbolic.ADD_reg (ARM64Symbolic.X10, ARM64Symbolic.X10, ARM64Symbolic.X13)
-                            ARM64Symbolic.MOVZ (ARM64Symbolic.X11, 1us, 0)
-                            ARM64Symbolic.STR (ARM64Symbolic.X11, ARM64Symbolic.X10, 0s) ]
+                            ARM64Symbolic.Label copyDone ]
                         @ generateLeakCounterInc ctx
                         @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 0us, 0)
                             ARM64Symbolic.B_label box
@@ -7311,7 +7194,9 @@ let private generateCliArgvHelper (ctx: CodeGenContext) (label: string) : ARM64S
       ARM64Symbolic.B_label lengthLabel
       ARM64Symbolic.Label lengthDoneLabel
       ARM64Symbolic.MOV_reg (ARM64Symbolic.X7, ARM64Symbolic.X28)
-      ARM64Symbolic.STR (ARM64Symbolic.X4, ARM64Symbolic.X7, 0s)
+      ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 1us, 0)
+      ARM64Symbolic.STR (ARM64Symbolic.X1, ARM64Symbolic.X7, 0s)
+      ARM64Symbolic.STR (ARM64Symbolic.X4, ARM64Symbolic.X7, 8s)
       ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X4, 7us)
       ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 3us, 0)
       ARM64Symbolic.LSR_reg (ARM64Symbolic.X9, ARM64Symbolic.X9, ARM64Symbolic.X10)
@@ -7319,7 +7204,7 @@ let private generateCliArgvHelper (ctx: CodeGenContext) (label: string) : ARM64S
       ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X9, 16us)
       ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X10)
       ARM64Symbolic.MOV_reg (ARM64Symbolic.X5, ARM64Symbolic.X3)
-      ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X7, 8us)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X7, 16us)
       ARM64Symbolic.MOV_reg (ARM64Symbolic.X2, ARM64Symbolic.X4)
       ARM64Symbolic.Label copyLabel
       ARM64Symbolic.CBZ (ARM64Symbolic.X2, copyDoneLabel)
@@ -7329,11 +7214,7 @@ let private generateCliArgvHelper (ctx: CodeGenContext) (label: string) : ARM64S
       ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 1us)
       ARM64Symbolic.SUB_imm (ARM64Symbolic.X2, ARM64Symbolic.X2, 1us)
       ARM64Symbolic.B_label copyLabel
-      ARM64Symbolic.Label copyDoneLabel
-      ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X7, 8us)
-      ARM64Symbolic.ADD_reg (ARM64Symbolic.X10, ARM64Symbolic.X10, ARM64Symbolic.X9)
-      ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 1us, 0)
-      ARM64Symbolic.STR (ARM64Symbolic.X1, ARM64Symbolic.X10, 0s) ]
+      ARM64Symbolic.Label copyDoneLabel ]
     @ generateLeakCounterInc ctx
     @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X6, 0us, 0)
         ARM64Symbolic.B_label boxLabel
@@ -7368,7 +7249,7 @@ let private generateLinuxCliExecuteHelper () : ARM64Symbolic.Instr list =
     let readPipe slot buffer lengthReg nextLabel =
         pairFd slot 0
         @ [ARM64Symbolic.AND_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, 0xffffffffUL)
-           ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, buffer, 8us)
+           ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, buffer, 16us)
            ARM64Symbolic.ADD_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, lengthReg)]
         @ loadImmediate ARM64Symbolic.X2 1048576L
         @ [ARM64Symbolic.SUB_reg (ARM64Symbolic.X2, ARM64Symbolic.X2, lengthReg)]
@@ -7377,14 +7258,9 @@ let private generateLinuxCliExecuteHelper () : ARM64Symbolic.Instr list =
            ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, nextLabel)
            ARM64Symbolic.ADD_reg (lengthReg, lengthReg, ARM64Symbolic.X0)]
     let finalizeString buffer lengthReg =
-        [ARM64Symbolic.STR (lengthReg, buffer, 0s)
-         ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, buffer, 8us)
-         ARM64Symbolic.ADD_reg (ARM64Symbolic.X9, ARM64Symbolic.X9, lengthReg)
-         ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 7us)
-         ARM64Symbolic.LSR_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 3)
-         ARM64Symbolic.LSL_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 3)
-         ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 1us, 0)
-         ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.X9, 0s)]
+        [ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 1us, 0)
+         ARM64Symbolic.STR (ARM64Symbolic.X10, buffer, 0s)
+         ARM64Symbolic.STR (lengthReg, buffer, 8s)]
     [ARM64Symbolic.Label "__dark_cli_execute"
      ARM64Symbolic.STP_pre (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
      ARM64Symbolic.MOV_reg (ARM64Symbolic.X29, ARM64Symbolic.SP)
@@ -7394,8 +7270,8 @@ let private generateLinuxCliExecuteHelper () : ARM64Symbolic.Instr list =
      ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 96us)
      // Copy the managed command to a NUL-terminated native buffer.
      ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, ARM64Symbolic.X28)
-     ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 0s)
-     ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X0, 8us)
+     ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s)
+     ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X0, 16us)
      zero ARM64Symbolic.X12
      ARM64Symbolic.Label "__dark_cli_command_copy"
      ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X10)
@@ -7505,7 +7381,7 @@ let private generateLinuxCliExecuteHelper () : ARM64Symbolic.Instr list =
     @ syscall 24us
     @ closeFd 0s 0 @ closeFd 0s 32 @ closeFd 8s 0 @ closeFd 8s 32
     @ loadStringLiteralPointer ARM64Symbolic.X0 "/bin/bash"
-    @ [ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, 8us)
+    @ [ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, 16us)
        ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, ARM64Symbolic.X29)
        ARM64Symbolic.Label "__dark_cli_find_root_for_exec"
        ARM64Symbolic.LDR (ARM64Symbolic.X13, ARM64Symbolic.X14, 0s)
@@ -7548,7 +7424,7 @@ let private generateLinuxCliExecuteHelper () : ARM64Symbolic.Instr list =
        ARM64Symbolic.Label "__dark_cli_shell_found"
        ARM64Symbolic.STR (ARM64Symbolic.X0, ARM64Symbolic.SP, 56s)]
     @ loadStringLiteralPointer ARM64Symbolic.X9 "-c"
-    @ [ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 8us)
+    @ [ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 16us)
        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
        ARM64Symbolic.STR (ARM64Symbolic.X19, ARM64Symbolic.SP, 72s)
        zero ARM64Symbolic.X9

@@ -377,8 +377,9 @@ let testHeapAllocReusesBlockIntoX3 () : Result<unit, string> =
               LIR.RefCountDec
                   (LIR.Physical LIR.X1, 16, LIR.GenericHeap, Some (rcMetadata scalarPairType))
               LIR.HeapAlloc (LIR.Physical LIR.X3, 16)
-              LIR.HeapStore (LIR.Physical LIR.X3, 0, LIR.Imm 2L, None)
-              LIR.HeapStore (LIR.Physical LIR.X3, 8, LIR.Imm 0x3234L, None)
+              LIR.HeapStore (LIR.Physical LIR.X3, 0, LIR.Imm 1L, None)
+              LIR.HeapStore (LIR.Physical LIR.X3, 8, LIR.Imm 2L, None)
+              LIR.HeapStore (LIR.Physical LIR.X3, 16, LIR.Imm 0x3234L, None)
               LIR.PrintHeapStringNoNewline (LIR.Physical LIR.X3) ]
             LIR.Ret
 
@@ -389,14 +390,15 @@ let testHeapAllocReusesBlockIntoX3 () : Result<unit, string> =
         elif stdout <> "42" then Error $"Expected reused X3 block to contain '42', got '{stdout}'"
         else Ok ()
 
-/// String RC lowering must preserve an X3/RCX string pointer while RCX is also
-/// used to calculate the address of the trailing refcount word.
+/// String RC lowering must support an X3/RCX string pointer while accessing the
+/// leading refcount word directly.
 let testStringRefCountSupportsX3 () : Result<unit, string> =
     let program =
         makeSimpleProgram
             [ LIR.HeapAlloc (LIR.Physical LIR.X3, 16)
-              LIR.HeapStore (LIR.Physical LIR.X3, 0, LIR.Imm 2L, None)
-              LIR.HeapStore (LIR.Physical LIR.X3, 8, LIR.Imm 0x3234L, None)
+              LIR.HeapStore (LIR.Physical LIR.X3, 0, LIR.Imm 1L, None)
+              LIR.HeapStore (LIR.Physical LIR.X3, 8, LIR.Imm 2L, None)
+              LIR.HeapStore (LIR.Physical LIR.X3, 16, LIR.Imm 0x3234L, None)
               LIR.RefCountIncString (LIR.Reg (LIR.Physical LIR.X3))
               LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X3))
               LIR.PrintHeapStringNoNewline (LIR.Physical LIR.X3)
@@ -409,6 +411,29 @@ let testStringRefCountSupportsX3 () : Result<unit, string> =
         if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}: {stderr}"
         elif stdout <> "42" then Error $"Expected X3 string to contain '42', got '{stdout}'"
         elif stderr.Trim() <> "" then Error $"Expected balanced X3 string RC, got '{stderr.Trim()}'"
+        else Ok ()
+
+/// String RC lowering must preserve an X12/R11 value pointer while R11 is used
+/// to materialize the immutable-buffer sentinel.
+let testStringRefCountSupportsX12 () : Result<unit, string> =
+    let program =
+        makeSimpleProgram
+            [ LIR.HeapAlloc (LIR.Physical LIR.X12, 16)
+              LIR.HeapStore (LIR.Physical LIR.X12, 0, LIR.Imm 1L, None)
+              LIR.HeapStore (LIR.Physical LIR.X12, 8, LIR.Imm 2L, None)
+              LIR.HeapStore (LIR.Physical LIR.X12, 16, LIR.Imm 0x3234L, None)
+              LIR.RefCountIncString (LIR.Reg (LIR.Physical LIR.X12))
+              LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X12))
+              LIR.PrintHeapStringNoNewline (LIR.Physical LIR.X12)
+              LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X12)) ]
+            LIR.Ret
+
+    match runLIRProgramFullWithOptions program true with
+    | Error error -> Error error
+    | Ok (exitCode, stdout, stderr) ->
+        if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}: {stderr}"
+        elif stdout <> "42" then Error $"Expected X12 string to contain '42', got '{stdout}'"
+        elif stderr.Trim() <> "" then Error $"Expected balanced X12 string RC, got '{stderr.Trim()}'"
         else Ok ()
 
 /// Literal materialization uses X12/R11 as its usual byte-copy temporary, so
@@ -5707,6 +5732,7 @@ let tests : (string * (unit -> Result<unit, string>)) list = [
     ("LIR CLI native call preserves live x64 caller register", testCliNativePreservesLiveCallerRegister)
     ("LIR HeapAlloc x64 reuses a block into X3", testHeapAllocReusesBlockIntoX3)
     ("LIR string x64 refcount supports X3", testStringRefCountSupportsX3)
+    ("LIR string x64 refcount supports X12", testStringRefCountSupportsX12)
     ("LIR string literal x64 supports X12 destination", testStringLiteralSupportsX12Destination)
     ("LIR string literal x64 uses static storage", testStringLiteralUsesStaticStorage)
     ("LIR string literal x64 heap store preserves X3", testStringLiteralHeapStorePreservesX3)

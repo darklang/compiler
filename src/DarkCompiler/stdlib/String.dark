@@ -8,10 +8,10 @@ let newline() : String = "\n"
 let __alignedDataSize(size: Int64) : Int64 = ((size + 7L) / 8L) * 8L
 
 let __byteLength(value: String) : Int64 =
-    __raw_get<Int64>(__string_to_rawptr(value), 0L)
+    __raw_get<Int64>(__string_to_rawptr(value), 8L)
 
 let getByteAt(value: String, index: Int64) : Int64 =
-    __raw_get_byte(__string_to_rawptr(value), index + 8L)
+    __raw_get_byte(__string_to_rawptr(value), index + 16L)
 
 // JSON traversal needs both the decoded scalar and its source byte width.
 // String values are UTF-8-valid by construction, so failure is unreachable.
@@ -35,9 +35,9 @@ let __byteSlice(value: String, start_: Int64, end_: Int64) : String =
     else
         let dataSize = Stdlib.String.__alignedDataSize(resultLength) in
         let pointer = __raw_alloc(16L + dataSize) in
-        let _ = __raw_write_word(pointer, 0L, resultLength) in
-        let _ = Stdlib.String.__copyBytesToPtr(value, actualStart, pointer, 8L, resultLength) in
-        let _ = __raw_write_word(pointer, 8L + dataSize, 1L) in
+        let _ = __raw_write_word(pointer, 0L, 1L) in
+        let _ = __raw_write_word(pointer, 8L, resultLength) in
+        let _ = Stdlib.String.__copyBytesToPtr(value, actualStart, pointer, 16L, resultLength) in
         __rawptr_to_string(pointer)
 
 let __byteTake(value: String, count: Int64) : String =
@@ -127,9 +127,9 @@ let __fromCodepointsRaw(codepoints: List<Int64>) : String =
     else
         let dataSize = Stdlib.String.__alignedDataSize(byteLength) in
         let pointer = __raw_alloc(16L + dataSize) in
-        let _ = __raw_write_word(pointer, 0L, byteLength) in
-        let _ = Stdlib.String.__encodeCodepoints(pointer, 8L, codepoints) in
-        let _ = __raw_write_word(pointer, 8L + dataSize, 1L) in
+        let _ = __raw_write_word(pointer, 0L, 1L) in
+        let _ = __raw_write_word(pointer, 8L, byteLength) in
+        let _ = Stdlib.String.__encodeCodepoints(pointer, 16L, codepoints) in
         __rawptr_to_string(pointer)
 
 let __allScalars(codepoints: List<Int64>) : Bool =

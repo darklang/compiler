@@ -17,8 +17,8 @@ The compiler currently has these managed or partially managed runtime shapes:
 | Boxed sums | fixed block with tag/payload | Root RC; payload release for strings, Blobs, lists, dicts, closures, tuples, records, and selected nested sums |
 | Tagged lists | Direct-payload skew RAL nodes allocated through raw memory | Root and iterative node RC helpers with shape-driven `RcReleasePlan` cleanup for direct generic fixed-block and boxed-sum payloads |
 | Dicts | tagged HAMT root with refcounted raw HAMT nodes | Path-copy structural sharing; `RawSlotInit<T>` edge retains; recursive node/key/value release when node RC reaches zero |
-| Dynamic strings | `[length:8][data][padding][refcount:8]` | Scoped RC, field retain/release, borrowed projection retain, literal sentinel skip |
-| Dynamic Blob | `[length:8][data][padding][refcount:8]` | Scoped RC, constructor/transform coverage, container retains/releases, and initial parity with strings |
+| Dynamic strings | `[refcount:8][length:8][data][padding]` | Scoped RC, field retain/release, borrowed projection retain, literal sentinel skip |
+| Dynamic Blob | `[refcount:8][length:8][data][padding]` | Scoped RC, constructor/transform coverage, container retains/releases, and initial parity with strings |
 | Closures | `[func_ptr][captures...][refcount:8]` | Closure root RC and recursive capture release for the covered capture shapes |
 | Streams | `[lifecycle][step closure][disposer closure][refcount:8]` | Stream-specific root RC; last release performs idempotent close, releases producer state/captures, and reuses the shell |
 | Raw pointers | raw addresses | Unmanaged except for the internal 8-byte producer-state cell, whose explicit `RawFree` balances accounting and reuses its size class |

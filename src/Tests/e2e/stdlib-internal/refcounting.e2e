@@ -11,7 +11,8 @@ let s = dynamicString("a") in let _ = __refcount_inc_string(s) in 0L = stdout="0
 // re-enabled to expect stderr="" as the refcounting implementation reaches it.
 
 // Dynamic strings are counted and decref'd at scope exit.
-let __stringRefcount(s: String): Int64 = let len = Stdlib.String.__byteLength(s) in let dataSize = ((len + 7L) / 8L) * 8L in __raw_get<Int64>(__string_to_rawptr(s), 8L + dataSize)
+let __stringRefcount(s: String): Int64 = __raw_get<Int64>(__string_to_rawptr(s), 0L)
+let s = dynamicString("abc") in __stringRefcount(s) = stdout="1\n" stderr="" // fresh dynamic string starts with one owned reference
 let s = "a" ++ "b" in 0L = stdout="0\n" stderr="" // string concat reclaimed
 let src = "a" ++ "bc" in let s = Stdlib.String.slice(src, 0I, 1I) in 0L = stdout="0\n" stderr="" // unaligned string slice reclaimed
 let s = Stdlib.String.fromCodepoints([97L]) in 0L = stdout="0\n" stderr="" // unaligned string builder reclaimed
@@ -33,9 +34,10 @@ let s = Stdlib.List.__toDisplayString_f64([1.25, 2.0]) in 0L = stdout="0\n" stde
 let s = Stdlib.Blob.toHex(Stdlib.Blob.__fromInt64List([1L, 2L, 255L])) in 0L = stdout="0\n" stderr="" // bytes-to-hex display string and input reclaimed
 let s = Stdlib.Base64.encode(Stdlib.Blob.__fromInt64List([1L, 2L, 3L])) in 0L = stdout="0\n" stderr="" // base64 encode string and input bytes reclaimed
 
-// Dynamic Blobs use the same length-aligned refcount slot as dynamic strings.
+// Dynamic Blobs use the same fixed-header refcount slot as dynamic strings.
 let b = Stdlib.Blob.__createZeroed(4L) in 0L = stdout="0\n" stderr=""
-let __blobRefcount(b: Blob): Int64 = let len = Stdlib.Blob.__byteLength(b) in let dataSize = ((len + 7L) / 8L) * 8L in __raw_get<Int64>(__blob_to_rawptr(b), 8L + dataSize)
+let __blobRefcount(b: Blob): Int64 = __raw_get<Int64>(__blob_to_rawptr(b), 0L)
+let b = Stdlib.Blob.__createZeroed(4L) in __blobRefcount(b) = stdout="1\n" stderr="" // fresh dynamic Blob starts with one owned reference
 
 // HAMT/dict roots use typed refcounting and reclaim raw nodes when the root dies.
 let d = Stdlib.Dict.__setOverwriting(Stdlib.Dict.__empty<Int64, Int64>(), 1L, 2L) in 0L = stdout="0\n" stderr="" // dict singleton reclaimed

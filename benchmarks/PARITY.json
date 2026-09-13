@@ -123,7 +123,7 @@
     },
     "nsieve": {
       "status": "comparable",
-      "dark_sha256": "bc3f99f484b768ea5d61be57f752cf5586894c0932f962869a36edc94285d5c1",
+      "dark_sha256": "1062c327bbdfd801eb133f559b51a7a0bccfa8f263cade891b7a928652511394",
       "rust_sha256": "0e814db9a50f343e1ddef2f1a4dcd42f62e01ffbe894b4760723b1f389da4818",
       "quick": {
         "status": "comparable"

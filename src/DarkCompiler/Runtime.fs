@@ -230,9 +230,8 @@ let generatePrintBool (target: ARM64.TargetConfig) : ARM64.Instr list =
 let generatePrintString (target: ARM64.TargetConfig) (stringLen: int) : ARM64.Instr list =
     let syscalls = ARM64.targetSyscalls target
     [
-        // String layout: [length:8][data:N] - skip length prefix
-        // X0 points to string start (length field), data is at X0+8
-        ARM64.ADD_imm (ARM64.X1, ARM64.X0, 8us)  // X1 = data address (skip 8-byte length)
+        // X0 points to [refcount][length][data].
+        ARM64.ADD_imm (ARM64.X1, ARM64.X0, 16us)
         ARM64.MOVZ (ARM64.X0, 1us, 0)  // X0 = stdout fd (1)
 
         // Load string length into X2 and call write syscall
@@ -1011,11 +1010,11 @@ let generateWriteSyscall (target: ARM64.TargetConfig) : ARM64.Instr list =
     ]
 
 /// Generate ARM64 instructions for Stdlib.File.exists
-/// Input: pathReg contains heap string pointer (format: [len:8][data:N])
+/// Input: pathReg contains heap string pointer (format: [refcount:8][len:8][data:N])
 /// Output: destReg = 1 if file exists, 0 if not
 ///
 /// Algorithm:
-/// 1. Get data pointer from heap string (path + 8)
+/// 1. Get data pointer from heap string (path + 16)
 /// 2. Save the path string to a null-terminated temp buffer on stack
 /// 3. Call access(path, F_OK) or faccessat(AT_FDCWD, path, F_OK, 0)
 /// 4. If syscall returns 0 (success), set dest = 1; else dest = 0
@@ -1054,13 +1053,13 @@ let generateFileExists (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (pathRe
             ARM64.STR (ARM64.X8, ARM64.SP, 312s)
 
             // Use non-allocatable registers for copy loop to avoid clobbering live values
-            // X10 = string length from [X19]
-            ARM64.LDR (ARM64.X10, ARM64.X19, 0s)
+            // X10 = string length from [X19 + 8]
+            ARM64.LDR (ARM64.X10, ARM64.X19, 8s)
 
             // X9 = dest pointer (SP)
             ARM64.MOV_reg (ARM64.X9, ARM64.SP)
-            // X11 = source pointer (X19 + 8)
-            ARM64.ADD_imm (ARM64.X11, ARM64.X19, 8us)
+            // X11 = source pointer (X19 + 16)
+            ARM64.ADD_imm (ARM64.X11, ARM64.X19, 16us)
 
             // Copy loop: copies X10 bytes from X11 to X9
             // copy_loop (7 instructions, 0-6):
@@ -1114,13 +1113,13 @@ let generateFileExists (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (pathRe
             ARM64.MOV_reg (ARM64.X22, ARM64.X2)  // Save X2
 
             // Use non-allocatable registers for copy loop to avoid clobbering live values
-            // X10 = string length from [X19]
-            ARM64.LDR (ARM64.X10, ARM64.X19, 0s)
+            // X10 = string length from [X19 + 8]
+            ARM64.LDR (ARM64.X10, ARM64.X19, 8s)
 
             // X9 = dest pointer (SP)
             ARM64.MOV_reg (ARM64.X9, ARM64.SP)
-            // X11 = source pointer (X19 + 8)
-            ARM64.ADD_imm (ARM64.X11, ARM64.X19, 8us)
+            // X11 = source pointer (X19 + 16)
+            ARM64.ADD_imm (ARM64.X11, ARM64.X19, 16us)
 
             // Copy loop (7 instructions, 0-6)
             ARM64.CBZ_offset (ARM64.X10, 7)     // 0: If length == 0, skip to null_term at inst 7
@@ -1201,12 +1200,12 @@ let generateFileDelete (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (pathRe
             ARM64.STR (ARM64.X8, ARM64.SP, 312s)
 
             // X2 = string length from [X19]
-            ARM64.LDR (ARM64.X2, ARM64.X19, 0s)
+            ARM64.LDR (ARM64.X2, ARM64.X19, 8s)
 
             // X0 = dest pointer (SP)
             ARM64.MOV_reg (ARM64.X0, ARM64.SP)
-            // X1 = source pointer (X19 + 8)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X19, 8us)
+            // X1 = source pointer (X19 + 16)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X19, 16us)
             // X4 = 0 (for LDRB offset)
             ARM64.MOVZ (ARM64.X4, 0us, 0)
 
@@ -1251,29 +1250,29 @@ let generateFileDelete (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (pathRe
 
             // Error path: Result = Error("Error")
             // Allocate error string: "Error" (5 chars)
-            // String format: [length:8][data:N][refcount:8]
+            // String format: [refcount:8][length:8][data:N]
             ARM64.MOV_reg (ARM64.X2, ARM64.X28)  // X2 = error string pointer  (1)
             ARM64.ADD_imm (ARM64.X28, ARM64.X28, 24us)  // (2)
             ARM64.MOVZ (ARM64.X1, 5us, 0)       // length = 5  (3)
-            ARM64.STR (ARM64.X1, ARM64.X2, 0s)  // Store length  (4)
+            ARM64.STR (ARM64.X1, ARM64.X2, 8s)  // Store length  (4)
             // Store "Error" byte by byte: E=69, r=114, r=114, o=111, r=114
             ARM64.MOVZ (ARM64.X1, 69us, 0)      // 'E'  (5)
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 8us)  // (6)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 16us)  // (6)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)  // (7)
             ARM64.MOVZ (ARM64.X1, 114us, 0)     // 'r'  (8)
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 9us)  // (9)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 17us)  // (9)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)  // (10)
             ARM64.MOVZ (ARM64.X1, 114us, 0)     // 'r'  (11)
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 10us)  // (12)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 18us)  // (12)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)  // (13)
             ARM64.MOVZ (ARM64.X1, 111us, 0)     // 'o'  (14)
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 11us)  // (15)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 19us)  // (15)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)  // (16)
             ARM64.MOVZ (ARM64.X1, 114us, 0)     // 'r'  (17)
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 12us)  // (18)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 20us)  // (18)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)  // (19)
             ARM64.MOVZ (ARM64.X1, 1us, 0)  // (20)
-            ARM64.STR (ARM64.X1, ARM64.X2, 16s) // refcount = 1  (21)
+            ARM64.STR (ARM64.X1, ARM64.X2, 0s) // refcount = 1  (21)
             // Now store Result with error
             ARM64.MOVZ (ARM64.X1, 1us, 0)       // tag = 1 (Error)  (22)
             ARM64.STR (ARM64.X1, ARM64.X0, 0s)  // Store tag  (23)
@@ -1322,12 +1321,12 @@ let generateFileDelete (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (pathRe
             ARM64.STR (ARM64.X8, ARM64.SP, 312s)
 
             // X2 = string length from [X19]
-            ARM64.LDR (ARM64.X2, ARM64.X19, 0s)
+            ARM64.LDR (ARM64.X2, ARM64.X19, 8s)
 
             // X0 = dest pointer (SP)
             ARM64.MOV_reg (ARM64.X0, ARM64.SP)
-            // X1 = source pointer (X19 + 8)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X19, 8us)
+            // X1 = source pointer (X19 + 16)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X19, 16us)
             // X4 = 0 (for LDRB offset)
             ARM64.MOVZ (ARM64.X4, 0us, 0)
 
@@ -1376,25 +1375,25 @@ let generateFileDelete (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (pathRe
             ARM64.MOV_reg (ARM64.X2, ARM64.X28)  // X2 = error string pointer  (1)
             ARM64.ADD_imm (ARM64.X28, ARM64.X28, 24us)  // (2)
             ARM64.MOVZ (ARM64.X1, 5us, 0)       // length = 5  (3)
-            ARM64.STR (ARM64.X1, ARM64.X2, 0s)  // Store length  (4)
+            ARM64.STR (ARM64.X1, ARM64.X2, 8s)  // Store length  (4)
             // Store "Error" byte by byte: E=69, r=114, r=114, o=111, r=114
             ARM64.MOVZ (ARM64.X1, 69us, 0)      // 'E'  (5)
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 8us)  // (6)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 16us)  // (6)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)  // (7)
             ARM64.MOVZ (ARM64.X1, 114us, 0)     // 'r'  (8)
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 9us)  // (9)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 17us)  // (9)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)  // (10)
             ARM64.MOVZ (ARM64.X1, 114us, 0)     // 'r'  (11)
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 10us)  // (12)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 18us)  // (12)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)  // (13)
             ARM64.MOVZ (ARM64.X1, 111us, 0)     // 'o'  (14)
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 11us)  // (15)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 19us)  // (15)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)  // (16)
             ARM64.MOVZ (ARM64.X1, 114us, 0)     // 'r'  (17)
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 12us)  // (18)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 20us)  // (18)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)  // (19)
             ARM64.MOVZ (ARM64.X1, 1us, 0)  // (20)
-            ARM64.STR (ARM64.X1, ARM64.X2, 16s) // refcount = 1  (21)
+            ARM64.STR (ARM64.X1, ARM64.X2, 0s) // refcount = 1  (21)
             ARM64.MOVZ (ARM64.X1, 1us, 0)       // tag = 1 (Error)  (22)
             ARM64.STR (ARM64.X1, ARM64.X0, 0s)  // Store tag  (23)
             ARM64.STR (ARM64.X2, ARM64.X0, 8s)  // payload = error string pointer  (24)
@@ -1444,12 +1443,12 @@ let generateFileSetExecutable (target: ARM64.TargetConfig) (destReg: ARM64.Reg) 
             ARM64.MOV_reg (ARM64.X20, destReg)
 
             // X2 = string length from [X19]
-            ARM64.LDR (ARM64.X2, ARM64.X19, 0s)
+            ARM64.LDR (ARM64.X2, ARM64.X19, 8s)
 
             // X0 = dest pointer (SP)
             ARM64.MOV_reg (ARM64.X0, ARM64.SP)
-            // X1 = source pointer (X19 + 8)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X19, 8us)
+            // X1 = source pointer (X19 + 16)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X19, 16us)
             // X4 = 0 (for LDRB offset)
             ARM64.MOVZ (ARM64.X4, 0us, 0)
 
@@ -1496,24 +1495,24 @@ let generateFileSetExecutable (target: ARM64.TargetConfig) (destReg: ARM64.Reg) 
             ARM64.MOV_reg (ARM64.X2, ARM64.X28)
             ARM64.ADD_imm (ARM64.X28, ARM64.X28, 24us)
             ARM64.MOVZ (ARM64.X1, 5us, 0)
-            ARM64.STR (ARM64.X1, ARM64.X2, 0s)
+            ARM64.STR (ARM64.X1, ARM64.X2, 8s)
             ARM64.MOVZ (ARM64.X1, 69us, 0)      // 'E'
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 8us)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 16us)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)
             ARM64.MOVZ (ARM64.X1, 114us, 0)     // 'r'
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 9us)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 17us)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)
             ARM64.MOVZ (ARM64.X1, 114us, 0)     // 'r'
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 10us)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 18us)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)
             ARM64.MOVZ (ARM64.X1, 111us, 0)     // 'o'
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 11us)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 19us)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)
             ARM64.MOVZ (ARM64.X1, 114us, 0)     // 'r'
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 12us)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 20us)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)
             ARM64.MOVZ (ARM64.X1, 1us, 0)
-            ARM64.STR (ARM64.X1, ARM64.X2, 16s)
+            ARM64.STR (ARM64.X1, ARM64.X2, 0s)
             ARM64.MOVZ (ARM64.X1, 1us, 0)
             ARM64.STR (ARM64.X1, ARM64.X0, 0s)
             ARM64.STR (ARM64.X2, ARM64.X0, 8s)
@@ -1561,12 +1560,12 @@ let generateFileSetExecutable (target: ARM64.TargetConfig) (destReg: ARM64.Reg) 
             ARM64.STR (ARM64.X8, ARM64.SP, 312s)
 
             // X2 = string length from [X19]
-            ARM64.LDR (ARM64.X2, ARM64.X19, 0s)
+            ARM64.LDR (ARM64.X2, ARM64.X19, 8s)
 
             // X0 = dest pointer (SP)
             ARM64.MOV_reg (ARM64.X0, ARM64.SP)
-            // X1 = source pointer (X19 + 8)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X19, 8us)
+            // X1 = source pointer (X19 + 16)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X19, 16us)
             // X4 = 0 (for LDRB offset)
             ARM64.MOVZ (ARM64.X4, 0us, 0)
 
@@ -1616,24 +1615,24 @@ let generateFileSetExecutable (target: ARM64.TargetConfig) (destReg: ARM64.Reg) 
             ARM64.MOV_reg (ARM64.X2, ARM64.X28)
             ARM64.ADD_imm (ARM64.X28, ARM64.X28, 24us)
             ARM64.MOVZ (ARM64.X1, 5us, 0)
-            ARM64.STR (ARM64.X1, ARM64.X2, 0s)
+            ARM64.STR (ARM64.X1, ARM64.X2, 8s)
             ARM64.MOVZ (ARM64.X1, 69us, 0)      // 'E'
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 8us)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 16us)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)
             ARM64.MOVZ (ARM64.X1, 114us, 0)     // 'r'
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 9us)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 17us)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)
             ARM64.MOVZ (ARM64.X1, 114us, 0)     // 'r'
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 10us)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 18us)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)
             ARM64.MOVZ (ARM64.X1, 111us, 0)     // 'o'
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 11us)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 19us)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)
             ARM64.MOVZ (ARM64.X1, 114us, 0)     // 'r'
-            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 12us)
+            ARM64.ADD_imm (ARM64.X3, ARM64.X2, 20us)
             ARM64.STRB_reg (ARM64.X1, ARM64.X3)
             ARM64.MOVZ (ARM64.X1, 1us, 0)
-            ARM64.STR (ARM64.X1, ARM64.X2, 16s)
+            ARM64.STR (ARM64.X1, ARM64.X2, 0s)
             ARM64.MOVZ (ARM64.X1, 1us, 0)
             ARM64.STR (ARM64.X1, ARM64.X0, 0s)
             ARM64.STR (ARM64.X2, ARM64.X0, 8s)
@@ -1665,7 +1664,7 @@ let generateFileSetExecutable (target: ARM64.TargetConfig) (destReg: ARM64.Reg) 
 /// - tag 0 = Ok, tag 1 = Error
 /// - payload = pointer to string
 ///
-/// String memory layout: [length:8][data:N][refcount:8]
+/// String memory layout: [refcount:8][length:8][data:N]
 ///
 /// Algorithm:
 /// 1. Copy path to stack with null terminator (same as FileExists)
@@ -1716,12 +1715,12 @@ let generateFileReadText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (path
 
             // Use non-allocatable registers for copy loop
             // X10 = string length from heap string
-            ARM64.LDR (ARM64.X10, ARM64.X19, 0s)
+            ARM64.LDR (ARM64.X10, ARM64.X19, 8s)
 
             // X9 = stack dest for null-terminated path (SP + 144 for after stat buffer)
             ARM64.ADD_imm (ARM64.X9, ARM64.SP, 144us)
-            // X11 = heap string data (X19 + 8)
-            ARM64.ADD_imm (ARM64.X11, ARM64.X19, 8us)
+            // X11 = heap string data (X19 + 16)
+            ARM64.ADD_imm (ARM64.X11, ARM64.X19, 16us)
 
             // Copy loop (7 instructions, 0-6)
             ARM64.CBZ_offset (ARM64.X10, 7)     // 0: If length == 0, skip to null_term
@@ -1753,7 +1752,7 @@ let generateFileReadText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (path
             // Check if open failed (fd < 0 means X0 has sign bit set)
             // X21 = fd
             ARM64.MOV_reg (ARM64.X21, ARM64.X0)
-            ARM64.TBNZ (ARM64.X0, 63, 35)  // If negative, branch to error path (+35 instructions)
+            ARM64.TBNZ (ARM64.X0, 63, 29)  // If negative, branch to error path
 
             // fstat(fd, statbuf) - X0 = fd, X1 = statbuf
             ARM64.MOV_reg (ARM64.X0, ARM64.X21)
@@ -1764,7 +1763,7 @@ let generateFileReadText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (path
             // Get file size from stat buffer (st_size is at offset 48 on Linux ARM64)
             ARM64.LDR (ARM64.X22, ARM64.SP, 48s)  // X22 = file size
 
-            // Allocate heap space for string: [len:8][data:N][refcount:8]
+            // Allocate heap space for string: [refcount:8][len:8][data:N]
             // Size = 8 + size + 8 = size + 16, round up to next 8 bytes
             // Simpler: just add 24 (16 + 8 for alignment padding)
             ARM64.ADD_imm (ARM64.X23, ARM64.X22, 24us)  // X23 = size + 24 (with padding)
@@ -1773,25 +1772,17 @@ let generateFileReadText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (path
             ARM64.MOV_reg (ARM64.X24, ARM64.X28)  // X24 = string pointer
             ARM64.ADD_reg (ARM64.X28, ARM64.X28, ARM64.X23)  // bump heap pointer
 
-            // Store length at [X24]
-            ARM64.STR (ARM64.X22, ARM64.X24, 0s)
+            // Store the fixed dynamic-buffer header.
+            ARM64.MOVZ (ARM64.X0, 1us, 0)
+            ARM64.STR (ARM64.X0, ARM64.X24, 0s)
+            ARM64.STR (ARM64.X22, ARM64.X24, 8s)
 
             // read(fd, buf, count) - read file contents
             ARM64.MOV_reg (ARM64.X0, ARM64.X21)  // fd
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 8us)  // buf = string data area
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 16us)  // buf = string data area
             ARM64.MOV_reg (ARM64.X2, ARM64.X22)  // count = file size
             ARM64.MOVZ (ARM64.X8, syscalls.Numbers.Read, 0)
             ARM64.SVC syscalls.SvcImmediate
-
-            // Store refcount = 1 at [X24 + 8 + aligned(size)]
-            ARM64.ADD_imm (ARM64.X25, ARM64.X22, 7us)
-            ARM64.MOVZ (ARM64.X0, 3us, 0)
-            ARM64.LSR_reg (ARM64.X25, ARM64.X25, ARM64.X0)
-            ARM64.LSL_reg (ARM64.X25, ARM64.X25, ARM64.X0)
-            ARM64.ADD_imm (ARM64.X25, ARM64.X25, 8us)
-            ARM64.ADD_reg (ARM64.X25, ARM64.X24, ARM64.X25)
-            ARM64.MOVZ (ARM64.X0, 1us, 0)
-            ARM64.STR (ARM64.X0, ARM64.X25, 0s)
 
             // close(fd)
             ARM64.MOV_reg (ARM64.X0, ARM64.X21)
@@ -1817,7 +1808,7 @@ let generateFileReadText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (path
             ARM64.MOV_reg (ARM64.X20, ARM64.X25)
 
             // Jump to cleanup
-            ARM64.B 30  // Skip error path (29 instructions + 1 to land on cleanup)
+            ARM64.B 29  // Skip error path
 
             // === Error path (file not found) ===
             // Create error string "File not found" and Error result
@@ -1829,34 +1820,32 @@ let generateFileReadText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (path
 
             // Store length = 5
             ARM64.MOVZ (ARM64.X0, 5us, 0)
-            ARM64.STR (ARM64.X0, ARM64.X24, 0s)
+            ARM64.STR (ARM64.X0, ARM64.X24, 8s)
 
             // Store "Error" (ASCII: 69, 114, 114, 111, 114)
             // E=69, r=114, r=114, o=111, r=114
             // Store at [X24+8] through [X24+12]
             ARM64.MOVZ (ARM64.X0, 69us, 0)  // 'E'
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 8us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 16us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
 
             ARM64.MOVZ (ARM64.X0, 114us, 0)  // 'r'
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 9us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 17us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
 
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 10us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 18us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
 
             ARM64.MOVZ (ARM64.X0, 111us, 0)  // 'o'
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 11us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 19us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
 
             ARM64.MOVZ (ARM64.X0, 114us, 0)  // 'r'
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 12us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 20us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
 
-            // Store refcount = 1 at [X24 + 8 + aligned(5)] = [X24 + 16]
             ARM64.MOVZ (ARM64.X0, 1us, 0)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 16us)
-            ARM64.STR (ARM64.X0, ARM64.X1, 0s)
+            ARM64.STR (ARM64.X0, ARM64.X24, 0s)
 
             // Allocate Error Result
             ARM64.MOV_reg (ARM64.X25, ARM64.X28)
@@ -1930,11 +1919,11 @@ let generateFileReadText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (path
 
             // Copy path with null terminator using non-allocatable registers
             // X10 = string length
-            ARM64.LDR (ARM64.X10, ARM64.X19, 0s)
+            ARM64.LDR (ARM64.X10, ARM64.X19, 8s)
             // X9 = dest (SP + 144)
             ARM64.ADD_imm (ARM64.X9, ARM64.SP, 144us)
-            // X11 = source (X19 + 8)
-            ARM64.ADD_imm (ARM64.X11, ARM64.X19, 8us)
+            // X11 = source (X19 + 16)
+            ARM64.ADD_imm (ARM64.X11, ARM64.X19, 16us)
 
             // Copy loop (7 instructions, 0-6)
             ARM64.CBZ_offset (ARM64.X10, 7)
@@ -1956,7 +1945,7 @@ let generateFileReadText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (path
             ARM64.SVC syscalls.SvcImmediate
 
             ARM64.MOV_reg (ARM64.X21, ARM64.X0)
-            ARM64.TBNZ (ARM64.X0, 63, 35)  // If negative, branch to error path
+            ARM64.TBNZ (ARM64.X0, 63, 29)  // If negative, branch to error path
 
             // fstat(fd, statbuf)
             ARM64.MOV_reg (ARM64.X0, ARM64.X21)
@@ -1973,23 +1962,16 @@ let generateFileReadText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (path
             ARM64.MOV_reg (ARM64.X24, ARM64.X28)
             ARM64.ADD_reg (ARM64.X28, ARM64.X28, ARM64.X23)
 
-            ARM64.STR (ARM64.X22, ARM64.X24, 0s)
+            ARM64.MOVZ (ARM64.X0, 1us, 0)
+            ARM64.STR (ARM64.X0, ARM64.X24, 0s)
+            ARM64.STR (ARM64.X22, ARM64.X24, 8s)
 
             // read
             ARM64.MOV_reg (ARM64.X0, ARM64.X21)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 8us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 16us)
             ARM64.MOV_reg (ARM64.X2, ARM64.X22)
             ARM64.MOVZ (ARM64.X16, syscalls.Numbers.Read, 0)
             ARM64.SVC syscalls.SvcImmediate
-
-            ARM64.ADD_imm (ARM64.X25, ARM64.X22, 7us)
-            ARM64.MOVZ (ARM64.X0, 3us, 0)
-            ARM64.LSR_reg (ARM64.X25, ARM64.X25, ARM64.X0)
-            ARM64.LSL_reg (ARM64.X25, ARM64.X25, ARM64.X0)
-            ARM64.ADD_imm (ARM64.X25, ARM64.X25, 8us)
-            ARM64.ADD_reg (ARM64.X25, ARM64.X24, ARM64.X25)
-            ARM64.MOVZ (ARM64.X0, 1us, 0)
-            ARM64.STR (ARM64.X0, ARM64.X25, 0s)
 
             // close
             ARM64.MOV_reg (ARM64.X0, ARM64.X21)
@@ -2008,37 +1990,36 @@ let generateFileReadText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (path
 
             ARM64.MOV_reg (ARM64.X20, ARM64.X25)
 
-            ARM64.B 30  // Skip error path (29 instructions + 1 to land on cleanup)
+            ARM64.B 29  // Skip error path
 
             // Error path (same as Linux)
             ARM64.MOV_reg (ARM64.X24, ARM64.X28)
             ARM64.ADD_imm (ARM64.X28, ARM64.X28, 24us)
 
             ARM64.MOVZ (ARM64.X0, 5us, 0)
-            ARM64.STR (ARM64.X0, ARM64.X24, 0s)
+            ARM64.STR (ARM64.X0, ARM64.X24, 8s)
 
             ARM64.MOVZ (ARM64.X0, 69us, 0)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 8us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 16us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
 
             ARM64.MOVZ (ARM64.X0, 114us, 0)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 9us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 17us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
 
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 10us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 18us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
 
             ARM64.MOVZ (ARM64.X0, 111us, 0)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 11us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 19us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
 
             ARM64.MOVZ (ARM64.X0, 114us, 0)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 12us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 20us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
 
             ARM64.MOVZ (ARM64.X0, 1us, 0)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 16us)
-            ARM64.STR (ARM64.X0, ARM64.X1, 0s)
+            ARM64.STR (ARM64.X0, ARM64.X24, 0s)
 
             ARM64.MOV_reg (ARM64.X25, ARM64.X28)
             ARM64.ADD_imm (ARM64.X28, ARM64.X28, 24us)
@@ -2127,11 +2108,11 @@ let generateFileWriteText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (pat
 
             // Copy path to stack buffer with null terminator using non-allocatable registers
             // X10 = path length
-            ARM64.LDR (ARM64.X10, ARM64.X19, 0s)
+            ARM64.LDR (ARM64.X10, ARM64.X19, 8s)
             // X9 = dest buffer (SP)
             ARM64.MOV_reg (ARM64.X9, ARM64.SP)
-            // X11 = source data (X19 + 8)
-            ARM64.ADD_imm (ARM64.X11, ARM64.X19, 8us)
+            // X11 = source data (X19 + 16)
+            ARM64.ADD_imm (ARM64.X11, ARM64.X19, 16us)
 
             // Copy loop (7 instructions, 0-6)
             ARM64.CBZ_offset (ARM64.X10, 7)
@@ -2161,8 +2142,8 @@ let generateFileWriteText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (pat
 
             // write(fd, buf, count)
             ARM64.MOV_reg (ARM64.X0, ARM64.X21)  // fd
-            ARM64.ADD_imm (ARM64.X1, ARM64.X22, 8us)  // buf = content data
-            ARM64.LDR (ARM64.X2, ARM64.X22, 0s)  // count = content length
+            ARM64.ADD_imm (ARM64.X1, ARM64.X22, 16us)  // buf = content data
+            ARM64.LDR (ARM64.X2, ARM64.X22, 8s)  // count = content length
             ARM64.MOVZ (ARM64.X8, syscalls.Numbers.Write, 0)
             ARM64.SVC syscalls.SvcImmediate
 
@@ -2180,34 +2161,33 @@ let generateFileWriteText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (pat
             ARM64.MOVZ (ARM64.X0, 1us, 0)
             ARM64.STR (ARM64.X0, ARM64.X23, 16s)  // refcount = 1
             ARM64.MOV_reg (ARM64.X20, ARM64.X23)
-            ARM64.B 30  // Jump to cleanup (skip 29 error path instructions + 1)
+            ARM64.B 29  // Jump to cleanup
 
             // Error path: Create Error("Error") result
             ARM64.MOV_reg (ARM64.X24, ARM64.X28)
             ARM64.ADD_imm (ARM64.X28, ARM64.X28, 24us)
 
             ARM64.MOVZ (ARM64.X0, 5us, 0)  // length = 5
-            ARM64.STR (ARM64.X0, ARM64.X24, 0s)
+            ARM64.STR (ARM64.X0, ARM64.X24, 8s)
 
             // Store "Error" bytes
             ARM64.MOVZ (ARM64.X0, 69us, 0)  // 'E'
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 8us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 16us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
             ARM64.MOVZ (ARM64.X0, 114us, 0)  // 'r'
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 9us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 17us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 10us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 18us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
             ARM64.MOVZ (ARM64.X0, 111us, 0)  // 'o'
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 11us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 19us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
             ARM64.MOVZ (ARM64.X0, 114us, 0)  // 'r'
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 12us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 20us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
 
             ARM64.MOVZ (ARM64.X0, 1us, 0)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 16us)
-            ARM64.STR (ARM64.X0, ARM64.X1, 0s)  // refcount
+            ARM64.STR (ARM64.X0, ARM64.X24, 0s)  // refcount
 
             // Allocate Error Result
             ARM64.MOV_reg (ARM64.X23, ARM64.X28)
@@ -2269,11 +2249,11 @@ let generateFileWriteText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (pat
 
             // Copy path to stack buffer using non-allocatable registers
             // X10 = path length
-            ARM64.LDR (ARM64.X10, ARM64.X19, 0s)
+            ARM64.LDR (ARM64.X10, ARM64.X19, 8s)
             // X9 = dest buffer (SP)
             ARM64.MOV_reg (ARM64.X9, ARM64.SP)
-            // X11 = source data (X19 + 8)
-            ARM64.ADD_imm (ARM64.X11, ARM64.X19, 8us)
+            // X11 = source data (X19 + 16)
+            ARM64.ADD_imm (ARM64.X11, ARM64.X19, 16us)
 
             // Copy loop (7 instructions, 0-6)
             ARM64.CBZ_offset (ARM64.X10, 7)
@@ -2300,8 +2280,8 @@ let generateFileWriteText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (pat
 
             // write(fd, buf, count)
             ARM64.MOV_reg (ARM64.X0, ARM64.X21)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X22, 8us)
-            ARM64.LDR (ARM64.X2, ARM64.X22, 0s)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X22, 16us)
+            ARM64.LDR (ARM64.X2, ARM64.X22, 8s)
             ARM64.MOVZ (ARM64.X16, syscalls.Numbers.Write, 0)
             ARM64.SVC syscalls.SvcImmediate
 
@@ -2319,33 +2299,32 @@ let generateFileWriteText (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (pat
             ARM64.MOVZ (ARM64.X0, 1us, 0)
             ARM64.STR (ARM64.X0, ARM64.X23, 16s)
             ARM64.MOV_reg (ARM64.X20, ARM64.X23)
-            ARM64.B 30  // Jump to cleanup (skip 29 error path instructions + 1)
+            ARM64.B 29  // Jump to cleanup
 
             // Error path
             ARM64.MOV_reg (ARM64.X24, ARM64.X28)
             ARM64.ADD_imm (ARM64.X28, ARM64.X28, 24us)
 
             ARM64.MOVZ (ARM64.X0, 5us, 0)
-            ARM64.STR (ARM64.X0, ARM64.X24, 0s)
+            ARM64.STR (ARM64.X0, ARM64.X24, 8s)
 
             ARM64.MOVZ (ARM64.X0, 69us, 0)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 8us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 16us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
             ARM64.MOVZ (ARM64.X0, 114us, 0)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 9us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 17us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 10us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 18us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
             ARM64.MOVZ (ARM64.X0, 111us, 0)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 11us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 19us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
             ARM64.MOVZ (ARM64.X0, 114us, 0)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 12us)
+            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 20us)
             ARM64.STRB_reg (ARM64.X0, ARM64.X1)
 
             ARM64.MOVZ (ARM64.X0, 1us, 0)
-            ARM64.ADD_imm (ARM64.X1, ARM64.X24, 16us)
-            ARM64.STR (ARM64.X0, ARM64.X1, 0s)
+            ARM64.STR (ARM64.X0, ARM64.X24, 0s)
 
             ARM64.MOV_reg (ARM64.X23, ARM64.X28)
             ARM64.ADD_imm (ARM64.X28, ARM64.X28, 24us)
@@ -2557,9 +2536,9 @@ let generateFileWriteFromPtr (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (
             ARM64.MOV_reg (ARM64.X21, lengthReg)  // X21 = length
 
             // Copy path to stack buffer with null terminator
-            ARM64.LDR (ARM64.X2, ARM64.X19, 0s)  // X2 = path length
+            ARM64.LDR (ARM64.X2, ARM64.X19, 8s)  // X2 = path length
             ARM64.MOV_reg (ARM64.X0, ARM64.SP)  // X0 = dest buffer
-            ARM64.ADD_imm (ARM64.X1, ARM64.X19, 8us)  // X1 = source data
+            ARM64.ADD_imm (ARM64.X1, ARM64.X19, 16us)  // X1 = source data
             ARM64.MOVZ (ARM64.X4, 0us, 0)  // X4 = index
 
             // Copy loop
@@ -2633,9 +2612,9 @@ let generateFileWriteFromPtr (target: ARM64.TargetConfig) (destReg: ARM64.Reg) (
             ARM64.MOV_reg (ARM64.X21, lengthReg)  // X21 = length
 
             // Copy path to stack buffer with null terminator
-            ARM64.LDR (ARM64.X2, ARM64.X19, 0s)  // X2 = path length
+            ARM64.LDR (ARM64.X2, ARM64.X19, 8s)  // X2 = path length
             ARM64.MOV_reg (ARM64.X0, ARM64.SP)  // X0 = dest buffer
-            ARM64.ADD_imm (ARM64.X1, ARM64.X19, 8us)  // X1 = source data
+            ARM64.ADD_imm (ARM64.X1, ARM64.X19, 16us)  // X1 = source data
             ARM64.MOVZ (ARM64.X4, 0us, 0)  // X4 = index
 
             // Copy loop
@@ -2834,7 +2813,7 @@ let generateCoverageFlush (target: ARM64.TargetConfig) (coverageExprCount: int) 
 /// destReg: destination register for the heap string pointer
 /// valueReg: FP register containing the float value
 /// The string format is "-123.45" (integer part + "." + 1-2 decimal digits)
-/// Heap string layout: [8 bytes length][N bytes data][8 bytes refcount]
+/// Heap string layout: [8 bytes refcount][8 bytes length][N bytes data]
 let generateFloatToString (destReg: ARM64.Reg) (valueReg: ARM64.FReg) : ARM64.Instr list =
     // This function:
     // 1. Converts float to characters in a buffer on stack
@@ -2951,25 +2930,19 @@ let generateFloatToString (destReg: ARM64.Reg) (valueReg: ARM64.FReg) : ARM64.In
         ARM64.SUB_reg (ARM64.X21, ARM64.X3, ARM64.X1)  // X21 = length (save for later)
 
         // Allocate heap string using bump allocator (X28)
-        // Total size = 8 (length) + string length + 8 (refcount), aligned to 8
+        // Total size = 8 (refcount) + 8 (length) + string data, aligned to 8
         ARM64.ADD_imm (ARM64.X0, ARM64.X21, 23us)  // X0 = len + 16 + 7 (for alignment)
         ARM64.AND_imm (ARM64.X0, ARM64.X0, 0xFFFFFFFFFFFFFFF8UL)  // Round down to 8-byte alignment
         ARM64.MOV_reg (ARM64.X19, ARM64.X28)  // X19 = current heap pointer (our allocation)
         ARM64.ADD_reg (ARM64.X28, ARM64.X28, ARM64.X0)  // Bump allocator
 
-        // Store length at [X19]
-        ARM64.STR (ARM64.X21, ARM64.X19, 0s)
-
-        // Initialize refcount to 1 at [X19 + 8 + aligned(length)]
-        ARM64.ADD_imm (ARM64.X3, ARM64.X21, 7us)
-        ARM64.AND_imm (ARM64.X3, ARM64.X3, 0xFFFFFFFFFFFFFFF8UL)
-        ARM64.ADD_reg (ARM64.X3, ARM64.X19, ARM64.X3)
         ARM64.MOVZ (ARM64.X4, 1us, 0)  // X4 = 1
-        ARM64.STR (ARM64.X4, ARM64.X3, 8s)
+        ARM64.STR (ARM64.X4, ARM64.X19, 0s)
+        ARM64.STR (ARM64.X21, ARM64.X19, 8s)
 
         // Copy string from stack buffer to heap
-        // X1 = source (stack buffer start), X19+8 = dest, X21 = length
-        ARM64.ADD_imm (ARM64.X3, ARM64.X19, 8us)  // X3 = dest
+        // X1 = source (stack buffer start), X19+16 = dest, X21 = length
+        ARM64.ADD_imm (ARM64.X3, ARM64.X19, 16us)  // X3 = dest
         ARM64.MOV_reg (ARM64.X2, ARM64.X21)  // X2 = length (counter)
 
         // Copy loop (byte by byte)
