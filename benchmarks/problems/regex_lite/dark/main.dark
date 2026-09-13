@@ -6,7 +6,7 @@ type Quantifier = ExactlyOne | ZeroOrMore | OneOrMore | ZeroOrOne
 type Piece = { atom: Atom, quantifier: Quantifier }
 
 let parseQuantifier(pattern: String, index: Int64, atom: Atom) : (Piece * Int64) =
-    if index >= Stdlib.String.__byteLength(pattern) then (Piece { atom = atom, quantifier = ExactlyOne }, index)
+    if index >= Stdlib.String.codepointLength(pattern) then (Piece { atom = atom, quantifier = ExactlyOne }, index)
     else
         match Stdlib.String.getByteAt(pattern, index) with
         | 42L -> (Piece { atom = atom, quantifier = ZeroOrMore }, index + 1L)
@@ -18,7 +18,7 @@ let parsePiece(pattern: String, index: Int64) : (Piece * Int64) =
     let byte = Stdlib.String.getByteAt(pattern, index) in
     if byte == 46L then parseQuantifier(pattern, index + 1L, AnyByte)
     else if byte == 91L then
-        if index + 4L >= Stdlib.String.__byteLength(pattern)
+        if index + 4L >= Stdlib.String.codepointLength(pattern)
            || Stdlib.String.getByteAt(pattern, index + 2L) != 45L
            || Stdlib.String.getByteAt(pattern, index + 4L) != 93L then
             Builtin.testRuntimeError("regex range must have form [a-z]")
@@ -35,7 +35,7 @@ let parseAlternatives(
     reversedPieces: List<Piece>,
     reversedAlternatives: List<List<Piece>>
 ) : List<List<Piece>> =
-    if index >= Stdlib.String.__byteLength(pattern) then
+    if index >= Stdlib.String.codepointLength(pattern) then
         Stdlib.List.reverse<List<Piece>>(
             Stdlib.List.push<List<Piece>>(reversedAlternatives, Stdlib.List.reverse<Piece>(reversedPieces)))
     else if Stdlib.String.getByteAt(pattern, index) == 124L then
@@ -117,7 +117,7 @@ let scan(alternatives: List<List<Piece>>, text: String, length: Int64, position:
 let run(remaining: Int64, alternatives: List<List<Piece>>, text: String, result: Int64) : Int64 =
     if remaining <= 0L then result
     else
-        let found = scan(alternatives, text, Stdlib.String.__byteLength(text), 0L, 0L, 0L) in
+        let found = scan(alternatives, text, Stdlib.String.codepointLength(text), 0L, 0L, 0L) in
         run(remaining - 1L, alternatives, text, (result + found.0 * 1000003L + found.1) % 1000000007L)
 
 let benchmarkArg(index: Int) : Int64 =

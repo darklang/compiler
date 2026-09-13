@@ -27,12 +27,12 @@ let search(
 ) : DiffResult =
     if k > d then
         if outcome.0 then DiffResult { distance = d, work = outcome.1 }
-        else if d >= Stdlib.String.__byteLength(leftText) + Stdlib.String.__byteLength(rightText) then
+        else if d >= Stdlib.String.codepointLength(leftText) + Stdlib.String.codepointLength(rightText) then
             Builtin.testRuntimeError("Myers search exceeded maximum edit distance")
         else search(leftText, rightText, d + 1L, -(d + 1L), current, Stdlib.Dict.empty, (false, outcome.1))
     else
-        let leftLength = Stdlib.String.__byteLength(leftText) in
-        let rightLength = Stdlib.String.__byteLength(rightText) in
+        let leftLength = Stdlib.String.codepointLength(leftText) in
+        let rightLength = Stdlib.String.codepointLength(rightText) in
         let choice =
             if k == -d then frontierGet(previous, k + 1L)
             else if k == d then frontierGet(previous, k - 1L) + 1L
@@ -53,8 +53,8 @@ let search(
             (outcome.0 || (endpoint.0 >= leftLength && endpoint.1 >= rightLength), nextWork))
 
 let myers(leftText: String, rightText: String) : DiffResult =
-    let leftLength = Stdlib.String.__byteLength(leftText) in
-    let rightLength = Stdlib.String.__byteLength(rightText) in
+    let leftLength = Stdlib.String.codepointLength(leftText) in
+    let rightLength = Stdlib.String.codepointLength(rightText) in
     let start = snake(leftText, rightText, leftLength, rightLength, 0L, 0L) in
     let initialWork = (start.0 + 1L) * (start.1 + 3L) in
     if start.0 >= leftLength && start.1 >= rightLength then DiffResult { distance = 0L, work = initialWork }

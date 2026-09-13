@@ -34,7 +34,7 @@
     "myers_diff": {"routine": {"args": ["20", "3", "2"], "expected_stdout": "233092160\n"}, "quick": {"args": ["4", "2", "1"], "expected_stdout": "71431859\n"}},
     "nbody": {"routine": {"args": ["500000"], "expected_stdout": "-169096\n"}, "quick": {"args": ["100"], "expected_stdout": "-169050\n"}},
     "nqueen": {"routine": {"args": ["13"], "expected_stdout": "73712\n"}, "quick": {"args": ["9"], "expected_stdout": "352\n"}},
-    "nsieve": {"routine": {"args": ["100000", "100"], "expected_stdout": "9592\n"}, "quick": {"args": ["100", "1"], "expected_stdout": "25\n"}},
+    "nsieve": {"routine": {"args": ["100000", "1"], "expected_stdout": "9592\n"}, "quick": {"args": ["100", "1"], "expected_stdout": "25\n"}},
     "pisum": {"routine": {"args": ["500", "10000"], "expected_stdout": "1644834071848\n"}, "quick": {"args": ["10", "1000"], "expected_stdout": "1643934566681\n"}},
     "primes": {"routine": {"args": ["10000"], "expected_stdout": "1229\n"}, "quick": {"args": ["1000"], "expected_stdout": "168\n"}},
     "quicksort": {"routine": {"args": ["5000", "42"], "expected_stdout": "600660212\n"}, "quick": {"args": ["20", "42"], "expected_stdout": "1312514\n"}},

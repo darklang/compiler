@@ -100,7 +100,6 @@ def build_dark(repository: Path, name: str, output: Path) -> str | None:
         [
             "dotnet",
             str(compiler),
-            "--allow-internal",
             "--emit-result",
             "--target=linux-x86_64",
             str(source),

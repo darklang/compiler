@@ -43,7 +43,7 @@ if [ -f "$PROBLEM_DIR/dark/main.dark" ]; then
     # available for a later correctness check or measurement.
     mkdir -p "$(dirname "$DARK_OUTPUT")"
     rm -f "$DARK_OUTPUT"
-    "$PROJECT_ROOT/dark" --allow-internal "$PROBLEM_DIR/dark/main.dark" -o "$DARK_OUTPUT" -q
+    "$PROJECT_ROOT/dark" "$PROBLEM_DIR/dark/main.dark" -o "$DARK_OUTPUT" -q
     chmod +x "$DARK_OUTPUT"
     pretty_ok "Dark build complete"
 fi

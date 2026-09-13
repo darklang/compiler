@@ -1,34 +1,33 @@
 // Nsieve Benchmark - Sieve of Eratosthenes
-// Counts primes up to n using a mutable flat bit-packed bitmap.
+// Counts primes up to n using Dict as sparse composite set
 
-let isComposite(bitmap: RawPtr, index: Int64) : Bool =
-    let byte = __raw_get_byte(bitmap, index / 8L + 16L) in
-    let mask = 1L << (index % 8L) in
-    (byte & mask) != 0L
+// Mark all multiples of prime as composite
+let markMultiples(j: Int64, step: Int64, n: Int64, composites: Dict<Bool>) : Dict<Bool> =
+    if j > n then composites
+    else markMultiples(j + step, step, n, Stdlib.Dict.setOverridingDuplicates<Bool>(composites, Stdlib.Int64.toString(j), true))
 
-let setComposite(bitmap: RawPtr, index: Int64) : Unit =
-    let offset = index / 8L + 16L in
-    let byte = __raw_get_byte(bitmap, offset) in
-    __raw_write_byte(bitmap, offset, Stdlib.Int64.bitwiseOr(byte, 1L << (index % 8L)))
-
-let markMultiples(j: Int64, step: Int64, n: Int64, bitmap: RawPtr) : Unit =
-    if j > n then ()
+// Run sieve for numbers from i to n
+let sieveLoop(i: Int64, n: Int64, composites: Dict<Bool>) : Dict<Bool> =
+    if i > n then composites
     else
-        let _ = setComposite(bitmap, j) in
-        markMultiples(j + step, step, n, bitmap)
+        let newComposites =
+            if Stdlib.Dict.member<Bool>(composites, Stdlib.Int64.toString(i)) then composites
+            else markMultiples(i + i, i, n, composites)
+        in
+        sieveLoop(i + 1L, n, newComposites)
 
-let sieveLoop(i: Int64, n: Int64, bitmap: RawPtr, count: Int64) : Int64 =
+// Count primes (numbers not in composites set)
+let countPrimes(i: Int64, n: Int64, composites: Dict<Bool>, count: Int64) : Int64 =
     if i > n then count
     else
-        if !isComposite(bitmap, i) then
-            let _ = markMultiples(i + i, i, n, bitmap) in
-            sieveLoop(i + 1L, n, bitmap, count + 1L)
-        else sieveLoop(i + 1L, n, bitmap, count)
+        let newCount = if Stdlib.Dict.member<Bool>(composites, Stdlib.Int64.toString(i)) then count else count + 1L in
+        countPrimes(i + 1L, n, composites, newCount)
 
 let nsieve(n: Int64) : Int64 =
-    let bitmap = Stdlib.Blob.__createZeroed((n + 8L) / 8L) in
-    sieveLoop(2L, n, __blob_to_rawptr(bitmap), 0L)
+    let composites = sieveLoop(2L, n, Stdlib.Dict.empty) in
+    countPrimes(2L, n, composites, 0L)
 
+// The routine profile runs one full-size sieve in both Dark and Rust.
 let repeat(remaining: Int64, n: Int64, result: Int64) : Int64 =
     if remaining <= 0L then result
     else repeat(remaining - 1L, n, nsieve(n))

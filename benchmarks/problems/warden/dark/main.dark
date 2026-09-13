@@ -43,7 +43,7 @@ let lex(source: String, index: Int64, length: Int64, tokenIndex: Int64, tokens: 
             lex(source, number.1, length, tokenIndex + 1L, next)
         else if (byte >= 97L && byte <= 122L) || (byte >= 65L && byte <= 90L) then
             let afterWord = scanWord(source, index, length) in
-            let token = wordToken(Stdlib.String.__byteSlice(source, index, afterWord)) in
+            let token = wordToken(Stdlib.String.substring(source, index, afterWord)) in
             let next = Stdlib.Dict.setOverridingDuplicates<Int64>(tokens, tokenKey(tokenIndex), token) in
             lex(source, afterWord, length, tokenIndex + 1L, next)
         else
@@ -129,5 +129,5 @@ if expressionCount <= 0L || repetitions <= 0L then Builtin.testRuntimeError("War
 else
     let statement = "x * x + y * 3 + (x + y) * (x - y) + x / 2;\n" in
     let source = Stdlib.String.repeat(statement, Stdlib.Int.fromInt64(expressionCount)) in
-    let lexed = lex(source, 0L, Stdlib.String.__byteLength(source), 0L, Stdlib.Dict.empty) in
+    let lexed = lex(source, 0L, Stdlib.String.codepointLength(source), 0L, Stdlib.Dict.empty) in
     Builtin.printLine(Stdlib.Int64.toString(run(repetitions, 0L, lexed.tokens, lexed.count, 0L)))

@@ -6,7 +6,7 @@
 
 // Get element from ALU at position i (mod 287)
 let getAlu(aluBytes: List<Int64>, i: Int64) : Int64 =
-    match Stdlib.List.__getAt<Int64>(aluBytes, i % 287L) with
+    match Stdlib.List.getAt<Int64>(aluBytes, Stdlib.Int.fromInt64(i % 287L)) with
     | Some(v) -> v
     | None -> 0L
 
@@ -34,14 +34,14 @@ let makeCumulative(table: List<(Int64 * Float)>, running: Float) : List<(Int64 *
 
 // Select element from cumulative table
 let selectRandom(table: List<(Int64 * Float)>, r: Float, idx: Int64) : Int64 =
-    match Stdlib.List.__getAt(table, idx) with
+    match Stdlib.List.getAt<(Int64 * Float)>(table, Stdlib.Int.fromInt64(idx)) with
     | None -> 0L
     | Some(item) ->
         let c = Stdlib.Tuple2.first(item) in
         let p = Stdlib.Tuple2.second(item) in
         if r < p then c
         else
-            if idx + 1L >= Stdlib.List.__length(table) then c
+            if idx + 1L >= Builtin.unwrap(Stdlib.Int.toInt64(Stdlib.List.length<(Int64 * Float)>(table))) then c
             else selectRandom(table, r, idx + 1L)
 
 // Generate random fasta checksum - returns (checksum, seed)

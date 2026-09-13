@@ -9,6 +9,18 @@ let matA(i: Int64, j: Int64) : Float =
 let getAt(v: List<Float>, i: Int64) : Float =
     Stdlib.List.getAtOrDefault<Float>(v, i, 0.0)
 
+let setAt(list: List<Float>, index: Int64, value: Float) : List<Float> =
+    match list with
+    | [] -> []
+    | head :: tail ->
+        if index == 0L then Stdlib.List.push<Float>(tail, value)
+        else Stdlib.List.push<Float>(setAt(tail, index - 1L, value), head)
+
+let repeat(value: Float, count: Int64) : List<Float> =
+    match Stdlib.List.repeat<Float>(Stdlib.Int.fromInt64(count), value) with
+    | Ok(values) -> values
+    | Error(message) -> Builtin.testRuntimeError(message)
+
 let avRow(i: Int64, j: Int64, n: Int64, v: List<Float>, acc: Float) : Float =
     if j >= n then acc
     else avRow(i, j + 1L, n, v, acc + matA(i, j) * getAt(v, j))
@@ -19,14 +31,14 @@ let atvRow(i: Int64, j: Int64, n: Int64, v: List<Float>, acc: Float) : Float =
 
 let avRows(i: Int64, n: Int64, v: List<Float>, out: List<Float>) : List<Float> =
     if i >= n then out
-    else avRows(i + 1L, n, v, Stdlib.List.__setAt<Float>(out, i, avRow(i, 0L, n, v, 0.0)))
+    else avRows(i + 1L, n, v, setAt(out, i, avRow(i, 0L, n, v, 0.0)))
 
 let atvRows(i: Int64, n: Int64, v: List<Float>, out: List<Float>) : List<Float> =
     if i >= n then out
-    else atvRows(i + 1L, n, v, Stdlib.List.__setAt<Float>(out, i, atvRow(i, 0L, n, v, 0.0)))
+    else atvRows(i + 1L, n, v, setAt(out, i, atvRow(i, 0L, n, v, 0.0)))
 
 let atav(n: Int64, v: List<Float>) : List<Float> =
-    let zeroes = Stdlib.List.__repeatInt64<Float>(n, 0.0, []) in
+    let zeroes = repeat(0.0, n) in
     atvRows(0L, n, avRows(0L, n, v, zeroes), zeroes)
 
 let iterate(iterations: Int64, n: Int64, u: List<Float>, v: List<Float>) : (List<Float> * List<Float>) =
@@ -41,7 +53,7 @@ let dot(i: Int64, n: Int64, a: List<Float>, b: List<Float>, acc: Float) : Float 
     else dot(i + 1L, n, a, b, acc + getAt(a, i) * getAt(b, i))
 
 let spectralNorm(n: Int64, iterations: Int64) : Float =
-    let result = iterate(iterations, n, Stdlib.List.__repeatInt64<Float>(n, 1.0, []), Stdlib.List.__repeatInt64<Float>(n, 0.0, [])) in
+    let result = iterate(iterations, n, repeat(1.0, n), repeat(0.0, n)) in
     let u = result.0 in
     let v = result.1 in
     Stdlib.Float.sqrt(dot(0L, n, u, v, 0.0) / dot(0L, n, v, v, 0.0))

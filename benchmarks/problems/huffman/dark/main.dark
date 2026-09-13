@@ -9,7 +9,7 @@ type HuffmanTree =
 type Codec = { tree: HuffmanTree, codes: Dict<Int64> }
 
 let symbolKey(symbol: Int64) : String =
-    Stdlib.String.__byteSlice("abcdefghijklmnopqrstuvwxyzABCDEF", symbol, symbol + 1L)
+    Stdlib.String.substring("abcdefghijklmnopqrstuvwxyzABCDEF", symbol, symbol + 1L)
 
 let treeWeight(tree: HuffmanTree) : Int64 =
     match tree with

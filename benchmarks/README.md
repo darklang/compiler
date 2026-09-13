@@ -140,8 +140,9 @@ This is the primary way we are tracking performance.
 
 The `routine` profile is the canonical comparable benchmark set and currently
 contains 29 pairs. Fannkuch runs the complete n=9 traversal in both languages,
-and nsieve runs 100 complete sieves over equivalent mutable flat bitmaps.
-Binary trees uses the same recursive allocation and traversal shape as Rust.
+and nsieve runs one complete sieve in each language using their ordinary public
+data-structure APIs. Binary trees uses the same recursive allocation and
+traversal shape as Rust.
 Full-size quicksort and spectral norm are included. A
 completed routine Cachegrind run records its measurements in
 the architecture-specific canonical JSON snapshot and `HISTORY.md`; targeted

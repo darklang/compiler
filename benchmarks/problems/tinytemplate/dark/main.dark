@@ -73,17 +73,21 @@ type RenderEnvironment = {
 }
 
 
-let byteLength(value: String) : Int64 = Stdlib.String.__byteLength(value)
+let byteLength(value: String) : Int64 =
+    Stdlib.String.codepointLength(value)
 
 let slice(value: String, start_: Int64, end_: Int64) : String =
-    Stdlib.String.__byteSlice(value, start_, end_)
+    Stdlib.String.substring(value, start_, end_)
 
 let startsAt(source: String, position: Int64, prefix: String) : Bool =
     let end_ = position + byteLength(prefix) in
     end_ <= byteLength(source) && slice(source, position, end_) == prefix
 
 let findFrom(source: String, needle: String, position: Int64) : Stdlib.Option.Option<Int64> =
-    Stdlib.String.__byteIndexOfFrom(source, needle, position)
+    let remaining = slice(source, position, byteLength(source)) in
+    match Stdlib.String.indexOf(remaining, needle) with
+    | None -> None
+    | Some(index) -> Some(position + Builtin.unwrap(Stdlib.Int.toInt64(index)))
 
 let offsetLoop(source: String, position: Int64, index: Int64, line: Int64, column: Int64) : (Int64, Int64) =
     if index >= position then (line, column)
@@ -117,7 +121,7 @@ let validPath(text: String) : Bool =
     !Stdlib.String.startsWith(text, "@") || text == "@index" || text == "@first" || text == "@last" || text == "@root"
 
 let splitAt(text: String, separator: String) : Stdlib.Option.Option<(String, String)> =
-    match Stdlib.String.__byteIndexOf(text, separator) with
+    match findFrom(text, separator, 0L) with
     | None -> None
     | Some(index) -> Some((slice(text, 0L, index), slice(text, index + byteLength(separator), byteLength(text))))
 
