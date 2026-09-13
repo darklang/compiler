@@ -2828,7 +2828,6 @@ let private isInternalIdentifier (name: string) : bool =
     let isAllUnderscores = name |> Seq.forall (fun c -> c = '_')
     (name.StartsWith("__") && not isAllUnderscores)
     || name.Contains(".__")
-    || name.Contains(".Internal.")
 
 let private validateNoInternalIdentifier (name: string) : Result<unit, string> =
     if isInternalIdentifier name then

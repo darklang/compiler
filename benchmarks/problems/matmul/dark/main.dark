@@ -10,10 +10,10 @@ let generateMatrixValues(remaining: Int64, index: Int64, seed: Int64, values: Di
     if remaining <= 0L then values
     else
         let next = nextRand(seed) in
-        generateMatrixValues(remaining - 1L, index + 1L, next, Stdlib.Internal.HAMT.__setOverwriting<Int64, Int64>(values, index, next % 100L))
+        generateMatrixValues(remaining - 1L, index + 1L, next, Stdlib.Dict.__setOverwriting<Int64, Int64>(values, index, next % 100L))
 
 let matrixValue(values: Dict<Int64, Int64>, index: Int64) : Int64 =
-    Stdlib.Internal.HAMT.__getOrDefault<Int64, Int64>(values, index, 0L)
+    Stdlib.Dict.__getOrDefault<Int64, Int64>(values, index, 0L)
 
 let dotCell(a: Dict<Int64, Int64>, b: Dict<Int64, Int64>, n: Int64, i: Int64, j: Int64, k: Int64, acc: Int64) : Int64 =
     if k >= n then acc
@@ -28,7 +28,7 @@ let multiplyCells(a: Dict<Int64, Int64>, b: Dict<Int64, Int64>, n: Int64, i: Int
     else
         let cell = dotCell(a, b, n, i, j, 0L, 0L) in
         let index = i * n + j in
-        let updated = Stdlib.Internal.HAMT.__setOverwriting<Int64, Int64>(result, index, cell) in
+        let updated = Stdlib.Dict.__setOverwriting<Int64, Int64>(result, index, cell) in
         multiplyCells(a, b, n, i, j + 1L, updated)
 
 let checksumCells(result: Dict<Int64, Int64>, total: Int64, index: Int64, acc: Int64) : Int64 =
@@ -38,9 +38,9 @@ let checksumCells(result: Dict<Int64, Int64>, total: Int64, index: Int64, acc: I
         checksumCells(result, total, index + 1L, (acc + cell * (index + 1L)) % 1000000007L)
 
 let matmulChecksum(n: Int64) : Int64 =
-    let a = generateMatrixValues(n * n, 0L, 42L, Stdlib.Internal.HAMT.__empty<Int64, Int64>()) in
-    let b = generateMatrixValues(n * n, 0L, 123L, Stdlib.Internal.HAMT.__empty<Int64, Int64>()) in
-    let result = multiplyCells(a, b, n, 0L, 0L, Stdlib.Internal.HAMT.__empty<Int64, Int64>()) in
+    let a = generateMatrixValues(n * n, 0L, 42L, Stdlib.Dict.__empty<Int64, Int64>()) in
+    let b = generateMatrixValues(n * n, 0L, 123L, Stdlib.Dict.__empty<Int64, Int64>()) in
+    let result = multiplyCells(a, b, n, 0L, 0L, Stdlib.Dict.__empty<Int64, Int64>()) in
     checksumCells(result, n * n, 0L, 0L)
 
 let benchmarkArg(index: Int) : Int64 =

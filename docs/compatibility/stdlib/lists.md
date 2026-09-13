@@ -95,14 +95,14 @@ The former public compiler aliases `List.equals`, `List.flatMap`,
 `List.forAll`, and `List.setAt` are absent from callable lookup; focused probes
 assert unresolved-callable failures. Compiler-owned sources use canonical
 `==`, `List.flatten`/`map`, `List.all`, and private
-`Stdlib.Internal.SkewList.setAt` as appropriate. The misplaced truncating
+`Stdlib.List.__setAt` as appropriate. The misplaced truncating
 `List.zip` in `Float.dark` is removed; canonical `List.zip` returns `Option`.
 
 The compiler-only list spread grammar and expression representation are gone.
 Compiler stdlib, benchmarks, and tests use `::` patterns, `@`, `List.push`,
 `List.append`, or explicitly private skew-list operations. Helpers prefixed
-`__`, `Stdlib.Internal.SkewList`, generated comparison/rendering functions, and
-ownership-rooting helpers are implementation details and are not additions to
+`__`, generated comparison/rendering functions, and ownership-rooting helpers
+are implementation details and are not additions to
 the public interpreter contract. The existing `getAtOrDefault` machine-sized
 helper remains a documented compiler implementation extension because removing
 it was outside the approved public-helper removal set; parity callers use

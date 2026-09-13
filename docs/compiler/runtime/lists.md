@@ -80,9 +80,8 @@ arbitrary-precision `Int`; native operations perform checked conversions.
 The module also provides the interpreter-compatible traversal, predicate,
 pairwise, sorting, uniqueness, grouping, partition, iteration, random-element,
 and chunking functions. See [list compatibility](../../compatibility/stdlib/lists.md) for the
-revision-stamped signature and behavior matrix. Names beginning with `__` and
-the `Stdlib.Internal.SkewList` module are private compiler implementation
-surface.
+revision-stamped signature and behavior matrix. Names beginning with `__` are
+private compiler implementation surface.
 
 ## Lowering and Reference Counting
 

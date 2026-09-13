@@ -141,6 +141,14 @@ module Outer =
 ---ROUNDTRIP---
 
 ---NAME---
+internal module segment is an ordinary public name
+---SOURCE---
+module Outer =
+  module Internal =
+    let identity<'a>(value: a) : a = value
+---ROUNDTRIP---
+
+---NAME---
 top level val reaches the unsupported execution boundary
 ---SOURCE---
 val answer = 42

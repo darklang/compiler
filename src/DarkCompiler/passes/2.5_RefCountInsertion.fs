@@ -254,7 +254,7 @@ let inferCExprType (ctx: TypeContext) (cexpr: CExpr) : AST.Type option =
     | BorrowedCall (funcName, args) ->
         // Return type from function registry (with special-case inference for stdlib list/tuple helpers)
         match funcName, args with
-        | name, [listAtom; _] when name.StartsWith("Stdlib.List.getAt") || name.StartsWith("Stdlib.Internal.SkewList.getAt") ->
+        | name, [listAtom; _] when name.StartsWith("Stdlib.List.getAt") || name.StartsWith("Stdlib.List.__getAt") ->
             match tryGetFuncReturnTypeFromReg ctx funcName with
             | Some retType -> Some retType
             | None ->
@@ -262,7 +262,7 @@ let inferCExprType (ctx: TypeContext) (cexpr: CExpr) : AST.Type option =
                 | Some (AST.TList elemType) ->
                     Some (AST.TSum ("Stdlib.Option.Option", [elemType]))
                 | _ -> None
-        | name, [listAtom] when name.StartsWith("Stdlib.List.head") || name.StartsWith("Stdlib.Internal.SkewList.head") ->
+        | name, [listAtom] when name.StartsWith("Stdlib.List.head") || name.StartsWith("Stdlib.List.__head") ->
             match tryGetFuncReturnTypeFromReg ctx funcName with
             | Some retType -> Some retType
             | None ->
@@ -270,7 +270,7 @@ let inferCExprType (ctx: TypeContext) (cexpr: CExpr) : AST.Type option =
                 | Some (AST.TList elemType) ->
                     Some (AST.TSum ("Stdlib.Option.Option", [elemType]))
                 | _ -> None
-        | name, [listAtom] when name.StartsWith("Stdlib.List.tail") || name.StartsWith("Stdlib.Internal.SkewList.tail") ->
+        | name, [listAtom] when name.StartsWith("Stdlib.List.tail") || name.StartsWith("Stdlib.List.__tail") ->
             match inferAtomType ctx listAtom with
             | Some (AST.TList elemType) when name.StartsWith("Stdlib.List.tail") ->
                 Some (AST.TSum ("Stdlib.Option.Option", [AST.TList elemType]))
@@ -1520,8 +1520,8 @@ let rec insertRCWithAnalysis
             let bodyReturned = returnedSet bodyInfo
             let consumedByImmediateI64Push =
                 let isI64Push (funcName: string) : bool =
-                    funcName = "Stdlib.Internal.SkewList.push_i64"
-                    || funcName = "Stdlib.Internal.SkewList.pushBack_i64"
+                    funcName = "Stdlib.List.__push_i64"
+                    || funcName = "Stdlib.List.__pushBack_i64"
                 let consumesSecondArg (args: Atom list) : bool =
                     match args with
                     | _listAtom :: Var valueTemp :: _ -> valueTemp = tempId
@@ -1665,8 +1665,8 @@ let rec insertRCWithAnalysis
                     match cexpr with
                     | Call (funcName, [_; Var valueTemp])
                     | TailCall (funcName, [_; Var valueTemp]) when
-                        funcName = "Stdlib.Internal.SkewList.push_i64"
-                        || funcName = "Stdlib.Internal.SkewList.pushBack_i64" ->
+                        funcName = "Stdlib.List.__push_i64"
+                        || funcName = "Stdlib.List.__pushBack_i64" ->
                         let transfersImmediateOwnedValue =
                             match frames with
                             | previous :: _ when previous.TempId = valueTemp ->

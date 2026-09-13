@@ -125,12 +125,12 @@ let testErasedListHeadPatternLowersToBorrowedCall () : TestResult =
         let hasBorrowedErasedHead =
             anfExpr
             |> containsCExpr (function
-                | ANF.BorrowedCall ("Stdlib.Internal.SkewList.headUnsafe_i64", _) -> true
+                | ANF.BorrowedCall ("Stdlib.List.__headUnsafe_i64", _) -> true
                 | _ -> false)
         let hasOwnedErasedHead =
             anfExpr
             |> containsCExpr (function
-                | ANF.Call ("Stdlib.Internal.SkewList.headUnsafe_i64", _) -> true
+                | ANF.Call ("Stdlib.List.__headUnsafe_i64", _) -> true
                 | _ -> false)
 
         if not hasBorrowedErasedHead then
@@ -164,7 +164,7 @@ let testTypedListHeadPatternRemainsOwnedCall () : TestResult =
             Ok ()
 
 let testSyntheticNullaryCallLowersToZeroArgs () : TestResult =
-    let funcName = "Stdlib.Internal.SkewList.__TAG_SINGLE"
+    let funcName = "Stdlib.List.__TAG_SINGLE"
     let expr = AST.Call (funcName, AST.NonEmptyList.singleton AST.UnitLiteral)
     let env : VarEnv = Map.empty
     let funcReg : FunctionRegistry =

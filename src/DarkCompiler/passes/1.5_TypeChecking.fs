@@ -1370,7 +1370,7 @@ let private buildEqExprForType
     | TString ->
         Call ("Stdlib.String.equals", NonEmptyList.fromList [leftExpr; rightExpr])
     | TInt ->
-        Call ("Stdlib.Internal.Integer.equals", NonEmptyList.fromList [leftExpr; rightExpr])
+        Call ("Stdlib.Int.__equals", NonEmptyList.fromList [leftExpr; rightExpr])
     | TList elemType ->
         let resolvedElemType = resolveType aliasReg elemType
         makeInternalTypeApp (EqHelperDispatchTypeApp (TList resolvedElemType, leftExpr, rightExpr))
@@ -6135,7 +6135,7 @@ let rec private buildEqHelperExpr
         Call ("Stdlib.String.equals", NonEmptyList.fromList [leftExpr; rightExpr])
 
     | _, TInt ->
-        Call ("Stdlib.Internal.Integer.equals", NonEmptyList.fromList [leftExpr; rightExpr])
+        Call ("Stdlib.Int.__equals", NonEmptyList.fromList [leftExpr; rightExpr])
 
     | ExpandCurrent, TDict (TString, valueType) ->
         let entryType = TTuple [TString; resolveType aliasReg valueType]
@@ -6320,10 +6320,10 @@ let rec private buildCompareHelperExpr
             If (leftExpr, comparisonResultLiteral 1L, comparisonResultLiteral -1L)
         )
     | ExpandCurrent, TInt ->
-        Call ("Stdlib.Internal.Integer.compare", NonEmptyList.fromList [leftExpr; rightExpr])
+        Call ("Stdlib.Int.__compare", NonEmptyList.fromList [leftExpr; rightExpr])
     | ExpandCurrent, TInt128 ->
         Call (
-            "Stdlib.Internal.Integer.compare",
+            "Stdlib.Int.__compare",
             NonEmptyList.fromList [
                 Call ("__int128_to_int", NonEmptyList.singleton leftExpr)
                 Call ("__int128_to_int", NonEmptyList.singleton rightExpr)
@@ -6331,7 +6331,7 @@ let rec private buildCompareHelperExpr
         )
     | ExpandCurrent, TUInt128 ->
         Call (
-            "Stdlib.Internal.Integer.compare",
+            "Stdlib.Int.__compare",
             NonEmptyList.fromList [
                 Call ("__uint128_to_int", NonEmptyList.singleton leftExpr)
                 Call ("__uint128_to_int", NonEmptyList.singleton rightExpr)

@@ -41,12 +41,12 @@ let power(base: Int8, exponent: Int8) : Int8 =
     if exponent < 0y then Builtin.crash("Cannot raise integer to a negative exponent")
     else
         let result =
-            Stdlib.Internal.Integer.wrapSigned(
-                Stdlib.Internal.Integer.power(
-                    Stdlib.Internal.Integer.fromInt8(base),
-                    Stdlib.Internal.Integer.fromInt8(exponent)),
+            Stdlib.Int.__wrapSigned(
+                Stdlib.Int.__power(
+                    Stdlib.Int.__fromInt8(base),
+                    Stdlib.Int.__fromInt8(exponent)),
                 8L) in
-        match Stdlib.Internal.Integer.toInt8(result) with
+        match Stdlib.Int.__toInt8(result) with
         | Some(value) -> value
         | None -> Builtin.crash("Internal Int8 power normalization invariant failed")
 

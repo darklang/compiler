@@ -47,7 +47,7 @@ let rotateLeft(list: List<Int64>, i: Int64) : List<Int64> =
 
 // Set element at index
 let setAt(list: List<Int64>, index: Int64, value: Int64) : List<Int64> =
-    Stdlib.Internal.SkewList.setAt<Int64>(list, index, value)
+    Stdlib.List.__setAt<Int64>(list, index, value)
 
 // Generate next permutation, returns (newPerm, newCount, done)
 let nextPerm(perm: List<Int64>, count: List<Int64>, i: Int64, n: Int64) : (List<Int64> * List<Int64> * Bool) =

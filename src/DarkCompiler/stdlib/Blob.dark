@@ -45,7 +45,7 @@ let __writeInt64List(ptr: RawPtr, bytes: List<Int64>, offset: Int64) : Int64 =
         Stdlib.Blob.__writeInt64List(ptr, rest, offset + 1L)
 
 let __fromInt64List(bytes: List<Int64>) : Blob =
-    let length = Stdlib.Internal.SkewList.length<Int64>(bytes) in
+    let length = Stdlib.List.__length<Int64>(bytes) in
     if length == 0L then Stdlib.Blob.__createZeroed(0L)
     else
         let dataSize = Stdlib.Blob.__alignedDataSize(length) in

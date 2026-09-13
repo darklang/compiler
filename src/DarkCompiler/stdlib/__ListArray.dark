@@ -2,16 +2,16 @@
 // Constructors establish runtime bounds. ListHIR proves physical uniqueness
 // and owns release; traversal kernels neither allocate nor release buffers.
 
-module Stdlib.Internal.ListArray
+module Stdlib.List
 
 // The mapping's private prefix and the common array layout cost 40 bytes.
 // Check before narrowing Int or multiplying a machine-sized length by eight.
-let repeatLength(count: Int) : Int64 =
+let __arrayRepeatLength(count: Int) : Int64 =
     if count <= 0I then 0L
     else if count > 1152921504606846970I then Builtin.crash("Out of heap memory")
     else Stdlib.Int.__toInt64Unchecked(count)
 
-let allocate(length: Int64) : RawPtr =
+let __arrayAllocate(length: Int64) : RawPtr =
     if length < 0L || length > 1152921504606846970L then Builtin.crash("Out of heap memory")
     else
         let capacity = if length <= 28L then 28L else length in
@@ -25,34 +25,34 @@ let allocate(length: Int64) : RawPtr =
 
 // This boundary keeps conditional cleanup out of each region continuation.
 // ListHIR's intrinsic supplies the exact fixed-block RC release metadata.
-let release(buffer: RawPtr) : Unit =
+let __arrayRelease(buffer: RawPtr) : Unit =
     let length = __raw_get<Int64>(buffer, 0L) in
     if length <= 28L then __list_array_release_small(buffer)
     else __mapped_free(buffer)
 
-let fill(buffer: RawPtr, index: Int64, length: Int64, value: Int64) : Unit =
+let __arrayFill(buffer: RawPtr, index: Int64, length: Int64, value: Int64) : Unit =
     if index >= length then ()
     else
         let _ = __raw_write_word(buffer, 24L + index * 8L, value) in
-        Stdlib.Internal.ListArray.fill(buffer, index + 1L, length, value)
+        Stdlib.List.__arrayFill(buffer, index + 1L, length, value)
 
-let repeat(count: Int, value: Int64) : RawPtr =
-    let length = Stdlib.Internal.ListArray.repeatLength(count) in
-    let buffer = Stdlib.Internal.ListArray.allocate(length) in
-    let _ = Stdlib.Internal.ListArray.fill(buffer, 0L, length, value) in
+let __arrayRepeat(count: Int, value: Int64) : RawPtr =
+    let length = Stdlib.List.__arrayRepeatLength(count) in
+    let buffer = Stdlib.List.__arrayAllocate(length) in
+    let _ = Stdlib.List.__arrayFill(buffer, 0L, length, value) in
     let _ = __raw_write_word(buffer, 16L, length) in
     buffer
 
-let map(buffer: RawPtr, index: Int64, length: Int64, fn: (Int64) -> Int64) : Unit =
+let __arrayMap(buffer: RawPtr, index: Int64, length: Int64, fn: (Int64) -> Int64) : Unit =
     if index >= length then ()
     else
         let offset = 24L + index * 8L in
         let value = __raw_get<Int64>(buffer, offset) in
         let mapped = fn(value) in
         let _ = __raw_write_word(buffer, offset, mapped) in
-        Stdlib.Internal.ListArray.map(buffer, index + 1L, length, fn)
+        Stdlib.List.__arrayMap(buffer, index + 1L, length, fn)
 
-let reverse(buffer: RawPtr, left: Int64, right: Int64) : Unit =
+let __arrayReverse(buffer: RawPtr, left: Int64, right: Int64) : Unit =
     if left >= right then ()
     else
         let leftOffset = 24L + left * 8L in
@@ -61,19 +61,19 @@ let reverse(buffer: RawPtr, left: Int64, right: Int64) : Unit =
         let b = __raw_get<Int64>(buffer, rightOffset) in
         let _ = __raw_write_word(buffer, leftOffset, b) in
         let _ = __raw_write_word(buffer, rightOffset, a) in
-        Stdlib.Internal.ListArray.reverse(buffer, left + 1L, right - 1L)
+        Stdlib.List.__arrayReverse(buffer, left + 1L, right - 1L)
 
-let copy(source: RawPtr, destination: RawPtr, index: Int64, length: Int64) : Unit =
+let __arrayCopy(source: RawPtr, destination: RawPtr, index: Int64, length: Int64) : Unit =
     if index >= length then ()
     else
         let offset = 24L + index * 8L in
         let value = __raw_get<Int64>(source, offset) in
         let _ = __raw_write_word(destination, offset, value) in
-        Stdlib.Internal.ListArray.copy(source, destination, index + 1L, length)
+        Stdlib.List.__arrayCopy(source, destination, index + 1L, length)
 
-let fold(buffer: RawPtr, index: Int64, length: Int64, acc: Int64, fn: (Int64, Int64) -> Int64) : Int64 =
+let __arrayFold(buffer: RawPtr, index: Int64, length: Int64, acc: Int64, fn: (Int64, Int64) -> Int64) : Int64 =
     if index >= length then acc
     else
         let value = __raw_get<Int64>(buffer, 24L + index * 8L) in
         let next = fn(acc, value) in
-        Stdlib.Internal.ListArray.fold(buffer, index + 1L, length, next, fn)
+        Stdlib.List.__arrayFold(buffer, index + 1L, length, next, fn)

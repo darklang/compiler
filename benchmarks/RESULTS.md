@@ -6,7 +6,7 @@ Best-known compatible routine-profile Dark performance vs audited Rust reference
 **Architecture:** `arm64`
 **Profile:** `routine` (schema 2)
 **Measurement policy:** `cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs`
-**Workload contract:** `e52a38d9766ae00470a88aac4d56bba0e631b37bf2c2aa5da23c362ae1d3c380`
+**Workload contract:** `218650a6c491f640af51e280af9f08cfd9dedff693cf1f3bfeb8cd6e1c418cff`
 **Compiler commit:** `b2d48df5331c9b2a3a77cd3f5172ee8683d7cb6c` - Run full fannkuch and include nsieve
 
 | Benchmark | Dark (3.64x) | Rust |

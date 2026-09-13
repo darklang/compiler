@@ -78,7 +78,7 @@ let private materializeComparisonPlan (targetType: AST.Type) (args: AST.Expr lis
             )
         | AST.TInt ->
             AST.Call (
-                "Stdlib.Internal.Integer.equals",
+                "Stdlib.Int.__equals",
                 AST.NonEmptyList.fromList [leftExpr; rightExpr]
             )
         | _ -> AST.BinOp (AST.Eq, leftExpr, rightExpr)
@@ -668,7 +668,7 @@ let private listHeadUnsafeFunction
     match jsonAccessor with
     | Some name when Map.containsKey name funcReg -> name
     | _ when elementType = AST.TFloat64 -> "Stdlib.List.__headUnsafeFloat"
-    | _ -> "Stdlib.Internal.SkewList.headUnsafe_i64"
+    | _ -> "Stdlib.List.__headUnsafe_i64"
 
 /// Pattern matching reads list payloads without taking an ownership edge.
 /// Typed accessors materialize owned return values in their callee; the erased
@@ -680,7 +680,7 @@ let private listHeadUnsafeExpr
     (listAtom: ANF.Atom)
     : ANF.CExpr =
     let functionName = listHeadUnsafeFunction funcReg elementType
-    if functionName = "Stdlib.Internal.SkewList.headUnsafe_i64" then
+    if functionName = "Stdlib.List.__headUnsafe_i64" then
         ANF.BorrowedCall (functionName, [listAtom])
     else
         ANF.Call (functionName, [listAtom])
@@ -1441,7 +1441,7 @@ let collectTypeApps (expr: AST.Expr) : Set<SpecKey> =
             if List.isEmpty entries then entrySpecs
             else
                 Set.add
-                    ("Stdlib.Internal.HAMT.__setOverwriting", [AST.TString; valueType])
+                    ("Stdlib.Dict.__setOverwriting", [AST.TString; valueType])
                     entrySpecs
         | AST.RecordLiteral (_, fields) ->
             fields |> List.fold (fun acc (_, value) -> visit acc value) specs
@@ -1640,7 +1640,7 @@ let rec replaceTypeApps (expr: AST.Expr) : AST.Expr =
             entries
             |> List.fold (fun dictExpr (key, value) ->
                 AST.TypeApp (
-                    "Stdlib.Internal.HAMT.__setOverwriting",
+                    "Stdlib.Dict.__setOverwriting",
                     [AST.TString; valueType],
                     AST.NonEmptyList.fromList [dictExpr; AST.StringLiteral key; value]
                 )) empty
@@ -1834,7 +1834,7 @@ let replaceTypeAppsWithRegistry (specRegistry: SpecRegistry) (expr: AST.Expr) : 
                     entries
                     |> List.fold (fun dictExpr (key, value) ->
                         AST.TypeApp (
-                            "Stdlib.Internal.HAMT.__setOverwriting",
+                            "Stdlib.Dict.__setOverwriting",
                             [AST.TString; valueType],
                             AST.NonEmptyList.fromList [dictExpr; AST.StringLiteral key; value]
                         )) (AST.DictLiteral (valueType, []))
@@ -2955,7 +2955,7 @@ let private comparisonForCapturedValue
     elif typ = AST.TString then
         AST.Call ("Stdlib.String.equals", exprArgsFromList [left; right])
     elif typ = AST.TInt then
-        AST.Call ("Stdlib.Internal.Integer.equals", exprArgsFromList [left; right])
+        AST.Call ("Stdlib.Int.__equals", exprArgsFromList [left; right])
     else
         AST.BinOp (AST.Eq, left, right)
 
@@ -5579,7 +5579,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                             Ok (wrapBindings finalBindings (ANF.Return finalAtom), varGen4)
                         | Ok AST.TInt ->
                             let (tempVar, varGen3) = ANF.freshVar varGen2
-                            let cexpr = ANF.Call ("Stdlib.Internal.Integer.equals", [leftAtom; rightAtom])
+                            let cexpr = ANF.Call ("Stdlib.Int.__equals", [leftAtom; rightAtom])
                             let (finalAtom, finalBindings, varGen4) =
                                 if op = AST.Neq then
                                     let (negVar, vg) = ANF.freshVar varGen3
@@ -6742,7 +6742,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                         else
                                             // Get tail for next iteration
                                             let (tailVar, vg2) = ANF.freshVar vg'
-                                            let tailExpr = ANF.Call ("Stdlib.Internal.SkewList.tail_i64", [currentList])
+                                            let tailExpr = ANF.Call ("Stdlib.List.__tail_i64", [currentList])
                                             let tailBinding = (tailVar, tailExpr)
                                             collectFromList rest (ANF.Var tailVar) env' (tailBinding :: bindings') vg2)
                             collectFromList innerPatterns sourceAtom env bindings vg
@@ -6772,7 +6772,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                     collectPatternBindings p (ANF.Var headVar) elemType env (headBinding :: rawHeadBinding :: bindings) vg1'
                                     |> Result.bind (fun (env', bindings', vg') ->
                                         let (rawTailVar, vg2) = ANF.freshVar vg'
-                                        let rawTailExpr = ANF.Call ("Stdlib.Internal.SkewList.tail_i64", [currentList])
+                                        let rawTailExpr = ANF.Call ("Stdlib.List.__tail_i64", [currentList])
                                         let rawTailBinding = (rawTailVar, rawTailExpr)
                                         // Wrap tail with TypedAtom to preserve list type
                                         let (tailVar, vg2') = ANF.freshVar vg2
@@ -6923,7 +6923,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                 let (typedValueVar, vg2) = ANF.freshVar vg1
                                 let typedValueExpr = ANF.TypedAtom (ANF.Var rawValueVar, elemType)
                                 let (rawTailVar, vg3) = ANF.freshVar vg2
-                                let rawTailExpr = ANF.Call ("Stdlib.Internal.SkewList.tail_i64", [currentList])
+                                let rawTailExpr = ANF.Call ("Stdlib.List.__tail_i64", [currentList])
                                 let (typedTailVar, vg4) = ANF.freshVar vg3
                                 let typedTailExpr = ANF.TypedAtom (ANF.Var rawTailVar, listType)
                                 let newBindings =
@@ -6987,7 +6987,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                             let headBinding = (headVar, headExpr)
                             // Extract tail using SkewList.tail_i64
                             let (rawTailVar, vg2) = ANF.freshVar vg1'
-                            let rawTailExpr = ANF.Call ("Stdlib.Internal.SkewList.tail_i64", [listAtom])
+                            let rawTailExpr = ANF.Call ("Stdlib.List.__tail_i64", [listAtom])
                             let rawTailBinding = (rawTailVar, rawTailExpr)
                             // Wrap with TypedAtom to preserve list type for tail
                             let listType = AST.TList elemType
@@ -7283,7 +7283,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                         else
                                             // Get tail for next iteration
                                             let (tailVar, vg2) = ANF.freshVar vg'
-                                            let tailExpr = ANF.Call ("Stdlib.Internal.SkewList.tail_i64", [currentList])
+                                            let tailExpr = ANF.Call ("Stdlib.List.__tail_i64", [currentList])
                                             let tailBinding = (tailVar, tailExpr)
                                             collectFromList rest (ANF.Var tailVar) env' (tailBinding :: bindings') vg2)
                             collectFromList innerPatterns sourceAtom env bindings vg)
@@ -7320,7 +7320,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                     collectBindings p (ANF.Var headVar) elemType env (headBinding :: bindings) vg1
                                     |> Result.bind (fun (env', bindings', vg') ->
                                         let (tailVar, vg2) = ANF.freshVar vg'
-                                        let tailExpr = ANF.Call ("Stdlib.Internal.SkewList.tail_i64", [currentList])
+                                        let tailExpr = ANF.Call ("Stdlib.List.__tail_i64", [currentList])
                                         let tailBinding = (tailVar, tailExpr)
                                         collectHeads rest (ANF.Var tailVar) env' (tailBinding :: bindings') vg2)
                             collectHeads headPatterns sourceAtom env bindings vg)
@@ -7358,7 +7358,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     Ok (Some (ANF.Var cmpVar, [(cmpVar, cmpExpr)], vg1))
                 | AST.PBigInt n ->
                     let (cmpVar, vg1) = ANF.freshVar vg
-                    let cmpExpr = ANF.Call ("Stdlib.Internal.Integer.equals", [scrutAtom; ANF.StringLiteral (n.ToString())])
+                    let cmpExpr = ANF.Call ("Stdlib.Int.__equals", [scrutAtom; ANF.StringLiteral (n.ToString())])
                     Ok (Some (ANF.Var cmpVar, [(cmpVar, cmpExpr)], vg1))
                 | AST.PInt128Literal n ->
                     let (cmpVar, vg1) = ANF.freshVar vg
@@ -7543,15 +7543,15 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                         Ok (Some (ANF.Var cmpVar, [(cmpVar, cmpExpr)], vg1))
                     elif patternLen = 1 then
                         let (lengthVar, vg1) = ANF.freshVar vg
-                        let lengthExpr = ANF.Call ("Stdlib.Internal.SkewList.length_i64", [scrutAtom])
+                        let lengthExpr = ANF.Call ("Stdlib.List.__length_i64", [scrutAtom])
                         let (cmpVar, vg2) = ANF.freshVar vg1
                         let cmpExpr = ANF.Prim (ANF.Eq, ANF.Var lengthVar, ANF.IntLiteral (ANF.Int64 1L))
                         Ok (Some (ANF.Var cmpVar, [(lengthVar, lengthExpr); (cmpVar, cmpExpr)], vg2))
                     else
                         // Multiple elements: check length == patternLen
-                        // Use Stdlib.Internal.SkewList.length which handles EMPTY/SINGLE/DEEP safely
+                        // Use Stdlib.List.__length which handles EMPTY/SINGLE/DEEP safely
                         let (lengthVar, vg1) = ANF.freshVar vg
-                        let lengthExpr = ANF.Call ("Stdlib.Internal.SkewList.length_i64", [scrutAtom])
+                        let lengthExpr = ANF.Call ("Stdlib.List.__length_i64", [scrutAtom])
                         let (cmpVar, vg2) = ANF.freshVar vg1
                         let cmpExpr = ANF.Prim (ANF.Eq, ANF.Var lengthVar, ANF.IntLiteral (ANF.Int64 (int64 patternLen)))
                         Ok (Some (ANF.Var cmpVar, [(lengthVar, lengthExpr); (cmpVar, cmpExpr)], vg2))
@@ -7563,7 +7563,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                         Ok None
                     else
                         let (lengthVar, vg1) = ANF.freshVar vg
-                        let lengthExpr = ANF.Call ("Stdlib.Internal.SkewList.length_i64", [scrutAtom])
+                        let lengthExpr = ANF.Call ("Stdlib.List.__length_i64", [scrutAtom])
                         let (cmpVar, vg2) = ANF.freshVar vg1
                         let cmpExpr = ANF.Prim (ANF.Gte, ANF.Var lengthVar, ANF.IntLiteral (ANF.Int64 (int64 minLength)))
                         Ok (Some (ANF.Var cmpVar, [(lengthVar, lengthExpr); (cmpVar, cmpExpr)], vg2))
@@ -7850,7 +7850,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                         Ok (env', bindings', vg')
                                     else
                                         let (tailVar, vg2) = ANF.freshVar vg'
-                                        let tailExpr = ANF.Call ("Stdlib.Internal.SkewList.tail_i64", [currentList])
+                                        let tailExpr = ANF.Call ("Stdlib.List.__tail_i64", [currentList])
                                         loop rest (ANF.Var tailVar) env' (bindings' @ [(tailVar, tailExpr)]) vg2)
                         loop patterns sourceAtom env bindings vg)
                 | AST.PListCons (headPatterns, tailPattern) ->
@@ -7878,7 +7878,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                 let (headVar, vg1) = ANF.freshVar currentVg
                                 let headExpr = listHeadUnsafeExpr funcReg elemType currentList
                                 let (tailVar, vg2) = ANF.freshVar vg1
-                                let tailExpr = ANF.Call ("Stdlib.Internal.SkewList.tail_i64", [currentList])
+                                let tailExpr = ANF.Call ("Stdlib.List.__tail_i64", [currentList])
                                 collectNestedPatternBindings pat (ANF.Var headVar) elemType currentEnv (currentBindings @ [(headVar, headExpr); (tailVar, tailExpr)]) vg2
                                 |> Result.bind (fun (env', bindings', vg') ->
                                     collectHeads rest (ANF.Var tailVar) env' bindings' vg')
@@ -7986,7 +7986,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     elif patternLen = 1 then
                         // A singleton has one digit whose tree pointer is at offset 16.
                         let (tagVar, vg1) = ANF.freshVar vg
-                        let tagExpr = ANF.Call ("Stdlib.Internal.SkewList.length_i64", [listAtom])
+                        let tagExpr = ANF.Call ("Stdlib.List.__length_i64", [listAtom])
                         let (checkVar, vg2) = ANF.freshVar vg1
                         let checkExpr = ANF.Prim (ANF.Eq, ANF.Var tagVar, ANF.IntLiteral (ANF.Int64 1L))
 
@@ -8090,8 +8090,8 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                         let (lengthVar, vg1) = ANF.freshVar vg
                         let lengthName =
                             match elemType with
-                            | AST.TFloat64 -> "Stdlib.Internal.SkewList.__lengthFloat"
-                            | _ -> "Stdlib.Internal.SkewList.length_i64"
+                            | AST.TFloat64 -> "Stdlib.List.__lengthFloat"
+                            | _ -> "Stdlib.List.__length_i64"
                         let lengthExpr = ANF.Call (lengthName, [listAtom])
                         let (checkVar, vg2) = ANF.freshVar vg1
                         let checkExpr = ANF.Prim (ANF.Eq, ANF.Var lengthVar, ANF.IntLiteral (ANF.Int64 (int64 patternLen)))
@@ -8512,7 +8512,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                     (withGuard, vg6))))
 
                     // Compile the DEEP branch: node at offset 16 (prefix[0])
-                    // For tail, call Stdlib.Internal.SkewList.tail to properly compute the tail
+                    // For tail, call Stdlib.List.__tail to properly compute the tail
                     let compileDeepBranch vg =
                         let (deepNodeVar, vg1) = ANF.freshVar vg
                         let deepNodeExpr = ANF.RawGet (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 16L), None)
@@ -8524,9 +8524,9 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                         let headBindingsWithType = headBindings @ [typedHeadBinding]
                         let typedHeadAtom = ANF.Var typedHeadVar
 
-                        // Call Stdlib.Internal.SkewList.tail to get the tail
+                        // Call Stdlib.List.__tail to get the tail
                         let (tailResultVar, vg3) = ANF.freshVar vg2'
-                        let tailCallExpr = ANF.Call ("Stdlib.Internal.SkewList.tail_i64", [listAtom])
+                        let tailCallExpr = ANF.Call ("Stdlib.List.__tail_i64", [listAtom])
                         // Wrap with TypedAtom to preserve correct list type in TypeMap
                         let (typedTailVar, vg3') = ANF.freshVar vg3
                         let typedTailExpr = ANF.TypedAtom (ANF.Var tailResultVar, listType)
@@ -8641,8 +8641,8 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     let (lengthVar, vg1) = ANF.freshVar vg
                     let lengthName =
                         match elemType with
-                        | AST.TFloat64 -> "Stdlib.Internal.SkewList.__lengthFloat"
-                        | _ -> "Stdlib.Internal.SkewList.length_i64"
+                        | AST.TFloat64 -> "Stdlib.List.__lengthFloat"
+                        | _ -> "Stdlib.List.__length_i64"
                     let lengthExpr = ANF.Call (lengthName, [listAtom])
                     let (lengthCheckVar, vg2) = ANF.freshVar vg1
                     let lengthCheckExpr = ANF.Prim (ANF.Gte, ANF.Var lengthVar, ANF.IntLiteral (ANF.Int64 (int64 numHeads)))
@@ -8669,7 +8669,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                                 listHeadUnsafeExpr funcReg elemType (ANF.Var currentListVar)
                             // Call tail to get rest
                             let (tailResultVar, vg2) = ANF.freshVar vg1
-                            let tailCallExpr = ANF.Call ("Stdlib.Internal.SkewList.tail_i64", [ANF.Var currentListVar])
+                            let tailCallExpr = ANF.Call ("Stdlib.List.__tail_i64", [ANF.Var currentListVar])
                             // Preserve type information for both head and tail values.
                             let (typedHeadVar, vg2') = ANF.freshVar vg2
                             let typedHeadExpr = ANF.TypedAtom (ANF.Var headResultVar, elemType)
@@ -9610,7 +9610,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                         Ok (finalAtom, allBindings, varGen4)
                     | Ok AST.TInt ->
                         let (tempVar, varGen3) = ANF.freshVar varGen2
-                        let cexpr = ANF.Call ("Stdlib.Internal.Integer.equals", [leftAtom; rightAtom])
+                        let cexpr = ANF.Call ("Stdlib.Int.__equals", [leftAtom; rightAtom])
                         let (finalAtom, finalBindings, varGen4) =
                             if op = AST.Neq then
                                 let (negVar, vg) = ANF.freshVar varGen3

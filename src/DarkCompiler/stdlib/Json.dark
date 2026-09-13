@@ -171,10 +171,10 @@ let __parseRoot(source: String) : Stdlib.Result.Result<Stdlib.Json.InternalValue
 // Concrete return types at these boundaries keep list projections unambiguous
 // for ownership lowering.
 let __viewListHead(items: List<Stdlib.Json.InternalValueView>) : Stdlib.Json.InternalValueView =
-    Stdlib.Internal.SkewList.headUnsafe<Stdlib.Json.InternalValueView>(items)
+    Stdlib.List.__headUnsafe<Stdlib.Json.InternalValueView>(items)
 
 let __viewFieldListHead(items: List<(String, Stdlib.Json.InternalValueView)>) : (String, Stdlib.Json.InternalValueView) =
-    Stdlib.Internal.SkewList.headUnsafe<(String, Stdlib.Json.InternalValueView)>(items)
+    Stdlib.List.__headUnsafe<(String, Stdlib.Json.InternalValueView)>(items)
 
 let __viewFieldName(field: (String, Stdlib.Json.InternalValueView)) : String =
     Stdlib.Tuple2.first<String, Stdlib.Json.InternalValueView>(field)
@@ -183,7 +183,7 @@ let __viewFieldValue(field: (String, Stdlib.Json.InternalValueView)) : Stdlib.Js
     Stdlib.Tuple2.second<String, Stdlib.Json.InternalValueView>(field)
 
 let __viewListTail(items: List<Stdlib.Json.InternalValueView>) : List<Stdlib.Json.InternalValueView> =
-    Stdlib.Internal.SkewList.tail<Stdlib.Json.InternalValueView>(items)
+    Stdlib.List.__tail<Stdlib.Json.InternalValueView>(items)
 
 let __viewListIsEmpty(items: List<Stdlib.Json.InternalValueView>) : Bool =
     Stdlib.List.isEmpty<Stdlib.Json.InternalValueView>(items)
@@ -381,8 +381,8 @@ let __objectFieldMap(source: String, view: Stdlib.Json.InternalValueView) : Stdl
 let __fieldNames(fields: List<(String, Stdlib.Json.InternalValueView)>) : List<String> =
     if Stdlib.List.isEmpty<(String, Stdlib.Json.InternalValueView)>(fields) then []
     else
-        let head = Stdlib.Internal.SkewList.headUnsafe<(String, Stdlib.Json.InternalValueView)>(fields) in
-        let tail = Stdlib.Internal.SkewList.tail<(String, Stdlib.Json.InternalValueView)>(fields) in
+        let head = Stdlib.List.__headUnsafe<(String, Stdlib.Json.InternalValueView)>(fields) in
+        let tail = Stdlib.List.__tail<(String, Stdlib.Json.InternalValueView)>(fields) in
         Stdlib.List.push<String>(
             Stdlib.Json.__fieldNames(tail),
             Stdlib.Tuple2.first<String, Stdlib.Json.InternalValueView>(head))

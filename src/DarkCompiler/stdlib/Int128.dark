@@ -16,41 +16,41 @@ let __modulus() : Int = __string_to_int("340282366920938463463374607431768211456
 let __maximum() : Int = __string_to_int("170141183460469231731687303715884105727")
 
 let __wrap(value: Int) : Int128 =
-    let unsigned = Stdlib.Internal.Integer.mod(value, Stdlib.Int128.__modulus()) in
+    let unsigned = Stdlib.Int.__mod(value, Stdlib.Int128.__modulus()) in
     let signed =
-        if Stdlib.Internal.Integer.greaterThan(unsigned, Stdlib.Int128.__maximum()) then
-            Stdlib.Internal.Integer.subtract(unsigned, Stdlib.Int128.__modulus())
+        if Stdlib.Int.__greaterThan(unsigned, Stdlib.Int128.__maximum()) then
+            Stdlib.Int.__subtract(unsigned, Stdlib.Int128.__modulus())
         else unsigned in
     Stdlib.Int128.__fromInt(signed)
 
 let add(a: Int128, b: Int128) : Int128 =
-    Stdlib.Int128.__wrap(Stdlib.Internal.Integer.add(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
+    Stdlib.Int128.__wrap(Stdlib.Int.__add(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
 let subtract(a: Int128, b: Int128) : Int128 =
-    Stdlib.Int128.__wrap(Stdlib.Internal.Integer.subtract(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
+    Stdlib.Int128.__wrap(Stdlib.Int.__subtract(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
 let multiply(a: Int128, b: Int128) : Int128 =
-    Stdlib.Int128.__wrap(Stdlib.Internal.Integer.multiply(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
+    Stdlib.Int128.__wrap(Stdlib.Int.__multiply(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
 let divide(a: Int128, b: Int128) : Int128 =
-    Stdlib.Int128.__wrap(Stdlib.Internal.Integer.divide(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
+    Stdlib.Int128.__wrap(Stdlib.Int.__divide(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
 
 let remainder(value: Int128, divisor: Int128) : Stdlib.Result.Result<Int128, String> =
-    match Stdlib.Internal.Integer.remainder(Stdlib.Int128.__asInt(value), Stdlib.Int128.__asInt(divisor)) with
+    match Stdlib.Int.__remainder(Stdlib.Int128.__asInt(value), Stdlib.Int128.__asInt(divisor)) with
     | Error(message) -> Error(message)
     | Ok(result) -> Ok(Stdlib.Int128.__wrap(result))
 let mod(value: Int128, modulus: Int128) : Int128 =
-    Stdlib.Int128.__wrap(Stdlib.Internal.Integer.mod(Stdlib.Int128.__asInt(value), Stdlib.Int128.__asInt(modulus)))
-let negate(value: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Internal.Integer.negate(Stdlib.Int128.__asInt(value)))
+    Stdlib.Int128.__wrap(Stdlib.Int.__mod(Stdlib.Int128.__asInt(value), Stdlib.Int128.__asInt(modulus)))
+let negate(value: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Int.__negate(Stdlib.Int128.__asInt(value)))
 let absoluteValue(value: Int128) : Int128 =
-    if Stdlib.Internal.Integer.lessThan(Stdlib.Int128.__asInt(value), Stdlib.Int128.__zero()) then
+    if Stdlib.Int.__lessThan(Stdlib.Int128.__asInt(value), Stdlib.Int128.__zero()) then
         Stdlib.Int128.negate(value)
     else value
 
-let lessThan(a: Int128, b: Int128) : Bool = Stdlib.Internal.Integer.lessThan(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b))
-let lessThanOrEqualTo(a: Int128, b: Int128) : Bool = Stdlib.Internal.Integer.lessThanOrEqualTo(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b))
-let greaterThan(a: Int128, b: Int128) : Bool = Stdlib.Internal.Integer.greaterThan(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b))
-let greaterThanOrEqualTo(a: Int128, b: Int128) : Bool = Stdlib.Internal.Integer.greaterThanOrEqualTo(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b))
+let lessThan(a: Int128, b: Int128) : Bool = Stdlib.Int.__lessThan(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b))
+let lessThanOrEqualTo(a: Int128, b: Int128) : Bool = Stdlib.Int.__lessThanOrEqualTo(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b))
+let greaterThan(a: Int128, b: Int128) : Bool = Stdlib.Int.__greaterThan(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b))
+let greaterThanOrEqualTo(a: Int128, b: Int128) : Bool = Stdlib.Int.__greaterThanOrEqualTo(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b))
 
-let sqrt(value: Int128) : Float = Stdlib.Internal.Integer.sqrt(Stdlib.Int128.__asInt(value))
-let toFloat(value: Int128) : Float = Stdlib.Internal.Integer.toFloat(Stdlib.Int128.__asInt(value))
+let sqrt(value: Int128) : Float = Stdlib.Int.__sqrt(Stdlib.Int128.__asInt(value))
+let toFloat(value: Int128) : Float = Stdlib.Int.__toFloat(Stdlib.Int128.__asInt(value))
 let sum(values: List<Int128>) : Int128 = Stdlib.List.fold<Int128, Int128>(values, 0Q, fun acc value -> Stdlib.Int128.add(acc, value))
 let max(a: Int128, b: Int128) : Int128 = if Stdlib.Int128.greaterThan(a, b) then a else b
 let min(a: Int128, b: Int128) : Int128 = if Stdlib.Int128.lessThan(a, b) then a else b
@@ -59,28 +59,28 @@ let clamp(value: Int128, limitA: Int128, limitB: Int128) : Int128 =
     let upper = Stdlib.Int128.max(limitA, limitB) in
     Stdlib.Int128.max(lower, Stdlib.Int128.min(upper, value))
 
-let toString(value: Int128) : String = Stdlib.Internal.Integer.toString(Stdlib.Int128.__asInt(value))
+let toString(value: Int128) : String = Stdlib.Int.__toString(Stdlib.Int128.__asInt(value))
 let parse(value: String) : Stdlib.Result.Result<Int128, Stdlib.Int128.ParseError> =
-    match Stdlib.Internal.Integer.parse(value) with
+    match Stdlib.Int.__parse(value) with
     | Error(_) -> Error(Stdlib.Int128.ParseError.BadFormat)
     | Ok(parsed) ->
-        match Stdlib.Internal.Integer.toInt128(parsed) with
+        match Stdlib.Int.__toInt128(parsed) with
         | None -> Error(Stdlib.Int128.ParseError.OutOfRange)
         | Some(result) -> Ok(result)
 
-let fromInt8(value: Int8) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Internal.Integer.fromInt8(value))
-let fromUInt8(value: UInt8) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Internal.Integer.fromUInt8(value))
-let fromInt16(value: Int16) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Internal.Integer.fromInt16(value))
-let fromUInt16(value: UInt16) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Internal.Integer.fromUInt16(value))
-let fromInt32(value: Int32) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Internal.Integer.fromInt32(value))
-let fromUInt32(value: UInt32) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Internal.Integer.fromUInt32(value))
-let fromInt64(value: Int64) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Internal.Integer.fromInt64(value))
-let fromUInt64(value: UInt64) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Internal.Integer.fromUInt64(value))
+let fromInt8(value: Int8) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromInt8(value))
+let fromUInt8(value: UInt8) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromUInt8(value))
+let fromInt16(value: Int16) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromInt16(value))
+let fromUInt16(value: UInt16) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromUInt16(value))
+let fromInt32(value: Int32) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromInt32(value))
+let fromUInt32(value: UInt32) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromUInt32(value))
+let fromInt64(value: Int64) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromInt64(value))
+let fromUInt64(value: UInt64) : Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromUInt64(value))
 
-let bitwiseAnd(a: Int128, b: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Internal.Integer.bitwiseAnd(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
-let bitwiseOr(a: Int128, b: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Internal.Integer.bitwiseOr(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
-let bitwiseXor(a: Int128, b: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Internal.Integer.bitwiseXor(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
-let bitwiseNot(value: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Internal.Integer.bitwiseNot(Stdlib.Int128.__asInt(value)))
-let __shiftCount(value: Int128) : Int = Stdlib.Internal.Integer.mod(Stdlib.Int128.__asInt(value), __string_to_int("128"))
-let shiftLeft(value: Int128, count: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Internal.Integer.shiftLeft(Stdlib.Int128.__asInt(value), Stdlib.Int128.__shiftCount(count)))
-let shiftRight(value: Int128, count: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Internal.Integer.shiftRight(Stdlib.Int128.__asInt(value), Stdlib.Int128.__shiftCount(count)))
+let bitwiseAnd(a: Int128, b: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Int.__bitwiseAnd(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
+let bitwiseOr(a: Int128, b: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Int.__bitwiseOr(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
+let bitwiseXor(a: Int128, b: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Int.__bitwiseXor(Stdlib.Int128.__asInt(a), Stdlib.Int128.__asInt(b)))
+let bitwiseNot(value: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Int.__bitwiseNot(Stdlib.Int128.__asInt(value)))
+let __shiftCount(value: Int128) : Int = Stdlib.Int.__mod(Stdlib.Int128.__asInt(value), __string_to_int("128"))
+let shiftLeft(value: Int128, count: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Int.__shiftLeft(Stdlib.Int128.__asInt(value), Stdlib.Int128.__shiftCount(count)))
+let shiftRight(value: Int128, count: Int128) : Int128 = Stdlib.Int128.__wrap(Stdlib.Int.__shiftRight(Stdlib.Int128.__asInt(value), Stdlib.Int128.__shiftCount(count)))

@@ -71,8 +71,8 @@ boundary.
 - Content-addressed package loading is absent. Package lookup-name validation
   remains resolver behavior, matching interpreter `NameResolver.fs:12-29`.
 - AOT unresolved/ambiguous diagnostics occur before execution.
-- Runtime helpers live under `Stdlib.Internal.*` or use `__` names and are
-  rejected by the post-parse visibility check.
+- Runtime helpers use `__` names and are rejected by the post-parse visibility
+  check.
 - Explicit compiler intrinsic candidates remain classified in
   [name-resolution.md](name-resolution.md). Performance is outside this matrix.
 

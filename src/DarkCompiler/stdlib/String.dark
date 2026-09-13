@@ -147,7 +147,7 @@ let toCodepoints(value: String) : List<Int64> =
     | Error(_) -> Builtin.testRuntimeError("Invalid UTF-8 string")
 
 let codepointLength(value: String) : Int64 =
-    Stdlib.Internal.SkewList.length<Int64>(Stdlib.String.toCodepoints(value))
+    Stdlib.List.__length<Int64>(Stdlib.String.toCodepoints(value))
 
 let toGraphemes(value: String) : List<String> =
     Unicode.segmentUtf8(value, 0L, [], "", [])

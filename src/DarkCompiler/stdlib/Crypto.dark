@@ -1244,12 +1244,12 @@ let debugBitwiseOr(a: Int64, b: Int64) : Int64 =
 let debugHmacKeyLen(keyLen: Int64, blockSize: Int64) : Int64 =
     let key = Stdlib.Blob.__createZeroed(keyLen) in
     let keyPadded = Stdlib.Crypto.__hmacPrepareKey(key, blockSize, Stdlib.Crypto.sha256) in
-    Stdlib.Internal.SkewList.length<Int64>(keyPadded)
+    Stdlib.List.__length<Int64>(keyPadded)
 
 // Debug: Test HMAC ipad/opad generation
 let debugHmacPadLen(blockSize: Int64) : Int64 =
     let pad = Stdlib.Crypto.__hmacCreatePad(54L, blockSize) in
-    Stdlib.Internal.SkewList.length<Int64>(pad)
+    Stdlib.List.__length<Int64>(pad)
 
 // Debug: Test just the hash function call in HMAC context
 let debugHashCall() : Int64 =
@@ -1265,14 +1265,14 @@ let debugSimpleHmac() : Int64 =
     let blockSize = 64L in
     let hashFn = Stdlib.Crypto.sha256 in
     let keyPadded = Stdlib.Crypto.__hmacPrepareKey(key, blockSize, hashFn) in
-    Stdlib.Internal.SkewList.length<Int64>(keyPadded)
+    Stdlib.List.__length<Int64>(keyPadded)
 
 // Debug: Test XOR of two lists
 let debugXorLists() : Int64 =
     let list1 = [1L, 2L, 3L, 4L] in
     let list2 = [5L, 6L, 7L, 8L] in
     let result = Stdlib.Crypto.__xorByteLists(list1, list2, []) in
-    Stdlib.Internal.SkewList.length<Int64>(result)
+    Stdlib.List.__length<Int64>(result)
 
 // Debug: Test tuple of lists pattern match
 let debugTupleMatch() : Int64 =
