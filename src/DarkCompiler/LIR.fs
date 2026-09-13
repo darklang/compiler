@@ -362,6 +362,9 @@ type FunctionCodegenFacts = {
     NeedsCliRuntimeState: bool
     NeedsCliArgvHelper: bool
     NeedsCliExecuteHelper: bool
+    /// The function can terminate through a runtime error or allocation
+    /// failure and therefore needs the backend's shared error routine.
+    NeedsRuntimeErrorHelper: bool
     Arm64RcHelperRequirements: Arm64RcHelperRequirements option
 }
 
@@ -448,6 +451,18 @@ let analyzeFunctionCodegenFacts (func: Function) : FunctionCodegenFacts =
         NeedsCliRuntimeState = needsCliRuntimeState
         NeedsCliArgvHelper = needsCliArgvHelper
         NeedsCliExecuteHelper = needsCliExecuteHelper
+        NeedsRuntimeErrorHelper =
+            func.CFG.Blocks
+            |> Map.exists (fun _ block ->
+                block.Instrs
+                |> List.exists (function
+                    | RuntimeError _
+                    | RuntimeErrorString _
+                    | HeapAlloc _
+                    | RawAlloc _
+                    | MappedAlloc _
+                    | MappedFree _ -> true
+                    | _ -> false))
         Arm64RcHelperRequirements = None
     }
 

@@ -198,6 +198,7 @@ let private genExitSyscall : X86_64.Instr list =
 
 /// Label for shared OOM handler (set per-program, not per-function)
 let private oomHandlerLabel = "__heap_oom"
+let private runtimeErrorHandlerLabel = "__dark_runtime_error"
 
 /// Generate a jump to the shared OOM handler
 let private genOomJump () : X86_64.Instr list =
@@ -205,25 +206,17 @@ let private genOomJump () : X86_64.Instr list =
 
 /// Generate the shared OOM handler code (placed once at end of program)
 let private genOomHandler () : X86_64.Instr list =
-    let msg = "Out of heap memory\n"
-    let bytes = System.Text.Encoding.UTF8.GetBytes(msg)
-    let len = bytes.Length
-    let padded = ((len + 7) / 8) * 8
-    let paddedBytes = (bytes |> Array.toList) @ List.replicate (padded - len) 0uy
-    let pushInstrs =
-        paddedBytes
-        |> List.chunkBySize 8
-        |> List.rev
-        |> List.collect (fun chunk ->
-            let value = chunk |> List.mapi (fun i b -> int64 b <<< (i * 8)) |> List.fold (|||) 0L
-            loadImm64 scratch value @ [X86_64.PUSH scratch])
     [X86_64.Label oomHandlerLabel]
-    @ pushInstrs
-    @ [X86_64.MOV_imm32 (X86_64.RDI, 2)]  // fd = stderr
-    @ [X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)]
-    @ loadImm64 X86_64.RDX (int64 len)
+    @ emitStringLiteral X86_64.R8 "Out of heap memory\n"
+    @ [X86_64.JMP runtimeErrorHandlerLabel]
+
+/// Shared non-returning writer for canonical error-string buffers in R8.
+let private genRuntimeErrorHandler () : X86_64.Instr list =
+    [ X86_64.Label runtimeErrorHandlerLabel
+      X86_64.MOV_load (X86_64.RDX, X86_64.R8, 8)
+      X86_64.LEA (X86_64.RSI, X86_64.R8, 16)
+      X86_64.MOV_imm32 (X86_64.RDI, 2) ]
     @ genWriteSyscall
-    @ [X86_64.ADD_imm (X86_64.RSP, int32 padded)]
     @ loadImm64 X86_64.RDI 1L
     @ genExitSyscall
 
@@ -3286,28 +3279,8 @@ let private translateInstr
             @ [ X86_64.MOV_load (destReg, X86_64.RSP, -savedBytes) ])
 
     | LIR.RuntimeError msg ->
-        // Write error message to stderr (fd=2) and exit(1)
-        let bytes = System.Text.Encoding.UTF8.GetBytes(msg + "\n")
-        let len = bytes.Length
-        let padded = ((len + 7) / 8) * 8
-        let paddedBytes = (bytes |> Array.toList) @ List.replicate (padded - len) 0uy
-        let pushInstrs =
-            paddedBytes
-            |> List.chunkBySize 8
-            |> List.rev
-            |> List.collect (fun chunk ->
-                let value = chunk |> List.mapi (fun i b -> int64 b <<< (i * 8)) |> List.fold (|||) 0L
-                loadImm64 scratch value @ [X86_64.PUSH scratch])
-        Ok (
-            pushInstrs
-            @ [X86_64.MOV_imm32 (X86_64.RDI, 2)]  // fd = stderr
-            @ [X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)]
-            @ loadImm64 X86_64.RDX (int64 len)
-            @ genWriteSyscall
-            @ [X86_64.ADD_imm (X86_64.RSP, int32 padded)]
-            @ loadImm64 X86_64.RDI 1L
-            @ genExitSyscall
-        )
+        Ok (emitStringLiteral X86_64.R8 (msg + "\n")
+            @ [X86_64.JMP runtimeErrorHandlerLabel])
 
     | LIR.RuntimeErrorString messageReg ->
         resolveReg messageReg
@@ -6323,4 +6296,4 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry)) 
                 }
             else
                 []
-        allInstrs @ listIncHelper @ listDecHelpers @ dictIncHelper @ plannedDictDecHelpers @ dictDecHelper @ dictDecDynamicKeyHelper @ dictDecDynamicValueHelper @ dictDecDynamicKeyValueHelper @ dictDecDynamicKeyDictValueHelper @ dictDecDynamicKeyDictListValueHelper @ dictDecListValueHelper @ dictDecDictValueHelper @ dictDecDictListValueHelper @ dictDecTupleStringListValueHelper @ dictDecTupleStringListDictValueHelper @ dictDecDynamicKeyTupleStringListDictValueHelper @ dictDecSumStringValueHelper @ closureIncHelper @ closureDecHelper @ streamDecHelper @ recursiveSumRcDecHelpers @ generateCliArgvHelper enableLeakCheck @ (if needsCliGetEnvHelper then generateCliGetEnvHelper enableLeakCheck else []) @ genOomHandler ())
+        allInstrs @ listIncHelper @ listDecHelpers @ dictIncHelper @ plannedDictDecHelpers @ dictDecHelper @ dictDecDynamicKeyHelper @ dictDecDynamicValueHelper @ dictDecDynamicKeyValueHelper @ dictDecDynamicKeyDictValueHelper @ dictDecDynamicKeyDictListValueHelper @ dictDecListValueHelper @ dictDecDictValueHelper @ dictDecDictListValueHelper @ dictDecTupleStringListValueHelper @ dictDecTupleStringListDictValueHelper @ dictDecDynamicKeyTupleStringListDictValueHelper @ dictDecSumStringValueHelper @ closureIncHelper @ closureDecHelper @ streamDecHelper @ recursiveSumRcDecHelpers @ generateCliArgvHelper enableLeakCheck @ (if needsCliGetEnvHelper then generateCliGetEnvHelper enableLeakCheck else []) @ genOomHandler () @ genRuntimeErrorHandler ())

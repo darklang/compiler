@@ -85,6 +85,7 @@ let heapOutOfMemoryMessage = "Out of heap memory"
 let private heapMmapSizeBytes = 512L * 1024L * 1024L
 let private heapMmapSizeMovzImm16 = 0x2000us  // 512MB == 0x20000000
 let private heapOverflowLabelPrefix = "__heap_oom_"
+let private runtimeErrorHelperLabel = "__dark_runtime_error"
 let private listRefCountIncHelperLabel = "__dark_list_refcount_inc_helper"
 let private listRefCountDecHelperLabel = "__dark_list_refcount_dec_helper"
 let private plannedListRefCountDecHelperLabelPrefix = "__dark_list_refcount_dec_plan_"
@@ -161,6 +162,7 @@ type Arm64ProgramFacts = {
     RecursiveReleaseTypes: Set<AST.Type>
     CliArgvHelperLabels: Set<string>
     NeedsCliExecuteHelper: bool
+    NeedsRuntimeErrorHelper: bool
 }
 
 /// ARM64-only metadata assembled from the reachable functions' carried facts.
@@ -243,15 +245,33 @@ let private loadStringLiteralPointer (destReg: ARM64Symbolic.Reg) (value: string
         ARM64Symbolic.ADD_label (destReg, destReg, labelRef)
     ]
 
-let private generateHeapOverflowTrapBody (target: ARM64.TargetConfig) : ARM64Symbolic.Instr list =
+let private generateHeapOverflowTrapBody (_target: ARM64.TargetConfig) : ARM64Symbolic.Instr list =
+    loadStringLiteralPointer ARM64Symbolic.X0 heapOutOfMemoryMessage
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 0us, 0)
+        ARM64Symbolic.B_label runtimeErrorHelperLabel ]
+
+/// Shared non-returning error writer. X0 is a fixed-header string buffer and X3
+/// selects the newline required by dynamically constructed exception text.
+let private generateRuntimeErrorHelper (target: ARM64.TargetConfig) : ARM64Symbolic.Instr list =
     let syscalls = ARM64.targetSyscalls target
-    let messageBytes = System.Text.Encoding.UTF8.GetBytes(heapOutOfMemoryMessage) |> Array.toList
-    runtimeInstrs (Runtime.generatePrintCharsToStderr target messageBytes)
-    @ [
-        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)  // exit code = 1
-        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Exit, 0)
+    let exitLabel = $"{runtimeErrorHelperLabel}_exit"
+    [ ARM64Symbolic.Label runtimeErrorHelperLabel
+      ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X0, 8s)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X0, 16us)
+      ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 2us, 0)
+      ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
+      ARM64Symbolic.SVC syscalls.SvcImmediate
+      ARM64Symbolic.CBZ (ARM64Symbolic.X3, exitLabel) ]
+    @ loadStringLiteralPointer ARM64Symbolic.X1 "\n"
+    @ [ ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 16us)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 2us, 0)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0)
+        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
         ARM64Symbolic.SVC syscalls.SvcImmediate
-    ]
+        ARM64Symbolic.Label exitLabel
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
+        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Exit, 0)
+        ARM64Symbolic.SVC syscalls.SvcImmediate ]
 
 // These cold paths depend only on the target ABI. Building their immutable
 // instruction lists once avoids reconstructing the same message and syscall
@@ -4760,39 +4780,20 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                 ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 160us) ])
 
     | LIR.RuntimeError message ->
-        let syscalls = ARM64.targetSyscalls ctx.Target
-        let messageBytes =
-            System.Text.Encoding.UTF8.GetBytes(message)
-            |> Array.toList
         Ok (
-            runtimeInstrs (Runtime.generatePrintCharsToStderr ctx.Target messageBytes)
-            @ [
-                ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)  // exit code = 1
-                ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Exit, 0)
-                ARM64Symbolic.SVC syscalls.SvcImmediate
-            ]
-        )
+            loadStringLiteralPointer ARM64Symbolic.X0 message
+            @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 0us, 0)
+                ARM64Symbolic.B_label runtimeErrorHelperLabel ])
 
     | LIR.RuntimeErrorString messageReg ->
         lirRegToARM64Reg messageReg
         |> Result.map (fun resolvedMessageReg ->
-            let syscalls = ARM64.targetSyscalls ctx.Target
-            // Preserve the heap String address across the write and newline.
-            [ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, resolvedMessageReg)]
-            @ [
-                // Dynamic String layout: [refcount:8][length:8][UTF-8 data:length].
-                ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X11, 8s)
-                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X11, 16us)
-                ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 2us, 0)
-                ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
-                ARM64Symbolic.SVC syscalls.SvcImmediate
-            ]
-            @ runtimeInstrs (Runtime.generatePrintCharsToStderr ctx.Target [10uy])
-            @ [
-                ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
-                ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Exit, 0)
-                ARM64Symbolic.SVC syscalls.SvcImmediate
-            ])
+            (if resolvedMessageReg = ARM64Symbolic.X0 then
+                 []
+             else
+                 [ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, resolvedMessageReg)])
+            @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 1us, 0)
+                ARM64Symbolic.B_label runtimeErrorHelperLabel ])
 
     // Floating-point instructions
     | LIR.FMov (dest, src) ->
@@ -8569,6 +8570,7 @@ type HelperCacheKey = {
     RecursiveReleaseTypes: AST.Type list
     CliArgvHelperLabels: string list
     NeedsCliExecuteHelper: bool
+    NeedsRuntimeErrorHelper: bool
     ListDecHelperLabels: string list
     PlannedListDecHelpers: (string * int) list
     PlannedGenericDecHelperLabels: string list
@@ -8668,6 +8670,7 @@ let private generatePreparedARM64WithOptionsAndCache
             RecursiveReleaseTypes = Set.empty
             CliArgvHelperLabels = Set.empty
             NeedsCliExecuteHelper = false
+            NeedsRuntimeErrorHelper = false
         }
         RcHelperRequirements = emptyRcHelperRequirements
     }
@@ -8700,6 +8703,7 @@ let private generatePreparedARM64WithOptionsAndCache
         || not (Set.isEmpty facts.RawSlotInitTypes)
         || facts.NeedsCliArgvHelper
         || facts.NeedsCliExecuteHelper
+        || facts.NeedsRuntimeErrorHelper
         || contributesRcHelpers
 
     let releasePlanSummary = precomputedReleasePlanSummary
@@ -8819,6 +8823,9 @@ let private generatePreparedARM64WithOptionsAndCache
                         NeedsCliExecuteHelper =
                             withAllocSizes.Facts.NeedsCliExecuteHelper
                             || facts.NeedsCliExecuteHelper
+                        NeedsRuntimeErrorHelper =
+                            withAllocSizes.Facts.NeedsRuntimeErrorHelper
+                            || facts.NeedsRuntimeErrorHelper
                 }
                 RcHelperRequirements = requirements
         }
@@ -8883,6 +8890,7 @@ let private generatePreparedARM64WithOptionsAndCache
         && Set.isEmpty metadata.Facts.RecursiveReleaseTypes
         && Set.isEmpty metadata.Facts.CliArgvHelperLabels
         && not metadata.Facts.NeedsCliExecuteHelper
+        && not metadata.Facts.NeedsRuntimeErrorHelper
         && not (hasRcHelperRequirements metadata.RcHelperRequirements)
 
     let mergeMetadata
@@ -8919,6 +8927,9 @@ let private generatePreparedARM64WithOptionsAndCache
                 NeedsCliExecuteHelper =
                     left.Facts.NeedsCliExecuteHelper
                     || right.Facts.NeedsCliExecuteHelper
+                NeedsRuntimeErrorHelper =
+                    left.Facts.NeedsRuntimeErrorHelper
+                    || right.Facts.NeedsRuntimeErrorHelper
             }
             RcHelperRequirements =
                 mergePrecomputedRcHelperRequirements
@@ -9350,6 +9361,11 @@ let private generatePreparedARM64WithOptionsAndCache
                 cliArgvHelpers
                 @ (if needsCliExecuteHelper && ARM64.targetOS target = Platform.Linux then generateLinuxCliExecuteHelper () else [])
             recordPhase "ARM64 Helper CLI Generation" cliHelperTimer
+            let runtimeErrorHelper =
+                if programMetadata.Facts.NeedsRuntimeErrorHelper then
+                    generateRuntimeErrorHelper target
+                else
+                    []
             let helperInstructions =
                 listRcHelpers
                 @ genericRcHelpers
@@ -9358,6 +9374,7 @@ let private generatePreparedARM64WithOptionsAndCache
                 @ streamRcHelpers
                 @ recursiveSumRcHelpers
                 @ cliHelpers
+                @ runtimeErrorHelper
             let peepholeTimer = startPhase ()
             let optimized = peepholeOptimize helperInstructions
             recordPhase "ARM64 Codegen Peephole" peepholeTimer
@@ -9374,6 +9391,7 @@ let private generatePreparedARM64WithOptionsAndCache
             CliArgvHelperLabels =
                 programMetadata.Facts.CliArgvHelperLabels |> Set.toList
             NeedsCliExecuteHelper = programMetadata.Facts.NeedsCliExecuteHelper
+            NeedsRuntimeErrorHelper = programMetadata.Facts.NeedsRuntimeErrorHelper
             ListDecHelperLabels = rcHelperRequirements.ListDecHelperLabels |> Set.toList
             PlannedListDecHelpers =
                 rcHelperRequirements.PlannedListDecHelpers
