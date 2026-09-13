@@ -1682,11 +1682,16 @@ let private computeCodeFileOffset
         (headerSize + commandsSize + 200 + 7) &&& (~~~7)
 
 /// Compute leak counter label position
-/// Returns map with the leak counter label after all other data, 8-byte aligned
-let computeLeakCounterLabel (codeFileOffset: int) (codeSize: int) (floatPoolSize: int) (stringPoolSize: int) : Map<string, int> =
+/// ELF counters occupy a separate page from executable code; Mach-O retains
+/// its existing word-aligned placement. Binary emission uses the same rule.
+let computeLeakCounterLabel (os: Platform.OS) (codeFileOffset: int) (codeSize: int) (floatPoolSize: int) (stringPoolSize: int) : Map<string, int> =
     let floatStart = (codeFileOffset + codeSize + 7) &&& (~~~7)
     let stringStart = floatStart + floatPoolSize
-    let leakStart = (stringStart + stringPoolSize + 7) &&& (~~~7)
+    let dataEnd = stringStart + stringPoolSize
+    let leakStart =
+        match os with
+        | Platform.Linux -> RuntimeDataLayout.elfCounterOffset dataEnd
+        | Platform.MacOS -> (dataEnd + 7) &&& (~~~7)
     Map.ofList [(ARM64Symbolic.leakCounterLabelName, leakStart)]
 
 /// Encode symbolic instructions with string and float pool support
@@ -1726,7 +1731,7 @@ let encodePreparedChunksWithPools
 
     let leakLabels =
         if enableLeakCheck then
-            computeLeakCounterLabel codeFileOffset codeSize floatPoolSize stringPoolSize
+            computeLeakCounterLabel os codeFileOffset codeSize floatPoolSize stringPoolSize
         else
             Map.empty
 

@@ -253,8 +253,9 @@ let createExecutableWithPools
     // the same large runtime on every executable.
     let codeSize = machineCode.Length * 4
     let floatAndStringSize = floatBytes.Length + stringBytes.Length
+    let dataStart = align8Int (int codeFileOffset + codeSize)
     let dataSize =
-        if enableLeakCheck then align8Int floatAndStringSize + 8
+        if enableLeakCheck then RuntimeDataLayout.elfCounterOffset (dataStart + floatAndStringSize) - dataStart + 8
         else floatAndStringSize
     let programHeader =
         createLoadSegment
@@ -263,7 +264,6 @@ let createExecutableWithPools
             (executableSegmentFlags enableLeakCheck)
     let headerBytes = createElfHeader codeEntryVAddr |> serializeElf64Header
     let programHeaderBytes = serializeElf64ProgramHeader programHeader
-    let dataStart = align8Int (int codeFileOffset + codeSize)
     let binary = Array.zeroCreate<byte> (dataStart + dataSize)
     Array.blit headerBytes 0 binary 0 headerBytes.Length
     Array.blit programHeaderBytes 0 binary headerBytes.Length programHeaderBytes.Length
@@ -320,11 +320,12 @@ let createExecutableWithCoverage (machineCode: uint32 array) (stringPool: Litera
     let alignedCoverageStart = align8Int floatAndStringBytes.Length
     let coveragePadding = Array.create (alignedCoverageStart - floatAndStringBytes.Length) 0uy
     let afterCoverage = alignedCoverageStart + coverageBytes.Length
-    let leakBytes = if enableLeakCheck then Array.create 8 0uy else [||]
-    let leakStart = align8Int afterCoverage
-    let leakPadding = Array.create (leakStart - afterCoverage) 0uy
     let dataBytes =
         if enableLeakCheck then
+            let leakBytes = Array.create 8 0uy
+            let dataStart = align8Int (int codeFileOffset + codeBytes.Length)
+            let leakStart = RuntimeDataLayout.elfCounterOffset (dataStart + afterCoverage) - dataStart
+            let leakPadding = Array.create (leakStart - afterCoverage) 0uy
             Array.concat [floatAndStringBytes; coveragePadding; coverageBytes; leakPadding; leakBytes]
         else
             Array.concat [floatAndStringBytes; coveragePadding; coverageBytes]

@@ -79,6 +79,13 @@ reacquires a block, and observes transformed contents. It also checks leak
 accounting. Inlining is disabled for that probe to preserve the seed function's
 release boundary. Ordinary semantic tests run with default optimizations.
 
+Repeated native execution also validates the instrumentation itself. Both x86
+allocation paths (raw and fixed-block) count a recycled block as live again.
+ELF leak counters are placed on a separate 64 KiB boundary, shared by relocation
+and image construction, so their writes cannot repeatedly invalidate hot code
+pages under QEMU. This padding is confined to leak-check builds; ordinary
+binaries retain their previous layout.
+
 ## Further architecture work
 
 This is the first end-to-end region slice, not a replacement for the entire

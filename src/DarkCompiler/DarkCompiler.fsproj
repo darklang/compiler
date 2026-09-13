@@ -12,6 +12,7 @@
     <Compile Include="Crash.fs" />
     <Compile Include="Output.fs" />
     <Compile Include="Platform.fs" />
+    <Compile Include="RuntimeDataLayout.fs" />
     <Compile Include="AST.fs" />
     <Compile Include="NameSyntax.fs" />
     <Compile Include="ASTPrettyPrinter.fs" />

@@ -1,0 +1,21 @@
+// edge-cases.dark - Cross-target ownership and empty/singleton execution checks.
+let retainedAlias() : Int64 =
+    let xs = [1L, 2L, 3L] in
+    let alias = xs in
+    let ys = Stdlib.List.reverse<Int64>(xs) in
+    let old = Stdlib.List.fold<Int64, Int64>(alias, 0L, fun acc x -> acc * 10L + x) in
+    let fresh = Stdlib.List.fold<Int64, Int64>(ys, 0L, fun acc x -> acc * 10L + x) in
+    old * 1000L + fresh
+
+let capturedScalar(offset: Int64) : Int64 =
+    let xs = [1L, 2L, 3L] in
+    let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + offset) in
+    Stdlib.List.fold<Int64, Int64>(ys, 0L, fun acc x -> acc + x)
+
+let empty() : Int64 =
+    Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>([]), 7L, fun acc x -> acc + x)
+
+let singleton() : Int64 =
+    Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>([9L]), 0L, fun acc x -> acc + x)
+
+if retainedAlias() == 123321L && capturedScalar(7L) == 27L && empty() == 7L && singleton() == 9L then 0L else 1L

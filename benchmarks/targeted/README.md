@@ -37,6 +37,11 @@ the exact same source files. Each case also runs with leak checking. Reports
 include source/assembly hashes, commit and dirty-state attribution, instruction
 counts, compile times, and executable sizes. They do not update canonical
 snapshots; single compile-time samples are diagnostic, not a timing gate.
+Normal execution must succeed for both compilers; leak checking must succeed
+for the candidate. Baseline leak-instrumentation failures are reported and
+retained in JSON independently of the ordinary instruction comparison.
+Cross-target execution controls additionally cover empty/singleton inputs,
+retained aliases, scalar captures, and callback-effect ordering.
 
 ```bash
 python3 benchmarks/targeted/list-array/compare.py \

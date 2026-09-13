@@ -1,0 +1,4 @@
+// effect-order.dark - Callback effects retain their source traversal order.
+let xs = [1L, 2L, 3L] in
+let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> let _ = Builtin.printLine(Stdlib.Int64.toString(x)) in x + 1L) in
+Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>(ys), 0L, fun acc x -> let _ = Builtin.printLine(Stdlib.Int64.toString(x)) in acc + x)

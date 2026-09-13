@@ -136,7 +136,7 @@ let dataLabelOffsets
         |> Option.defaultValue dataStart
     literalLabels
     |> Map.add "_empty_dynamic_buffer" emptyOffset
-    |> Map.add "_leak_count" dataEnd
+    |> Map.add "_leak_count" (RuntimeDataLayout.elfCounterOffset dataEnd)
 
 /// Returns the final machine code bytes and label positions.
 let resolveAndEncode (instructions: Instr list) : Result<ResolveResult, string> =

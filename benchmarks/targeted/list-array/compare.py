@@ -11,7 +11,10 @@ import tempfile
 import time
 
 
-CASES = {"main": "8205000\n", "shared": "360000\n", "captured-list": "9\n"}
+CASES = {
+    "main": "8205000\n", "shared": "360000\n", "captured-list": "9\n",
+    "edge-cases": "0\n", "effect-order": "1\n2\n3\n4\n3\n2\n9\n",
+}
 
 
 def checked(command, cwd):
@@ -40,10 +43,13 @@ def measure(repository, source, expected, target, output):
         raise RuntimeError(f"Expected one positive instruction count: {execution.stderr}")
     binary_bytes = output.stat().st_size
     checked(command + ["--leak-check"], repository)
-    leak = checked([str(counter), target, str(output)], repository)
-    if leak.stdout != expected or "leaks:" in leak.stderr:
-        raise RuntimeError(f"Leak-check failed for {source.name}: {leak.stdout}{leak.stderr}")
-    return {"instructions": int(counts[0]), "compile_ms": compile_ms, "binary_bytes": binary_bytes, "leak_check_passed": True}
+    leak = subprocess.run([str(counter), target, str(output)], cwd=repository, text=True, capture_output=True, timeout=30)
+    leak_passed = leak.returncode == 0 and leak.stdout == expected and "leaks:" not in leak.stderr
+    return {
+        "instructions": int(counts[0]), "compile_ms": compile_ms, "binary_bytes": binary_bytes,
+        "leak_check_passed": leak_passed, "leak_check_exit_code": leak.returncode,
+        "leak_check_stdout": leak.stdout, "leak_check_stderr": leak.stderr,
+    }
 
 
 def main():
@@ -52,6 +58,7 @@ def main():
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--target", choices=["arm64", "x86_64"], required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--cases", choices=list(CASES), nargs="+", default=list(CASES))
     args = parser.parse_args()
     roots = {"baseline": args.baseline.resolve(), "candidate": args.candidate.resolve()}
     sources = Path(__file__).resolve().parent
@@ -63,7 +70,8 @@ def main():
             "assembly_sha256": hashlib.sha256((repository / "bin/DarkCompiler/Debug/net10.0/DarkCompiler.dll").read_bytes()).hexdigest(),
         }
     with tempfile.TemporaryDirectory(prefix="list-array-bench-") as temporary:
-        for name, expected in CASES.items():
+        for name in args.cases:
+            expected = CASES[name]
             source = sources / f"{name}.dark"
             measurements = {
                 label: measure(repository, source, expected, args.target, Path(temporary) / f"{label}-{name}")
@@ -73,9 +81,16 @@ def main():
             measurements["instruction_ratio"] = measurements["candidate"]["instructions"] / measurements["baseline"]["instructions"]
             report["workloads"][name] = measurements
             print(f"{name}: ratio={measurements['instruction_ratio']:.6f}", flush=True)
+            for label in roots:
+                if not measurements[label]["leak_check_passed"]:
+                    print(f"{name}: {label} leak check FAILED (exit {measurements[label]['leak_check_exit_code']})", flush=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n")
+    # Baseline instruction measurements must succeed, but an existing baseline
+    # instrumentation failure does not excuse a candidate failure or erase the
+    # usable performance comparison. Always retain both statuses in the report.
+    return 0 if all(case["candidate"]["leak_check_passed"] for case in report["workloads"].values()) else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

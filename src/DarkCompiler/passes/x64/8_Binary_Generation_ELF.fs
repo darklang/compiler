@@ -23,12 +23,14 @@ let createExecutableWithPools
     // Create string data
     let stringBytes = Binary_Generation_ELF.createStringData stringPool
 
+    let dataStart = (120 + machineCode.Length + 7) &&& (~~~7)
+
     let dataBytes =
         let floatAndStringBytes = Array.append floatBytes stringBytes
-        let leakBytes = if enableLeakCheck then Array.create 8 0uy else [||]
-        let leakStart = ((floatAndStringBytes.Length + 7) / 8) * 8
-        let leakPadding = Array.create (leakStart - floatAndStringBytes.Length) 0uy
         if enableLeakCheck then
+            let leakBytes = Array.create 8 0uy
+            let leakStart = RuntimeDataLayout.elfCounterOffset (dataStart + floatAndStringBytes.Length) - dataStart
+            let leakPadding = Array.create (leakStart - floatAndStringBytes.Length) 0uy
             Array.concat [floatAndStringBytes; leakPadding; leakBytes]
         else
             floatAndStringBytes

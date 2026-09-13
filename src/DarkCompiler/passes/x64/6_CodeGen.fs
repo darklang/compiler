@@ -3505,8 +3505,8 @@ let private translateInstr
                  X86_64.Jcc (X86_64.LE, okLabel)])
             @ genOomJump ()
             @ [X86_64.Label okLabel]
-            @ genLeakCounterInc ctx
-            @ freeListPost)
+            @ freeListPost
+            @ genLeakCounterInc ctx)
 
     | LIR.HeapStore (addr, offset, src, _) ->
         resolveReg addr
@@ -4410,7 +4410,9 @@ let private translateInstr
                          X86_64.Jcc (X86_64.LE, okLabel)]
                     @ genOomJump ()
                     @ [X86_64.Label okLabel]
-                freeListCheck @ allocInstrs @ boundsCheck @ genLeakCounterInc ctx @ [X86_64.Label doneLabel]))
+                // Recycled blocks become live allocations just like bumped
+                // blocks. Both paths must reach the accounting increment.
+                freeListCheck @ allocInstrs @ boundsCheck @ [X86_64.Label doneLabel] @ genLeakCounterInc ctx))
 
     | LIR.RawFree ptr ->
         resolveReg ptr
