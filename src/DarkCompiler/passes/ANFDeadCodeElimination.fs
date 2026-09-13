@@ -45,7 +45,8 @@ let private extractFromCExpr (cexpr: ANF.CExpr) : string list =
     | ANF.TupleGet (tuple, _) -> extractFromAtom tuple
     | ANF.RecordAlloc (_, fields) -> extractFromAtoms fields
     | ANF.RecordGet (_, record, _) -> extractFromAtom record
-    | ANF.RecordClone (_, record, fields) ->
+    | ANF.RecordClone (_, record, fields)
+    | ANF.RecordReuse (_, record, fields) ->
         extractFromAtom record @ extractFromAtoms fields
     | ANF.StringConcat (left, right)
     | ANF.CanonicalBufferEq (_, left, right) ->

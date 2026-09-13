@@ -460,6 +460,7 @@ let private mustPreserveEvaluation (context: OptimizeContext) (cexpr: CExpr) : b
     | RecordAlloc _ -> false
     | RecordGet _ -> false
     | RecordClone _ -> false
+    | RecordReuse _ -> true
     // These have side effects
     | Call _ -> true
     | BorrowedCall _ -> true
@@ -561,7 +562,8 @@ let private addCExprUses (cexpr: CExpr) (uses: Set<TempId>) : Set<TempId> =
     | TupleGet (tuple, _) -> addAtomUse tuple uses
     | RecordAlloc (_, fields) -> addAtomUses fields uses
     | RecordGet (_, record, _) -> addAtomUse record uses
-    | RecordClone (_, record, fields) ->
+    | RecordClone (_, record, fields)
+    | RecordReuse (_, record, fields) ->
         uses |> addAtomUse record |> addAtomUses fields
     | StringConcat (left, right)
     | CanonicalBufferEq (_, left, right) -> uses |> addAtomUse left |> addAtomUse right
@@ -680,7 +682,8 @@ let cexprUsesTemp (tid: TempId) (cexpr: CExpr) : bool =
     | ClosureAlloc (_, atoms)
     | TupleAlloc atoms
     | RecordAlloc (_, atoms) -> anyUsed atoms
-    | RecordClone (_, record, fields) -> used record || anyUsed fields
+    | RecordClone (_, record, fields)
+    | RecordReuse (_, record, fields) -> used record || anyUsed fields
     | CliNative (_, atoms) -> anyUsed atoms
     | IndirectCall (first, rest)
     | IndirectTailCall (first, rest)
@@ -758,6 +761,8 @@ let private substCExprValue (env: Map<TempId, Atom>) (cexpr: CExpr) : CExpr =
     | RecordGet (descriptor, record, idx) -> RecordGet (descriptor, s record, idx)
     | RecordClone (descriptor, record, fields) ->
         RecordClone (descriptor, s record, substAtoms env fields)
+    | RecordReuse (descriptor, record, fields) ->
+        RecordReuse (descriptor, s record, substAtoms env fields)
     | StringConcat (left, right) -> StringConcat (s left, s right)
     | CanonicalBufferEq (kind, left, right) -> CanonicalBufferEq (kind, s left, s right)
     | RefCountInc (atom, size, kind, sourceType) -> RefCountInc (s atom, size, kind, sourceType)
@@ -1014,6 +1019,7 @@ let private tryCSEKey (cexpr: CExpr) : CSEKey option =
     | TupleAlloc _
     | RecordAlloc _
     | RecordClone _
+    | RecordReuse _
     | StringConcat _
     | CanonicalBufferEq _
     | RefCountInc _

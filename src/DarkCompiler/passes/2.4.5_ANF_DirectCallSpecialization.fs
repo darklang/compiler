@@ -120,7 +120,8 @@ let private analyzeCExpr (cexpr: CExpr) (analysis: ProgramAnalysis) : ProgramAna
         |> analyzeMany captures
     | TupleAlloc atoms -> analyzeMany atoms analysis
     | RecordAlloc (_, atoms) -> analyzeMany atoms analysis
-    | RecordClone (_, record, fields) -> analyzeMany (record :: fields) analysis
+    | RecordClone (_, record, fields)
+    | RecordReuse (_, record, fields) -> analyzeMany (record :: fields) analysis
     | CliNative (_, args) -> analyzeMany args analysis
     | TupleGet (tuple, _) -> analyze tuple analysis
     | RecordGet (_, record, _) -> analyze record analysis
@@ -268,6 +269,8 @@ let private rewriteCExpr
     | RecordGet (descriptor, record, index) -> RecordGet (descriptor, rewrite record, index)
     | RecordClone (descriptor, record, fields) ->
         RecordClone (descriptor, rewrite record, rewriteMany fields)
+    | RecordReuse (descriptor, record, fields) ->
+        RecordReuse (descriptor, rewrite record, rewriteMany fields)
     | StringConcat (left, right) -> StringConcat (rewrite left, rewrite right)
     | CanonicalBufferEq (kind, left, right) ->
         CanonicalBufferEq (kind, rewrite left, rewrite right)

@@ -218,7 +218,8 @@ let maxTempIdInCExpr (cexpr: ANF.CExpr) : int =
     | ANF.TupleGet (tuple, _) -> maxTempIdInAtom tuple
     | ANF.RecordAlloc (_, fields) -> maxTempIdInAtoms fields
     | ANF.RecordGet (_, record, _) -> maxTempIdInAtom record
-    | ANF.RecordClone (_, record, fields) -> maxTempIdWithAtoms record fields
+    | ANF.RecordClone (_, record, fields)
+    | ANF.RecordReuse (_, record, fields) -> maxTempIdWithAtoms record fields
     | ANF.StringConcat (left, right)
     | ANF.CanonicalBufferEq (_, left, right) ->
         max (maxTempIdInAtom left) (maxTempIdInAtom right)
@@ -554,7 +555,8 @@ let private inferSimpleCExprDestType
     | ANF.TupleGet (ANF.Var tupleId, index) ->
         tupleGetDestType builder tempId tupleGetAliasType tupleId index
     | ANF.RecordAlloc (descriptor, _)
-    | ANF.RecordClone (descriptor, _, _) ->
+    | ANF.RecordClone (descriptor, _, _)
+    | ANF.RecordReuse (descriptor, _, _) ->
         Some (AST.TRecord (descriptor.RuntimeTypeName, descriptor.TypeArgs))
     | ANF.RecordGet (descriptor, _, index) ->
         descriptor.Fields |> List.tryItem index |> Option.map snd
@@ -611,6 +613,7 @@ let cexprDescription (cexpr: ANF.CExpr) : string =
     | ANF.RecordAlloc (descriptor, _) -> System.String.Concat("RecordAlloc ", descriptor.RuntimeTypeName)
     | ANF.RecordGet (descriptor, _, _) -> System.String.Concat("RecordGet ", descriptor.RuntimeTypeName)
     | ANF.RecordClone (descriptor, _, _) -> System.String.Concat("RecordClone ", descriptor.RuntimeTypeName)
+    | ANF.RecordReuse (descriptor, _, _) -> System.String.Concat("RecordReuse ", descriptor.RuntimeTypeName)
     | ANF.StringConcat _ -> "StringConcat"
     | ANF.CanonicalBufferEq _ -> "CanonicalBufferEq"
     | ANF.RefCountInc _ -> "RefCountInc"
@@ -1105,6 +1108,23 @@ let rec convertExpr
                             MIR.HeapStore (destReg, index * 8, operand, valueType)))
                     |> sequenceResults
                     |> Result.map (fun stores -> allocInstr :: stores)
+                | ANF.RecordReuse (descriptor, recordAtom, fields) ->
+                    match recordAtom with
+                    | ANF.Var sourceId ->
+                        let recordType = AST.TRecord (descriptor.RuntimeTypeName, descriptor.TypeArgs)
+                        fields
+                        |> List.mapi (fun index field -> (index, field))
+                        |> List.map (fun (index, field) ->
+                            let fieldType = atomType builder field
+                            let valueType = if fieldType = AST.TFloat64 then Some AST.TFloat64 else None
+                            atomToOperand builder field
+                            |> Result.map (fun operand ->
+                                MIR.HeapStore (destReg, index * 8, operand, valueType)))
+                        |> sequenceResults
+                        |> Result.map (fun stores ->
+                            MIR.Mov (destReg, MIR.Register (tempToVReg sourceId), Some recordType) :: stores)
+                    | _ ->
+                        Error "Internal error: Record reuse on non-variable (ANF invariant violated)"
                 | ANF.RecordGet (_, recordAtom, index) ->
                     match recordAtom with
                     | ANF.Var tid ->
@@ -1803,6 +1823,23 @@ and convertExprToOperand
                             MIR.HeapStore (destReg, index * 8, operand, valueType)))
                     |> sequenceResults
                     |> Result.map (fun stores -> allocInstr :: stores)
+                | ANF.RecordReuse (descriptor, recordAtom, fields) ->
+                    match recordAtom with
+                    | ANF.Var sourceId ->
+                        let recordType = AST.TRecord (descriptor.RuntimeTypeName, descriptor.TypeArgs)
+                        fields
+                        |> List.mapi (fun index field -> (index, field))
+                        |> List.map (fun (index, field) ->
+                            let fieldType = atomType builder field
+                            let valueType = if fieldType = AST.TFloat64 then Some AST.TFloat64 else None
+                            atomToOperand builder field
+                            |> Result.map (fun operand ->
+                                MIR.HeapStore (destReg, index * 8, operand, valueType)))
+                        |> sequenceResults
+                        |> Result.map (fun stores ->
+                            MIR.Mov (destReg, MIR.Register (tempToVReg sourceId), Some recordType) :: stores)
+                    | _ ->
+                        Error "Internal error: Record reuse on non-variable (ANF invariant violated)"
                 | ANF.RecordGet (_, recordAtom, index) ->
                     match recordAtom with
                     | ANF.Var tid ->

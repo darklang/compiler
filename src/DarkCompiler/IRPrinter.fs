@@ -119,6 +119,9 @@ let private prettyPrintANFCExpr = function
     | ANF.RecordClone (descriptor, recordAtom, fields) ->
         let fieldsText = fields |> commaSeparated prettyPrintANFAtom
         $"RecordClone({descriptor.RuntimeTypeName}, {prettyPrintANFAtom recordAtom}, [{fieldsText}])"
+    | ANF.RecordReuse (descriptor, recordAtom, fields) ->
+        let fieldsText = fields |> commaSeparated prettyPrintANFAtom
+        $"RecordReuse({descriptor.RuntimeTypeName}, {prettyPrintANFAtom recordAtom}, [{fieldsText}])"
     | ANF.RefCountInc (atom, payloadSize, kind, _) ->
         $"rc_inc({prettyPrintANFAtom atom}, size={payloadSize}, kind={prettyPrintANFRcKind kind})"
     | ANF.RefCountDec (atom, payloadSize, kind, _) ->

@@ -374,6 +374,8 @@ let inferCExprType (ctx: TypeContext) (cexpr: CExpr) : AST.Type option =
         Some (AST.TRecord (descriptor.RuntimeTypeName, descriptor.TypeArgs))
     | RecordClone (descriptor, _, _) ->
         Some (AST.TRecord (descriptor.RuntimeTypeName, descriptor.TypeArgs))
+    | RecordReuse (descriptor, _, _) ->
+        Some (AST.TRecord (descriptor.RuntimeTypeName, descriptor.TypeArgs))
     | RecordGet (descriptor, _, index) ->
         descriptor.Fields
         |> List.tryItem index
@@ -486,6 +488,7 @@ let private tryOwnershipPreservingAliasSource (cexpr: CExpr) : TempId option =
     | Atom (Var sourceId) -> Some sourceId
     | TypedAtom (Var _, AST.TStream _) -> None
     | TypedAtom (Var sourceId, _) -> Some sourceId
+    | RecordReuse (_, Var sourceId, _) -> Some sourceId
     | _ -> None
 
 /// Analyze return values and track alias chains in a single pass
@@ -672,6 +675,7 @@ let isBorrowingExpr (cexpr: CExpr) : bool =
     | IfValue _ -> true            // Selects one of two existing values; no ownership transfer
     | TupleGet _ -> true           // Extracts pointer from tuple/list - borrowed from parent
     | RecordGet _ -> true          // Record projections borrow from the owning record
+    | RecordReuse _ -> true        // Reuses the source allocation and transfers its ownership
     | RawGet _ -> true             // RawGet reads existing memory; it does not transfer ownership
     | RawTake _ -> false           // RawTake transfers the slot's existing ownership to the result
     | StringToRawPtr _ -> true     // RawPtr view is borrowed from the dynamic buffer

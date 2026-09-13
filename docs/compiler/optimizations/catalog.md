@@ -28,8 +28,8 @@ from Git history.
   and reversed-relational canonicalization.
 - **Interprocedural and aggregate work:** uniform literal direct-parameter
   propagation, bounded scalar-literal cloning, ownership-safe tuple projection
-  forwarding, projection-only scalar tuple and record replacement, and unused
-  ANF binding elimination.
+  forwarding, projection-only scalar tuple and record replacement, unique Float
+  record-clone allocation reuse, and unused ANF binding elimination.
 - **Loops and control flow:** bounded recursive-loop unrolling, tail recursion
   modulo wrapping addition or multiplication, effect-free call and Float-load
   hoisting, affine induction reduction, factor-two counted-loop unrolling,
@@ -86,11 +86,16 @@ complete lexical use set consists only of projections, local aliases, and
 representation-only record-clone sources. Escaping clones retain their own
 allocation even when an eligible source allocation is removed.
 
-Returns, calls, closure capture, storage, raw operations, managed fields,
-floating-point fields, and unknown uses preserve allocation. Float aggregates
-remain excluded because extending their field live ranges can exceed the
-current non-spilling Float register allocator. Focused tests cover the accepted
-projection, alias, clone, and branch shapes plus each conservative boundary.
+Returns, calls, closure capture, storage, raw operations, managed fields, and
+unknown uses preserve scalar-replacement allocations. Float aggregates remain
+excluded from scalar replacement because extending their field live ranges can
+exceed the current non-spilling Float register allocator. However, a locally
+allocated record whose fields are all immediate and include Float64 may
+transfer its unique ownership to a sole later clone. The clone overwrites that
+block in place after any projections, including through transparent local
+aliases, avoiding a new allocation without extending Float live ranges.
+Focused tests cover accepted projection, alias, and clone-chain shapes plus the
+conservative call, later-use, managed-field, and branch boundaries.
 
 ## MIR optimization
 

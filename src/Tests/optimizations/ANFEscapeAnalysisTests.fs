@@ -28,6 +28,29 @@ let rec private containsAggregateAllocation (expr: AExpr) : bool =
         containsAggregateAllocation thenBranch
         || containsAggregateAllocation elseBranch
 
+let rec private aggregateAllocationCount (expr: AExpr) : int =
+    match expr with
+    | Return _ -> 0
+    | Let (_, cexpr, body) ->
+        let current =
+            match cexpr with
+            | TupleAlloc _
+            | RecordAlloc _
+            | RecordClone _ -> 1
+            | RecordReuse _ -> 0
+            | _ -> 0
+        current + aggregateAllocationCount body
+    | If (_, thenBranch, elseBranch) ->
+        aggregateAllocationCount thenBranch + aggregateAllocationCount elseBranch
+
+let rec private containsRecordReuse (expr: AExpr) : bool =
+    match expr with
+    | Return _ -> false
+    | Let (_, RecordReuse _, _) -> true
+    | Let (_, _, body) -> containsRecordReuse body
+    | If (_, thenBranch, elseBranch) ->
+        containsRecordReuse thenBranch || containsRecordReuse elseBranch
+
 let private optimizeBody (body: AExpr) : AExpr =
     let func =
         { Name = "fixture"
@@ -185,6 +208,166 @@ let testFloatRecordPreservesAllocation () : TestResult =
     if containsAggregateAllocation body then Ok ()
     else Error "Expected Float record to remain allocated until Float spilling is supported"
 
+let testUniqueFloatRecordCloneReusesSourceAllocation () : TestResult =
+    let descriptor = pointDescriptor AST.TFloat64
+    let body =
+        Let (
+            TempId 0,
+            RecordAlloc (descriptor, [FloatLiteral 1.0; FloatLiteral 2.0]),
+            Let (
+                TempId 1,
+                RecordClone (descriptor, Var (TempId 0), [FloatLiteral 3.0; FloatLiteral 2.0]),
+                Return (Var (TempId 1))
+            )
+        )
+        |> optimizeBody
+    match aggregateAllocationCount body with
+    | 1 -> Ok ()
+    | count -> Error $"Expected unique Float clone reuse to retain one allocation, got {count}"
+
+let testFloatRecordCloneAliasChainReusesAllocation () : TestResult =
+    let descriptor = pointDescriptor AST.TFloat64
+    let body =
+        Let (
+            TempId 0,
+            RecordAlloc (descriptor, [FloatLiteral 1.0; FloatLiteral 2.0]),
+            Let (
+                TempId 1,
+                RecordClone (descriptor, Var (TempId 0), [FloatLiteral 3.0; FloatLiteral 2.0]),
+                Let (
+                    TempId 2,
+                    Atom (Var (TempId 1)),
+                    Let (
+                        TempId 3,
+                        RecordClone (descriptor, Var (TempId 2), [FloatLiteral 4.0; FloatLiteral 2.0]),
+                        Return (Var (TempId 3))
+                    )
+                )
+            )
+        )
+        |> optimizeBody
+    match aggregateAllocationCount body with
+    | 1 -> Ok ()
+    | count -> Error $"Expected Float clone alias chain to reuse one allocation, got {count}"
+
+let testFloatRecordProjectionBeforeClonePermitsReuse () : TestResult =
+    let descriptor = pointDescriptor AST.TFloat64
+    let body =
+        Let (
+            TempId 0,
+            RecordAlloc (descriptor, [FloatLiteral 1.0; FloatLiteral 2.0]),
+            Let (
+                TempId 1,
+                RecordGet (descriptor, Var (TempId 0), 0),
+                Let (
+                    TempId 2,
+                    RecordClone (descriptor, Var (TempId 0), [FloatLiteral 3.0; Var (TempId 1)]),
+                    Return (Var (TempId 2))
+                )
+            )
+        )
+        |> optimizeBody
+    if aggregateAllocationCount body = 1 && containsRecordReuse body then Ok ()
+    else Error $"Expected projections before a Float clone to permit reuse, got {body}"
+
+let testFloatRecordUseAfterCloneRejectsReuse () : TestResult =
+    let descriptor = pointDescriptor AST.TFloat64
+    let body =
+        Let (
+            TempId 0,
+            RecordAlloc (descriptor, [FloatLiteral 1.0; FloatLiteral 2.0]),
+            Let (
+                TempId 1,
+                RecordClone (descriptor, Var (TempId 0), [FloatLiteral 3.0; FloatLiteral 2.0]),
+                Return (Var (TempId 0))
+            )
+        )
+        |> optimizeBody
+    if aggregateAllocationCount body = 2 && not (containsRecordReuse body) then Ok ()
+    else Error $"Expected a source use after its clone to reject reuse, got {body}"
+
+let testFloatRecordCallBeforeCloneRejectsReuse () : TestResult =
+    let descriptor = pointDescriptor AST.TFloat64
+    let body =
+        Let (
+            TempId 0,
+            RecordAlloc (descriptor, [FloatLiteral 1.0; FloatLiteral 2.0]),
+            Let (
+                TempId 1,
+                Call ("observe", [Var (TempId 0)]),
+                Let (
+                    TempId 2,
+                    RecordClone (descriptor, Var (TempId 0), [FloatLiteral 3.0; FloatLiteral 2.0]),
+                    Return (Var (TempId 2))
+                )
+            )
+        )
+        |> optimizeBody
+    if aggregateAllocationCount body = 2 && not (containsRecordReuse body) then Ok ()
+    else Error $"Expected a call before a Float clone to reject reuse, got {body}"
+
+let testManagedFloatRecordRejectsReuse () : TestResult =
+    let descriptor =
+        { pointDescriptor AST.TFloat64 with
+            Fields = ["x", AST.TFloat64; "label", AST.TString] }
+    let body =
+        Let (
+            TempId 0,
+            RecordAlloc (descriptor, [FloatLiteral 1.0; StringLiteral "old"]),
+            Let (
+                TempId 1,
+                RecordClone (descriptor, Var (TempId 0), [FloatLiteral 2.0; StringLiteral "new"]),
+                Return (Var (TempId 1))
+            )
+        )
+        |> optimizeBody
+    if aggregateAllocationCount body = 2 && not (containsRecordReuse body) then Ok ()
+    else Error $"Expected a record with a managed field to reject reuse, got {body}"
+
+let testFloatRecordAliasUseAfterCloneRejectsReuse () : TestResult =
+    let descriptor = pointDescriptor AST.TFloat64
+    let body =
+        Let (
+            TempId 0,
+            RecordAlloc (descriptor, [FloatLiteral 1.0; FloatLiteral 2.0]),
+            Let (
+                TempId 1,
+                Atom (Var (TempId 0)),
+                Let (
+                    TempId 2,
+                    RecordClone (descriptor, Var (TempId 1), [FloatLiteral 3.0; FloatLiteral 2.0]),
+                    Return (Var (TempId 0))
+                )
+            )
+        )
+        |> optimizeBody
+    if aggregateAllocationCount body = 2 && not (containsRecordReuse body) then Ok ()
+    else Error $"Expected a source-alias use after a Float clone to reject reuse, got {body}"
+
+let testFloatRecordBranchClonesRejectReuse () : TestResult =
+    let descriptor = pointDescriptor AST.TFloat64
+    let body =
+        Let (
+            TempId 0,
+            RecordAlloc (descriptor, [FloatLiteral 1.0; FloatLiteral 2.0]),
+            If (
+                BoolLiteral true,
+                Let (
+                    TempId 1,
+                    RecordClone (descriptor, Var (TempId 0), [FloatLiteral 3.0; FloatLiteral 2.0]),
+                    Return (Var (TempId 1))
+                ),
+                Let (
+                    TempId 2,
+                    RecordClone (descriptor, Var (TempId 0), [FloatLiteral 4.0; FloatLiteral 2.0]),
+                    Return (Var (TempId 2))
+                )
+            )
+        )
+        |> optimizeBody
+    if aggregateAllocationCount body = 3 && not (containsRecordReuse body) then Ok ()
+    else Error $"Expected branch-local Float clones to reject reuse, got {body}"
+
 let tests =
     [ ("Scalar record projection removes allocation", testScalarRecordProjectionRemovesAllocation)
       ("Projection-only aggregate alias removes allocation", testAggregateAliasRemovesAllocation)
@@ -195,4 +378,12 @@ let tests =
       ("Closure-captured record preserves allocation", testRecordCapturedByClosurePreservesAllocation)
       ("Branch-local record projections remove allocation", testBranchLocalProjectionsRemoveAllocation)
       ("Managed record preserves allocation", testManagedRecordPreservesAllocation)
-      ("Float record preserves allocation", testFloatRecordPreservesAllocation) ]
+      ("Float record preserves allocation", testFloatRecordPreservesAllocation)
+      ("Unique Float record clone reuses source allocation", testUniqueFloatRecordCloneReusesSourceAllocation)
+      ("Float record clone alias chain reuses allocation", testFloatRecordCloneAliasChainReusesAllocation)
+      ("Float record projection before clone permits reuse", testFloatRecordProjectionBeforeClonePermitsReuse)
+      ("Float record use after clone rejects reuse", testFloatRecordUseAfterCloneRejectsReuse)
+      ("Float record call before clone rejects reuse", testFloatRecordCallBeforeCloneRejectsReuse)
+      ("Managed Float record rejects reuse", testManagedFloatRecordRejectsReuse)
+      ("Float record alias use after clone rejects reuse", testFloatRecordAliasUseAfterCloneRejectsReuse)
+      ("Float record branch clones reject reuse", testFloatRecordBranchClonesRejectReuse) ]

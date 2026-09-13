@@ -176,19 +176,28 @@ Output: let t0 = 2 * 3 in
 ## Pass 2.4.6: Escape Analysis (`2.4.6_ANF_EscapeAnalysis.fs`)
 
 **Input**: Specialized ANF
-**Output**: ANF with eligible local aggregates replaced by scalar values
+**Output**: ANF with eligible local aggregates scalar-replaced or uniquely reused
 
 The first escape-analysis scope covers fixed-layout tuple and record
-allocations whose fields are all non-floating immediate scalar values. An allocation is
-removed only when its complete lexical use set consists of field projections,
-local aliases, and representation-only record-clone sources. Returns, calls,
-closure capture, storage, raw-pointer operations, managed fields, and every
-unmodelled use preserve the heap representation. Floating-point aggregates
-also remain allocated because scalar replacement can extend their live ranges,
-and the current floating-point register allocator cannot spill them.
+allocations whose fields are all non-floating immediate scalar values. An
+allocation is removed only when its complete lexical use set consists of field
+projections, local aliases, and representation-only record-clone sources.
+Returns, calls, closure capture, storage, raw-pointer operations, managed
+fields, and every unmodelled use preserve the heap representation.
+Floating-point aggregates also remain allocated because scalar replacement can
+extend their live ranges, and the current floating-point register allocator
+cannot spill them.
+
+For records with only immediate fields and at least one Float field, the pass
+can instead rewrite the sole later clone of a locally allocated record to reuse
+the same heap block. Projections and transparent aliases may precede that
+clone. Calls, branches, captures, source references in replacement fields, and
+any source-family use after the clone reject reuse. This ownership transfer
+keeps Float values in memory while removing repeated clone allocations.
 
 Running before reference-count insertion ensures eliminated aggregates never
-acquire root retain or release operations. Stack allocation, managed-field
+acquire root retain or release operations and allows reused records to be
+treated as one ownership family. Stack allocation, managed-field reuse or
 scalar replacement, and interprocedural representation changes are outside the
 current scope.
 

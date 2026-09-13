@@ -556,6 +556,7 @@ type CExpr =
     | RecordAlloc of descriptor:RecordDescriptor * fields:Atom list
     | RecordGet of descriptor:RecordDescriptor * record:Atom * index:int
     | RecordClone of descriptor:RecordDescriptor * record:Atom * fields:Atom list
+    | RecordReuse of descriptor:RecordDescriptor * record:Atom * fields:Atom list
     // String operations (heap-allocating)
     | StringConcat of left:Atom * right:Atom    // Concatenate strings: s1 ++ s2
     | CanonicalBufferEq of kind:CanonicalBufferKind * left:Atom * right:Atom

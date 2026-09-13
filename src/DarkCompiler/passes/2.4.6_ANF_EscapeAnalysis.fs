@@ -3,9 +3,10 @@
 // This deliberately narrow first escape-analysis pass scalar-replaces local
 // tuple and record allocations only when their complete lexical use set is
 // projections, aliases, or the representation-only source of a record clone.
-// Managed and floating-point fields, plus every unmodelled use, retain the
-// ordinary heap allocation. Float scalarization is deferred until the float
-// register allocator can spill the longer live ranges it may create.
+// Managed fields and every unmodelled use retain the ordinary heap allocation.
+// Float scalarization is deferred until the float register allocator can spill
+// longer live ranges, but uniquely owned Float record clone chains reuse their
+// existing allocation in place.
 
 module ANF_EscapeAnalysis
 
@@ -48,6 +49,74 @@ let private atomsUseTracked (tracked: Set<TempId>) (atoms: Atom list) : bool =
 let private cexprUsesTracked (tracked: Set<TempId>) (cexpr: CExpr) : bool =
     tracked
     |> Set.exists (fun id -> ANF_Optimize.cexprUsesTemp id cexpr)
+
+let rec private exprUsesTracked (tracked: Set<TempId>) (expr: AExpr) : bool =
+    match expr with
+    | Return atom -> atomsUseTracked tracked [atom]
+    | Let (_, cexpr, body) ->
+        cexprUsesTracked tracked cexpr || exprUsesTracked tracked body
+    | If (condition, thenBranch, elseBranch) ->
+        atomsUseTracked tracked [condition]
+        || exprUsesTracked tracked thenBranch
+        || exprUsesTracked tracked elseBranch
+
+let private isImmediateFieldType (typ: AST.Type) : bool =
+    typ = AST.TFloat64 || isScalarType typ
+
+/// Rewrite the sole consuming clone of a uniquely local immediate record to
+/// reuse its source block. Projections and transparent aliases may precede the
+/// clone; every other use, branch, or later reference conservatively rejects
+/// reuse.
+let rec private reuseUniqueRecordClone
+    (sourceDescriptor: RecordDescriptor)
+    (tracked: Set<TempId>)
+    (expr: AExpr)
+    : AExpr option =
+    match expr with
+    | Return _ -> None
+    | If _ -> None
+    | Let (boundId, RecordClone (descriptor, Var cloneSourceId, fields), body)
+        when Set.contains cloneSourceId tracked && descriptor = sourceDescriptor ->
+        if not (atomsUseTracked tracked fields)
+           && not (exprUsesTracked tracked body) then
+            Some (Let (boundId, RecordReuse (descriptor, Var cloneSourceId, fields), body))
+        else
+            None
+    | Let (boundId, Atom (Var sourceId), body) when Set.contains sourceId tracked ->
+        reuseUniqueRecordClone sourceDescriptor (Set.add boundId tracked) body
+        |> Option.map (fun body -> Let (boundId, Atom (Var sourceId), body))
+    | Let (boundId, TypedAtom (Var sourceId, typ), body) when Set.contains sourceId tracked ->
+        reuseUniqueRecordClone sourceDescriptor (Set.add boundId tracked) body
+        |> Option.map (fun body -> Let (boundId, TypedAtom (Var sourceId, typ), body))
+    | Let (boundId, cexpr, body) ->
+        let isProjection =
+            match cexpr with
+            | RecordGet (_, Var recordId, _) -> Set.contains recordId tracked
+            | _ -> false
+        if isProjection || not (cexprUsesTracked tracked cexpr) then
+            reuseUniqueRecordClone sourceDescriptor tracked body
+            |> Option.map (fun body -> Let (boundId, cexpr, body))
+        else
+            None
+
+let private reuseEligibleRecordClone
+    (boundId: TempId)
+    (cexpr: CExpr)
+    (body: AExpr)
+    : AExpr =
+    let descriptor =
+        match cexpr with
+        | RecordAlloc (descriptor, _)
+        | RecordClone (descriptor, _, _)
+        | RecordReuse (descriptor, _, _) -> Some descriptor
+        | _ -> None
+    match descriptor with
+    | Some descriptor
+        when descriptor.Fields |> List.forall (snd >> isImmediateFieldType)
+             && descriptor.Fields |> List.exists (snd >> (=) AST.TFloat64) ->
+        reuseUniqueRecordClone descriptor (Set.singleton boundId) body
+        |> Option.defaultValue body
+    | _ -> body
 
 /// Prove that an allocation and every alias derived from it stay inside the
 /// local projection/clone boundary. Calls and storage are rejected by the
@@ -170,6 +239,7 @@ let rec private scalarReplaceExpr
         let aggregate = Map.find sourceId aggregates
         scalarReplaceExpr returnTypes scalarTemps (Map.add boundId aggregate aggregates) body
     | Let (boundId, cexpr, body) ->
+        let body = reuseEligibleRecordClone boundId cexpr body
         let rewrittenCExpr = rewriteProjection aggregates cexpr
         match tryScalarAggregate scalarTemps rewrittenCExpr with
         | Some aggregate when hasOnlyLocalAggregateUses (Set.singleton boundId) body ->
