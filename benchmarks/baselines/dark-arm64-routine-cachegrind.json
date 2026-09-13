@@ -9,11 +9,11 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs"
   },
-  "contract_sha256": "3ec0fae5931a873cd7e23c62b9fdaccbda63b9851c381de469e16e6765b1d1f8",
-  "generated_at": "2026-09-13T22:31:53+00:00",
+  "contract_sha256": "97b3d2490bbf0c6040b4623bf3aa71726b5aa6173f90fdefcefb5d3e4dc24648",
+  "generated_at": "2026-09-13T23:38:37+00:00",
   "compiler": {
-    "commit": "59042c7fea57a6cd8783131ecbd53900d35ad81b",
-    "subject": "Add five runtime application benchmarks"
+    "commit": "f806269199f9ff2a038b7ddbc11dc22758ed22dc",
+    "subject": "Restrict benchmarks to public Dark APIs"
   },
   "benchmarks": [
     {
@@ -30,7 +30,7 @@
     },
     {
       "name": "edigits",
-      "instructions": 3334770978
+      "instructions": 1724752465
     },
     {
       "name": "factorial",
@@ -38,11 +38,11 @@
     },
     {
       "name": "fannkuch",
-      "instructions": 23681380693
+      "instructions": 23918821535
     },
     {
       "name": "fasta",
-      "instructions": 454539838
+      "instructions": 7719486910
     },
     {
       "name": "fft",
@@ -54,7 +54,7 @@
     },
     {
       "name": "huffman",
-      "instructions": 1919516505
+      "instructions": 6442997915
     },
     {
       "name": "leibniz",
@@ -66,7 +66,7 @@
     },
     {
       "name": "matmul",
-      "instructions": 931349942
+      "instructions": 2130138761
     },
     {
       "name": "merkletrees",
@@ -74,7 +74,7 @@
     },
     {
       "name": "myers_diff",
-      "instructions": 5100640118
+      "instructions": 30802188851
     },
     {
       "name": "nbody",
@@ -86,7 +86,7 @@
     },
     {
       "name": "nsieve",
-      "instructions": 557295690
+      "instructions": 4305616573
     },
     {
       "name": "pisum",
@@ -98,7 +98,7 @@
     },
     {
       "name": "quicksort",
-      "instructions": 179287842
+      "instructions": 192723619
     },
     {
       "name": "raytracer",
@@ -106,11 +106,11 @@
     },
     {
       "name": "regex_lite",
-      "instructions": 4399477343
+      "instructions": 4408024171
     },
     {
       "name": "spectral_norm",
-      "instructions": 63961303
+      "instructions": 229725034
     },
     {
       "name": "string_equality",
@@ -126,11 +126,11 @@
     },
     {
       "name": "tinytemplate",
-      "instructions": 1021215184
+      "instructions": 34888976276
     },
     {
       "name": "warden",
-      "instructions": 2098952483
+      "instructions": 2105453216
     }
   ]
 }
