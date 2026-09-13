@@ -9,7 +9,7 @@ module ListHIR
 
 type ListId = ListId of int
 
-type Scalar = { Expression: AST.Expr; Type: AST.Type }
+type Scalar = SemanticIR.Operand
 
 type Transform =
     | Map of callback: Scalar
@@ -19,13 +19,15 @@ type Construction =
     | Literal of elements: Scalar list
     | Repeat of count: Scalar * value: Scalar
 
-type Operation<'transform> =
+type Operation<'transform, 'block> =
     | Construct of result: ListId * construction: Construction
     | Transform of result: ListId * source: ListId * operation: 'transform
     | Fold of name: string * source: ListId * initial: Scalar * callback: Scalar
     | ScalarBinding of name: string * value: Scalar
+    | Branch of name: string * condition: Scalar * ifTrue: 'block * ifFalse: 'block
 
-type FunctionalRegion = private FunctionalRegion of Operation<Transform> list * Scalar
+type FunctionalBlock = private FunctionalBlock of SemanticIR.Block<Operation<Transform, FunctionalBlock>>
+type FunctionalRegion = private FunctionalRegion of FunctionalBlock
 
 /// Runtime extent identity survives aliases and consuming transformations.
 /// It names a construction, never a source variable that could be rebound.
@@ -73,11 +75,15 @@ type StorageRegion = private StorageRegion of FunctionalRegion * Map<ListId, Arr
 type Ownership = Consume | BorrowAndCopy
 
 type OwnedOperation = {
-    Operation: Operation<Transform * Ownership>
+    Operation: Operation<Transform * Ownership, OwnedBlock>
     Releases: ListId list
 }
+and OwnedBlock = {
+    EntryReleases: ListId list
+    Body: SemanticIR.Block<OwnedOperation>
+}
 
-type OwnedRegion = private OwnedRegion of OwnedOperation list * Scalar * Map<ListId, ArrayLayout>
+type OwnedRegion = private OwnedRegion of OwnedBlock * Map<ListId, ArrayLayout>
 
 type AllocationSummary = {
     Allocations: int
@@ -87,35 +93,51 @@ type AllocationSummary = {
     Releases: int
 }
 
-/// These are exact storage-operation counts for a straight-line region, not
-/// counts of allocations performed inside scalar expressions or callbacks.
-let allocationSummary (OwnedRegion (operations, _, layouts)) : AllocationSummary =
-    operations
-    |> List.fold (fun summary step ->
-        let allocations, bytes, copies, reused =
-            match step.Operation with
-            | Construct (output, _)
-            | Transform (output, _, (_, BorrowAndCopy)) ->
-                let layout =
-                    match Map.tryFind output layouts with
-                    | Some layout -> layout
-                    | None -> Crash.crash "List HIR: missing allocation layout"
-                1, requestedBytes layout, (match step.Operation with Transform _ -> 1 | _ -> 0), 0
-            | Transform (_, _, (_, Consume)) -> 0, constantBytes 0L, 0, 1
-            | _ -> 0, constantBytes 0L, 0, 0
-        { Allocations = summary.Allocations + allocations
-          AllocatedBytes = addBytes summary.AllocatedBytes bytes
-          Copies = summary.Copies + copies
-          ReusedTransforms = summary.ReusedTransforms + reused
-          Releases = summary.Releases + List.length step.Releases })
-        { Allocations = 0; AllocatedBytes = constantBytes 0L; Copies = 0; ReusedTransforms = 0; Releases = 0 }
+/// Preserve alternatives and their continuation without enumerating paths or
+/// adding mutually exclusive costs. Callback/scalar allocations are excluded.
+type AllocationBudget =
+    | Complete of AllocationSummary
+    | Conditional of prefix: AllocationSummary * ifTrue: AllocationBudget * ifFalse: AllocationBudget * continuation: AllocationBudget
+
+let allocationBudget (OwnedRegion (block, layouts)) : AllocationBudget =
+    let empty = { Allocations = 0; AllocatedBytes = constantBytes 0L; Copies = 0; ReusedTransforms = 0; Releases = 0 }
+    let rec budget block =
+        loop { empty with Releases = List.length block.EntryReleases } block.Body.Operations
+    and loop summary operations =
+        match operations with
+        | [] -> Complete summary
+        | { Operation = Branch (_, _, yes, no); Releases = releases } :: rest ->
+            Conditional (summary, budget yes, budget no, loop { empty with Releases = List.length releases } rest)
+        | step :: rest ->
+            let allocations, bytes, copies, reused =
+                match step.Operation with
+                | Construct (output, _)
+                | Transform (output, _, (_, BorrowAndCopy)) ->
+                    let layout =
+                        match Map.tryFind output layouts with
+                        | Some layout -> layout
+                        | None -> Crash.crash "List HIR: missing allocation layout"
+                    1, requestedBytes layout, (match step.Operation with Transform _ -> 1 | _ -> 0), 0
+                | Transform (_, _, (_, Consume)) -> 0, constantBytes 0L, 0, 1
+                | _ -> 0, constantBytes 0L, 0, 0
+            loop { Allocations = summary.Allocations + allocations
+                   AllocatedBytes = addBytes summary.AllocatedBytes bytes
+                   Copies = summary.Copies + copies
+                   ReusedTransforms = summary.ReusedTransforms + reused
+                   Releases = summary.Releases + List.length step.Releases } rest
+    budget block
 
 type private Extraction = {
     Lists: Map<string, ListId>
     Types: Map<string, AST.Type>
-    Operations: Operation<Transform> list
+    Operations: Operation<Transform, FunctionalBlock> list
     NextId: int
+    Paths: int
 }
+
+// ANF is still a continuation tree. Bound duplication until explicit join
+// blocks reach the downstream IR; this limit is on expanded paths, not depth.
+let private maxLoweredPaths = 16
 
 let private immediate = function
     | AST.TInt64 | AST.TBool -> true
@@ -133,7 +155,7 @@ let tryExtract
     (freeVariables: AST.Expr -> Set<string>)
     (expression: AST.Expr)
     : FunctionalRegion option =
-    let operand state accepts expr =
+    let operand state accepts expr : Scalar option =
         let referencesList =
             freeVariables expr |> Set.exists (fun name -> Map.containsKey name state.Lists)
         if referencesList then None
@@ -144,7 +166,7 @@ let tryExtract
 
     let scalar state expr = operand state immediate expr
 
-    let callback state expected expr =
+    let callback state expected expr : Scalar option =
         // A closure may not hide a region alias or an effectful destructor.
         let capturesAreImmediate =
             match expr with
@@ -188,7 +210,26 @@ let tryExtract
                 |> Option.map (fun (source, next) -> addList next (fun id -> Transform (id, source, Reverse)))
             | _ -> None
 
-    let bindScalar state name expr =
+    let rec bindScalar state name expr =
+        match expr with
+        | AST.If (condition, yes, no) ->
+            operand state ((=) AST.TBool) condition
+            |> Option.bind (fun condition ->
+                region name { state with Operations = []; Paths = 1 } yes
+                |> Option.bind (fun (FunctionalBlock yes as yesBlock, afterYes, yesPaths) ->
+                    region name { state with Operations = []; NextId = afterYes; Paths = 1 } no
+                    |> Option.bind (fun (FunctionalBlock no as noBlock, afterNo, noPaths) ->
+                        let paths = state.Paths * (yesPaths + noPaths)
+                        if yes.Result.Type <> no.Result.Type || paths > maxLoweredPaths then None
+                        else Some { state with
+                                      NextId = afterNo
+                                      Paths = paths
+                                      Types = Map.add name yes.Result.Type state.Types
+                                      Lists = Map.remove name state.Lists
+                                      Operations = Branch (name, condition, yesBlock, noBlock) :: state.Operations })))
+        | _ -> bindSimpleScalar state name expr
+
+    and bindSimpleScalar state name expr =
         match listCall expr with
         | Some ("Stdlib.List.fold_i64_i64", [input; initial; fn]) ->
             list state input
@@ -207,15 +248,7 @@ let tryExtract
                              Lists = Map.remove name state.Lists
                              Operations = ScalarBinding (name, value) :: state.Operations })
 
-    let rec collectNames expr =
-        match expr with
-        | AST.Let (AST.LPVariable name, _, body) -> Set.add name (collectNames body)
-        | _ -> freeVariables expression
-    let rec resultName names index =
-        let name = $"__list_hir_result_{index}"
-        if Set.contains name names then resultName names (index + 1) else name
-
-    let rec region finalName state expr =
+    and region finalName state expr =
         match expr with
         | AST.Let (AST.LPVariable name, value, body) ->
             match list state value with
@@ -226,11 +259,19 @@ let tryExtract
         | _ ->
             bindScalar state finalName expr
             |> Option.bind (fun next ->
-                if next.NextId = 0 then None
-                else
-                    Map.tryFind finalName next.Types
-                    |> Option.map (fun typ ->
-                        FunctionalRegion (List.rev next.Operations, { Expression = AST.Var finalName; Type = typ })))
+                Map.tryFind finalName next.Types
+                |> Option.map (fun typ ->
+                    FunctionalBlock { Operations = List.rev next.Operations
+                                      Result = { Expression = AST.Var finalName; Type = typ } }, next.NextId, next.Paths))
+
+    let rec collectNames expr =
+        match expr with
+        | AST.Let (AST.LPVariable name, value, body) -> Set.add name (Set.union (collectNames value) (collectNames body))
+        | AST.If (condition, yes, no) -> Set.unionMany [collectNames condition; collectNames yes; collectNames no]
+        | _ -> freeVariables expr
+    let rec resultName names index =
+        let name = $"__list_hir_result_{index}"
+        if Set.contains name names then resultName names (index + 1) else name
 
     let isListOperation value =
         match listCall value with
@@ -246,7 +287,8 @@ let tryExtract
         | _ -> isListOperation expression
     if candidate then
         let finalName = resultName (collectNames expression) 0
-        region finalName { Lists = Map.empty; Types = Map.empty; Operations = []; NextId = 0 } expression
+        region finalName { Lists = Map.empty; Types = Map.empty; Operations = []; NextId = 0; Paths = 1 } expression
+        |> Option.bind (fun (block, nextId, _) -> if nextId = 0 then None else Some (FunctionalRegion block))
     else None
 
 let private lookup name key map =
@@ -256,16 +298,16 @@ let private lookup name key map =
 
 let private source = function
     | Transform (_, input, _) | Fold (_, input, _, _) -> Some input
-    | Construct _ | ScalarBinding _ -> None
+    | Construct _ | ScalarBinding _ | Branch _ -> None
 
 let private result = function
     | Construct (output, _) | Transform (output, _, _) -> Some output
-    | Fold _ | ScalarBinding _ -> None
+    | Fold _ | ScalarBinding _ | Branch _ -> None
 
 /// Small fixed blocks use the recycling heap; larger arrays own a mapping.
-let selectStorage (FunctionalRegion (operations, _) as region) : StorageRegion =
-    let layouts =
-        operations
+let selectStorage (FunctionalRegion block as region) : StorageRegion =
+    let rec select layouts (FunctionalBlock block) =
+        block.Operations
         |> List.fold (fun layouts operation ->
             match operation with
             | Construct (id, Literal elements) ->
@@ -273,50 +315,77 @@ let selectStorage (FunctionalRegion (operations, _) as region) : StorageRegion =
                 Map.add id (if length <= recycledCapacityLimit then RecycledArray length else MappedArray length) layouts
             | Construct (id, Repeat _) -> Map.add id (RuntimeArray id) layouts
             | Transform (id, input, _) -> Map.add id (lookup "layout" input layouts) layouts
-            | Fold _ | ScalarBinding _ -> layouts) Map.empty
-    StorageRegion (region, layouts)
+            | Branch (_, _, yes, no) -> select (select layouts yes) no
+            | Fold _ | ScalarBinding _ -> layouts) layouts
+    StorageRegion (region, select Map.empty block)
 
-let private useCounts operations =
-    operations
-    |> List.choose source
-    |> List.countBy id
-    |> Map.ofList
+/// Region aliases are canonical identities. Opaque scalar evaluations cannot
+/// access them; callbacks cannot capture them. These are value-edge contracts,
+/// not permission to reorder scalar effects or to mutate a borrowed parameter.
+let rec private valueContract operation : SemanticIR.ValueContract<ListId> =
+    let uses =
+        match operation with
+        | Branch (_, _, yes, no) -> Set.union (entryLive yes Set.empty) (entryLive no Set.empty)
+        | _ -> source operation |> Option.toList |> Set.ofList
+    { Uses = uses; Defines = result operation |> Option.toList |> Set.ofList }
+and private entryLive (FunctionalBlock block) liveAfter =
+    List.foldBack (fun operation live -> SemanticIR.liveBefore (valueContract operation) live) block.Operations liveAfter
 
-/// Last-use ownership is exact because all region aliases are canonical ListIds
-/// and no list reference can escape into scalar expressions or callbacks.
-let elaborateOwnership (StorageRegion (FunctionalRegion (operations, finalValue), layouts)) : OwnedRegion =
-    let counts = useCounts operations
-    let owned, _ =
-        operations
-        |> List.mapFold (fun remaining operation ->
-            let ownership, releases, next =
-                match source operation with
-                | None -> Consume, [], remaining
-                | Some input ->
-                    let count = lookup "use count" input remaining
-                    let next = Map.add input (count - 1) remaining
+/// No physical ownership is needed to check the region's incoming value
+/// interface. The current representation permits no external collection roots.
+let verifyFunctional (FunctionalRegion block) : Result<unit, string> =
+    if Set.isEmpty (entryLive block Set.empty) then Ok ()
+    else Error "List HIR: external collection roots in a closed region"
+
+/// Solve backwards through explicit joins. A continuation's live values must
+/// survive both paths; values needed by only one path die on the other edge.
+let elaborateOwnership (StorageRegion (FunctionalRegion block, layouts)) : OwnedRegion =
+    let rec elaborate (FunctionalBlock block) liveAfter =
+        let operations, liveBefore =
+            List.foldBack (fun operation (tail, live) ->
+                let ownedOperation, releases, before =
                     match operation with
-                    | Transform _ -> (if count = 1 then Consume else BorrowAndCopy), [], next
-                    | _ -> Consume, (if count = 1 then [input] else []), next
-            let unusedOutput =
-                result operation
-                |> Option.filter (fun output -> not (Map.containsKey output counts))
-                |> Option.toList
-            let ownedOperation =
-                match operation with
-                | Construct (output, elements) -> Construct (output, elements)
-                | Transform (output, input, transform) -> Transform (output, input, (transform, ownership))
-                | Fold (name, input, initial, callback) -> Fold (name, input, initial, callback)
-                | ScalarBinding (name, value) -> ScalarBinding (name, value)
-            { Operation = ownedOperation; Releases = releases @ unusedOutput }, next) counts
-    OwnedRegion (owned, finalValue, layouts)
+                    | Branch (name, condition, yes, no) ->
+                        let yes, yesLive = elaborate yes live
+                        let no, noLive = elaborate no live
+                        let before = Set.union yesLive noLive
+                        let edge branch required =
+                            { branch with EntryReleases = Set.difference before required |> Set.toList }
+                        Branch (name, condition, edge yes yesLive, edge no noLive), [], before
+                    | _ ->
+                        let unusedOutput = result operation |> Option.filter (fun output -> not (Set.contains output live)) |> Option.toList
+                        let owned, releases =
+                            match operation with
+                            | Construct (output, construction) -> Construct (output, construction), []
+                            | Transform (output, input, transform) ->
+                                let ownership = if Set.contains input live then BorrowAndCopy else Consume
+                                Transform (output, input, (transform, ownership)), []
+                            | Fold (name, input, initial, callback) ->
+                                Fold (name, input, initial, callback), (if Set.contains input live then [] else [input])
+                            | ScalarBinding (name, value) -> ScalarBinding (name, value), []
+                            | Branch _ -> Crash.crash "List HIR: branch handled before leaf ownership"
+                        owned, releases @ unusedOutput, SemanticIR.liveBefore (valueContract operation) live
+                { Operation = ownedOperation; Releases = releases } :: tail, before)
+                block.Operations ([], liveAfter)
+        { EntryReleases = []; Body = { Operations = operations; Result = block.Result } }, liveBefore
+    let owned, _ = elaborate block Set.empty
+    OwnedRegion (owned, layouts)
 
 /// Independent accounting check: each operation requires a live input, consumes
 /// or borrows its unit, creates exactly one result unit, and releases live units.
 let verifyOwnership (operations: OwnedOperation list) : Result<unit, string> =
+    let rec release live = function
+        | [] -> Ok live
+        | value :: rest when Set.contains value live -> release (Set.remove value live) rest
+        | _ -> Error "List HIR: duplicate or invalid release"
     let rec loop declared live rest =
         match rest with
-        | [] -> if Set.isEmpty live then Ok () else Error "List HIR: unreleased region values"
+        | [] -> Ok (declared, live)
+        | { Operation = Branch (_, _, yes, no); Releases = releases } :: tail ->
+            checkBlock declared live yes |> Result.bind (fun (afterYes, yesLive) ->
+                checkBlock afterYes live no |> Result.bind (fun (afterNo, noLive) ->
+                    if yesLive <> noLive then Error "List HIR: inconsistent ownership at branch join"
+                    else release yesLive releases |> Result.bind (fun live -> loop afterNo live tail)))
         | step :: tail ->
             let inputValid = source step.Operation |> Option.forall (fun input -> Set.contains input live)
             let outputFresh = result step.Operation |> Option.forall (fun output -> not (Set.contains output declared))
@@ -330,16 +399,15 @@ let verifyOwnership (operations: OwnedOperation list) : Result<unit, string> =
                     match result step.Operation with
                     | Some output -> Set.add output afterInput, Set.add output declared
                     | None -> afterInput, declared
-                let rec release live releases =
-                    match releases with
-                    | [] -> loop declared live tail
-                    | value :: rest when Set.contains value live -> release (Set.remove value live) rest
-                    | _ -> Error "List HIR: duplicate or invalid release"
-                release afterOutput step.Releases
+                release afterOutput step.Releases |> Result.bind (fun live -> loop declared live tail)
+    and checkBlock declared live block =
+        release live block.EntryReleases |> Result.bind (fun live -> loop declared live block.Body.Operations)
     loop Set.empty Set.empty operations
+    |> Result.bind (fun (_, live) -> if Set.isEmpty live then Ok () else Error "List HIR: unreleased region values")
 
-let verify (OwnedRegion (operations, finalValue, layouts)) : Result<unit, string> =
-    let typesValid step =
+let verify (OwnedRegion (block, layouts)) : Result<unit, string> =
+    let rec blockValid block = immediate block.Body.Result.Type && List.forall typesValid block.Body.Operations
+    and typesValid step =
         match step.Operation with
         | Construct (output, Literal elements) ->
             elements |> List.forall (fun element -> element.Type = AST.TInt64)
@@ -355,15 +423,19 @@ let verify (OwnedRegion (operations, finalValue, layouts)) : Result<unit, string
         | Fold (_, _, initial, callback) ->
             initial.Type = AST.TInt64 && callback.Type = AST.TFunction ([AST.TInt64; AST.TInt64], AST.TInt64)
         | ScalarBinding (_, value) -> immediate value.Type
+        | Branch (_, condition, yes, no) ->
+            condition.Type = AST.TBool && yes.Body.Result.Type = no.Body.Result.Type
+            && blockValid yes && blockValid no
     if layouts |> Map.exists (fun _ layout ->
         match layout with
         | RecycledArray length -> length < 0 || length > recycledCapacityLimit
         | MappedArray length -> length <= recycledCapacityLimit || length > maxCapacity
         | RuntimeArray _ -> false) then
         Error "List HIR: unsupported allocation size"
-    elif not (immediate finalValue.Type) || not (List.forall typesValid operations) then
+    elif not (blockValid block) then
         Error "List HIR: invalid storage operand types"
-    else verifyOwnership operations
+    elif not (List.isEmpty block.EntryReleases) then Error "List HIR: root cannot release incoming values"
+    else verifyOwnership block.Body.Operations
 
 type LowerScalar = AST.Expr -> ANF.VarGen -> Map<string, ANF.TempId * AST.Type> -> Result<ANF.AExpr * ANF.VarGen, string>
 
@@ -407,8 +479,8 @@ let private wrap bindings body = List.foldBack (fun (id, value) tail -> ANF.Let 
 
 /// Lower verified storage operations to existing raw memory and RC primitives.
 /// The raw pointer is never tagged as a source List or assigned a fake Blob type.
-let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (operations, finalValue, layouts) as region) =
-    let lowerValue env vg value =
+let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (block, layouts) as region) =
+    let lowerValue env vg (value: Scalar) =
         lowerScalar value.Expression vg env
         |> Result.map (fun (expr, next) ->
             let id, final = ANF.freshVar next
@@ -444,14 +516,28 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (operations, finalValue
             let _, initialized, final = write copy 16 buffer.Length afterCopy
             wrap (allocations @ List.concat copied @ initialized) (ANF.Return copy), final
 
-    let rec loop env buffers vg (steps: OwnedOperation list) =
+    let rec lowerBlock env buffers vg block =
+        let releases, next = release buffers block.EntryReleases vg
+        loop block.Body.Result env buffers next block.Body.Operations
+        |> Result.map (fun (body, final) -> wrap releases body, final)
+    and loop finalValue env buffers vg (steps: OwnedOperation list) =
         match steps with
         | [] -> lowerScalar finalValue.Expression vg env
         | step :: rest ->
             let lowerRest env buffers vg =
                 let releases, next = release buffers step.Releases vg
-                loop env buffers next rest |> Result.map (fun (body, final) -> wrap releases body, final)
+                loop finalValue env buffers next rest |> Result.map (fun (body, final) -> wrap releases body, final)
             match step.Operation with
+            | Branch (name, condition, yes, no) ->
+                lowerValue env vg condition |> Result.bind (fun (evaluation, condition, next) ->
+                    lowerBlock env buffers next yes |> Result.bind (fun (yesExpr, afterYes) ->
+                        lowerBlock env buffers afterYes no |> Result.bind (fun (noExpr, afterNo) ->
+                            let joined, afterJoin = ANF.freshVar afterNo
+                            let typ = yes.Body.Result.Type
+                            lowerRest (Map.add name (joined, typ) env) buffers afterJoin
+                            |> Result.map (fun (body, final) ->
+                                let join atom = ANF.Let (joined, ANF.TypedAtom (atom, typ), body)
+                                bindReturns evaluation (fun _ -> ANF.If (condition, bindReturns yesExpr join, bindReturns noExpr join)), final))))
             | ScalarBinding (name, value) ->
                 lowerValue env vg value
                 |> Result.bind (fun (expr, atom, next) ->
@@ -544,4 +630,4 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (operations, finalValue
                             bindReturns initialExpr (fun _ -> bindReturns callbackExpr (fun _ ->
                                 wrap (List.concat bindings) (ANF.Let (id, ANF.TypedAtom (value, AST.TInt64), body)))), final)))
 
-    verify region |> Result.bind (fun () -> loop env Map.empty vg operations)
+    verify region |> Result.bind (fun () -> lowerBlock env Map.empty vg block)

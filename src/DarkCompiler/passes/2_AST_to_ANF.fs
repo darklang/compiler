@@ -5253,7 +5253,8 @@ let rec toANFCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarG
     match ListHIR.tryExtract infer (fun value -> freeVars value Set.empty) expr with
     | Some region ->
         let lower value vg environment = toANFUnplannedCore sumTypeNames value vg environment typeReg variantLookup funcReg moduleRegistry
-        region |> ListHIR.selectStorage |> ListHIR.elaborateOwnership |> ListHIR.lower lower env varGen
+        ListHIR.verifyFunctional region |> Result.bind (fun () ->
+            region |> ListHIR.selectStorage |> ListHIR.elaborateOwnership |> ListHIR.lower lower env varGen)
     | None -> toANFUnplannedCore sumTypeNames expr varGen env typeReg variantLookup funcReg moduleRegistry
 
 and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen) (env: VarEnv) (typeReg: TypeRegistry) (variantLookup: VariantLookup) (funcReg: FunctionRegistry) (moduleRegistry: AST.ModuleRegistry) : Result<ANF.AExpr * ANF.VarGen, string> =

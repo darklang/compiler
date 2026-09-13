@@ -1,0 +1,38 @@
+// list-array-branches.e2e - Branch-local mutation and cleanup of inferred arrays.
+// Reacquiring a seeded block distinguishes array lowering from persistent lists.
+let seedBranchBlock() : RawPtr = let p = __raw_alloc(56L) in let _ = __raw_write_word(p, 0L, 40L) in let _ = __raw_write_word(p, 40L, 999L) in let _ = __raw_write_word(p, 48L, 1L) in let s = __rawptr_to_string(p) in let _ = Stdlib.String.__byteLength(s) in p
+let inspectBranchBlock() : Int64 = let p = __raw_alloc(56L) in let _ = __raw_write_word(p, 0L, 40L) in let _ = __raw_write_word(p, 48L, 1L) in let s = __rawptr_to_string(p) in __raw_get<Int64>(__string_to_rawptr(s), 40L)
+let branchArray(flag: Bool) : Int64 = let xs = [1L, 2L, 3L] in if flag then let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + 1L) in Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>(ys), 0L, fun acc x -> acc * 10L + x) else Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>(xs), 0L, fun acc x -> acc * 10L + x)
+let branchJoin(flag: Bool) : Int64 = let xs = [1L, 2L, 3L] in let alias = xs in let selected = if flag then Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>(xs), 0L, fun acc x -> acc * 10L + x) else 7L in let old = Stdlib.List.fold<Int64, Int64>(alias, 0L, fun acc x -> acc * 10L + x) in selected * 1000L + old
+let branchDrop(flag: Bool) : Int64 = let xs = [1L, 2L, 3L] in if flag then Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc + x) else 7L
+let branchNested(first: Bool, second: Bool) : Int64 = let xs = [1L, 2L, 3L] in let n = if first then if second then Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>(xs), 0L, fun acc x -> acc * 10L + x) else 11L else Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc + x) in let old = Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc * 10L + x) in n + old
+let branchRuntime(count: Int, flag: Bool) : Int64 = let xs = Stdlib.List.repeatUnsafe<Int64>(count, 7L) in if flag then Stdlib.List.fold<Int64, Int64>(Stdlib.List.map<Int64, Int64>(xs, fun x -> x + 1L), 0L, fun acc x -> acc + x) else 9L
+let branchLocal(flag: Bool) : Int64 = let xs = [1L, 2L, 3L] in let chosen = if flag then let xs = Stdlib.List.repeatUnsafe<Int64>(40I, 2L) in Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc + x) else let xs = [9L] in Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc + x) in let old = Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc + x) in chosen + old
+let branchEffects(flag: Bool) : Int64 = let xs = [1L, 2L, 3L] in let n = if (let _ = Builtin.printLine("condition") in flag) then Stdlib.List.fold<Int64, Int64>(Stdlib.List.map<Int64, Int64>(xs, fun x -> let _ = Builtin.printLine(Stdlib.Int64.toString(x)) in x + 1L), 0L, fun acc x -> acc + x) else (let _ = Builtin.printLine("else") in 7L) in let old = Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> let _ = Builtin.printLine(Stdlib.Int64.toString(x)) in acc + x) in n + old
+let branchBool(flag: Bool) : Int64 = let xs = [1L, 2L, 3L] in let chosen = if flag then let total = Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc + x) in total > 5L else false in if chosen then Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>(xs), 0L, fun acc x -> acc * 10L + x) else 7L
+let branchSequence(flag: Bool) : Int64 = let xs = [1L, 2L, 3L] in let a = if flag then Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc + x) else 1L in let b = if flag then 2L else Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>(xs), 0L, fun acc x -> acc * 10L + x) in let c = if flag then Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc * 10L + x) else 3L in let d = if flag then 4L else Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc + x) in a + b + c + d
+
+let _ = seedBranchBlock() in let result = branchArray(true) in result + inspectBranchBlock() = stdout="434\n" stderr="" disable_opt_inline=true
+let _ = seedBranchBlock() in let result = branchArray(false) in result + inspectBranchBlock() = stdout="322\n" stderr="" disable_opt_inline=true
+branchJoin(true) = 321123L
+branchJoin(false) = 7123L
+branchDrop(true) = 6L
+branchDrop(false) = 7L
+branchNested(true, true) = 444L
+branchNested(true, false) = 134L
+branchNested(false, true) = 129L
+branchNested(false, false) = 129L
+branchRuntime(3I, true) = 24L
+branchRuntime(3I, false) = 9L
+branchRuntime(128I, true) = 1024L
+branchRuntime(128I, false) = 9L
+branchRuntime(0I, true) = 0L
+branchRuntime(-999999999999999999999999999999I, false) = 9L
+branchLocal(true) = 86L
+branchLocal(false) = 15L
+branchEffects(true) = stdout="condition\n1\n2\n3\n1\n2\n3\n15\n" stderr=""
+branchEffects(false) = stdout="condition\nelse\n1\n2\n3\n13\n" stderr=""
+branchBool(true) = 321L
+branchBool(false) = 7L
+branchSequence(true) = 135L
+branchSequence(false) = 331L

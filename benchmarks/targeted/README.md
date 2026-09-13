@@ -64,6 +64,11 @@ iterations to expose mapping overhead above process-startup noise;
 `runtime-effects` checks count/value evaluation,
 callback order, and normalization of zero and huge negative counts on both
 targets.
+`branch-unique` exercises consuming transformations on mutually exclusive
+paths. `branch-shared` retains the original list after a scalar join, requiring
+a copy only on the mutating path. Both alternate branches over 1,000 iterations
+with 128-element runtime buffers and require candidate leak checks on both
+native backends.
 `mapped-buffer.dark` is a candidate-only internal probe: compile with
 `--allow-internal --emit-result --leak-check` and expect `5376` with no leaks.
 

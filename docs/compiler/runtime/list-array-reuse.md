@@ -6,7 +6,7 @@ ownership annotation, public list type, or external calling convention changes.
 
 ## Implemented boundary
 
-`ListHIR.fs` recognizes straight-line regions beginning with a list literal or
+`ListHIR.fs` recognizes structured regions beginning with a list literal or
 a supported list operation after monomorphization and lambda lifting, before
 AST-to-ANF lowering destroys collection semantics. Supported operations are
 `List.map<Int64, Int64>`, `List.reverse<Int64>`, and
@@ -15,6 +15,11 @@ AST-to-ANF lowering destroys collection semantics. Supported operations are
 longer restricted to the small allocator's 28-element limit. Scalar bindings
 and region results have type `Int64` or `Bool`; the repeat count is a
 constructor-specific managed `Int` operand, not a general managed region value.
+Regions can contain nested `if` expressions with immediate scalar conditions
+and `Int64`/`Bool` results, including scalar bindings used after a join. Each
+branch may construct and consume local lists, or use lists from its enclosing
+scope. Lists cannot themselves be branch results. Result/Option payloads and
+pattern matching remain outside this grammar, including checked `List.repeat`.
 
 Callbacks must be known closure constructions or function references. Captures
 are restricted to immediate scalar values and static code addresses. External
@@ -38,31 +43,44 @@ builders and pooled large buffers are not implemented.
 The region IR has three private program types:
 
 ```text
-FunctionalRegion: typed scalar operands + semantic collection edges
+FunctionalRegion: typed blocks + semantic collection edges + scalar joins
   -> StorageRegion: explicit array layouts
   -> OwnedRegion: consume-or-copy transformations + explicit releases
   -> existing ANF primitives -> MIR -> existing native backends
 ```
 
-The stages share an `Operation<'transform>` family. Only owned transforms carry
+`SemanticIR.fs` defines shared typed operands, blocks, and value-edge contracts
+independent of array layouts and ANF. It is a foundation used by ListHIR, not
+yet a whole-program semantic IR or a primitive effect registry. Opaque scalar
+expressions and callbacks retain their original evaluation order; their types
+are not evidence of purity.
+
+The stages share an `Operation<'transform, 'block>` family. Only owned transforms carry
 an ownership decision. Collection identities are monotonic and separate from
 ANF temporary identifiers; lexical aliases resolve to the same collection
-identity before use counting. Runtime extents name their originating
+identity before liveness solving. Runtime extents name their originating
 construction identity, not a lexical count variable; aliases, consuming
 transforms and variable shadowing cannot change this origin. Lowering carries
 the pointer, validated length atom and selected layout together. Scalar bindings
 retain checked types.
 
-A final use transfers the source allocation into the result. If another use
-survives, the transform borrows the source and allocates/copies independent
-storage. Every reader's last use releases its source, and unused results are
-released. This closed grammar proves physical uniqueness statically: a buffer
+A backwards liveness pass solves collection uses through branch joins. A final
+use transfers the source allocation into the result. If another use survives,
+including in the continuation after a join, the transform borrows the source
+and allocates/copies independent storage. Mutually exclusive final uses may
+each consume the same incoming allocation. A list needed by only one branch
+is released on entry to the other branch, after condition evaluation. Every
+reader's last use releases its source, and unused results are released.
+This closed grammar proves physical uniqueness statically: a buffer
 has one physical ownership unit, while all logical aliases are visible in the
 region graph. A borrowed parameter with RC=1 is **not** evidence of uniqueness;
 borrowed external lists are ineligible.
 
-`verifyOwnership` checks live inputs, globally unique identities, balanced
-releases, and absence of leaked region roots. The stage verifier also checks
+`verifyFunctional` checks the closed region's incoming collection interface
+using representation-independent value contracts. `verifyOwnership` checks
+live inputs, globally unique identities (including between sibling branches),
+balanced releases, identical surviving ownership at joins, and absence of
+leaked region roots. The stage verifier also checks
 operand types, layout agreement, and allocation bounds. Construction is atomic
 at the region level: element expressions run first in source order, then the
 compiler allocates and initializes the buffer before exposing its identity.
@@ -74,9 +92,11 @@ before conversion or multiplication. That rejection uses the stdlib fatal-error
 mechanism (`Uncaught exception: Out of heap memory`); an OS allocation failure
 uses the native allocator's fatal path.
 
-`allocationSummary` reports exact region allocation counts/requested bytes, copies,
+`allocationBudget` reports exact region allocation counts/requested bytes, copies,
 reused transformations, and releases, excluding work inside scalar expressions
-and callbacks. Requested bytes include the mapped allocator's private prefix,
+and callbacks. Its tree retains the prefix, mutually exclusive branch budgets,
+and shared continuation separately; it neither sums alternatives nor enumerates
+every execution path. Requested bytes include the mapped allocator's private prefix,
 but exclude OS page rounding. Byte budgets contain a constant term and physical
 runtime-buffer counts keyed by construction identities. Each runtime buffer
 costs `256` for `n <= 28`, otherwise `40 + 8*n`; copies add another buffer with
@@ -85,6 +105,12 @@ original signed count. Distinct runtime constructors retain distinct terms.
 These are piecewise budgets, not an affine approximation. Pass tests check them and
 the resulting native-memory ANF operations. `--dump-anf` exposes allocations,
 stores, calls, and cleanup.
+
+The current ANF is a continuation tree, so lowering places a scalar join's
+continuation on each returning path. Region extraction limits paths through
+explicit HIR branches to 16 to bound the additional code duplication; larger regions use the supported persistent
+representation (eligible subregions can still be selected independently).
+Explicit downstream join blocks are needed before lifting that restriction.
 
 ## Storage contract
 
@@ -148,7 +174,8 @@ ANF pipeline or a complete Perceus implementation. The next boundaries are:
    builders, a growth policy, and profitable pooling for large runtime buffers.
    Checked repeat construction, independent variable-byte mappings and
    loop-based kernels provide the reclamation/execution foundation.
-2. A general semantic HIR and primitive effect/alias/ownership contracts;
+2. Extend the typed block/value-contract foundation into a general semantic HIR
+   with explicit downstream joins and primitive effect/alias/ownership contracts;
    layout/destruction metadata independent of ANF; stage verifiers throughout
    the pipeline. Generated printing must precede general ownership elaboration.
 3. Function ownership and representation interfaces, bounded specialization,

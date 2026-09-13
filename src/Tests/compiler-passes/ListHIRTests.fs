@@ -25,14 +25,17 @@ let private extract expression =
     let infer types expr = AST_to_ANF.inferTypeCore Set.empty expr types Map.empty Map.empty functions Map.empty
     ListHIR.tryExtract infer (fun expr -> AST_to_ANF.freeVars expr Set.empty) expression
 
-let private checkSummary expression expected () =
+let private checkBudget expression expected () =
     match extract expression with
     | None -> Error "Expected a closed List<Int64> region"
     | Some region ->
-        let owned = region |> ListHIR.selectStorage |> ListHIR.elaborateOwnership
-        ListHIR.verify owned |> Result.bind (fun () ->
-            let actual = ListHIR.allocationSummary owned
-            if actual = expected then Ok () else Error $"Storage budget: expected {expected}, got {actual}")
+        ListHIR.verifyFunctional region |> Result.bind (fun () ->
+            let owned = region |> ListHIR.selectStorage |> ListHIR.elaborateOwnership
+            ListHIR.verify owned |> Result.bind (fun () ->
+                let actual = ListHIR.allocationBudget owned
+                if actual = expected then Ok () else Error $"Storage budget: expected {expected}, got {actual}"))
+
+let private checkSummary expression expected = checkBudget expression (ListHIR.Complete expected)
 
 let private unique = bind "xs" (values 3) (bind "ys" (map (AST.Var "xs")) (fold (reverse (AST.Var "ys"))))
 let private shared =
@@ -70,7 +73,36 @@ let private root = ListHIR.ListId 0
 let private construct releases : ListHIR.OwnedOperation =
     { Operation = ListHIR.Construct (root, ListHIR.Literal []); Releases = releases }
 
+let private zero : ListHIR.AllocationSummary = { Allocations = 0; AllocatedBytes = bytes 0L; Copies = 0; ReusedTransforms = 0; Releases = 0 }
+let private allocated = { zero with Allocations = 1; AllocatedBytes = bytes 56L }
+let private choice yes no = AST.If (AST.BoolLiteral true, yes, no)
+let private branchUses = bind "xs" (values 3) (choice (fold (map (AST.Var "xs"))) (fold (reverse (AST.Var "xs"))))
+let private branchJoin = bind "xs" (values 3) (bind "selected" (choice (fold (reverse (AST.Var "xs"))) (AST.Int64Literal 7L)) (fold (AST.Var "xs")))
+let private manyBranches count =
+    bind "xs" (values 3)
+        (List.foldBack (fun index body -> bind $"branch{index}" (choice (fold (AST.Var "xs")) (AST.Int64Literal 7L)) body) [1 .. count] (fold (AST.Var "xs")))
+let private ownedBlock releases operations : ListHIR.OwnedBlock =
+    { EntryReleases = releases
+      Body = { Operations = operations; Result = { Expression = AST.Int64Literal 0L; Type = AST.TInt64 } } }
+let private ownedBranch yes no : ListHIR.OwnedOperation =
+    { Operation = ListHIR.Branch ("joined", { Expression = AST.BoolLiteral true; Type = AST.TBool }, yes, no); Releases = [] }
+
 let tests = [
+    "List HIR bounds continuation expansion", rejects (manyBranches 5)
+    "List HIR accepts the bounded continuation frontier", (fun () ->
+        match extract (manyBranches 4) with
+        | None -> Error "Expected sixteen-path region"
+        | Some region -> region |> ListHIR.selectStorage |> ListHIR.elaborateOwnership |> ListHIR.verify)
+    "List HIR rejects list-valued branch joins", rejects (bind "xs" (values 3) (bind "selected" (choice (reverse (AST.Var "xs")) (AST.Var "xs")) (fold (AST.Var "selected"))))
+    "List HIR rejects branch callbacks hiding aliases", rejects (bind "xs" (values 3) (choice (fold (call "Stdlib.List.map_i64_i64" [AST.Var "xs"; AST.Closure ("mapCallback", [AST.Var "xs"])])) (AST.Int64Literal 7L)))
+    "List HIR consumes independently on mutually exclusive paths", checkBudget branchUses (ListHIR.Conditional (allocated, ListHIR.Complete { zero with ReusedTransforms = 1; Releases = 1 }, ListHIR.Complete { zero with ReusedTransforms = 1; Releases = 1 }, ListHIR.Complete zero))
+    "List HIR preserves a source needed after the join", checkBudget branchJoin (ListHIR.Conditional (allocated, ListHIR.Complete { allocated with Copies = 1; Releases = 1 }, ListHIR.Complete zero, ListHIR.Complete { zero with Releases = 1 }))
+    "List HIR releases unused inputs on the other edge", checkBudget (bind "xs" (values 3) (choice (fold (AST.Var "xs")) (AST.Int64Literal 7L))) (ListHIR.Conditional (allocated, ListHIR.Complete { zero with Releases = 1 }, ListHIR.Complete { zero with Releases = 1 }, ListHIR.Complete zero))
+    "List HIR budgets branch-local constructors separately", checkBudget (bind "xs" (values 3) (choice (fold repeat) (fold (values 3)))) (ListHIR.Conditional ({ allocated with Releases = 1 }, ListHIR.Complete { zero with Allocations = 1; AllocatedBytes = runtimeBytes 0L [ListHIR.ListId 1, 1L]; Releases = 1 }, ListHIR.Complete { allocated with Releases = 1 }, ListHIR.Complete zero))
+    "List HIR verifier rejects mismatched branch ownership", rejectsOwnership [construct []; ownedBranch (ownedBlock [root] []) (ownedBlock [] [])]
+    "List HIR verifier rejects branch-local leaked values", rejectsOwnership [ownedBranch (ownedBlock [] [construct []]) (ownedBlock [] [])]
+    "List HIR verifier rejects duplicate identities across branches", rejectsOwnership [ownedBranch (ownedBlock [] [construct [root]]) (ownedBlock [] [construct [root]])]
+    "List HIR verifier rejects double edge cleanup", rejectsOwnership [construct []; ownedBranch (ownedBlock [root; root] []) (ownedBlock [root] [])]
     "List HIR consumes unique map/reverse storage", checkSummary unique { Allocations = 1; AllocatedBytes = bytes 56L; Copies = 0; ReusedTransforms = 2; Releases = 1 }
     "List HIR copies a surviving source version", checkSummary shared { Allocations = 2; AllocatedBytes = bytes 112L; Copies = 1; ReusedTransforms = 0; Releases = 2 }
     "List HIR normalizes aliases before last-use solving", checkSummary (bind "xs" (values 3) (bind "alias" (AST.Var "xs") (fold (reverse (AST.Var "alias"))))) { Allocations = 1; AllocatedBytes = bytes 56L; Copies = 0; ReusedTransforms = 1; Releases = 1 }

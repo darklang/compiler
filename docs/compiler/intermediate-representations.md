@@ -15,6 +15,13 @@ ANF → MIR → LIR → target ISA → Binary
 - **LIR**: Shared low-level instructions with virtual registers and abstract
   physical register names that each backend maps to its target ISA
 
+Before ANF, `SemanticIR.fs` supplies typed block results and representation-
+independent value contracts. ListHIR uses these for structured collection
+regions, storage selection, and branch-aware ownership elaboration. This is
+not yet the general program IR; see
+[compiler-selected list arrays](runtime/list-array-reuse.md) for its boundary
+and the remaining explicit-join work.
+
 ## Dumping IRs
 
 Use the CLI to dump textual IRs while compiling:
