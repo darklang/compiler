@@ -112,11 +112,8 @@ Stdlib.List.getAtOrDefault<Int64>([10L, 20L, 30L], 3L, 99L) = 99L
 let selected = Stdlib.List.getAtOrDefault<Float>([-0.0], 0L, 1.0) in Stdlib.Float.toBits(selected) = 9223372036854775808UL
 let fallback = Stdlib.List.getAtOrDefault<Float>([1.0], 1L, -0.0) in Stdlib.Float.toBits(fallback) = 9223372036854775808UL
 
-// Regression test: Stdlib.List.getAt<Float> should correctly extract Float from Option
-// NOTE: Float list storage works (FpToGp converts Float bits to GP for RawSlotInit),
-// but extraction doesn't work yet - __raw_get<Float> returns bits in GP register
-// and needs GpToFp conversion at function return level, which isn't implemented.
-// let v = [1.0, 2.0, 3.0] in match Stdlib.List.getAt<Float>(v, 1I) with | Some(x) -> Stdlib.Float.toInt(x * 1000.0) | None -> -1 = 2000
+// Float results cross the generic Option boundary without losing their type.
+let floats = [1.0, 2.0, 3.0] in match Stdlib.List.getAt<Float>(floats, 1I) with | Some(x) -> Stdlib.Float.toInt(x * 1000.0) | None -> -1L = 2000L
 
 // ===================================================================
 // Stdlib.List.findFirst - Find first element matching predicate
@@ -196,9 +193,9 @@ match Stdlib.List.partition([1L, 2L, 3L, 4L, 5L], fun x -> x > 2L) with | (trues
 // ===================================================================
 // List memory reclamation regression
 // ===================================================================
-// Disabled on x86_64: requires reference counting, which is implemented
-// but currently gated off (enabling it regresses 37 other tests). See
-// docs/x64-refcounting.md.
+// Disabled pending the cross-backend memory matrix even though x86-64
+// reference-counting support is implemented. See
+// docs/compiler/backend/x64.md.
 //
 // let memReclaimMakeHelper(n: Int64, acc: List<Int64>) : List<Int64> =
 //     if n <= 0 then acc
@@ -215,9 +212,3 @@ match Stdlib.List.partition([1L, 2L, 3L, 4L, 5L], fun x -> x > 2L) with | (trues
 //         memReclaimBurn(iters - 1, total + len)
 //
 // memReclaimBurn(10000, 0) = 4000000
-
-// ===================================================================
-// NOTE: Functions disabled due to compiler bugs
-// ===================================================================
-
-// Stdlib.List.zip - disabled due to tuple recursion bug

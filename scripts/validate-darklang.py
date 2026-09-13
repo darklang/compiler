@@ -55,7 +55,7 @@ TEST CONVERSION EXAMPLE:
         0L
 
 SEE ALSO:
-    docs/darklang-differences.md - Documents all known differences and skip reasons
+    docs/compatibility/overview.md - Routes compatibility ledgers and skip reasons
 """
 
 import argparse
@@ -916,7 +916,7 @@ class Validator:
     def _should_skip(self, test: TestCase) -> Optional[str]:
         """Check if test should be skipped.
 
-        See docs/darklang-differences.md for detailed explanations of each skip reason.
+        See docs/compatibility/overview.md for the compatibility ledgers and skip reasons.
 
         Skip reason categories:
         - Tooling differences: eval:* reasons (error testing, output capture)

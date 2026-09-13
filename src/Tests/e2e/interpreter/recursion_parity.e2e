@@ -1,6 +1,6 @@
 // Recursive binding parity corpus.
 //
-// Same-source classification is recorded in docs/recursion-parity.md for
+// Same-source classification is recorded in docs/compatibility/language/recursion.md for
 // compiler b2e1f3d1e4ce0338d4c4662db9a1326f2e2cb899 and interpreter
 // 04fbe9dcc995c6188757d583e273cbd30a3e2d3d.
 

@@ -31,7 +31,7 @@
 // Callee-saved registers are saved/restored in prologue/epilogue according to
 // the active target architecture.
 //
-// See docs/features/register-allocation.md for detailed documentation.
+// See docs/compiler/backend/register-allocation.md for detailed documentation.
 
 module RegisterAllocation
 

@@ -5,7 +5,7 @@
 // transformation.
 // Keep this file as the structural source of truth for syntax-facing compiler
 // nodes; language support and compatibility boundaries belong in
-// docs/darklang-differences.md.
+// docs/compatibility/overview.md.
 
 module AST
 

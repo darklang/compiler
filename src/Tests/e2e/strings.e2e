@@ -137,8 +137,8 @@ $"{"a" ++ "b"}" = "ab"
 // Catches mutations #1 (depth + 1 -> depth - 1) and #7 (depth - 1 -> depth + 1)
 type NestedBraceRec = { ``val``: String } $"{NestedBraceRec { ``val`` = "ok" }.``val``}" = "ok"
 
-// NOTE: Multiple interpolations like $"{x} and {y}" trigger a pre-existing bug
-// in chained string concatenation code generation - to be fixed separately
+// Multiple interpolations lower through chained string concatenation.
+let x = "one" in let y = "two" in $"{x} and {y}" = "one and two"
 
 // =============================================================================
 // Stdlib.String.getByteAt Tests

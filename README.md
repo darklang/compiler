@@ -9,7 +9,7 @@ development environment, contributor workflow, verification, architecture,
 features, compatibility, benchmarks, and agent guidance to their canonical
 sources.
 
-The compiler runs an eight-pass pipeline from source to native binary. See
-[`docs/architecture.md`](docs/architecture.md) and
-[`docs/compiler-passes.md`](docs/compiler-passes.md) for its design and pass
+The compiler runs an eight-pass pipeline from source to native binary. See the
+[compiler overview](docs/compiler/overview.md) and
+[pipeline reference](docs/compiler/pipeline.md) for its design and pass
 contracts.

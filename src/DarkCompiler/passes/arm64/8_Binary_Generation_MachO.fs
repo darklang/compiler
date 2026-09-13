@@ -23,7 +23,7 @@
 //
 // Code signing: Required for macOS execution, done via `codesign -s -` (ad-hoc).
 //
-// See docs/features/binary-generation.md for detailed documentation.
+// See docs/compiler/backend/binary-generation.md for detailed documentation.
 
 module Binary_Generation_MachO
 

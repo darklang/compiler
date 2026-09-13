@@ -864,7 +864,7 @@ let typeEnvFromVarEnv (varEnv: VarEnv) : Map<string, AST.Type> =
 // - Name mangling encodes types: identity_i64, swap_str_bool
 // - Iterative: handles nested generics like List<Option<T>>
 //
-// See docs/features/generics.md for detailed documentation.
+// See docs/compiler/frontend/generics.md for detailed documentation.
 // ============================================================================
 
 /// Generic function registry - maps generic function names to their definitions
@@ -2251,7 +2251,7 @@ let inlineLambdasInProgram (program: AST.Program) : AST.Program =
 // All function values use closures for uniform calling convention, even non-capturing
 // lambdas and function references. This simplifies higher-order function support.
 //
-// See docs/features/closures.md for detailed documentation.
+// See docs/compiler/frontend/closures.md for detailed documentation.
 // ============================================================================
 
 /// State for lambda lifting - tracks generated functions and counter

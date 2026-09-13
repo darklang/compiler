@@ -1,5 +1,5 @@
 // Interpreter-compatible primitive literal syntax and boundary values.
-// The source contract is pinned in docs/primitive-literals-parity.md.
+// The source contract is pinned in docs/compatibility/language/primitive-literals.md.
 
 // Existing arbitrary-precision Int values retain their suffix spelling.
 let identityInt(value: Int) : Int = value identityInt(9223372036854775808I) = 9223372036854775808I

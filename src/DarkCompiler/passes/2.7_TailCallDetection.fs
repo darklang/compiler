@@ -20,7 +20,7 @@
 // has been fixed (DeadCodeElimination.fs was not recognizing TailCall as a
 // function call, causing stdlib functions called via tail call to be removed).
 //
-// See docs/features/tail-call-optimization.md for detailed documentation.
+// See docs/compiler/optimizations/tail-calls.md for detailed documentation.
 
 module TailCallDetection
 

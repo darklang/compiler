@@ -16,7 +16,7 @@
 //
 // No code signing needed on Linux (unlike macOS).
 //
-// See docs/features/binary-generation.md for detailed documentation.
+// See docs/compiler/backend/binary-generation.md for detailed documentation.
 
 module Binary_Generation_ELF
 

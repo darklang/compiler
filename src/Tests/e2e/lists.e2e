@@ -323,17 +323,16 @@ match [1L, 2L, 3L] with | h :: rest -> match [h + 10L] @ rest with | [a, b, c] -
 let a = [3L] in let b = [2L] @ a in Stdlib.List.length([1L] @ b) = 3I
 // =====================================================
 // Lists of Floats
-// KNOWN BUG: Float list pattern matching fails - lists fall through to wildcard
 // =====================================================
 
 // Float list - basic
-// DISABLED: match [1.0, 2.0, 3.0] with | [a, b, c] -> a + b + c | _ -> 0.0 = stdout="6.00\n"
+match [1.0, 2.0, 3.0] with | [a, b, c] -> a + b + c | _ -> 0.0 = 6.0
 
 // Float list - two elements
-// DISABLED: match [1.5, 2.5] with | [a, b] -> a * b | _ -> 0.0 = stdout="3.75\n"
+match [1.5, 2.5] with | [a, b] -> a * b | _ -> 0.0 = 3.75
 
 // Float list in variable
-// DISABLED: let fs = [1.0, 2.0] in match fs with | [a, b] -> a + b | _ -> 0.0 = stdout="3.00\n"
+let fs = [1.0, 2.0] in match fs with | [a, b] -> a + b | _ -> 0.0 = 3.0
 
 // =====================================================
 // Lists of Tuples
@@ -404,8 +403,7 @@ match [true, false] with | [a, b] -> if a && b then 1L else 0L | _ -> -1L = 0L
 // =====================================================
 
 // Sum list of floats recursively
-// DISABLED (same float list bug): let sumFloats(xs: List<Float>) : Float = match xs with | [] -> 0.0 | h :: t -> h + sumFloats(t)
-// DISABLED: sumFloats([1.0, 2.0, 3.0, 4.0]) = stdout="10.00\n"
+let sumFloats(xs: List<Float>) : Float = match xs with | [] -> 0.0 | h :: t -> h + sumFloats(t); sumFloats([1.0, 2.0, 3.0, 4.0]) = 10.0
 
 // Concatenate list of strings
 let concatStrings(xs: List<String>) : String = match xs with | [] -> "" | h :: t -> h ++ concatStrings(t)
