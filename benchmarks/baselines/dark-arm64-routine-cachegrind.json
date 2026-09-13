@@ -9,11 +9,11 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs"
   },
-  "contract_sha256": "2f4e8d149d0eb7a5bbbbea471086afae5bb34d6a687e7d102256a0cde0fcfcc8",
-  "generated_at": "2026-09-13T18:53:50+00:00",
+  "contract_sha256": "e52a38d9766ae00470a88aac4d56bba0e631b37bf2c2aa5da23c362ae1d3c380",
+  "generated_at": "2026-09-13T19:20:36+00:00",
   "compiler": {
-    "commit": "f8f6bfa72c8a97f7d9d4d2a40628e0f64931244f",
-    "subject": "Generalize CSE value classification"
+    "commit": "b2d48df5331c9b2a3a77cd3f5172ee8683d7cb6c",
+    "subject": "Run full fannkuch and include nsieve"
   },
   "benchmarks": [
     {
@@ -35,6 +35,10 @@
     {
       "name": "factorial",
       "instructions": 64689
+    },
+    {
+      "name": "fannkuch",
+      "instructions": 23727526579
     },
     {
       "name": "fasta",
@@ -71,6 +75,10 @@
     {
       "name": "nqueen",
       "instructions": 207722244
+    },
+    {
+      "name": "nsieve",
+      "instructions": 557297189
     },
     {
       "name": "pisum",
