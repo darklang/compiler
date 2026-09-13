@@ -30,13 +30,12 @@ rejected, nested tuple patterns destructure recursively, and equality is
 structural. Tuple allocation checks elements in source order and ANF preserves
 that left-to-right order. Tuple types use `A * B`; parenthesized comma tuple
 types are rejected in annotations and call-site type arguments. Bare comma
-tuples are accepted only as match scrutinees. Public syntax rejects numeric
+tuples are rejected in every expression position, including match scrutinees. Public syntax rejects numeric
 projection; callers use destructuring or `Stdlib.Tuple2`/`Stdlib.Tuple3`.
 
 The public parser rejects numeric projection and comma tuple types.
 Tuple-bearing compiler sources use star tuple types and destructuring or
 `Stdlib.Tuple2`/`Stdlib.Tuple3`, matching the interpreter.
-Internal-mode parser input and generated compiler AST retain `TupleAccess` as an
-AOT-only typed lowering operation; it is not public source syntax. Multi-argument
-compiler function types `(A, B) -> C` remain a documented compiler-only function
-type extension and are not interpreted as tuple types.
+Generated compiler AST retains `TupleAccess` as an AOT-only typed lowering
+operation used by compiler-owned sources. Multi-argument function types use
+`A -> B -> C`; `(A, B) -> C` is rejected.

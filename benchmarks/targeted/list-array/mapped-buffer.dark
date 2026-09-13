@@ -1,13 +1,13 @@
 // mapped-buffer.dark - Cross-target reclamation and live-value syscall probe.
-let roundtrip(bytes: Int64, retained: Int64) : Int64 =
-    let p = __mapped_alloc(bytes) in
-    let _ = __raw_write_word(p, 0L, 17L) in
-    let _ = __raw_write_word(p, bytes - 8L, 25L) in
-    let value = __raw_get<Int64>(p, 0L) + __raw_get<Int64>(p, bytes - 8L) in
-    let _ = __mapped_free(p) in
+let roundtrip (bytes: Int64) (retained: Int64) : Int64 =
+    let p = __mapped_alloc (bytes) in
+    let _ = __raw_write_word (p) (0L) (17L) in
+    let _ = __raw_write_word (p) (bytes - 8L) (25L) in
+    let value = __raw_get<Int64> (p) (0L) + __raw_get<Int64> (p) (bytes - 8L) in
+    let _ = __mapped_free (p) in
     retained + value
 
-let loop(n: Int64, acc: Int64) : Int64 =
-    if n == 0L then acc else loop(n - 1L, roundtrip(8388608L, acc))
+let loop (n: Int64) (acc: Int64) : Int64 =
+    if n == 0L then acc else loop (n - 1L) (roundtrip (8388608L) (acc))
 
-loop(128L, 0L)
+loop (128L) (0L)

@@ -52,8 +52,8 @@ and declaring-type-qualified references:
 Red
 Color.Red
 Option.Some 42L
-Pair.Pair(1L, "one")
-OneTuple.OneTuple((1L, "one"))
+Pair.Pair 1L "one"
+OneTuple.OneTuple (1L, "one")
 ```
 
 The canonical parser rejects the removed compiler declaration dialect: omitted
@@ -128,7 +128,7 @@ Values render in interpreter form, including concrete generic arguments:
 ```text
 Color.Red
 Option<Int64>.Some(42)
-Pair<Int64, String>.Pair(1, "one")
+Pair<Int64, String>.Pair 1 "one"
 ```
 
 Multiple fields render comma-separated; a single tuple field retains nested
@@ -160,4 +160,4 @@ same-case collisions across nominal types, exact arity, left-to-right payload
 failure, rendering, and nominal equality. Compiler-pass tests cover duplicate
 types, parameters, constructors and fields, undeclared parameters, empty
 declarations, unknown type references, generic reference arity, removed legacy
-compiler dialect forms, and resolved-reference AST shape.
+syntax forms, and resolved-reference AST shape.

@@ -403,7 +403,7 @@ match [true, false] with | [a, b] -> if a && b then 1L else 0L | _ -> -1L = 0L
 // =====================================================
 
 // Sum list of floats recursively
-let sumFloats(xs: List<Float>) : Float = match xs with | [] -> 0.0 | h :: t -> h + sumFloats(t); sumFloats([1.0, 2.0, 3.0, 4.0]) = 10.0
+let sumFloats (xs: List<Float>) : Float = match xs with | [] -> 0.0 | h :: t -> h + sumFloats (t); sumFloats ([1.0, 2.0, 3.0, 4.0]) = 10.0
 
 // Concatenate list of strings
 let concatStrings (xs: List<String>) : String = match xs with | [] -> "" | h :: t -> h ++ concatStrings (t)

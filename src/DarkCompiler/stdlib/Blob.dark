@@ -200,14 +200,14 @@ let __validateUtf8 (blob: Blob) (index: Int64) (length: Int64) : Int64 =
         let b0 = Stdlib.Blob.__getByte (blob) (index) in
         if b0 <= 127L then Stdlib.Blob.__validateUtf8 (blob) (index + 1L) (length)
         else if b0 >= 194L && b0 <= 223L then
-            if index + 1L >= length || !Stdlib.Blob.__isContinuation (Stdlib.Blob.__getByte (blob) (index + 1L)) then index
+            if index + 1L >= length || Stdlib.Bool.not (Stdlib.Blob.__isContinuation (Stdlib.Blob.__getByte (blob) (index + 1L))) then index
             else Stdlib.Blob.__validateUtf8 (blob) (index + 2L) (length)
         else if b0 >= 224L && b0 <= 239L then
             if index + 2L >= length then index
             else
                 let b1 = Stdlib.Blob.__getByte (blob) (index + 1L) in
                 let b2 = Stdlib.Blob.__getByte (blob) (index + 2L) in
-                if !Stdlib.Blob.__isContinuation (b1) || !Stdlib.Blob.__isContinuation (b2) then index
+                if Stdlib.Bool.not (Stdlib.Blob.__isContinuation (b1)) || Stdlib.Bool.not (Stdlib.Blob.__isContinuation (b2)) then index
                 else if b0 == 224L && b1 < 160L then index
                 else if b0 == 237L && b1 >= 160L then index
                 else Stdlib.Blob.__validateUtf8 (blob) (index + 3L) (length)
@@ -217,9 +217,9 @@ let __validateUtf8 (blob: Blob) (index: Int64) (length: Int64) : Int64 =
                 let b1 = Stdlib.Blob.__getByte (blob) (index + 1L) in
                 let b2 = Stdlib.Blob.__getByte (blob) (index + 2L) in
                 let b3 = Stdlib.Blob.__getByte (blob) (index + 3L) in
-                if !Stdlib.Blob.__isContinuation (b1)
-                   || !Stdlib.Blob.__isContinuation (b2)
-                   || !Stdlib.Blob.__isContinuation (b3) then index
+                if Stdlib.Bool.not (Stdlib.Blob.__isContinuation (b1))
+                   || Stdlib.Bool.not (Stdlib.Blob.__isContinuation (b2))
+                   || Stdlib.Bool.not (Stdlib.Blob.__isContinuation (b3)) then index
                 else if b0 == 240L && b1 < 144L then index
                 else if b0 == 244L && b1 >= 144L then index
                 else Stdlib.Blob.__validateUtf8 (blob) (index + 4L) (length)

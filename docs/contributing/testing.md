@@ -16,7 +16,7 @@ canonical formatting
 ---SOURCE---
 let x = 5 in x
 ---EXPECTED---
-let x = 5I in x
+let x = 5 in x
 ---ROUNDTRIP---
 ```
 

@@ -5,7 +5,7 @@ module Unicode
 type Utf8Error = InvalidUtf8 of Int64
 
 let isScalar (codepoint: Int64) : Bool =
-    codepoint >= 0L && codepoint <= 1114111L && !(codepoint >= 55296L && codepoint <= 57343L)
+    codepoint >= 0L && codepoint <= 1114111L && Stdlib.Bool.not (codepoint >= 55296L && codepoint <= 57343L)
 
 let __isContinuation (byte: Int64) : Bool = byte >= 128L && byte <= 191L
 
@@ -17,26 +17,39 @@ let decodeAt (value: String) (index: Int64) : Stdlib.Result.Result<(Int64 * Int6
         if b0 <= 127L then Ok ((b0, 1L))
         else if b0 >= 194L && b0 <= 223L && index + 1L < length then
             let b1 = Stdlib.String.getByteAt (value) (index + 1L) in
-            if Unicode.__isContinuation (b1) then Ok ((((b0 & 31L) << 6L) ^ (b1 & 63L), 2L))
+            if Unicode.__isContinuation (b1) then
+                Ok ((Stdlib.Int64.bitwiseOr
+                        (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b0 31L) 6L)
+                        (Stdlib.Int64.bitwiseAnd b1 63L), 2L))
             else Error (Unicode.Utf8Error.InvalidUtf8 (index))
         else if b0 >= 224L && b0 <= 239L && index + 2L < length then
             let b1 = Stdlib.String.getByteAt (value) (index + 1L) in
             let b2 = Stdlib.String.getByteAt (value) (index + 2L) in
             let validSecond = Unicode.__isContinuation (b1) &&
-                !(b0 == 224L && b1 < 160L) &&
-                !(b0 == 237L && b1 > 159L) in
+                Stdlib.Bool.not (b0 == 224L && b1 < 160L) &&
+                Stdlib.Bool.not (b0 == 237L && b1 > 159L) in
             if validSecond && Unicode.__isContinuation (b2) then
-                Ok ((((b0 & 15L) << 12L) ^ ((b1 & 63L) << 6L) ^ (b2 & 63L), 3L))
+                Ok ((Stdlib.Int64.bitwiseOr
+                        (Stdlib.Int64.bitwiseOr
+                            (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b0 15L) 12L)
+                            (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b1 63L) 6L))
+                        (Stdlib.Int64.bitwiseAnd b2 63L), 3L))
             else Error (Unicode.Utf8Error.InvalidUtf8 (index))
         else if b0 >= 240L && b0 <= 244L && index + 3L < length then
             let b1 = Stdlib.String.getByteAt (value) (index + 1L) in
             let b2 = Stdlib.String.getByteAt (value) (index + 2L) in
             let b3 = Stdlib.String.getByteAt (value) (index + 3L) in
             let validSecond = Unicode.__isContinuation (b1) &&
-                !(b0 == 240L && b1 < 144L) &&
-                !(b0 == 244L && b1 > 143L) in
+                Stdlib.Bool.not (b0 == 240L && b1 < 144L) &&
+                Stdlib.Bool.not (b0 == 244L && b1 > 143L) in
             if validSecond && Unicode.__isContinuation (b2) && Unicode.__isContinuation (b3) then
-                Ok ((((b0 & 7L) << 18L) ^ ((b1 & 63L) << 12L) ^ ((b2 & 63L) << 6L) ^ (b3 & 63L), 4L))
+                Ok ((Stdlib.Int64.bitwiseOr
+                        (Stdlib.Int64.bitwiseOr
+                            (Stdlib.Int64.bitwiseOr
+                                (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b0 7L) 18L)
+                                (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b1 63L) 12L))
+                            (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b2 63L) 6L))
+                        (Stdlib.Int64.bitwiseAnd b3 63L), 4L))
             else Error (Unicode.Utf8Error.InvalidUtf8 (index))
         else Error (Unicode.Utf8Error.InvalidUtf8 (index))
 
@@ -395,7 +408,7 @@ let __mapCaseUtf8 (value: String) (index: Int64) (uppercase: Bool) (full: Bool) 
             let codepoint = Stdlib.Tuple2.first<Int64, Int64> (decoded) in
             let width = Stdlib.Tuple2.second<Int64, Int64> (decoded) in
             let mapped =
-                if !uppercase && codepoint == 931L && previousCased && !Unicode.__hasFollowingCased (value) (index + width) then [962L]
+                if Stdlib.Bool.not uppercase && codepoint == 931L && previousCased && Stdlib.Bool.not (Unicode.__hasFollowingCased (value) (index + width)) then [962L]
                 else if uppercase && full then Unicode.uppercaseCodepointFull (codepoint)
                 else if uppercase then Unicode.uppercaseCodepoint (codepoint)
                 else Unicode.lowercaseCodepoint (codepoint) in

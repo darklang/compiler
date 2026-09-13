@@ -46,28 +46,15 @@ let lessThan (a: UInt8) (b: UInt8) : Bool = a < b
 
 let lessThanOrEqualTo (a: UInt8) (b: UInt8) : Bool = a <= b
 
-// Bitwise operations
-let bitwiseAnd (a: UInt8) (b: UInt8) : UInt8 = a & b
-
-let bitwiseOr (a: UInt8) (b: UInt8) : UInt8 = a ||| b
-
-let bitwiseXor (a: UInt8) (b: UInt8) : UInt8 = (a ||| b) & ~~~(a & b)
-
-let shiftLeft (a: UInt8) (shift: UInt8) : UInt8 = a << shift
-
-let shiftRight (a: UInt8) (shift: UInt8) : UInt8 = a >> shift
-
-let bitwiseNot (a: UInt8) : UInt8 = ~~~a
-
 // Count number of set bits (population count)
 // Uses parallel bit counting algorithm (SWAR)
 let __popcount (x: UInt8) : UInt8 =
     let mask1 = 85uy in
     let mask2 = 51uy in
     let mask3 = 15uy in
-    let x = x - ((x >> 1uy) & mask1) in
-    let x = (x & mask2) + ((x >> 2uy) & mask2) in
-    let x = (x + (x >> 4uy)) & mask3 in
+    let x = x - Stdlib.UInt8.bitwiseAnd (Stdlib.UInt8.shiftRight x 1uy) mask1 in
+    let x = Stdlib.UInt8.bitwiseAnd x mask2 + Stdlib.UInt8.bitwiseAnd (Stdlib.UInt8.shiftRight x 2uy) mask2 in
+    let x = Stdlib.UInt8.bitwiseAnd (x + Stdlib.UInt8.shiftRight x 4uy) mask3 in
     x
 
 // Convert a single digit (0uy-9uy) to its string representation

@@ -2,14 +2,13 @@
 """
 Validate E2E test expected outputs against the Darklang interpreter.
 
-This script parses .e2e test files, converts compiler syntax to Darklang syntax,
-runs expressions through the darklang-interpreter, and compares results.
+This script parses canonical .e2e test files, runs their expressions through
+the pinned darklang-interpreter, and compares results.
 
 USAGE:
     python3 scripts/validate-darklang.py                    # Validate all e2e tests
     python3 scripts/validate-darklang.py path/to/test.e2e   # Validate specific file
     python3 scripts/validate-darklang.py --verbose          # Show all results
-    python3 scripts/validate-darklang.py --show-conversions # Show syntax conversions
     python3 scripts/validate-darklang.py --show-failures    # Show only failures
 
 MANUAL VALIDATION:
@@ -25,34 +24,19 @@ HOW IT WORKS:
     the `eval` command.
 
     Supported constructs:
-    - Function definitions (converted to curried lambdas)
+    - Canonical function definitions
     - Let bindings
     - Lambda expressions
     - Match expressions
 
     Results are captured using Builtin.debug for comparison.
 
-SYNTAX CONVERSIONS:
-    The script automatically converts compiler syntax to Darklang syntax:
-    - Integer literals: 5 -> 5L
-    - List separators: [1, 2] -> [1L; 2L]
-    - Function calls: Module.fn(a, b) -> Stdlib.Module.fn a b
-    - Lambdas already use the shared `fun x -> body` syntax
-
 TEST CONVERSION EXAMPLE:
-    For a test like `let x = 5 in x + 1 = 6`:
+    For a test like `let x = 5 in x + 1 = 6`, source is embedded unchanged:
 
-        let __result = let x = 5L in x + 1L
+        let __result = let x = 5 in x + 1
         Builtin.debug "" __result
-        0L
-
-    For tests with `def` preambles:
-
-        // Original: def add(a: Int64, b: Int64) : Int64 = a + b add(1, 2) = 3
-        let add = fun a -> fun b -> a + b
-        let __result = add 1L 2L
-        Builtin.debug "" __result
-        0L
+        0
 
 SEE ALSO:
     docs/compatibility/overview.md - Routes compatibility ledgers and skip reasons
@@ -83,7 +67,7 @@ class TestCase:
     line_number: int
     expression: str
     expected: str
-    preamble: Optional[str] = None  # e.g., "def foo(...) = ..."
+    preamble: Optional[str] = None
 
 
 @dataclass
@@ -166,13 +150,6 @@ class FileRunner:
 class E2EParser:
     """Parses .e2e test files."""
 
-    # Pattern for test line: expression = expected
-    # Handle inline `def` definitions that precede the test expression
-    TEST_PATTERN = re.compile(
-        r'^(?P<preamble>(?:def\s+\w+.*?=\s+.*?\s+)+)?'  # Optional def preamble
-        r'(?P<expr>.+?)\s*=\s*(?P<expected>.+)$'
-    )
-
     def parse_file(self, filepath: Path) -> list[TestCase]:
         """Parse an .e2e file and return list of test cases."""
         tests = []
@@ -194,14 +171,9 @@ class E2EParser:
 
     def _parse_test_line(self, line: str, line_num: int) -> Optional[TestCase]:
         """Parse a single test line."""
-        # Handle lines with inline def definitions
-        # Format: def foo(x: T): T = body expr = expected
-
-        # First, check if line contains a def
+        # Legacy `def` preambles are not canonical source and are not rewritten.
         if line.startswith('def '):
-            # Find the last '=' that's followed by expected value
-            # We need to handle nested def statements
-            return self._parse_line_with_def(line, line_num)
+            return None
 
         # Simple case: expr = expected
         # Need to find the last top-level '=' that separates expr from expected
@@ -246,64 +218,6 @@ class E2EParser:
             i += 1
 
         return value
-
-    def _parse_line_with_def(self, line: str, line_num: int) -> Optional[TestCase]:
-        """Parse a line that starts with def."""
-        # Pattern: def name(params): RetType = body <actual_expr> = <expected>
-        # The challenge is finding where the def body ends and the test expr begins
-
-        # Strategy: Find the pattern where we have the function body followed by
-        # a function call or expression, then = expected
-
-        # Look for common patterns like "def foo(...) = ... foo(...) = expected"
-        # We need to match the function name and find its call
-
-        # Extract function name
-        match = re.match(r'def\s+(\w+)', line)
-        if not match:
-            return None
-        func_name = match.group(1)
-
-        # Find where the function definition ends
-        # Look for the function call pattern after the def
-        # Pattern: after "def name(...) = body" we should see "name(" or an expression
-
-        # Find all occurrences of the function name
-        # The last meaningful '=' should be our test separator
-
-        # Simple heuristic: find the rightmost ' = ' where right side looks like a value
-        equals_pos = self._find_test_equals(line)
-        if equals_pos is None:
-            return None
-
-        preamble_and_expr = line[:equals_pos].strip()
-        expected = line[equals_pos + 1:].strip()
-
-        # Now separate preamble (def) from the test expression
-        # Look for the function call or expression after the def body
-
-        # Find where the function body ends - usually right before function is called
-        # or where a standalone expression begins
-
-        # Use a pattern to find "def...= body func_name(" or similar
-        def_pattern = rf'(def\s+{func_name}\s*\([^)]*\)\s*(?::\s*\w+)?\s*=\s*.+?)\s+({func_name}\s*\(.+)$'
-        def_match = re.match(def_pattern, preamble_and_expr)
-
-        if def_match:
-            preamble = def_match.group(1).strip()
-            expr = def_match.group(2).strip()
-        else:
-            # Try alternate pattern for multiple defs or different structures
-            # For now, treat the whole left side as the expression with embedded def
-            preamble = None
-            expr = preamble_and_expr
-
-        return TestCase(
-            line_number=line_num,
-            expression=expr,
-            expected=expected,
-            preamble=preamble
-        )
 
     def _find_test_equals(self, line: str) -> Optional[int]:
         """Find the position of the '=' that separates expression from expected value."""
@@ -360,420 +274,28 @@ class E2EParser:
         return last_equals
 
 
-class SyntaxConverter:
-    """Converts Ralph2 syntax to Darklang syntax."""
-
-    # Mapping of Ralph2 stdlib modules to Darklang
-    STDLIB_MODULES = {
-        'Int64': 'Stdlib.Int64',
-        'Int32': 'Stdlib.Int32',
-        'Int16': 'Stdlib.Int16',
-        'Int8': 'Stdlib.Int8',
-        'UInt64': 'Stdlib.UInt64',
-        'UInt32': 'Stdlib.UInt32',
-        'UInt16': 'Stdlib.UInt16',
-        'UInt8': 'Stdlib.UInt8',
-        'Float': 'Stdlib.Float',
-        'String': 'Stdlib.String',
-        'List': 'Stdlib.List',
-        'Dict': 'Stdlib.Dict',
-        'Option': 'Stdlib.Option',
-        'Result': 'Stdlib.Result',
-        'Bool': 'Stdlib.Bool',
-        'Char': 'Stdlib.Char',
-        'Tuple2': 'Stdlib.Tuple2',
-        'Tuple3': 'Stdlib.Tuple3',
-        'Math': 'Stdlib.Math',
-        'Blob': 'Stdlib.Blob',
-        'Base64': 'Stdlib.Base64',
-        'Uuid': 'Stdlib.Uuid',
-    }
-
-    def convert(self, expr: str) -> str:
-        """Convert Ralph2 expression to Darklang syntax."""
-        result = expr
-
-        # Convert stdlib function calls: Module.func(args) -> Stdlib.Module.func args
-        result = self._convert_stdlib_calls(result)
-
-        # Convert list syntax: [1, 2, 3] -> [1L; 2L; 3L]
-        result = self._convert_lists(result)
-
-        # Convert integer literals: add L suffix
-        result = self._convert_int_literals(result)
-
-        # Convert let...in to block syntax: let x = e in body -> (let x = e\nbody)
-        result = self._convert_let_in(result)
-
-        return result
-
-    def _convert_let_in(self, expr: str) -> str:
-        """Convert let...in expressions to Darklang block syntax.
-
-        Darklang doesn't use 'in' keyword. Instead:
-            let x = 5 in x + 1
-        becomes:
-            (let x = 5L
-            x + 1L)
-        """
-        result = expr
-
-        # Process from right to left to handle nested let...in properly
-        # Each iteration handles the rightmost let...in
-        max_iterations = 20  # Prevent infinite loops
-        iteration = 0
-
-        while ' in ' in result and iteration < max_iterations:
-            iteration += 1
-
-            # Find the rightmost ' in ' that's preceded by 'let ... = ...'
-            # Work backwards to find the matching let
-            in_pos = self._find_rightmost_let_in(result)
-            if in_pos is None:
-                break
-
-            # Find the matching 'let' for this 'in'
-            let_info = self._find_matching_let(result, in_pos)
-            if let_info is None:
-                break
-
-            let_start, var_name, value_end = let_info
-            value = result[value_end:in_pos].strip()
-
-            # Body is everything after ' in '
-            body_start = in_pos + 4  # len(' in ')
-            body = self._extract_let_body(result, body_start)
-
-            if body is None:
-                break
-
-            body_end = body_start + len(body)
-
-            # Build the replacement: (let var = value\nbody)
-            replacement = f"(let {var_name} = {value}\n{body})"
-
-            # Replace in result
-            result = result[:let_start] + replacement + result[body_end:]
-
-        return result
-
-    def _find_rightmost_let_in(self, expr: str) -> Optional[int]:
-        """Find the position of the rightmost ' in ' that's part of a let binding."""
-        # Search backwards for ' in '
-        pos = len(expr)
-        while True:
-            pos = expr.rfind(' in ', 0, pos)
-            if pos == -1:
-                return None
-            # Check if there's a 'let' before this 'in'
-            prefix = expr[:pos]
-            if 'let ' in prefix:
-                return pos
-            pos -= 1
-        return None
-
-    def _find_matching_let(self, expr: str, in_pos: int) -> Optional[tuple[int, str, int]]:
-        """Find the let that matches this 'in' position.
-
-        Returns (let_start, var_name, value_start) or None.
-        """
-        # Look backwards from in_pos for 'let <var> ='
-        # The tricky part is handling nested let expressions
-
-        prefix = expr[:in_pos]
-
-        # Find the rightmost 'let' that's not inside a nested block
-        depth = 0
-        i = len(prefix) - 1
-        while i >= 0:
-            if prefix[i] == ')':
-                depth += 1
-            elif prefix[i] == '(':
-                depth -= 1
-            elif depth == 0:
-                # Check for 'let '
-                if i >= 3 and prefix[i-3:i+1] == 'let ':
-                    # Found potential let, extract var name and value start
-                    match = re.match(r'(\w+)\s*=\s*', prefix[i+1:])
-                    if match:
-                        var_name = match.group(1)
-                        value_start = i + 1 + match.end()
-                        return (i - 3, var_name, value_start)
-            i -= 1
-
-        return None
-
-    def _extract_let_body(self, expr: str, start: int) -> Optional[str]:
-        """Extract the body of a let...in expression starting at position start."""
-        depth = 0
-        in_string = False
-        string_char = None
-        i = start
-
-        while i < len(expr):
-            char = expr[i]
-
-            # Handle string literals
-            if char in '"\'`' and (i == 0 or expr[i-1] != '\\'):
-                if not in_string:
-                    in_string = True
-                    string_char = char
-                elif char == string_char:
-                    in_string = False
-                    string_char = None
-                i += 1
-                continue
-
-            if in_string:
-                i += 1
-                continue
-
-            # Track nesting
-            if char in '([{':
-                depth += 1
-            elif char in ')]}':
-                if depth == 0:
-                    # End of body
-                    return expr[start:i]
-                depth -= 1
-            elif char == '=' and depth == 0:
-                # Check if this is the test separator (= expected)
-                # Look for ' = ' pattern that's not '=='
-                if i + 1 < len(expr) and expr[i + 1] != '=':
-                    if i > 0 and expr[i - 1] not in '!<>':
-                        # This might be the test separator
-                        return expr[start:i].rstrip()
-
-            i += 1
-
-        # Rest of expression is the body
-        return expr[start:]
-
-    def _convert_stdlib_calls(self, expr: str) -> str:
-        """Convert Ralph2 stdlib calls to Darklang syntax."""
-        result = expr
-
-        # Pattern: Module.func(arg1, arg2, ...)
-        # Convert to: Stdlib.Module.func arg1 arg2 ...
-
-        for ralph_mod, dark_mod in self.STDLIB_MODULES.items():
-            # Match Module.function(args) but NOT if already preceded by Stdlib.
-            # Negative lookbehind for 'Stdlib.'
-            pattern = rf'(?<!Stdlib\.)\b{ralph_mod}\.(\w+)\s*\(([^)]*)\)'
-
-            def replace_call(m):
-                func_name = m.group(1)
-                args_str = m.group(2).strip()
-
-                if not args_str:
-                    return f'{dark_mod}.{func_name}'
-
-                # Parse arguments - need to handle nested parens
-                args = self._split_args(args_str)
-                args_converted = ' '.join(args)
-                return f'{dark_mod}.{func_name} {args_converted}'
-
-            result = re.sub(pattern, replace_call, result)
-
-        # Also convert existing Stdlib.Module.func(args) to Stdlib.Module.func args
-        pattern = r'Stdlib\.(\w+)\.(\w+)\s*\(([^)]*)\)'
-
-        def convert_stdlib_parens(m):
-            module = m.group(1)
-            func_name = m.group(2)
-            args_str = m.group(3).strip()
-
-            if not args_str:
-                return f'Stdlib.{module}.{func_name}'
-
-            args = self._split_args(args_str)
-            args_converted = ' '.join(args)
-            return f'Stdlib.{module}.{func_name} {args_converted}'
-
-        result = re.sub(pattern, convert_stdlib_parens, result)
-
-        return result
-
-    def _split_args(self, args_str: str) -> list[str]:
-        """Split function arguments, respecting nested parentheses."""
-        args = []
-        current = []
-        depth = 0
-        in_string = False
-        string_char = None
-
-        for i, char in enumerate(args_str):
-            if char in '"\'`' and (i == 0 or args_str[i-1] != '\\'):
-                if not in_string:
-                    in_string = True
-                    string_char = char
-                elif char == string_char:
-                    in_string = False
-                    string_char = None
-                current.append(char)
-            elif in_string:
-                current.append(char)
-            elif char in '([{':
-                depth += 1
-                current.append(char)
-            elif char in ')]}':
-                depth -= 1
-                current.append(char)
-            elif char == ',' and depth == 0:
-                args.append(''.join(current).strip())
-                current = []
-            else:
-                current.append(char)
-
-        if current:
-            args.append(''.join(current).strip())
-
-        return args
-
-    def _convert_lists(self, expr: str) -> str:
-        """Convert list syntax: [1, 2, 3] -> [1L; 2L; 3L]."""
-        result = expr
-
-        # Find list literals and convert comma to semicolon
-        # This is tricky because we need to handle nested structures
-
-        def convert_list_content(match):
-            content = match.group(1)
-            if not content.strip():
-                return '[]'
-            # Split by comma (respecting nesting) and join with semicolon
-            items = self._split_args(content)
-            return '[' + '; '.join(items) + ']'
-
-        # Simple pattern for list literals
-        # This won't handle deeply nested cases perfectly
-        result = re.sub(r'\[([^\[\]]*)\]', convert_list_content, result)
-
-        return result
-
-    def _convert_int_literals(self, expr: str) -> str:
-        """Add L suffix to integer literals."""
-        result = expr
-
-        # Match integers that don't already have a suffix
-        # Avoid matching:
-        # - Floats (have decimal point)
-        # - Already suffixed (L, l, s, y)
-        # - Part of identifiers
-
-        # Pattern: word boundary, optional minus, digits, word boundary
-        # But not followed by L/l/s/y/. and not preceded by letter
-
-        def add_l_suffix(m):
-            # Check what comes before and after
-            num = m.group(0)
-            return num + 'L'
-
-        # Match standalone integers
-        # Negative lookahead for decimal point or existing suffix
-        # Negative lookbehind for letters, underscore, or decimal point (to avoid matching in identifiers or floats)
-        result = re.sub(
-            r'(?<![\w\.])(-?\d+)(?![\w\.])',
-            add_l_suffix,
-            result
-        )
-
-        return result
-
-    def convert_expected(self, expected: str) -> str:
-        """Convert expected value to Darklang format."""
-        result = expected
-
-        # Convert lists
-        result = self._convert_lists(result)
-
-        # Convert integers in expected values
-        result = self._convert_int_literals(result)
-
-        return result
-
-    def convert_def_to_lambda(self, preamble: str) -> str:
-        """Convert def statements to curried lambda form for file mode.
-
-        Example:
-            def add(a: Int64, b: Int64) : Int64 = a + b
-        Becomes:
-            let add = fun a -> fun b -> a + b
-        """
-        result_lines = []
-
-        # Pattern to match: def name(params) : RetType = body
-        # We need to handle multiple defs
-        def_pattern = re.compile(
-            r'def\s+(\w+)\s*\(([^)]*)\)\s*(?::\s*[\w\[\]<>,\s]+)?\s*=\s*(.+?)(?=\s+def\s|\s*$)',
-            re.DOTALL
-        )
-
-        for match in def_pattern.finditer(preamble):
-            func_name = match.group(1)
-            params_str = match.group(2).strip()
-            body = match.group(3).strip()
-
-            # Parse parameters (name: Type, ...)
-            param_names = []
-            if params_str:
-                for param in params_str.split(','):
-                    param = param.strip()
-                    if ':' in param:
-                        param_name = param.split(':')[0].strip()
-                        param_names.append(param_name)
-                    elif param:
-                        param_names.append(param)
-
-            # Convert body
-            converted_body = self.convert(body)
-
-            # Build curried lambda: fun a -> fun b -> body
-            if param_names:
-                lambda_expr = converted_body
-                for param in reversed(param_names):
-                    lambda_expr = f"fun {param} -> {lambda_expr}"
-                result_lines.append(f"let {func_name} = {lambda_expr}")
-            else:
-                result_lines.append(f"let {func_name} = {converted_body}")
-
-        return '\n'.join(result_lines)
+class CanonicalSource:
+    """Build interpreter programs directly from canonical repository source."""
+
+    def prepare(self, source: str) -> str:
+        return source
 
     def generate_file_code(self, expr: str, preamble: Optional[str] = None) -> str:
-        """Generate complete .dark file code for file-based execution.
-
-        Uses Builtin.debug to output the result, which works for any type.
-
-        Example for expr "let x = 5 in x + 1":
-            let __result = let x = 5L in x + 1L
-            Builtin.debug "" __result
-            0L
-        """
         lines = []
-
-        # Add converted preamble (def -> lambda)
         if preamble:
-            converted_preamble = self.convert_def_to_lambda(preamble)
-            lines.append(converted_preamble)
-
-        # Convert the main expression
-        converted_expr = self.convert(expr)
-
-        # Wrap in result capture and debug output
-        lines.append(f"let __result = {converted_expr}")
+            lines.append(preamble)
+        lines.append(f"let __result = {expr}")
         lines.append('Builtin.debug "" __result')
-        lines.append("0L")
-
-        return '\n'.join(lines)
+        lines.append("0")
+        return "\n".join(lines)
 
 
 class Validator:
     """Validates test cases against the Darklang interpreter."""
 
-    def __init__(self, verbose: bool = False, show_conversions: bool = False, temp_dir: Optional[Path] = None):
-        self.converter = SyntaxConverter()
+    def __init__(self, verbose: bool = False, temp_dir: Optional[Path] = None):
+        self.source = CanonicalSource()
         self.verbose = verbose
-        self.show_conversions = show_conversions
         # Create temp directory for file-based execution
         if temp_dir is None:
             self._temp_dir_obj = tempfile.TemporaryDirectory()
@@ -799,18 +321,17 @@ class Validator:
                 skip_reason=skip_reason
             )
 
-        # Convert syntax and generate file code
+        # Embed canonical syntax directly and generate file code.
         try:
             expr_for_run = self._strip_error_expr(test.expression)
-            file_code = self.converter.generate_file_code(expr_for_run, test.preamble)
-            converted_expected = self.converter.convert_expected(test.expected)
-            # For display purposes, show the converted expression
-            converted_expr = self.converter.convert(expr_for_run)
+            file_code = self.source.generate_file_code(expr_for_run, test.preamble)
+            converted_expected = self.source.prepare(test.expected)
+            converted_expr = self.source.prepare(expr_for_run)
         except Exception as e:
             return ValidationResult(
                 test=test,
                 result=TestResult.ERROR,
-                error_message=f"Conversion error: {e}"
+                error_message=f"Source preparation error: {e}"
             )
 
         expected_error = self._expected_error_message(test.expression, converted_expected)
@@ -916,14 +437,10 @@ class Validator:
     def _should_skip(self, test: TestCase) -> Optional[str]:
         """Check if test should be skipped.
 
-        See docs/compatibility/overview.md for the compatibility ledgers and skip reasons.
+        See docs/compatibility/overview.md for the compatibility boundary and skip reasons.
 
-        Skip reason categories:
-        - Tooling differences: eval:* reasons (error testing, output capture)
-        - Syntactic differences: syntax:* reasons (unsupported syntax in interpreter)
-        - Semantic bugs: semantic:*, eval:float_precision
-        - Missing from interpreter: semantic:bitwise, semantic:boolean_not, stdlib:*
-        - Compiler-only features: extension:*, internal:* reasons
+        Skip reason categories cover tooling limitations, known semantic bugs,
+        missing interpreter stdlib functions, and compiler-internal APIs.
         """
         expr = test.expression
         expected = test.expected
@@ -951,15 +468,6 @@ class Validator:
         # === SEMANTIC BUGS (compiler produces wrong output) ===
         if re.search(r'-?\d+\.\d{3,}', expr):
             return "eval:float_precision"
-        # === MISSING FROM INTERPRETER ===
-        # Features implemented in compiler that should be added to interpreter
-        if ('<<' in expr or '>>' in expr or '^' in expr or '~' in expr or
-            re.search(r'(?<!&)&(?!&)', expr) or
-            re.search(r'(?<!\|)\|(?!\|)', expr)):
-            return "semantic:bitwise"
-        if '!' in expr:
-            return "semantic:boolean_not"
-
         # Stdlib functions missing from interpreter
         missing_stdlib_map = {
             'Random.': 'stdlib:random',              # Random.int64
@@ -997,7 +505,7 @@ class Validator:
         # Custom types/enums (not defined in the test itself)
         allowed_modules = {'Int64', 'Int32', 'Int16', 'Int8', 'UInt64', 'UInt32', 'UInt16', 'UInt8',
                           'Float', 'String', 'List', 'Dict', 'Option', 'Result', 'Bool', 'Char',
-                          'Tuple2', 'Tuple3', 'Math', 'Blob', 'Base64', 'Uuid', 'Stdlib', 'Some', 'None', 'Ok', 'Error'}
+                          'Tuple2', 'Tuple3', 'Math', 'Bytes', 'Base64', 'Uuid', 'Stdlib', 'Some', 'None', 'Ok', 'Error'}
         pascal_matches = re.findall(r'\b([A-Z][a-z]+[A-Za-z]*)\b', expr)
         for pascal_name in pascal_matches:
             if pascal_name not in allowed_modules:
@@ -1124,11 +632,6 @@ def main():
         help='Show all test results'
     )
     parser.add_argument(
-        '--show-conversions', '-c',
-        action='store_true',
-        help='Show syntax conversions'
-    )
-    parser.add_argument(
         '--show-failures', '-f',
         action='store_true',
         help='Show only failures'
@@ -1155,10 +658,7 @@ def main():
 
     # Parse and validate
     e2e_parser = E2EParser()
-    validator = Validator(
-        verbose=args.verbose,
-        show_conversions=args.show_conversions
-    )
+    validator = Validator(verbose=args.verbose)
 
     try:
         all_results: dict[Path, list[ValidationResult]] = {}
@@ -1181,10 +681,6 @@ def main():
                 if args.verbose or (args.show_failures and result.result in (TestResult.FAIL, TestResult.ERROR)):
                     status_str = result.result.value
                     print(f"  Line {test.line_number}: {status_str}")
-
-                    if args.show_conversions and result.converted_expr:
-                        print(f"    Ralph2:   {test.expression}")
-                        print(f"    Darklang: {result.converted_expr}")
 
                     if result.result == TestResult.FAIL:
                         print(f"    Expected: {test.expected}")

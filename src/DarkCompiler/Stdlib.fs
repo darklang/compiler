@@ -7,10 +7,28 @@ module Stdlib
 
 open AST
 
+let private integerBitwiseFunctions (typ: Type) : ModuleFunc list =
+    [ { Name = "bitwiseAnd"; TypeParams = []; ParamTypes = [typ; typ]; ReturnType = typ }
+      { Name = "bitwiseOr"; TypeParams = []; ParamTypes = [typ; typ]; ReturnType = typ }
+      { Name = "bitwiseXor"; TypeParams = []; ParamTypes = [typ; typ]; ReturnType = typ }
+      { Name = "shiftLeft"; TypeParams = []; ParamTypes = [typ; typ]; ReturnType = typ }
+      { Name = "shiftRight"; TypeParams = []; ParamTypes = [typ; typ]; ReturnType = typ }
+      { Name = "bitwiseNot"; TypeParams = []; ParamTypes = [typ]; ReturnType = typ } ]
+
+let private integerBitwiseModule (name: string) (typ: Type) : ModuleDef =
+    { Name = $"Stdlib.{name}"
+      Functions = integerBitwiseFunctions typ }
+
+let boolIntrinsicModule : ModuleDef =
+    { Name = "Stdlib.Bool"
+      Functions =
+        [ { Name = "not"; TypeParams = []; ParamTypes = [TBool]; ReturnType = TBool } ] }
+
 /// Intrinsic Stdlib.Int64 functions
 let int64IntrinsicModule : ModuleDef = {
     Name = "Stdlib.Int64"
-    Functions = [
+    Functions =
+        integerBitwiseFunctions TInt64 @ [
         // toFloat : (Int64) -> Float
         { Name = "toFloat"; TypeParams = []; ParamTypes = [TInt64]; ReturnType = TFloat64 }
     ]
@@ -220,7 +238,15 @@ let rawMemoryIntrinsics : ModuleFunc list = [
 
 /// All intrinsic Stdlib modules
 let allModules : ModuleDef list = [
+    boolIntrinsicModule
+    integerBitwiseModule "Int8" TInt8
+    integerBitwiseModule "Int16" TInt16
+    integerBitwiseModule "Int32" TInt32
     int64IntrinsicModule
+    integerBitwiseModule "UInt8" TUInt8
+    integerBitwiseModule "UInt16" TUInt16
+    integerBitwiseModule "UInt32" TUInt32
+    integerBitwiseModule "UInt64" TUInt64
     floatIntrinsicModule
     cliIntrinsicModule
     fileIntrinsicModule

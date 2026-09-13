@@ -28,7 +28,7 @@ let testTypedDecodingUsesSharedViews
     : TestResult =
     let source =
         "type JsonPlanningPerson = { name: String, scores: List<Int64> }\n"
-        + "Stdlib.Json.parse<JsonPlanningPerson>(\"{\\\"name\\\":\\\"A\\\",\\\"scores\\\":[1,2]}\")"
+        + "Stdlib.Json.parse<JsonPlanningPerson> \"{\\\"name\\\":\\\"A\\\",\\\"scores\\\":[1,2]}\""
 
     plannedSource stdlib source
     |> Result.bind (fun planned ->
@@ -57,7 +57,7 @@ let testTypedEncodingUsesSharedWriter
     : TestResult =
     let source =
         "type JsonPlanningOutput = { name: String, scores: List<Int64> }\n"
-        + "Stdlib.Json.serialize<JsonPlanningOutput>(JsonPlanningOutput { name = \"A\", scores = [1L, 2L] })"
+        + "Stdlib.Json.serialize<JsonPlanningOutput> (JsonPlanningOutput { name = \"A\", scores = [1L, 2L] })"
 
     plannedSource stdlib source
     |> Result.bind (fun planned ->

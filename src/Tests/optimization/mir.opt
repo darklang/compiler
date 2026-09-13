@@ -314,7 +314,7 @@ Function loop:
 const_branch_elimination_bitand
 ---INPUT---
 let pick (n: Int64) : Int64 =
-    let masked = n & 0L in
+    let masked = Stdlib.Int64.bitwiseAnd n 0L in
     if masked == 0L then 1L else 2L
 ---EXPECTED---
 Function pick:

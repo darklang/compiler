@@ -1,12 +1,12 @@
 // runtime-effects.dark - Cross-target evaluation order, zero and huge negatives.
-let printedRuntimeCount() : Int = let _ = Builtin.printLine("count") in 3I
-let printedRuntimeValue() : Int64 = let _ = Builtin.printLine("value") in 7L
+let printedRuntimeCount () : Int = let _ = Builtin.printLine ("count") in 3
+let printedRuntimeValue () : Int64 = let _ = Builtin.printLine ("value") in 7L
 
-let xs = Stdlib.List.repeatUnsafe<Int64>(printedRuntimeCount(), printedRuntimeValue()) in
-let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> let _ = Builtin.printLine("map") in x + 1L) in
-let positive = Stdlib.List.fold<Int64, Int64>(ys, 5L, fun acc x -> let _ = Builtin.printLine("fold") in acc + x) in
-let empty = Stdlib.List.repeatUnsafe<Int64>(0I, printedRuntimeValue()) in
-let zero = Stdlib.List.fold<Int64, Int64>(empty, 5L, fun acc x -> acc + x) in
-let backwards = Stdlib.List.repeatUnsafe<Int64>(-999999999999999999999999999999I, printedRuntimeValue()) in
-let negative = Stdlib.List.fold<Int64, Int64>(backwards, 5L, fun acc x -> acc + x) in
+let xs = Stdlib.List.repeatUnsafe<Int64> (printedRuntimeCount ()) (printedRuntimeValue ()) in
+let ys = Stdlib.List.map<Int64, Int64> (xs) (fun x -> let _ = Builtin.printLine ("map") in x + 1L) in
+let positive = Stdlib.List.fold<Int64, Int64> (ys) (5L) (fun acc x -> let _ = Builtin.printLine ("fold") in acc + x) in
+let empty = Stdlib.List.repeatUnsafe<Int64> (0) (printedRuntimeValue ()) in
+let zero = Stdlib.List.fold<Int64, Int64> (empty) (5L) (fun acc x -> acc + x) in
+let backwards = Stdlib.List.repeatUnsafe<Int64> (-999999999999999999999999999999) (printedRuntimeValue ()) in
+let negative = Stdlib.List.fold<Int64, Int64> (backwards) (5L) (fun acc x -> acc + x) in
 positive + zero + negative

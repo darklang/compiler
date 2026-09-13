@@ -184,7 +184,7 @@ let testCatalogRejectsIllTypedAvailableValue
                 (CompilerLibrary.Available (AST.StringLiteral "not an Error"))
         ]
     let source =
-        "let ignored = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error>(\"branch-main\", \"\", Darklang.LanguageTools.ProgramTypes.Hash.Hash(\"type-error\")) in ()"
+        "let ignored = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error> \"branch-main\" \"\" (Darklang.LanguageTools.ProgramTypes.Hash.Hash \"type-error\") in ()"
     let report = compile stdlib catalog source
     match report.Result with
     | Error error when error.Contains("Package value catalog validation failed") -> Ok ()
@@ -194,9 +194,9 @@ let testCatalogRejectsIllTypedAvailableValue
 let testInt8PackageProbeParity (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
     let source =
         """
-        match Builtin.pmEvaluateValue<Int8>(Darklang.LanguageTools.ProgramTypes.Hash.Hash("darklang-test-values-int8Value")) with
-        | Some(value) -> Builtin.printLine(Stdlib.Bool.toString(Stdlib.Int8.add(value, 5y) == 10y))
-        | None -> Builtin.printLine("false")
+        match Builtin.pmEvaluateValue<Int8> (Darklang.LanguageTools.ProgramTypes.Hash.Hash "darklang-test-values-int8Value") with
+        | Some value -> Builtin.printLine (Stdlib.Bool.toString (Stdlib.Int8.add value 5y == 10y))
+        | None -> Builtin.printLine "false"
         """
     let report = compile stdlib int8ProbeCatalog source
     match report.Result with

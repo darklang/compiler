@@ -82,35 +82,35 @@ def suffix_dark_int64_literals(source: str) -> str:
     return "\n".join(suffix_line(line) for line in source.split("\n"))
 
 COMPACT_LOOKUP_SOURCE = [
-    "let __hexDigit(byte: Int64) : Int64 =",
+    "let __hexDigit (byte: Int64) : Int64 =",
     "    if byte >= 48 && byte <= 57 then byte - 48",
     "    else if byte >= 65 && byte <= 70 then byte - 55",
     '    else Builtin.testRuntimeError("Invalid generated Unicode data")',
     "",
-    "let __hex(data: String, index: Int64, remaining: Int64, acc: Int64) : Int64 =",
+    "let __hex (data: String) (index: Int64) (remaining: Int64) (acc: Int64) : Int64 =",
     "    if remaining == 0 then acc",
-    "    else Unicode.Data.__hex(data, index + 1, remaining - 1, acc * 16 + Unicode.Data.__hexDigit(Stdlib.String.getByteAt(data, index)))",
+    "    else Unicode.Data.__hex (data) (index + 1) (remaining - 1) (acc * 16 + Unicode.Data.__hexDigit (Stdlib.String.getByteAt (data) (index)))",
     "",
-    "let __lookupMappingValueIn(data: String, index: Int64, key: Int64, keyWidth: Int64, recordWidth: Int64, valueIndex: Int64) : Stdlib.Option.Option<Int64> =",
-    "    if index >= Stdlib.String.__byteLength(data) then None",
+    "let __lookupMappingValueIn (data: String) (index: Int64) (key: Int64) (keyWidth: Int64) (recordWidth: Int64) (valueIndex: Int64) : Stdlib.Option.Option<Int64> =",
+    "    if index >= Stdlib.String.__byteLength (data) then None",
     "    else",
-    "        let found = Unicode.Data.__hex(data, index, keyWidth, 0) in",
+    "        let found = Unicode.Data.__hex (data) (index) (keyWidth) (0) in",
     "        if found == key then",
-    "            let length = Unicode.Data.__hex(data, index + keyWidth, 1, 0) in",
-    "            if valueIndex < length then Some(Unicode.Data.__hex(data, index + keyWidth + 1 + valueIndex * 6, 6, 0)) else None",
+    "            let length = Unicode.Data.__hex (data) (index + keyWidth) (1) (0) in",
+    "            if valueIndex < length then Some (Unicode.Data.__hex (data) (index + keyWidth + 1 + valueIndex * 6) (6) (0)) else None",
     "        else if found > key then None",
-    "        else Unicode.Data.__lookupMappingValueIn(data, index + recordWidth, key, keyWidth, recordWidth, valueIndex)",
+    "        else Unicode.Data.__lookupMappingValueIn (data) (index + recordWidth) (key) (keyWidth) (recordWidth) (valueIndex)",
     "",
-    "let __lookupRangeIn(data: String, index: Int64, codepoint: Int64, recordWidth: Int64) : Stdlib.Option.Option<Int64> =",
-    "    if index >= Stdlib.String.__byteLength(data) then None",
+    "let __lookupRangeIn (data: String) (index: Int64) (codepoint: Int64) (recordWidth: Int64) : Stdlib.Option.Option<Int64> =",
+    "    if index >= Stdlib.String.__byteLength (data) then None",
     "    else",
-    "        let start_ = Unicode.Data.__hex(data, index, 6, 0) in",
-    "        let end_ = Unicode.Data.__hex(data, index + 6, 6, 0) in",
+    "        let start_ = Unicode.Data.__hex (data) (index) (6) (0) in",
+    "        let end_ = Unicode.Data.__hex (data) (index + 6) (6) (0) in",
     "        if codepoint < start_ then None",
-    "        else if codepoint <= end_ then Some(Unicode.Data.__hex(data, index + 12, 2, 0))",
-    "        else Unicode.Data.__lookupRangeIn(data, index + recordWidth, codepoint, recordWidth)",
+    "        else if codepoint <= end_ then Some (Unicode.Data.__hex (data) (index + 12) (2) (0))",
+    "        else Unicode.Data.__lookupRangeIn (data) (index + recordWidth) (codepoint) (recordWidth)",
     "",
-    "let __graphemeFromCode(value: Int64) : Unicode.Data.GraphemeBreak =",
+    "let __graphemeFromCode (value: Int64) : Unicode.Data.GraphemeBreak =",
     "    if value == 1 then Unicode.Data.GraphemeBreak.GBCR",
     "    else if value == 2 then Unicode.Data.GraphemeBreak.GBLF",
     "    else if value == 3 then Unicode.Data.GraphemeBreak.GBControl",
@@ -126,13 +126,13 @@ COMPACT_LOOKUP_SOURCE = [
     "    else if value == 13 then Unicode.Data.GraphemeBreak.GBLVT",
     "    else Unicode.Data.GraphemeBreak.GBOther",
     "",
-    "let __indicFromCode(value: Int64) : Unicode.Data.IndicConjunctBreak =",
+    "let __indicFromCode (value: Int64) : Unicode.Data.IndicConjunctBreak =",
     "    if value == 1 then Unicode.Data.IndicConjunctBreak.InCBConsonant",
     "    else if value == 2 then Unicode.Data.IndicConjunctBreak.InCBExtend",
     "    else if value == 3 then Unicode.Data.IndicConjunctBreak.InCBLinker",
     "    else Unicode.Data.IndicConjunctBreak.InCBNone",
     "",
-    "let __categoryFromCode(value: Int64) : Unicode.Data.GeneralCategory =",
+    "let __categoryFromCode (value: Int64) : Unicode.Data.GeneralCategory =",
 ] + [
     f"    {'if' if index == 0 else 'else if'} value == {index} then Unicode.Data.GeneralCategory.{name}"
     for index, name in enumerate(GENERAL_CATEGORIES[:-1])
@@ -301,7 +301,7 @@ def encode_ranges(
 
 
 def emit_string_data(name: str, chunks: list[str]) -> list[str]:
-    result = [f"let __{name}Data() : List<String> =", "    ["]
+    result = [f"let __{name}Data () : List<String> =", "    ["]
     result.extend(
         f'        "{chunk}"{"," if index + 1 < len(chunks) else ""}'
         for index, chunk in enumerate(chunks)
@@ -371,16 +371,16 @@ def generate_compact_data(
         "type IndicConjunctBreak = InCBNone | InCBConsonant | InCBExtend | InCBLinker",
         "type GeneralCategory = " + " | ".join(GENERAL_CATEGORIES),
         "",
-        f'let unicodeVersion() : String = "{UNICODE_VERSION}"',
+        f'let unicodeVersion () : String = "{UNICODE_VERSION}"',
         "",
-        "let sourceHashes() : List<(String, String)> =",
+        "let sourceHashes () : List<(String * String)> =",
         "    [",
     ]
     lines.extend(
         f'        ("{name}", "{sha}"){"," if i + 1 < len(source_hashes) else ""}'
         for i, (name, sha) in enumerate(source_hashes)
     )
-    lines.extend(["    ]", "", "let tableCounts() : List<(String, Int64)> =", "    ["])
+    lines.extend(["    ]", "", "let tableCounts () : List<(String * Int64)> =", "    ["])
     count_items = sorted(counts.items())
     lines.extend(
         f'        ("{name}", {count}){"," if i + 1 < len(count_items) else ""}'
@@ -419,17 +419,17 @@ def generate_compact_data(
             next_shard += 1
             function_name = f"__{name}Chunk{chunk_index}"
             shard_lines[shard_index].extend([
-                f"let {function_name}() : String = \"{chunk}\"",
+                f"let {function_name} () : String = \"{chunk}\"",
                 "",
             ])
             references.append(
-                f"Unicode.Data.Table{shard_index:02d}.{function_name}()"
+                f"Unicode.Data.Table{shard_index:02d}.{function_name} ()"
             )
         table_references[name] = references
     shards = ["\n".join(shard) for shard in shard_lines]
 
     lines.extend([
-        "let contextualCasing() : List<(Int64, List<Int64>, List<Int64>, List<Int64>, String)> =",
+        "let contextualCasing () : List<(Int64 * List<Int64> * List<Int64> * List<Int64> * String)> =",
         "    [",
     ])
     lines.extend(
@@ -443,7 +443,7 @@ def generate_compact_data(
         first, *rest = calls
         result = [
             f"{indent}match {first} with",
-            f"{indent}| Some(value) -> Some(value)",
+            f"{indent}| Some (value) -> Some (value)",
             f"{indent}| None ->",
         ]
         if rest:
@@ -462,7 +462,7 @@ def generate_compact_data(
             group_name = f"__{name}LookupGroup{group_index // 4}"
             group_names.append(group_name)
             lines.extend([
-                f"let {group_name}({parameters}) : Stdlib.Option.Option<Int64> =",
+                f"let {group_name} {parameters} : Stdlib.Option.Option<Int64> =",
                 *emit_option_chain(
                     [call_for_reference(reference) for reference in references[group_index:group_index + 4]],
                     "    ",
@@ -470,9 +470,9 @@ def generate_compact_data(
                 "",
             ])
         lines.extend([
-            f"let __{name}Lookup({parameters}) : Stdlib.Option.Option<Int64> =",
+            f"let __{name}Lookup {parameters} : Stdlib.Option.Option<Int64> =",
             *emit_option_chain(
-                [f"Unicode.Data.{group_name}({arguments})" for group_name in group_names],
+                [f"Unicode.Data.{group_name} {arguments}" for group_name in group_names],
                 "    ",
             ),
             "",
@@ -489,9 +489,9 @@ def generate_compact_data(
             name,
             table_references[name],
             lambda reference, key_width=key_width, record_width=record_width:
-                f"Unicode.Data.__lookupMappingValueIn({reference}, 0, key, {key_width}, {record_width}, valueIndex)",
-            "key: Int64, valueIndex: Int64",
-            "key, valueIndex",
+                f"Unicode.Data.__lookupMappingValueIn ({reference}) (0) (key) ({key_width}) ({record_width}) (valueIndex)",
+            "(key: Int64) (valueIndex: Int64)",
+            "(key) (valueIndex)",
         )
 
     for name in [
@@ -503,24 +503,24 @@ def generate_compact_data(
             name,
             table_references[name],
             lambda reference:
-                f"Unicode.Data.__lookupRangeIn({reference}, 0, codepoint, 14)",
-            "codepoint: Int64",
-            "codepoint",
+                f"Unicode.Data.__lookupRangeIn ({reference}) (0) (codepoint) (14)",
+            "(codepoint: Int64)",
+            "(codepoint)",
         )
 
     lines.extend([
-        "let lookupCanonicalDecompositionAt(codepoint: Int64, index: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__canonicalDecompositionLookup(codepoint, index)",
-        "let lookupCanonicalComposition(key: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__canonicalCompositionLookup(key, 0)",
-        "let lookupCombiningClass(codepoint: Int64) : Int64 = Stdlib.Option.withDefault<Int64>(Unicode.Data.__combiningClassLookup(codepoint), 0)",
-        "let lookupGraphemeBreak(codepoint: Int64) : Unicode.Data.GraphemeBreak = Unicode.Data.__graphemeFromCode(Stdlib.Option.withDefault<Int64>(Unicode.Data.__graphemeBreakLookup(codepoint), 0))",
-        "let isExtendedPictographic(codepoint: Int64) : Bool = Stdlib.Option.isSome<Int64>(Unicode.Data.__extendedPictographicLookup(codepoint))",
-        "let lookupIndicConjunctBreak(codepoint: Int64) : Unicode.Data.IndicConjunctBreak = Unicode.Data.__indicFromCode(Stdlib.Option.withDefault<Int64>(Unicode.Data.__indicConjunctBreakLookup(codepoint), 0))",
-        "let isCased(codepoint: Int64) : Bool = Stdlib.Option.isSome<Int64>(Unicode.Data.__casedLookup(codepoint))",
-        "let isCaseIgnorable(codepoint: Int64) : Bool = Stdlib.Option.isSome<Int64>(Unicode.Data.__caseIgnorableLookup(codepoint))",
-        "let lookupUppercaseAt(codepoint: Int64, index: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__uppercaseLookup(codepoint, index)",
-        "let lookupLowercaseAt(codepoint: Int64, index: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__lowercaseLookup(codepoint, index)",
-        "let lookupGeneralCategory(codepoint: Int64) : Unicode.Data.GeneralCategory = Unicode.Data.__categoryFromCode(Stdlib.Option.withDefault<Int64>(Unicode.Data.__generalCategoryLookup(codepoint), 29))",
-        "let isWhiteSpace(codepoint: Int64) : Bool = Stdlib.Option.isSome<Int64>(Unicode.Data.__whiteSpaceLookup(codepoint))",
+        "let lookupCanonicalDecompositionAt (codepoint: Int64) (index: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__canonicalDecompositionLookup (codepoint) (index)",
+        "let lookupCanonicalComposition (key: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__canonicalCompositionLookup (key) (0)",
+        "let lookupCombiningClass (codepoint: Int64) : Int64 = Stdlib.Option.withDefault<Int64> (Unicode.Data.__combiningClassLookup (codepoint)) (0)",
+        "let lookupGraphemeBreak (codepoint: Int64) : Unicode.Data.GraphemeBreak = Unicode.Data.__graphemeFromCode (Stdlib.Option.withDefault<Int64> (Unicode.Data.__graphemeBreakLookup (codepoint)) (0))",
+        "let isExtendedPictographic (codepoint: Int64) : Bool = Stdlib.Option.isSome<Int64> (Unicode.Data.__extendedPictographicLookup (codepoint))",
+        "let lookupIndicConjunctBreak (codepoint: Int64) : Unicode.Data.IndicConjunctBreak = Unicode.Data.__indicFromCode (Stdlib.Option.withDefault<Int64> (Unicode.Data.__indicConjunctBreakLookup (codepoint)) (0))",
+        "let isCased (codepoint: Int64) : Bool = Stdlib.Option.isSome<Int64> (Unicode.Data.__casedLookup (codepoint))",
+        "let isCaseIgnorable (codepoint: Int64) : Bool = Stdlib.Option.isSome<Int64> (Unicode.Data.__caseIgnorableLookup (codepoint))",
+        "let lookupUppercaseAt (codepoint: Int64) (index: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__uppercaseLookup (codepoint) (index)",
+        "let lookupLowercaseAt (codepoint: Int64) (index: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__lowercaseLookup (codepoint) (index)",
+        "let lookupGeneralCategory (codepoint: Int64) : Unicode.Data.GeneralCategory = Unicode.Data.__categoryFromCode (Stdlib.Option.withDefault<Int64> (Unicode.Data.__generalCategoryLookup (codepoint)) (29))",
+        "let isWhiteSpace (codepoint: Int64) : Bool = Stdlib.Option.isSome<Int64> (Unicode.Data.__whiteSpaceLookup (codepoint))",
         "",
     ])
     declaration_starts = [

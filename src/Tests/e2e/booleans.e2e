@@ -3,7 +3,7 @@
 // Tests covering:
 // - Boolean literals
 // - Integer comparisons
-// - Boolean operations (&&, ||, !)
+// - Boolean operations (&&, ||, Stdlib.Bool.not)
 // - Let bindings with booleans
 
 
@@ -66,11 +66,11 @@ false = false
 
 // OR (||)
 
-// NOT (!)
-!true = false
-!false = true
-!!true = true
-!!false = false
+// NOT (Stdlib.Bool.not)
+Stdlib.Bool.not true = false
+Stdlib.Bool.not false = true
+Stdlib.Bool.not (Stdlib.Bool.not true) = true
+Stdlib.Bool.not (Stdlib.Bool.not false) = false
 
 
 // ===================================================================
@@ -84,10 +84,10 @@ false = false
 1L == 2L || 3L == 4L = false
 
 // Negated comparisons
-!(1L == 1L) = false
-!(1L == 2L) = true
-!(5L < 3L) = true
-!(5L > 3L) = false
+Stdlib.Bool.not (1L == 1L) = false
+Stdlib.Bool.not (1L == 2L) = true
+Stdlib.Bool.not (5L < 3L) = true
+Stdlib.Bool.not (5L > 3L) = false
 
 
 // ===================================================================
@@ -108,8 +108,8 @@ let x = 1L < 2L in let y = 3L > 2L in x && y = true
 // Boolean operations in let values
 let x = true && false in x = false
 let x = true || false in x = true
-let x = !true in x = false
-let x = !(1L == 2L) in x = true
+let x = Stdlib.Bool.not true in x = false
+let x = Stdlib.Bool.not (1L == 2L) in x = true
 
 
 // ===================================================================
@@ -133,5 +133,5 @@ true && (false || true) = true
 (6L / 2L) == 3L = true
 
 // Negation with arithmetic
-!(5L + 5L == 11L) = true
-!(3L * 3L == 9L) = false
+Stdlib.Bool.not (5L + 5L == 11L) = true
+Stdlib.Bool.not (3L * 3L == 9L) = false

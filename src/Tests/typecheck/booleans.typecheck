@@ -15,14 +15,14 @@ false : bool
 // Logical operators
 true && false : bool
 true || false : bool
-!true : bool
-!false : bool
+Stdlib.Bool.not true : bool
+Stdlib.Bool.not false : bool
 
 // Complex boolean expressions
 (1L == 1L) && (2L == 2L) : bool
 (1L < 2L) || (3L > 4L) : bool
-!(5L < 3L) : bool
-!!(true && false) : bool
+Stdlib.Bool.not (5L < 3L) : bool
+Stdlib.Bool.not (Stdlib.Bool.not (true && false)) : bool
 
 // Comparisons with arithmetic
 2L + 3L == 5L : bool

@@ -256,56 +256,56 @@ return 0
 ---NAME---
 const_fold_int_shl
 ---INPUT---
-8L << 3L
+Stdlib.Int64.shiftLeft 8L 3L
 ---EXPECTED---
 return 64
 
 ---NAME---
 const_fold_int_shr
 ---INPUT---
-64L >> 3L
+Stdlib.Int64.shiftRight 64L 3L
 ---EXPECTED---
 return 8
 
 ---NAME---
 const_fold_int_bitand
 ---INPUT---
-6L & 3L
+Stdlib.Int64.bitwiseAnd 6L 3L
 ---EXPECTED---
 return 2
 
 ---NAME---
 const_fold_int_bitor
 ---INPUT---
-4L ||| 3L
+Stdlib.Int64.bitwiseOr 4L 3L
 ---EXPECTED---
 return 7
 
 ---NAME---
 const_fold_int_bitxor
 ---INPUT---
-6L ^ 3L
+Stdlib.Int64.bitwiseXor 6L 3L
 ---EXPECTED---
 return 5
 
 ---NAME---
 const_fold_uint64_bitand
 ---INPUT---
-18446744073709551615UL & 9223372036854775808UL
+Stdlib.UInt64.bitwiseAnd 18446744073709551615UL 9223372036854775808UL
 ---EXPECTED---
 return 9223372036854775808
 
 ---NAME---
 const_fold_uint64_bitor
 ---INPUT---
-9223372036854775808UL ||| 7UL
+Stdlib.UInt64.bitwiseOr 9223372036854775808UL 7UL
 ---EXPECTED---
 return 9223372036854775815
 
 ---NAME---
 const_fold_uint64_bitxor
 ---INPUT---
-18446744073709551615UL ^ 1UL
+Stdlib.UInt64.bitwiseXor 18446744073709551615UL 1UL
 ---EXPECTED---
 return 18446744073709551614
 
@@ -624,14 +624,14 @@ return -3.5
 ---NAME---
 unary_not_true
 ---INPUT---
-if !true then 1L else 2L
+if Stdlib.Bool.not true then 1L else 2L
 ---EXPECTED---
 return 2
 
 ---NAME---
 unary_not_false
 ---INPUT---
-if !false then 1L else 2L
+if Stdlib.Bool.not false then 1L else 2L
 ---EXPECTED---
 return 1
 
@@ -1070,7 +1070,7 @@ return t1
 ---NAME---
 branch_on_single_use_bool_negation
 ---INPUT---
-let f (cond: Bool) : Int64 = if !cond then 1L else 2L
+let f (cond: Bool) : Int64 = if Stdlib.Bool.not cond then 1L else 2L
 f (true)
 ---EXPECTED---
 Function f:
@@ -1087,7 +1087,7 @@ return t2
 branch_on_reused_bool_negation_not_rewritten
 ---INPUT---
 let f (cond: Bool) : Bool =
-  let negated = !cond in
+  let negated = Stdlib.Bool.not cond in
   if negated then negated else false
 f (true)
 ---EXPECTED---
@@ -1105,7 +1105,7 @@ return t3
 ---NAME---
 negated_integer_comparison_uses_complement
 ---INPUT---
-let f (left: Int64) (right: Int64) : Bool = !(left < right)
+let f (left: Int64) (right: Int64) : Bool = Stdlib.Bool.not (left < right)
 f (1L) (2L)
 ---EXPECTED---
 Function f:
@@ -1119,7 +1119,7 @@ return t4
 ---NAME---
 negated_float_comparison_preserves_nan_semantics
 ---INPUT---
-let f (left: Float) (right: Float) : Bool = !(left < right)
+let f (left: Float) (right: Float) : Bool = Stdlib.Bool.not (left < right)
 f (1.0) (2.0)
 ---EXPECTED---
 Function f:
@@ -1160,7 +1160,7 @@ return t2
 ---NAME---
 identity_bitand_self
 ---INPUT---
-let f (x: Int64) : Int64 = x & x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseAnd x x
 f (42L)
 ---EXPECTED---
 Function f:
@@ -1173,7 +1173,7 @@ return t2
 ---NAME---
 identity_bitor_self
 ---INPUT---
-let f (x: Int64) : Int64 = x ||| x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseOr x x
 f (42L)
 ---EXPECTED---
 Function f:
@@ -1186,7 +1186,7 @@ return t2
 ---NAME---
 identity_bitand_absorption
 ---INPUT---
-let f (x: Int64) (y: Int64) : Int64 = x & (x ||| y)
+let f (x: Int64) (y: Int64) : Int64 = Stdlib.Int64.bitwiseAnd x (Stdlib.Int64.bitwiseOr x y)
 ---EXPECTED---
 Function f:
 return t0
@@ -1194,7 +1194,7 @@ return t0
 ---NAME---
 identity_bitor_absorption
 ---INPUT---
-let f (x: Int64) (y: Int64) : Int64 = x ||| (x & y)
+let f (x: Int64) (y: Int64) : Int64 = Stdlib.Int64.bitwiseOr x (Stdlib.Int64.bitwiseAnd x y)
 ---EXPECTED---
 Function f:
 return t0
@@ -1202,7 +1202,7 @@ return t0
 ---NAME---
 identity_bitand_zero_right
 ---INPUT---
-let f (x: Int64) : Int64 = x & 0L
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseAnd x 0L
 ---EXPECTED---
 Function f:
 return 0
@@ -1210,7 +1210,7 @@ return 0
 ---NAME---
 identity_bitand_zero_left
 ---INPUT---
-let f (x: Int64) : Int64 = 0L & x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseAnd 0L x
 ---EXPECTED---
 Function f:
 return 0
@@ -1218,7 +1218,7 @@ return 0
 ---NAME---
 identity_bitor_zero_right
 ---INPUT---
-let f (x: Int64) : Int64 = x ||| 0L
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseOr x 0L
 ---EXPECTED---
 Function f:
 return t0
@@ -1226,7 +1226,7 @@ return t0
 ---NAME---
 identity_bitor_zero_left
 ---INPUT---
-let f (x: Int64) : Int64 = 0L ||| x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseOr 0L x
 ---EXPECTED---
 Function f:
 return t0
@@ -1234,7 +1234,7 @@ return t0
 ---NAME---
 identity_bitxor_zero_right
 ---INPUT---
-let f (x: Int64) : Int64 = x ^ 0L
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseXor x 0L
 ---EXPECTED---
 Function f:
 return t0
@@ -1242,7 +1242,7 @@ return t0
 ---NAME---
 identity_bitxor_zero_left
 ---INPUT---
-let f (x: Int64) : Int64 = 0L ^ x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseXor 0L x
 ---EXPECTED---
 Function f:
 return t0
@@ -1250,7 +1250,7 @@ return t0
 ---NAME---
 identity_uint64_bitand_zero_right
 ---INPUT---
-let f (x: UInt64) : UInt64 = x & 0UL
+let f (x: UInt64) : UInt64 = Stdlib.UInt64.bitwiseAnd x 0UL
 ---EXPECTED---
 Function f:
 return 0
@@ -1258,7 +1258,7 @@ return 0
 ---NAME---
 identity_uint64_bitand_zero_left
 ---INPUT---
-let f (x: UInt64) : UInt64 = 0UL & x
+let f (x: UInt64) : UInt64 = Stdlib.UInt64.bitwiseAnd 0UL x
 ---EXPECTED---
 Function f:
 return 0
@@ -1266,7 +1266,7 @@ return 0
 ---NAME---
 identity_uint64_bitor_zero_right
 ---INPUT---
-let f (x: UInt64) : UInt64 = x ||| 0UL
+let f (x: UInt64) : UInt64 = Stdlib.UInt64.bitwiseOr x 0UL
 ---EXPECTED---
 Function f:
 return t0
@@ -1274,7 +1274,7 @@ return t0
 ---NAME---
 identity_uint64_bitor_zero_left
 ---INPUT---
-let f (x: UInt64) : UInt64 = 0UL ||| x
+let f (x: UInt64) : UInt64 = Stdlib.UInt64.bitwiseOr 0UL x
 ---EXPECTED---
 Function f:
 return t0
@@ -1282,7 +1282,7 @@ return t0
 ---NAME---
 identity_uint64_bitxor_zero_right
 ---INPUT---
-let f (x: UInt64) : UInt64 = x ^ 0UL
+let f (x: UInt64) : UInt64 = Stdlib.UInt64.bitwiseXor x 0UL
 ---EXPECTED---
 Function f:
 return t0
@@ -1290,7 +1290,7 @@ return t0
 ---NAME---
 identity_uint64_bitxor_zero_left
 ---INPUT---
-let f (x: UInt64) : UInt64 = 0UL ^ x
+let f (x: UInt64) : UInt64 = Stdlib.UInt64.bitwiseXor 0UL x
 ---EXPECTED---
 Function f:
 return t0
@@ -1298,7 +1298,7 @@ return t0
 ---NAME---
 preserve_uint64_bitand_nonzero
 ---INPUT---
-let f (x: UInt64) : UInt64 = x & 1UL
+let f (x: UInt64) : UInt64 = Stdlib.UInt64.bitwiseAnd x 1UL
 ---EXPECTED---
 Function f:
 let TempId 1 = t0 & 1
@@ -1307,7 +1307,7 @@ return t1
 ---NAME---
 preserve_uint64_bitor_nonzero
 ---INPUT---
-let f (x: UInt64) : UInt64 = x ||| 1UL
+let f (x: UInt64) : UInt64 = Stdlib.UInt64.bitwiseOr x 1UL
 ---EXPECTED---
 Function f:
 let TempId 1 = t0 | 1
@@ -1316,7 +1316,7 @@ return t1
 ---NAME---
 preserve_uint64_bitxor_nonzero
 ---INPUT---
-let f (x: UInt64) : UInt64 = x ^ 1UL
+let f (x: UInt64) : UInt64 = Stdlib.UInt64.bitwiseXor x 1UL
 ---EXPECTED---
 Function f:
 let TempId 1 = t0 ^ 1
@@ -1325,7 +1325,7 @@ return t1
 ---NAME---
 identity_bitxor_self
 ---INPUT---
-let f (x: Int64) : Int64 = x ^ x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseXor x x
 ---EXPECTED---
 Function f:
 return 0
@@ -1449,7 +1449,7 @@ return t0
 ---NAME---
 identity_bool_double_not
 ---INPUT---
-let f (x: Bool) : Bool = !!x
+let f (x: Bool) : Bool = Stdlib.Bool.not (Stdlib.Bool.not x)
 ---EXPECTED---
 Function f:
 return t0
@@ -1457,7 +1457,7 @@ return t0
 ---NAME---
 identity_bool_and_complement_right
 ---INPUT---
-let f (x: Bool) : Bool = x && !x
+let f (x: Bool) : Bool = x && Stdlib.Bool.not x
 ---EXPECTED---
 Function f:
 return false
@@ -1465,7 +1465,7 @@ return false
 ---NAME---
 identity_bool_or_complement_right
 ---INPUT---
-let f (x: Bool) : Bool = x || !x
+let f (x: Bool) : Bool = x || Stdlib.Bool.not x
 ---EXPECTED---
 Function f:
 return true
@@ -1497,7 +1497,7 @@ return true
 ---NAME---
 identity_bitwise_double_not
 ---INPUT---
-let f (x: Int64) : Int64 = ~~~(~~~x)
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseNot (Stdlib.Int64.bitwiseNot x)
 ---EXPECTED---
 Function f:
 return t0
@@ -1505,7 +1505,7 @@ return t0
 ---NAME---
 bitwise_complement_and_right
 ---INPUT---
-let f (x: Int64) : Int64 = x & ~~~x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseAnd x (Stdlib.Int64.bitwiseNot x)
 ---EXPECTED---
 Function f:
 return 0
@@ -1513,7 +1513,7 @@ return 0
 ---NAME---
 bitwise_complement_and_left
 ---INPUT---
-let f (x: Int64) : Int64 = ~~~x & x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseNot x) x
 ---EXPECTED---
 Function f:
 return 0
@@ -1521,7 +1521,7 @@ return 0
 ---NAME---
 bitwise_complement_or_right
 ---INPUT---
-let f (x: Int64) : Int64 = x ||| ~~~x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseOr x (Stdlib.Int64.bitwiseNot x)
 ---EXPECTED---
 Function f:
 return -1
@@ -1529,7 +1529,7 @@ return -1
 ---NAME---
 bitwise_complement_or_left
 ---INPUT---
-let f (x: Int64) : Int64 = ~~~x ||| x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseNot x) x
 ---EXPECTED---
 Function f:
 return -1
@@ -1537,7 +1537,7 @@ return -1
 ---NAME---
 bitwise_complement_xor_right
 ---INPUT---
-let f (x: Int64) : Int64 = x ^ ~~~x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseXor x (Stdlib.Int64.bitwiseNot x)
 ---EXPECTED---
 Function f:
 return -1
@@ -1545,7 +1545,7 @@ return -1
 ---NAME---
 bitwise_complement_xor_left
 ---INPUT---
-let f (x: Int64) : Int64 = ~~~x ^ x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseNot x) x
 ---EXPECTED---
 Function f:
 return -1
@@ -1554,8 +1554,8 @@ return -1
 bitwise_complement_preserves_reused_not
 ---INPUT---
 let f (x: Int64) : (Int64 * Int64) =
-  let complemented = ~~~x in
-  (x & complemented, complemented)
+  let complemented = Stdlib.Int64.bitwiseNot x in
+  (Stdlib.Int64.bitwiseAnd x complemented, complemented)
 ---EXPECTED---
 Function f:
 let TempId 1 = ~~~t0
@@ -1612,7 +1612,7 @@ return t5
 ---NAME---
 identity_bitand_all_ones_right
 ---INPUT---
-let f (x: Int64) : Int64 = x & -1L
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseAnd x -1L
 ---EXPECTED---
 Function f:
 return t0
@@ -1620,7 +1620,7 @@ return t0
 ---NAME---
 identity_bitand_all_ones_left
 ---INPUT---
-let f (x: Int64) : Int64 = -1L & x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseAnd -1L x
 ---EXPECTED---
 Function f:
 return t0
@@ -1628,7 +1628,7 @@ return t0
 ---NAME---
 identity_bitor_all_ones_right
 ---INPUT---
-let f (x: Int64) : Int64 = x ||| -1L
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseOr x -1L
 ---EXPECTED---
 Function f:
 return -1
@@ -1636,7 +1636,7 @@ return -1
 ---NAME---
 identity_bitor_all_ones_left
 ---INPUT---
-let f (x: Int64) : Int64 = -1L ||| x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseOr -1L x
 ---EXPECTED---
 Function f:
 return -1
@@ -1644,7 +1644,7 @@ return -1
 ---NAME---
 identity_bitxor_all_ones_right
 ---INPUT---
-let f (x: Int64) : Int64 = x ^ -1L
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseXor x -1L
 ---EXPECTED---
 Function f:
 let TempId 1 = ~~~t0
@@ -1653,7 +1653,7 @@ return t1
 ---NAME---
 identity_bitxor_all_ones_left
 ---INPUT---
-let f (x: Int64) : Int64 = -1L ^ x
+let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseXor -1L x
 ---EXPECTED---
 Function f:
 let TempId 1 = ~~~t0
@@ -1662,7 +1662,7 @@ return t1
 ---NAME---
 identity_shl_zero
 ---INPUT---
-let f (x: Int64) : Int64 = x << 0L
+let f (x: Int64) : Int64 = Stdlib.Int64.shiftLeft x 0L
 ---EXPECTED---
 Function f:
 return t0
@@ -1670,7 +1670,7 @@ return t0
 ---NAME---
 identity_shr_zero
 ---INPUT---
-let f (x: Int64) : Int64 = x >> 0L
+let f (x: Int64) : Int64 = Stdlib.Int64.shiftRight x 0L
 ---EXPECTED---
 Function f:
 return t0
@@ -1678,7 +1678,7 @@ return t0
 ---NAME---
 identity_shl_zero_left
 ---INPUT---
-let f (x: Int64) : Int64 = 0L << x
+let f (x: Int64) : Int64 = Stdlib.Int64.shiftLeft 0L x
 ---EXPECTED---
 Function f:
 return 0
@@ -1686,7 +1686,7 @@ return 0
 ---NAME---
 identity_shr_zero_left
 ---INPUT---
-let f (x: Int64) : Int64 = 0L >> x
+let f (x: Int64) : Int64 = Stdlib.Int64.shiftRight 0L x
 ---EXPECTED---
 Function f:
 return 0

@@ -81,7 +81,7 @@ let __quantifier (chars: List<Char>) : Stdlib.Result.Result<(Stdlib.Regex.Quanti
              let minimum = Stdlib.Tuple3.first<Int64, Bool, List<Char>> (first) in
              let sawMinimum = Stdlib.Tuple3.second<Int64, Bool, List<Char>> (first) in
              let afterMinimum = Stdlib.Tuple3.third<Int64, Bool, List<Char>> (first) in
-             if !sawMinimum then Error ("missing repetition count")
+             if Stdlib.Bool.not sawMinimum then Error ("missing repetition count")
              else
                  match afterMinimum with
                  | [] -> Error ("invalid repetition")
@@ -215,7 +215,7 @@ let __classAny (chars: List<Char>) (value: Char) : Bool =
 let __classMatches (content: String) (value: Char) : Bool =
     match Stdlib.String.toList (content) with
     | [] -> false
-    | first :: rest -> if first == '^' then !Stdlib.Regex.__classAny (rest) (value) else Stdlib.Regex.__classAny (Stdlib.List.push<Char> (rest) (first)) (value)
+    | first :: rest -> if first == '^' then Stdlib.Bool.not (Stdlib.Regex.__classAny (rest) (value)) else Stdlib.Regex.__classAny (Stdlib.List.push<Char> (rest) (first)) (value)
 
 let __consume (atom: Stdlib.Regex.Atom) (input: List<Char>) : List<Stdlib.Regex.Candidate> =
     match input with

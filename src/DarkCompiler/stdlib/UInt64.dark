@@ -46,19 +46,6 @@ let lessThan (a: UInt64) (b: UInt64) : Bool = a < b
 
 let lessThanOrEqualTo (a: UInt64) (b: UInt64) : Bool = a <= b
 
-// Bitwise operations
-let bitwiseAnd (a: UInt64) (b: UInt64) : UInt64 = a & b
-
-let bitwiseOr (a: UInt64) (b: UInt64) : UInt64 = a ||| b
-
-let bitwiseXor (a: UInt64) (b: UInt64) : UInt64 = (a ||| b) & ~~~(a & b)
-
-let shiftLeft (a: UInt64) (shift: UInt64) : UInt64 = a << shift
-
-let shiftRight (a: UInt64) (shift: UInt64) : UInt64 = a >> shift
-
-let bitwiseNot (a: UInt64) : UInt64 = ~~~a
-
 // Count number of set bits (population count)
 // Uses parallel bit counting algorithm (SWAR)
 let __popcount (x: UInt64) : UInt64 =
@@ -66,10 +53,10 @@ let __popcount (x: UInt64) : UInt64 =
     let mask2 = 3689348814741910323UL in
     let mask3 = 1085102592571150095UL in
     let mult = 72340172838076673UL in
-    let x = x - ((x >> 1UL) & mask1) in
-    let x = (x & mask2) + ((x >> 2UL) & mask2) in
-    let x = (x + (x >> 4UL)) & mask3 in
-    (x * mult) >> 56UL
+    let x = x - Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight x 1UL) mask1 in
+    let x = Stdlib.UInt64.bitwiseAnd x mask2 + Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight x 2UL) mask2 in
+    let x = Stdlib.UInt64.bitwiseAnd (x + Stdlib.UInt64.shiftRight x 4UL) mask3 in
+    Stdlib.UInt64.shiftRight (x * mult) 56UL
 
 // Convert a single digit (0UL-9UL) to its string representation
 let __digitToString (n: UInt64) : String =
@@ -88,8 +75,8 @@ let __digitToString (n: UInt64) : String =
 
 // Convert an integer to its string representation
 let toString (n: UInt64) : String =
-    if (n >> 63UL) == 1UL then
-        let quotient = (n >> 1UL) / 5UL in
+    if Stdlib.UInt64.shiftRight n 63UL == 1UL then
+        let quotient = Stdlib.UInt64.shiftRight n 1UL / 5UL in
         let remainder = n - (quotient * 10UL) in
         // Decimal fragments are ASCII and therefore already closed under NFC.
         __string_concat_raw (Stdlib.UInt64.toString (quotient)) (Stdlib.UInt64.__digitToString (remainder))

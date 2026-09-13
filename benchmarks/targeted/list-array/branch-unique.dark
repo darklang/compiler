@@ -1,10 +1,10 @@
 // branch-unique.dark - Mutually exclusive final uses share one runtime buffer.
-let pipeline(count: Int, flag: Bool) : Int64 =
-    let xs = Stdlib.List.repeatUnsafe<Int64>(count, 7L) in
+let pipeline (count: Int) (flag: Bool) : Int64 =
+    let xs = Stdlib.List.repeatUnsafe<Int64> (count) (7L) in
     if flag then
-        Stdlib.List.fold<Int64, Int64>(Stdlib.List.map<Int64, Int64>(xs, fun x -> x + 1L), 0L, fun acc x -> acc + x)
+        Stdlib.List.fold<Int64, Int64> (Stdlib.List.map<Int64, Int64> (xs) (fun x -> x + 1L)) (0L) (fun acc x -> acc + x)
     else
-        Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>(xs), 0L, fun acc x -> acc + x)
-let run(n: Int64, acc: Int64) : Int64 =
-    if n == 0L then acc else run(n - 1L, acc + pipeline(128I, n % 2L == 0L))
-run(1000L, 0L)
+        Stdlib.List.fold<Int64, Int64> (Stdlib.List.reverse<Int64> (xs)) (0L) (fun acc x -> acc + x)
+let run (n: Int64) (acc: Int64) : Int64 =
+    if n == 0L then acc else run (n - 1L) (acc + pipeline (128) (n % 2L == 0L))
+run (1000L) (0L)

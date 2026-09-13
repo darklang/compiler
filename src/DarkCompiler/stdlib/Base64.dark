@@ -45,10 +45,10 @@ let __decodeChar (c: Int64) : Int64 =
 
 // Encode 3 bytes to 4 base64 characters
 let __encode3Bytes (b0: Int64) (b1: Int64) (b2: Int64) (urlSafe: Bool) : String =
-    let c0 = (b0 >> 2L) & 63L in
-    let c1 = ((b0 & 3L) << 4L) ^ ((b1 >> 4L) & 15L) in
-    let c2 = ((b1 & 15L) << 2L) ^ ((b2 >> 6L) & 3L) in
-    let c3 = b2 & 63L in
+    let c0 = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight b0 2L) 63L in
+    let c1 = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b0 3L) 4L) (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight b1 4L) 15L) in
+    let c2 = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b1 15L) 2L) (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight b2 6L) 3L) in
+    let c3 = Stdlib.Int64.bitwiseAnd b2 63L in
     if urlSafe then
         Stdlib.Base64.__encodeCharUrl (c0) ++
         Stdlib.Base64.__encodeCharUrl (c1) ++
@@ -62,9 +62,9 @@ let __encode3Bytes (b0: Int64) (b1: Int64) (b2: Int64) (urlSafe: Bool) : String 
 
 // Encode 2 bytes to 3 base64 characters + 1 padding
 let __encode2Bytes (b0: Int64) (b1: Int64) (urlSafe: Bool) : String =
-    let c0 = (b0 >> 2L) & 63L in
-    let c1 = ((b0 & 3L) << 4L) ^ ((b1 >> 4L) & 15L) in
-    let c2 = (b1 & 15L) << 2L in
+    let c0 = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight b0 2L) 63L in
+    let c1 = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b0 3L) 4L) (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight b1 4L) 15L) in
+    let c2 = Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b1 15L) 2L in
     if urlSafe then
         Stdlib.Base64.__encodeCharUrl (c0) ++
         Stdlib.Base64.__encodeCharUrl (c1) ++
@@ -76,8 +76,8 @@ let __encode2Bytes (b0: Int64) (b1: Int64) (urlSafe: Bool) : String =
 
 // Encode 1 byte to 2 base64 characters + 2 padding
 let __encode1Byte (b0: Int64) (urlSafe: Bool) : String =
-    let c0 = (b0 >> 2L) & 63L in
-    let c1 = (b0 & 3L) << 4L in
+    let c0 = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight b0 2L) 63L in
+    let c1 = Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b0 3L) 4L in
     if urlSafe then
         Stdlib.Base64.__encodeCharUrl (c0) ++
         Stdlib.Base64.__encodeCharUrl (c1) ++ "=="
@@ -125,18 +125,18 @@ let __decode4Chars (c0: Int64) (c1: Int64) (c2: Int64) (c3: Int64) : (List<Int64
         ([], true)
     else if v2 == -2L then
         // Two padding chars - 1 output byte
-        let b0 = ((v0 << 2L) ^ (v1 >> 4L)) & 255L in
+        let b0 = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft v0 2L) (Stdlib.Int64.shiftRight v1 4L)) 255L in
         ([b0], false)
     else if v3 == -2L then
         // One padding char - 2 output bytes
-        let b0 = ((v0 << 2L) ^ (v1 >> 4L)) & 255L in
-        let b1 = ((v1 << 4L) ^ (v2 >> 2L)) & 255L in
+        let b0 = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft v0 2L) (Stdlib.Int64.shiftRight v1 4L)) 255L in
+        let b1 = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft v1 4L) (Stdlib.Int64.shiftRight v2 2L)) 255L in
         ([b0, b1], false)
     else
         // No padding - 3 output bytes
-        let b0 = ((v0 << 2L) ^ (v1 >> 4L)) & 255L in
-        let b1 = ((v1 << 4L) ^ (v2 >> 2L)) & 255L in
-        let b2 = ((v2 << 6L) ^ v3) & 255L in
+        let b0 = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft v0 2L) (Stdlib.Int64.shiftRight v1 4L)) 255L in
+        let b1 = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft v1 4L) (Stdlib.Int64.shiftRight v2 2L)) 255L in
+        let b2 = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft v2 6L) v3) 255L in
         ([b0, b1, b2], false)
 
 // Decode base64 helper

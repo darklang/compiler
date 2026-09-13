@@ -75,24 +75,24 @@ value types are rejected statically.
 public callable surface is:
 
 ```dark
-isEmpty(dict: Dict<a>) : Bool
-singleton(key: String, value: a) : Dict<a>
-size(dict: Dict<a>) : Int
-get(dict: Dict<a>, key: String) : Option<a>
-set(dict: Dict<a>, key: String, value: a) : Dict<a>
-setOverridingDuplicates(dict: Dict<a>, key: String, value: a) : Dict<a>
-remove(dict: Dict<a>, key: String) : Dict<a>
-merge(left: Dict<a>, right: Dict<a>) : Dict<a>
-keys(dict: Dict<a>) : List<String>
-values(dict: Dict<a>) : List<a>
-toList(dict: Dict<a>) : List<(String, a)>
-fromListOverwritingDuplicates(entries: List<(String, a)>) : Dict<a>
-fromList(entries: List<(String, a)>) : Option<Dict<a>>
-member(dict: Dict<a>, key: String) : Bool
-map(dict: Dict<a>, fn: String -> a -> b) : Dict<b>
-iter(dict: Dict<a>, fn: String -> a -> Unit) : Unit
-filter(dict: Dict<a>, fn: String -> a -> Bool) : Dict<a>
-filterMap(dict: Dict<a>, fn: String -> a -> Option<b>) : Dict<b>
+let isEmpty (dict: Dict<a>) : Bool
+let singleton (key: String) (value: a) : Dict<a>
+let size (dict: Dict<a>) : Int
+let get (dict: Dict<a>) (key: String) : Option<a>
+let set (dict: Dict<a>) (key: String) (value: a) : Dict<a>
+let setOverridingDuplicates (dict: Dict<a>) (key: String) (value: a) : Dict<a>
+let remove (dict: Dict<a>) (key: String) : Dict<a>
+let merge (left: Dict<a>) (right: Dict<a>) : Dict<a>
+let keys (dict: Dict<a>) : List<String>
+let values (dict: Dict<a>) : List<a>
+let toList (dict: Dict<a>) : List<(String * a)>
+let fromListOverwritingDuplicates (entries: List<(String * a)>) : Dict<a>
+let fromList (entries: List<(String * a)>) : Option<Dict<a>>
+let member (dict: Dict<a>) (key: String) : Bool
+let map (dict: Dict<a>) (fn: String -> a -> b) : Dict<b>
+let iter (dict: Dict<a>) (fn: String -> a -> Unit) : Unit
+let filter (dict: Dict<a>) (fn: String -> a -> Bool) : Dict<a>
+let filterMap (dict: Dict<a>) (fn: String -> a -> Option<b>) : Dict<b>
 ```
 
 The former compiler-only public names `entries`, `fold`, and `getOrDefault`

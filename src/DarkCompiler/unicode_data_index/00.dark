@@ -76,17 +76,19 @@ let __casedLookupGroup0 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
         | None ->
             None
 
-let __indicFromCode (value: Int64) : Unicode.Data.IndicConjunctBreak =
-    if value == 1L then Unicode.Data.IndicConjunctBreak.InCBConsonant
-    else if value == 2L then Unicode.Data.IndicConjunctBreak.InCBExtend
-    else if value == 3L then Unicode.Data.IndicConjunctBreak.InCBLinker
-    else Unicode.Data.IndicConjunctBreak.InCBNone
+let __canonicalCompositionLookup (key: Int64) (valueIndex: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__canonicalCompositionLookupGroup0 (key) (valueIndex) with
+    | Some (value) -> Some (value)
+    | None ->
+        match Unicode.Data.__canonicalCompositionLookupGroup1 (key) (valueIndex) with
+        | Some (value) -> Some (value)
+        | None ->
+            None
 
-let __caseIgnorableLookup (codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Unicode.Data.__caseIgnorableLookupGroup0 (codepoint) with
+let __casedLookup (codepoint: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__casedLookupGroup0 (codepoint) with
     | Some (value) -> Some (value)
     | None ->
         None
 
-type GraphemeBreak = GBOther | GBCR | GBLF | GBControl | GBExtend | GBZWJ | GBRegionalIndicator | GBPrepend | GBSpacingMark | GBL | GBV | GBT | GBLV | GBLVT
-let unicodeVersion () : String = "17.0.0"
+let lookupCanonicalComposition (key: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__canonicalCompositionLookup (key) (0L)

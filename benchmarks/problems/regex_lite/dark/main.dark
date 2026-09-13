@@ -76,7 +76,7 @@ let advancePositions (positions: List<Int64>) (piece: Piece) (text: String) (len
 
 let matchesSequence (pieces: List<Piece>) (positions: List<Int64>) (text: String) (length: Int64) : Bool =
     match pieces with
-    | [] -> !Stdlib.List.isEmpty<Int64> (positions)
+    | [] -> Stdlib.Bool.not (Stdlib.List.isEmpty<Int64> (positions))
     | piece :: rest ->
         let next = advancePositions (positions) (piece) (text) (length) ([]) in
         if Stdlib.List.isEmpty<Int64> (next) then false

@@ -594,12 +594,12 @@ module TokenizeExpression =
 
   // // CLEANUP: fix this, the range is correct, but the order isn't for typeArgs
   // ("Builtin.jsonParse<Bool> \"true\"" |> tokenize) =
-  //   [ (TokenType.ModuleName, (0I, 0I), (0I, 7I))
-  //     (TokenType.FunctionName, (0I, 8I), (0I, 17I))
-  //     (TokenType.TypeName, (0I, 18I), (0I, 22I))
-  //     (TokenType.Symbol, (0I, 24I), (0I, 25I))
-  //     (TokenType.String, (0I, 25I), (0I, 29I))
-  //     (TokenType.Symbol, (0I, 29I), (0I, 30I)) ]
+  //   [ (TokenType.ModuleName, (0, 0), (0, 7))
+  //     (TokenType.FunctionName, (0, 8), (0, 17))
+  //     (TokenType.TypeName, (0, 18), (0, 22))
+  //     (TokenType.Symbol, (0, 24), (0, 25))
+  //     (TokenType.String, (0, 25), (0, 29))
+  //     (TokenType.Symbol, (0, 29), (0, 30)) ]
 
   ("if true then true else false" |> tokenize) =
     [ (TokenType.Keyword, (0, 0), (0, 2))

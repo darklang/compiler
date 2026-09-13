@@ -137,8 +137,8 @@ let nestedFloatLets (n: Int64) : Float = let a = Stdlib.Int64.toFloat (n) in let
 
 // Successive immutable record updates may reuse a uniquely owned Float record.
 type EscapeAnalysisFloatPoint = { x: Float, y: Float }
-let updateEscapeAnalysisFloatPoint() : Float = let p0 = EscapeAnalysisFloatPoint { x = 1.0, y = 2.0 } in let p1 = { p0 with x = 3.0 } in let alias = p1 in let p2 = { alias with x = 4.0 } in p2.x + p2.y
-updateEscapeAnalysisFloatPoint() = 6.0
+let updateEscapeAnalysisFloatPoint () : Float = let p0 = EscapeAnalysisFloatPoint { x = 1.0, y = 2.0 } in let p1 = { p0 with x = 3.0 } in let alias = p1 in let p2 = { alias with x = 4.0 } in p2.x + p2.y
+updateEscapeAnalysisFloatPoint () = 6.0
 
 // Float returned from deeply nested computation
 let deepNestedFloat (x: Int64) : Float = let f1 = Stdlib.Int64.toFloat (x) in let f2 = f1 + f1 in let f3 = f2 * f2 in let f4 = f3 / 2.0 in f4; deepNestedFloat (3L) = 18.0

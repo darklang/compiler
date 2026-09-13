@@ -249,7 +249,7 @@ Add to the appropriate module file under `src/DarkCompiler/stdlib/`, such as
 ```dark
 module Stdlib.Int64
 
-let abs(n: Int64) : Int64 =
+let abs (n: Int64) : Int64 =
     if n < 0 then 0 - n else n
 ```
 

@@ -1,14 +1,14 @@
 // runtime-shared.dark - Runtime-sized copies must preserve retained old versions.
-let pipeline(count: Int) : Int64 =
-    let xs = Stdlib.List.repeatUnsafe<Int64>(count, 2L) in
+let pipeline (count: Int) : Int64 =
+    let xs = Stdlib.List.repeatUnsafe<Int64> (count) (2L) in
     let alias = xs in
-    let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + 3L) in
-    let old = Stdlib.List.fold<Int64, Int64>(alias, 0L, fun acc x -> acc + x) in
-    let fresh = Stdlib.List.fold<Int64, Int64>(Stdlib.List.reverse<Int64>(ys), 0L, fun acc x -> acc + x) in
+    let ys = Stdlib.List.map<Int64, Int64> (xs) (fun x -> x + 3L) in
+    let old = Stdlib.List.fold<Int64, Int64> (alias) (0L) (fun acc x -> acc + x) in
+    let fresh = Stdlib.List.fold<Int64, Int64> (Stdlib.List.reverse<Int64> (ys)) (0L) (fun acc x -> acc + x) in
     old * 10L + fresh
 
-let loop(n: Int64, acc: Int64) : Int64 =
+let loop (n: Int64) (acc: Int64) : Int64 =
     if n == 0L then acc
-    else loop(n - 1L, acc + pipeline(Stdlib.Int.fromInt64(256L + n % 2L)))
+    else loop (n - 1L) (acc + pipeline (Stdlib.Int.fromInt64 (256L + n % 2L)))
 
-loop(1000L, 0L)
+loop (1000L) (0L)

@@ -2870,7 +2870,31 @@ let rec private checkExprWithParamNamesAndSumTypeNames
                                 | Some TBool | None -> Ok (TBool, BinOp (op, left', right'))
                                 | Some other -> Error (TypeMismatch (other, TBool, $"result of {opName}"))))
 
-        // Bitwise operators: Int -> Int -> Int (same integer type)
+        // Exponentiation is defined by the canonical numeric modules. The
+        // 128-bit modules intentionally have no power operation.
+        | Pow ->
+            let supportsPower (typ: Type) =
+                match typ with
+                | TInt | TInt8 | TInt16 | TInt32 | TInt64
+                | TUInt8 | TUInt16 | TUInt32 | TUInt64 | TFloat64 -> true
+                | _ -> false
+
+            checkExpr left env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg None
+            |> Result.bind (fun (leftType, left') ->
+                if not (supportsPower leftType) then
+                    Error (InvalidOperation ("^", [leftType]))
+                else
+                    checkExpr right env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg (Some leftType)
+                    |> Result.bind (fun (rightType, right') ->
+                        if rightType <> leftType then
+                            Error (TypeMismatch (leftType, rightType, "right operand of ^"))
+                        else
+                            match expectedType with
+                            | Some expected when expected <> leftType ->
+                                Error (TypeMismatch (expected, leftType, "result of ^"))
+                            | _ -> Ok (leftType, BinOp (Pow, left', right'))))
+
+        // Internal bitwise operators: Int -> Int -> Int (same integer type).
         | Shl | Shr | BitAnd | BitOr | BitXor ->
             let opName =
                 match op with
@@ -5719,7 +5743,7 @@ let rec private checkExprWithParamNamesAndSumTypeNames
                 expected |> Option.map (fun typ -> addConstraint name typ constraints) |> Option.defaultValue constraints
             | BinOp (op, left, right) ->
                 match op with
-                | Add | Sub | Mul | Div | Mod | Shl | Shr | BitAnd | BitOr | BitXor ->
+                | Add | Sub | Mul | Div | Mod | Pow | Shl | Shr | BitAnd | BitOr | BitXor ->
                     let operandType =
                         expected
                         |> Option.filter (containsTVar >> not)

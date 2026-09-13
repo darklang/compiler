@@ -357,7 +357,7 @@ let __parseParts (value: String) (hasMilliseconds: Bool) : Stdlib.Result.Result<
                                     afterSecond == 19L &&
                                     ((hasMilliseconds && Stdlib.DateTime.__hasByte (value) (19L) (46L) &&
                                       afterMillisecond == 23L && Stdlib.DateTime.__hasByte (value) (23L) (90L)) ||
-                                     ((!hasMilliseconds) && Stdlib.DateTime.__hasByte (value) (19L) (90L))) in
+                                     ((Stdlib.Bool.not hasMilliseconds) && Stdlib.DateTime.__hasByte (value) (19L) (90L))) in
                                 let fieldsAreValid =
                                     year >= 1L && year <= 9999L &&
                                     month >= 1L && month <= 12L &&

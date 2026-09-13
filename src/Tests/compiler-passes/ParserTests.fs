@@ -20,15 +20,15 @@ let private testLongNumericTokenStreamIsStackSafe () : TestResult =
 
 let private testTupleLetDoesNotOpenNestedFunctionLayout () : TestResult =
     let source =
-        """let pairsToStrings(pairs: List<(String, String)>) : List<String> =
-    Stdlib.List.map<(String, String), String>(pairs, fun pair -> let (key, value) = pair in key ++ value)
-let identity(value: String) : String = value"""
+        """let pairsToStrings (pairs: List<(String * String)>) : List<String> =
+    Stdlib.List.map<(String * String), String> pairs (fun pair -> let (key, value) = pair in key ++ value)
+let identity (value: String) : String = value"""
     match Parser.parseString false source with
     | Ok _ -> Ok ()
     | Error err -> Error err
 
-let private testParenthesizedCallKeepsMultipleArguments () : TestResult =
-    let source = "let recurse(a: Int8, b: Int8) : Int8 = recurse(a, b)"
+let private testSpaceApplicationKeepsMultipleArguments () : TestResult =
+    let source = "let recurse (a: Int8) (b: Int8) : Int8 = recurse a b"
     match Parser.parseString false source with
     | Ok (Program [FunctionDef definition]) ->
         match definition.Body with
@@ -39,7 +39,7 @@ let private testParenthesizedCallKeepsMultipleArguments () : TestResult =
 
 let private testSubtractionFollowsParenthesizedCall () : TestResult =
     let source =
-        "let dropLast(value: String) : Int64 = Stdlib.String.__byteLength(value) - 1L"
+        "let dropLast (value: String) : Int64 = (Stdlib.String.__byteLength value) - 1L"
     match Parser.parseString true source with
     | Ok (Program [FunctionDef definition]) ->
         match definition.Body with
@@ -49,22 +49,33 @@ let private testSubtractionFollowsParenthesizedCall () : TestResult =
     | Ok program -> Error $"Expected one function declaration, got {program}"
     | Error err -> Error err
 
-let private testAdjacentCallGroupsStayCurried () : TestResult =
+let private testNegativeLiteralRemainsAFunctionArgument () : TestResult =
     let source =
-        "let apply(fn: (Int64) -> (Int64) -> Int64) : Int64 = fn(1L)(2L)"
+        "let byteLength (value: String) : Int64 = Stdlib.String.__byteLength value -1L"
+    match Parser.parseString true source with
+    | Ok (Program [FunctionDef definition]) ->
+        match definition.Body with
+        | Call ("Stdlib.String.__byteLength", args)
+            when NonEmptyList.toList args = [Var "value"; Int64Literal -1L] -> Ok ()
+        | body -> Error $"Expected a negative second argument, got {body}"
+    | Ok program -> Error $"Expected one function declaration, got {program}"
+    | Error err -> Error err
+
+let private testSpaceApplicationStaysCurried () : TestResult =
+    let source =
+        "let apply (fn: Int64 -> Int64 -> Int64) : Int64 = fn 1L 2L"
     match Parser.parseString false source with
     | Ok (Program [FunctionDef definition]) ->
         match definition.Body with
-        | Apply (Call ("fn", firstArgs), secondArgs)
-            when NonEmptyList.toList firstArgs = [Int64Literal 1L]
-                 && NonEmptyList.toList secondArgs = [Int64Literal 2L] -> Ok ()
-        | body -> Error $"Expected two curried call groups, got {body}"
+        | Call ("fn", args)
+            when NonEmptyList.toList args = [Int64Literal 1L; Int64Literal 2L] -> Ok ()
+        | body -> Error $"Expected two space-applied arguments, got {body}"
     | Ok program -> Error $"Expected one function declaration, got {program}"
     | Error err -> Error err
 
 let private testTopLevelExpressionFollowsFunctionDeclaration () : TestResult =
     let source =
-        "let identity(value: Int64) : Int64 = value\nidentity(1L)"
+        "let identity (value: Int64) : Int64 = value\nidentity 1L"
     match Parser.parseString false source with
     | Ok (Program [FunctionDef definition; Expression expression]) ->
         match definition.Body, expression with
@@ -86,9 +97,10 @@ let private testFlattenParamGroupsRestoresSourceOrder () : TestResult =
 let tests : (string * (unit -> TestResult)) list = [
     ("Long numeric token streams are stack safe", testLongNumericTokenStreamIsStackSafe)
     ("Tuple lets do not open nested function layout", testTupleLetDoesNotOpenNestedFunctionLayout)
-    ("Parenthesized calls keep multiple arguments", testParenthesizedCallKeepsMultipleArguments)
+    ("Space application keeps multiple arguments", testSpaceApplicationKeepsMultipleArguments)
     ("Subtraction follows a parenthesized call", testSubtractionFollowsParenthesizedCall)
-    ("Adjacent call groups stay curried", testAdjacentCallGroupsStayCurried)
+    ("Negative literals remain function arguments", testNegativeLiteralRemainsAFunctionArgument)
+    ("Space application stays curried", testSpaceApplicationStaysCurried)
     ("Top-level expressions follow function declarations", testTopLevelExpressionFollowsFunctionDeclaration)
 
     ("Flattened parameter groups retain source order", testFlattenParamGroupsRestoresSourceOrder)

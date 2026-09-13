@@ -49,8 +49,8 @@ let __utf16Units (codepoints: List<Int64>) (acc: List<Int64>) : List<Int64> =
         if codepoint <= 65535L then Stdlib.Char.__utf16Units (rest) (Stdlib.List.push<Int64> (acc) (codepoint))
         else
             let adjusted = codepoint - 65536L in
-            let high = 55296L + (adjusted >> 10L) in
-            let low = 56320L + (adjusted & 1023L) in
+            let high = 55296L + Stdlib.Int64.shiftRight adjusted 10L in
+            let low = 56320L + Stdlib.Int64.bitwiseAnd adjusted 1023L in
             Stdlib.Char.__utf16Units (rest) (Stdlib.List.push<Int64> (Stdlib.List.push<Int64> (acc) (high)) (low))
 
 let __compareUnits (left: List<Int64>) (right: List<Int64>) : Int64 =

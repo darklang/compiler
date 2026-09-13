@@ -3,21 +3,6 @@
 
 module Unicode.Data
 
-let __canonicalCompositionLookupGroup0 (key: Int64) (valueIndex: Int64) : Stdlib.Option.Option<Int64> =
-    match Unicode.Data.__lookupMappingValueIn (Unicode.Data.Table17.__canonicalCompositionChunk0 ()) (0L) (key) (12L) (19L) (valueIndex) with
-    | Some (value) -> Some (value)
-    | None ->
-        match Unicode.Data.__lookupMappingValueIn (Unicode.Data.Table18.__canonicalCompositionChunk1 ()) (0L) (key) (12L) (19L) (valueIndex) with
-        | Some (value) -> Some (value)
-        | None ->
-            match Unicode.Data.__lookupMappingValueIn (Unicode.Data.Table19.__canonicalCompositionChunk2 ()) (0L) (key) (12L) (19L) (valueIndex) with
-            | Some (value) -> Some (value)
-            | None ->
-                match Unicode.Data.__lookupMappingValueIn (Unicode.Data.Table20.__canonicalCompositionChunk3 ()) (0L) (key) (12L) (19L) (valueIndex) with
-                | Some (value) -> Some (value)
-                | None ->
-                    None
-
 let __canonicalCompositionLookupGroup1 (key: Int64) (valueIndex: Int64) : Stdlib.Option.Option<Int64> =
     match Unicode.Data.__lookupMappingValueIn (Unicode.Data.Table21.__canonicalCompositionChunk4 ()) (0L) (key) (12L) (19L) (valueIndex) with
     | Some (value) -> Some (value)
@@ -32,6 +17,24 @@ let __canonicalCompositionLookupGroup1 (key: Int64) (valueIndex: Int64) : Stdlib
                 | Some (value) -> Some (value)
                 | None ->
                     None
+
+let __canonicalDecompositionLookup (key: Int64) (valueIndex: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__canonicalDecompositionLookupGroup0 (key) (valueIndex) with
+    | Some (value) -> Some (value)
+    | None ->
+        match Unicode.Data.__canonicalDecompositionLookupGroup1 (key) (valueIndex) with
+        | Some (value) -> Some (value)
+        | None ->
+            match Unicode.Data.__canonicalDecompositionLookupGroup2 (key) (valueIndex) with
+            | Some (value) -> Some (value)
+            | None ->
+                match Unicode.Data.__canonicalDecompositionLookupGroup3 (key) (valueIndex) with
+                | Some (value) -> Some (value)
+                | None ->
+                    match Unicode.Data.__canonicalDecompositionLookupGroup4 (key) (valueIndex) with
+                    | Some (value) -> Some (value)
+                    | None ->
+                        None
 
 let __generalCategoryLookupGroup4 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
     match Unicode.Data.__lookupRangeIn (Unicode.Data.Table31.__generalCategoryChunk16 ()) (0L) (codepoint) (14L) with
@@ -48,47 +51,38 @@ let __generalCategoryLookupGroup4 (codepoint: Int64) : Stdlib.Option.Option<Int6
                 | None ->
                     None
 
-let __caseIgnorableLookupGroup0 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Unicode.Data.__lookupRangeIn (Unicode.Data.Table50.__caseIgnorableChunk0 ()) (0L) (codepoint) (14L) with
+let __generalCategoryLookupGroup1 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__lookupRangeIn (Unicode.Data.Table19.__generalCategoryChunk4 ()) (0L) (codepoint) (14L) with
     | Some (value) -> Some (value)
     | None ->
-        match Unicode.Data.__lookupRangeIn (Unicode.Data.Table51.__caseIgnorableChunk1 ()) (0L) (codepoint) (14L) with
+        match Unicode.Data.__lookupRangeIn (Unicode.Data.Table20.__generalCategoryChunk5 ()) (0L) (codepoint) (14L) with
         | Some (value) -> Some (value)
         | None ->
-            match Unicode.Data.__lookupRangeIn (Unicode.Data.Table52.__caseIgnorableChunk2 ()) (0L) (codepoint) (14L) with
+            match Unicode.Data.__lookupRangeIn (Unicode.Data.Table21.__generalCategoryChunk6 ()) (0L) (codepoint) (14L) with
             | Some (value) -> Some (value)
             | None ->
-                match Unicode.Data.__lookupRangeIn (Unicode.Data.Table53.__caseIgnorableChunk3 ()) (0L) (codepoint) (14L) with
+                match Unicode.Data.__lookupRangeIn (Unicode.Data.Table22.__generalCategoryChunk7 ()) (0L) (codepoint) (14L) with
                 | Some (value) -> Some (value)
                 | None ->
                     None
 
-let __graphemeBreakLookup (codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Unicode.Data.__graphemeBreakLookupGroup0 (codepoint) with
+let __graphemeBreakLookupGroup2 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__lookupRangeIn (Unicode.Data.Table37.__graphemeBreakChunk8 ()) (0L) (codepoint) (14L) with
     | Some (value) -> Some (value)
     | None ->
-        match Unicode.Data.__graphemeBreakLookupGroup1 (codepoint) with
+        match Unicode.Data.__lookupRangeIn (Unicode.Data.Table38.__graphemeBreakChunk9 ()) (0L) (codepoint) (14L) with
         | Some (value) -> Some (value)
         | None ->
-            match Unicode.Data.__graphemeBreakLookupGroup2 (codepoint) with
+            match Unicode.Data.__lookupRangeIn (Unicode.Data.Table39.__graphemeBreakChunk10 ()) (0L) (codepoint) (14L) with
             | Some (value) -> Some (value)
             | None ->
                 None
 
-let __canonicalCompositionLookup (key: Int64) (valueIndex: Int64) : Stdlib.Option.Option<Int64> =
-    match Unicode.Data.__canonicalCompositionLookupGroup0 (key) (valueIndex) with
-    | Some (value) -> Some (value)
-    | None ->
-        match Unicode.Data.__canonicalCompositionLookupGroup1 (key) (valueIndex) with
-        | Some (value) -> Some (value)
-        | None ->
-            None
-
-let __casedLookup (codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Unicode.Data.__casedLookupGroup0 (codepoint) with
+let __whiteSpaceLookupGroup0 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__lookupRangeIn (Unicode.Data.Table42.__whiteSpaceChunk0 ()) (0L) (codepoint) (14L) with
     | Some (value) -> Some (value)
     | None ->
         None
 
-let lookupCanonicalComposition (key: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__canonicalCompositionLookup (key) (0L)
-let isCased (codepoint: Int64) : Bool = Stdlib.Option.isSome<Int64> (Unicode.Data.__casedLookup (codepoint))
+let lookupGraphemeBreak (codepoint: Int64) : Unicode.Data.GraphemeBreak = Unicode.Data.__graphemeFromCode (Stdlib.Option.withDefault<Int64> (Unicode.Data.__graphemeBreakLookup (codepoint)) (0L))
+let lookupLowercaseAt (codepoint: Int64) (index: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__lowercaseLookup (codepoint) (index)

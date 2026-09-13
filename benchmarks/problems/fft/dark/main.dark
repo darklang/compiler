@@ -74,7 +74,7 @@ let benchmarkArg (index: Int) : Int64 =
 
 let size = benchmarkArg (0) in
 let repetitions = benchmarkArg (1) in
-if !isPowerOfTwo (size) || repetitions <= 0L then
+if Stdlib.Bool.not (isPowerOfTwo (size)) || repetitions <= 0L then
     Builtin.testRuntimeError ("FFT size must be a positive power of two and repetitions must be positive")
 else
     let input = generateInput (size) (0L) ([]) in

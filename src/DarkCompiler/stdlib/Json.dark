@@ -10,21 +10,21 @@ type InternalValueView = Int64
 type InternalEnumObject = EnumNotObject | EnumNoFields | EnumOneField of String * Stdlib.Json.InternalValueView | EnumManyFields of List<String>
 
 let __makeView (start: Int64) (endIndex: Int64) : Stdlib.Json.InternalValueView =
-    (start << 32L) ||| endIndex
+    Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft start 32L) endIndex
 
 let __viewStart (view: Stdlib.Json.InternalValueView) : Int64 =
-    (view >> 32L) & 2147483647L
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight view 32L) 2147483647L
 
 let __viewEnd (view: Stdlib.Json.InternalValueView) : Int64 =
-    view & 2147483647L
+    Stdlib.Int64.bitwiseAnd view 2147483647L
 
 let __viewHasSingleField (view: Stdlib.Json.InternalValueView) : Bool = view < 0L
 
 let __viewIsDuplicate (view: Stdlib.Json.InternalValueView) : Bool =
-    (view & 2147483648L) != 0L
+    (Stdlib.Int64.bitwiseAnd view 2147483648L) != 0L
 
 let __markDuplicate (view: Stdlib.Json.InternalValueView) : Stdlib.Json.InternalValueView =
-    view ||| 2147483648L
+    Stdlib.Int64.bitwiseOr view 2147483648L
 
 let __scanStringChars (source: String) (index: Int64) (length: Int64) : Int64 =
     if index >= length then -1L
@@ -70,7 +70,7 @@ let __scanArray (source: String) (index: Int64) (length: Int64) : Int64 =
         let scannedValue = Stdlib.Json.__scanValue (source) (current) (length) in
         if scannedValue < 0L then -1L
         else
-            let afterValue = scannedValue & 4294967295L in
+            let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
             let afterTrivia = Stdlib.AltJson.__skipTrivia (source) (afterValue) (length) in
             if afterTrivia < 0L || afterTrivia >= length then -1L
             else
@@ -83,7 +83,7 @@ let __scanArray (source: String) (index: Int64) (length: Int64) : Int64 =
                         -1L
                     else
                         let rest = Stdlib.Json.__scanArray (source) (afterComma) (length) in
-                        if rest < 0L then -1L else rest & 4294967295L
+                        if rest < 0L then -1L else Stdlib.Int64.bitwiseAnd rest 4294967295L
                 else -1L
 
 let __scanObject (source: String) (index: Int64) (length: Int64) : Int64 =
@@ -101,12 +101,12 @@ let __scanObject (source: String) (index: Int64) (length: Int64) : Int64 =
                 let scannedValue = Stdlib.Json.__scanValue (source) (colon + 1L) (length) in
                 if scannedValue < 0L then -1L
                 else
-                    let afterValue = scannedValue & 4294967295L in
+                    let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
                     let afterTrivia = Stdlib.AltJson.__skipTrivia (source) (afterValue) (length) in
                     if afterTrivia < 0L || afterTrivia >= length then -1L
                     else
                         let separator = Stdlib.String.getByteAt (source) (afterTrivia) in
-                        if separator == 125L then (afterTrivia + 1L) ||| 4611686018427387904L
+                        if separator == 125L then Stdlib.Int64.bitwiseOr (afterTrivia + 1L) 4611686018427387904L
                         else if separator == 44L then
                             let afterComma = Stdlib.AltJson.__skipTrivia (source) (afterTrivia + 1L) (length) in
                             if afterComma < 0L || afterComma >= length
@@ -114,7 +114,7 @@ let __scanObject (source: String) (index: Int64) (length: Int64) : Int64 =
                                 -1L
                             else
                                 let rest = Stdlib.Json.__scanObject (source) (afterComma) (length) in
-                                if rest < 0L then -1L else rest & 4294967295L
+                                if rest < 0L then -1L else Stdlib.Int64.bitwiseAnd rest 4294967295L
                         else -1L
 
 let __scanValue (source: String) (index: Int64) (length: Int64) : Int64 =
@@ -159,12 +159,12 @@ let __parseRoot (source: String) : Stdlib.Result.Result<Stdlib.Json.InternalValu
         let scannedValue = Stdlib.Json.__scanValue (source) (start) (length) in
         if scannedValue < 0L then Stdlib.Result.Result.Error (Stdlib.Json.ParseError.ParseError.NotJson)
         else
-            let afterValue = scannedValue & 4294967295L in
+            let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
             let endIndex = Stdlib.AltJson.__skipTrivia (source) (afterValue) (length) in
             if endIndex == length then
-                let view = (start << 32L) ||| afterValue in
-                if (scannedValue & 4611686018427387904L) != 0L then
-                    Stdlib.Result.Result.Ok (view ||| -9223372036854775808L)
+                let view = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft start 32L) afterValue in
+                if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904L) != 0L then
+                    Stdlib.Result.Result.Ok (Stdlib.Int64.bitwiseOr view -9223372036854775808L)
                 else Stdlib.Result.Result.Ok (view)
             else Stdlib.Result.Result.Error (Stdlib.Json.ParseError.ParseError.NotJson)
 
@@ -231,11 +231,11 @@ let __collectArrayItems (source: String) (index: Int64) (limit: Int64) : Stdlib.
         let scannedValue = Stdlib.Json.__scanValue (source) (current) (limit) in
         if scannedValue < 0L then Stdlib.Option.Option.None
         else
-            let afterValue = scannedValue & 4294967295L in
-            let plainValue = (current << 32L) ||| afterValue in
+            let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
+            let plainValue = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft current 32L) afterValue in
             let value =
-                if (scannedValue & 4611686018427387904L) != 0L then
-                    plainValue ||| -9223372036854775808L
+                if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904L) != 0L then
+                    Stdlib.Int64.bitwiseOr plainValue -9223372036854775808L
                 else plainValue in
             let afterTrivia = Stdlib.AltJson.__skipTrivia (source) (afterValue) (limit) in
             if afterTrivia < 0L || afterTrivia >= limit then Stdlib.Option.Option.None
@@ -271,9 +271,9 @@ let __arrayNext (source: String) (arrayView: Stdlib.Json.InternalValueView) (nex
         let scannedValue = Stdlib.Json.__scanValue (source) (current) (limit) in
         if scannedValue < 0L then -2L
         else
-            let plainView = (current << 32L) ||| (scannedValue & 4294967295L) in
-            if (scannedValue & 4611686018427387904L) != 0L then
-                plainView ||| -9223372036854775808L
+            let plainView = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft current 32L) (Stdlib.Int64.bitwiseAnd scannedValue 4294967295L) in
+            if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904L) != 0L then
+                Stdlib.Int64.bitwiseOr plainView -9223372036854775808L
             else plainView
 
 let __arrayAfter (source: String) (arrayView: Stdlib.Json.InternalValueView) (itemView: Stdlib.Json.InternalValueView) : Int64 =
@@ -304,11 +304,11 @@ let __collectObjectFields (source: String) (index: Int64) (limit: Int64) : Stdli
                 let scannedValue = Stdlib.Json.__scanValue (source) (valueStart) (limit) in
                 if scannedValue < 0L then Stdlib.Option.Option.None
                 else
-                    let afterValue = scannedValue & 4294967295L in
-                    let plainValue = (valueStart << 32L) ||| afterValue in
+                    let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
+                    let plainValue = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft valueStart 32L) afterValue in
                     let value =
-                        if (scannedValue & 4611686018427387904L) != 0L then
-                            plainValue ||| -9223372036854775808L
+                        if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904L) != 0L then
+                            Stdlib.Int64.bitwiseOr plainValue -9223372036854775808L
                         else plainValue in
                     let field =
                         (key, value) in
@@ -348,11 +348,11 @@ let __collectObjectFieldMap (source: String) (index: Int64) (limit: Int64) (acc:
                 let scannedValue = Stdlib.Json.__scanValue (source) (valueStart) (limit) in
                 if scannedValue < 0L then Stdlib.Option.Option.None
                 else
-                    let afterValue = scannedValue & 4294967295L in
-                    let plainValue = (valueStart << 32L) ||| afterValue in
+                    let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
+                    let plainValue = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft valueStart 32L) afterValue in
                     let value =
-                        if (scannedValue & 4611686018427387904L) != 0L then
-                            plainValue ||| -9223372036854775808L
+                        if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904L) != 0L then
+                            Stdlib.Int64.bitwiseOr plainValue -9223372036854775808L
                         else plainValue in
                     let field =
                         match Stdlib.Dict.get<Stdlib.Json.InternalValueView> (acc) (key) with
@@ -388,7 +388,7 @@ let __fieldNames (fields: List<(String * Stdlib.Json.InternalValueView)>) : List
 let __enumCandidate (source: String) (view: Stdlib.Json.InternalValueView) : Stdlib.Json.InternalEnumObject =
     let start = Stdlib.Json.__viewStart (view) in
     let endIndex = Stdlib.Json.__viewEnd (view) in
-    if !Stdlib.Json.__viewHasSingleField (view) then
+    if Stdlib.Bool.not (Stdlib.Json.__viewHasSingleField (view)) then
         Stdlib.Json.__enumObject (source) (view)
     else if Stdlib.Json.__viewByte (source) (view) != 123L
        || endIndex <= start + 1L
@@ -468,8 +468,8 @@ let __padNumber (value: String) (goalLength: Int64) : String =
 
 let __floatRatio (value: Float) : (Int * Int) =
     let bits = Stdlib.Float.toBits (value) in
-    let rawExponent = (bits >> 52UL) & 2047UL in
-    let mantissa = bits & 4503599627370495UL in
+    let rawExponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
+    let mantissa = Stdlib.UInt64.bitwiseAnd bits 4503599627370495UL in
     let significand =
         if rawExponent == 0UL then Stdlib.Int.fromUInt64 (mantissa)
         else Stdlib.Int.add (Stdlib.Int.fromUInt64 (mantissa)) (Stdlib.Int.shiftLeft (1) (52)) in
@@ -561,15 +561,15 @@ let __shortestScientificFloat (numerator: Int) (denominator: Int) (targetBits: U
 
 let __serializeFloat (value: Float) : String =
     let bits = Stdlib.Float.toBits (value) in
-    let exponent = (bits >> 52UL) & 2047UL in
-    let fraction = bits & 4503599627370495UL in
+    let exponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
+    let fraction = Stdlib.UInt64.bitwiseAnd bits 4503599627370495UL in
     if exponent == 2047UL then
         if fraction != 0UL then "\"NaN\""
-        else if (bits >> 63UL) == 1UL then "\"-Infinity\""
+        else if Stdlib.UInt64.shiftRight bits 63UL == 1UL then "\"-Infinity\""
         else "\"Infinity\""
     else
         let absolute = Stdlib.Float.abs (value) in
-        if absolute == 0.0 then if (bits >> 63UL) == 1UL then "-0.0" else "0.0"
+        if absolute == 0.0 then if Stdlib.UInt64.shiftRight bits 63UL == 1UL then "-0.0" else "0.0"
         else
             let ratio = Stdlib.Json.__floatRatio (absolute) in
             let rendered =
@@ -577,7 +577,7 @@ let __serializeFloat (value: Float) : String =
                     Stdlib.Json.__shortestScientificFloat (ratio.0) (ratio.1) (Stdlib.Float.toBits (absolute)) (1L)
                 else
                     Stdlib.Json.__shortestFloat (ratio.0) (ratio.1) (Stdlib.Float.toBits (absolute)) (1L) in
-            if (bits >> 63UL) == 1UL then "-" ++ rendered else rendered
+            if Stdlib.UInt64.shiftRight bits 63UL == 1UL then "-" ++ rendered else rendered
 
 let __numberHasDecimalSyntax (text: String) : Bool =
     Stdlib.AltJson.__findNumberMarker (text) (0L) (46L) (46L) >= 0L
@@ -585,14 +585,14 @@ let __numberHasDecimalSyntax (text: String) : Bool =
 
 let __floatIsInteger (value: Float) : Bool =
     let bits = Stdlib.Float.toBits (Stdlib.Float.abs (value)) in
-    let rawExponent = (bits >> 52UL) & 2047UL in
+    let rawExponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
     if rawExponent == 2047UL then false
     else if rawExponent >= 1075UL then true
     else if rawExponent < 1023UL then value == 0.0
     else
         let fractionalBits = 1075UL - rawExponent in
-        let fractionalMask = (1UL << fractionalBits) - 1UL in
-        (bits & fractionalMask) == 0UL
+        let fractionalMask = (Stdlib.UInt64.shiftLeft 1UL fractionalBits) - 1UL in
+        Stdlib.UInt64.bitwiseAnd bits fractionalMask == 0UL
 
 let __floatInteger (text: String) : Stdlib.Option.Option<Int> =
     match Stdlib.AltJson.__numberToFloat (text) with

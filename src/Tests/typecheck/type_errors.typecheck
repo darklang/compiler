@@ -8,7 +8,7 @@ true * false : error
 // Boolean operators with integers
 1L && 2L : error
 5L || 10L : error
-!42L : error
+Stdlib.Bool.not 42L : error
 
 // If with mismatched branch types
 if true then 10L else false : error

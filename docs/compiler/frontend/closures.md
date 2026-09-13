@@ -63,13 +63,13 @@ When a lambda is encountered in argument position:
 **Before:**
 ```dark
 let y = 10 in
-(fun x -> x + y)(5)
+(fun x -> x + y) 5
 ```
 
 **After lifting:**
 ```dark
 // Generated function:
-let __closure_0(__closure, x: Int64) =
+let __closure_0 (__closure: RawPtr) (x: Int64) =
     let y = __closure.1  // Extract captured y
     in x + y
 
@@ -152,7 +152,7 @@ let y = 10 in (fun x -> (fun z -> x + y + z)(2))(30)  // 42
 ### Higher-Order Functions
 ```dark
 let apply = fun f x -> f(x)
-in apply(fun x -> x * 2, 21)  // 42
+in apply (fun x -> x * 2) 21  // 42
 ```
 
 ### Partial Application

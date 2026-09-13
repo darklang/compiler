@@ -150,7 +150,3 @@ respectively, identical to the pinned interpreter files.
   capability/runtime service boundary. This is the only retained DateTime
   host-access extension; conversions themselves remain UTC, locale-free and
   timezone-free.
-- The compiler accepts `I` as an explicit arbitrary-precision integer suffix.
-  The current upstream interpreter uses unsuffixed `Int`; the canonical parser
-  does the same. This spelling extension does not change the
-  canonical DateTime or Duration signatures.

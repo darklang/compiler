@@ -1,9 +1,12 @@
 # Darklang Compatibility
 
-This compiler aims to match the Darklang interpreter while compiling programs
-ahead of time to native code. Compiler source and E2E tests are authoritative
-for implemented behavior. The revision-pinned ledgers in this directory record
-compatibility boundaries and intentional extensions.
+The compiler's public parser follows darklang/dark revision
+`04fbe9dcc995c6188757d583e273cbd30a3e2d3d`. Repository Dark source is
+validated directly against that interpreter; there is no
+compiler-to-interpreter syntax conversion layer. Compiler source and E2E tests
+are authoritative for implemented behavior, and the revision-pinned ledgers in
+this directory record AOT compatibility boundaries and intentional runtime or
+standard-library extensions.
 
 Run the compatibility validator with:
 
@@ -14,20 +17,24 @@ python3 scripts/validate-darklang.py
 
 ## Source syntax
 
-The validator translates supported compiler spellings where the interpreter
-uses different syntax.
+Public source uses space application (`f a b`, `f ()`), whitespace-separated
+curried parameters (`let f (a: A) (b: B) : C = ...`), unsuffixed `Int`
+literals, parenthesized tuple expressions, and `A -> B -> C` function types.
+Lists accept comma separators, sized integer suffixes and generic angle syntax
+are shared, and strings support interpolation and the full scalar-aware escape
+alphabet.
 
-| Area | Compiler spelling | Interpreter spelling |
-|---|---|---|
-| Explicit arbitrary integer | `5I` | `5` |
-| Sized integers | `1y`, `1s`, `1l`, and unsigned forms | Not supported |
-| Lists | `[1, 2]` | `[1L; 2L]` |
-| Calls | `Mod.fn(a, b)` | `Stdlib.Mod.fn a b` |
-| Generic types | `List<Int64>` | Interpreter type syntax |
-| Interpolation | `$"Hello {name}"` | Not supported |
+`^` is right-associative exponentiation. Symbolic `<<`, `>>`, `&`, `|||`,
+`~~~`, and `!` are reserved but unsupported in expressions; source uses named
+functions such as `Stdlib.Int64.shiftLeft`, `Stdlib.Int64.bitwiseAnd`, and
+`Stdlib.Bool.not`. Backend bitwise primitives remain internal compiler IR.
 
-Bindings and lambdas otherwise use the shared public grammar. The detailed
-language comparisons cover [bindings](language/bindings.md),
+Compiler-generated AST may contain `TupleAccess`, `RawPtr`, the internal
+two-argument Dict representation, and internal bitwise nodes. None has an
+`allowInternal` parser spelling: internal mode controls identifier access, not
+a second grammar.
+
+The detailed language comparisons cover [bindings](language/bindings.md),
 [identifiers](language/identifiers.md),
 [name resolution](language/name-resolution.md),
 [primitive literals](language/primitive-literals.md),
@@ -44,7 +51,7 @@ expression evaluator:
 | Prefix | Meaning |
 |---|---|
 | `eval:*` | Compile errors, expected runtime errors, stdout, stderr, exit codes, or builtin test infrastructure |
-| `syntax:*` | A compiler spelling that the validator cannot translate |
+| `syntax:*` | Source unsupported by the pinned interpreter or canonical parser |
 | `semantic:*` | A compiler operation absent from or observably different from the interpreter |
 | `stdlib:*` | A standard-library operation absent from the pinned interpreter |
 | `extension:*` | An explicitly supported compiler extension |
@@ -58,10 +65,9 @@ contract.
 ## Compiler extensions
 
 The compiler supports integer `/` with truncation toward zero; the interpreter
-uses `/` for Float and named functions for integer division. The compiler also
-has bitwise operators, Boolean `!`, sized-integer literals, interpolation, and
-private SkewList/HAMT helpers that are not interpreter syntax or public parity
-surface.
+uses `/` for Float and named functions for integer division. Private
+SkewList/HAMT helpers and selected standard-library additions remain extensions,
+not alternate public parser spellings.
 
 The validator also recognizes standard-library extensions such as selected
 Random functions, byte access, list/string slicing helpers, and Float

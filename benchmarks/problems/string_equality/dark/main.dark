@@ -1,61 +1,45 @@
 // String equality benchmark: exercise identity, equal allocations, length
 // mismatch, and early/late byte mismatches for short and long dynamic strings.
 
-let operatorEquals(left: String, right: String) : Bool = left == right
+let operatorEquals (left: String) (right: String) : Bool = left == right
 
-let apiEquals(left: String, right: String) : Bool =
-    Stdlib.String.equals(left, right)
+let apiEquals (left: String) (right: String) : Bool =
+    Stdlib.String.equals (left) (right)
 
-let contribution(matches: Bool, weight: Int64) : Int64 =
+let contribution (matches: Bool) (weight: Int64) : Int64 =
     if matches then weight else 0L
 
-let runOperator(
-    remaining: Int64,
-    left: String,
-    equal: String,
-    lengthMismatch: String,
-    firstMismatch: String,
-    lastMismatch: String,
-    checksum: Int64
-) : Int64 =
+let runOperator (remaining: Int64) (left: String) (equal: String) (lengthMismatch: String) (firstMismatch: String) (lastMismatch: String) (checksum: Int64) : Int64 =
     if remaining <= 0L then checksum
     else
         let next =
             checksum
-            + contribution(operatorEquals(left, left), 1L)
-            + contribution(operatorEquals(left, equal), 2L)
-            + contribution(operatorEquals(left, lengthMismatch), 4L)
-            + contribution(operatorEquals(left, firstMismatch), 8L)
-            + contribution(operatorEquals(left, lastMismatch), 16L) in
-        runOperator(remaining - 1L, left, equal, lengthMismatch, firstMismatch, lastMismatch, next)
+            + contribution (operatorEquals (left) (left)) (1L)
+            + contribution (operatorEquals (left) (equal)) (2L)
+            + contribution (operatorEquals (left) (lengthMismatch)) (4L)
+            + contribution (operatorEquals (left) (firstMismatch)) (8L)
+            + contribution (operatorEquals (left) (lastMismatch)) (16L) in
+        runOperator (remaining - 1L) (left) (equal) (lengthMismatch) (firstMismatch) (lastMismatch) (next)
 
-let runApi(
-    remaining: Int64,
-    left: String,
-    equal: String,
-    lengthMismatch: String,
-    firstMismatch: String,
-    lastMismatch: String,
-    checksum: Int64
-) : Int64 =
+let runApi (remaining: Int64) (left: String) (equal: String) (lengthMismatch: String) (firstMismatch: String) (lastMismatch: String) (checksum: Int64) : Int64 =
     if remaining <= 0L then checksum
     else
         let next =
             checksum
-            + contribution(apiEquals(left, left), 32L)
-            + contribution(apiEquals(left, equal), 64L)
-            + contribution(apiEquals(left, lengthMismatch), 128L)
-            + contribution(apiEquals(left, firstMismatch), 256L)
-            + contribution(apiEquals(left, lastMismatch), 512L) in
-        runApi(remaining - 1L, left, equal, lengthMismatch, firstMismatch, lastMismatch, next)
+            + contribution (apiEquals (left) (left)) (32L)
+            + contribution (apiEquals (left) (equal)) (64L)
+            + contribution (apiEquals (left) (lengthMismatch)) (128L)
+            + contribution (apiEquals (left) (firstMismatch)) (256L)
+            + contribution (apiEquals (left) (lastMismatch)) (512L) in
+        runApi (remaining - 1L) (left) (equal) (lengthMismatch) (firstMismatch) (lastMismatch) (next)
 
-let benchmarkArg(index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64(index) with
-    | Ok(value) -> value
-    | Error(message) -> Builtin.testRuntimeError(message)
+let benchmarkArg (index: Int) : Int64 =
+    match Stdlib.Cli.Args.int64 (index) with
+    | Ok (value) -> value
+    | Error (message) -> Builtin.testRuntimeError (message)
 
-let iterations = benchmarkArg(0I) in
-let token = Stdlib.Int64.toString(benchmarkArg(1I)) in
+let iterations = benchmarkArg (0) in
+let token = Stdlib.Int64.toString (benchmarkArg (1)) in
 let shortLeft = "ab" ++ token ++ "cd" in
 let shortEqual = "a" ++ "b" ++ token ++ "cd" in
 let shortLengthMismatch = "ab" ++ token ++ "cdx" in
@@ -69,20 +53,6 @@ let longEqual = "pre" ++ "fix:" ++ token ++ ":" ++ longMiddle ++ ":suffix" in
 let longLengthMismatch = "prefix:" ++ token ++ ":" ++ longMiddle ++ ":suffix!" in
 let longFirstMismatch = "xrefix:" ++ token ++ ":" ++ longMiddle ++ ":suffix" in
 let longLastMismatch = "prefix:" ++ token ++ ":" ++ longMiddle ++ ":suffiy" in
-Builtin.printLine(
-    Stdlib.Int64.toString(
-        runApi(
-            iterations,
-            longLeft,
-            longEqual,
-            longLengthMismatch,
-            longFirstMismatch,
-            longLastMismatch,
-            runOperator(
-                iterations,
-                shortLeft,
-                shortEqual,
-                shortLengthMismatch,
-                shortFirstMismatch,
-                shortLastMismatch,
-                0L))))
+Builtin.printLine (
+    Stdlib.Int64.toString (
+        runApi (iterations) (longLeft) (longEqual) (longLengthMismatch) (longFirstMismatch) (longLastMismatch) (runOperator (iterations) (shortLeft) (shortEqual) (shortLengthMismatch) (shortFirstMismatch) (shortLastMismatch) (0L))))

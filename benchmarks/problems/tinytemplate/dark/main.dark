@@ -19,7 +19,7 @@ type Document = { root: Value, collections: List<(Int64 * Collection)> }
 
 type PathHead = FinalPathHead of String | NestedPathHead of (String * Int64)
 
-type SourceRef = (Int64, Int64)
+type SourceRef = (Int64 * Int64)
 
 type Instruction =
     | Literal of String
@@ -118,7 +118,7 @@ let parseUnsignedAt (text: String) (index: Int64) (total: Int64) : Stdlib.Option
         else parseUnsignedAt (text) (index + 1L) (total * 10L + byte - 48L)
 
 let validPath (text: String) : Bool =
-    !Stdlib.String.startsWith (text) ("@") || text == "@index" || text == "@first" || text == "@last" || text == "@root"
+    Stdlib.Bool.not (Stdlib.String.startsWith (text) ("@")) || text == "@index" || text == "@first" || text == "@last" || text == "@root"
 
 let splitAt (text: String) (separator: String) : Stdlib.Option.Option<(String * String)> =
     match findFrom (text) (separator) (0L) with
@@ -225,13 +225,13 @@ let closeFor (state: CompilerState) (target: Int64) : Stdlib.Result.Result<(Comp
 let compileIf (state: CompilerState) (next: Int64) (text: String) : Stdlib.Result.Result<CompilerState, TemplateError> =
     let negated = Stdlib.String.startsWith (text) ("not ") in
     let pathText = if negated then Stdlib.String.trim (slice (text) (4L) (byteLength (text))) else text in
-    if !validPath (pathText) then Error (parseError (state.source) (state.position) ("Invalid keyword name '" ++ pathText ++ "'"))
+    if Stdlib.Bool.not (validPath (pathText)) then Error (parseError (state.source) (state.position) ("Invalid keyword name '" ++ pathText ++ "'"))
     else
         let index = instructionCount (state.reversed) in
         let blocks = Stdlib.List.push<Block> (state.blocks) (BranchBlock (index)) in
         let nextState = moveCompiler (state) (next) (state.reversed) (blocks) (state.trimNext) in
         let reference = (state.position + 2L, next - 2L) in
-        compileLoop (emit (nextState) (Branch ((reference, !negated, -1L))))
+        compileLoop (emit (nextState) (Branch ((reference, Stdlib.Bool.not negated, -1L))))
 
 let compileElse (state: CompilerState) (next: Int64) (text: String) : Stdlib.Result.Result<CompilerState, TemplateError> =
     if text != "" then Error (parseError (state.source) (state.position) ("Unexpected text after else"))
@@ -256,7 +256,7 @@ let compileWith (state: CompilerState) (next: Int64) (text: String) : Stdlib.Res
     | None -> Error (parseError (state.source) (state.position) ("Expected 'as <name>' in with block"))
     | Some (parts) ->
         let path = Stdlib.String.trim (parts.0) in
-        if !validPath (path) then Error (parseError (state.source) (state.position) ("Invalid keyword name '" ++ path ++ "'"))
+        if Stdlib.Bool.not (validPath (path)) then Error (parseError (state.source) (state.position) ("Invalid keyword name '" ++ path ++ "'"))
         else
             let blocks = Stdlib.List.push<Block> (state.blocks) (WithBlock) in
             let nextState = moveCompiler (state) (next) (state.reversed) (blocks) (state.trimNext) in
@@ -280,7 +280,7 @@ let compileFor (state: CompilerState) (next: Int64) (text: String) : Stdlib.Resu
     | None -> Error (parseError (state.source) (state.position) ("Unable to parse for block"))
     | Some (parts) ->
         let path = Stdlib.String.trim (parts.1) in
-        if !validPath (path) then Error (parseError (state.source) (state.position) ("Invalid keyword name '" ++ path ++ "'"))
+        if Stdlib.Bool.not (validPath (path)) then Error (parseError (state.source) (state.position) ("Invalid keyword name '" ++ path ++ "'"))
         else
             let reference = (state.position + 2L, next - 2L) in
             let withContext = emit (state) (PushIterationContext (reference)) in
@@ -304,7 +304,7 @@ let compileCall (state: CompilerState) (next: Int64) (text: String) : Stdlib.Res
     | None -> Error (parseError (state.source) (state.position) ("Unable to parse call block"))
     | Some (parts) ->
         let path = Stdlib.String.trim (parts.1) in
-        if !validPath (path) then Error (parseError (state.source) (state.position) ("Invalid keyword name '" ++ path ++ "'"))
+        if Stdlib.Bool.not (validPath (path)) then Error (parseError (state.source) (state.position) ("Invalid keyword name '" ++ path ++ "'"))
         else
             let nextState = moveCompiler (state) (next) (state.reversed) (state.blocks) (state.trimNext) in
             let reference = (state.position + 2L, next - 2L) in
@@ -528,7 +528,7 @@ let truthy (collections: List<(Int64 * Collection)>) (value: Value) : Bool =
     | StringValue (text) -> byteLength (text) != 0L
     | ArrayValue (id) ->
         match collectionGet (collections) (id) with
-        | Some (ArrayCollection (values)) -> !Stdlib.List.isEmpty<Value> (values)
+        | Some (ArrayCollection (values)) -> Stdlib.Bool.not (Stdlib.List.isEmpty<Value> (values))
         | _ -> false
     | ObjectValue (_) -> true
 
@@ -599,7 +599,7 @@ let renderBranchInstruction (instructions: List<Instruction>) (counter: Int64) (
     match specialPath (environment.collections) (scopes) (environment.source) (path) with
     | Error (error) -> Error (error)
     | Ok (value) ->
-        let condition = if invert then !truthy (environment.collections) (value) else truthy (environment.collections) (value) in
+        let condition = if invert then Stdlib.Bool.not (truthy (environment.collections) (value)) else truthy (environment.collections) (value) in
         renderProgram (instructions) (if condition then target else counter + 1L) (scopes) (environment) (output)
 
 let renderNamedInstruction (instructions: List<Instruction>) (counter: Int64) (scopes: List<ContextElement>) (environment: RenderEnvironment) (output: String) (reference: SourceRef) : Stdlib.Result.Result<String, TemplateError> =

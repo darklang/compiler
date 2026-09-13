@@ -1,13 +1,13 @@
 // shared.dark - Retained old list versions force a copy before transformation.
-let pipeline(seed: Int64) : Int64 =
+let pipeline (seed: Int64) : Int64 =
     let xs = [seed, seed + 1L, seed + 2L] in
-    let ys = Stdlib.List.map<Int64, Int64>(xs, fun x -> x + 1L) in
-    let old = Stdlib.List.fold<Int64, Int64>(xs, 0L, fun acc x -> acc + x) in
-    let fresh = Stdlib.List.fold<Int64, Int64>(ys, 0L, fun acc x -> acc + x) in
+    let ys = Stdlib.List.map<Int64, Int64> (xs) (fun x -> x + 1L) in
+    let old = Stdlib.List.fold<Int64, Int64> (xs) (0L) (fun acc x -> acc + x) in
+    let fresh = Stdlib.List.fold<Int64, Int64> (ys) (0L) (fun acc x -> acc + x) in
     old + fresh
 
-let loop(n: Int64, acc: Int64) : Int64 =
+let loop (n: Int64) (acc: Int64) : Int64 =
     if n == 0L then acc
-    else loop(n - 1L, acc + pipeline(n % 10L))
+    else loop (n - 1L) (acc + pipeline (n % 10L))
 
-loop(10000L, 0L)
+loop (10000L) (0L)

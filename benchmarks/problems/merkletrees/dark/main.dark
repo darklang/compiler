@@ -15,7 +15,7 @@
 let hashLoop (h: Int64) (data: Int64) (i: Int64) : Int64 =
     if i >= 8L then h
     else
-        let h1 = (h ^ (data & 255L)) * 1099511628211L in
+        let h1 = Stdlib.Int64.bitwiseXor h (Stdlib.Int64.bitwiseAnd data 255L) * 1099511628211L in
         hashLoop (h1) (data) (i + 1L)
 
 let hashVal (data: Int64) : Int64 =
@@ -30,7 +30,7 @@ let hashPair (left: Int64) (right: Int64) : Int64 =
 let buildTree (depth: Int64) (leafStart: Int64) : Int64 =
     if depth == 0L then hashVal (leafStart)
     else
-        let leftSize = 1L << (depth - 1L) in
+        let leftSize = Stdlib.Int64.shiftLeft 1L (depth - 1L) in
         let left = buildTree (depth - 1L) (leafStart) in
         let right = buildTree (depth - 1L) (leafStart + leftSize) in
         hashPair (left) (right)

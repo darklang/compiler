@@ -87,15 +87,10 @@ and Token =
     | TGte         // >=
     | TAnd         // &&
     | TOr          // ||
-    | TNot         // !
     | TPipe        // |> (pipe operator)
     | TPercent     // % (modulo)
-    | TShl         // << (left shift)
-    | TShr         // >> (right shift)
-    | TBitAnd      // & (bitwise and)
-    | TBitOr       // ||| (bitwise or)
-    | TBitXor      // ^ (bitwise xor)
-    | TBitNot      // ~~~ (bitwise not)
+    | TDoubleRightAngle // >> (two generic-closing angle brackets)
+    | TPow         // ^ (exponentiation)
     | TIdent of string
     | TTypeVar of string // apostrophe-prefixed type variable; apostrophe is syntax, not part of identity
     | TEOF
@@ -362,19 +357,19 @@ let rec lex (input: string) : Result<Token list, string> =
         | '=' :: '=' :: rest -> lexHelper rest (TEqEq :: acc)
         | '=' :: rest -> lexHelper rest (TEquals :: acc)
         | '!' :: '=' :: rest -> lexHelper rest (TNeq :: acc)
-        | '!' :: rest -> lexHelper rest (TNot :: acc)
-        | '<' :: '<' :: rest -> lexHelper rest (TShl :: acc)
+        | '!' :: _ -> Error "Operator '!' is reserved but not supported by the expression grammar"
+        | '<' :: '<' :: _ -> Error "Operator '<<' is reserved but not supported by the expression grammar"
         | '<' :: '=' :: rest -> lexHelper rest (TLte :: acc)
         | '<' :: rest -> lexHelper rest (TLt :: acc)
-        | '>' :: '>' :: rest -> lexHelper rest (TShr :: acc)
+        | '>' :: '>' :: rest -> lexHelper rest (TDoubleRightAngle :: acc)
         | '>' :: '=' :: rest -> lexHelper rest (TGte :: acc)
         | '>' :: rest -> lexHelper rest (TGt :: acc)
         | '&' :: '&' :: rest -> lexHelper rest (TAnd :: acc)
-        | '&' :: rest -> lexHelper rest (TBitAnd :: acc)
-        | '^' :: rest -> lexHelper rest (TBitXor :: acc)
-        | '~' :: '~' :: '~' :: rest -> lexHelper rest (TBitNot :: acc)
+        | '&' :: _ -> Error "Operator '&' is reserved but not supported by the expression grammar"
+        | '^' :: rest -> lexHelper rest (TPow :: acc)
+        | '~' :: '~' :: '~' :: _ -> Error "Operator '~~~' is reserved but not supported by the expression grammar"
         | '%' :: rest -> lexHelper rest (TPercent :: acc)
-        | '|' :: '|' :: '|' :: rest -> lexHelper rest (TBitOr :: acc)
+        | '|' :: '|' :: '|' :: _ -> Error "Operator '|||' is reserved but not supported by the expression grammar"
         | '|' :: '|' :: rest -> lexHelper rest (TOr :: acc)
         | '|' :: '>' :: rest -> lexHelper rest (TPipe :: acc)
         | '|' :: rest -> lexHelper rest (TBar :: acc)
@@ -821,14 +816,14 @@ let rec parseTypeBase (typeParams: Set<string>) (tokens: Token list) : Result<Ty
         |> Result.bind (fun (elemType, afterElem) ->
             match afterElem with
             | TGt :: remaining -> Ok (TList elemType, remaining)
-            | TShr :: remaining -> Ok (TList elemType, TGt :: remaining)  // >> is two >'s
+            | TDoubleRightAngle :: remaining -> Ok (TList elemType, TGt :: remaining)  // >> is two >'s
             | _ -> Error "Expected '>' after List element type")
     | TIdent "Stream" :: TLt :: rest ->
         parseTypeWithContext typeParams rest
         |> Result.bind (fun (elemType, afterElem) ->
             match afterElem with
             | TGt :: remaining -> Ok (TStream elemType, remaining)
-            | TShr :: remaining -> Ok (TStream elemType, TGt :: remaining)
+            | TDoubleRightAngle :: remaining -> Ok (TStream elemType, TGt :: remaining)
             | _ -> Error "Expected '>' after Stream element type")
     | TIdent "Dict" :: TLt :: rest ->
         // Dict type: Dict<KeyType, ValueType>
@@ -840,13 +835,13 @@ let rec parseTypeBase (typeParams: Set<string>) (tokens: Token list) : Result<Ty
                 |> Result.bind (fun (valueType, afterValue) ->
                     match afterValue with
                     | TGt :: remaining -> Ok (TDict (firstTypeArg, valueType), remaining)
-                    | TShr :: remaining -> Ok (TDict (firstTypeArg, valueType), TGt :: remaining)  // >> is two >'s
+                    | TDoubleRightAngle :: remaining -> Ok (TDict (firstTypeArg, valueType), TGt :: remaining)  // >> is two >'s
                     | _ -> Error "Expected '>' after Dict value type")
             | TGt :: remaining ->
                 // Upstream interpreter syntax uses Dict<ValueType> shorthand
                 // with implicit String keys.
                 Ok (TDict (AST.TString, firstTypeArg), remaining)
-            | TShr :: remaining ->
+            | TDoubleRightAngle :: remaining ->
                 Ok (TDict (AST.TString, firstTypeArg), TGt :: remaining)  // >> is two >'s
             | _ -> Error "Expected ',' or '>' after Dict type argument")
     | TIdent typeName :: rest when typeName.Length > 0 && System.Char.IsUpper(typeName.[0]) ->
@@ -878,7 +873,7 @@ let rec parseTypeBase (typeParams: Set<string>) (tokens: Token list) : Result<Ty
                 |> Result.bind (fun (ty, remaining) ->
                     match remaining with
                     | TGt :: rest -> Ok (List.rev (ty :: acc), rest)
-                    | TShr :: rest -> Ok (List.rev (ty :: acc), TGt :: rest)  // >> is two >'s
+                    | TDoubleRightAngle :: rest -> Ok (List.rev (ty :: acc), TGt :: rest)  // >> is two >'s
                     | TComma :: rest -> parseTypeArgsInType rest (ty :: acc)
                     | _ -> Error "Expected ',' or '>' after type argument in generic type")
             parseTypeArgsInType typeArgsStart []
@@ -974,7 +969,7 @@ let rec parseTypeArgs (tokens: Token list) (acc: Type list) : Result<Type list *
         | TGt :: rest ->
             // Last type argument
             Ok (List.rev (ty :: acc), rest)
-        | TShr :: rest ->
+        | TDoubleRightAngle :: rest ->
             // >> is two >'s - last type argument, put one > back
             Ok (List.rev (ty :: acc), TGt :: rest)
         | TComma :: rest ->
@@ -1356,7 +1351,7 @@ let parseFunctionDef (tokens: Token list) (parseExpr: Token list -> Result<Expr 
         | TAdjacentLParen :: _ ->
             Error "Function parameters require whitespace before '('"
         | _ -> Error $"Expected '<' or '(' after function name '{name}'"
-    | _ -> Error "Expected function declaration (let name(params) : type = body)"
+    | _ -> Error "Expected function declaration (let name (param: Type) : Type = body)"
 
 /// Parse a pattern for pattern matching
 let rec parsePattern (tokens: Token list) : Result<Pattern * Token list, string> =
@@ -1789,7 +1784,7 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
 
         | TLet :: TIdent firstName :: TLParen :: rest ->
             // Nested function declaration:
-            // let name(args) : ReturnType = fnBody body
+            // let name (arg: Type) : ReturnType = fnBody body
             parseNestedFunctionLet (TFunctionDeclaration :: TIdent firstName :: TLParen :: rest)
         | TLet :: TIdent firstName :: TLt :: rest ->
             // Generic nested function declaration.
@@ -1951,7 +1946,7 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                                 // Partial application: f(a) becomes f(left, a)
                                 match NonEmptyList.toList args with
                                 | [UnitLiteral] ->
-                                    // Zero-arg call placeholder: f() |> g() => g(f())
+                                    // Unit-argument placeholder: f () |> g ()
                                     Call (funcName, NonEmptyList.singleton leftExpr)
                                 | _ ->
                                     Call (funcName, NonEmptyList.cons leftExpr args)
@@ -1959,7 +1954,7 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                                 // Generic partial application: f<T>(a) becomes f<T>(left, a)
                                 match NonEmptyList.toList args with
                                 | [UnitLiteral] ->
-                                    // Zero-arg call placeholder: f() |> g<T>() => g<T>(f())
+                                    // Unit-argument placeholder for piped generic calls.
                                     TypeApp (funcName, typeArgs, NonEmptyList.singleton leftExpr)
                                 | _ ->
                                     TypeApp (funcName, typeArgs, NonEmptyList.cons leftExpr args)
@@ -1983,52 +1978,16 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
             parseOrRest left remaining)
 
     and parseAnd (toks: Token list) : Result<Expr * Token list, string> =
-        parseBitOr toks
+        parseComparison toks
         |> Result.bind (fun (left, remaining) ->
             let rec parseAndRest (leftExpr: Expr) (toks: Token list) : Result<Expr * Token list, string> =
                 match toks with
                 | TAnd :: rest ->
-                    parseBitOr rest
+                    parseComparison rest
                     |> Result.bind (fun (right, remaining') ->
                         parseAndRest (BinOp (And, leftExpr, right)) remaining')
                 | _ -> Ok (leftExpr, toks)
             parseAndRest left remaining)
-
-    and parseBitOr (toks: Token list) : Result<Expr * Token list, string> =
-        parseBitXor toks
-        |> Result.bind (fun (left, remaining) ->
-            let rec parseBitOrRest (leftExpr: Expr) (toks: Token list) : Result<Expr * Token list, string> =
-                match toks with
-                | TBitOr :: rest ->
-                    parseBitXor rest
-                    |> Result.bind (fun (right, remaining') ->
-                        parseBitOrRest (BinOp (BitOr, leftExpr, right)) remaining')
-                | _ -> Ok (leftExpr, toks)
-            parseBitOrRest left remaining)
-
-    and parseBitXor (toks: Token list) : Result<Expr * Token list, string> =
-        parseBitAnd toks
-        |> Result.bind (fun (left, remaining) ->
-            let rec parseBitXorRest (leftExpr: Expr) (toks: Token list) : Result<Expr * Token list, string> =
-                match toks with
-                | TBitXor :: rest ->
-                    parseBitAnd rest
-                    |> Result.bind (fun (right, remaining') ->
-                        parseBitXorRest (BinOp (BitXor, leftExpr, right)) remaining')
-                | _ -> Ok (leftExpr, toks)
-            parseBitXorRest left remaining)
-
-    and parseBitAnd (toks: Token list) : Result<Expr * Token list, string> =
-        parseComparison toks
-        |> Result.bind (fun (left, remaining) ->
-            let rec parseBitAndRest (leftExpr: Expr) (toks: Token list) : Result<Expr * Token list, string> =
-                match toks with
-                | TBitAnd :: rest ->
-                    parseComparison rest
-                    |> Result.bind (fun (right, remaining') ->
-                        parseBitAndRest (BinOp (BitAnd, leftExpr, right)) remaining')
-                | _ -> Ok (leftExpr, toks)
-            parseBitAndRest left remaining)
 
     and parseComparison (toks: Token list) : Result<Expr * Token list, string> =
         parseListAppend toks
@@ -2062,7 +2021,7 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
             | _ -> Ok (left, remaining))
 
     and parseListAppend (toks: Token list) : Result<Expr * Token list, string> =
-        parseShift toks
+        parseAdditive toks
         |> Result.bind (fun (left, remaining) ->
             match remaining with
             | TAt :: rest ->
@@ -2071,22 +2030,6 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                     (Call ("Stdlib.List.append", NonEmptyList.fromList [left; right]), remaining'))
             | _ ->
                 Ok (left, remaining))
-
-    and parseShift (toks: Token list) : Result<Expr * Token list, string> =
-        parseAdditive toks
-        |> Result.bind (fun (left, remaining) ->
-            let rec parseShiftRest (leftExpr: Expr) (toks: Token list) : Result<Expr * Token list, string> =
-                match toks with
-                | TShl :: rest ->
-                    parseAdditive rest
-                    |> Result.bind (fun (right, remaining') ->
-                        parseShiftRest (BinOp (Shl, leftExpr, right)) remaining')
-                | TShr :: rest ->
-                    parseAdditive rest
-                    |> Result.bind (fun (right, remaining') ->
-                        parseShiftRest (BinOp (Shr, leftExpr, right)) remaining')
-                | _ -> Ok (leftExpr, toks)
-            parseShiftRest left remaining)
 
     and parseAdditive (toks: Token list) : Result<Expr * Token list, string> =
         parseMultiplicative toks
@@ -2109,24 +2052,34 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
             parseAdditiveRest left remaining)
 
     and parseMultiplicative (toks: Token list) : Result<Expr * Token list, string> =
-        parseUnary toks
+        parsePower toks
         |> Result.bind (fun (left, remaining) ->
             let rec parseMultiplicativeRest (leftExpr: Expr) (toks: Token list) : Result<Expr * Token list, string> =
                 match toks with
                 | TStar :: rest ->
-                    parseUnary rest
+                    parsePower rest
                     |> Result.bind (fun (right, remaining') ->
                         parseMultiplicativeRest (BinOp (Mul, leftExpr, right)) remaining')
                 | TSlash :: rest ->
-                    parseUnary rest
+                    parsePower rest
                     |> Result.bind (fun (right, remaining') ->
                         parseMultiplicativeRest (BinOp (Div, leftExpr, right)) remaining')
                 | TPercent :: rest ->
-                    parseUnary rest
+                    parsePower rest
                     |> Result.bind (fun (right, remaining') ->
                         parseMultiplicativeRest (BinOp (Mod, leftExpr, right)) remaining')
                 | _ -> Ok (leftExpr, toks)
             parseMultiplicativeRest left remaining)
+
+    and parsePower (toks: Token list) : Result<Expr * Token list, string> =
+        parseUnary toks
+        |> Result.bind (fun (left, remaining) ->
+            match remaining with
+            | TPow :: rest ->
+                parsePower rest
+                |> Result.map (fun (right, remaining') ->
+                    (BinOp (Pow, left, right), remaining'))
+            | _ -> Ok (left, remaining))
 
     and parseUnary (toks: Token list) : Result<Expr * Token list, string> =
         match toks with
@@ -2150,23 +2103,22 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
             // For non-literal expressions, use UnaryOp
             parseUnary rest
             |> Result.map (fun (expr, remaining) -> (UnaryOp (Neg, expr), remaining))
-        | TNot :: rest ->
-            parseUnary rest
-            |> Result.map (fun (expr, remaining) -> (UnaryOp (Not, expr), remaining))
-        | TBitNot :: rest ->
-            parseUnary rest
-            |> Result.map (fun (expr, remaining) -> (UnaryOp (BitNot, expr), remaining))
         | _ ->
             parsePrimary toks
 
     and parsePrimary (toks: Token list) : Result<Expr * Token list, string> =
         // Parse a primary expression, then handle postfix operations and
         // Space application: f x y
+        let startsWithGroupedExpression =
+            match toks with
+            | TLParen :: _ | TAdjacentLParen :: _ -> true
+            | _ -> false
+
         parsePrimaryBase toks
         |> Result.bind (fun (expr, remaining) ->
-            parsePostfix false expr remaining
-            |> Result.bind (fun (postfixExpr, remaining', endsWithParenthesizedCall) ->
-                parseApplication postfixExpr remaining' (not endsWithParenthesizedCall) false))
+            parsePostfix expr remaining
+            |> Result.bind (fun (postfixExpr, remaining') ->
+                parseApplication postfixExpr remaining' (not startsWithGroupedExpression) false))
 
     and parseApplication
         (callee: Expr)
@@ -2189,8 +2141,7 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                 else
                     parsePrimaryBase toks
                     |> Result.bind (fun (argBaseExpr, afterArgBase) ->
-                        parsePostfix false argBaseExpr afterArgBase
-                        |> Result.map (fun (argExpr, remaining, _) -> (argExpr, remaining)))
+                        parsePostfix argBaseExpr afterArgBase)
 
             parseOneArg ()
             |> Result.bind (fun (argExpr, afterArg) ->
@@ -2324,7 +2275,7 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                 // Parenthesized constructor syntax is handled by parsePostfix.
                 Ok (Constructor (UnresolvedConstructor (Some typeName), variantName, None), afterQualified)
             | TLParen :: TRParen :: rest ->
-                // Qualified zero-arg call: Stdlib.Module.fn()
+                // Qualified unit-argument call: Stdlib.Module.fn ()
                 Ok (Call (fullName, NonEmptyList.singleton UnitLiteral), rest)
             | TLt :: typeArgsStart ->
                 // Qualified generic function call: Stdlib.List.length<t>(args)
@@ -2355,10 +2306,10 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                 // Qualified variable reference (function as value)
                 Ok (Var fullName, afterQualified)
         | TIdent name :: TLParen :: TRParen :: rest when name.Length = 0 || not (System.Char.IsUpper(name.[0])) ->
-            // Zero-arg call: fn()
+            // Unit-argument call: fn ()
             Ok (Call (name, NonEmptyList.singleton UnitLiteral), rest)
         | TIdent name :: TLt :: rest when name.Length = 0 || not (System.Char.IsUpper(name.[0])) ->
-            // Could be generic function call: name<type, ...>(args)
+            // Could be generic function application: name<type, ...> args
             // Or could be comparison: name < expr
             // Disambiguate by checking whether a full type argument list parses.
             let looksLikeGenericCall tokens =
@@ -2422,6 +2373,20 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                 (afterOp: Token list)
                 : Result<Expr * Token list, string> =
                 parsePipeOperatorSection op afterOp
+            let parseOperatorFunctionSection
+                (op: BinOp)
+                (afterOp: Token list)
+                : Result<Expr * Token list, string> =
+                Ok (
+                    Lambda (
+                        NonEmptyList.fromList
+                            [ lambdaParameter (LPVariable "$operator_left")
+                              lambdaParameter (LPVariable "$operator_right") ],
+                        None,
+                        BinOp (op, Var "$operator_left", Var "$operator_right")
+                    ),
+                    afterOp
+                )
             match rest with
             | TAnd :: TRParen :: afterOp ->
                 // (&&) - operator section, parse the right operand
@@ -2451,16 +2416,8 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                 parseGeneratedPipeOperatorSection Lte afterOp
             | TGte :: TRParen :: afterOp ->
                 parseGeneratedPipeOperatorSection Gte afterOp
-            | TBitAnd :: TRParen :: afterOp ->
-                parseGeneratedPipeOperatorSection BitAnd afterOp
-            | TBitOr :: TRParen :: afterOp ->
-                parseGeneratedPipeOperatorSection BitOr afterOp
-            | TBitXor :: TRParen :: afterOp ->
-                parseGeneratedPipeOperatorSection BitXor afterOp
-            | TShl :: TRParen :: afterOp ->
-                parseGeneratedPipeOperatorSection Shl afterOp
-            | TShr :: TRParen :: afterOp ->
-                parseGeneratedPipeOperatorSection Shr afterOp
+            | TPow :: TRParen :: afterOp ->
+                parseOperatorFunctionSection Pow afterOp
             | TPlusPlus :: TRParen :: afterOp ->
                 parsePipeOperatorSection StringConcat afterOp
             | _ ->
@@ -2630,30 +2587,26 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                     Ok (ListLiteral (List.rev (expr :: acc)), rest)
                 | _ -> Error "Expected ';', ',', or ']' in list literal")
 
-    and parsePostfix
-        (endsWithParenthesizedCall: bool)
-        (expr: Expr)
-        (toks: Token list)
-        : Result<Expr * Token list * bool, string> =
-        // Handle postfix operations: tuple access (.0, .1), field access (.fieldName),
-        // and optional parenthesized call arguments.
+    and parsePostfix (expr: Expr) (toks: Token list) : Result<Expr * Token list, string> =
+        // Handle postfix operations: tuple access (.0, .1), field access
+        // (.fieldName), and parenthesized arguments in space application.
         match toks with
         | TDot :: TBigInt index :: rest ->
             if index > bigint System.Int32.MaxValue then
                 Error "Tuple index is too large"
             else
                 let accessExpr = TupleAccess (expr, int index)
-                parsePostfix false accessExpr rest
+                parsePostfix accessExpr rest
         | TDot :: TInt64 index :: rest ->
             if index < 0L then
                 Error "Tuple index cannot be negative"
             else
                 let accessExpr = TupleAccess (expr, int index)
-                parsePostfix false accessExpr rest
+                parsePostfix accessExpr rest
         | TDot :: TIdent fieldName :: rest ->
             // Record field access
             let accessExpr = RecordAccess (expr, fieldName)
-            parsePostfix false accessExpr rest
+            parsePostfix accessExpr rest
         | TAdjacentLParen :: rest ->
             let rec hasTopLevelComma depth remaining =
                 match remaining with
@@ -2671,11 +2624,11 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                 Error "Parenthesized call syntax is not supported; use 'f a b'"
             | _ ->
                 // Adjacency is immaterial for a single grouped argument.
-                Ok (expr, TLParen :: rest, endsWithParenthesizedCall)
+                Ok (expr, TLParen :: rest)
         | TLParen :: rest ->
             // A spaced parenthesis is one grouped or tuple argument.
-            Ok (expr, toks, endsWithParenthesizedCall)
-        | _ -> Ok (expr, toks, endsWithParenthesizedCall)
+            Ok (expr, toks)
+        | _ -> Ok (expr, toks)
 
     // Parse top-level elements (functions or expressions)
     let rec parseTopLevels
@@ -2718,14 +2671,14 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
 
         | TLet :: TIdent firstName :: TLParen :: rest ->
             // Top-level function definition:
-            // let name(args) : ReturnType = body
+            // let name (arg: Type) : ReturnType = body
             parseFunctionDef (TFunctionDeclaration :: TIdent firstName :: TLParen :: rest) parseExpr
             |> Result.bind (fun (funcDef, remaining) ->
                 parseTopLevels remaining (NameSyntax.SourceFunction (NameSyntax.identifierFromText firstName, funcDef) :: acc))
 
         | TLet :: TIdent firstName :: TLt :: rest ->
             // Generic top-level function definition:
-            // let name<'t>(args) : ReturnType = body
+            // let name<'t> (arg: t) : ReturnType = body
             parseFunctionDef (TFunctionDeclaration :: TIdent firstName :: TLt :: rest) parseExpr
             |> Result.bind (fun (funcDef, remaining) ->
                 parseTopLevels remaining (NameSyntax.SourceFunction (NameSyntax.identifierFromText firstName, funcDef) :: acc))
@@ -2754,6 +2707,8 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                     | TEOF :: [] ->
                         // Single expression program
                         Ok (NameSyntax.SourceDeclarations (NonEmptyList.fromList (List.rev (NameSyntax.SourceExpression expr :: acc))))
+                    | TDoubleRightAngle :: _ ->
+                        Error "Operator '>>' is reserved but not supported by the expression grammar"
                     | _ ->
                         // More top-level definitions after expression not allowed for now
                         Error "Unexpected tokens after expression (only function definitions can be followed by more definitions)")
@@ -2935,8 +2890,8 @@ let private validatePublicDictTypeArity (tokens: Token list) : Result<unit, stri
         | TLt :: rest -> containsTopLevelComma (depth + 1) rest
         | TGt :: _ when depth = 1 -> false
         | TGt :: rest -> containsTopLevelComma (depth - 1) rest
-        | TShr :: _ when depth <= 2 -> false
-        | TShr :: rest -> containsTopLevelComma (depth - 2) rest
+        | TDoubleRightAngle :: _ when depth <= 2 -> false
+        | TDoubleRightAngle :: rest -> containsTopLevelComma (depth - 2) rest
         | TComma :: _ when depth = 1 -> true
         | _ :: rest -> containsTopLevelComma depth rest
     let rec validate remaining =

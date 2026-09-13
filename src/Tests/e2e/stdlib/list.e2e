@@ -113,7 +113,7 @@ let selected = Stdlib.List.getAtOrDefault<Float> ([-0.0]) (0L) (1.0) in Stdlib.F
 let fallback = Stdlib.List.getAtOrDefault<Float> ([1.0]) (1L) (-0.0) in Stdlib.Float.toBits (fallback) = 9223372036854775808UL
 
 // Float results cross the generic Option boundary without losing their type.
-let floats = [1.0, 2.0, 3.0] in match Stdlib.List.getAt<Float>(floats, 1I) with | Some(x) -> Stdlib.Float.toInt(x * 1000.0) | None -> -1L = 2000L
+let floats = [1.0, 2.0, 3.0] in match Stdlib.List.getAt<Float> (floats) (1) with | Some (x) -> Stdlib.Float.toInt (x * 1000.0) | None -> -1L = 2000L
 
 // ===================================================================
 // Stdlib.List.findFirst - Find first element matching predicate

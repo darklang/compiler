@@ -6,13 +6,10 @@ module Stdlib.Bool
 
 // Stdlib.Bool - Boolean operations
 
-let not (b: Bool) : Bool = !b
-
 let and (a: Bool) (b: Bool) : Bool = a && b
 
 let or (a: Bool) (b: Bool) : Bool = a || b
 
-let xor (a: Bool) (b: Bool) : Bool = if a then !b else b
+let xor (a: Bool) (b: Bool) : Bool = if a then Stdlib.Bool.not b else b
 
 let toString (b: Bool) : String = if b then "true" else "false"
-

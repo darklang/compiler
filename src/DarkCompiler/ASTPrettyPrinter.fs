@@ -103,6 +103,7 @@ let private formatBinOp (op: BinOp) : string =
     | Mul -> "*"
     | Div -> "/"
     | Mod -> "%"
+    | Pow -> "^"
     | Shl -> "<<"
     | Shr -> ">>"
     | BitAnd -> "&"
@@ -137,6 +138,7 @@ let private isComparisonOp (op: BinOp) : bool =
     | Mul
     | Div
     | Mod
+    | Pow
     | Shl
     | Shr
     | BitAnd
@@ -167,6 +169,7 @@ let private binOpPrecedence (op: BinOp) : int =
     | Mul
     | Div
     | Mod -> 9
+    | Pow -> 10
 
 let private shouldParenthesizeBinChild (parentOp: BinOp) (isLeftChild: bool) (childOp: BinOp) : bool =
     let parentPrec = binOpPrecedence parentOp
@@ -177,6 +180,9 @@ let private shouldParenthesizeBinChild (parentOp: BinOp) (isLeftChild: bool) (ch
         false
     elif isComparisonOp parentOp then
         true
+    elif parentOp = Pow then
+        // Exponentiation is right-associative.
+        isLeftChild
     else
         // Operators are left-associative: left child can omit equal-precedence
         // parentheses, right child needs them to preserve tree shape.
@@ -340,7 +346,7 @@ let rec private formatExpr (expr: Expr) : string =
         | [] -> []
         | [lastArg] -> [formatAppArg lastArg]
         | currentArg :: ((UnitLiteral as nextArg) :: restArgs) ->
-            // `f x ()` is ambiguous with zero-arg calls (`x()`).
+            // `f x ()` can be reparsed as applying unit to `x`.
             // Parenthesize the preceding argument to preserve argument boundaries.
             $"({formatAppArg currentArg})"
             :: (formatAppArgs (nextArg :: restArgs))

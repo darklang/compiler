@@ -512,7 +512,7 @@ let testExpressionTypeCheckingReusesBaseRegistries
     : TestResult =
     let baseEnv = stdlib.Context.TypeCheckEnv
     let source =
-        "Stdlib.List.map<Int64, Int64>([1L, 2L], fun x -> x + 1L) == [2L, 3L]"
+        "Stdlib.List.map<Int64, Int64> [1L, 2L] (fun x -> x + 1L) == [2L, 3L]"
     CompilerLibrary.parseProgram false source
     |> Result.bind (fun program ->
         TypeChecking.checkProgramWithBaseEnvAndSettings
@@ -651,10 +651,10 @@ let testStdlibReachabilityIsReused
     : TestResult =
     use session = new CompilerLibrary.CompilationSession()
     let source functionName =
-        $"let {functionName}(value: Int64) : String =\n"
-        + $"    if value <= 0L then Stdlib.Int64.toString(value)\n"
-        + $"    else {functionName}(value - 1L)\n\n"
-        + $"{functionName}(1L)"
+        $"let {functionName} (value: Int64) : String =\n"
+        + $"    if value <= 0L then Stdlib.Int64.toString value\n"
+        + $"    else {functionName} (value - 1L)\n\n"
+        + $"{functionName} 1L"
     expectCompiled (compile stdlib session CompilerLibrary.defaultOptions (source "first_user_function"))
     |> Result.bind (fun () ->
         expectCompiled (compile stdlib session CompilerLibrary.defaultOptions (source "second_user_function")))

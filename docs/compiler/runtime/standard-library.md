@@ -90,17 +90,17 @@ user code:
 ```dark
 module Stdlib.Int64
 
-let max(a: Int64, b: Int64) : Int64 =
+let max (a: Int64) (b: Int64) : Int64 =
     if a > b then a else b
 ```
 
 ```dark
 module Stdlib.List
 
-let map<'a, 'b>(list: List<a>, fn: (a) -> b) : List<b> =
+let map<'a, 'b> (list: List<a>) (fn: a -> b) : List<b> =
     match list with
     | [] -> []
-    | h :: t -> Stdlib.List.push<b>(Stdlib.List.map<a, b>(t, fn), fn(h))
+    | h :: t -> Stdlib.List.push<b> (Stdlib.List.map<a, b> t fn) (fn h)
 ```
 
 ## Root prelude
@@ -108,11 +108,11 @@ let map<'a, 'b>(list: List<a>, fn: (a) -> b) : List<b> =
 ```dark
 module Stdlib
 
-let equals<'a>(left: a, right: a) : Bool
-let notEquals<'a>(left: a, right: a) : Bool
-let print(str: String) : Unit
-let printLine(str: String) : Unit
-let printLines(lines: List<String>) : Unit
+let equals<'a> (left: a) (right: a) : Bool
+let notEquals<'a> (left: a) (right: a) : Bool
+let print (str: String) : Unit
+let printLine (str: String) : Unit
+let printLines (lines: List<String>) : Unit
 ```
 
 Equality functions monomorphize over the compiler's existing typed structural
@@ -124,24 +124,24 @@ separate compiler stage and suppresses Unit.
 ## Stdlib.Int64
 
 ```dark
-let add(a: Int64, b: Int64) : Int64 = a + b
-let sub(a: Int64, b: Int64) : Int64 = a - b
-let mul(a: Int64, b: Int64) : Int64 = a * b
-let div(a: Int64, b: Int64) : Int64 = a / b
-let mod(a: Int64, b: Int64) : Int64 = a % b
-let max(a: Int64, b: Int64) : Int64
-let min(a: Int64, b: Int64) : Int64
-let absoluteValue(a: Int64) : Int64
-let negate(a: Int64) : Int64
-let power(base: Int64, exponent: Int64) : Int64
-let clamp(value: Int64, limitA: Int64, limitB: Int64) : Int64
-let toString(n: Int64) : String
-let popcount(x: Int64) : Int64  // Count set bits
+let add (a: Int64) (b: Int64) : Int64 = a + b
+let sub (a: Int64) (b: Int64) : Int64 = a - b
+let mul (a: Int64) (b: Int64) : Int64 = a * b
+let div (a: Int64) (b: Int64) : Int64 = a / b
+let mod (a: Int64) (b: Int64) : Int64 = a % b
+let max (a: Int64) (b: Int64) : Int64
+let min (a: Int64) (b: Int64) : Int64
+let absoluteValue (a: Int64) : Int64
+let negate (a: Int64) : Int64
+let power (base: Int64) (exponent: Int64) : Int64
+let clamp (value: Int64) (limitA: Int64) (limitB: Int64) : Int64
+let toString (n: Int64) : String
+let popcount (x: Int64) : Int64  // Count set bits
 // Bitwise
-let bitwiseAnd(a: Int64, b: Int64) : Int64
-let bitwiseXor(a: Int64, b: Int64) : Int64
-let shiftLeft(a: Int64, shift: Int64) : Int64
-let shiftRight(a: Int64, shift: Int64) : Int64
+let bitwiseAnd (a: Int64) (b: Int64) : Int64
+let bitwiseXor (a: Int64) (b: Int64) : Int64
+let shiftLeft (a: Int64) (shift: Int64) : Int64
+let shiftRight (a: Int64) (shift: Int64) : Int64
 ```
 
 ## Stdlib.Int8/Int16/Int32/UInt8/UInt16/UInt32/UInt64
@@ -151,11 +151,11 @@ These modules mirror the `Stdlib.Int64` API for their respective widths.
 ## Stdlib.Bool
 
 ```dark
-let not(b: Bool) : Bool
-let and(a: Bool, b: Bool) : Bool
-let or(a: Bool, b: Bool) : Bool
-let xor(a: Bool, b: Bool) : Bool
-let toString(b: Bool) : String
+let not (b: Bool) : Bool
+let and (a: Bool) (b: Bool) : Bool
+let or (a: Bool) (b: Bool) : Bool
+let xor (a: Bool) (b: Bool) : Bool
+let toString (b: Bool) : String
 ```
 
 ## Stdlib.Option
@@ -165,16 +165,16 @@ module Stdlib.Option
 
 type Option<'t> = | Some of t | None
 
-let isSome<'t>(opt: Option<t>) : Bool
-let isNone<'t>(opt: Option<t>) : Bool
-let withDefault<'t>(opt: Option<t>, default: t) : t
-let map<'t, 'u>(opt: Option<t>, fn: (t) -> u) : Option<u>
-let andThen<'t, 'u>(opt: Option<t>, fn: (t) -> Option<u>) : Option<u>
-let and<'a, 'b>(option1: Option<a>, option2: Option<b>) : Option<b>
-let toList<'t>(opt: Option<t>) : List<t>
+let isSome<'t> (opt: Option<t>) : Bool
+let isNone<'t> (opt: Option<t>) : Bool
+let withDefault<'t> (opt: Option<t>) (default: t) : t
+let map<'t, 'u> (opt: Option<t>) (fn: t -> u) : Option<u>
+let andThen<'t, 'u> (opt: Option<t>) (fn: t -> Option<u>) : Option<u>
+let and<'a, 'b> (option1: Option<a>) (option2: Option<b>) : Option<b>
+let toList<'t> (opt: Option<t>) : List<t>
 ```
 
-`Stdlib.List.iter<'a>(list, fn)` invokes `fn` exactly once per element in
+`Stdlib.List.iter<'a> list fn` invokes `fn` exactly once per element in
 head-to-tail order and returns Unit; the empty list performs no calls.
 
 ## Stdlib.Result
@@ -184,14 +184,14 @@ module Stdlib.Result
 
 type Result<'t, 'e> = | Ok of t | Error of e
 
-let isOk<'t, 'e>(result: Result<t, e>) : Bool
-let isError<'t, 'e>(result: Result<t, e>) : Bool
-let withDefault<'t, 'e>(result: Result<t, e>, default: t) : t
-let map<'t, 'u, 'e>(result: Result<t, e>, fn: (t) -> u) : Result<u, e>
-let mapError<'t, 'e, 'f>(fn: (e) -> f, result: Result<t, e>) : Result<t, f>
-let andThen<'t, 'u, 'e>(result: Result<t, e>, fn: (t) -> Result<u, e>) : Result<u, e>
-let and<'t, 'e>(result1: Result<t, e>, result2: Result<t, e>) : Result<t, e>
-let or<'t, 'e>(result1: Result<t, e>, result2: Result<t, e>) : Result<t, e>
+let isOk<'t, 'e> (result: Result<t, e>) : Bool
+let isError<'t, 'e> (result: Result<t, e>) : Bool
+let withDefault<'t, 'e> (result: Result<t, e>) (default: t) : t
+let map<'t, 'u, 'e> (result: Result<t, e>) (fn: t -> u) : Result<u, e>
+let mapError<'t, 'e, 'f> (fn: e -> f) (result: Result<t, e>) : Result<t, f>
+let andThen<'t, 'u, 'e> (result: Result<t, e>) (fn: t -> Result<u, e>) : Result<u, e>
+let and<'t, 'e> (result1: Result<t, e>) (result2: Result<t, e>) : Result<t, e>
+let or<'t, 'e> (result1: Result<t, e>) (result2: Result<t, e>) : Result<t, e>
 ```
 
 ## Stdlib.Retry
@@ -199,10 +199,10 @@ let or<'t, 'e>(result1: Result<t, e>, result2: Result<t, e>) : Result<t, e>
 ```dark
 module Stdlib.Retry
 
-let withBackoffLoop<'a>(maxAttempts: Int, attempt: Int, delayMs: Float, fn: (Unit) -> Result<a, String>) : Result<a, String>
-let withBackoff<'a>(maxAttempts: Int, fn: (Unit) -> Result<a, String>) : Result<a, String>
-let withFixedDelayLoop<'a>(maxAttempts: Int, attempt: Int, delayMs: Float, fn: (Unit) -> Result<a, String>) : Result<a, String>
-let withFixedDelay<'a>(maxAttempts: Int, delayMs: Float, fn: (Unit) -> Result<a, String>) : Result<a, String>
+let withBackoffLoop<'a> (maxAttempts: Int) (attempt: Int) (delayMs: Float) (fn: Unit -> Result<a, String>) : Result<a, String>
+let withBackoff<'a> (maxAttempts: Int) (fn: Unit -> Result<a, String>) : Result<a, String>
+let withFixedDelayLoop<'a> (maxAttempts: Int) (attempt: Int) (delayMs: Float) (fn: Unit -> Result<a, String>) : Result<a, String>
+let withFixedDelay<'a> (maxAttempts: Int) (delayMs: Float) (fn: Unit -> Result<a, String>) : Result<a, String>
 ```
 
 Callbacks run at least once. Retry stops on the first `Ok` or once the current
@@ -213,16 +213,16 @@ while fixed delay stays unchanged.
 ## Stdlib.Stream
 
 ```dark
-let fromList<'a>(items: List<'a>) : Stream<'a>
-let unfold<'state, 'a>(initial: 'state, step: 'state -> Option<('a, 'state)>) : Stream<'a>
-let next<'a>(stream: Stream<'a>) : Option<'a>
-let toList<'a>(stream: Stream<'a>) : List<'a>
-let toBlob(stream: Stream<UInt8>) : Blob
-let close<'a>(stream: Stream<'a>) : Unit
-let map<'a, 'b>(stream: Stream<'a>, fn: 'a -> 'b) : Stream<'b>
-let filter<'a>(stream: Stream<'a>, predicate: 'a -> Bool) : Stream<'a>
-let take<'a>(stream: Stream<'a>, count: Int) : Stream<'a>
-let concat<'a>(streams: List<Stream<'a>>) : Stream<'a>
+let fromList<'a> (items: List<a>) : Stream<a>
+let unfold<'state, 'a> (initial: state) (step: state -> Option<(a * state)>) : Stream<a>
+let next<'a> (stream: Stream<a>) : Option<a>
+let toList<'a> (stream: Stream<a>) : List<a>
+let toBlob (stream: Stream<UInt8>) : Blob
+let close<'a> (stream: Stream<a>) : Unit
+let map<'a, 'b> (stream: Stream<a>) (fn: a -> b) : Stream<b>
+let filter<'a> (stream: Stream<a>) (predicate: a -> Bool) : Stream<a>
+let take<'a> (stream: Stream<a>) (count: Int) : Stream<a>
+let concat<'a> (streams: List<Stream<a>>) : Stream<a>
 ```
 
 All transformations are lazy and single-consumer. Exhaustion, explicit close,
@@ -231,12 +231,12 @@ early termination, and last-owner release share an idempotent disposal path.
 ## Stdlib.File (Intrinsic)
 
 ```dark
-let readText(path: String) : Result<String, String>
-let writeText(path: String, content: String) : Result<Unit, String>
-let appendText(path: String, content: String) : Result<Unit, String>
-let delete(path: String) : Result<Unit, String>
-let exists(path: String) : Bool
-let setExecutable(path: String) : Result<Unit, String>
+let readText (path: String) : Result<String, String>
+let writeText (path: String) (content: String) : Result<Unit, String>
+let appendText (path: String) (content: String) : Result<Unit, String>
+let delete (path: String) : Result<Unit, String>
+let exists (path: String) : Bool
+let setExecutable (path: String) : Result<Unit, String>
 ```
 
 These generate syscall sequences (open, read/write, close).
@@ -244,11 +244,11 @@ These generate syscall sequences (open, read/write, close).
 ## Stdlib.Cli
 
 ```dark
-let Stdlib.Cli.execute(command: String) : Stdlib.Cli.ExecutionOutcome
-let Stdlib.Cli.Process.run(program: String, args: List<String>) : Result<Output, Posix.Error>
-let Stdlib.Cli.OS.getOS() : Result<OS, String>
-let Stdlib.Cli.Stdin.readKey() : KeyRead
-let Stdlib.Cli.Posix.sleep(delayMs: Float) : Unit
+let Stdlib.Cli.execute (command: String) : Stdlib.Cli.ExecutionOutcome
+let Stdlib.Cli.Process.run (program: String) (args: List<String>) : Result<Output, Posix.Error>
+let Stdlib.Cli.OS.getOS () : Result<OS, String>
+let Stdlib.Cli.Stdin.readKey () : KeyRead
+let Stdlib.Cli.Posix.sleep (delayMs: Float) : Unit
 ```
 
 Portable helpers are Dark source; typed CLI operations lower through
@@ -261,7 +261,7 @@ ARM64, Linux x86_64, and macOS ARM64. It does not spawn a shell process.
 ## Stdlib.Random (Intrinsic)
 
 ```dark
-let int64() : Int64  // 8 random bytes
+let int64 () : Int64  // 8 random bytes
 ```
 
 Uses platform-specific random source:
@@ -293,7 +293,7 @@ Stdlib functions are only included if called (dead code elimination).
 Generic stdlib functions are monomorphized per use:
 
 ```dark
-Stdlib.List.map<Int64, String>(nums, toString)
+Stdlib.List.map<Int64, String> nums toString
 ```
 
 Creates `Stdlib.List.map_i64_String` specialized function.

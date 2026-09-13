@@ -301,7 +301,7 @@ let __indexedMapHelper<'a, 'b> (list: List<a>) (fn: Int -> a -> b) (index: Int) 
 // Returns (elements where predicate is true, elements where predicate is false)
 let partition<'a> (list: List<a>) (fn: (a) -> Bool) : (List<a> * List<a>) =
     match list with
-    | [] -> ([]) ([])
+    | [] -> ([], [])
     | head :: tail ->
         match Stdlib.List.partition<a> (tail) (fn) with
         | (trueList, falseList) ->
@@ -384,10 +384,10 @@ let zipShortest<'a, 'b> (listA: List<a>) (listB: List<b>) : List<(a * b)> =
 
 let unzip<'a, 'b> (pairs: List<(a * b)>) : (List<a> * List<b>) =
     match pairs with
-    | [] -> ([]) ([])
+    | [] -> ([], [])
     | (first, second) :: tail ->
         match Stdlib.List.unzip<a, b> (tail) with
-        | (firsts, seconds) -> (Stdlib.List.push<a> (firsts) (first)) (Stdlib.List.push<b> (seconds) (second))
+        | (firsts, seconds) -> (Stdlib.List.push<a> (firsts) (first), Stdlib.List.push<b> (seconds) (second))
 
 let splitLast<'a> (list: List<a>) : Stdlib.Option.Option<(List<a> * a)> =
     match Stdlib.List.reverse<a> (list) with
@@ -436,7 +436,7 @@ let iter<'a> (list: List<a>) (fn: (a) -> Unit) : Unit =
         Stdlib.List.iter<a> (tail) (fn)
 
 let __randomIndex (bound: Int64) : Int64 =
-    let sample = Stdlib.Random.int64 () & 9223372036854775807L in
+    let sample = Stdlib.Int64.bitwiseAnd (Stdlib.Random.int64 ()) 9223372036854775807L in
     let limit = 9223372036854775807L - (9223372036854775807L % bound) in
     if sample < limit then sample % bound else Stdlib.List.__randomIndex (bound)
 

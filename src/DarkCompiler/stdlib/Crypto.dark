@@ -14,18 +14,18 @@ module Stdlib.Crypto
 let __mask32 () : Int64 = 4294967295L
 
 let __add32 (a: Int64) (b: Int64) : Int64 =
-    (a + b) & Stdlib.Crypto.__mask32 ()
+    Stdlib.Int64.bitwiseAnd (a + b) (Stdlib.Crypto.__mask32 ())
 
 let __rotr32 (x: Int64) (n: Int64) : Int64 =
-    let masked = x & Stdlib.Crypto.__mask32 () in
-    Stdlib.Int64.bitwiseOr ((masked >> n)) ((masked << (32L - n))) & Stdlib.Crypto.__mask32 ()
+    let masked = Stdlib.Int64.bitwiseAnd x (Stdlib.Crypto.__mask32 ()) in
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftRight masked n) (Stdlib.Int64.shiftLeft masked (32L - n))) (Stdlib.Crypto.__mask32 ())
 
 let __rotl32 (x: Int64) (n: Int64) : Int64 =
-    let masked = x & Stdlib.Crypto.__mask32 () in
-    Stdlib.Int64.bitwiseOr ((masked << n)) ((masked >> (32L - n))) & Stdlib.Crypto.__mask32 ()
+    let masked = Stdlib.Int64.bitwiseAnd x (Stdlib.Crypto.__mask32 ()) in
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft masked n) (Stdlib.Int64.shiftRight masked (32L - n))) (Stdlib.Crypto.__mask32 ())
 
 let __not32 (x: Int64) : Int64 =
-    (~~~x) & Stdlib.Crypto.__mask32 ()
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseNot x) (Stdlib.Crypto.__mask32 ())
 
 // =============================================================================
 // Byte Packing/Unpacking
@@ -37,7 +37,7 @@ let __getBE32 (b: Blob) (offset: Int64) : Int64 =
     let b1 = Stdlib.Blob.__getByte (b) (offset + 1L) in
     let b2 = Stdlib.Blob.__getByte (b) (offset + 2L) in
     let b3 = Stdlib.Blob.__getByte (b) (offset + 3L) in
-    Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr ((b0 << 24L)) ((b1 << 16L))) ((b2 << 8L))) (b3)
+    Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft b0 24L) (Stdlib.Int64.shiftLeft b1 16L)) (Stdlib.Int64.shiftLeft b2 8L)) b3
 
 // Read 32-bit little-endian word from bytes at offset
 let __getLE32 (b: Blob) (offset: Int64) : Int64 =
@@ -45,31 +45,31 @@ let __getLE32 (b: Blob) (offset: Int64) : Int64 =
     let b1 = Stdlib.Blob.__getByte (b) (offset + 1L) in
     let b2 = Stdlib.Blob.__getByte (b) (offset + 2L) in
     let b3 = Stdlib.Blob.__getByte (b) (offset + 3L) in
-    Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr (b0) ((b1 << 8L))) ((b2 << 16L))) ((b3 << 24L))
+    Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr b0 (Stdlib.Int64.shiftLeft b1 8L)) (Stdlib.Int64.shiftLeft b2 16L)) (Stdlib.Int64.shiftLeft b3 24L)
 
 // Read 64-bit big-endian word from bytes at offset
 let __getBE64 (b: Blob) (offset: Int64) : Int64 =
     let hi = Stdlib.Crypto.__getBE32 (b) (offset) in
     let lo = Stdlib.Crypto.__getBE32 (b) (offset + 4L) in
-    Stdlib.Int64.bitwiseOr ((hi << 32L)) (lo)
+    Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft hi 32L) lo
 
 // Convert 32-bit value to 4-byte list (big-endian)
 let __int32ToBE (v: Int64) : List<Int64> =
-    [(v >> 24L) & 255L, (v >> 16L) & 255L, (v >> 8L) & 255L, v & 255L]
+    [Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 24L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 16L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 8L) 255L, Stdlib.Int64.bitwiseAnd v 255L]
 
 // Convert 32-bit value to 4-byte list (little-endian)
 let __int32ToLE (v: Int64) : List<Int64> =
-    [v & 255L, (v >> 8L) & 255L, (v >> 16L) & 255L, (v >> 24L) & 255L]
+    [Stdlib.Int64.bitwiseAnd v 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 8L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 16L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 24L) 255L]
 
 // Convert 64-bit value to 8-byte list (big-endian)
 let __int64ToBE (v: Int64) : List<Int64> =
-    [(v >> 56L) & 255L, (v >> 48L) & 255L, (v >> 40L) & 255L, (v >> 32L) & 255L,
-     (v >> 24L) & 255L, (v >> 16L) & 255L, (v >> 8L) & 255L, v & 255L]
+    [Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 56L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 48L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 40L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 32L) 255L,
+     Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 24L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 16L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 8L) 255L, Stdlib.Int64.bitwiseAnd v 255L]
 
 // Convert 64-bit value to 8-byte list (little-endian)
 let __int64ToLE (v: Int64) : List<Int64> =
-    [v & 255L, (v >> 8L) & 255L, (v >> 16L) & 255L, (v >> 24L) & 255L,
-     (v >> 32L) & 255L, (v >> 40L) & 255L, (v >> 48L) & 255L, (v >> 56L) & 255L]
+    [Stdlib.Int64.bitwiseAnd v 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 8L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 16L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 24L) 255L,
+     Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 32L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 40L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 48L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 56L) 255L]
 
 // =============================================================================
 // Hex Encoding (for test output)
@@ -84,7 +84,7 @@ let __nibbleToHex (n: Int64) : String =
     | _ -> "?"
 
 let __byteToHex (b: Int64) : String =
-    Stdlib.Crypto.__nibbleToHex ((b >> 4L) & 15L) ++ Stdlib.Crypto.__nibbleToHex (b & 15L)
+    Stdlib.Crypto.__nibbleToHex (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight b 4L) 15L) ++ Stdlib.Crypto.__nibbleToHex (Stdlib.Int64.bitwiseAnd b 15L)
 
 let __bytesToHexHelper (b: Blob) (index: Int64) (len: Int64) (acc: String) : String =
     if index >= len then
@@ -103,19 +103,19 @@ let debugRotl32 (x: Int64) (n: Int64) : Int64 =
 
 // Debug: components of rotl32 calculation
 let debugRotl32Parts (x: Int64) (n: Int64) : (Int64 * Int64 * Int64) =
-    let masked = x & Stdlib.Crypto.__mask32 () in
-    let leftPart = masked << n in
-    let rightPart = masked >> (32L - n) in
-    (leftPart, rightPart, leftPart & Stdlib.Crypto.__mask32 ())
+    let masked = Stdlib.Int64.bitwiseAnd x (Stdlib.Crypto.__mask32 ()) in
+    let leftPart = Stdlib.Int64.shiftLeft masked n in
+    let rightPart = Stdlib.Int64.shiftRight masked (32L - n) in
+    (leftPart, rightPart, Stdlib.Int64.bitwiseAnd leftPart (Stdlib.Crypto.__mask32 ()))
 
 // Debug: full rotl32 trace showing all intermediate values
 // Returns (masked, leftPart, rightPart, orResult, finalResult)
 let debugRotl32Full (x: Int64) (n: Int64) : (Int64 * Int64 * Int64 * Int64 * Int64) =
-    let masked = x & Stdlib.Crypto.__mask32 () in
-    let leftPart = masked << n in
-    let rightPart = masked >> (32L - n) in
+    let masked = Stdlib.Int64.bitwiseAnd x (Stdlib.Crypto.__mask32 ()) in
+    let leftPart = Stdlib.Int64.shiftLeft masked n in
+    let rightPart = Stdlib.Int64.shiftRight masked (32L - n) in
     let orResult = Stdlib.Int64.bitwiseOr (leftPart) (rightPart) in
-    let finalResult = orResult & Stdlib.Crypto.__mask32 () in
+    let finalResult = Stdlib.Int64.bitwiseAnd orResult (Stdlib.Crypto.__mask32 ()) in
     (masked, leftPart, rightPart, orResult, finalResult)
 
 // Debug function: test rotr32
@@ -223,10 +223,10 @@ let debugMd5F (b: Int64) (c: Int64) (d: Int64) : Int64 =
 // Debug: trace through F function components for specific inputs
 // Returns (b_and_c, not_b, not_b_and_d, result)
 let debugMd5FTrace (b: Int64) (c: Int64) (d: Int64) : (Int64 * Int64 * Int64 * Int64) =
-    let b_and_c = b & c in
+    let b_and_c = Stdlib.Int64.bitwiseAnd b c in
     let not_b = Stdlib.Crypto.__not32 (b) in
-    let not_b_and_d = not_b & d in
-    let result = Stdlib.Int64.bitwiseOr (b_and_c) (not_b_and_d) & Stdlib.Crypto.__mask32 () in
+    let not_b_and_d = Stdlib.Int64.bitwiseAnd not_b d in
+    let result = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseOr b_and_c not_b_and_d) (Stdlib.Crypto.__mask32 ()) in
     (b_and_c, not_b, not_b_and_d, result)
 
 // Debug: test not32 function
@@ -235,7 +235,7 @@ let debugNot32 (x: Int64) : Int64 =
 
 // Debug: test raw bitwise NOT before masking
 let debugRawNot (x: Int64) : Int64 =
-    ~~~x
+    Stdlib.Int64.bitwiseNot x
 
 // Debug function: compute one MD5 step and return new B value
 let debugMd5OneStep (a: Int64) (b: Int64) (c: Int64) (d: Int64) (m: Int64) : Int64 =
@@ -330,11 +330,11 @@ let debugMd5Round48Trace (padded: Blob) : (Int64 * Int64 * Int64 * Int64 * Int64
     (f, g, m, k, s, temp, rotated, newB)
 
 // Debug: test I function components
-// I(b, c, d) = c ^ (b | ~d)
+// SHA-1 I(b, c, d) combines c with the complement of d using XOR and OR.
 let debugMd5I (b: Int64) (c: Int64) (d: Int64) : (Int64 * Int64 * Int64 * Int64) =
     let not_d = Stdlib.Crypto.__not32 (d) in
     let b_or_not_d = Stdlib.Int64.bitwiseOr (b) (not_d) in
-    let result = (c ^ b_or_not_d) & Stdlib.Crypto.__mask32 () in
+    let result = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor c b_or_not_d) (Stdlib.Crypto.__mask32 ()) in
     (not_d, b_or_not_d, c, result)
 
 // Debug: run 49 MD5 rounds and return the state
@@ -514,7 +514,7 @@ let __xorByteLists (a: List<Int64>) (b: List<Int64>) (acc: List<Int64>) : List<I
     | x :: xs ->
         match b with
         | [] -> Stdlib.List.reverse<Int64> (acc)
-        | y :: ys -> Stdlib.Crypto.__xorByteLists (xs) (ys) (Stdlib.List.push<Int64> (acc) (x ^ y))
+        | y :: ys -> Stdlib.Crypto.__xorByteLists (xs) (ys) (Stdlib.List.push<Int64> (acc) (Stdlib.Int64.bitwiseXor x y))
 
 // Create a list of N zeros
 let __zeros (n: Int64) (acc: List<Int64>) : List<Int64> =
@@ -602,16 +602,16 @@ let __md5G (i: Int64) : Int64 =
 let __md5F (i: Int64) (b: Int64) (c: Int64) (d: Int64) : Int64 =
     if i < 16L then
         // F = (B and C) or ((not B) and D)
-        Stdlib.Int64.bitwiseOr ((b & c)) ((Stdlib.Crypto.__not32 (b) & d)) & Stdlib.Crypto.__mask32 ()
+        Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseAnd b c) (Stdlib.Int64.bitwiseAnd (Stdlib.Crypto.__not32 b) d)) (Stdlib.Crypto.__mask32 ())
     else if i < 32L then
         // G = (D and B) or ((not D) and C)
-        Stdlib.Int64.bitwiseOr ((d & b)) ((Stdlib.Crypto.__not32 (d) & c)) & Stdlib.Crypto.__mask32 ()
+        Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseAnd d b) (Stdlib.Int64.bitwiseAnd (Stdlib.Crypto.__not32 d) c)) (Stdlib.Crypto.__mask32 ())
     else if i < 48L then
         // H = B xor C xor D
-        (b ^ c ^ d) & Stdlib.Crypto.__mask32 ()
+        Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor b c) d) (Stdlib.Crypto.__mask32 ())
     else
         // I = C xor (B or (not D))
-        (c ^ (Stdlib.Int64.bitwiseOr (b) (Stdlib.Crypto.__not32 (d)))) & Stdlib.Crypto.__mask32 ()
+        Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor c (Stdlib.Int64.bitwiseOr b (Stdlib.Crypto.__not32 d))) (Stdlib.Crypto.__mask32 ())
 
 // MD5 reads 16 words from a 64-byte block
 let __md5GetWord (block: Blob) (blockOffset: Int64) (wordIndex: Int64) : Int64 =
@@ -720,13 +720,13 @@ let __sha1K (i: Int64) : Int64 =
 // SHA-1 round function
 let __sha1F (i: Int64) (b: Int64) (c: Int64) (d: Int64) : Int64 =
     if i < 20L then
-        ((b & c) ^ (Stdlib.Crypto.__not32 (b) & d)) & Stdlib.Crypto.__mask32 ()
+        Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseAnd b c) (Stdlib.Int64.bitwiseAnd (Stdlib.Crypto.__not32 b) d)) (Stdlib.Crypto.__mask32 ())
     else if i < 40L then
-        (b ^ c ^ d) & Stdlib.Crypto.__mask32 ()
+        Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor b c) d) (Stdlib.Crypto.__mask32 ())
     else if i < 60L then
-        ((b & c) ^ (b & d) ^ (c & d)) & Stdlib.Crypto.__mask32 ()
+        Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseAnd b c) (Stdlib.Int64.bitwiseAnd b d)) (Stdlib.Int64.bitwiseAnd c d)) (Stdlib.Crypto.__mask32 ())
     else
-        (b ^ c ^ d) & Stdlib.Crypto.__mask32 ()
+        Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor b c) d) (Stdlib.Crypto.__mask32 ())
 
 // SHA-1 message schedule - expand 16 words to 80
 let __sha1ExpandWord (w: List<Int64>) (i: Int64) : Int64 =
@@ -735,7 +735,7 @@ let __sha1ExpandWord (w: List<Int64>) (i: Int64) : Int64 =
     let w8 = Stdlib.Crypto.__listGet (w) (i - 8L) in
     let w14 = Stdlib.Crypto.__listGet (w) (i - 14L) in
     let w16 = Stdlib.Crypto.__listGet (w) (i - 16L) in
-    Stdlib.Crypto.__rotl32 (w3 ^ w8 ^ w14 ^ w16) (1L)
+    Stdlib.Crypto.__rotl32 (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor w3 w8) w14) w16) 1L
 
 // Build the full 80-word message schedule from 64-byte block
 let __sha1Schedule (block: Blob) (blockOffset: Int64) (w: List<Int64>) (i: Int64) : List<Int64> =
@@ -855,24 +855,24 @@ let __sha256K (i: Int64) : Int64 =
 
 // SHA-256 sigma functions
 let __sha256Sigma0 (x: Int64) : Int64 =
-    (Stdlib.Crypto.__rotr32 (x) (2L) ^ Stdlib.Crypto.__rotr32 (x) (13L) ^ Stdlib.Crypto.__rotr32 (x) (22L)) & Stdlib.Crypto.__mask32 ()
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor (Stdlib.Crypto.__rotr32 x 2L) (Stdlib.Crypto.__rotr32 x 13L)) (Stdlib.Crypto.__rotr32 x 22L)) (Stdlib.Crypto.__mask32 ())
 
 let __sha256Sigma1 (x: Int64) : Int64 =
-    (Stdlib.Crypto.__rotr32 (x) (6L) ^ Stdlib.Crypto.__rotr32 (x) (11L) ^ Stdlib.Crypto.__rotr32 (x) (25L)) & Stdlib.Crypto.__mask32 ()
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor (Stdlib.Crypto.__rotr32 x 6L) (Stdlib.Crypto.__rotr32 x 11L)) (Stdlib.Crypto.__rotr32 x 25L)) (Stdlib.Crypto.__mask32 ())
 
 let __sha256sigma0 (x: Int64) : Int64 =
-    (Stdlib.Crypto.__rotr32 (x) (7L) ^ Stdlib.Crypto.__rotr32 (x) (18L) ^ ((x & Stdlib.Crypto.__mask32 ()) >> 3L)) & Stdlib.Crypto.__mask32 ()
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor (Stdlib.Crypto.__rotr32 x 7L) (Stdlib.Crypto.__rotr32 x 18L)) (Stdlib.Int64.shiftRight (Stdlib.Int64.bitwiseAnd x (Stdlib.Crypto.__mask32 ())) 3L)) (Stdlib.Crypto.__mask32 ())
 
 let __sha256sigma1 (x: Int64) : Int64 =
-    (Stdlib.Crypto.__rotr32 (x) (17L) ^ Stdlib.Crypto.__rotr32 (x) (19L) ^ ((x & Stdlib.Crypto.__mask32 ()) >> 10L)) & Stdlib.Crypto.__mask32 ()
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor (Stdlib.Crypto.__rotr32 x 17L) (Stdlib.Crypto.__rotr32 x 19L)) (Stdlib.Int64.shiftRight (Stdlib.Int64.bitwiseAnd x (Stdlib.Crypto.__mask32 ())) 10L)) (Stdlib.Crypto.__mask32 ())
 
 // SHA-256 Ch function: (x AND y) XOR ((NOT x) AND z)
 let __sha256Ch (x: Int64) (y: Int64) (z: Int64) : Int64 =
-    ((x & y) ^ (Stdlib.Crypto.__not32 (x) & z)) & Stdlib.Crypto.__mask32 ()
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseAnd x y) (Stdlib.Int64.bitwiseAnd (Stdlib.Crypto.__not32 x) z)) (Stdlib.Crypto.__mask32 ())
 
 // SHA-256 Maj function: (x AND y) XOR (x AND z) XOR (y AND z)
 let __sha256Maj (x: Int64) (y: Int64) (z: Int64) : Int64 =
-    ((x & y) ^ (x & z) ^ (y & z)) & Stdlib.Crypto.__mask32 ()
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseAnd x y) (Stdlib.Int64.bitwiseAnd x z)) (Stdlib.Int64.bitwiseAnd y z)) (Stdlib.Crypto.__mask32 ())
 
 // SHA-256 message schedule expansion
 let __sha256ExpandWord (w: List<Int64>) (i: Int64) : Int64 =
@@ -993,15 +993,15 @@ let __shr64 (x: Int64) (n: Int64) : Int64 =
     if n == 0L then x
     else
         // Create mask with (64-n) 1s at bottom to clear sign-extended bits
-        let mask = ~~~((-1L) << (64L - n)) in
-        (x >> n) & mask
+        let mask = Stdlib.Int64.bitwiseNot (Stdlib.Int64.shiftLeft (-1L) (64L - n)) in
+        Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight x n) mask
 
 // 64-bit right rotation with proper handling of sign extension
 let __rotr64 (x: Int64) (n: Int64) : Int64 =
     if n == 0L then x
     else
         // Use logical shift for the right portion, then OR with left shift
-        Stdlib.Int64.bitwiseOr (Stdlib.Crypto.__shr64 (x) (n)) (x << (64L - n))
+        Stdlib.Int64.bitwiseOr (Stdlib.Crypto.__shr64 x n) (Stdlib.Int64.shiftLeft x (64L - n))
 
 // SHA-384/512 K constants (first 64 bits of fractional parts of cube roots of first 80 primes)
 // Values from FIPS 180-4 specification
@@ -1031,24 +1031,24 @@ let __sha512K (i: Int64) : Int64 =
 
 // SHA-384/512 sigma functions (64-bit versions)
 let __sha512Sigma0 (x: Int64) : Int64 =
-    Stdlib.Crypto.__rotr64 (x) (28L) ^ Stdlib.Crypto.__rotr64 (x) (34L) ^ Stdlib.Crypto.__rotr64 (x) (39L)
+    Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor (Stdlib.Crypto.__rotr64 x 28L) (Stdlib.Crypto.__rotr64 x 34L)) (Stdlib.Crypto.__rotr64 x 39L)
 
 let __sha512Sigma1 (x: Int64) : Int64 =
-    Stdlib.Crypto.__rotr64 (x) (14L) ^ Stdlib.Crypto.__rotr64 (x) (18L) ^ Stdlib.Crypto.__rotr64 (x) (41L)
+    Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor (Stdlib.Crypto.__rotr64 x 14L) (Stdlib.Crypto.__rotr64 x 18L)) (Stdlib.Crypto.__rotr64 x 41L)
 
 let __sha512sigma0 (x: Int64) : Int64 =
-    Stdlib.Crypto.__rotr64 (x) (1L) ^ Stdlib.Crypto.__rotr64 (x) (8L) ^ Stdlib.Crypto.__shr64 (x) (7L)
+    Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor (Stdlib.Crypto.__rotr64 x 1L) (Stdlib.Crypto.__rotr64 x 8L)) (Stdlib.Crypto.__shr64 x 7L)
 
 let __sha512sigma1 (x: Int64) : Int64 =
-    Stdlib.Crypto.__rotr64 (x) (19L) ^ Stdlib.Crypto.__rotr64 (x) (61L) ^ Stdlib.Crypto.__shr64 (x) (6L)
+    Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor (Stdlib.Crypto.__rotr64 x 19L) (Stdlib.Crypto.__rotr64 x 61L)) (Stdlib.Crypto.__shr64 x 6L)
 
 // SHA-384/512 Ch function
 let __sha512Ch (x: Int64) (y: Int64) (z: Int64) : Int64 =
-    (x & y) ^ ((~~~x) & z)
+    Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseAnd x y) (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseNot x) z)
 
 // SHA-384/512 Maj function
 let __sha512Maj (x: Int64) (y: Int64) (z: Int64) : Int64 =
-    (x & y) ^ (x & z) ^ (y & z)
+    Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseAnd x y) (Stdlib.Int64.bitwiseAnd x z)) (Stdlib.Int64.bitwiseAnd y z)
 
 // Read 64-bit big-endian word from bytes
 let __sha384GetWord (block: Blob) (offset: Int64) : Int64 =
@@ -1234,7 +1234,7 @@ let debugShr64 (x: Int64) (n: Int64) : Int64 =
 
 // Debug: just the left shift part of rotation
 let debugLeftShift (x: Int64) (n: Int64) : Int64 =
-    x << n
+    Stdlib.Int64.shiftLeft x n
 
 // Debug: test bitwiseOr
 let debugBitwiseOr (a: Int64) (b: Int64) : Int64 =

@@ -60,8 +60,8 @@ let __segmentMatches (pattern: String) (path: String) (patternIndex: Int64) (pat
     | None -> Stdlib.Cli.File.__segmentMatchesNoStar (pattern) (path) (patternIndex) (pathIndex)
     | Some (_) ->
         let parts = Stdlib.String.split (pattern) ("*") in
-        let anchoredStart = !Stdlib.String.startsWith (pattern) ("*") in
-        let anchoredEnd = !Stdlib.String.endsWith (pattern) ("*") in
+        let anchoredStart = Stdlib.Bool.not (Stdlib.String.startsWith (pattern) ("*")) in
+        let anchoredEnd = Stdlib.Bool.not (Stdlib.String.endsWith (pattern) ("*")) in
         Stdlib.Cli.File.__matchStarParts (parts) (path) (pathIndex) (anchoredStart) (anchoredEnd)
 
 let __copySegments (segments: List<String>) : List<String> =

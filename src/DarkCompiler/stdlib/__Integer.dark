@@ -58,8 +58,8 @@ let __compareMagnitude (a: String) (b: String) : Int64 =
 let __compareText (a: String) (b: String) : Int64 =
     let aneg = Stdlib.Int.__isNegativeText (a) in
     let bneg = Stdlib.Int.__isNegativeText (b) in
-    if aneg && !bneg then -1L
-    else if !aneg && bneg then 1L
+    if aneg && Stdlib.Bool.not bneg then -1L
+    else if Stdlib.Bool.not aneg && bneg then 1L
     else
         let magnitudeComparison =
             Stdlib.Int.__compareMagnitude (Stdlib.Int.__magnitudeText (a)) (Stdlib.Int.__magnitudeText (b)) in
@@ -263,7 +263,7 @@ let __shiftRight (value: Int) (count: Int) : Int =
     | Error (message) -> Builtin.crash (message)
     | Ok (remainder) ->
         if Stdlib.Int.__lessThan (value) (Stdlib.Int.__value ("0"))
-           && !Stdlib.Int.__equals (remainder) (Stdlib.Int.__value ("0")) then
+           && Stdlib.Bool.not (Stdlib.Int.__equals (remainder) (Stdlib.Int.__value ("0"))) then
             Stdlib.Int.__subtract (quotient) (Stdlib.Int.__value ("1"))
         else quotient
 
@@ -320,7 +320,7 @@ let __bitwiseAnd (a: Int) (b: Int) : Int =
     let bneg = Stdlib.Int.__lessThan (b) (Stdlib.Int.__value ("0")) in
     let apos = if aneg then Stdlib.Int.__bitwiseNot (a) else a in
     let bpos = if bneg then Stdlib.Int.__bitwiseNot (b) else b in
-    if !aneg && !bneg then Stdlib.Int.__bitwiseAndPositive (apos) (bpos)
+    if Stdlib.Bool.not aneg && Stdlib.Bool.not bneg then Stdlib.Int.__bitwiseAndPositive (apos) (bpos)
     else if aneg && bneg then
         Stdlib.Int.__bitwiseNot (Stdlib.Int.__bitwiseOrPositive (apos) (bpos))
     else if aneg then
@@ -333,7 +333,7 @@ let __bitwiseOr (a: Int) (b: Int) : Int =
     let bneg = Stdlib.Int.__lessThan (b) (Stdlib.Int.__value ("0")) in
     let apos = if aneg then Stdlib.Int.__bitwiseNot (a) else a in
     let bpos = if bneg then Stdlib.Int.__bitwiseNot (b) else b in
-    if !aneg && !bneg then Stdlib.Int.__bitwiseOrPositive (apos) (bpos)
+    if Stdlib.Bool.not aneg && Stdlib.Bool.not bneg then Stdlib.Int.__bitwiseOrPositive (apos) (bpos)
     else if aneg && bneg then
         Stdlib.Int.__bitwiseNot (Stdlib.Int.__bitwiseAndPositive (apos) (bpos))
     else if aneg then
@@ -366,7 +366,7 @@ let __parse (value: String) : Stdlib.Result.Result<Int, Bool> =
     let negative = first == 45L in
     let hasSign = negative || first == 43L in
     let digitStart = if hasSign then 1L else 0L in
-    if digitStart >= length || !Stdlib.Int.__validDigits (input) (digitStart) then
+    if digitStart >= length || Stdlib.Bool.not (Stdlib.Int.__validDigits (input) (digitStart)) then
         Error (false)
     else
         let magnitude = Stdlib.Int.__normalizeMagnitude (Stdlib.String.__byteDrop (input) (digitStart)) in
@@ -481,13 +481,13 @@ let __sqrt (value: Int) : Float = Stdlib.Float.sqrt (Stdlib.Int.__toFloat (value
 
 let __fromFloat (value: Float) : Int =
     let bits = Stdlib.Float.toBits (value) in
-    let rawExponent = (bits >> 52UL) & 2047UL in
+    let rawExponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
     if rawExponent == 2047UL then
         Builtin.crash ("Encountered out-of-range value for type of Int")
     else if rawExponent == 0UL then Stdlib.Int.__value ("0")
     else
-        let mantissa = bits & 4503599627370495UL in
-        let significand = mantissa ||| 4503599627370496UL in
+        let mantissa = Stdlib.UInt64.bitwiseAnd bits 4503599627370495UL in
+        let significand = Stdlib.UInt64.bitwiseOr mantissa 4503599627370496UL in
         let exponent = Stdlib.Float.__smallUInt64ToInt64 (rawExponent) - 1023L - 52L in
         let magnitude = Stdlib.Int.__fromUInt64 (significand) in
         let truncated =
@@ -495,7 +495,7 @@ let __fromFloat (value: Float) : Int =
                 Stdlib.Int.__shiftLeft (magnitude) (Stdlib.Int.__fromInt64 (exponent))
             else
                 Stdlib.Int.__shiftRight (magnitude) (Stdlib.Int.__fromInt64 (0L - exponent)) in
-        if (bits >> 63UL) == 1UL then Stdlib.Int.__negate (truncated) else truncated
+        if Stdlib.UInt64.shiftRight bits 63UL == 1UL then Stdlib.Int.__negate (truncated) else truncated
 
 // Build an unsigned 64L-bit entropy word in Int without overflowing machine
 // arithmetic. Random.int64 returns the native word with its sign bit intact.

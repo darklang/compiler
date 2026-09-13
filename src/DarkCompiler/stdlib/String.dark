@@ -103,17 +103,17 @@ let __encodeUtf8At (pointer: RawPtr) (offset: Int64) (codepoint: Int64) : Int64 
     if codepoint < 128L then
         let _ = __raw_write_byte (pointer) (offset) (codepoint) in offset + 1L
     else if codepoint < 2048L then
-        let _ = __raw_write_byte (pointer) (offset) (192L ^ (codepoint >> 6L)) in
-        let _ = __raw_write_byte (pointer) (offset + 1L) (128L ^ (codepoint & 63L)) in offset + 2L
+        let _ = __raw_write_byte (pointer) (offset) (Stdlib.Int64.bitwiseOr 192L (Stdlib.Int64.shiftRight codepoint 6L)) in
+        let _ = __raw_write_byte (pointer) (offset + 1L) (Stdlib.Int64.bitwiseOr 128L (Stdlib.Int64.bitwiseAnd codepoint 63L)) in offset + 2L
     else if codepoint < 65536L then
-        let _ = __raw_write_byte (pointer) (offset) (224L ^ (codepoint >> 12L)) in
-        let _ = __raw_write_byte (pointer) (offset + 1L) (128L ^ ((codepoint >> 6L) & 63L)) in
-        let _ = __raw_write_byte (pointer) (offset + 2L) (128L ^ (codepoint & 63L)) in offset + 3L
+        let _ = __raw_write_byte (pointer) (offset) (Stdlib.Int64.bitwiseOr 224L (Stdlib.Int64.shiftRight codepoint 12L)) in
+        let _ = __raw_write_byte (pointer) (offset + 1L) (Stdlib.Int64.bitwiseOr 128L (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight codepoint 6L) 63L)) in
+        let _ = __raw_write_byte (pointer) (offset + 2L) (Stdlib.Int64.bitwiseOr 128L (Stdlib.Int64.bitwiseAnd codepoint 63L)) in offset + 3L
     else
-        let _ = __raw_write_byte (pointer) (offset) (240L ^ (codepoint >> 18L)) in
-        let _ = __raw_write_byte (pointer) (offset + 1L) (128L ^ ((codepoint >> 12L) & 63L)) in
-        let _ = __raw_write_byte (pointer) (offset + 2L) (128L ^ ((codepoint >> 6L) & 63L)) in
-        let _ = __raw_write_byte (pointer) (offset + 3L) (128L ^ (codepoint & 63L)) in offset + 4L
+        let _ = __raw_write_byte (pointer) (offset) (Stdlib.Int64.bitwiseOr 240L (Stdlib.Int64.shiftRight codepoint 18L)) in
+        let _ = __raw_write_byte (pointer) (offset + 1L) (Stdlib.Int64.bitwiseOr 128L (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight codepoint 12L) 63L)) in
+        let _ = __raw_write_byte (pointer) (offset + 2L) (Stdlib.Int64.bitwiseOr 128L (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight codepoint 6L) 63L)) in
+        let _ = __raw_write_byte (pointer) (offset + 3L) (Stdlib.Int64.bitwiseOr 128L (Stdlib.Int64.bitwiseAnd codepoint 63L)) in offset + 4L
 
 let __encodeCodepoints (pointer: RawPtr) (offset: Int64) (codepoints: List<Int64>) : Int64 =
     match codepoints with
@@ -325,7 +325,7 @@ let __egcIndex (values: List<String>) (search: List<String>) (index: Int) (first
     let nextFirst = if matches then Stdlib.String.__firstMatch (first) (index) else first in
     let nextLast = if matches then Some (index) else last in
     match values with
-    | [] -> (nextFirst) (nextLast)
+    | [] -> (nextFirst, nextLast)
     | _head :: rest ->
         Stdlib.String.__egcIndex (rest) (search) (index + Stdlib.Int.fromInt64 (1L)) (nextFirst) (nextLast)
 
@@ -446,7 +446,7 @@ let articleFor (nextWord: String) : String =
     match Stdlib.String.head (nextWord) with
     | None -> ""
     | Some (char) ->
-        if Stdlib.String.length (nextWord) > Stdlib.Int.fromInt64 (1L) && !Stdlib.Char.isASCIILetter (char) then
+        if Stdlib.String.length (nextWord) > Stdlib.Int.fromInt64 (1L) && Stdlib.Bool.not (Stdlib.Char.isASCIILetter (char)) then
             Stdlib.String.articleFor (Stdlib.String.dropFirst (nextWord) (Stdlib.Int.fromInt64 (1L)))
         else if char == 'A' || char == 'E' || char == 'I' || char == 'O' || char == 'U' ||
                 char == 'a' || char == 'e' || char == 'i' || char == 'o' || char == 'u' then "an"
@@ -471,86 +471,82 @@ let splitOnNewline (value: String) : List<String> =
     if Stdlib.String.isEmpty (value) then [] else Stdlib.String.split (value) ("\n")
 
 let htmlEscape (value: String) : String =
-    Stdlib.String.join(
-        Stdlib.List.map<Char, String>(Stdlib.String.toList (value), fun char ->
+    Stdlib.String.join (Stdlib.List.map<Char, String> (Stdlib.String.toList (value)) (fun char ->
             if char == '<' then "&lt;"
             else if char == '>' then "&gt;"
             else if char == '&' then "&amp;"
             else if char == '"' then "&quot;"
             else if char == '\'' then "&#x27;"
-            else Stdlib.Char.toString(char)),
-        "")
+            else Stdlib.Char.toString (char))) ("")
 
-let toBlob(value: String) : Blob = Stdlib.Blob.fromString(value)
-let toBytes(value: String) : List<UInt8> = Stdlib.Blob.toList(Stdlib.String.toBlob(value))
+let toBlob (value: String) : Blob = Stdlib.Blob.fromString (value)
+let toBytes (value: String) : List<UInt8> = Stdlib.Blob.toList (Stdlib.String.toBlob (value))
 
-let fromBlob(blob: Blob) : Stdlib.Option.Option<String> =
-    match Stdlib.Blob.toString(blob) with
-    | Ok(value) -> Some(Unicode.normalizeValid(value))
-    | Error(_) -> None
+let fromBlob (blob: Blob) : Stdlib.Option.Option<String> =
+    match Stdlib.Blob.toString (blob) with
+    | Ok (value) -> Some (Unicode.normalizeValid (value))
+    | Error (_) -> None
 
-let __decodeBlobWithReplacement(blob: Blob, index: Int64, acc: List<Int64>) : List<Int64> =
-    let length = Stdlib.Blob.__byteLength(blob) in
-    if index >= length then Stdlib.List.reverse<Int64>(acc)
+let __decodeBlobWithReplacement (blob: Blob) (index: Int64) (acc: List<Int64>) : List<Int64> =
+    let length = Stdlib.Blob.__byteLength (blob) in
+    if index >= length then Stdlib.List.reverse<Int64> (acc)
     else
-        let b0 = Stdlib.Blob.__getByte(blob, index) in
-        if b0 <= 127L then Stdlib.String.__decodeBlobWithReplacement(blob, index + 1L, Stdlib.List.push<Int64>(acc, b0))
-        else if b0 >= 194L && b0 <= 223L && index + 1L < length && Stdlib.Blob.__isContinuation(Stdlib.Blob.__getByte(blob, index + 1L)) then
-            let b1 = Stdlib.Blob.__getByte(blob, index + 1L) in
-            Stdlib.String.__decodeBlobWithReplacement(blob, index + 2L, Stdlib.List.push<Int64>(acc, ((b0 & 31L) << 6L) ^ (b1 & 63L)))
+        let b0 = Stdlib.Blob.__getByte (blob) (index) in
+        if b0 <= 127L then Stdlib.String.__decodeBlobWithReplacement (blob) (index + 1L) (Stdlib.List.push<Int64> (acc) (b0))
+        else if b0 >= 194L && b0 <= 223L && index + 1L < length && Stdlib.Blob.__isContinuation (Stdlib.Blob.__getByte (blob) (index + 1L)) then
+            let b1 = Stdlib.Blob.__getByte (blob) (index + 1L) in
+            Stdlib.String.__decodeBlobWithReplacement (blob) (index + 2L) (Stdlib.List.push<Int64> (acc) (Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b0 31L) 6L) (Stdlib.Int64.bitwiseAnd b1 63L)))
         else if b0 >= 224L && b0 <= 239L && index + 2L < length then
-            let b1 = Stdlib.Blob.__getByte(blob, index + 1L) in
-            let b2 = Stdlib.Blob.__getByte(blob, index + 2L) in
-            if Stdlib.Blob.__isContinuation(b1) && Stdlib.Blob.__isContinuation(b2) && !(b0 == 224L && b1 < 160L) && !(b0 == 237L && b1 >= 160L) then
-                Stdlib.String.__decodeBlobWithReplacement(blob, index + 3L, Stdlib.List.push<Int64>(acc, ((b0 & 15L) << 12L) ^ ((b1 & 63L) << 6L) ^ (b2 & 63L)))
-            else Stdlib.String.__decodeBlobWithReplacement(blob, index + 1L, Stdlib.List.push<Int64>(acc, 65533L))
+            let b1 = Stdlib.Blob.__getByte (blob) (index + 1L) in
+            let b2 = Stdlib.Blob.__getByte (blob) (index + 2L) in
+            if Stdlib.Blob.__isContinuation (b1) && Stdlib.Blob.__isContinuation (b2) && Stdlib.Bool.not (b0 == 224L && b1 < 160L) && Stdlib.Bool.not (b0 == 237L && b1 >= 160L) then
+                Stdlib.String.__decodeBlobWithReplacement (blob) (index + 3L) (Stdlib.List.push<Int64> (acc) (Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b0 15L) 12L) (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b1 63L) 6L)) (Stdlib.Int64.bitwiseAnd b2 63L)))
+            else Stdlib.String.__decodeBlobWithReplacement (blob) (index + 1L) (Stdlib.List.push<Int64> (acc) (65533L))
         else if b0 >= 240L && b0 <= 244L && index + 3L < length then
-            let b1 = Stdlib.Blob.__getByte(blob, index + 1L) in
-            let b2 = Stdlib.Blob.__getByte(blob, index + 2L) in
-            let b3 = Stdlib.Blob.__getByte(blob, index + 3L) in
-            if Stdlib.Blob.__isContinuation(b1) && Stdlib.Blob.__isContinuation(b2) && Stdlib.Blob.__isContinuation(b3) && !(b0 == 240L && b1 < 144L) && !(b0 == 244L && b1 >= 144L) then
-                Stdlib.String.__decodeBlobWithReplacement(blob, index + 4L, Stdlib.List.push<Int64>(acc, ((b0 & 7L) << 18L) ^ ((b1 & 63L) << 12L) ^ ((b2 & 63L) << 6L) ^ (b3 & 63L)))
-            else Stdlib.String.__decodeBlobWithReplacement(blob, index + 1L, Stdlib.List.push<Int64>(acc, 65533L))
-        else Stdlib.String.__decodeBlobWithReplacement(blob, index + 1L, Stdlib.List.push<Int64>(acc, 65533L))
+            let b1 = Stdlib.Blob.__getByte (blob) (index + 1L) in
+            let b2 = Stdlib.Blob.__getByte (blob) (index + 2L) in
+            let b3 = Stdlib.Blob.__getByte (blob) (index + 3L) in
+            if Stdlib.Blob.__isContinuation (b1) && Stdlib.Blob.__isContinuation (b2) && Stdlib.Blob.__isContinuation (b3) && Stdlib.Bool.not (b0 == 240L && b1 < 144L) && Stdlib.Bool.not (b0 == 244L && b1 >= 144L) then
+                Stdlib.String.__decodeBlobWithReplacement (blob) (index + 4L) (Stdlib.List.push<Int64> (acc) (Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b0 7L) 18L) (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b1 63L) 12L)) (Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseAnd b2 63L) 6L)) (Stdlib.Int64.bitwiseAnd b3 63L)))
+            else Stdlib.String.__decodeBlobWithReplacement (blob) (index + 1L) (Stdlib.List.push<Int64> (acc) (65533L))
+        else Stdlib.String.__decodeBlobWithReplacement (blob) (index + 1L) (Stdlib.List.push<Int64> (acc) (65533L))
 
-let fromBlobWithReplacement(blob: Blob) : String =
-    Unicode.normalizeValid(Stdlib.String.__fromCodepointsRaw(Stdlib.String.__decodeBlobWithReplacement(blob, 0L, [])))
+let fromBlobWithReplacement (blob: Blob) : String =
+    Unicode.normalizeValid (Stdlib.String.__fromCodepointsRaw (Stdlib.String.__decodeBlobWithReplacement (blob) (0L) ([])))
 
-let fromBytes(bytes: List<UInt8>) : Stdlib.Option.Option<String> =
-    Stdlib.String.fromBlob(Stdlib.Blob.fromList(bytes))
+let fromBytes (bytes: List<UInt8>) : Stdlib.Option.Option<String> =
+    Stdlib.String.fromBlob (Stdlib.Blob.fromList (bytes))
 
-let fromBytesWithReplacement(bytes: List<UInt8>) : String =
-    Stdlib.String.fromBlobWithReplacement(Stdlib.Blob.fromList(bytes))
+let fromBytesWithReplacement (bytes: List<UInt8>) : String =
+    Stdlib.String.fromBlobWithReplacement (Stdlib.Blob.fromList (bytes))
 
-let base64Encode(value: String) : String = Stdlib.Base64.encode(Stdlib.String.toBlob(value))
+let base64Encode (value: String) : String = Stdlib.Base64.encode (Stdlib.String.toBlob (value))
 
-let base64UrlEncode(value: String) : String =
-    Stdlib.String.replaceAll(Stdlib.Base64.urlEncode(Stdlib.String.toBlob(value)), "=", "")
+let base64UrlEncode (value: String) : String =
+    Stdlib.String.replaceAll (Stdlib.Base64.urlEncode (Stdlib.String.toBlob (value))) ("=") ("")
 
-let base64Decode(value: String) : Stdlib.Result.Result<String, String> =
-    match Stdlib.Base64.decode(value) with
-    | Error(error) -> Error(error)
-    | Ok(blob) ->
-        match Stdlib.String.fromBlob(blob) with
-        | Some(decoded) -> Ok(decoded)
-        | None -> Error("Invalid UTF-8 string")
+let base64Decode (value: String) : Stdlib.Result.Result<String, String> =
+    match Stdlib.Base64.decode (value) with
+    | Error (error) -> Error (error)
+    | Ok (blob) ->
+        match Stdlib.String.fromBlob (blob) with
+        | Some (decoded) -> Ok (decoded)
+        | None -> Error ("Invalid UTF-8 string")
 
-let digest(value: String) : String =
-    Stdlib.Base64.urlEncode(Stdlib.Crypto.sha384(Stdlib.String.toBlob(value)))
+let digest (value: String) : String =
+    Stdlib.Base64.urlEncode (Stdlib.Crypto.sha384 (Stdlib.String.toBlob (value)))
 
-let __random(length: Int, acc: String) : String =
-    let zero = Stdlib.Int.fromInt64(0L) in
+let __random (length: Int) (acc: String) : String =
+    let zero = Stdlib.Int.fromInt64 (0L) in
     if length <= zero then acc
     else
-        let candidate = Stdlib.Random.int64() & 63L in
-        if candidate >= 62L then Stdlib.String.__random(length, acc)
+        let candidate = Stdlib.Int64.bitwiseAnd (Stdlib.Random.int64 ()) 63L in
+        if candidate >= 62L then Stdlib.String.__random (length) (acc)
         else
             let alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" in
-            Stdlib.String.__random(
-                length - Stdlib.Int.fromInt64(1L),
-                acc ++ Stdlib.String.__byteSlice(alphabet, candidate, candidate + 1L))
+            Stdlib.String.__random (length - Stdlib.Int.fromInt64 (1L)) (acc ++ Stdlib.String.__byteSlice (alphabet) (candidate) (candidate + 1L))
 
-let random(length: Int) : Stdlib.Result.Result<String, String> =
-    let zero = Stdlib.Int.fromInt64(0L) in
-    if length < zero then Error("Expected `length` to be positive, but it was `" ++ Stdlib.Int.toString(length) ++ "`")
-    else Ok(Stdlib.String.__random(length, ""))
+let random (length: Int) : Stdlib.Result.Result<String, String> =
+    let zero = Stdlib.Int.fromInt64 (0L) in
+    if length < zero then Error ("Expected `length` to be positive, but it was `" ++ Stdlib.Int.toString (length) ++ "`")
+    else Ok (Stdlib.String.__random (length) (""))

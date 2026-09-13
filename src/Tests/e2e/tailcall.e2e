@@ -38,7 +38,7 @@ affineOverflow (2L) (4L) (9223372036854775807L) (0L) = 9223372036854775805L
 // multiplication or bitwise semantics.
 let boundedHashLoop (h: Int64) (data: Int64) (i: Int64) : Int64 =
     if i >= 8L then h
-    else boundedHashLoop ((h ^ (data & 255L)) * 1099511628211L) (data) (i + 1L)
+    else boundedHashLoop (Stdlib.Int64.bitwiseXor h (Stdlib.Int64.bitwiseAnd data 255L) * 1099511628211L) (data) (i + 1L)
 
 // Simple tail recursion (accumulator pattern)
 // This pattern should be detected and optimized

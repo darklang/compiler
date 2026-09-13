@@ -119,7 +119,7 @@ let __hexDigitUInt64 (byte: Int64) : UInt64 =
 
 let __hexWordAt (digits: String) (index: Int64) (endIndex: Int64) (value: UInt64) : UInt64 =
     if index == endIndex then value
-    else Stdlib.Uuid.__hexWordAt (digits) (index + 1L) (endIndex) ((value << 4UL) + Stdlib.Uuid.__hexDigitUInt64 (Stdlib.String.getByteAt (digits) (index)))
+    else Stdlib.Uuid.__hexWordAt (digits) (index + 1L) (endIndex) (Stdlib.UInt64.shiftLeft value 4UL + Stdlib.Uuid.__hexDigitUInt64 (Stdlib.String.getByteAt (digits) (index)))
 
 let __parseDigits (digits: String) : Stdlib.Result.Result<Uuid, Stdlib.Uuid.ParseError> =
     let high = Stdlib.Uuid.__hexWordAt (digits) (0L) (16L) (0UL) in
@@ -158,14 +158,14 @@ let __nibbleToHexUInt64 (n: UInt64) : String =
 
 // Helper: convert byte (from int64 at shift position) to 2 hex chars
 let __byteToHex (value: Int64) (shift: Int64) : String =
-    let byte = (value >> shift) & 255L in
-    let hi = (byte >> 4L) & 15L in
-    let lo = byte & 15L in
+    let byte = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight value shift) 255L in
+    let hi = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight byte 4L) 15L in
+    let lo = Stdlib.Int64.bitwiseAnd byte 15L in
     Stdlib.Uuid.__nibbleToHex (hi) ++ Stdlib.Uuid.__nibbleToHex (lo)
 
 let __wordToHex (value: UInt64) (remaining: Int64) (acc: String) : String =
     if remaining == 0L then acc
-    else Stdlib.Uuid.__wordToHex (value >> 4UL) (remaining - 1L) (Stdlib.Uuid.__nibbleToHexUInt64 (value & 15UL) ++ acc)
+    else Stdlib.Uuid.__wordToHex (Stdlib.UInt64.shiftRight value 4UL) (remaining - 1L) (Stdlib.Uuid.__nibbleToHexUInt64 (Stdlib.UInt64.bitwiseAnd value 15UL) ++ acc)
 
 /// Stringify UUID values as 8-4-4-4-12 lower-case hexadecimal digits.
 let toString (uuid: Uuid) : String =
@@ -185,11 +185,11 @@ let generate () : Uuid =
     // Using XOR since we cleared the bits first with AND
     // Mask -61441 = 0xFFFFFFFFFFFF0FFF (clears bits 12-15)
     // Version 16384 = 0x4000 (sets bit 14 for version 4)
-    let highWithVersion = (high & (-61441L)) ^ 16384L in
+    let highWithVersion = Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseAnd high (-61441L)) 16384L in
     // Set variant (10xx) in byte 8: clear upper 2 bits, set to 10
     // Mask 4611686018427387903 = 0x3FFFFFFFFFFFFFFF (clears top 2 bits)
     // Variant -9223372036854775808 = 0x8000000000000000 (sets top bit)
-    let lowWithVariant = (low & 4611686018427387903L) ^ (-9223372036854775808L) in
+    let lowWithVariant = Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseAnd low 4611686018427387903L) (-9223372036854775808L) in
     // Format: 8-4-4-4-12 hex chars
     // bytes 0-3 (bits 32-63 of high)
     let text = Stdlib.Uuid.__byteToHex (highWithVersion) (56L) ++

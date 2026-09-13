@@ -16,7 +16,7 @@ let __string_hash_loop (s: String) (idx: Int64) (len: Int64) (acc: Int64) : Int6
         acc
     else
         let byte = Stdlib.String.getByteAt (s) (idx) in
-        let next = (acc ^ byte) * __hash_prime () in
+        let next = Stdlib.Int64.bitwiseXor acc byte * __hash_prime () in
         __string_hash_loop (s) (idx + 1L) (len) (next)
 
 // FNV-1a hash over Blob payloads. Identity equality may produce collisions for
@@ -30,7 +30,7 @@ let __blob_hash_loop (value: Blob) (idx: Int64) (len: Int64) (acc: Int64) : Int6
         acc
     else
         let byte = Stdlib.Blob.__getByte (value) (idx) in
-        let next = (acc ^ byte) * __hash_prime () in
+        let next = Stdlib.Int64.bitwiseXor acc byte * __hash_prime () in
         __blob_hash_loop (value) (idx + 1L) (len) (next)
 
 // Blob equality is handle identity, matching ordinary and recursive equality.

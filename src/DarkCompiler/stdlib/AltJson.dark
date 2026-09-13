@@ -441,10 +441,10 @@ let __escapeControl (byte: Int64) : String =
 
 let __escapeCodeUnit (value: Int64) : String =
     "\\u" ++
-    Stdlib.AltJson.__hexDigit ((value >> 12L) & 15L) ++
-    Stdlib.AltJson.__hexDigit ((value >> 8L) & 15L) ++
-    Stdlib.AltJson.__hexDigit ((value >> 4L) & 15L) ++
-    Stdlib.AltJson.__hexDigit (value & 15L)
+    Stdlib.AltJson.__hexDigit (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight value 12L) 15L) ++
+    Stdlib.AltJson.__hexDigit (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight value 8L) 15L) ++
+    Stdlib.AltJson.__hexDigit (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight value 4L) 15L) ++
+    Stdlib.AltJson.__hexDigit (Stdlib.Int64.bitwiseAnd value 15L)
 
 let __escapeStringAt (value: String) (index: Int64) (length: Int64) (acc: String) : String =
     if index >= length then acc
@@ -466,8 +466,8 @@ let __escapeStringAt (value: String) (index: Int64) (length: Int64) (acc: String
                 if codepoint <= 65535L then Stdlib.String.__byteSlice (value) (index) (index + consumed)
                 else
                     let supplementary = codepoint - 65536L in
-                    let high = 55296L + (supplementary >> 10L) in
-                    let low = 56320L + (supplementary & 1023L) in
+                    let high = 55296L + Stdlib.Int64.shiftRight supplementary 10L in
+                    let low = 56320L + Stdlib.Int64.bitwiseAnd supplementary 1023L in
                     Stdlib.AltJson.__escapeCodeUnit (high) ++ Stdlib.AltJson.__escapeCodeUnit (low) in
             Stdlib.AltJson.__escapeStringAt (value) (index + consumed) (length) (acc ++ escaped)
 

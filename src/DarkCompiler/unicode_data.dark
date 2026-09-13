@@ -35,60 +35,54 @@ let __categoryFromCode (value: Int64) : Unicode.Data.GeneralCategory =
     else if value == 28L then Unicode.Data.GeneralCategory.Co
     else Unicode.Data.GeneralCategory.Cn
 
-let __generalCategoryLookupGroup5 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Unicode.Data.__lookupRangeIn (Unicode.Data.Table35.__generalCategoryChunk20 ()) (0L) (codepoint) (14L) with
+let __generalCategoryLookupGroup3 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__lookupRangeIn (Unicode.Data.Table27.__generalCategoryChunk12 ()) (0L) (codepoint) (14L) with
     | Some (value) -> Some (value)
     | None ->
-        match Unicode.Data.__lookupRangeIn (Unicode.Data.Table36.__generalCategoryChunk21 ()) (0L) (codepoint) (14L) with
+        match Unicode.Data.__lookupRangeIn (Unicode.Data.Table28.__generalCategoryChunk13 ()) (0L) (codepoint) (14L) with
         | Some (value) -> Some (value)
         | None ->
-            match Unicode.Data.__lookupRangeIn (Unicode.Data.Table37.__generalCategoryChunk22 ()) (0L) (codepoint) (14L) with
+            match Unicode.Data.__lookupRangeIn (Unicode.Data.Table29.__generalCategoryChunk14 ()) (0L) (codepoint) (14L) with
             | Some (value) -> Some (value)
             | None ->
-                match Unicode.Data.__lookupRangeIn (Unicode.Data.Table38.__generalCategoryChunk23 ()) (0L) (codepoint) (14L) with
+                match Unicode.Data.__lookupRangeIn (Unicode.Data.Table30.__generalCategoryChunk15 ()) (0L) (codepoint) (14L) with
                 | Some (value) -> Some (value)
                 | None ->
                     None
 
-let sourceHashes () : List<(String * String)> =
-    [
-        ("CompositionExclusions.txt", "2f239196ef3b5b61db5cc476e9bd80f534d15aa1b74e1be1dea5d042a344c85f"),
-        ("DerivedCoreProperties.txt", "24c7fed1195c482faaefd5c1e7eb821c5ee1fb6de07ecdbaa64b56a99da22c08"),
-        ("GraphemeBreakProperty.txt", "d6b51d1d2ae5c33b451b7ed994b48f1f4dc62b2272a5831e7fd418514a6bae89"),
-        ("PropList.txt", "130dcddcaadaf071008bdfce1e7743e04fdfbc910886f017d9f9ac931d8c64dd"),
-        ("SpecialCasing.txt", "efc25faf19de21b92c1194c111c932e03d2a5eaf18194e33f1156e96de4c9588"),
-        ("UnicodeData.txt", "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c"),
-        ("emoji-data.txt", "2cb2bb9455cda83e8481541ecf5b6dfda66a3bb89efa3fa7c5297eccf607b72b")
-    ]
+let __generalCategoryLookupGroup0 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__lookupRangeIn (Unicode.Data.Table15.__generalCategoryChunk0 ()) (0L) (codepoint) (14L) with
+    | Some (value) -> Some (value)
+    | None ->
+        match Unicode.Data.__lookupRangeIn (Unicode.Data.Table16.__generalCategoryChunk1 ()) (0L) (codepoint) (14L) with
+        | Some (value) -> Some (value)
+        | None ->
+            match Unicode.Data.__lookupRangeIn (Unicode.Data.Table17.__generalCategoryChunk2 ()) (0L) (codepoint) (14L) with
+            | Some (value) -> Some (value)
+            | None ->
+                match Unicode.Data.__lookupRangeIn (Unicode.Data.Table18.__generalCategoryChunk3 ()) (0L) (codepoint) (14L) with
+                | Some (value) -> Some (value)
+                | None ->
+                    None
 
-let tableCounts () : List<(String * Int64)> =
-    [
-        ("canonicalCompositions", 965L),
-        ("canonicalDecompositions", 2081L),
-        ("caseIgnorableRanges", 464L),
-        ("casedRanges", 158L),
-        ("combiningClassRanges", 403L),
-        ("compositionExclusions", 81L),
-        ("contextualCasingMappings", 16L),
-        ("extendedPictographicRanges", 451L),
-        ("generalCategoryRanges", 3409L),
-        ("graphemeBreakRanges", 1386L),
-        ("indicConjunctRanges", 473L),
-        ("lowercaseMappings", 1488L),
-        ("uppercaseMappings", 1580L),
-        ("whiteSpaceRanges", 11L)
-    ]
+let __generalCategoryLookupGroup6 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__lookupRangeIn (Unicode.Data.Table39.__generalCategoryChunk24 ()) (0L) (codepoint) (14L) with
+    | Some (value) -> Some (value)
+    | None ->
+        match Unicode.Data.__lookupRangeIn (Unicode.Data.Table40.__generalCategoryChunk25 ()) (0L) (codepoint) (14L) with
+        | Some (value) -> Some (value)
+        | None ->
+            match Unicode.Data.__lookupRangeIn (Unicode.Data.Table41.__generalCategoryChunk26 ()) (0L) (codepoint) (14L) with
+            | Some (value) -> Some (value)
+            | None ->
+                None
 
-let __whiteSpaceLookupGroup0 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Unicode.Data.__lookupRangeIn (Unicode.Data.Table42.__whiteSpaceChunk0 ()) (0L) (codepoint) (14L) with
+let __indicConjunctBreakLookup (codepoint: Int64) : Stdlib.Option.Option<Int64> =
+    match Unicode.Data.__indicConjunctBreakLookupGroup0 (codepoint) with
     | Some (value) -> Some (value)
     | None ->
         None
 
-let __whiteSpaceLookup (codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Unicode.Data.__whiteSpaceLookupGroup0 (codepoint) with
-    | Some (value) -> Some (value)
-    | None ->
-        None
-
+let lookupIndicConjunctBreak (codepoint: Int64) : Unicode.Data.IndicConjunctBreak = Unicode.Data.__indicFromCode (Stdlib.Option.withDefault<Int64> (Unicode.Data.__indicConjunctBreakLookup (codepoint)) (0L))
 let lookupUppercaseAt (codepoint: Int64) (index: Int64) : Stdlib.Option.Option<Int64> = Unicode.Data.__uppercaseLookup (codepoint) (index)
+let isWhiteSpace (codepoint: Int64) : Bool = Stdlib.Option.isSome<Int64> (Unicode.Data.__whiteSpaceLookup (codepoint))

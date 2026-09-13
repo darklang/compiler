@@ -321,7 +321,7 @@ applyThree (fun a -> a + 1L) (fun b -> b * 2L) (fun c -> c - 5L) (10L) = 36L
 // simpleInferType is called to infer the return type.
 
 // Function variable partially applied inside lambda
-// Here 'f' is bound as a variable with type (Int64, Int64) -> Int64
+// Here 'f' is bound as a variable with type Int64 -> Int64 -> Int64
 // The lambda fun x -> f(x) partially applies f, returning (Int64) -> Int64
 let partialAdd (a: Int64) (b: Int64): Int64 = a + b let makeAdder = fun x -> partialAdd (x) in let addFive = makeAdder (5L) in addFive (3L) = 8L
 

@@ -12,11 +12,11 @@ Stdlib.Cli.Sys.currentPid () > 0 = true
 
 // POSIX failures must preserve the kernel errno instead of inferring it from
 // localized command-line utility output.
-match Stdlib.Cli.Posix.kill (Stdlib.Cli.Sys.currentPid ()) (99999) with | Error (error) -> (error.errno) (error.message) | Ok (()) -> (0) ("unexpected") = (22, "Invalid argument")
+match Stdlib.Cli.Posix.kill (Stdlib.Cli.Sys.currentPid ()) (99999) with | Error (error) -> (error.errno, error.message) | Ok (()) -> (0, "unexpected") = (22, "Invalid argument")
 
 match Stdlib.Cli.Process.exec ("printf") (["%s", "direct execution"]) with | Ok (output) -> output | Error (message) -> message = "direct execution"
 
-match Stdlib.Cli.Process.run ("/definitely/missing/cli-parity") ([]) with | Error (error) -> (error.errno) (error.message) | Ok (_) -> (0) ("unexpected") = (2, "No such file or directory")
+match Stdlib.Cli.Process.run ("/definitely/missing/cli-parity") ([]) with | Error (error) -> (error.errno, error.message) | Ok (_) -> (0, "unexpected") = (2, "No such file or directory")
 
 let outcome = Stdlib.Cli.execute ("printf 'stdout'; printf 'stderr' >&2; exit 7") in (outcome.exitCode, outcome.stdout, outcome.stderr) = (7, "stdout", "stderr")
 

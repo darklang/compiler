@@ -8,4 +8,4 @@ let equals<'a> (left: a) (right: a) : Bool =
 
 /// Returns true when both values are not structurally equal.
 let notEquals<'a> (left: a) (right: a) : Bool =
-    !Stdlib.equals<'a> (left) (right)
+    Stdlib.Bool.not (Stdlib.equals<'a> (left) (right))

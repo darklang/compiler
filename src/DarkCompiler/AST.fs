@@ -101,6 +101,7 @@ type BinOp =
     | Mul
     | Div
     | Mod  // %
+    | Pow  // ^
     // Bitwise operations
     | Shl     // << (left shift)
     | Shr     // >> (right shift)

@@ -29,11 +29,11 @@ let toBits (f: Float) : UInt64 = 0UL
 let isNaN (value: Float) : Bool = value != value
 
 let __isNegative (value: Float) : Bool =
-    (Stdlib.Float.toBits (value) >> 63UL) == 1UL
+    Stdlib.UInt64.shiftRight (Stdlib.Float.toBits (value)) 63UL == 1UL
 
 let __isInfinite (value: Float) : Bool =
-    let exponent = (Stdlib.Float.toBits (value) >> 52UL) & 2047UL in
-    exponent == 2047UL && !Stdlib.Float.isNaN (value)
+    let exponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight (Stdlib.Float.toBits (value)) 52UL) 2047UL in
+    exponent == 2047UL && Stdlib.Bool.not (Stdlib.Float.isNaN (value))
 
 let __infinity () : Float = 1.0 / 0.0
 let __negativeInfinity () : Float = -1.0 / 0.0
@@ -42,8 +42,8 @@ let __nan () : Float = 0.0 / 0.0
 let __smallUInt64ToInt64 (n: UInt64) : Int64 =
     if n == 0UL then 0L
     else
-        let half = n >> 1UL in
-        let remainder = n & 1UL in
+        let half = Stdlib.UInt64.shiftRight n 1UL in
+        let remainder = Stdlib.UInt64.bitwiseAnd n 1UL in
         Stdlib.Float.__smallUInt64ToInt64 (half) * 2L + (if remainder == 1UL then 1L else 0L)
 
 // Float rounding returns the interpreter's arbitrary-precision Int, not the
@@ -70,7 +70,7 @@ let roundUp (value: Float) : Int = Stdlib.Float.ceiling (value)
 let __isOdd (value: Int) : Bool =
     match Stdlib.Int.remainder (value) (Stdlib.Int.fromInt64 (2L)) with
     | Error (message) -> Builtin.testRuntimeError (message)
-    | Ok (remainder) -> !(remainder == Stdlib.Int.fromInt64 (0L))
+    | Ok (remainder) -> Stdlib.Bool.not (remainder == Stdlib.Int.fromInt64 (0L))
 
 let round (value: Float) : Int =
     let lower = Stdlib.Float.floor (value) in
@@ -124,7 +124,7 @@ let __scanMantissa (value: String) (index: Int64) (digits: String) (fractionalDi
         if Stdlib.Float.__isDigit (byte) then
             let digit = Stdlib.String.__byteSlice (value) (index) (index + 1L) in
             Stdlib.Float.__scanMantissa (value) (index + 1L) (digits ++ digit) (if sawDot then fractionalDigits + 1L else fractionalDigits) (sawDot) (true)
-        else if byte == 46L && !sawDot then
+        else if byte == 46L && Stdlib.Bool.not sawDot then
             Stdlib.Float.__scanMantissa (value) (index + 1L) (digits) (fractionalDigits) (true) (sawDigit)
         else if (byte == 101L || byte == 69L) && sawDigit then
             match Stdlib.Float.__scanExponent (value) (index + 1L) with
@@ -327,9 +327,9 @@ let __multiplyTextByDigit (value: String) (digit: Int64) (count: Int64) : String
 
 let toString (value: Float) : String =
     let bits = Stdlib.Float.toBits (value) in
-    let negative = (bits >> 63UL) == 1UL in
-    let rawExponent = (bits >> 52UL) & 2047UL in
-    let mantissa = bits & 4503599627370495UL in
+    let negative = Stdlib.UInt64.shiftRight bits 63UL == 1UL in
+    let rawExponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
+    let mantissa = Stdlib.UInt64.bitwiseAnd bits 4503599627370495UL in
     if rawExponent == 2047UL then
         if mantissa != 0UL then "NaN" else if negative then "-Infinity" else "Infinity"
     else if rawExponent == 0UL && mantissa == 0UL then
@@ -431,10 +431,10 @@ let power (base: Float) (exponent: Float) : Float =
             else if Stdlib.Float.__isInfinite (base) then
                 if exponent > 0.0 then if base < 0.0 && odd then Stdlib.Float.__negativeInfinity () else Stdlib.Float.__infinity ()
                 else if base < 0.0 && odd then -0.0 else 0.0
-            else if base < 0.0 && !isIntegral then Stdlib.Float.__nan ()
+            else if base < 0.0 && Stdlib.Bool.not isIntegral then Stdlib.Float.__nan ()
             else if exponent == 0.5 then Stdlib.Float.sqrt (base)
             else if exponent == -0.5 then 1.0 / Stdlib.Float.sqrt (base)
-            else if !isIntegral then
+            else if Stdlib.Bool.not isIntegral then
                 Stdlib.Float.__exp (exponent * Stdlib.Float.__log (absBase))
             else
                 match Stdlib.Int.toInt64 (if exponent < 0.0 then Stdlib.Int.negate (integral) else integral) with

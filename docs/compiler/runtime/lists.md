@@ -11,7 +11,7 @@ counting for every shared root, structural edge, and managed element payload.
 [1, 2, 3]                // comma-separated literal
 [1; 2; 3;]               // semicolons and trailing separators are accepted
 [left] @ [middle, right]  // right-associative append
-Stdlib.List.push(xs, x)   // prepend a value
+Stdlib.List.push xs x   // prepend a value
 ```
 
 Newlines may also separate literal elements. A line aligned with or outdented

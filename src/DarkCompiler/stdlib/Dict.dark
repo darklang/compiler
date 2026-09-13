@@ -38,8 +38,8 @@ let __toUtf16Units (codepoints: List<Int64>) : List<Int64> =
         if codepoint < 65536L then Stdlib.List.push<Int64> (rest) (codepoint)
         else
             let supplementary = codepoint - 65536L in
-            let highSurrogate = 55296L + (supplementary >> 10L) in
-            let lowSurrogate = 56320L + (supplementary & 1023L) in
+            let highSurrogate = 55296L + Stdlib.Int64.shiftRight supplementary 10L in
+            let lowSurrogate = 56320L + Stdlib.Int64.bitwiseAnd supplementary 1023L in
             [highSurrogate, lowSurrogate] @ rest
 
 let __compareUtf16Units (left: List<Int64>) (right: List<Int64>) : Int32 =
@@ -84,7 +84,7 @@ let __findNextKey<'v> (entries: List<(String * v)>) (after: Stdlib.Option.Option
             | None -> true
             | Some (previousKey) -> Stdlib.Dict.__compareString (entry.0) (previousKey) > 0l in
         let nextCandidate =
-            if !isAfter then candidate
+            if Stdlib.Bool.not isAfter then candidate
             else
                 match candidate with
                 | None -> Some (Stdlib.Dict.__copyKey (entry.0))

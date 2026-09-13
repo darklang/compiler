@@ -2,12 +2,12 @@
 
 Best-known compatible routine-profile Dark performance vs audited Rust references (instruction counts).
 
-**Snapshot timestamp:** 2026-09-13T23:38:37+00:00
+**Snapshot timestamp:** 2026-09-14T00:25:36+00:00
 **Architecture:** `arm64`
 **Profile:** `routine` (schema 2)
 **Measurement policy:** `cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs`
-**Workload contract:** `97b3d2490bbf0c6040b4623bf3aa71726b5aa6173f90fdefcefb5d3e4dc24648`
-**Compiler commit:** `f806269199f9ff2a038b7ddbc11dc22758ed22dc` - Restrict benchmarks to public Dark APIs
+**Workload contract:** `89f422ad73b37c96ebbf41bf5d3a03790439b6aa6876fc780147a5d344c43e42`
+**Compiler commit:** `e6db8ae33491b8749fa655c186076b5b1bf46ba6` - Remove legacy operator syntax and conversion tooling
 
 | Benchmark | Dark (17.4x) | Rust |
 |---|---:|---:|

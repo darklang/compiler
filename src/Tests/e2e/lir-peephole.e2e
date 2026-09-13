@@ -28,7 +28,7 @@ positiveConstantModulo (21L) = 1L
 
 // Test bit 0 extraction (power-of-2 mask = 1)
 let testBit0 (x: Int64) : Int64 =
-  if (x & 1L) == 0L then 0L else 1L
+  if (Stdlib.Int64.bitwiseAnd x 1L) == 0L then 0L else 1L
 testBit0 (0L) = 0L
 testBit0 (1L) = 1L
 testBit0 (2L) = 0L
@@ -38,7 +38,7 @@ testBit0 (255L) = 1L
 
 // Test bit 1 extraction (power-of-2 mask = 2)
 let testBit1 (x: Int64) : Int64 =
-  if (x & 2L) == 0L then 0L else 1L
+  if (Stdlib.Int64.bitwiseAnd x 2L) == 0L then 0L else 1L
 testBit1 (0L) = 0L
 testBit1 (1L) = 0L
 testBit1 (2L) = 1L
@@ -50,7 +50,7 @@ testBit1 (7L) = 1L
 
 // Test bit 2 extraction (power-of-2 mask = 4)
 let testBit2 (x: Int64) : Int64 =
-  if (x & 4L) == 0L then 0L else 1L
+  if (Stdlib.Int64.bitwiseAnd x 4L) == 0L then 0L else 1L
 testBit2 (0L) = 0L
 testBit2 (3L) = 0L
 testBit2 (4L) = 1L
@@ -60,7 +60,7 @@ testBit2 (12L) = 1L
 
 // Test bit 3 extraction (power-of-2 mask = 8)
 let testBit3 (x: Int64) : Int64 =
-  if (x & 8L) == 0L then 0L else 1L
+  if (Stdlib.Int64.bitwiseAnd x 8L) == 0L then 0L else 1L
 testBit3 (0L) = 0L
 testBit3 (7L) = 0L
 testBit3 (8L) = 1L
@@ -70,7 +70,7 @@ testBit3 (24L) = 1L
 
 // Test bit 4 extraction (power-of-2 mask = 16)
 let testBit4 (x: Int64) : Int64 =
-  if (x & 16L) == 0L then 0L else 1L
+  if (Stdlib.Int64.bitwiseAnd x 16L) == 0L then 0L else 1L
 testBit4 (0L) = 0L
 testBit4 (15L) = 0L
 testBit4 (16L) = 1L
@@ -80,7 +80,7 @@ testBit4 (48L) = 1L
 
 // Test higher bit positions
 let testBit7 (x: Int64) : Int64 =
-  if (x & 128L) == 0L then 0L else 1L
+  if (Stdlib.Int64.bitwiseAnd x 128L) == 0L then 0L else 1L
 testBit7 (0L) = 0L
 testBit7 (127L) = 0L
 testBit7 (128L) = 1L
@@ -89,7 +89,7 @@ testBit7 (256L) = 0L
 
 // Test bit 8 (mask = 256)
 let testBit8 (x: Int64) : Int64 =
-  if (x & 256L) == 0L then 0L else 1L
+  if (Stdlib.Int64.bitwiseAnd x 256L) == 0L then 0L else 1L
 testBit8 (0L) = 0L
 testBit8 (255L) = 0L
 testBit8 (256L) = 1L
@@ -104,9 +104,9 @@ testBit8 (512L) = 0L
 
 // Extract multiple bits and combine them
 let extractBits (x: Int64) : Int64 =
-  let b0 = if (x & 1L) == 0L then 0L else 1L in
-  let b1 = if (x & 2L) == 0L then 0L else 2L in
-  let b2 = if (x & 4L) == 0L then 0L else 4L in
+  let b0 = if (Stdlib.Int64.bitwiseAnd x 1L) == 0L then 0L else 1L in
+  let b1 = if (Stdlib.Int64.bitwiseAnd x 2L) == 0L then 0L else 2L in
+  let b2 = if (Stdlib.Int64.bitwiseAnd x 4L) == 0L then 0L else 4L in
   b0 + b1 + b2
 
 extractBits (0L) = 0L
@@ -128,7 +128,7 @@ let loopWithBitTest (mask: Int64) (n: Int64) (acc: Int64) : Int64 =
   if n <= 0L then acc
   else
     // Loop-invariant bit test on mask
-    let hasBit = if (mask & 4L) == 0L then 0L else 10L in
+    let hasBit = if (Stdlib.Int64.bitwiseAnd mask 4L) == 0L then 0L else 10L in
     loopWithBitTest (mask) (n - 1L) (acc + hasBit)
 
 // mask=4 has bit 2 set, so hasBit=10, 5 iterations = 50
@@ -201,14 +201,14 @@ mulBy63 (10L) = 630L
 // Power-of-2 mask values that trigger TBZ/TBNZ when isPowerOf2 works
 // These masks are: 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024
 let checkPowerOf2Mask1 (x: Int64) : Int64 =
-  if (x & 1L) != 0L then 1L else 0L
+  if (Stdlib.Int64.bitwiseAnd x 1L) != 0L then 1L else 0L
 checkPowerOf2Mask1 (0L) = 0L
 checkPowerOf2Mask1 (1L) = 1L
 checkPowerOf2Mask1 (2L) = 0L
 checkPowerOf2Mask1 (3L) = 1L
 
 let checkPowerOf2Mask512 (x: Int64) : Int64 =
-  if (x & 512L) != 0L then 1L else 0L
+  if (Stdlib.Int64.bitwiseAnd x 512L) != 0L then 1L else 0L
 checkPowerOf2Mask512 (0L) = 0L
 checkPowerOf2Mask512 (511L) = 0L
 checkPowerOf2Mask512 (512L) = 1L
@@ -216,7 +216,7 @@ checkPowerOf2Mask512 (1023L) = 1L
 checkPowerOf2Mask512 (1024L) = 0L
 
 let checkPowerOf2Mask1024 (x: Int64) : Int64 =
-  if (x & 1024L) != 0L then 1L else 0L
+  if (Stdlib.Int64.bitwiseAnd x 1024L) != 0L then 1L else 0L
 checkPowerOf2Mask1024 (0L) = 0L
 checkPowerOf2Mask1024 (1023L) = 0L
 checkPowerOf2Mask1024 (1024L) = 1L

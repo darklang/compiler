@@ -193,9 +193,10 @@ Leaf Node:
   and dict release helpers rather than implicit GC scanning
 - **Complexity**: HAMT is more complex than simple hash tables, but necessary for immutability
 
-**Current status**: Phase 4 in progress - bitwise operators and popcount
+**Current status**: Phase 4 in progress - named bitwise functions and popcount
 implemented, raw memory intrinsics added, HAMT helper functions in
-`src/DarkCompiler/stdlib/`.
+`src/DarkCompiler/stdlib/`. Public symbolic bitwise syntax is not part of the
+language.
 
 ## Test-Driven Development
 

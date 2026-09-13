@@ -21,7 +21,7 @@ let __unsignedInt (value: Int128) : Int =
 
 let __toInt (value: Int128) : Int =
     let unsigned = Stdlib.Int128.__unsignedInt (value) in
-    if (Stdlib.Int128.__high (value) >> 63UL) == 1UL then
+    if Stdlib.UInt64.shiftRight (Stdlib.Int128.__high (value)) 63UL == 1UL then
         Stdlib.Int.__subtract (unsigned) (__string_to_int ("340282366920938463463374607431768211456"))
     else unsigned
 
@@ -59,13 +59,13 @@ let remainder (value: Int128) (divisor: Int128) : Stdlib.Result.Result<Int128, S
     | Ok (result) -> Ok (Stdlib.Int128.__fromInt (result))
 let mod (value: Int128) (modulus: Int128) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__mod (Stdlib.Int128.__toInt (value)) (Stdlib.Int128.__toInt (modulus)))
 let negate (value: Int128) : Int128 = Stdlib.Int128.subtract (Stdlib.Int128.__fromWords (0UL) (0UL)) (value)
-let absoluteValue (value: Int128) : Int128 = if (Stdlib.Int128.__high (value) >> 63UL) == 1UL then Stdlib.Int128.negate (value) else value
+let absoluteValue (value: Int128) : Int128 = if Stdlib.UInt64.shiftRight (Stdlib.Int128.__high (value)) 63UL == 1UL then Stdlib.Int128.negate (value) else value
 
 let lessThan (a: Int128) (b: Int128) : Bool =
     let aHigh = Stdlib.Int128.__high (a) in
     let bHigh = Stdlib.Int128.__high (b) in
-    let aNegative = (aHigh >> 63UL) == 1UL in
-    let bNegative = (bHigh >> 63UL) == 1UL in
+    let aNegative = Stdlib.UInt64.shiftRight aHigh 63UL == 1UL in
+    let bNegative = Stdlib.UInt64.shiftRight bHigh 63UL == 1UL in
     if aNegative != bNegative then aNegative
     else aHigh < bHigh || (aHigh == bHigh && Stdlib.Int128.__low (a) < Stdlib.Int128.__low (b))
 let __equals (a: Int128) (b: Int128) : Bool = Stdlib.Int128.__equalsWords (a) (Stdlib.Int128.__low (b)) (Stdlib.Int128.__high (b))
@@ -86,7 +86,7 @@ let clamp (value: Int128) (limitA: Int128) (limitB: Int128) : Int128 =
 let toString (value: Int128) : String =
     let low = Stdlib.Int128.__low (value) in
     let high = Stdlib.Int128.__high (value) in
-    if (high >> 63UL) == 0UL then Stdlib.UInt128.__toStringWords (low) (high)
+    if Stdlib.UInt64.shiftRight high 63UL == 0UL then Stdlib.UInt128.__toStringWords (low) (high)
     else
         let magnitudeLow = 0UL - low in
         let magnitudeHigh = 18446744073709551615UL - high + (if magnitudeLow == 0UL then 1UL else 0UL) in
@@ -125,9 +125,9 @@ let fromInt32 (value: Int32) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__fr
 let fromUInt32 (value: UInt32) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__fromUInt32 (value))
 let fromInt64 (value: Int64) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__fromInt64 (value))
 let fromUInt64 (value: UInt64) : Int128 = Stdlib.Int128.__fromWords (value) (0UL)
-let bitwiseAnd (a: Int128) (b: Int128) : Int128 = Stdlib.Int128.__fromWords (Stdlib.Int128.__low (a) & Stdlib.Int128.__low (b)) (Stdlib.Int128.__high (a) & Stdlib.Int128.__high (b))
-let bitwiseOr (a: Int128) (b: Int128) : Int128 = Stdlib.Int128.__fromWords (Stdlib.Int128.__low (a) ||| Stdlib.Int128.__low (b)) (Stdlib.Int128.__high (a) ||| Stdlib.Int128.__high (b))
-let bitwiseXor (a: Int128) (b: Int128) : Int128 = Stdlib.Int128.__fromWords (Stdlib.Int128.__low (a) ^ Stdlib.Int128.__low (b)) (Stdlib.Int128.__high (a) ^ Stdlib.Int128.__high (b))
+let bitwiseAnd (a: Int128) (b: Int128) : Int128 = Stdlib.Int128.__fromWords (Stdlib.UInt64.bitwiseAnd (Stdlib.Int128.__low (a)) (Stdlib.Int128.__low (b))) (Stdlib.UInt64.bitwiseAnd (Stdlib.Int128.__high (a)) (Stdlib.Int128.__high (b)))
+let bitwiseOr (a: Int128) (b: Int128) : Int128 = Stdlib.Int128.__fromWords (Stdlib.UInt64.bitwiseOr (Stdlib.Int128.__low (a)) (Stdlib.Int128.__low (b))) (Stdlib.UInt64.bitwiseOr (Stdlib.Int128.__high (a)) (Stdlib.Int128.__high (b)))
+let bitwiseXor (a: Int128) (b: Int128) : Int128 = Stdlib.Int128.__fromWords (Stdlib.UInt64.bitwiseXor (Stdlib.Int128.__low (a)) (Stdlib.Int128.__low (b))) (Stdlib.UInt64.bitwiseXor (Stdlib.Int128.__high (a)) (Stdlib.Int128.__high (b)))
 let bitwiseNot (value: Int128) : Int128 = Stdlib.Int128.__fromWords (18446744073709551615UL - Stdlib.Int128.__low (value)) (18446744073709551615UL - Stdlib.Int128.__high (value))
 
 let shiftLeft (value: Int128) (count: Int128) : Int128 =
@@ -135,11 +135,11 @@ let shiftLeft (value: Int128) (count: Int128) : Int128 =
     Stdlib.Int128.__fromWords (Stdlib.UInt128.__low (shifted)) (Stdlib.UInt128.__high (shifted))
 
 let shiftRight (value: Int128) (count: Int128) : Int128 =
-    let amount = Stdlib.Int128.__low (count) & 127UL in
+    let amount = Stdlib.UInt64.bitwiseAnd (Stdlib.Int128.__low (count)) 127UL in
     let low = Stdlib.Int128.__low (value) in
     let high = Stdlib.Int128.__high (value) in
-    let negative = (high >> 63UL) == 1UL in
+    let negative = Stdlib.UInt64.shiftRight high 63UL == 1UL in
     let fill = if negative then 18446744073709551615UL else 0UL in
     if amount == 0UL then value
-    else if amount < 64UL then Stdlib.Int128.__fromWords ((low >> amount) ||| (high << (64UL - amount)), (high >> amount) ||| (fill << (64UL - amount)))
-    else Stdlib.Int128.__fromWords ((high >> (amount - 64UL)) ||| (fill << (128UL - amount)), fill)
+    else if amount < 64UL then Stdlib.Int128.__fromWords (Stdlib.UInt64.bitwiseOr (Stdlib.UInt64.shiftRight low amount) (Stdlib.UInt64.shiftLeft high (64UL - amount))) (Stdlib.UInt64.bitwiseOr (Stdlib.UInt64.shiftRight high amount) (Stdlib.UInt64.shiftLeft fill (64UL - amount)))
+    else Stdlib.Int128.__fromWords (Stdlib.UInt64.bitwiseOr (Stdlib.UInt64.shiftRight high (amount - 64UL)) (Stdlib.UInt64.shiftLeft fill (128UL - amount))) (fill)

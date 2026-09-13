@@ -78,7 +78,7 @@ type VariantLookup = Map<string, (string * string list * int * Type option)>
 
 ### Function Definitions
 ```dark
-let add(a: Int64, b: Int64) : Int64 = a + b
+let add (a: Int64) (b: Int64) : Int64 = a + b
 ```
 1. Add parameters to type environment
 2. Check body expression
@@ -103,7 +103,7 @@ a + b
 
 ### Unary Operations
 ```dark
-~~~x
+Stdlib.Int64.bitwiseNot x
 ```
 1. Check operand type
 2. Verify the operator is valid for that type
@@ -111,7 +111,7 @@ a + b
 
 ### Function Calls
 ```dark
-add(1, 2)
+add 1 2
 ```
 1. Look up function signature
 2. Check argument types match parameter types
@@ -127,7 +127,7 @@ let addFive = add(5)  // Partial application
 
 Desugars to:
 ```dark
-let addFive = fun x -> add(5, x)
+let addFive = fun x -> add 5 x
 ```
 
 This is handled by generating lambda wrappers with fresh parameter names.
@@ -137,14 +137,14 @@ This is handled by generating lambda wrappers with fresh parameter names.
 Generic functions use type parameters:
 
 ```dark
-let identity<'T>(x: T) : T = x
+let identity<'T> (x: T) : T = x
 ```
 
 At call sites, type arguments can be explicit or inferred from argument types,
 and in some contexts from the expected return type:
 ```dark
-identity<Int64>(42)  // Explicit
-identity(42)         // Inferred from argument
+identity<Int64> 42  // Explicit
+identity 42         // Inferred from argument
 ```
 
 ### Freshening

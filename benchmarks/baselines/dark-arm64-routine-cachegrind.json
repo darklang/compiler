@@ -9,11 +9,11 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs"
   },
-  "contract_sha256": "97b3d2490bbf0c6040b4623bf3aa71726b5aa6173f90fdefcefb5d3e4dc24648",
-  "generated_at": "2026-09-13T23:38:37+00:00",
+  "contract_sha256": "89f422ad73b37c96ebbf41bf5d3a03790439b6aa6876fc780147a5d344c43e42",
+  "generated_at": "2026-09-14T00:25:36+00:00",
   "compiler": {
-    "commit": "f806269199f9ff2a038b7ddbc11dc22758ed22dc",
-    "subject": "Restrict benchmarks to public Dark APIs"
+    "commit": "e6db8ae33491b8749fa655c186076b5b1bf46ba6",
+    "subject": "Remove legacy operator syntax and conversion tooling"
   },
   "benchmarks": [
     {

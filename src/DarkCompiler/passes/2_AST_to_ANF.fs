@@ -390,6 +390,27 @@ let tryFloatIntrinsic (funcName: string) (args: ANF.Atom list) : ANF.CExpr optio
         Some (ANF.FloatToBits xAtom)
     | _ -> None
 
+/// Canonical named APIs whose AOT implementation maps directly to backend
+/// Boolean and fixed-width integer primitives.
+let tryCanonicalPrimitiveIntrinsic (funcName: string) (args: ANF.Atom list) : ANF.CExpr option =
+    match funcName, args with
+    | "Stdlib.Bool.not", [value] -> Some (ANF.UnaryPrim (ANF.Not, value))
+    | _ ->
+        let fixedWidthModules =
+            set [ "Stdlib.Int8"; "Stdlib.Int16"; "Stdlib.Int32"; "Stdlib.Int64"
+                  "Stdlib.UInt8"; "Stdlib.UInt16"; "Stdlib.UInt32"; "Stdlib.UInt64" ]
+        let nameParts = funcName.Split('.')
+        let moduleName = nameParts |> Array.rev |> Array.skip 1 |> Array.rev |> String.concat "."
+        let operationName = nameParts |> Array.tryLast
+        match Set.contains moduleName fixedWidthModules, operationName, args with
+        | true, Some "bitwiseAnd", [left; right] -> Some (ANF.Prim (ANF.BitAnd, left, right))
+        | true, Some "bitwiseOr", [left; right] -> Some (ANF.Prim (ANF.BitOr, left, right))
+        | true, Some "bitwiseXor", [left; right] -> Some (ANF.Prim (ANF.BitXor, left, right))
+        | true, Some "shiftLeft", [left; right] -> Some (ANF.Prim (ANF.Shl, left, right))
+        | true, Some "shiftRight", [left; right] -> Some (ANF.Prim (ANF.Shr, left, right))
+        | true, Some "bitwiseNot", [value] -> Some (ANF.UnaryPrim (ANF.BitNot, value))
+        | _ -> None
+
 /// Try to convert a function call to a raw memory intrinsic CExpr
 /// These are internal-only functions for implementing HAMT data structures
 /// Returns Some CExpr if it's a raw memory intrinsic, None otherwise
@@ -2723,7 +2744,7 @@ let rec simpleInferType
         let leftType = simpleInferType left typeEnv funcParams funcReturnTypes genericFuncDefs typeReg variantLookup
         let rightType = simpleInferType right typeEnv funcParams funcReturnTypes genericFuncDefs typeReg variantLookup
         match op with
-        | AST.Add | AST.Sub | AST.Mul | AST.Div | AST.Mod ->
+        | AST.Add | AST.Sub | AST.Mul | AST.Div | AST.Mod | AST.Pow ->
             match leftType, rightType with
             | Some lt, Some rt when lt = rt && isNumericType lt -> Some lt
             | Some (AST.TVar _), Some rt when isNumericType rt -> Some rt
@@ -4245,6 +4266,7 @@ let convertBinOp (op: AST.BinOp) : ANF.BinOp =
     | AST.Mul -> ANF.Mul
     | AST.Div -> ANF.Div
     | AST.Mod -> ANF.Mod
+    | AST.Pow -> Crash.crash "Exponentiation must lower through the canonical numeric power function"
     | AST.Shl -> ANF.Shl
     | AST.Shr -> ANF.Shr
     | AST.BitAnd -> ANF.BitAnd
@@ -4265,10 +4287,20 @@ let convertBinOp (op: AST.BinOp) : ANF.BinOp =
 /// machine-word primitives.
 let private integerFunctionForBinOp (operandType: AST.Type) (op: AST.BinOp) : string option =
     let moduleName =
-        match operandType with
-        | AST.TInt -> Some "Stdlib.Int"
-        | AST.TInt128 -> Some "Stdlib.Int128"
-        | AST.TUInt128 -> Some "Stdlib.UInt128"
+        match op, operandType with
+        | AST.Pow, AST.TInt -> Some "Stdlib.Int"
+        | AST.Pow, AST.TInt8 -> Some "Stdlib.Int8"
+        | AST.Pow, AST.TInt16 -> Some "Stdlib.Int16"
+        | AST.Pow, AST.TInt32 -> Some "Stdlib.Int32"
+        | AST.Pow, AST.TInt64 -> Some "Stdlib.Int64"
+        | AST.Pow, AST.TUInt8 -> Some "Stdlib.UInt8"
+        | AST.Pow, AST.TUInt16 -> Some "Stdlib.UInt16"
+        | AST.Pow, AST.TUInt32 -> Some "Stdlib.UInt32"
+        | AST.Pow, AST.TUInt64 -> Some "Stdlib.UInt64"
+        | AST.Pow, AST.TFloat64 -> Some "Stdlib.Float"
+        | _, AST.TInt -> Some "Stdlib.Int"
+        | _, AST.TInt128 -> Some "Stdlib.Int128"
+        | _, AST.TUInt128 -> Some "Stdlib.UInt128"
         | _ -> None
     let functionName =
         match op, operandType with
@@ -4277,13 +4309,11 @@ let private integerFunctionForBinOp (operandType: AST.Type) (op: AST.BinOp) : st
         | AST.Mul, _ -> Some "multiply"
         | AST.Div, _ -> Some "divide"
         | AST.Mod, _ -> Some "mod"
+        | AST.Pow, _ -> Some "power"
         | AST.Shl, _ -> Some "shiftLeft"
         | AST.Shr, _ -> Some "shiftRight"
         | AST.BitAnd, _ -> Some "bitwiseAnd"
         | AST.BitOr, _ -> Some "bitwiseOr"
-        // The compiler's historical arbitrary-width spelling uses ^ for power.
-        // Fixed-width and 128-bit ^ remain the bitwise-XOR extension.
-        | AST.BitXor, AST.TInt -> Some "power"
         | AST.BitXor, _ -> Some "bitwiseXor"
         | AST.Lt, _ -> Some "lessThan"
         | AST.Gt, _ -> Some "greaterThan"
@@ -4741,7 +4771,7 @@ let rec inferTypeCore (sumTypeNames: Set<string>) (expr: AST.Expr) (typeEnv: Map
                     if leftType = rightType then Ok leftType
                     else Error $"Binary operator operands must match: left={leftType}, right={rightType}"))
         match op with
-        | AST.Add | AST.Sub | AST.Mul | AST.Div | AST.Mod ->
+        | AST.Add | AST.Sub | AST.Mul | AST.Div | AST.Mod | AST.Pow ->
             ensureSameType ()
             |> Result.bind (fun operandType ->
                 match operandType with
@@ -5670,7 +5700,7 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                         let cexpr = ANF.Call ("Stdlib.String.__appendNormalized", [leftAtom; rightAtom])
                         Ok (ANF.Let (tempVar, cexpr, ANF.Return (ANF.Var tempVar)), varGen3)
                     // Arithmetic, bitwise, and comparison operators - use simple primitive
-                    | AST.Add | AST.Sub | AST.Mul | AST.Div | AST.Mod
+                    | AST.Add | AST.Sub | AST.Mul | AST.Div | AST.Mod | AST.Pow
                     | AST.Shl | AST.Shr | AST.BitAnd | AST.BitOr | AST.BitXor
                     | AST.Lt | AST.Gt | AST.Lte | AST.Gte
                     | AST.And | AST.Or ->
@@ -5966,6 +5996,11 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                     match tryRawMemoryIntrinsic sumTypeNames funcName argAtoms with
                     | Some intrinsicExpr ->
                         // Raw memory intrinsic call
+                        let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
+                        Ok (withArgSetups finalExpr, varGen2)
+                    | None ->
+                    match tryCanonicalPrimitiveIntrinsic funcName argAtoms with
+                    | Some intrinsicExpr ->
                         let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
                         Ok (withArgSetups finalExpr, varGen2)
                     | None ->
@@ -9719,7 +9754,7 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                     let allBindings = leftBindings @ rightBindings @ [(tempVar, cexpr)]
                     Ok (ANF.Var tempVar, allBindings, varGen3)
                 // Arithmetic, bitwise, and comparison operators - use simple primitive
-                | AST.Add | AST.Sub | AST.Mul | AST.Div | AST.Mod
+                | AST.Add | AST.Sub | AST.Mul | AST.Div | AST.Mod | AST.Pow
                 | AST.Shl | AST.Shr | AST.BitAnd | AST.BitOr | AST.BitXor
                 | AST.Lt | AST.Gt | AST.Lte | AST.Gte
                 | AST.And | AST.Or ->
@@ -9849,6 +9884,11 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                             let allBindings = argBindings @ [(tempVar, intrinsicExpr)]
                             Ok (ANF.Var tempVar, allBindings, varGen2)
                         | None ->
+                            match tryCanonicalPrimitiveIntrinsic funcName argAtoms with
+                            | Some intrinsicExpr ->
+                                let allBindings = argBindings @ [(tempVar, intrinsicExpr)]
+                                Ok (ANF.Var tempVar, allBindings, varGen2)
+                            | None ->
                             // Check if it's a Float intrinsic
                             match tryFloatIntrinsic funcName argAtoms with
                             | Some intrinsicExpr ->

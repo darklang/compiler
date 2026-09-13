@@ -20,7 +20,7 @@ let __tlv (blob: Blob) (offset: Int64) : Stdlib.Option.Option<(Int64 * Int64 * I
         let parsed =
             if firstLength < 128L then Some ((offset + 2L, firstLength))
             else
-                let byteCount = firstLength & 127L in
+                let byteCount = Stdlib.Int64.bitwiseAnd firstLength 127L in
                 if byteCount == 0L || byteCount > 8L then None
                 else Stdlib.X509.__readLengthBytes (blob) (offset + 2L) (byteCount) (0L) in
         match parsed with

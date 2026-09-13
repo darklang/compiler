@@ -21,12 +21,12 @@ let x = 3L in let y = 2L in -(x + y) = -5L
 let x = 10L in let y = 3L in -(x - y) = -7L
 
 // Boolean not through variables
-let b = true in !b = false
-let b = false in !b = true
+let b = true in Stdlib.Bool.not b = false
+let b = false in Stdlib.Bool.not b = true
 
 // Nested not
-let b = true in !!b = true
-let b = false in !!b = false
+let b = true in Stdlib.Bool.not (Stdlib.Bool.not b) = true
+let b = false in Stdlib.Bool.not (Stdlib.Bool.not b) = false
 
 // ===================================================================
 // Constant Propagation

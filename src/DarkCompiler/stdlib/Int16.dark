@@ -60,19 +60,6 @@ let lessThan (a: Int16) (b: Int16) : Bool = a < b
 
 let lessThanOrEqualTo (a: Int16) (b: Int16) : Bool = a <= b
 
-// Bitwise operations
-let bitwiseAnd (a: Int16) (b: Int16) : Int16 = a & b
-
-let bitwiseOr (a: Int16) (b: Int16) : Int16 = a ||| b
-
-let bitwiseXor (a: Int16) (b: Int16) : Int16 = (a ||| b) & ~~~(a & b)
-
-let shiftLeft (a: Int16) (shift: Int16) : Int16 = a << shift
-
-let shiftRight (a: Int16) (shift: Int16) : Int16 = a >> shift
-
-let bitwiseNot (a: Int16) : Int16 = ~~~a
-
 // Count number of set bits (population count)
 // Uses parallel bit counting algorithm (SWAR)
 let __popcount (x: Int16) : Int16 =
@@ -80,11 +67,11 @@ let __popcount (x: Int16) : Int16 =
     let mask2 = 13107s in
     let mask3 = 3855s in
     let mask4 = 31s in
-    let x = x - ((x >> 1s) & mask1) in
-    let x = (x & mask2) + ((x >> 2s) & mask2) in
-    let x = (x + (x >> 4s)) & mask3 in
-    let x = x + (x >> 8s) in
-    x & mask4
+    let x = x - Stdlib.Int16.bitwiseAnd (Stdlib.Int16.shiftRight x 1s) mask1 in
+    let x = Stdlib.Int16.bitwiseAnd x mask2 + Stdlib.Int16.bitwiseAnd (Stdlib.Int16.shiftRight x 2s) mask2 in
+    let x = Stdlib.Int16.bitwiseAnd (x + Stdlib.Int16.shiftRight x 4s) mask3 in
+    let x = x + Stdlib.Int16.shiftRight x 8s in
+    Stdlib.Int16.bitwiseAnd x mask4
 
 // Convert a single digit (0s-9s) to its string representation
 let __digitToString (n: Int16) : String =

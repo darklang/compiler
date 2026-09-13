@@ -125,11 +125,11 @@ Stdlib.Int.bitwiseAnd -5 3 = 3
 Stdlib.Int.bitwiseOr -5 3 = -5
 Stdlib.Int.bitwiseXor -5 3 = -8
 Stdlib.Int.shiftRight -5 1 = -3
-(12 & 10) = 8
-(12 ||| 10) = 14
-~~~12 = -13
-(1 << 100) = 1267650600228229401496703205376
-(-5 >> 1) = -3
+Stdlib.Int.bitwiseAnd 12 10 = 8
+Stdlib.Int.bitwiseOr 12 10 = 14
+Stdlib.Int.bitwiseNot 12 = -13
+Stdlib.Int.shiftLeft 1 100 = 1267650600228229401496703205376
+Stdlib.Int.shiftRight (-5) 1 = -3
 let value = Stdlib.Int.power 2 100 in -value = -1267650600228229401496703205376
 
 // --- remaining upstream numeric conversions ---

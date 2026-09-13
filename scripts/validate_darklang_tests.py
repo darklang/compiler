@@ -13,25 +13,17 @@ def load_validate_darklang_module():
     return module
 
 
-def test_public_lambda_syntax_is_unchanged():
+def test_canonical_source_is_embedded_unchanged():
     module = load_validate_darklang_module()
-    converter = module.SyntaxConverter()
-    actual = converter.convert("fun x y -> x + y")
     expected = "fun x y -> x + y"
+    source = module.CanonicalSource()
+    actual = source.prepare(expected)
     assert actual == expected, f"expected {expected!r}, got {actual!r}"
-
-
-def test_blob_module_uses_interpreter_namespace():
-    module = load_validate_darklang_module()
-    converter = module.SyntaxConverter()
-    actual = converter.convert("Blob.fromList([72uy])")
-    expected = "Stdlib.Blob.fromList [72uy]"
-    assert actual == expected, f"expected {expected!r}, got {actual!r}"
+    assert "let __result = [1, 2]" in source.generate_file_code("[1, 2]")
 
 
 def main():
-    test_public_lambda_syntax_is_unchanged()
-    test_blob_module_uses_interpreter_namespace()
+    test_canonical_source_is_embedded_unchanged()
 
 
 if __name__ == "__main__":
