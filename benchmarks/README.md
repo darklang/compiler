@@ -130,7 +130,10 @@ opportunities—not forcing either compiler to miss legitimate optimizations.
 
 ### Cachegrind Mode (default)
 
-Uses **Valgrind Cachegrind** to count instructions. Slower (~50x) but deterministic - same input always produces identical counts. Useful for:
+Uses **Valgrind Cachegrind** to count instructions with cache and branch
+simulation disabled. The resulting instruction count is deterministic—the same
+binary and input produce the same count—without spending time calculating
+metrics that the benchmark policy does not consume. Useful for:
 
 - Detecting performance regressions in CI
 - Comparing instruction efficiency between languages
@@ -312,7 +315,6 @@ benchmarks/
   results/                   # Benchmark results by timestamp
     YYYY-MM-DD_HHMMSS/
       compiler_version.txt   # Git commit of compiler
-      cachegrind/            # Temporary cachegrind output files (cleaned after run)
       *_hyperfine.json       # Raw hyperfine output
       *_summary.md           # Per-benchmark markdown
       summary.md             # Overall summary

@@ -15,10 +15,7 @@ from pathlib import Path
 
 
 def parse_baselines_file(baselines_path: Path) -> dict:
-    """Parse BASELINES.md to extract language baselines per benchmark.
-
-    Returns: {benchmark: [{language, instructions, data_refs, ...}]}
-    """
+    """Parse BASELINES.md instruction counts per benchmark."""
     if not baselines_path.exists():
         return {}
 
@@ -34,22 +31,13 @@ def parse_baselines_file(baselines_path: Path) -> dict:
             continue
         if in_table and line.startswith("|"):
             cols = [c.strip() for c in line.split("|")]
-            if len(cols) >= 9:
+            if len(cols) >= 4:
                 benchmark = cols[1].strip()
                 lang = cols[2].strip().lower()
                 try:
-                    branches = int(cols[7].replace(",", ""))
-                    mispred_pct = float(cols[8].replace("%", ""))
-                    mispreds = int(branches * mispred_pct / 100)
-
                     entry = {
                         "language": lang,
                         "instructions": int(cols[3].replace(",", "")),
-                        "data_refs": int(cols[4].replace(",", "")),
-                        "d1_misses": int(cols[5].replace(",", "")),
-                        "ll_misses": int(cols[6].replace(",", "")),
-                        "branches": branches,
-                        "branch_mispredicts": mispreds,
                     }
                     if benchmark not in baselines:
                         baselines[benchmark] = []
@@ -125,44 +113,22 @@ def generate_summary(results: dict, output_dir: Path, quiet: bool = False):
                 break
         baseline_instrs = baseline.get("instructions", 1) if baseline else None
 
-        headers = [
-            "Language",
-            "Instructions",
-            "vs Rust",
-            "Data Refs",
-            "L1 Miss",
-            "LL Miss",
-            "Branches",
-            "Mispred",
-        ]
+        headers = ["Language", "Instructions", "vs Rust"]
         rows = []
 
         for r in sorted_results:
             lang = r.get("language", "unknown").capitalize()
             instrs = r.get("instructions", 0)
-            data_refs = r.get("data_refs", 0)
-            d1_misses = r.get("d1_misses", 0)
-            ll_misses = r.get("ll_misses", 0)
-            branches = r.get("branches", 0)
-            mispreds = r.get("branch_mispredicts", 0)
-
             ratio = (
                 instrs / baseline_instrs
                 if baseline_instrs is not None and baseline_instrs > 0
                 else None
             )
-            mispred_rate = (mispreds / branches * 100) if branches > 0 else 0
-
             rows.append(
                 [
                     lang,
                     format_number(instrs),
                     format_ratio(ratio) if ratio is not None else "-",
-                    format_number(data_refs),
-                    format_number(d1_misses),
-                    format_number(ll_misses),
-                    format_number(branches),
-                    f"{mispred_rate:.1f}%",
                 ]
             )
 

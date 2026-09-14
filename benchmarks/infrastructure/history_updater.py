@@ -76,19 +76,16 @@ def update_baselines(benchmarks_dir: Path, json_results: dict) -> None:
             details[name] = rust[0]
             existing[name] = rust[0]["instructions"]
     lines = [
-        "# Benchmark Baselines", "", "Reference metrics for the human-audited Rust benchmark pairs.", "",
-        "| Benchmark     | Language | Instructions     | Data Refs        | L1 Miss     | LL Miss     | Branches        | Mispred |",
-        "|---------------|----------|------------------|------------------|-------------|-------------|-----------------|---------|",
+        "# Benchmark Baselines", "", "Reference instruction counts for the human-audited Rust benchmark pairs.", "",
+        "| Benchmark     | Language | Instructions     |",
+        "|---------------|----------|------------------|",
     ]
     old_rows = {name: {"instructions": count} for name, count in existing.items()}
     old_rows.update(details)
     for name in sorted(old_rows):
         row = old_rows[name]
-        branches = row.get("branches", 0)
-        mispred = row.get("branch_mispredicts", 0)
-        rate = mispred / branches * 100 if branches else 0
         lines.append(
-            f"| {name:<13} | rust     | {format_number(row['instructions']):>16} | {format_number(row.get('data_refs', 0)):>16} | {format_number(row.get('d1_misses', 0)):>11} | {format_number(row.get('ll_misses', 0)):>11} | {format_number(branches):>15} | {rate:>6.1f}% |"
+            f"| {name:<13} | rust     | {format_number(row['instructions']):>16} |"
         )
     atomic_write_text(benchmarks_dir / "BASELINES.md", "\n".join(lines) + "\n")
 
