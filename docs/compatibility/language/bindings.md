@@ -16,12 +16,12 @@ evidence only.
 | Claim | Compiler probe | Interpreter evidence | Result |
 | --- | --- | --- | --- |
 | `let` accepts optional `in` and a layout continuation | `src/Tests/syntax/bindings.syntax`; `src/Tests/e2e/interpreter/bindings.e2e` | `backend/testfiles/execution/language/basic/elet.dark`; `LibParser/Parser.fs:1357-1443` | Shared |
-| Let and lambda binders are variable, wildcard, unit, parenthesized, or nested tuple patterns only | `bindings.syntax`; restricted parser in `src/DarkCompiler/passes/1_Parser.fs` | dedicated `parseLetPattern`, `LibParser/Parser.fs:1306-1355` | Shared |
+| Let and lambda binders are variable, wildcard, unit, parenthesized, or nested tuple patterns only | `bindings.syntax`; restricted parser in `src/DarkCompiler/frontend/Parser.fs` | dedicated `parseLetPattern`, `LibParser/Parser.fs:1306-1355` | Shared |
 | Public lambdas use unannotated `fun patterns -> body` | `bindings.syntax`; canonical parser probes | `backend/testfiles/execution/language/basic/elambda.dark`; `LibParser/Parser.fs:2044-2071` | Shared |
 | Parameter and return annotations belong to local function declarations | `bindings.syntax`; parser and program-structure tests | `LibParser/Parser.fs` local-function production | Shared |
 | The RHS is outside the new scope and runs before the continuation | `bindings.e2e` rebinding and use-before-binding probes | `LibParser/WrittenTypesToProgramTypes.fs:591-611` | Shared |
 | Duplicate usable names reject the complete let/lambda binder set; `_` names do not bind | duplicate rejection cases in `bindings.syntax`; validator at `AST.fs:213-249` | `LibParser/Validation.fs:81-150,201-216` | Shared |
-| Tuple destructuring commits atomically; mismatch skips the continuation | mismatch and evaluation-order cases in `bindings.e2e`; lowering at `2_AST_to_ANF.fs:4263-4339` | `LibExecution/ProgramTypesToRuntimeTypes.fs:721-730`; `LibExecution/Interpreter.fs:1882-1898` | Shared |
+| Tuple destructuring commits atomically; mismatch skips the continuation | mismatch and evaluation-order cases in `bindings.e2e`; lowering at `AST_to_ANF.fs:4263-4339` | `LibExecution/ProgramTypesToRuntimeTypes.fs:721-730`; `LibExecution/Interpreter.fs:1882-1898` | Shared |
 | Nearest binders shadow; closures capture the definition-time binding | rebinding and capture cases in `bindings.e2e`; `closures.e2e` | `elet.dark`, `elambda.dark`, and `earg.dark` | Shared |
 | Child-expression bindings do not escape conditions, arms, matches, lambdas, operands, calls, or sequences | scope-isolation cases in `bindings.e2e`; resolver and ANF scope tests | interpreter name binding and evaluator expression frames | Shared |
 | Match-only literal, constructor, list, and record patterns are rejected in bindings | rejection cases in `bindings.syntax` | `Parser.fs:1305-1355` | Shared |

@@ -1,0 +1,2411 @@
+// RefCountInsertion.fs - Reference Count Insertion Pass
+//
+// Inserts RefCountInc and RefCountDec operations into ANF.
+//
+// Design decisions:
+// - Borrowed calling convention: callers retain ownership, callees borrow
+// - Decrement when heap values go out of scope (end of Let body)
+// - Don't decrement returned values (ownership transfers to caller)
+// - Increment when extracting heap values from tuples (they become shared)
+//
+// The pass uses type inference from the conversion result to determine
+// which TempIds hold heap-allocated values.
+//
+// Heap types (reference counted): Tuples, Records, Sum types, Lists, Dicts, Strings
+// Stack types (NOT RC'd): Integers, Booleans, Float64, RawPtr
+//
+// See docs/compiler/runtime/reference-counting.md for detailed documentation.
+
+module RefCountInsertion
+
+open ANF
+open AST_to_ANF
+
+/// Immutable registry projections and memoized type plans shared by every
+/// function processed in one RC insertion pass. TypeContext itself is copied
+/// as local TempId information changes, so keep the reusable planning state in
+/// a reference object carried by those copies.
+type RcTypePlanningContext = {
+    mutable RecordRegistries:
+        (Map<string, (string * AST.Type) list> * Map<string, string list>) option
+    Shapes: System.Collections.Generic.Dictionary<AST.Type, RcShape>
+    Metadata: System.Collections.Generic.Dictionary<AST.Type, RcMetadata>
+}
+
+let createRcTypePlanningContext () : RcTypePlanningContext =
+    {
+        RecordRegistries = None
+        Shapes = System.Collections.Generic.Dictionary<AST.Type, RcShape>()
+        Metadata = System.Collections.Generic.Dictionary<AST.Type, RcMetadata>()
+    }
+
+/// Type context for inferring types during RC insertion
+type TypeContext = {
+    TypeReg: TypeRegistry
+    VariantLookup: VariantLookup
+    SumShapeReg: RcSumShapeRegistry
+    FuncReg: FunctionRegistry
+    FuncParams: Map<string, (string * AST.Type) list>
+    /// Maps TempId -> Type for values we've seen
+    TempTypes: Map<TempId, AST.Type>
+    /// Maps TempId -> function name for closures (to resolve closure call return types)
+    ClosureFuncs: Map<TempId, string>
+    /// Registry projections and canonical ownership plans shared across local
+    /// TypeContext copies for this pass.
+    TypePlanning: RcTypePlanningContext
+}
+
+/// Create initial context from conversion result
+let createContext (result: ConversionResult) : TypeContext =
+    let (Program (functions, _)) = result.Program
+    let funcReg =
+        functions
+        |> List.fold
+            (fun registry func ->
+                Map.add
+                    func.Name
+                    (AST.TFunction (
+                        func.TypedParams |> List.map (fun param -> param.Type),
+                        func.ReturnType
+                    ))
+                    registry)
+            result.FuncReg
+    { TypeReg = result.TypeReg
+      VariantLookup = result.VariantLookup
+      SumShapeReg = result.RcSumShapeReg
+      FuncReg = funcReg
+      FuncParams = result.FuncParams
+      TempTypes = Map.empty
+      ClosureFuncs = Map.empty
+      TypePlanning = createRcTypePlanningContext () }
+
+let private withTempTypes (ctx: TypeContext) (types: Map<TempId, AST.Type>) : TypeContext =
+    { ctx with TempTypes = types }
+
+/// Add a closure TempId -> function name mapping to context
+let addClosureFunc (ctx: TypeContext) (tempId: TempId) (funcName: string) : TypeContext =
+    { ctx with ClosureFuncs = Map.add tempId funcName ctx.ClosureFuncs }
+
+/// Try to get the function name of a closure from its TempId
+let tryGetClosureFunc (ctx: TypeContext) (atom: Atom) : string option =
+    match atom with
+    | Var tid -> Map.tryFind tid ctx.ClosureFuncs
+    | _ -> None
+
+/// Try to get the type of a TempId
+let tryGetType (ctx: TypeContext) (tempId: TempId) : AST.Type option =
+    Map.tryFind tempId ctx.TempTypes
+
+/// Try to get a function's return type from the function registry
+let tryGetFuncReturnTypeFromReg (ctx: TypeContext) (funcName: string) : AST.Type option =
+    match Map.tryFind funcName ctx.FuncReg with
+    | Some (AST.TFunction (_, retType)) -> Some retType
+    | Some otherType -> Some otherType
+    | None -> None
+
+/// Infer the type of an atom (best-effort)
+let inferAtomType (ctx: TypeContext) (atom: Atom) : AST.Type option =
+    match atom with
+    | UnitLiteral -> Some AST.TUnit
+    | IntLiteral n -> Some (ANF.sizedIntToType n)
+    | BoolLiteral _ -> Some AST.TBool
+    | StringLiteral _ -> Some AST.TString
+    | FloatLiteral _ -> Some AST.TFloat64
+    | Var tid -> tryGetType ctx tid
+    | FuncRef funcName -> Map.tryFind funcName ctx.FuncReg
+
+let private isIntegerType (typ: AST.Type) : bool =
+    match typ with
+    | AST.TInt8 | AST.TInt16 | AST.TInt32 | AST.TInt64
+    | AST.TUInt8 | AST.TUInt16 | AST.TUInt32 | AST.TUInt64 -> true
+    | _ -> false
+
+let private inferArithmeticType (leftType: AST.Type option) (rightType: AST.Type option) : AST.Type option =
+    match leftType, rightType with
+    | Some AST.TFloat64, _
+    | _, Some AST.TFloat64 ->
+        Some AST.TFloat64
+    | Some left, Some right when left = right && isIntegerType left ->
+        Some left
+    | Some left, None when isIntegerType left ->
+        Some left
+    | None, Some right when isIntegerType right ->
+        Some right
+    | _ ->
+        None
+
+let private isHeapLikeForBitwiseTagging (typ: AST.Type) : bool =
+    match typ with
+    | AST.TTuple _
+    | AST.TRecord _
+    | AST.TSum _
+    | AST.TList _
+    | AST.TDict _ ->
+        true
+    | _ ->
+        false
+
+/// Return types for monomorphized intrinsics that are not always present in FuncReg
+let private tryGetMonomorphizedIntrinsicReturnType (ctx: TypeContext) (funcName: string) : AST.Type option =
+    let tryParseMangled (mangled: string) : AST.Type option =
+        match tryParseMangledType ctx.VariantLookup mangled with
+        | Ok typ -> Some typ
+        | Error _ -> None
+
+    if funcName.StartsWith("__raw_get_") then
+        funcName.Substring("__raw_get_".Length)
+        |> tryParseMangled
+    elif funcName.StartsWith("__raw_take_") then
+        funcName.Substring("__raw_take_".Length)
+        |> tryParseMangled
+    elif funcName.StartsWith("__raw_slot_init_") then Some AST.TUnit
+    elif funcName.StartsWith("__hash_") then Some AST.TInt64
+    elif funcName.StartsWith("__key_eq_") then Some AST.TBool
+    elif funcName.StartsWith("__empty_dict_") then Some AST.TInt64
+    elif funcName.StartsWith("__dict_is_null_") then Some AST.TBool
+    elif funcName.StartsWith("__dict_get_tag_") then Some AST.TInt64
+    elif funcName.StartsWith("__dict_to_rawptr_") then Some AST.TRawPtr
+    elif funcName.StartsWith("__rawptr_to_dict_") then
+        funcName.Substring("__rawptr_to_dict_".Length)
+        |> fun suffix -> tryParseMangled $"dict_{suffix}"
+    elif funcName.StartsWith("__list_is_null_") then Some AST.TBool
+    elif funcName.StartsWith("__list_get_tag_") then Some AST.TInt64
+    elif funcName.StartsWith("__list_to_rawptr_") then Some AST.TRawPtr
+    elif funcName.StartsWith("__rawptr_to_list_") then
+        funcName.Substring("__rawptr_to_list_".Length)
+        |> tryParseMangled
+        |> Option.map AST.TList
+    else None
+
+/// Infer the type of a CExpr in the given context
+let inferCExprType (ctx: TypeContext) (cexpr: CExpr) : AST.Type option =
+    match cexpr with
+    | Atom atom -> inferAtomType ctx atom
+    | TypedAtom (_, typ) -> Some typ  // Use the explicit type annotation
+    | Prim (op, left, right) ->
+        // Binary ops return int or bool depending on op
+        match op with
+        | Add | Sub | Mul | Div ->
+            let leftType = inferAtomType ctx left
+            let rightType = inferAtomType ctx right
+            inferArithmeticType leftType rightType
+        | Mod | Shl | Shr ->
+            let leftType = inferAtomType ctx left
+            let rightType = inferAtomType ctx right
+            match leftType, rightType with
+            | Some l, Some r when l = r && isIntegerType l -> Some l
+            | Some l, None when isIntegerType l -> Some l
+            | None, Some r when isIntegerType r -> Some r
+            | Some l, Some _ -> Some l
+            | Some l, None -> Some l
+            | None, Some r -> Some r
+            | None, None -> None
+        | BitAnd | BitOr | BitXor ->
+            let leftType = inferAtomType ctx left
+            let rightType = inferAtomType ctx right
+            match leftType, rightType with
+            // Pointer-tagging lowerings use bitwise ops over tagged heap values and masks.
+            // The result is a scalar tag/masked pointer value, not a heap object ownership value.
+            | Some l, _ when isHeapLikeForBitwiseTagging l -> Some AST.TInt64
+            | _, Some r when isHeapLikeForBitwiseTagging r -> Some AST.TInt64
+            | Some l, Some r when l = r && isIntegerType l -> Some l
+            | Some l, None when isIntegerType l -> Some l
+            | None, Some r when isIntegerType r -> Some r
+            | Some l, Some _ -> Some l
+            | Some l, None -> Some l
+            | None, Some r -> Some r
+            | None, None -> None
+        | Eq | Neq | Lt | Gt | Lte | Gte | And | Or -> Some AST.TBool
+    | CanonicalBufferEq _ -> Some AST.TBool
+    | UnaryPrim (op, atom) ->
+        match op with
+        | Neg ->
+            match inferAtomType ctx atom with
+            | Some AST.TFloat64 -> Some AST.TFloat64
+            | Some _ -> Some AST.TInt64
+            | None -> None
+        | Not -> Some AST.TBool
+        | BitNot ->
+            // Preserve the operand type instead of assuming Int64.
+            // This keeps sized integer semantics (e.g. UInt8) intact.
+            inferAtomType ctx atom
+    // Float intrinsics
+    | FloatSqrt _ -> Some AST.TFloat64
+    | FloatAbs _ -> Some AST.TFloat64
+    | FloatNeg _ -> Some AST.TFloat64
+    | Int64ToFloat _ -> Some AST.TFloat64
+    | FloatToInt64 _ -> Some AST.TInt64
+    | FloatToBits _ -> Some AST.TUInt64
+    | FloatToString _ -> Some AST.TString
+    | RandomInt64 -> Some AST.TInt64
+    | DateTimeNow -> Some AST.TDateTime
+    | Sleep _ -> Some AST.TUnit
+    | StdoutWrite _ -> Some AST.TUnit
+    | StdinReadLine -> Some AST.TString
+    | CliNative (operation, _) ->
+        match operation with
+        | Execute | ProcessIO | TerminateProcess -> Some (AST.TRecord ("Stdlib.Cli.NativeOutput", []))
+        | RunProcess -> Some (AST.TRecord ("Stdlib.Cli.NativeProcessOutput", []))
+        | GetEnv | GetArgv -> Some (AST.TSum ("Stdlib.Option.Option", [AST.TString]))
+        | Kill -> Some (AST.TSum ("Stdlib.Result.Result", [AST.TUnit; AST.TRecord ("Stdlib.Cli.NativePosixError", [])]))
+        | Hostname -> Some (AST.TSum ("Stdlib.Result.Result", [AST.TString; AST.TRecord ("Stdlib.Cli.NativePosixError", [])]))
+        | HostOS | HostArchitecture | GetPid | GetUid | CpuCount | SpawnProcess -> Some AST.TInt64
+    | IfValue (_, thenAtom, _) -> inferAtomType ctx thenAtom
+    | Call (funcName, args)
+    | BorrowedCall (funcName, args) ->
+        // Return type from function registry (with special-case inference for stdlib list/tuple helpers)
+        match funcName, args with
+        | name, [listAtom; _] when name.StartsWith("Stdlib.List.getAt") || name.StartsWith("Stdlib.List.__getAt") ->
+            match tryGetFuncReturnTypeFromReg ctx funcName with
+            | Some retType -> Some retType
+            | None ->
+                match inferAtomType ctx listAtom with
+                | Some (AST.TList elemType) ->
+                    Some (AST.TSum ("Stdlib.Option.Option", [elemType]))
+                | _ -> None
+        | name, [listAtom] when name.StartsWith("Stdlib.List.head") || name.StartsWith("Stdlib.List.__head") ->
+            match tryGetFuncReturnTypeFromReg ctx funcName with
+            | Some retType -> Some retType
+            | None ->
+                match inferAtomType ctx listAtom with
+                | Some (AST.TList elemType) ->
+                    Some (AST.TSum ("Stdlib.Option.Option", [elemType]))
+                | _ -> None
+        | name, [listAtom] when name.StartsWith("Stdlib.List.tail") || name.StartsWith("Stdlib.List.__tail") ->
+            match inferAtomType ctx listAtom with
+            | Some (AST.TList elemType) when name.StartsWith("Stdlib.List.tail") ->
+                Some (AST.TSum ("Stdlib.Option.Option", [AST.TList elemType]))
+            | Some (AST.TList elemType) ->
+                Some (AST.TList elemType)
+            | _ -> tryGetFuncReturnTypeFromReg ctx funcName
+        | name, [tupleAtom] when name.StartsWith("Stdlib.Tuple2.first") ->
+            match tryGetFuncReturnTypeFromReg ctx funcName with
+            | Some retType -> Some retType
+            | None ->
+                match inferAtomType ctx tupleAtom with
+                | Some (AST.TTuple (firstType :: _)) -> Some firstType
+                | _ -> None
+        | name, [tupleAtom] when name.StartsWith("Stdlib.Tuple2.second") ->
+            match tryGetFuncReturnTypeFromReg ctx funcName with
+            | Some retType -> Some retType
+            | None ->
+                match inferAtomType ctx tupleAtom with
+                | Some (AST.TTuple (_ :: secondType :: _)) -> Some secondType
+                | _ -> None
+        | _ ->
+            match tryGetFuncReturnTypeFromReg ctx funcName with
+            | Some t -> Some t
+            | None -> tryGetMonomorphizedIntrinsicReturnType ctx funcName
+    | TailCall (funcName, _) ->
+        // Tail calls have same return type as regular calls
+        Map.tryFind funcName ctx.FuncReg
+    | IndirectCall (funcAtom, _) ->
+        // Look up the function's type to get its return type
+        match funcAtom with
+        | Var tid ->
+            match tryGetType ctx tid with
+            | Some (AST.TFunction (_, retType)) -> Some retType
+            // Raw code pointers are pointer-sized integers after projection
+            // from the internal function-closure layout.
+            | Some AST.TRawPtr | Some AST.TInt64 -> Some AST.TBool
+            | _ -> None
+        | _ -> None
+    | IndirectTailCall (funcAtom, _) ->
+        // Same as IndirectCall
+        match funcAtom with
+        | Var tid ->
+            match tryGetType ctx tid with
+            | Some (AST.TFunction (_, retType)) -> Some retType
+            | Some AST.TRawPtr | Some AST.TInt64 -> Some AST.TBool
+            | _ -> None
+        | _ -> None
+    | ClosureAlloc (funcName, _) ->
+        // Closure payload size is resolved by the backend from the function
+        // pointer, so ownership insertion must preserve the source function type
+        // instead of treating the closure as an ordinary fixed block.
+        match Map.tryFind funcName ctx.FuncReg with
+        | Some (AST.TFunction _ as funcType) -> Some funcType
+        | Some otherType ->
+            Crash.crash $"RefCountInsertion: ClosureAlloc target '{funcName}' has non-function type {otherType}"
+        | None ->
+            Crash.crash $"RefCountInsertion: ClosureAlloc target '{funcName}' not found in function registry"
+    | ClosureCall (closureAtom, _) ->
+        // Prefer the concrete closure target when available; otherwise use
+        // the closure value's function type carried by the ANF type registry.
+        match tryGetClosureFunc ctx closureAtom with
+        | Some funcName -> tryGetFuncReturnTypeFromReg ctx funcName
+        | None ->
+            match closureAtom with
+            | Var tid ->
+                match tryGetType ctx tid with
+                | Some (AST.TFunction (_, retType)) -> Some retType
+                | _ -> None
+            | _ -> None
+    | ClosureTailCall (closureAtom, _) ->
+        // Same as ClosureCall
+        match tryGetClosureFunc ctx closureAtom with
+        | Some funcName -> tryGetFuncReturnTypeFromReg ctx funcName
+        | None ->
+            match closureAtom with
+            | Var tid ->
+                match tryGetType ctx tid with
+                | Some (AST.TFunction (_, retType)) -> Some retType
+                | _ -> None
+            | _ -> None
+    | TupleAlloc elems ->
+        // Infer element types and create TTuple
+        let elemTypes =
+            elems
+            |> List.map (function
+                | UnitLiteral -> AST.TUnit
+                | IntLiteral n -> ANF.sizedIntToType n
+                | BoolLiteral _ -> AST.TBool
+                | StringLiteral _ -> AST.TString
+                | FloatLiteral _ -> AST.TFloat64
+                | Var tid ->
+                    match tryGetType ctx tid with
+                    | Some t -> t
+                    | None -> Crash.crash $"RefCountInsertion: Type not found for temp {tid} in TupleAlloc"
+                | FuncRef funcName ->
+                    match Map.tryFind funcName ctx.FuncReg with
+                    | Some t -> t
+                    | None -> Crash.crash $"RefCountInsertion: Type not found for function {funcName} in TupleAlloc")
+        Some (AST.TTuple elemTypes)
+    | RecordAlloc (descriptor, _) ->
+        Some (AST.TRecord (descriptor.RuntimeTypeName, descriptor.TypeArgs))
+    | RecordClone (descriptor, _, _) ->
+        Some (AST.TRecord (descriptor.RuntimeTypeName, descriptor.TypeArgs))
+    | RecordReuse (descriptor, _, _) ->
+        Some (AST.TRecord (descriptor.RuntimeTypeName, descriptor.TypeArgs))
+    | RecordGet (descriptor, _, index) ->
+        descriptor.Fields
+        |> List.tryItem index
+        |> Option.map snd
+    | TupleGet (tupleAtom, index) ->
+        // Get element type from tuple type
+        match tupleAtom with
+        | Var tid ->
+            match tryGetType ctx tid with
+            | Some (AST.TTuple elemTypes) when index < List.length elemTypes ->
+                Some (List.item index elemTypes)
+            | Some (AST.TEnumFields fieldTypes) when index < List.length fieldTypes ->
+                Some (List.item index fieldTypes)
+            | Some (AST.TRecord (typeName, _)) ->
+                // Record fields - look up field type
+                match Map.tryFind typeName ctx.TypeReg with
+                | Some recordInfo when index < List.length recordInfo.Fields ->
+                    Some (snd (List.item index recordInfo.Fields))
+                | _ -> None
+            | Some (AST.TList elemType) ->
+                // List Cons cells are (tag, head, tail) - index 1 is head, index 2 is tail
+                match index with
+                | 0 -> Some AST.TInt64  // tag
+                | 1 -> Some elemType    // head element
+                | 2 -> Some (AST.TList elemType)  // tail is same list type
+                | _ -> None
+            | Some (AST.TSum (_typeName, typeArgs)) ->
+                // Sum type layout: [tag:8][payload:8]
+                // index 0 = tag (Int64), index 1 = payload
+                match index with
+                | 0 -> Some AST.TInt64  // tag
+                | 1 ->
+                    // Payload type depends on variant, but for simple cases like Option<T>,
+                    // the payload type is the first type argument
+                    match typeArgs with
+                    | [singleType] -> Some singleType
+                    | _ -> None
+                | _ -> None
+            | Some (AST.TFunction _) ->
+                // Closures are typed as TFunction but laid out as tuples:
+                // [func_ptr:8][cap1:8][cap2:8]...
+                // Index 0 is the function pointer (Int64), rest are captures
+                Some AST.TInt64  // All closure slots are pointer-sized
+            | _ -> None
+        | _ -> None
+    | StringConcat (_, _) -> Some AST.TString  // String concatenation returns a string
+    | RefCountInc (_, _, _, _) -> Some AST.TUnit
+    | RefCountDec (_, _, _, _) -> Some AST.TUnit
+    | Print (_, valueType) -> Some valueType  // Print returns the type it prints
+    | FileReadText _ -> Some (AST.TSum ("Stdlib.Result.Result", [AST.TString; AST.TString]))  // Result<String, String>
+    | FileExists _ -> Some AST.TBool  // Bool
+    | FileWriteText _ -> Some (AST.TSum ("Stdlib.Result.Result", [AST.TUnit; AST.TString]))  // Result<Unit, String>
+    | FileAppendText _ -> Some (AST.TSum ("Stdlib.Result.Result", [AST.TUnit; AST.TString]))  // Result<Unit, String>
+    | FileDelete _ -> Some (AST.TSum ("Stdlib.Result.Result", [AST.TUnit; AST.TString]))  // Result<Unit, String>
+    | FileSetExecutable _ -> Some (AST.TSum ("Stdlib.Result.Result", [AST.TUnit; AST.TString]))  // Result<Unit, String>
+    | FileWriteFromPtr _ -> Some AST.TBool  // Returns Bool (success/failure)
+    // Raw memory intrinsics (no ref counting - manually managed)
+    | RawAlloc _ -> Some AST.TRawPtr  // Returns raw pointer
+    | MappedAlloc _ -> Some AST.TRawPtr  // Returns raw pointer
+    | RawFree _ -> Some AST.TUnit  // Returns unit
+    | MappedFree _ -> Some AST.TUnit  // Returns unit
+    | RawGet (_, _, valueType) -> valueType
+    | RawTake (_, _, valueType) -> valueType
+    | RawGetByte _ -> Some AST.TInt64  // Returns 1-byte value (zero-extended)
+    | RawWriteWord _ -> Some AST.TUnit  // Returns unit
+    | RawWriteByte _ -> Some AST.TUnit  // Returns unit
+    | RawSlotInit _ -> Some AST.TUnit  // Returns unit
+    | StringToRawPtr _ -> Some AST.TRawPtr
+    | RawPtrToString _ -> Some AST.TString
+    | BlobToRawPtr _ -> Some AST.TRawPtr
+    | RawPtrToBlob _ -> Some AST.TBlob
+    | RawPtrToInt128 _ -> Some AST.TInt128
+    | RawPtrToUInt128 _ -> Some AST.TUInt128
+    | DictToRawPtr _ -> Some AST.TRawPtr
+    | RawPtrToDict (_, _, dictType) -> Some dictType
+    | ListToRawPtr _ -> Some AST.TRawPtr
+    | RawPtrToList (_, _, listType) -> Some listType
+    // Dynamic buffer refcount intrinsics
+    | RefCountIncString _ -> Some AST.TUnit  // Returns unit
+    | RefCountDecString _ -> Some AST.TUnit  // Returns unit
+    | RefCountIncBlob _ -> Some AST.TUnit   // Returns unit
+    | RefCountDecBlob _ -> Some AST.TUnit   // Returns unit
+    | RuntimeError _ -> Some AST.TUnit
+    | RuntimeErrorString _ -> Some AST.TUnit
+
+/// Return analysis annotation for AExpr nodes
+type ReturnAnnotatedExpr =
+    | RReturn of Atom * Set<TempId>
+    | RLet of TempId * CExpr * ReturnAnnotatedExpr * Set<TempId>
+    | RIf of Atom * ReturnAnnotatedExpr * ReturnAnnotatedExpr * Set<TempId>
+    | RJoin of TypedParam * ReturnAnnotatedExpr * ReturnAnnotatedExpr * Set<TempId>
+    | RJump of TempId * Atom * Set<TempId>
+
+/// Get the set of returned TempIds for a return-annotated expression
+let returnedSet (expr: ReturnAnnotatedExpr) : Set<TempId> =
+    match expr with
+    | RReturn (_, returned) -> returned
+    | RLet (_, _, _, returned) -> returned
+    | RIf (_, _, _, returned) -> returned
+    | RJoin (_, _, _, returned) -> returned
+    | RJump (_, _, returned) -> returned
+
+/// Collect the alias chain for a TempId (includes the TempId itself)
+let rec collectAliasChain (aliases: Map<TempId, TempId>) (tempId: TempId) : Set<TempId> =
+    match Map.tryFind tempId aliases with
+    | Some nextId -> Set.add tempId (collectAliasChain aliases nextId)
+    | None -> Set.singleton tempId
+
+/// Most TypedAtoms only preserve type information for an existing value. A
+/// RawPtr-to-Stream TypedAtom is different: Stream construction seeds its RC
+/// word at zero and relies on the first owning use to materialize an edge.
+/// Following that cast back to the RawPtr would invent ownership that does not
+/// yet exist and incorrectly remove the required retain.
+let private tryOwnershipPreservingAliasSource (cexpr: CExpr) : TempId option =
+    match cexpr with
+    | Atom (Var sourceId) -> Some sourceId
+    | TypedAtom (Var _, AST.TStream _) -> None
+    | TypedAtom (Var sourceId, _) -> Some sourceId
+    | RecordReuse (_, Var sourceId, _) -> Some sourceId
+    | _ -> None
+
+/// Analyze return values and track alias chains in a single pass
+let rec analyzeReturns
+    (joins: Map<TempId, Set<TempId>>)
+    (aliases: Map<TempId, TempId>)
+    (expr: AExpr)
+    : ReturnAnnotatedExpr =
+    match expr with
+    | Jump (target, atom) ->
+        let returned =
+            match Map.tryFind target joins with
+            | None -> Crash.crash $"Return analysis: join target {target} is not in scope"
+            | Some returned when Set.contains target returned ->
+                let argumentAliases = match atom with Var id -> collectAliasChain aliases id | _ -> Set.empty
+                Set.union (Set.remove target returned) argumentAliases
+            | Some returned -> returned
+        RJump (target, atom, returned)
+    | Join (parameter, continuation, entry) ->
+        let body = analyzeReturns joins (Map.remove parameter.Id aliases) continuation
+        let entryInfo = analyzeReturns (Map.add parameter.Id (returnedSet body) joins) aliases entry
+        RJoin (parameter, body, entryInfo, returnedSet entryInfo)
+    | Return atom ->
+        let returned =
+            match atom with
+            | Var tid -> collectAliasChain aliases tid
+            | _ -> Set.empty
+        RReturn (atom, returned)
+    | Let (tempId, cexpr, body) ->
+        let aliases' =
+            match tryOwnershipPreservingAliasSource cexpr with
+            | Some sourceId -> Map.add tempId sourceId aliases
+            | _ -> aliases
+        let bodyInfo = analyzeReturns joins aliases' body
+        RLet (tempId, cexpr, bodyInfo, returnedSet bodyInfo)
+    | If (cond, thenBranch, elseBranch) ->
+        let thenInfo = analyzeReturns joins aliases thenBranch
+        let elseInfo = analyzeReturns joins aliases elseBranch
+        let returned = Set.union (returnedSet thenInfo) (returnedSet elseInfo)
+        RIf (cond, thenInfo, elseInfo, returned)
+
+let private atomOccurrenceCount (target: TempId) (atoms: Atom list) : int =
+    atoms
+    |> List.sumBy (fun atom ->
+        match atom with
+        | Var tempId when tempId = target -> 1
+        | _ -> 0)
+
+/// Count ownership-bearing aggregate fields drawn from an alias family.
+/// RecordClone's source record is borrowed by the clone operation, so it cannot
+/// be the ownership-transfer use.
+let private aggregateAliasFieldCount
+    (aliases: Set<TempId>)
+    (cexpr: CExpr)
+    : int =
+    let countFields (fields: Atom list) : int =
+        aliases
+        |> Set.toList
+        |> List.sumBy (fun target -> atomOccurrenceCount target fields)
+
+    match cexpr with
+    | TupleAlloc elements
+    | RecordAlloc (_, elements)
+    | ClosureAlloc (_, elements) ->
+        countFields elements
+    | RecordClone (_, source, fields) ->
+        let sourceUsesAlias =
+            aliases
+            |> Set.exists (fun target -> ANF_Optimize.atomUsesTemp target source)
+        if sourceUsesAlias then 0 else countFields fields
+    | _ ->
+        0
+
+let private rawSlotAliasValueCount
+    (aliases: Set<TempId>)
+    (cexpr: CExpr)
+    : int =
+    match cexpr with
+    | RawSlotInit (_, _, Var valueId, _) when Set.contains valueId aliases -> 1
+    | _ -> 0
+
+let rec private returnAnnotatedExprUsesAnyAlias
+    (aliases: Set<TempId>)
+    (body: ReturnAnnotatedExpr)
+    : bool =
+    let atomUsesAnyAlias atom =
+        aliases
+        |> Set.exists (fun target -> ANF_Optimize.atomUsesTemp target atom)
+
+    match body with
+    | RReturn (atom, _) -> atomUsesAnyAlias atom
+    | RJump (_, atom, _) -> atomUsesAnyAlias atom
+    | RJoin (parameter, continuation, entry, _) ->
+        returnAnnotatedExprUsesAnyAlias (Set.remove parameter.Id aliases) continuation
+        || returnAnnotatedExprUsesAnyAlias aliases entry
+    | RLet (_, cexpr, nextBody, _) ->
+        (aliases |> Set.exists (fun target -> ANF_Optimize.cexprUsesTemp target cexpr))
+        || returnAnnotatedExprUsesAnyAlias aliases nextBody
+    | RIf (cond, thenBranch, elseBranch, _) ->
+        atomUsesAnyAlias cond
+        || returnAnnotatedExprUsesAnyAlias aliases thenBranch
+        || returnAnnotatedExprUsesAnyAlias aliases elseBranch
+
+let private cexprReleasesAnyAlias (aliases: Set<TempId>) (cexpr: CExpr) : bool =
+    match cexpr with
+    | RefCountDec (atom, _, _, _)
+    | RefCountDecString atom
+    | RefCountDecBlob atom ->
+        aliases
+        |> Set.exists (fun target -> ANF_Optimize.atomUsesTemp target atom)
+    | _ ->
+        false
+
+/// Once ownership is transferred into an aggregate, do not permit observable
+/// work before that aggregate is returned. This preserves internal refcount
+/// probes while allowing nested tuple/record/closure construction suffixes.
+let rec private aggregateFlowsDirectlyToReturn
+    (aggregateId: TempId)
+    (body: ReturnAnnotatedExpr)
+    : bool =
+    let rec loop (aliases: Set<TempId>) (body: ReturnAnnotatedExpr) : bool =
+        match body with
+        | RReturn (Var returnedId, _) ->
+            Set.contains returnedId aliases
+        | RLet (nextId, nextExpr, nextBody, _) ->
+            match tryOwnershipPreservingAliasSource nextExpr with
+            | Some sourceId when Set.contains sourceId aliases ->
+                loop (Set.add nextId aliases) nextBody
+            | _ ->
+                aggregateAliasFieldCount aliases nextExpr > 0
+                && aggregateFlowsDirectlyToReturn nextId nextBody
+        | RIf (_, thenBranch, elseBranch, _) ->
+            loop aliases thenBranch && loop aliases elseBranch
+        | RJoin _ | RJump _ -> false
+        | RReturn _ ->
+            false
+
+    loop (Set.singleton aggregateId) body
+
+/// Find the aggregate use that begins a closed construction suffix ending in
+/// Return. Earlier borrowed uses preserve the candidate's owned edge; an
+/// explicit release makes the proof ineligible.
+let rec private transfersIntoReturnedAggregate
+    (candidateId: TempId)
+    (body: ReturnAnnotatedExpr)
+    : bool =
+    let rec loop (aliases: Set<TempId>) (body: ReturnAnnotatedExpr) : bool =
+        match body with
+        | RLet (aggregateId, cexpr, nextBody, _) ->
+            match tryOwnershipPreservingAliasSource cexpr with
+            | Some sourceId when Set.contains sourceId aliases ->
+                loop (Set.add aggregateId aliases) nextBody
+            | _ ->
+                if aggregateAliasFieldCount aliases cexpr > 0 then
+                    aggregateFlowsDirectlyToReturn aggregateId nextBody
+                elif rawSlotAliasValueCount aliases cexpr > 0 then
+                    false
+                elif cexprReleasesAnyAlias aliases cexpr then
+                    false
+                else
+                    loop aliases nextBody
+        | RIf (_, thenBranch, elseBranch, _) ->
+            loop aliases thenBranch && loop aliases elseBranch
+        | RJoin _ | RJump _ -> false
+        | RReturn _ ->
+            false
+
+    loop (Set.singleton candidateId) body
+
+/// Move a locally-owned edge into its first ownership-bearing raw slot use
+/// when no alias remains live afterward. RawSlotInit normally retains a copied
+/// edge; the move instead lets the slot adopt the binding's pending ownership.
+let rec private transfersIntoRawSlot
+    (candidateId: TempId)
+    (body: ReturnAnnotatedExpr)
+    : bool =
+    let rec loop (aliases: Set<TempId>) (body: ReturnAnnotatedExpr) : bool =
+        match body with
+        | RLet (nextId, cexpr, nextBody, _) ->
+            match tryOwnershipPreservingAliasSource cexpr with
+            | Some sourceId when Set.contains sourceId aliases ->
+                loop (Set.add nextId aliases) nextBody
+            | _ ->
+                let rawSlotUses = rawSlotAliasValueCount aliases cexpr
+                if rawSlotUses > 0 then
+                    rawSlotUses = 1
+                    && not (returnAnnotatedExprUsesAnyAlias aliases nextBody)
+                elif aggregateAliasFieldCount aliases cexpr > 0
+                     || cexprReleasesAnyAlias aliases cexpr then
+                    false
+                else
+                    loop aliases nextBody
+        | RIf (_, thenBranch, elseBranch, _) ->
+            loop aliases thenBranch && loop aliases elseBranch
+        | RJoin _ | RJump _ -> false
+        | RReturn _ ->
+            false
+
+    loop (Set.singleton candidateId) body
+
+/// Check if a CExpr is a borrowing/aliasing operation
+/// Borrowed/aliased values should NOT get their own RefCountDec - the original value owns the memory
+let isBorrowingExpr (cexpr: CExpr) : bool =
+    match cexpr with
+    | IfValue _ -> true            // Selects one of two existing values; no ownership transfer
+    | TupleGet _ -> true           // Extracts pointer from tuple/list - borrowed from parent
+    | RecordGet _ -> true          // Record projections borrow from the owning record
+    | RecordReuse _ -> true        // Reuses the source allocation and transfers its ownership
+    | RawGet _ -> true             // RawGet reads existing memory; it does not transfer ownership
+    | RawTake _ -> false           // RawTake transfers the slot's existing ownership to the result
+    | StringToRawPtr _ -> true     // RawPtr view is borrowed from the dynamic buffer
+    | BlobToRawPtr _ -> true      // RawPtr view is borrowed from the dynamic buffer
+    | DictToRawPtr _ -> true       // RawPtr view is borrowed from the tagged container
+    | ListToRawPtr _ -> true       // RawPtr view is borrowed from the tagged container
+    | BorrowedCall _ -> true       // Callee returns an alias kept alive by one of its arguments
+    | Atom (Var _) -> true         // Alias/copy of existing variable - don't double-dec
+    | TypedAtom (Var _, _) -> true // TypedAtom wrapping a variable - also borrowed
+    | _ -> false
+
+let private canonicalRcTypeForShape (ctx: TypeContext) (typ: AST.Type) : AST.Type =
+    let canonicalBareSum name =
+        AST.TSum (name, [])
+
+    let rec canonicalize typ =
+        match typ with
+        | AST.TRecord (name, []) when Map.containsKey name ctx.SumShapeReg ->
+            canonicalBareSum name
+        | AST.TSum (name, []) when Map.containsKey name ctx.SumShapeReg ->
+            canonicalBareSum name
+        | AST.TRecord (name, typeArgs) ->
+            AST.TRecord (name, List.map canonicalize typeArgs)
+        | AST.TSum (name, typeArgs) ->
+            AST.TSum (name, List.map canonicalize typeArgs)
+        | AST.TFunction (paramTypes, returnType) ->
+            AST.TFunction (List.map canonicalize paramTypes, canonicalize returnType)
+        | AST.TTuple elemTypes ->
+            AST.TTuple (List.map canonicalize elemTypes)
+        | AST.TEnumFields fieldTypes ->
+            AST.TEnumFields (List.map canonicalize fieldTypes)
+        | AST.TList elemType ->
+            AST.TList (canonicalize elemType)
+        | AST.TStream elemType ->
+            AST.TStream (canonicalize elemType)
+        | AST.TDict (keyType, valueType) ->
+            AST.TDict (canonicalize keyType, canonicalize valueType)
+        | AST.TVar _ | AST.TInt8 | AST.TInt16 | AST.TInt32 | AST.TInt64 | AST.TInt128 | AST.TInt
+        | AST.TUInt8 | AST.TUInt16 | AST.TUInt32 | AST.TUInt64 | AST.TUInt128
+        | AST.TBool | AST.TFloat64 | AST.TString | AST.TBlob | AST.TChar | AST.TDateTime
+        | AST.TUnit | AST.TRawPtr | AST.TRuntimeError ->
+            typ
+
+    canonicalize typ
+
+let private canonicalRcSourceType (ctx: TypeContext) (typ: AST.Type) : AST.Type =
+    let rec canonicalize typ =
+        match typ with
+        | AST.TRecord (name, []) when Map.containsKey name ctx.SumShapeReg ->
+            AST.TSum (name, [])
+        | AST.TRecord (name, typeArgs) ->
+            AST.TRecord (name, List.map canonicalize typeArgs)
+        | AST.TSum (name, typeArgs) ->
+            AST.TSum (name, List.map canonicalize typeArgs)
+        | AST.TFunction (paramTypes, returnType) ->
+            AST.TFunction (List.map canonicalize paramTypes, canonicalize returnType)
+        | AST.TTuple elemTypes ->
+            AST.TTuple (List.map canonicalize elemTypes)
+        | AST.TEnumFields fieldTypes ->
+            AST.TEnumFields (List.map canonicalize fieldTypes)
+        | AST.TList elemType ->
+            AST.TList (canonicalize elemType)
+        | AST.TStream elemType ->
+            AST.TStream (canonicalize elemType)
+        | AST.TDict (keyType, valueType) ->
+            AST.TDict (canonicalize keyType, canonicalize valueType)
+        | AST.TVar _ | AST.TInt8 | AST.TInt16 | AST.TInt32 | AST.TInt64 | AST.TInt128 | AST.TInt
+        | AST.TUInt8 | AST.TUInt16 | AST.TUInt32 | AST.TUInt64 | AST.TUInt128
+        | AST.TBool | AST.TFloat64 | AST.TString | AST.TBlob | AST.TChar | AST.TDateTime
+        | AST.TUnit | AST.TRawPtr | AST.TRuntimeError ->
+            typ
+
+    canonicalize typ
+
+let private rcShapeForType (ctx: TypeContext) (typ: AST.Type) : RcShape =
+    match ctx.TypePlanning.Shapes.TryGetValue typ with
+    | true, shape -> shape
+    | false, _ ->
+        let (recordFieldsReg, recordTypeParamsReg) =
+            match ctx.TypePlanning.RecordRegistries with
+            | Some registries -> registries
+            | None ->
+                let registries =
+                    (recordFieldsRegistry ctx.TypeReg,
+                     recordTypeParamsRegistry ctx.TypeReg)
+                ctx.TypePlanning.RecordRegistries <- Some registries
+                registries
+        let shape =
+            typ
+            |> canonicalRcTypeForShape ctx
+            |> rcShapeOfTypeWithSums
+                recordFieldsReg
+                recordTypeParamsReg
+                ctx.SumShapeReg
+        ctx.TypePlanning.Shapes.[typ] <- shape
+        shape
+
+let private rcMetadataForTypeAndShape
+    (ctx: TypeContext)
+    (typ: AST.Type)
+    (shape: RcShape)
+    : RcMetadata =
+    let canonicalType = canonicalRcSourceType ctx typ
+    match ctx.TypePlanning.Metadata.TryGetValue canonicalType with
+    | true, metadata -> metadata
+    | false, _ ->
+        let releasePlan = rcShapeReleasePlan shape
+        let metadata = {
+            ReleasePlanCacheKey = rcReleasePlanCacheKey canonicalType releasePlan
+            ReleasePlan = Some releasePlan
+            SourceType = Some canonicalType
+        }
+        ctx.TypePlanning.Metadata.[canonicalType] <- metadata
+        metadata
+
+let private shapeNeedsManagedAliasRootPreservation (ctx: TypeContext) (typ: AST.Type) : bool =
+    typ |> rcShapeForType ctx |> rcShapeNeedsManagedAliasRootPreservation
+
+let private bindingNeedsShapeAutomaticDec
+    (cexpr: CExpr)
+    (typ: AST.Type)
+    (shape: RcShape)
+    : bool =
+    rcShapeNeedsAutomaticBindingDec shape
+    || match typ, cexpr with
+       | AST.TFunction _, ClosureAlloc _ -> true
+       | AST.TFunction _, Call (funcName, _) when not (funcName.StartsWith("Stdlib.")) -> true
+       | AST.TFunction _, ClosureCall _ -> true
+       | _ -> false
+
+/// Values whose runtime representation is known to fail the RC helper's
+/// dynamic-root guard, so emitting the helper call cannot affect ownership.
+let private cexprProducesNonRcSentinel (cexpr: CExpr) : bool =
+    match cexpr with
+    | Atom (StringLiteral _)
+    | TypedAtom (StringLiteral _, _) ->
+        true
+    | TypedAtom (IntLiteral (Int64 0L), AST.TList _) ->
+        true
+    | _ ->
+        false
+
+/// Carry fixed-root metadata with the ownership obligation that created it.
+/// One obligation can be emitted on several return paths; deriving the same
+/// canonical type and recursive release plan at each use is duplicate work.
+type private ReturnDec =
+    TempId * AST.Type * RcShape * RcKind option * RcMetadata option
+
+let private createReturnDec
+    (ctx: TypeContext)
+    (tempId: TempId)
+    (typ: AST.Type)
+    (shape: RcShape)
+    (kindOverride: RcKind option)
+    : ReturnDec =
+    let metadata =
+        match rcShapeReleaseOperation shape with
+        | Some (FixedSizeRoot _) ->
+            Some (rcMetadataForTypeAndShape ctx typ shape)
+        | Some DynamicStringBuffer
+        | Some DynamicBlobBuffer
+        | None ->
+            None
+    (tempId, typ, shape, kindOverride, metadata)
+
+let private retainExprForShape
+    (ctx: TypeContext)
+    (tempId: TempId)
+    (typ: AST.Type)
+    (shape: RcShape)
+    : CExpr =
+    match rcShapeRetainOperation shape with
+    | Some DynamicStringBuffer ->
+        RefCountIncString (Var tempId)
+    | Some DynamicBlobBuffer ->
+        RefCountIncBlob (Var tempId)
+    | Some (FixedSizeRoot (size, kind)) ->
+        RefCountInc (
+            Var tempId,
+            size,
+            kind,
+            Some (rcMetadataForTypeAndShape ctx typ shape))
+    | None ->
+        Crash.crash $"retainExprForShape: type '{typ}' does not have an RC retain operation"
+
+let private releaseExprForShape
+    (tempId: TempId)
+    (typ: AST.Type)
+    (shape: RcShape)
+    (kindOverride: RcKind option)
+    (metadata: RcMetadata option)
+    : CExpr =
+    match rcShapeReleaseOperation shape with
+    | Some DynamicStringBuffer ->
+        RefCountDecString (Var tempId)
+    | Some DynamicBlobBuffer ->
+        RefCountDecBlob (Var tempId)
+    | Some (FixedSizeRoot (size, defaultKind)) ->
+        let kind = kindOverride |> Option.defaultValue defaultKind
+        let metadata =
+            match metadata with
+            | Some metadata -> metadata
+            | None ->
+                Crash.crash
+                    $"releaseExprForShape: fixed-size type '{typ}' is missing RC metadata"
+        RefCountDec (
+            Var tempId,
+            size,
+            kind,
+            Some metadata)
+    | None ->
+        Crash.crash $"releaseExprForShape: type '{typ}' does not have an RC release operation"
+
+let private functionParamReturnTransfersOwnedAccumulator
+    (ctx: TypeContext)
+    (funcName: string)
+    (paramIndex: int)
+    (paramType: AST.Type)
+    : bool =
+    let isMapHelper =
+        funcName = "Stdlib.List.__mapHelper"
+        || funcName.StartsWith("Stdlib.List.__mapHelper_")
+    let returnsClosureList =
+        match tryGetFuncReturnTypeFromReg ctx funcName with
+        | Some (AST.TList (AST.TFunction _)) -> true
+        | _ -> false
+
+    match isMapHelper, paramIndex, paramType with
+    | true, 0, AST.TList _ when returnsClosureList -> true
+    | true, 2, AST.TList _ -> true
+    | _ -> false
+
+/// Recognize a record parameter used as the sole returned accumulator of a
+/// direct self-recursive loop. The function keeps its own reference to this
+/// parameter so each backedge can release the previous record before adopting
+/// the freshly-owned replacement.
+let private isInternalRecordTailAccumulator
+    (func: Function)
+    (paramIndex: int)
+    (param: TypedParam)
+    : bool =
+    let rec canonicalAlias (aliases: Map<TempId, TempId>) (tempId: TempId) : TempId =
+        match Map.tryFind tempId aliases with
+        | Some sourceId when sourceId <> tempId -> canonicalAlias aliases sourceId
+        | _ -> tempId
+
+    let rec analyze
+        (aliases: Map<TempId, TempId>)
+        (expr: AExpr)
+        : bool * bool =
+        match expr with
+        | Join _ | Jump _ -> (false, false)
+        | Return (Var tempId) ->
+            (canonicalAlias aliases tempId = param.Id, false)
+        | Return _ ->
+            (false, false)
+        | Let (callTemp, Call (targetFunc, args), Return (Var returnTemp))
+            when targetFunc = func.Name && callTemp = returnTemp ->
+            match List.tryItem paramIndex args with
+            | Some (Var replacement) when canonicalAlias aliases replacement <> param.Id ->
+                (true, true)
+            | _ ->
+                (false, false)
+        | Let (tempId, Atom (Var sourceId), body)
+        | Let (tempId, TypedAtom (Var sourceId, _), body) ->
+            analyze (Map.add tempId (canonicalAlias aliases sourceId) aliases) body
+        | Let (_, Call (targetFunc, _), _) when targetFunc = func.Name ->
+            (false, false)
+        | Let (_, _, body) ->
+            analyze aliases body
+        | If (_, thenBranch, elseBranch) ->
+            let (thenValid, thenRecurses) = analyze aliases thenBranch
+            let (elseValid, elseRecurses) = analyze aliases elseBranch
+            (thenValid && elseValid, thenRecurses || elseRecurses)
+
+    match param.Type, func.ReturnType with
+    | AST.TRecord _, returnType when returnType = param.Type ->
+        let (valid, recurses) = analyze Map.empty func.Body
+        valid && recurses
+    | _ ->
+        false
+
+/// Insert RefCountInc for returned parameters at a Return node
+let insertParamIncsAtReturn
+    (ctx: TypeContext)
+    (paramIncs: (TempId * AST.Type * RcShape) list)
+    (returned: Set<TempId>)
+    (expr: AExpr)
+    (varGen: VarGen)
+    (types: Map<TempId, AST.Type>)
+    : AExpr * VarGen * Map<TempId, AST.Type> =
+    let active =
+        paramIncs
+        |> List.filter (fun (tempId, _, _) -> Set.contains tempId returned)
+    List.foldBack
+        (fun (tempId, typ, shape) (accExpr, accVarGen, accTypes) ->
+            let (dummyId, varGen') = freshVar accVarGen
+            let incExpr = retainExprForShape ctx tempId typ shape
+            let accExpr' = Let (dummyId, incExpr, accExpr)
+            (accExpr', varGen', Map.add dummyId AST.TUnit accTypes))
+        active
+        (expr, varGen, types)
+
+/// Insert RefCountDec operations before a Return using the current dec stack
+let insertReturnDecs
+    (returnDecs: ReturnDec list)
+    (expr: AExpr)
+    (varGen: VarGen)
+    (types: Map<TempId, AST.Type>)
+    : AExpr * VarGen * Map<TempId, AST.Type> =
+    let decsInOrder = List.rev returnDecs
+    List.fold
+        (fun (accExpr, accVarGen, accTypes) (tempId, typ, shape, kindOverride, metadata) ->
+            let (dummyId, varGen') = freshVar accVarGen
+            let decExpr = releaseExprForShape tempId typ shape kindOverride metadata
+            let accExpr' = Let (dummyId, decExpr, accExpr)
+            (accExpr', varGen', Map.add dummyId AST.TUnit accTypes))
+        (expr, varGen, types)
+        decsInOrder
+
+/// Stored state for rebuilding a Let while unwinding an expression spine
+type LetFrame = {
+    TempId: TempId
+    CExpr: CExpr
+    TupleIncTargets: (TempId * AST.Type * RcShape) list
+    /// The pass owns exactly one pending release for this value, and its next
+    /// use transfers that ownership into a closed returned aggregate suffix.
+    TransferableOwnership: ReturnDec option
+    ReturnInc: (AST.Type * RcShape) option
+    BranchDec: ReturnDec option
+}
+
+/// Apply a single Let frame around an expression (uses current varGen/types)
+let applyLetFrame
+    (ctx: TypeContext)
+    (frame: LetFrame)
+    (expr: AExpr, varGen: VarGen, types: Map<TempId, AST.Type>)
+    : AExpr * VarGen * Map<TempId, AST.Type> =
+    let (incBindingsRev, varGen1) =
+        frame.TupleIncTargets
+        |> List.fold (fun (acc, vg) (tid, typ, shape) ->
+            let (dummyId, vg') = freshVar vg
+            ((dummyId, retainExprForShape ctx tid typ shape) :: acc, vg')) ([], varGen)
+    let incBindings = List.rev incBindingsRev
+
+    let typesWithIncs =
+        incBindings
+        |> List.fold (fun m (tid, _) -> Map.add tid AST.TUnit m) types
+
+    let (returnIncBinding, varGen2, typesWithReturnInc) =
+        match frame.ReturnInc with
+        | Some (typ, shape) ->
+            let (incId, vg) = freshVar varGen1
+            let incExpr = retainExprForShape ctx frame.TempId typ shape
+            ([(incId, incExpr)], vg, Map.add incId AST.TUnit typesWithIncs)
+        | None ->
+            ([], varGen1, typesWithIncs)
+
+    let bodyWithReturnInc = wrapBindings returnIncBinding expr
+    let letExpr = Let (frame.TempId, frame.CExpr, bodyWithReturnInc)
+    let exprWithIncs = wrapBindings incBindings letExpr
+    (exprWithIncs, varGen2, typesWithReturnInc)
+
+/// Apply a stack of Let frames (innermost-first)
+let applyLetFrames
+    (ctx: TypeContext)
+    (frames: LetFrame list)
+    (expr: AExpr, varGen: VarGen, types: Map<TempId, AST.Type>)
+    : AExpr * VarGen * Map<TempId, AST.Type> =
+    let folder
+        ((accExpr, accVarGen, accTypes): AExpr * VarGen * Map<TempId, AST.Type>)
+        (frame: LetFrame)
+        : AExpr * VarGen * Map<TempId, AST.Type> =
+        applyLetFrame ctx frame (accExpr, accVarGen, accTypes)
+    List.fold folder (expr, varGen, types) frames
+
+let private tailCallArgTempIds (cexpr: CExpr) : Set<TempId> =
+    let fromAtom (atom: Atom) : Set<TempId> =
+        match atom with
+        | Var tid -> Set.singleton tid
+        | _ -> Set.empty
+    match cexpr with
+    | TailCall (_, args) ->
+        args |> List.fold (fun acc atom -> Set.union acc (fromAtom atom)) Set.empty
+    | IndirectTailCall (func, args) ->
+        (fromAtom func, args)
+        ||> List.fold (fun acc atom -> Set.union acc (fromAtom atom))
+    | ClosureTailCall (closure, args) ->
+        (fromAtom closure, args)
+        ||> List.fold (fun acc atom -> Set.union acc (fromAtom atom))
+    | _ ->
+        Set.empty
+
+let private isSelfTailCallTarget (currentFuncName: string) (targetFunc: string) : bool =
+    targetFunc = currentFuncName
+    || targetFunc.StartsWith($"{currentFuncName}_")
+
+let rec private isTempUsedAsSelfTailCallArg
+    (currentFuncName: string)
+    (targetTemp: TempId)
+    (expr: ReturnAnnotatedExpr)
+    : bool =
+    let rec loop (aliases: Set<TempId>) (expr: ReturnAnnotatedExpr) : bool =
+        let argsContainAlias (args: Atom list) : bool =
+            args
+            |> List.exists (function
+                | Var tempId -> Set.contains tempId aliases
+                | _ -> false)
+
+        match expr with
+        | RJump _ -> false
+        | RJoin (_, continuation, entry, _) -> loop aliases continuation || loop aliases entry
+        | RReturn _ ->
+            false
+        | RLet (_, Call (targetFunc, args), _, _)
+            when isSelfTailCallTarget currentFuncName targetFunc && argsContainAlias args ->
+            true
+        | RLet (_, TailCall (targetFunc, args), _, _)
+            when isSelfTailCallTarget currentFuncName targetFunc && argsContainAlias args ->
+            true
+        | RLet (aliasTemp, Atom (Var sourceTemp), body, _)
+        | RLet (aliasTemp, TypedAtom (Var sourceTemp, _), body, _)
+            when Set.contains sourceTemp aliases ->
+            loop (Set.add aliasTemp aliases) body
+        | RLet (_, _, body, _) ->
+            loop aliases body
+        | RIf (_, thenBranch, elseBranch, _) ->
+            loop aliases thenBranch || loop aliases elseBranch
+
+    loop (Set.singleton targetTemp) expr
+
+let rec private collectMovableTailDecPrefix
+    (tailArgTemps: Set<TempId>)
+    (expr: AExpr)
+    : (TempId * CExpr) list * AExpr =
+    match expr with
+    | Let (tmpId, RefCountDec (Var tid, size, kind, sourceType), rest) when not (Set.contains tid tailArgTemps) ->
+        let (bindings, remaining) = collectMovableTailDecPrefix tailArgTemps rest
+        ((tmpId, RefCountDec (Var tid, size, kind, sourceType)) :: bindings, remaining)
+    | Let (tmpId, RefCountDecString atom, rest) ->
+        let overlaps =
+            match atom with
+            | Var tid -> Set.contains tid tailArgTemps
+            | _ -> false
+        if overlaps then
+            ([], expr)
+        else
+            let (bindings, remaining) = collectMovableTailDecPrefix tailArgTemps rest
+            ((tmpId, RefCountDecString atom) :: bindings, remaining)
+    | Let (tmpId, RefCountDecBlob atom, rest) ->
+        let overlaps =
+            match atom with
+            | Var tid -> Set.contains tid tailArgTemps
+            | _ -> false
+        if overlaps then
+            ([], expr)
+        else
+            let (bindings, remaining) = collectMovableTailDecPrefix tailArgTemps rest
+            ((tmpId, RefCountDecBlob atom) :: bindings, remaining)
+    | _ ->
+        ([], expr)
+
+let rec private moveDecsBeforeNonSelfTailCalls (currentFuncName: string) (expr: AExpr) : AExpr =
+    match expr with
+    | Jump _ -> expr
+    | Join (parameter, continuation, entry) ->
+        Join (parameter, moveDecsBeforeNonSelfTailCalls currentFuncName continuation, moveDecsBeforeNonSelfTailCalls currentFuncName entry)
+    | Return _ ->
+        expr
+    | If (cond, thenBranch, elseBranch) ->
+        If (
+            cond,
+            moveDecsBeforeNonSelfTailCalls currentFuncName thenBranch,
+            moveDecsBeforeNonSelfTailCalls currentFuncName elseBranch
+        )
+    | Let (tempId, cexpr, body) ->
+        let body' = moveDecsBeforeNonSelfTailCalls currentFuncName body
+        match cexpr with
+        | TailCall (targetFunc, _) when targetFunc <> currentFuncName ->
+            let tailArgTemps = tailCallArgTempIds cexpr
+            let (movableDecs, remainingBody) = collectMovableTailDecPrefix tailArgTemps body'
+            let tailLet = Let (tempId, cexpr, remainingBody)
+            wrapBindings movableDecs tailLet
+        | _ ->
+            Let (tempId, cexpr, body')
+
+let rec private insertOwnedAccumulatorDecsBeforeSelfTailCalls
+    (ctx: TypeContext)
+    (currentFuncName: string)
+    (ownedParamDecs: ReturnDec list)
+    (expr: AExpr)
+    (varGen: VarGen)
+    (types: Map<TempId, AST.Type>)
+    : AExpr * VarGen * Map<TempId, AST.Type> =
+    let decsForSelfTailCall (args: Atom list) : ReturnDec list =
+        let argTemps =
+            args
+            |> List.fold (fun acc atom ->
+                match atom with
+                | Var tempId -> Set.add tempId acc
+                | _ -> acc) Set.empty
+
+        ownedParamDecs
+        |> List.filter (fun (tempId, _, _, _, _) -> not (Set.contains tempId argTemps))
+
+    let wrapOwnedAccumulatorDecs
+        (decs: ReturnDec list)
+        (tailExpr: AExpr)
+        (varGen: VarGen)
+        (types: Map<TempId, AST.Type>)
+        : AExpr * VarGen * Map<TempId, AST.Type> =
+        decs
+        |> List.fold
+            (fun (accExpr, accVarGen, accTypes) (tempId, typ, shape, kindOverride, metadata) ->
+                let (dummyId, varGen') = freshVar accVarGen
+                let decExpr =
+                    releaseExprForShape tempId typ shape kindOverride metadata
+                (Let (dummyId, decExpr, accExpr), varGen', Map.add dummyId AST.TUnit accTypes))
+            (tailExpr, varGen, types)
+
+    match expr with
+    | Jump _ -> (expr, varGen, types)
+    | Join (parameter, continuation, entry) ->
+        let body, next, bodyTypes = insertOwnedAccumulatorDecsBeforeSelfTailCalls ctx currentFuncName ownedParamDecs continuation varGen types
+        let entry', final, finalTypes = insertOwnedAccumulatorDecsBeforeSelfTailCalls ctx currentFuncName ownedParamDecs entry next bodyTypes
+        (Join (parameter, body, entry'), final, finalTypes)
+    | Return _ ->
+        (expr, varGen, types)
+    | If (cond, thenBranch, elseBranch) ->
+        let (thenBranch', varGen1, types1) =
+            insertOwnedAccumulatorDecsBeforeSelfTailCalls ctx currentFuncName ownedParamDecs thenBranch varGen types
+        let (elseBranch', varGen2, types2) =
+            insertOwnedAccumulatorDecsBeforeSelfTailCalls ctx currentFuncName ownedParamDecs elseBranch varGen1 types1
+        (If (cond, thenBranch', elseBranch'), varGen2, types2)
+    | Let (tempId, Call (targetFunc, args), body) when isSelfTailCallTarget currentFuncName targetFunc ->
+        let (body', varGen1, types1) =
+            insertOwnedAccumulatorDecsBeforeSelfTailCalls ctx currentFuncName ownedParamDecs body varGen types
+        let callExpr = Let (tempId, Call (targetFunc, args), body')
+        wrapOwnedAccumulatorDecs (decsForSelfTailCall args) callExpr varGen1 types1
+    | Let (tempId, TailCall (targetFunc, args), body) when isSelfTailCallTarget currentFuncName targetFunc ->
+        let (body', varGen1, types1) =
+            insertOwnedAccumulatorDecsBeforeSelfTailCalls ctx currentFuncName ownedParamDecs body varGen types
+        let tailExpr = Let (tempId, TailCall (targetFunc, args), body')
+        wrapOwnedAccumulatorDecs (decsForSelfTailCall args) tailExpr varGen1 types1
+    | Let (tempId, cexpr, body) ->
+        let (body', varGen1, types1) =
+            insertOwnedAccumulatorDecsBeforeSelfTailCalls ctx currentFuncName ownedParamDecs body varGen types
+        (Let (tempId, cexpr, body'), varGen1, types1)
+
+let private isClosureMapHelperTarget (targetFunc: string) : bool =
+    targetFunc = "Stdlib.List.__mapHelper"
+    || targetFunc.StartsWith("Stdlib.List.__mapHelper_")
+
+/// Find the two rare post-RC cleanups with one allocation-free body scan.
+let rec private requiredFunctionCleanups
+    (currentFuncName: string)
+    (expr: AExpr)
+    : bool * bool =
+    match expr with
+    | Jump _ | Return _ -> (false, false)
+    | Join (_, thenBranch, elseBranch)
+    | If (_, thenBranch, elseBranch) ->
+        let (thenNeedsMapRetain, thenNeedsTailDecMove) =
+            requiredFunctionCleanups currentFuncName thenBranch
+        let (elseNeedsMapRetain, elseNeedsTailDecMove) =
+            requiredFunctionCleanups currentFuncName elseBranch
+        (thenNeedsMapRetain || elseNeedsMapRetain,
+         thenNeedsTailDecMove || elseNeedsTailDecMove)
+    | Let (_, cexpr, body) ->
+        let (bodyNeedsMapRetain, bodyNeedsTailDecMove) =
+            requiredFunctionCleanups currentFuncName body
+        let currentNeedsMapRetain =
+            match cexpr with
+            | Call (targetFunc, _)
+            | TailCall (targetFunc, _) -> isClosureMapHelperTarget targetFunc
+            | _ -> false
+        let currentNeedsTailDecMove =
+            match cexpr with
+            | TailCall (targetFunc, _) -> targetFunc <> currentFuncName
+            | _ -> false
+        (currentNeedsMapRetain || bodyNeedsMapRetain,
+         currentNeedsTailDecMove || bodyNeedsTailDecMove)
+
+let rec private insertClosureMapSourceRetainsBeforeHelperCalls
+    (ctx: TypeContext)
+    (currentFuncName: string)
+    (expr: AExpr)
+    (varGen: VarGen)
+    (types: Map<TempId, AST.Type>)
+    : AExpr * VarGen * Map<TempId, AST.Type> =
+    let currentIsMapHelper =
+        currentFuncName = "Stdlib.List.__mapHelper"
+        || currentFuncName.StartsWith("Stdlib.List.__mapHelper_")
+
+    let targetReturnsClosureList (targetFunc: string) : bool =
+        match tryGetFuncReturnTypeFromReg ctx targetFunc with
+        | Some (AST.TList (AST.TFunction _)) -> true
+        | _ -> false
+
+    let wrapSourceRetain
+        (targetFunc: string)
+        (args: Atom list)
+        (callExpr: AExpr)
+        (varGen: VarGen)
+        (types: Map<TempId, AST.Type>)
+        : AExpr * VarGen * Map<TempId, AST.Type> =
+        match currentIsMapHelper, targetReturnsClosureList targetFunc, args with
+        | false, true, Var sourceTemp :: _ ->
+            match tryGetType (withTempTypes ctx types) sourceTemp with
+            | Some sourceType ->
+                let shape = rcShapeForType ctx sourceType
+                if rcShapeNeedsBorrowedRetain shape then
+                    let (dummyId, varGen') = freshVar varGen
+                    let incExpr =
+                        retainExprForShape ctx sourceTemp sourceType shape
+                    (Let (dummyId, incExpr, callExpr), varGen', Map.add dummyId AST.TUnit types)
+                else
+                    (callExpr, varGen, types)
+            | _ ->
+                (callExpr, varGen, types)
+        | _ ->
+            (callExpr, varGen, types)
+
+    match expr with
+    | Jump _ -> (expr, varGen, types)
+    | Join (parameter, continuation, entry) ->
+        let body, next, bodyTypes = insertClosureMapSourceRetainsBeforeHelperCalls ctx currentFuncName continuation varGen types
+        let entry', final, finalTypes = insertClosureMapSourceRetainsBeforeHelperCalls ctx currentFuncName entry next bodyTypes
+        (Join (parameter, body, entry'), final, finalTypes)
+    | Return _ ->
+        (expr, varGen, types)
+    | If (cond, thenBranch, elseBranch) ->
+        let (thenBranch', varGen1, types1) =
+            insertClosureMapSourceRetainsBeforeHelperCalls ctx currentFuncName thenBranch varGen types
+        let (elseBranch', varGen2, types2) =
+            insertClosureMapSourceRetainsBeforeHelperCalls ctx currentFuncName elseBranch varGen1 types1
+        (If (cond, thenBranch', elseBranch'), varGen2, types2)
+    | Let (tempId, Call (targetFunc, args), body) when isClosureMapHelperTarget targetFunc ->
+        let (body', varGen1, types1) =
+            insertClosureMapSourceRetainsBeforeHelperCalls ctx currentFuncName body varGen types
+        let callExpr = Let (tempId, Call (targetFunc, args), body')
+        wrapSourceRetain targetFunc args callExpr varGen1 types1
+    | Let (tempId, TailCall (targetFunc, args), body) when isClosureMapHelperTarget targetFunc ->
+        let (body', varGen1, types1) =
+            insertClosureMapSourceRetainsBeforeHelperCalls ctx currentFuncName body varGen types
+        let callExpr = Let (tempId, TailCall (targetFunc, args), body')
+        wrapSourceRetain targetFunc args callExpr varGen1 types1
+    | Let (tempId, cexpr, body) ->
+        let (body', varGen1, types1) =
+            insertClosureMapSourceRetainsBeforeHelperCalls ctx currentFuncName body varGen types
+        (Let (tempId, cexpr, body'), varGen1, types1)
+
+/// Insert reference counting operations using return analysis and a dec stack
+/// Returns (transformed expr, varGen, types defined in this subtree)
+let rec insertRCWithAnalysis
+    (joinScopes: Map<TempId, Set<TempId>>)
+    (inheritedBranchDecs: ReturnDec list)
+    (ctx: TypeContext)
+    (currentFuncName: string option)
+    (expr: ReturnAnnotatedExpr)
+    (varGen: VarGen)
+    (returnDecs: ReturnDec list)
+    (inheritedTransferableOwnership: ReturnDec list)
+    (paramIncs: (TempId * AST.Type * RcShape) list)
+    (types: Map<TempId, AST.Type>)
+    : AExpr * VarGen * Map<TempId, AST.Type> =
+    let pendingIds = returnDecs |> List.map (fun (id, _, _, _, _) -> id) |> Set.ofList
+    let branchDecs =
+        inheritedBranchDecs
+        |> List.filter (fun (id, _, _, _, _) ->
+            not (Set.contains id (returnedSet expr)) && not (Set.contains id pendingIds))
+    let returnDecs = branchDecs @ returnDecs
+    let ctxWithTypes = withTempTypes ctx types
+    let functionReturnsNestedRecordListDict =
+        let isSingleListDictRecord (name: string) : bool =
+            ctx.TypeReg
+            |> Map.tryFind name
+            |> Option.map (fun recordInfo ->
+                match recordInfo.Fields |> List.map snd with
+                | [ AST.TList (AST.TDict _) ] -> true
+                | _ -> false)
+            |> Option.defaultValue false
+
+        match currentFuncName |> Option.bind (tryGetFuncReturnTypeFromReg ctx) with
+        | Some (AST.TList (AST.TRecord (name, _))) ->
+            isSingleListDictRecord name
+        | _ ->
+            false
+    let mapHelperTransfersSecondParam =
+        let isMapHelper (funcName: string) : bool =
+            funcName = "Stdlib.List.__mapHelper"
+            || funcName.StartsWith("Stdlib.List.__mapHelper_")
+        let secondParamTransfersOwnership (funcName: string) : bool =
+            match Map.tryFind funcName ctx.FuncReg with
+            | Some (AST.TFunction (_ :: secondParamType :: _, _)) ->
+                secondParamType
+                |> rcShapeForType ctx
+                |> rcShapeIsOwnershipTransferRoot
+            | _ ->
+                false
+
+        currentFuncName
+        |> Option.exists (fun funcName ->
+            isMapHelper funcName && secondParamTransfersOwnership funcName)
+    let rec descend
+        (ctx: TypeContext)
+        (expr: ReturnAnnotatedExpr)
+        (varGen: VarGen)
+        (returnDecs: ReturnDec list)
+        (inheritedTransferableOwnership: ReturnDec list)
+        (inheritedBranchDecs: ReturnDec list)
+        (frames: LetFrame list)
+        (types: Map<TempId, AST.Type>)
+        : AExpr * VarGen * Map<TempId, AST.Type> =
+        match expr with
+        | RJump (target, atom, _) ->
+            let deferred =
+                match Map.tryFind target joinScopes with
+                | Some ids -> ids
+                | None -> Crash.crash $"RC insertion: join target {target} is not in scope"
+            let localDecs = returnDecs |> List.filter (fun (id, _, _, _, _) -> not (Set.contains id deferred))
+            insertReturnDecs localDecs (Jump (target, atom)) varGen types
+            |> applyLetFrames ctx frames
+
+        | RJoin (parameter, continuation, entry, _) ->
+            let conditional = (frames |> List.choose (fun frame -> frame.BranchDec)) @ inheritedBranchDecs
+            let transferable = (frames |> List.choose (fun frame -> frame.TransferableOwnership)) @ inheritedTransferableOwnership
+            let deferred =
+                conditional @ returnDecs |> List.map (fun (id, _, _, _, _) -> id) |> Set.ofList
+            let continuationTypes = Map.add parameter.Id parameter.Type types
+            let body, afterBody, bodyTypes =
+                insertRCWithAnalysis joinScopes conditional ctx currentFuncName continuation varGen returnDecs transferable paramIncs continuationTypes
+            let entry', final, finalTypes =
+                insertRCWithAnalysis (Map.add parameter.Id deferred joinScopes) conditional ctx currentFuncName entry afterBody returnDecs transferable paramIncs bodyTypes
+            applyLetFrames ctx frames (Join (parameter, body, entry'), final, finalTypes)
+
+        | RReturn (atom, returned) ->
+            let baseExpr = Return atom
+            let (withParamIncs, varGen1, types1) =
+                insertParamIncsAtReturn ctx paramIncs returned baseExpr varGen types
+            let (withDecs, varGen2, types2) = insertReturnDecs returnDecs withParamIncs varGen1 types1
+            let (finalExpr, finalVarGen, finalTypes) = applyLetFrames ctx frames (withDecs, varGen2, types2)
+            (finalExpr, finalVarGen, finalTypes)
+
+        | RIf (cond, thenBranch, elseBranch, _) ->
+            let branchConditionalOwnership =
+                (frames |> List.choose (fun frame -> frame.BranchDec)) @ inheritedBranchDecs
+            let branchTransferableOwnership =
+                frames
+                |> List.choose (fun frame -> frame.TransferableOwnership)
+                |> fun local -> local @ inheritedTransferableOwnership
+            let returnDecTemps =
+                returnDecs
+                |> List.map (fun (tempId, _, _, _, _) -> tempId)
+                |> Set.ofList
+            let branchLocalDecs (branchReturned: Set<TempId>) : ReturnDec list =
+                let frameDecs =
+                    frames
+                    |> List.choose (fun frame ->
+                        match frame.BranchDec with
+                        | Some (tempId, _, _, _, _ as dec)
+                            when not (Set.contains tempId branchReturned)
+                                 && not (Set.contains tempId returnDecTemps) ->
+                            Some dec
+                        | _ ->
+                            None)
+                frameDecs
+            let (thenBranch', varGen1, types1) =
+                insertRCWithAnalysis
+                    joinScopes
+                    branchConditionalOwnership
+                    ctx
+                    currentFuncName
+                    thenBranch
+                    varGen
+                    (branchLocalDecs (returnedSet thenBranch) @ returnDecs)
+                    branchTransferableOwnership
+                    paramIncs
+                    types
+            let (elseBranch', varGen2, types2) =
+                insertRCWithAnalysis
+                    joinScopes
+                    branchConditionalOwnership
+                    ctx
+                    currentFuncName
+                    elseBranch
+                    varGen1
+                    (branchLocalDecs (returnedSet elseBranch) @ returnDecs)
+                    branchTransferableOwnership
+                    paramIncs
+                    types1
+            let (finalExpr, finalVarGen, finalTypes) =
+                applyLetFrames ctx frames (If (cond, thenBranch', elseBranch'), varGen2, types2)
+            (finalExpr, finalVarGen, finalTypes)
+
+        | RLet (tempId, cexpr, bodyInfo, _) ->
+            let (TempId tempIdInt) = tempId
+
+            // This walk visits each binding once. Do not memoize by CExpr:
+            // sibling branches may reuse TempIds, making structurally equal
+            // expressions resolve to different types in their local contexts.
+            let maybeType = inferCExprType ctx cexpr
+
+            // When a temp is aliased through one or more let-bound vars, infer its type
+            // from the first concrete use-site (typically a call argument position).
+            let rec inferAliasedVarTypeFromUse (aliasedTemp: TempId) (nextBody: ReturnAnnotatedExpr) : AST.Type option =
+                let inferFromCall (funcName: string) (args: Atom list) : AST.Type option =
+                    match Map.tryFind funcName ctx.FuncReg with
+                    | Some (AST.TFunction (paramTypes, _)) ->
+                        args
+                        |> List.mapi (fun idx atom -> (idx, atom))
+                        |> List.tryPick (fun (idx, atom) ->
+                            match atom with
+                            | Var tid when tid = aliasedTemp && idx < List.length paramTypes ->
+                                Some (List.item idx paramTypes)
+                            | _ ->
+                                None)
+                    | _ ->
+                        None
+
+                match nextBody with
+                | RLet (_, RawSlotInit (_, _, Var valueTemp, valueType), _, _) when valueTemp = aliasedTemp ->
+                    Some valueType
+                | RLet (_, Call (funcName, args), _, _) ->
+                    inferFromCall funcName args
+                | RLet (_, BorrowedCall (funcName, args), _, _) ->
+                    inferFromCall funcName args
+                | RLet (_, TailCall (funcName, args), _, _) ->
+                    inferFromCall funcName args
+                | RLet (nextAliasTemp, Atom (Var sourceId), nextNextBody, _) when sourceId = aliasedTemp ->
+                    inferAliasedVarTypeFromUse nextAliasTemp nextNextBody
+                | RLet (nextAliasTemp, TypedAtom (Var sourceId, aliasType), nextNextBody, _) when sourceId = aliasedTemp ->
+                    if shapeNeedsManagedAliasRootPreservation ctx aliasType then
+                        Some aliasType
+                    else
+                        inferAliasedVarTypeFromUse nextAliasTemp nextNextBody
+                | RIf (Var tid, _, _, _) when tid = aliasedTemp ->
+                    Some AST.TBool
+                | _ ->
+                    None
+
+            // Use a TypedAtom alias in the body to preserve the intended payload type
+            // when TupleGet cannot infer it from a multi-parameter sum.
+            let inferredType =
+                match maybeType with
+                | Some t ->
+                    let aliasTypeFromBody =
+                        match bodyInfo with
+                        | RLet (_, TypedAtom (Var sourceId, aliasType), _, _) when sourceId = tempId ->
+                            Some aliasType
+                        | RLet (aliasTemp, Atom (Var sourceId), nextBody, _) when sourceId = tempId ->
+                            inferAliasedVarTypeFromUse aliasTemp nextBody
+                        | _ ->
+                            None
+
+                    match aliasTypeFromBody with
+                    | Some inferredAliasType when shapeNeedsManagedAliasRootPreservation ctx inferredAliasType && not (shapeNeedsManagedAliasRootPreservation ctx t) ->
+                        inferredAliasType
+                    | _ ->
+                        t
+                | None ->
+                    match cexpr, bodyInfo with
+                    | TupleGet _, RLet (_, TypedAtom (Var sourceId, aliasType), _, _) when sourceId = tempId ->
+                        aliasType
+                    | RawGet (_, _, None), RLet (_, TypedAtom (Var sourceId, aliasType), _, _) when sourceId = tempId ->
+                        // RawGet without an explicit type is often immediately re-typed via TypedAtom.
+                        // Preserve that alias type instead of guessing Int64.
+                        aliasType
+                    | RawGet (_, _, None), RLet (aliasTemp, Atom (Var sourceId), nextBody, _) when sourceId = tempId ->
+                        match inferAliasedVarTypeFromUse aliasTemp nextBody with
+                        | Some inferredAliasType ->
+                            inferredAliasType
+                        | None ->
+                            // Keep unresolved rather than guessing Int64.
+                            AST.TVar $"raw_get_{tempIdInt}"
+                    | RawGet (_, _, None), _ ->
+                        // Unknown RawGet payload type: preserve as unresolved type variable.
+                        AST.TVar $"raw_get_{tempIdInt}"
+                    | _ ->
+                        // Preserve unresolved type information instead of defaulting to Int64.
+                        AST.TVar $"inferred_{tempIdInt}"
+
+            let typesWithBinding =
+                match cexpr with
+                | TypedAtom (Var sourceId, aliasType) ->
+                    types |> Map.add tempId inferredType |> Map.add sourceId aliasType
+                | _ ->
+                    Map.add tempId inferredType types
+
+            let ctxWithTypes = withTempTypes ctx typesWithBinding
+
+            // Track closure function names for later ClosureCall type resolution
+            let ctx'' =
+                match cexpr with
+                | ClosureAlloc (funcName, _) -> addClosureFunc ctxWithTypes tempId funcName
+                | _ -> ctxWithTypes
+            let inferredShape = rcShapeForType ctx inferredType
+
+            let bodyReturned = returnedSet bodyInfo
+            let consumedByImmediateI64Push =
+                let isI64Push (funcName: string) : bool =
+                    funcName = "Stdlib.List.__push_i64"
+                    || funcName = "Stdlib.List.__pushBack_i64"
+                let consumesSecondArg (args: Atom list) : bool =
+                    match args with
+                    | _listAtom :: Var valueTemp :: _ -> valueTemp = tempId
+                    | _ -> false
+                match bodyInfo with
+                | RLet (_, Call (funcName, args), _, _)
+                | RLet (_, TailCall (funcName, args), _, _) ->
+                    isI64Push funcName && consumesSecondArg args
+                | _ ->
+                    false
+            let skipReturnDecForMapHelperLists =
+                mapHelperTransfersSecondParam
+                && match inferredType with
+                   | AST.TList _ -> true
+                   | _ -> false
+
+            let bindingDec =
+                let materializesBorrowedCall =
+                    match cexpr with
+                    | BorrowedCall _ -> true
+                    | _ -> false
+                if bindingNeedsShapeAutomaticDec cexpr inferredType inferredShape
+                   && (not (isBorrowingExpr cexpr) || materializesBorrowedCall)
+                   && not (cexprProducesNonRcSentinel cexpr)
+                   && not skipReturnDecForMapHelperLists
+                   && not consumedByImmediateI64Push then
+                    let kindOverride =
+                        match inferredType with
+                        | AST.TList (AST.TFunction _) -> Some TaggedList
+                        | _ -> None
+                    Some (
+                        createReturnDec
+                            ctx
+                            tempId
+                            inferredType
+                            inferredShape
+                            kindOverride)
+                else
+                    None
+
+            // TempIds are unique within the function, so the current binding's
+            // pending-release multiplicity is known while prepending it. Keep
+            // that fact instead of rescanning the growing release stack.
+            let (returnDecs', currentBindingHasSinglePendingDec) =
+                let needsNestedRecordListDictDictDec =
+                    functionReturnsNestedRecordListDict
+                    && match inferredType with
+                       | AST.TDict _ -> true
+                       | _ -> false
+
+                match bindingDec with
+                | Some dec when not (Set.contains tempId bodyReturned) ->
+                    if needsNestedRecordListDictDictDec then
+                        // List<Record { List<Dict<_, _>> }> construction retains the
+                        // dict once for the inner list payload and once for the returned graph.
+                        // The current shape-specific ARM64 helpers release that graph, but the
+                        // local dict temp still needs both ownership edges balanced.
+                        (dec :: dec :: returnDecs, false)
+                    else
+                        (dec :: returnDecs, true)
+                | _ ->
+                    (returnDecs, false)
+
+            let rec tempProducesNonRcSentinel (targetId: TempId) : bool =
+                frames
+                |> List.tryFind (fun frame -> frame.TempId = targetId)
+                |> Option.map (fun frame ->
+                    match tryOwnershipPreservingAliasSource frame.CExpr with
+                    | Some sourceId -> tempProducesNonRcSentinel sourceId
+                    | None ->
+                        match frame.CExpr with
+                        | IfValue (_, thenValue, elseValue) ->
+                            atomProducesNonRcSentinel thenValue
+                            && atomProducesNonRcSentinel elseValue
+                        | _ -> cexprProducesNonRcSentinel frame.CExpr)
+                |> Option.defaultValue false
+
+            and atomProducesNonRcSentinel (atom: Atom) : bool =
+                match atom with
+                | StringLiteral _ -> true
+                | Var sourceId -> tempProducesNonRcSentinel sourceId
+                | _ -> false
+
+            let allocationIncTargets =
+                let compoundAllocationTargets =
+                    match cexpr with
+                    | TupleAlloc elems ->
+                        elems
+                        |> List.fold (fun acc atom ->
+                            match atom with
+                            | Var tid ->
+                                match tryGetType ctxWithTypes tid with
+                                | Some t ->
+                                    let shape = rcShapeForType ctx t
+                                    if rcShapeNeedsBorrowedRetain shape
+                                       && not (tempProducesNonRcSentinel tid) then
+                                        (tid, t, shape) :: acc
+                                    else
+                                        acc
+                                | _ -> acc
+                            | _ -> acc
+                        ) []
+                        |> List.rev
+                    | RecordAlloc (_, fields)
+                    | RecordClone (_, _, fields) ->
+                        fields
+                        |> List.fold (fun acc atom ->
+                            match atom with
+                            | Var tid ->
+                                match tryGetType ctx tid with
+                                | Some t ->
+                                    let shape = rcShapeForType ctx t
+                                    if rcShapeNeedsBorrowedRetain shape
+                                       && not (tempProducesNonRcSentinel tid) then
+                                        (tid, t, shape) :: acc
+                                    else
+                                        acc
+                                | _ -> acc
+                            | _ -> acc
+                        ) []
+                        |> List.rev
+                    | ClosureAlloc (_, captures) ->
+                        captures
+                        |> List.fold (fun acc atom ->
+                            match atom with
+                            | Var tid ->
+                                match tryGetType ctxWithTypes tid with
+                                | Some t ->
+                                    let shape = rcShapeForType ctx t
+                                    if rcShapeNeedsBorrowedRetain shape
+                                       && not (tempProducesNonRcSentinel tid) then
+                                        (tid, t, shape) :: acc
+                                    else
+                                        acc
+                                | _ -> acc
+                            | _ -> acc
+                        ) []
+                        |> List.rev
+                    | _ -> []
+                let erasedSkewListElementTargets =
+                    match cexpr with
+                    | Call (funcName, [_; Var valueTemp])
+                    | TailCall (funcName, [_; Var valueTemp]) when
+                        funcName = "Stdlib.List.__push_i64"
+                        || funcName = "Stdlib.List.__pushBack_i64" ->
+                        let transfersImmediateOwnedValue =
+                            match frames with
+                            | previous :: _ when previous.TempId = valueTemp ->
+                                not (isBorrowingExpr previous.CExpr)
+                            | _ ->
+                                false
+                        match transfersImmediateOwnedValue, tryGetType ctxWithTypes valueTemp with
+                        | false, Some valueType ->
+                            let shape = rcShapeForType ctx valueType
+                            if rcShapeNeedsBorrowedRetain shape
+                               && not (tempProducesNonRcSentinel valueTemp) then
+                                [ valueTemp, valueType, shape ]
+                            else
+                                []
+                        | _ ->
+                            []
+                    | _ ->
+                        []
+                compoundAllocationTargets @ erasedSkewListElementTargets
+
+            let rawSlotRetainTargets =
+                match cexpr with
+                | RawSlotInit (_, _, _, AST.TStream _) ->
+                    // A materialized Stream seeds its RC word at zero; the
+                    // first typed slot retain establishes the owning edge.
+                    []
+                | RawSlotInit (_, _, Var valueTemp, valueType) ->
+                    let shape = rcShapeForType ctx valueType
+                    if rcShapeNeedsBorrowedRetain shape
+                       && not (tempProducesNonRcSentinel valueTemp) then
+                        [valueTemp, valueType, shape]
+                    else
+                        []
+                | _ ->
+                    []
+
+            let transferableOwnership =
+                match bindingDec, currentBindingHasSinglePendingDec with
+                | Some dec, true
+                    when transfersIntoReturnedAggregate tempId bodyInfo
+                         || transfersIntoRawSlot tempId bodyInfo ->
+                    Some dec
+                | _ ->
+                    None
+
+            let rec resolveAliasOwner (targetId: TempId) : TempId =
+                frames
+                |> List.tryFind (fun frame -> frame.TempId = targetId)
+                |> Option.map (fun frame ->
+                    match tryOwnershipPreservingAliasSource frame.CExpr with
+                    | Some sourceId -> resolveAliasOwner sourceId
+                    | None -> targetId)
+                |> Option.defaultValue targetId
+
+            let transferredOwnership =
+                (allocationIncTargets @ rawSlotRetainTargets)
+                |> List.fold (fun (transfers, transferredOwners) (targetId, _, _) ->
+                    let ownerId = resolveAliasOwner targetId
+                    if Set.contains ownerId transferredOwners then
+                        (transfers, transferredOwners)
+                    else
+                        frames
+                        |> List.tryPick (fun candidate ->
+                            match candidate.TransferableOwnership with
+                            | Some ((candidateOwnerId, _, _, _, _) as pendingDec) when candidateOwnerId = ownerId ->
+                                Some pendingDec
+                            | _ ->
+                                None)
+                        |> Option.orElseWith (fun () ->
+                            inheritedTransferableOwnership
+                            |> List.tryFind (fun (candidateOwnerId, _, _, _, _) -> candidateOwnerId = ownerId))
+                        |> Option.map (fun pendingDec ->
+                            ((targetId, pendingDec) :: transfers, Set.add ownerId transferredOwners))
+                        |> Option.defaultValue (transfers, transferredOwners)
+                ) ([], Set.empty)
+                |> fst
+                |> List.rev
+
+            let cexprAfterTransfers =
+                match cexpr, transferredOwnership with
+                | RawSlotInit (ptr, byteOffset, Var valueTemp, _), transfers when
+                    transfers
+                    |> List.exists (fun (targetId, _) -> targetId = valueTemp) ->
+                    // RawSlotInit's backend retain is unnecessary when the slot
+                    // adopts the producer's existing owned edge.
+                    RawWriteWord (ptr, byteOffset, Var valueTemp)
+                | _ ->
+                    cexpr
+
+            let transferredOwnerIds =
+                transferredOwnership
+                |> List.map (fun (_, (ownerId, _, _, _, _)) -> ownerId)
+                |> Set.ofList
+
+            let allocationIncTargetsAfterTransfers =
+                let removeFirstTarget
+                    (targetId: TempId)
+                    (targets: (TempId * AST.Type * RcShape) list)
+                    : (TempId * AST.Type * RcShape) list =
+                    let rec loop prefix remaining =
+                        match remaining with
+                        | [] -> List.rev prefix
+                        | (candidateId, _, _) :: tail when candidateId = targetId ->
+                            List.rev prefix @ tail
+                        | head :: tail ->
+                            loop (head :: prefix) tail
+                    loop [] targets
+
+                transferredOwnership
+                |> List.fold (fun targets (targetId, _) -> removeFirstTarget targetId targets) allocationIncTargets
+
+            let rec removePendingDec
+                (target: ReturnDec)
+                (pending: ReturnDec list)
+                : ReturnDec list =
+                match pending with
+                | [] -> []
+                | head :: tail when head = target -> tail
+                | head :: tail -> head :: removePendingDec target tail
+
+            let returnDecsAfterTransfers =
+                transferredOwnership
+                |> List.fold (fun pending (_, target) -> removePendingDec target pending) returnDecs'
+
+            let inheritedTransferableOwnershipAfterTransfers =
+                transferredOwnership
+                |> List.fold
+                    (fun pending (_, target) -> removePendingDec target pending)
+                    inheritedTransferableOwnership
+
+            let framesAfterTransfers =
+                // Ownership transfers are rare. Preserve the existing frame
+                // spine when there is nothing to clear instead of rebuilding
+                // every preceding frame for every ordinary binding.
+                if Set.isEmpty transferredOwnerIds then
+                    frames
+                else
+                    frames
+                    |> List.map (fun candidate ->
+                        if Set.contains candidate.TempId transferredOwnerIds then
+                            {
+                                candidate with
+                                    TransferableOwnership = None
+                                    BranchDec = None
+                            }
+                        else
+                            candidate)
+
+            let returnInc =
+                let retainedTypeFromAtom (atom: Atom) : (AST.Type * RcShape) option =
+                    match atom with
+                    | Var tid ->
+                        match tryGetType ctx tid with
+                        | Some t ->
+                            let shape = rcShapeForType ctx t
+                            if rcShapeNeedsBorrowedRetain shape then
+                                Some (t, shape)
+                            else
+                                None
+                        | _ -> None
+                    | _ -> None
+
+                let borrowedProjectionFeedsSelfTailCall =
+                    let sourceParentIsOwnedLocal (sourceId: TempId) : bool =
+                        let rec loop (visited: Set<TempId>) (candidateId: TempId) : bool =
+                            if Set.contains candidateId visited then
+                                false
+                            else
+                                frames
+                                |> List.tryFind (fun frame -> frame.TempId = candidateId)
+                                |> Option.exists (fun frame ->
+                                    match frame.CExpr with
+                                    | Atom (Var aliasedId)
+                                    | TypedAtom (Var aliasedId, _) ->
+                                        loop (Set.add candidateId visited) aliasedId
+                                    | _ ->
+                                        not (isBorrowingExpr frame.CExpr))
+
+                        loop Set.empty sourceId
+
+                    match currentFuncName, cexpr with
+                    | Some funcName, TupleGet (Var sourceId, _)
+                    | Some funcName, RecordGet (_, Var sourceId, _) ->
+                        sourceParentIsOwnedLocal sourceId
+                        && isTempUsedAsSelfTailCallArg funcName tempId bodyInfo
+                    | _ ->
+                        false
+
+                match cexpr with
+                | BorrowedCall _ when rcShapeNeedsBorrowedRetain inferredShape ->
+                    // A borrowed call has no owned result edge to transfer from
+                    // its callee. Materialize one for the local binding; its
+                    // ordinary pending decrement then balances this retain.
+                    Some (inferredType, inferredShape)
+                | IfValue (_, thenAtom, elseAtom) ->
+                    // IfValue selects one of two existing heap values.
+                    // Materialize ownership on the selected temp before source temps are decref'd.
+                    match retainedTypeFromAtom thenAtom, retainedTypeFromAtom elseAtom with
+                    | Some info, _ -> Some info
+                    | None, Some info -> Some info
+                    | None, None -> None
+                | _ when borrowedProjectionFeedsSelfTailCall
+                         && rcShapeNeedsBorrowedRetain inferredShape ->
+                    Some (inferredType, inferredShape)
+                | Atom (Var sourceId)
+                | TypedAtom (Var sourceId, _) ->
+                    // Returning a pure alias of an already-returned owned value should not inc again.
+                    if rcShapeNeedsBorrowedRetain inferredShape
+                       && Set.contains tempId bodyReturned
+                       && isBorrowingExpr cexpr then
+                        if Set.contains sourceId bodyReturned then
+                            None
+                        else
+                            Some (inferredType, inferredShape)
+                    else
+                        None
+                | _ ->
+                    if rcShapeNeedsBorrowedRetain inferredShape
+                       && Set.contains tempId bodyReturned
+                       && isBorrowingExpr cexpr then
+                        Some (inferredType, inferredShape)
+                    else
+                        None
+
+            let frame = {
+                TempId = tempId
+                CExpr = cexprAfterTransfers
+                TupleIncTargets = allocationIncTargetsAfterTransfers
+                TransferableOwnership = transferableOwnership
+                ReturnInc = returnInc
+                BranchDec = bindingDec
+            }
+
+            // Process the body iteratively, then rebuild on the way back out
+            descend
+                ctx''
+                bodyInfo
+                varGen
+                returnDecsAfterTransfers
+                inheritedTransferableOwnershipAfterTransfers
+                (inheritedBranchDecs |> List.filter (fun (id, _, _, _, _) -> not (Set.contains id transferredOwnerIds)))
+                (frame :: framesAfterTransfers)
+                typesWithBinding
+
+    descend ctxWithTypes expr varGen returnDecs inheritedTransferableOwnership inheritedBranchDecs [] types
+
+/// Insert reference counting operations into an AExpr
+/// Returns (transformed expr, varGen, accumulated TempTypes)
+let private insertRCInternal
+    (ctx: TypeContext)
+    (expr: AExpr)
+    (varGen: VarGen)
+    (types: Map<TempId, AST.Type>)
+    : AExpr * VarGen * Map<TempId, AST.Type> =
+    let ctxWithTypes = withTempTypes ctx types
+    let analyzed = analyzeReturns Map.empty Map.empty expr
+    insertRCWithAnalysis Map.empty [] ctxWithTypes None analyzed varGen [] [] [] types
+
+/// Insert reference counting operations into an AExpr
+/// Returns (transformed expr, varGen, accumulated TempTypes)
+let insertRC (ctx: TypeContext) (expr: AExpr) (varGen: VarGen) : AExpr * VarGen * Map<TempId, AST.Type> =
+    insertRCInternal ctx expr varGen Map.empty
+
+type private FunctionPhaseTimings = {
+    ReturnAnalysisMs: float
+    ParameterAnalysisMs: float
+    BodyInsertionMs: float
+    AccumulatorCleanupMs: float
+    CleanupPlanningMs: float
+    CleanupRewriteMs: float
+}
+
+let private emptyFunctionPhaseTimings = {
+    ReturnAnalysisMs = 0.0
+    ParameterAnalysisMs = 0.0
+    BodyInsertionMs = 0.0
+    AccumulatorCleanupMs = 0.0
+    CleanupPlanningMs = 0.0
+    CleanupRewriteMs = 0.0
+}
+
+let private addFunctionPhaseTimings
+    (left: FunctionPhaseTimings)
+    (right: FunctionPhaseTimings)
+    : FunctionPhaseTimings =
+    {
+        ReturnAnalysisMs = left.ReturnAnalysisMs + right.ReturnAnalysisMs
+        ParameterAnalysisMs = left.ParameterAnalysisMs + right.ParameterAnalysisMs
+        BodyInsertionMs = left.BodyInsertionMs + right.BodyInsertionMs
+        AccumulatorCleanupMs = left.AccumulatorCleanupMs + right.AccumulatorCleanupMs
+        CleanupPlanningMs = left.CleanupPlanningMs + right.CleanupPlanningMs
+        CleanupRewriteMs = left.CleanupRewriteMs + right.CleanupRewriteMs
+    }
+
+let private measureFunctionPhase
+    (enabled: bool)
+    (work: unit -> 'a)
+    : 'a * float =
+    if enabled then
+        let started = System.Diagnostics.Stopwatch.GetTimestamp()
+        let result = work ()
+        let elapsed = System.Diagnostics.Stopwatch.GetElapsedTime started
+        (result, elapsed.TotalMilliseconds)
+    else
+        (work (), 0.0)
+
+/// Insert RC operations into a function
+/// Returns (transformed function, varGen, accumulated TempTypes)
+let private insertRCInFunctionInternal
+    (tracePhases: bool)
+    (ctx: TypeContext)
+    (func: Function)
+    (varGen: VarGen)
+    (types: Map<TempId, AST.Type>)
+    : Function * VarGen * Map<TempId, AST.Type> * FunctionPhaseTimings =
+    let typesWithParams =
+        func.TypedParams
+        |> List.fold (fun m tp -> Map.add tp.Id tp.Type m) types
+    let ctxWithParams = withTempTypes ctx typesWithParams
+
+    let (bodyInfo, returnAnalysisMs) =
+        measureFunctionPhase tracePhases (fun () -> analyzeReturns Map.empty Map.empty func.Body)
+    let (parameterInfos, parameterAnalysisMs) =
+        measureFunctionPhase tracePhases (fun () ->
+            func.TypedParams
+            |> List.mapi (fun index param -> (index, param))
+            |> List.map (fun (index, param) ->
+                let shape = rcShapeForType ctxWithParams param.Type
+                let transfersOwnedAccumulator =
+                    functionParamReturnTransfersOwnedAccumulator
+                        ctxWithParams
+                        func.Name
+                        index
+                        param.Type
+                let internalOwnedAccumulator =
+                    isInternalRecordTailAccumulator func index param
+                (param, shape, transfersOwnedAccumulator, internalOwnedAccumulator)))
+    let internalOwnedParams =
+        parameterInfos
+        |> List.choose (fun (param, shape, _, isInternalOwned) ->
+            if isInternalOwned then Some (param, shape) else None)
+    let internalOwnedParamIds =
+        internalOwnedParams |> List.map (fun (param, _) -> param.Id) |> Set.ofList
+    let paramIncsRev =
+        parameterInfos
+        |> List.fold (fun acc (param, shape, transfersOwnedAccumulator, _) ->
+            if rcShapeNeedsBorrowedRetain shape
+               && not transfersOwnedAccumulator
+               && not (Set.contains param.Id internalOwnedParamIds) then
+                (param.Id, param.Type, shape) :: acc
+            else
+                acc
+        ) []
+    let paramIncs = List.rev paramIncsRev
+    let ownedParamDecs =
+        parameterInfos
+        |> List.choose (fun (param, shape, transfersOwnedAccumulator, _) ->
+            if transfersOwnedAccumulator
+               || Set.contains param.Id internalOwnedParamIds then
+                Some (createReturnDec ctxWithParams param.Id param.Type shape None)
+            else
+                None)
+
+    // Process function body with return analysis
+    let ((bodyWithRC, varGen', accTypes), bodyInsertionMs) =
+        measureFunctionPhase tracePhases (fun () ->
+            insertRCWithAnalysis
+                Map.empty
+                []
+                ctxWithParams
+                (Some func.Name)
+                bodyInfo
+                varGen
+                []
+                []
+                paramIncs
+                typesWithParams)
+    let retainInternalParam
+        ((param, shape): TypedParam * RcShape)
+        (body: AExpr, currentVarGen: VarGen, currentTypes: Map<TempId, AST.Type>)
+        : AExpr * VarGen * Map<TempId, AST.Type> =
+        let (dummyId, nextVarGen) = freshVar currentVarGen
+        let retain = retainExprForShape ctxWithParams param.Id param.Type shape
+        (Let (dummyId, retain, body), nextVarGen, Map.add dummyId AST.TUnit currentTypes)
+    let ((bodyWithInternalParamRetains, varGen''', accTypes''), accumulatorCleanupMs) =
+        measureFunctionPhase tracePhases (fun () ->
+            let (bodyWithOwnedAccumulatorDecs, varGen'', accTypes') =
+                if List.isEmpty ownedParamDecs then
+                    (bodyWithRC, varGen', accTypes)
+                else
+                    insertOwnedAccumulatorDecsBeforeSelfTailCalls
+                        ctxWithParams
+                        func.Name
+                        ownedParamDecs
+                        bodyWithRC
+                        varGen'
+                        accTypes
+            List.foldBack
+                retainInternalParam
+                internalOwnedParams
+                (bodyWithOwnedAccumulatorDecs, varGen'', accTypes'))
+    let ((needsClosureMapRetains, needsTailDecMove), cleanupPlanningMs) =
+        measureFunctionPhase tracePhases (fun () ->
+            requiredFunctionCleanups func.Name bodyWithInternalParamRetains)
+    let ((body', varGen'''', accTypes'''), cleanupRewriteMs) =
+        measureFunctionPhase tracePhases (fun () ->
+            let (bodyWithClosureMapSourceRetains, nextVarGen, nextTypes) =
+                if needsClosureMapRetains then
+                    insertClosureMapSourceRetainsBeforeHelperCalls
+                        ctxWithParams
+                        func.Name
+                        bodyWithInternalParamRetains
+                        varGen'''
+                        accTypes''
+                else
+                    (bodyWithInternalParamRetains, varGen''', accTypes'')
+            let rewrittenBody =
+                if needsTailDecMove then
+                    moveDecsBeforeNonSelfTailCalls func.Name bodyWithClosureMapSourceRetains
+                else
+                    bodyWithClosureMapSourceRetains
+            (rewrittenBody, nextVarGen, nextTypes))
+    let timings = {
+        ReturnAnalysisMs = returnAnalysisMs
+        ParameterAnalysisMs = parameterAnalysisMs
+        BodyInsertionMs = bodyInsertionMs
+        AccumulatorCleanupMs = accumulatorCleanupMs
+        CleanupPlanningMs = cleanupPlanningMs
+        CleanupRewriteMs = cleanupRewriteMs
+    }
+    ({ func with Body = body' }, varGen'''', accTypes''', timings)
+
+/// Insert RC operations into a function
+/// Returns (transformed function, varGen, accumulated TempTypes)
+let insertRCInFunction (ctx: TypeContext) (func: Function) (varGen: VarGen) : Function * VarGen * Map<TempId, AST.Type> =
+    let (func', varGen', types', _timings) =
+        insertRCInFunctionInternal false ctx func varGen Map.empty
+    (func', varGen', types')
+
+// ============================================================================
+// TypeMap Completeness Verification
+// ============================================================================
+
+let private isTempMissing (typeMap: ANF.TypeMap) (tempId: TempId) : bool =
+    not (Map.containsKey tempId typeMap)
+
+let rec collectMissingTempIdsInExpr
+    (typeMap: ANF.TypeMap)
+    (expr: AExpr)
+    (acc: TempId list)
+    : TempId list =
+    match expr with
+    | Jump _ | Return _ -> acc
+    | Let (tempId, _, body) ->
+        let acc' = if isTempMissing typeMap tempId then tempId :: acc else acc
+        collectMissingTempIdsInExpr typeMap body acc'
+    | Join (parameter, continuation, entry) ->
+        let acc' = if isTempMissing typeMap parameter.Id then parameter.Id :: acc else acc
+        collectMissingTempIdsInExpr typeMap continuation acc' |> collectMissingTempIdsInExpr typeMap entry
+    | If (_, thenBranch, elseBranch) ->
+        let acc' = collectMissingTempIdsInExpr typeMap thenBranch acc
+        collectMissingTempIdsInExpr typeMap elseBranch acc'
+
+let collectMissingTempIdsInFunction
+    (typeMap: ANF.TypeMap)
+    (func: Function)
+    (acc: TempId list)
+    : TempId list =
+    let acc' =
+        func.TypedParams
+        |> List.fold (fun acc tp -> if isTempMissing typeMap tp.Id then tp.Id :: acc else acc) acc
+    collectMissingTempIdsInExpr typeMap func.Body acc'
+
+/// Find the greatest TempId defined by an ANF expression. ANF variables are
+/// introduced only by function parameters and Let bindings, so definitions
+/// are sufficient to place a fresh-variable generator beyond every use.
+let rec private maxDefinedTempIdInExpr (expr: AExpr) : int =
+    match expr with
+    | Jump _ | Return _ -> -1
+    | Let (TempId tempId, _, body) ->
+        max tempId (maxDefinedTempIdInExpr body)
+    | Join (parameter, continuation, entry) ->
+        let (TempId id) = parameter.Id
+        max id (max (maxDefinedTempIdInExpr continuation) (maxDefinedTempIdInExpr entry))
+    | If (_, thenBranch, elseBranch) ->
+        max
+            (maxDefinedTempIdInExpr thenBranch)
+            (maxDefinedTempIdInExpr elseBranch)
+
+let private maxDefinedTempIdInFunction (func: Function) : int =
+    let paramMax =
+        func.TypedParams
+        |> List.fold (fun current param ->
+            let (TempId tempId) = param.Id
+            max current tempId) -1
+    max paramMax (maxDefinedTempIdInExpr func.Body)
+
+let private freshVarGenAfterProgram (Program (functions, mainExpr)) : VarGen =
+    let functionMax =
+        functions
+        |> List.fold (fun current func ->
+            max current (maxDefinedTempIdInFunction func)) -1
+    VarGen (max functionMax (maxDefinedTempIdInExpr mainExpr) + 1)
+
+/// Verify that all defined TempIds have types in the TypeMap
+/// Returns a list of TempIds that are missing from the TypeMap
+let verifyTypeMapCompleteness (program: ANF.Program) (typeMap: ANF.TypeMap) : TempId list =
+    let (ANF.Program (functions, mainExpr)) = program
+    let missing =
+        functions
+        |> List.fold (fun acc func -> collectMissingTempIdsInFunction typeMap func acc) []
+        |> collectMissingTempIdsInExpr typeMap mainExpr
+    List.rev missing
+
+/// Check immediate join interfaces and lexical captures after type recovery.
+/// Legacy tree-only functions are outside this verifier's migration boundary.
+let verifyJoinInterfaces (ctx: TypeContext) (program: Program) : Result<unit, string> =
+    let rec containsJoin = function
+        | Join _ | Jump _ -> true
+        | Let (_, _, body) -> containsJoin body
+        | If (_, yes, no) -> containsJoin yes || containsJoin no
+        | Return _ -> false
+    let atomUses = function Var id -> Set.singleton id | _ -> Set.empty
+    let checkUses visible uses =
+        let missing = Set.difference uses visible
+        if Set.isEmpty missing then Ok ()
+        else Error $"ANF join interface: operands outside lexical scope: {missing}"
+    let rec check visible joins canReturn expr =
+        match expr with
+        | Return atom ->
+            if canReturn then checkUses visible (atomUses atom)
+            else Error "ANF join interface: entry returns a value instead of transferring control"
+        | Jump (target, atom) ->
+            checkUses visible (atomUses atom) |> Result.bind (fun () ->
+                match Map.tryFind target joins, inferAtomType ctx atom with
+                | None, _ -> Error $"ANF join interface: target {target} is outside lexical scope"
+                | Some expected, Some actual when expected = actual -> Ok ()
+                | Some expected, actual -> Error $"ANF join interface: target {target} expects {expected}, got {actual}")
+        | Let (id, operation, body) ->
+            checkUses visible (ANF_Optimize.cexprTempUses operation)
+            |> Result.bind (fun () ->
+                match operation with
+                | RuntimeError _ | RuntimeErrorString _ -> Ok ()
+                | _ -> check (Set.add id visible) joins canReturn body)
+        | If (condition, yes, no) ->
+            checkUses visible (atomUses condition)
+            |> Result.bind (fun () -> check visible joins canReturn yes)
+            |> Result.bind (fun () -> check visible joins canReturn no)
+        | Join (parameter, continuation, entry) ->
+            if parameter.Type <> AST.TInt64 && parameter.Type <> AST.TBool then
+                Error $"ANF join interface: managed or unsupported block argument {parameter.Type}"
+            elif Set.contains parameter.Id visible || Map.containsKey parameter.Id joins then
+                Error $"ANF join interface: target {parameter.Id} shadows an enclosing identity"
+            else
+                check (Set.add parameter.Id visible) joins canReturn continuation
+                |> Result.bind (fun () -> check visible (Map.add parameter.Id parameter.Type joins) false entry)
+    let verify visible expr =
+        if containsJoin expr then check visible Map.empty true expr else Ok ()
+    let (Program (functions, main)) = program
+    functions
+    |> List.fold (fun result func ->
+        result |> Result.bind (fun () ->
+            verify (func.TypedParams |> List.map (fun parameter -> parameter.Id) |> Set.ofList) func.Body
+            |> Result.mapError (fun error -> $"{func.Name}: {error}"))) (Ok ())
+    |> Result.bind (fun () -> verify Set.empty main)
+
+let private insertRCInProgramInternal
+    (phaseRecorder: (string -> float -> unit) option)
+    (result: ConversionResult)
+    : Result<ANF.Program * ANF.TypeMap, string> =
+    let startPhase () =
+        phaseRecorder |> Option.map (fun _ -> System.Diagnostics.Stopwatch.StartNew())
+    let recordPhase name timer =
+        match phaseRecorder, timer with
+        | Some record, Some (timer: System.Diagnostics.Stopwatch) ->
+            timer.Stop()
+            record name timer.Elapsed.TotalMilliseconds
+        | _ -> ()
+
+    let contextTimer = startPhase ()
+    let ctx = createContext result
+    recordPhase "Reference Count Context" contextTimer
+    let (ANF.Program (functions, mainExpr)) = result.Program
+    // Inlining and generated JSON helpers can produce thousands of existing
+    // temporaries. A fixed starting value eventually collides with them, and
+    // sibling-branch type state can then suppress a required retain.
+    let varGen = freshVarGenAfterProgram result.Program
+
+    // Process all functions, accumulating types
+    let rec processFuncs
+        (funcs: Function list)
+        (vg: VarGen)
+        (accFuncs: Function list)
+        (accTypes: Map<TempId, AST.Type>)
+        (accTimings: FunctionPhaseTimings)
+        : Function list * VarGen * Map<TempId, AST.Type> * FunctionPhaseTimings =
+        match funcs with
+        | [] -> (List.rev accFuncs, vg, accTypes, accTimings)
+        | f :: rest ->
+            let (f', vg', types, timings) =
+                insertRCInFunctionInternal
+                    (Option.isSome phaseRecorder)
+                    ctx
+                    f
+                    vg
+                    Map.empty
+            let accTypes' =
+                Map.fold (fun acc tempId typ -> Map.add tempId typ acc) accTypes types
+            processFuncs
+                rest
+                vg'
+                (f' :: accFuncs)
+                accTypes'
+                (addFunctionPhaseTimings accTimings timings)
+
+    let functionsTimer = startPhase ()
+    let (functions', varGen1, typesFromFuncs, functionTimings) =
+        processFuncs functions varGen [] Map.empty emptyFunctionPhaseTimings
+    phaseRecorder
+    |> Option.iter (fun record ->
+        record "Reference Count Return Analysis" functionTimings.ReturnAnalysisMs
+        record "Reference Count Parameter Analysis" functionTimings.ParameterAnalysisMs
+        record "Reference Count Body Insertion" functionTimings.BodyInsertionMs
+        record "Reference Count Accumulator Cleanup" functionTimings.AccumulatorCleanupMs
+        record "Reference Count Cleanup Planning" functionTimings.CleanupPlanningMs
+        record "Reference Count Cleanup Rewrite" functionTimings.CleanupRewriteMs)
+    recordPhase "Reference Count Functions" functionsTimer
+
+    // Process main expression
+    let mainTimer = startPhase ()
+    let (mainExpr', _, finalTypeMap) =
+        insertRCInternal ctx mainExpr varGen1 typesFromFuncs
+    recordPhase "Reference Count Main" mainTimer
+
+    // Verify TypeMap completeness - all defined TempIds should have types
+    let verificationTimer = startPhase ()
+    let program' = ANF.Program (functions', mainExpr')
+    let missingTypes = verifyTypeMapCompleteness program' finalTypeMap
+    recordPhase "Reference Count Verification" verificationTimer
+    if not (List.isEmpty missingTypes) then
+        let missingStr = missingTypes |> List.map (fun (TempId n) -> $"t{n}") |> String.concat ", "
+        Crash.crash $"RefCountInsertion: TypeMap incomplete - missing types for: {missingStr}"
+
+    verifyJoinInterfaces (withTempTypes ctx finalTypeMap) program'
+    |> Result.map (fun () -> program', finalTypeMap)
+
+/// Insert RC operations into a program
+/// Returns (ANF.Program, TypeMap) where TypeMap contains all TempId -> Type mappings
+let insertRCInProgram (result: ConversionResult) : Result<ANF.Program * ANF.TypeMap, string> =
+    insertRCInProgramInternal None result
+
+/// Insert RC operations while reporting nested phase timings.
+let insertRCInProgramWithTrace
+    (phaseRecorder: (string -> float -> unit) option)
+    (result: ConversionResult)
+    : Result<ANF.Program * ANF.TypeMap, string> =
+    insertRCInProgramInternal phaseRecorder result

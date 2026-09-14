@@ -54,7 +54,7 @@ the allocatable subset onto x86_64 registers during code generation.
 
 ## Algorithm
 
-Implemented in `5_RegisterAllocation.fs`:
+Implemented in `RegisterAllocation.fs`:
 
 ### Phase 1: Liveness Analysis
 
@@ -194,11 +194,11 @@ type LiveInterval = {
 
 | File | Purpose |
 |------|---------|
-| `5_RegisterAllocation.fs` | Liveness analysis |
-| `5_RegisterAllocation.fs` | Interference graph construction |
-| `5_RegisterAllocation.fs` | Maximum Cardinality Search (PEO) |
-| `5_RegisterAllocation.fs` | Greedy coloring with coalescing preferences |
-| `5_RegisterAllocation.fs` | Main chordal allocation entry points |
+| `RegisterAllocation.fs` | Liveness analysis |
+| `RegisterAllocation.fs` | Interference graph construction |
+| `RegisterAllocation.fs` | Maximum Cardinality Search (PEO) |
+| `RegisterAllocation.fs` | Greedy coloring with coalescing preferences |
+| `RegisterAllocation.fs` | Main chordal allocation entry points |
 
 ## Tests
 

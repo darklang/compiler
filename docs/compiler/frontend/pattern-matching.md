@@ -41,7 +41,7 @@ type Pattern =
 
 ## Match Compilation
 
-Implemented in `2_AST_to_ANF.fs`.
+Implemented in `AST_to_ANF.fs`.
 
 ### Algorithm
 
@@ -197,8 +197,8 @@ alternatives with failed-binding rollback),
 guard then body decision order), and `backend/src/LibExecution/Interpreter.fs:1961`
 plus `packages/darklang/prettyPrinter/runtimeError.dark:253` (observable
 non-exhaustive failure). Current compiler anchors are `AST.fs:162`,
-`passes/1_Parser.fs:1312`, `passes/1.5_TypeChecking.fs:4535`, and
-`passes/2_AST_to_ANF.fs:7148` and `:8782`. Line numbers name the pinned/audited
+`frontend/Parser.fs:1312`, `frontend/TypeChecking.fs:4535`, and
+`passes/anf/AST_to_ANF.fs:7148` and `:8782`. Line numbers name the pinned/audited
 trees above and may move in later revisions.
 
 The public grammar accepts unit, literal, variable, wildcard, parenthesized or
@@ -335,7 +335,7 @@ match c with
 | File | Purpose |
 |------|---------|
 | `AST.fs` | Pattern type definitions |
-| `2_AST_to_ANF.fs` | Match compilation, exhaustiveness, and binding extraction |
+| `AST_to_ANF.fs` | Match compilation, exhaustiveness, and binding extraction |
 
 ## Tests
 

@@ -107,7 +107,7 @@ reuse work remain:
 |---|---|
 | `src/DarkCompiler/LiteralPool.fs` | literal string pool |
 | `src/DarkCompiler/LIR.fs` | string and dynamic-buffer RC instructions |
-| `src/DarkCompiler/passes/2.5_RefCountInsertion.fs` | string lifetime insertion |
-| `src/DarkCompiler/passes/arm64/6_CodeGen.fs` | ARM64 string allocation and RC |
-| `src/DarkCompiler/passes/x64/6_CodeGen.fs` | x64 string allocation and RC |
+| `src/DarkCompiler/passes/anf/RefCountInsertion.fs` | string lifetime insertion |
+| `src/DarkCompiler/backend/arm64/CodeGen.fs` | ARM64 string allocation and RC |
+| `src/DarkCompiler/backend/x64/CodeGen.fs` | x64 string allocation and RC |
 | `src/DarkCompiler/stdlib/String.dark` | stdlib string functions |

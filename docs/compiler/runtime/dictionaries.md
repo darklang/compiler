@@ -35,9 +35,9 @@ compiler implementation details.
 Current source evidence at the compiler comparison point is
 `src/DarkCompiler/stdlib/Dict.dark:9-216` for the public wrappers and ordered
 higher-order operations, `src/DarkCompiler/stdlib/__HAMT.dark:10-60` for the
-private generic storage boundary, `src/DarkCompiler/passes/1_Parser.fs:2034-2035`
-for the empty value, `src/DarkCompiler/passes/1.5_TypeChecking.fs:5742-5747`
-for content equality, `src/DarkCompiler/passes/1.6_ValueRendering.fs:219-258`
+private generic storage boundary, `src/DarkCompiler/frontend/Parser.fs:2034-2035`
+for the empty value, `src/DarkCompiler/frontend/TypeChecking.fs:5742-5747`
+for content equality, `src/DarkCompiler/frontend/ValueRendering.fs:219-258`
 for canonical rendering, and `src/DarkCompiler/Stdlib.fs:145-166` for the raw
 internal intrinsics. Interpreter evidence at the pinned revision is
 `packages/darklang/stdlib/dict.dark:4-127`,
@@ -161,7 +161,7 @@ The contract is anchored in:
 - `src/DarkCompiler/Stdlib.fs` for native intrinsic registration
 - `src/DarkCompiler/Runtime.fs` and architecture code generation for native
   allocation, output, and failure behavior
-- `src/DarkCompiler/passes/1.5_TypeChecking.fs` for public typing and equality
+- `src/DarkCompiler/frontend/TypeChecking.fs` for public typing and equality
 - `src/DarkCompiler/stdlib/Dict.dark` for the public module
 - `src/DarkCompiler/stdlib/__HAMT.dark` for private generic storage
 - `src/Tests/e2e/dict_parity.e2e` and pinned upstream Dict/edict cases for the

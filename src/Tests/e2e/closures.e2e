@@ -437,7 +437,7 @@ let toFloat = fun x -> Stdlib.Int64.toFloat x in let result = toFloat 5L + 1.0 i
 // =====================================================
 // Tests that multiple float literal arguments are passed correctly to closures.
 // Mutation #182 changes tempFRegCounter + 1 to tempFRegCounter - 1 in the
-// ClosureCall float argument handling code (line 717 in 4_MIR_to_LIR.fs).
+// ClosureCall float argument handling code (line 717 in MIR_to_LIR.fs).
 // With the mutation, multiple float literals would get assigned conflicting
 // temp registers, causing incorrect values to be passed to the closure.
 //
@@ -465,7 +465,7 @@ let sum5 = fun a b c d e -> a + b + c + d + e in sum5 1.0 2.0 3.0 4.0 5.0 = 15.0
 // Tests that multiple float literal arguments are passed correctly to closures
 // when the closure is called in TAIL position from a function.
 // Mutation #183 changes tempFRegCounter + 1 to tempFRegCounter - 1 in the
-// ClosureTailCall float argument handling code (line 796 in 4_MIR_to_LIR.fs).
+// ClosureTailCall float argument handling code (line 796 in MIR_to_LIR.fs).
 // With the mutation, multiple float literals would get assigned conflicting
 // temp registers, causing incorrect values to be passed to the closure.
 //

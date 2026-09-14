@@ -34,7 +34,7 @@ type BinOp =
     // ...
 ```
 
-### Step 2: Lexer (`src/DarkCompiler/passes/1_Parser.fs`)
+### Step 2: Lexer (`src/DarkCompiler/frontend/Parser.fs`)
 
 Add a token type and lexer case:
 
@@ -47,7 +47,7 @@ type Token =
 | '%' -> (TPercent, rest)
 ```
 
-### Step 3: Parser (`src/DarkCompiler/passes/1_Parser.fs`)
+### Step 3: Parser (`src/DarkCompiler/frontend/Parser.fs`)
 
 Add operator precedence and parsing. For `%`, it has same precedence as `*` and `/`:
 
@@ -58,7 +58,7 @@ Add operator precedence and parsing. For `%`, it has same precedence as `*` and 
     AST.BinOp (AST.Mod, left, right)
 ```
 
-### Step 4: Type Checking (`src/DarkCompiler/passes/1.5_TypeChecking.fs`)
+### Step 4: Type Checking (`src/DarkCompiler/frontend/TypeChecking.fs`)
 
 Add type rules for the operator:
 
@@ -78,7 +78,7 @@ type BinOp =
     | Mod  // <- Add here
 ```
 
-### Step 6: AST to ANF (`src/DarkCompiler/passes/2_AST_to_ANF.fs`)
+### Step 6: AST to ANF (`src/DarkCompiler/passes/anf/AST_to_ANF.fs`)
 
 Add conversion in `convertBinOp`:
 
@@ -96,7 +96,7 @@ Add to MIR.BinOp:
 type BinOp = Add | Sub | Mul | Div | Mod
 ```
 
-### Step 8: ANF to MIR (`src/DarkCompiler/passes/3_ANF_to_MIR.fs`)
+### Step 8: ANF to MIR (`src/DarkCompiler/passes/anf/ANF_to_MIR.fs`)
 
 Add conversion - usually straightforward:
 
@@ -114,7 +114,7 @@ type Instr =
     | Msub of dest:Operand * minuend:Operand * multiplicand:Operand * multiplier:Operand
 ```
 
-### Step 10: MIR to LIR (`src/DarkCompiler/passes/4_MIR_to_LIR.fs`)
+### Step 10: MIR to LIR (`src/DarkCompiler/passes/mir/MIR_to_LIR.fs`)
 
 Emit the instruction sequence. For modulo: `a % b = a - (a / b) * b`
 
@@ -124,7 +124,7 @@ Emit the instruction sequence. For modulo: `a % b = a - (a / b) * b`
     // Emit: MSUB dest, tmp, right, left
 ```
 
-### Step 11: Register Allocation (`src/DarkCompiler/passes/5_RegisterAllocation.fs`)
+### Step 11: Register Allocation (`src/DarkCompiler/passes/lir/RegisterAllocation.fs`)
 
 Update liveness analysis and allocation for new instruction:
 
@@ -134,7 +134,7 @@ Update liveness analysis and allocation for new instruction:
     // Use: minuend, multiplicand, multiplier
 ```
 
-### Step 12: Code Generation (`src/DarkCompiler/passes/arm64/6_CodeGen.fs`, `src/DarkCompiler/passes/x64/6_CodeGen.fs`)
+### Step 12: Code Generation (`src/DarkCompiler/backend/arm64/CodeGen.fs`, `src/DarkCompiler/backend/x64/CodeGen.fs`)
 
 Generate backend-specific instructions. ARM64 can lower modulo directly to
 `MSUB`; x64 needs the equivalent target-specific sequence.
@@ -144,7 +144,7 @@ Generate backend-specific instructions. ARM64 can lower modulo directly to
     ARM64.MSUB (toReg dest, toReg minuend, toReg multiplicand, toReg multiplier)
 ```
 
-### Step 13: Encoding (`src/DarkCompiler/passes/arm64/7_Encoding.fs`, `src/DarkCompiler/passes/x64/7_Encoding.fs`)
+### Step 13: Encoding (`src/DarkCompiler/backend/arm64/Encoding.fs`, `src/DarkCompiler/backend/x64/Encoding.fs`)
 
 Encode any new backend instruction forms to machine code bytes. For ARM64
 `MSUB`:
@@ -196,7 +196,7 @@ and Expr =
 
 ### Step 2: Update ALL AST Traversal Functions
 
-This is the tedious part. Search for functions that match on `Expr` and add cases. Common locations in `2_AST_to_ANF.fs`:
+This is the tedious part. Search for functions that match on `Expr` and add cases. Common locations in `AST_to_ANF.fs`:
 
 - `applySubstToExpr` - apply type substitutions
 - `collectTypeApps` - collect generic instantiations
@@ -209,7 +209,7 @@ This is the tedious part. Search for functions that match on `Expr` and add case
 - `toANF` - main ANF conversion
 - `toAtom` - convert to atom
 
-In `1.5_TypeChecking.fs`:
+In `TypeChecking.fs`:
 - `checkExpr` - type check expression
 - `collectFreeVars` - collect free variables for closures
 

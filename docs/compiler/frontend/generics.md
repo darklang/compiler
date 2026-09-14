@@ -28,7 +28,7 @@ swap<String, Bool> ("hello", true)
 
 ### 3. Monomorphization Process
 
-The compiler performs monomorphization in `2_AST_to_ANF.fs`:
+The compiler performs monomorphization in `AST_to_ANF.fs`:
 
 1. **Collect generic definitions**: Find all functions with type parameters
 2. **Find instantiation sites**: Scan for `TypeApp` expressions (generic calls)
@@ -100,7 +100,7 @@ Type substitution walks the AST and replaces type variables with concrete types:
 
 ## Related Files
 
-- `src/DarkCompiler/passes/2_AST_to_ANF.fs` - Monomorphization helpers and entry points (`specializeFromSpecs`, `monomorphize`, `monomorphizeWithExternalDefs`)
-- `src/DarkCompiler/passes/1.5_TypeChecking.fs` - Generic type validation
+- `src/DarkCompiler/passes/anf/AST_to_ANF.fs` - Monomorphization helpers and entry points (`specializeFromSpecs`, `monomorphize`, `monomorphizeWithExternalDefs`)
+- `src/DarkCompiler/frontend/TypeChecking.fs` - Generic type validation
 - `src/DarkCompiler/AST.fs` - `TVar`, `TypeApp` type definitions
 - `src/Tests/e2e/generics.e2e` - Test cases

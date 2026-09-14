@@ -33,7 +33,7 @@ non-retaining `RawWriteWord` and removes the producer's pending release.
 
 ## Ownership Insertion
 
-Pass 2.5, `src/DarkCompiler/passes/2.5_RefCountInsertion.fs`, inserts retains
+Pass 2.5, `src/DarkCompiler/passes/anf/RefCountInsertion.fs`, inserts retains
 and releases after ANF lowering.
 
 Important current rules:

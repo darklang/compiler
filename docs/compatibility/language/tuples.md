@@ -16,9 +16,9 @@ construction and recursive matching, plus
 `backend/testfiles/execution/stdlib/tuple.dark` for same-source construction,
 access, destructuring, matching, equality, and evaluation-order probes.
 
-Compiler evidence is `1.5_TypeChecking.fs` for ordered positional types and
-exact bounds, `2_AST_to_ANF.fs` for ordered allocation, recursive patterns,
-and structural equality, `Runtime.fs` and `passes/1.6_ValueRendering.fs` for
+Compiler evidence is `TypeChecking.fs` for ordered positional types and
+exact bounds, `AST_to_ANF.fs` for ordered allocation, recursive patterns,
+and structural equality, `Runtime.fs` and `frontend/ValueRendering.fs` for
 rendering, and `tuples.e2e` together with `tuple-parity.e2e` for executable
 coverage.
 

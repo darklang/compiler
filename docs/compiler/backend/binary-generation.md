@@ -22,7 +22,7 @@ control over the binary layout.
 
 ## Mach-O Format (macOS)
 
-Implemented for ARM64 in `src/DarkCompiler/passes/arm64/8_Binary_Generation_MachO.fs`.
+Implemented for ARM64 in `src/DarkCompiler/backend/arm64/Binary_Generation_MachO.fs`.
 
 ### File Structure
 
@@ -74,8 +74,8 @@ The `-s -` flag performs ad-hoc signing (no certificate needed).
 
 ## ELF Format (Linux)
 
-Implemented for ARM64 in `src/DarkCompiler/passes/arm64/8_Binary_Generation_ELF.fs`
-and for x86-64 in `src/DarkCompiler/passes/x64/8_Binary_Generation_ELF.fs`.
+Implemented for ARM64 in `src/DarkCompiler/backend/arm64/Binary_Generation_ELF.fs`
+and for x86-64 in `src/DarkCompiler/backend/x64/Binary_Generation_ELF.fs`.
 
 ### File Structure
 
@@ -152,9 +152,9 @@ Code generation handles these differences at the MIR/CodeGen level.
 
 | File | Purpose |
 |------|---------|
-| `passes/arm64/8_Binary_Generation_MachO.fs` | ARM64 Mach-O generation |
-| `passes/arm64/8_Binary_Generation_ELF.fs` | ARM64 ELF generation |
-| `passes/x64/8_Binary_Generation_ELF.fs` | x86-64 ELF generation |
+| `backend/arm64/Binary_Generation_MachO.fs` | ARM64 Mach-O generation |
+| `backend/arm64/Binary_Generation_ELF.fs` | ARM64 ELF generation |
+| `backend/x64/Binary_Generation_ELF.fs` | x86-64 ELF generation |
 | `Binary.fs` | Common types for binary structures |
 | `Binary_ELF.fs` | ELF-specific type definitions |
 

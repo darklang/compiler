@@ -1400,7 +1400,7 @@ let private compileMirToLir
 
     let suffix = if stageSuffix = "" then "" else $" ({stageSuffix})"
 
-    if verbosity >= 1 then println $"  [3.1/7] SSA Construction{suffix}..."
+    if verbosity >= 1 then println $"  [mir.ssa] SSA Construction{suffix}..."
     let ssaStart = sw.Elapsed.TotalMilliseconds
     let convertFunction func =
         let convert () =
@@ -1443,7 +1443,7 @@ let private compileMirToLir
                 ("cfg_simplify", mirOptions.EnableCFGSimplify)
                 ("licm", mirOptions.EnableLICM)
             ]
-    if verbosity >= 1 then println $"  [3.5/7] {mirPassLabel}{suffix}..."
+    if verbosity >= 1 then println $"  [mir.optimize] {mirPassLabel}{suffix}..."
     let mirOptStart = sw.Elapsed.TotalMilliseconds
     let optimizedProgram =
         if shouldRunMIROptimize mirOptions then
@@ -1503,7 +1503,7 @@ let private compileMirToLir
         let t = System.Math.Round(mirOptElapsed, 1)
         println $"        {t}ms"
 
-    if verbosity >= 1 then println $"  [4/7] MIR → LIR{suffix}..."
+    if verbosity >= 1 then println $"  [lir.lower] MIR → LIR{suffix}..."
     let lirStart = sw.Elapsed.TotalMilliseconds
     let lirPhaseRecorder =
         passTimingRecorder
@@ -1556,7 +1556,7 @@ let private compileMirToLir
             formatPassGroup
                 "LIR Peephole"
                 [("peephole", not options.DisableLIROpt && not options.DisableLIRPeephole)]
-        if verbosity >= 1 then println $"  [4.5/7] {lirPassLabel}{suffix}..."
+        if verbosity >= 1 then println $"  [lir.peephole] {lirPassLabel}{suffix}..."
         let lirOptStart = sw.Elapsed.TotalMilliseconds
         let optimizedFuncs =
             if options.DisableLIROpt || options.DisableLIRPeephole then
@@ -1627,7 +1627,7 @@ let private lowerToAllocatedLir
         if List.isEmpty functionsToCompile then
             Ok []
         else
-            if verbosity >= 1 then println $"  [3/7] ANF → MIR{suffix}..."
+            if verbosity >= 1 then println $"  [mir.lower] ANF → MIR{suffix}..."
             let mirStart = sw.Elapsed.TotalMilliseconds
             let anfProgram = ANF.Program (functionsToCompile, ANF.Return ANF.UnitLiteral)
             let mirPhaseRecorder =
@@ -1693,7 +1693,7 @@ let private lowerToAllocatedLir
                         passTimingRecorder
                         "ARM64 Function Metadata Planning"
                         metadataPlanningElapsed
-                    if verbosity >= 1 then println "  [5/7] Register Allocation..."
+                    if verbosity >= 1 then println "  [lir.allocate-registers] Register Allocation..."
                     let allocStart = sw.Elapsed.TotalMilliseconds
                     let arch = Platform.archFor target
                     let allocateFunction func =
@@ -1832,7 +1832,7 @@ let private buildAnf
                 ("cse", anfOptions.EnableCSE)
                 ("strength_reduction", anfOptions.EnableStrengthReduction)
             ]
-    if verbosity >= 1 then println $"  [2.3/7] {anfPassLabel}..."
+    if verbosity >= 1 then println $"  [anf.optimize] {anfPassLabel}..."
     let anfProgram = ANF.Program (functions, ANF.Return ANF.UnitLiteral)
     if shouldDumpIR verbosity options.DumpANF then
         printANFProgram options "=== ANF (before optimization) ===" anfProgram
@@ -1854,7 +1854,7 @@ let private buildAnf
     if shouldDumpIR verbosity options.DumpANF then
         printANFProgram options "=== ANF (after optimization) ===" anfOptimized
 
-    if verbosity >= 1 then println "  [2.4/7] ANF Inlining..."
+    if verbosity >= 1 then println "  [anf.inline] ANF Inlining..."
     let inlineStart = sw.Elapsed.TotalMilliseconds
     let anfInlined =
         if options.DisableInlining then
@@ -1867,7 +1867,7 @@ let private buildAnf
                 anfOptimized
 
     if verbosity >= 1 && specializeInternalSignatures then
-        println "  [2.4.4/7] ANF Higher-Order Specialization..."
+        println "  [anf.specialize-closures] ANF Higher-Order Specialization..."
     let higherOrderStart = sw.Elapsed.TotalMilliseconds
     let anfKnownHigherOrder =
         if options.DisableInlining || not specializeInternalSignatures then
@@ -1882,7 +1882,7 @@ let private buildAnf
         println $"        {t}ms"
 
     if verbosity >= 1 && specializeInternalSignatures then
-        println "  [2.4.5/7] ANF Direct-Call Specialization..."
+        println "  [anf.specialize-calls] ANF Direct-Call Specialization..."
     let specializationStart = sw.Elapsed.TotalMilliseconds
     let anfSpecialized =
         if options.DisableInlining || not specializeInternalSignatures then
@@ -1902,7 +1902,7 @@ let private buildAnf
         println $"        {t}ms"
 
     if verbosity >= 1 && not options.DisableANFOpt then
-        println "  [2.4.6/7] ANF Escape Analysis..."
+        println "  [anf.escape-analysis] ANF Escape Analysis..."
     let escapeAnalysisStart = sw.Elapsed.TotalMilliseconds
     let anfAfterEscapeAnalysis =
         if options.DisableANFOpt then
@@ -1918,7 +1918,7 @@ let private buildAnf
 
     let convResult = buildConversionResult anfAfterEscapeAnalysis registries
 
-    if verbosity >= 1 then println "  [2.5/7] Reference Count Insertion..."
+    if verbosity >= 1 then println "  [anf.reference-counts] Reference Count Insertion..."
     let rcStart = sw.Elapsed.TotalMilliseconds
     let rcPhaseRecorder =
         passTimingRecorder
@@ -1953,7 +1953,7 @@ let private applyTco
     (functions: ANF.Function list)
     (passTimingRecorder: PassTimingRecorder option)
     : ANF.Function list =
-    if verbosity >= 1 then println "  [2.7/7] Tail Call Detection..."
+    if verbosity >= 1 then println "  [anf.tail-calls] Tail Call Detection..."
     let tcoStart = sw.Elapsed.TotalMilliseconds
     let anfProgram = ANF.Program (functions, ANF.Return ANF.UnitLiteral)
     let anfAfterTCO =
@@ -4154,7 +4154,7 @@ let private compileUserWithPlan (plan: UserCompilePlan) : CompileReport =
                         | Error err, _
                         | _, Error err -> Error err
                         | Ok allocatedDependencyFuncs, Ok (programAnfFunctions, programTypeMap) ->
-                            if plan.Verbosity >= 1 then println "  [2.6/7] Print Insertion..."
+                            if plan.Verbosity >= 1 then println "  [anf.print-result] Print Insertion..."
                             let printStart = sw.Elapsed.TotalMilliseconds
                             let printResult =
                                 match plan.Mode with
@@ -4286,7 +4286,7 @@ let private compileUserWithPlan (plan: UserCompilePlan) : CompileReport =
                                         userCallGraphElapsed
                                     let finalUserFuncs =
                                         if plan.TreeShakeUserFunctions then
-                                            if plan.Verbosity >= 1 then println "  [5.5/7] Function Tree Shaking..."
+                                            if plan.Verbosity >= 1 then println "  [lir.tree-shake] Function Tree Shaking..."
                                             let treeShakeStart = sw.Elapsed.TotalMilliseconds
                                             let shakenUserFuncs =
                                                 if plan.Options.DisableFunctionTreeShaking then
@@ -4435,8 +4435,8 @@ let private compileUserWithPlan (plan: UserCompilePlan) : CompileReport =
                                             plan.Options
                                             sw
                                             plan.PassTimingRecorder
-                                            "  [6/7] Code Generation..."
-                                            "  [7/7] ARM64 Emit ({format})..."
+                                            "  [backend.codegen] Code Generation..."
+                                            "  [backend.emit] ARM64 Emit ({format})..."
                                             false
                                             false
                                             plan.Session
@@ -4712,16 +4712,16 @@ let private labelsForMode (mode: CompileMode) : UserCompileLabels =
     match mode with
     | FullProgram ->
         {
-            Parse = "  [1/7] Parse..."
-            TypeCheck = "  [1.5/7] Type Checking (with stdlib env)..."
-            Anf = "  [2/7] AST → ANF (user only)..."
+            Parse = "  [frontend.parse] Parse..."
+            TypeCheck = "  [frontend.type-check] Type Checking (with stdlib env)..."
+            Anf = "  [anf.lower] AST → ANF (user only)..."
             StageSuffix = "user only"
         }
     | TestExpression ->
         {
-            Parse = "  [1/7] Parse (test expr only)..."
-            TypeCheck = "  [1.5/7] Type Checking (with preamble env)..."
-            Anf = "  [2/7] AST → ANF (test expr only)..."
+            Parse = "  [frontend.parse] Parse (test expr only)..."
+            TypeCheck = "  [frontend.type-check] Type Checking (with preamble env)..."
+            Anf = "  [anf.lower] AST → ANF (test expr only)..."
             StageSuffix = ""
         }
 

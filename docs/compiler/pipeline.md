@@ -16,37 +16,37 @@ The Dark compiler transforms source code through a series of passes, each with a
 
 | #    | Pass                    | File                                                        | Transform                                     |
 |------|-------------------------|-------------------------------------------------------------|-----------------------------------------------|
-| 1    | Parser                  | `passes/1_Parser.fs`                             | Source → AST                                  |
-| 1.5  | Type checking           | `passes/1.5_TypeChecking.fs`                                | AST → Typed AST                               |
-| 2    | AST → ANF               | `passes/2_AST_to_ANF.fs`                                    | AST → ANF                                     |
+| 1    | Parser                  | `frontend/Parser.fs`                             | Source → AST                                  |
+| 1.5  | Type checking           | `frontend/TypeChecking.fs`                                | AST → Typed AST                               |
+| 2    | AST → ANF               | `passes/anf/AST_to_ANF.fs`                                    | AST → ANF                                     |
 | 2 (regions) | List representation and ownership | `ListHIR.fs`, called by AST → ANF | Closed semantic lists → storage → owned arrays → ANF |
-| 2.3  | ANF optimizations       | `passes/2.3_ANF_Optimize.fs`                                | ANF → ANF                                     |
-| 2.4  | ANF inlining            | `passes/2.4_ANF_Inlining.fs`                                | ANF → ANF                                     |
-| 2.4.4 | Known closure specialization | `passes/2.4.4_ANF_HigherOrderSpecialization.fs`       | ANF → ANF                                     |
-| 2.4.5 | Direct-call specialization | `passes/2.4.5_ANF_DirectCallSpecialization.fs`          | ANF → ANF                                     |
-| 2.4.6 | Escape analysis        | `passes/2.4.6_ANF_EscapeAnalysis.fs`                        | ANF → scalar-replaced ANF                     |
-| 2.5  | Ref count insertion     | `passes/2.5_RefCountInsertion.fs`                           | ANF + memory ops                              |
-| 2.6  | Print insertion         | `passes/2.6_PrintInsertion.fs`                              | ANF → ANF                                     |
-| 2.7  | Tail call detection     | `passes/2.7_TailCallDetection.fs`                           | ANF → ANF                                     |
-| 3    | ANF → MIR               | `passes/3_ANF_to_MIR.fs`                                    | ANF → CFG                                     |
-| 3.1  | SSA construction        | `passes/3.1_SSA_Construction.fs`                            | MIR → SSA-form MIR                            |
-| 3.5  | MIR optimizations       | `passes/3.5_MIR_Optimize.fs`                                | MIR → MIR                                     |
-| 4    | MIR → LIR               | `passes/4_MIR_to_LIR.fs`                                    | MIR → LIR (virtual regs)                      |
-| 4.5  | LIR peephole            | `passes/4.5_LIR_Peephole.fs`                                | LIR → LIR                                     |
-| 5    | Register allocation     | `passes/5_RegisterAllocation.fs`                            | LIR (virtual) → LIR (physical)                |
-| 5.5  | Function tree shaking   | `passes/5.5_FunctionTreeShaking.fs`                         | LIR → pruned LIR                              |
-| 6    | Code generation         | `passes/{arm64,x64}/6_CodeGen.fs`                           | LIR → ISA instructions                        |
-| 7    | Encode & resolve        | `passes/{arm64,x64}/7_Encoding.fs` + `7_Resolve.fs`         | ISA → machine code bytes                      |
-| 8    | Binary generation       | `passes/{arm64,x64}/8_Binary_Generation_*.fs`               | Blob → Mach-O or ELF executable              |
+| 2.3  | ANF optimizations       | `passes/anf/ANF_Optimize.fs`                                | ANF → ANF                                     |
+| 2.4  | ANF inlining            | `passes/anf/ANF_Inlining.fs`                                | ANF → ANF                                     |
+| 2.4.4 | Known closure specialization | `passes/anf/ANF_HigherOrderSpecialization.fs`       | ANF → ANF                                     |
+| 2.4.5 | Direct-call specialization | `passes/anf/ANF_DirectCallSpecialization.fs`          | ANF → ANF                                     |
+| 2.4.6 | Escape analysis        | `passes/anf/ANF_EscapeAnalysis.fs`                        | ANF → scalar-replaced ANF                     |
+| 2.5  | Ref count insertion     | `passes/anf/RefCountInsertion.fs`                           | ANF + memory ops                              |
+| 2.6  | Print insertion         | `passes/anf/PrintInsertion.fs`                              | ANF → ANF                                     |
+| 2.7  | Tail call detection     | `passes/anf/TailCallDetection.fs`                           | ANF → ANF                                     |
+| 3    | ANF → MIR               | `passes/anf/ANF_to_MIR.fs`                                    | ANF → CFG                                     |
+| 3.1  | SSA construction        | `passes/mir/SSA_Construction.fs`                            | MIR → SSA-form MIR                            |
+| 3.5  | MIR optimizations       | `passes/mir/MIR_Optimize.fs`                                | MIR → MIR                                     |
+| 4    | MIR → LIR               | `passes/mir/MIR_to_LIR.fs`                                    | MIR → LIR (virtual regs)                      |
+| 4.5  | LIR peephole            | `passes/lir/LIR_Peephole.fs`                                | LIR → LIR                                     |
+| 5    | Register allocation     | `passes/lir/RegisterAllocation.fs`                            | LIR (virtual) → LIR (physical)                |
+| 5.5  | Function tree shaking   | `passes/lir/FunctionTreeShaking.fs`                         | LIR → pruned LIR                              |
+| 6    | Code generation         | `backend/{arm64,x64}/CodeGen.fs`                           | LIR → ISA instructions                        |
+| 7    | Encode & resolve        | `backend/{arm64,x64}/Encoding.fs` + `Resolve.fs`         | ISA → machine code bytes                      |
+| 8    | Binary generation       | `backend/{arm64,x64}/8_Binary_Generation_*.fs`               | Blob → Mach-O or ELF executable              |
 
 Passes 1–5 are shared across targets. Passes 6–8 live under
-`passes/arm64/` or `passes/x64/`. The host is validated once as a
+`backend/arm64/` or `backend/x64/`. The host is validated once as a
 `Platform.Target` before stdlib construction, and `CompilerLibrary.generateBinary`
 selects the backend from that explicit target.
 
 ---
 
-## Pass 1: Parser (`1_Parser.fs`)
+## Pass 1: Parser (`Parser.fs`)
 
 **Input**: Source code string
 **Output**: Abstract Syntax Tree (AST)
@@ -71,7 +71,7 @@ Output: Let("x", BinOp(Add, IntLiteral(1), IntLiteral(2)),
 
 ---
 
-## Pass 1.5: Type Checking (`1.5_TypeChecking.fs`)
+## Pass 1.5: Type Checking (`TypeChecking.fs`)
 
 **Input**: AST
 **Output**: Type-checked AST (same structure, validated)
@@ -97,7 +97,7 @@ Error:  Type mismatch: expected Int64, got String in binary operator
 
 ---
 
-## Pass 2: AST to ANF (`2_AST_to_ANF.fs`)
+## Pass 2: AST to ANF (`AST_to_ANF.fs`)
 
 **Input**: AST
 **Output**: A-Normal Form (ANF)
@@ -131,7 +131,7 @@ Output: let t0 = 2 * 3 in
 
 ---
 
-## Pass 2.3: ANF Optimizations (`2.3_ANF_Optimize.fs`)
+## Pass 2.3: ANF Optimizations (`ANF_Optimize.fs`)
 
 **Input**: ANF
 **Output**: Optimized ANF
@@ -148,7 +148,7 @@ Output: let t0 = 2 * 3 in
 
 ---
 
-## Pass 2.4: ANF Inlining (`2.4_ANF_Inlining.fs`)
+## Pass 2.4: ANF Inlining (`ANF_Inlining.fs`)
 
 **Input**: ANF
 **Output**: ANF with selected calls inlined
@@ -159,7 +159,7 @@ Output: let t0 = 2 * 3 in
 
 ---
 
-## Pass 2.4.4: Known Closure Specialization (`2.4.4_ANF_HigherOrderSpecialization.fs`)
+## Pass 2.4.4: Known Closure Specialization (`ANF_HigherOrderSpecialization.fs`)
 
 **Input**: Inlined ANF
 **Output**: ANF with selected higher-order helpers specialized
@@ -173,7 +173,7 @@ Output: let t0 = 2 * 3 in
 
 ---
 
-## Pass 2.4.6: Escape Analysis (`2.4.6_ANF_EscapeAnalysis.fs`)
+## Pass 2.4.6: Escape Analysis (`ANF_EscapeAnalysis.fs`)
 
 **Input**: Specialized ANF
 **Output**: ANF with eligible local aggregates scalar-replaced or uniquely reused
@@ -203,7 +203,7 @@ current scope.
 
 ---
 
-## Pass 2.5: Reference Count Insertion (`2.5_RefCountInsertion.fs`)
+## Pass 2.5: Reference Count Insertion (`RefCountInsertion.fs`)
 
 **Input**: ANF
 **Output**: ANF with RefCountInc/RefCountDec operations
@@ -218,7 +218,7 @@ current scope.
 
 ---
 
-## Pass 2.6: Print Insertion (`2.6_PrintInsertion.fs`)
+## Pass 2.6: Print Insertion (`PrintInsertion.fs`)
 
 **Input**: ANF
 **Output**: ANF with explicit print operations
@@ -229,7 +229,7 @@ current scope.
 
 ---
 
-## Pass 2.7: Tail Call Optimization (`2.7_TailCallDetection.fs`)
+## Pass 2.7: Tail Call Optimization (`TailCallDetection.fs`)
 
 **Input**: ANF with refcounting
 **Output**: ANF annotated for tail calls / self-recursion loops
@@ -240,7 +240,7 @@ current scope.
 
 ---
 
-## Pass 3: ANF to MIR (`3_ANF_to_MIR.fs`)
+## Pass 3: ANF to MIR (`ANF_to_MIR.fs`)
 
 **Input**: ANF
 **Output**: Mid-level IR as Control Flow Graph (CFG)
@@ -273,7 +273,7 @@ Output: block0:
 
 ---
 
-## Pass 3.1: SSA Construction (`3.1_SSA_Construction.fs`)
+## Pass 3.1: SSA Construction (`SSA_Construction.fs`)
 
 **Input**: MIR CFG
 **Output**: MIR CFG in SSA form
@@ -284,7 +284,7 @@ Output: block0:
 
 ---
 
-## Pass 3.5: MIR Optimizations (`3.5_MIR_Optimize.fs`)
+## Pass 3.5: MIR Optimizations (`MIR_Optimize.fs`)
 
 **Input**: MIR CFG in SSA
 **Output**: Optimized MIR CFG
@@ -302,7 +302,7 @@ Output: block0:
 
 ---
 
-## Pass 4: MIR to LIR (`4_MIR_to_LIR.fs`)
+## Pass 4: MIR to LIR (`MIR_to_LIR.fs`)
 
 **Input**: MIR (target-independent)
 **Output**: LIR (virtual registers, target-neutral instruction shapes)
@@ -331,7 +331,7 @@ when mixing stdlib, preamble, and user functions.
 
 ---
 
-## Pass 4.5: LIR Peephole (`4.5_LIR_Peephole.fs`)
+## Pass 4.5: LIR Peephole (`LIR_Peephole.fs`)
 
 **Input**: LIR (virtual regs)
 **Output**: Optimized LIR (virtual regs)
@@ -342,7 +342,7 @@ when mixing stdlib, preamble, and user functions.
 
 ---
 
-## Pass 5: Register Allocation (`5_RegisterAllocation.fs`)
+## Pass 5: Register Allocation (`RegisterAllocation.fs`)
 
 **Input**: LIR with virtual registers
 **Output**: LIR with physical registers
@@ -360,7 +360,7 @@ when mixing stdlib, preamble, and user functions.
 ### Register Classes (LIR-level abstraction)
 
 The LIR uses abstract `PhysReg` identifiers X0-X30; each backend maps
-them to actual hardware registers in `passes/{arch}/6_CodeGen.fs`.
+them to actual hardware registers in `backend/{arch}/CodeGen.fs`.
 
 - **Caller-saved (preferred)**: X1-X7
 - **Callee-saved**: X19-X26 on ARM64, X19-X21 on x86_64 (fewer because
@@ -373,7 +373,7 @@ the allocator is aware of this via `isX86_64 arch` checks.
 
 ---
 
-## Pass 5.5: Function Tree Shaking (`5.5_FunctionTreeShaking.fs`)
+## Pass 5.5: Function Tree Shaking (`FunctionTreeShaking.fs`)
 
 **Input**: LIR (physical regs)
 **Output**: LIR with only reachable functions
@@ -386,7 +386,7 @@ the allocator is aware of this via `isX86_64 arch` checks.
 
 ---
 
-## Pass 6: Code Generation (`passes/{arm64,x64}/6_CodeGen.fs`)
+## Pass 6: Code Generation (`backend/{arm64,x64}/CodeGen.fs`)
 
 **Input**: LIR with physical registers
 **Output**: Target-specific symbolic instruction list
@@ -422,8 +422,8 @@ the allocator is aware of this via `isX86_64 arch` checks.
 
 | Backend | Encoding                               | Resolve                               | Binary                                                             |
 |---------|----------------------------------------|---------------------------------------|--------------------------------------------------------------------|
-| arm64   | `passes/arm64/7_Encoding.fs`           | `passes/arm64/7_Resolve.fs`           | `passes/arm64/8_Binary_Generation_{MachO,ELF}.fs` via `7_Emit.fs` |
-| x64     | `passes/x64/7_Encoding.fs`             | `passes/x64/7_Resolve.fs`             | `passes/x64/8_Binary_Generation_ELF.fs`                            |
+| arm64   | `backend/arm64/Encoding.fs`           | `backend/arm64/Resolve.fs`           | `backend/arm64/Binary_Generation_{MachO,ELF}.fs` via `Emit.fs` |
+| x64     | `backend/x64/Encoding.fs`             | `backend/x64/Resolve.fs`             | `backend/x64/Binary_Generation_ELF.fs`                            |
 
 ---
 

@@ -38,7 +38,7 @@ omitted when the function type is never compared.
 
 ## Lambda Lifting Algorithm
 
-Implemented in `2_AST_to_ANF.fs`:
+Implemented in `AST_to_ANF.fs`:
 
 ### Phase 1: Free Variable Collection
 
@@ -104,8 +104,8 @@ type CExpr =
 
 ## Code Generation
 
-From `src/DarkCompiler/passes/arm64/6_CodeGen.fs` and
-`src/DarkCompiler/passes/x64/6_CodeGen.fs`:
+From `src/DarkCompiler/backend/arm64/CodeGen.fs` and
+`src/DarkCompiler/backend/x64/CodeGen.fs`:
 
 1. **ClosureAlloc**: Allocates tuple on heap, stores function address and captures
 2. **ClosureCall**: Loads function pointer from closure[0], passes closure as hidden first arg
@@ -165,10 +165,10 @@ in add(10)(32)  // 42
 
 | File | Purpose |
 |------|---------|
-| `2_AST_to_ANF.fs:696-1011` | Lambda lifting (freeVars, liftLambdasInExpr) |
+| `AST_to_ANF.fs:696-1011` | Lambda lifting (freeVars, liftLambdasInExpr) |
 | `ANF.fs:76-78` | ClosureAlloc, ClosureCall, ClosureTailCall types |
-| `src/DarkCompiler/passes/arm64/6_CodeGen.fs` | ARM64 closure runtime code generation |
-| `src/DarkCompiler/passes/x64/6_CodeGen.fs` | x64 closure runtime code generation |
+| `src/DarkCompiler/backend/arm64/CodeGen.fs` | ARM64 closure runtime code generation |
+| `src/DarkCompiler/backend/x64/CodeGen.fs` | x64 closure runtime code generation |
 
 ## Tests
 

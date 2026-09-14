@@ -43,7 +43,7 @@ from Git history.
 
 ## ANF simplification
 
-`passes/2.3_ANF_Optimize.fs` and `src/Tests/optimization/anf.opt` own:
+`passes/anf/ANF_Optimize.fs` and `src/Tests/optimization/anf.opt` own:
 
 - literal folding for float negation, absolute value, square root,
   Int64/Float conversions, Float bit conversion and comparison, string
@@ -71,7 +71,7 @@ negative fixtures are part of each transformation's contract.
 
 ## Direct-call specialization
 
-`passes/2.4.5_ANF_DirectCallSpecialization.fs` specializes internal direct
+`passes/anf/ANF_DirectCallSpecialization.fs` specializes internal direct
 calls when callee identity and scalar literal arguments are statically known.
 It supports uniform literal parameter removal and bounded scalar-literal
 cloning while retaining fallbacks and excluding address-taken, closure, and
@@ -80,7 +80,7 @@ signatures, float-bit identity, indirect-use exclusions, and ownership rules.
 
 ## Escape analysis and scalar replacement
 
-`passes/2.4.6_ANF_EscapeAnalysis.fs` removes fixed-layout tuple and record
+`passes/anf/ANF_EscapeAnalysis.fs` removes fixed-layout tuple and record
 allocations whose fields are non-floating immediate scalar values and whose
 complete lexical use set consists only of projections, local aliases, and
 representation-only record-clone sources. Escaping clones retain their own
@@ -99,7 +99,7 @@ conservative call, later-use, managed-field, and branch boundaries.
 
 ## MIR optimization
 
-`passes/3.5_MIR_Optimize.fs` and `src/Tests/optimization/mir.opt` own:
+`passes/mir/MIR_Optimize.fs` and `src/Tests/optimization/mir.opt` own:
 
 - dominator-scoped scalar and effect-free-call common-subexpression reuse;
 - barrier-aware exact scalar heap-load reuse through `FloatSqrt`, `FloatAbs`,
@@ -118,7 +118,7 @@ negated reductions exceeds the current non-spilling Float register allocator.
 
 ## LIR, allocation, and backend optimization
 
-`passes/4.5_LIR_Peephole.fs`, `passes/5_RegisterAllocation.fs`, and the native
+`passes/lir/LIR_Peephole.fs`, `passes/lir/RegisterAllocation.fs`, and the native
 backends own:
 
 - floating constant-load motion;

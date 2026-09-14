@@ -18,11 +18,11 @@ HEAD. Compiler history is reproducible with `git show <revision>:<path>`.
 ## Source map
 
 Compiler ownership is split between the canonical
-[parser](../../../src/DarkCompiler/passes/1_Parser.fs),
-[type checker](../../../src/DarkCompiler/passes/1.5_TypeChecking.fs), and
-[AST-to-ANF lowering](../../../src/DarkCompiler/passes/2_AST_to_ANF.fs). The ANF `If`
+[parser](../../../src/DarkCompiler/frontend/Parser.fs),
+[type checker](../../../src/DarkCompiler/frontend/TypeChecking.fs), and
+[AST-to-ANF lowering](../../../src/DarkCompiler/passes/anf/AST_to_ANF.fs). The ANF `If`
 is converted to a typed shared result register and CFG join in
-[ANF-to-MIR](../../../src/DarkCompiler/passes/3_ANF_to_MIR.fs). Runtime output support
+[ANF-to-MIR](../../../src/DarkCompiler/passes/anf/ANF_to_MIR.fs). Runtime output support
 in [Runtime.fs](../../../src/DarkCompiler/Runtime.fs) makes selected results observable;
 focused failures use the existing compiler-generated runtime-error operation,
 whose callable contract is outside this work item.

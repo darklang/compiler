@@ -137,16 +137,16 @@ JSON extensions. There are no JSON-specific compiler-only serialized types.
   `src/DarkCompiler/stdlib/AltJson*.dark`, `Json*.dark`,
   `RuntimeTypes*.dark`, and `LanguageTools.dark` sources.
 - AOT plan construction and recursive record/enum substitution:
-  `src/DarkCompiler/passes/1.7_JsonPlanning.fs`.
+  `src/DarkCompiler/frontend/JsonPlanning.fs`.
 - The shared packed-range reader, container traversal, scalar extraction, and writer
   primitives are in `src/DarkCompiler/stdlib/Json.dark`.
 - Generic intrinsic checking and unsupported-shape diagnostics:
-  `src/DarkCompiler/passes/1.5_TypeChecking.fs`.
+  `src/DarkCompiler/frontend/TypeChecking.fs`.
 - Late specialization integration and stdlib loading:
   `src/DarkCompiler/CompilerLibrary.fs`.
 - Recursive ownership shapes and native release helpers:
   `src/DarkCompiler/ANF.fs`,
-  `src/DarkCompiler/passes/2.5_RefCountInsertion.fs`, and the architecture
+  `src/DarkCompiler/passes/anf/RefCountInsertion.fs`, and the architecture
   backends.
 
 The interpreter sources revalidated for this work are

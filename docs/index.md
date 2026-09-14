@@ -20,6 +20,7 @@ grouped by purpose; each subject has one canonical source.
 
 - [Architecture overview](compiler/overview.md)
 - [Compiler pipeline](compiler/pipeline.md)
+- [Compiler source organization](compiler/source-organization.md)
 - [Intermediate representations](compiler/intermediate-representations.md)
 - [End-to-end example](compiler/end-to-end-example.md)
 - [Design decisions](compiler/design-decisions.md)

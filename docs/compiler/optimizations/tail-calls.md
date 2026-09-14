@@ -7,7 +7,7 @@ recursive ownership are recorded in the
 
 ## Detection
 
-Pass `2.7_TailCallDetection.fs` recognizes direct, indirect, and closure calls
+Pass `TailCallDetection.fs` recognizes direct, indirect, and closure calls
 whose result is returned without further computation:
 
 ```fsharp

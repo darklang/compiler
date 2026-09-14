@@ -199,9 +199,9 @@ FCVTZS X0, D0      // X0 = (int)D0
 
 | File | Purpose |
 |------|---------|
-| `passes/arm64/6_CodeGen.fs` | LIR → symbolic ARM64 |
-| `passes/arm64/7_Resolve.fs` | Symbolic data-label pool resolution |
-| `passes/arm64/7_Encoding.fs` | ARM64 → bytes |
+| `backend/arm64/CodeGen.fs` | LIR → symbolic ARM64 |
+| `backend/arm64/Resolve.fs` | Symbolic data-label pool resolution |
+| `backend/arm64/Encoding.fs` | ARM64 → bytes |
 | `ARM64.fs` | Concrete ARM64 instruction types |
 | `ARM64Symbolic.fs` | ARM64 instruction types with symbolic data references |
 | `Runtime.fs` | Runtime support |

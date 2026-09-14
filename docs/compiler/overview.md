@@ -21,7 +21,7 @@ Source -> AST -> ANF -> MIR -> LIR -> RegAlloc -> CodeGen -> Encode -> Binary
 
 Passes 1-5 run through parsing, type checking, target-independent IR lowering,
 and register allocation. Passes 6-8 (CodeGen, encoding, binary output) live
-under `passes/arm64/` or `passes/x64/` depending on the target.
+under `backend/arm64/` or `backend/x64/` depending on the target.
 
 ### Why Multiple IRs?
 
@@ -75,7 +75,7 @@ boundary, storage contract, and remaining general HIR migration.
 
 Uses reference counting (not tracing GC):
 
-1. `2.5_RefCountInsertion.fs` inserts inc/dec operations in ANF
+1. `RefCountInsertion.fs` inserts inc/dec operations in ANF
 2. Runtime functions handle actual ref counting
 3. Borrowed calling convention: callers retain ownership
 
@@ -95,14 +95,14 @@ Why ref counting?
 
 - ARM64 (macOS and Linux) and x86_64 (Linux).
 - Direct binary generation — no external assembler or linker:
-  - `passes/arm64/8_Binary_Generation_MachO.fs` — ARM64 macOS
-  - `passes/arm64/8_Binary_Generation_ELF.fs`   — ARM64 Linux
-  - `passes/x64/8_Binary_Generation_ELF.fs`     — x86_64 Linux
+  - `backend/arm64/Binary_Generation_MachO.fs` — ARM64 macOS
+  - `backend/arm64/Binary_Generation_ELF.fs`   — ARM64 Linux
+  - `backend/x64/Binary_Generation_ELF.fs`     — x86_64 Linux
 - The host OS/architecture pair is validated once as a `Platform.Target`
   before stdlib construction. Register allocation, backend selection, runtime
   generation, and binary emission receive that target explicitly.
 - Adding a new architecture: add a case to `Platform.Arch`, create
-  `passes/<arch>/{6_CodeGen,7_Encoding,7_Resolve,8_Binary_Generation_*}.fs`,
+  `backend/<arch>/{6_CodeGen,7_Encoding,7_Resolve,8_Binary_Generation_*}.fs`,
   and wire it into `CompilerLibrary.generateBinary`.
 
 ## Compiler Library API

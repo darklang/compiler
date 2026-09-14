@@ -18,7 +18,7 @@ comparison unless it changes an observable result.
 | Argument evaluation | Function and argument expressions are evaluated eagerly and arguments are evaluated left to right before the combinator selects a value. | Same-source print probes at `control_combinators_retry.e2e:22-26` require the exact byte sequence `12` before the enclosing result. | Public parity |
 | `Retry.withBackoffLoop` / `withBackoff` | Run the callback before testing the limit. Stop on the first `Ok` or when `attempt >= maxAttempts`; return that callback result unchanged. Sleep only after an eligible `Error`, then increment the attempt and double the delay. The wrapper starts at attempt 1 and 100.0 ms. | Portable source at `stdlib/Retry.dark:5-16`; deterministic callbacks cover immediate success, nonpositive maximum, terminal failure, explicit starting attempts, eventual success, counts, and final payloads at `control_combinators_retry.e2e:28-43`. | Public parity |
 | `Retry.withFixedDelayLoop` / `withFixedDelay` | The same termination and propagation rules apply, but the delay is unchanged. The wrapper starts at attempt 1. | Portable source at `stdlib/Retry.dark:18-29`; deterministic focused cases cover both entry points and a real 1 ms inter-attempt delay at `control_combinators_retry.e2e:32-42`. | Public parity |
-| Retry delay | Milliseconds are passed to a blocking delay between callback attempts only. | `Cli.Posix.sleep` delegates at `stdlib/CliPosix.dark:29-30`; the typed effect is introduced at `passes/2_AST_to_ANF.fs:155-157` and retained as a Float through ANF/MIR/LIR. Code generation normalizes total nanoseconds into native seconds/nanoseconds and retries the remaining timeout on `EINTR` for Linux ARM64, Linux x86_64, and macOS ARM64. Backend assertions pin conversion, syscall numbers, target conventions, and interruption loops. | Behavior parity through an internal AOT boundary |
+| Retry delay | Milliseconds are passed to a blocking delay between callback attempts only. | `Cli.Posix.sleep` delegates at `stdlib/CliPosix.dark:29-30`; the typed effect is introduced at `passes/anf/AST_to_ANF.fs:155-157` and retained as a Float through ANF/MIR/LIR. Code generation normalizes total nanoseconds into native seconds/nanoseconds and retries the remaining timeout on `EINTR` for Linux ARM64, Linux x86_64, and macOS ARM64. Backend assertions pin conversion, syscall numbers, target conventions, and interruption loops. | Behavior parity through an internal AOT boundary |
 
 The enabled interpreter truth tables are
 `src/Tests/e2e/upstream/stdlib/option.dark:288,291,294,297` and
@@ -39,7 +39,7 @@ Enabling the exact upstream `Option.and(None, None)` case also exposed a
 compiler parser association error: the parser attached the second
 nullary constructor as a payload of the first. Constructor payload application
 now follows the same left-associative path as other calls at
-`passes/1_Parser.fs:2202-2208,2267-2270`. This is required for the
+`frontend/Parser.fs:2202-2208,2267-2270`. This is required for the
 unchanged pinned source, not a compiler-only syntax extension.
 
 ## Pinned source anchors
@@ -60,8 +60,8 @@ spawning the shell command `sleep`. The implementation now loads
 `stdlib/Retry.dark` at `CompilerLibrary.fs:1129-1138`; represents delay at
 `ANF.fs:292`, `MIR.fs:154`, and `LIR.fs:190`; assigns target syscall numbers at
 `Platform.fs:90-138`; and lowers the operation at
-`passes/arm64/6_CodeGen.fs:6142-6195` and
-`passes/x64/6_CodeGen.fs:4275-4319`.
+`backend/arm64/CodeGen.fs:6142-6195` and
+`backend/x64/CodeGen.fs:4275-4319`.
 
 ## Extensions and intentional divergences
 

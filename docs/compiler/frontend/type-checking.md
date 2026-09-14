@@ -200,7 +200,7 @@ type TypeError =
 
 | File | Purpose |
 |------|---------|
-| `src/DarkCompiler/passes/1.5_TypeChecking.fs` | Main type checker |
+| `src/DarkCompiler/frontend/TypeChecking.fs` | Main type checker |
 | `src/DarkCompiler/AST.fs` | Type definitions |
 
 ## Key Functions

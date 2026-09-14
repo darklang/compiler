@@ -12,8 +12,8 @@ The interpreter evidence was rechecked in `LibParser/Parser.fs`,
 `LibParser/WrittenTypesToProgramTypes.fs`, `LibDB/NameLookup.fs`,
 `LibExecution/ProgramTypes.fs`, and `Builtins.CliHost/Libs/Cli.fs` at the pinned
 revision. Compiler evidence was rechecked in `AST.fs`, `NameSyntax.fs`, both
-parser passes, the whole-program section of `1.5_TypeChecking.fs`,
-`2_AST_to_ANF.fs`, `CompilerLibrary.fs`, `Program.fs`, and the e2e runner.
+parser passes, the whole-program section of `TypeChecking.fs`,
+`AST_to_ANF.fs`, `CompilerLibrary.fs`, `Program.fs`, and the e2e runner.
 
 ## Rule matrix
 

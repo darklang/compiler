@@ -85,12 +85,12 @@ not public recursion syntax.
 
 ## Source anchors
 
-- Parsing: `passes/1_Parser.fs`
+- Parsing: `frontend/Parser.fs`
 - Stable parsed identities: `NameSyntax.fs`
 - Resolution, SCCs, monomorphic checking, and diagnostics:
-  `passes/1.5_TypeChecking.fs`
-- Closure identity and lowered group layout: `passes/2_AST_to_ANF.fs`
-- Identity-safe self-tail ownership: `passes/2.7_TailCallDetection.fs`
+  `frontend/TypeChecking.fs`
+- Closure identity and lowered group layout: `passes/anf/AST_to_ANF.fs`
+- Identity-safe self-tail ownership: `passes/anf/TailCallDetection.fs`
 - Existing behavioral coverage: `functions.e2e`, `tailcall.e2e`,
   `tuple-recursion.e2e`, closure tests, and
   `compiler-passes/TailCallDetectionTests.fs`

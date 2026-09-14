@@ -1,0 +1,10605 @@
+// CodeGen.fs - Code Generation (Pass 6)
+//
+// Transforms LIR into ARM64 instructions.
+//
+// Code generation algorithm:
+// - Maps LIR physical registers to ARM64 registers
+// - Selects ARM64 instruction forms (immediate vs register operands)
+// - Generates MOVZ instructions for loading immediate values
+// - Handles 12-bit immediate constraints for ADD/SUB
+//
+// Assumes register allocation completed (no virtual registers remain)
+//
+// Example:
+//   X0 <- Mov(Imm 42); X1 <- Add(X0, Imm 5)
+//   →
+//   MOVZ X0, #42, LSL #0; ADD X1, X0, #5
+
+module CodeGen
+
+/// Code generation options
+type CodeGenOptions = {
+    /// Disable free list memory reuse (always bump allocate)
+    DisableFreeList: bool
+    /// Enable coverage instrumentation
+    EnableCoverage: bool
+    /// Number of coverage expressions (determines buffer size)
+    CoverageExprCount: int
+    /// Enable leak checking instrumentation
+    EnableLeakCheck: bool
+}
+
+/// Default code generation options
+let defaultOptions : CodeGenOptions = {
+    DisableFreeList = false
+    EnableCoverage = false
+    CoverageExprCount = 0
+    EnableLeakCheck = false
+}
+
+/// Caller-owned reuse for expensive, immutable release-plan summaries.
+/// The cache validates complete release-plan shapes before returning a value.
+type ReleasePlanSummaryCache =
+    bool
+        -> string
+        -> ANF.RcReleasePlan
+        -> (unit -> LIR.Arm64ReleasePlanSummary)
+        -> LIR.Arm64ReleasePlanSummary
+
+/// Opt-in attribution for one freshly generated LIR instruction. The elapsed
+/// value uses Stopwatch timestamp ticks, and the instruction count is measured
+/// before the function-level ARM64 peephole pass.
+type LirOpExpansionRecorder = string -> string -> string -> int -> int64 -> unit
+
+/// Code generation context (passed through to instruction conversion)
+type CodeGenContext = {
+    Target: ARM64.TargetConfig
+    Options: CodeGenOptions
+    SumShapeRegistry: ANF.RcSumShapeRegistry
+    RecordRegistry: LIR.RecordRegistry
+    RawSlotInitRetainTargets: Map<AST.Type, LIR.Arm64SlotInitRootRetainTarget option> option
+    ClosurePayloadSizes: Map<string, int>
+    ClosureCaptureTypes: Map<string, AST.Type list>
+    FunctionName: string
+    /// Deterministic block/instruction identity for labels emitted by an effect.
+    /// One source effect can be cloned into multiple CFG locations.
+    InstructionSite: string
+    // Function context for tail call epilogue generation
+    StackSize: int
+    UsedCalleeSaved: LIR.PhysReg list
+    HeapOverflowLabel: string
+    RecordLirOpExpansion: LirOpExpansionRecorder option
+}
+
+let private rcSumShapeRegistryFromVariantRegistry (variantRegistry: LIR.VariantRegistry) : ANF.RcSumShapeRegistry =
+    variantRegistry
+    |> Map.map (fun _typeName typeVariants ->
+        { TypeParams = typeVariants.TypeParams
+          Payloads =
+            typeVariants.Variants
+            |> List.sortBy (fun variant -> variant.Tag)
+            |> List.map (fun variant -> variant.Tag, variant.Payload) })
+
+let leakCounterLabel = ARM64Symbolic.leakCounterLabelName
+let heapOutOfMemoryMessage = "Out of heap memory"
+let private heapMmapSizeBytes = 512L * 1024L * 1024L
+let private heapMmapSizeMovzImm16 = 0x2000us  // 512MB == 0x20000000
+let private heapOverflowLabelPrefix = "__heap_oom_"
+let private runtimeErrorHelperLabel = "__dark_runtime_error"
+let private listRefCountIncHelperLabel = "__dark_list_refcount_inc_helper"
+let private listRefCountDecHelperLabel = "__dark_list_refcount_dec_helper"
+let private plannedListRefCountDecHelperLabelPrefix = "__dark_list_refcount_dec_plan_"
+let private plannedGenericRefCountDecHelperLabelPrefix = "__dark_generic_refcount_dec_plan_"
+let private listRefCountDecStringHelperLabel = "__dark_list_refcount_dec_string_helper"
+let private listRefCountDecBlobHelperLabel = "__dark_list_refcount_dec_blob_helper"
+let private listRefCountDecListHelperLabel = "__dark_list_refcount_dec_list_helper"
+let private listRefCountDecDictHelperLabel = "__dark_list_refcount_dec_dict_helper"
+let private listRefCountDecDictListHelperLabel = "__dark_list_refcount_dec_dict_list_helper"
+let private listRefCountDecClosureHelperLabel = "__dark_list_refcount_dec_closure_helper"
+let private dictRefCountIncHelperLabel = "__dark_dict_refcount_inc_helper"
+let private dictRefCountDecHelperLabel = "__dark_dict_refcount_dec_helper"
+let private dictRefCountDecListValueHelperLabel = "__dark_dict_refcount_dec_list_value_helper"
+let private dictRefCountDecDictValueHelperLabel = "__dark_dict_refcount_dec_dict_value_helper"
+let private dictRefCountDecDictListValueHelperLabel = "__dark_dict_refcount_dec_dict_list_value_helper"
+let private dictRefCountDecTupleStringListValueHelperLabel = "__dark_dict_refcount_dec_tuple_string_list_value_helper"
+let private dictRefCountDecTupleStringListDictValueHelperLabel = "__dark_dict_refcount_dec_tuple_string_list_dict_value_helper"
+let private dictRefCountDecSumStringValueHelperLabel = "__dark_dict_refcount_dec_sum_string_value_helper"
+let private plannedDictRefCountDecHelperLabelPrefix = "__dark_dict_refcount_dec_plan_"
+let private closureRefCountIncHelperLabel = "__dark_closure_refcount_inc_helper"
+let private closureRefCountDecHelperLabel = "__dark_closure_refcount_dec_helper"
+let private streamRefCountDecHelperLabel = "__dark_stream_refcount_dec_helper"
+
+// Small fixed blocks are cheaper to build directly than to name and cache.
+// Stop counting as soon as repeated recursive expansion becomes the dominant
+// cost and an outlined helper is worthwhile.
+let private genericReleaseHelperNodeThreshold = ANF.rcReleasePlanCompactKeyNodeThreshold
+
+let private genericReleasePlanIsExpensive (releasePlan: ANF.RcReleasePlan) : bool =
+    ANF.rcReleasePlanExceedsNodeCount
+        genericReleaseHelperNodeThreshold
+        releasePlan
+
+let private callerOwnsSinglePayloadSum (functionName: string) : bool =
+    functionName.StartsWith("Stdlib.Dict.")
+    || not (functionName.StartsWith("Stdlib."))
+
+let private recursiveSumRefCountDecHelperLabel (sourceType: AST.Type) : string =
+    $"__dark_recursive_sum_rc_dec_{ANF.rcSourceTypeFingerprint sourceType}"
+
+let private plannedListDecHelperLabelForFingerprint (fingerprint: string) : string =
+    $"{plannedListRefCountDecHelperLabelPrefix}{fingerprint}"
+
+let private plannedListDecHelperLabelForReleasePlan (releasePlan: ANF.RcReleasePlan) : string =
+    releasePlan
+    |> ANF.rcReleasePlanFingerprint
+    |> plannedListDecHelperLabelForFingerprint
+
+let private plannedGenericDecHelperBaseLabelForFingerprint (fingerprint: string) : string =
+    $"{plannedGenericRefCountDecHelperLabelPrefix}{fingerprint}"
+
+let private specializePlannedGenericDecHelperLabel
+    (ownsSinglePayloadSum: bool)
+    (baseLabel: string)
+    : string =
+    let ownership = if ownsSinglePayloadSum then "owned" else "borrowed"
+    $"{baseLabel}_{ownership}"
+
+let private plannedDictDecHelperLabelForFingerprint (fingerprint: string) : string =
+    $"{plannedDictRefCountDecHelperLabelPrefix}{fingerprint}"
+
+let private plannedDictDecHelperLabelForReleasePlan (releasePlan: ANF.RcReleasePlan) : string =
+    releasePlan
+    |> ANF.rcReleasePlanFingerprint
+    |> plannedDictDecHelperLabelForFingerprint
+
+type private RcReleasePlanSummary = LIR.Arm64ReleasePlanSummary
+type private RcHelperRequirements = LIR.Arm64RcHelperRequirements
+
+type Arm64ProgramFacts = {
+    ClosurePayloadSizesFromParams: Map<string, int>
+    ClosurePayloadSizesFromAllocs: Map<string, int>
+    ClosureCaptureTypes: Map<string, AST.Type list>
+    RecursiveReleaseTypes: Set<AST.Type>
+    CliArgvHelperLabels: Set<string>
+    NeedsCliExecuteHelper: bool
+    NeedsCliRunProcessHelper: bool
+    NeedsCliProcessLifecycleHelpers: bool
+    NeedsRuntimeErrorHelper: bool
+}
+
+/// ARM64-only metadata assembled from the reachable functions' carried facts.
+[<Struct>]
+type Arm64ProgramMetadata = {
+    Facts: Arm64ProgramFacts
+    RcHelperRequirements: RcHelperRequirements
+}
+
+let private slotInitRootRetainTarget
+    (recordRegistry: LIR.RecordRegistry)
+    (sumShapeRegistry: ANF.RcSumShapeRegistry)
+    (valueType: AST.Type)
+    : LIR.Arm64SlotInitRootRetainTarget option =
+    let shapeOfKnownType (typ: AST.Type) : ANF.RcShape option =
+        match typ with
+        | AST.TRecord (name, _) when not (Map.containsKey name recordRegistry) ->
+            None
+        | _ ->
+            Some (
+                ANF.rcShapeOfTypeWithSums
+                    recordRegistry
+                    (ANF.inferredRecordTypeParamsRegistry recordRegistry)
+                    sumShapeRegistry
+                    typ
+            )
+
+    shapeOfKnownType valueType
+    |> Option.bind (function
+            | ANF.TaggedListShape _ ->
+                Some LIR.SlotInitListRootRetain
+            | ANF.DictRoot _ ->
+                Some LIR.SlotInitDictRootRetain
+            | ANF.DynamicString
+            | ANF.DynamicBlob ->
+                Some LIR.SlotInitDynamicBufferRetain
+            | ANF.ClosureShape _ ->
+                Some LIR.SlotInitClosureRootRetain
+            | ANF.FixedBlock (payloadSize, _) ->
+                match valueType with
+                | AST.TTuple _
+                | AST.TRecord _
+                | AST.TInt128
+                | AST.TUInt128 -> Some (LIR.SlotInitGenericRootRetain payloadSize)
+                | _ -> None
+            | ANF.StreamRoot -> Some (LIR.SlotInitGenericRootRetain 24)
+            | ANF.BoxedSum (payloadSize, _, _) ->
+                match valueType with
+                | AST.TSum _ -> Some (LIR.SlotInitGenericRootRetain payloadSize)
+                | _ -> None
+            | ANF.RecursiveSumRef _ ->
+                Some (LIR.SlotInitGenericRootRetain 16)
+            | ANF.Immediate
+            | ANF.StaticString
+            | ANF.RawUnmanaged ->
+                None)
+
+let private dataLabel (name: string) : ARM64Symbolic.LabelRef =
+    ARM64Symbolic.DataLabel (ARM64Symbolic.Named name)
+
+let private stringDataLabel (value: string) : ARM64Symbolic.LabelRef =
+    ARM64Symbolic.DataLabel (ARM64Symbolic.StringLiteral value)
+
+let private floatDataLabel (value: float) : ARM64Symbolic.LabelRef =
+    ARM64Symbolic.DataLabel (ARM64Symbolic.FloatLiteral value)
+
+let private codeLabel (name: string) : ARM64Symbolic.LabelRef =
+    ARM64Symbolic.CodeLabel name
+
+let private runtimeInstrs (instrs: ARM64.Instr list) : ARM64Symbolic.Instr list =
+    ARM64Symbolic.ofARM64List instrs
+
+let private utf8Len (value: string) : int =
+    System.Text.Encoding.UTF8.GetByteCount value
+
+let private loadStringLiteralPointer (destReg: ARM64Symbolic.Reg) (value: string) : ARM64Symbolic.Instr list =
+    let labelRef = stringDataLabel value
+    [
+        ARM64Symbolic.ADRP (destReg, labelRef)
+        ARM64Symbolic.ADD_label (destReg, destReg, labelRef)
+    ]
+
+let private generateHeapOverflowTrapBody (_target: ARM64.TargetConfig) : ARM64Symbolic.Instr list =
+    loadStringLiteralPointer ARM64Symbolic.X0 heapOutOfMemoryMessage
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 0us, 0)
+        ARM64Symbolic.B_label runtimeErrorHelperLabel ]
+
+/// Shared non-returning error writer. X0 is a fixed-header string buffer and X3
+/// selects the newline required by dynamically constructed exception text.
+let private generateRuntimeErrorHelper (target: ARM64.TargetConfig) : ARM64Symbolic.Instr list =
+    let syscalls = ARM64.targetSyscalls target
+    let exitLabel = $"{runtimeErrorHelperLabel}_exit"
+    [ ARM64Symbolic.Label runtimeErrorHelperLabel
+      ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X0, 8s)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X0, 16us)
+      ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 2us, 0)
+      ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
+      ARM64Symbolic.SVC syscalls.SvcImmediate
+      ARM64Symbolic.CBZ (ARM64Symbolic.X3, exitLabel) ]
+    @ loadStringLiteralPointer ARM64Symbolic.X1 "\n"
+    @ [ ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 16us)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 2us, 0)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0)
+        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
+        ARM64Symbolic.SVC syscalls.SvcImmediate
+        ARM64Symbolic.Label exitLabel
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
+        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Exit, 0)
+        ARM64Symbolic.SVC syscalls.SvcImmediate ]
+
+// These cold paths depend only on the target ABI. Building their immutable
+// instruction lists once avoids reconstructing the same message and syscall
+// sequence for every executable in a compilation session.
+let private macOSHeapOverflowTrapBody =
+    generateHeapOverflowTrapBody (ARM64.targetConfigFor Platform.MacOSARM64)
+
+let private linuxHeapOverflowTrapBody =
+    generateHeapOverflowTrapBody (ARM64.targetConfigFor Platform.LinuxARM64)
+
+let private preparedHeapOverflowTrapBody (target: ARM64.TargetConfig) =
+    match ARM64.targetOS target with
+    | Platform.MacOS -> macOSHeapOverflowTrapBody
+    | Platform.Linux -> linuxHeapOverflowTrapBody
+
+let private generateHeapOverflowTrapBlock
+    (body: ARM64Symbolic.Instr list)
+    (label: string)
+    : ARM64Symbolic.Instr list =
+    ARM64Symbolic.Label label :: body
+
+let private withHeapBoundsCheck
+    (overflowLabel: string)
+    (nextPtrInstrs: ARM64Symbolic.Instr list)
+    (allocInstrs: ARM64Symbolic.Instr list)
+    : ARM64Symbolic.Instr list =
+    [
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X11, heapMmapSizeMovzImm16, 16)
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X11, ARM64Symbolic.X27, ARM64Symbolic.X11)
+    ]
+    @ nextPtrInstrs
+    @ [
+        ARM64Symbolic.CMP_reg (ARM64Symbolic.X14, ARM64Symbolic.X11)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, overflowLabel)
+    ]
+    @ allocInstrs
+
+let private checkedBumpAllocReg
+    (overflowLabel: string)
+    (destReg: ARM64Symbolic.Reg)
+    (sizeReg: ARM64Symbolic.Reg)
+    : ARM64Symbolic.Instr list =
+    withHeapBoundsCheck
+        overflowLabel
+        [ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X28, sizeReg)]
+        [
+            ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X28)
+            ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, sizeReg)
+        ]
+
+let private generateListRefCountIncHelper () : ARM64Symbolic.Instr list =
+    let label (name: string) : string = $"__dark_list_rc_inc_{name}"
+    let size24 = label "size_24"
+    let size32 = label "size_32"
+    let haveSize = label "have_size"
+    let helperRet = label "ret"
+
+    [
+        ARM64Symbolic.Label listRefCountIncHelperLabel
+        // X0 = tagged list pointer (or 0)
+        ARM64Symbolic.CBZ (ARM64Symbolic.X0, helperRet)
+        ARM64Symbolic.AND_imm (ARM64Symbolic.X1, ARM64Symbolic.X0, 7UL)
+        ARM64Symbolic.CBZ (ARM64Symbolic.X1, helperRet)  // Untagged pointer => not a skew-list node
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X1, 3us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, helperRet)
+        // This contiguous all-ones mask is an encodable AArch64 logical immediate.
+        ARM64Symbolic.AND_imm (ARM64Symbolic.X2, ARM64Symbolic.X0, 0xFFFFFFFFFFFFFFF8UL)
+
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X1, 1us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, size32)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X1, 3us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, size24)
+
+        // Tag 2 (LEAF).
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 8us, 0)
+        ARM64Symbolic.B_label haveSize
+
+        ARM64Symbolic.Label size24
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 24us, 0)
+        ARM64Symbolic.B_label haveSize
+
+        ARM64Symbolic.Label size32
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 32us, 0)
+        ARM64Symbolic.B_label haveSize
+
+        ARM64Symbolic.Label haveSize
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X2, ARM64Symbolic.X2, ARM64Symbolic.X3)
+        ARM64Symbolic.LDR (ARM64Symbolic.X4, ARM64Symbolic.X2, 0s)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X4, ARM64Symbolic.X4, 1us)
+        ARM64Symbolic.STR (ARM64Symbolic.X4, ARM64Symbolic.X2, 0s)
+
+        ARM64Symbolic.Label helperRet
+        ARM64Symbolic.RET
+    ]
+
+let private generateListRefCountDecHelperWith
+    (helperLabel: string)
+    (ctx: CodeGenContext)
+    (leafGenericPayloadSize: int option)
+    (leafGenericReleasePlan: ANF.RcReleasePlan option)
+    (releaseLeafDynamicBufferPayload: bool)
+    (releaseLeafListPayload: bool)
+    (releaseLeafDictPayload: bool)
+    (releaseLeafClosurePayload: bool)
+    (managedLeafFieldTypes: AST.Type list)
+    : ARM64Symbolic.Instr list =
+    let label (name: string) : string = $"{helperLabel}_{name}"
+    let leakDec =
+        if ctx.Options.EnableLeakCheck then
+            let labelRef = dataLabel leakCounterLabel
+            [
+                ARM64Symbolic.ADRP (ARM64Symbolic.X17, labelRef)
+                ARM64Symbolic.ADD_label (ARM64Symbolic.X17, ARM64Symbolic.X17, labelRef)
+                ARM64Symbolic.LDR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+                ARM64Symbolic.SUB_imm (ARM64Symbolic.X16, ARM64Symbolic.X16, 1us)
+                ARM64Symbolic.STR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+            ]
+        else
+            []
+
+    let addChild (suffix: string) : ARM64Symbolic.Instr list =
+        let doneLabel = label $"child_done_{suffix}"
+        let pushLabel = label $"child_push_{suffix}"
+        [
+            ARM64Symbolic.CBZ (ARM64Symbolic.X8, doneLabel)
+            // Only traverse plausible tagged list pointers inside the managed heap range.
+            ARM64Symbolic.AND_imm (ARM64Symbolic.X9, ARM64Symbolic.X8, 7UL)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X9, doneLabel)
+            ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 3us)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, doneLabel)
+            // This contiguous all-ones mask is an encodable AArch64 logical immediate.
+            ARM64Symbolic.AND_imm (ARM64Symbolic.X10, ARM64Symbolic.X8, 0xFFFFFFFFFFFFFFF8UL)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X10, ARM64Symbolic.X27)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, doneLabel)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X10, ARM64Symbolic.X28)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, doneLabel)
+            ARM64Symbolic.CBNZ (ARM64Symbolic.X0, pushLabel)
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X8)
+            ARM64Symbolic.B_label doneLabel
+            ARM64Symbolic.Label pushLabel
+            ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+            ARM64Symbolic.STR (ARM64Symbolic.X8, ARM64Symbolic.SP, 0s)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 1us)
+            ARM64Symbolic.Label doneLabel
+        ]
+
+    let loopCheck = label "loop_check"
+    let popOrRet = label "pop_or_ret"
+    let helperRet = label "ret"
+    let size8 = label "size_8"
+    let size24 = label "size_24"
+    let size32 = label "size_32"
+    let haveSize = label "have_size"
+    let collectSingle = label "collect_single"
+    let collectDeep = label "collect_deep"
+    let collectNode2 = label "collect_node2"
+    let collectNodeChildren = label "collect_node_children"
+    let collectNode3 = label "collect_node3"
+    let collectLeaf = label "collect_leaf"
+    let releaseValue = label "release_value"
+    let leafPayloadDone = label "leaf_payload_done"
+    let afterPrefix = label "after_prefix"
+    let afterSuffix = label "after_suffix"
+    let freeNode = label "free_node"
+
+    let releaseClosurePayload =
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 0s)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X8, leafPayloadDone)
+            ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -96s)
+            ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.STR (ARM64Symbolic.X30, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X8)
+            ARM64Symbolic.BL closureRefCountDecHelperLabel
+            ARM64Symbolic.LDR (ARM64Symbolic.X30, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 96s)
+            ARM64Symbolic.Label leafPayloadDone
+        ]
+
+    let releaseDynamicBufferPayload =
+        let refcountUpdate =
+            if List.isEmpty leakDec then
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
+                ]
+            else
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
+                    ARM64Symbolic.CBNZ (ARM64Symbolic.X14, leafPayloadDone)
+                ] @ leakDec
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X3, 0s)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X12, leafPayloadDone)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X27)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, leafPayloadDone)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X28)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, leafPayloadDone)
+            ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 0xFFFFus, 0)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0xFFFFus, 16)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0xFFFFus, 32)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0x7FFFus, 48)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X14, ARM64Symbolic.X15)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, leafPayloadDone)
+        ]
+        @ refcountUpdate
+        @ [ARM64Symbolic.Label leafPayloadDone]
+
+    let releaseRecursivePayload (sourceType: AST.Type) =
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 0s)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X8, leafPayloadDone)
+            ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -96s)
+            ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.STR (ARM64Symbolic.X30, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X8)
+            ARM64Symbolic.BL (recursiveSumRefCountDecHelperLabel sourceType)
+            ARM64Symbolic.LDR (ARM64Symbolic.X30, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 96s)
+            ARM64Symbolic.Label leafPayloadDone
+        ]
+
+    let leafListHelperLabelForReleasePlan (releasePlan: ANF.RcReleasePlan) : string =
+        match releasePlan with
+        | ANF.RootRelease (_, ANF.TaggedList, ANF.TaggedListPayloadRelease elementRelease) ->
+            match elementRelease with
+            | ANF.NoReleasePlan ->
+                listRefCountDecHelperLabel
+            | ANF.DynamicBufferRelease ANF.DynamicStringBuffer ->
+                listRefCountDecStringHelperLabel
+            | ANF.DynamicBufferRelease ANF.DynamicBlobBuffer ->
+                listRefCountDecBlobHelperLabel
+            | ANF.DynamicBufferRelease _ ->
+                listRefCountDecHelperLabel
+            | ANF.RecursiveRelease sourceType ->
+                plannedListDecHelperLabelForReleasePlan (ANF.RecursiveRelease sourceType)
+            | ANF.RootRelease (_, ANF.TaggedList, _) ->
+                listRefCountDecListHelperLabel
+            | ANF.RootRelease (
+                  _,
+                  ANF.DictHeap,
+                  ANF.DictPayloadRelease (ANF.DynamicBufferRelease _, _))
+            | ANF.RootRelease (
+                  _,
+                  ANF.DictHeap,
+                  ANF.DictPayloadRelease (_, ANF.DynamicBufferRelease _)) ->
+                plannedListDecHelperLabelForReleasePlan elementRelease
+            | ANF.RootRelease (_, ANF.DictHeap, _) ->
+                listRefCountDecDictHelperLabel
+            | ANF.RootRelease (_, ANF.ClosureHeap, _) ->
+                listRefCountDecClosureHelperLabel
+            | ANF.RootRelease (_, ANF.StreamHeap, _) ->
+                plannedListDecHelperLabelForReleasePlan elementRelease
+            | ANF.RootRelease (_, ANF.GenericHeap, _) ->
+                plannedListDecHelperLabelForReleasePlan elementRelease
+        | _ ->
+            listRefCountDecHelperLabel
+
+    let leafDictHelperLabelForReleasePlan (releasePlan: ANF.RcReleasePlan) : string =
+        match releasePlan with
+        | (ANF.RootRelease (
+              _,
+              ANF.DictHeap,
+              ANF.DictPayloadRelease (ANF.DynamicBufferRelease _, _)) as dictReleasePlan)
+        | (ANF.RootRelease (
+              _,
+              ANF.DictHeap,
+              ANF.DictPayloadRelease (_, ANF.DynamicBufferRelease _)) as dictReleasePlan) ->
+            plannedDictDecHelperLabelForReleasePlan dictReleasePlan
+        | ANF.RootRelease (_, ANF.DictHeap, ANF.DictPayloadRelease (_, ANF.RootRelease (_, ANF.TaggedList, _))) ->
+            dictRefCountDecListValueHelperLabel
+        | ANF.RootRelease (_, ANF.DictHeap, ANF.DictPayloadRelease (_, ANF.RootRelease (_, ANF.DictHeap, _))) ->
+            dictRefCountDecDictValueHelperLabel
+        | _ ->
+            dictRefCountDecHelperLabel
+
+    let releaseLeafDictPayloadWithHelper (dictHelperLabel: string) =
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 0s)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X8, leafPayloadDone)
+            ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -96s)
+            ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.STR (ARM64Symbolic.X30, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X8)
+            ARM64Symbolic.BL dictHelperLabel
+            ARM64Symbolic.LDR (ARM64Symbolic.X30, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 96s)
+            ARM64Symbolic.Label leafPayloadDone
+        ]
+
+    let releasePlanDynamicBufferFieldFrom
+        (baseReg: ARM64Symbolic.Reg)
+        (fieldOffset: int)
+        (path: string)
+        : ARM64Symbolic.Instr list =
+        let fieldDone = label $"leaf_plan_dynamic_{path}_{fieldOffset}_done"
+        let refcountUpdate =
+            if List.isEmpty leakDec then
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
+                ]
+            else
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
+                    ARM64Symbolic.CBNZ (ARM64Symbolic.X14, fieldDone)
+                ] @ leakDec
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, baseReg, int16 fieldOffset)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X12, fieldDone)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X27)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, fieldDone)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X28)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, fieldDone)
+            ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 0xFFFFus, 0)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0xFFFFus, 16)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0xFFFFus, 32)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0x7FFFus, 48)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X14, ARM64Symbolic.X15)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, fieldDone)
+        ]
+        @ refcountUpdate
+        @ [ARM64Symbolic.Label fieldDone]
+
+    let releasePlanManagedRootFieldFrom
+        (baseReg: ARM64Symbolic.Reg)
+        (fieldOffset: int)
+        (path: string)
+        (helperLabel: string)
+        : ARM64Symbolic.Instr list =
+        let fieldDone = label $"leaf_plan_root_{path}_{fieldOffset}_done"
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, baseReg, int16 fieldOffset)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X12, fieldDone)
+            ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -112s)
+            ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.STR (ARM64Symbolic.X30, ARM64Symbolic.SP, 96s)
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X12)
+            ARM64Symbolic.BL helperLabel
+            ARM64Symbolic.LDR (ARM64Symbolic.X30, ARM64Symbolic.SP, 96s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 112s)
+            ARM64Symbolic.Label fieldDone
+        ]
+
+    let rec releasePlanFieldFrom
+        (baseReg: ARM64Symbolic.Reg)
+        (fieldOffset: int)
+        (path: string)
+        (fieldReleasePlan: ANF.RcReleasePlan)
+        : ARM64Symbolic.Instr list =
+        match fieldReleasePlan with
+        | ANF.DynamicBufferRelease _ ->
+            releasePlanDynamicBufferFieldFrom baseReg fieldOffset path
+        | ANF.RootRelease (_, ANF.TaggedList, _) ->
+            releasePlanManagedRootFieldFrom
+                baseReg
+                fieldOffset
+                path
+                (leafListHelperLabelForReleasePlan fieldReleasePlan)
+        | ANF.RootRelease (_, ANF.DictHeap, _) ->
+            releasePlanManagedRootFieldFrom
+                baseReg
+                fieldOffset
+                path
+                (leafDictHelperLabelForReleasePlan fieldReleasePlan)
+        | ANF.RootRelease (_, ANF.ClosureHeap, _) ->
+            releasePlanManagedRootFieldFrom baseReg fieldOffset path closureRefCountDecHelperLabel
+        | ANF.RootRelease (payloadSize, ANF.GenericHeap, ANF.FixedBlockPayloadRelease _)
+        | ANF.RootRelease (payloadSize, ANF.GenericHeap, ANF.BoxedSumPayloadRelease _) ->
+            releasePlanGenericFieldFrom baseReg fieldOffset payloadSize path fieldReleasePlan
+        | _ ->
+            []
+
+    and releasePlanBoxedSumVariantFieldsFrom
+        (baseReg: ARM64Symbolic.Reg)
+        (path: string)
+        (variants: ANF.RcBoxedSumVariantRelease list)
+        : ARM64Symbolic.Instr list =
+        let releaseVariant (variant: ANF.RcBoxedSumVariantRelease) : (int * ARM64Symbolic.Instr list) option =
+            let releaseInstrs =
+                variant.FieldReleases
+                |> List.collect (fun (ANF.FieldRelease (fieldOffset, fieldReleasePlan)) ->
+                    releasePlanFieldFrom
+                        baseReg
+                        fieldOffset
+                        $"{path}_tag_{variant.Tag}"
+                        fieldReleasePlan)
+
+            if List.isEmpty releaseInstrs then
+                None
+            else
+                Some (variant.Tag, releaseInstrs)
+
+        let cases = variants |> List.choose releaseVariant
+
+        if List.isEmpty cases then
+            []
+        else
+            let sumDone = label $"leaf_plan_sum_{path}_done"
+            [
+                ARM64Symbolic.LDR (ARM64Symbolic.X10, baseReg, 0s)
+            ]
+            @
+            (cases
+             |> List.mapi (fun index (tag, releaseInstrs) ->
+                let nextCase = label $"leaf_plan_sum_{path}_variant_{index}_next"
+                [
+                    ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, uint16 tag)
+                    ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, nextCase)
+                ]
+                @ releaseInstrs
+                @ [
+                    ARM64Symbolic.B_label sumDone
+                    ARM64Symbolic.Label nextCase
+                ])
+             |> List.concat)
+            @ [ARM64Symbolic.Label sumDone]
+
+    and releasePlanGenericFieldFrom
+        (baseReg: ARM64Symbolic.Reg)
+        (fieldOffset: int)
+        (payloadSize: int)
+        (path: string)
+        (fieldReleasePlan: ANF.RcReleasePlan)
+        : ARM64Symbolic.Instr list =
+        let fieldDone = label $"leaf_plan_generic_{path}_{fieldOffset}_done"
+        let childFieldReleases =
+            match fieldReleasePlan with
+            | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (_, fieldReleases)) ->
+                fieldReleases
+                |> List.collect (fun (ANF.FieldRelease (childOffset, childReleasePlan)) ->
+                    releasePlanFieldFrom ARM64Symbolic.X11 childOffset $"{path}_{fieldOffset}" childReleasePlan)
+            | ANF.RootRelease (_, ANF.GenericHeap, ANF.BoxedSumPayloadRelease (_, _, variants)) ->
+                releasePlanBoxedSumVariantFieldsFrom ARM64Symbolic.X11 $"{path}_{fieldOffset}" variants
+            | _ ->
+                []
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, baseReg, int16 fieldOffset)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X12, fieldDone)
+            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, int16 payloadSize)
+            ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+            ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, int16 payloadSize)
+            ARM64Symbolic.CBNZ (ARM64Symbolic.X15, fieldDone)
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, ARM64Symbolic.X12)
+            ARM64Symbolic.STP_pre (ARM64Symbolic.X12, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
+        ]
+        @ childFieldReleases
+        @ [
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.SP, 0s)
+        ]
+        @ (if payloadSize >= 0 && payloadSize < 256 then
+            [
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X27, uint16 payloadSize)
+                ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X12, ARM64Symbolic.X13, 0s)
+            ]
+           else
+            [])
+        @ leakDec
+        @ [
+            ARM64Symbolic.LDP_post (ARM64Symbolic.X12, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.Label fieldDone
+        ]
+
+    let releaseManagedLeafFieldsFromPlan (releasePlan: ANF.RcReleasePlan) : ARM64Symbolic.Instr list =
+        match releasePlan with
+        | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (_, fieldReleases)) ->
+            fieldReleases
+            |> List.collect (fun (ANF.FieldRelease (fieldOffset, fieldReleasePlan)) ->
+                releasePlanFieldFrom ARM64Symbolic.X8 fieldOffset "root" fieldReleasePlan)
+        | ANF.RootRelease (_, ANF.GenericHeap, ANF.BoxedSumPayloadRelease (_, _, variants)) ->
+            releasePlanBoxedSumVariantFieldsFrom ARM64Symbolic.X8 "root" variants
+        | _ ->
+            []
+
+    let managedLeafFieldReleasePlan (fieldType: AST.Type) : ANF.RcReleasePlan option =
+        match fieldType with
+        | AST.TRecord (name, _) when not (Map.containsKey name ctx.RecordRegistry) ->
+            None
+        | _ ->
+            Some (ANF.rcReleasePlanOfTypeWithSums ctx.RecordRegistry ctx.SumShapeRegistry fieldType)
+
+    let releaseManagedLeafFields =
+        managedLeafFieldTypes
+        |> List.mapi (fun index fieldType ->
+            let fieldOffset = index * 8
+            match managedLeafFieldReleasePlan fieldType with
+            | Some fieldReleasePlan ->
+                releasePlanFieldFrom
+                    ARM64Symbolic.X8
+                    fieldOffset
+                    $"legacy_{index}"
+                    fieldReleasePlan
+            | None ->
+                [])
+        |> List.concat
+
+    let releaseLeafFieldPayloads =
+        match leafGenericReleasePlan with
+        | Some releasePlan ->
+            releaseManagedLeafFieldsFromPlan releasePlan
+        | None ->
+            releaseManagedLeafFields
+
+    let releaseLeafPayload =
+        match leafGenericPayloadSize, releaseLeafDynamicBufferPayload, releaseLeafListPayload, releaseLeafDictPayload, releaseLeafClosurePayload with
+        | None, false, false, false, false ->
+            match leafGenericReleasePlan with
+            | Some (ANF.RecursiveRelease sourceType) -> releaseRecursivePayload sourceType
+            | Some (ANF.RootRelease (_, ANF.DictHeap, _) as dictReleasePlan) ->
+                releaseLeafDictPayloadWithHelper
+                    (leafDictHelperLabelForReleasePlan dictReleasePlan)
+            | _ -> []
+        | None, true, _, _, _ ->
+            releaseDynamicBufferPayload
+        | None, false, true, _, _ ->
+            [
+                ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 0s)
+            ]
+            @ addChild "leaf_payload_list"
+        | None, false, false, true, _ ->
+            let helperLabel =
+                if helperLabel = listRefCountDecDictListHelperLabel then
+                    dictRefCountDecListValueHelperLabel
+                else
+                    dictRefCountDecHelperLabel
+            releaseLeafDictPayloadWithHelper helperLabel
+        | None, false, false, false, true ->
+            releaseClosurePayload
+        | Some payloadSize, _, _, _, _ ->
+            [
+                ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 0s)
+                ARM64Symbolic.CBZ (ARM64Symbolic.X8, leafPayloadDone)
+                // Specialized fixed-block helpers can encounter primitive leaves from nested lists.
+                // Only aligned managed-heap payload pointers have trailing refcounts to decrement.
+                ARM64Symbolic.AND_imm (ARM64Symbolic.X9, ARM64Symbolic.X8, 7UL)
+                ARM64Symbolic.CBNZ (ARM64Symbolic.X9, leafPayloadDone)
+                ARM64Symbolic.CMP_reg (ARM64Symbolic.X8, ARM64Symbolic.X27)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, leafPayloadDone)
+                ARM64Symbolic.CMP_reg (ARM64Symbolic.X8, ARM64Symbolic.X28)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, leafPayloadDone)
+                ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X8, int16 payloadSize)
+                ARM64Symbolic.SUB_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 1us)
+                ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X8, int16 payloadSize)
+                ARM64Symbolic.CBNZ (ARM64Symbolic.X9, leafPayloadDone)
+            ]
+            @ releaseLeafFieldPayloads
+            @ (if List.isEmpty releaseLeafFieldPayloads then
+                []
+               else
+                // Field release may use X8 for nested payloads; reload the leaf payload before freeing it.
+                [ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 0s)])
+            @ (if payloadSize >= 0 && payloadSize < 256 then
+                [
+                    ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X27, int16 payloadSize)
+                    ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.X8, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X8, ARM64Symbolic.X27, int16 payloadSize)
+                ]
+               else
+                [])
+            @ leakDec
+            @ [ARM64Symbolic.Label leafPayloadDone]
+
+    // Primitive elements have no payload-release code and cannot clobber the
+    // current node. Only helpers with actual payload work need X19-X21 or a
+    // callee-save frame; the separate DFS work stack is unchanged.
+    let preserveForPayloadRelease instructions =
+        if List.isEmpty releaseLeafPayload then [] else instructions
+
+    [ARM64Symbolic.Label helperLabel]
+    @ preserveForPayloadRelease [
+        // Preserve callee-saved registers used to keep the current node stable
+        // across payload-release helpers. Pending DFS entries are pushed above.
+        ARM64Symbolic.STP_pre (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, -32s)
+        ARM64Symbolic.STR (ARM64Symbolic.X21, ARM64Symbolic.SP, 16s)
+    ]
+    @ [
+        // X0 = current tagged list pointer to process, X1 = number of pending stack entries.
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 0us, 0)
+        ARM64Symbolic.B_label loopCheck
+
+        ARM64Symbolic.Label loopCheck
+        ARM64Symbolic.CBZ (ARM64Symbolic.X0, popOrRet)
+        ARM64Symbolic.AND_imm (ARM64Symbolic.X2, ARM64Symbolic.X0, 7UL)
+        ARM64Symbolic.CBZ (ARM64Symbolic.X2, popOrRet)
+        // This contiguous all-ones mask is an encodable AArch64 logical immediate.
+        ARM64Symbolic.AND_imm (ARM64Symbolic.X3, ARM64Symbolic.X0, 0xFFFFFFFFFFFFFFF8UL)
+        ARM64Symbolic.CMP_reg (ARM64Symbolic.X3, ARM64Symbolic.X27)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, popOrRet)
+        ARM64Symbolic.CMP_reg (ARM64Symbolic.X3, ARM64Symbolic.X28)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, popOrRet)
+
+        // Resolve payload size from skew-list node tag.
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 1us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, size32)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 2us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, size8)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 3us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, size24)
+        ARM64Symbolic.B_label popOrRet
+
+        ARM64Symbolic.Label size8
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X4, 8us, 0)
+        ARM64Symbolic.B_label haveSize
+        ARM64Symbolic.Label size24
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X4, 24us, 0)
+        ARM64Symbolic.B_label haveSize
+        ARM64Symbolic.Label size32
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X4, 32us, 0)
+        ARM64Symbolic.B_label haveSize
+        ARM64Symbolic.Label haveSize
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X5, ARM64Symbolic.X3, ARM64Symbolic.X4)
+        ARM64Symbolic.LDR (ARM64Symbolic.X6, ARM64Symbolic.X5, 0s)
+        ARM64Symbolic.SUB_imm (ARM64Symbolic.X6, ARM64Symbolic.X6, 1us)
+        ARM64Symbolic.STR (ARM64Symbolic.X6, ARM64Symbolic.X5, 0s)
+        ARM64Symbolic.CBNZ (ARM64Symbolic.X6, popOrRet)
+
+        // Refcount reached zero: collect child pointers for further decref work.
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 1us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, collectSingle)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 2us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, collectLeaf)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 3us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, collectNode2)
+        ARM64Symbolic.B_label freeNode
+
+        // DIGIT: tree and remaining-spine children at 16 and 24.
+        ARM64Symbolic.Label collectSingle
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 16s)
+    ]
+    @ addChild "digit_tree"
+    @ [
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 24s)
+    ]
+    @ addChild "digit_rest"
+    @ [
+        ARM64Symbolic.B_label freeNode
+
+        // NODE: release the value before collecting structural children because
+        // payload helpers may use X0 as scratch/work state.
+        ARM64Symbolic.Label collectNode2
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
+        ARM64Symbolic.B_label releaseValue
+
+        ARM64Symbolic.Label collectNode3
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 0s)
+    ]
+    @ addChild "node3_0"
+    @ [
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 8s)
+    ]
+    @ addChild "node3_1"
+    @ [
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 16s)
+    ]
+    @ addChild "node3_2"
+    @ [
+        ARM64Symbolic.B_label freeNode
+
+        ARM64Symbolic.Label collectDeep
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
+        ARM64Symbolic.LDR (ARM64Symbolic.X7, ARM64Symbolic.X3, 8s)  // prefix_count
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X7, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, afterPrefix)
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 16s)
+    ]
+    @ addChild "deep_p0"
+    @ [
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X7, 1us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, afterPrefix)
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 24s)
+    ]
+    @ addChild "deep_p1"
+    @ [
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X7, 2us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, afterPrefix)
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 32s)
+    ]
+    @ addChild "deep_p2"
+    @ [
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X7, 3us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, afterPrefix)
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 40s)
+    ]
+    @ addChild "deep_p3"
+    @ [
+        ARM64Symbolic.Label afterPrefix
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 48s)  // middle tree
+    ]
+    @ addChild "deep_middle"
+    @ [
+        ARM64Symbolic.LDR (ARM64Symbolic.X7, ARM64Symbolic.X3, 56s)  // suffix_count
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X7, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, afterSuffix)
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 64s)
+    ]
+    @ addChild "deep_s0"
+    @ [
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X7, 1us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, afterSuffix)
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 72s)
+    ]
+    @ addChild "deep_s1"
+    @ [
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X7, 2us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, afterSuffix)
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 80s)
+    ]
+    @ addChild "deep_s2"
+    @ [
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X7, 3us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, afterSuffix)
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 88s)
+    ]
+    @ addChild "deep_s3"
+    @ [
+        ARM64Symbolic.Label afterSuffix
+        ARM64Symbolic.B_label freeNode
+
+        ARM64Symbolic.Label collectLeaf
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
+        ARM64Symbolic.Label releaseValue
+    ]
+    @ preserveForPayloadRelease [
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, ARM64Symbolic.X2)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X20, ARM64Symbolic.X3)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X21, ARM64Symbolic.X4)
+    ]
+    @ releaseLeafPayload
+    @ preserveForPayloadRelease [
+        // Leaves are done after payload release. Internal nodes still own two
+        // complete-tree edges.
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X2, ARM64Symbolic.X19)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X3, ARM64Symbolic.X20)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X4, ARM64Symbolic.X21)
+    ]
+    @ [
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 3us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, freeNode)
+        ARM64Symbolic.Label collectNodeChildren
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 8s)
+    ]
+    @ addChild "node_left"
+    @ [
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X3, 16s)
+    ]
+    @ addChild "node_right"
+    @ [
+        ARM64Symbolic.Label freeNode
+        // Recycle node memory by payload size class.
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X5, ARM64Symbolic.X27, ARM64Symbolic.X4)
+        ARM64Symbolic.LDR (ARM64Symbolic.X6, ARM64Symbolic.X5, 0s)
+        ARM64Symbolic.STR (ARM64Symbolic.X6, ARM64Symbolic.X3, 0s)
+        ARM64Symbolic.STR (ARM64Symbolic.X3, ARM64Symbolic.X5, 0s)
+    ]
+    @ leakDec
+    @ [
+        ARM64Symbolic.B_label loopCheck
+
+        ARM64Symbolic.Label popOrRet
+        ARM64Symbolic.CBZ (ARM64Symbolic.X1, helperRet)
+        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, 0s)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+        ARM64Symbolic.SUB_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 1us)
+        ARM64Symbolic.B_label loopCheck
+
+        ARM64Symbolic.Label helperRet
+    ]
+    @ preserveForPayloadRelease [
+        ARM64Symbolic.LDR (ARM64Symbolic.X21, ARM64Symbolic.SP, 16s)
+        ARM64Symbolic.LDP_post (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, 32s)
+    ]
+    @ [ARM64Symbolic.RET]
+
+type private ListRefCountDecHelperSpec = {
+    Label: string
+    ReleaseLeafListPayload: bool
+    ReleaseLeafDictPayload: bool
+    ReleaseLeafClosurePayload: bool
+}
+
+let private listRefCountDecHelperSpecs : ListRefCountDecHelperSpec list =
+    [
+    { Label = listRefCountDecHelperLabel
+      ReleaseLeafListPayload = false
+      ReleaseLeafDictPayload = false
+      ReleaseLeafClosurePayload = false }
+    { Label = listRefCountDecListHelperLabel
+      ReleaseLeafListPayload = true
+      ReleaseLeafDictPayload = false
+      ReleaseLeafClosurePayload = false }
+    { Label = listRefCountDecDictHelperLabel
+      ReleaseLeafListPayload = false
+      ReleaseLeafDictPayload = true
+      ReleaseLeafClosurePayload = false }
+    { Label = listRefCountDecDictListHelperLabel
+      ReleaseLeafListPayload = false
+      ReleaseLeafDictPayload = true
+      ReleaseLeafClosurePayload = false }
+    { Label = listRefCountDecClosureHelperLabel
+      ReleaseLeafListPayload = false
+      ReleaseLeafDictPayload = false
+      ReleaseLeafClosurePayload = true }
+    ]
+
+let private generateNeededListRefCountDecHelpers
+    (ctx: CodeGenContext)
+    (neededHelperLabels: Set<string>)
+    (plannedListDecHelpers: Map<string, int * ANF.RcReleasePlan>)
+    : ARM64Symbolic.Instr list =
+    let staticHelpers =
+        (listRefCountDecHelperSpecs
+         |> List.collect (fun spec ->
+             if Set.contains spec.Label neededHelperLabels then
+                 generateListRefCountDecHelperWith
+                     spec.Label
+                     ctx
+                     None
+                     None
+                     false
+                     spec.ReleaseLeafListPayload
+                     spec.ReleaseLeafDictPayload
+                     spec.ReleaseLeafClosurePayload
+                     []
+             else
+                 []))
+        @ (if Set.contains listRefCountDecStringHelperLabel neededHelperLabels then
+               generateListRefCountDecHelperWith
+                   listRefCountDecStringHelperLabel
+                   ctx
+                   None
+                   None
+                   true
+                   false
+                   false
+                   false
+                   []
+           else
+               [])
+        @ (if Set.contains listRefCountDecBlobHelperLabel neededHelperLabels then
+               generateListRefCountDecHelperWith
+                   listRefCountDecBlobHelperLabel
+                   ctx
+                   None
+                   None
+                   true
+                   false
+                   false
+                   false
+                   []
+           else
+               [])
+
+    let plannedHelpers =
+        plannedListDecHelpers
+        |> Map.toList
+        |> List.collect (fun (helperLabel, (payloadSize, releasePlan)) ->
+            if Set.contains helperLabel neededHelperLabels then
+                let plannedPayloadSize =
+                    match releasePlan with
+                    | ANF.RecursiveRelease _ -> None
+                    | ANF.RootRelease (_, ANF.DictHeap, _) -> None
+                    | _ -> Some payloadSize
+                generateListRefCountDecHelperWith
+                    helperLabel
+                    ctx
+                    plannedPayloadSize
+                    (Some releasePlan)
+                    false
+                    false
+                    false
+                    false
+                    []
+            else
+                [])
+
+    staticHelpers @ plannedHelpers
+
+let private generateClosurePayloadSizeResolver
+    (ctx: CodeGenContext)
+    (label: string -> string)
+    (readyLabel: string)
+    : ARM64Symbolic.Instr list =
+    let cases =
+        ctx.ClosurePayloadSizes
+        |> Map.toList
+        |> List.filter (fun (_, payloadSize) -> payloadSize <> 8)
+        |> List.mapi (fun index (funcName, payloadSize) ->
+            let nextLabel = label $"payload_next_{index}"
+            [
+                ARM64Symbolic.ADR (ARM64Symbolic.X11, codeLabel funcName)
+                ARM64Symbolic.CMP_reg (ARM64Symbolic.X9, ARM64Symbolic.X11)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, nextLabel)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X10, uint16 payloadSize, 0)
+                ARM64Symbolic.B_label readyLabel
+                ARM64Symbolic.Label nextLabel
+            ])
+        |> List.concat
+
+    [
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X0, 0s)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 8us, 0)
+    ]
+    @ cases
+
+let private generateClosureRefCountIncHelper (ctx: CodeGenContext) : ARM64Symbolic.Instr list =
+    let label (name: string) : string = $"__dark_closure_rc_inc_{name}"
+    let ready = label "payload_ready"
+    let helperRet = label "ret"
+    [
+        ARM64Symbolic.Label closureRefCountIncHelperLabel
+        ARM64Symbolic.CBZ (ARM64Symbolic.X0, helperRet)
+    ]
+    @ generateClosurePayloadSizeResolver ctx label ready
+    @ [
+        ARM64Symbolic.Label ready
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X12, ARM64Symbolic.X0, ARM64Symbolic.X10)
+        ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+        ARM64Symbolic.Label helperRet
+        ARM64Symbolic.RET
+    ]
+
+let private tryRcReleasePlanOfType
+    (recordRegistry: LIR.RecordRegistry)
+    (sumShapeRegistry: ANF.RcSumShapeRegistry)
+    (typ: AST.Type)
+    : ANF.RcReleasePlan option =
+    match typ with
+    | AST.TRecord (name, _) when not (Map.containsKey name recordRegistry) ->
+        None
+    | _ ->
+        Some (ANF.rcReleasePlanOfTypeWithSums recordRegistry sumShapeRegistry typ)
+
+let private rcMetadataReleasePlan (metadata: ANF.RcMetadata option) : ANF.RcReleasePlan option =
+    metadata |> Option.bind (fun m -> m.ReleasePlan)
+
+let private requiredRcMetadataReleasePlan (context: string) (metadata: ANF.RcMetadata option) : ANF.RcReleasePlan =
+    match rcMetadataReleasePlan metadata with
+    | Some releasePlan -> releasePlan
+    | None -> Crash.crash $"{context}: missing RC release plan metadata"
+
+let private generateRecursiveSumRefCountDecHelper
+    (ctx: CodeGenContext)
+    (sourceType: AST.Type)
+    : ARM64Symbolic.Instr list =
+    let helperLabel = recursiveSumRefCountDecHelperLabel sourceType
+    let label suffix = $"{helperLabel}_{suffix}"
+    let releasePlan =
+        ANF.rcReleasePlanOfTypeWithSums ctx.RecordRegistry ctx.SumShapeRegistry sourceType
+
+    let rec releaseFromX0 (path: string) (plan: ANF.RcReleasePlan) : ARM64Symbolic.Instr list =
+        match plan with
+        | ANF.NoReleasePlan ->
+            []
+        | ANF.DynamicBufferRelease _ ->
+            let doneLabel = label $"{path}_dynamic_done"
+            let leakRelease =
+                if ctx.Options.EnableLeakCheck then
+                    let labelRef = dataLabel leakCounterLabel
+                    [
+                        ARM64Symbolic.CBNZ (ARM64Symbolic.X1, doneLabel)
+                        ARM64Symbolic.ADRP (ARM64Symbolic.X17, labelRef)
+                        ARM64Symbolic.ADD_label (ARM64Symbolic.X17, ARM64Symbolic.X17, labelRef)
+                        ARM64Symbolic.LDR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+                        ARM64Symbolic.SUB_imm (ARM64Symbolic.X16, ARM64Symbolic.X16, 1us)
+                        ARM64Symbolic.STR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+                    ]
+                else
+                    []
+            [
+                ARM64Symbolic.CBZ (ARM64Symbolic.X0, doneLabel)
+                ARM64Symbolic.CMP_reg (ARM64Symbolic.X0, ARM64Symbolic.X27)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, doneLabel)
+                ARM64Symbolic.CMP_reg (ARM64Symbolic.X0, ARM64Symbolic.X28)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, doneLabel)
+                ARM64Symbolic.LDR (ARM64Symbolic.X1, ARM64Symbolic.X0, 0s)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 0xFFFFus, 0)
+                ARM64Symbolic.MOVK (ARM64Symbolic.X3, 0xFFFFus, 16)
+                ARM64Symbolic.MOVK (ARM64Symbolic.X3, 0xFFFFus, 32)
+                ARM64Symbolic.MOVK (ARM64Symbolic.X3, 0x7FFFus, 48)
+                ARM64Symbolic.CMP_reg (ARM64Symbolic.X1, ARM64Symbolic.X3)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, doneLabel)
+                ARM64Symbolic.SUB_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 1us)
+                ARM64Symbolic.STR (ARM64Symbolic.X1, ARM64Symbolic.X0, 0s)
+            ]
+            @ leakRelease
+            @ [ARM64Symbolic.Label doneLabel]
+        | ANF.RecursiveRelease recursiveType ->
+            [ARM64Symbolic.BL (recursiveSumRefCountDecHelperLabel recursiveType)]
+        | ANF.RootRelease (_, ANF.TaggedList, ANF.TaggedListPayloadRelease elementRelease) ->
+            let helper =
+                match elementRelease with
+                | ANF.NoReleasePlan -> listRefCountDecHelperLabel
+                | ANF.DynamicBufferRelease ANF.DynamicStringBuffer -> listRefCountDecStringHelperLabel
+                | ANF.DynamicBufferRelease ANF.DynamicBlobBuffer -> listRefCountDecBlobHelperLabel
+                | ANF.DynamicBufferRelease _ -> listRefCountDecHelperLabel
+                | ANF.RecursiveRelease recursiveType ->
+                    plannedListDecHelperLabelForReleasePlan (ANF.RecursiveRelease recursiveType)
+                | ANF.RootRelease (_, ANF.TaggedList, _) -> listRefCountDecListHelperLabel
+                | ANF.RootRelease (
+                      _,
+                      ANF.DictHeap,
+                      ANF.DictPayloadRelease (ANF.DynamicBufferRelease _, _))
+                | ANF.RootRelease (
+                      _,
+                      ANF.DictHeap,
+                      ANF.DictPayloadRelease (_, ANF.DynamicBufferRelease _)) ->
+                    plannedListDecHelperLabelForReleasePlan elementRelease
+                | ANF.RootRelease (_, ANF.DictHeap, _) -> listRefCountDecDictHelperLabel
+                | ANF.RootRelease (_, ANF.ClosureHeap, _) -> listRefCountDecClosureHelperLabel
+                | ANF.RootRelease (_, ANF.StreamHeap, _) -> plannedListDecHelperLabelForReleasePlan elementRelease
+                | ANF.RootRelease (_, ANF.GenericHeap, _) -> plannedListDecHelperLabelForReleasePlan elementRelease
+            [ARM64Symbolic.BL helper]
+        | ANF.RootRelease (payloadSize, ANF.GenericHeap, payloadPlan) ->
+            let doneLabel = label $"{path}_done"
+            let payloadReleases = releasePayload path payloadPlan
+            let freeRoot =
+                if payloadSize >= 0 && payloadSize < 256 then
+                    [
+                        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, 0s)
+                        ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X27, int16 payloadSize)
+                        ARM64Symbolic.STR (ARM64Symbolic.X2, ARM64Symbolic.X0, 0s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X0, ARM64Symbolic.X27, int16 payloadSize)
+                    ]
+                else
+                    []
+            [
+                ARM64Symbolic.CBZ (ARM64Symbolic.X0, doneLabel)
+                ARM64Symbolic.LDR (ARM64Symbolic.X1, ARM64Symbolic.X0, int16 payloadSize)
+                ARM64Symbolic.SUB_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 1us)
+                ARM64Symbolic.STR (ARM64Symbolic.X1, ARM64Symbolic.X0, int16 payloadSize)
+                ARM64Symbolic.CBNZ (ARM64Symbolic.X1, doneLabel)
+                ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
+            ]
+            @ payloadReleases
+            @ freeRoot
+            @ (if ctx.Options.EnableLeakCheck then
+                let labelRef = dataLabel leakCounterLabel
+                [
+                    ARM64Symbolic.ADRP (ARM64Symbolic.X17, labelRef)
+                    ARM64Symbolic.ADD_label (ARM64Symbolic.X17, ARM64Symbolic.X17, labelRef)
+                    ARM64Symbolic.LDR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X16, ARM64Symbolic.X16, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+                ]
+               else
+                [])
+            @ [
+                ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+                ARM64Symbolic.Label doneLabel
+            ]
+        | unsupported ->
+            Crash.crash $"ARM64 recursive sum RC helper does not support nested release plan {unsupported}"
+
+    and releaseField (path: string) (index: int) (ANF.FieldRelease (offset, plan)) : ARM64Symbolic.Instr list =
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, 0s)
+            ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X0, int16 offset)
+        ]
+        @ releaseFromX0 $"{path}_field_{index}" plan
+
+    and releaseFields (path: string) (fields: ANF.RcFieldRelease list) : ARM64Symbolic.Instr list =
+        fields
+        |> List.mapi (releaseField path)
+        |> List.concat
+
+    and releasePayload (path: string) (payload: ANF.RcPayloadReleasePlan) : ARM64Symbolic.Instr list =
+        match payload with
+        | ANF.NoPayloadRelease ->
+            []
+        | ANF.FixedBlockPayloadRelease (_, fields)
+        | ANF.ClosurePayloadRelease fields ->
+            releaseFields path fields
+        | ANF.BoxedSumPayloadRelease (_, _, variants) ->
+            let doneLabel = label $"{path}_variant_done"
+            let cases =
+                variants
+                |> List.filter (fun variant -> not (List.isEmpty variant.FieldReleases))
+                |> List.mapi (fun index variant ->
+                    let nextLabel = label $"{path}_variant_{index}_next"
+                    [
+                        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, 0s)
+                        ARM64Symbolic.LDR (ARM64Symbolic.X1, ARM64Symbolic.X0, 0s)
+                        ARM64Symbolic.CMP_imm (ARM64Symbolic.X1, uint16 variant.Tag)
+                        ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, nextLabel)
+                    ]
+                    @ releaseFields $"{path}_variant_{index}" variant.FieldReleases
+                    @ [
+                        ARM64Symbolic.B_label doneLabel
+                        ARM64Symbolic.Label nextLabel
+                    ])
+                |> List.concat
+            cases @ [ARM64Symbolic.Label doneLabel]
+        | unsupported ->
+            Crash.crash $"ARM64 recursive sum RC helper does not support payload release plan {unsupported}"
+
+    match releasePlan with
+    | ANF.RootRelease (_, ANF.GenericHeap, _) ->
+        [ARM64Symbolic.Label helperLabel]
+        @ releaseFromX0 "root" releasePlan
+        @ [ARM64Symbolic.RET]
+    | _ ->
+        Crash.crash $"ARM64 recursive sum RC helper requires a generic root release plan, got {releasePlan}"
+
+let private generateClosureRefCountDecHelper
+    (dictHelperForReleasePlan: ANF.RcReleasePlan -> string)
+    (ctx: CodeGenContext)
+    : ARM64Symbolic.Instr list =
+    let label (name: string) : string = $"__dark_closure_rc_dec_{name}"
+    let ready = label "payload_ready"
+    let helperRet = label "ret"
+    let skipFreelist = label "skip_freelist"
+    let capturesReleased = label "captures_released"
+    let leakDec =
+        if ctx.Options.EnableLeakCheck then
+            let labelRef = dataLabel leakCounterLabel
+            [
+                ARM64Symbolic.ADRP (ARM64Symbolic.X17, labelRef)
+                ARM64Symbolic.ADD_label (ARM64Symbolic.X17, ARM64Symbolic.X17, labelRef)
+                ARM64Symbolic.LDR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+                ARM64Symbolic.SUB_imm (ARM64Symbolic.X16, ARM64Symbolic.X16, 1us)
+                ARM64Symbolic.STR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+            ]
+        else
+            []
+
+    let rec releaseFixedChildField
+        (baseReg: ARM64Symbolic.Reg)
+        (fieldOffset: int)
+        (payloadSize: int)
+        (fieldReleasePlan: ANF.RcReleasePlan)
+        (doneLabel: string)
+        : ARM64Symbolic.Instr list =
+        let childDone = label $"{doneLabel}_child_{fieldOffset}_done"
+        let childSkipFreelist = label $"{doneLabel}_child_{fieldOffset}_skip_freelist"
+        let childFieldReleaseInstrs =
+            match fieldReleasePlan with
+            | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (_, fieldReleases)) ->
+                fieldReleases
+                |> List.collect (fun (ANF.FieldRelease (childFieldOffset, childFieldReleasePlan)) ->
+                    releaseFieldPlanFrom ARM64Symbolic.X11 childFieldOffset childFieldReleasePlan childDone)
+            | ANF.RootRelease (_, ANF.GenericHeap, ANF.BoxedSumPayloadRelease (_, _, variants)) ->
+                releaseBoxedSumVariantFieldsFrom ARM64Symbolic.X11 variants childDone
+            | _ ->
+                []
+        let releaseChildFields =
+            if List.isEmpty childFieldReleaseInstrs then
+                []
+            else
+                [
+                    ARM64Symbolic.STP_pre (ARM64Symbolic.X11, ARM64Symbolic.X12, ARM64Symbolic.SP, -16s)
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, ARM64Symbolic.X12)
+                ]
+                @ childFieldReleaseInstrs
+                @ [ARM64Symbolic.LDP_post (ARM64Symbolic.X11, ARM64Symbolic.X12, ARM64Symbolic.SP, 16s)]
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, baseReg, int16 fieldOffset)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X12, childDone)
+            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, int16 payloadSize)
+            ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+            ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, int16 payloadSize)
+            ARM64Symbolic.CBNZ (ARM64Symbolic.X15, childDone)
+        ]
+        @ releaseChildFields
+        @ (if payloadSize >= 0 && payloadSize < 256 then
+            [
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X27, uint16 payloadSize)
+                ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X12, ARM64Symbolic.X13, 0s)
+            ]
+           else
+            [ARM64Symbolic.B_label childSkipFreelist])
+        @ [
+            ARM64Symbolic.Label childSkipFreelist
+        ]
+        @ leakDec
+        @ [ARM64Symbolic.Label childDone]
+
+    and releaseDynamicBufferChildField
+        (baseReg: ARM64Symbolic.Reg)
+        (fieldOffset: int)
+        (doneLabel: string)
+        : ARM64Symbolic.Instr list =
+        let bufferDone = label $"{doneLabel}_dynamic_buffer_{fieldOffset}_done"
+        let refcountUpdate =
+            if List.isEmpty leakDec then
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                ]
+            else
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                    ARM64Symbolic.CBNZ (ARM64Symbolic.X15, bufferDone)
+                ] @ leakDec
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, baseReg, int16 fieldOffset)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X12, bufferDone)
+            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0x7FFFus, 48)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, bufferDone)
+        ]
+        @ refcountUpdate
+        @ [ARM64Symbolic.Label bufferDone]
+
+    and releaseManagedRootChildField
+        (baseReg: ARM64Symbolic.Reg)
+        (fieldOffset: int)
+        (helperLabel: string)
+        (doneLabel: string)
+        : ARM64Symbolic.Instr list =
+        let childDone = label $"{doneLabel}_child_root_{fieldOffset}_done"
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, baseReg, int16 fieldOffset)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X12, childDone)
+            ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X8, ARM64Symbolic.SP, -32s)
+            ARM64Symbolic.STR (ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X12)
+            ARM64Symbolic.BL helperLabel
+            ARM64Symbolic.LDR (ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X8, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.Label childDone
+        ]
+
+    and releaseFieldPlanFrom
+        (baseReg: ARM64Symbolic.Reg)
+        (fieldOffset: int)
+        (fieldReleasePlan: ANF.RcReleasePlan)
+        (doneLabel: string)
+        : ARM64Symbolic.Instr list =
+        let dictHelperForChildPlan (fieldReleasePlan: ANF.RcReleasePlan) : string =
+            match fieldReleasePlan with
+            | ANF.RootRelease (_, ANF.DictHeap, ANF.DictPayloadRelease (_, ANF.RootRelease (_, ANF.TaggedList, _))) ->
+                dictRefCountDecListValueHelperLabel
+            | _ ->
+                dictRefCountDecHelperLabel
+
+        match fieldReleasePlan with
+        | ANF.DynamicBufferRelease _ ->
+            releaseDynamicBufferChildField baseReg fieldOffset doneLabel
+        | ANF.RootRelease (_, ANF.TaggedList, _) ->
+            releaseManagedRootChildField baseReg fieldOffset listRefCountDecHelperLabel doneLabel
+        | ANF.RootRelease (_, ANF.DictHeap, _) ->
+            releaseManagedRootChildField baseReg fieldOffset (dictHelperForChildPlan fieldReleasePlan) doneLabel
+        | ANF.RootRelease (_, ANF.ClosureHeap, _) ->
+            releaseManagedRootChildField baseReg fieldOffset closureRefCountDecHelperLabel doneLabel
+        | ANF.RootRelease (_, ANF.StreamHeap, _) ->
+            releaseManagedRootChildField baseReg fieldOffset streamRefCountDecHelperLabel doneLabel
+        | ANF.RootRelease (payloadSize, ANF.GenericHeap, ANF.FixedBlockPayloadRelease _)
+        | ANF.RootRelease (payloadSize, ANF.GenericHeap, ANF.BoxedSumPayloadRelease _) ->
+            releaseFixedChildField baseReg fieldOffset payloadSize fieldReleasePlan doneLabel
+        | _ ->
+            []
+
+    and releaseBoxedSumVariantFieldsFrom
+        (baseReg: ARM64Symbolic.Reg)
+        (variants: ANF.RcBoxedSumVariantRelease list)
+        (doneLabel: string)
+        : ARM64Symbolic.Instr list =
+        let releaseVariant (variant: ANF.RcBoxedSumVariantRelease) : (int * ARM64Symbolic.Instr list) option =
+            let releaseInstrs =
+                variant.FieldReleases
+                |> List.collect (fun (ANF.FieldRelease (fieldOffset, fieldReleasePlan)) ->
+                    releaseFieldPlanFrom baseReg fieldOffset fieldReleasePlan doneLabel)
+
+            if List.isEmpty releaseInstrs then
+                None
+            else
+                Some (variant.Tag, releaseInstrs)
+
+        let cases = variants |> List.choose releaseVariant
+
+        if List.isEmpty cases then
+            []
+        else
+            let sumDone = label $"{doneLabel}_sum_done"
+            [
+                ARM64Symbolic.LDR (ARM64Symbolic.X10, baseReg, 0s)
+            ]
+            @
+            (cases
+             |> List.mapi (fun index (tag, releaseInstrs) ->
+                let nextCase = label $"{doneLabel}_sum_variant_{index}_next"
+                [
+                    ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, uint16 tag)
+                    ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, nextCase)
+                ]
+                @ releaseInstrs
+                @ [
+                    ARM64Symbolic.B_label sumDone
+                    ARM64Symbolic.Label nextCase
+                ])
+             |> List.concat)
+            @ [ARM64Symbolic.Label sumDone]
+
+    let releaseDynamicCapture (fieldOffset: int) (doneLabel: string) : ARM64Symbolic.Instr list =
+        let bufferDone = label $"{doneLabel}_dynamic_capture_{fieldOffset}_done"
+        let refcountUpdate =
+            if List.isEmpty leakDec then
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                ]
+            else
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                    ARM64Symbolic.CBNZ (ARM64Symbolic.X15, bufferDone)
+                ] @ leakDec
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X0, int16 fieldOffset)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X12, bufferDone)
+            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0x7FFFus, 48)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, bufferDone)
+        ]
+        @ refcountUpdate
+        @ [ARM64Symbolic.Label bufferDone]
+
+    let fixedBlockFieldReleases
+        (releasePlan: ANF.RcReleasePlan)
+        (doneLabel: string)
+        : ARM64Symbolic.Instr list =
+        match releasePlan with
+        | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (_, fieldReleases)) ->
+            fieldReleases
+            |> List.collect (fun (ANF.FieldRelease (fieldOffset, fieldReleasePlan)) ->
+                releaseFieldPlanFrom ARM64Symbolic.X8 fieldOffset fieldReleasePlan doneLabel)
+        | ANF.RootRelease (_, ANF.GenericHeap, ANF.BoxedSumPayloadRelease (_, _, variants)) ->
+            releaseBoxedSumVariantFieldsFrom ARM64Symbolic.X8 variants doneLabel
+        | _ ->
+            []
+
+    let releaseFixedCapture (fieldOffset: int) (releasePlan: ANF.RcReleasePlan) (payloadSize: int) (doneLabel: string) : ARM64Symbolic.Instr list =
+        let captureDone = label $"{doneLabel}_field_{fieldOffset}_done"
+        let captureSkipFreelist = label $"{doneLabel}_field_{fieldOffset}_skip_freelist"
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X0, int16 fieldOffset)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X8, captureDone)
+            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X8, int16 payloadSize)
+            ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+            ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X8, int16 payloadSize)
+            ARM64Symbolic.CBNZ (ARM64Symbolic.X15, captureDone)
+        ]
+        @ fixedBlockFieldReleases releasePlan doneLabel
+        @ (if payloadSize >= 0 && payloadSize < 256 then
+            [
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X27, uint16 payloadSize)
+                ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X8, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X8, ARM64Symbolic.X13, 0s)
+            ]
+           else
+            [ARM64Symbolic.B_label captureSkipFreelist])
+        @ [
+            ARM64Symbolic.Label captureSkipFreelist
+        ]
+        @ leakDec
+        @ [ARM64Symbolic.Label captureDone]
+
+    let releaseCaptureCases =
+        ctx.ClosureCaptureTypes
+        |> Map.toList
+        |> List.mapi (fun index (funcName, captureTypes) ->
+            let nextCase = label $"captures_next_{index}"
+            let releaseLabel = label $"captures_release_{index}"
+            let releaseInstrs =
+                captureTypes
+                |> List.mapi (fun captureIndex captureType ->
+                    let fieldOffset = (captureIndex + 1) * 8
+                    match captureType with
+                    | AST.TString
+                    | AST.TChar
+                    | AST.TInt
+                    | AST.TBlob ->
+                        releaseDynamicCapture fieldOffset $"captures_{index}_{captureIndex}"
+                    | _ ->
+                        match tryRcReleasePlanOfType ctx.RecordRegistry ctx.SumShapeRegistry captureType with
+                        | Some (ANF.RootRelease (_, ANF.TaggedList, ANF.TaggedListPayloadRelease elementRelease)) ->
+                            let helper =
+                                match elementRelease with
+                                | ANF.NoReleasePlan -> listRefCountDecHelperLabel
+                                | ANF.DynamicBufferRelease ANF.DynamicStringBuffer -> listRefCountDecStringHelperLabel
+                                | ANF.DynamicBufferRelease ANF.DynamicBlobBuffer -> listRefCountDecBlobHelperLabel
+                                | ANF.DynamicBufferRelease _ -> listRefCountDecHelperLabel
+                                | ANF.RecursiveRelease sourceType ->
+                                    plannedListDecHelperLabelForReleasePlan (ANF.RecursiveRelease sourceType)
+                                | ANF.RootRelease (_, ANF.TaggedList, _) -> listRefCountDecListHelperLabel
+                                | ANF.RootRelease (
+                                      _,
+                                      ANF.DictHeap,
+                                      ANF.DictPayloadRelease (ANF.DynamicBufferRelease _, _))
+                                | ANF.RootRelease (
+                                      _,
+                                      ANF.DictHeap,
+                                      ANF.DictPayloadRelease (_, ANF.DynamicBufferRelease _)) ->
+                                    plannedListDecHelperLabelForReleasePlan elementRelease
+                                | ANF.RootRelease (_, ANF.DictHeap, ANF.DictPayloadRelease (_, ANF.RootRelease (_, ANF.TaggedList, _))) ->
+                                    listRefCountDecDictListHelperLabel
+                                | ANF.RootRelease (_, ANF.DictHeap, _) -> listRefCountDecDictHelperLabel
+                                | ANF.RootRelease (_, ANF.ClosureHeap, _) -> listRefCountDecClosureHelperLabel
+                                | ANF.RootRelease (_, ANF.StreamHeap, _) ->
+                                    plannedListDecHelperLabelForReleasePlan elementRelease
+                                | ANF.RootRelease (_, ANF.GenericHeap, _) ->
+                                    plannedListDecHelperLabelForReleasePlan elementRelease
+                            releaseManagedRootChildField ARM64Symbolic.X0 fieldOffset helper $"captures_{index}_{captureIndex}"
+                        | Some (ANF.RootRelease (_, ANF.DictHeap, _) as releasePlan) ->
+                            releaseManagedRootChildField
+                                ARM64Symbolic.X0
+                                fieldOffset
+                                (dictHelperForReleasePlan releasePlan)
+                                $"captures_{index}_{captureIndex}"
+                        | Some (ANF.RootRelease (_, ANF.ClosureHeap, _)) ->
+                            releaseManagedRootChildField ARM64Symbolic.X0 fieldOffset closureRefCountDecHelperLabel $"captures_{index}_{captureIndex}"
+                        | Some (ANF.RootRelease (_, ANF.StreamHeap, _)) ->
+                            releaseManagedRootChildField ARM64Symbolic.X0 fieldOffset streamRefCountDecHelperLabel $"captures_{index}_{captureIndex}"
+                        | Some (ANF.RootRelease (payloadSize, ANF.GenericHeap, (ANF.FixedBlockPayloadRelease _ | ANF.BoxedSumPayloadRelease _)) as releasePlan) ->
+                            releaseFixedCapture fieldOffset releasePlan payloadSize $"captures_{index}_{captureIndex}"
+                        | _ ->
+                            [])
+                |> List.concat
+            [
+                ARM64Symbolic.ADR (ARM64Symbolic.X11, codeLabel funcName)
+                ARM64Symbolic.CMP_reg (ARM64Symbolic.X9, ARM64Symbolic.X11)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, nextCase)
+                ARM64Symbolic.Label releaseLabel
+            ]
+            @ releaseInstrs
+            @ [
+                ARM64Symbolic.B_label capturesReleased
+                ARM64Symbolic.Label nextCase
+            ])
+        |> List.concat
+
+    [
+        ARM64Symbolic.Label closureRefCountDecHelperLabel
+        ARM64Symbolic.CBZ (ARM64Symbolic.X0, helperRet)
+    ]
+    @ generateClosurePayloadSizeResolver ctx label ready
+    @ [
+        ARM64Symbolic.Label ready
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X12, ARM64Symbolic.X0, ARM64Symbolic.X10)
+        ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+        ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+        ARM64Symbolic.CBNZ (ARM64Symbolic.X15, helperRet)
+    ]
+    @ releaseCaptureCases
+    @ [
+        ARM64Symbolic.Label capturesReleased
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, 256us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, skipFreelist)
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X13, ARM64Symbolic.X27, ARM64Symbolic.X10)
+        ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
+        ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X0, 0s)
+        ARM64Symbolic.STR (ARM64Symbolic.X0, ARM64Symbolic.X13, 0s)
+        ARM64Symbolic.Label skipFreelist
+    ]
+    @ leakDec
+    @ [
+        ARM64Symbolic.Label helperRet
+        ARM64Symbolic.RET
+    ]
+
+let private generateStreamRefCountDecHelper (ctx: CodeGenContext) : ARM64Symbolic.Instr list =
+    let helperRet = $"{streamRefCountDecHelperLabel}_ret"
+    let alreadyClosed = $"{streamRefCountDecHelperLabel}_closed"
+    let leakDec =
+        if ctx.Options.EnableLeakCheck then
+            let labelRef = dataLabel leakCounterLabel
+            [
+                ARM64Symbolic.ADRP (ARM64Symbolic.X17, labelRef)
+                ARM64Symbolic.ADD_label (ARM64Symbolic.X17, ARM64Symbolic.X17, labelRef)
+                ARM64Symbolic.LDR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+                ARM64Symbolic.SUB_imm (ARM64Symbolic.X16, ARM64Symbolic.X16, 1us)
+                ARM64Symbolic.STR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+            ]
+        else
+            []
+    [
+        ARM64Symbolic.Label streamRefCountDecHelperLabel
+        ARM64Symbolic.CBZ (ARM64Symbolic.X0, helperRet)
+        ARM64Symbolic.LDR (ARM64Symbolic.X1, ARM64Symbolic.X0, 24s)
+        ARM64Symbolic.SUB_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 1us)
+        ARM64Symbolic.STR (ARM64Symbolic.X1, ARM64Symbolic.X0, 24s)
+        ARM64Symbolic.CBNZ (ARM64Symbolic.X1, helperRet)
+        ARM64Symbolic.STP_pre (ARM64Symbolic.X19, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, ARM64Symbolic.X0)
+        ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X19, 0s)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 5us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, alreadyClosed)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 5us, 0)
+        ARM64Symbolic.STR (ARM64Symbolic.X2, ARM64Symbolic.X19, 0s)
+        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X19, 16s)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 0us, 0)
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X0, 0s)
+        ARM64Symbolic.BLR ARM64Symbolic.X9
+        ARM64Symbolic.Label alreadyClosed
+        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X19, 8s)
+        ARM64Symbolic.BL closureRefCountDecHelperLabel
+        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X19, 16s)
+        ARM64Symbolic.BL closureRefCountDecHelperLabel
+        ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X27, 24s)
+        ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X19, 0s)
+        ARM64Symbolic.STR (ARM64Symbolic.X19, ARM64Symbolic.X27, 24s)
+    ]
+    @ leakDec
+    @ [
+        ARM64Symbolic.LDP_post (ARM64Symbolic.X19, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+        ARM64Symbolic.Label helperRet
+        ARM64Symbolic.RET
+    ]
+
+let private releasePlanIsRootKind (kind: ANF.RcKind) (releasePlan: ANF.RcReleasePlan) : bool =
+    match releasePlan with
+    | ANF.RootRelease (_, planKind, _) when planKind = kind ->
+        true
+    | _ ->
+        false
+
+let private releasePlanIsTaggedListWithElementRelease
+    (elementPredicate: ANF.RcReleasePlan -> bool)
+    (releasePlan: ANF.RcReleasePlan)
+    : bool =
+    match releasePlan with
+    | ANF.RootRelease (_, ANF.TaggedList, ANF.TaggedListPayloadRelease elementRelease) ->
+        elementPredicate elementRelease
+    | _ ->
+        false
+
+let private releasePlanIsDictWithListValue (releasePlan: ANF.RcReleasePlan) : bool =
+    match releasePlan with
+    | ANF.RootRelease (_, ANF.DictHeap, ANF.DictPayloadRelease (_, ANF.RootRelease (_, ANF.TaggedList, _))) ->
+        true
+    | _ ->
+        false
+
+let private releasePlanIsDynamicBufferOperation
+    (operation: ANF.RcOperation)
+    (releasePlan: ANF.RcReleasePlan)
+    : bool =
+    match releasePlan with
+    | ANF.DynamicBufferRelease planOperation when planOperation = operation ->
+        true
+    | _ ->
+        false
+
+let private releasePlanFieldHasRelease
+    (fieldOffset: int)
+    (predicate: ANF.RcReleasePlan -> bool)
+    (fieldReleases: ANF.RcFieldRelease list)
+    : bool =
+    fieldReleases
+    |> List.exists (function
+        | ANF.FieldRelease (offset, releasePlan) when offset = fieldOffset ->
+            predicate releasePlan
+        | _ ->
+            false)
+
+let private releasePlanIsFixedBlockWithFieldReleases
+    (payloadSize: int)
+    (expectedFieldReleases: (int * (ANF.RcReleasePlan -> bool)) list)
+    (releasePlan: ANF.RcReleasePlan)
+    : bool =
+    match releasePlan with
+    | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (planPayloadSize, fieldReleases))
+        when planPayloadSize = payloadSize ->
+        expectedFieldReleases
+        |> List.forall (fun (fieldOffset, predicate) ->
+            releasePlanFieldHasRelease fieldOffset predicate fieldReleases)
+    | _ ->
+        false
+
+let private releasePlanIsSingleListDictFieldPayload (releasePlan: ANF.RcReleasePlan) : bool =
+    releasePlan
+    |> releasePlanIsFixedBlockWithFieldReleases
+        8
+        [
+            0, releasePlanIsTaggedListWithElementRelease (releasePlanIsRootKind ANF.DictHeap)
+        ]
+
+let private releasePlanIsThreeManagedFieldPayload (releasePlan: ANF.RcReleasePlan) : bool =
+    releasePlan
+    |> releasePlanIsFixedBlockWithFieldReleases
+        24
+        [
+            0, releasePlanIsDynamicBufferOperation ANF.DynamicStringBuffer
+            8, releasePlanIsRootKind ANF.TaggedList
+            16, releasePlanIsRootKind ANF.DictHeap
+        ]
+
+let private releasePlanIsTaggedListWithTuple2ElementFieldRelease
+    (fieldPredicate: ANF.RcReleasePlan -> bool)
+    (releasePlan: ANF.RcReleasePlan)
+    : bool =
+    releasePlan
+    |> releasePlanIsTaggedListWithElementRelease (function
+        | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (16, fieldReleases)) ->
+            fieldReleases
+            |> List.exists (function
+                | ANF.FieldRelease (_, fieldRelease) ->
+                    fieldPredicate fieldRelease)
+        | _ ->
+            false)
+
+let private releasePlanFieldReleaseAt
+    (fieldOffset: int)
+    (fieldReleases: ANF.RcFieldRelease list)
+    : ANF.RcReleasePlan option =
+    fieldReleases
+    |> List.tryPick (function
+        | ANF.FieldRelease (offset, releasePlan) when offset = fieldOffset ->
+            Some releasePlan
+        | _ ->
+            None)
+
+let private releasePlanRootKindAt
+    (fieldOffset: int)
+    (kind: ANF.RcKind)
+    (fieldReleases: ANF.RcFieldRelease list)
+    : bool =
+    match releasePlanFieldReleaseAt fieldOffset fieldReleases with
+    | Some (ANF.RootRelease (_, planKind, _)) when planKind = kind ->
+        true
+    | _ ->
+        false
+
+let private releasePlanDynamicOperationAt
+    (fieldOffset: int)
+    (operation: ANF.RcOperation)
+    (fieldReleases: ANF.RcFieldRelease list)
+    : bool =
+    match releasePlanFieldReleaseAt fieldOffset fieldReleases with
+    | Some (ANF.DynamicBufferRelease planOperation) when planOperation = operation ->
+        true
+    | _ ->
+        false
+
+let private listDecHelperForElementRelease
+    (elementFingerprint: string)
+    (elementRelease: ANF.RcReleasePlan)
+    : string =
+        match elementRelease with
+        | ANF.NoReleasePlan ->
+            listRefCountDecHelperLabel
+        | ANF.DynamicBufferRelease ANF.DynamicStringBuffer ->
+            listRefCountDecStringHelperLabel
+        | ANF.DynamicBufferRelease ANF.DynamicBlobBuffer ->
+            listRefCountDecBlobHelperLabel
+        | ANF.DynamicBufferRelease _ ->
+            listRefCountDecHelperLabel
+        | ANF.RecursiveRelease _ ->
+            plannedListDecHelperLabelForFingerprint elementFingerprint
+        | ANF.RootRelease (_, ANF.TaggedList, _) ->
+            listRefCountDecListHelperLabel
+        | ANF.RootRelease (
+              _,
+              ANF.DictHeap,
+              ANF.DictPayloadRelease (ANF.DynamicBufferRelease _, _))
+        | ANF.RootRelease (
+              _,
+              ANF.DictHeap,
+              ANF.DictPayloadRelease (_, ANF.DynamicBufferRelease _)) ->
+            plannedListDecHelperLabelForFingerprint elementFingerprint
+        | ANF.RootRelease (_, ANF.DictHeap, _) when releasePlanIsDictWithListValue elementRelease ->
+            listRefCountDecDictListHelperLabel
+        | ANF.RootRelease (_, ANF.DictHeap, _) ->
+            listRefCountDecDictHelperLabel
+        | ANF.RootRelease (_, ANF.ClosureHeap, _) ->
+            listRefCountDecClosureHelperLabel
+        | ANF.RootRelease (_, ANF.StreamHeap, _) ->
+            plannedListDecHelperLabelForFingerprint elementFingerprint
+        | ANF.RootRelease (_, ANF.GenericHeap, _) ->
+            plannedListDecHelperLabelForFingerprint elementFingerprint
+
+let private listDecHelperForReleasePlan (releasePlan: ANF.RcReleasePlan) : string =
+    match releasePlan with
+    | ANF.RootRelease (_, _, ANF.TaggedListPayloadRelease elementRelease) ->
+        listDecHelperForElementRelease
+            (ANF.rcReleasePlanFingerprint elementRelease)
+            elementRelease
+    | _ ->
+        listRefCountDecHelperLabel
+
+let private listDecHelperForType (ctx: CodeGenContext) (sourceType: AST.Type) : string =
+    match tryRcReleasePlanOfType ctx.RecordRegistry ctx.SumShapeRegistry sourceType with
+    | Some releasePlan -> listDecHelperForReleasePlan releasePlan
+    | None -> Crash.crash $"listDecHelperForType: missing RC metadata for list element type {sourceType}"
+
+let private dictPayloadReleaseNeedsPlannedHelper (keyRelease: ANF.RcReleasePlan) (valueRelease: ANF.RcReleasePlan) : bool =
+    match keyRelease, valueRelease with
+    | ANF.DynamicBufferRelease _, _
+    | _, ANF.DynamicBufferRelease _ ->
+        true
+    | ANF.NoReleasePlan, ANF.RootRelease (_, ANF.TaggedList, _)
+    | ANF.NoReleasePlan, ANF.RootRelease (_, ANF.DictHeap, _)
+    | ANF.NoReleasePlan, ANF.RootRelease (_, ANF.ClosureHeap, _) ->
+        true
+    | _, ANF.RootRelease (_, ANF.GenericHeap, _) ->
+        true
+    | _ ->
+        false
+
+let private dictDecHelperForReleasePlanWithFingerprint
+    (releasePlanFingerprint: string)
+    (releasePlan: ANF.RcReleasePlan)
+    : string =
+    match releasePlan with
+    | ANF.RootRelease (_, ANF.DictHeap, ANF.DictPayloadRelease (keyRelease, valueRelease))
+        when dictPayloadReleaseNeedsPlannedHelper keyRelease valueRelease ->
+        plannedDictDecHelperLabelForFingerprint releasePlanFingerprint
+    | ANF.RootRelease (_, ANF.DictHeap, ANF.DictPayloadRelease (_, valueRelease)) ->
+        match valueRelease with
+        | ANF.RootRelease (_, ANF.TaggedList, _) ->
+            dictRefCountDecListValueHelperLabel
+        | ANF.RootRelease (_, ANF.DictHeap, _) when releasePlanIsDictWithListValue valueRelease ->
+            dictRefCountDecDictListValueHelperLabel
+        | ANF.RootRelease (_, ANF.DictHeap, _) ->
+            dictRefCountDecDictValueHelperLabel
+        | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (16, fieldReleases))
+            when releasePlanDynamicOperationAt 0 ANF.DynamicStringBuffer fieldReleases
+                 && releasePlanRootKindAt 8 ANF.TaggedList fieldReleases ->
+            dictRefCountDecTupleStringListValueHelperLabel
+        | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (24, fieldReleases))
+            when releasePlanDynamicOperationAt 0 ANF.DynamicStringBuffer fieldReleases
+                 && releasePlanRootKindAt 8 ANF.TaggedList fieldReleases
+                 && releasePlanRootKindAt 16 ANF.DictHeap fieldReleases ->
+            dictRefCountDecTupleStringListDictValueHelperLabel
+        | ANF.RootRelease (_, ANF.GenericHeap, ANF.BoxedSumPayloadRelease (_, fieldReleases, _))
+            when releasePlanDynamicOperationAt 8 ANF.DynamicStringBuffer fieldReleases ->
+            dictRefCountDecSumStringValueHelperLabel
+        | _ ->
+            dictRefCountDecHelperLabel
+    | _ ->
+        dictRefCountDecHelperLabel
+
+let private dictDecHelperForReleasePlan (releasePlan: ANF.RcReleasePlan) : string =
+    dictDecHelperForReleasePlanWithFingerprint
+        (ANF.rcReleasePlanFingerprint releasePlan)
+        releasePlan
+
+let private generateDictRefCountIncHelper () : ARM64Symbolic.Instr list =
+    let label (name: string) : string = $"__dark_dict_rc_inc_{name}"
+    let internalTag = label "internal"
+    let leafTag = label "leaf"
+    let collisionTag = label "collision"
+    let haveOffset = label "have_offset"
+    let helperRet = label "ret"
+
+    [
+        ARM64Symbolic.Label dictRefCountIncHelperLabel
+        // X0 = tagged HAMT root. Tags: 1 internal, 2 leaf, 3 collision.
+        ARM64Symbolic.CBZ (ARM64Symbolic.X0, helperRet)
+        ARM64Symbolic.AND_imm (ARM64Symbolic.X1, ARM64Symbolic.X0, 3UL)
+        ARM64Symbolic.CBZ (ARM64Symbolic.X1, helperRet)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X1, 3us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, helperRet)
+        // This contiguous all-ones mask is an encodable AArch64 logical immediate.
+        ARM64Symbolic.AND_imm (ARM64Symbolic.X2, ARM64Symbolic.X0, 0xFFFFFFFFFFFFFFF8UL)
+        ARM64Symbolic.CMP_reg (ARM64Symbolic.X2, ARM64Symbolic.X27)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, helperRet)
+        ARM64Symbolic.CMP_reg (ARM64Symbolic.X2, ARM64Symbolic.X28)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, helperRet)
+
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X1, 1us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, internalTag)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X1, 2us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, leafTag)
+        ARM64Symbolic.B_label collisionTag
+
+        ARM64Symbolic.Label leafTag
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 16us, 0)
+        ARM64Symbolic.B_label haveOffset
+
+        ARM64Symbolic.Label collisionTag
+        ARM64Symbolic.LDR (ARM64Symbolic.X3, ARM64Symbolic.X2, 0s)
+        ARM64Symbolic.LSL_imm (ARM64Symbolic.X3, ARM64Symbolic.X3, 4)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X3, ARM64Symbolic.X3, 8us)
+        ARM64Symbolic.B_label haveOffset
+
+        ARM64Symbolic.Label internalTag
+        ARM64Symbolic.LDR (ARM64Symbolic.X4, ARM64Symbolic.X2, 0s) // bitmap
+        // D16 is reserved scratch: count the bitmap bytes, horizontally add
+        // them, and zero-extend the resulting byte into the child count.
+        ARM64Symbolic.FMOV_from_gp (ARM64Symbolic.D16, ARM64Symbolic.X4)
+        ARM64Symbolic.CNT_8B (ARM64Symbolic.D16, ARM64Symbolic.D16)
+        ARM64Symbolic.ADDV_8B (ARM64Symbolic.D16, ARM64Symbolic.D16)
+        ARM64Symbolic.UMOV_byte (ARM64Symbolic.X3, ARM64Symbolic.D16)
+        ARM64Symbolic.LSL_imm (ARM64Symbolic.X3, ARM64Symbolic.X3, 3)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X3, ARM64Symbolic.X3, 8us)
+
+        ARM64Symbolic.Label haveOffset
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X4, ARM64Symbolic.X2, ARM64Symbolic.X3)
+        ARM64Symbolic.LDR (ARM64Symbolic.X5, ARM64Symbolic.X4, 0s)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X5, ARM64Symbolic.X5, 1us)
+        ARM64Symbolic.STR (ARM64Symbolic.X5, ARM64Symbolic.X4, 0s)
+
+        ARM64Symbolic.Label helperRet
+        ARM64Symbolic.RET
+    ]
+
+let private generateDictRefCountDecHelper
+    (helperLabel: string)
+    (releaseLeafDynamicKey: bool)
+    (releaseLeafDynamicValue: bool)
+    (releaseLeafListValue: bool)
+    (releaseLeafDictValueHelper: string option)
+    (releaseLeafClosureValue: bool)
+    (releaseLeafStreamValue: bool)
+    (leafFixedBlockValueRelease: (int * ANF.RcReleasePlan) option)
+    (releaseLeafTupleStringListValue: bool)
+    (releaseLeafTupleStringListDictValue: bool)
+    (releaseLeafSumStringValue: bool)
+    (ctx: CodeGenContext)
+    : ARM64Symbolic.Instr list =
+    let label (name: string) : string = $"{helperLabel}_{name}"
+    let leakDec =
+        if ctx.Options.EnableLeakCheck then
+            let labelRef = dataLabel leakCounterLabel
+            [
+                ARM64Symbolic.ADRP (ARM64Symbolic.X17, labelRef)
+                ARM64Symbolic.ADD_label (ARM64Symbolic.X17, ARM64Symbolic.X17, labelRef)
+                ARM64Symbolic.LDR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+                ARM64Symbolic.SUB_imm (ARM64Symbolic.X16, ARM64Symbolic.X16, 1us)
+                ARM64Symbolic.STR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+            ]
+        else
+            []
+
+    let addChild (suffix: string) : ARM64Symbolic.Instr list =
+        let doneLabel = label $"child_done_{suffix}"
+        let pushLabel = label $"child_push_{suffix}"
+        [
+            ARM64Symbolic.CBZ (ARM64Symbolic.X8, doneLabel)
+            ARM64Symbolic.AND_imm (ARM64Symbolic.X9, ARM64Symbolic.X8, 3UL)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X9, doneLabel)
+            ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 3us)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, doneLabel)
+            // This contiguous all-ones mask is an encodable AArch64 logical immediate.
+            ARM64Symbolic.AND_imm (ARM64Symbolic.X10, ARM64Symbolic.X8, 0xFFFFFFFFFFFFFFF8UL)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X10, ARM64Symbolic.X27)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, doneLabel)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X10, ARM64Symbolic.X28)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, doneLabel)
+            ARM64Symbolic.CBNZ (ARM64Symbolic.X0, pushLabel)
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X8)
+            ARM64Symbolic.B_label doneLabel
+            ARM64Symbolic.Label pushLabel
+            ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+            ARM64Symbolic.STR (ARM64Symbolic.X8, ARM64Symbolic.SP, 0s)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 1us)
+            ARM64Symbolic.Label doneLabel
+        ]
+
+    let loopCheck = label "loop_check"
+    let popOrRet = label "pop_or_ret"
+    let helperRet = label "ret"
+    let internalTag = label "internal"
+    let leafTag = label "leaf"
+    let collisionTag = label "collision"
+    let haveOffset = label "have_offset"
+    let collectInternal = label "collect_internal"
+    let collectLoop = label "collect_loop"
+    let freeNode = label "free_node"
+    let skipFreeList = label "skip_freelist"
+    let skipLeafListValueRelease = label "skip_leaf_list_value_release"
+    let skipLeafDictValueRelease = label "skip_leaf_dict_value_release"
+    let skipLeafClosureValueRelease = label "skip_leaf_closure_value_release"
+    let skipLeafStreamValueRelease = label "skip_leaf_stream_value_release"
+    let skipLeafDynamicKeyRelease = label "skip_leaf_dynamic_key_release"
+    let skipLeafDynamicValueRelease = label "skip_leaf_dynamic_value_release"
+    let skipCollisionPayloadRelease = label "skip_collision_payload_release"
+    let collisionPayloadLoop = label "collision_payload_loop"
+    let collisionPayloadDone = label "collision_payload_done"
+    let skipCollisionDynamicKeyRelease = label "skip_collision_dynamic_key_release"
+    let skipCollisionDynamicValueRelease = label "skip_collision_dynamic_value_release"
+    let skipCollisionRootPayloadRelease = label "skip_collision_root_payload_release"
+    let collisionRootPayloadLoop = label "collision_root_payload_loop"
+    let collisionRootPayloadDone = label "collision_root_payload_done"
+    let skipCollisionListValueRelease = label "skip_collision_list_value_release"
+    let skipCollisionDictValueRelease = label "skip_collision_dict_value_release"
+    let skipCollisionClosureValueRelease = label "skip_collision_closure_value_release"
+    let skipCollisionStreamValueRelease = label "skip_collision_stream_value_release"
+    let skipLeafFixedBlockValueRelease = label "skip_leaf_fixed_block_value_release"
+    let skipCollisionGenericPayloadRelease = label "skip_collision_generic_payload_release"
+    let collisionGenericPayloadLoop = label "collision_generic_payload_loop"
+    let collisionGenericPayloadDone = label "collision_generic_payload_done"
+    let skipLeafTupleStringListValueRelease = label "skip_leaf_tuple_string_list_value_release"
+    let tupleStringListValueDone = label "tuple_string_list_value_done"
+    let skipLeafSumStringValueRelease = label "skip_leaf_sum_string_value_release"
+    let sumStringValueDone = label "sum_string_value_done"
+    let sumStringBufferDone = label "sum_string_buffer_done"
+
+    let releaseLeafManagedRootValueInstrs (targetHelperLabel: string) (skipLabel: string) =
+        [
+            ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 2us)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, skipLabel)
+            ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -112s)
+            ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.STR (ARM64Symbolic.X30, ARM64Symbolic.SP, 96s)
+            ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X3, 8s)
+            ARM64Symbolic.BL targetHelperLabel
+            ARM64Symbolic.LDR (ARM64Symbolic.X30, ARM64Symbolic.SP, 96s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 112s)
+            ARM64Symbolic.Label skipLabel
+        ]
+
+    let releaseManagedRootValueAtBaseInstrs
+        (baseReg: ARM64.Reg)
+        (fieldOffset: int16)
+        (targetHelperLabel: string)
+        (skipLabel: string)
+        =
+        [
+            ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -112s)
+            ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.STR (ARM64Symbolic.X30, ARM64Symbolic.SP, 96s)
+            ARM64Symbolic.LDR (ARM64Symbolic.X0, baseReg, fieldOffset)
+            ARM64Symbolic.BL targetHelperLabel
+            ARM64Symbolic.LDR (ARM64Symbolic.X30, ARM64Symbolic.SP, 96s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 112s)
+            ARM64Symbolic.Label skipLabel
+        ]
+
+    let releaseLeafDynamicBufferFieldInstrs
+        (fieldOffset: int16)
+        (skipLabel: string)
+        : ARM64Symbolic.Instr list =
+        let refcountUpdate =
+            if List.isEmpty leakDec then
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                ]
+            else
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                    ARM64Symbolic.CBNZ (ARM64Symbolic.X15, skipLabel)
+                ] @ leakDec
+
+        [
+            ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 2us)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, skipLabel)
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X3, fieldOffset)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X12, skipLabel)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X27)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, skipLabel)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X28)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, skipLabel)
+            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0x7FFFus, 48)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, skipLabel)
+        ]
+        @ refcountUpdate
+        @ [ARM64Symbolic.Label skipLabel]
+
+    let releaseDynamicBufferFieldAtBaseInstrs
+        (baseReg: ARM64.Reg)
+        (fieldOffset: int16)
+        (skipLabel: string)
+        : ARM64Symbolic.Instr list =
+        let refcountUpdate =
+            if List.isEmpty leakDec then
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                ]
+            else
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                    ARM64Symbolic.CBNZ (ARM64Symbolic.X15, skipLabel)
+                ] @ leakDec
+
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, baseReg, fieldOffset)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X12, skipLabel)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X27)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, skipLabel)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X28)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, skipLabel)
+            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
+            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0x7FFFus, 48)
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, skipLabel)
+        ]
+        @ refcountUpdate
+        @ [ARM64Symbolic.Label skipLabel]
+
+    let rec releasePlanFieldFrom
+        (baseReg: ARM64.Reg)
+        (fieldOffset: int)
+        (path: string)
+        (fieldReleasePlan: ANF.RcReleasePlan)
+        : ARM64Symbolic.Instr list =
+        match fieldReleasePlan with
+        | ANF.DynamicBufferRelease _ ->
+            releaseDynamicBufferFieldAtBaseInstrs baseReg (int16 fieldOffset) (label $"generic_dynamic_{path}_{fieldOffset}_done")
+        | ANF.RootRelease (_, ANF.TaggedList, _) ->
+            releaseManagedRootValueAtBaseInstrs
+                baseReg
+                (int16 fieldOffset)
+                (listDecHelperForReleasePlan fieldReleasePlan)
+                (label $"generic_list_{path}_{fieldOffset}_done")
+        | ANF.RootRelease (_, ANF.DictHeap, _) ->
+            releaseManagedRootValueAtBaseInstrs
+                baseReg
+                (int16 fieldOffset)
+                (dictDecHelperForReleasePlan fieldReleasePlan)
+                (label $"generic_dict_{path}_{fieldOffset}_done")
+        | ANF.RootRelease (_, ANF.ClosureHeap, _) ->
+            releaseManagedRootValueAtBaseInstrs
+                baseReg
+                (int16 fieldOffset)
+                closureRefCountDecHelperLabel
+                (label $"generic_closure_{path}_{fieldOffset}_done")
+        | ANF.RootRelease (payloadSize, ANF.GenericHeap, ANF.FixedBlockPayloadRelease _)
+        | ANF.RootRelease (payloadSize, ANF.GenericHeap, ANF.BoxedSumPayloadRelease _) ->
+            releaseGenericValueAtBaseInstrs
+                baseReg
+                (int16 fieldOffset)
+                payloadSize
+                fieldReleasePlan
+                $"{path}_{fieldOffset}"
+        | _ ->
+            []
+
+    and releasePlanBoxedSumVariantFieldsFrom
+        (baseReg: ARM64.Reg)
+        (path: string)
+        (variants: ANF.RcBoxedSumVariantRelease list)
+        : ARM64Symbolic.Instr list =
+        let releaseVariant (variant: ANF.RcBoxedSumVariantRelease) =
+            let releaseInstrs =
+                variant.FieldReleases
+                |> List.collect (fun (ANF.FieldRelease (fieldOffset, fieldReleasePlan)) ->
+                    releasePlanFieldFrom
+                        baseReg
+                        fieldOffset
+                        $"{path}_tag_{variant.Tag}"
+                        fieldReleasePlan)
+
+            if List.isEmpty releaseInstrs then
+                None
+            else
+                Some (variant.Tag, releaseInstrs)
+
+        let cases = variants |> List.choose releaseVariant
+
+        if List.isEmpty cases then
+            []
+        else
+            let sumDone = label $"generic_sum_{path}_done"
+            [
+                ARM64Symbolic.LDR (ARM64Symbolic.X10, baseReg, 0s)
+            ]
+            @
+            (cases
+             |> List.mapi (fun index (tag, releaseInstrs) ->
+                let nextCase = label $"generic_sum_{path}_variant_{index}_next"
+                [
+                    ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, uint16 tag)
+                    ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, nextCase)
+                ]
+                @ releaseInstrs
+                @ [
+                    ARM64Symbolic.B_label sumDone
+                    ARM64Symbolic.Label nextCase
+                ])
+             |> List.concat)
+            @ [ARM64Symbolic.Label sumDone]
+
+    and releaseGenericValueAtBaseInstrs
+        (baseReg: ARM64.Reg)
+        (fieldOffset: int16)
+        (payloadSize: int)
+        (releasePlan: ANF.RcReleasePlan)
+        (path: string)
+        : ARM64Symbolic.Instr list =
+        let genericDone = label $"generic_value_{path}_done"
+        let childFieldReleases =
+            match releasePlan with
+            | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (_, fieldReleases)) ->
+                fieldReleases
+                |> List.collect (fun (ANF.FieldRelease (childOffset, childReleasePlan)) ->
+                    releasePlanFieldFrom
+                        ARM64Symbolic.X11
+                        childOffset
+                        $"{path}_{childOffset}"
+                        childReleasePlan)
+            | ANF.RootRelease (_, ANF.GenericHeap, ANF.BoxedSumPayloadRelease (_, _, variants)) ->
+                releasePlanBoxedSumVariantFieldsFrom ARM64Symbolic.X11 path variants
+            | _ ->
+                []
+
+        [
+            ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -112s)
+            ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.STR (ARM64Symbolic.X30, ARM64Symbolic.SP, 96s)
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, baseReg, fieldOffset)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X12, genericDone)
+            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, int16 payloadSize)
+            ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+            ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, int16 payloadSize)
+            ARM64Symbolic.CBNZ (ARM64Symbolic.X15, genericDone)
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, ARM64Symbolic.X12)
+            ARM64Symbolic.STR (ARM64Symbolic.X12, ARM64Symbolic.SP, 104s)
+        ]
+        @ childFieldReleases
+        @ [
+            ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.SP, 104s)
+        ]
+        @ (if payloadSize >= 0 && payloadSize < 256 then
+            [
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X27, uint16 payloadSize)
+                ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X12, ARM64Symbolic.X13, 0s)
+            ]
+           else
+            [])
+        @ leakDec
+        @ [
+            ARM64Symbolic.Label genericDone
+            ARM64Symbolic.LDR (ARM64Symbolic.X30, ARM64Symbolic.SP, 96s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 112s)
+        ]
+
+    let releaseLeafDynamicKeyInstrs =
+        if releaseLeafDynamicKey then
+            releaseLeafDynamicBufferFieldInstrs 0s skipLeafDynamicKeyRelease
+        else
+            []
+
+    let releaseLeafDynamicValueInstrs =
+        if releaseLeafDynamicValue then
+            releaseLeafDynamicBufferFieldInstrs 8s skipLeafDynamicValueRelease
+        else
+            []
+
+    let releaseCollisionDynamicPayloadInstrs =
+        if releaseLeafDynamicKey || releaseLeafDynamicValue then
+            [
+                ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 3us)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, skipCollisionPayloadRelease)
+                ARM64Symbolic.LDR (ARM64Symbolic.X5, ARM64Symbolic.X3, 0s)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X6, 0us, 0)
+                ARM64Symbolic.Label collisionPayloadLoop
+                ARM64Symbolic.CMP_reg (ARM64Symbolic.X6, ARM64Symbolic.X5)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, collisionPayloadDone)
+                ARM64Symbolic.LSL_imm (ARM64Symbolic.X11, ARM64Symbolic.X6, 4)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 8us)
+                ARM64Symbolic.ADD_reg (ARM64Symbolic.X11, ARM64Symbolic.X3, ARM64Symbolic.X11)
+            ]
+            @ (if releaseLeafDynamicKey then
+                   releaseDynamicBufferFieldAtBaseInstrs ARM64Symbolic.X11 0s skipCollisionDynamicKeyRelease
+               else
+                   [])
+            @ (if releaseLeafDynamicValue then
+                   releaseDynamicBufferFieldAtBaseInstrs ARM64Symbolic.X11 8s skipCollisionDynamicValueRelease
+               else
+                   [])
+            @ [
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X6, ARM64Symbolic.X6, 1us)
+                ARM64Symbolic.B_label collisionPayloadLoop
+                ARM64Symbolic.Label collisionPayloadDone
+                ARM64Symbolic.Label skipCollisionPayloadRelease
+            ]
+        else
+            []
+
+    let releaseCollisionManagedRootValueInstrs =
+        let releases =
+            (if releaseLeafListValue then
+                 releaseManagedRootValueAtBaseInstrs
+                     ARM64Symbolic.X11
+                     8s
+                     listRefCountDecHelperLabel
+                     skipCollisionListValueRelease
+             else
+                 [])
+            @ (match releaseLeafDictValueHelper with
+               | Some targetHelperLabel ->
+                   releaseManagedRootValueAtBaseInstrs
+                       ARM64Symbolic.X11
+                       8s
+                       targetHelperLabel
+                       skipCollisionDictValueRelease
+               | None ->
+                   [])
+            @ (if releaseLeafClosureValue then
+                   releaseManagedRootValueAtBaseInstrs
+                       ARM64Symbolic.X11
+                       8s
+                       closureRefCountDecHelperLabel
+                       skipCollisionClosureValueRelease
+               else
+                   [])
+            @ (if releaseLeafStreamValue then
+                   releaseManagedRootValueAtBaseInstrs
+                       ARM64Symbolic.X11
+                       8s
+                       streamRefCountDecHelperLabel
+                       skipCollisionStreamValueRelease
+               else
+                   [])
+
+        if List.isEmpty releases then
+            []
+        else
+            [
+                ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 3us)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, skipCollisionRootPayloadRelease)
+                ARM64Symbolic.LDR (ARM64Symbolic.X5, ARM64Symbolic.X3, 0s)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X6, 0us, 0)
+                ARM64Symbolic.Label collisionRootPayloadLoop
+                ARM64Symbolic.CMP_reg (ARM64Symbolic.X6, ARM64Symbolic.X5)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, collisionRootPayloadDone)
+                ARM64Symbolic.LSL_imm (ARM64Symbolic.X11, ARM64Symbolic.X6, 4)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 8us)
+                ARM64Symbolic.ADD_reg (ARM64Symbolic.X11, ARM64Symbolic.X3, ARM64Symbolic.X11)
+            ]
+            @ releases
+            @ [
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X6, ARM64Symbolic.X6, 1us)
+                ARM64Symbolic.B_label collisionRootPayloadLoop
+                ARM64Symbolic.Label collisionRootPayloadDone
+                ARM64Symbolic.Label skipCollisionRootPayloadRelease
+            ]
+
+    let releaseLeafGenericValueInstrs =
+        match leafFixedBlockValueRelease with
+        | Some (payloadSize, releasePlan) ->
+            [
+                ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 2us)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, skipLeafFixedBlockValueRelease)
+            ]
+            @ releaseGenericValueAtBaseInstrs
+                ARM64Symbolic.X3
+                8s
+                payloadSize
+                releasePlan
+                "leaf_value"
+            @ [
+                ARM64Symbolic.Label skipLeafFixedBlockValueRelease
+            ]
+        | None ->
+            []
+
+    let releaseCollisionGenericValueInstrs =
+        match leafFixedBlockValueRelease with
+        | Some (payloadSize, releasePlan) ->
+            [
+                ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 3us)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, skipCollisionGenericPayloadRelease)
+                ARM64Symbolic.LDR (ARM64Symbolic.X5, ARM64Symbolic.X3, 0s)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X6, 0us, 0)
+                ARM64Symbolic.Label collisionGenericPayloadLoop
+                ARM64Symbolic.CMP_reg (ARM64Symbolic.X6, ARM64Symbolic.X5)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, collisionGenericPayloadDone)
+                ARM64Symbolic.LSL_imm (ARM64Symbolic.X11, ARM64Symbolic.X6, 4)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 8us)
+                ARM64Symbolic.ADD_reg (ARM64Symbolic.X11, ARM64Symbolic.X3, ARM64Symbolic.X11)
+            ]
+            @ releaseGenericValueAtBaseInstrs
+                ARM64Symbolic.X11
+                8s
+                payloadSize
+                releasePlan
+                "collision_value"
+            @ [
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X6, ARM64Symbolic.X6, 1us)
+                ARM64Symbolic.B_label collisionGenericPayloadLoop
+                ARM64Symbolic.Label collisionGenericPayloadDone
+                ARM64Symbolic.Label skipCollisionGenericPayloadRelease
+            ]
+        | None ->
+            []
+
+    let releaseLeafListValueInstrs =
+        if releaseLeafListValue then
+            releaseLeafManagedRootValueInstrs listRefCountDecHelperLabel skipLeafListValueRelease
+        else
+            []
+
+    let releaseLeafDictValueInstrs =
+        match releaseLeafDictValueHelper with
+        | Some targetHelperLabel ->
+            releaseLeafManagedRootValueInstrs targetHelperLabel skipLeafDictValueRelease
+        | None ->
+            []
+
+    let releaseLeafClosureValueInstrs =
+        if releaseLeafClosureValue then
+            releaseLeafManagedRootValueInstrs closureRefCountDecHelperLabel skipLeafClosureValueRelease
+        else
+            []
+
+    let releaseLeafStreamValueInstrs =
+        if releaseLeafStreamValue then
+            releaseLeafManagedRootValueInstrs streamRefCountDecHelperLabel skipLeafStreamValueRelease
+        else
+            []
+
+    let releaseLeafTupleStringListValueInstrs =
+        if releaseLeafTupleStringListValue || releaseLeafTupleStringListDictValue then
+            let tupleRefcountOffset =
+                if releaseLeafTupleStringListDictValue then 24s else 16s
+            let tuplePayloadSize =
+                if releaseLeafTupleStringListDictValue then 24us else 16us
+            let bufferLeakDec = leakDec
+            let bufferRefcountUpdate =
+                if List.isEmpty bufferLeakDec then
+                    [
+                        ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                    ]
+                else
+                    [
+                        ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                        ARM64Symbolic.CBNZ_offset (ARM64Symbolic.X15, 6)
+                    ] @ bufferLeakDec
+            let tupleLeakDec = leakDec
+            [
+                ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 2us)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, skipLeafTupleStringListValueRelease)
+                ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -112s)
+                ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                ARM64Symbolic.STR (ARM64Symbolic.X30, ARM64Symbolic.SP, 96s)
+                ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.X3, 8s)
+                ARM64Symbolic.STR (ARM64Symbolic.X11, ARM64Symbolic.SP, 104s)
+                ARM64Symbolic.CBZ (ARM64Symbolic.X11, tupleStringListValueDone)
+                ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X11, tupleRefcountOffset)
+                ARM64Symbolic.SUB_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+                ARM64Symbolic.STR (ARM64Symbolic.X12, ARM64Symbolic.X11, tupleRefcountOffset)
+                ARM64Symbolic.CBNZ (ARM64Symbolic.X12, tupleStringListValueDone)
+
+                ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X11, 0s)
+                ARM64Symbolic.CBZ_offset (ARM64Symbolic.X12, 7 + List.length bufferRefcountUpdate)
+                ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
+                ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
+                ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
+                ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0x7FFFus, 48)
+                ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)
+                ARM64Symbolic.B_cond (ARM64Symbolic.EQ, List.length bufferRefcountUpdate + 1)
+            ]
+            @ bufferRefcountUpdate
+            @ [
+                ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.SP, 104s)
+                ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X11, 8s)
+                ARM64Symbolic.BL listRefCountDecHelperLabel
+            ]
+            @ (if releaseLeafTupleStringListDictValue then
+                   [
+                       ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.SP, 104s)
+                       ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X11, 16s)
+                       ARM64Symbolic.BL dictRefCountDecHelperLabel
+                   ]
+               else
+                   [])
+            @ [
+                ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.SP, 104s)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X27, tuplePayloadSize)
+                ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X11, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X11, ARM64Symbolic.X13, 0s)
+            ]
+            @ tupleLeakDec
+            @ [
+                ARM64Symbolic.Label tupleStringListValueDone
+                ARM64Symbolic.LDR (ARM64Symbolic.X30, ARM64Symbolic.SP, 96s)
+                ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 112s)
+                ARM64Symbolic.Label skipLeafTupleStringListValueRelease
+            ]
+        else
+            []
+
+    let releaseLeafSumStringValueInstrs =
+        if releaseLeafSumStringValue then
+            let bufferLeakDec = leakDec
+            let bufferRefcountUpdate =
+                if List.isEmpty bufferLeakDec then
+                    [
+                        ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                    ]
+                else
+                    [
+                        ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                        ARM64Symbolic.CBNZ (ARM64Symbolic.X15, sumStringBufferDone)
+                    ] @ bufferLeakDec
+            [
+                ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 2us)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, skipLeafSumStringValueRelease)
+                ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -112s)
+                ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                ARM64Symbolic.STR (ARM64Symbolic.X30, ARM64Symbolic.SP, 96s)
+                ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.X3, 8s)
+                ARM64Symbolic.CBZ (ARM64Symbolic.X11, sumStringValueDone)
+                ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X11, 16s)
+                ARM64Symbolic.SUB_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+                ARM64Symbolic.STR (ARM64Symbolic.X12, ARM64Symbolic.X11, 16s)
+                ARM64Symbolic.CBNZ (ARM64Symbolic.X12, sumStringValueDone)
+
+                ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X11, 8s)
+                ARM64Symbolic.CBZ (ARM64Symbolic.X12, sumStringBufferDone)
+                ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
+                ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
+                ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
+                ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0x7FFFus, 48)
+                ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, sumStringBufferDone)
+            ]
+            @ bufferRefcountUpdate
+            @ [
+                ARM64Symbolic.Label sumStringBufferDone
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X27, 16us)
+                ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X11, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X11, ARM64Symbolic.X13, 0s)
+            ]
+            @ leakDec
+            @ [
+                ARM64Symbolic.Label sumStringValueDone
+                ARM64Symbolic.LDR (ARM64Symbolic.X30, ARM64Symbolic.SP, 96s)
+                ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 112s)
+                ARM64Symbolic.Label skipLeafSumStringValueRelease
+            ]
+        else
+            []
+
+    [
+        ARM64Symbolic.Label helperLabel
+        // X0 = current tagged HAMT root, X1 = pending work stack count.
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 0us, 0)
+        ARM64Symbolic.B_label loopCheck
+
+        ARM64Symbolic.Label loopCheck
+        ARM64Symbolic.CBZ (ARM64Symbolic.X0, popOrRet)
+        ARM64Symbolic.AND_imm (ARM64Symbolic.X2, ARM64Symbolic.X0, 3UL)
+        ARM64Symbolic.CBZ (ARM64Symbolic.X2, popOrRet)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 3us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, popOrRet)
+        // This contiguous all-ones mask is an encodable AArch64 logical immediate.
+        ARM64Symbolic.AND_imm (ARM64Symbolic.X3, ARM64Symbolic.X0, 0xFFFFFFFFFFFFFFF8UL)
+        ARM64Symbolic.CMP_reg (ARM64Symbolic.X3, ARM64Symbolic.X27)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, popOrRet)
+        ARM64Symbolic.CMP_reg (ARM64Symbolic.X3, ARM64Symbolic.X28)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, popOrRet)
+
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 1us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, internalTag)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 2us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, leafTag)
+        ARM64Symbolic.B_label collisionTag
+
+        ARM64Symbolic.Label leafTag
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X4, 16us, 0)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X5, 0us, 0)
+        ARM64Symbolic.B_label haveOffset
+
+        ARM64Symbolic.Label collisionTag
+        ARM64Symbolic.LDR (ARM64Symbolic.X4, ARM64Symbolic.X3, 0s)
+        ARM64Symbolic.LSL_imm (ARM64Symbolic.X4, ARM64Symbolic.X4, 4)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X4, ARM64Symbolic.X4, 8us)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X5, 0us, 0)
+        ARM64Symbolic.B_label haveOffset
+
+        ARM64Symbolic.Label internalTag
+        ARM64Symbolic.LDR (ARM64Symbolic.X6, ARM64Symbolic.X3, 0s) // bitmap
+        // D16 is reserved scratch: count the bitmap bytes, horizontally add
+        // them, and zero-extend the resulting byte into the child count.
+        ARM64Symbolic.FMOV_from_gp (ARM64Symbolic.D16, ARM64Symbolic.X6)
+        ARM64Symbolic.CNT_8B (ARM64Symbolic.D16, ARM64Symbolic.D16)
+        ARM64Symbolic.ADDV_8B (ARM64Symbolic.D16, ARM64Symbolic.D16)
+        ARM64Symbolic.UMOV_byte (ARM64Symbolic.X5, ARM64Symbolic.D16)
+        ARM64Symbolic.LSL_imm (ARM64Symbolic.X4, ARM64Symbolic.X5, 3)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X4, ARM64Symbolic.X4, 8us)
+
+        ARM64Symbolic.Label haveOffset
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X6, ARM64Symbolic.X3, ARM64Symbolic.X4)
+        ARM64Symbolic.LDR (ARM64Symbolic.X7, ARM64Symbolic.X6, 0s)
+        ARM64Symbolic.SUB_imm (ARM64Symbolic.X7, ARM64Symbolic.X7, 1us)
+        ARM64Symbolic.STR (ARM64Symbolic.X7, ARM64Symbolic.X6, 0s)
+        ARM64Symbolic.CBNZ (ARM64Symbolic.X7, popOrRet)
+    ]
+    @ releaseLeafDynamicKeyInstrs
+    @ releaseLeafDynamicValueInstrs
+    @ releaseCollisionDynamicPayloadInstrs
+    @ releaseCollisionManagedRootValueInstrs
+    @ releaseCollisionGenericValueInstrs
+    @ releaseLeafListValueInstrs
+    @ releaseLeafDictValueInstrs
+    @ releaseLeafClosureValueInstrs
+    @ releaseLeafStreamValueInstrs
+    @ releaseLeafGenericValueInstrs
+    @ releaseLeafTupleStringListValueInstrs
+    @ releaseLeafSumStringValueInstrs
+    @ [
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 1us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, collectInternal)
+        ARM64Symbolic.B_label freeNode
+
+        ARM64Symbolic.Label collectInternal
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X6, 0us, 0)
+        ARM64Symbolic.Label collectLoop
+        ARM64Symbolic.CMP_reg (ARM64Symbolic.X6, ARM64Symbolic.X5)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, freeNode)
+        ARM64Symbolic.LSL_imm (ARM64Symbolic.X7, ARM64Symbolic.X6, 3)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X7, ARM64Symbolic.X7, 8us)
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X7, ARM64Symbolic.X3, ARM64Symbolic.X7)
+        ARM64Symbolic.LDR (ARM64Symbolic.X8, ARM64Symbolic.X7, 0s)
+    ]
+    @ addChild "internal"
+    @ [
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X6, ARM64Symbolic.X6, 1us)
+        ARM64Symbolic.B_label collectLoop
+
+        ARM64Symbolic.Label freeNode
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X4, 256us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, skipFreeList)
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X6, ARM64Symbolic.X27, ARM64Symbolic.X4)
+        ARM64Symbolic.LDR (ARM64Symbolic.X7, ARM64Symbolic.X6, 0s)
+        ARM64Symbolic.STR (ARM64Symbolic.X7, ARM64Symbolic.X3, 0s)
+        ARM64Symbolic.STR (ARM64Symbolic.X3, ARM64Symbolic.X6, 0s)
+        ARM64Symbolic.Label skipFreeList
+    ]
+    @ leakDec
+    @ [
+        ARM64Symbolic.B_label loopCheck
+
+        ARM64Symbolic.Label popOrRet
+        ARM64Symbolic.CBZ (ARM64Symbolic.X1, helperRet)
+        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, 0s)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+        ARM64Symbolic.SUB_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 1us)
+        ARM64Symbolic.B_label loopCheck
+
+        ARM64Symbolic.Label helperRet
+        ARM64Symbolic.RET
+    ]
+
+let private generatePlannedDictRefCountDecHelper
+    (helperLabel: string)
+    (releasePlan: ANF.RcReleasePlan)
+    (ctx: CodeGenContext)
+    : ARM64Symbolic.Instr list =
+    let unsupported context release =
+        Crash.crash $"ARM64 planned dict RefCountDec does not support {context} release plan {release}"
+
+    match releasePlan with
+    | ANF.RootRelease (_, ANF.DictHeap, ANF.DictPayloadRelease (keyRelease, valueRelease)) ->
+        let releaseLeafDynamicKey =
+            match keyRelease with
+            | ANF.NoReleasePlan -> false
+            | ANF.DynamicBufferRelease _ -> true
+            | other -> unsupported "key" other
+
+        let (
+            releaseLeafDynamicValue,
+            releaseLeafListValue,
+            releaseLeafDictValueHelper,
+            releaseLeafClosureValue,
+            releaseLeafStreamValue,
+            leafFixedBlockValueRelease,
+            releaseLeafTupleStringListValue,
+            releaseLeafTupleStringListDictValue,
+            releaseLeafSumStringValue
+            ) =
+            match valueRelease with
+            | ANF.NoReleasePlan ->
+                false, false, None, false, false, None, false, false, false
+            | ANF.DynamicBufferRelease _ ->
+                true, false, None, false, false, None, false, false, false
+            | ANF.RootRelease (_, ANF.TaggedList, _) ->
+                false, true, None, false, false, None, false, false, false
+            | ANF.RootRelease (_, ANF.DictHeap, _) ->
+                false, false, Some (dictDecHelperForReleasePlan valueRelease), false, false, None, false, false, false
+            | ANF.RootRelease (_, ANF.ClosureHeap, _) ->
+                false, false, None, true, false, None, false, false, false
+            | ANF.RootRelease (_, ANF.StreamHeap, _) ->
+                false, false, None, false, true, None, false, false, false
+            | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (16, fieldReleases))
+                when releasePlanDynamicOperationAt 0 ANF.DynamicStringBuffer fieldReleases
+                     && releasePlanRootKindAt 8 ANF.TaggedList fieldReleases ->
+                false, false, None, false, false, Some (16, valueRelease), false, false, false
+            | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (24, fieldReleases))
+                when releasePlanDynamicOperationAt 0 ANF.DynamicStringBuffer fieldReleases
+                     && releasePlanRootKindAt 8 ANF.TaggedList fieldReleases
+                     && releasePlanRootKindAt 16 ANF.DictHeap fieldReleases ->
+                false, false, None, false, false, Some (24, valueRelease), false, false, false
+            | ANF.RootRelease (_, ANF.GenericHeap, ANF.BoxedSumPayloadRelease (_, fieldReleases, _))
+                when releasePlanDynamicOperationAt 8 ANF.DynamicStringBuffer fieldReleases ->
+                false, false, None, false, false, Some (16, valueRelease), false, false, false
+            | ANF.RootRelease (payloadSize, ANF.GenericHeap, _) ->
+                false, false, None, false, false, Some (payloadSize, valueRelease), false, false, false
+            | other ->
+                unsupported "value" other
+
+        generateDictRefCountDecHelper
+            helperLabel
+            releaseLeafDynamicKey
+            releaseLeafDynamicValue
+            releaseLeafListValue
+            releaseLeafDictValueHelper
+            releaseLeafClosureValue
+            releaseLeafStreamValue
+            leafFixedBlockValueRelease
+            releaseLeafTupleStringListValue
+            releaseLeafTupleStringListDictValue
+            releaseLeafSumStringValue
+            ctx
+    | other ->
+        Crash.crash $"ARM64 planned dict RefCountDec helper requires a DictHeap release plan, got {other}"
+
+let generateLeakCounterInc (ctx: CodeGenContext) : ARM64Symbolic.Instr list =
+    if ctx.Options.EnableLeakCheck then
+        let labelRef = dataLabel leakCounterLabel
+        [
+            ARM64Symbolic.ADRP (ARM64Symbolic.X17, labelRef)
+            ARM64Symbolic.ADD_label (ARM64Symbolic.X17, ARM64Symbolic.X17, labelRef)
+            ARM64Symbolic.LDR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X16, ARM64Symbolic.X16, 1us)
+            ARM64Symbolic.STR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+        ]
+    else
+        []
+
+let generateLeakCounterDec (ctx: CodeGenContext) : ARM64Symbolic.Instr list =
+    if ctx.Options.EnableLeakCheck then
+        let labelRef = dataLabel leakCounterLabel
+        [
+            ARM64Symbolic.ADRP (ARM64Symbolic.X17, labelRef)
+            ARM64Symbolic.ADD_label (ARM64Symbolic.X17, ARM64Symbolic.X17, labelRef)
+            ARM64Symbolic.LDR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+            ARM64Symbolic.SUB_imm (ARM64Symbolic.X16, ARM64Symbolic.X16, 1us)
+            ARM64Symbolic.STR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+        ]
+    else
+        []
+
+let generateLeakCounterIncIfResultError (ctx: CodeGenContext) (resultReg: ARM64Symbolic.Reg) : ARM64Symbolic.Instr list =
+    let leakInc = generateLeakCounterInc ctx
+    if List.isEmpty leakInc then
+        []
+    else
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X15, resultReg, 0s)
+            ARM64Symbolic.CBZ_offset (ARM64Symbolic.X15, List.length leakInc + 1)
+        ] @ leakInc
+
+let generateLeakCheckReport (ctx: CodeGenContext) : ARM64Symbolic.Instr list =
+    if ctx.Options.EnableLeakCheck then
+        let prefix = Runtime.generatePrintCharsToStderr ctx.Target [byte 'l'; byte 'e'; byte 'a'; byte 'k'; byte 's'; byte ':'; byte ' '] |> runtimeInstrs
+        let printCount = Runtime.generatePrintInt64ToStderrNoExit ctx.Target |> runtimeInstrs
+        let skipOffset = List.length prefix + 1 + List.length printCount + 1
+        let labelRef = dataLabel leakCounterLabel
+        [
+            ARM64Symbolic.ADRP (ARM64Symbolic.X17, labelRef)
+            ARM64Symbolic.ADD_label (ARM64Symbolic.X17, ARM64Symbolic.X17, labelRef)
+            ARM64Symbolic.LDR (ARM64Symbolic.X16, ARM64Symbolic.X17, 0s)
+            ARM64Symbolic.CBZ_offset (ARM64Symbolic.X16, skipOffset)
+        ]
+        @ prefix
+        @ [ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X16)]
+        @ printCount
+    else
+        []
+
+/// Convert LIR.PhysReg to ARM64Symbolic.Reg
+let lirPhysRegToARM64Reg (physReg: LIR.PhysReg) : ARM64Symbolic.Reg =
+    match physReg with
+    | LIR.X0 -> ARM64Symbolic.X0
+    | LIR.X1 -> ARM64Symbolic.X1
+    | LIR.X2 -> ARM64Symbolic.X2
+    | LIR.X3 -> ARM64Symbolic.X3
+    | LIR.X4 -> ARM64Symbolic.X4
+    | LIR.X5 -> ARM64Symbolic.X5
+    | LIR.X6 -> ARM64Symbolic.X6
+    | LIR.X7 -> ARM64Symbolic.X7
+    | LIR.X8 -> ARM64Symbolic.X8
+    | LIR.X9 -> ARM64Symbolic.X9
+    | LIR.X10 -> ARM64Symbolic.X10
+    | LIR.X11 -> ARM64Symbolic.X11
+    | LIR.X12 -> ARM64Symbolic.X12
+    | LIR.X13 -> ARM64Symbolic.X13
+    | LIR.X14 -> ARM64Symbolic.X14
+    | LIR.X15 -> ARM64Symbolic.X15
+    | LIR.X16 -> ARM64Symbolic.X16
+    | LIR.X17 -> ARM64Symbolic.X17
+    | LIR.X19 -> ARM64Symbolic.X19
+    | LIR.X20 -> ARM64Symbolic.X20
+    | LIR.X21 -> ARM64Symbolic.X21
+    | LIR.X22 -> ARM64Symbolic.X22
+    | LIR.X23 -> ARM64Symbolic.X23
+    | LIR.X24 -> ARM64Symbolic.X24
+    | LIR.X25 -> ARM64Symbolic.X25
+    | LIR.X26 -> ARM64Symbolic.X26
+    | LIR.X27 -> ARM64Symbolic.X27
+    | LIR.X29 -> ARM64Symbolic.X29
+    | LIR.X30 -> ARM64Symbolic.X30
+    | LIR.SP -> ARM64Symbolic.SP
+
+/// Convert LIR.PhysFPReg to ARM64Symbolic.FReg
+let lirPhysFPRegToARM64FReg (physReg: LIR.PhysFPReg) : ARM64Symbolic.FReg =
+    match physReg with
+    | LIR.D0 -> ARM64Symbolic.D0
+    | LIR.D1 -> ARM64Symbolic.D1
+    | LIR.D2 -> ARM64Symbolic.D2
+    | LIR.D3 -> ARM64Symbolic.D3
+    | LIR.D4 -> ARM64Symbolic.D4
+    | LIR.D5 -> ARM64Symbolic.D5
+    | LIR.D6 -> ARM64Symbolic.D6
+    | LIR.D7 -> ARM64Symbolic.D7
+    | LIR.D8 -> ARM64Symbolic.D8
+    | LIR.D9 -> ARM64Symbolic.D9
+    | LIR.D10 -> ARM64Symbolic.D10
+    | LIR.D11 -> ARM64Symbolic.D11
+    | LIR.D12 -> ARM64Symbolic.D12
+    | LIR.D13 -> ARM64Symbolic.D13
+    | LIR.D14 -> ARM64Symbolic.D14
+    | LIR.D15 -> ARM64Symbolic.D15
+
+/// Convert LIR.FReg to ARM64Symbolic.FReg
+/// For FVirtual, we use a two-tier allocation scheme to avoid collisions:
+/// - FVirtual 1000 -> D18 (left operand temp for binary ops)
+/// - FVirtual 1001 -> D17 (right operand temp for binary ops)
+/// - FVirtual 3000-3007 -> D14-D15 (temps for float call args)
+/// - FVirtual 0-7 -> D2-D9 (dedicated 1:1 mapping for parameters)
+/// - FVirtual 8+ -> D10-D13 (4 temps with modulo, for SSA temps and locals)
+///
+/// The two-tier scheme ensures that parameter VRegs (0-7) never collide with
+/// SSA-generated temps (which have high IDs like 12001). Parameters get D2-D9,
+/// while temps get D10-D13 with modulo 4.
+let lirFRegToARM64FReg (freg: LIR.FReg) : Result<ARM64Symbolic.FReg, string> =
+    match freg with
+    | LIR.FPhysical physReg -> Ok (lirPhysFPRegToARM64FReg physReg)
+    // Special temp registers for specific purposes
+    | LIR.FVirtual 1000 -> Ok ARM64Symbolic.D18  // Left temp for binary ops
+    | LIR.FVirtual 1001 -> Ok ARM64Symbolic.D17  // Right temp for binary ops
+    | LIR.FVirtual 2000 -> Ok ARM64Symbolic.D16  // Reserved scratch for FPhi cycles and runtime helpers
+    | LIR.FVirtual n when n >= 3000 && n < 4000 ->
+        // Temps for float call arguments - use D19-D26 (8 registers)
+        // These must not collide with each other since up to 8 floats
+        // can be loaded before FArgMoves. Using D19-D26 avoids collision
+        // with argument regs D0-D7, parameter VRegs D2-D9, SSA temps D10-D13,
+        // and binary op temps D17-D18.
+        let tempIdx = (n - 3000) % 8
+        match tempIdx with
+        | 0 -> Ok ARM64Symbolic.D19
+        | 1 -> Ok ARM64Symbolic.D20
+        | 2 -> Ok ARM64Symbolic.D21
+        | 3 -> Ok ARM64Symbolic.D22
+        | 4 -> Ok ARM64Symbolic.D23
+        | 5 -> Ok ARM64Symbolic.D24
+        | 6 -> Ok ARM64Symbolic.D25
+        | _ -> Ok ARM64Symbolic.D26
+    | LIR.FVirtual n when n >= 0 && n <= 7 ->
+        // Parameters (VRegs 0-7) get dedicated D2-D9 mapping
+        // This prevents collisions with SSA-generated temps
+        let physReg =
+            match n with
+            | 0 -> ARM64Symbolic.D2
+            | 1 -> ARM64Symbolic.D3
+            | 2 -> ARM64Symbolic.D4
+            | 3 -> ARM64Symbolic.D5
+            | 4 -> ARM64Symbolic.D6
+            | 5 -> ARM64Symbolic.D7
+            | 6 -> ARM64Symbolic.D8
+            | _ -> ARM64Symbolic.D9
+        Ok physReg
+    | LIR.FVirtual n when n < 10000 ->
+        // ANF-level VRegs (8-9999): function params and local bindings
+        // These come from ANF TempIds which are sequential across functions.
+        // Pool: D0, D1, D10-D15, D27-D31 (13 registers)
+        // Using direct index: (n - 8) % 13
+        let tempRegs = [| ARM64Symbolic.D0; ARM64Symbolic.D1; ARM64Symbolic.D10; ARM64Symbolic.D11; ARM64Symbolic.D12; ARM64Symbolic.D13; ARM64Symbolic.D14; ARM64Symbolic.D15;
+                          ARM64Symbolic.D27; ARM64Symbolic.D28; ARM64Symbolic.D29; ARM64Symbolic.D30; ARM64Symbolic.D31 |]
+        let regIdx = (n - 8) % tempRegs.Length
+        Ok tempRegs.[regIdx]
+    | LIR.FVirtual n ->
+        // MIR intermediates (VRegs 10000+): computation temps from freshReg
+        // Use same pool but with offset to reduce collisions with ANF-level VRegs
+        // The offset of 7 ensures that if ANF VReg k and MIR VReg (10000+k) exist,
+        // they map to different registers (since 7 and 13 are coprime)
+        let tempRegs = [| ARM64Symbolic.D0; ARM64Symbolic.D1; ARM64Symbolic.D10; ARM64Symbolic.D11; ARM64Symbolic.D12; ARM64Symbolic.D13; ARM64Symbolic.D14; ARM64Symbolic.D15;
+                          ARM64Symbolic.D27; ARM64Symbolic.D28; ARM64Symbolic.D29; ARM64Symbolic.D30; ARM64Symbolic.D31 |]
+        let regIdx = ((n - 10000) + 7) % tempRegs.Length
+        Ok tempRegs.[regIdx]
+
+/// Convert LIR.Reg to ARM64Symbolic.Reg (assumes physical registers only)
+let lirRegToARM64Reg (reg: LIR.Reg) : Result<ARM64Symbolic.Reg, string> =
+    match reg with
+    | LIR.Physical physReg -> Ok (lirPhysRegToARM64Reg physReg)
+    | LIR.Virtual vreg -> Error $"Virtual register {vreg} should have been allocated"
+
+/// Convert LIR.Reg (Virtual) to LIR.FReg (FVirtual) for float HeapStore
+/// This is used when a float value is stored via HeapStore - the register
+/// ID is shared between Virtual and FVirtual address spaces
+let virtualToFVirtual (reg: LIR.Reg) : LIR.FReg =
+    match reg with
+    | LIR.Virtual n -> LIR.FVirtual n
+    | LIR.Physical p -> LIR.FPhysical (
+        // Map GP physical registers to FP physical registers for edge cases
+        match p with
+        | LIR.X0 -> LIR.D0 | LIR.X1 -> LIR.D1 | LIR.X2 -> LIR.D2 | LIR.X3 -> LIR.D3
+        | LIR.X4 -> LIR.D4 | LIR.X5 -> LIR.D5 | LIR.X6 -> LIR.D6 | LIR.X7 -> LIR.D7
+        | _ -> LIR.D15)
+
+/// Generate ARM64 instructions to load an immediate into a register
+let loadImmediate (dest: ARM64Symbolic.Reg) (value: int64) : ARM64Symbolic.Instr list =
+    // Load 64-bit immediate using MOVZ/MOVN + MOVK sequence
+    // For negative numbers, MOVN (move NOT) can be more efficient
+
+    // Extract each 16-bit chunk
+    let chunk0 = uint16 (value >>> 0) &&& 0xFFFFus
+    let chunk1 = uint16 (value >>> 16) &&& 0xFFFFus
+    let chunk2 = uint16 (value >>> 32) &&& 0xFFFFus
+    let chunk3 = uint16 (value >>> 48) &&& 0xFFFFus
+
+    // Count how many chunks are all-zeros vs all-ones
+    let zeroCount =
+        (if chunk0 = 0us then 1 else 0) +
+        (if chunk1 = 0us then 1 else 0) +
+        (if chunk2 = 0us then 1 else 0) +
+        (if chunk3 = 0us then 1 else 0)
+    let onesCount =
+        (if chunk0 = 0xFFFFus then 1 else 0) +
+        (if chunk1 = 0xFFFFus then 1 else 0) +
+        (if chunk2 = 0xFFFFus then 1 else 0) +
+        (if chunk3 = 0xFFFFus then 1 else 0)
+
+    // Use MOVN if more chunks are 0xFFFF (inverted gives more zeros)
+    if onesCount > zeroCount then
+        // Use MOVN: start with first non-0xFFFF chunk, then MOVK for remaining non-0xFFFF chunks
+        // MOVN Xd, #imm, LSL #shift sets Xd = NOT(imm << shift), filling rest with 1s
+        // Find first chunk that is NOT 0xFFFF (so inverting gives a meaningful value)
+        let chunks = [(chunk0, 0); (chunk1, 16); (chunk2, 32); (chunk3, 48)]
+        let firstNonOnes = chunks |> List.tryFind (fun (c, _) -> c <> 0xFFFFus)
+        match firstNonOnes with
+        | Some (firstChunk, firstShift) ->
+            // Start with MOVN using inverted first non-0xFFFF chunk
+            let invFirstChunk = ~~~firstChunk
+            [ARM64Symbolic.MOVN (dest, invFirstChunk, firstShift)]
+            @ (if firstShift <> 0 && chunk0 <> 0xFFFFus then [ARM64Symbolic.MOVK (dest, chunk0, 0)] else [])
+            @ (if firstShift <> 16 && chunk1 <> 0xFFFFus then [ARM64Symbolic.MOVK (dest, chunk1, 16)] else [])
+            @ (if firstShift <> 32 && chunk2 <> 0xFFFFus then [ARM64Symbolic.MOVK (dest, chunk2, 32)] else [])
+            @ (if firstShift <> 48 && chunk3 <> 0xFFFFus then [ARM64Symbolic.MOVK (dest, chunk3, 48)] else [])
+        | None ->
+            // All chunks are 0xFFFF, use MOVN #0 to get all 1s (-1)
+            [ARM64Symbolic.MOVN (dest, 0us, 0)]
+    else
+        // Use MOVZ: find first non-zero chunk, then MOVK for remaining non-zero chunks
+        // MOVZ Xd, #imm, LSL #shift sets Xd = imm << shift, zeros elsewhere
+        let chunks = [(chunk0, 0); (chunk1, 16); (chunk2, 32); (chunk3, 48)]
+        let firstNonZero = chunks |> List.tryFind (fun (c, _) -> c <> 0us)
+        match firstNonZero with
+        | Some (firstChunk, firstShift) ->
+            // Start with MOVZ using first non-zero chunk
+            [ARM64Symbolic.MOVZ (dest, firstChunk, firstShift)]
+            @ (if firstShift <> 0 && chunk0 <> 0us then [ARM64Symbolic.MOVK (dest, chunk0, 0)] else [])
+            @ (if firstShift <> 16 && chunk1 <> 0us then [ARM64Symbolic.MOVK (dest, chunk1, 16)] else [])
+            @ (if firstShift <> 32 && chunk2 <> 0us then [ARM64Symbolic.MOVK (dest, chunk2, 32)] else [])
+            @ (if firstShift <> 48 && chunk3 <> 0us then [ARM64Symbolic.MOVK (dest, chunk3, 48)] else [])
+        | None ->
+            // All chunks are zero, just use MOVZ #0
+            [ARM64Symbolic.MOVZ (dest, 0us, 0)]
+
+/// Generate ARM64 instructions to load a stack slot into a register
+/// Stack slots are accessed relative to FP (X29)
+/// Uses LDUR for small offsets (-256 to +255), computes address for larger offsets
+let loadStackSlot (dest: ARM64Symbolic.Reg) (offset: int) : Result<ARM64Symbolic.Instr list, string> =
+    if offset >= -256 && offset <= 255 then
+        // Small offset: use LDUR directly
+        Ok [ARM64Symbolic.LDUR (dest, ARM64Symbolic.X29, int16 offset)]
+    elif offset < 0 && -offset <= 4095 then
+        // Larger negative offset: compute address into X10, then load
+        // X10 = X29 - (-offset), then LDR dest, [X10, #0]
+        Ok [
+            ARM64Symbolic.SUB_imm (ARM64Symbolic.X10, ARM64Symbolic.X29, uint16 (-offset))
+            ARM64Symbolic.LDR (dest, ARM64Symbolic.X10, 0s)
+        ]
+    elif offset > 0 && offset <= 4095 then
+        // Larger positive offset: compute address into X10, then load
+        Ok [
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X29, uint16 offset)
+            ARM64Symbolic.LDR (dest, ARM64Symbolic.X10, 0s)
+        ]
+    else
+        Error $"Stack offset {offset} exceeds supported range (-4095 to +4095)"
+
+/// Load an integer or managed-string operand for a native CLI helper call.
+let private loadCliOperand (dest: ARM64Symbolic.Reg) (operand: LIR.Operand) : Result<ARM64Symbolic.Instr list, string> =
+    match operand with
+    | LIR.Imm value -> Ok (loadImmediate dest value)
+    | LIR.Reg source ->
+        lirRegToARM64Reg source
+        |> Result.map (fun sourceReg ->
+            if sourceReg = dest then [] else [ARM64Symbolic.MOV_reg (dest, sourceReg)])
+    | LIR.StackSlot offset -> loadStackSlot dest offset
+    | LIR.StringSymbol value -> Ok (loadStringLiteralPointer dest value)
+    | _ -> Error "CLI native operation received a non-integer operand"
+
+/// Generate ARM64 instructions to store a register to a stack slot
+/// Stack slots are accessed relative to FP (X29)
+/// Uses STUR for small offsets (-256 to +255), computes address for larger offsets
+let storeStackSlot (src: ARM64Symbolic.Reg) (offset: int) : Result<ARM64Symbolic.Instr list, string> =
+    if offset >= -256 && offset <= 255 then
+        // Small offset: use STUR directly
+        Ok [ARM64Symbolic.STUR (src, ARM64Symbolic.X29, int16 offset)]
+    elif offset < 0 && -offset <= 4095 then
+        // Larger negative offset: compute address into X10, then store
+        // X10 = X29 - (-offset), then STR src, [X10, #0]
+        Ok [
+            ARM64Symbolic.SUB_imm (ARM64Symbolic.X10, ARM64Symbolic.X29, uint16 (-offset))
+            ARM64Symbolic.STR (src, ARM64Symbolic.X10, 0s)
+        ]
+    elif offset > 0 && offset <= 4095 then
+        // Larger positive offset: compute address into X10, then store
+        Ok [
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X29, uint16 offset)
+            ARM64Symbolic.STR (src, ARM64Symbolic.X10, 0s)
+        ]
+    else
+        Error $"Stack offset {offset} exceeds supported range (-4095 to +4095)"
+
+/// Generate STP instructions to save callee-saved register pairs
+/// Returns instructions and total bytes pushed
+let generateCalleeSavedSaves (regs: LIR.PhysReg list) : ARM64Symbolic.Instr list * int =
+    // Process in pairs. If odd number, pad with X27 (or just save single)
+    let rec savePairs (remaining: LIR.PhysReg list) (offset: int) (acc: ARM64Symbolic.Instr list) =
+        match remaining with
+        | [] -> (List.rev acc, offset)
+        | [single] ->
+            // Single register: use STR instead of STP
+            let instr = ARM64Symbolic.STR (lirPhysRegToARM64Reg single, ARM64Symbolic.SP, int16 offset)
+            (List.rev (instr :: acc), offset + 8)
+        | r1 :: r2 :: rest ->
+            let instr = ARM64Symbolic.STP (lirPhysRegToARM64Reg r1, lirPhysRegToARM64Reg r2, ARM64Symbolic.SP, int16 offset)
+            savePairs rest (offset + 16) (instr :: acc)
+
+    if List.isEmpty regs then
+        ([], 0)
+    else
+        savePairs regs 0 []
+
+/// Generate LDP instructions to restore callee-saved register pairs
+let generateCalleeSavedRestores (regs: LIR.PhysReg list) : ARM64Symbolic.Instr list =
+    let rec restorePairs (remaining: LIR.PhysReg list) (offset: int) (acc: ARM64Symbolic.Instr list) =
+        match remaining with
+        | [] -> List.rev acc
+        | [single] ->
+            let instr = ARM64Symbolic.LDR (lirPhysRegToARM64Reg single, ARM64Symbolic.SP, int16 offset)
+            List.rev (instr :: acc)
+        | r1 :: r2 :: rest ->
+            let instr = ARM64Symbolic.LDP (lirPhysRegToARM64Reg r1, lirPhysRegToARM64Reg r2, ARM64Symbolic.SP, int16 offset)
+            restorePairs rest (offset + 16) (instr :: acc)
+
+    if List.isEmpty regs then []
+    else restorePairs regs 0 []
+
+/// Calculate stack space needed for callee-saved registers (16-byte aligned)
+let calleeSavedStackSpace (regs: LIR.PhysReg list) : int =
+    let count = List.length regs
+    if count = 0 then 0
+    else ((count * 8 + 15) / 16) * 16  // 16-byte aligned
+
+/// Generate function prologue
+/// Saves FP, LR, callee-saved registers, and allocates stack space
+let generatePrologue (usedCalleeSaved: LIR.PhysReg list) (stackSize: int) : ARM64Symbolic.Instr list =
+    // Prologue sequence:
+    // 1. Save FP (X29) and LR (X30) with pre-indexed addressing (combines SUB and STP)
+    // 2. Set FP = SP: MOV X29, SP
+    // 3. Allocate stack space for spills and callee-saved registers
+    // 4. Save callee-saved registers
+
+    // Use pre-indexed STP to save FP/LR and decrement SP in one instruction
+    let saveFpLr = [ARM64Symbolic.STP_pre (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)]
+    let setFp = [ARM64Symbolic.MOV_reg (ARM64Symbolic.X29, ARM64Symbolic.SP)]
+
+    // Calculate total additional stack space needed
+    let calleeSavedSpace = calleeSavedStackSpace usedCalleeSaved
+    let totalExtraStack = stackSize + calleeSavedSpace
+
+    // Allocate all stack space at once (for spills + callee-saved)
+    let allocStack =
+        if totalExtraStack > 0 then
+            [ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 totalExtraStack)]
+        else
+            []
+
+    // Save callee-saved registers at [SP]
+    // (callee-saved are at the bottom of the frame, spill space is above them)
+    let (saveCalleeSavedInstrs, _) = generateCalleeSavedSaves usedCalleeSaved
+
+    saveFpLr @ setFp @ allocStack @ saveCalleeSavedInstrs
+
+/// Generate function epilogue
+/// Restores callee-saved registers, FP, LR, and returns
+let generateEpilogue (usedCalleeSaved: LIR.PhysReg list) (stackSize: int) : ARM64Symbolic.Instr list =
+    // Epilogue sequence (reverse of prologue):
+    // 1. Restore callee-saved registers from [SP + stackSize]
+    // 2. Deallocate stack space (spills + callee-saved) at once
+    // 3. Restore FP and LR with post-indexed addressing (combines LDP and ADD)
+    // 4. Return: RET
+
+    // Restore callee-saved registers from [SP]
+    // (callee-saved are at the bottom of the frame, spill space is above them)
+    let calleeSavedSpace = calleeSavedStackSpace usedCalleeSaved
+    let restoreCalleeSavedInstrs = generateCalleeSavedRestores usedCalleeSaved
+
+    // Deallocate all stack space at once
+    let totalExtraStack = stackSize + calleeSavedSpace
+    let deallocStack =
+        if totalExtraStack > 0 then
+            [ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 totalExtraStack)]
+        else
+            []
+
+    // Use post-indexed LDP to restore FP/LR and increment SP in one instruction
+    let restoreFpLr = [ARM64Symbolic.LDP_post (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)]
+    let ret = [ARM64Symbolic.RET]
+
+    restoreCalleeSavedInstrs @ deallocStack @ restoreFpLr @ ret
+
+/// Convert LIR instruction to ARM64 instructions
+let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symbolic.Instr list, string> =
+    let generatePrintListInstrs (listReg: ARM64Symbolic.Reg) (elemType: AST.Type) (includeNewline: bool) : ARM64Symbolic.Instr list =
+        let syscalls = ARM64.targetSyscalls ctx.Target
+
+        // Generate element print code based on type (uses X0 for value)
+        let elemPrintCode =
+            match elemType with
+            | AST.TInt64 -> runtimeInstrs (Runtime.generatePrintInt64NoNewline ctx.Target)
+            | AST.TUInt64 -> runtimeInstrs (Runtime.generatePrintUInt64NoNewline ctx.Target)
+            | AST.TBool -> runtimeInstrs (Runtime.generatePrintBoolNoNewline ctx.Target)
+            | AST.TFloat64 ->
+                // Need to move from X0 to D0 for float
+                [ARM64Symbolic.FMOV_from_gp (ARM64Symbolic.D0, ARM64Symbolic.X0)] @ runtimeInstrs (Runtime.generatePrintFloatNoNewline ctx.Target)
+            | AST.TString | AST.TChar ->
+                // X0 has string address, load len/data and print
+                [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 16us)] @
+                runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target)
+            | AST.TTuple elemTypes ->
+                // Print tuple inside list: (elem1, elem2, ...)
+                // Use X21 for tuple ptr (callee-saved), keep X19 for list ptr
+                let moveTupleToX21 = [ARM64Symbolic.MOV_reg (ARM64Symbolic.X21, ARM64Symbolic.X0)]
+
+                // Print "("
+                let printOpenParen = [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X0, uint16 (byte '('), 0)
+                    ARM64Symbolic.STRB (ARM64Symbolic.X0, ARM64Symbolic.SP, 0)
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP)
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0)
+                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
+                    ARM64Symbolic.SVC syscalls.SvcImmediate
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+                ]
+
+                // Print ", " helper
+                let printTupleCommaSpace = [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X0, uint16 (byte ','), 0)
+                    ARM64Symbolic.STRB (ARM64Symbolic.X0, ARM64Symbolic.SP, 0)
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X0, uint16 (byte ' '), 0)
+                    ARM64Symbolic.STRB (ARM64Symbolic.X0, ARM64Symbolic.SP, 1)
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP)
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 2us, 0)
+                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
+                    ARM64Symbolic.SVC syscalls.SvcImmediate
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+                ]
+
+                // Generate code for each tuple element (load from X21)
+                let tupleElemInstrs =
+                    elemTypes
+                    |> List.mapi (fun i eType ->
+                        let loadElem = [ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X21, int16 (i * 8))]
+                        let printElem =
+                            match eType with
+                            | AST.TInt64 -> runtimeInstrs (Runtime.generatePrintInt64NoNewline ctx.Target)
+                            | AST.TUInt64 -> runtimeInstrs (Runtime.generatePrintUInt64NoNewline ctx.Target)
+                            | AST.TBool -> runtimeInstrs (Runtime.generatePrintBoolNoNewline ctx.Target)
+                            | AST.TFloat64 ->
+                                [ARM64Symbolic.FMOV_from_gp (ARM64Symbolic.D0, ARM64Symbolic.X0)] @ runtimeInstrs (Runtime.generatePrintFloatNoNewline ctx.Target)
+                            | AST.TString | AST.TChar ->
+                                [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 16us)] @
+                                runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target)
+                            | _ -> runtimeInstrs (Runtime.generatePrintInt64NoNewline ctx.Target)
+                        let comma = if i < List.length elemTypes - 1 then printTupleCommaSpace else []
+                        loadElem @ printElem @ comma
+                    )
+                    |> List.concat
+
+                // Print ")"
+                let printCloseParen = [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X0, uint16 (byte ')'), 0)
+                    ARM64Symbolic.STRB (ARM64Symbolic.X0, ARM64Symbolic.SP, 0)
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP)
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0)
+                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
+                    ARM64Symbolic.SVC syscalls.SvcImmediate
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+                ]
+
+                moveTupleToX21 @ printOpenParen @ tupleElemInstrs @ printCloseParen
+            | _ ->
+                // For other types (nested lists, etc.), print as integer for now
+                runtimeInstrs (Runtime.generatePrintInt64NoNewline ctx.Target)
+
+        let elemPrintLen = List.length elemPrintCode
+
+        // Print "[" - 9 instructions
+        let printOpenBracket = [
+            ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us);
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X0, uint16 (byte '['), 0);
+            ARM64Symbolic.STRB (ARM64Symbolic.X0, ARM64Symbolic.SP, 0);
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0);          // fd = stdout
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP);    // buffer
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0);         // len = 1
+            ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0);
+            ARM64Symbolic.SVC syscalls.SvcImmediate;
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+        ]
+
+        // Setup: X19 = list pointer, X20 = 1 (first element flag)
+        let setup = [ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, listReg); ARM64Symbolic.MOVZ (ARM64Symbolic.X20, 1us, 0)]
+
+        // Print ", " - used inside loop when not first element
+        let printCommaSpace = [
+            ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us);
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X0, uint16 (byte ','), 0);
+            ARM64Symbolic.STRB (ARM64Symbolic.X0, ARM64Symbolic.SP, 0);
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X0, uint16 (byte ' '), 0);
+            ARM64Symbolic.STRB (ARM64Symbolic.X0, ARM64Symbolic.SP, 1);
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0);
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP);
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 2us, 0);
+            ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0);
+            ARM64Symbolic.SVC syscalls.SvcImmediate;
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+        ]
+        let commaLen = List.length printCommaSpace
+
+        // Loop structure:
+        // loop_start:
+        //   CBZ X19, loop_end           // if list == nil, exit
+        //   CBNZ X20, skip_comma        // if first, skip comma
+        //   <print ", ">
+        // skip_comma:
+        //   MOV X20, 0                  // first = false
+        //   LDR X0, [X19, #8]           // X0 = head
+        //   <print element>
+        //   LDR X19, [X19, #16]         // X19 = tail
+        //   B loop_start
+        // loop_end:
+        //   <print "]">
+
+        // Calculate branch offsets
+        // loopBodyLen = instructions after CBZ = CBNZ(1) + comma(11) + skipComma(2) + element(N) + loopEnd(2)
+        let loopBodyLen = 1 + commaLen + 2 + elemPrintLen + 2
+        // CBZ skips to loop_end (after B), which is at index loopBodyLen+1 (since CBZ is at index 0)
+        let cbzOffset = loopBodyLen + 1
+        // CBNZ skips commaLen instructions to reach skipComma
+        let skipCommaOffset = commaLen
+
+        let loopStart = [ARM64Symbolic.CBZ_offset (ARM64Symbolic.X19, cbzOffset); ARM64Symbolic.CBNZ_offset (ARM64Symbolic.X20, skipCommaOffset)]
+        let skipComma = [ARM64Symbolic.MOVZ (ARM64Symbolic.X20, 0us, 0); ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X19, 8s)]
+        // B is at index loopBodyLen, jump back to CBZ at index 0
+        let loopEnd = [ARM64Symbolic.LDR (ARM64Symbolic.X19, ARM64Symbolic.X19, 16s); ARM64Symbolic.B (-loopBodyLen)]
+        let loopCode = loopStart @ printCommaSpace @ skipComma @ elemPrintCode @ loopEnd
+
+        let printCloseBracket =
+            if includeNewline then
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us);
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X0, uint16 (byte ']'), 0);
+                    ARM64Symbolic.STRB (ARM64Symbolic.X0, ARM64Symbolic.SP, 0);
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X0, uint16 (byte '\n'), 0);
+                    ARM64Symbolic.STRB (ARM64Symbolic.X0, ARM64Symbolic.SP, 1);
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0);
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP);
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 2us, 0);
+                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0);
+                    ARM64Symbolic.SVC syscalls.SvcImmediate;
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+                ]
+            else
+                [
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us);
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X0, uint16 (byte ']'), 0);
+                    ARM64Symbolic.STRB (ARM64Symbolic.X0, ARM64Symbolic.SP, 0);
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0);
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP);
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0);
+                    ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0);
+                    ARM64Symbolic.SVC syscalls.SvcImmediate;
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+                ]
+
+        setup @ printOpenBracket @ loopCode @ printCloseBracket
+
+    match instr with
+    | LIR.Phi _ ->
+        // Phi nodes should be eliminated before code generation (by register allocation)
+        Error "Phi nodes should be eliminated before code generation"
+
+    | LIR.FPhi _ ->
+        // Float phi nodes should be eliminated before code generation (by register allocation)
+        Error "Float phi nodes should be eliminated before code generation"
+
+    | LIR.Mov (dest, src) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            match src with
+            | LIR.Imm value ->
+                Ok (loadImmediate destReg value)
+            | LIR.FloatImm _ ->
+                Error "Float code generation not yet implemented"
+            | LIR.Reg srcReg ->
+                lirRegToARM64Reg srcReg
+                |> Result.map (fun srcARM64 ->
+                    // Skip self-moves (can happen after register allocation coalesces VRegs)
+                    if destReg = srcARM64 then []
+                    else [ARM64Symbolic.MOV_reg (destReg, srcARM64)])
+            | LIR.StackSlot offset ->
+                // Load from stack slot into destination register
+                loadStackSlot destReg offset
+            | LIR.StringSymbol value ->
+                Ok (loadStringLiteralPointer destReg value)
+            | LIR.FloatSymbol _ ->
+                Error "Cannot MOV float reference - use FLoad instruction"
+            | LIR.FuncAddr funcName ->
+                // Load function address using ADR instruction
+                Ok [ARM64Symbolic.ADR (destReg, codeLabel funcName)])
+
+    | LIR.Store (offset, src) ->
+        // Store register to stack slot
+        lirRegToARM64Reg src
+        |> Result.bind (fun srcReg -> storeStackSlot srcReg offset)
+
+    | LIR.Add (dest, left, right) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg left
+            |> Result.bind (fun leftReg ->
+                match right with
+                | LIR.Imm value when value >= 0L && value < 4096L ->
+                    // Can use immediate ADD
+                    Ok [ARM64Symbolic.ADD_imm (destReg, leftReg, uint16 value)]
+                | LIR.Imm value ->
+                    // Need to load immediate into register first
+                    let tempReg = ARM64Symbolic.X9  // Use X9 as temp
+                    Ok (loadImmediate tempReg value @ [ARM64Symbolic.ADD_reg (destReg, leftReg, tempReg)])
+                | LIR.FloatImm _ ->
+                    Error "Float code generation not yet implemented"
+                | LIR.Reg rightReg ->
+                    lirRegToARM64Reg rightReg
+                    |> Result.map (fun rightARM64 -> [ARM64Symbolic.ADD_reg (destReg, leftReg, rightARM64)])
+                | LIR.StackSlot offset ->
+                    // Load stack slot into temp register, then add
+                    let tempReg = ARM64Symbolic.X9
+                    loadStackSlot tempReg offset
+                    |> Result.map (fun loadInstrs -> loadInstrs @ [ARM64Symbolic.ADD_reg (destReg, leftReg, tempReg)])
+                | LIR.StringSymbol _ ->
+                    Error "Cannot use string reference in arithmetic operation"
+                | LIR.FloatSymbol _ ->
+                    Error "Cannot use float reference in integer arithmetic"
+                | LIR.FuncAddr _ ->
+                    Error "Cannot use function address in arithmetic operation"))
+
+    | LIR.Sub (dest, left, right) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg left
+            |> Result.bind (fun leftReg ->
+                match right with
+                | LIR.Imm value when value >= 0L && value < 4096L ->
+                    Ok [ARM64Symbolic.SUB_imm (destReg, leftReg, uint16 value)]
+                | LIR.Imm value ->
+                    let tempReg = ARM64Symbolic.X9
+                    Ok (loadImmediate tempReg value @ [ARM64Symbolic.SUB_reg (destReg, leftReg, tempReg)])
+                | LIR.FloatImm _ ->
+                    Error "Float code generation not yet implemented"
+                | LIR.Reg rightReg ->
+                    lirRegToARM64Reg rightReg
+                    |> Result.map (fun rightARM64 -> [ARM64Symbolic.SUB_reg (destReg, leftReg, rightARM64)])
+                | LIR.StackSlot offset ->
+                    // Load stack slot into temp register, then subtract
+                    let tempReg = ARM64Symbolic.X9
+                    loadStackSlot tempReg offset
+                    |> Result.map (fun loadInstrs -> loadInstrs @ [ARM64Symbolic.SUB_reg (destReg, leftReg, tempReg)])
+                | LIR.StringSymbol _ ->
+                    Error "Cannot use string reference in arithmetic operation"
+                | LIR.FloatSymbol _ ->
+                    Error "Cannot use float reference in integer arithmetic"
+                | LIR.FuncAddr _ ->
+                    Error "Cannot use function address in arithmetic operation"))
+
+
+    | LIR.Mul (dest, left, right) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg left
+            |> Result.bind (fun leftReg ->
+                lirRegToARM64Reg right
+                |> Result.map (fun rightReg -> [ARM64Symbolic.MUL (destReg, leftReg, rightReg)])))
+
+    | LIR.Sdiv (dest, left, right) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg left
+            |> Result.bind (fun leftReg ->
+                lirRegToARM64Reg right
+                |> Result.map (fun rightReg -> [ARM64Symbolic.SDIV (destReg, leftReg, rightReg)])))
+    | LIR.Udiv (dest, left, right) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg left
+            |> Result.bind (fun leftReg ->
+                lirRegToARM64Reg right
+                |> Result.map (fun rightReg -> [ARM64Symbolic.UDIV (destReg, leftReg, rightReg)])))
+
+    | LIR.Msub (dest, mulLeft, mulRight, sub) ->
+        // MSUB: dest = sub - mulLeft * mulRight
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg mulLeft
+            |> Result.bind (fun mulLeftReg ->
+                lirRegToARM64Reg mulRight
+                |> Result.bind (fun mulRightReg ->
+                    lirRegToARM64Reg sub
+                    |> Result.map (fun subReg ->
+                        [ARM64Symbolic.MSUB (destReg, mulLeftReg, mulRightReg, subReg)]))))
+
+    | LIR.Madd (dest, mulLeft, mulRight, add) ->
+        // MADD: dest = add + mulLeft * mulRight
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg mulLeft
+            |> Result.bind (fun mulLeftReg ->
+                lirRegToARM64Reg mulRight
+                |> Result.bind (fun mulRightReg ->
+                    lirRegToARM64Reg add
+                    |> Result.map (fun addReg ->
+                        [ARM64Symbolic.MADD (destReg, mulLeftReg, mulRightReg, addReg)]))))
+
+    | LIR.Cmp (left, right) ->
+        lirRegToARM64Reg left
+        |> Result.bind (fun leftReg ->
+            match right with
+            | LIR.Imm value when value >= 0L && value < 4096L ->
+                Ok [ARM64Symbolic.CMP_imm (leftReg, uint16 value)]
+            | LIR.Imm value ->
+                let tempReg = ARM64Symbolic.X9
+                Ok (loadImmediate tempReg value @ [ARM64Symbolic.CMP_reg (leftReg, tempReg)])
+            | LIR.FloatImm _ ->
+                Error "Float code generation not yet implemented"
+            | LIR.Reg rightReg ->
+                lirRegToARM64Reg rightReg
+                |> Result.map (fun rightARM64 -> [ARM64Symbolic.CMP_reg (leftReg, rightARM64)])
+            | LIR.StackSlot offset ->
+                // Load stack slot into temp register, then compare
+                let tempReg = ARM64Symbolic.X9
+                loadStackSlot tempReg offset
+                |> Result.map (fun loadInstrs -> loadInstrs @ [ARM64Symbolic.CMP_reg (leftReg, tempReg)])
+            | LIR.StringSymbol _ ->
+                Error "Cannot compare string references directly"
+            | LIR.FloatSymbol _ ->
+                Error "Cannot compare float references directly - use FCmp"
+            | LIR.FuncAddr _ ->
+                Error "Cannot compare function addresses directly")
+
+    | LIR.Cset (dest, cond) ->
+        lirRegToARM64Reg dest
+        |> Result.map (fun destReg ->
+            let arm64Cond =
+                match cond with
+                | LIR.EQ -> ARM64Symbolic.EQ
+                | LIR.NE -> ARM64Symbolic.NE
+                | LIR.LT -> ARM64Symbolic.LT
+                | LIR.GT -> ARM64Symbolic.GT
+                | LIR.LE -> ARM64Symbolic.LE
+                | LIR.GE -> ARM64Symbolic.GE
+                | LIR.ULT -> ARM64Symbolic.LO
+                | LIR.UGT -> ARM64Symbolic.HI
+                | LIR.ULE -> ARM64Symbolic.LS
+                | LIR.UGE -> ARM64Symbolic.HS
+            [ARM64Symbolic.CSET (destReg, arm64Cond)])
+
+    | LIR.And (dest, left, right) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg left
+            |> Result.bind (fun leftReg ->
+                lirRegToARM64Reg right
+                |> Result.map (fun rightReg -> [ARM64Symbolic.AND_reg (destReg, leftReg, rightReg)])))
+
+    | LIR.And_imm (dest, src, imm) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.AND_imm (destReg, srcReg, uint64 imm)]))
+
+    | LIR.Orr (dest, left, right) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg left
+            |> Result.bind (fun leftReg ->
+                lirRegToARM64Reg right
+                |> Result.map (fun rightReg -> [ARM64Symbolic.ORR_reg (destReg, leftReg, rightReg)])))
+
+    | LIR.Eor (dest, left, right) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg left
+            |> Result.bind (fun leftReg ->
+                lirRegToARM64Reg right
+                |> Result.map (fun rightReg -> [ARM64Symbolic.EOR_reg (destReg, leftReg, rightReg)])))
+
+    | LIR.Lsl (dest, src, shift) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.bind (fun srcReg ->
+                lirRegToARM64Reg shift
+                |> Result.map (fun shiftReg -> [ARM64Symbolic.LSL_reg (destReg, srcReg, shiftReg)])))
+
+    | LIR.Lsr (dest, src, shift) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.bind (fun srcReg ->
+                lirRegToARM64Reg shift
+                |> Result.map (fun shiftReg -> [ARM64Symbolic.LSR_reg (destReg, srcReg, shiftReg)])))
+
+    | LIR.Asr (dest, src, shift) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.bind (fun srcReg ->
+                lirRegToARM64Reg shift
+                |> Result.map (fun shiftReg -> [ARM64Symbolic.ASR_reg (destReg, srcReg, shiftReg)])))
+
+    | LIR.Lsl_imm (dest, src, shift) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.LSL_imm (destReg, srcReg, shift)]))
+
+    | LIR.Lsr_imm (dest, src, shift) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.LSR_imm (destReg, srcReg, shift)]))
+
+    | LIR.Asr_imm (dest, src, shift) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.ASR_imm (destReg, srcReg, shift)]))
+
+    | LIR.Neg (dest, src) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.NEG (destReg, srcReg)]))
+
+    | LIR.Mvn (dest, src) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.MVN (destReg, srcReg)]))
+
+    // Sign/zero extension for integer overflow truncation
+    | LIR.Sxtb (dest, src) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.SXTB (destReg, srcReg)]))
+
+    | LIR.Sxth (dest, src) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.SXTH (destReg, srcReg)]))
+
+    | LIR.Sxtw (dest, src) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.SXTW (destReg, srcReg)]))
+
+    | LIR.Uxtb (dest, src) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.UXTB (destReg, srcReg)]))
+
+    | LIR.Uxth (dest, src) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.UXTH (destReg, srcReg)]))
+
+    | LIR.Uxtw (dest, src) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.UXTW (destReg, srcReg)]))
+
+    | LIR.PrintBool reg ->
+        // Print booleans as "true" or "false" (no exit)
+        lirRegToARM64Reg reg
+        |> Result.map (fun regARM64 ->
+            if regARM64 <> ARM64Symbolic.X0 then
+                [ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, regARM64)] @ runtimeInstrs (Runtime.generatePrintBoolNoExit ctx.Target)
+            else
+                runtimeInstrs (Runtime.generatePrintBoolNoExit ctx.Target))
+
+    | LIR.PrintChars chars ->
+        // Print literal characters (for tuple/list delimiters like "(", ", ", ")")
+        Ok (runtimeInstrs (Runtime.generatePrintChars ctx.Target chars))
+
+    | LIR.PrintBlob reg ->
+        // Render the in-process Blob without exposing its payload or identity.
+        lirRegToARM64Reg reg
+        |> Result.map (fun regARM64 ->
+            if regARM64 <> ARM64Symbolic.X19 then
+                [ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, regARM64)] @ runtimeInstrs (Runtime.generatePrintBlob ctx.Target)
+            else
+                runtimeInstrs (Runtime.generatePrintBlob ctx.Target))
+
+    | LIR.PrintInt64NoNewline reg ->
+        // Print integer without newline (for tuple elements)
+        lirRegToARM64Reg reg
+        |> Result.map (fun regARM64 ->
+            if regARM64 <> ARM64Symbolic.X0 then
+                [ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, regARM64)] @ runtimeInstrs (Runtime.generatePrintInt64NoNewline ctx.Target)
+            else
+                runtimeInstrs (Runtime.generatePrintInt64NoNewline ctx.Target))
+
+    | LIR.PrintUInt64NoNewline reg ->
+        // Print unsigned integer without newline (for tuple elements)
+        lirRegToARM64Reg reg
+        |> Result.map (fun regARM64 ->
+            if regARM64 <> ARM64Symbolic.X0 then
+                [ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, regARM64)] @ runtimeInstrs (Runtime.generatePrintUInt64NoNewline ctx.Target)
+            else
+                runtimeInstrs (Runtime.generatePrintUInt64NoNewline ctx.Target))
+
+    | LIR.PrintBoolNoNewline reg ->
+        // Print boolean without newline (for tuple elements)
+        lirRegToARM64Reg reg
+        |> Result.map (fun regARM64 ->
+            if regARM64 <> ARM64Symbolic.X0 then
+                [ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, regARM64)] @ runtimeInstrs (Runtime.generatePrintBoolNoNewline ctx.Target)
+            else
+                runtimeInstrs (Runtime.generatePrintBoolNoNewline ctx.Target))
+
+    | LIR.PrintFloatNoNewline freg ->
+        // Print float without newline (for tuple/list elements)
+        lirFRegToARM64FReg freg
+        |> Result.map (fun fregARM64 ->
+            if fregARM64 <> ARM64Symbolic.D0 then
+                [ARM64Symbolic.FMOV_reg (ARM64Symbolic.D0, fregARM64)] @ runtimeInstrs (Runtime.generatePrintFloatNoNewline ctx.Target)
+            else
+                runtimeInstrs (Runtime.generatePrintFloatNoNewline ctx.Target))
+
+    | LIR.PrintHeapStringNoNewline reg ->
+        // Print heap string without newline (for tuple/list elements)
+        lirRegToARM64Reg reg
+        |> Result.map (fun regARM64 ->
+            // Dynamic buffer layout: [refcount:8][length:8][data:N].
+            let loadInstrs = [ARM64Symbolic.LDR (ARM64Symbolic.X10, regARM64, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, regARM64, 16us)]
+            let loadAndPrint = loadInstrs @ runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target)
+            if regARM64 <> ARM64Symbolic.X9 then
+                loadAndPrint
+            else
+                // Need to save the original address first
+                let saveReg = [ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, regARM64)]
+                let loadFromSaved = [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X11, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X11, 16us)]
+                saveReg @ loadFromSaved @ runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target))
+
+    | LIR.PrintList (listPtr, elemType) ->
+        // Print list as [elem1, elem2, ...]
+        // List layout: Nil = 0, Cons = [tag=1, head, tail]
+        // Uses X19 for list pointer (callee-saved), X20 for first flag
+        lirRegToARM64Reg listPtr
+        |> Result.map (fun listReg -> generatePrintListInstrs listReg elemType true)
+
+    | LIR.PrintSum (sumPtr, variants) ->
+        // Print sum type: variant name + optional payload + newline
+        // Sum layout depends on whether ANY variant has a payload:
+        // - If any payload: [tag, payload] on heap
+        // - If all nullary: just the tag value (integer)
+        lirRegToARM64Reg sumPtr
+        |> Result.map (fun sumReg ->
+            let syscalls = ARM64.targetSyscalls ctx.Target
+
+            // Check if any variant has a payload
+            let hasAnyPayload = variants |> List.exists (fun (_, _, payload) -> Option.isSome payload)
+
+            // Helper: generate code to print a string literal
+            let printLiteral (s: string) =
+                let bytes = System.Text.Encoding.UTF8.GetBytes(s)
+                if bytes.Length = 0 then []
+                else
+                    let alignedSize = max 16 ((bytes.Length + 15) &&& ~~~15)
+                    [ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 alignedSize)] @
+                    (bytes |> Array.toList |> List.mapi (fun i b ->
+                        [ARM64Symbolic.MOVZ (ARM64Symbolic.X0, uint16 b, 0); ARM64Symbolic.STRB (ARM64Symbolic.X0, ARM64Symbolic.SP, i)]
+                    ) |> List.concat) @
+                    [ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0);
+                     ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP);
+                     ARM64Symbolic.MOVZ (ARM64Symbolic.X2, uint16 bytes.Length, 0);
+                     ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0);
+                     ARM64Symbolic.SVC syscalls.SvcImmediate;
+                     ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 alignedSize)]
+
+            // Setup depends on representation
+            let setup =
+                if hasAnyPayload then
+                    // Heap-allocated: X19 = sum pointer, load tag from [X19, 0] into X20
+                    [ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, sumReg); ARM64Symbolic.LDR (ARM64Symbolic.X20, ARM64Symbolic.X19, 0s)]
+                else
+                    // All nullary: X19 = sum pointer (for consistency), X20 = tag (the value itself)
+                    [ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, sumReg); ARM64Symbolic.MOV_reg (ARM64Symbolic.X20, sumReg)]
+
+            // Generate code for each variant: compare tag, branch, print name, optionally print payload
+            // Structure: for each variant, generate:
+            //   CMP X20, #tag
+            //   B.NE next_variant
+            //   <print variant name>
+            //   <if payload: print "(", print payload, print ")">
+            //   B end
+            // next_variant:
+            //   ... (repeat)
+            // end:
+            //   <print "\n">
+
+            // Pre-calculate code blocks for each variant
+            let variantBlocks =
+                variants |> List.map (fun (variantName, _tag, payloadType) ->
+                    let printName = printLiteral variantName
+                    let printPayload =
+                        match payloadType with
+                        | None -> []
+                        | Some pType ->
+                            let printOpen = printLiteral "("
+                            let loadPayload = [ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X19, 8s)]  // Load payload from offset 8
+                            let printPayloadValue =
+                                match pType with
+                                | AST.TInt64 -> runtimeInstrs (Runtime.generatePrintInt64NoNewline ctx.Target)
+                                | AST.TUInt64 -> runtimeInstrs (Runtime.generatePrintUInt64NoNewline ctx.Target)
+                                | AST.TBool -> runtimeInstrs (Runtime.generatePrintBoolNoNewline ctx.Target)
+                                | AST.TFloat64 ->
+                                    [ARM64Symbolic.FMOV_from_gp (ARM64Symbolic.D0, ARM64Symbolic.X0)] @ runtimeInstrs (Runtime.generatePrintFloatNoNewline ctx.Target)
+                                | AST.TString | AST.TChar | AST.TInt128 | AST.TUInt128 ->
+                                    [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 16us)] @
+                                    runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target)
+                                | AST.TList elemType ->
+                                    match ListDisplay.getDisplayStringFunc elemType with
+                                    | Some funcName ->
+                                        let callToDisplay = [ARM64Symbolic.BL funcName]
+                                        let saveDisplayString = [ARM64Symbolic.MOV_reg (ARM64Symbolic.X21, ARM64Symbolic.X0)]
+                                        let printString =
+                                            [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 16us)] @
+                                            runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target)
+                                        let releaseDisplayString =
+                                            match convertInstr ctx (LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X21))) with
+                                            | Ok instrs -> instrs
+                                            | Error e -> Crash.crash e
+                                        callToDisplay @ saveDisplayString @ printString @ releaseDisplayString
+                                    | None ->
+                                        Crash.crash $"Unsupported list element type in sum variant: {elemType}"
+                                | t -> Crash.crash $"Unsupported payload type in sum variant: {t}"
+                            let printClose = printLiteral ")"
+                            printOpen @ loadPayload @ printPayloadValue @ printClose
+                    (printName, printPayload))
+
+            // Calculate end label offset from each variant block
+            // We'll build the code and calculate offsets manually
+
+            let printNewline = printLiteral "\n"
+
+            // Build variant blocks with branching
+            // For each variant: CMP(1) + B.NE(1) + name + payload + B(1) to end
+            let blockLengths =
+                variants
+                |> List.mapi (fun i (_, _tag, _) ->
+                    let (printName, printPayload) = variantBlocks.[i]
+                    2 + List.length printName + List.length printPayload + 1)  // CMP + B.NE + name + payload + B
+
+            let totalVariantCodeLen = List.sum blockLengths
+
+            let variantCode =
+                variants
+                |> List.mapi (fun i (_, tag, _) -> i, tag)
+                |> List.mapFold (fun currentPos (i, tag) ->
+                    let (printName, printPayload) = variantBlocks.[i]
+                    let blockLen = 2 + List.length printName + List.length printPayload + 1
+                    // B.NE is at position 1, next block CMP is at position blockLen
+                    // So offset = blockLen - 1 (forward jump from B.NE to next CMP)
+                    let nextBlockOffset = blockLen - 1
+                    let endFromHere = totalVariantCodeLen - currentPos - blockLen + 1  // Jump to after all variant blocks
+
+                    let cmpInstr = ARM64Symbolic.CMP_imm (ARM64Symbolic.X20, uint16 tag)
+                    let branchNeInstr = ARM64Symbolic.B_cond (ARM64Symbolic.NE, nextBlockOffset)  // Skip this variant's code
+                    let branchEndInstr = ARM64Symbolic.B endFromHere  // Jump to end (after all variant code)
+
+                    [cmpInstr; branchNeInstr] @ printName @ printPayload @ [branchEndInstr],
+                    currentPos + blockLen)
+                    0
+                |> fst
+                |> List.concat
+
+            setup @ variantCode @ printNewline)
+
+    | LIR.PrintRecord (recordPtr, typeName, fields) ->
+        // Print record: TypeName { field1 = val1, field2 = val2, ... }\n
+        // Record layout: [field0, field1, field2, ...] on heap (each 8 bytes)
+        lirRegToARM64Reg recordPtr
+        |> Result.map (fun recordReg ->
+            let syscalls = ARM64.targetSyscalls ctx.Target
+
+            // Helper: generate code to print a string literal
+            let printLiteral (s: string) =
+                let bytes = System.Text.Encoding.UTF8.GetBytes(s)
+                if bytes.Length = 0 then []
+                else
+                    let alignedSize = max 16 ((bytes.Length + 15) &&& ~~~15)
+                    [ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 alignedSize)] @
+                    (bytes |> Array.toList |> List.mapi (fun i b ->
+                        [ARM64Symbolic.MOVZ (ARM64Symbolic.X0, uint16 b, 0); ARM64Symbolic.STRB (ARM64Symbolic.X0, ARM64Symbolic.SP, i)]
+                    ) |> List.concat) @
+                    [ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0);
+                     ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP);
+                     ARM64Symbolic.MOVZ (ARM64Symbolic.X2, uint16 bytes.Length, 0);
+                     ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0);
+                     ARM64Symbolic.SVC syscalls.SvcImmediate;
+                     ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 alignedSize)]
+
+            // Save record pointer in callee-saved register X19
+            let setup = [ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, recordReg)]
+
+            // Print type name and opening brace
+            let printHeader = printLiteral (typeName + " { ")
+
+            // Print each field: "fieldName = value" with ", " separator between fields
+            let printFields =
+                fields
+                |> List.mapi (fun i (fieldName, fieldType) ->
+                    let printFieldName = printLiteral (fieldName + " = ")
+                    let offset = int16 (i * 8)  // Each field is 8 bytes
+                    let loadField = [ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X19, offset)]
+                    let printValue =
+                        match fieldType with
+                        | AST.TInt64 -> runtimeInstrs (Runtime.generatePrintInt64NoNewline ctx.Target)
+                        | AST.TUInt64 -> runtimeInstrs (Runtime.generatePrintUInt64NoNewline ctx.Target)
+                        | AST.TBool -> runtimeInstrs (Runtime.generatePrintBoolNoNewline ctx.Target)
+                        | AST.TFloat64 ->
+                            [ARM64Symbolic.FMOV_from_gp (ARM64Symbolic.D0, ARM64Symbolic.X0)] @ runtimeInstrs (Runtime.generatePrintFloatNoNewline ctx.Target)
+                        | AST.TString | AST.TChar | AST.TInt128 | AST.TUInt128 ->
+                            // String is a pointer: load length, compute data ptr, print
+                            [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s); ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 16us)] @
+                            runtimeInstrs (Runtime.generatePrintStringNoNewline ctx.Target)
+                        | t -> Crash.crash $"Unsupported field type in record: {t}"
+                    let separator =
+                        if i < List.length fields - 1 then printLiteral ", "
+                        else []
+                    printFieldName @ loadField @ printValue @ separator)
+                |> List.concat
+
+            // Print closing brace and newline
+            let printFooter = printLiteral " }\n"
+
+            setup @ printHeader @ printFields @ printFooter)
+
+    | LIR.Call (dest, funcName, args) ->
+        // Function call: arguments already moved to X0-X7 by preceding MOVs
+        // Caller-save is handled by SaveRegs/RestoreRegs instructions
+        Ok [ARM64Symbolic.BL funcName]
+
+    | LIR.TailCall (funcName, args) ->
+        // Tail call: restore stack frame, then branch (no link)
+        // This is the same as the epilogue but with B instead of RET
+        let calleeSavedSpace = calleeSavedStackSpace ctx.UsedCalleeSaved
+        let restoreCalleeSavedInstrs = generateCalleeSavedRestores ctx.UsedCalleeSaved
+        // Deallocate all stack at once
+        let totalExtraStack = ctx.StackSize + calleeSavedSpace
+        let deallocStack =
+            if totalExtraStack > 0 then
+                [ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 totalExtraStack)]
+            else
+                []
+        let restoreFpLr = [ARM64Symbolic.LDP_post (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)]
+        let branch = [ARM64Symbolic.B_label funcName]
+        Ok (restoreCalleeSavedInstrs @ deallocStack @ restoreFpLr @ branch)
+
+    | LIR.IndirectCall (dest, func, args) ->
+        // Indirect call: call through function pointer in register
+        // Use BLR instruction instead of BL
+        lirRegToARM64Reg func
+        |> Result.map (fun funcReg -> [ARM64Symbolic.BLR funcReg])
+
+    | LIR.IndirectTailCall (func, args) ->
+        // Indirect tail call: restore stack frame, then branch to register
+        lirRegToARM64Reg func
+        |> Result.map (fun funcReg ->
+            let calleeSavedSpace = calleeSavedStackSpace ctx.UsedCalleeSaved
+            let restoreCalleeSavedInstrs = generateCalleeSavedRestores ctx.UsedCalleeSaved
+            let totalExtraStack = ctx.StackSize + calleeSavedSpace
+            let deallocStack =
+                if totalExtraStack > 0 then
+                    [ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 totalExtraStack)]
+                else
+                    []
+            let restoreFpLr = [ARM64Symbolic.LDP_post (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)]
+            let branch = [ARM64Symbolic.BR funcReg]
+            restoreCalleeSavedInstrs @ deallocStack @ restoreFpLr @ branch)
+
+    | LIR.ClosureAlloc (dest, funcName, captures) ->
+        // Allocate closure on heap: (func_ptr, cap1, cap2, ...)
+        // Each slot is 8 bytes
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            let numSlots = 1 + List.length captures  // func_ptr + captures
+            let sizeBytes = numSlots * 8
+            // Total size includes 8 bytes for ref count, aligned to 8 bytes
+            let totalSize = ((sizeBytes + 8) + 7) &&& (~~~7)
+
+            // Allocate using bump allocator
+            let allocInstrs = [
+                ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X28)                      // dest = current heap pointer
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 1us, 0)                          // X15 = 1 (initial ref count)
+                ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X28, int16 sizeBytes)       // store ref count after payload
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, uint16 totalSize)  // bump pointer
+            ]
+
+            // Store function address at offset 0
+            let storeFuncAddr = [
+                ARM64Symbolic.ADR (ARM64Symbolic.X15, codeLabel funcName)               // X15 = function address
+                ARM64Symbolic.STR (ARM64Symbolic.X15, destReg, 0s)                      // [dest] = func_ptr
+            ]
+
+            // Store captures at subsequent offsets
+            let storeCaptures =
+                captures
+                |> List.mapi (fun i cap -> (i, cap))
+                |> List.collect (fun (i, cap) ->
+                    let offset = (i + 1) * 8
+                    match cap with
+                    | LIR.Imm value ->
+                        loadImmediate ARM64Symbolic.X15 value @
+                        [ARM64Symbolic.STR (ARM64Symbolic.X15, destReg, int16 offset)]
+                    | LIR.Reg reg ->
+                        match lirRegToARM64Reg reg with
+                        | Ok srcReg ->
+                            // Avoid storing dest into itself at offset
+                            if srcReg = destReg then
+                                [ARM64Symbolic.MOV_reg (ARM64Symbolic.X15, srcReg); ARM64Symbolic.STR (ARM64Symbolic.X15, destReg, int16 offset)]
+                            else
+                                [ARM64Symbolic.STR (srcReg, destReg, int16 offset)]
+                        | Error msg -> Crash.crash $"ClosureAlloc: lirRegToARM64Reg failed: {msg}"
+                    | LIR.FuncAddr fname ->
+                        [ARM64Symbolic.ADR (ARM64Symbolic.X15, codeLabel fname); ARM64Symbolic.STR (ARM64Symbolic.X15, destReg, int16 offset)]
+                    | other -> Crash.crash $"ClosureAlloc: Unexpected capture operand type: {other}")
+
+            Ok (allocInstrs @ generateLeakCounterInc ctx @ storeFuncAddr @ storeCaptures))
+
+    | LIR.ClosureCall (dest, funcPtr, args) ->
+        // Call through closure - MIR_to_LIR already set up:
+        // - X9: function pointer (loaded from closure[0])
+        // - X0: closure
+        // - X1-X7: args
+        // Just do the BLR
+        lirRegToARM64Reg funcPtr
+        |> Result.map (fun funcPtrReg ->
+            [ARM64Symbolic.BLR funcPtrReg])
+
+    | LIR.ClosureTailCall (funcPtr, args) ->
+        // Closure tail call: restore stack frame, then branch to register
+        lirRegToARM64Reg funcPtr
+        |> Result.map (fun funcPtrReg ->
+            let calleeSavedSpace = calleeSavedStackSpace ctx.UsedCalleeSaved
+            let restoreCalleeSavedInstrs = generateCalleeSavedRestores ctx.UsedCalleeSaved
+            let totalExtraStack = ctx.StackSize + calleeSavedSpace
+            let deallocStack =
+                if totalExtraStack > 0 then
+                    [ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 totalExtraStack)]
+                else
+                    []
+            let restoreFpLr = [ARM64Symbolic.LDP_post (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)]
+            let branch = [ARM64Symbolic.BR funcPtrReg]
+            restoreCalleeSavedInstrs @ deallocStack @ restoreFpLr @ branch)
+
+    | LIR.SaveRegs (intRegs, floatRegs) ->
+        // Save only the caller-saved registers that are live across this call
+        // We maintain fixed offsets for ArgMoves compatibility:
+        // Layout: X1-X10 at SP+0..SP+72 (fixed), D0-D7 at SP+80..SP+136
+        // If no registers need saving, emit nothing (no stack allocation)
+        if List.isEmpty intRegs && List.isEmpty floatRegs then
+            Ok []  // Nothing to save - no stack allocation needed
+        else
+            // Determine stack size - we need fixed layout for ArgMoves compatibility
+            // when any int registers are saved
+            let hasIntRegs = not (List.isEmpty intRegs)
+            let hasFloatRegs = not (List.isEmpty floatRegs)
+            let intSlotSize = if hasIntRegs then 80 else 0  // X1-X10 (10 regs * 8 bytes)
+            let floatSlotSize = if hasFloatRegs then 64 else 0  // D0-D7 (8 regs * 8 bytes)
+            let totalSize = intSlotSize + floatSlotSize
+
+            let allocStack = [ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 totalSize)]
+
+            // Save int registers using STP pairs where possible
+            // Pairs: (X1,X2)@0, (X3,X4)@16, (X5,X6)@32, (X7,X8)@48, (X9,X10)@64
+            let intPairs = [
+                (LIR.X1, LIR.X2, 0s)
+                (LIR.X3, LIR.X4, 16s)
+                (LIR.X5, LIR.X6, 32s)
+                (LIR.X7, LIR.X8, 48s)
+                (LIR.X9, LIR.X10, 64s)
+            ]
+
+            let intSaves : ARM64Symbolic.Instr list =
+                intPairs |> List.collect (fun (r1, r2, offset) ->
+                    let has1 = List.contains r1 intRegs
+                    let has2 = List.contains r2 intRegs
+                    match (has1, has2) with
+                    | (true, true) ->
+                        // Both registers - use STP
+                        [ARM64Symbolic.STP (lirPhysRegToARM64Reg r1, lirPhysRegToARM64Reg r2, ARM64Symbolic.SP, offset)]
+                    | (true, false) ->
+                        // Only first register - use STR
+                        [ARM64Symbolic.STR (lirPhysRegToARM64Reg r1, ARM64Symbolic.SP, offset)]
+                    | (false, true) ->
+                        // Only second register - use STR
+                        [ARM64Symbolic.STR (lirPhysRegToARM64Reg r2, ARM64Symbolic.SP, offset + 8s)]
+                    | (false, false) ->
+                        // Neither register
+                        [])
+
+            // Save float registers using STP_fp pairs where possible
+            // Pairs: (D0,D1)@0, (D2,D3)@16, (D4,D5)@32, (D6,D7)@48
+            let baseFloatOffset = if hasIntRegs then 80s else 0s
+            let floatPairs = [
+                (LIR.D0, LIR.D1, 0s)
+                (LIR.D2, LIR.D3, 16s)
+                (LIR.D4, LIR.D5, 32s)
+                (LIR.D6, LIR.D7, 48s)
+            ]
+
+            let floatSaves : ARM64Symbolic.Instr list =
+                floatPairs |> List.collect (fun (f1, f2, offset) ->
+                    let has1 = List.contains f1 floatRegs
+                    let has2 = List.contains f2 floatRegs
+                    match (has1, has2) with
+                    | (true, true) ->
+                        // Both registers - use STP_fp
+                        [ARM64Symbolic.STP_fp (lirPhysFPRegToARM64FReg f1, lirPhysFPRegToARM64FReg f2, ARM64Symbolic.SP, baseFloatOffset + offset)]
+                    | (true, false) ->
+                        // Only first register - use STR_fp
+                        [ARM64Symbolic.STR_fp (lirPhysFPRegToARM64FReg f1, ARM64Symbolic.SP, baseFloatOffset + offset)]
+                    | (false, true) ->
+                        // Only second register - use STR_fp
+                        [ARM64Symbolic.STR_fp (lirPhysFPRegToARM64FReg f2, ARM64Symbolic.SP, baseFloatOffset + offset + 8s)]
+                    | (false, false) ->
+                        // Neither register
+                        [])
+
+            Ok (allocStack @ intSaves @ floatSaves)
+
+    | LIR.RestoreRegs (intRegs, floatRegs) ->
+        // Restore only the caller-saved registers that are live across this call
+        // Must match the layout from SaveRegs
+        if List.isEmpty intRegs && List.isEmpty floatRegs then
+            Ok []  // Nothing was saved - no stack deallocation needed
+        else
+            let hasIntRegs = not (List.isEmpty intRegs)
+            let hasFloatRegs = not (List.isEmpty floatRegs)
+            let intSlotSize = if hasIntRegs then 80 else 0
+            let floatSlotSize = if hasFloatRegs then 64 else 0
+            let totalSize = intSlotSize + floatSlotSize
+
+            // Restore int registers using LDP pairs where possible
+            // Pairs: (X1,X2)@0, (X3,X4)@16, (X5,X6)@32, (X7,X8)@48, (X9,X10)@64
+            let intPairs = [
+                (LIR.X1, LIR.X2, 0s)
+                (LIR.X3, LIR.X4, 16s)
+                (LIR.X5, LIR.X6, 32s)
+                (LIR.X7, LIR.X8, 48s)
+                (LIR.X9, LIR.X10, 64s)
+            ]
+
+            let intRestores : ARM64Symbolic.Instr list =
+                intPairs |> List.collect (fun (r1, r2, offset) ->
+                    let has1 = List.contains r1 intRegs
+                    let has2 = List.contains r2 intRegs
+                    match (has1, has2) with
+                    | (true, true) ->
+                        // Both registers - use LDP
+                        [ARM64Symbolic.LDP (lirPhysRegToARM64Reg r1, lirPhysRegToARM64Reg r2, ARM64Symbolic.SP, offset)]
+                    | (true, false) ->
+                        // Only first register - use LDR
+                        [ARM64Symbolic.LDR (lirPhysRegToARM64Reg r1, ARM64Symbolic.SP, offset)]
+                    | (false, true) ->
+                        // Only second register - use LDR
+                        [ARM64Symbolic.LDR (lirPhysRegToARM64Reg r2, ARM64Symbolic.SP, offset + 8s)]
+                    | (false, false) ->
+                        // Neither register
+                        [])
+
+            // Restore float registers using LDP_fp pairs where possible
+            // Pairs: (D0,D1)@0, (D2,D3)@16, (D4,D5)@32, (D6,D7)@48
+            let baseFloatOffset = if hasIntRegs then 80s else 0s
+            let floatPairs = [
+                (LIR.D0, LIR.D1, 0s)
+                (LIR.D2, LIR.D3, 16s)
+                (LIR.D4, LIR.D5, 32s)
+                (LIR.D6, LIR.D7, 48s)
+            ]
+
+            let floatRestores : ARM64Symbolic.Instr list =
+                floatPairs |> List.collect (fun (f1, f2, offset) ->
+                    let has1 = List.contains f1 floatRegs
+                    let has2 = List.contains f2 floatRegs
+                    match (has1, has2) with
+                    | (true, true) ->
+                        // Both registers - use LDP_fp
+                        [ARM64Symbolic.LDP_fp (lirPhysFPRegToARM64FReg f1, lirPhysFPRegToARM64FReg f2, ARM64Symbolic.SP, baseFloatOffset + offset)]
+                    | (true, false) ->
+                        // Only first register - use LDR_fp
+                        [ARM64Symbolic.LDR_fp (lirPhysFPRegToARM64FReg f1, ARM64Symbolic.SP, baseFloatOffset + offset)]
+                    | (false, true) ->
+                        // Only second register - use LDR_fp
+                        [ARM64Symbolic.LDR_fp (lirPhysFPRegToARM64FReg f2, ARM64Symbolic.SP, baseFloatOffset + offset + 8s)]
+                    | (false, false) ->
+                        // Neither register
+                        [])
+
+            let deallocStack = [ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, uint16 totalSize)]
+
+            Ok (intRestores @ floatRestores @ deallocStack)
+
+    | LIR.ArgMoves moves ->
+        // Parallel move resolution for function arguments
+        // After SaveRegs, X1-X10 are saved at [SP+0..SP+72]
+        // If source is in X1-X7 and could be clobbered, load from stack instead
+        //
+        // Stack layout after SaveRegs: X1@[SP+0], X2@[SP+8], ..., X10@[SP+72]
+        let saveRegsOffset (reg: LIR.PhysReg) : int option =
+            match reg with
+            | LIR.X1 -> Some 0
+            | LIR.X2 -> Some 8
+            | LIR.X3 -> Some 16
+            | LIR.X4 -> Some 24
+            | LIR.X5 -> Some 32
+            | LIR.X6 -> Some 40
+            | LIR.X7 -> Some 48
+            | LIR.X8 -> Some 56
+            | LIR.X9 -> Some 64
+            | LIR.X10 -> Some 72
+            | _ -> None
+
+        // Find which destination registers (X0-X7) will be written
+        let destRegs = moves |> List.map fst |> Set.ofList
+
+        // For each move, determine how to execute it safely
+        let generateMove (destReg: LIR.PhysReg, srcOp: LIR.Operand) : Result<ARM64Symbolic.Instr list, string> =
+            let destARM64 = lirPhysRegToARM64Reg destReg
+            match srcOp with
+            | LIR.Imm value ->
+                Ok (loadImmediate destARM64 value)
+            | LIR.Reg (LIR.Physical srcPhysReg) ->
+                // If source equals destination, it's a no-op
+                if srcPhysReg = destReg then
+                    Ok []
+                else
+                    // Check if source register will be clobbered by an earlier move
+                    // A register is clobbered if it's a destination of a move to a LOWER index
+                    // (since we process X0, X1, X2, ... in order)
+                    let srcWillBeClobbered =
+                        match srcPhysReg with
+                        | LIR.X1 | LIR.X2 | LIR.X3 | LIR.X4 | LIR.X5 | LIR.X6 | LIR.X7 ->
+                            Set.contains srcPhysReg destRegs
+                        | _ -> false
+                    if srcWillBeClobbered then
+                        // Load from SaveRegs stack instead of live register
+                        match saveRegsOffset srcPhysReg with
+                        | Some offset ->
+                            Ok [ARM64Symbolic.LDR (destARM64, ARM64Symbolic.SP, int16 offset)]
+                        | None ->
+                            Error $"ArgMoves: Source register {srcPhysReg} will be clobbered but has no SaveRegs offset"
+                    else
+                        let srcARM64 = lirPhysRegToARM64Reg srcPhysReg
+                        Ok [ARM64Symbolic.MOV_reg (destARM64, srcARM64)]
+            | LIR.Reg (LIR.Virtual _) ->
+                Error "Virtual register in ArgMoves - should have been allocated"
+            | LIR.StackSlot offset ->
+                loadStackSlot destARM64 offset
+            | LIR.StringSymbol value ->
+                Ok (loadStringLiteralPointer destARM64 value)
+            | LIR.FuncAddr funcName ->
+                Ok [ARM64Symbolic.ADR (destARM64, codeLabel funcName)]
+            | LIR.FloatImm _ | LIR.FloatSymbol _ ->
+                Error "Float in ArgMoves not yet supported"
+
+        // MIR lowering stores moves in ABI destination order (X0, X1, ...),
+        // and register allocation changes only their source operands.
+        let moveInstrs =
+            moves
+            |> ResultList.mapResults generateMove
+            |> Result.map List.concat
+
+        moveInstrs
+
+    | LIR.TailArgMoves moves ->
+        // Parallel move resolution for TAIL CALL arguments
+        // Unlike ArgMoves, there is NO SaveRegs, so we can't load from stack.
+        // We use the shared ParallelMoves module with X16 as the temp register.
+
+        // Helper to get source register if operand is a physical register
+        let getSrcPhysReg (srcOp: LIR.Operand) : LIR.PhysReg option =
+            match srcOp with
+            | LIR.Reg (LIR.Physical srcPhysReg) -> Some srcPhysReg
+            | _ -> None
+
+        // Generate a single move instruction (for non-register sources)
+        let generateMoveInstr (destReg: LIR.PhysReg, srcOp: LIR.Operand) : Result<ARM64Symbolic.Instr list, string> =
+            let destARM64 = lirPhysRegToARM64Reg destReg
+            match srcOp with
+            | LIR.Imm value ->
+                Ok (loadImmediate destARM64 value)
+            | LIR.Reg (LIR.Physical srcPhysReg) ->
+                let srcARM64 = lirPhysRegToARM64Reg srcPhysReg
+                Ok [ARM64Symbolic.MOV_reg (destARM64, srcARM64)]
+            | LIR.Reg (LIR.Virtual _) ->
+                Error "Virtual register in TailArgMoves - should have been allocated"
+            | LIR.StackSlot offset ->
+                loadStackSlot destARM64 offset
+            | LIR.FuncAddr funcName ->
+                Ok [ARM64Symbolic.ADR (destARM64, codeLabel funcName)]
+            | LIR.StringSymbol value ->
+                Ok (loadStringLiteralPointer destARM64 value)
+            | LIR.FloatImm _ | LIR.FloatSymbol _ ->
+                Error "Float in TailArgMoves not yet supported"
+
+        // Use the shared parallel move resolution algorithm
+        let actions = ParallelMoves.resolve moves getSrcPhysReg
+
+        // Convert actions to ARM64 instructions
+        actions
+        |> ResultList.mapResults (function
+            | ParallelMoves.SaveToTemp reg ->
+                // Save register to X16 (temp)
+                Ok [ARM64Symbolic.MOV_reg (ARM64Symbolic.X16, lirPhysRegToARM64Reg reg)]
+            | ParallelMoves.Move (dest, src) ->
+                generateMoveInstr (dest, src)
+            | ParallelMoves.MoveFromTemp dest ->
+                // Move from X16 (temp) to destination
+                Ok [ARM64Symbolic.MOV_reg (lirPhysRegToARM64Reg dest, ARM64Symbolic.X16)])
+        |> Result.map List.concat
+
+    | LIR.FArgMoves moves ->
+        // Float argument moves - move float values to D0-D7
+        // Uses parallel move resolution to handle register conflicts correctly
+
+        // First, convert all source FRegs to ARM64 FRegs
+        let resolvedMoves =
+            moves
+            |> List.map (fun (destPhysReg, srcFReg) ->
+                let destARM64 = lirPhysFPRegToARM64FReg destPhysReg
+                match lirFRegToARM64FReg srcFReg with
+                | Ok srcARM64 -> Ok (destARM64, srcARM64)
+                | Error e -> Error e)
+            |> List.fold (fun acc r ->
+                match acc, r with
+                | Ok moves, Ok move -> Ok (move :: moves)
+                | Error e, _ -> Error e
+                | _, Error e -> Error e) (Ok [])
+            |> Result.map List.rev
+
+        match resolvedMoves with
+        | Error e -> Error e
+        | Ok armMoves ->
+            // Use ParallelMoves.resolve to get the correct move order
+            // We treat ARM64Symbolic.FReg as both dest and src type
+            let getSrcReg (srcReg: ARM64Symbolic.FReg) : ARM64Symbolic.FReg option = Some srcReg
+            let actions = ParallelMoves.resolve armMoves getSrcReg
+
+            // Convert actions to ARM64 instructions
+            // Use reserved D16 as the temporary register for cycle breaking.
+            actions
+            |> List.collect (function
+                | ParallelMoves.SaveToTemp srcReg ->
+                    // Save to D16 (temp) - using upper SIMD register
+                    [ARM64Symbolic.FMOV_reg (ARM64Symbolic.D16, srcReg)]
+                | ParallelMoves.Move (dest, src) ->
+                    if dest <> src then
+                        [ARM64Symbolic.FMOV_reg (dest, src)]
+                    else
+                        []
+                | ParallelMoves.MoveFromTemp dest ->
+                    // Move from D16 (temp) to destination
+                    [ARM64Symbolic.FMOV_reg (dest, ARM64Symbolic.D16)])
+            |> Ok
+
+    | LIR.PrintInt64 reg ->
+        // Value to print should be in X0 (no exit)
+        lirRegToARM64Reg reg
+        |> Result.map (fun regARM64 ->
+            if regARM64 <> ARM64Symbolic.X0 then
+                // Move to X0 if not already there
+                [ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, regARM64)] @ runtimeInstrs (Runtime.generatePrintInt64NoExit ctx.Target)
+            else
+                runtimeInstrs (Runtime.generatePrintInt64NoExit ctx.Target))
+
+    | LIR.PrintUInt64 reg ->
+        // Value to print should be in X0 (no exit)
+        lirRegToARM64Reg reg
+        |> Result.map (fun regARM64 ->
+            if regARM64 <> ARM64Symbolic.X0 then
+                [ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, regARM64)] @ runtimeInstrs (Runtime.generatePrintUInt64NoExit ctx.Target)
+            else
+                runtimeInstrs (Runtime.generatePrintUInt64NoExit ctx.Target))
+
+    | LIR.Exit ->
+        // Exit program with code 0
+        Ok (runtimeInstrs (Runtime.generateExit ctx.Target))
+
+    | LIR.PrintFloat freg ->
+        // Print float value from FP register
+        // Value should be in D0 for generatePrintFloat
+        lirFRegToARM64FReg freg
+        |> Result.map (fun fregARM64 ->
+            if fregARM64 <> ARM64Symbolic.D0 then
+                // Move to D0 if not already there
+                [ARM64Symbolic.FMOV_reg (ARM64Symbolic.D0, fregARM64)] @ runtimeInstrs (Runtime.generatePrintFloat ctx.Target)
+            else
+                runtimeInstrs (Runtime.generatePrintFloat ctx.Target))
+
+    | LIR.PrintString value ->
+        // To print a string, we need:
+        // 1. ADRP + ADD to load string address into X0
+        // 2. Call Runtime.generatePrintString which handles write syscall
+        let len = utf8Len value
+        let labelRef = stringDataLabel value
+        Ok ([
+            ARM64Symbolic.ADRP (ARM64Symbolic.X0, labelRef)  // Load page address of string
+            ARM64Symbolic.ADD_label (ARM64Symbolic.X0, ARM64Symbolic.X0, labelRef)  // Add page offset
+        ] @ runtimeInstrs (Runtime.generatePrintString ctx.Target len))
+
+    | LIR.StdoutWrite (effectId, value, appendNewline) ->
+        let syscalls = ARM64.targetSyscalls ctx.Target
+        let label suffix = $"__presentation_{ctx.FunctionName}_{effectId}_{ctx.InstructionSite}_{suffix}"
+        let writeLoop prefix =
+            let loopLabel = label $"{prefix}_write"
+            let retryLabel = label $"{prefix}_retry"
+            let errorLabel = label $"{prefix}_error"
+            let doneLabel = label $"{prefix}_done"
+            let resultCheck =
+                match ARM64.targetOS ctx.Target with
+                | Platform.MacOS ->
+                    [ ARM64Symbolic.B_cond_label (ARM64Symbolic.HS, errorLabel)
+                      ARM64Symbolic.B_label $"{prefix}_success"
+                      ARM64Symbolic.Label errorLabel
+                      ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 4us)
+                      ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, retryLabel)
+                      ARM64Symbolic.B_label doneLabel
+                      ARM64Symbolic.Label $"{prefix}_success" ]
+                | Platform.Linux ->
+                    loadImmediate ARM64Symbolic.X12 -4L
+                    @ [ ARM64Symbolic.CMP_reg (ARM64Symbolic.X0, ARM64Symbolic.X12)
+                        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, retryLabel)
+                        ARM64Symbolic.TBNZ_label (ARM64Symbolic.X0, 63, doneLabel) ]
+            [ ARM64Symbolic.Label loopLabel
+              ARM64Symbolic.CBZ (ARM64Symbolic.X2, doneLabel)
+              ARM64Symbolic.Label retryLabel
+              ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Write, 0)
+              ARM64Symbolic.SVC syscalls.SvcImmediate ]
+            @ resultCheck
+            @ [ ARM64Symbolic.CBZ (ARM64Symbolic.X0, doneLabel)
+                ARM64Symbolic.ADD_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, ARM64Symbolic.X0)
+                ARM64Symbolic.SUB_reg (ARM64Symbolic.X2, ARM64Symbolic.X2, ARM64Symbolic.X0)
+                ARM64Symbolic.B_label loopLabel
+                ARM64Symbolic.Label doneLabel ]
+
+        let setupValue =
+            match value with
+            | LIR.Reg reg ->
+                lirRegToARM64Reg reg
+                |> Result.map (fun src ->
+                    [ ARM64Symbolic.MOV_reg (ARM64Symbolic.X9, src)
+                      ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X9, 8s)
+                      ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X9, 16us) ])
+            | LIR.StackSlot offset ->
+                loadStackSlot ARM64Symbolic.X9 offset
+                |> Result.map (fun load ->
+                    load
+                    @ [ ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X9, 8s)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X9, 16us) ])
+            | LIR.StringSymbol text ->
+                Ok (loadStringLiteralPointer ARM64Symbolic.X9 text
+                    @ [ ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X9, 8s)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X9, 16us) ])
+            | _ -> Error "StdoutWrite requires a String operand"
+
+        setupValue
+        |> Result.map (fun setup ->
+            let savedRegs =
+                [ ARM64Symbolic.X0; ARM64Symbolic.X1; ARM64Symbolic.X2; ARM64Symbolic.X3
+                  ARM64Symbolic.X4; ARM64Symbolic.X5; ARM64Symbolic.X6; ARM64Symbolic.X7
+                  ARM64Symbolic.X8; ARM64Symbolic.X9; ARM64Symbolic.X10; ARM64Symbolic.X11
+                  ARM64Symbolic.X12; ARM64Symbolic.X13; ARM64Symbolic.X14; ARM64Symbolic.X15
+                  ARM64Symbolic.X16; ARM64Symbolic.X17 ]
+            let save =
+                [ ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 160us) ]
+                @ (savedRegs |> List.mapi (fun i reg -> ARM64Symbolic.STR (reg, ARM64Symbolic.SP, int16 (i * 8))))
+            let restore =
+                (savedRegs |> List.mapi (fun i reg -> ARM64Symbolic.LDR (reg, ARM64Symbolic.SP, int16 (i * 8))))
+                @ [ ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 160us) ]
+            let newline =
+                if not appendNewline then []
+                else
+                    [ ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 10us, 0)
+                      ARM64Symbolic.STRB (ARM64Symbolic.X9, ARM64Symbolic.SP, 144)
+                      ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
+                      ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 144us)
+                      ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0) ]
+                    @ writeLoop "stdout_newline"
+            save
+            @ setup
+            @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0) ]
+            @ writeLoop "stdout"
+            @ newline
+            @ restore)
+
+    | LIR.StdinReadLine (effectId, dest) ->
+        lirRegToARM64Reg dest
+        |> Result.map (fun destReg ->
+            let syscalls = ARM64.targetSyscalls ctx.Target
+            let label suffix = $"__presentation_{ctx.FunctionName}_{effectId}_{ctx.InstructionSite}_{suffix}"
+            let readLabel = label "stdin_read"
+            let retryLabel = label "stdin_retry"
+            let gotByteLabel = label "stdin_byte"
+            let finishLabel = label "stdin_finish"
+            let noCrLabel = label "stdin_no_cr"
+            let readResultCheck =
+                match ARM64.targetOS ctx.Target with
+                | Platform.MacOS ->
+                    let errorLabel = label "stdin_error"
+                    [ ARM64Symbolic.B_cond_label (ARM64Symbolic.HS, errorLabel)
+                      ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 1us)
+                      ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, gotByteLabel)
+                      ARM64Symbolic.B_label finishLabel
+                      ARM64Symbolic.Label errorLabel
+                      ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 4us)
+                      ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, retryLabel)
+                      ARM64Symbolic.B_label finishLabel ]
+                | Platform.Linux ->
+                    loadImmediate ARM64Symbolic.X12 -4L
+                    @ [ ARM64Symbolic.CMP_reg (ARM64Symbolic.X0, ARM64Symbolic.X12)
+                        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, retryLabel)
+                        ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 1us)
+                        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, gotByteLabel)
+                        ARM64Symbolic.B_label finishLabel ]
+            let savedRegs =
+                [ ARM64Symbolic.X0; ARM64Symbolic.X1; ARM64Symbolic.X2; ARM64Symbolic.X3
+                  ARM64Symbolic.X4; ARM64Symbolic.X5; ARM64Symbolic.X6; ARM64Symbolic.X7
+                  ARM64Symbolic.X8; ARM64Symbolic.X9; ARM64Symbolic.X10; ARM64Symbolic.X11
+                  ARM64Symbolic.X12; ARM64Symbolic.X13; ARM64Symbolic.X14; ARM64Symbolic.X15
+                  ARM64Symbolic.X16; ARM64Symbolic.X17 ]
+            [ ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 160us) ]
+            @ (savedRegs |> List.mapi (fun i reg -> ARM64Symbolic.STR (reg, ARM64Symbolic.SP, int16 (i * 8))))
+            @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 0us, 0)
+                ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.SP, 144s)
+                ARM64Symbolic.Label readLabel
+                ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.SP, 144s)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X28, 16us)
+                ARM64Symbolic.ADD_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, ARM64Symbolic.X10)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0)
+                ARM64Symbolic.Label retryLabel
+                ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Read, 0)
+                ARM64Symbolic.SVC syscalls.SvcImmediate ]
+            @ readResultCheck
+            @ [ ARM64Symbolic.Label gotByteLabel
+                ARM64Symbolic.LDRB_imm (ARM64Symbolic.X11, ARM64Symbolic.X1, 0)
+                ARM64Symbolic.CMP_imm (ARM64Symbolic.X11, 10us)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, finishLabel)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 1us)
+                ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.SP, 144s)
+                ARM64Symbolic.B_label readLabel
+                ARM64Symbolic.Label finishLabel
+                ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.SP, 144s)
+                ARM64Symbolic.CBZ (ARM64Symbolic.X10, noCrLabel)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X28, 15us)
+                ARM64Symbolic.ADD_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, ARM64Symbolic.X10)
+                ARM64Symbolic.LDRB_imm (ARM64Symbolic.X11, ARM64Symbolic.X1, 0)
+                ARM64Symbolic.CMP_imm (ARM64Symbolic.X11, 13us)
+                ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, noCrLabel)
+                ARM64Symbolic.SUB_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 1us)
+                ARM64Symbolic.Label noCrLabel
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
+                ARM64Symbolic.STR (ARM64Symbolic.X0, ARM64Symbolic.X28, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.X28, 8s)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X10, 7us)
+                ARM64Symbolic.LSR_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 3)
+                ARM64Symbolic.LSL_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 3)
+                ARM64Symbolic.STR (ARM64Symbolic.X28, ARM64Symbolic.SP, 152s)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 16us)
+                ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X11) ]
+            @ generateLeakCounterInc ctx
+            @ (savedRegs |> List.mapi (fun i reg -> ARM64Symbolic.LDR (reg, ARM64Symbolic.SP, int16 (i * 8))))
+            @ [ ARM64Symbolic.LDR (destReg, ARM64Symbolic.SP, 152s)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 160us) ])
+
+    | LIR.RuntimeError message ->
+        Ok (
+            loadStringLiteralPointer ARM64Symbolic.X0 message
+            @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 0us, 0)
+                ARM64Symbolic.B_label runtimeErrorHelperLabel ])
+
+    | LIR.RuntimeErrorString messageReg ->
+        lirRegToARM64Reg messageReg
+        |> Result.map (fun resolvedMessageReg ->
+            (if resolvedMessageReg = ARM64Symbolic.X0 then
+                 []
+             else
+                 [ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, resolvedMessageReg)])
+            @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 1us, 0)
+                ARM64Symbolic.B_label runtimeErrorHelperLabel ])
+
+    // Floating-point instructions
+    | LIR.FMov (dest, src) ->
+        lirFRegToARM64FReg dest
+        |> Result.bind (fun destReg ->
+            lirFRegToARM64FReg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.FMOV_reg (destReg, srcReg)]))
+
+    | LIR.FLoad (dest, value) ->
+        lirFRegToARM64FReg dest
+        |> Result.map (fun destReg ->
+            if System.BitConverter.DoubleToInt64Bits(value) = 0L then
+                [ARM64Symbolic.FMOV_zero destReg]
+            elif ARM64.tryEncodeFmovFloatImmediate value |> Option.isSome then
+                [ARM64Symbolic.FMOV_imm (destReg, value)]
+            else
+                let labelRef = floatDataLabel value
+                [
+                    ARM64Symbolic.ADRP (ARM64Symbolic.X9, labelRef)           // Load page address of float
+                    ARM64Symbolic.ADD_label (ARM64Symbolic.X9, ARM64Symbolic.X9, labelRef)  // Add page offset
+                    ARM64Symbolic.LDR_fp (destReg, ARM64Symbolic.X9, 0s)        // Load float from [X9]
+                ])
+
+    | LIR.FAdd (dest, left, right) ->
+        lirFRegToARM64FReg dest
+        |> Result.bind (fun destReg ->
+            lirFRegToARM64FReg left
+            |> Result.bind (fun leftReg ->
+                lirFRegToARM64FReg right
+                |> Result.map (fun rightReg -> [ARM64Symbolic.FADD (destReg, leftReg, rightReg)])))
+
+    | LIR.FSub (dest, left, right) ->
+        lirFRegToARM64FReg dest
+        |> Result.bind (fun destReg ->
+            lirFRegToARM64FReg left
+            |> Result.bind (fun leftReg ->
+                lirFRegToARM64FReg right
+                |> Result.map (fun rightReg -> [ARM64Symbolic.FSUB (destReg, leftReg, rightReg)])))
+
+    | LIR.FMul (dest, left, right) ->
+        lirFRegToARM64FReg dest
+        |> Result.bind (fun destReg ->
+            lirFRegToARM64FReg left
+            |> Result.bind (fun leftReg ->
+                lirFRegToARM64FReg right
+                |> Result.map (fun rightReg -> [ARM64Symbolic.FMUL (destReg, leftReg, rightReg)])))
+
+    | LIR.FDiv (dest, left, right) ->
+        lirFRegToARM64FReg dest
+        |> Result.bind (fun destReg ->
+            lirFRegToARM64FReg left
+            |> Result.bind (fun leftReg ->
+                lirFRegToARM64FReg right
+                |> Result.map (fun rightReg -> [ARM64Symbolic.FDIV (destReg, leftReg, rightReg)])))
+
+    | LIR.FNeg (dest, src) ->
+        lirFRegToARM64FReg dest
+        |> Result.bind (fun destReg ->
+            lirFRegToARM64FReg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.FNEG (destReg, srcReg)]))
+
+    | LIR.FAbs (dest, src) ->
+        lirFRegToARM64FReg dest
+        |> Result.bind (fun destReg ->
+            lirFRegToARM64FReg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.FABS (destReg, srcReg)]))
+
+    | LIR.FSqrt (dest, src) ->
+        lirFRegToARM64FReg dest
+        |> Result.bind (fun destReg ->
+            lirFRegToARM64FReg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.FSQRT (destReg, srcReg)]))
+
+    | LIR.FCmp (left, right) ->
+        lirFRegToARM64FReg left
+        |> Result.bind (fun leftReg ->
+            lirFRegToARM64FReg right
+            |> Result.map (fun rightReg -> [ARM64Symbolic.FCMP (leftReg, rightReg)]))
+
+    | LIR.Int64ToFloat (dest, src) ->
+        lirFRegToARM64FReg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.SCVTF (destReg, srcReg)]))
+
+    | LIR.FloatToInt64 (dest, src) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirFRegToARM64FReg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.FCVTZS (destReg, srcReg)]))
+
+    | LIR.GpToFp (dest, src) ->
+        // Move bits from GP register to FP register (for floats loaded from heap)
+        lirFRegToARM64FReg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.FMOV_from_gp (destReg, srcReg)]))
+
+    | LIR.FpToGp (dest, src) ->
+        // Move bits from FP register to GP register (for floats stored to list)
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirFRegToARM64FReg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.FMOV_to_gp (destReg, srcReg)]))
+
+    | LIR.FloatToBits (dest, src) ->
+        // Copy Float64 bits to UInt64 (uses FMOV to GP register)
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirFRegToARM64FReg src
+            |> Result.map (fun srcReg -> [ARM64Symbolic.FMOV_to_gp (destReg, srcReg)]))
+
+    // Heap operations
+    | LIR.HeapAlloc (dest, sizeBytes) ->
+        // Heap allocator with free list support
+        // X27 = free list heads base, X28 = bump allocator pointer
+        //
+        // Memory layout with reference counting:
+        //   [payload: sizeBytes][refcount: 8 bytes]
+        //
+        // Algorithm:
+        // 1. Check free list for this size class (sizeClassOffset = sizeBytes)
+        // 2. If free list non-empty: pop from list, initialize refcount, return
+        // 3. If empty: bump allocate from X28
+        //
+        // Code structure (10 instructions):
+        //   LDR X15, [X27, sizeBytes]         ; Load free list head
+        //   CBZ X15, +5                       ; If empty, skip to bump alloc (5 instrs)
+        //   MOV dest, X15                     ; dest = freed block
+        //   LDR X14, [X15, 0]                 ; Load next pointer from freed block
+        //   STR X14, [X27, sizeBytes]         ; Update free list head
+        //   MOVZ X14, 1                       ; X14 = 1 (initial ref count)
+        //   STR X14, [dest, sizeBytes]        ; Store ref count
+        //   B +5                              ; Skip bump allocator (5 instrs)
+        //   ; Bump allocator:
+        //   MOV dest, X28                     ; dest = current heap pointer
+        //   MOVZ X15, 1                       ; X15 = 1 (initial ref count)
+        //   STR X15, [X28, sizeBytes]         ; store ref count after payload
+        //   ADD X28, X28, totalSize           ; bump pointer
+        //   (continue)
+        lirRegToARM64Reg dest
+        |> Result.map (fun destReg ->
+            // Total size includes 8 bytes for ref count, aligned to 8 bytes
+            let totalSize = ((sizeBytes + 8) + 7) &&& (~~~7)
+            if ctx.Options.DisableFreeList then
+                // Bump allocator only (no free list reuse)
+                (withHeapBoundsCheck
+                    ctx.HeapOverflowLabel
+                    [ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X28, uint16 totalSize)]
+                    [
+                        ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X28)                  // dest = current heap pointer
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 1us, 0)                      // X15 = 1 (initial ref count)
+                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X28, int16 sizeBytes)   // store ref count after payload
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, uint16 totalSize) // bump pointer
+                    ])
+                @ generateLeakCounterInc ctx
+            else
+                // Full allocator with free list support
+                let popFreeList = [
+                    ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X15)                  // dest = freed block
+                    ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X15, 0s)        // Load next pointer
+                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X27, int16 sizeBytes)   // Update free list head
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X14, 1us, 0)                       // X14 = 1 (initial ref count)
+                    ARM64Symbolic.STR (ARM64Symbolic.X14, destReg, int16 sizeBytes)      // Store ref count
+                ]
+
+                let bumpAlloc =
+                    withHeapBoundsCheck
+                        ctx.HeapOverflowLabel
+                        [ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X28, uint16 totalSize)]
+                        [
+                            ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X28)                  // dest = current heap pointer
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 1us, 0)                      // X15 = 1 (initial ref count)
+                            ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X28, int16 sizeBytes)   // store ref count after payload
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, uint16 totalSize) // bump pointer
+                        ]
+
+                [
+                    ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X27, int16 sizeBytes)   // Load free list head
+                    ARM64Symbolic.CBZ_offset (ARM64Symbolic.X15, popFreeList.Length + 2)         // If empty, jump past pop path + branch to bump alloc
+                ]
+                @ popFreeList
+                // B uses a current-PC-relative instruction offset, so skipping N instructions needs N + 1.
+                @ [ARM64Symbolic.B (bumpAlloc.Length + 1)]
+                @ bumpAlloc
+                @ generateLeakCounterInc ctx)
+
+    | LIR.HeapStore (addr, offset, src, valueType) ->
+        // Store value at addr + offset (offset is in bytes)
+        lirRegToARM64Reg addr
+        |> Result.bind (fun addrReg ->
+            match src, valueType with
+            | LIR.Imm value, _ ->
+                // Load immediate into temp register, then store
+                let tempReg = ARM64Symbolic.X9
+                Ok (loadImmediate tempReg value @
+                    [ARM64Symbolic.STR (tempReg, addrReg, int16 offset)])
+            | LIR.Reg srcReg, Some AST.TFloat64 ->
+                // Float value in register: interpret as FReg and use STR_fp
+                // The srcReg ID is actually an FVirtual, convert to ARM64 FP register
+                lirFRegToARM64FReg (virtualToFVirtual srcReg)
+                |> Result.map (fun srcARM64FP ->
+                    [ARM64Symbolic.STR_fp (srcARM64FP, addrReg, int16 offset)])
+            | LIR.Reg srcReg, _ ->
+                lirRegToARM64Reg srcReg
+                |> Result.map (fun srcARM64 ->
+                    // If src and addr are the same register, we have a problem
+                    // due to register allocation bug. Use temp register as workaround.
+                    if srcARM64 = addrReg then
+                        // Save value to temp, use temp for store
+                        let tempReg = ARM64Symbolic.X9
+                        [ARM64Symbolic.MOV_reg (tempReg, srcARM64); ARM64Symbolic.STR (tempReg, addrReg, int16 offset)]
+                    else
+                        [ARM64Symbolic.STR (srcARM64, addrReg, int16 offset)])
+            | LIR.StackSlot slotOffset, _ ->
+                // Load from stack slot into temp, then store to heap
+                let tempReg = ARM64Symbolic.X9
+                loadStackSlot tempReg slotOffset
+                |> Result.map (fun loadInstrs ->
+                    loadInstrs @ [ARM64Symbolic.STR (tempReg, addrReg, int16 offset)])
+            | LIR.FuncAddr funcName, _ ->
+                // Load function address into temp, then store to heap
+                let tempReg = ARM64Symbolic.X9
+                Ok [ARM64Symbolic.ADR (tempReg, codeLabel funcName); ARM64Symbolic.STR (tempReg, addrReg, int16 offset)]
+            | LIR.StringSymbol value, _ ->
+                // Convert literal string to heap format when storing in tuples/data structures
+                // Dynamic and literal strings share [refcount:8][length:8][data:N].
+                // We must convert because tuple extraction expects heap format
+                let len = utf8Len value
+                let labelRef = stringDataLabel value
+                let totalSize = ((len + 16) + 7) &&& (~~~7)  // 8-byte aligned
+                Ok ([
+                    // Load literal string address into X10
+                    // Load the literal data pointer after its two-word header.
+                    ARM64Symbolic.ADRP (ARM64Symbolic.X10, labelRef)
+                    ARM64Symbolic.ADD_label (ARM64Symbolic.X10, ARM64Symbolic.X10, labelRef)
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 16us)
+                    // Allocate heap space (bump allocator), store address in X9
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X9, ARM64Symbolic.X28)  // X9 = current heap pointer (result)
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, uint16 totalSize)  // bump pointer
+                    // Store length (known at compile time)
+                ] @ loadImmediate ARM64Symbolic.X11 (int64 len) @ [
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 1us, 0)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X9, 0s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X11, ARM64Symbolic.X9, 8s)
+                    // Copy bytes: counter in X13, limit in X11
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0us, 0)  // X13 = 0
+                    // Loop start (if X13 >= len, done)
+                    ARM64Symbolic.CMP_reg (ARM64Symbolic.X13, ARM64Symbolic.X11)
+                    ARM64Symbolic.B_cond (ARM64Symbolic.GE, 7)  // Skip 7 instructions to exit loop
+                    ARM64Symbolic.LDRB (ARM64Symbolic.X15, ARM64Symbolic.X10, ARM64Symbolic.X13)  // X15 = literal[X13]
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X9, 16us)
+                    ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X13)  // X14 = heap + 8 + X13
+                    ARM64Symbolic.STRB_reg (ARM64Symbolic.X15, ARM64Symbolic.X14)  // heap_data[X13] = byte
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 1us)  // X13++
+                    ARM64Symbolic.B (-7)  // Loop back to CMP
+                    // Store heap string address to tuple slot
+                    ARM64Symbolic.STR (ARM64Symbolic.X9, addrReg, int16 offset)
+                ] @ generateLeakCounterInc ctx)
+            | LIR.FloatSymbol value, _ ->
+                // Load float literal from pool into temp FP register, then store to heap
+                let labelRef = floatDataLabel value
+                Ok [
+                    ARM64Symbolic.ADRP (ARM64Symbolic.X9, labelRef)              // Load page address
+                    ARM64Symbolic.ADD_label (ARM64Symbolic.X9, ARM64Symbolic.X9, labelRef) // Add offset
+                    ARM64Symbolic.LDR_fp (ARM64Symbolic.D15, ARM64Symbolic.X9, 0s)         // Load float into D15
+                    ARM64Symbolic.STR_fp (ARM64Symbolic.D15, addrReg, int16 offset) // Store float to heap
+                ]
+            | _ -> Error "Unsupported operand type in HeapStore")
+
+    | LIR.HeapLoad (dest, addr, offset) ->
+        // Load value from addr + offset (offset is in bytes)
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg addr
+            |> Result.map (fun addrReg ->
+                [ARM64Symbolic.LDR (destReg, addrReg, int16 offset)]))
+
+    | LIR.RefCountInc (addr, payloadSize, kind, _) ->
+        // Generic RC increment for heap values.
+        // RcKind controls list-helper dispatch explicitly (no payload-size heuristics).
+        lirRegToARM64Reg addr
+        |> Result.map (fun addrReg ->
+            let tupleIncPath = [
+                ARM64Symbolic.LDR (ARM64Symbolic.X15, addrReg, int16 payloadSize)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                ARM64Symbolic.STR (ARM64Symbolic.X15, addrReg, int16 payloadSize)
+            ]
+
+            match kind with
+            | LIR.TaggedList ->
+                let listIncCall = [
+                    ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -64s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, addrReg)
+                    ARM64Symbolic.BL listRefCountIncHelperLabel
+                    ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 64s)
+                ]
+                let listCallLen = List.length listIncCall
+                [
+                    ARM64Symbolic.CBZ_offset (addrReg, listCallLen + 1)
+                ]
+                @ listIncCall
+            | LIR.DictHeap ->
+                let dictIncCall = [
+                    ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -80s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, addrReg)
+                    ARM64Symbolic.BL dictRefCountIncHelperLabel
+                    ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 80s)
+                ]
+                [
+                    ARM64Symbolic.CBZ_offset (addrReg, List.length dictIncCall + 1)
+                ]
+                @ dictIncCall
+            | LIR.ClosureHeap ->
+                let closureIncCall = [
+                    ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -96s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, addrReg)
+                    ARM64Symbolic.BL closureRefCountIncHelperLabel
+                    ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 96s)
+                ]
+                [
+                    ARM64Symbolic.CBZ_offset (addrReg, List.length closureIncCall + 1)
+                ]
+                @ closureIncCall
+            | LIR.GenericHeap
+            | LIR.StreamHeap ->
+                [
+                    ARM64Symbolic.CBZ_offset (addrReg, 4)
+                ] @ tupleIncPath)
+
+    | LIR.RefCountDec (addr, payloadSize, kind, metadata) ->
+        // Decrement ref count at [addr + payloadSize]
+        // Skip if addr is null (e.g., empty list = 0)
+        // When ref count hits 0, add block to free list for memory reuse
+        //
+        // Free list structure:
+        // - X27 = base of free list heads (32 slots × 8 bytes = 256 bytes)
+        // - Slot N contains head of free list for blocks of size (N+1)*8 bytes
+        // - sizeClassOffset = payloadSize (for 8-aligned payloads)
+        // - Freed blocks use first 8 bytes as next pointer
+        //
+        // Code structure (8 instructions, plus optional leak counter update):
+        //   CBZ addr, +8                      ; If null, skip all 7 instructions
+        //   LDR X15, [addr, payloadSize]      ; Load ref count
+        //   SUB X15, X15, 1                   ; Decrement
+        //   STR X15, [addr, payloadSize]      ; Store back
+        //   CBNZ X15, +4                      ; If not zero, skip free list code (4 instrs)
+        //   LDR X14, [X27, payloadSize]       ; Load current free list head
+        //   STR X14, [addr, 0]                ; Store old head as next in freed block
+        //   STR addr, [X27, payloadSize]      ; Update free list head to freed block
+        //   (continue)
+        lirRegToARM64Reg addr
+        |> Result.map (fun addrReg ->
+            let releasePlan = rcMetadataReleasePlan metadata
+            let leakDec = generateLeakCounterDec ctx
+            // Keep this expansion deferred. Most release kinds use a runtime
+            // helper, and complex generic roots are normally outlined below.
+            let tupleDecPath () =
+                let releaseListFieldFromHelper (baseReg: ARM64Symbolic.Reg) (fieldOffset: int) (helperLabel: string) : ARM64Symbolic.Instr list =
+                    let fieldReg =
+                        if baseReg = ARM64Symbolic.X12 then ARM64Symbolic.X16 else ARM64Symbolic.X12
+                    let callInstrs = [
+                        ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -128s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X12, ARM64Symbolic.X13, ARM64Symbolic.SP, 96s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X14, ARM64Symbolic.X15, ARM64Symbolic.SP, 112s)
+                        ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, fieldReg)
+                        ARM64Symbolic.BL helperLabel
+                        ARM64Symbolic.LDP (ARM64Symbolic.X14, ARM64Symbolic.X15, ARM64Symbolic.SP, 112s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X12, ARM64Symbolic.X13, ARM64Symbolic.SP, 96s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                        ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 128s)
+                    ]
+                    [
+                        ARM64Symbolic.LDR (fieldReg, baseReg, int16 fieldOffset)
+                        ARM64Symbolic.CBZ_offset (fieldReg, List.length callInstrs + 1)
+                    ] @ callInstrs
+
+                let releaseListFieldFromPlan (baseReg: ARM64Symbolic.Reg) (fieldOffset: int) (fieldReleasePlan: ANF.RcReleasePlan) : ARM64Symbolic.Instr list =
+                    releaseListFieldFromHelper baseReg fieldOffset (listDecHelperForReleasePlan fieldReleasePlan)
+
+                let releaseDictFieldFromHelper (baseReg: ARM64Symbolic.Reg) (fieldOffset: int) (helperLabel: string) : ARM64Symbolic.Instr list =
+                    let fieldReg =
+                        if baseReg = ARM64Symbolic.X12 then ARM64Symbolic.X16 else ARM64Symbolic.X12
+                    let callInstrs = [
+                        ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -128s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X12, ARM64Symbolic.X13, ARM64Symbolic.SP, 96s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X14, ARM64Symbolic.X15, ARM64Symbolic.SP, 112s)
+                        ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, fieldReg)
+                        ARM64Symbolic.BL helperLabel
+                        ARM64Symbolic.LDP (ARM64Symbolic.X14, ARM64Symbolic.X15, ARM64Symbolic.SP, 112s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X12, ARM64Symbolic.X13, ARM64Symbolic.SP, 96s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                        ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 128s)
+                    ]
+                    [
+                        ARM64Symbolic.LDR (fieldReg, baseReg, int16 fieldOffset)
+                        ARM64Symbolic.CBZ_offset (fieldReg, List.length callInstrs + 1)
+                    ] @ callInstrs
+
+                let releaseDictFieldFromPlan (baseReg: ARM64Symbolic.Reg) (fieldOffset: int) (fieldReleasePlan: ANF.RcReleasePlan) : ARM64Symbolic.Instr list =
+                    releaseDictFieldFromHelper baseReg fieldOffset (dictDecHelperForReleasePlan fieldReleasePlan)
+
+                let releaseClosureFieldFrom (baseReg: ARM64Symbolic.Reg) (fieldOffset: int) : ARM64Symbolic.Instr list =
+                    let fieldReg =
+                        if baseReg = ARM64Symbolic.X12 then ARM64Symbolic.X16 else ARM64Symbolic.X12
+                    let callInstrs = [
+                        ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -128s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X12, ARM64Symbolic.X13, ARM64Symbolic.SP, 96s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X14, ARM64Symbolic.X15, ARM64Symbolic.SP, 112s)
+                        ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, fieldReg)
+                        ARM64Symbolic.BL closureRefCountDecHelperLabel
+                        ARM64Symbolic.LDP (ARM64Symbolic.X14, ARM64Symbolic.X15, ARM64Symbolic.SP, 112s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X12, ARM64Symbolic.X13, ARM64Symbolic.SP, 96s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                        ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                        ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 128s)
+                    ]
+                    [
+                        ARM64Symbolic.LDR (fieldReg, baseReg, int16 fieldOffset)
+                        ARM64Symbolic.CBZ_offset (fieldReg, List.length callInstrs + 1)
+                    ] @ callInstrs
+
+                let releaseDynamicBufferFieldFrom (baseReg: ARM64Symbolic.Reg) (fieldOffset: int) : ARM64Symbolic.Instr list =
+                    let bufferLeakDec = generateLeakCounterDec ctx
+                    let refcountUpdate =
+                        if List.isEmpty bufferLeakDec then
+                            [
+                                ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                                ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                            ]
+                        else
+                            [
+                                ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                                ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                                ARM64Symbolic.CBNZ_offset (ARM64Symbolic.X15, 6)
+                            ] @ bufferLeakDec
+                    let bcondOffset = List.length refcountUpdate + 1
+                    let body =
+                        [
+                            ARM64Symbolic.LDR (ARM64Symbolic.X12, baseReg, int16 fieldOffset)
+                            ARM64Symbolic.CBZ_offset (ARM64Symbolic.X12, 8 + List.length refcountUpdate)
+                            ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, 0s)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
+                            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
+                            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
+                            ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0x7FFFus, 48)
+                            ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)
+                            ARM64Symbolic.B_cond (ARM64Symbolic.EQ, bcondOffset)
+                        ] @ refcountUpdate
+                    [
+                        ARM64Symbolic.STP_pre (ARM64Symbolic.X12, ARM64Symbolic.X13, ARM64Symbolic.SP, -32s)
+                        ARM64Symbolic.STP (ARM64Symbolic.X14, ARM64Symbolic.X15, ARM64Symbolic.SP, 16s)
+                    ]
+                    @ body
+                    @ [
+                        ARM64Symbolic.LDP (ARM64Symbolic.X14, ARM64Symbolic.X15, ARM64Symbolic.SP, 16s)
+                        ARM64Symbolic.LDP_post (ARM64Symbolic.X12, ARM64Symbolic.X13, ARM64Symbolic.SP, 32s)
+                    ]
+
+                let releaseDynamicBufferField (fieldOffset: int) : ARM64Symbolic.Instr list =
+                    releaseDynamicBufferFieldFrom addrReg fieldOffset
+
+                let rec releaseFieldPlanFrom
+                    (baseReg: ARM64Symbolic.Reg)
+                    (fieldOffset: int)
+                    (fieldReleasePlan: ANF.RcReleasePlan)
+                    : ARM64Symbolic.Instr list =
+                    match fieldReleasePlan with
+                    | ANF.DynamicBufferRelease _ ->
+                        releaseDynamicBufferFieldFrom baseReg fieldOffset
+                    | ANF.RootRelease (_, ANF.TaggedList, _) ->
+                        releaseListFieldFromPlan baseReg fieldOffset fieldReleasePlan
+                    | ANF.RootRelease (_, ANF.DictHeap, _) ->
+                        releaseDictFieldFromPlan baseReg fieldOffset fieldReleasePlan
+                    | ANF.RootRelease (_, ANF.ClosureHeap, _) ->
+                        releaseClosureFieldFrom baseReg fieldOffset
+                    | ANF.RootRelease (_, ANF.StreamHeap, _) ->
+                        releaseListFieldFromHelper baseReg fieldOffset streamRefCountDecHelperLabel
+                    | ANF.RootRelease (childPayloadSize, ANF.GenericHeap, ANF.FixedBlockPayloadRelease _)
+                    | ANF.RootRelease (childPayloadSize, ANF.GenericHeap, ANF.BoxedSumPayloadRelease _) ->
+                        releaseFixedBlockFieldWithPlan baseReg fieldOffset childPayloadSize fieldReleasePlan
+                    | ANF.RecursiveRelease sourceType ->
+                        releaseListFieldFromHelper
+                            baseReg
+                            fieldOffset
+                            (recursiveSumRefCountDecHelperLabel sourceType)
+                    | _ ->
+                        []
+
+                and releaseBoxedSumVariantFieldsFrom
+                    (baseReg: ARM64Symbolic.Reg)
+                    (variants: ANF.RcBoxedSumVariantRelease list)
+                    : ARM64Symbolic.Instr list =
+                    let releaseVariant (variant: ANF.RcBoxedSumVariantRelease) : (int * ARM64Symbolic.Instr list) option =
+                        let releaseInstrs =
+                            variant.FieldReleases
+                            |> List.collect (fun (ANF.FieldRelease (fieldOffset, fieldReleasePlan)) ->
+                                releaseFieldPlanFrom baseReg fieldOffset fieldReleasePlan)
+
+                        if List.isEmpty releaseInstrs then
+                            None
+                        else
+                            Some (variant.Tag, releaseInstrs)
+
+                    let rec variantCases (cases: (int * ARM64Symbolic.Instr list) list) : ARM64Symbolic.Instr list =
+                        match cases with
+                        | [] ->
+                            []
+                        | (tag, releaseInstrs) :: rest ->
+                            let restInstrs = variantCases rest
+                            let branchToEnd =
+                                if List.isEmpty restInstrs then
+                                    []
+                                else
+                                    [ARM64Symbolic.B (List.length restInstrs + 1)]
+                            [
+                                ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, uint16 tag)
+                                ARM64Symbolic.B_cond (ARM64Symbolic.NE, List.length releaseInstrs + List.length branchToEnd + 1)
+                            ]
+                            @ releaseInstrs
+                            @ branchToEnd
+                            @ restInstrs
+
+                    let cases = variants |> List.choose releaseVariant
+
+                    if List.isEmpty cases then
+                        []
+                    else
+                        [ARM64Symbolic.LDR (ARM64Symbolic.X10, baseReg, 0s)]
+                        @ variantCases cases
+
+                and releaseFixedBlockFieldWithPlan
+                    (baseReg: ARM64Symbolic.Reg)
+                    (fieldOffset: int)
+                    (childPayloadSize: int)
+                    (fieldReleasePlan: ANF.RcReleasePlan)
+                    : ARM64Symbolic.Instr list =
+                        let childFieldReleaseInstrs =
+                            match fieldReleasePlan with
+                            | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (_, fieldReleases)) ->
+                                fieldReleases
+                                |> List.collect (fun (ANF.FieldRelease (childFieldOffset, fieldReleasePlan)) ->
+                                    releaseFieldPlanFrom ARM64Symbolic.X11 childFieldOffset fieldReleasePlan)
+                            | ANF.RootRelease (_, ANF.GenericHeap, ANF.BoxedSumPayloadRelease (_, _, variants)) ->
+                                releaseBoxedSumVariantFieldsFrom ARM64Symbolic.X11 variants
+                            | _ ->
+                                []
+                        let childLeakDec = generateLeakCounterDec ctx
+                        let freeChild =
+                            (if List.isEmpty childFieldReleaseInstrs then
+                                []
+                             else
+                                [ ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, ARM64Symbolic.X12) ]
+                                @ childFieldReleaseInstrs
+                                @ [ ARM64Symbolic.MOV_reg (ARM64Symbolic.X12, ARM64Symbolic.X11) ])
+                            @
+                            (if childPayloadSize >= 0 && childPayloadSize < 256 then
+                                [
+                                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X27, uint16 childPayloadSize)
+                                    ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X13, 0s)
+                                    ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)
+                                    ARM64Symbolic.STR (ARM64Symbolic.X12, ARM64Symbolic.X13, 0s)
+                                ]
+                             else
+                                [])
+                            @ childLeakDec
+
+                        let afterDec =
+                            if List.isEmpty freeChild then
+                                []
+                            else
+                                [ARM64Symbolic.CBNZ_offset (ARM64Symbolic.X15, List.length freeChild + 1)]
+                                @ freeChild
+                        let body =
+                            [
+                                ARM64Symbolic.LDR (ARM64Symbolic.X12, baseReg, int16 fieldOffset)
+                                ARM64Symbolic.CBZ_offset (ARM64Symbolic.X12, 3 + List.length afterDec + 1)
+                                ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X12, int16 childPayloadSize)
+                                ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                                ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X12, int16 childPayloadSize)
+                            ] @ afterDec
+
+                        [
+                            ARM64Symbolic.STP_pre (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, -48s)
+                            ARM64Symbolic.STP (ARM64Symbolic.X12, ARM64Symbolic.X13, ARM64Symbolic.SP, 16s)
+                            ARM64Symbolic.STP (ARM64Symbolic.X14, ARM64Symbolic.X15, ARM64Symbolic.SP, 32s)
+                        ]
+                        @ body
+                        @ [
+                            ARM64Symbolic.LDP (ARM64Symbolic.X14, ARM64Symbolic.X15, ARM64Symbolic.SP, 32s)
+                            ARM64Symbolic.LDP (ARM64Symbolic.X12, ARM64Symbolic.X13, ARM64Symbolic.SP, 16s)
+                            ARM64Symbolic.LDP_post (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 48s)
+                        ]
+
+                let fixedBlockFieldReleaseInstrs =
+                    releasePlan
+                    |> Option.map (function
+                        | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (_, fieldReleases)) ->
+                            fieldReleases
+                            |> List.collect (fun (ANF.FieldRelease (fieldOffset, fieldReleasePlan)) ->
+                                releaseFieldPlanFrom ARM64Symbolic.X11 fieldOffset fieldReleasePlan)
+                        | _ ->
+                            [])
+                    |> Option.defaultValue []
+
+                let releaseSumPayloadInstrs =
+                    match releasePlan with
+                    | Some (ANF.RootRelease (_, ANF.GenericHeap, ANF.BoxedSumPayloadRelease (_, _, variants))) ->
+                        if List.length variants = 1
+                           && not (callerOwnsSinglePayloadSum ctx.FunctionName) then
+                            []
+                        else
+                            releaseBoxedSumVariantFieldsFrom ARM64Symbolic.X11 variants
+                    | _ ->
+                        []
+
+                let fieldReleaseInstrs =
+                    fixedBlockFieldReleaseInstrs
+                    @ releaseSumPayloadInstrs
+
+                // Field-release helpers use X10-X15 as scratch registers. Keep a
+                // source allocated in that range in X11 while traversing, and
+                // reload the generic root from the stack before free-list insertion.
+                // Sources in X0-X9 remain directly addressable, which avoids an
+                // unnecessary move and preserves the established instruction shape.
+                let stableFieldReleaseInstrs =
+                    if List.isEmpty fieldReleaseInstrs then
+                        []
+                    else
+                        let stableBaseReg =
+                            if List.contains
+                                   addrReg
+                                   [ ARM64Symbolic.X10; ARM64Symbolic.X11; ARM64Symbolic.X12
+                                     ARM64Symbolic.X13; ARM64Symbolic.X14; ARM64Symbolic.X15 ] then
+                                ARM64Symbolic.X11
+                            else
+                                addrReg
+                        let releases =
+                            releasePlan
+                            |> Option.map (function
+                                | ANF.RootRelease (_, ANF.GenericHeap, ANF.FixedBlockPayloadRelease (_, fieldReleases)) ->
+                                    fieldReleases
+                                    |> List.collect (fun (ANF.FieldRelease (fieldOffset, fieldReleasePlan)) ->
+                                        releaseFieldPlanFrom stableBaseReg fieldOffset fieldReleasePlan)
+                                | ANF.RootRelease (_, ANF.GenericHeap, ANF.BoxedSumPayloadRelease (_, _, variants)) ->
+                                    releaseBoxedSumVariantFieldsFrom stableBaseReg variants
+                                | _ ->
+                                    [])
+                            |> Option.defaultValue []
+                        [
+                            ARM64Symbolic.STP_pre (addrReg, ARM64Symbolic.X11, ARM64Symbolic.SP, -16s)
+                        ]
+                        @ (if stableBaseReg = ARM64Symbolic.X11 && addrReg <> ARM64Symbolic.X11 then
+                               [ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, addrReg)]
+                           else
+                               [])
+                        @ releases
+                        @ [
+                            ARM64Symbolic.LDR (addrReg, ARM64Symbolic.SP, 0s)
+                            ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.SP, 8s)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+                        ]
+
+                let releaseInstrs =
+                    stableFieldReleaseInstrs
+                    @
+                    (if payloadSize >= 0 && payloadSize < 256 then
+                        [
+                            ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X27, int16 payloadSize)
+                            ARM64Symbolic.STR (ARM64Symbolic.X14, addrReg, 0s)
+                            ARM64Symbolic.STR (addrReg, ARM64Symbolic.X27, int16 payloadSize)
+                        ]
+                     else
+                        [])
+                    @ leakDec
+                [
+                    ARM64Symbolic.LDR (ARM64Symbolic.X15, addrReg, int16 payloadSize)
+                    ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, addrReg, int16 payloadSize)
+                ]
+                @ (if List.isEmpty releaseInstrs then
+                    []
+                   else
+                    [ARM64Symbolic.CBNZ_offset (ARM64Symbolic.X15, List.length releaseInstrs + 1)]
+                    @ releaseInstrs)
+
+            match kind with
+            | LIR.TaggedList ->
+                let releasePlan =
+                    requiredRcMetadataReleasePlan "TaggedList RefCountDec" metadata
+                let helperLabel =
+                    match releasePlan with
+                    | ANF.RootRelease (_, _, ANF.TaggedListPayloadRelease (ANF.RootRelease (_, ANF.GenericHeap, _) as elementRelease)) ->
+                        plannedListDecHelperLabelForReleasePlan elementRelease
+                    | _ ->
+                        listDecHelperForReleasePlan releasePlan
+                let listDecCall = [
+                    ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -80s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, addrReg)
+                    ARM64Symbolic.BL helperLabel
+                    ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 80s)
+                ]
+                let listCallLen = List.length listDecCall
+                [
+                    ARM64Symbolic.CBZ_offset (addrReg, listCallLen + 1)
+                ]
+                @ listDecCall
+            | LIR.DictHeap ->
+                let helperLabel =
+                    metadata
+                    |> requiredRcMetadataReleasePlan "DictHeap RefCountDec"
+                    |> dictDecHelperForReleasePlan
+                let dictDecCall = [
+                    ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -96s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, addrReg)
+                    ARM64Symbolic.BL helperLabel
+                    ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 96s)
+                ]
+                [
+                    ARM64Symbolic.CBZ_offset (addrReg, List.length dictDecCall + 1)
+                ]
+                @ dictDecCall
+            | LIR.ClosureHeap ->
+                let closureDecCall = [
+                    ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -96s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, addrReg)
+                    ARM64Symbolic.BL closureRefCountDecHelperLabel
+                    ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 96s)
+                ]
+                [
+                    ARM64Symbolic.CBZ_offset (addrReg, List.length closureDecCall + 1)
+                ]
+                @ closureDecCall
+            | LIR.StreamHeap ->
+                let streamDecCall = [
+                    ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -96s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                    ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                    ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, addrReg)
+                    ARM64Symbolic.BL streamRefCountDecHelperLabel
+                    ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                    ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 96s)
+                ]
+                [ARM64Symbolic.CBZ_offset (addrReg, List.length streamDecCall + 1)] @ streamDecCall
+            | LIR.GenericHeap ->
+                let inlineDecPath = tupleDecPath ()
+                let cbzOffset = List.length inlineDecPath + 1
+                [ARM64Symbolic.CBZ_offset (addrReg, cbzOffset)] @ inlineDecPath)
+
+    | LIR.CanonicalBufferEq (dest, _, left, right) ->
+        // Canonical buffers share the [refcount:8][length:8][data:N] layout. Compare the
+        // representation directly without allocating or calling stdlib code.
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            let materialize operand target =
+                match operand with
+                | LIR.Reg reg ->
+                    lirRegToARM64Reg reg
+                    |> Result.map (fun source ->
+                        if source = target then [] else [ARM64Symbolic.MOV_reg (target, source)])
+                | LIR.StringSymbol value ->
+                    let labelRef = stringDataLabel value
+                    Ok [ARM64Symbolic.ADRP (target, labelRef)
+                        ARM64Symbolic.ADD_label (target, target, labelRef)]
+                | _ -> Error "CanonicalBufferEq requires StringSymbol or Reg operands"
+
+            let label suffix =
+                $"__canonical_buffer_eq_{ctx.FunctionName}_{ctx.InstructionSite}_{suffix}"
+            let wordLoop = label "words"
+            let byteLoop = label "bytes"
+            let equalLabel = label "equal"
+            let unequalLabel = label "unequal"
+            let doneLabel = label "done"
+
+            materialize left ARM64Symbolic.X8
+            |> Result.bind (fun leftInstrs ->
+                materialize right ARM64Symbolic.X9
+                |> Result.map (fun rightInstrs ->
+                    leftInstrs
+                    @ rightInstrs
+                    @ [ARM64Symbolic.CMP_reg (ARM64Symbolic.X8, ARM64Symbolic.X9)
+                       ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, equalLabel)
+                       ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X8, 8s)
+                       ARM64Symbolic.LDR (ARM64Symbolic.X12, ARM64Symbolic.X9, 8s)
+                       ARM64Symbolic.CMP_reg (ARM64Symbolic.X10, ARM64Symbolic.X12)
+                       ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, unequalLabel)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X8, ARM64Symbolic.X8, 16us)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 16us)
+                       ARM64Symbolic.Label wordLoop
+                       ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, 8us)
+                       ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, byteLoop)
+                       ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.X8, 0s)
+                       ARM64Symbolic.LDR (ARM64Symbolic.X13, ARM64Symbolic.X9, 0s)
+                       ARM64Symbolic.CMP_reg (ARM64Symbolic.X11, ARM64Symbolic.X13)
+                       ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, unequalLabel)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X8, ARM64Symbolic.X8, 8us)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 8us)
+                       ARM64Symbolic.SUB_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 8us)
+                       ARM64Symbolic.B_label wordLoop
+                       ARM64Symbolic.Label byteLoop
+                       ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, 0us)
+                       ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, equalLabel)
+                       ARM64Symbolic.LDRB_imm (ARM64Symbolic.X11, ARM64Symbolic.X8, 0)
+                       ARM64Symbolic.LDRB_imm (ARM64Symbolic.X13, ARM64Symbolic.X9, 0)
+                       ARM64Symbolic.CMP_reg (ARM64Symbolic.X11, ARM64Symbolic.X13)
+                       ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, unequalLabel)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X8, ARM64Symbolic.X8, 1us)
+                       ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 1us)
+                       ARM64Symbolic.SUB_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 1us)
+                       ARM64Symbolic.B_label byteLoop
+                       ARM64Symbolic.Label equalLabel
+                       ARM64Symbolic.MOVZ (ARM64Symbolic.X11, 1us, 0)
+                       ARM64Symbolic.B_label doneLabel
+                       ARM64Symbolic.Label unequalLabel
+                       ARM64Symbolic.MOVZ (ARM64Symbolic.X11, 0us, 0)
+                       ARM64Symbolic.Label doneLabel]
+                    @ (if destReg = ARM64Symbolic.X11 then [] else [ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X11)]))))
+
+    | LIR.StringConcat (dest, left, right) ->
+        // String concatenation:
+        // Dynamic and literal strings share [refcount:8][length:8][data:N].
+        //
+        // Register usage:
+        // X9  = left data address (for literal: string address, for heap: addr+8)
+        // X10 = left length
+        // X11 = right data address
+        // X12 = right length
+        // X13 = total length
+        // X14 = result pointer
+        // X15 = temp for byte copy
+        //
+        // Algorithm:
+        // 1. Load left address and length into X9, X10
+        // 2. Load right address and length into X11, X12
+        // 3. Calculate total length: X13 = X10 + X12
+        // 4. Allocate: total + 16 bytes using bump allocator
+        // 5. Store refcount and total length in the fixed header
+        // 6. Copy left bytes to [X14+16]
+        // 7. Copy right bytes after the left bytes
+        // 9. Move result to dest
+
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            // Helper: load operand address and length into registers
+            let loadOperandInfo (operand: LIR.Operand) (addrReg: ARM64Symbolic.Reg) (lenReg: ARM64Symbolic.Reg) : Result<ARM64Symbolic.Instr list, string> =
+                match operand with
+                | LIR.StringSymbol value ->
+                    // Literal string: address via ADRP+ADD, length from UTF-8 bytes
+                    // Skip the literal's fixed header to get its data address.
+                    let len = utf8Len value
+                    let labelRef = stringDataLabel value
+                    Ok ([
+                        ARM64Symbolic.ADRP (addrReg, labelRef)
+                        ARM64Symbolic.ADD_label (addrReg, addrReg, labelRef)
+                        ARM64Symbolic.ADD_imm (addrReg, addrReg, 16us)
+                    ] @ loadImmediate lenReg (int64 len))
+                | LIR.Reg reg ->
+                    // Dynamic string: length at [reg+8], data at [reg+16].
+                    lirRegToARM64Reg reg
+                    |> Result.map (fun srcReg ->
+                        [
+                            ARM64Symbolic.LDR (lenReg, srcReg, 8s)
+                            ARM64Symbolic.ADD_imm (addrReg, srcReg, 16us)
+                        ])
+                | other -> Error $"StringConcat requires StringSymbol or Reg operand, got: {other}"
+
+            // Load both operands
+            loadOperandInfo left ARM64Symbolic.X9 ARM64Symbolic.X10
+            |> Result.bind (fun leftInstrs ->
+                loadOperandInfo right ARM64Symbolic.X11 ARM64Symbolic.X12
+                |> Result.map (fun rightInstrs ->
+                    // Calculate total length
+                    let calcTotal = [ARM64Symbolic.ADD_reg (ARM64Symbolic.X13, ARM64Symbolic.X10, ARM64Symbolic.X12)]
+
+                    // Allocate: totalLen + 16 bytes (8 for length, 8 for refcount)
+                    // Using bump allocator (X28 = bump pointer)
+                    let allocate = [
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X13, 16us)   // X14 = total + 16
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 7us)    // Align up
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 0xFFF8us, 0)          // ~7 mask (lower bits)
+                        ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0xFFFFus, 16)         // Bits 16-31
+                        ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0xFFFFus, 32)         // Bits 32-47
+                        ARM64Symbolic.MOVK (ARM64Symbolic.X15, 0xFFFFus, 48)         // Bits 48-63
+                        ARM64Symbolic.AND_reg (ARM64Symbolic.X14, ARM64Symbolic.X14, ARM64Symbolic.X15)  // X14 = aligned size
+                        ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, ARM64Symbolic.X28)            // X14 = current heap ptr (result)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X13, 16us)      // X15 = total + 16
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 7us)       // Align
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0xFFF8us, 0)              // ~7 mask again (X15 was clobbered)
+                        ARM64Symbolic.MOVK (ARM64Symbolic.X0, 0xFFFFus, 16)             // Bits 16-31
+                        ARM64Symbolic.MOVK (ARM64Symbolic.X0, 0xFFFFus, 32)             // Bits 32-47
+                        ARM64Symbolic.MOVK (ARM64Symbolic.X0, 0xFFFFus, 48)             // Bits 48-63
+                        ARM64Symbolic.AND_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X0)
+                        ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X15) // Bump heap pointer
+                    ]
+
+                    let storeHeader = [
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 1us, 0)
+                        ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X13, ARM64Symbolic.X14, 8s)
+                    ]
+
+                    // Copy left bytes after the fixed header.
+                    // IMPORTANT: Don't use X0-X7 as temps - they may hold function arguments!
+                    // Strategy: Use pointer-bumping loops instead of indexed addressing
+                    // X15 = source pointer (starts at X9, bumped each iteration)
+                    // X16 = dest pointer (starts at X14+8, bumped each iteration)
+                    // X13 = remaining count (starts at X10, decremented, reused since we stored total already)
+                    let copyLeft = [
+                        ARM64Symbolic.MOV_reg (ARM64Symbolic.X15, ARM64Symbolic.X9)              // 0: X15 = src ptr
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X16, ARM64Symbolic.X14, 16us)
+                        ARM64Symbolic.MOV_reg (ARM64Symbolic.X13, ARM64Symbolic.X10)             // 2: X13 = remaining = len1
+                        // Loop: if X13 == 0, done (skip 7 instructions to exit past B at index 9)
+                        ARM64Symbolic.CBZ_offset (ARM64Symbolic.X13, 7)                  // 3: Skip 7 instructions if done -> index 10 (past end)
+                        ARM64Symbolic.LDRB_imm (ARM64Symbolic.X8, ARM64Symbolic.X15, 0)          // 4: X8 = byte at [X15]
+                        ARM64Symbolic.STRB_reg (ARM64Symbolic.X8, ARM64Symbolic.X16)             // 5: [X16] = byte
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)        // 6: X15++ (src ptr)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X16, ARM64Symbolic.X16, 1us)        // 7: X16++ (dest ptr)
+                        ARM64Symbolic.SUB_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 1us)        // 8: X13-- (remaining)
+                        ARM64Symbolic.B (-6)                                     // 9: Loop back to CBZ (index 3)
+                    ]
+
+                    // Copy right bytes: loop copying X12 bytes from X11 to [X14+8+X10]
+                    // X15 = source pointer (starts at X11)
+                    // X16 = dest pointer (starts at X14+8+X10, already in X16 from copyLeft end)
+                    // X13 = remaining count (use X12)
+                    // Note: X16 is already at X14+8+len1 after copyLeft loop ends!
+                    let copyRight = [
+                        ARM64Symbolic.MOV_reg (ARM64Symbolic.X15, ARM64Symbolic.X11)             // 0: X15 = src ptr (right string)
+                        ARM64Symbolic.MOV_reg (ARM64Symbolic.X13, ARM64Symbolic.X12)             // 1: X13 = remaining = len2
+                        // Loop: if X13 == 0, done (skip 7 instructions to exit past B at index 8)
+                        ARM64Symbolic.CBZ_offset (ARM64Symbolic.X13, 7)                  // 2: Skip 7 instructions if done -> index 9 (past end)
+                        ARM64Symbolic.LDRB_imm (ARM64Symbolic.X8, ARM64Symbolic.X15, 0)          // 3: X8 = byte at [X15]
+                        ARM64Symbolic.STRB_reg (ARM64Symbolic.X8, ARM64Symbolic.X16)             // 4: [X16] = byte
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)        // 5: X15++ (src ptr)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X16, ARM64Symbolic.X16, 1us)        // 6: X16++ (dest ptr)
+                        ARM64Symbolic.SUB_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 1us)        // 7: X13-- (remaining)
+                        ARM64Symbolic.B (-6)                                     // 8: Loop back to CBZ (index 2)
+                    ]
+
+                    // Move result to dest
+                    let moveResult = [ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X14)]
+
+                    leftInstrs @ rightInstrs @ calcTotal @ allocate @ storeHeader @ copyLeft @ copyRight @ moveResult @ generateLeakCounterInc ctx
+                )))
+
+    | LIR.PrintHeapString reg ->
+        // Print a dynamic string with [refcount:8][length:8][data:N].
+        // Note: The syscall clobbers X0, X1, X2, X8. If the input register is one
+        // of these, we save it to X9 before and restore after so subsequent code
+        // can still use it.
+        // 1. Save input to X9
+        // 2. Load length from [X9] into X2
+        // 3. Compute data pointer (X9 + 8) into X1
+        // 4. Set X0 = 1 (stdout)
+        // 5. write syscall
+        // 6. Write the result-rendering newline
+        // 7. Restore input register if it was clobbered
+        lirRegToARM64Reg reg
+        |> Result.map (fun regARM64 ->
+            let isClobbered = regARM64 = ARM64Symbolic.X0 || regARM64 = ARM64Symbolic.X1 || regARM64 = ARM64Symbolic.X2 || regARM64 = ARM64Symbolic.X8
+            let restoreInstrs = if isClobbered then [ARM64Symbolic.MOV_reg (regARM64, ARM64Symbolic.X9)] else []
+            [
+                ARM64Symbolic.MOV_reg (ARM64Symbolic.X9, regARM64)           // X9 = input (save in case regARM64 is X0/X1/X2)
+                ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X9, 8s)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X9, 16us)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)                // X0 = stdout fd
+            ]
+            @ runtimeInstrs (Runtime.generateWriteSyscall ctx.Target)
+            @ [ ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 10us, 0)
+                ARM64Symbolic.STRB (ARM64Symbolic.X10, ARM64Symbolic.SP, 0)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
+                ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0) ]
+            @ runtimeInstrs (Runtime.generateWriteSyscall ctx.Target)
+            @ [ ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us) ]
+            @ restoreInstrs)
+
+    | LIR.LoadFuncAddr (dest, funcName) ->
+        // Load the address of a function into the destination register using ADR
+        lirRegToARM64Reg dest
+        |> Result.map (fun destReg ->
+            [ARM64Symbolic.ADR (destReg, codeLabel funcName)])
+
+    | LIR.FileReadText (dest, path) ->
+        // File reading: generates syscall sequence to read file contents
+        // Returns Result<String, String>
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            match path with
+            | LIR.Reg pathReg ->
+                // Already a heap string pointer
+                lirRegToARM64Reg pathReg
+                |> Result.map (fun pathARM64 ->
+                    runtimeInstrs (Runtime.generateFileReadText ctx.Target destReg pathARM64)
+                    @ generateLeakCounterInc ctx
+                    @ generateLeakCounterInc ctx)
+            | LIR.StringSymbol value ->
+                Ok (
+                    loadStringLiteralPointer ARM64Symbolic.X15 value
+                    @ runtimeInstrs (Runtime.generateFileReadText ctx.Target destReg ARM64Symbolic.X15)
+                    @ generateLeakCounterInc ctx
+                    @ generateLeakCounterInc ctx)
+            | LIR.StackSlot offset ->
+                loadStackSlot ARM64Symbolic.X15 offset
+                |> Result.map (fun loadInstrs ->
+                    loadInstrs
+                    @ runtimeInstrs (Runtime.generateFileReadText ctx.Target destReg ARM64Symbolic.X15)
+                    @ generateLeakCounterInc ctx
+                    @ generateLeakCounterInc ctx)
+            | _ -> Error "FileReadText requires string operand")
+
+    | LIR.FileExists (dest, path) ->
+        // File exists check: generates syscall sequence to check file accessibility
+        // Uses access/faccessat syscall to check if path exists
+        // Path can be either a Reg (heap string pointer) or StringSymbol (literal string)
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            match path with
+            | LIR.Reg pathReg ->
+                // Already a heap string pointer
+                lirRegToARM64Reg pathReg
+                |> Result.map (fun pathARM64 ->
+                    runtimeInstrs (Runtime.generateFileExists ctx.Target destReg pathARM64))
+            | LIR.StringSymbol value ->
+                Ok (loadStringLiteralPointer ARM64Symbolic.X15 value @ runtimeInstrs (Runtime.generateFileExists ctx.Target destReg ARM64Symbolic.X15))
+            | LIR.StackSlot offset ->
+                // Load heap string from stack slot
+                loadStackSlot ARM64Symbolic.X15 offset
+                |> Result.map (fun loadInstrs ->
+                    loadInstrs @ runtimeInstrs (Runtime.generateFileExists ctx.Target destReg ARM64Symbolic.X15))
+            | _ -> Error "FileExists requires string operand")
+
+    | LIR.FileWriteText (dest, path, content) ->
+        // File write: writes content string to file at path
+        // Returns Result<Unit, String>
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            // Helper to get operand into a register
+            let getOperandReg operand tempReg =
+                match operand with
+                | LIR.Reg reg ->
+                    lirRegToARM64Reg reg |> Result.map (fun r -> ([], r))
+                | LIR.StringSymbol value ->
+                    Ok (loadStringLiteralPointer tempReg value, tempReg)
+                | LIR.StackSlot offset ->
+                    loadStackSlot tempReg offset |> Result.map (fun instrs -> (instrs, tempReg))
+                | _ -> Error "FileWriteText requires string operands"
+
+            getOperandReg path ARM64Symbolic.X15
+            |> Result.bind (fun (pathInstrs, pathReg) ->
+                getOperandReg content ARM64Symbolic.X14
+                |> Result.map (fun (contentInstrs, contentReg) ->
+                    pathInstrs
+                    @ contentInstrs
+                    @ runtimeInstrs (Runtime.generateFileWriteText ctx.Target destReg pathReg contentReg false)
+                    @ generateLeakCounterInc ctx
+                    @ generateLeakCounterIncIfResultError ctx destReg)))
+
+    | LIR.FileAppendText (dest, path, content) ->
+        // File append: appends content string to file at path
+        // Returns Result<Unit, String>
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            // Same helper as FileWriteText
+            let getOperandReg operand tempReg =
+                match operand with
+                | LIR.Reg reg ->
+                    lirRegToARM64Reg reg |> Result.map (fun r -> ([], r))
+                | LIR.StringSymbol value ->
+                    Ok (loadStringLiteralPointer tempReg value, tempReg)
+                | LIR.StackSlot offset ->
+                    loadStackSlot tempReg offset |> Result.map (fun instrs -> (instrs, tempReg))
+                | _ -> Error "FileAppendText requires string operands"
+
+            getOperandReg path ARM64Symbolic.X15
+            |> Result.bind (fun (pathInstrs, pathReg) ->
+                getOperandReg content ARM64Symbolic.X14
+                |> Result.map (fun (contentInstrs, contentReg) ->
+                    pathInstrs
+                    @ contentInstrs
+                    @ runtimeInstrs (Runtime.generateFileWriteText ctx.Target destReg pathReg contentReg true)
+                    @ generateLeakCounterInc ctx
+                    @ generateLeakCounterIncIfResultError ctx destReg)))
+
+    | LIR.FileDelete (dest, path) ->
+        // File delete: deletes file at path
+        // Uses unlink syscall to remove file
+        // Returns Result<Unit, String>
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            match path with
+            | LIR.Reg pathReg ->
+                // Already a heap string pointer
+                lirRegToARM64Reg pathReg
+                |> Result.map (fun pathARM64 ->
+                    runtimeInstrs (Runtime.generateFileDelete ctx.Target destReg pathARM64)
+                    @ generateLeakCounterInc ctx
+                    @ generateLeakCounterIncIfResultError ctx destReg)
+            | LIR.StringSymbol value ->
+                Ok (
+                    loadStringLiteralPointer ARM64Symbolic.X15 value
+                    @ runtimeInstrs (Runtime.generateFileDelete ctx.Target destReg ARM64Symbolic.X15)
+                    @ generateLeakCounterInc ctx
+                    @ generateLeakCounterIncIfResultError ctx destReg)
+            | LIR.StackSlot offset ->
+                // Load heap string from stack slot
+                loadStackSlot ARM64Symbolic.X15 offset
+                |> Result.map (fun loadInstrs ->
+                    loadInstrs
+                    @ runtimeInstrs (Runtime.generateFileDelete ctx.Target destReg ARM64Symbolic.X15)
+                    @ generateLeakCounterInc ctx
+                    @ generateLeakCounterIncIfResultError ctx destReg)
+            | _ -> Error "FileDelete requires string operand")
+
+    | LIR.FileSetExecutable (dest, path) ->
+        // File set executable: sets executable bit on file at path
+        // Uses chmod syscall with executable permission
+        // Returns Result<Unit, String>
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            match path with
+            | LIR.Reg pathReg ->
+                // Already a heap string pointer
+                lirRegToARM64Reg pathReg
+                |> Result.map (fun pathARM64 ->
+                    runtimeInstrs (Runtime.generateFileSetExecutable ctx.Target destReg pathARM64)
+                    @ generateLeakCounterInc ctx
+                    @ generateLeakCounterIncIfResultError ctx destReg)
+            | LIR.StringSymbol value ->
+                Ok (
+                    loadStringLiteralPointer ARM64Symbolic.X15 value
+                    @ runtimeInstrs (Runtime.generateFileSetExecutable ctx.Target destReg ARM64Symbolic.X15)
+                    @ generateLeakCounterInc ctx
+                    @ generateLeakCounterIncIfResultError ctx destReg)
+            | LIR.StackSlot offset ->
+                loadStackSlot ARM64Symbolic.X15 offset
+                |> Result.map (fun loadInstrs ->
+                    loadInstrs
+                    @ runtimeInstrs (Runtime.generateFileSetExecutable ctx.Target destReg ARM64Symbolic.X15)
+                    @ generateLeakCounterInc ctx
+                    @ generateLeakCounterIncIfResultError ctx destReg)
+            | _ -> Error "FileSetExecutable requires string operand")
+
+    | LIR.FileWriteFromPtr (dest, path, ptr, length) ->
+        // Write raw bytes from ptr to file at path
+        // Returns 1 on success, 0 on failure
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg ptr
+            |> Result.bind (fun ptrARM64 ->
+                lirRegToARM64Reg length
+                |> Result.bind (fun lengthARM64 ->
+                    match path with
+                    | LIR.Reg pathReg ->
+                        // Already a heap string pointer
+                        lirRegToARM64Reg pathReg
+                        |> Result.map (fun pathARM64 ->
+                            runtimeInstrs (Runtime.generateFileWriteFromPtr ctx.Target destReg pathARM64 ptrARM64 lengthARM64)
+                            @ generateLeakCounterIncIfResultError ctx destReg)
+                    | LIR.StringSymbol value ->
+                        Ok (
+                            loadStringLiteralPointer ARM64Symbolic.X15 value
+                            @ runtimeInstrs (Runtime.generateFileWriteFromPtr ctx.Target destReg ARM64Symbolic.X15 ptrARM64 lengthARM64)
+                            @ generateLeakCounterIncIfResultError ctx destReg)
+                    | LIR.StackSlot offset ->
+                        loadStackSlot ARM64Symbolic.X15 offset
+                        |> Result.map (fun loadInstrs ->
+                            loadInstrs
+                            @ runtimeInstrs (Runtime.generateFileWriteFromPtr ctx.Target destReg ARM64Symbolic.X15 ptrARM64 lengthARM64)
+                            @ generateLeakCounterIncIfResultError ctx destReg)
+                    | _ -> Error "FileWriteFromPtr requires string path operand")))
+
+    | LIR.MappedAlloc (dest, numBytes) ->
+        lirRegToARM64Reg dest |> Result.bind (fun destReg ->
+            lirRegToARM64Reg numBytes |> Result.map (fun sizeReg ->
+                let syscalls = ARM64.targetSyscalls ctx.Target
+                let os = ARM64.targetOS ctx.Target
+                let flags = if os = Platform.MacOS then 0x1002us else 0x22us
+                // The mapping length lives before the returned, word-aligned
+                // payload. Preserve it across the syscall, not in a volatile reg.
+                [ ARM64Symbolic.CMP_imm (sizeReg, 0us)
+                  ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, ctx.HeapOverflowLabel)
+                  ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, sizeReg, 8us)
+                  ARM64Symbolic.CMP_imm (ARM64Symbolic.X1, 0us)
+                  ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, ctx.HeapOverflowLabel)
+                  ARM64Symbolic.STP_pre (ARM64Symbolic.X1, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
+                  ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
+                  ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 3us, 0)
+                  ARM64Symbolic.MOVZ (ARM64Symbolic.X3, flags, 0)
+                  ARM64Symbolic.MOVZ (ARM64Symbolic.X4, 0us, 0)
+                  ARM64Symbolic.MVN (ARM64Symbolic.X4, ARM64Symbolic.X4)
+                  ARM64Symbolic.MOVZ (ARM64Symbolic.X5, 0us, 0)
+                  ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Mmap, 0)
+                  ARM64Symbolic.SVC syscalls.SvcImmediate ]
+                @ (if os = Platform.MacOS then
+                       [ARM64Symbolic.B_cond_label (ARM64Symbolic.HS, ctx.HeapOverflowLabel)]
+                   else
+                       [ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us); ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, ctx.HeapOverflowLabel)])
+                @ [ ARM64Symbolic.LDP_post (ARM64Symbolic.X1, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+                    ARM64Symbolic.STR (ARM64Symbolic.X1, ARM64Symbolic.X0, 0s)
+                    ARM64Symbolic.ADD_imm (destReg, ARM64Symbolic.X0, 8us) ]
+                @ generateLeakCounterInc ctx))
+
+    | LIR.MappedFree ptr ->
+        lirRegToARM64Reg ptr |> Result.map (fun ptrReg ->
+            let syscalls = ARM64.targetSyscalls ctx.Target
+            [ ARM64Symbolic.SUB_imm (ARM64Symbolic.X0, ptrReg, 8us)
+              ARM64Symbolic.LDR (ARM64Symbolic.X1, ARM64Symbolic.X0, 0s)
+              ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Munmap, 0)
+              ARM64Symbolic.SVC syscalls.SvcImmediate
+              ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+              ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, ctx.HeapOverflowLabel) ]
+            @ generateLeakCounterDec ctx)
+
+    | LIR.RawAlloc (dest, numBytes) ->
+        // Raw allocation: free-list reuse for small aligned size classes, else bump allocation.
+        // This path is used by skew-list nodes, so freed raw blocks must be reused to avoid OOM.
+        // numBytes is already in a physical register (from MIR_to_LIR)
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg numBytes
+            |> Result.map (fun numBytesReg ->
+                let alignSizeInstrs = [
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, numBytesReg, 7us)        // X15 = numBytes + 7
+                    ARM64Symbolic.MOVZ (ARM64Symbolic.X14, 3us, 0)                     // X14 = 3 (shift amount)
+                    ARM64Symbolic.LSR_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X14)  // X15 = (numBytes + 7) >> 3
+                    ARM64Symbolic.LSL_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X14)  // X15 = aligned size
+                ]
+
+                if ctx.Options.DisableFreeList then
+                    alignSizeInstrs
+                    @ checkedBumpAllocReg ctx.HeapOverflowLabel destReg ARM64Symbolic.X15
+                    @ generateLeakCounterInc ctx
+                else
+                    let popFreeList = [
+                        ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X14)             // dest = free-list head block
+                        ARM64Symbolic.LDR (ARM64Symbolic.X13, ARM64Symbolic.X14, 0s)   // X13 = next block
+                        ARM64Symbolic.STR (ARM64Symbolic.X13, ARM64Symbolic.X12, 0s)   // update free-list head
+                    ]
+
+                    let bumpAlloc = checkedBumpAllocReg ctx.HeapOverflowLabel destReg ARM64Symbolic.X15
+
+                    alignSizeInstrs
+                    @ [
+                        ARM64Symbolic.CMP_imm (ARM64Symbolic.X15, 8us)                  // Need at least payload + refcount to have a payload class
+                        ARM64Symbolic.B_cond (ARM64Symbolic.LT, popFreeList.Length + 8) // skip free-list lookup for undersized allocations
+                        ARM64Symbolic.SUB_imm (ARM64Symbolic.X13, ARM64Symbolic.X15, 8us) // X13 = payload size class (total size minus refcount word)
+                        ARM64Symbolic.CMP_imm (ARM64Symbolic.X13, 248us)                // free-list has slots for payload classes up to 248 bytes
+                        ARM64Symbolic.B_cond (ARM64Symbolic.GT, popFreeList.Length + 5) // skip free-list lookup when class is out of range
+                        ARM64Symbolic.ADD_reg (ARM64Symbolic.X12, ARM64Symbolic.X27, ARM64Symbolic.X13) // X12 = &free_list[payload_class]
+                        ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X12, 0s)    // X14 = free-list head
+                        ARM64Symbolic.CBZ_offset (ARM64Symbolic.X14, popFreeList.Length + 2) // if empty, jump to bump path
+                    ]
+                    @ popFreeList
+                    // B uses a current-PC-relative instruction offset, so skipping N instructions needs N + 1.
+                    @ [ARM64Symbolic.B (bumpAlloc.Length + 1)]
+                    @ bumpAlloc
+                    @ generateLeakCounterInc ctx))
+
+    | LIR.RawFree ptr ->
+        // RawFree is an internal 8-byte cell operation. Stream producer-state
+        // cells and lifecycle probes are its only callers, so the size class is
+        // statically exact even though RawPtr itself is erased.
+        lirRegToARM64Reg ptr
+        |> Result.map (fun ptrReg ->
+            [
+                ARM64Symbolic.LDR (ARM64Symbolic.X14, ARM64Symbolic.X27, 0s)
+                ARM64Symbolic.STR (ARM64Symbolic.X14, ptrReg, 0s)
+                ARM64Symbolic.STR (ptrReg, ARM64Symbolic.X27, 0s)
+            ]
+            @ generateLeakCounterDec ctx)
+
+    | LIR.RawGet (dest, ptr, byteOffset) ->
+        // Load 8 bytes from ptr + byteOffset
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg ptr
+            |> Result.bind (fun ptrReg ->
+                lirRegToARM64Reg byteOffset
+                |> Result.map (fun offsetReg ->
+                    [
+                        ARM64Symbolic.ADD_reg (ARM64Symbolic.X15, ptrReg, offsetReg)   // X15 = ptr + offset
+                        ARM64Symbolic.LDR (destReg, ARM64Symbolic.X15, 0s)             // dest = [X15]
+                    ])))
+
+    | LIR.RawGetByte (dest, ptr, byteOffset) ->
+        // Load 1 byte from ptr + byteOffset (zero-extended to 64 bits)
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirRegToARM64Reg ptr
+            |> Result.bind (fun ptrReg ->
+                lirRegToARM64Reg byteOffset
+                |> Result.map (fun offsetReg ->
+                    [
+                        ARM64Symbolic.ADD_reg (ARM64Symbolic.X15, ptrReg, offsetReg)   // X15 = ptr + offset
+                        ARM64Symbolic.LDRB_imm (destReg, ARM64Symbolic.X15, 0)         // dest = [X15] (byte, zero-extended)
+                    ])))
+
+    | LIR.RawWriteWord (ptr, byteOffset, value) ->
+        // Store 8 unmanaged bytes at ptr + byteOffset.
+        lirRegToARM64Reg ptr
+        |> Result.bind (fun ptrReg ->
+            lirRegToARM64Reg byteOffset
+            |> Result.bind (fun offsetReg ->
+                lirRegToARM64Reg value
+                |> Result.map (fun valueReg ->
+                    let tempReg =
+                        if ptrReg = ARM64Symbolic.X15 || offsetReg = ARM64Symbolic.X15 || valueReg = ARM64Symbolic.X15 then
+                            ARM64Symbolic.X14
+                        else
+                            ARM64Symbolic.X15
+                    [
+                        ARM64Symbolic.ADD_reg (tempReg, ptrReg, offsetReg)   // temp = ptr + offset
+                        ARM64Symbolic.STR (valueReg, tempReg, 0s)            // [temp] = value
+                    ])))
+
+    | LIR.RawSlotInit (ptr, byteOffset, value, valueType) ->
+        // Store 8 bytes at ptr + byteOffset.
+        // If the stored value is RC-managed, increment ownership because the parent now owns that edge.
+        lirRegToARM64Reg ptr
+        |> Result.bind (fun ptrReg ->
+            lirRegToARM64Reg byteOffset
+            |> Result.bind (fun offsetReg ->
+                lirRegToARM64Reg value
+                |> Result.map (fun valueReg ->
+                    let tempReg =
+                        if ptrReg = ARM64Symbolic.X15 || offsetReg = ARM64Symbolic.X15 || valueReg = ARM64Symbolic.X15 then
+                            ARM64Symbolic.X14
+                        else
+                            ARM64Symbolic.X15
+                    let storeValue = [
+                        ARM64Symbolic.ADD_reg (tempReg, ptrReg, offsetReg)   // temp = ptr + offset
+                        ARM64Symbolic.STR (valueReg, tempReg, 0s)            // [temp] = value
+                    ]
+
+                    let retainTarget =
+                        match ctx.RawSlotInitRetainTargets with
+                        | Some targets ->
+                            Map.tryFind valueType targets |> Option.flatten
+                        | None ->
+                            slotInitRootRetainTarget
+                                ctx.RecordRegistry
+                                ctx.SumShapeRegistry
+                                valueType
+
+                    let ownershipInc =
+                        match retainTarget with
+                        | Some LIR.SlotInitListRootRetain ->
+                            [
+                                ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -64s)
+                                ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                                ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                                ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                                ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, valueReg)
+                                ARM64Symbolic.BL listRefCountIncHelperLabel
+                                ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                                ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                                ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                                ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 64s)
+                            ]
+                        | Some LIR.SlotInitDictRootRetain ->
+                            [
+                                ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -80s)
+                                ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                                ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                                ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                                ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                                ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, valueReg)
+                                ARM64Symbolic.BL dictRefCountIncHelperLabel
+                                ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                                ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                                ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                                ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                                ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 80s)
+                            ]
+                        | Some LIR.SlotInitDynamicBufferRetain ->
+                            let refAddrReg, preserveAddr =
+                                if valueReg = ARM64Symbolic.X13 || valueReg = ARM64Symbolic.X15 then
+                                    ARM64Symbolic.X12, [ARM64Symbolic.MOV_reg (ARM64Symbolic.X12, valueReg)]
+                                else
+                                    valueReg, []
+                            preserveAddr @ [
+                                ARM64Symbolic.LDR (ARM64Symbolic.X15, refAddrReg, 0s)
+                                ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
+                                ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
+                                ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
+                                ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0x7FFFus, 48)
+                                ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)
+                                ARM64Symbolic.B_cond (ARM64Symbolic.EQ, 3)
+                                ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)
+                                ARM64Symbolic.STR (ARM64Symbolic.X15, refAddrReg, 0s)
+                            ]
+                        | Some LIR.SlotInitClosureRootRetain ->
+                            let closureIncCall = [
+                                ARM64Symbolic.STP_pre (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, -96s)
+                                ARM64Symbolic.STP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                                ARM64Symbolic.STP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                                ARM64Symbolic.STP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                                ARM64Symbolic.STP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                                ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                                ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, valueReg)
+                                ARM64Symbolic.BL closureRefCountIncHelperLabel
+                                ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 80s)
+                                ARM64Symbolic.LDP (ARM64Symbolic.X8, ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+                                ARM64Symbolic.LDP (ARM64Symbolic.X6, ARM64Symbolic.X7, ARM64Symbolic.SP, 48s)
+                                ARM64Symbolic.LDP (ARM64Symbolic.X4, ARM64Symbolic.X5, ARM64Symbolic.SP, 32s)
+                                ARM64Symbolic.LDP (ARM64Symbolic.X2, ARM64Symbolic.X3, ARM64Symbolic.SP, 16s)
+                                ARM64Symbolic.LDP_post (ARM64Symbolic.X0, ARM64Symbolic.X1, ARM64Symbolic.SP, 96s)
+                            ]
+                            [
+                                ARM64Symbolic.CBZ_offset (valueReg, List.length closureIncCall + 1)
+                            ]
+                            @ closureIncCall
+                        | Some (LIR.SlotInitGenericRootRetain payloadSize) ->
+                            let rcReg =
+                                if valueReg = ARM64Symbolic.X15 then ARM64Symbolic.X14 else ARM64Symbolic.X15
+                            [
+                                ARM64Symbolic.CBZ_offset (valueReg, 4)
+                                ARM64Symbolic.LDR (rcReg, valueReg, int16 payloadSize)
+                                ARM64Symbolic.ADD_imm (rcReg, rcReg, 1us)
+                                ARM64Symbolic.STR (rcReg, valueReg, int16 payloadSize)
+                            ]
+                        | _ -> []
+
+                    storeValue @ ownershipInc)))
+
+    | LIR.RawWriteByte (ptr, byteOffset, value) ->
+        // Store 1 byte at ptr + byteOffset
+        // IMPORTANT: If any input reg is X15, use X14 as temp instead
+        lirRegToARM64Reg ptr
+        |> Result.bind (fun ptrReg ->
+            lirRegToARM64Reg byteOffset
+            |> Result.bind (fun offsetReg ->
+                lirRegToARM64Reg value
+                |> Result.map (fun valueReg ->
+                    let tempReg =
+                        if ptrReg = ARM64Symbolic.X15 || offsetReg = ARM64Symbolic.X15 || valueReg = ARM64Symbolic.X15 then
+                            ARM64Symbolic.X14
+                        else
+                            ARM64Symbolic.X15
+                    [
+                        ARM64Symbolic.ADD_reg (tempReg, ptrReg, offsetReg)   // temp = ptr + offset
+                        ARM64Symbolic.STRB_reg (valueReg, tempReg)           // [temp] = value (byte)
+                    ])))
+
+    | LIR.RefCountIncString str
+    | LIR.RefCountIncBlob str ->
+        // Increment the leading refcount for a dynamic buffer.
+        // Literal strings have refcount = INT64_MAX as sentinel (don't modify read-only memory)
+        match str with
+        | LIR.StringSymbol _ ->
+            // Literal string - no refcount, no-op
+            Ok []
+        | LIR.Reg reg ->
+            // Heap and materialized literal buffers keep the refcount at [addr].
+            lirRegToARM64Reg reg
+            |> Result.map (fun addrReg ->
+                let refAddrReg, preserveAddr =
+                    if addrReg = ARM64Symbolic.X13 || addrReg = ARM64Symbolic.X15 then
+                        ARM64Symbolic.X14, [ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, addrReg)]
+                    else
+                        addrReg, []
+                preserveAddr @ [
+                    ARM64Symbolic.LDR (ARM64Symbolic.X15, refAddrReg, 0s)             // X15 = refcount
+                ]
+                // INT64_MAX fits a single MOVN; retain the exact sentinel test
+                // without a four-instruction constant on every buffer RC edge.
+                @ loadImmediate ARM64Symbolic.X13 System.Int64.MaxValue
+                @ [
+                    ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)             // Compare with sentinel
+                    ARM64Symbolic.B_cond (ARM64Symbolic.EQ, 3)                       // If literal string, skip to end
+                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)        // X15++
+                    ARM64Symbolic.STR (ARM64Symbolic.X15, refAddrReg, 0s)             // store back
+                ])
+        | _ -> Error "dynamic buffer RefCountInc requires StringSymbol or Reg operand"
+
+    | LIR.RefCountDecString str
+    | LIR.RefCountDecBlob str ->
+        // Decrement the leading refcount for a dynamic buffer.
+        // Literal strings have refcount = INT64_MAX as sentinel (don't modify read-only memory)
+        match str with
+        | LIR.StringSymbol _ ->
+            // Literal string - no refcount, no-op
+            Ok []
+        | LIR.Reg reg ->
+            // Heap and materialized literal buffers keep the refcount at [addr].
+            lirRegToARM64Reg reg
+            |> Result.map (fun addrReg ->
+                let leakDec = generateLeakCounterDec ctx
+                let refAddrReg, preserveAddr =
+                    if addrReg = ARM64Symbolic.X13 || addrReg = ARM64Symbolic.X15 then
+                        ARM64Symbolic.X14, [ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, addrReg)]
+                    else
+                        addrReg, []
+                let bcondOffset = if List.isEmpty leakDec then 3 else 9
+                let refcountUpdate =
+                    if List.isEmpty leakDec then
+                        [
+                            ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)        // X15--
+                            ARM64Symbolic.STR (ARM64Symbolic.X15, refAddrReg, 0s)             // store back
+                        ]
+                    else
+                        [
+                            ARM64Symbolic.SUB_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)        // X15--
+                            ARM64Symbolic.STR (ARM64Symbolic.X15, refAddrReg, 0s)             // store back
+                            // If refcount hits 0, update leak counter (string freeing not implemented yet)
+                            ARM64Symbolic.CBNZ_offset (ARM64Symbolic.X15, 6)                 // If not zero, skip leak counter
+                        ] @ leakDec
+                preserveAddr @ [
+                    ARM64Symbolic.LDR (ARM64Symbolic.X15, refAddrReg, 0s)             // X15 = refcount
+                ]
+                @ loadImmediate ARM64Symbolic.X13 System.Int64.MaxValue
+                @ [
+                    ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)             // Compare with sentinel
+                    ARM64Symbolic.B_cond (ARM64Symbolic.EQ, bcondOffset)             // If literal string, skip to end
+                ] @ refcountUpdate)
+        | _ -> Error "dynamic buffer RefCountDec requires StringSymbol or Reg operand"
+
+    | LIR.RandomInt64 dest ->
+        // Generate random 8 bytes as Int64
+        lirRegToARM64Reg dest
+        |> Result.map (fun destReg ->
+            runtimeInstrs (Runtime.generateRandomInt64 ctx.Target destReg))
+
+    | LIR.DateTimeNow dest ->
+        // Generate the current UTC instant as 100ns Unix ticks.
+        lirRegToARM64Reg dest
+        |> Result.map (fun destReg ->
+            runtimeInstrs (Runtime.generateDateTimeNow ctx.Target destReg))
+
+    | LIR.Sleep (effectId, delayMs) ->
+        lirFRegToARM64FReg delayMs
+        |> Result.map (fun delayReg ->
+            let syscalls = ARM64.targetSyscalls ctx.Target
+            let label suffix = $"__sleep_{ctx.FunctionName}_{effectId}_{ctx.InstructionSite}_{suffix}"
+            let retryLabel = label "retry"
+            let interruptedLabel = label "interrupted"
+            let releaseLabel = label "release"
+            let completeLabel = label "complete"
+            let millionLabel = floatDataLabel 1000000.0
+            let resultCheck =
+                match ARM64.targetOS ctx.Target with
+                | Platform.Linux ->
+                    loadImmediate ARM64Symbolic.X12 -4L
+                    @ [ ARM64Symbolic.CMP_reg (ARM64Symbolic.X0, ARM64Symbolic.X12)
+                        ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, interruptedLabel)
+                        ARM64Symbolic.B_label releaseLabel ]
+                | Platform.MacOS ->
+                    [ ARM64Symbolic.B_cond_label (ARM64Symbolic.HS, interruptedLabel)
+                      ARM64Symbolic.B_label releaseLabel ]
+            let interruptCheck =
+                match ARM64.targetOS ctx.Target with
+                | Platform.Linux -> []
+                | Platform.MacOS ->
+                    [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 4us)
+                      ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, releaseLabel) ]
+            [ ARM64Symbolic.ADRP (ARM64Symbolic.X9, millionLabel)
+              ARM64Symbolic.ADD_label (ARM64Symbolic.X9, ARM64Symbolic.X9, millionLabel)
+              ARM64Symbolic.LDR_fp (ARM64Symbolic.D16, ARM64Symbolic.X9, 0s)
+              ARM64Symbolic.FMUL (ARM64Symbolic.D16, delayReg, ARM64Symbolic.D16)
+              ARM64Symbolic.FCVTZS (ARM64Symbolic.X9, ARM64Symbolic.D16)
+              ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 0us)
+              ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, completeLabel) ]
+            @ loadImmediate ARM64Symbolic.X12 1000000000L
+            @ [ ARM64Symbolic.SDIV (ARM64Symbolic.X10, ARM64Symbolic.X9, ARM64Symbolic.X12)
+                ARM64Symbolic.MSUB (ARM64Symbolic.X11, ARM64Symbolic.X10, ARM64Symbolic.X12, ARM64Symbolic.X9)
+                ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 32us)
+                ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 0s)
+                ARM64Symbolic.MOVZ (ARM64Symbolic.X12, 0us, 0)
+                ARM64Symbolic.STP (ARM64Symbolic.X12, ARM64Symbolic.X12, ARM64Symbolic.SP, 16s)
+                ARM64Symbolic.Label retryLabel
+                ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.SP)
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 16us)
+                ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Nanosleep, 0)
+                ARM64Symbolic.SVC syscalls.SvcImmediate ]
+            @ resultCheck
+            @ [ ARM64Symbolic.Label interruptedLabel ]
+            @ interruptCheck
+            @ [ ARM64Symbolic.LDP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 16s)
+                ARM64Symbolic.STP (ARM64Symbolic.X10, ARM64Symbolic.X11, ARM64Symbolic.SP, 0s)
+                ARM64Symbolic.B_label retryLabel
+                ARM64Symbolic.Label releaseLabel
+                ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 32us)
+                ARM64Symbolic.Label completeLabel ])
+
+    | LIR.CliNative (dest, operation, args) ->
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            match operation with
+            | LIR.HostOS ->
+                Ok [ARM64Symbolic.MOVZ (destReg, (if ARM64.targetOS ctx.Target = Platform.MacOS then 2us else 1us), 0)]
+            | LIR.HostArchitecture ->
+                Ok [ARM64Symbolic.MOVZ (destReg, (if ARM64.targetOS ctx.Target = Platform.MacOS then 3us else 2us), 0)]
+            | LIR.Hostname ->
+                let label suffix = $"__hostname_{ctx.FunctionName}_{ctx.InstructionSite}_{suffix}"
+                let failureLabel = label "failure"
+                let lengthLabel = label "length"
+                let lengthDoneLabel = label "length_done"
+                let copyLabel = label "copy"
+                let copyDoneLabel = label "copy_done"
+                let completeLabel = label "complete"
+                let os = ARM64.targetOS ctx.Target
+                let stackSize, nodeOffset, syscallNumber =
+                    match os with
+                    | Platform.Linux -> (400us, 65us, 160us)
+                    | Platform.MacOS -> (1280us, 256us, 164us)
+                let failureCheck =
+                    match os with
+                    | Platform.Linux ->
+                        [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+                          ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, failureLabel) ]
+                    | Platform.MacOS -> [ARM64Symbolic.B_cond_label (ARM64Symbolic.HS, failureLabel)]
+                let normalizeErrno =
+                    match os with
+                    | Platform.Linux -> [ARM64Symbolic.NEG (ARM64Symbolic.X2, ARM64Symbolic.X0)]
+                    | Platform.MacOS -> [ARM64Symbolic.MOV_reg (ARM64Symbolic.X2, ARM64Symbolic.X0)]
+                Ok (
+                    [ ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, stackSize)
+                      ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.SP)
+                      ARM64Symbolic.MOVZ ((ARM64.targetSyscalls ctx.Target).SyscallRegister, syscallNumber, 0)
+                      ARM64Symbolic.SVC (ARM64.targetSyscalls ctx.Target).SvcImmediate ]
+                    @ failureCheck
+                    @ [ ARM64Symbolic.ADD_imm (ARM64Symbolic.X2, ARM64Symbolic.SP, nodeOffset)
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X3, 0us, 0)
+                        ARM64Symbolic.Label lengthLabel
+                        ARM64Symbolic.LDRB (ARM64Symbolic.X4, ARM64Symbolic.X2, ARM64Symbolic.X3)
+                        ARM64Symbolic.CBZ (ARM64Symbolic.X4, lengthDoneLabel)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X3, ARM64Symbolic.X3, 1us)
+                        ARM64Symbolic.B_label lengthLabel
+                        ARM64Symbolic.Label lengthDoneLabel
+                        ARM64Symbolic.MOV_reg (ARM64Symbolic.X5, ARM64Symbolic.X28)
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X8, 1us, 0)
+                        ARM64Symbolic.STR (ARM64Symbolic.X8, ARM64Symbolic.X5, 0s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X3, ARM64Symbolic.X5, 8s)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X6, ARM64Symbolic.X3, 7us)
+                        ARM64Symbolic.LSR_imm (ARM64Symbolic.X6, ARM64Symbolic.X6, 3)
+                        ARM64Symbolic.LSL_imm (ARM64Symbolic.X6, ARM64Symbolic.X6, 3)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X7, ARM64Symbolic.X6, 16us)
+                        ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X7)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X7, ARM64Symbolic.X5, 16us)
+                        ARM64Symbolic.MOV_reg (ARM64Symbolic.X8, ARM64Symbolic.X3)
+                        ARM64Symbolic.Label copyLabel
+                        ARM64Symbolic.CBZ (ARM64Symbolic.X8, copyDoneLabel)
+                        ARM64Symbolic.LDRB_imm (ARM64Symbolic.X9, ARM64Symbolic.X2, 0)
+                        ARM64Symbolic.STRB_reg (ARM64Symbolic.X9, ARM64Symbolic.X7)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X2, ARM64Symbolic.X2, 1us)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X7, ARM64Symbolic.X7, 1us)
+                        ARM64Symbolic.SUB_imm (ARM64Symbolic.X8, ARM64Symbolic.X8, 1us)
+                        ARM64Symbolic.B_label copyLabel
+                        ARM64Symbolic.Label copyDoneLabel
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, stackSize) ]
+                    @ generateLeakCounterInc ctx
+                    @ [ ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X28)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 24us)
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X8, 0us, 0)
+                        ARM64Symbolic.STR (ARM64Symbolic.X8, destReg, 0s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X5, destReg, 8s)
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X8, 1us, 0)
+                        ARM64Symbolic.STR (ARM64Symbolic.X8, destReg, 16s) ]
+                    @ generateLeakCounterInc ctx
+                    @ [ ARM64Symbolic.B_label completeLabel
+                        ARM64Symbolic.Label failureLabel ]
+                    @ normalizeErrno
+                    @ [ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, stackSize)]
+                    @ loadStringLiteralPointer ARM64Symbolic.X3 "POSIX error"
+                    @ [ ARM64Symbolic.MOV_reg (ARM64Symbolic.X4, ARM64Symbolic.X28)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 24us)
+                        ARM64Symbolic.STR (ARM64Symbolic.X2, ARM64Symbolic.X4, 0s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X3, ARM64Symbolic.X4, 8s)
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X5, 1us, 0)
+                        ARM64Symbolic.STR (ARM64Symbolic.X5, ARM64Symbolic.X4, 16s) ]
+                    @ generateLeakCounterInc ctx
+                    @ [ ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X28)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 24us)
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X5, 1us, 0)
+                        ARM64Symbolic.STR (ARM64Symbolic.X5, destReg, 0s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X4, destReg, 8s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X5, destReg, 16s) ]
+                    @ generateLeakCounterInc ctx
+                    @ [ARM64Symbolic.Label completeLabel])
+            | LIR.Execute when ARM64.targetOS ctx.Target = Platform.Linux ->
+                match args with
+                | [command] ->
+                    loadCliOperand ARM64Symbolic.X0 command
+                    |> Result.map (fun loads ->
+                        loads
+                        @ [ARM64Symbolic.BL "__dark_cli_execute"]
+                        @ (if destReg = ARM64Symbolic.X0 then []
+                           else [ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X0)]))
+                | _ -> Error "CLI execute expects exactly one command"
+            | LIR.GetPid | LIR.GetUid ->
+                let os = ARM64.targetOS ctx.Target
+                let number =
+                    match operation, os with
+                    | LIR.GetPid, Platform.Linux -> 172us
+                    | LIR.GetPid, Platform.MacOS -> 20us
+                    | LIR.GetUid, Platform.Linux -> 174us
+                    | LIR.GetUid, Platform.MacOS -> 24us
+                    | _ -> 0us
+                let syscalls = ARM64.targetSyscalls ctx.Target
+                Ok [ARM64Symbolic.MOVZ (syscalls.SyscallRegister, number, 0)
+                    ARM64Symbolic.SVC syscalls.SvcImmediate
+                    ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X0)]
+            | LIR.CpuCount ->
+                match ARM64.targetOS ctx.Target with
+                | Platform.MacOS ->
+                    let label suffix = $"__cpu_count_{ctx.FunctionName}_{ctx.InstructionSite}_{suffix}"
+                    let fallback = label "fallback"
+                    let complete = label "complete"
+                    Ok (
+                        [ ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 32us) ]
+                        @ loadImmediate ARM64Symbolic.X9 0x1900000006L
+                        @ [ ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 0s)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 0us, 0)
+                            ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 8s)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 4us, 0)
+                            ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 16s)
+                            ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.SP)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 2us, 0)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X2, ARM64Symbolic.SP, 8us)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X3, ARM64Symbolic.SP, 16us)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X4, 0us, 0)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X5, 0us, 0)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X16, 202us, 0)
+                            ARM64Symbolic.SVC 0x80us
+                            ARM64Symbolic.B_cond_label (ARM64Symbolic.HS, fallback)
+                            ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.SP, 8s)
+                            ARM64Symbolic.CBZ (ARM64Symbolic.X9, fallback)
+                            ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X9)
+                            ARM64Symbolic.B_label complete
+                            ARM64Symbolic.Label fallback
+                            ARM64Symbolic.MOVZ (destReg, 1us, 0)
+                            ARM64Symbolic.Label complete
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 32us) ])
+                | Platform.Linux ->
+                    let label suffix = $"__cpu_count_{ctx.FunctionName}_{ctx.InstructionSite}_{suffix}"
+                    let byteLoop = label "byte_loop"
+                    let bitLoop = label "bit_loop"
+                    let nextByte = label "next_byte"
+                    let doneLabel = label "done"
+                    let fallback = label "fallback"
+                    let complete = label "complete"
+                    let zeroMask =
+                        [0 .. 15]
+                        |> List.map (fun index -> ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, int16 (index * 8)))
+                    Ok (
+                        [ ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 128us)
+                          ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 0us, 0) ]
+                        @ zeroMask
+                        @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 128us, 0)
+                            ARM64Symbolic.MOV_reg (ARM64Symbolic.X2, ARM64Symbolic.SP)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X8, 123us, 0)
+                            ARM64Symbolic.SVC 0us
+                            ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+                            ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, fallback)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 0us, 0)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 0us, 0)
+                            ARM64Symbolic.Label byteLoop
+                            ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 128us)
+                            ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, doneLabel)
+                            ARM64Symbolic.LDRB (ARM64Symbolic.X11, ARM64Symbolic.SP, ARM64Symbolic.X9)
+                            ARM64Symbolic.Label bitLoop
+                            ARM64Symbolic.CBZ (ARM64Symbolic.X11, nextByte)
+                            ARM64Symbolic.AND_imm (ARM64Symbolic.X12, ARM64Symbolic.X11, 1UL)
+                            ARM64Symbolic.ADD_reg (ARM64Symbolic.X10, ARM64Symbolic.X10, ARM64Symbolic.X12)
+                            ARM64Symbolic.LSR_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 1)
+                            ARM64Symbolic.B_label bitLoop
+                            ARM64Symbolic.Label nextByte
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 1us)
+                            ARM64Symbolic.B_label byteLoop
+                            ARM64Symbolic.Label doneLabel
+                            ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X10)
+                            ARM64Symbolic.B_label complete
+                            ARM64Symbolic.Label fallback
+                            ARM64Symbolic.MOVZ (destReg, 1us, 0)
+                            ARM64Symbolic.Label complete
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 128us) ])
+            | LIR.GetArgv ->
+                match args with
+                | [index] ->
+                    loadCliOperand ARM64Symbolic.X0 index
+                    |> Result.map (fun loads ->
+                        loads
+                        @ [ARM64Symbolic.BL $"__dark_cli_argv_{ctx.FunctionName}"]
+                        @ (if destReg = ARM64Symbolic.X0 then []
+                           else [ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X0)]))
+                | _ -> Error "CLI argv expects exactly one index"
+            | LIR.GetEnv ->
+                match args with
+                | [name] ->
+                    loadCliOperand ARM64Symbolic.X0 name
+                    |> Result.map (fun loads ->
+                        let label suffix = $"__getenv_{ctx.FunctionName}_{ctx.InstructionSite}_{suffix}"
+                        let findRoot = label "find_root"
+                        let rootFound = label "root_found"
+                        let findArgvEnd = label "find_argv_end"
+                        let nextEntry = label "next_entry"
+                        let compareName = label "compare_name"
+                        let nameMatched = label "name_matched"
+                        let findLength = label "find_length"
+                        let lengthFound = label "length_found"
+                        let copyValue = label "copy_value"
+                        let copyDone = label "copy_done"
+                        let missing = label "missing"
+                        let box = label "box"
+                        loads
+                        @ [ ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.X29)
+                            ARM64Symbolic.Label findRoot
+                            ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X1, 0s)
+                            ARM64Symbolic.CBZ (ARM64Symbolic.X2, rootFound)
+                            ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.X2)
+                            ARM64Symbolic.B_label findRoot
+                            ARM64Symbolic.Label rootFound
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 24us)
+                            ARM64Symbolic.Label findArgvEnd
+                            ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X1, 0s)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 8us)
+                            ARM64Symbolic.CBNZ (ARM64Symbolic.X2, findArgvEnd)
+                            ARM64Symbolic.LDR (ARM64Symbolic.X3, ARM64Symbolic.X0, 8s)
+                            ARM64Symbolic.Label nextEntry
+                            ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X1, 0s)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 8us)
+                            ARM64Symbolic.CBZ (ARM64Symbolic.X2, missing)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X4, 0us, 0)
+                            ARM64Symbolic.Label compareName
+                            ARM64Symbolic.CMP_reg (ARM64Symbolic.X4, ARM64Symbolic.X3)
+                            ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, nameMatched)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X5, ARM64Symbolic.X0, 16us)
+                            ARM64Symbolic.LDRB (ARM64Symbolic.X6, ARM64Symbolic.X5, ARM64Symbolic.X4)
+                            ARM64Symbolic.LDRB (ARM64Symbolic.X5, ARM64Symbolic.X2, ARM64Symbolic.X4)
+                            ARM64Symbolic.CMP_reg (ARM64Symbolic.X5, ARM64Symbolic.X6)
+                            ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, nextEntry)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X4, ARM64Symbolic.X4, 1us)
+                            ARM64Symbolic.B_label compareName
+                            ARM64Symbolic.Label nameMatched
+                            ARM64Symbolic.LDRB (ARM64Symbolic.X5, ARM64Symbolic.X2, ARM64Symbolic.X4)
+                            ARM64Symbolic.CMP_imm (ARM64Symbolic.X5, 61us)
+                            ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, nextEntry)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X8, ARM64Symbolic.X2, 1us)
+                            ARM64Symbolic.ADD_reg (ARM64Symbolic.X8, ARM64Symbolic.X8, ARM64Symbolic.X3)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 0us, 0)
+                            ARM64Symbolic.Label findLength
+                            ARM64Symbolic.LDRB (ARM64Symbolic.X5, ARM64Symbolic.X8, ARM64Symbolic.X9)
+                            ARM64Symbolic.CBZ (ARM64Symbolic.X5, lengthFound)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 1us)
+                            ARM64Symbolic.B_label findLength
+                            ARM64Symbolic.Label lengthFound
+                            ARM64Symbolic.MOV_reg (ARM64Symbolic.X7, ARM64Symbolic.X28)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X11, 1us, 0)
+                            ARM64Symbolic.STR (ARM64Symbolic.X11, ARM64Symbolic.X7, 0s)
+                            ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X7, 8s)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X9, 7us)
+                            ARM64Symbolic.LSR_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 3)
+                            ARM64Symbolic.LSL_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 3)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X13, 16us)
+                            ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X14)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X7, 16us)
+                            ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, ARM64Symbolic.X9)
+                            ARM64Symbolic.MOV_reg (ARM64Symbolic.X12, ARM64Symbolic.X8)
+                            ARM64Symbolic.Label copyValue
+                            ARM64Symbolic.CBZ (ARM64Symbolic.X11, copyDone)
+                            ARM64Symbolic.LDRB_imm (ARM64Symbolic.X5, ARM64Symbolic.X12, 0)
+                            ARM64Symbolic.STRB_reg (ARM64Symbolic.X5, ARM64Symbolic.X10)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 1us)
+                            ARM64Symbolic.SUB_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 1us)
+                            ARM64Symbolic.B_label copyValue
+                            ARM64Symbolic.Label copyDone ]
+                        @ generateLeakCounterInc ctx
+                        @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 0us, 0)
+                            ARM64Symbolic.B_label box
+                            ARM64Symbolic.Label missing
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 1us, 0)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X7, 0us, 0)
+                            ARM64Symbolic.Label box
+                            ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X28)
+                            ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 24us)
+                            ARM64Symbolic.STR (ARM64Symbolic.X15, destReg, 0s)
+                            ARM64Symbolic.STR (ARM64Symbolic.X7, destReg, 8s)
+                            ARM64Symbolic.MOVZ (ARM64Symbolic.X11, 1us, 0)
+                            ARM64Symbolic.STR (ARM64Symbolic.X11, destReg, 16s) ]
+                        @ generateLeakCounterInc ctx)
+                | _ -> Error "CLI getenv expects exactly one name"
+            | LIR.Kill ->
+                match args with
+                | [pid; signal] ->
+                    loadCliOperand ARM64Symbolic.X0 pid
+                    |> Result.bind (fun pidLoads ->
+                        loadCliOperand ARM64Symbolic.X1 signal
+                        |> Result.map (fun signalLoads ->
+                            let success =
+                                [ ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X28)
+                                  ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 24us)
+                                  ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 0us, 0)
+                                  ARM64Symbolic.STR (ARM64Symbolic.X2, destReg, 0s)
+                                  ARM64Symbolic.STR (ARM64Symbolic.X2, destReg, 8s)
+                                  ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0)
+                                  ARM64Symbolic.STR (ARM64Symbolic.X2, destReg, 16s) ]
+                                @ generateLeakCounterInc ctx
+                            let normalizeErrno =
+                                match ARM64.targetOS ctx.Target with
+                                | Platform.Linux -> [ARM64Symbolic.NEG (ARM64Symbolic.X2, ARM64Symbolic.X0)]
+                                | Platform.MacOS -> [ARM64Symbolic.MOV_reg (ARM64Symbolic.X2, ARM64Symbolic.X0)]
+                            let failure =
+                                normalizeErrno
+                                @ loadStringLiteralPointer ARM64Symbolic.X3 "POSIX error"
+                                @ [ ARM64Symbolic.MOV_reg (ARM64Symbolic.X4, ARM64Symbolic.X28)
+                                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 24us)
+                                    ARM64Symbolic.STR (ARM64Symbolic.X2, ARM64Symbolic.X4, 0s)
+                                    ARM64Symbolic.STR (ARM64Symbolic.X3, ARM64Symbolic.X4, 8s)
+                                    ARM64Symbolic.MOVZ (ARM64Symbolic.X5, 1us, 0)
+                                    ARM64Symbolic.STR (ARM64Symbolic.X5, ARM64Symbolic.X4, 16s) ]
+                                @ generateLeakCounterInc ctx
+                                @ [ ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X28)
+                                    ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 24us)
+                                    ARM64Symbolic.MOVZ (ARM64Symbolic.X5, 1us, 0)
+                                    ARM64Symbolic.STR (ARM64Symbolic.X5, destReg, 0s)
+                                    ARM64Symbolic.STR (ARM64Symbolic.X4, destReg, 8s)
+                                    ARM64Symbolic.STR (ARM64Symbolic.X5, destReg, 16s) ]
+                                @ generateLeakCounterInc ctx
+                            let branchToFailure =
+                                match ARM64.targetOS ctx.Target with
+                                | Platform.Linux -> ARM64Symbolic.B_cond (ARM64Symbolic.LT, List.length success + 2)
+                                | Platform.MacOS -> ARM64Symbolic.B_cond (ARM64Symbolic.HS, List.length success + 2)
+                            let prepareFailureCheck =
+                                match ARM64.targetOS ctx.Target with
+                                | Platform.Linux -> [ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)]
+                                | Platform.MacOS -> []
+                            let syscalls = ARM64.targetSyscalls ctx.Target
+                            let killNumber =
+                                match ARM64.targetOS ctx.Target with
+                                | Platform.Linux -> 129us
+                                | Platform.MacOS -> 37us
+                            pidLoads
+                            @ signalLoads
+                            @ [ ARM64Symbolic.MOVZ (syscalls.SyscallRegister, killNumber, 0)
+                                ARM64Symbolic.SVC syscalls.SvcImmediate ]
+                            @ prepareFailureCheck
+                            @ [branchToFailure]
+                            @ success
+                            @ [ARM64Symbolic.B (List.length failure + 1)]
+                            @ failure))
+                | _ -> Error "CLI kill expects a pid and signal"
+            | LIR.RunProcess when ARM64.targetOS ctx.Target = Platform.Linux ->
+                match args with
+                | [request] ->
+                    loadCliOperand ARM64Symbolic.X0 request
+                    |> Result.map (fun loads ->
+                        loads
+                        @ [ARM64Symbolic.BL "__dark_cli_run_process"]
+                        @ (if destReg = ARM64Symbolic.X0 then [] else [ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X0)]))
+                | _ -> Error "CLI run process expects one request"
+            | LIR.RunProcess ->
+                Ok (loadStringLiteralPointer ARM64Symbolic.X8 ""
+                    @ loadStringLiteralPointer ARM64Symbolic.X9 "native process execution unavailable"
+                    @ [ ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X28)
+                        ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 48us)
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 38us, 0)
+                        ARM64Symbolic.STR (ARM64Symbolic.X10, destReg, 0s)
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 0us, 0)
+                        ARM64Symbolic.MVN (ARM64Symbolic.X10, ARM64Symbolic.X10)
+                        ARM64Symbolic.STR (ARM64Symbolic.X10, destReg, 8s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X8, destReg, 16s)
+                        ARM64Symbolic.STR (ARM64Symbolic.X9, destReg, 24s)
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 0us, 0)
+                        ARM64Symbolic.STR (ARM64Symbolic.X10, destReg, 32s)
+                        ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 1us, 0)
+                        ARM64Symbolic.STR (ARM64Symbolic.X10, destReg, 40s) ])
+            | LIR.SpawnProcess when ARM64.targetOS ctx.Target = Platform.Linux ->
+                match args with
+                | [command] ->
+                    loadCliOperand ARM64Symbolic.X0 command
+                    |> Result.map (fun loads ->
+                        loads
+                        @ [ ARM64Symbolic.BL "__dark_cli_spawn_process"
+                            ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X0) ])
+                | _ -> Error "CLI spawn process expects one command"
+            | LIR.ProcessIO when ARM64.targetOS ctx.Target = Platform.Linux ->
+                match args with
+                | [handle; input] ->
+                    loadCliOperand ARM64Symbolic.X0 handle
+                    |> Result.bind (fun handleLoads ->
+                        loadCliOperand ARM64Symbolic.X1 input
+                        |> Result.map (fun inputLoads ->
+                            handleLoads
+                            @ inputLoads
+                            @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 0us, 0)
+                                ARM64Symbolic.BL "__dark_cli_process_io"
+                                ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X0) ]))
+                | _ -> Error "CLI process IO expects a handle and input"
+            | LIR.TerminateProcess when ARM64.targetOS ctx.Target = Platform.Linux ->
+                match args with
+                | [handle] ->
+                    loadCliOperand ARM64Symbolic.X0 handle
+                    |> Result.map (fun loads ->
+                        loads
+                        @ [ ARM64Symbolic.BL "__dark_cli_terminate_process"
+                            ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X0) ])
+                | _ -> Error "CLI terminate process expects one handle"
+            | LIR.Execute | LIR.ProcessIO | LIR.TerminateProcess ->
+                let errorMessage =
+                    match operation with
+                    | LIR.ProcessIO | LIR.TerminateProcess -> "Invalid process handle"
+                    | _ -> "native CLI operation unavailable"
+                Ok (loadStringLiteralPointer ARM64Symbolic.X8 ""
+                @ loadStringLiteralPointer ARM64Symbolic.X9 errorMessage
+                @ [ARM64Symbolic.MOV_reg (destReg, ARM64Symbolic.X28)
+                   ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 32us)]
+                @ [ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 0us, 0)
+                   ARM64Symbolic.MVN (ARM64Symbolic.X10, ARM64Symbolic.X10)
+                   ARM64Symbolic.STR (ARM64Symbolic.X10, destReg, 0s)
+                   ARM64Symbolic.STR (ARM64Symbolic.X8, destReg, 8s)
+                   ARM64Symbolic.STR (ARM64Symbolic.X9, destReg, 16s)
+                   ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 1us, 0)
+                   ARM64Symbolic.STR (ARM64Symbolic.X10, destReg, 24s)])
+            | LIR.SpawnProcess -> Ok (loadImmediate destReg -1L))
+
+    | LIR.FloatToString (dest, value) ->
+        // Convert float in FP register to heap string
+        lirRegToARM64Reg dest
+        |> Result.bind (fun destReg ->
+            lirFRegToARM64FReg value
+            |> Result.map (fun valueReg ->
+                runtimeInstrs (Runtime.generateFloatToString destReg valueReg) @ generateLeakCounterInc ctx))
+
+    | LIR.CoverageHit exprId ->
+        // Increment coverage counter at _coverage_data[exprId * 8]
+        // Uses PC-relative addressing (ADRP+ADD) to get BSS buffer address
+        // Uses X9 and X10 as scratch registers
+        let offset = exprId * 8
+        Ok ([
+            // Get address of coverage buffer using PC-relative addressing
+            ARM64Symbolic.ADRP (ARM64Symbolic.X9, dataLabel ARM64Symbolic.coverageDataLabelName)
+            ARM64Symbolic.ADD_label (ARM64Symbolic.X9, ARM64Symbolic.X9, dataLabel ARM64Symbolic.coverageDataLabelName)
+        ] @
+        // Add offset for this expression's counter
+        (if offset = 0 then
+            []
+        elif offset < 4096 then
+            [ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, uint16 offset)]
+        else
+            loadImmediate ARM64Symbolic.X10 (int64 offset) @ [ARM64Symbolic.ADD_reg (ARM64Symbolic.X9, ARM64Symbolic.X9, ARM64Symbolic.X10)]) @
+        [
+            ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X9, 0s)        // X10 = coverage_buffer[exprId]
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 1us)  // X10++
+            ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.X9, 0s)        // coverage_buffer[exprId] = X10
+        ])
+
+let private generatePlannedGenericRefCountDecHelper
+    (helperLabel: string)
+    (spec: LIR.Arm64PlannedGenericDecHelper)
+    (ctx: CodeGenContext)
+    : ARM64Symbolic.Instr list =
+    // The normal generic-release lowering remains the single source of truth.
+    // Give borrowed helpers a unique Stdlib-shaped function identity so the
+    // existing single-payload sum ownership rule is preserved exactly.
+    let helperFunctionName =
+        if spec.OwnsSinglePayloadSum then helperLabel
+        else $"Stdlib.{helperLabel}"
+    let helperCtx = {
+        ctx with
+            FunctionName = helperFunctionName
+            InstructionSite = "root"
+    }
+    let metadata = {
+        ANF.ReleasePlanCacheKey = None
+        ANF.ReleasePlan = Some spec.ReleasePlan
+        ANF.SourceType = None
+    }
+
+    match convertInstr
+              helperCtx
+              (LIR.RefCountDec (
+                  LIR.Physical LIR.X0,
+                  spec.PayloadSize,
+                  LIR.GenericHeap,
+                  Some metadata)) with
+    | Ok body ->
+        [
+            ARM64Symbolic.Label helperLabel
+            // The body may call nested release helpers. Preserve the root and
+            // our caller's link register until the complete plan has finished.
+            ARM64Symbolic.STP_pre (
+                ARM64Symbolic.X0,
+                ARM64Symbolic.X30,
+                ARM64Symbolic.SP,
+                -16s)
+        ]
+        @ body
+        @ [
+            ARM64Symbolic.LDP_post (
+                ARM64Symbolic.X0,
+                ARM64Symbolic.X30,
+                ARM64Symbolic.SP,
+                16s)
+            ARM64Symbolic.RET
+        ]
+    | Error error ->
+        Crash.crash $"ARM64 generic release helper generation failed for {helperLabel}: {error}"
+
+/// The compilation-session function cache also stores immutable generic
+/// release helpers. Their reserved stable label fully identifies the planned
+/// body; the cache separately keys target and codegen options.
+let private plannedGenericRefCountDecHelperCacheKey
+    (helperLabel: string)
+    : LIR.Function =
+    let entry = LIR.Label "cache_entry"
+    let block : LIR.BasicBlock = {
+        Label = entry
+        Instrs = []
+        Terminator = LIR.Ret
+    }
+    {
+        Name = helperLabel
+        TypedParams = []
+        CFG = {
+            Entry = entry
+            Blocks = Map.ofList [entry, block]
+        }
+        StackSize = 0
+        UsedCalleeSaved = []
+        CodegenFacts = None
+    }
+
+let isPlannedGenericRefCountDecHelperCacheKey
+    (func: LIR.Function)
+    : bool =
+    Option.isNone func.CodegenFacts
+    && func.Name.StartsWith(plannedGenericRefCountDecHelperLabelPrefix)
+
+/// Convert LIR terminator to ARM64 instructions
+/// epilogueLabel: the label to jump to for function return (handles stack cleanup)
+let convertTerminator (epilogueLabel: string) (nextLabel: string option) (terminator: LIR.Terminator) : Result<ARM64Symbolic.Instr list, string> =
+    match terminator with
+    | LIR.Ret ->
+        // Jump to function epilogue (handles stack cleanup and RET)
+        if nextLabel = None then Ok [] else Ok [ARM64Symbolic.B_label epilogueLabel]
+
+    | LIR.Branch (condReg, trueLabel, falseLabel) ->
+        // Branch if register is non-zero (true), otherwise fall through to else
+        // Use CBNZ (compare and branch if not zero) to true label
+        // Then unconditional branch to false label
+        lirRegToARM64Reg condReg
+        |> Result.map (fun arm64Reg ->
+            let (LIR.Label trueLbl) = trueLabel
+            let (LIR.Label falseLbl) = falseLabel
+            [ARM64Symbolic.CBNZ (arm64Reg, trueLbl)]
+            @ (if nextLabel = Some falseLbl then [] else [ARM64Symbolic.B_label falseLbl]))
+
+    | LIR.BranchZero (condReg, zeroLabel, nonZeroLabel) ->
+        // Branch if register is zero, otherwise fall through to non-zero case
+        // Use CBZ (compare and branch if zero) to zero label
+        // Then unconditional branch to non-zero label
+        lirRegToARM64Reg condReg
+        |> Result.map (fun arm64Reg ->
+            let (LIR.Label zeroLbl) = zeroLabel
+            let (LIR.Label nonZeroLbl) = nonZeroLabel
+            [ARM64Symbolic.CBZ (arm64Reg, zeroLbl)]
+            @ (if nextLabel = Some nonZeroLbl then [] else [ARM64Symbolic.B_label nonZeroLbl]))
+
+    | LIR.BranchBitZero (condReg, bit, zeroLabel, nonZeroLabel) ->
+        // Branch if specified bit is zero, otherwise fall through to non-zero case
+        // Use TBZ (test bit and branch if zero) to zero label
+        // Then unconditional branch to non-zero label
+        lirRegToARM64Reg condReg
+        |> Result.map (fun arm64Reg ->
+            let (LIR.Label zeroLbl) = zeroLabel
+            let (LIR.Label nonZeroLbl) = nonZeroLabel
+            [ARM64Symbolic.TBZ_label (arm64Reg, bit, zeroLbl)]
+            @ (if nextLabel = Some nonZeroLbl then [] else [ARM64Symbolic.B_label nonZeroLbl]))
+
+    | LIR.BranchBitNonZero (condReg, bit, nonZeroLabel, zeroLabel) ->
+        // Branch if specified bit is non-zero, otherwise fall through to zero case
+        // Use TBNZ (test bit and branch if not zero) to non-zero label
+        // Then unconditional branch to zero label
+        lirRegToARM64Reg condReg
+        |> Result.map (fun arm64Reg ->
+            let (LIR.Label nonZeroLbl) = nonZeroLabel
+            let (LIR.Label zeroLbl) = zeroLabel
+            [ARM64Symbolic.TBNZ_label (arm64Reg, bit, nonZeroLbl)]
+            @ (if nextLabel = Some zeroLbl then [] else [ARM64Symbolic.B_label zeroLbl]))
+
+    | LIR.Jump label ->
+        let (LIR.Label lbl) = label
+        if nextLabel = Some lbl then Ok [] else Ok [ARM64Symbolic.B_label lbl]
+
+    | LIR.CondBranch (cond, trueLabel, falseLabel) ->
+        // Branch based on condition flags (set by previous CMP)
+        // Use B.cond to true label, then unconditional branch to false label
+        let (LIR.Label trueLbl) = trueLabel
+        let (LIR.Label falseLbl) = falseLabel
+        let arm64Cond =
+            match cond with
+            | LIR.EQ -> ARM64Symbolic.EQ
+            | LIR.NE -> ARM64Symbolic.NE
+            | LIR.LT -> ARM64Symbolic.LT
+            | LIR.GT -> ARM64Symbolic.GT
+            | LIR.LE -> ARM64Symbolic.LE
+            | LIR.GE -> ARM64Symbolic.GE
+            | LIR.ULT -> ARM64Symbolic.LO
+            | LIR.UGT -> ARM64Symbolic.HI
+            | LIR.ULE -> ARM64Symbolic.LS
+            | LIR.UGE -> ARM64Symbolic.HS
+        Ok ([ARM64Symbolic.B_cond_label (arm64Cond, trueLbl)]
+            @ (if nextLabel = Some falseLbl then [] else [ARM64Symbolic.B_label falseLbl]))
+
+/// Convert LIR basic block to ARM64 instructions (with label)
+/// epilogueLabel: passed through to terminator for Ret handling
+let private lirInstructionCaseNames =
+    Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<LIR.Instr>)
+    |> Array.map (fun case -> case.Name)
+
+let private readLirInstructionTag =
+    Microsoft.FSharp.Reflection.FSharpValue.PreComputeUnionTagReader(typeof<LIR.Instr>)
+
+let private lirInstructionOpcode (instr: LIR.Instr) : string =
+    let tag = readLirInstructionTag instr
+    if tag < 0 || tag >= lirInstructionCaseNames.Length then
+        Crash.crash $"ARM64 LIR profiling received invalid instruction tag {tag}"
+    else
+        lirInstructionCaseNames.[tag]
+
+let private lirInstructionProfileDetail (instr: LIR.Instr) : string =
+    match instr with
+    | LIR.RefCountInc (_, payloadSize, kind, metadata)
+    | LIR.RefCountDec (_, payloadSize, kind, metadata) ->
+        let sourceType =
+            metadata
+            |> Option.bind (fun value -> value.SourceType)
+            |> Option.map TypeChecking.typeToString
+            |> Option.defaultValue "unknown"
+        $"{kind}:{payloadSize}:{sourceType}"
+    | _ -> ""
+
+let convertBlock (ctx: CodeGenContext) (epilogueLabel: string) (nextBlock: LIR.BasicBlock option) (block: LIR.BasicBlock) : Result<ARM64Symbolic.Instr list, string> =
+    // Emit label for this block
+    let (LIR.Label lbl) = block.Label
+    let labelInstr = ARM64Symbolic.Label lbl
+
+    block.Instrs
+    |> List.mapi (fun index instr ->
+        let instructionCtx = {
+            ctx with InstructionSite = $"{lbl}_{index}"
+        }
+        match ctx.RecordLirOpExpansion with
+        | None -> convertInstr instructionCtx instr
+        | Some record ->
+            let started = System.Diagnostics.Stopwatch.GetTimestamp()
+            convertInstr instructionCtx instr
+            |> Result.map (fun instructions ->
+                let elapsedTicks =
+                    System.Diagnostics.Stopwatch.GetTimestamp() - started
+                record
+                    ctx.FunctionName
+                    (lirInstructionOpcode instr)
+                    (lirInstructionProfileDetail instr)
+                    instructions.Length
+                    elapsedTicks
+                instructions))
+    |> ResultList.collectResults id
+    |> Result.bind (fun instrs ->
+        let nextLabel = nextBlock |> Option.map (fun next -> let (LIR.Label label) = next.Label in label)
+        convertTerminator epilogueLabel nextLabel block.Terminator
+        |> Result.map (fun termInstrs ->
+            labelInstr :: (instrs @ termInstrs)))
+
+/// Convert LIR CFG to ARM64 instructions
+/// epilogueLabel: passed through to blocks for Ret handling
+let convertCFG (ctx: CodeGenContext) (epilogueLabel: string) (cfg: LIR.CFG) : Result<ARM64Symbolic.Instr list, string> =
+    LIR.layoutBlocks cfg
+    |> Result.mapError (fun e -> $"ARM64 codegen: function {ctx.FunctionName}: {e}")
+    |> Result.bind (fun blocks ->
+        blocks
+        |> List.mapi (fun index block -> convertBlock ctx epilogueLabel (List.tryItem (index + 1) blocks) block)
+        |> ResultList.collectResults id)
+
+/// Generate heap initialization code for _start function
+/// Uses mmap to allocate 512MB of heap space and initializes X27/X28
+///
+/// Memory layout:
+///   X27 -> [free list heads: 256 bytes (32 entries × 8 bytes)]
+///   X28 -> [heap allocation area: mapped heap after free list heads]
+///
+/// Free list heads are indexed by (totalSize / 8), where totalSize includes
+/// the 8-byte ref count. Size class 0 and 1 are unused (too small).
+/// Size class 2 = 16 bytes, class 3 = 24 bytes, etc.
+///
+/// X27 is the base for free list heads (constant after init)
+/// X28 is the bump pointer for new allocations
+let generateHeapInit (target: ARM64.TargetConfig) : ARM64Symbolic.Instr list =
+    let freeListSize = 256
+    let os = ARM64.targetOS target
+    let syscalls = ARM64.targetSyscalls target
+    let mmapFlags =
+        match os with
+        | Platform.MacOS -> 0x1002us  // MAP_PRIVATE | MAP_ANON
+        | Platform.Linux -> 0x22us    // MAP_PRIVATE | MAP_ANONYMOUS
+    let heapSizeForMmap = loadImmediate ARM64Symbolic.X1 heapMmapSizeBytes
+    [
+        // mmap(NULL, 512MB, PROT_READ|PROT_WRITE, flags, -1, 0)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)              // addr = NULL
+    ]
+    @ heapSizeForMmap
+    @ [
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 3us, 0)              // PROT_READ | PROT_WRITE
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X3, mmapFlags, 0)        // flags
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X4, 0us, 0)              // X4 = 0
+        ARM64Symbolic.MVN (ARM64Symbolic.X4, ARM64Symbolic.X4)             // X4 = ~0 = -1 (fd)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X5, 0us, 0)              // offset = 0
+        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Mmap, 0)
+        ARM64Symbolic.SVC syscalls.SvcImmediate
+        // Check for mmap failure (returns -1 on error)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X15, 0us, 0)             // X15 = 0
+        ARM64Symbolic.MVN (ARM64Symbolic.X15, ARM64Symbolic.X15)           // X15 = -1
+        ARM64Symbolic.CMP_reg (ARM64Symbolic.X0, ARM64Symbolic.X15)        // Compare X0 with -1
+        ARM64Symbolic.B_cond (ARM64Symbolic.NE, 3)                 // Skip exit if not error (+3 instructions)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)              // exit code = 1
+        ARM64Symbolic.MOVZ (syscalls.SyscallRegister, syscalls.Numbers.Exit, 0)
+        ARM64Symbolic.SVC syscalls.SvcImmediate
+        // X0 now contains mmap result (valid address)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X27, ARM64Symbolic.X0)        // X27 = free list heads base
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X27, uint16 freeListSize)  // X28 = heap start
+        // No need to zero free list - MAP_ANONYMOUS provides zeroed pages
+    ]
+
+/// Linux AArch64 shell runner. Generated binaries remain libc-free, and both
+/// redirected streams are made nonblocking and drained on every wait probe.
+/// Return argv[index + 1] as a boxed Option<String>. Native argv entries are
+/// zero-terminated bytes, so present values are copied into managed Dark strings.
+/// The root _start frame terminates the normal frame-pointer chain. Its initial
+/// stack layout keeps argc at +16, argv[0] at +24, and the first positional
+/// argument at +32, so no register is reserved
+/// for CLI state between calls.
+let private generateCliArgvHelper (ctx: CodeGenContext) (label: string) : ARM64Symbolic.Instr list =
+    let missingLabel = $"{label}_missing"
+    let lengthLabel = $"{label}_length"
+    let lengthDoneLabel = $"{label}_length_done"
+    let copyLabel = $"{label}_copy"
+    let copyDoneLabel = $"{label}_copy_done"
+    let boxLabel = $"{label}_box"
+    [ ARM64Symbolic.Label label
+      ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+      ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, missingLabel)
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.X29)
+      ARM64Symbolic.Label $"{label}_find_root"
+      ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X1, 0s)
+      ARM64Symbolic.CBZ (ARM64Symbolic.X2, $"{label}_root_found")
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.X2)
+      ARM64Symbolic.B_label $"{label}_find_root"
+      ARM64Symbolic.Label $"{label}_root_found"
+      ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X1, 16s)
+      ARM64Symbolic.SUB_imm (ARM64Symbolic.X2, ARM64Symbolic.X2, 1us)
+      ARM64Symbolic.CMP_reg (ARM64Symbolic.X0, ARM64Symbolic.X2)
+      ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, missingLabel)
+      ARM64Symbolic.LSL_imm (ARM64Symbolic.X2, ARM64Symbolic.X0, 3)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, ARM64Symbolic.X2)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X1, 32us)
+      ARM64Symbolic.LDR (ARM64Symbolic.X3, ARM64Symbolic.X1, 0s)
+      ARM64Symbolic.MOVZ (ARM64Symbolic.X4, 0us, 0)
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X5, ARM64Symbolic.X3)
+      ARM64Symbolic.Label lengthLabel
+      ARM64Symbolic.LDRB_imm (ARM64Symbolic.X6, ARM64Symbolic.X5, 0)
+      ARM64Symbolic.CBZ (ARM64Symbolic.X6, lengthDoneLabel)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X4, ARM64Symbolic.X4, 1us)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X5, ARM64Symbolic.X5, 1us)
+      ARM64Symbolic.B_label lengthLabel
+      ARM64Symbolic.Label lengthDoneLabel
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X7, ARM64Symbolic.X28)
+      ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 1us, 0)
+      ARM64Symbolic.STR (ARM64Symbolic.X1, ARM64Symbolic.X7, 0s)
+      ARM64Symbolic.STR (ARM64Symbolic.X4, ARM64Symbolic.X7, 8s)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X4, 7us)
+      ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 3us, 0)
+      ARM64Symbolic.LSR_reg (ARM64Symbolic.X9, ARM64Symbolic.X9, ARM64Symbolic.X10)
+      ARM64Symbolic.LSL_reg (ARM64Symbolic.X9, ARM64Symbolic.X9, ARM64Symbolic.X10)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X9, 16us)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X10)
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X5, ARM64Symbolic.X3)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X7, 16us)
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X2, ARM64Symbolic.X4)
+      ARM64Symbolic.Label copyLabel
+      ARM64Symbolic.CBZ (ARM64Symbolic.X2, copyDoneLabel)
+      ARM64Symbolic.LDRB_imm (ARM64Symbolic.X1, ARM64Symbolic.X5, 0)
+      ARM64Symbolic.STRB_reg (ARM64Symbolic.X1, ARM64Symbolic.X10)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X5, ARM64Symbolic.X5, 1us)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 1us)
+      ARM64Symbolic.SUB_imm (ARM64Symbolic.X2, ARM64Symbolic.X2, 1us)
+      ARM64Symbolic.B_label copyLabel
+      ARM64Symbolic.Label copyDoneLabel ]
+    @ generateLeakCounterInc ctx
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X6, 0us, 0)
+        ARM64Symbolic.B_label boxLabel
+        ARM64Symbolic.Label missingLabel
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X6, 1us, 0)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X7, 0us, 0)
+        ARM64Symbolic.Label boxLabel
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X28)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 24us)
+        ARM64Symbolic.STR (ARM64Symbolic.X6, ARM64Symbolic.X0, 0s)
+        ARM64Symbolic.STR (ARM64Symbolic.X7, ARM64Symbolic.X0, 8s)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 1us, 0)
+        ARM64Symbolic.STR (ARM64Symbolic.X1, ARM64Symbolic.X0, 16s) ]
+    @ generateLeakCounterInc ctx
+    @ [ ARM64Symbolic.RET ]
+
+/// Start a shell-language command and retain its pid and descriptors in the
+/// fixed process table rooted at X25.
+let private generateLinuxCliSpawnProcessHelper () : ARM64Symbolic.Instr list =
+    let syscall number =
+        [ ARM64Symbolic.MOVZ (ARM64Symbolic.X8, number, 0)
+          ARM64Symbolic.SVC 0us ]
+    let zero reg = ARM64Symbolic.MOVZ (reg, 0us, 0)
+    let pairFd slot shift =
+        [ ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, slot)
+          ARM64Symbolic.LSR_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, shift)
+          ARM64Symbolic.AND_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, 0xffffffffUL) ]
+    let closeFd slot shift = pairFd slot shift @ syscall 57us
+    let setNonblocking slot =
+        pairFd slot 0
+        @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 4us, 0)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 2048us, 0) ]
+        @ syscall 25us
+    [ ARM64Symbolic.Label "__dark_cli_spawn_process"
+      ARM64Symbolic.STP_pre (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X29, ARM64Symbolic.SP)
+      ARM64Symbolic.STP_pre (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, -16s)
+      ARM64Symbolic.STP_pre (ARM64Symbolic.X21, ARM64Symbolic.X22, ARM64Symbolic.SP, -16s)
+      ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 80us)
+      ARM64Symbolic.CBNZ (ARM64Symbolic.X25, "__dark_spawn_table_ready")
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X25, ARM64Symbolic.X28)
+      ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 4096us, 0)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X9)
+      ARM64Symbolic.Label "__dark_spawn_table_ready"
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, ARM64Symbolic.X28)
+      ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X0, 16us)
+      zero ARM64Symbolic.X12
+      ARM64Symbolic.Label "__dark_spawn_command_copy"
+      ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X10)
+      ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, "__dark_spawn_command_copied")
+      ARM64Symbolic.LDRB (ARM64Symbolic.X13, ARM64Symbolic.X11, ARM64Symbolic.X12)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X19, ARM64Symbolic.X12)
+      ARM64Symbolic.STRB_reg (ARM64Symbolic.X13, ARM64Symbolic.X14)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+      ARM64Symbolic.B_label "__dark_spawn_command_copy"
+      ARM64Symbolic.Label "__dark_spawn_command_copied"
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X19, ARM64Symbolic.X10)
+      zero ARM64Symbolic.X13
+      ARM64Symbolic.STRB_reg (ARM64Symbolic.X13, ARM64Symbolic.X14)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 8us)
+      ARM64Symbolic.LSR_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 3)
+      ARM64Symbolic.LSL_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 3)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X10)
+      // Recover inherited envp from the root frame.
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, ARM64Symbolic.X29)
+      ARM64Symbolic.Label "__dark_spawn_find_root"
+      ARM64Symbolic.LDR (ARM64Symbolic.X13, ARM64Symbolic.X14, 0s)
+      ARM64Symbolic.CBZ (ARM64Symbolic.X13, "__dark_spawn_root_found")
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, ARM64Symbolic.X13)
+      ARM64Symbolic.B_label "__dark_spawn_find_root"
+      ARM64Symbolic.Label "__dark_spawn_root_found"
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 24us)
+      ARM64Symbolic.Label "__dark_spawn_find_envp"
+      ARM64Symbolic.LDR (ARM64Symbolic.X13, ARM64Symbolic.X14, 0s)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 8us)
+      ARM64Symbolic.CBNZ (ARM64Symbolic.X13, "__dark_spawn_find_envp")
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X22, ARM64Symbolic.X14)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.SP, 0us)
+      zero ARM64Symbolic.X1 ]
+    @ syscall 59us
+    @ [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_spawn_failed")
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.SP, 8us)
+        zero ARM64Symbolic.X1 ]
+    @ syscall 59us
+    @ [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_spawn_failed_close_stdin")
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.SP, 16us)
+        zero ARM64Symbolic.X1 ]
+    @ syscall 59us
+    @ [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_spawn_failed_close_output")
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 17us, 0)
+        zero ARM64Symbolic.X1; zero ARM64Symbolic.X2; zero ARM64Symbolic.X3; zero ARM64Symbolic.X4 ]
+    @ syscall 220us
+    @ [ ARM64Symbolic.CBZ (ARM64Symbolic.X0, "__dark_spawn_child")
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_spawn_failed_close_all")
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X21, ARM64Symbolic.X0) ]
+    @ closeFd 0s 0 @ closeFd 8s 32 @ closeFd 16s 32
+    @ setNonblocking 8s @ setNonblocking 16s
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 1us, 0)
+        ARM64Symbolic.Label "__dark_spawn_find_slot"
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 63us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, "__dark_spawn_no_slot")
+        ARM64Symbolic.LSL_imm (ARM64Symbolic.X10, ARM64Symbolic.X0, 6)
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X10, ARM64Symbolic.X25, ARM64Symbolic.X10)
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X10, 0s)
+        ARM64Symbolic.CBZ (ARM64Symbolic.X9, "__dark_spawn_slot_found")
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, 1us)
+        ARM64Symbolic.B_label "__dark_spawn_find_slot"
+        ARM64Symbolic.Label "__dark_spawn_slot_found"
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 1us, 0)
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X10, 0s)
+        ARM64Symbolic.STR (ARM64Symbolic.X21, ARM64Symbolic.X10, 8s)
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.SP, 0s)
+        ARM64Symbolic.LSR_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 32)
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X10, 16s)
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.SP, 8s)
+        ARM64Symbolic.AND_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 0xffffffffUL)
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X10, 24s)
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.SP, 16s)
+        ARM64Symbolic.AND_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 0xffffffffUL)
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X10, 32s)
+        // Keep raw accumulated output outside the managed object graph. Each
+        // communicate call copies only its newly-read suffix into immutable
+        // managed strings; terminate copies the complete buffers.
+        ARM64Symbolic.STR (ARM64Symbolic.X28, ARM64Symbolic.X10, 48s)
+        zero ARM64Symbolic.X9
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X28, 0s) ]
+    @ loadImmediate ARM64Symbolic.X9 1048584L
+    @ [ ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X9)
+        ARM64Symbolic.STR (ARM64Symbolic.X28, ARM64Symbolic.X10, 56s)
+        zero ARM64Symbolic.X9
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X28, 0s) ]
+    @ loadImmediate ARM64Symbolic.X9 1048584L
+    @ [ ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X9)
+        ARM64Symbolic.B_label "__dark_spawn_return"
+        ARM64Symbolic.Label "__dark_spawn_no_slot"
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X21)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 9us, 0) ]
+    @ syscall 129us
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
+        ARM64Symbolic.MVN (ARM64Symbolic.X0, ARM64Symbolic.X0)
+        ARM64Symbolic.B_label "__dark_spawn_return"
+        ARM64Symbolic.Label "__dark_spawn_failed_close_all" ]
+    @ closeFd 16s 0 @ closeFd 16s 32
+    @ [ ARM64Symbolic.Label "__dark_spawn_failed_close_output" ]
+    @ closeFd 8s 0 @ closeFd 8s 32
+    @ [ ARM64Symbolic.Label "__dark_spawn_failed_close_stdin" ]
+    @ closeFd 0s 0 @ closeFd 0s 32
+    @ [ ARM64Symbolic.Label "__dark_spawn_failed"
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
+        ARM64Symbolic.MVN (ARM64Symbolic.X0, ARM64Symbolic.X0)
+        ARM64Symbolic.Label "__dark_spawn_return"
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 80us)
+        ARM64Symbolic.LDP_post (ARM64Symbolic.X21, ARM64Symbolic.X22, ARM64Symbolic.SP, 16s)
+        ARM64Symbolic.LDP_post (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, 16s)
+        ARM64Symbolic.LDP_post (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+        ARM64Symbolic.RET
+        ARM64Symbolic.Label "__dark_spawn_child" ]
+    @ pairFd 0s 0
+    @ [ zero ARM64Symbolic.X1; zero ARM64Symbolic.X2 ]
+    @ syscall 24us
+    @ pairFd 8s 32
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 1us, 0); zero ARM64Symbolic.X2 ]
+    @ syscall 24us
+    @ pairFd 16s 32
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 2us, 0); zero ARM64Symbolic.X2 ]
+    @ syscall 24us
+    @ closeFd 0s 0 @ closeFd 0s 32 @ closeFd 8s 0 @ closeFd 8s 32 @ closeFd 16s 0 @ closeFd 16s 32
+    @ loadStringLiteralPointer ARM64Symbolic.X20 "/bin/bash"
+    @ loadStringLiteralPointer ARM64Symbolic.X9 "-c"
+    @ [ ARM64Symbolic.ADD_imm (ARM64Symbolic.X20, ARM64Symbolic.X20, 16us)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 16us)
+        ARM64Symbolic.STR (ARM64Symbolic.X20, ARM64Symbolic.SP, 32s)
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 40s)
+        ARM64Symbolic.STR (ARM64Symbolic.X19, ARM64Symbolic.SP, 48s)
+        zero ARM64Symbolic.X9
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 56s)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X20)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 32us)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X2, ARM64Symbolic.X22) ]
+    @ syscall 221us
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 127us, 0) ]
+    @ syscall 93us
+
+/// Communicate with and terminate children tracked by the X25 process table.
+let private generateLinuxCliProcessLifecycleHelpers (ctx: CodeGenContext) : ARM64Symbolic.Instr list =
+    let syscall number =
+        [ ARM64Symbolic.MOVZ (ARM64Symbolic.X8, number, 0)
+          ARM64Symbolic.SVC 0us ]
+    let zero reg = ARM64Symbolic.MOVZ (reg, 0us, 0)
+    let finalizeString buffer lengthReg =
+        [ ARM64Symbolic.STR (lengthReg, buffer, 8s)
+          ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 1us, 0)
+          ARM64Symbolic.STR (ARM64Symbolic.X10, buffer, 0s)
+        ]
+    let epilogue =
+        [ ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 64us)
+          ARM64Symbolic.LDP_post (ARM64Symbolic.X23, ARM64Symbolic.X24, ARM64Symbolic.SP, 16s)
+          ARM64Symbolic.LDP_post (ARM64Symbolic.X21, ARM64Symbolic.X22, ARM64Symbolic.SP, 16s)
+          ARM64Symbolic.LDP_post (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, 16s)
+          ARM64Symbolic.LDP_post (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+          ARM64Symbolic.RET ]
+    let invalidOutcome label =
+        loadStringLiteralPointer ARM64Symbolic.X8 ""
+        @ loadStringLiteralPointer ARM64Symbolic.X9 "Process not found"
+        @ [ ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X28)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 32us)
+            zero ARM64Symbolic.X10
+            ARM64Symbolic.MVN (ARM64Symbolic.X10, ARM64Symbolic.X10)
+            ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.X0, 0s)
+            ARM64Symbolic.STR (ARM64Symbolic.X8, ARM64Symbolic.X0, 8s)
+            ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X0, 16s)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 1us, 0)
+            ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.X0, 24s) ]
+        @ generateLeakCounterInc ctx
+        @ [ ARM64Symbolic.B_label label ]
+    let communicate =
+        [ ARM64Symbolic.Label "__dark_cli_process_io"
+          ARM64Symbolic.STP_pre (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
+          ARM64Symbolic.MOV_reg (ARM64Symbolic.X29, ARM64Symbolic.SP)
+          ARM64Symbolic.STP_pre (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, -16s)
+          ARM64Symbolic.STP_pre (ARM64Symbolic.X21, ARM64Symbolic.X22, ARM64Symbolic.SP, -16s)
+          ARM64Symbolic.STP_pre (ARM64Symbolic.X23, ARM64Symbolic.X24, ARM64Symbolic.SP, -16s)
+          ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 64us)
+          ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, ARM64Symbolic.X0)
+          ARM64Symbolic.MOV_reg (ARM64Symbolic.X20, ARM64Symbolic.X1)
+          ARM64Symbolic.STR (ARM64Symbolic.X2, ARM64Symbolic.SP, 24s)
+          ARM64Symbolic.CMP_imm (ARM64Symbolic.X19, 1us)
+          ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_process_io_invalid")
+          ARM64Symbolic.CMP_imm (ARM64Symbolic.X19, 63us)
+          ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, "__dark_process_io_invalid")
+          ARM64Symbolic.LSL_imm (ARM64Symbolic.X9, ARM64Symbolic.X19, 6)
+          ARM64Symbolic.ADD_reg (ARM64Symbolic.X21, ARM64Symbolic.X25, ARM64Symbolic.X9)
+          ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X21, 0s)
+          ARM64Symbolic.CBZ (ARM64Symbolic.X9, "__dark_process_io_invalid")
+          ARM64Symbolic.LDR (ARM64Symbolic.X22, ARM64Symbolic.X21, 48s)
+          ARM64Symbolic.LDR (ARM64Symbolic.X23, ARM64Symbolic.X21, 56s)
+          ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X22, 0s)
+          ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 0s)
+          ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X23, 0s)
+          ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 8s)
+          ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.SP, 24s)
+          ARM64Symbolic.CBZ (ARM64Symbolic.X9, "__dark_process_io_suffix_ready")
+          zero ARM64Symbolic.X9
+          ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 0s)
+          ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 8s)
+          ARM64Symbolic.Label "__dark_process_io_suffix_ready"
+          zero ARM64Symbolic.X24
+          // Write input plus the interpreter's WriteLine newline.
+          ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.X20, 8s)
+          ARM64Symbolic.STR (ARM64Symbolic.X2, ARM64Symbolic.SP, 16s)
+          ARM64Symbolic.CBZ (ARM64Symbolic.X2, "__dark_process_io_read_stdout")
+          ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X21, 16s)
+          ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X20, 16us) ]
+        @ syscall 64us
+        @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 10us, 0)
+            ARM64Symbolic.STRB (ARM64Symbolic.X9, ARM64Symbolic.SP, 56)
+            ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X21, 16s)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 56us)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0) ]
+        @ syscall 64us
+        @ [ ARM64Symbolic.Label "__dark_process_io_read_stdout"
+            ARM64Symbolic.LDR (ARM64Symbolic.X19, ARM64Symbolic.X22, 0s)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X22, 8us)
+            ARM64Symbolic.ADD_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, ARM64Symbolic.X19) ]
+        @ loadImmediate ARM64Symbolic.X2 1048576L
+        @ [ ARM64Symbolic.SUB_reg (ARM64Symbolic.X2, ARM64Symbolic.X2, ARM64Symbolic.X19)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X2, "__dark_process_io_read_stderr")
+            ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X21, 24s) ]
+        @ syscall 63us
+        @ [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, "__dark_process_io_read_stderr")
+            ARM64Symbolic.ADD_reg (ARM64Symbolic.X19, ARM64Symbolic.X19, ARM64Symbolic.X0)
+            ARM64Symbolic.STR (ARM64Symbolic.X19, ARM64Symbolic.X22, 0s)
+            ARM64Symbolic.B_label "__dark_process_io_read_stdout"
+            ARM64Symbolic.Label "__dark_process_io_read_stderr"
+            ARM64Symbolic.LDR (ARM64Symbolic.X20, ARM64Symbolic.X23, 0s)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.X23, 8us)
+            ARM64Symbolic.ADD_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, ARM64Symbolic.X20) ]
+        @ loadImmediate ARM64Symbolic.X2 1048576L
+        @ [ ARM64Symbolic.SUB_reg (ARM64Symbolic.X2, ARM64Symbolic.X2, ARM64Symbolic.X20)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X2, "__dark_process_io_status")
+            ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X21, 32s) ]
+        @ syscall 63us
+        @ [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, "__dark_process_io_status")
+            ARM64Symbolic.ADD_reg (ARM64Symbolic.X20, ARM64Symbolic.X20, ARM64Symbolic.X0)
+            ARM64Symbolic.STR (ARM64Symbolic.X20, ARM64Symbolic.X23, 0s)
+            ARM64Symbolic.B_label "__dark_process_io_read_stderr"
+            ARM64Symbolic.Label "__dark_process_io_status"
+            ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X21, 0s)
+            ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 2us)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, "__dark_process_io_stored_status")
+            ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X21, 8s)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 32us)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0)
+            zero ARM64Symbolic.X3 ]
+        @ syscall 260us
+        @ [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_process_io_read_stdout")
+            ARM64Symbolic.CBNZ (ARM64Symbolic.X0, "__dark_process_io_finished")
+            ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.CBZ (ARM64Symbolic.X9, "__dark_process_io_running")
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X24, ARM64Symbolic.X24, 1us)
+            ARM64Symbolic.CMP_imm (ARM64Symbolic.X24, 100us)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, "__dark_process_io_running")
+            zero ARM64Symbolic.X9
+            ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 40s) ]
+        @ loadImmediate ARM64Symbolic.X9 100000000L
+        @ [ ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 48s)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.SP, 40us)
+            zero ARM64Symbolic.X1 ]
+        @ syscall 101us
+        @ [ ARM64Symbolic.B_label "__dark_process_io_read_stdout"
+            ARM64Symbolic.Label "__dark_process_io_finished"
+            ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.AND_imm (ARM64Symbolic.X11, ARM64Symbolic.X10, 0x7fUL)
+            ARM64Symbolic.CBNZ (ARM64Symbolic.X11, "__dark_process_io_signaled")
+            ARM64Symbolic.LSR_imm (ARM64Symbolic.X24, ARM64Symbolic.X10, 8)
+            ARM64Symbolic.B_label "__dark_process_io_store_status"
+            ARM64Symbolic.Label "__dark_process_io_signaled"
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X24, ARM64Symbolic.X11, 128us)
+            ARM64Symbolic.Label "__dark_process_io_store_status"
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 2us, 0)
+            ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X21, 0s)
+            ARM64Symbolic.STR (ARM64Symbolic.X24, ARM64Symbolic.X21, 40s)
+            ARM64Symbolic.B_label "__dark_process_io_build"
+            ARM64Symbolic.Label "__dark_process_io_stored_status"
+            ARM64Symbolic.LDR (ARM64Symbolic.X24, ARM64Symbolic.X21, 40s)
+            ARM64Symbolic.B_label "__dark_process_io_build"
+            ARM64Symbolic.Label "__dark_process_io_running"
+            zero ARM64Symbolic.X24
+            ARM64Symbolic.Label "__dark_process_io_build"
+            // Copy the newly-read suffix (or the full accumulation for the
+            // terminate caller) into immutable managed strings.
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, ARM64Symbolic.X28) ]
+        @ loadImmediate ARM64Symbolic.X9 1048592L
+        @ [ ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X9)
+            ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X22, 0s)
+            ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.SP, 0s)
+            ARM64Symbolic.SUB_reg (ARM64Symbolic.X10, ARM64Symbolic.X10, ARM64Symbolic.X11)
+            zero ARM64Symbolic.X12
+            ARM64Symbolic.Label "__dark_process_io_copy_stdout"
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X10)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, "__dark_process_io_stdout_copied")
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X22, 8us)
+            ARM64Symbolic.ADD_reg (ARM64Symbolic.X13, ARM64Symbolic.X13, ARM64Symbolic.X11)
+            ARM64Symbolic.LDRB (ARM64Symbolic.X14, ARM64Symbolic.X13, ARM64Symbolic.X12)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X19, 16us)
+            ARM64Symbolic.ADD_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X12)
+            ARM64Symbolic.STRB_reg (ARM64Symbolic.X14, ARM64Symbolic.X15)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+            ARM64Symbolic.B_label "__dark_process_io_copy_stdout"
+            ARM64Symbolic.Label "__dark_process_io_stdout_copied"
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X20, ARM64Symbolic.X28)
+            ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.SP, 0s) ]
+        @ loadImmediate ARM64Symbolic.X9 1048592L
+        @ [ ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X9)
+            ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X23, 0s)
+            ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.SP, 8s)
+            ARM64Symbolic.SUB_reg (ARM64Symbolic.X10, ARM64Symbolic.X10, ARM64Symbolic.X11)
+            zero ARM64Symbolic.X12
+            ARM64Symbolic.Label "__dark_process_io_copy_stderr"
+            ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X10)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, "__dark_process_io_stderr_copied")
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X23, 8us)
+            ARM64Symbolic.ADD_reg (ARM64Symbolic.X13, ARM64Symbolic.X13, ARM64Symbolic.X11)
+            ARM64Symbolic.LDRB (ARM64Symbolic.X14, ARM64Symbolic.X13, ARM64Symbolic.X12)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X20, 16us)
+            ARM64Symbolic.ADD_reg (ARM64Symbolic.X15, ARM64Symbolic.X15, ARM64Symbolic.X12)
+            ARM64Symbolic.STRB_reg (ARM64Symbolic.X14, ARM64Symbolic.X15)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+            ARM64Symbolic.B_label "__dark_process_io_copy_stderr"
+            ARM64Symbolic.Label "__dark_process_io_stderr_copied"
+            ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.SP, 8s) ]
+        @ [ ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.SP, 0s) ]
+        @ finalizeString ARM64Symbolic.X19 ARM64Symbolic.X10
+        @ [ ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.SP, 8s) ]
+        @ finalizeString ARM64Symbolic.X20 ARM64Symbolic.X10
+        @ [ ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X28)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 32us)
+            ARM64Symbolic.STR (ARM64Symbolic.X24, ARM64Symbolic.X0, 0s)
+            ARM64Symbolic.STR (ARM64Symbolic.X19, ARM64Symbolic.X0, 8s)
+            ARM64Symbolic.STR (ARM64Symbolic.X20, ARM64Symbolic.X0, 16s)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 1us, 0)
+            ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X0, 24s) ]
+        @ generateLeakCounterInc ctx
+        @ generateLeakCounterInc ctx
+        @ generateLeakCounterInc ctx
+        @ [ ARM64Symbolic.B_label "__dark_process_io_return"
+            ARM64Symbolic.Label "__dark_process_io_invalid" ]
+        @ invalidOutcome "__dark_process_io_return"
+        @ [ ARM64Symbolic.Label "__dark_process_io_return" ]
+        @ epilogue
+    let terminate =
+        [ ARM64Symbolic.Label "__dark_cli_terminate_process"
+          ARM64Symbolic.STP_pre (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
+          ARM64Symbolic.MOV_reg (ARM64Symbolic.X29, ARM64Symbolic.SP)
+          ARM64Symbolic.STP_pre (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, -16s)
+          ARM64Symbolic.STP_pre (ARM64Symbolic.X21, ARM64Symbolic.X22, ARM64Symbolic.SP, -16s)
+          ARM64Symbolic.STP_pre (ARM64Symbolic.X23, ARM64Symbolic.X24, ARM64Symbolic.SP, -16s)
+          ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 64us)
+          ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 1us)
+          ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_terminate_invalid")
+          ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 63us)
+          ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, "__dark_terminate_invalid")
+          ARM64Symbolic.LSL_imm (ARM64Symbolic.X9, ARM64Symbolic.X0, 6)
+          ARM64Symbolic.ADD_reg (ARM64Symbolic.X21, ARM64Symbolic.X25, ARM64Symbolic.X9)
+          ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X21, 0s)
+          ARM64Symbolic.CBZ (ARM64Symbolic.X9, "__dark_terminate_invalid")
+          ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 2us)
+          ARM64Symbolic.B_cond_label (ARM64Symbolic.EQ, "__dark_terminate_collect")
+          ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X21, 8s)
+          ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 15us, 0) ]
+        @ syscall 129us
+        @ [ ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X21, 8s)
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 32us)
+            zero ARM64Symbolic.X2
+            zero ARM64Symbolic.X3 ]
+        @ syscall 260us
+        @ [ ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.SP, 32s)
+            ARM64Symbolic.AND_imm (ARM64Symbolic.X11, ARM64Symbolic.X10, 0x7fUL)
+            ARM64Symbolic.CBNZ (ARM64Symbolic.X11, "__dark_terminate_signaled")
+            ARM64Symbolic.LSR_imm (ARM64Symbolic.X9, ARM64Symbolic.X10, 8)
+            ARM64Symbolic.B_label "__dark_terminate_store"
+            ARM64Symbolic.Label "__dark_terminate_signaled"
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X11, 128us)
+            ARM64Symbolic.Label "__dark_terminate_store"
+            ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X21, 40s)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 2us, 0)
+            ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X21, 0s)
+            ARM64Symbolic.Label "__dark_terminate_collect"
+            ARM64Symbolic.LSR_imm (ARM64Symbolic.X0, ARM64Symbolic.X9, 6) // overwritten below; keep X0 defined
+            zero ARM64Symbolic.X1 ]
+        @ [ // Call communicate with empty input to drain and box the outcome.
+            // Recover handle from slot address rather than the allocation counter.
+            ARM64Symbolic.SUB_reg (ARM64Symbolic.X0, ARM64Symbolic.X21, ARM64Symbolic.X25)
+            ARM64Symbolic.LSR_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, 6) ]
+        @ loadStringLiteralPointer ARM64Symbolic.X1 ""
+        @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0)
+            ARM64Symbolic.BL "__dark_cli_process_io"
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, ARM64Symbolic.X0)
+            ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X21, 16s) ]
+        @ syscall 57us
+        @ [ ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X21, 24s) ]
+        @ syscall 57us
+        @ [ ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X21, 32s) ]
+        @ syscall 57us
+        @ [ zero ARM64Symbolic.X9
+            ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X21, 0s)
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X19)
+            ARM64Symbolic.B_label "__dark_terminate_return"
+            ARM64Symbolic.Label "__dark_terminate_invalid" ]
+        @ invalidOutcome "__dark_terminate_return"
+        @ [ ARM64Symbolic.Label "__dark_terminate_return" ]
+        @ epilogue
+    let cleanup =
+        [ ARM64Symbolic.Label "__dark_cli_cleanup_processes"
+          ARM64Symbolic.STP_pre (ARM64Symbolic.X19, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
+          ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+          ARM64Symbolic.CBZ (ARM64Symbolic.X25, "__dark_cleanup_process_done")
+          ARM64Symbolic.MOVZ (ARM64Symbolic.X19, 1us, 0)
+          ARM64Symbolic.Label "__dark_cleanup_process_next"
+          ARM64Symbolic.CMP_imm (ARM64Symbolic.X19, 63us)
+          ARM64Symbolic.B_cond_label (ARM64Symbolic.GT, "__dark_cleanup_process_done")
+          ARM64Symbolic.LSL_imm (ARM64Symbolic.X9, ARM64Symbolic.X19, 6)
+          ARM64Symbolic.ADD_reg (ARM64Symbolic.X9, ARM64Symbolic.X25, ARM64Symbolic.X9)
+          ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X9, 0s)
+          ARM64Symbolic.CBZ (ARM64Symbolic.X10, "__dark_cleanup_process_advance")
+          ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X9, 8s)
+          ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 9us, 0) ]
+        @ syscall 129us
+        @ [ ARM64Symbolic.LSL_imm (ARM64Symbolic.X9, ARM64Symbolic.X19, 6)
+            ARM64Symbolic.ADD_reg (ARM64Symbolic.X9, ARM64Symbolic.X25, ARM64Symbolic.X9)
+            ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X9, 8s)
+            ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.SP)
+            zero ARM64Symbolic.X2
+            zero ARM64Symbolic.X3 ]
+        @ syscall 260us
+        @ [ ARM64Symbolic.LSL_imm (ARM64Symbolic.X9, ARM64Symbolic.X19, 6)
+            ARM64Symbolic.ADD_reg (ARM64Symbolic.X9, ARM64Symbolic.X25, ARM64Symbolic.X9)
+            ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X9, 16s) ]
+        @ syscall 57us
+        @ [ ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X9, 24s) ]
+        @ syscall 57us
+        @ [ ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X9, 32s) ]
+        @ syscall 57us
+        @ [ zero ARM64Symbolic.X10
+            ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.X9, 0s)
+            ARM64Symbolic.Label "__dark_cleanup_process_advance"
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.X19, ARM64Symbolic.X19, 1us)
+            ARM64Symbolic.B_label "__dark_cleanup_process_next"
+            ARM64Symbolic.Label "__dark_cleanup_process_done"
+            ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 16us)
+            ARM64Symbolic.LDP_post (ARM64Symbolic.X19, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+            ARM64Symbolic.RET ]
+    communicate @ terminate @ cleanup
+
+/// Linux AArch64 argv runner. The request contains packed NUL-separated argv,
+/// an optional cwd/environment overlay or a second argv for a pipeline.
+/// Executables are resolved portably before this boundary, so the child can
+/// call execve directly without a shell or utility process.
+let private generateLinuxCliRunProcessHelper () : ARM64Symbolic.Instr list =
+    let syscall number =
+        [ARM64Symbolic.MOVZ (ARM64Symbolic.X8, number, 0)
+         ARM64Symbolic.SVC 0us]
+    let zero reg = ARM64Symbolic.MOVZ (reg, 0us, 0)
+    let pairFd slot shift =
+        [ ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, slot)
+          ARM64Symbolic.LSR_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, shift)
+          ARM64Symbolic.AND_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, 0xffffffffUL) ]
+    let closeFd slot shift = pairFd slot shift @ syscall 57us
+    let setNonblocking slot =
+        pairFd slot 0
+        @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 4us, 0)
+            ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 2048us, 0) ]
+        @ syscall 25us
+    let readPipe slot buffer lengthReg nextLabel =
+        pairFd slot 0
+        @ [ ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, buffer, 16us)
+            ARM64Symbolic.ADD_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, lengthReg) ]
+        @ loadImmediate ARM64Symbolic.X2 1048576L
+        @ [ ARM64Symbolic.SUB_reg (ARM64Symbolic.X2, ARM64Symbolic.X2, lengthReg) ]
+        @ syscall 63us
+        @ [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+            ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, nextLabel)
+            ARM64Symbolic.ADD_reg (lengthReg, lengthReg, ARM64Symbolic.X0) ]
+    let finalizeString buffer lengthReg =
+        [ ARM64Symbolic.STR (lengthReg, buffer, 8s)
+          ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 1us, 0)
+          ARM64Symbolic.STR (ARM64Symbolic.X10, buffer, 0s)
+        ]
+    [ ARM64Symbolic.Label "__dark_cli_run_process"
+      ARM64Symbolic.STP_pre (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X29, ARM64Symbolic.SP)
+      ARM64Symbolic.STP_pre (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, -16s)
+      ARM64Symbolic.STP_pre (ARM64Symbolic.X21, ARM64Symbolic.X22, ARM64Symbolic.SP, -16s)
+      ARM64Symbolic.STP_pre (ARM64Symbolic.X23, ARM64Symbolic.X24, ARM64Symbolic.SP, -16s)
+      ARM64Symbolic.STP_pre (ARM64Symbolic.X25, ARM64Symbolic.X26, ARM64Symbolic.SP, -16s)
+      ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 128us)
+      // ENOENT is recoverable policy input for PATH lookup. Remember the
+      // scratch-allocation boundary so a failed candidate attempt can return
+      // empty strings without permanently consuming its two 1 MiB buffers.
+      ARM64Symbolic.STR (ARM64Symbolic.X28, ARM64Symbolic.SP, 96s)
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X25, ARM64Symbolic.X0)
+      // Copy packed argv and add the terminating NUL required by execve.
+      ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X25, 8s)
+      ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s)
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, ARM64Symbolic.X28)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X0, 16us)
+      zero ARM64Symbolic.X12
+      ARM64Symbolic.Label "__dark_run_argv_copy"
+      ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X10)
+      ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, "__dark_run_argv_copied")
+      ARM64Symbolic.LDRB (ARM64Symbolic.X13, ARM64Symbolic.X11, ARM64Symbolic.X12)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X19, ARM64Symbolic.X12)
+      ARM64Symbolic.STRB_reg (ARM64Symbolic.X13, ARM64Symbolic.X14)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+      ARM64Symbolic.B_label "__dark_run_argv_copy"
+      ARM64Symbolic.Label "__dark_run_argv_copied"
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X19, ARM64Symbolic.X10)
+      zero ARM64Symbolic.X15
+      ARM64Symbolic.STRB_reg (ARM64Symbolic.X15, ARM64Symbolic.X14)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X10, 8us)
+      ARM64Symbolic.LSR_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 3)
+      ARM64Symbolic.LSL_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 3)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X11)
+      // Build argv pointers from separators in the copied buffer.
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X24, ARM64Symbolic.X28)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X10, 2us)
+      ARM64Symbolic.LSL_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 3)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X11)
+      zero ARM64Symbolic.X12
+      zero ARM64Symbolic.X13
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, ARM64Symbolic.X24)
+      ARM64Symbolic.STR (ARM64Symbolic.X19, ARM64Symbolic.X14, 0s)
+      ARM64Symbolic.Label "__dark_run_argv_scan"
+      ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X10)
+      ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, "__dark_run_argv_done")
+      ARM64Symbolic.LDRB (ARM64Symbolic.X15, ARM64Symbolic.X19, ARM64Symbolic.X12)
+      ARM64Symbolic.CBNZ (ARM64Symbolic.X15, "__dark_run_argv_next")
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 8us)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X24, ARM64Symbolic.X13)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X12, 1us)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X15, ARM64Symbolic.X19, ARM64Symbolic.X15)
+      ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+      ARM64Symbolic.Label "__dark_run_argv_next"
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+      ARM64Symbolic.B_label "__dark_run_argv_scan"
+      ARM64Symbolic.Label "__dark_run_argv_done"
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 8us)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X24, ARM64Symbolic.X13)
+      zero ARM64Symbolic.X15
+      ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+      // Pipeline mode carries a second packed argv. Build its independent
+      // native buffer and pointer vector before either child is created.
+      ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X25, 0s)
+      ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 4us)
+      ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_run_pipeline_argv_done")
+      ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X25, 40s)
+      ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s)
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, ARM64Symbolic.X28)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X0, 16us)
+      zero ARM64Symbolic.X12
+      ARM64Symbolic.Label "__dark_run_pipeline_argv_copy"
+      ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X10)
+      ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, "__dark_run_pipeline_argv_copied")
+      ARM64Symbolic.LDRB (ARM64Symbolic.X13, ARM64Symbolic.X11, ARM64Symbolic.X12)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X19, ARM64Symbolic.X12)
+      ARM64Symbolic.STRB_reg (ARM64Symbolic.X13, ARM64Symbolic.X14)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+      ARM64Symbolic.B_label "__dark_run_pipeline_argv_copy"
+      ARM64Symbolic.Label "__dark_run_pipeline_argv_copied"
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X19, ARM64Symbolic.X10)
+      zero ARM64Symbolic.X15
+      ARM64Symbolic.STRB_reg (ARM64Symbolic.X15, ARM64Symbolic.X14)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X10, 8us)
+      ARM64Symbolic.LSR_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 3)
+      ARM64Symbolic.LSL_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 3)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X11)
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, ARM64Symbolic.X28)
+      ARM64Symbolic.STR (ARM64Symbolic.X11, ARM64Symbolic.SP, 104s)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X10, 2us)
+      ARM64Symbolic.LSL_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 3)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X13)
+      zero ARM64Symbolic.X12
+      zero ARM64Symbolic.X13
+      ARM64Symbolic.STR (ARM64Symbolic.X19, ARM64Symbolic.X11, 0s)
+      ARM64Symbolic.Label "__dark_run_pipeline_argv_scan"
+      ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X10)
+      ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, "__dark_run_pipeline_argv_terminated")
+      ARM64Symbolic.LDRB (ARM64Symbolic.X15, ARM64Symbolic.X19, ARM64Symbolic.X12)
+      ARM64Symbolic.CBNZ (ARM64Symbolic.X15, "__dark_run_pipeline_argv_next")
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 8us)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X11, ARM64Symbolic.X13)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X12, 1us)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X15, ARM64Symbolic.X19, ARM64Symbolic.X15)
+      ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+      ARM64Symbolic.Label "__dark_run_pipeline_argv_next"
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+      ARM64Symbolic.B_label "__dark_run_pipeline_argv_scan"
+      ARM64Symbolic.Label "__dark_run_pipeline_argv_terminated"
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 8us)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X11, ARM64Symbolic.X13)
+      zero ARM64Symbolic.X15
+      ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+      ARM64Symbolic.Label "__dark_run_pipeline_argv_done"
+      // Locate the inherited envp from _start's root frame.
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, ARM64Symbolic.X29)
+      ARM64Symbolic.Label "__dark_run_find_root"
+      ARM64Symbolic.LDR (ARM64Symbolic.X13, ARM64Symbolic.X14, 0s)
+      ARM64Symbolic.CBZ (ARM64Symbolic.X13, "__dark_run_root_found")
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, ARM64Symbolic.X13)
+      ARM64Symbolic.B_label "__dark_run_find_root"
+      ARM64Symbolic.Label "__dark_run_root_found"
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 24us)
+      ARM64Symbolic.Label "__dark_run_find_envp"
+      ARM64Symbolic.LDR (ARM64Symbolic.X13, ARM64Symbolic.X14, 0s)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 8us)
+      ARM64Symbolic.CBNZ (ARM64Symbolic.X13, "__dark_run_find_envp")
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X26, ARM64Symbolic.X14)
+      ARM64Symbolic.STR (ARM64Symbolic.X26, ARM64Symbolic.SP, 88s)
+      // Prepend packed environment overrides to inherited envp. libc getenv
+      // observes the first matching entry, so an override wins even when the
+      // inherited vector also contains that name.
+      ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X25, 24s)
+      ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s)
+      ARM64Symbolic.CBZ (ARM64Symbolic.X10, "__dark_run_environment_done")
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, ARM64Symbolic.X28)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X0, 16us)
+      zero ARM64Symbolic.X12
+      ARM64Symbolic.Label "__dark_run_environment_copy"
+      ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X10)
+      ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, "__dark_run_environment_copied")
+      ARM64Symbolic.LDRB (ARM64Symbolic.X13, ARM64Symbolic.X11, ARM64Symbolic.X12)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X19, ARM64Symbolic.X12)
+      ARM64Symbolic.STRB_reg (ARM64Symbolic.X13, ARM64Symbolic.X14)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+      ARM64Symbolic.B_label "__dark_run_environment_copy"
+      ARM64Symbolic.Label "__dark_run_environment_copied"
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X19, ARM64Symbolic.X10)
+      zero ARM64Symbolic.X15
+      ARM64Symbolic.STRB_reg (ARM64Symbolic.X15, ARM64Symbolic.X14)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X10, 8us)
+      ARM64Symbolic.LSR_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 3)
+      ARM64Symbolic.LSL_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 3)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X11)
+      // Count inherited entries to reserve the complete pointer vector.
+      ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.SP, 88s)
+      zero ARM64Symbolic.X12
+      ARM64Symbolic.Label "__dark_run_environment_count"
+      ARM64Symbolic.LDR (ARM64Symbolic.X13, ARM64Symbolic.X11, 0s)
+      ARM64Symbolic.CBZ (ARM64Symbolic.X13, "__dark_run_environment_counted")
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 8us)
+      ARM64Symbolic.B_label "__dark_run_environment_count"
+      ARM64Symbolic.Label "__dark_run_environment_counted"
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X26, ARM64Symbolic.X28)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X11, ARM64Symbolic.X10, ARM64Symbolic.X12)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 2us)
+      ARM64Symbolic.LSL_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 3)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X11)
+      // Build pointers for each packed override.
+      zero ARM64Symbolic.X12
+      zero ARM64Symbolic.X13
+      ARM64Symbolic.STR (ARM64Symbolic.X19, ARM64Symbolic.X26, 0s)
+      ARM64Symbolic.Label "__dark_run_environment_scan"
+      ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X10)
+      ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, "__dark_run_environment_append_inherited")
+      ARM64Symbolic.LDRB (ARM64Symbolic.X15, ARM64Symbolic.X19, ARM64Symbolic.X12)
+      ARM64Symbolic.CBNZ (ARM64Symbolic.X15, "__dark_run_environment_next")
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 8us)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X26, ARM64Symbolic.X13)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X12, 1us)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X15, ARM64Symbolic.X19, ARM64Symbolic.X15)
+      ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+      ARM64Symbolic.Label "__dark_run_environment_next"
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+      ARM64Symbolic.B_label "__dark_run_environment_scan"
+      ARM64Symbolic.Label "__dark_run_environment_append_inherited"
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 8us)
+      ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.SP, 88s)
+      ARM64Symbolic.Label "__dark_run_environment_append_next"
+      ARM64Symbolic.LDR (ARM64Symbolic.X15, ARM64Symbolic.X11, 0s)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X26, ARM64Symbolic.X13)
+      ARM64Symbolic.STR (ARM64Symbolic.X15, ARM64Symbolic.X14, 0s)
+      ARM64Symbolic.CBZ (ARM64Symbolic.X15, "__dark_run_environment_done")
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X13, 8us)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X11, 8us)
+      ARM64Symbolic.B_label "__dark_run_environment_append_next"
+      ARM64Symbolic.Label "__dark_run_environment_done"
+      ARM64Symbolic.LDR (ARM64Symbolic.X19, ARM64Symbolic.X24, 0s)
+      // Copy cwd to a native NUL-terminated buffer.
+      ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X25, 16s)
+      ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s)
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X11, ARM64Symbolic.X28)
+      ARM64Symbolic.STR (ARM64Symbolic.X11, ARM64Symbolic.SP, 72s)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X13, ARM64Symbolic.X0, 16us)
+      zero ARM64Symbolic.X12
+      ARM64Symbolic.Label "__dark_run_cwd_copy"
+      ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X10)
+      ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, "__dark_run_cwd_done")
+      ARM64Symbolic.LDRB (ARM64Symbolic.X14, ARM64Symbolic.X13, ARM64Symbolic.X12)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X15, ARM64Symbolic.X11, ARM64Symbolic.X12)
+      ARM64Symbolic.STRB_reg (ARM64Symbolic.X14, ARM64Symbolic.X15)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+      ARM64Symbolic.B_label "__dark_run_cwd_copy"
+      ARM64Symbolic.Label "__dark_run_cwd_done"
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X15, ARM64Symbolic.X11, ARM64Symbolic.X10)
+      zero ARM64Symbolic.X14
+      ARM64Symbolic.STRB_reg (ARM64Symbolic.X14, ARM64Symbolic.X15)
+      ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 8us)
+      ARM64Symbolic.LSR_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 3)
+      ARM64Symbolic.LSL_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 3)
+      ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X10)
+      // Reserve managed output buffers.
+      ARM64Symbolic.MOV_reg (ARM64Symbolic.X20, ARM64Symbolic.X28) ]
+    @ loadImmediate ARM64Symbolic.X10 1048592L
+    @ [ ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X10)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X21, ARM64Symbolic.X28)
+        ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X10)
+        zero ARM64Symbolic.X22
+        zero ARM64Symbolic.X23
+        zero ARM64Symbolic.X9
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 56s)
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 80s)
+        // stdout and stderr pipes
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.SP, 0us)
+        zero ARM64Symbolic.X1 ]
+    @ syscall 59us
+    @ [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_run_spawn_error")
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.SP, 8us)
+        zero ARM64Symbolic.X1 ]
+    @ syscall 59us
+    @ [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_run_spawn_error_close_stdout")
+        // A close-on-exec pipe reports child setup/exec errno to the parent.
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.SP, 16us) ]
+    @ loadImmediate ARM64Symbolic.X1 524288L
+    @ syscall 59us
+    @ [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_run_spawn_error_close_output")
+        // The producer and consumer share this pipe only in pipeline mode. It
+        // is created unconditionally so every child/error path has one stable
+        // descriptor layout.
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.SP, 112us)
+        zero ARM64Symbolic.X1 ]
+    @ syscall 59us
+    @ [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_run_spawn_error_close_errno")
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X25, 0s)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 4us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_run_clone_consumer")
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 17us, 0)
+        zero ARM64Symbolic.X1; zero ARM64Symbolic.X2; zero ARM64Symbolic.X3; zero ARM64Symbolic.X4 ]
+    @ syscall 220us
+    @ [ ARM64Symbolic.CBZ (ARM64Symbolic.X0, "__dark_run_pipeline_producer")
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_run_spawn_error_close_pipeline")
+        ARM64Symbolic.STR (ARM64Symbolic.X0, ARM64Symbolic.SP, 120s)
+        ARM64Symbolic.Label "__dark_run_clone_consumer"
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 17us, 0)
+        zero ARM64Symbolic.X1; zero ARM64Symbolic.X2; zero ARM64Symbolic.X3; zero ARM64Symbolic.X4 ]
+    @ syscall 220us
+    @ [ ARM64Symbolic.CBZ (ARM64Symbolic.X0, "__dark_run_child")
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_run_spawn_error_close_all")
+        ARM64Symbolic.STR (ARM64Symbolic.X0, ARM64Symbolic.SP, 32s)
+        zero ARM64Symbolic.X9
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 24s) ]
+    @ closeFd 0s 32 @ closeFd 8s 32 @ closeFd 16s 32 @ closeFd 112s 0 @ closeFd 112s 32
+    @ setNonblocking 0s @ setNonblocking 8s
+    @ [ ARM64Symbolic.Label "__dark_run_drain_wait" ]
+    @ readPipe 0s ARM64Symbolic.X20 ARM64Symbolic.X22 "__dark_run_read_stderr"
+    @ [ ARM64Symbolic.Label "__dark_run_read_stderr" ]
+    @ readPipe 8s ARM64Symbolic.X21 ARM64Symbolic.X23 "__dark_run_wait"
+    @ [ ARM64Symbolic.Label "__dark_run_wait"
+        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, 32s)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 24us)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0)
+        zero ARM64Symbolic.X3 ]
+    @ syscall 260us
+    @ [ ARM64Symbolic.CBNZ (ARM64Symbolic.X0, "__dark_run_finished")
+        // Timeout mode decrements one millisecond per wait probe.
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X25, 0s)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 3us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_run_sleep")
+        ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.SP, 56s)
+        ARM64Symbolic.LDR (ARM64Symbolic.X11, ARM64Symbolic.X25, 32s)
+        ARM64Symbolic.CMP_reg (ARM64Symbolic.X10, ARM64Symbolic.X11)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_run_timeout_next")
+        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, 32s)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 9us, 0) ]
+    @ syscall 129us
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 1us, 0)
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+        ARM64Symbolic.B_label "__dark_run_blocking_wait"
+        ARM64Symbolic.Label "__dark_run_timeout_next"
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 1us)
+        ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.SP, 56s)
+        ARM64Symbolic.Label "__dark_run_sleep"
+        zero ARM64Symbolic.X9
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 40s) ]
+    @ loadImmediate ARM64Symbolic.X9 1000000L
+    @ [ ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 48s)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.SP, 40us)
+        zero ARM64Symbolic.X1 ]
+    @ syscall 101us
+    @ [ ARM64Symbolic.B_label "__dark_run_drain_wait"
+        ARM64Symbolic.Label "__dark_run_blocking_wait"
+        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, 32s)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 24us)
+        zero ARM64Symbolic.X2; zero ARM64Symbolic.X3 ]
+    @ syscall 260us
+    @ [ ARM64Symbolic.Label "__dark_run_finished"
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X25, 0s)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 4us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_run_all_children_finished")
+        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, 120s)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 80us)
+        zero ARM64Symbolic.X2; zero ARM64Symbolic.X3 ]
+    @ syscall 260us
+    @ [ ARM64Symbolic.Label "__dark_run_all_children_finished" ]
+    @ readPipe 0s ARM64Symbolic.X20 ARM64Symbolic.X22 "__dark_run_final_stderr"
+    @ [ ARM64Symbolic.Label "__dark_run_final_stderr" ]
+    @ readPipe 8s ARM64Symbolic.X21 ARM64Symbolic.X23 "__dark_run_final_close"
+    @ [ ARM64Symbolic.Label "__dark_run_final_close" ]
+    @ closeFd 0s 0 @ closeFd 8s 0
+    @ pairFd 16s 0
+    @ [ ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 80us)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 8us, 0) ]
+    @ syscall 63us
+    @ closeFd 16s 0
+    @ [ ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.SP, 24s)
+        ARM64Symbolic.AND_imm (ARM64Symbolic.X11, ARM64Symbolic.X10, 0x7fUL)
+        ARM64Symbolic.CBNZ (ARM64Symbolic.X11, "__dark_run_signaled")
+        ARM64Symbolic.LSR_imm (ARM64Symbolic.X12, ARM64Symbolic.X10, 8)
+        ARM64Symbolic.B_label "__dark_run_build_result"
+        ARM64Symbolic.Label "__dark_run_signaled"
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X11, 128us)
+        ARM64Symbolic.B_label "__dark_run_build_result"
+        ARM64Symbolic.Label "__dark_run_spawn_error_close_all" ]
+    @ closeFd 112s 0 @ closeFd 112s 32
+    @ [ ARM64Symbolic.Label "__dark_run_spawn_error_close_pipeline" ]
+    @ [ ARM64Symbolic.Label "__dark_run_spawn_error_close_errno" ]
+    @ closeFd 16s 0 @ closeFd 16s 32
+    @ [ ARM64Symbolic.Label "__dark_run_spawn_error_close_output" ]
+    @ closeFd 8s 0 @ closeFd 8s 32
+    @ [ ARM64Symbolic.Label "__dark_run_spawn_error_close_stdout" ]
+    @ closeFd 0s 0 @ closeFd 0s 32
+    @ [ ARM64Symbolic.Label "__dark_run_spawn_error"
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X12, 127us, 0)
+        ARM64Symbolic.Label "__dark_run_build_result"
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.SP, 80s)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 2us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_run_keep_capture_buffers")
+        ARM64Symbolic.LDR (ARM64Symbolic.X28, ARM64Symbolic.SP, 96s)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X20, ARM64Symbolic.X28)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 16us)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X21, ARM64Symbolic.X28)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 16us)
+        zero ARM64Symbolic.X22
+        zero ARM64Symbolic.X23
+        ARM64Symbolic.Label "__dark_run_keep_capture_buffers" ]
+    @ finalizeString ARM64Symbolic.X20 ARM64Symbolic.X22
+    @ finalizeString ARM64Symbolic.X21 ARM64Symbolic.X23
+    @ [ ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X28)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 48us)
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.SP, 80s)
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X0, 0s)
+        ARM64Symbolic.STR (ARM64Symbolic.X12, ARM64Symbolic.X0, 8s)
+        ARM64Symbolic.STR (ARM64Symbolic.X20, ARM64Symbolic.X0, 16s)
+        ARM64Symbolic.STR (ARM64Symbolic.X21, ARM64Symbolic.X0, 24s)
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X0, 32s)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X9, 1us, 0)
+        ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.X0, 40s)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 128us)
+        ARM64Symbolic.LDP_post (ARM64Symbolic.X25, ARM64Symbolic.X26, ARM64Symbolic.SP, 16s)
+        ARM64Symbolic.LDP_post (ARM64Symbolic.X23, ARM64Symbolic.X24, ARM64Symbolic.SP, 16s)
+        ARM64Symbolic.LDP_post (ARM64Symbolic.X21, ARM64Symbolic.X22, ARM64Symbolic.SP, 16s)
+        ARM64Symbolic.LDP_post (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, 16s)
+        ARM64Symbolic.LDP_post (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+        ARM64Symbolic.RET
+        ARM64Symbolic.Label "__dark_run_child" ]
+    @ pairFd 0s 32
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 1us, 0); zero ARM64Symbolic.X2 ]
+    @ syscall 24us
+    @ pairFd 8s 32
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 2us, 0); zero ARM64Symbolic.X2 ]
+    @ syscall 24us
+    @ [ ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X25, 0s)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 4us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_run_child_input_ready") ]
+    @ pairFd 112s 0
+    @ [ zero ARM64Symbolic.X1; zero ARM64Symbolic.X2 ]
+    @ syscall 24us
+    @ [ ARM64Symbolic.Label "__dark_run_child_input_ready" ]
+    @ closeFd 0s 0 @ closeFd 0s 32 @ closeFd 8s 0 @ closeFd 8s 32 @ closeFd 16s 0 @ closeFd 112s 0 @ closeFd 112s 32
+    @ [ // Apply cwd only for runIn mode.
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X25, 0s)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 1us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_run_child_exec")
+        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, 72s) ]
+    @ syscall 49us
+    @ [ ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_run_child_fail")
+        ARM64Symbolic.Label "__dark_run_child_exec"
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.X25, 0s)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 4us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_run_child_first_argv")
+        ARM64Symbolic.LDR (ARM64Symbolic.X1, ARM64Symbolic.SP, 104s)
+        ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X1, 0s)
+        ARM64Symbolic.B_label "__dark_run_child_argv_ready"
+        ARM64Symbolic.Label "__dark_run_child_first_argv"
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X19)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.X24)
+        ARM64Symbolic.Label "__dark_run_child_argv_ready"
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X2, ARM64Symbolic.X26) ]
+    @ syscall 221us
+    @ [ ARM64Symbolic.Label "__dark_run_child_fail"
+        // Linux syscalls return -errno. Preserve errno before write changes X0.
+        zero ARM64Symbolic.X10
+        ARM64Symbolic.SUB_reg (ARM64Symbolic.X10, ARM64Symbolic.X10, ARM64Symbolic.X0)
+        ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.SP, 80s) ]
+    @ pairFd 16s 32
+    @ [ ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 80us)
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 8us, 0) ]
+    @ syscall 64us
+    @ [
+        ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 127us, 0) ]
+    @ syscall 93us
+    @ [ ARM64Symbolic.Label "__dark_run_pipeline_producer" ]
+    @ pairFd 112s 32
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 1us, 0); zero ARM64Symbolic.X2 ]
+    @ syscall 24us
+    @ pairFd 8s 32
+    @ [ ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 2us, 0); zero ARM64Symbolic.X2 ]
+    @ syscall 24us
+    @ closeFd 0s 0 @ closeFd 0s 32 @ closeFd 8s 0 @ closeFd 8s 32 @ closeFd 16s 0 @ closeFd 112s 0 @ closeFd 112s 32
+    @ [ ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X19)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X1, ARM64Symbolic.X24)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X2, ARM64Symbolic.X26) ]
+    @ syscall 221us
+    @ [ ARM64Symbolic.B_label "__dark_run_child_fail" ]
+
+let private generateLinuxCliExecuteHelper () : ARM64Symbolic.Instr list =
+    let syscall number =
+        [ARM64Symbolic.MOVZ (ARM64Symbolic.X8, number, 0)
+         ARM64Symbolic.SVC 0us]
+    let zero reg = ARM64Symbolic.MOVZ (reg, 0us, 0)
+    let pairFd slot shift =
+        [ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, slot)
+         ARM64Symbolic.LSR_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, shift)]
+    let closeFd slot shift = pairFd slot shift @ syscall 57us
+    let setNonblocking slot =
+        pairFd slot 0
+        @ [ARM64Symbolic.AND_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, 0xffffffffUL)
+           ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 4us, 0)
+           ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 2048us, 0)]
+        @ syscall 25us
+    let readPipe slot buffer lengthReg nextLabel =
+        pairFd slot 0
+        @ [ARM64Symbolic.AND_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, 0xffffffffUL)
+           ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, buffer, 16us)
+           ARM64Symbolic.ADD_reg (ARM64Symbolic.X1, ARM64Symbolic.X1, lengthReg)]
+        @ loadImmediate ARM64Symbolic.X2 1048576L
+        @ [ARM64Symbolic.SUB_reg (ARM64Symbolic.X2, ARM64Symbolic.X2, lengthReg)]
+        @ syscall 63us
+        @ [ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+           ARM64Symbolic.B_cond_label (ARM64Symbolic.LE, nextLabel)
+           ARM64Symbolic.ADD_reg (lengthReg, lengthReg, ARM64Symbolic.X0)]
+    let finalizeString buffer lengthReg =
+        [ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 1us, 0)
+         ARM64Symbolic.STR (ARM64Symbolic.X10, buffer, 0s)
+         ARM64Symbolic.STR (lengthReg, buffer, 8s)]
+    [ARM64Symbolic.Label "__dark_cli_execute"
+     ARM64Symbolic.STP_pre (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
+     ARM64Symbolic.MOV_reg (ARM64Symbolic.X29, ARM64Symbolic.SP)
+     ARM64Symbolic.STP_pre (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, -16s)
+     ARM64Symbolic.STP_pre (ARM64Symbolic.X21, ARM64Symbolic.X22, ARM64Symbolic.SP, -16s)
+     ARM64Symbolic.STP_pre (ARM64Symbolic.X23, ARM64Symbolic.X30, ARM64Symbolic.SP, -16s)
+     ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 96us)
+     // Copy the managed command to a NUL-terminated native buffer.
+     ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, ARM64Symbolic.X28)
+     ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.X0, 8s)
+     ARM64Symbolic.ADD_imm (ARM64Symbolic.X11, ARM64Symbolic.X0, 16us)
+     zero ARM64Symbolic.X12
+     ARM64Symbolic.Label "__dark_cli_command_copy"
+     ARM64Symbolic.CMP_reg (ARM64Symbolic.X12, ARM64Symbolic.X10)
+     ARM64Symbolic.B_cond_label (ARM64Symbolic.GE, "__dark_cli_command_copied")
+     ARM64Symbolic.LDRB (ARM64Symbolic.X13, ARM64Symbolic.X11, ARM64Symbolic.X12)
+     ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X19, ARM64Symbolic.X12)
+     ARM64Symbolic.STRB_reg (ARM64Symbolic.X13, ARM64Symbolic.X14)
+     ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X12, 1us)
+     ARM64Symbolic.B_label "__dark_cli_command_copy"
+     ARM64Symbolic.Label "__dark_cli_command_copied"
+     ARM64Symbolic.ADD_reg (ARM64Symbolic.X14, ARM64Symbolic.X19, ARM64Symbolic.X10)
+     zero ARM64Symbolic.X15
+     ARM64Symbolic.STRB_reg (ARM64Symbolic.X15, ARM64Symbolic.X14)
+     ARM64Symbolic.ADD_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 8us)
+     ARM64Symbolic.LSR_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 3)
+     ARM64Symbolic.LSL_imm (ARM64Symbolic.X10, ARM64Symbolic.X10, 3)
+     ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X10)
+     // Reserve two bounded managed string blocks.
+     ARM64Symbolic.MOV_reg (ARM64Symbolic.X20, ARM64Symbolic.X28)]
+    @ loadImmediate ARM64Symbolic.X10 1048592L
+    @ [ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X10)
+       ARM64Symbolic.MOV_reg (ARM64Symbolic.X21, ARM64Symbolic.X28)
+       ARM64Symbolic.ADD_reg (ARM64Symbolic.X28, ARM64Symbolic.X28, ARM64Symbolic.X10)
+       zero ARM64Symbolic.X22; zero ARM64Symbolic.X23
+       // pipe2(stdout), pipe2(stderr)
+       ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.SP, 0us); zero ARM64Symbolic.X1]
+    @ syscall 59us
+    @ [ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+       ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_cli_spawn_error")
+       ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.SP, 8us); zero ARM64Symbolic.X1]
+    @ syscall 59us
+    @ [ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+       ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_cli_spawn_error_close_stdout")
+       // clone(SIGCHLD, 0, 0, 0, 0)
+       ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 17us, 0)
+       zero ARM64Symbolic.X1; zero ARM64Symbolic.X2; zero ARM64Symbolic.X3; zero ARM64Symbolic.X4]
+    @ syscall 220us
+    @ [ARM64Symbolic.CBZ (ARM64Symbolic.X0, "__dark_cli_child")
+       ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+       ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_cli_spawn_error_close_all")
+       ARM64Symbolic.STR (ARM64Symbolic.X0, ARM64Symbolic.SP, 32s)
+       zero ARM64Symbolic.X9
+       ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 16s)]
+    @ closeFd 0s 32 @ closeFd 8s 32
+    @ setNonblocking 0s @ setNonblocking 8s
+    @ [ARM64Symbolic.Label "__dark_cli_drain_wait"]
+    @ readPipe 0s ARM64Symbolic.X20 ARM64Symbolic.X22 "__dark_cli_read_stderr"
+    @ [ARM64Symbolic.Label "__dark_cli_read_stderr"]
+    @ readPipe 8s ARM64Symbolic.X21 ARM64Symbolic.X23 "__dark_cli_wait"
+    @ [ARM64Symbolic.Label "__dark_cli_wait"
+       ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.SP, 32s)
+       ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 16us)
+       ARM64Symbolic.MOVZ (ARM64Symbolic.X2, 1us, 0); zero ARM64Symbolic.X3]
+    @ syscall 260us
+    @ [ARM64Symbolic.CMP_imm (ARM64Symbolic.X0, 0us)
+       ARM64Symbolic.B_cond_label (ARM64Symbolic.LT, "__dark_cli_drain_wait")
+       ARM64Symbolic.CBNZ (ARM64Symbolic.X0, "__dark_cli_finished")
+       zero ARM64Symbolic.X9
+       ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 40s)]
+    @ loadImmediate ARM64Symbolic.X9 1000000L
+    @ [ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 48s)
+       ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.SP, 40us); zero ARM64Symbolic.X1]
+    @ syscall 101us
+    @ [ARM64Symbolic.B_label "__dark_cli_drain_wait"
+       ARM64Symbolic.Label "__dark_cli_finished"]
+    @ readPipe 0s ARM64Symbolic.X20 ARM64Symbolic.X22 "__dark_cli_final_stderr"
+    @ [ARM64Symbolic.Label "__dark_cli_final_stderr"]
+    @ readPipe 8s ARM64Symbolic.X21 ARM64Symbolic.X23 "__dark_cli_final_close"
+    @ [ARM64Symbolic.Label "__dark_cli_final_close"]
+    @ closeFd 0s 0 @ closeFd 8s 0
+    @ [ARM64Symbolic.LDR (ARM64Symbolic.X10, ARM64Symbolic.SP, 16s)
+       ARM64Symbolic.AND_imm (ARM64Symbolic.X11, ARM64Symbolic.X10, 0x7fUL)
+       ARM64Symbolic.CBNZ (ARM64Symbolic.X11, "__dark_cli_signaled")
+       ARM64Symbolic.LSR_imm (ARM64Symbolic.X12, ARM64Symbolic.X10, 8)
+       ARM64Symbolic.B_label "__dark_cli_build_result"
+       ARM64Symbolic.Label "__dark_cli_signaled"
+       ARM64Symbolic.ADD_imm (ARM64Symbolic.X12, ARM64Symbolic.X11, 128us)
+       ARM64Symbolic.B_label "__dark_cli_build_result"
+       ARM64Symbolic.Label "__dark_cli_spawn_error_close_all"]
+    @ closeFd 8s 0 @ closeFd 8s 32
+    @ [ARM64Symbolic.Label "__dark_cli_spawn_error_close_stdout"]
+    @ closeFd 0s 0 @ closeFd 0s 32
+    @ [ARM64Symbolic.Label "__dark_cli_spawn_error"
+       ARM64Symbolic.MOVZ (ARM64Symbolic.X12, 127us, 0)
+       ARM64Symbolic.Label "__dark_cli_build_result"]
+    @ finalizeString ARM64Symbolic.X20 ARM64Symbolic.X22
+    @ finalizeString ARM64Symbolic.X21 ARM64Symbolic.X23
+    @ [ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X28)
+       ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 32us)]
+    @ [ARM64Symbolic.STR (ARM64Symbolic.X12, ARM64Symbolic.X0, 0s)
+       ARM64Symbolic.STR (ARM64Symbolic.X20, ARM64Symbolic.X0, 8s)
+       ARM64Symbolic.STR (ARM64Symbolic.X21, ARM64Symbolic.X0, 16s)
+       ARM64Symbolic.MOVZ (ARM64Symbolic.X10, 1us, 0)
+       ARM64Symbolic.STR (ARM64Symbolic.X10, ARM64Symbolic.X0, 24s)
+       ARM64Symbolic.ADD_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 96us)
+       ARM64Symbolic.LDP_post (ARM64Symbolic.X23, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+       ARM64Symbolic.LDP_post (ARM64Symbolic.X21, ARM64Symbolic.X22, ARM64Symbolic.SP, 16s)
+       ARM64Symbolic.LDP_post (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, 16s)
+       ARM64Symbolic.LDP_post (ARM64Symbolic.X29, ARM64Symbolic.X30, ARM64Symbolic.SP, 16s)
+       ARM64Symbolic.RET
+       ARM64Symbolic.Label "__dark_cli_child"]
+    @ pairFd 0s 32
+    @ [ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 1us, 0); zero ARM64Symbolic.X2]
+    @ syscall 24us
+    @ pairFd 8s 32
+    @ [ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 2us, 0); zero ARM64Symbolic.X2]
+    @ syscall 24us
+    @ closeFd 0s 0 @ closeFd 0s 32 @ closeFd 8s 0 @ closeFd 8s 32
+    @ loadStringLiteralPointer ARM64Symbolic.X0 "/bin/bash"
+    @ [ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.X0, 16us)
+       ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, ARM64Symbolic.X29)
+       ARM64Symbolic.Label "__dark_cli_find_root_for_exec"
+       ARM64Symbolic.LDR (ARM64Symbolic.X13, ARM64Symbolic.X14, 0s)
+       ARM64Symbolic.CBZ (ARM64Symbolic.X13, "__dark_cli_exec_root_found")
+       ARM64Symbolic.MOV_reg (ARM64Symbolic.X14, ARM64Symbolic.X13)
+       ARM64Symbolic.B_label "__dark_cli_find_root_for_exec"
+       ARM64Symbolic.Label "__dark_cli_exec_root_found"
+       ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 24us)
+       ARM64Symbolic.Label "__dark_cli_find_envp_for_exec"
+       ARM64Symbolic.LDR (ARM64Symbolic.X13, ARM64Symbolic.X14, 0s)
+       ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 8us)
+       ARM64Symbolic.CBNZ (ARM64Symbolic.X13, "__dark_cli_find_envp_for_exec")
+       ARM64Symbolic.STR (ARM64Symbolic.X14, ARM64Symbolic.SP, 88s)
+       ARM64Symbolic.Label "__dark_cli_find_shell"
+       ARM64Symbolic.LDR (ARM64Symbolic.X13, ARM64Symbolic.X14, 0s)
+       ARM64Symbolic.CBZ (ARM64Symbolic.X13, "__dark_cli_shell_found")
+       ARM64Symbolic.LDRB_imm (ARM64Symbolic.X10, ARM64Symbolic.X13, 0)
+       ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, 83us)
+       ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_cli_next_env")
+       ARM64Symbolic.LDRB_imm (ARM64Symbolic.X10, ARM64Symbolic.X13, 1)
+       ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, 72us)
+       ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_cli_next_env")
+       ARM64Symbolic.LDRB_imm (ARM64Symbolic.X10, ARM64Symbolic.X13, 2)
+       ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, 69us)
+       ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_cli_next_env")
+       ARM64Symbolic.LDRB_imm (ARM64Symbolic.X10, ARM64Symbolic.X13, 3)
+       ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, 76us)
+       ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_cli_next_env")
+       ARM64Symbolic.LDRB_imm (ARM64Symbolic.X10, ARM64Symbolic.X13, 4)
+       ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, 76us)
+       ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_cli_next_env")
+       ARM64Symbolic.LDRB_imm (ARM64Symbolic.X10, ARM64Symbolic.X13, 5)
+       ARM64Symbolic.CMP_imm (ARM64Symbolic.X10, 61us)
+       ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_cli_next_env")
+       ARM64Symbolic.ADD_imm (ARM64Symbolic.X0, ARM64Symbolic.X13, 6us)
+       ARM64Symbolic.B_label "__dark_cli_shell_found"
+       ARM64Symbolic.Label "__dark_cli_next_env"
+       ARM64Symbolic.ADD_imm (ARM64Symbolic.X14, ARM64Symbolic.X14, 8us)
+       ARM64Symbolic.B_label "__dark_cli_find_shell"
+       ARM64Symbolic.Label "__dark_cli_shell_found"
+       ARM64Symbolic.STR (ARM64Symbolic.X0, ARM64Symbolic.SP, 56s)]
+    @ loadStringLiteralPointer ARM64Symbolic.X9 "-c"
+    @ [ARM64Symbolic.ADD_imm (ARM64Symbolic.X9, ARM64Symbolic.X9, 16us)
+       ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 64s)
+       ARM64Symbolic.STR (ARM64Symbolic.X19, ARM64Symbolic.SP, 72s)
+       zero ARM64Symbolic.X9
+       ARM64Symbolic.STR (ARM64Symbolic.X9, ARM64Symbolic.SP, 80s)
+       ARM64Symbolic.ADD_imm (ARM64Symbolic.X1, ARM64Symbolic.SP, 56us)
+       ARM64Symbolic.LDR (ARM64Symbolic.X2, ARM64Symbolic.SP, 88s)]
+    @ syscall 221us
+    @ [ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 127us, 0)]
+    @ syscall 93us
+
+/// Convert LIR function to ARM64 instructions with prologue and epilogue
+let convertFunction
+    (heapOverflowTrapBody: ARM64Symbolic.Instr list)
+    (ctx: CodeGenContext)
+    (func: LIR.Function)
+    : Result<ARM64Symbolic.Instr list, string> =
+    // Generate epilogue label for this function (passed to convertCFG for Ret terminators)
+    let epilogueLabel = "_epilogue_" + func.Name
+    let overflowLabel = heapOverflowLabelPrefix + func.Name
+    let needsHeapOverflowTrap =
+        func.CFG.Blocks
+        |> Map.exists (fun _ block ->
+            block.Instrs
+            |> List.exists (function
+                | LIR.HeapAlloc _ -> true
+                | LIR.RawAlloc _ -> true
+                | LIR.MappedAlloc _ | LIR.MappedFree _ -> true
+                | _ -> false))
+
+    // Create function-specific context with stack info for tail call epilogue generation
+    let funcCtx = {
+        ctx with
+            FunctionName = func.Name
+            RawSlotInitRetainTargets =
+                func.CodegenFacts
+                |> Option.bind (fun facts -> facts.Arm64RawSlotInitRetainTargets)
+            StackSize = func.StackSize
+            UsedCalleeSaved = func.UsedCalleeSaved
+            HeapOverflowLabel = overflowLabel
+    }
+
+    // Convert CFG to ARM64 instructions
+    match convertCFG funcCtx epilogueLabel func.CFG with
+    | Error err -> Error err
+    | Ok cfgInstrs ->
+        // Generate prologue (save FP/LR, allocate stack)
+        let prologue = generatePrologue func.UsedCalleeSaved func.StackSize
+
+        // Generate heap initialization for _start only
+        let heapInit =
+            if func.Name = "_start" then generateHeapInit ctx.Target
+            else []
+
+        // Note: Coverage buffer is in BSS section (zero-initialized by OS)
+        // No runtime initialization needed - CoverageHit uses ADRP+ADD to access it
+
+        // Shared cold path for allocation overflow in this function.
+        let heapOverflowTrap =
+            if needsHeapOverflowTrap then
+                generateHeapOverflowTrapBlock heapOverflowTrapBody overflowLabel
+            else
+                []
+
+        // Generate epilogue (deallocate stack, restore FP/LR, return or exit)
+        let epilogueLabelInstr = [ARM64Symbolic.Label ("_epilogue_" + func.Name)]
+        let epilogue =
+            if func.Name = "_start" then
+                // For _start, flush coverage (if enabled) then exit instead of return
+                let coverageFlush =
+                    if ctx.Options.EnableCoverage then
+                        runtimeInstrs (Runtime.generateCoverageFlush ctx.Target ctx.Options.CoverageExprCount)
+                    else []
+                let leakCheckReport = generateLeakCheckReport ctx
+                generateEpilogue func.UsedCalleeSaved func.StackSize
+                |> List.filter (function ARM64Symbolic.RET -> false | _ -> true)  // Remove RET
+                |> fun instrs -> instrs @ coverageFlush @ leakCheckReport @ runtimeInstrs (Runtime.generateExit ctx.Target)
+            else
+                generateEpilogue func.UsedCalleeSaved func.StackSize
+
+        // Add function entry label (for BL to branch to)
+        let functionEntryLabel = [ARM64Symbolic.Label func.Name]
+
+        // Terminate _start's frame-pointer chain so CLI helpers can recover
+        // argv/envp from the original stack without reserving X18.
+        let rootFrameInit =
+            if func.Name = "_start" then
+                [ARM64Symbolic.MOVZ (ARM64Symbolic.X29, 0us, 0)
+                 ARM64Symbolic.MOVZ (ARM64Symbolic.X25, 0us, 0)]
+            else []
+
+        // Parameter stack stores and parallel register moves are already the first
+        // instructions in the allocated CFG entry block.
+        // Keep the epilogue immediately after the CFG so its final Ret terminator
+        // can fall through. The terminating epilogue makes the overflow trap a
+        // cold out-of-line block reached only by explicit allocation branches.
+        Ok (functionEntryLabel @ rootFrameInit @ prologue @ heapInit @ cfgInstrs @ epilogueLabelInstr @ epilogue @ heapOverflowTrap)
+
+type private RegisterLifetimeStep =
+    | Unrelated
+    | Overwritten
+    | ReadOrControlFlow
+
+/// Classify one instruction while proving that a register value is dead.
+/// Control flow is a conservative barrier because this local peephole does not
+/// construct a CFG for the final symbolic instruction stream.
+let private registerLifetimeStep
+    (target: ARM64Symbolic.Reg)
+    (instr: ARM64Symbolic.Instr)
+    : RegisterLifetimeStep =
+    let classify (reads: ARM64Symbolic.Reg list) (writes: ARM64Symbolic.Reg list) =
+        if List.contains target reads then ReadOrControlFlow
+        elif List.contains target writes then Overwritten
+        else Unrelated
+
+    match instr with
+    | ARM64Symbolic.MOVZ (dest, _, _)
+    | ARM64Symbolic.MOVN (dest, _, _)
+    | ARM64Symbolic.CSET (dest, _)
+    | ARM64Symbolic.ADRP (dest, _)
+    | ARM64Symbolic.ADR (dest, _)
+    | ARM64Symbolic.FMOV_to_gp (dest, _)
+    | ARM64Symbolic.UMOV_byte (dest, _)
+    | ARM64Symbolic.FCVTZS (dest, _) ->
+        classify [] [dest]
+    | ARM64Symbolic.MOVK (dest, _, _) ->
+        classify [dest] [dest]
+    | ARM64Symbolic.ADD_imm (dest, src, _)
+    | ARM64Symbolic.SUB_imm (dest, src, _)
+    | ARM64Symbolic.SUB_imm12 (dest, src, _)
+    | ARM64Symbolic.SUBS_imm (dest, src, _)
+    | ARM64Symbolic.AND_imm (dest, src, _)
+    | ARM64Symbolic.LSL_imm (dest, src, _)
+    | ARM64Symbolic.LSR_imm (dest, src, _)
+    | ARM64Symbolic.ASR_imm (dest, src, _)
+    | ARM64Symbolic.ADD_label (dest, src, _) ->
+        classify [src] [dest]
+    | ARM64Symbolic.MVN (dest, src)
+    | ARM64Symbolic.MOV_reg (dest, src)
+    | ARM64Symbolic.NEG (dest, src)
+    | ARM64Symbolic.SXTB (dest, src)
+    | ARM64Symbolic.SXTH (dest, src)
+    | ARM64Symbolic.SXTW (dest, src)
+    | ARM64Symbolic.UXTB (dest, src)
+    | ARM64Symbolic.UXTH (dest, src)
+    | ARM64Symbolic.UXTW (dest, src) ->
+        classify [src] [dest]
+    | ARM64Symbolic.ADD_reg (dest, src1, src2)
+    | ARM64Symbolic.SUB_reg (dest, src1, src2)
+    | ARM64Symbolic.MUL (dest, src1, src2)
+    | ARM64Symbolic.SDIV (dest, src1, src2)
+    | ARM64Symbolic.UDIV (dest, src1, src2)
+    | ARM64Symbolic.AND_reg (dest, src1, src2)
+    | ARM64Symbolic.BIC_reg (dest, src1, src2)
+    | ARM64Symbolic.ORR_reg (dest, src1, src2)
+    | ARM64Symbolic.EOR_reg (dest, src1, src2)
+    | ARM64Symbolic.LSL_reg (dest, src1, src2)
+    | ARM64Symbolic.LSR_reg (dest, src1, src2)
+    | ARM64Symbolic.ASR_reg (dest, src1, src2) ->
+        classify [src1; src2] [dest]
+    | ARM64Symbolic.ADD_shifted (dest, src1, src2, _)
+    | ARM64Symbolic.SUB_shifted (dest, src1, src2, _) ->
+        classify [src1; src2] [dest]
+    | ARM64Symbolic.MSUB (dest, src1, src2, src3)
+    | ARM64Symbolic.MADD (dest, src1, src2, src3) ->
+        classify [src1; src2; src3] [dest]
+    | ARM64Symbolic.CMP_imm (src, _) ->
+        classify [src] []
+    | ARM64Symbolic.CMP_reg (src1, src2) ->
+        classify [src1; src2] []
+    | ARM64Symbolic.STRB (src, addr, _)
+    | ARM64Symbolic.STR (src, addr, _)
+    | ARM64Symbolic.STUR (src, addr, _) ->
+        classify [src; addr] []
+    | ARM64Symbolic.STRB_reg (src, addr) ->
+        classify [src; addr] []
+    | ARM64Symbolic.LDRB (dest, addr, index) ->
+        classify [addr; index] [dest]
+    | ARM64Symbolic.LDRB_imm (dest, addr, _)
+    | ARM64Symbolic.LDR (dest, addr, _)
+    | ARM64Symbolic.LDUR (dest, addr, _) ->
+        classify [addr] [dest]
+    | ARM64Symbolic.STP (reg1, reg2, addr, _) ->
+        classify [reg1; reg2; addr] []
+    | ARM64Symbolic.STP_pre (reg1, reg2, addr, _) ->
+        classify [reg1; reg2; addr] [addr]
+    | ARM64Symbolic.LDP (reg1, reg2, addr, _) ->
+        classify [addr] [reg1; reg2]
+    | ARM64Symbolic.LDP_post (reg1, reg2, addr, _) ->
+        classify [addr] [reg1; reg2; addr]
+    | ARM64Symbolic.LDR_fp (_, addr, _)
+    | ARM64Symbolic.STR_fp (_, addr, _)
+    | ARM64Symbolic.STP_fp (_, _, addr, _)
+    | ARM64Symbolic.LDP_fp (_, _, addr, _) ->
+        classify [addr] []
+    | ARM64Symbolic.FMOV_from_gp (_, src)
+    | ARM64Symbolic.SCVTF (_, src) ->
+        classify [src] []
+    | ARM64Symbolic.FADD _
+    | ARM64Symbolic.FSUB _
+    | ARM64Symbolic.FMUL _
+    | ARM64Symbolic.FDIV _
+    | ARM64Symbolic.FNEG _
+    | ARM64Symbolic.FABS _
+    | ARM64Symbolic.FSQRT _
+    | ARM64Symbolic.FCMP _
+    | ARM64Symbolic.FMOV_reg _
+    | ARM64Symbolic.FMOV_zero _
+    | ARM64Symbolic.FMOV_imm _
+    | ARM64Symbolic.CNT_8B _
+    | ARM64Symbolic.ADDV_8B _ ->
+        Unrelated
+    | ARM64Symbolic.BL _
+    | ARM64Symbolic.BLR _
+    | ARM64Symbolic.BR _
+    | ARM64Symbolic.CBZ _
+    | ARM64Symbolic.CBNZ _
+    | ARM64Symbolic.B_label _
+    | ARM64Symbolic.B_cond_label _
+    | ARM64Symbolic.CBZ_offset _
+    | ARM64Symbolic.CBNZ_offset _
+    | ARM64Symbolic.TBZ _
+    | ARM64Symbolic.TBNZ _
+    | ARM64Symbolic.TBZ_label _
+    | ARM64Symbolic.TBNZ_label _
+    | ARM64Symbolic.B _
+    | ARM64Symbolic.B_cond _
+    | ARM64Symbolic.RET
+    | ARM64Symbolic.SVC _
+    | ARM64Symbolic.Label _ ->
+        ReadOrControlFlow
+
+let private overwrittenBeforeReadOrEnd
+    (target: ARM64Symbolic.Reg)
+    (instrs: ARM64Symbolic.Instr list)
+    : bool =
+    let rec check remaining =
+        match remaining with
+        | [] -> true
+        | instr :: rest ->
+            match registerLifetimeStep target instr with
+            | Unrelated -> check rest
+            | Overwritten -> true
+            | ReadOrControlFlow -> false
+
+    check instrs
+
+/// Return the condition that selects the complementary control-flow edge.
+let private invertCondition (condition: ARM64.Condition) : ARM64.Condition =
+    match condition with
+    | ARM64.EQ -> ARM64.NE
+    | ARM64.NE -> ARM64.EQ
+    | ARM64.LT -> ARM64.GE
+    | ARM64.GT -> ARM64.LE
+    | ARM64.LE -> ARM64.GT
+    | ARM64.GE -> ARM64.LT
+    | ARM64.LO -> ARM64.HS
+    | ARM64.HI -> ARM64.LS
+    | ARM64.LS -> ARM64.HI
+    | ARM64.HS -> ARM64.LO
+
+/// Peephole optimization pass
+/// Patterns:
+/// 1. SUB_imm + CMP #0 → SUBS (fuse subtract and compare)
+/// 2. MOV Xn, Xn → remove (redundant self-move)
+/// 3. FMOV Dn, Dn → remove (redundant FP self-move)
+/// 4. ADD Xn, Xn, #0 → remove (add zero)
+/// 5. SUB Xn, Xn, #0 → remove (subtract zero)
+/// 6. B_label X + Label X → remove branch (branch to next instruction)
+/// 7. CMP #0 + B.EQ → CBZ (compare zero and branch equal)
+/// 8. CMP #0 + B.NE → CBNZ (compare zero and branch not equal)
+/// 9. AND Xn, Xn, Xn → MOV (AND with self is identity)
+/// 10. ORR Xn, Xn, Xn → MOV (OR with self is identity)
+/// 11. MOVN #0 + EOR + AND → BIC (bit clear when the inverted temporary is overwritten)
+/// 12. B.cond true + B false + true: → B.!cond false + true: (fall through)
+let peepholeOptimize (instrs: ARM64Symbolic.Instr list) : ARM64Symbolic.Instr list =
+    let rec optimize acc remaining =
+        match remaining with
+        | [] -> List.rev acc
+        // Fuse SUB + CMP #0 into SUBS
+        | ARM64Symbolic.SUB_imm (dest, src, imm) :: ARM64Symbolic.CMP_imm (cmpReg, 0us) :: rest when dest = cmpReg ->
+            optimize (ARM64Symbolic.SUBS_imm (dest, src, imm) :: acc) rest
+        // Fuse CMP #0 + B.EQ into CBZ
+        | ARM64Symbolic.CMP_imm (reg, 0us) :: ARM64Symbolic.B_cond_label (ARM64.EQ, label) :: rest ->
+            optimize (ARM64Symbolic.CBZ (reg, label) :: acc) rest
+        // Fuse CMP #0 + B.NE into CBNZ
+        | ARM64Symbolic.CMP_imm (reg, 0us) :: ARM64Symbolic.B_cond_label (ARM64.NE, label) :: rest ->
+            optimize (ARM64Symbolic.CBNZ (reg, label) :: acc) rest
+        // Fuse x & (y EOR -1) into BIC x, y. Requiring AND to overwrite the
+        // EOR destination proves that the inverted temporary is dead here.
+        | ARM64Symbolic.MOVN (allOnes, 0us, 0)
+          :: ARM64Symbolic.EOR_reg (inverted, value, eorMask)
+          :: ARM64Symbolic.AND_reg (dest, left, andRight)
+          :: rest
+            when eorMask = allOnes
+                 && andRight = inverted
+                 && dest = inverted
+                 && allOnes <> inverted
+                 && allOnes <> left
+                 && allOnes <> value
+                 && inverted <> left
+                 && overwrittenBeforeReadOrEnd allOnes rest ->
+            optimize (ARM64Symbolic.BIC_reg (dest, left, value) :: acc) rest
+        | ARM64Symbolic.MOVN (allOnes, 0us, 0)
+          :: ARM64Symbolic.EOR_reg (inverted, eorMask, value)
+          :: ARM64Symbolic.AND_reg (dest, left, andRight)
+          :: rest
+            when eorMask = allOnes
+                 && andRight = inverted
+                 && dest = inverted
+                 && allOnes <> inverted
+                 && allOnes <> left
+                 && allOnes <> value
+                 && inverted <> left
+                 && overwrittenBeforeReadOrEnd allOnes rest ->
+            optimize (ARM64Symbolic.BIC_reg (dest, left, value) :: acc) rest
+        // Remove redundant self-move (integer)
+        | ARM64Symbolic.MOV_reg (dest, src) :: rest when dest = src ->
+            optimize acc rest
+        // Remove redundant self-move (FP)
+        | ARM64Symbolic.FMOV_reg (dest, src) :: rest when dest = src ->
+            optimize acc rest
+        // Remove add zero
+        | ARM64Symbolic.ADD_imm (dest, src, 0us) :: rest when dest = src ->
+            optimize acc rest
+        // Remove subtract zero
+        | ARM64Symbolic.SUB_imm (dest, src, 0us) :: rest when dest = src ->
+            optimize acc rest
+        // Make an immediately following true target the fallthrough edge.
+        | ARM64Symbolic.B_cond_label (condition, trueTarget)
+          :: ARM64Symbolic.B_label falseTarget
+          :: ARM64Symbolic.Label label
+          :: rest
+            when trueTarget = label ->
+            let branch =
+                ARM64Symbolic.B_cond_label (invertCondition condition, falseTarget)
+            optimize (ARM64Symbolic.Label label :: branch :: acc) rest
+        // AND with self is identity - simplify to MOV if dest differs from operand
+        | ARM64Symbolic.AND_reg (dest, src1, src2) :: rest when src1 = src2 ->
+            if dest = src1 then
+                optimize acc rest  // dest = src AND src = src, remove entirely
+            else
+                optimize (ARM64Symbolic.MOV_reg (dest, src1) :: acc) rest
+        // OR with self is identity - simplify to MOV if dest differs from operand
+        | ARM64Symbolic.ORR_reg (dest, src1, src2) :: rest when src1 = src2 ->
+            if dest = src1 then
+                optimize acc rest  // dest = src OR src = src, remove entirely
+            else
+                optimize (ARM64Symbolic.MOV_reg (dest, src1) :: acc) rest
+        // Remove branch to next instruction
+        | ARM64Symbolic.B_label target :: ARM64Symbolic.Label lbl :: rest when target = lbl ->
+            optimize (ARM64Symbolic.Label lbl :: acc) rest
+        // Fuse LSL_imm + ADD_reg into ADD_shifted: dest = src1 + (src2 << shift)
+        // Pattern: LSL_imm temp, x, shift; ADD_reg dest, x, temp → ADD_shifted dest, x, x, shift
+        | ARM64Symbolic.LSL_imm (lslDest, lslSrc, shift) :: ARM64Symbolic.ADD_reg (addDest, addSrc1, addSrc2) :: rest
+            when lslDest = addSrc2 && lslSrc = addSrc1 ->
+            optimize (ARM64Symbolic.ADD_shifted (addDest, addSrc1, lslSrc, shift) :: acc) rest
+        // Fuse LSL_imm + ADD_reg (commutative): ADD_reg dest, temp, x → ADD_shifted dest, x, x, shift
+        | ARM64Symbolic.LSL_imm (lslDest, lslSrc, shift) :: ARM64Symbolic.ADD_reg (addDest, addSrc1, addSrc2) :: rest
+            when lslDest = addSrc1 && lslSrc = addSrc2 ->
+            optimize (ARM64Symbolic.ADD_shifted (addDest, addSrc2, lslSrc, shift) :: acc) rest
+        // Fuse LSL_imm + SUB_reg into SUB_shifted: dest = shifted - src
+        // Pattern: LSL_imm temp, x, shift; SUB_reg dest, temp, x → SUB_shifted dest, temp, x, 0 then adjust
+        // Actually for n = 2^k - 1: x * n = (x << k) - x, so SUB dest, shifted, x
+        // We need: SUB_shifted dest, (x << shift), x, 0 but that's not quite right...
+        // For x * 7 = (x << 3) - x: LSL temp, x, 3; SUB dest, temp, x
+        // This becomes: dest = temp - x = (x << 3) - x
+        // ARM64 SUB_shifted is: dest = src1 - (src2 << shift)
+        // So we need: dest = (x << 3) - x which is dest = (x << 3) - (x << 0)
+        // That's not directly expressible with SUB_shifted... but we can use:
+        // SUB dest, temp, x where temp = x << 3, which is two instructions
+        // Actually let's skip SUB fusion for now since it doesn't map cleanly to SUB_shifted
+        | instr :: rest ->
+            optimize (instr :: acc) rest
+    optimize [] instrs
+
+// Plan the expensive, registry-independent portion of ARM64 RC helper
+// selection once per finalized LIR function. The result is carried through
+// tree shaking and merged only when the final compilation unit is assembled.
+let private precomputedEmptyReleasePlanSummary : RcReleasePlanSummary = {
+    ListDecHelperLabels = Set.empty
+    PlannedListDecHelpers = Map.empty
+    ExpensiveGenericDecHelper = None
+    DictDecHelperLabels = Set.empty
+    PlannedDictDecHelpers = Map.empty
+    NeedsClosureRcDecHelper = false
+    NeedsStreamRcDecHelper = false
+}
+
+let private mergePrecomputedPlannedListHelpers
+    (left: Map<string, int * ANF.RcReleasePlan>)
+    (right: Map<string, int * ANF.RcReleasePlan>)
+    : Map<string, int * ANF.RcReleasePlan> =
+    Map.fold
+        (fun acc label spec ->
+            match Map.tryFind label acc with
+            | Some existing when existing <> spec ->
+                Crash.crash $"planned list RC helper label collision for {label}"
+            | Some _ -> acc
+            | None -> Map.add label spec acc)
+        left
+        right
+
+let private mergePrecomputedPlannedGenericHelpers
+    (left: Map<string, LIR.Arm64PlannedGenericDecHelper>)
+    (right: Map<string, LIR.Arm64PlannedGenericDecHelper>)
+    : Map<string, LIR.Arm64PlannedGenericDecHelper> =
+    Map.fold
+        (fun acc label (spec: LIR.Arm64PlannedGenericDecHelper) ->
+            match Map.tryFind label acc with
+            | Some (existing: LIR.Arm64PlannedGenericDecHelper)
+                when existing.PayloadSize <> spec.PayloadSize
+                     || existing.ReleasePlan <> spec.ReleasePlan
+                     || existing.OwnsSinglePayloadSum <> spec.OwnsSinglePayloadSum ->
+                Crash.crash $"planned generic RC helper label collision for {label}"
+            | Some (existing: LIR.Arm64PlannedGenericDecHelper) ->
+                Map.add
+                    label
+                    { existing with
+                        ReleasePlanMemoKeys =
+                            Set.union
+                                existing.ReleasePlanMemoKeys
+                                spec.ReleasePlanMemoKeys }
+                    acc
+            | None -> Map.add label spec acc)
+        left
+        right
+
+let private mergePrecomputedPlannedDictHelpers
+    (left: Map<string, ANF.RcReleasePlan>)
+    (right: Map<string, ANF.RcReleasePlan>)
+    : Map<string, ANF.RcReleasePlan> =
+    Map.fold
+        (fun acc label plan ->
+            match Map.tryFind label acc with
+            | Some existing when existing <> plan ->
+                Crash.crash $"planned dict RC helper label collision for {label}"
+            | Some _ -> acc
+            | None -> Map.add label plan acc)
+        left
+        right
+
+let private addPrecomputedPlannedListHelper
+    payloadSize
+    elementFingerprint
+    elementRelease
+    (summary: RcReleasePlanSummary)
+    : RcReleasePlanSummary =
+    let label = plannedListDecHelperLabelForFingerprint elementFingerprint
+    match Map.tryFind label summary.PlannedListDecHelpers with
+    | Some existing when existing <> (payloadSize, elementRelease) ->
+        Crash.crash $"planned list RC helper label collision for {label}"
+    | Some _ -> summary
+    | None ->
+        { summary with
+            PlannedListDecHelpers =
+                Map.add label (payloadSize, elementRelease) summary.PlannedListDecHelpers }
+
+let private addPrecomputedPlannedDictHelper
+    releasePlanFingerprint
+    releasePlan
+    (summary: RcReleasePlanSummary)
+    : RcReleasePlanSummary =
+    let label =
+        dictDecHelperForReleasePlanWithFingerprint
+            releasePlanFingerprint
+            releasePlan
+    match Map.tryFind label summary.PlannedDictDecHelpers with
+    | Some existing when existing <> releasePlan ->
+        Crash.crash $"planned dict RC helper label collision for {label}"
+    | Some _ -> summary
+    | None ->
+        { summary with
+            PlannedDictDecHelpers =
+                Map.add label releasePlan summary.PlannedDictDecHelpers }
+
+let private addPrecomputedPlannedGenericHelper
+    ownsSinglePayloadSum
+    memoKey
+    baseLabel
+    payloadSize
+    releasePlan
+    (requirements: RcHelperRequirements)
+    : RcHelperRequirements =
+    let label =
+        specializePlannedGenericDecHelperLabel ownsSinglePayloadSum baseLabel
+    let spec : LIR.Arm64PlannedGenericDecHelper = {
+        ReleasePlanMemoKeys = Set.singleton memoKey
+        PayloadSize = payloadSize
+        ReleasePlan = releasePlan
+        OwnsSinglePayloadSum = ownsSinglePayloadSum
+    }
+    match Map.tryFind label requirements.PlannedGenericDecHelpers with
+    | Some existing
+        when existing.PayloadSize <> spec.PayloadSize
+             || existing.ReleasePlan <> spec.ReleasePlan
+             || existing.OwnsSinglePayloadSum <> spec.OwnsSinglePayloadSum ->
+        Crash.crash $"planned generic RC helper label collision for {label}"
+    | Some existing ->
+        { requirements with
+            PlannedGenericDecHelpers =
+                requirements.PlannedGenericDecHelpers
+                |> Map.add
+                    label
+                    { existing with
+                        ReleasePlanMemoKeys =
+                            Set.union
+                                existing.ReleasePlanMemoKeys
+                                spec.ReleasePlanMemoKeys } }
+    | None ->
+        { requirements with
+            PlannedGenericDecHelpers =
+                Map.add label spec requirements.PlannedGenericDecHelpers }
+
+let rec private collectPrecomputedReleasePlanSummary
+    (includeStaticRootDependencies: bool)
+    (collectListLabels: bool)
+    (collectPlannedListHelpers: bool)
+    (collectDictLabels: bool)
+    (collectPlannedDictHelpers: bool)
+    (collectClosureNeed: bool)
+    (summary: RcReleasePlanSummary)
+    (releasePlan: ANF.RcReleasePlan)
+    : RcReleasePlanSummary * uint64 =
+    let summary =
+        match releasePlan with
+        | ANF.RootRelease (_, ANF.ClosureHeap, _) when collectClosureNeed ->
+            { summary with NeedsClosureRcDecHelper = true }
+        | ANF.RootRelease (_, ANF.StreamHeap, _) ->
+            { summary with NeedsStreamRcDecHelper = true }
+        | _ -> summary
+
+    let collectFields
+        childListLabels
+        childPlannedListHelpers
+        childDictLabels
+        childPlannedDictHelpers
+        childClosureNeed
+        initialSummary
+        fieldReleases =
+        fieldReleases
+        |> List.fold
+            (fun (summary, childFingerprintsRev) (ANF.FieldRelease (_, fieldReleasePlan)) ->
+                let nextSummary, childFingerprint =
+                    collectPrecomputedReleasePlanSummary
+                        includeStaticRootDependencies
+                        childListLabels
+                        childPlannedListHelpers
+                        childDictLabels
+                        childPlannedDictHelpers
+                        childClosureNeed
+                        summary
+                        fieldReleasePlan
+                (nextSummary, childFingerprint :: childFingerprintsRev))
+            (initialSummary, [])
+        |> fun (collectedSummary, childFingerprintsRev) ->
+            (collectedSummary, List.rev childFingerprintsRev)
+
+    match releasePlan with
+    | ANF.RootRelease (_, _, ANF.TaggedListPayloadRelease elementRelease) ->
+        let summary, elementFingerprint =
+            collectPrecomputedReleasePlanSummary
+                includeStaticRootDependencies
+                collectListLabels
+                collectPlannedListHelpers
+                collectDictLabels
+                collectPlannedDictHelpers
+                false
+                summary
+                elementRelease
+        let fingerprint =
+            ANF.rcReleasePlanFingerprintHashFromChildren
+                releasePlan
+                [elementFingerprint]
+        let elementFingerprintString =
+            ANF.rcReleasePlanFingerprintString elementFingerprint
+        let summary =
+            if collectListLabels then
+                { summary with
+                    ListDecHelperLabels =
+                        Set.add
+                            (listDecHelperForElementRelease
+                                elementFingerprintString
+                                elementRelease)
+                            summary.ListDecHelperLabels }
+            else summary
+        let summary =
+            match collectPlannedListHelpers, elementRelease with
+            | true, ANF.RootRelease (payloadSize, ANF.GenericHeap, _)
+            | true, ANF.RootRelease (payloadSize, ANF.StreamHeap, _) ->
+                addPrecomputedPlannedListHelper
+                    payloadSize
+                    elementFingerprintString
+                    elementRelease
+                    summary
+            | true, ANF.RootRelease (
+                  payloadSize,
+                  ANF.DictHeap,
+                  ANF.DictPayloadRelease (ANF.DynamicBufferRelease _, _))
+            | true, ANF.RootRelease (
+                  payloadSize,
+                  ANF.DictHeap,
+                  ANF.DictPayloadRelease (_, ANF.DynamicBufferRelease _)) ->
+                addPrecomputedPlannedListHelper
+                    payloadSize
+                    elementFingerprintString
+                    elementRelease
+                    summary
+            | true, ANF.RecursiveRelease _ ->
+                addPrecomputedPlannedListHelper
+                    8
+                    elementFingerprintString
+                    elementRelease
+                    summary
+            | _ -> summary
+        (summary, fingerprint)
+    | ANF.RootRelease (_, kind, ANF.DictPayloadRelease (keyRelease, valueRelease)) ->
+        if collectPlannedDictHelpers && kind <> ANF.DictHeap then
+            Crash.crash $"ARM64 planned dict dependency collection saw DictPayloadRelease for non-dict kind {kind}"
+        else
+            let childDictLabels =
+                collectDictLabels
+                && (includeStaticRootDependencies || kind <> ANF.DictHeap)
+            let collectChild summary childRelease =
+                collectPrecomputedReleasePlanSummary
+                    includeStaticRootDependencies
+                    collectListLabels
+                    collectPlannedListHelpers
+                    childDictLabels
+                    collectPlannedDictHelpers
+                    false
+                    summary
+                    childRelease
+            let summary, keyFingerprint = collectChild summary keyRelease
+            let summary, valueFingerprint = collectChild summary valueRelease
+            let fingerprint =
+                ANF.rcReleasePlanFingerprintHashFromChildren
+                    releasePlan
+                    [keyFingerprint; valueFingerprint]
+            let fingerprintString =
+                ANF.rcReleasePlanFingerprintString fingerprint
+            let summary =
+                if collectDictLabels && kind = ANF.DictHeap then
+                    { summary with
+                        DictDecHelperLabels =
+                            Set.add
+                                (dictDecHelperForReleasePlanWithFingerprint
+                                    fingerprintString
+                                    releasePlan)
+                                summary.DictDecHelperLabels }
+                else summary
+            let summary =
+                if collectPlannedDictHelpers
+                   && dictPayloadReleaseNeedsPlannedHelper keyRelease valueRelease then
+                    addPrecomputedPlannedDictHelper
+                        fingerprintString
+                        releasePlan
+                        summary
+                else summary
+            (summary, fingerprint)
+    | ANF.RootRelease (_, kind, ANF.FixedBlockPayloadRelease (_, fieldReleases)) ->
+        let collectStaticOrGeneric = includeStaticRootDependencies || kind = ANF.GenericHeap
+        let summary, childFingerprints =
+            collectFields
+                (collectListLabels && collectStaticOrGeneric)
+                (collectPlannedListHelpers && kind = ANF.GenericHeap)
+                (collectDictLabels && collectStaticOrGeneric)
+                (collectPlannedDictHelpers && kind = ANF.GenericHeap)
+                (collectClosureNeed && kind = ANF.GenericHeap)
+                summary
+                fieldReleases
+        (summary,
+         ANF.rcReleasePlanFingerprintHashFromChildren
+             releasePlan
+             childFingerprints)
+    | ANF.RootRelease (_, kind, ANF.BoxedSumPayloadRelease (_, fieldReleases, variants)) ->
+        let collectStaticOrGeneric = includeStaticRootDependencies || kind = ANF.GenericHeap
+        let summary, fieldFingerprints =
+            collectFields
+                (collectListLabels && collectStaticOrGeneric)
+                (collectPlannedListHelpers && kind = ANF.GenericHeap)
+                (collectDictLabels && collectStaticOrGeneric)
+                (collectPlannedDictHelpers && kind = ANF.GenericHeap)
+                (collectClosureNeed && kind = ANF.GenericHeap)
+                summary
+                fieldReleases
+        // Variant-specific fields are already represented by the combined
+        // release fields above. They still contribute to the stable helper
+        // identity, so fingerprint their disjoint subtrees without collecting
+        // the same requirements twice.
+        let variantFingerprints =
+            variants
+            |> List.collect (fun variant ->
+                variant.FieldReleases
+                |> List.map (fun (ANF.FieldRelease (_, childReleasePlan)) ->
+                    ANF.rcReleasePlanFingerprintHash childReleasePlan))
+        (summary,
+         ANF.rcReleasePlanFingerprintHashFromChildren
+             releasePlan
+             (fieldFingerprints @ variantFingerprints))
+    | ANF.RootRelease (_, _, ANF.ClosurePayloadRelease fieldReleases) ->
+        let summary, childFingerprints =
+            collectFields
+                collectListLabels
+                collectPlannedListHelpers
+                collectDictLabels
+                collectPlannedDictHelpers
+                false
+                summary
+                fieldReleases
+        (summary,
+         ANF.rcReleasePlanFingerprintHashFromChildren
+             releasePlan
+             childFingerprints)
+    | ANF.RootRelease (_, ANF.DictHeap, _)
+        when collectDictLabels && not includeStaticRootDependencies ->
+        let fingerprint = ANF.rcReleasePlanFingerprintHash releasePlan
+        let fingerprintString = ANF.rcReleasePlanFingerprintString fingerprint
+        ({ summary with
+            DictDecHelperLabels =
+                Set.add
+                    (dictDecHelperForReleasePlanWithFingerprint
+                        fingerprintString
+                        releasePlan)
+                    summary.DictDecHelperLabels },
+         fingerprint)
+    | _ ->
+        (summary,
+         ANF.rcReleasePlanFingerprintHashFromChildren releasePlan [])
+
+let private summarizePrecomputedReleasePlan includeStaticRootDependencies releasePlan =
+    let summary, releasePlanFingerprint =
+        collectPrecomputedReleasePlanSummary
+            includeStaticRootDependencies
+            true
+            true
+            true
+            true
+            true
+            precomputedEmptyReleasePlanSummary
+            releasePlan
+    match releasePlan with
+    | ANF.RootRelease (
+          payloadSize,
+          ANF.GenericHeap,
+          (ANF.FixedBlockPayloadRelease _ | ANF.BoxedSumPayloadRelease _))
+        when genericReleasePlanIsExpensive releasePlan ->
+        { summary with
+            ExpensiveGenericDecHelper =
+                Some (
+                    plannedGenericDecHelperBaseLabelForFingerprint
+                        (ANF.rcReleasePlanFingerprintString releasePlanFingerprint),
+                    payloadSize,
+                    releasePlan) }
+    | _ ->
+        summary
+
+let private precomputedEmptyRcHelperRequirements : RcHelperRequirements = {
+    ListDecHelperLabels = Set.empty
+    PlannedListDecHelpers = Map.empty
+    PlannedGenericDecHelpers = Map.empty
+    PlannedDictDecHelpers = Map.empty
+    DictDecHelperLabels = Set.empty
+    NeedsListRcIncHelper = false
+    NeedsDictRcIncHelper = false
+    NeedsClosureRcIncHelper = false
+    NeedsClosureRcDecHelper = false
+    NeedsStreamRcDecHelper = false
+    ReleasePlanSummaries = Map.empty
+}
+
+let private precomputedReleasePlanSummaryWithCache
+    (summaryCache: ReleasePlanSummaryCache option)
+    includeStaticRootDependencies
+    memoKey
+    releasePlan
+    (requirements: RcHelperRequirements)
+    : RcReleasePlanSummary * RcHelperRequirements =
+    let key = (includeStaticRootDependencies, memoKey)
+    match Map.tryFind key requirements.ReleasePlanSummaries with
+    | Some summary -> (summary, requirements)
+    | None ->
+        let generate () =
+            summarizePrecomputedReleasePlan includeStaticRootDependencies releasePlan
+        let summary =
+            match summaryCache, memoKey with
+            | Some cache, LIR.FingerprintedReleasePlan cacheKey ->
+                cache includeStaticRootDependencies cacheKey releasePlan generate
+            | _ ->
+                generate ()
+        (summary,
+         { requirements with
+             ReleasePlanSummaries = Map.add key summary requirements.ReleasePlanSummaries })
+
+let private precomputedReleasePlanSummary =
+    precomputedReleasePlanSummaryWithCache None
+
+let private addPrecomputedReleasePlanRequirements
+    (summary: RcReleasePlanSummary)
+    (requirements: RcHelperRequirements)
+    : RcHelperRequirements =
+    { requirements with
+        PlannedListDecHelpers =
+            mergePrecomputedPlannedListHelpers
+                requirements.PlannedListDecHelpers
+                summary.PlannedListDecHelpers
+        PlannedDictDecHelpers =
+            mergePrecomputedPlannedDictHelpers
+                requirements.PlannedDictDecHelpers
+                summary.PlannedDictDecHelpers }
+
+let private collectPrecomputedRefCountDecRequirement
+    (summaryCache: ReleasePlanSummaryCache option)
+    (ownsSinglePayloadSum: bool)
+    (requirements: RcHelperRequirements)
+    (kind, memoKey, metadata)
+    : RcHelperRequirements =
+    match kind with
+    | LIR.TaggedList
+    | LIR.DictHeap ->
+        let context =
+            if kind = LIR.TaggedList then "TaggedList RefCountDec helper selection"
+            else "DictHeap RefCountDec helper selection"
+        let releasePlan = requiredRcMetadataReleasePlan context metadata
+        let summary, requirements =
+            precomputedReleasePlanSummaryWithCache
+                summaryCache
+                false
+                (LIR.rcReleasePlanMemoKey metadata)
+                releasePlan
+                requirements
+        let requirements = addPrecomputedReleasePlanRequirements summary requirements
+        if kind = LIR.TaggedList then
+            { requirements with
+                ListDecHelperLabels =
+                    Set.add (listDecHelperForReleasePlan releasePlan) requirements.ListDecHelperLabels }
+        else
+            { requirements with
+                DictDecHelperLabels =
+                    Set.add (dictDecHelperForReleasePlan releasePlan) requirements.DictDecHelperLabels }
+    | LIR.GenericHeap ->
+        match rcMetadataReleasePlan metadata with
+        | None -> requirements
+        | Some releasePlan ->
+            let summary, requirements =
+                precomputedReleasePlanSummaryWithCache
+                    summaryCache
+                    false
+                    (LIR.rcReleasePlanMemoKey metadata)
+                    releasePlan
+                    requirements
+            let requirements = addPrecomputedReleasePlanRequirements summary requirements
+            let requirements = {
+                requirements with
+                    ListDecHelperLabels = Set.union requirements.ListDecHelperLabels summary.ListDecHelperLabels
+                    DictDecHelperLabels = Set.union requirements.DictDecHelperLabels summary.DictDecHelperLabels
+                    NeedsClosureRcDecHelper = requirements.NeedsClosureRcDecHelper || summary.NeedsClosureRcDecHelper
+                    NeedsStreamRcDecHelper = requirements.NeedsStreamRcDecHelper || summary.NeedsStreamRcDecHelper
+            }
+            match summary.ExpensiveGenericDecHelper with
+            | Some (baseLabel, payloadSize, releasePlan) ->
+                addPrecomputedPlannedGenericHelper
+                    ownsSinglePayloadSum
+                    memoKey
+                    baseLabel
+                    payloadSize
+                    releasePlan
+                    requirements
+            | _ ->
+                requirements
+    | LIR.ClosureHeap ->
+        { requirements with NeedsClosureRcDecHelper = true }
+    | LIR.StreamHeap ->
+        { requirements with NeedsStreamRcDecHelper = true }
+
+let private collectPrecomputedRefCountIncRequirement
+    (requirements: RcHelperRequirements)
+    kind
+    : RcHelperRequirements =
+    match kind with
+    | LIR.TaggedList -> { requirements with NeedsListRcIncHelper = true }
+    | LIR.DictHeap -> { requirements with NeedsDictRcIncHelper = true }
+    | LIR.ClosureHeap -> { requirements with NeedsClosureRcIncHelper = true }
+    | LIR.GenericHeap
+    | LIR.StreamHeap -> requirements
+
+let private planFunctionArm64RcRequirements
+    (summaryCache: ReleasePlanSummaryCache option)
+    releasePlanSummaries
+    functionName
+    (facts: LIR.FunctionCodegenFacts)
+    =
+    let initialRequirements = {
+        precomputedEmptyRcHelperRequirements with
+            ReleasePlanSummaries = releasePlanSummaries
+    }
+    facts.RefCountDecRequirements
+    |> Map.fold
+        (fun requirements (kind, memoKey) metadata ->
+            collectPrecomputedRefCountDecRequirement
+                summaryCache
+                (callerOwnsSinglePayloadSum functionName)
+                requirements
+                (kind, memoKey, metadata))
+        initialRequirements
+    |> fun requirements ->
+        facts.RefCountIncRequirements
+        |> Set.fold collectPrecomputedRefCountIncRequirement requirements
+
+let private planRawSlotInitRetainTargets
+    (recordRegistry: LIR.RecordRegistry)
+    (sumShapeRegistry: ANF.RcSumShapeRegistry)
+    (facts: LIR.FunctionCodegenFacts)
+    : LIR.FunctionCodegenFacts =
+    let targets =
+        facts.RawSlotInitTypes
+        |> Set.toList
+        |> List.map (fun valueType ->
+            (valueType,
+             slotInitRootRetainTarget
+                 recordRegistry
+                 sumShapeRegistry
+                 valueType))
+        |> Map.ofList
+    { facts with Arm64RawSlotInitRetainTargets = Some targets }
+
+let private mergePrecomputedReleasePlanSummaries left right =
+    Map.fold
+        (fun acc key summary ->
+            match Map.tryFind key acc with
+            | Some existing when existing <> summary ->
+                Crash.crash "ARM64 release-plan summary mismatch"
+            | Some _ -> acc
+            | None -> Map.add key summary acc)
+        left
+        right
+
+let private mergePrecomputedRcHelperRequirements
+    (left: RcHelperRequirements)
+    (right: RcHelperRequirements)
+    : RcHelperRequirements =
+    {
+        ListDecHelperLabels = Set.union left.ListDecHelperLabels right.ListDecHelperLabels
+        PlannedListDecHelpers =
+            mergePrecomputedPlannedListHelpers left.PlannedListDecHelpers right.PlannedListDecHelpers
+        PlannedGenericDecHelpers =
+            mergePrecomputedPlannedGenericHelpers left.PlannedGenericDecHelpers right.PlannedGenericDecHelpers
+        PlannedDictDecHelpers =
+            mergePrecomputedPlannedDictHelpers left.PlannedDictDecHelpers right.PlannedDictDecHelpers
+        DictDecHelperLabels = Set.union left.DictDecHelperLabels right.DictDecHelperLabels
+        NeedsListRcIncHelper = left.NeedsListRcIncHelper || right.NeedsListRcIncHelper
+        NeedsDictRcIncHelper = left.NeedsDictRcIncHelper || right.NeedsDictRcIncHelper
+        NeedsClosureRcIncHelper = left.NeedsClosureRcIncHelper || right.NeedsClosureRcIncHelper
+        NeedsClosureRcDecHelper = left.NeedsClosureRcDecHelper || right.NeedsClosureRcDecHelper
+        NeedsStreamRcDecHelper = left.NeedsStreamRcDecHelper || right.NeedsStreamRcDecHelper
+        ReleasePlanSummaries =
+            mergePrecomputedReleasePlanSummaries left.ReleasePlanSummaries right.ReleasePlanSummaries
+    }
+
+/// Attach backend-specific helper planning to a compilation batch. Release
+/// plans shared by sibling functions are traversed once, while each function
+/// retains only its own semantic requirements for later tree-shaken unions.
+let attachARM64CodegenFactsToFunctionsWithCache
+    (summaryCache: ReleasePlanSummaryCache option)
+    (recordRegistry: LIR.RecordRegistry)
+    (sumShapeRegistry: ANF.RcSumShapeRegistry)
+    (functions: LIR.Function list)
+    : LIR.Function list =
+    functions
+    |> List.mapFold
+        (fun releasePlanSummaries func ->
+            let facts =
+                match func.CodegenFacts with
+                | Some facts -> facts
+                | None ->
+                    Crash.crash $"ARM64 metadata planning requires LIR facts for function '{func.Name}'"
+            let plannedSlotInitFacts =
+                planRawSlotInitRetainTargets
+                    recordRegistry
+                    sumShapeRegistry
+                    facts
+            let requirementsWithMemo =
+                planFunctionArm64RcRequirements
+                    summaryCache
+                    releasePlanSummaries
+                    func.Name
+                    plannedSlotInitFacts
+            let functionRequirements = {
+                requirementsWithMemo with
+                    ReleasePlanSummaries = Map.empty
+            }
+            let plannedFacts = {
+                plannedSlotInitFacts with
+                    Arm64RcHelperRequirements = Some functionRequirements
+            }
+            ({ func with CodegenFacts = Some plannedFacts },
+             requirementsWithMemo.ReleasePlanSummaries))
+        Map.empty
+    |> fst
+
+let attachARM64CodegenFactsToFunctions
+    (functions: LIR.Function list)
+    : LIR.Function list =
+    functions
+    |> attachARM64CodegenFactsToFunctionsWithCache None Map.empty Map.empty
+    |> List.map (fun func ->
+        let facts =
+            func.CodegenFacts
+            |> Option.map (fun facts ->
+                { facts with Arm64RawSlotInitRetainTargets = None })
+        { func with CodegenFacts = facts })
+
+let private outlineExpensiveGenericReleasesInFunction
+    (func: LIR.Function)
+    : LIR.Function =
+    let helperLabelsByMemoKey =
+        match func.CodegenFacts |> Option.bind (fun facts -> facts.Arm64RcHelperRequirements) with
+        | None ->
+            Crash.crash $"ARM64 generic release outlining requires helper facts for '{func.Name}'"
+        | Some requirements ->
+            requirements.PlannedGenericDecHelpers
+            |> Map.toList
+            |> List.collect (fun (label, spec) ->
+                spec.ReleasePlanMemoKeys
+                |> Set.toList
+                |> List.map (fun memoKey -> memoKey, label))
+            |> Map.ofList
+    if Map.isEmpty helperLabelsByMemoKey then
+        func
+    else
+        let outlineInstr instr =
+            match instr with
+            | LIR.RefCountDec (addr, _, LIR.GenericHeap, metadata) ->
+                match Map.tryFind (LIR.rcReleasePlanMemoKey metadata) helperLabelsByMemoKey with
+                | Some helperLabel ->
+                    [
+                        LIR.SaveRegs ([], [])
+                        LIR.ArgMoves [(LIR.X0, LIR.Reg addr)]
+                        // The physical destination declares that this effect has no
+                        // virtual result while retaining normal call liveness.
+                        LIR.Call (LIR.Physical LIR.X0, helperLabel, [LIR.Reg addr])
+                        LIR.RestoreRegs ([], [])
+                    ]
+                | _ ->
+                    [instr]
+            | _ ->
+                [instr]
+        let blocks =
+            func.CFG.Blocks
+            |> Map.map (fun _ block ->
+                { block with Instrs = List.collect outlineInstr block.Instrs })
+        { func with CFG = { func.CFG with Blocks = blocks } }
+
+/// Plan ARM64 helpers from finalized symbolic LIR, then expose expensive
+/// generic releases as ordinary calls before register allocation. Attached
+/// facts still describe the original release effects and survive allocation.
+let prepareARM64FunctionsForAllocationWithCache
+    (summaryCache: ReleasePlanSummaryCache option)
+    (phaseRecorder: (string -> float -> unit) option)
+    (recordRegistry: LIR.RecordRegistry)
+    (sumShapeRegistry: ANF.RcSumShapeRegistry)
+    (functions: LIR.Function list)
+    : LIR.Function list =
+    let recordPhase name (timer: System.Diagnostics.Stopwatch) =
+        match phaseRecorder with
+        | Some record ->
+            timer.Stop()
+            record name timer.Elapsed.TotalMilliseconds
+        | None -> ()
+    let factsTimer = System.Diagnostics.Stopwatch.StartNew()
+    let functionsWithFacts =
+        functions
+        |> attachARM64CodegenFactsToFunctionsWithCache
+            summaryCache
+            recordRegistry
+            sumShapeRegistry
+    recordPhase "ARM64 Function Facts Planning" factsTimer
+    let outliningTimer = System.Diagnostics.Stopwatch.StartNew()
+    let outlinedFunctions =
+        functionsWithFacts |> List.map outlineExpensiveGenericReleasesInFunction
+    recordPhase "ARM64 Generic Release Outlining" outliningTimer
+    outlinedFunctions
+
+let prepareARM64FunctionsForAllocation
+    (functions: LIR.Function list)
+    : LIR.Function list =
+    let functionsWithFacts = attachARM64CodegenFactsToFunctions functions
+    functionsWithFacts |> List.map outlineExpensiveGenericReleasesInFunction
+
+/// Explicit preparation entry point for tools that construct LIR directly.
+/// Production performs the same preparation before register allocation.
+let prepareARM64Program
+    (LIR.Program (functions, variants, records))
+    : LIR.Program =
+    let sumShapeRegistry = rcSumShapeRegistryFromVariantRegistry variants
+    let functionsWithFacts =
+        functions
+        |> List.map (fun func ->
+            match func.CodegenFacts with
+            | Some _ -> func
+            | None -> LIR.attachFunctionCodegenFacts func)
+        |> prepareARM64FunctionsForAllocationWithCache
+            None
+            None
+            records
+            sumShapeRegistry
+    LIR.Program (functionsWithFacts, variants, records)
+
+/// Convert LIR program to ARM64 instructions with options
+/// Caller-owned conversion cache. Program-wide helper and layout generation is
+/// intentionally outside this hook and is performed for every executable.
+type FunctionCodegenCache =
+    LIR.Function -> (unit -> Result<ARM64Symbolic.Instr list, string>) -> Result<ARM64Symbolic.Instr list, string>
+
+/// Caller-owned cache for summaries of reusable function groups. Group
+/// summaries form a monoid, so an executable can merge cached dependency and
+/// stdlib facts with the small fresh program fragment.
+type MetadataGroup = {
+    ContextIdentity: obj
+    Functions: LIR.Function list
+}
+
+type FunctionGroup = {
+    /// Must uniquely identify this exact ordered function sequence when reusable.
+    ContextIdentity: obj
+    ReusableAcrossCompilations: bool
+    Functions: LIR.Function list
+}
+
+type MetadataGroupCache =
+    obj
+        -> LIR.Function list
+        -> (unit -> Arm64ProgramMetadata)
+        -> Arm64ProgramMetadata
+
+[<NoComparison>]
+type HelperCacheKey = {
+    ClosurePayloadSizesFromParams: (string * int) list
+    ClosurePayloadSizesFromAllocs: (string * int) list
+    ClosureCaptureTypes: (string * AST.Type list) list
+    RecursiveReleaseTypes: AST.Type list
+    CliArgvHelperLabels: string list
+    NeedsCliExecuteHelper: bool
+    NeedsCliRunProcessHelper: bool
+    NeedsCliProcessLifecycleHelpers: bool
+    NeedsRuntimeErrorHelper: bool
+    ListDecHelperLabels: string list
+    PlannedListDecHelpers: (string * int) list
+    PlannedGenericDecHelperLabels: string list
+    PlannedDictDecHelperLabels: string list
+    DictDecHelperLabels: string list
+    NeedsListRcIncHelper: bool
+    NeedsDictRcIncHelper: bool
+    NeedsClosureRcIncHelper: bool
+    NeedsClosureRcDecHelper: bool
+    NeedsStreamRcDecHelper: bool
+}
+
+type HelperCodegenCache =
+    HelperCacheKey
+        -> (unit -> ARM64Symbolic.Instr list)
+        -> ARM64Symbolic.Instr list
+
+type GeneratedChunk = {
+    InstructionParts: ARM64Symbolic.Instr list list
+    ReusableAcrossCompilations: bool
+}
+
+type FunctionGroupCodegenCache =
+    obj
+        -> LIR.Function list
+        -> (unit -> Result<GeneratedChunk list, string>)
+        -> Result<GeneratedChunk list, string>
+
+type GeneratedProgram = private GeneratedProgram of GeneratedChunk list
+
+let generatedProgramChunks (GeneratedProgram chunks) : GeneratedChunk list = chunks
+
+let generatedProgramInstructions (GeneratedProgram chunks) : ARM64Symbolic.Instr list =
+    chunks
+    |> List.collect (fun chunk ->
+        chunk.InstructionParts |> List.collect id)
+
+let private generatePreparedARM64WithOptionsAndCache
+    (target: ARM64.TargetConfig)
+    (options: CodeGenOptions)
+    (preparedSumShapeRegistry: ANF.RcSumShapeRegistry option)
+    (functionCache: FunctionCodegenCache option)
+    (functionGroupCache: FunctionGroupCodegenCache option)
+    (functionGroups: FunctionGroup list)
+    (metadataGroupCache: MetadataGroupCache option)
+    (helperCache: HelperCodegenCache option)
+    (metadataGroups: MetadataGroup list)
+    (lirOpExpansionRecorder: LirOpExpansionRecorder option)
+    (phaseRecorder: (string -> float -> unit) option)
+    (program: LIR.Program)
+    : Result<GeneratedProgram, string> =
+    let startPhase () =
+        phaseRecorder |> Option.map (fun _ -> System.Diagnostics.Stopwatch.StartNew())
+    let recordPhase name timer =
+        match phaseRecorder, timer with
+        | Some record, Some (timer: System.Diagnostics.Stopwatch) ->
+            timer.Stop()
+            record name timer.Elapsed.TotalMilliseconds
+        | _ -> ()
+    let metadataTimer = startPhase ()
+    let (LIR.Program (functions, variantRegistry, recordRegistry)) = program
+    let registrySetupTimer = startPhase ()
+    let heapOverflowTrapBody = preparedHeapOverflowTrapBody target
+    let sumShapeRegistry =
+        preparedSumShapeRegistry
+        |> Option.defaultWith (fun () ->
+            rcSumShapeRegistryFromVariantRegistry variantRegistry)
+    recordPhase "ARM64 Metadata Registry Setup" registrySetupTimer
+    let functionInventoryTimer = startPhase ()
+    // Ensure _start is first (entry point)
+    let sortedFunctions =
+        match List.partition (fun (f: LIR.Function) -> f.Name = "_start") functions with
+        | startFunc :: _, otherFuncs -> startFunc :: otherFuncs
+        | [], _ -> functions  // No _start, keep original order
+    recordPhase "ARM64 Metadata Function Inventory" functionInventoryTimer
+
+    let unionLabelSets (sets: Set<string> list) : Set<string> =
+        match sets with
+        | [] -> Set.empty
+        | _ -> Set.unionMany sets
+
+    let listDecHelperDictDependencyLabels (helperLabel: string) : Set<string> =
+        if helperLabel = listRefCountDecDictListHelperLabel then
+            Set.singleton dictRefCountDecListValueHelperLabel
+        else
+            Set.empty
+
+    let summarizeReleasePlan = summarizePrecomputedReleasePlan
+
+    let emptyRcHelperRequirements = precomputedEmptyRcHelperRequirements
+
+    let emptyProgramMetadata = {
+        Facts = {
+            ClosurePayloadSizesFromParams = Map.empty
+            ClosurePayloadSizesFromAllocs = Map.empty
+            ClosureCaptureTypes = Map.empty
+            RecursiveReleaseTypes = Set.empty
+            CliArgvHelperLabels = Set.empty
+            NeedsCliExecuteHelper = false
+            NeedsCliRunProcessHelper = false
+            NeedsCliProcessLifecycleHelpers = false
+            NeedsRuntimeErrorHelper = false
+        }
+        RcHelperRequirements = emptyRcHelperRequirements
+    }
+
+    let hasRcHelperRequirements (requirements: RcHelperRequirements) =
+        not (Set.isEmpty requirements.ListDecHelperLabels)
+        || not (Map.isEmpty requirements.PlannedListDecHelpers)
+        || not (Map.isEmpty requirements.PlannedGenericDecHelpers)
+        || not (Map.isEmpty requirements.PlannedDictDecHelpers)
+        || not (Set.isEmpty requirements.DictDecHelperLabels)
+        || requirements.NeedsListRcIncHelper
+        || requirements.NeedsDictRcIncHelper
+        || requirements.NeedsClosureRcIncHelper
+        || requirements.NeedsClosureRcDecHelper
+        || requirements.NeedsStreamRcDecHelper
+        || not (Map.isEmpty requirements.ReleasePlanSummaries)
+
+    let contributesProgramMetadata (func: LIR.Function) =
+        let facts =
+            match func.CodegenFacts with
+            | Some facts -> facts
+            | None -> Crash.crash "ARM64 codegen invariant: missing validated function facts"
+        let contributesRcHelpers =
+            match facts.Arm64RcHelperRequirements with
+            | Some requirements -> hasRcHelperRequirements requirements
+            | None -> Crash.crash "ARM64 codegen invariant: missing validated RC helper requirements"
+        Option.isSome facts.ClosurePayloadSizeFromParams
+        || not (List.isEmpty facts.ClosurePayloadSizesFromAllocs)
+        || not (Set.isEmpty facts.RecursiveReleaseTypes)
+        || not (Set.isEmpty facts.RawSlotInitTypes)
+        || facts.NeedsCliArgvHelper
+        || facts.NeedsCliExecuteHelper
+        || facts.NeedsCliRunProcessHelper
+        || facts.NeedsCliProcessLifecycleHelpers
+        || facts.NeedsRuntimeErrorHelper
+        || contributesRcHelpers
+
+    let releasePlanSummary = precomputedReleasePlanSummary
+    let addReleasePlanRequirements = addPrecomputedReleasePlanRequirements
+
+    let collectRawSlotInitRequirement
+        (requirements: RcHelperRequirements)
+        (retainTarget: LIR.Arm64SlotInitRootRetainTarget option)
+        : RcHelperRequirements =
+        match retainTarget with
+        | Some LIR.SlotInitListRootRetain ->
+            { requirements with NeedsListRcIncHelper = true }
+        | Some LIR.SlotInitDictRootRetain ->
+            { requirements with NeedsDictRcIncHelper = true }
+        | Some LIR.SlotInitClosureRootRetain ->
+            { requirements with NeedsClosureRcIncHelper = true }
+        | Some LIR.SlotInitDynamicBufferRetain
+        | Some (LIR.SlotInitGenericRootRetain _)
+        | None ->
+            requirements
+
+    let collectFunctionMetadata
+        (metadata: Arm64ProgramMetadata)
+        ((func, facts): LIR.Function * LIR.FunctionCodegenFacts)
+        : Arm64ProgramMetadata =
+        let withClosureParams =
+            match facts.ClosurePayloadSizeFromParams with
+            | Some payloadSize ->
+                {
+                    metadata with
+                        Facts = {
+                            metadata.Facts with
+                                ClosurePayloadSizesFromParams =
+                                    Map.add
+                                        func.Name
+                                        payloadSize
+                                        metadata.Facts.ClosurePayloadSizesFromParams
+                        }
+                }
+            | None ->
+                metadata
+
+        let withClosureCaptures =
+            match facts.ClosureCaptureTypes with
+            | Some captures ->
+                {
+                    withClosureParams with
+                        Facts = {
+                            withClosureParams.Facts with
+                                ClosureCaptureTypes =
+                                    Map.add
+                                        func.Name
+                                        captures
+                                        withClosureParams.Facts.ClosureCaptureTypes
+                        }
+                }
+            | None ->
+                withClosureParams
+
+        let withAllocSizes =
+            facts.ClosurePayloadSizesFromAllocs
+            |> List.fold
+                (fun metadata (funcName, payloadSize) ->
+                    {
+                        metadata with
+                            Facts = {
+                                metadata.Facts with
+                                    ClosurePayloadSizesFromAllocs =
+                                        Map.add
+                                            funcName
+                                            payloadSize
+                                            metadata.Facts.ClosurePayloadSizesFromAllocs
+                            }
+                    })
+                withClosureCaptures
+
+        let requirements =
+            match facts.Arm64RcHelperRequirements with
+            | Some plannedRequirements ->
+                mergePrecomputedRcHelperRequirements
+                    withAllocSizes.RcHelperRequirements
+                    plannedRequirements
+            | None ->
+                Crash.crash "ARM64 codegen invariant: missing validated RC helper requirements"
+            |> fun requirements ->
+                match facts.Arm64RawSlotInitRetainTargets with
+                | Some targets ->
+                    targets
+                    |> Map.values
+                    |> Seq.fold collectRawSlotInitRequirement requirements
+                | None ->
+                    facts.RawSlotInitTypes
+                    |> Set.fold
+                        (fun current valueType ->
+                            slotInitRootRetainTarget
+                                recordRegistry
+                                sumShapeRegistry
+                                valueType
+                            |> collectRawSlotInitRequirement current)
+                        requirements
+
+        {
+            withAllocSizes with
+                Facts = {
+                    withAllocSizes.Facts with
+                        RecursiveReleaseTypes =
+                            Set.union
+                                withAllocSizes.Facts.RecursiveReleaseTypes
+                                facts.RecursiveReleaseTypes
+                        CliArgvHelperLabels =
+                            if facts.NeedsCliArgvHelper then
+                                Set.add
+                                    $"__dark_cli_argv_{func.Name}"
+                                    withAllocSizes.Facts.CliArgvHelperLabels
+                            else
+                                withAllocSizes.Facts.CliArgvHelperLabels
+                        NeedsCliExecuteHelper =
+                            withAllocSizes.Facts.NeedsCliExecuteHelper
+                            || facts.NeedsCliExecuteHelper
+                        NeedsCliRunProcessHelper =
+                            withAllocSizes.Facts.NeedsCliRunProcessHelper
+                            || facts.NeedsCliRunProcessHelper
+                        NeedsCliProcessLifecycleHelpers =
+                            withAllocSizes.Facts.NeedsCliProcessLifecycleHelpers
+                            || facts.NeedsCliProcessLifecycleHelpers
+                        NeedsRuntimeErrorHelper =
+                            withAllocSizes.Facts.NeedsRuntimeErrorHelper
+                            || facts.NeedsRuntimeErrorHelper
+                }
+                RcHelperRequirements = requirements
+        }
+
+    let finishMetadata (instructionMetadata: Arm64ProgramMetadata) =
+        let rcHelperRequirements =
+            instructionMetadata.Facts.ClosureCaptureTypes
+            |> Map.fold
+                (fun requirements _ captureTypes ->
+                    captureTypes
+                    |> List.fold
+                        (fun requirements captureType ->
+                            match tryRcReleasePlanOfType recordRegistry sumShapeRegistry captureType with
+                            | None -> requirements
+                            | Some releasePlan ->
+                                let summary, requirements =
+                                    releasePlanSummary
+                                        true
+                                        (LIR.StructuralReleasePlan (Some releasePlan))
+                                        releasePlan
+                                        requirements
+                                let withPlanRequirements = addReleasePlanRequirements summary requirements
+                                {
+                                    withPlanRequirements with
+                                        ListDecHelperLabels =
+                                            Set.union
+                                                withPlanRequirements.ListDecHelperLabels
+                                                summary.ListDecHelperLabels
+                                        DictDecHelperLabels =
+                                            Set.union
+                                                withPlanRequirements.DictDecHelperLabels
+                                                summary.DictDecHelperLabels
+                                })
+                        requirements)
+                instructionMetadata.RcHelperRequirements
+        { instructionMetadata with RcHelperRequirements = rcHelperRequirements }
+
+    let summarizeGroup (group: LIR.Function list) =
+        let summaryTimer = startPhase ()
+        // Retain source function order: map entries intentionally preserve the
+        // original last-writer-wins behavior for compiler-generated labels.
+        let summary =
+            group
+            |> List.map (fun func ->
+                let facts =
+                    match func.CodegenFacts with
+                    | Some facts -> facts
+                    | None -> Crash.crash "ARM64 codegen invariant: missing validated function facts"
+                (func, facts))
+            |> List.fold collectFunctionMetadata emptyProgramMetadata
+            |> finishMetadata
+        recordPhase "ARM64 Metadata Group Summarization" summaryTimer
+        summary
+
+    let mergeMaps left right =
+        Map.fold (fun result key value -> Map.add key value result) left right
+
+    let isEmptyMetadata (metadata: Arm64ProgramMetadata) =
+        Map.isEmpty metadata.Facts.ClosurePayloadSizesFromParams
+        && Map.isEmpty metadata.Facts.ClosurePayloadSizesFromAllocs
+        && Map.isEmpty metadata.Facts.ClosureCaptureTypes
+        && Set.isEmpty metadata.Facts.RecursiveReleaseTypes
+        && Set.isEmpty metadata.Facts.CliArgvHelperLabels
+        && not metadata.Facts.NeedsCliExecuteHelper
+        && not metadata.Facts.NeedsCliRunProcessHelper
+        && not metadata.Facts.NeedsCliProcessLifecycleHelpers
+        && not metadata.Facts.NeedsRuntimeErrorHelper
+        && not (hasRcHelperRequirements metadata.RcHelperRequirements)
+
+    let mergeMetadata
+        (left: Arm64ProgramMetadata)
+        (right: Arm64ProgramMetadata)
+        : Arm64ProgramMetadata =
+        if isEmptyMetadata left then
+            right
+        elif isEmptyMetadata right then
+            left
+        else
+            {
+            Facts = {
+                ClosurePayloadSizesFromParams =
+                    mergeMaps
+                        left.Facts.ClosurePayloadSizesFromParams
+                        right.Facts.ClosurePayloadSizesFromParams
+                ClosurePayloadSizesFromAllocs =
+                    mergeMaps
+                        left.Facts.ClosurePayloadSizesFromAllocs
+                        right.Facts.ClosurePayloadSizesFromAllocs
+                ClosureCaptureTypes =
+                    mergeMaps
+                        left.Facts.ClosureCaptureTypes
+                        right.Facts.ClosureCaptureTypes
+                RecursiveReleaseTypes =
+                    Set.union
+                        left.Facts.RecursiveReleaseTypes
+                        right.Facts.RecursiveReleaseTypes
+                CliArgvHelperLabels =
+                    Set.union
+                        left.Facts.CliArgvHelperLabels
+                        right.Facts.CliArgvHelperLabels
+                NeedsCliExecuteHelper =
+                    left.Facts.NeedsCliExecuteHelper
+                    || right.Facts.NeedsCliExecuteHelper
+                NeedsCliRunProcessHelper =
+                    left.Facts.NeedsCliRunProcessHelper
+                    || right.Facts.NeedsCliRunProcessHelper
+                NeedsCliProcessLifecycleHelpers =
+                    left.Facts.NeedsCliProcessLifecycleHelpers
+                    || right.Facts.NeedsCliProcessLifecycleHelpers
+                NeedsRuntimeErrorHelper =
+                    left.Facts.NeedsRuntimeErrorHelper
+                    || right.Facts.NeedsRuntimeErrorHelper
+            }
+            RcHelperRequirements =
+                mergePrecomputedRcHelperRequirements
+                    left.RcHelperRequirements
+                    right.RcHelperRequirements
+            }
+
+    let groupCompositionTimer = startPhase ()
+    let groups : MetadataGroup list =
+        match metadataGroups with
+        | [] ->
+            let identity = System.Object()
+            [{ ContextIdentity = identity
+               Functions = functions }]
+        | groups -> groups
+
+    let programMetadata =
+        groups
+        |> List.fold (fun metadata group ->
+            // Functions with no contribution are the identity element. Leaving
+            // them out makes cache keys reflect metadata semantics rather than
+            // incidental reachability, so overlapping stdlib subsets reuse the
+            // same immutable summary.
+            let contributingFunctions =
+                group.Functions |> List.filter contributesProgramMetadata
+            let groupMetadata =
+                match metadataGroupCache with
+                | Some cache ->
+                    cache
+                        group.ContextIdentity
+                        contributingFunctions
+                        (fun () -> summarizeGroup contributingFunctions)
+                | None ->
+                    summarizeGroup contributingFunctions
+            mergeMetadata metadata groupMetadata) emptyProgramMetadata
+    recordPhase "ARM64 Metadata Group Composition" groupCompositionTimer
+
+    let rcHelperRequirements = programMetadata.RcHelperRequirements
+    let needsCliExecuteHelper = programMetadata.Facts.NeedsCliExecuteHelper
+    let needsCliRunProcessHelper = programMetadata.Facts.NeedsCliRunProcessHelper
+    let needsCliProcessLifecycleHelpers = programMetadata.Facts.NeedsCliProcessLifecycleHelpers
+
+    let closurePayloadSizes =
+        Map.fold
+            (fun acc funcName payloadSize -> Map.add funcName payloadSize acc)
+            programMetadata.Facts.ClosurePayloadSizesFromParams
+            programMetadata.Facts.ClosurePayloadSizesFromAllocs
+
+    // StackSize and UsedCalleeSaved are set per-function in convertFunction.
+    let ctx = {
+        Target = target
+        Options = options
+        SumShapeRegistry = sumShapeRegistry
+        RecordRegistry = recordRegistry
+        RawSlotInitRetainTargets = None
+        ClosurePayloadSizes = closurePayloadSizes
+        ClosureCaptureTypes = programMetadata.Facts.ClosureCaptureTypes
+        FunctionName = ""
+        InstructionSite = ""
+        StackSize = 0
+        UsedCalleeSaved = []
+        HeapOverflowLabel = ""
+        RecordLirOpExpansion = lirOpExpansionRecorder
+    }
+
+    let plannedListDecHelpers = rcHelperRequirements.PlannedListDecHelpers
+
+    let plannedGenericDecHelpers =
+        rcHelperRequirements.PlannedGenericDecHelpers
+
+    let plannedDictDecHelpers = rcHelperRequirements.PlannedDictDecHelpers
+
+    recordPhase "ARM64 Codegen Metadata" metadataTimer
+
+    let convertCached func =
+        // Function chunks are closed by their epilogue (or _start exit), so
+        // peephole patterns cannot span into the next function's entry label.
+        // The compiler's fixed _start trampoline is reusable too: the changing
+        // user expression lives behind its __dark_compiler_program_entry call.
+        // Cache each finalized chunk and never rescan it per executable.
+        let generate () =
+            convertFunction heapOverflowTrapBody ctx func
+            |> Result.map peepholeOptimize
+        let reusableAcrossCompilations = Option.isSome functionCache
+        let converted =
+            match functionCache with
+            | Some cache when reusableAcrossCompilations -> cache func generate
+            | _ -> generate ()
+        converted
+        |> Result.map (fun instructions -> {
+            InstructionParts = [instructions]
+            ReusableAcrossCompilations = reusableAcrossCompilations
+        })
+
+    let functionTimer = startPhase ()
+    // Compilation assembly already knows the exact stdlib/program/dependency
+    // boundaries. Consume those ordered groups directly instead of rescanning
+    // every function to rediscover them during codegen.
+    let functionRuns : (FunctionGroup option * LIR.Function list) list =
+        match functionGroups with
+        | [] -> [ (None, sortedFunctions) ]
+        | groups ->
+            let groupedFunctions = groups |> List.collect (fun group -> group.Functions)
+            let orderMatches =
+                List.length groupedFunctions = List.length sortedFunctions
+                && List.forall2
+                    (fun left right -> obj.ReferenceEquals(left, right))
+                    groupedFunctions
+                    sortedFunctions
+            if not orderMatches then
+                Crash.crash "ARM64 codegen invariant: function groups do not match program order"
+            groups
+            |> List.map (fun group -> (Some group, group.Functions))
+
+    let convertRun (group: FunctionGroup option, runFunctions) =
+        let generate () =
+            ResultList.mapResults convertCached runFunctions
+            |> Result.map (fun chunks ->
+                match group, functionGroupCache, chunks with
+                | Some group, Some _, _ :: _ when group.ReusableAcrossCompilations ->
+                    // Retain the cached function instruction lists as separate
+                    // preparation parts. Emission can compose their already-
+                    // encoded templates once per reusable group without
+                    // re-encoding every fixed instruction in each group shape.
+                    [{
+                        InstructionParts =
+                            chunks
+                            |> List.collect (fun chunk -> chunk.InstructionParts)
+                        ReusableAcrossCompilations = true
+                    }]
+                | _ -> chunks)
+        match group, functionGroupCache with
+        | Some group, Some cache when group.ReusableAcrossCompilations ->
+            cache group.ContextIdentity runFunctions generate
+        | _ ->
+            generate ()
+
+    let convertedFunctionChunks =
+        ResultList.mapResults convertRun functionRuns
+        |> Result.map List.concat
+    recordPhase "ARM64 Codegen Functions" functionTimer
+
+    convertedFunctionChunks
+    |> Result.map (fun functionChunks ->
+        let functionChunks =
+            if needsCliProcessLifecycleHelpers && ARM64.targetOS target = Platform.Linux then
+                functionChunks
+                |> List.map (fun chunk ->
+                    let containsStartEpilogue =
+                        chunk.InstructionParts
+                        |> List.exists (List.contains (ARM64Symbolic.Label "_epilogue__start"))
+                    if containsStartEpilogue then
+                        { chunk with
+                            InstructionParts =
+                                chunk.InstructionParts
+                                |> List.map (List.collect (fun instr ->
+                                    if instr = ARM64Symbolic.Label "_epilogue__start" then
+                                        [instr; ARM64Symbolic.BL "__dark_cli_cleanup_processes"]
+                                    else
+                                        [instr]))
+                            ReusableAcrossCompilations = false }
+                    else
+                        chunk)
+            else
+                functionChunks
+        let helperTimer = startPhase ()
+        let generateHelperInstructions () =
+            // The helper cache key below completely describes helper planning
+            // as well as the emitted helper instructions. Keep the dependency
+            // closure inside the cache miss path so repeated executables do
+            // not rediscover an already-generated plan.
+            let helperMetadataTimer = startPhase ()
+            let listDecHelperDependencyLabels (helperLabel: string) : Set<string> =
+                match Map.tryFind helperLabel plannedListDecHelpers with
+                | Some (_, releasePlan) ->
+                    (summarizeReleasePlan false releasePlan).ListDecHelperLabels
+                    |> Set.remove helperLabel
+                | None ->
+                    Set.empty
+
+            let rec expandListDecHelperDependencies
+                (selectedLabels: Set<string>)
+                (pendingLabels: string list)
+                : Set<string> =
+                match pendingLabels with
+                | [] ->
+                    selectedLabels
+                | helperLabel :: rest ->
+                    let dependencyLabels =
+                        listDecHelperDependencyLabels helperLabel
+                        |> Set.filter (fun dependencyLabel ->
+                            not (Set.contains dependencyLabel selectedLabels))
+
+                    expandListDecHelperDependencies
+                        (Set.union selectedLabels dependencyLabels)
+                        (rest @ Set.toList dependencyLabels)
+
+            let neededListRcDecHelperLabels =
+                let calledLabels = rcHelperRequirements.ListDecHelperLabels
+                if Set.isEmpty calledLabels then
+                    Set.empty
+                else
+                    let rootLabels = Set.add listRefCountDecHelperLabel calledLabels
+                    expandListDecHelperDependencies rootLabels (Set.toList rootLabels)
+
+            let rec rcReleasePlanContains
+                (predicate: ANF.RcReleasePlan -> bool)
+                (releasePlan: ANF.RcReleasePlan)
+                : bool =
+                if predicate releasePlan then
+                    true
+                else
+                    match releasePlan with
+                    | ANF.RootRelease (_, _, ANF.FixedBlockPayloadRelease (_, fieldReleases))
+                    | ANF.RootRelease (_, _, ANF.BoxedSumPayloadRelease (_, fieldReleases, _))
+                    | ANF.RootRelease (_, _, ANF.ClosurePayloadRelease fieldReleases) ->
+                        fieldReleases
+                        |> List.exists (fun (ANF.FieldRelease (_, fieldReleasePlan)) ->
+                            rcReleasePlanContains predicate fieldReleasePlan)
+                    | ANF.RootRelease (_, _, ANF.DictPayloadRelease (keyRelease, valueRelease)) ->
+                        rcReleasePlanContains predicate keyRelease
+                        || rcReleasePlanContains predicate valueRelease
+                    | ANF.RootRelease (_, _, ANF.TaggedListPayloadRelease elementRelease) ->
+                        rcReleasePlanContains predicate elementRelease
+                    | _ ->
+                        false
+
+            let selectedPlannedListHelpersNeed predicate selectedLabels =
+                plannedListDecHelpers
+                |> Map.toList
+                |> List.exists (fun (helperLabel, (_, releasePlan)) ->
+                    Set.contains helperLabel selectedLabels
+                    && rcReleasePlanContains predicate releasePlan)
+
+            let selectedStaticListHelpersNeed
+                (directSpecNeed: ListRefCountDecHelperSpec -> bool)
+                (selectedLabels: Set<string>)
+                : bool =
+                listRefCountDecHelperSpecs
+                |> List.exists (fun spec ->
+                    Set.contains spec.Label selectedLabels
+                    && directSpecNeed spec)
+
+            let dictDecHelperDependencyLabels (helperLabel: string) : Set<string> =
+                match Map.tryFind helperLabel plannedDictDecHelpers with
+                | Some (ANF.RootRelease (_, ANF.DictHeap, ANF.DictPayloadRelease (_, valueRelease))) ->
+                    match valueRelease with
+                    | ANF.RootRelease (_, ANF.TaggedList, _) ->
+                        Set.singleton dictRefCountDecListValueHelperLabel
+                    | ANF.RootRelease (_, ANF.DictHeap, _) ->
+                        Set.singleton (dictDecHelperForReleasePlan valueRelease)
+                    | ANF.RootRelease (_, ANF.GenericHeap, _) ->
+                        Set.union
+                            (summarizeReleasePlan false valueRelease).ListDecHelperLabels
+                            (summarizeReleasePlan true valueRelease).DictDecHelperLabels
+                    | _ ->
+                        Set.empty
+                | Some other ->
+                    Crash.crash $"ARM64 planned dict dependency labels require a DictHeap release plan, got {other}"
+                | None ->
+                    match helperLabel with
+                    | label when label = dictRefCountDecListValueHelperLabel ->
+                        Set.singleton listRefCountDecHelperLabel
+                    | label when label = dictRefCountDecDictValueHelperLabel ->
+                        Set.singleton dictRefCountDecHelperLabel
+                    | label when label = dictRefCountDecDictListValueHelperLabel ->
+                        Set.singleton dictRefCountDecListValueHelperLabel
+                    | label when label = dictRefCountDecTupleStringListValueHelperLabel ->
+                        Set.singleton listRefCountDecHelperLabel
+                    | label when label = dictRefCountDecTupleStringListDictValueHelperLabel ->
+                        Set.ofList [ listRefCountDecHelperLabel; dictRefCountDecHelperLabel ]
+                    | _ ->
+                        Set.empty
+
+            let neededDictRcDecHelperLabels =
+                let listHelperDictLabels =
+                    neededListRcDecHelperLabels
+                    |> Set.toList
+                    |> List.map (fun helperLabel ->
+                        let staticLabels = listDecHelperDictDependencyLabels helperLabel
+                        let plannedLabels =
+                            plannedListDecHelpers
+                            |> Map.tryFind helperLabel
+                            |> Option.map (fun (_, releasePlan) ->
+                                (summarizeReleasePlan false releasePlan).DictDecHelperLabels)
+                            |> Option.defaultValue Set.empty
+                        Set.union staticLabels plannedLabels)
+                    |> unionLabelSets
+
+                let directLabels =
+                    rcHelperRequirements.DictDecHelperLabels
+                    |> Set.union listHelperDictLabels
+
+                let rec expandDependencies selectedLabels pendingLabels =
+                    match pendingLabels with
+                    | [] -> selectedLabels
+                    | helperLabel :: rest ->
+                        let dependencies =
+                            dictDecHelperDependencyLabels helperLabel
+                            |> Set.filter (fun dependency ->
+                                not (Set.contains dependency selectedLabels))
+                        expandDependencies
+                            (Set.union selectedLabels dependencies)
+                            (rest @ Set.toList dependencies)
+
+                expandDependencies directLabels (Set.toList directLabels)
+
+            let listRcDecHelperLabelsFromDictHelpers =
+                neededDictRcDecHelperLabels
+                |> Set.toList
+                |> List.map dictDecHelperDependencyLabels
+                |> unionLabelSets
+                |> Set.filter (fun label -> label = listRefCountDecHelperLabel)
+
+            let selectedListRcDecHelperLabels =
+                Set.union neededListRcDecHelperLabels listRcDecHelperLabelsFromDictHelpers
+
+            let needsDictRcDecHelper =
+                Set.contains dictRefCountDecHelperLabel neededDictRcDecHelperLabels
+            let needsDictRcDecListValueHelper =
+                Set.contains dictRefCountDecListValueHelperLabel neededDictRcDecHelperLabels
+            let needsDictRcDecDictValueHelper =
+                Set.contains dictRefCountDecDictValueHelperLabel neededDictRcDecHelperLabels
+            let needsDictRcDecDictListValueHelper =
+                Set.contains dictRefCountDecDictListValueHelperLabel neededDictRcDecHelperLabels
+            let needsDictRcDecTupleStringListValueHelper =
+                Set.contains dictRefCountDecTupleStringListValueHelperLabel neededDictRcDecHelperLabels
+            let needsDictRcDecTupleStringListDictValueHelper =
+                Set.contains dictRefCountDecTupleStringListDictValueHelperLabel neededDictRcDecHelperLabels
+            let needsDictRcDecSumStringValueHelper =
+                Set.contains dictRefCountDecSumStringValueHelperLabel neededDictRcDecHelperLabels
+
+            recordPhase "ARM64 Metadata Helper Planning" helperMetadataTimer
+
+            let helperSelectionTimer = startPhase ()
+            let selectedListHelpersNeedDictDecHelper =
+                selectedStaticListHelpersNeed
+                    (fun spec -> spec.ReleaseLeafDictPayload)
+                    selectedListRcDecHelperLabels
+                || selectedPlannedListHelpersNeed
+                    (function ANF.RootRelease (_, ANF.DictHeap, _) -> true | _ -> false)
+                    selectedListRcDecHelperLabels
+
+            let selectedListHelpersNeedClosureDecHelper =
+                selectedStaticListHelpersNeed
+                    (fun spec -> spec.ReleaseLeafClosurePayload)
+                    selectedListRcDecHelperLabels
+                || selectedPlannedListHelpersNeed
+                    (function ANF.RootRelease (_, ANF.ClosureHeap, _) -> true | _ -> false)
+                    selectedListRcDecHelperLabels
+
+            let plannedDictHelpersNeedClosureDecHelper =
+                plannedDictDecHelpers
+                |> Map.exists (fun _ releasePlan ->
+                    rcReleasePlanContains
+                        (function ANF.RootRelease (_, ANF.ClosureHeap, _) -> true | _ -> false)
+                        releasePlan)
+
+            let selectedListHelpersNeedStreamDecHelper =
+                selectedPlannedListHelpersNeed
+                    (function ANF.RootRelease (_, ANF.StreamHeap, _) -> true | _ -> false)
+                    selectedListRcDecHelperLabels
+
+            let plannedDictHelpersNeedStreamDecHelper =
+                plannedDictDecHelpers
+                |> Map.exists (fun _ releasePlan ->
+                    rcReleasePlanContains
+                        (function ANF.RootRelease (_, ANF.StreamHeap, _) -> true | _ -> false)
+                        releasePlan)
+
+            let needsClosureRcDecHelper = rcHelperRequirements.NeedsClosureRcDecHelper
+            let selectedClosureHelpersNeedStreamDecHelper =
+                if needsClosureRcDecHelper
+                   || selectedListHelpersNeedClosureDecHelper
+                   || plannedDictHelpersNeedClosureDecHelper then
+                    ctx.ClosureCaptureTypes
+                    |> Map.exists (fun _ captureTypes ->
+                        captureTypes
+                        |> List.exists (fun captureType ->
+                            tryRcReleasePlanOfType ctx.RecordRegistry ctx.SumShapeRegistry captureType
+                            |> Option.exists (rcReleasePlanContains
+                                (function ANF.RootRelease (_, ANF.StreamHeap, _) -> true | _ -> false))))
+                else
+                    false
+
+            let needsStreamRcDecHelper =
+                rcHelperRequirements.NeedsStreamRcDecHelper
+                || selectedListHelpersNeedStreamDecHelper
+                || plannedDictHelpersNeedStreamDecHelper
+                || selectedClosureHelpersNeedStreamDecHelper
+
+            let emitClosureRcDecHelper =
+                needsClosureRcDecHelper
+                || selectedListHelpersNeedClosureDecHelper
+                || plannedDictHelpersNeedClosureDecHelper
+                || needsStreamRcDecHelper
+
+            recordPhase "ARM64 Helper Selection" helperSelectionTimer
+            let listHelperTimer = startPhase ()
+            let listRcHelpers =
+                (if rcHelperRequirements.NeedsListRcIncHelper then generateListRefCountIncHelper () else [])
+                @ generateNeededListRefCountDecHelpers ctx selectedListRcDecHelperLabels plannedListDecHelpers
+            recordPhase "ARM64 Helper List Generation" listHelperTimer
+            let genericHelperTimer = startPhase ()
+            let genericRcHelpers =
+                plannedGenericDecHelpers
+                |> Map.toList
+                |> List.collect (fun (helperLabel, spec) ->
+                    let generate () =
+                        generatePlannedGenericRefCountDecHelper helperLabel spec ctx
+                        |> Ok
+                    let generated =
+                        match functionCache with
+                        | Some cache ->
+                            cache
+                                (plannedGenericRefCountDecHelperCacheKey helperLabel)
+                                generate
+                        | None ->
+                            generate ()
+                    match generated with
+                    | Ok instructions -> instructions
+                    | Error error ->
+                        Crash.crash
+                            $"ARM64 cached generic release helper generation failed for {helperLabel}: {error}")
+            recordPhase "ARM64 Helper Generic Release Generation" genericHelperTimer
+            let dictHelperTimer = startPhase ()
+            let dictRcHelpers =
+                (if rcHelperRequirements.NeedsDictRcIncHelper then generateDictRefCountIncHelper () else [])
+                @ (plannedDictDecHelpers
+                   |> Map.toList
+                   |> List.collect (fun (helperLabel, releasePlan) ->
+                       generatePlannedDictRefCountDecHelper helperLabel releasePlan ctx))
+                @ (if needsDictRcDecHelper || selectedListHelpersNeedDictDecHelper || not (Map.isEmpty plannedDictDecHelpers) then generateDictRefCountDecHelper dictRefCountDecHelperLabel false false false None false false None false false false ctx else [])
+                @ (if needsDictRcDecListValueHelper then generateDictRefCountDecHelper dictRefCountDecListValueHelperLabel false false true None false false None false false false ctx else [])
+                @ (if needsDictRcDecDictValueHelper then generateDictRefCountDecHelper dictRefCountDecDictValueHelperLabel false false false (Some dictRefCountDecHelperLabel) false false None false false false ctx else [])
+                @ (if needsDictRcDecDictListValueHelper then generateDictRefCountDecHelper dictRefCountDecDictListValueHelperLabel false false false (Some dictRefCountDecListValueHelperLabel) false false None false false false ctx else [])
+                @ (if needsDictRcDecTupleStringListValueHelper then generateDictRefCountDecHelper dictRefCountDecTupleStringListValueHelperLabel false false false None false false None true false false ctx else [])
+                @ (if needsDictRcDecTupleStringListDictValueHelper then generateDictRefCountDecHelper dictRefCountDecTupleStringListDictValueHelperLabel false false false None false false None false true false ctx else [])
+                @ (if needsDictRcDecSumStringValueHelper then generateDictRefCountDecHelper dictRefCountDecSumStringValueHelperLabel false false false None false false None false false true ctx else [])
+            recordPhase "ARM64 Helper Dict Generation" dictHelperTimer
+            let closureHelperTimer = startPhase ()
+            let closureRcHelpers =
+                (if rcHelperRequirements.NeedsClosureRcIncHelper then generateClosureRefCountIncHelper ctx else [])
+                @ (if emitClosureRcDecHelper then generateClosureRefCountDecHelper dictDecHelperForReleasePlan ctx else [])
+            let streamRcHelpers =
+                if needsStreamRcDecHelper then generateStreamRefCountDecHelper ctx else []
+            recordPhase "ARM64 Helper Closure Stream Generation" closureHelperTimer
+            let recursiveHelperTimer = startPhase ()
+            let recursiveSumRcHelpers =
+                programMetadata.Facts.RecursiveReleaseTypes
+                |> Set.toList
+                |> List.collect (generateRecursiveSumRefCountDecHelper ctx)
+            recordPhase "ARM64 Helper Recursive Sum Generation" recursiveHelperTimer
+            let cliHelperTimer = startPhase ()
+            let cliArgvHelpers =
+                programMetadata.Facts.CliArgvHelperLabels
+                |> Set.toList
+                |> List.collect (generateCliArgvHelper ctx)
+            let cliHelpers =
+                cliArgvHelpers
+                @ (if needsCliProcessLifecycleHelpers && ARM64.targetOS target = Platform.Linux then generateLinuxCliSpawnProcessHelper () else [])
+                @ (if needsCliProcessLifecycleHelpers && ARM64.targetOS target = Platform.Linux then generateLinuxCliProcessLifecycleHelpers ctx else [])
+                @ (if needsCliRunProcessHelper && ARM64.targetOS target = Platform.Linux then generateLinuxCliRunProcessHelper () else [])
+                @ (if needsCliExecuteHelper && ARM64.targetOS target = Platform.Linux then generateLinuxCliExecuteHelper () else [])
+            recordPhase "ARM64 Helper CLI Generation" cliHelperTimer
+            let runtimeErrorHelper =
+                if programMetadata.Facts.NeedsRuntimeErrorHelper then
+                    generateRuntimeErrorHelper target
+                else
+                    []
+            let helperInstructions =
+                listRcHelpers
+                @ genericRcHelpers
+                @ dictRcHelpers
+                @ closureRcHelpers
+                @ streamRcHelpers
+                @ recursiveSumRcHelpers
+                @ cliHelpers
+                @ runtimeErrorHelper
+            let peepholeTimer = startPhase ()
+            let optimized = peepholeOptimize helperInstructions
+            recordPhase "ARM64 Codegen Peephole" peepholeTimer
+            optimized
+        let helperCacheKey = {
+            ClosurePayloadSizesFromParams =
+                programMetadata.Facts.ClosurePayloadSizesFromParams |> Map.toList
+            ClosurePayloadSizesFromAllocs =
+                programMetadata.Facts.ClosurePayloadSizesFromAllocs |> Map.toList
+            ClosureCaptureTypes =
+                programMetadata.Facts.ClosureCaptureTypes |> Map.toList
+            RecursiveReleaseTypes =
+                programMetadata.Facts.RecursiveReleaseTypes |> Set.toList
+            CliArgvHelperLabels =
+                programMetadata.Facts.CliArgvHelperLabels |> Set.toList
+            NeedsCliExecuteHelper = programMetadata.Facts.NeedsCliExecuteHelper
+            NeedsCliRunProcessHelper = programMetadata.Facts.NeedsCliRunProcessHelper
+            NeedsCliProcessLifecycleHelpers = programMetadata.Facts.NeedsCliProcessLifecycleHelpers
+            NeedsRuntimeErrorHelper = programMetadata.Facts.NeedsRuntimeErrorHelper
+            ListDecHelperLabels = rcHelperRequirements.ListDecHelperLabels |> Set.toList
+            PlannedListDecHelpers =
+                rcHelperRequirements.PlannedListDecHelpers
+                |> Map.toList
+                |> List.map (fun (label, (payloadSize, _releasePlan)) ->
+                    (label, payloadSize))
+            PlannedGenericDecHelperLabels =
+                rcHelperRequirements.PlannedGenericDecHelpers |> Map.keys |> Seq.toList
+            PlannedDictDecHelperLabels =
+                rcHelperRequirements.PlannedDictDecHelpers |> Map.keys |> Seq.toList
+            DictDecHelperLabels = rcHelperRequirements.DictDecHelperLabels |> Set.toList
+            NeedsListRcIncHelper = rcHelperRequirements.NeedsListRcIncHelper
+            NeedsDictRcIncHelper = rcHelperRequirements.NeedsDictRcIncHelper
+            NeedsClosureRcIncHelper = rcHelperRequirements.NeedsClosureRcIncHelper
+            NeedsClosureRcDecHelper = rcHelperRequirements.NeedsClosureRcDecHelper
+            NeedsStreamRcDecHelper = rcHelperRequirements.NeedsStreamRcDecHelper
+        }
+        let optimizedHelperInstructions =
+            match helperCache with
+            | Some cache -> cache helperCacheKey generateHelperInstructions
+            | None -> generateHelperInstructions ()
+        recordPhase "ARM64 Codegen Helpers" helperTimer
+        let assemblyTimer = startPhase ()
+        let generated =
+            GeneratedProgram (
+                functionChunks
+                @ [{
+                    InstructionParts = [optimizedHelperInstructions]
+                    ReusableAcrossCompilations = Option.isSome helperCache
+                }])
+        recordPhase "ARM64 Codegen Assembly" assemblyTimer
+        generated)
+
+let generateARM64WithOptionsAndCaches
+    (target: ARM64.TargetConfig)
+    (options: CodeGenOptions)
+    (preparedSumShapeRegistry: ANF.RcSumShapeRegistry option)
+    (functionCache: FunctionCodegenCache option)
+    (functionGroupCache: FunctionGroupCodegenCache option)
+    (functionGroups: FunctionGroup list)
+    (metadataGroupCache: MetadataGroupCache option)
+    (helperCache: HelperCodegenCache option)
+    (metadataGroups: MetadataGroup list)
+    (lirOpExpansionRecorder: LirOpExpansionRecorder option)
+    (phaseRecorder: (string -> float -> unit) option)
+    (program: LIR.Program)
+    : Result<GeneratedProgram, string> =
+    let (LIR.Program (functions, _, _)) = program
+    let missingFacts =
+        functions
+        |> List.tryPick (fun func ->
+            match func.CodegenFacts with
+            | None ->
+                Some $"ARM64 codegen requires prepared LIR; function '{func.Name}' has no codegen facts"
+            | Some facts when Option.isNone facts.Arm64RcHelperRequirements ->
+                Some $"ARM64 codegen requires prepared LIR; function '{func.Name}' has no ARM64 helper plan"
+            | Some _ ->
+                None)
+    match missingFacts with
+    | Some error -> Error error
+    | None ->
+        generatePreparedARM64WithOptionsAndCache
+            target
+            options
+            preparedSumShapeRegistry
+            functionCache
+            functionGroupCache
+            functionGroups
+            metadataGroupCache
+            helperCache
+            metadataGroups
+            lirOpExpansionRecorder
+            phaseRecorder
+            program
+
+let generateARM64WithOptionsAndCache
+    (target: ARM64.TargetConfig)
+    (options: CodeGenOptions)
+    (functionCache: FunctionCodegenCache option)
+    (phaseRecorder: (string -> float -> unit) option)
+    (program: LIR.Program)
+    : Result<GeneratedProgram, string> =
+    generateARM64WithOptionsAndCaches
+        target
+        options
+        None
+        functionCache
+        None
+        []
+        None
+        None
+        []
+        None
+        phaseRecorder
+        program
+
+let generateARM64WithOptions (target: ARM64.TargetConfig) (options: CodeGenOptions) (program: LIR.Program) : Result<GeneratedProgram, string> =
+    generateARM64WithOptionsAndCache target options None None program
+
+/// Convert LIR program to ARM64 instructions (uses default options)
+let generateARM64 (target: ARM64.TargetConfig) (program: LIR.Program) : Result<GeneratedProgram, string> =
+    generateARM64WithOptions target defaultOptions program

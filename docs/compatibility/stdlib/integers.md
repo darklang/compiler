@@ -50,7 +50,7 @@ at operations and conversions that require them. Typed representation views
 are ownership-neutral, while newly computed fixed blocks are owned. `ANF.fs`
 classifies `Int` as a managed dynamic value and both 128-bit types as managed
 16-byte fixed blocks, including when nested in closures and heap shapes. Fixed-width
-shifts and arithmetic lower in `4_MIR_to_LIR.fs`; signed right shift is
+shifts and arithmetic lower in `MIR_to_LIR.fs`; signed right shift is
 arithmetic, unsigned right shift is logical, and counts use the interpreter's
 machine-width masks on both ARM64 and x86-64.
 

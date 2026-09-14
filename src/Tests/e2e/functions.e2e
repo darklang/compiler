@@ -174,7 +174,7 @@ funcX 5L = 9L
 // =====================================================
 // Return Type Fixpoint Computation (mutation #162)
 // =====================================================
-// These tests exercise the buildReturnTypeReg fixpoint algorithm in 3_ANF_to_MIR.fs
+// These tests exercise the buildReturnTypeReg fixpoint algorithm in ANF_to_MIR.fs
 // The algorithm iterates until the return type map stabilizes.
 // With mutation #162 (iterations + 1 -> iterations - 1), the iteration counter
 // goes negative instead of positive, but the algorithm still converges correctly

@@ -124,7 +124,7 @@ type CFG = {
 
 ### ANF to MIR Transformation
 
-Key transformations in `3_ANF_to_MIR.fs`:
+Key transformations in `ANF_to_MIR.fs`:
 
 1. **Let bindings** → MIR instructions
 2. **If expressions** → Branch + multiple blocks
@@ -201,7 +201,7 @@ type Instr =
 
 ### MIR to LIR Transformation
 
-Key transformations in `4_MIR_to_LIR.fs`:
+Key transformations in `MIR_to_LIR.fs`:
 
 1. **Operand constraints**: operations that require registers get explicit
    register operands before code generation
@@ -232,7 +232,7 @@ Key differences from older indexed LIR:
 ## Constant Pools
 
 Literal pools are defined in `LiteralPool.fs` and built during ARM64 resolution
-(`passes/arm64/7_Resolve.fs`). The x64 backend does not use them.
+(`backend/arm64/Resolve.fs`). The x64 backend does not use them.
 
 ### String Pool
 ```fsharp
@@ -286,11 +286,11 @@ according to the backend's calling convention and reserved-register rules.
 |------|---------|
 | `MIR.fs` | MIR types |
 | `LIR.fs` | LIR types |
-| `3_ANF_to_MIR.fs` | ANF → MIR |
-| `4_MIR_to_LIR.fs` | MIR → LIR |
-| `3.1_SSA_Construction.fs` | SSA form |
-| `3.5_MIR_Optimize.fs` | MIR optimizations |
-| `5_RegisterAllocation.fs` | Register allocation and phi resolution |
+| `ANF_to_MIR.fs` | ANF → MIR |
+| `MIR_to_LIR.fs` | MIR → LIR |
+| `SSA_Construction.fs` | SSA form |
+| `MIR_Optimize.fs` | MIR optimizations |
+| `RegisterAllocation.fs` | Register allocation and phi resolution |
 
 ## Example Pipeline
 
