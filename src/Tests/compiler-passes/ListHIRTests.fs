@@ -12,7 +12,7 @@ let private repeat = call "Stdlib.List.repeatUnsafe_i64" [AST.BigIntLiteral 3I; 
 let private bytes constant : ListRegion.AllocationBytes = { ConstantBytes = constant; RuntimeBuffers = Map.empty }
 let private runtimeBytes constant terms : ListRegion.AllocationBytes = { ConstantBytes = constant; RuntimeBuffers = Map.ofList terms }
 
-let private functions : AST_to_ANF.FunctionRegistry =
+let private functions : TypeRegistries.FunctionRegistry =
     Map.ofList [
         "mapCallback", AST.TFunction ([AST.TRawPtr; AST.TInt64], AST.TInt64)
         "foldCallback", AST.TFunction ([AST.TRawPtr; AST.TInt64; AST.TInt64], AST.TInt64)
@@ -22,8 +22,8 @@ let private functions : AST_to_ANF.FunctionRegistry =
     ]
 
 let private extract expression =
-    let infer types expr = AST_to_ANF.inferTypeCore Set.empty expr types Map.empty Map.empty functions Map.empty
-    ExtractListRegions.tryExtract (Set.ofList ["mapCallback"; "foldCallback"]) infer (fun expr -> AST_to_ANF.freeVars expr Set.empty) expression
+    let infer types expr = LoweringTypeInference.inferTypeCore Set.empty expr types Map.empty Map.empty functions Map.empty
+    ExtractListRegions.tryExtract (Set.ofList ["mapCallback"; "foldCallback"]) infer (fun expr -> ClosureAnalysis.freeVars expr Set.empty) expression
 
 let private checkBudget expression expected () =
     match extract expression with

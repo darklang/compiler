@@ -22,6 +22,12 @@ before splitting recursive dispatchers; use narrow typed callbacks for recursive
 expression handlers. Avoid generic helper collections and cross-file recursive
 module dependencies. File size is a review signal, not a partitioning rule.
 
+ANF expression lowering has typed recursion callbacks in
+`passes/anf/lowering/LoweringCallbacks.fs`. `Expressions.fs` ties the recursive
+entry points together; atom, ordinary-expression, and pattern handlers cannot
+depend on that driver. Pattern matching retains its cohesive recursive pattern
+compiler and source-order failure rendering in one larger module.
+
 ## Migration sequence
 
 1. Remove numeric filenames, group passes, and name driver diagnostics without

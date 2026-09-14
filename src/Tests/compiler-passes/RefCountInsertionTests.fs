@@ -881,7 +881,7 @@ let private rawSlotTransferTestFunction
     (usesValueAfterSlot: bool)
     : TypeContext * Function * TempId =
     let listType = AST.TList valueType
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("makeValue", AST.TFunction ([], valueType))
             ("observeValue", AST.TFunction ([valueType], AST.TUnit))
@@ -1058,7 +1058,7 @@ let testBranchLocalTempReuseUsesCurrentTypeContext () : TestResult =
 let testReturnedAggregateTransfersOwnedValueThroughAlias () : TestResult =
     let childType = AST.TTuple [AST.TInt64]
     let outerType = AST.TTuple [childType]
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("makeChild", AST.TFunction ([], childType))
             ("wrapChild", AST.TFunction ([], outerType))
@@ -1111,7 +1111,7 @@ let testReturnedAggregateTransfersOwnedValueThroughAlias () : TestResult =
 let testReturnedAggregateTransfersOwnedValueThroughTypedAlias () : TestResult =
     let childType = AST.TTuple [AST.TInt64]
     let outerType = AST.TTuple [childType]
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("makeChild", AST.TFunction ([], childType))
             ("wrapChild", AST.TFunction ([], outerType))
@@ -1164,7 +1164,7 @@ let testReturnedAggregateTransfersOwnedValueThroughTypedAlias () : TestResult =
 let testReturnedAggregateRetainsOwnershipProducingStreamAlias () : TestResult =
     let streamType = AST.TStream AST.TInt64
     let outerType = AST.TTuple [streamType]
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("wrapStream", AST.TFunction ([], outerType))
         ]
@@ -1214,7 +1214,7 @@ let testReturnedAggregateRetainsOwnershipProducingStreamAlias () : TestResult =
 let testReturnedAggregateTransfersOwnedValueAfterBorrowedUse () : TestResult =
     let childType = AST.TTuple [AST.TInt64]
     let outerType = AST.TTuple [childType; AST.TInt64]
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("makeChild", AST.TFunction ([], childType))
             ("inspectChild", AST.TFunction ([childType], AST.TInt64))
@@ -1273,7 +1273,7 @@ let testReturnedAggregateTransfersOwnedValueAfterBorrowedUse () : TestResult =
 let testExplicitReleaseBlocksLaterAggregateTransfer () : TestResult =
     let childType = AST.TTuple [AST.TInt64]
     let outerType = AST.TTuple [childType]
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("makeChild", AST.TFunction ([], childType))
             ("wrapChild", AST.TFunction ([], outerType))
@@ -1324,7 +1324,7 @@ let testExplicitReleaseBlocksLaterAggregateTransfer () : TestResult =
 let testReturnedAggregateTransfersOwnedValueAcrossBranches () : TestResult =
     let childType = AST.TTuple [AST.TInt64]
     let outerType = AST.TTuple [childType]
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("makeChild", AST.TFunction ([], childType))
             ("wrapChild", AST.TFunction ([AST.TBool], outerType))
@@ -1382,7 +1382,7 @@ let testReturnedAggregateTransfersOwnedValueAcrossBranches () : TestResult =
 let testReturnedAggregateRequiresEveryBranchToTransferOwnedValue () : TestResult =
     let childType = AST.TTuple [AST.TInt64]
     let outerType = AST.TTuple [childType]
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("makeChild", AST.TFunction ([], childType))
             ("wrapChild", AST.TFunction ([AST.TBool], outerType))
@@ -1444,7 +1444,7 @@ let testReturnedAggregateTransfersNestedOwnedAliases () : TestResult =
     let childType = AST.TTuple [AST.TInt64]
     let innerType = AST.TTuple [childType]
     let outerType = AST.TTuple [innerType]
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("makeChild", AST.TFunction ([], childType))
             ("wrapChild", AST.TFunction ([], outerType))
@@ -1513,7 +1513,7 @@ let testReturnedAggregateTransfersNestedOwnedAliases () : TestResult =
 let testReturnedAggregateDoesNotTransferDuplicatedAliases () : TestResult =
     let childType = AST.TTuple [AST.TInt64]
     let outerType = AST.TTuple [childType; childType]
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("makeChild", AST.TFunction ([], childType))
             ("duplicateChild", AST.TFunction ([], outerType))
@@ -1738,7 +1738,7 @@ let testAggregateSkipsRetainForConditionalStaticString () : TestResult =
         Ok ()
 
 let testNonSelfTailCallDoesNotLeaveDecAfterTailCall () : TestResult =
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("callee", AST.TFunction ([AST.TInt64], AST.TInt64))
             ("caller", AST.TFunction ([AST.TInt64], AST.TInt64))
@@ -1784,7 +1784,7 @@ let testNonSelfTailCallDoesNotLeaveDecAfterTailCall () : TestResult =
 
 let testAliasReturnMaterializesOwnershipEvenIfFunctionMarkedBorrowed () : TestResult =
     let nodeType = AST.TList AST.TInt64
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("Stdlib.List.__node2GetChild_i64", AST.TFunction ([nodeType; AST.TInt64], nodeType))
         ]
@@ -1832,7 +1832,7 @@ let testMapHelperAccumulatorReturnDoesNotRetainOwnedAccumulator () : TestResult 
     let mappedListType = AST.TList (AST.TFunction ([AST.TInt64], AST.TInt64))
     let mapperType = AST.TFunction ([AST.TInt64], AST.TFunction ([AST.TInt64], AST.TInt64))
     let helperName = "Stdlib.List.__mapHelper_i64_fn_i64_to_i64"
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             (helperName, AST.TFunction ([sourceListType; mapperType; mappedListType], mappedListType))
         ]
@@ -1877,7 +1877,7 @@ let testMapHelperSelfTailCallReleasesReplacedAccumulator () : TestResult =
     let helperName = "Stdlib.List.__mapHelper"
     let specializedHelperName = "Stdlib.List.__mapHelper_i64_fn_i64_to_i64"
     let pushBackName = "Stdlib.List.__pushBack_fn_i64_to_i64"
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             (helperName, AST.TFunction ([sourceListType; mapperType; mappedListType], mappedListType))
             (specializedHelperName, AST.TFunction ([sourceListType; mapperType; mappedListType], mappedListType))
@@ -1940,7 +1940,7 @@ let private testBorrowedProjectionRecursiveArgsAreRetained (recursiveCExpr: stri
     let resultType = AST.TTuple [state1Type; state2Type]
     let helperName = "loop"
     let roundName = "round"
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             (helperName, AST.TFunction ([state1Type; state2Type; AST.TInt64], resultType))
             (roundName, AST.TFunction ([state1Type; state2Type; AST.TInt64], resultType))
@@ -2012,7 +2012,7 @@ let testBorrowedProjectionAliasSelfRecursiveCallArgsAreRetained () : TestResult 
     let resultType = AST.TTuple [state1Type; state2Type]
     let helperName = "loop"
     let roundName = "round"
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             (helperName, AST.TFunction ([state1Type; state2Type; AST.TInt64], resultType))
             (roundName, AST.TFunction ([state1Type; state2Type; AST.TInt64], resultType))
@@ -2089,7 +2089,7 @@ let testBorrowedProjectionIfBranchSelfRecursiveCallArgsAreRetained () : TestResu
     let resultType = AST.TTuple [state1Type; state2Type]
     let helperName = "loop"
     let roundName = "round"
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             (helperName, AST.TFunction ([state1Type; state2Type; AST.TInt64], resultType))
             (roundName, AST.TFunction ([state1Type; state2Type; AST.TInt64], resultType))
@@ -2199,7 +2199,7 @@ let testBorrowedProjectionFromParameterSelfRecursiveCallStaysBorrowed () : TestR
     let childType = AST.TTuple [AST.TInt64]
     let parentType = AST.TTuple [childType]
     let helperName = "loop"
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             (helperName, AST.TFunction ([parentType; childType], childType))
         ]
@@ -2251,7 +2251,7 @@ let testMapHelperClosureProducingCallRetainsBorrowedSource () : TestResult =
     let mappedListType = AST.TList (AST.TFunction ([AST.TInt64], AST.TInt64))
     let mapperType = AST.TFunction ([AST.TInt64], AST.TFunction ([AST.TInt64], AST.TInt64))
     let helperName = "Stdlib.List.__mapHelper_i64_fn_i64_to_i64"
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             (helperName, AST.TFunction ([sourceListType; mapperType; mappedListType], mappedListType))
         ]
@@ -2300,7 +2300,7 @@ let testMapHelperClosureSourceToValueKeepsSourceBorrowed () : TestResult =
     let mappedListType = AST.TList AST.TInt64
     let mapperType = AST.TFunction ([AST.TFunction ([AST.TInt64], AST.TInt64)], AST.TInt64)
     let helperName = "Stdlib.List.__mapHelper_fn_i64_to_i64_i64"
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             (helperName, AST.TFunction ([sourceListType; mapperType; mappedListType], mappedListType))
         ]
@@ -2345,7 +2345,7 @@ let testClosurePushBackRetainsImmediateClosureCallResult () : TestResult =
     let makerType = AST.TFunction ([AST.TInt64], closureType)
     let listType = AST.TList closureType
     let pushBackName = "Stdlib.List.__pushBack_fn_i64_to_i64"
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("makeClosure", makerType)
             ("mappedClosure", closureType)
@@ -2400,7 +2400,7 @@ let testClosurePushBackRetainsImmediateClosureCallResult () : TestResult =
 
 let testBorrowedCallMaterializesOwnedLocal () : TestResult =
     let nodeType = AST.TList AST.TInt64
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("consumer", AST.TFunction ([nodeType; AST.TInt64], AST.TInt64))
             ("Stdlib.List.__node2GetChild_i64", AST.TFunction ([nodeType; AST.TInt64], nodeType))
@@ -2454,7 +2454,7 @@ let testBorrowedCallMaterializesOwnedLocal () : TestResult =
 
 let testReturnedBorrowedCallMaterializesOwnership () : TestResult =
     let nodeType = AST.TList AST.TInt64
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("project", AST.TFunction ([nodeType], nodeType))
             ("borrowChild", AST.TFunction ([nodeType], nodeType))
@@ -2497,7 +2497,7 @@ let testReturnedBorrowedCallMaterializesOwnership () : TestResult =
 
 let testCallReturningClosureGetsAutoDecAfterUse () : TestResult =
     let closureType = AST.TFunction ([AST.TInt64], AST.TInt64)
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("makeClosure", AST.TFunction ([], closureType))
         ]
@@ -2542,7 +2542,7 @@ let testCallReturningClosureGetsAutoDecAfterUse () : TestResult =
 let testClosureCallReturningClosureGetsAutoDecAfterUse () : TestResult =
     let returnedClosureType = AST.TFunction ([AST.TInt64], AST.TInt64)
     let makerClosureType = AST.TFunction ([AST.TInt64], returnedClosureType)
-    let funcReg : AST_to_ANF.FunctionRegistry =
+    let funcReg : TypeRegistries.FunctionRegistry =
         Map.ofList [
             ("makeClosure", makerClosureType)
             ("returnedClosure", returnedClosureType)

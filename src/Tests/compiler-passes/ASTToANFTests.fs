@@ -5,8 +5,23 @@
 
 module ASTToANFTests
 
+open LoweringPrimitives
+open TypeRegistries
+open SpecializationIdentity
+open TypeSubstitution
+open Monomorphization
+open InlineLambdas
+open ClosureAnalysis
+open ClosureComparisons
+open LiftExpressions
+open LiftFunctions
+open PrepareFunctions
+open LoweringOperators
+open LoweringTypeInference
+open LoweringAggregates
+open ANFContinuations
+open LoweringExpressions
 open AST_to_ANF
-
 type TestResult = Result<unit, string>
 
 let private emptyTypeReg : TypeRegistry = Map.empty

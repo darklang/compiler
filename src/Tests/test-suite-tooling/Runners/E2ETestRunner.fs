@@ -6,6 +6,22 @@ module TestDSL.E2ETestRunner
 
 open System
 open AST
+open LoweringPrimitives
+open TypeRegistries
+open SpecializationIdentity
+open TypeSubstitution
+open Monomorphization
+open InlineLambdas
+open ClosureAnalysis
+open ClosureComparisons
+open LiftExpressions
+open LiftFunctions
+open PrepareFunctions
+open LoweringOperators
+open LoweringTypeInference
+open LoweringAggregates
+open ANFContinuations
+open LoweringExpressions
 open AST_to_ANF
 open TestDSL.E2EFormat
 
@@ -224,7 +240,7 @@ type private PreamblePlan = {
     Analysis: CompilerLibrary.PreambleAnalysis option
     Specialization: SpecializationResult
     StdlibSpecs: Set<SpecKey>
-    ExternalTypeReg: AST_to_ANF.TypeRegistry
+    ExternalTypeReg: TypeRegistries.TypeRegistry
     ExternalVariantLookup: VariantLookup
 }
 
@@ -694,7 +710,7 @@ let private analyzePreambleWithReducedFunctionSet
             reducedProgram
         |> Result.mapError TypeChecking.typeErrorToString
         |> Result.map (fun (_programType, typedPreambleAst, preambleTypeCheckEnv) ->
-            let preambleGenericDefs = AST_to_ANF.extractGenericFuncDefs typedPreambleAst
+            let preambleGenericDefs = SpecializationIdentity.extractGenericFuncDefs typedPreambleAst
             {
                 TypedAST = typedPreambleAst
                 TypeCheckEnv = preambleTypeCheckEnv

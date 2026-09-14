@@ -53,9 +53,9 @@ let private parseOptimizationSource (source: string) : Result<AST.Program * bool
 
 let private convertTypedProgram (typedAst: AST.Program) : Result<AST_to_ANF.ConversionResult, string> =
     let moduleRegistry = Stdlib.buildModuleRegistry ()
-    let monomorphized = AST_to_ANF.monomorphize typedAst
-    let inlined = AST_to_ANF.inlineLambdasInProgram monomorphized
-    AST_to_ANF.liftLambdasInProgram Map.empty Map.empty Map.empty Map.empty inlined
+    let monomorphized = PrepareFunctions.monomorphize typedAst
+    let inlined = InlineLambdas.inlineLambdasInProgram monomorphized
+    LiftFunctions.liftLambdasInProgram Map.empty Map.empty Map.empty Map.empty inlined
     |> Result.bind (fun lifted ->
         AST_to_ANF.splitTopLevels lifted
         |> Result.bind (fun (typeDefs, functions, expr) ->
@@ -188,7 +188,7 @@ let getOptimizedMIR (stdlib: CompilerLibrary.StdlibResult) (source: string) : Re
                     let anfProgram = PrintInsertion.insertPrint functions mainExpr programType
 
                     // Convert to MIR
-                    match ANF_to_MIR.toMIR anfProgram typeMap Map.empty programType convResultOptimized.VariantLookup (AST_to_ANF.recordFieldsRegistry convResultOptimized.TypeReg) false externalReturnTypes with
+                    match ANF_to_MIR.toMIR anfProgram typeMap Map.empty programType convResultOptimized.VariantLookup (TypeRegistries.recordFieldsRegistry convResultOptimized.TypeReg) false externalReturnTypes with
                     | Error e -> Error $"MIR conversion error: {e}"
                     | Ok mirProgram ->
                         // SSA construction
@@ -231,7 +231,7 @@ let getOptimizedLIR (stdlib: CompilerLibrary.StdlibResult) (source: string) : Re
                     let anfProgram = PrintInsertion.insertPrint functions mainExpr programType
 
                     // Convert to MIR
-                    match ANF_to_MIR.toMIR anfProgram typeMap Map.empty programType convResultOptimized.VariantLookup (AST_to_ANF.recordFieldsRegistry convResultOptimized.TypeReg) false externalReturnTypes with
+                    match ANF_to_MIR.toMIR anfProgram typeMap Map.empty programType convResultOptimized.VariantLookup (TypeRegistries.recordFieldsRegistry convResultOptimized.TypeReg) false externalReturnTypes with
                     | Error e -> Error $"MIR conversion error: {e}"
                     | Ok mirProgram ->
                         // SSA construction and optimization

@@ -28,7 +28,8 @@ swap<String, Bool> ("hello", true)
 
 ### 3. Monomorphization Process
 
-The compiler performs monomorphization in `AST_to_ANF.fs`:
+The compiler performs monomorphization in `passes/preparation/Monomorphization.fs`,
+with identity, substitution, and program entry points in neighboring modules:
 
 1. **Collect generic definitions**: Find all functions with type parameters
 2. **Find instantiation sites**: Scan for `TypeApp` expressions (generic calls)

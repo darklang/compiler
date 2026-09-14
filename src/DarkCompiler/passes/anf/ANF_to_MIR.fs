@@ -42,7 +42,7 @@ let private mkRecordField (name: string) (typ: AST.Type) : MIR.RecordField =
 /// Build VariantRegistry from VariantLookup
 /// VariantLookup: variantName -> (typeName, typeParams, tagIndex, payloadType)
 /// VariantRegistry: typeName -> TypeVariants (with named record types)
-let buildVariantRegistry (variantLookup: AST_to_ANF.VariantLookup) : MIR.VariantRegistry =
+let buildVariantRegistry (variantLookup: LoweringPrimitives.VariantLookup) : MIR.VariantRegistry =
     let entries = variantLookup |> Map.toList
     let canonicalEntries =
         entries
@@ -1628,7 +1628,7 @@ let toMIR
     (typeMap: ANF.TypeMap)
     (typeReg: Map<string, (string * AST.Type) list>)
     (mainExprType: AST.Type)
-    (variantLookup: AST_to_ANF.VariantLookup)
+    (variantLookup: LoweringPrimitives.VariantLookup)
     (typeRegForRecords: Map<string, (string * AST.Type) list>)
     (enableCoverage: bool)
     (externalReturnTypes: Map<string, AST.Type>)
@@ -1707,7 +1707,7 @@ let private toMIRFunctionsOnlyInternal
     (program: ANF.Program)
     (typeMap: ANF.TypeMap)
     (typeReg: Map<string, (string * AST.Type) list>)
-    (variantLookup: AST_to_ANF.VariantLookup)
+    (variantLookup: LoweringPrimitives.VariantLookup)
     (typeRegForRecords: Map<string, (string * AST.Type) list>)
     (enableCoverage: bool)
     (externalReturnTypes: Map<string, AST.Type>)
@@ -1757,7 +1757,7 @@ let toMIRFunctionsOnly
     (program: ANF.Program)
     (typeMap: ANF.TypeMap)
     (typeReg: Map<string, (string * AST.Type) list>)
-    (variantLookup: AST_to_ANF.VariantLookup)
+    (variantLookup: LoweringPrimitives.VariantLookup)
     (typeRegForRecords: Map<string, (string * AST.Type) list>)
     (enableCoverage: bool)
     (externalReturnTypes: Map<string, AST.Type>)
@@ -1779,7 +1779,7 @@ let toMIRFunctionsOnlyWithTrace
     (program: ANF.Program)
     (typeMap: ANF.TypeMap)
     (typeReg: Map<string, (string * AST.Type) list>)
-    (variantLookup: AST_to_ANF.VariantLookup)
+    (variantLookup: LoweringPrimitives.VariantLookup)
     (typeRegForRecords: Map<string, (string * AST.Type) list>)
     (enableCoverage: bool)
     (externalReturnTypes: Map<string, AST.Type>)

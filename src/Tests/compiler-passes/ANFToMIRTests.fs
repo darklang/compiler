@@ -16,7 +16,7 @@ let testRawGetIntrinsicReturnTypeDoesNotDefaultToInt64 () : TestResult =
 
 let testBuildVariantRegistryRejectsInconsistentTypeParams () : TestResult =
     try
-        let variantLookup : AST_to_ANF.VariantLookup =
+        let variantLookup : LoweringPrimitives.VariantLookup =
             Map.empty
             |> Map.add "Some" ("Option", ["a"], 0, Some (AST.TVar "a"))
             |> Map.add "None" ("Option", [], 1, None)

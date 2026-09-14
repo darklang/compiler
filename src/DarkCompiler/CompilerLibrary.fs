@@ -557,7 +557,7 @@ let private mergeMirRegistryOverlay baseRegistry overlay =
 
 let private projectMirRegistryOverlay
     ((baseVariants, baseRecords): MIR.VariantRegistry * MIR.RecordRegistry)
-    (localVariantLookup: AST_to_ANF.VariantLookup)
+    (localVariantLookup: LoweringPrimitives.VariantLookup)
     (localRecordFields: Map<string, (string * AST.Type) list>)
     : MIR.VariantRegistry * MIR.RecordRegistry =
     let localVariants = ANF_to_MIR.buildVariantRegistry localVariantLookup
@@ -927,7 +927,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
     member internal _.ProjectMirRegistries
         (contextIdentity: obj)
         ((baseVariants, baseRecords): MIR.VariantRegistry * MIR.RecordRegistry)
-        (localVariantLookup: AST_to_ANF.VariantLookup)
+        (localVariantLookup: LoweringPrimitives.VariantLookup)
         (localRecordFields: Map<string, (string * AST.Type) list>)
         : MIR.VariantRegistry * MIR.RecordRegistry =
         let projectLocalOverlay () =
@@ -2220,12 +2220,12 @@ let private packageCatalogFunctionNames =
 /// This lets ordinary programs skip catalog specialization without changing
 /// the behavior of generic wrappers around the catalog API.
 let private buildPackageCatalogGenericCallers
-    (genericFuncDefs: AST_to_ANF.GenericFuncDefs)
+    (genericFuncDefs: SpecializationIdentity.GenericFuncDefs)
     : Set<string> =
     let callsByFunction =
         genericFuncDefs
         |> Map.map (fun _ definition ->
-            AST_to_ANF.collectCalledFunctions definition.Body)
+            Monomorphization.collectCalledFunctions definition.Body)
     let rec findFixedPoint callers =
         let targets = Set.union packageCatalogFunctionNames callers
         let next =
@@ -2243,13 +2243,13 @@ let private buildPackageCatalogGenericCallers
 type PipelineContext = {
     Target: Platform.Target
     TypeCheckEnv: TypeChecking.TypeCheckEnv
-    GenericFuncDefs: AST_to_ANF.GenericFuncDefs
-    SpecRegistry: AST_to_ANF.SpecRegistry
+    GenericFuncDefs: SpecializationIdentity.GenericFuncDefs
+    SpecRegistry: SpecializationIdentity.SpecRegistry
     Registries: AST_to_ANF.Registries
     BaseFuncNames: Set<string>
     LambdaLiftFuncParams: Map<string, (string * AST.Type) list>
-    LambdaLiftTypeReg: AST_to_ANF.TypeRegistry
-    LambdaLiftVariantLookup: AST_to_ANF.VariantLookup
+    LambdaLiftTypeReg: TypeRegistries.TypeRegistry
+    LambdaLiftVariantLookup: LoweringPrimitives.VariantLookup
     ProjectedMirRegistries: MIR.VariantRegistry * MIR.RecordRegistry
     ReturnTypes: Map<string, AST.Type>
     PackageCatalogGenericCallers: Set<string>
@@ -2258,14 +2258,14 @@ type PipelineContext = {
 let private buildContext
     (target: Platform.Target)
     (typeCheckEnv: TypeChecking.TypeCheckEnv)
-    (genericFuncDefs: AST_to_ANF.GenericFuncDefs)
-    (specRegistry: AST_to_ANF.SpecRegistry)
+    (genericFuncDefs: SpecializationIdentity.GenericFuncDefs)
+    (specRegistry: SpecializationIdentity.SpecRegistry)
     (registries: AST_to_ANF.Registries)
     (baseFuncNames: Set<string>)
     (returnTypes: Map<string, AST.Type>)
     : PipelineContext =
     let (lambdaLiftTypeReg, lambdaLiftVariantLookup) =
-        AST_to_ANF.prepareLambdaLiftBaseTypes
+        LiftFunctions.prepareLambdaLiftBaseTypes
             registries.TypeReg
             registries.VariantLookup
     {
@@ -2304,7 +2304,7 @@ type PreambleContext = {
 type PreambleAnalysis = {
     TypedAST: AST.Program
     TypeCheckEnv: TypeChecking.TypeCheckEnv
-    GenericFuncDefs: AST_to_ANF.GenericFuncDefs
+    GenericFuncDefs: SpecializationIdentity.GenericFuncDefs
 }
 
 /// Result of compiling stdlib - can be reused across compilations
@@ -2431,8 +2431,8 @@ let private emptyRegistries (moduleRegistry: AST.ModuleRegistry) : AST_to_ANF.Re
     }
 
 let private liftLambdasWithBase
-    (baseTypeReg: AST_to_ANF.TypeRegistry)
-    (baseVariantLookup: AST_to_ANF.VariantLookup)
+    (baseTypeReg: TypeRegistries.TypeRegistry)
+    (baseVariantLookup: LoweringPrimitives.VariantLookup)
     (baseFuncParams: Map<string, (string * AST.Type) list>)
     (baseFuncReturnTypes: Map<string, AST.Type>)
     (passTimingRecorder: PassTimingRecorder option)
@@ -2445,7 +2445,7 @@ let private liftLambdasWithBase
         recordPassTiming passTimingRecorder name timer.Elapsed.TotalMilliseconds
         result
     measure "AST -> ANF Preparation: Lambda Lifting" (fun () ->
-        AST_to_ANF.liftLambdasInProgram
+        LiftFunctions.liftLambdasInProgram
             baseTypeReg
             baseVariantLookup
             baseFuncParams
@@ -2453,31 +2453,31 @@ let private liftLambdasWithBase
             program)
 
 let private mergeSpecRegistries
-    (baseRegistry: AST_to_ANF.SpecRegistry)
-    (overlayRegistry: AST_to_ANF.SpecRegistry)
-    : AST_to_ANF.SpecRegistry =
+    (baseRegistry: SpecializationIdentity.SpecRegistry)
+    (overlayRegistry: SpecializationIdentity.SpecRegistry)
+    : SpecializationIdentity.SpecRegistry =
     Map.fold (fun acc key value -> Map.add key value acc) baseRegistry overlayRegistry
 
 let private collectLocalSpecs
-    (genericDefs: AST_to_ANF.GenericFuncDefs)
+    (genericDefs: SpecializationIdentity.GenericFuncDefs)
     (program: AST.Program)
-    : Set<AST_to_ANF.SpecKey> =
+    : Set<SpecializationIdentity.SpecKey> =
     let (AST.Program topLevels) = program
     let allSpecs =
         topLevels
         |> List.map (function
-            | AST.FunctionDef f when List.isEmpty f.TypeParams -> AST_to_ANF.collectTypeAppsFromFunc f
-            | AST.ValueDef valueDef -> AST_to_ANF.collectTypeApps (AST.valueDefBody valueDef)
-            | AST.Expression e -> AST_to_ANF.collectTypeApps e
+            | AST.FunctionDef f when List.isEmpty f.TypeParams -> Monomorphization.collectTypeAppsFromFunc f
+            | AST.ValueDef valueDef -> Monomorphization.collectTypeApps (AST.valueDefBody valueDef)
+            | AST.Expression e -> Monomorphization.collectTypeApps e
             | _ -> Set.empty)
         |> List.fold Set.union Set.empty
     allSpecs
     |> Set.filter (fun (funcName, _) -> Map.containsKey funcName genericDefs)
 
 type private MonomorphizationMode =
-    | Monomorphize of AST_to_ANF.GenericFuncDefs option
-    | ReplaceTypeApps of AST_to_ANF.SpecRegistry
-    | SpecializeLocalAndReplace of AST_to_ANF.SpecRegistry
+    | Monomorphize of SpecializationIdentity.GenericFuncDefs option
+    | ReplaceTypeApps of SpecializationIdentity.SpecRegistry
+    | SpecializeLocalAndReplace of SpecializationIdentity.SpecRegistry
 
 /// Materialize checked module values as one lexical binding per execution
 /// scope. This gives every reference ordinary value semantics through the
@@ -2509,14 +2509,14 @@ let private materializeProgramValues
                     if Set.contains name names then
                         eligible
                         |> List.fold (fun dependencies (candidate, _) ->
-                            if AST_to_ANF.varOccursInExpr candidate value then Set.add candidate dependencies
+                            if InlineLambdas.varOccursInExpr candidate value then Set.add candidate dependencies
                             else dependencies) names
                     else names) fixedPoint
             if Set.count next = Set.count fixedPoint then next else required next
         let direct =
             eligible
             |> List.fold (fun names (name, _) ->
-                if AST_to_ANF.varOccursInExpr name body then Set.add name names else names) Set.empty
+                if InlineLambdas.varOccursInExpr name body then Set.add name names else names) Set.empty
         let needed = required direct
         let selected = eligible |> List.filter (fun (name, _) -> Set.contains name needed)
         let rec orderByDependencies ordered remaining =
@@ -2530,7 +2530,7 @@ let private materializeProgramValues
                         remainingNames
                         |> Set.remove name
                         |> Set.forall (fun candidate ->
-                            not (AST_to_ANF.varOccursInExpr candidate value)))
+                            not (InlineLambdas.varOccursInExpr candidate value)))
                 match ready with
                 | [] ->
                     Crash.crash "Checked top-level values contain a cyclic materialization dependency"
@@ -2559,8 +2559,8 @@ let private materializeProgramValues
 
 let private prepareProgramForAnf
     (monomorphization: MonomorphizationMode)
-    (baseTypeReg: AST_to_ANF.TypeRegistry)
-    (baseVariantLookup: AST_to_ANF.VariantLookup)
+    (baseTypeReg: TypeRegistries.TypeRegistry)
+    (baseVariantLookup: LoweringPrimitives.VariantLookup)
     (baseFuncNames: Set<string>)
     (baseFuncParams: Map<string, (string * AST.Type) list>)
     (baseFuncReturnTypes: Map<string, AST.Type>)
@@ -2579,24 +2579,24 @@ let private prepareProgramForAnf
         measure "AST -> ANF Preparation: Monomorphization" (fun () ->
             match monomorphization with
             | Monomorphize None ->
-                Ok (AST_to_ANF.monomorphize program)
+                Ok (PrepareFunctions.monomorphize program)
             | Monomorphize (Some defs) ->
-                Ok (AST_to_ANF.monomorphizeWithExternalDefs defs program)
+                Ok (PrepareFunctions.monomorphizeWithExternalDefs defs program)
             | ReplaceTypeApps specRegistry ->
-                AST_to_ANF.replaceTypeAppsInProgramWithRegistry specRegistry program
+                Monomorphization.replaceTypeAppsInProgramWithRegistry specRegistry program
             | SpecializeLocalAndReplace specRegistry ->
-                let localGenericDefs = AST_to_ANF.extractGenericFuncDefs program
+                let localGenericDefs = SpecializationIdentity.extractGenericFuncDefs program
                 if Map.isEmpty localGenericDefs then
-                    AST_to_ANF.replaceTypeAppsInProgramWithRegistry specRegistry program
+                    Monomorphization.replaceTypeAppsInProgramWithRegistry specRegistry program
                 else
                     let localSpecs = collectLocalSpecs localGenericDefs program
-                    let specialization = AST_to_ANF.specializeFromSpecs localGenericDefs localSpecs
+                    let specialization = Monomorphization.specializeFromSpecs localGenericDefs localSpecs
                     let combinedSpecRegistry =
                         mergeSpecRegistries specRegistry specialization.SpecRegistry
                     let (AST.Program items) = program
                     let specializedTopLevels = specialization.SpecializedFuncs |> List.map AST.FunctionDef
                     let programWithSpecializations = AST.Program (specializedTopLevels @ items)
-                    AST_to_ANF.replaceTypeAppsInProgramWithRegistry combinedSpecRegistry programWithSpecializations)
+                    Monomorphization.replaceTypeAppsInProgramWithRegistry combinedSpecRegistry programWithSpecializations)
     match monomorphizedResult with
     | Error err -> Error err
     | Ok monomorphized ->
@@ -2608,12 +2608,12 @@ let private prepareProgramForAnf
                     |> List.choose (function AST.FunctionDef f -> Some f.Name | _ -> None)
                     |> Set.ofList
                 let knownFuncNames = Set.union baseFuncNames localFuncNames
-                AST_to_ANF.programNeedsLambdaLowering knownFuncNames monomorphized)
+                Monomorphization.programNeedsLambdaLowering knownFuncNames monomorphized)
         if needsLowering then
             measure "AST -> ANF Preparation: Lambda Lowering" (fun () ->
                 let inlined =
                     measure "AST -> ANF Preparation: Lambda Inlining" (fun () ->
-                        AST_to_ANF.inlineLambdasInProgram monomorphized)
+                        InlineLambdas.inlineLambdasInProgram monomorphized)
                 liftLambdasWithBase
                     baseTypeReg
                     baseVariantLookup
@@ -2691,7 +2691,7 @@ let private convertTypedDeclarations
         | Some context ->
             (context.LambdaLiftTypeReg, context.LambdaLiftVariantLookup)
         | None ->
-            AST_to_ANF.prepareLambdaLiftBaseTypes
+            LiftFunctions.prepareLambdaLiftBaseTypes
                 baseRegistries.TypeReg
                 baseRegistries.VariantLookup
     prepareProgramForAnf
@@ -2781,11 +2781,11 @@ let private convertTypedProgramToUserOnlyWithMode
                     Set.contains name localNames
                     || Set.contains name baseContext.BaseFuncNames
                 let rec materialize
-                    (specRegistry: AST_to_ANF.SpecRegistry)
+                    (specRegistry: SpecializationIdentity.SpecRegistry)
                     (localFunctionNames: Set<string>)
-                    (pendingSpecs: Set<AST_to_ANF.SpecKey>)
+                    (pendingSpecs: Set<SpecializationIdentity.SpecKey>)
                     (accFunctions: AST.FunctionDef list)
-                    : AST_to_ANF.SpecRegistry * AST.FunctionDef list =
+                    : SpecializationIdentity.SpecRegistry * AST.FunctionDef list =
                     let missingSpecs =
                         pendingSpecs
                         |> Set.filter (fun key -> not (Map.containsKey key specRegistry))
@@ -2793,7 +2793,7 @@ let private convertTypedProgramToUserOnlyWithMode
                         (specRegistry, accFunctions)
                     else
                         let specialization =
-                            AST_to_ANF.specializeFromSpecs baseContext.GenericFuncDefs missingSpecs
+                            Monomorphization.specializeFromSpecs baseContext.GenericFuncDefs missingSpecs
                         let combinedRegistry =
                             mergeSpecRegistries specRegistry specialization.SpecRegistry
                         let materializedTopLevels =
@@ -2979,7 +2979,7 @@ let analyzePreamble
             preambleAst
         |> Result.mapError (fun typeErr -> $"Preamble type error: {TypeChecking.typeErrorToString typeErr}")
         |> Result.map (fun (_programType, typedPreambleAst, preambleTypeCheckEnv) ->
-            let preambleGenericDefs = AST_to_ANF.extractGenericFuncDefs typedPreambleAst
+            let preambleGenericDefs = SpecializationIdentity.extractGenericFuncDefs typedPreambleAst
             {
                 TypedAST = typedPreambleAst
                 TypeCheckEnv = preambleTypeCheckEnv
@@ -3207,7 +3207,7 @@ let buildStdlibWithTrace
             Error msg
         | Ok (_, typedStdlib, typeCheckEnv) ->
             // Extract generic function definitions for on-demand monomorphization
-            let genericFuncDefs = AST_to_ANF.extractGenericFuncDefs typedStdlib
+            let genericFuncDefs = SpecializationIdentity.extractGenericFuncDefs typedStdlib
             // Build module registry once (reused across all compilations)
             let moduleRegistry = Stdlib.buildModuleRegistry ()
             match
@@ -3300,9 +3300,9 @@ let buildStdlib (target: Platform.Target) : Result<StdlibResult, string> =
 /// Build stdlib specializations for a spec set and merge them into the stdlib result
 let buildStdlibSpecializations
     (stdlib: StdlibResult)
-    (specs: Set<AST_to_ANF.SpecKey>)
-    (externalTypeReg: AST_to_ANF.TypeRegistry)
-    (externalVariantLookup: AST_to_ANF.VariantLookup)
+    (specs: Set<SpecializationIdentity.SpecKey>)
+    (externalTypeReg: TypeRegistries.TypeRegistry)
+    (externalVariantLookup: LoweringPrimitives.VariantLookup)
     (passTimingRecorder: PassTimingRecorder option)
     : Result<StdlibResult, string> =
     if Set.isEmpty specs then
@@ -3316,14 +3316,14 @@ let buildStdlibSpecializations
         let externalIndexedTypeReg =
             TypeChecking.indexTypeRegistry
                 materializationVariantLookup
-                (AST_to_ANF.recordTypeParamsRegistry externalTypeReg)
-                (AST_to_ANF.recordFieldsRegistry externalTypeReg)
+                (TypeRegistries.recordTypeParamsRegistry externalTypeReg)
+                (TypeRegistries.recordFieldsRegistry externalTypeReg)
         let materializationTypeReg =
             Map.fold
                 (fun acc name typeInfo -> Map.add name typeInfo acc)
                 stdlib.Context.TypeCheckEnv.IndexedTypeReg
                 externalIndexedTypeReg
-        let specialization = AST_to_ANF.specializeFromSpecs stdlib.Context.GenericFuncDefs specs
+        let specialization = Monomorphization.specializeFromSpecs stdlib.Context.GenericFuncDefs specs
         let initialCombinedSpecRegistry = mergeSpecRegistries stdlib.Context.SpecRegistry specialization.SpecRegistry
         let existingNames =
             stdlib.StdlibANFFunctions
@@ -3355,12 +3355,12 @@ let buildStdlibSpecializations
                         | _ -> None)
                 let helperSpecs =
                     initiallyMaterializedFunctions
-                    |> List.map AST_to_ANF.collectTypeAppsFromFunc
+                    |> List.map Monomorphization.collectTypeAppsFromFunc
                     |> List.fold Set.union Set.empty
                     |> Set.filter (fun (funcName, _) ->
                         Map.containsKey funcName stdlib.Context.GenericFuncDefs)
                 let helperSpecialization =
-                    AST_to_ANF.specializeFromSpecs stdlib.Context.GenericFuncDefs helperSpecs
+                    Monomorphization.specializeFromSpecs stdlib.Context.GenericFuncDefs helperSpecs
                 let combinedSpecRegistry =
                     mergeSpecRegistries initialCombinedSpecRegistry helperSpecialization.SpecRegistry
                 let materializedFunctions =
@@ -3411,7 +3411,7 @@ let buildStdlibSpecializations
                             SumTypeNames =
                                 Set.union
                                     registries.SumTypeNames
-                                    (AST_to_ANF.sumTypeNamesFromVariantLookup externalVariantLookup)
+                                    (LoweringPrimitives.sumTypeNamesFromVariantLookup externalVariantLookup)
                     }
                     let localReturnTypes = extractReturnTypes localRegistries.FuncReg
                     let varGen = ANF.VarGen 0
@@ -3467,7 +3467,7 @@ let buildStdlibSpecializations
                                 let lambdaLiftFuncParams =
                                     reserveBaseFunctionParams registries.FuncParams baseFuncNames
                                 let (lambdaLiftTypeReg, lambdaLiftVariantLookup) =
-                                    AST_to_ANF.prepareLambdaLiftBaseTypes
+                                    LiftFunctions.prepareLambdaLiftBaseTypes
                                         registries.TypeReg
                                         registries.VariantLookup
                                 let updatedContext = {
@@ -3662,13 +3662,13 @@ let private catalogFunction
         Recursion = None
     }
 
-let private collectProgramSpecs (program: AST.Program) : Set<AST_to_ANF.SpecKey> =
+let private collectProgramSpecs (program: AST.Program) : Set<SpecializationIdentity.SpecKey> =
     let (AST.Program topLevels) = program
     topLevels
     |> List.map (function
         | AST.FunctionDef func when List.isEmpty func.TypeParams ->
-            AST_to_ANF.collectTypeAppsFromFunc func
-        | AST.Expression expr -> AST_to_ANF.collectTypeApps expr
+            Monomorphization.collectTypeAppsFromFunc func
+        | AST.Expression expr -> Monomorphization.collectTypeApps expr
         | _ -> Set.empty)
     |> List.fold Set.union Set.empty
 
@@ -3676,9 +3676,9 @@ let private collectProgramCalls (program: AST.Program) : Set<string> =
     let (AST.Program topLevels) = program
     topLevels
     |> List.map (function
-        | AST.FunctionDef func -> AST_to_ANF.collectCalledFunctions func.Body
-        | AST.ValueDef valueDef -> AST_to_ANF.collectCalledFunctions (AST.valueDefBody valueDef)
-        | AST.Expression expr -> AST_to_ANF.collectCalledFunctions expr
+        | AST.FunctionDef func -> Monomorphization.collectCalledFunctions func.Body
+        | AST.ValueDef valueDef -> Monomorphization.collectCalledFunctions (AST.valueDefBody valueDef)
+        | AST.Expression expr -> Monomorphization.collectCalledFunctions expr
         | AST.TypeDef _ -> Set.empty)
     |> List.fold Set.union Set.empty
 
@@ -3705,7 +3705,7 @@ let private materializeReachablePackageValueCatalog
     let (PackageValueCatalog entries) = catalog
     validateDistinctCatalogHashes entries
     |> Result.bind (fun () ->
-        let localGenericDefs = AST_to_ANF.extractGenericFuncDefs typedProgram
+        let localGenericDefs = SpecializationIdentity.extractGenericFuncDefs typedProgram
         let genericDefs =
             Map.fold
                 (fun current name definition -> Map.add name definition current)
@@ -3714,7 +3714,7 @@ let private materializeReachablePackageValueCatalog
         let specialization =
             typedProgram
             |> collectProgramSpecs
-            |> AST_to_ANF.specializeFromSpecs genericDefs
+            |> Monomorphization.specializeFromSpecs genericDefs
         let requestedEvaluatorTypes =
             specialization.ExternalSpecs
             |> Set.toList
@@ -3724,7 +3724,7 @@ let private materializeReachablePackageValueCatalog
             |> Set.ofList
         let specializedCalls =
             specialization.SpecializedFuncs
-            |> List.map (fun func -> AST_to_ANF.collectCalledFunctions func.Body)
+            |> List.map (fun func -> Monomorphization.collectCalledFunctions func.Body)
             |> List.fold Set.union Set.empty
         let reachableCalls = Set.union (collectProgramCalls typedProgram) specializedCalls
         let needsFind = Set.contains "Builtin.pmFindValuesByValueType" reachableCalls
@@ -3807,7 +3807,7 @@ let private materializeReachablePackageValueCatalog
                     locationsBody
 
             let evaluatorFunction (resultType: AST.Type) =
-                let name = AST_to_ANF.specName "Builtin.pmEvaluateValue" [resultType]
+                let name = SpecializationIdentity.specName "Builtin.pmEvaluateValue" [resultType]
                 let cases =
                     reachableEntries
                     |> List.choose (fun entry ->
@@ -4506,7 +4506,7 @@ let buildPreambleContext
                 Error msg
             | Ok (_programType, typedPreambleAst, preambleTypeCheckEnv) ->
                 // Extract generic function definitions from preamble
-                let preambleGenericDefs = AST_to_ANF.extractGenericFuncDefs typedPreambleAst
+                let preambleGenericDefs = SpecializationIdentity.extractGenericFuncDefs typedPreambleAst
                 // Merge stdlib generics with preamble generics
                 let mergedGenericDefs = Map.fold (fun acc k v -> Map.add k v acc) stdlib.Context.GenericFuncDefs preambleGenericDefs
 
@@ -4611,7 +4611,7 @@ let buildPreambleContext
 let buildPreambleContextFromAnalysis
     (stdlib: StdlibResult)
     (analysis: PreambleAnalysis)
-    (specialization: AST_to_ANF.SpecializationResult)
+    (specialization: SpecializationIdentity.SpecializationResult)
     (sourceFile: string)
     (_funcLineMap: Map<string, int>)
     (passTimingRecorder: PassTimingRecorder option)

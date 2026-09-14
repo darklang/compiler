@@ -1,0 +1,1455 @@
+// ExpressionLowering.fs - Lower expressions while delegating recursive children through typed callbacks.
+
+module ExpressionLowering
+
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+open ANF
+open Output
+open LoweringPrimitives
+open TypeRegistries
+open SpecializationIdentity
+open TypeSubstitution
+open Monomorphization
+open InlineLambdas
+open ClosureAnalysis
+open ClosureComparisons
+open LiftExpressions
+open LiftFunctions
+open PrepareFunctions
+open LoweringOperators
+open LoweringTypeInference
+open LoweringAggregates
+open ANFContinuations
+open LoweringCallbacks
+
+let lowerExpression (toANFCore: ExpressionLowerer) (toAtomCore: AtomLowerer) (toANFBoundAtomCore: BoundAtomLowerer) (sumTypeNames: Set<string>) (inertScopes: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen) (env: VarEnv) (typeReg: TypeRegistry) (variantLookup: VariantLookup) (funcReg: FunctionRegistry) (moduleRegistry: AST.ModuleRegistry) : Result<ANF.AExpr * ANF.VarGen, string> =
+    match expr with
+    | AST.RecursiveLet _ -> Error "RecursiveLet must be lowered during lambda lifting"
+    | AST.DictLiteral (_, []) ->
+        Ok (ANF.Return (ANF.IntLiteral (ANF.Int64 0L)), varGen)
+    | AST.DictLiteral _ -> Error "Non-empty DictLiteral must be lowered during generic specialization"
+    | AST.BoundaryRender (renderer, value) ->
+        toANFCore sumTypeNames inertScopes value varGen env typeReg variantLookup funcReg moduleRegistry
+        |> Result.map (fun (valueExpr, varGen1) ->
+            let (renderedVar, varGen2) = ANF.freshVar varGen1
+            let renderedExpr =
+                bindReturns valueExpr (fun valueAtom ->
+                    ANF.Let (
+                        renderedVar,
+                        ANF.Call (renderer, [valueAtom]),
+                        ANF.Return (ANF.Var renderedVar)
+                    ))
+            (renderedExpr, varGen2))
+    | AST.RuntimeError message ->
+        let (runtimeErrorVar, varGen1) = ANF.freshVar varGen
+        Ok (ANF.Let (runtimeErrorVar, ANF.RuntimeError message, ANF.Return ANF.UnitLiteral), varGen1)
+    | AST.UnitLiteral ->
+        // Unit literal becomes return of unit value (represented as 0)
+        Ok (ANF.Return (ANF.UnitLiteral), varGen)
+
+    | AST.Int64Literal n ->
+        // Integer literal (default Int64)
+        Ok (ANF.Return (ANF.IntLiteral (ANF.Int64 n)), varGen)
+
+    | AST.Int128Literal n ->
+        let (resultVar, varGen1) = ANF.freshVar varGen
+        Ok (ANF.Let (resultVar, int128Construction n, ANF.Return (ANF.Var resultVar)), varGen1)
+
+    | AST.BigIntLiteral n ->
+        Ok (ANF.Return (ANF.StringLiteral (n.ToString())), varGen)
+
+    | AST.Int8Literal n ->
+        Ok (ANF.Return (ANF.IntLiteral (ANF.Int8 n)), varGen)
+
+    | AST.Int16Literal n ->
+        Ok (ANF.Return (ANF.IntLiteral (ANF.Int16 n)), varGen)
+
+    | AST.Int32Literal n ->
+        Ok (ANF.Return (ANF.IntLiteral (ANF.Int32 n)), varGen)
+
+    | AST.UInt8Literal n ->
+        Ok (ANF.Return (ANF.IntLiteral (ANF.UInt8 n)), varGen)
+
+    | AST.UInt16Literal n ->
+        Ok (ANF.Return (ANF.IntLiteral (ANF.UInt16 n)), varGen)
+
+    | AST.UInt32Literal n ->
+        Ok (ANF.Return (ANF.IntLiteral (ANF.UInt32 n)), varGen)
+
+    | AST.UInt64Literal n ->
+        Ok (ANF.Return (ANF.IntLiteral (ANF.UInt64 n)), varGen)
+
+    | AST.UInt128Literal n ->
+        let (resultVar, varGen1) = ANF.freshVar varGen
+        Ok (ANF.Let (resultVar, uint128Construction n, ANF.Return (ANF.Var resultVar)), varGen1)
+
+    | AST.BoolLiteral b ->
+        // Boolean literal becomes return
+        Ok (ANF.Return (ANF.BoolLiteral b), varGen)
+
+    | AST.StringLiteral s ->
+        // String literal becomes return
+        Ok (ANF.Return (ANF.StringLiteral (s.Normalize(System.Text.NormalizationForm.FormC))), varGen)
+
+    | AST.CharLiteral s ->
+        // Char literal becomes return (stored as string, same runtime representation)
+        Ok (ANF.Return (ANF.StringLiteral (s.Normalize(System.Text.NormalizationForm.FormC))), varGen)
+
+    | AST.FloatLiteral f ->
+        // Float literal becomes return
+        Ok (ANF.Return (ANF.FloatLiteral f), varGen)
+
+    | AST.Var name ->
+        if isBuiltinTestNanName name then
+            Ok (ANF.Return (ANF.FloatLiteral System.Double.NaN), varGen)
+        else if name = "Stdlib.Blob.empty" then
+            // Blob.empty shares the immortal empty dynamic-buffer literal.
+            Ok (ANF.Return (ANF.StringLiteral ""), varGen)
+        else if name = "Darklang.LanguageTools.PackageManager.PickContext.empty" then
+            toANFCore sumTypeNames inertScopes
+                (AST.RecordLiteral (
+                    AST.unresolvedRecordReference "Darklang.LanguageTools.PackageManager.PickContext" [],
+                    [("currentModule", AST.ListLiteral [])]
+                ))
+                varGen env typeReg variantLookup funcReg moduleRegistry
+        else if name = "Stdlib.List.empty" || name = "Stdlib.List.empty_v0" then
+            // The empty skew-list is the null pointer with tag zero.
+            Ok (ANF.Return (ANF.IntLiteral (ANF.Int64 0L)), varGen)
+        else
+            // Variable reference: look up in environment
+            match tryLookupResolved name env with
+            | Some ((tempId, _), _) -> Ok (ANF.Return (ANF.Var tempId), varGen)
+            | None ->
+                // Check if it's a module function (e.g., Stdlib.Int64.add)
+                match Stdlib.tryGetFunction moduleRegistry name with
+                | Some (_, resolvedName) ->
+                    let (closureId, varGen') = ANF.freshVar varGen
+                    let closureAlloc = ANF.ClosureAlloc (resolvedName, [])
+                    Ok (ANF.Let (closureId, closureAlloc, ANF.Return (ANF.Var closureId)), varGen')
+                | None ->
+                    // Check if it's a function reference (function name used as value)
+                    match tryLookupResolved name funcReg with
+                    | Some (_, resolvedName) ->
+                        let (closureId, varGen') = ANF.freshVar varGen
+                        let closureAlloc = ANF.ClosureAlloc (resolvedName, [])
+                        Ok (ANF.Let (closureId, closureAlloc, ANF.Return (ANF.Var closureId)), varGen')
+                    | None ->
+                        Error $"Undefined variable: {name}"
+
+    | AST.FuncRef name ->
+        // Explicit function reference - wrap in closure for uniform calling convention
+        let (closureId, varGen') = ANF.freshVar varGen
+        let closureAlloc = ANF.ClosureAlloc (name, [])
+        Ok (ANF.Let (closureId, closureAlloc, ANF.Return (ANF.Var closureId)), varGen')
+
+    | AST.Closure (funcName, captures) ->
+        // Closure: allocate closure tuple with function address and captured values
+        // Convert each capture expression to an atom
+        let rec convertCaptures (caps: AST.Expr list) (vg: ANF.VarGen) (acc: (ANF.Atom * (ANF.TempId * ANF.CExpr) list) list) =
+            match caps with
+            | [] -> Ok (List.rev acc, vg)
+            | AST.FuncRef funcName :: rest ->
+                convertCaptures rest vg ((ANF.FuncRef funcName, []) :: acc)
+            | cap :: rest ->
+                toAtomCore sumTypeNames inertScopes cap vg env typeReg variantLookup funcReg moduleRegistry
+                |> Result.bind (fun (capAtom, capBindings, vg') ->
+                    convertCaptures rest vg' ((capAtom, capBindings) :: acc))
+        convertCaptures captures varGen []
+        |> Result.map (fun (captureResults, varGen1) ->
+            let captureAtoms = captureResults |> List.map fst
+            let allBindings = captureResults |> List.collect snd
+            // Generate ClosureAlloc: allocate closure tuple
+            let (closureId, varGen2) = ANF.freshVar varGen1
+            let closureAlloc = ANF.ClosureAlloc (funcName, captureAtoms)
+            let finalExpr = ANF.Let (closureId, closureAlloc, ANF.Return (ANF.Var closureId))
+            let exprWithBindings = wrapBindings allBindings finalExpr
+            (exprWithBindings, varGen2))
+
+    | AST.Let (pattern, value, body) ->
+        // Evaluate the RHS in the incoming environment, then prepare every
+        // projection before exposing any binder to the continuation.
+        // Infer the type of the value for type-directed field lookup
+        let typeEnv = typeEnvFromVarEnv env
+        inferTypeCore sumTypeNames value typeEnv typeReg variantLookup funcReg moduleRegistry
+        |> Result.bind (fun valueType ->
+            if not (letPatternAcceptsType pattern valueType) then
+                // Type checking has replaced the continuation with the binding
+                // mismatch error. Preserve every RHS effect, then transition
+                // directly to that error without preparing any projection.
+                toANFCore sumTypeNames inertScopes value varGen env typeReg variantLookup funcReg moduleRegistry
+                |> Result.bind (fun (valueExpr, varGen1) ->
+                    toANFCore sumTypeNames inertScopes body varGen1 env typeReg variantLookup funcReg moduleRegistry
+                    |> Result.map (fun (failureExpr, varGen2) ->
+                        (bindReturns valueExpr (fun _ -> failureExpr), varGen2)))
+            else
+              let compileContinuation valueAtom valueBindings varGen1 =
+                match pattern with
+                | AST.LPVariable name ->
+                    let (bindingId, varGen2) = ANF.freshVar varGen1
+                    let env' = Map.add name (bindingId, valueType) env
+                    toANFCore sumTypeNames inertScopes body varGen2 env' typeReg variantLookup funcReg moduleRegistry
+                    |> Result.map (fun (bodyExpr, varGen3) ->
+                        let transition =
+                            ANF.Let (bindingId, ANF.Atom valueAtom, bodyExpr)
+                            |> wrapBindings valueBindings
+                        (transition, varGen3))
+                | AST.LPUnit | AST.LPWildcard ->
+                    toANFCore sumTypeNames inertScopes body varGen1 env typeReg variantLookup funcReg moduleRegistry
+                    |> Result.map (fun (bodyExpr, varGen2) ->
+                        (wrapBindings valueBindings bodyExpr, varGen2))
+                | AST.LPTuple _ ->
+                    let (rootId, varGen2) = ANF.freshVar varGen1
+                    lowerLetPatternBindings pattern (ANF.Var rootId) valueType env [] varGen2
+                    |> Result.bind (fun (env', patternBindingsRev, varGen3) ->
+                        toANFCore sumTypeNames inertScopes body varGen3 env' typeReg variantLookup funcReg moduleRegistry
+                        |> Result.map (fun (bodyExpr, varGen4) ->
+                            let transition =
+                                wrapBindings (List.rev patternBindingsRev) bodyExpr
+                                |> fun continuation -> ANF.Let (rootId, ANF.Atom valueAtom, continuation)
+                                |> wrapBindings valueBindings
+                            (transition, varGen4)))
+
+              // Try toAtom first; if it fails for complex expressions like Match, use toANF
+              match toAtomCore sumTypeNames inertScopes value varGen env typeReg variantLookup funcReg moduleRegistry with
+              | Ok (valueAtom, valueBindings, varGen1) ->
+                  compileContinuation valueAtom valueBindings varGen1
+              | Error _ ->
+                  // Complex expression (like Match) - compile with toANF and transform returns
+                  toANFCore sumTypeNames inertScopes value varGen env typeReg variantLookup funcReg moduleRegistry
+                  |> Result.bind (fun (valueExpr, varGen2) ->
+                      let (rootId, varGen3) = ANF.freshVar varGen2
+                      lowerLetPatternBindings pattern (ANF.Var rootId) valueType env [] varGen3
+                      |> Result.bind (fun (env', patternBindingsRev, varGen4) ->
+                          toANFCore sumTypeNames inertScopes body varGen4 env' typeReg variantLookup funcReg moduleRegistry
+                          |> Result.map (fun (bodyExpr, varGen5) ->
+                              let patternContinuation =
+                                  wrapBindings (List.rev patternBindingsRev) bodyExpr
+                              let rec transformReturns anfExpr =
+                                  match anfExpr with
+                                  | ANF.Return atom -> ANF.Let (rootId, ANF.Atom atom, patternContinuation)
+                                  | ANF.Jump _ -> anfExpr
+                                  | ANF.Join (parameter, continuation, entry) ->
+                                      ANF.Join (parameter, transformReturns continuation, transformReturns entry)
+                                  | ANF.Let (id, cexpr, rest) -> ANF.Let (id, cexpr, transformReturns rest)
+                                  | ANF.If (cond, thenBr, elseBr) ->
+                                      ANF.If (cond, transformReturns thenBr, transformReturns elseBr)
+                              (transformReturns valueExpr, varGen5)))))
+
+    | AST.UnaryOp (AST.Neg, innerExpr) ->
+        // Unary negation: use operand type to select float vs integer path
+        let typeEnv = typeEnvFromVarEnv env
+        inferTypeCore sumTypeNames innerExpr typeEnv typeReg variantLookup funcReg moduleRegistry
+        |> Result.bind (fun innerType ->
+            match innerType with
+            | AST.TFloat64 ->
+                match innerExpr with
+                | AST.FloatLiteral f ->
+                    // Constant-fold negative float literals at compile time
+                    Ok (ANF.Return (ANF.FloatLiteral (-f)), varGen)
+                | _ ->
+                    toAtomCore sumTypeNames inertScopes innerExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                    |> Result.map (fun (innerAtom, innerBindings, varGen1) ->
+                        let (tempVar, varGen2) = ANF.freshVar varGen1
+                        let cexpr = ANF.FloatNeg innerAtom
+                        let finalExpr = ANF.Let (tempVar, cexpr, ANF.Return (ANF.Var tempVar))
+                        let exprWithBindings = wrapBindings innerBindings finalExpr
+                        (exprWithBindings, varGen2))
+            | AST.TInt64 ->
+                match innerExpr with
+                | AST.Int64Literal n when n = System.Int64.MinValue ->
+                    // The lexer stores INT64_MIN as a sentinel for "9223372036854775808"
+                    // When negated, it should remain INT64_MIN (mathematically correct)
+                    Ok (ANF.Return (ANF.IntLiteral (ANF.Int64 System.Int64.MinValue)), varGen)
+                | _ ->
+                    let zeroExpr = AST.Int64Literal 0L
+                    toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+            | AST.TInt ->
+                toANFCore sumTypeNames inertScopes
+                    (AST.BinOp (AST.Sub, AST.BigIntLiteral System.Numerics.BigInteger.Zero, innerExpr))
+                    varGen env typeReg variantLookup funcReg moduleRegistry
+            | AST.TInt128 ->
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, AST.Int128Literal System.Int128.Zero, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+            | AST.TInt32 ->
+                let zeroExpr = AST.Int32Literal 0l
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+            | AST.TInt16 ->
+                let zeroExpr = AST.Int16Literal 0s
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+            | AST.TInt8 ->
+                let zeroExpr = AST.Int8Literal 0y
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+            | AST.TUInt64 ->
+                let zeroExpr = AST.UInt64Literal 0UL
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+            | AST.TUInt32 ->
+                let zeroExpr = AST.UInt32Literal 0ul
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+            | AST.TUInt16 ->
+                let zeroExpr = AST.UInt16Literal 0us
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+            | AST.TUInt8 ->
+                let zeroExpr = AST.UInt8Literal 0uy
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, zeroExpr, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+            | AST.TUInt128 ->
+                toANFCore sumTypeNames inertScopes (AST.BinOp (AST.Sub, AST.UInt128Literal System.UInt128.Zero, innerExpr)) varGen env typeReg variantLookup funcReg moduleRegistry
+            | _ ->
+                Error $"Negation requires numeric operand, got {innerType}")
+
+    | AST.UnaryOp (AST.Not, innerExpr) ->
+        // Boolean not: convert operand to atom and apply Not
+        toAtomCore sumTypeNames inertScopes innerExpr varGen env typeReg variantLookup funcReg moduleRegistry |> Result.map (fun (innerAtom, innerBindings, varGen1) ->
+            // Create unary op and bind to fresh variable
+            let (tempVar, varGen2) = ANF.freshVar varGen1
+            let cexpr = ANF.UnaryPrim (ANF.Not, innerAtom)
+
+            // Build the expression: innerBindings + let tempVar = op
+            let finalExpr = ANF.Let (tempVar, cexpr, ANF.Return (ANF.Var tempVar))
+            let exprWithBindings = wrapBindings innerBindings finalExpr
+
+            (exprWithBindings, varGen2))
+
+    | AST.UnaryOp (AST.BitNot, innerExpr) ->
+        let typeEnv = typeEnvFromVarEnv env
+        inferTypeCore sumTypeNames innerExpr typeEnv typeReg variantLookup funcReg moduleRegistry
+        |> Result.bind (fun innerType ->
+            toAtomCore sumTypeNames inertScopes innerExpr varGen env typeReg variantLookup funcReg moduleRegistry
+            |> Result.map (fun (innerAtom, innerBindings, varGen1) ->
+                let (tempVar, varGen2) = ANF.freshVar varGen1
+                let cexpr =
+                    match innerType with
+                    | AST.TInt -> ANF.Call ("Stdlib.Int.bitwiseNot", [innerAtom])
+                    | AST.TInt128 -> ANF.Call ("Stdlib.Int128.bitwiseNot", [innerAtom])
+                    | AST.TUInt128 -> ANF.Call ("Stdlib.UInt128.bitwiseNot", [innerAtom])
+                    | _ -> ANF.UnaryPrim (ANF.BitNot, innerAtom)
+                let finalExpr = ANF.Let (tempVar, cexpr, ANF.Return (ANF.Var tempVar))
+                (wrapBindings innerBindings finalExpr, varGen2)))
+
+    | AST.BinOp (op, left, right) ->
+        toANFBoundAtomCore sumTypeNames inertScopes left varGen env typeReg variantLookup funcReg moduleRegistry
+        |> Result.bind (fun (leftExpr, leftAtom, varGen1) ->
+            toANFBoundAtomCore sumTypeNames inertScopes right varGen1 env typeReg variantLookup funcReg moduleRegistry
+            |> Result.bind (fun (rightExpr, rightAtom, varGen2) ->
+                let typeEnv = typeEnvFromVarEnv env
+                let buildCoreExpr () : Result<ANF.AExpr * ANF.VarGen, string> =
+                    match op with
+                    | AST.Eq | AST.Neq ->
+                        // Infer type of left operand to check if structural comparison is needed
+                        match inferTypeCore sumTypeNames left typeEnv typeReg variantLookup funcReg moduleRegistry with
+                        | Ok operandType when isCompoundType operandType ->
+                            // Generate structural equality
+                            let (eqBindings, eqResultAtom, varGen3) =
+                                generateStructuralEquality leftAtom rightAtom operandType varGen2 typeReg variantLookup
+                            // For Neq, negate the result
+                            let (finalAtom, finalBindings, varGen4) =
+                                if op = AST.Neq then
+                                    let (negVar, vg) = ANF.freshVar varGen3
+                                    let negExpr = ANF.UnaryPrim (ANF.Not, eqResultAtom)
+                                    (ANF.Var negVar, eqBindings @ [(negVar, negExpr)], vg)
+                                else
+                                    (eqResultAtom, eqBindings, varGen3)
+                            Ok (wrapBindings finalBindings (ANF.Return finalAtom), varGen4)
+                        | Ok AST.TInt ->
+                            let (tempVar, varGen3) = ANF.freshVar varGen2
+                            let cexpr = ANF.Call ("Stdlib.Int.__equals", [leftAtom; rightAtom])
+                            let (finalAtom, finalBindings, varGen4) =
+                                if op = AST.Neq then
+                                    let (negVar, vg) = ANF.freshVar varGen3
+                                    let negExpr = ANF.UnaryPrim (ANF.Not, ANF.Var tempVar)
+                                    (ANF.Var negVar, [(tempVar, cexpr); (negVar, negExpr)], vg)
+                                else
+                                    (ANF.Var tempVar, [(tempVar, cexpr)], varGen3)
+                            Ok (wrapBindings finalBindings (ANF.Return finalAtom), varGen4)
+                        | Ok operandType when canonicalBufferKindForType operandType |> Option.isSome ->
+                            let (tempVar, varGen3) = ANF.freshVar varGen2
+                            let kind =
+                                canonicalBufferKindForType operandType
+                                |> Option.defaultWith (fun () -> Crash.crash $"Expected canonical buffer type, got {operandType}")
+                            let cexpr = ANF.CanonicalBufferEq (kind, leftAtom, rightAtom)
+                            // For Neq, negate the result
+                            let (finalAtom, finalBindings, varGen4) =
+                                if op = AST.Neq then
+                                    let (negVar, vg) = ANF.freshVar varGen3
+                                    let negExpr = ANF.UnaryPrim (ANF.Not, ANF.Var tempVar)
+                                    (ANF.Var negVar, [(tempVar, cexpr); (negVar, negExpr)], vg)
+                                else
+                                    (ANF.Var tempVar, [(tempVar, cexpr)], varGen3)
+                            Ok (wrapBindings finalBindings (ANF.Return finalAtom), varGen4)
+                        | (Ok AST.TInt128 as wideType)
+                        | (Ok AST.TUInt128 as wideType) ->
+                            let (tempVar, varGen3) = ANF.freshVar varGen2
+                            let equalsName =
+                                match wideType with
+                                | Ok AST.TInt128 -> "Stdlib.Int128.__equals"
+                                | Ok AST.TUInt128 -> "Stdlib.UInt128.__equals"
+                                | _ -> Crash.crash "128-bit equality dispatch lost its operand type"
+                            let cexpr = ANF.Call (equalsName, [leftAtom; rightAtom])
+                            let (finalAtom, finalBindings, varGen4) =
+                                if op = AST.Neq then
+                                    let (negVar, vg) = ANF.freshVar varGen3
+                                    (ANF.Var negVar, [(tempVar, cexpr); (negVar, ANF.UnaryPrim (ANF.Not, ANF.Var tempVar))], vg)
+                                else (ANF.Var tempVar, [(tempVar, cexpr)], varGen3)
+                            Ok (wrapBindings finalBindings (ANF.Return finalAtom), varGen4)
+                        | _ ->
+                            // Primitive type or type inference failed - use simple comparison
+                            let (tempVar, varGen3) = ANF.freshVar varGen2
+                            let cexpr = ANF.Prim (convertBinOp op, leftAtom, rightAtom)
+                            Ok (ANF.Let (tempVar, cexpr, ANF.Return (ANF.Var tempVar)), varGen3)
+                    | AST.StringConcat ->
+                        // Text concatenation is an NFC composition boundary.
+                        let (tempVar, varGen3) = ANF.freshVar varGen2
+                        let cexpr = ANF.Call ("Stdlib.String.__appendNormalized", [leftAtom; rightAtom])
+                        Ok (ANF.Let (tempVar, cexpr, ANF.Return (ANF.Var tempVar)), varGen3)
+                    // Arithmetic, bitwise, and comparison operators - use simple primitive
+                    | AST.Add | AST.Sub | AST.Mul | AST.Div | AST.Mod | AST.Pow
+                    | AST.Shl | AST.Shr | AST.BitAnd | AST.BitOr | AST.BitXor
+                    | AST.Lt | AST.Gt | AST.Lte | AST.Gte
+                    | AST.And | AST.Or ->
+                        let (tempVar, varGen3) = ANF.freshVar varGen2
+                        let cexpr =
+                            match inferTypeCore sumTypeNames left typeEnv typeReg variantLookup funcReg moduleRegistry with
+                            | Ok operandType ->
+                                match integerFunctionForBinOp operandType op with
+                                | Some funcName -> ANF.Call (funcName, [leftAtom; rightAtom])
+                                | None -> ANF.Prim (convertBinOp op, leftAtom, rightAtom)
+                            | _ -> ANF.Prim (convertBinOp op, leftAtom, rightAtom)
+                        Ok (ANF.Let (tempVar, cexpr, ANF.Return (ANF.Var tempVar)), varGen3)
+
+                buildCoreExpr ()
+                |> Result.map (fun (coreExpr, varGen3) ->
+                    let withRight = bindReturns rightExpr (fun _ -> coreExpr)
+                    let withLeft = bindReturns leftExpr (fun _ -> withRight)
+                    (withLeft, varGen3))))
+
+    | AST.If (cond, thenBranch, elseBranch) ->
+        // If expression: convert condition to atom, both branches to ANF
+        // Try toAtom first; if it fails for complex expressions like Match, use toANF
+        match toAtomCore sumTypeNames inertScopes cond varGen env typeReg variantLookup funcReg moduleRegistry with
+        | Ok (condAtom, condBindings, varGen1) ->
+            toANFCore sumTypeNames inertScopes thenBranch varGen1 env typeReg variantLookup funcReg moduleRegistry |> Result.bind (fun (thenExpr, varGen2) ->
+                toANFCore sumTypeNames inertScopes elseBranch varGen2 env typeReg variantLookup funcReg moduleRegistry |> Result.map (fun (elseExpr, varGen3) ->
+                    // Build the expression: condBindings + if condAtom then thenExpr else elseExpr
+                    let finalExpr = ANF.If (condAtom, thenExpr, elseExpr)
+                    let exprWithBindings = wrapBindings condBindings finalExpr
+                    (exprWithBindings, varGen3)))
+        | Error _ ->
+            // Complex condition (like Match) - compile with toANF and transform
+            // Create: let condTemp = <cond> in if condTemp then <then> else <else>
+            let (condTemp, varGen1) = ANF.freshVar varGen
+            toANFCore sumTypeNames inertScopes cond varGen1 env typeReg variantLookup funcReg moduleRegistry
+            |> Result.bind (fun (condExpr, varGen2) ->
+                toANFCore sumTypeNames inertScopes thenBranch varGen2 env typeReg variantLookup funcReg moduleRegistry
+                |> Result.bind (fun (thenExpr, varGen3) ->
+                    toANFCore sumTypeNames inertScopes elseBranch varGen3 env typeReg variantLookup funcReg moduleRegistry
+                    |> Result.map (fun (elseExpr, varGen4) ->
+                        // Transform: replace Returns in condExpr with Let + If
+                        let ifExpr = ANF.If (ANF.Var condTemp, thenExpr, elseExpr)
+                        let rec transformReturns expr =
+                            match expr with
+                            | ANF.Return atom -> ANF.Let (condTemp, ANF.Atom atom, ifExpr)
+                            | ANF.Jump _ -> expr
+                            | ANF.Join (parameter, continuation, entry) ->
+                                ANF.Join (parameter, transformReturns continuation, transformReturns entry)
+                            | ANF.Let (id, cexpr, rest) -> ANF.Let (id, cexpr, transformReturns rest)
+                            | ANF.If (c, t, e) -> ANF.If (c, transformReturns t, transformReturns e)
+                        (transformReturns condExpr, varGen4))))
+
+    | AST.Sequence (first, next) ->
+        // Preserve source order and let the final expression carry the value.
+        // bindReturns also prevents the tail from running after a failing head.
+        toANFCore sumTypeNames inertScopes first varGen env typeReg variantLookup funcReg moduleRegistry
+        |> Result.bind (fun (firstExpr, varGen1) ->
+            toANFCore sumTypeNames inertScopes next varGen1 env typeReg variantLookup funcReg moduleRegistry
+            |> Result.map (fun (nextExpr, varGen2) ->
+                (bindReturns firstExpr (fun _ -> nextExpr), varGen2)))
+
+    | AST.Call (funcName, args) when isBuiltinUnwrapName funcName ->
+        let argList = exprArgsToList args
+        match argList with
+        | [argExpr] ->
+            let typeEnv = typeEnvFromVarEnv env
+            inferTypeCore sumTypeNames argExpr typeEnv typeReg variantLookup funcReg moduleRegistry
+            |> Result.bind (fun argType ->
+                let lookupVariantInfo (expectedTypeName: string) (variantName: string) : Result<int * AST.Type option, string> =
+                    match Map.tryFind variantName variantLookup with
+                    | Some (typeName, _, tag, payloadTypeOpt) when typeName = expectedTypeName ->
+                        Ok (tag, payloadTypeOpt)
+                    | Some (typeName, _, _, _) ->
+                        Error $"Builtin.unwrap expected variant {variantName} in {expectedTypeName}, got {typeName}"
+                    | None ->
+                        Error $"Builtin.unwrap could not find variant tag for {expectedTypeName}.{variantName}"
+
+                let buildUnwrapExpr (successTag: int) (payloadType: AST.Type) (failureMessage: string) : Result<ANF.AExpr * ANF.VarGen, string> =
+                    toAtomCore sumTypeNames inertScopes argExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                    |> Result.map (fun (argAtom0, argBindings0, vg1) ->
+                        let (argAtom, argBindings, vg2) =
+                            match argAtom0 with
+                            | ANF.Var _ -> (argAtom0, argBindings0, vg1)
+                            | _ ->
+                                let (argVar, vg') = ANF.freshVar vg1
+                                (ANF.Var argVar, argBindings0 @ [(argVar, ANF.Atom argAtom0)], vg')
+
+                        let (tagVar, vg3) = ANF.freshVar vg2
+                        let (isSuccessVar, vg4) = ANF.freshVar vg3
+                        let tagBindings = [
+                            (tagVar, ANF.TupleGet (argAtom, 0))
+                            (isSuccessVar, ANF.Prim (ANF.Eq, ANF.Var tagVar, ANF.IntLiteral (ANF.Int64 (int64 successTag))))
+                        ]
+
+                        let normalizedPayloadType =
+                            if containsTypeVar payloadType then AST.TUnit else payloadType
+
+                        let (payloadVar, vg5) = ANF.freshVar vg4
+                        let (typedPayloadVar, vg6) = ANF.freshVar vg5
+                        let thenBranch =
+                            ANF.Let (
+                                payloadVar,
+                                ANF.TupleGet (argAtom, 1),
+                                ANF.Let (
+                                    typedPayloadVar,
+                                    ANF.TypedAtom (ANF.Var payloadVar, normalizedPayloadType),
+                                    ANF.Return (ANF.Var typedPayloadVar)
+                                )
+                            )
+
+                        let (printVar, vg7) = ANF.freshVar vg6
+                        let elseBranch =
+                            ANF.Let (
+                                printVar,
+                                ANF.RuntimeError failureMessage,
+                                ANF.Return ANF.UnitLiteral
+                            )
+
+                        let ifExpr = ANF.If (ANF.Var isSuccessVar, thenBranch, elseBranch)
+                        let finalExpr = wrapBindings (argBindings @ tagBindings) ifExpr
+                        (finalExpr, vg7))
+
+                match argType with
+                | AST.TSum ("Stdlib.Option.Option", [valueType]) ->
+                    lookupVariantInfo "Stdlib.Option.Option" "Some"
+                    |> Result.bind (fun (successTag, _) ->
+                        buildUnwrapExpr successTag valueType "Cannot unwrap None")
+                | AST.TSum ("Stdlib.Option.Option", []) ->
+                    lookupVariantInfo "Stdlib.Option.Option" "Some"
+                    |> Result.bind (fun (successTag, payloadTypeOpt) ->
+                        let payloadTypeResult =
+                            match argExpr with
+                            | AST.Constructor (_, "Some", Some payloadExpr) ->
+                                inferTypeCore sumTypeNames payloadExpr typeEnv typeReg variantLookup funcReg moduleRegistry
+                            | _ ->
+                                match payloadTypeOpt with
+                                | Some payloadType -> Ok payloadType
+                                | None -> Ok AST.TUnit
+                        payloadTypeResult
+                        |> Result.bind (fun payloadType ->
+                            buildUnwrapExpr successTag payloadType "Cannot unwrap None"))
+                | AST.TSum ("Stdlib.Result.Result", [okType; _]) ->
+                    lookupVariantInfo "Stdlib.Result.Result" "Ok"
+                    |> Result.bind (fun (successTag, _) ->
+                        let failureMessage =
+                            match argExpr with
+                            | AST.Constructor (_, "Error", Some payloadExpr) ->
+                                match unwrapErrorPayloadToString payloadExpr with
+                                | Some payloadText -> $"Cannot unwrap Error: {payloadText}"
+                                | None -> "Cannot unwrap Error"
+                            | _ ->
+                                "Cannot unwrap Error"
+                        buildUnwrapExpr successTag okType failureMessage)
+                | AST.TSum ("Stdlib.Result.Result", []) ->
+                    lookupVariantInfo "Stdlib.Result.Result" "Ok"
+                    |> Result.bind (fun (successTag, payloadTypeOpt) ->
+                        let payloadTypeResult =
+                            match argExpr with
+                            | AST.Constructor (_, "Ok", Some payloadExpr) ->
+                                inferTypeCore sumTypeNames payloadExpr typeEnv typeReg variantLookup funcReg moduleRegistry
+                            | _ ->
+                                match payloadTypeOpt with
+                                | Some payloadType -> Ok payloadType
+                                | None -> Ok AST.TUnit
+                        let failureMessage =
+                            match argExpr with
+                            | AST.Constructor (_, "Error", Some payloadExpr) ->
+                                match unwrapErrorPayloadToString payloadExpr with
+                                | Some payloadText -> $"Cannot unwrap Error: {payloadText}"
+                                | None -> "Cannot unwrap Error"
+                            | _ ->
+                                "Cannot unwrap Error"
+                        payloadTypeResult
+                        |> Result.bind (fun payloadType ->
+                            buildUnwrapExpr successTag payloadType failureMessage))
+                | _ ->
+                    Error $"Internal error: Builtin.unwrap should have been typechecked as Option/Result, got {typeToString argType}")
+        | _ ->
+            Error $"Internal error: Builtin.unwrap should have exactly 1 argument, got {List.length argList}"
+
+    | AST.Call (funcName, args) when isRuntimeFailureName funcName ->
+        let argList = exprArgsToList args
+        match argList with
+        | [messageExpr] ->
+            match unwrapErrorPayloadToString messageExpr with
+            | Some messageText ->
+                let fullMessage = $"Uncaught exception: {messageText}"
+                let (runtimeErrorVar, varGen1) = ANF.freshVar varGen
+                let runtimeErrorExpr = ANF.RuntimeError fullMessage
+                Ok (ANF.Let (runtimeErrorVar, runtimeErrorExpr, ANF.Return ANF.UnitLiteral), varGen1)
+            | None ->
+                toAtomCore sumTypeNames inertScopes messageExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                |> Result.map (fun (messageAtom, messageBindings, varGen1) ->
+                    let (fullMessageVar, varGen2) = ANF.freshVar varGen1
+                    let (runtimeErrorVar, varGen3) = ANF.freshVar varGen2
+                    let errorExpr =
+                        ANF.Let (
+                            fullMessageVar,
+                            ANF.StringConcat (ANF.StringLiteral "Uncaught exception: ", messageAtom),
+                            ANF.Let (
+                                runtimeErrorVar,
+                                ANF.RuntimeErrorString (ANF.Var fullMessageVar),
+                                ANF.Return ANF.UnitLiteral
+                            )
+                        )
+                    (wrapBindings messageBindings errorExpr, varGen3))
+        | _ ->
+            Error $"Internal error: {funcName} should have exactly 1 argument, got {List.length argList}"
+
+    | AST.Call (funcName, args) ->
+        // Function call: convert all arguments to atoms
+        // If an argument is a function reference, wrap it in a trivial closure for uniform calling convention
+        let argExprList = exprArgsToList args
+
+        let wrapFuncRefInClosure (argExpr: ANF.AExpr) (atom: ANF.Atom) (vg: ANF.VarGen) : ANF.AExpr * ANF.Atom * ANF.VarGen =
+            match atom with
+            | ANF.FuncRef fnName ->
+                // Function reference needs to be wrapped in a closure.
+                let (closureId, vg') = ANF.freshVar vg
+                let closureExpr = ANF.Let (closureId, ANF.ClosureAlloc (fnName, []), ANF.Return (ANF.Var closureId))
+                let wrappedExpr = bindReturns argExpr (fun _ -> closureExpr)
+                (wrappedExpr, ANF.Var closureId, vg')
+            | _ ->
+                (argExpr, atom, vg)
+
+        let rec convertArgs
+            (argExprs: AST.Expr list)
+            (vg: ANF.VarGen)
+            (accExprs: ANF.AExpr list)
+            (accAtoms: ANF.Atom list)
+            : Result<ANF.AExpr list * ANF.Atom list * ANF.VarGen, string> =
+            match argExprs with
+            | [] ->
+                Ok (List.rev accExprs, List.rev accAtoms, vg)
+            | arg :: rest ->
+                toANFBoundAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
+                |> Result.bind (fun (argExpr, argAtom, vg') ->
+                    // Wrap function references in closures for uniform calling convention.
+                    let (wrappedExpr, wrappedAtom, vg'') = wrapFuncRefInClosure argExpr argAtom vg'
+                    convertArgs rest vg'' (wrappedExpr :: accExprs) (wrappedAtom :: accAtoms))
+
+        // Regular function call (including module functions like Stdlib.Int64.add)
+        convertArgs argExprList varGen [] []
+        |> Result.bind (fun (argSetupExprs, argAtoms, varGen1) ->
+            // Bind call result to fresh variable
+            let (resultVar, varGen2) = ANF.freshVar varGen1
+            let withArgSetups (finalExpr: ANF.AExpr) =
+                List.foldBack
+                    (fun argExpr acc -> bindReturns argExpr (fun _ -> acc))
+                    argSetupExprs
+                    finalExpr
+            // Check if funcName is a variable (indirect call) or a defined function (direct call)
+            match Map.tryFind funcName env with
+            | Some (tempId, AST.TFunction (paramTypes, _)) ->
+                // Variable with function type - use closure call
+                // All function values are now closures (even non-capturing ones)
+                let normalizedArgAtoms = normalizeSyntheticNullaryArgAtoms paramTypes argExprList argAtoms
+                let callExpr = ANF.ClosureCall (ANF.Var tempId, normalizedArgAtoms)
+                let finalExpr = ANF.Let (resultVar, callExpr, ANF.Return (ANF.Var resultVar))
+                Ok (withArgSetups finalExpr, varGen2)
+            | Some (tempId, AST.TVar _) ->
+                // Higher-order generic values can remain unresolved (TVar) until
+                // surrounding inference finalizes concrete shapes.
+                let callExpr = ANF.ClosureCall (ANF.Var tempId, argAtoms)
+                let finalExpr = ANF.Let (resultVar, callExpr, ANF.Return (ANF.Var resultVar))
+                Ok (withArgSetups finalExpr, varGen2)
+            | Some (_, varType) ->
+                // Variable exists but is not a function type
+                Error $"Cannot call '{funcName}' - it has type {varType}, not a function type"
+            | None ->
+                // Resolved stdlib equality APIs lower to the representation
+                // operation at the AST boundary, including calls from stdlib.
+                match tryCanonicalBufferEqualityIntrinsic funcName argAtoms with
+                | Some intrinsicExpr ->
+                    let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
+                    Ok (withArgSetups finalExpr, varGen2)
+                | None ->
+                // Not a variable - check explicit presentation effects first.
+                match tryPresentationIntrinsic funcName argAtoms with
+                | Some intrinsicExpr ->
+                    let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
+                    Ok (withArgSetups finalExpr, varGen2)
+                | None ->
+                match tryCliIntrinsic funcName (normalizeNullaryIntrinsicArgs argAtoms) with
+                | Some intrinsicExpr ->
+                    let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
+                    Ok (withArgSetups finalExpr, varGen2)
+                | None ->
+                // Check if it's a file intrinsic.
+                match tryFileIntrinsic funcName argAtoms with
+                | Some intrinsicExpr ->
+                    let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
+                    Ok (withArgSetups finalExpr, varGen2)
+                | None ->
+                    // Check if it's a raw memory intrinsic
+                    match tryRawMemoryIntrinsic sumTypeNames funcName argAtoms with
+                    | Some intrinsicExpr ->
+                        // Raw memory intrinsic call
+                        let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
+                        Ok (withArgSetups finalExpr, varGen2)
+                    | None ->
+                    match tryCanonicalPrimitiveIntrinsic funcName argAtoms with
+                    | Some intrinsicExpr ->
+                        let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
+                        Ok (withArgSetups finalExpr, varGen2)
+                    | None ->
+                    // Check if it's a Float intrinsic
+                    match tryFloatIntrinsic funcName argAtoms with
+                    | Some intrinsicExpr ->
+                        // Float intrinsic call
+                        let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
+                        Ok (withArgSetups finalExpr, varGen2)
+                    | None ->
+                    // Check if it's a random intrinsic
+                    match tryRandomIntrinsic funcName argAtoms with
+                    | Some intrinsicExpr ->
+                        // Random intrinsic call
+                        let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
+                        Ok (withArgSetups finalExpr, varGen2)
+                    | None ->
+                    // Check if it's a DateTime intrinsic.
+                    match tryDateTimeIntrinsic funcName argAtoms with
+                    | Some intrinsicExpr ->
+                        // DateTime intrinsic call.
+                        let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
+                        Ok (withArgSetups finalExpr, varGen2)
+                    | None ->
+                    // Check if it's a defined function
+                    match Map.tryFind funcName funcReg with
+                    | Some (AST.TFunction (paramTypes, _)) ->
+                        // Direct call to defined function
+                        let normalizedArgAtoms = normalizeSyntheticNullaryArgAtoms paramTypes argExprList argAtoms
+                        let callExpr = ANF.Call (funcName, normalizedArgAtoms)
+                        let finalExpr = ANF.Let (resultVar, callExpr, ANF.Return (ANF.Var resultVar))
+                        Ok (withArgSetups finalExpr, varGen2)
+                    | Some _ ->
+                        // Preserve existing behavior for malformed registry entries.
+                        let callExpr = ANF.Call (funcName, argAtoms)
+                        let finalExpr = ANF.Let (resultVar, callExpr, ANF.Return (ANF.Var resultVar))
+                        Ok (withArgSetups finalExpr, varGen2)
+                    | None ->
+                        // Unknown function - could be error or forward reference
+                        // For now, assume it's a valid function (will fail at link time if not)
+                        let callExpr = ANF.Call (funcName, argAtoms)
+                        let finalExpr = ANF.Let (resultVar, callExpr, ANF.Return (ANF.Var resultVar))
+                        Ok (withArgSetups finalExpr, varGen2))
+
+    | AST.TypeApp (_funcName, _typeArgs, _args) ->
+        // Generic function call - not yet implemented
+        Error "Generic function calls not yet implemented"
+
+    | AST.TupleLiteral elements ->
+        // Convert all elements to bound atoms so tuple elements can include expressions
+        // that cannot be lowered directly with toAtom (for example Builtin.testRuntimeError).
+        let rec convertElements
+            (elems: AST.Expr list)
+            (vg: ANF.VarGen)
+            (accExprs: ANF.AExpr list)
+            (accAtoms: ANF.Atom list)
+            : Result<ANF.AExpr list * ANF.Atom list * ANF.VarGen, string> =
+            match elems with
+            | [] -> Ok (List.rev accExprs, List.rev accAtoms, vg)
+            | elem :: rest ->
+                toANFBoundAtomCore sumTypeNames inertScopes elem vg env typeReg variantLookup funcReg moduleRegistry
+                |> Result.bind (fun (elemExpr, elemAtom, vg') ->
+                    convertElements rest vg' (elemExpr :: accExprs) (elemAtom :: accAtoms))
+
+        convertElements elements varGen [] []
+        |> Result.map (fun (elemExprs, elemAtoms, varGen1) ->
+            // Create TupleAlloc and bind to fresh variable
+            let (resultVar, varGen2) = ANF.freshVar varGen1
+            let tupleExpr = ANF.TupleAlloc elemAtoms
+            let tupleAllocExpr = ANF.Let (resultVar, tupleExpr, ANF.Return (ANF.Var resultVar))
+            let exprWithSetups =
+                List.foldBack
+                    (fun elemExpr acc -> bindReturns elemExpr (fun _ -> acc))
+                    elemExprs
+                    tupleAllocExpr
+
+            (exprWithSetups, varGen2))
+
+    | AST.TupleAccess (tupleExpr, index) ->
+        // Convert tuple to atom and create TupleGet
+        toAtomCore sumTypeNames inertScopes tupleExpr varGen env typeReg variantLookup funcReg moduleRegistry
+        |> Result.map (fun (tupleAtom, tupleBindings, varGen1) ->
+            let (resultVar, varGen2) = ANF.freshVar varGen1
+            let getExpr = ANF.TupleGet (tupleAtom, index)
+            let finalExpr = ANF.Let (resultVar, getExpr, ANF.Return (ANF.Var resultVar))
+            let exprWithBindings = wrapBindings tupleBindings finalExpr
+
+            (exprWithBindings, varGen2))
+
+    | AST.RecordLiteral (reference, fields) ->
+        let typeName = reference.ResolvedTypeName
+        // Evaluate fields in source order, then place their already-computed atoms
+        // into the record's declaration-order layout.
+        let fieldOrder =
+            match Map.tryFind typeName typeReg with
+            | Some recordInfo -> recordInfo.Fields |> List.map fst
+            | None -> Crash.crash $"Record type '{typeName}' not found in typeReg"
+
+        let rec convertFields remaining vg acc =
+            match remaining with
+            | [] -> Ok (List.rev acc, vg)
+            | (fieldName, fieldExpr) :: rest ->
+                toANFBoundAtomCore sumTypeNames inertScopes fieldExpr vg env typeReg variantLookup funcReg moduleRegistry
+                |> Result.bind (fun (setupExpr, fieldAtom, vg') ->
+                    convertFields rest vg' ((fieldName, setupExpr, fieldAtom) :: acc))
+
+        convertFields fields varGen []
+        |> Result.map (fun (convertedFields, varGen1) ->
+            let atomByName =
+                convertedFields
+                |> List.map (fun (fieldName, _, atom) -> (fieldName, atom))
+                |> Map.ofList
+            let orderedAtoms =
+                fieldOrder
+                |> List.map (fun fieldName ->
+                    match Map.tryFind fieldName atomByName with
+                    | Some atom -> atom
+                    | None -> Crash.crash $"Record literal '{typeName}' is missing field '{fieldName}' after type checking")
+            let (resultVar, varGen2) = ANF.freshVar varGen1
+            let allocation =
+                ANF.Let (
+                    resultVar,
+                    ANF.RecordAlloc (recordDescriptor reference (Map.find typeName typeReg), orderedAtoms),
+                    ANF.Return (ANF.Var resultVar)
+                )
+            let withSourceOrderEvaluation =
+                convertedFields
+                |> List.map (fun (_, setupExpr, _) -> setupExpr)
+                |> List.foldBack (fun setupExpr body -> bindReturns setupExpr (fun _ -> body)) <| allocation
+            (withSourceOrderEvaluation, varGen2))
+
+    | AST.RecordUpdate (recordExpr, updates) ->
+        let typeEnv = typeEnvFromVarEnv env
+        inferTypeCore sumTypeNames recordExpr typeEnv typeReg variantLookup funcReg moduleRegistry
+        |> Result.bind (fun recordType ->
+            match recordType with
+            | AST.TRecord (typeName, typeArgs) ->
+                match Map.tryFind typeName typeReg with
+                | Some recordInfo ->
+                    let typeFields = recordInfo.Fields
+                    toANFBoundAtomCore sumTypeNames inertScopes recordExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                    |> Result.bind (fun (recordSetup, recordAtom, varGen1) ->
+                        let rec convertUpdates remaining vg acc =
+                            match remaining with
+                            | [] -> Ok (List.rev acc, vg)
+                            | (fieldName, updateExpr) :: rest ->
+                                toANFBoundAtomCore sumTypeNames inertScopes updateExpr vg env typeReg variantLookup funcReg moduleRegistry
+                                |> Result.bind (fun (setupExpr, updateAtom, vg') ->
+                                    convertUpdates rest vg' ((fieldName, setupExpr, updateAtom) :: acc))
+
+                        convertUpdates updates varGen1 []
+                        |> Result.map (fun (convertedUpdates, varGen2) ->
+                            let updatesByName =
+                                convertedUpdates
+                                |> List.map (fun (fieldName, _, atom) -> (fieldName, atom))
+                                |> Map.ofList
+
+                            let (fieldAtoms, projectionBindings, varGen3) =
+                                typeFields
+                                |> List.mapi (fun index (fieldName, _) -> (index, fieldName))
+                                |> List.fold (fun (atoms, bindings, vg) (index, fieldName) ->
+                                    match Map.tryFind fieldName updatesByName with
+                                    | Some atom -> (atom :: atoms, bindings, vg)
+                                    | None ->
+                                        let (fieldVar, vg') = ANF.freshVar vg
+                                        (ANF.Var fieldVar :: atoms,
+                                         (
+                                             fieldVar,
+                                             ANF.RecordGet (
+                                                 recordDescriptor
+                                                     {
+                                                         SourceTypeName = typeName
+                                                         ResolvedTypeName = typeName
+                                                         TypeArgs = typeArgs
+                                                     }
+                                                     recordInfo,
+                                                 recordAtom,
+                                                 index
+                                             )
+                                         ) :: bindings,
+                                         vg')) ([], [], varGen2)
+
+                            let (resultVar, varGen4) = ANF.freshVar varGen3
+                            let allocation =
+                                ANF.Let (
+                                    resultVar,
+                                    ANF.RecordClone (
+                                        recordDescriptor
+                                            {
+                                                SourceTypeName = typeName
+                                                ResolvedTypeName = typeName
+                                                TypeArgs = typeArgs
+                                            }
+                                            recordInfo,
+                                        recordAtom,
+                                        List.rev fieldAtoms
+                                    ),
+                                    ANF.Return (ANF.Var resultVar)
+                                )
+                            let withProjections = wrapBindings (List.rev projectionBindings) allocation
+                            let withUpdates =
+                                convertedUpdates
+                                |> List.map (fun (_, setupExpr, _) -> setupExpr)
+                                |> List.foldBack (fun setupExpr body -> bindReturns setupExpr (fun _ -> body)) <| withProjections
+                            let withRecord = bindReturns recordSetup (fun _ -> withUpdates)
+                            (withRecord, varGen4)))
+                | None ->
+                    Error $"Unknown record type: {typeName}"
+            | _ ->
+                Error "Cannot use record update syntax on non-record type")
+
+    | AST.RecordAccess (recordExpr, fieldName) ->
+        // Projection is type-directed so the nominal descriptor and keyed slot
+        // always agree, including after aliases and generic substitution.
+        let typeEnv = typeEnvFromVarEnv env
+        inferTypeCore sumTypeNames recordExpr typeEnv typeReg variantLookup funcReg moduleRegistry
+        |> Result.bind (fun recordType ->
+            match recordType with
+            | AST.TRecord (typeName, typeArgs) ->
+                // Look up field index in the specific record type
+                match Map.tryFind typeName typeReg with
+                | Some recordInfo ->
+                    match List.tryFindIndex (fun (name, _) -> name = fieldName) recordInfo.Fields with
+                    | Some index ->
+                        toAtomCore sumTypeNames inertScopes recordExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                        |> Result.map (fun (recordAtom, recordBindings, varGen1) ->
+                            let (resultVar, varGen2) = ANF.freshVar varGen1
+                            let getExpr =
+                                ANF.RecordGet (
+                                    recordDescriptor
+                                        {
+                                            SourceTypeName = typeName
+                                            ResolvedTypeName = typeName
+                                            TypeArgs = typeArgs
+                                        }
+                                        recordInfo,
+                                    recordAtom,
+                                    index
+                                )
+                            let finalExpr = ANF.Let (resultVar, getExpr, ANF.Return (ANF.Var resultVar))
+                            let exprWithBindings = wrapBindings recordBindings finalExpr
+                            (exprWithBindings, varGen2))
+                    | None ->
+                        Error $"Record type '{typeName}' has no field '{fieldName}'"
+                | None ->
+                    Error $"Unknown record type: {typeName}"
+            | _ ->
+                Error $"Cannot access field '{fieldName}' on non-record type")
+
+    | AST.Constructor (constructorTypeName, variantName, payload) ->
+        match tryFindVariant constructorTypeName variantName variantLookup with
+        | None ->
+            Error $"Unknown constructor: {variantName}"
+        | Some (typeName, _, tag, _) ->
+            // Check if ANY variant in this type has a payload
+            // If so, all variants must be heap-allocated for consistency
+            // Note: We get typeName from variantLookup, not from AST (which may be empty)
+            let typeHasPayloadVariants =
+                variantLookup
+                |> Map.exists (fun _ (tName, _, _, pType) -> tName = typeName && pType.IsSome)
+
+            match payload with
+            | None when not typeHasPayloadVariants ->
+                // Pure enum type (no payloads anywhere): return tag as an integer
+                Ok (ANF.Return (ANF.IntLiteral (ANF.Int64 (int64 tag))), varGen)
+            | None ->
+                // No payload but type has other variants with payloads
+                // Heap-allocate as [tag, 0] for uniform 2-element structure
+                // This enables consistent structural equality comparison
+                let tagAtom = ANF.IntLiteral (ANF.Int64 (int64 tag))
+                let dummyPayload = ANF.IntLiteral (ANF.Int64 0L)
+                let (resultVar, varGen1) = ANF.freshVar varGen
+                let tupleExpr = ANF.TupleAlloc [tagAtom; dummyPayload]
+                let finalExpr = ANF.Let (resultVar, tupleExpr, ANF.Return (ANF.Var resultVar))
+                Ok (finalExpr, varGen1)
+            | Some payloadExpr ->
+                // Variant with payload: allocate [tag, payload] on heap
+                toANFBoundAtomCore sumTypeNames inertScopes payloadExpr varGen env typeReg variantLookup funcReg moduleRegistry
+                |> Result.map (fun (payloadSetupExpr, payloadAtom, varGen1) ->
+                    let tagAtom = ANF.IntLiteral (ANF.Int64 (int64 tag))
+                    // Create TupleAlloc [tag, payload] and bind to fresh variable
+                    let (resultVar, varGen2) = ANF.freshVar varGen1
+                    let tupleExpr = ANF.TupleAlloc [tagAtom; payloadAtom]
+                    let finalExpr = ANF.Let (resultVar, tupleExpr, ANF.Return (ANF.Var resultVar))
+                    let exprWithPayloadEvaluation = bindReturns payloadSetupExpr (fun _ -> finalExpr)
+                    (exprWithPayloadEvaluation, varGen2))
+
+    | AST.ListLiteral elements ->
+        // Compile list literal as SkewList
+        // Tags: EMPTY=0, SINGLE=1, DEEP=2, NODE2=3, NODE3=4, LEAF=5
+        // DEEP layout: [measure:8][prefixCount:8][p0:8][p1:8][p2:8][p3:8][middle:8][suffixCount:8][s0:8][s1:8][s2:8][s3:8]
+
+        // Tag a raw pointer as a list value without routing through Stdlib wrappers.
+        // Keep a typed binding so RC/type inference still treats the result as List<a>.
+        let tagRawPtrAsList (listNode: AST.Type) (tag: int64) (ptrVar: ANF.TempId) (vg: ANF.VarGen) (bindings: (ANF.TempId * ANF.CExpr) list) =
+            let (taggedRawVar, vg1) = ANF.freshVar vg
+            let tagExpr = ANF.Prim (ANF.BitOr, ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 tag))
+            let (taggedVar, vg2) = ANF.freshVar vg1
+            let typedExpr = ANF.TypedAtom (ANF.Var taggedRawVar, listNode)
+            (ANF.Var taggedVar, bindings @ [(taggedRawVar, tagExpr); (taggedVar, typedExpr)], vg2)
+
+        // Helper to create a LEAF node wrapping an element
+        let allocLeaf (elemAtom: ANF.Atom) (elemType: AST.Type) (vg: ANF.VarGen) (bindings: (ANF.TempId * ANF.CExpr) list) =
+            let (ptrVar, vg1) = ANF.freshVar vg
+            let (setVar, vg2) = ANF.freshVar vg1
+            let (setRcVar, vg3) = ANF.freshVar vg2
+            let allocExpr = ANF.RawAlloc (ANF.IntLiteral (ANF.Int64 16L))
+            let setExpr = ANF.RawSlotInit (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 0L), elemAtom, elemType)
+            let setRcExpr = ANF.RawWriteWord (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 8L), ANF.IntLiteral (ANF.Int64 1L))
+            let vg4 = vg3
+            let bindings4 = bindings @ [(ptrVar, allocExpr); (setVar, setExpr); (setRcVar, setRcExpr)]
+            let leafListType = AST.TList elemType
+            tagRawPtrAsList leafListType 5L ptrVar vg4 bindings4
+
+        // Helper to create a SINGLE node containing a TreeNode
+        let allocSingle (listNode: AST.Type) (nodeAtom: ANF.Atom) (vg: ANF.VarGen) (bindings: (ANF.TempId * ANF.CExpr) list) =
+            let (ptrVar, vg1) = ANF.freshVar vg
+            let (setVar, vg2) = ANF.freshVar vg1
+            let (setRcVar, vg3) = ANF.freshVar vg2
+            let allocExpr = ANF.RawAlloc (ANF.IntLiteral (ANF.Int64 16L))
+            let setExpr = ANF.RawSlotInit (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 0L), nodeAtom, listNode)
+            let setRcExpr = ANF.RawWriteWord (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 8L), ANF.IntLiteral (ANF.Int64 1L))
+            let bindings1 = bindings @ [(ptrVar, allocExpr); (setVar, setExpr); (setRcVar, setRcExpr)]
+            tagRawPtrAsList listNode 1L ptrVar vg3 bindings1
+
+        // Helper to create a DEEP node
+        let allocDeep (listNode: AST.Type) (measure: int) (prefixNodes: ANF.Atom list) (middle: ANF.Atom) (suffixNodes: ANF.Atom list) (vg: ANF.VarGen) (bindings: (ANF.TempId * ANF.CExpr) list) =
+            let prefixCount = List.length prefixNodes
+            let suffixCount = List.length suffixNodes
+            let (ptrVar, vg1) = ANF.freshVar vg
+            let allocExpr = ANF.RawAlloc (ANF.IntLiteral (ANF.Int64 104L))  // 12 fields * 8 bytes + refcount
+
+            // Build all the set operations
+            let setAt offset value valueType vg bindings =
+                let (setVar, vg') = ANF.freshVar vg
+                let setExpr =
+                    match valueType with
+                    | Some slotType -> ANF.RawSlotInit (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 (int64 offset)), value, slotType)
+                    | None -> ANF.RawWriteWord (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 (int64 offset)), value)
+                (vg', bindings @ [(setVar, setExpr)])
+
+            let (vg2, bindings2) = setAt 0 (ANF.IntLiteral (ANF.Int64 (int64 measure))) None vg1 (bindings @ [(ptrVar, allocExpr)])
+            let (vg3, bindings3) = setAt 8 (ANF.IntLiteral (ANF.Int64 (int64 prefixCount))) None vg2 bindings2
+
+            // Set prefix nodes (p0-p3 at offsets 16, 24, 32, 40)
+            let rec setPrefix nodes offset vg bindings =
+                match nodes with
+                | [] -> (vg, bindings)
+                | n :: rest ->
+                    let (vg', bindings') = setAt offset n (Some listNode) vg bindings
+                    setPrefix rest (offset + 8) vg' bindings'
+            let (vg4, bindings4) = setPrefix prefixNodes 16 vg3 bindings3
+
+            // Set middle at offset 48 (type-uniform: another SkewList of nodes)
+            let (vg5, bindings5) = setAt 48 middle (Some listNode) vg4 bindings4
+
+            // Set suffix count at offset 56
+            let (vg6, bindings6) = setAt 56 (ANF.IntLiteral (ANF.Int64 (int64 suffixCount))) None vg5 bindings5
+
+            // Set suffix nodes (s0-s3 at offsets 64, 72, 80, 88)
+            let (vg7, bindings7) = setPrefix suffixNodes 64 vg6 bindings6
+
+            // Set refcount at offset 96
+            let (vg8, bindings8) = setAt 96 (ANF.IntLiteral (ANF.Int64 1L)) None vg7 bindings7
+
+            // Tag with DEEP (2)
+            tagRawPtrAsList listNode 2L ptrVar vg8 bindings8
+
+        // Build SkewList nodes for middle spines without using pushBack.
+        let emptyTree = ANF.IntLiteral (ANF.Int64 0L)
+
+        let nodeAtom (node: ANF.Atom, _measure: int) = node
+        let nodeMeasure (_node: ANF.Atom, measure: int) = measure
+
+        // Helper to create a NODE2 (tag 3): [child0:8][child1:8][measure:8]
+        let allocNode2 (listNode: AST.Type) (left: ANF.Atom * int) (right: ANF.Atom * int) (vg: ANF.VarGen) (bindings: (ANF.TempId * ANF.CExpr) list) =
+            let (ptrVar, vg1) = ANF.freshVar vg
+            let allocExpr = ANF.RawAlloc (ANF.IntLiteral (ANF.Int64 32L))
+            let (set0Var, vg2) = ANF.freshVar vg1
+            let set0Expr = ANF.RawSlotInit (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 0L), nodeAtom left, listNode)
+            let (set1Var, vg3) = ANF.freshVar vg2
+            let set1Expr = ANF.RawSlotInit (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 8L), nodeAtom right, listNode)
+            let measure = nodeMeasure left + nodeMeasure right
+            let (set2Var, vg4) = ANF.freshVar vg3
+            let set2Expr = ANF.RawWriteWord (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 16L), ANF.IntLiteral (ANF.Int64 (int64 measure)))
+            let (setRcVar, vg5) = ANF.freshVar vg4
+            let setRcExpr = ANF.RawWriteWord (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 24L), ANF.IntLiteral (ANF.Int64 1L))
+            let bindings1 =
+                bindings
+                @ [(ptrVar, allocExpr); (set0Var, set0Expr); (set1Var, set1Expr); (set2Var, set2Expr); (setRcVar, setRcExpr)]
+            let (taggedNode, bindings2, vg6) = tagRawPtrAsList listNode 3L ptrVar vg5 bindings1
+            ((taggedNode, measure), bindings2, vg6)
+
+        // Helper to create a NODE3 (tag 4): [child0:8][child1:8][child2:8][measure:8]
+        let allocNode3 (listNode: AST.Type) (first: ANF.Atom * int) (second: ANF.Atom * int) (third: ANF.Atom * int) (vg: ANF.VarGen) (bindings: (ANF.TempId * ANF.CExpr) list) =
+            let (ptrVar, vg1) = ANF.freshVar vg
+            let allocExpr = ANF.RawAlloc (ANF.IntLiteral (ANF.Int64 40L))
+            let (set0Var, vg2) = ANF.freshVar vg1
+            let set0Expr = ANF.RawSlotInit (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 0L), nodeAtom first, listNode)
+            let (set1Var, vg3) = ANF.freshVar vg2
+            let set1Expr = ANF.RawSlotInit (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 8L), nodeAtom second, listNode)
+            let (set2Var, vg4) = ANF.freshVar vg3
+            let set2Expr = ANF.RawSlotInit (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 16L), nodeAtom third, listNode)
+            let measure = nodeMeasure first + nodeMeasure second + nodeMeasure third
+            let (set3Var, vg5) = ANF.freshVar vg4
+            let set3Expr = ANF.RawWriteWord (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 24L), ANF.IntLiteral (ANF.Int64 (int64 measure)))
+            let (setRcVar, vg6) = ANF.freshVar vg5
+            let setRcExpr = ANF.RawWriteWord (ANF.Var ptrVar, ANF.IntLiteral (ANF.Int64 32L), ANF.IntLiteral (ANF.Int64 1L))
+            let bindings1 =
+                bindings
+                @ [(ptrVar, allocExpr); (set0Var, set0Expr); (set1Var, set1Expr); (set2Var, set2Expr); (set3Var, set3Expr); (setRcVar, setRcExpr)]
+            let (taggedNode, bindings2, vg7) = tagRawPtrAsList listNode 4L ptrVar vg6 bindings1
+            ((taggedNode, measure), bindings2, vg7)
+
+        let splitAt count nodes =
+            let rec loop remaining acc rest =
+                match remaining, rest with
+                | 0, _ -> Ok (List.rev acc, rest)
+                | _, [] -> Error "List literal: not enough nodes for split"
+                | n, x :: xs -> loop (n - 1) (x :: acc) xs
+            loop count [] nodes
+
+        let groupSizes nodeCount =
+            if nodeCount < 2 then
+                Error "List literal: middle spine needs at least 2 nodes"
+            else
+                match nodeCount % 3 with
+                | 0 -> Ok (List.replicate (nodeCount / 3) 3)
+                | 1 ->
+                    if nodeCount < 4 then
+                        Error "List literal: invalid middle spine size"
+                    else
+                        Ok (2 :: 2 :: List.replicate ((nodeCount - 4) / 3) 3)
+                | _ ->
+                    Ok (2 :: List.replicate ((nodeCount - 2) / 3) 3)
+
+        let rec buildGroupedNodes listNode sizes nodes vg bindings acc =
+            match sizes with
+            | [] -> Ok (List.rev acc, bindings, vg)
+            | size :: rest ->
+                splitAt size nodes
+                |> Result.bind (fun (group, remaining) ->
+                    match size, group with
+                    | 2, [a; b] ->
+                        let (nodeInfo, bindings1, vg1) = allocNode2 listNode a b vg bindings
+                        buildGroupedNodes listNode rest remaining vg1 bindings1 (nodeInfo :: acc)
+                    | 3, [a; b; c] ->
+                        let (nodeInfo, bindings1, vg1) = allocNode3 listNode a b c vg bindings
+                        buildGroupedNodes listNode rest remaining vg1 bindings1 (nodeInfo :: acc)
+                    | _ ->
+                        Error $"List literal: unexpected group size {size}")
+
+        let rec buildTree (listNode: AST.Type) (nodes: (ANF.Atom * int) list) (vg: ANF.VarGen) (bindings: (ANF.TempId * ANF.CExpr) list) =
+            let nodeCount = List.length nodes
+            match nodes with
+            | [] -> Ok (emptyTree, bindings, vg)
+            | [single] ->
+                let (resultAtom, resultBindings, vg1) = allocSingle listNode (nodeAtom single) vg bindings
+                Ok (resultAtom, resultBindings, vg1)
+            | first :: rest when nodeCount <= 5 ->
+                let totalMeasure = nodes |> List.sumBy nodeMeasure
+                let prefixNodes = [nodeAtom first]
+                let suffixNodes = rest |> List.map nodeAtom
+                let (resultAtom, resultBindings, vg1) = allocDeep listNode totalMeasure prefixNodes emptyTree suffixNodes vg bindings
+                Ok (resultAtom, resultBindings, vg1)
+            | _ ->
+                splitAt 2 nodes
+                |> Result.bind (fun (prefixNodes, rest) ->
+                    let restLength = List.length rest
+                    let middleCount = restLength - 2
+                    splitAt middleCount rest
+                    |> Result.bind (fun (middleNodes, suffixNodes) ->
+                        groupSizes (List.length middleNodes)
+                        |> Result.bind (fun sizes ->
+                            buildGroupedNodes listNode sizes middleNodes vg bindings []
+                            |> Result.bind (fun (groupedMiddle, bindings1, vg1) ->
+                                buildTree listNode groupedMiddle vg1 bindings1
+                                |> Result.map (fun (middleTree, bindings2, vg2) ->
+                                    let totalMeasure = nodes |> List.sumBy nodeMeasure
+                                    let prefixAtoms = prefixNodes |> List.map nodeAtom
+                                    let suffixAtoms = suffixNodes |> List.map nodeAtom
+                                    let (resultAtom, resultBindings, vg3) =
+                                        allocDeep listNode totalMeasure prefixAtoms middleTree suffixAtoms vg2 bindings2
+                                    (resultAtom, resultBindings, vg3))))))
+
+        if List.isEmpty elements then
+            // Empty list is EMPTY (represented as 0)
+            Ok (ANF.Return (ANF.IntLiteral (ANF.Int64 0L)), varGen)
+        else
+            let typeEnv = typeEnvFromVarEnv env
+
+            // Convert all elements to atoms first
+            let rec convertElements (elems: AST.Expr list) (vg: ANF.VarGen) (acc: (ANF.Atom * AST.Type * (ANF.TempId * ANF.CExpr) list) list) =
+                match elems with
+                | [] -> Ok (List.rev acc, vg)
+                | e :: rest ->
+                    inferTypeCore sumTypeNames e typeEnv typeReg variantLookup funcReg moduleRegistry
+                    |> Result.bind (fun elemType ->
+                        toAtomCore sumTypeNames inertScopes e vg env typeReg variantLookup funcReg moduleRegistry
+                        |> Result.bind (fun (atom, bindings, vg') ->
+                            convertElements rest vg' ((atom, elemType, bindings) :: acc)))
+
+            convertElements elements varGen []
+            |> Result.bind (fun (atomsWithBindings, varGen1) ->
+                // Flatten all element bindings
+                let elemBindings = atomsWithBindings |> List.collect (fun (_, _, bindings) -> bindings)
+                let elemAtoms = atomsWithBindings |> List.map (fun (atom, elemType, _) -> (atom, elemType))
+
+                let listType =
+                    match elemAtoms with
+                    | (_, elemType) :: _ -> AST.TList elemType
+                    | [] -> AST.TList (AST.TVar "a")
+                let (resultAtom, resultBindings, varGen2) =
+                    buildSkewListLiteral listType elemAtoms varGen1 elemBindings
+                let (typedResultVar, varGen3) = ANF.freshVar varGen2
+                let finalExpr =
+                    ANF.Let (
+                        typedResultVar,
+                        ANF.TypedAtom (resultAtom, listType),
+                        ANF.Return (ANF.Var typedResultVar)
+                    )
+                let exprWithBindings = wrapBindings resultBindings finalExpr
+                Ok (exprWithBindings, varGen3))
+
+    | AST.Match (scrutinee, cases) ->
+        PatternLowering.lowerMatch toANFCore toAtomCore toANFBoundAtomCore sumTypeNames inertScopes scrutinee cases varGen env typeReg variantLookup funcReg moduleRegistry
+
+    | AST.InterpolatedString parts ->
+        // Desugar interpolated string to StringConcat chain
+        // $"Hello {name}!" → "Hello " ++ name ++ "!"
+        let partToExpr (part: AST.StringPart) : AST.Expr =
+            match part with
+            | AST.StringText s -> AST.StringLiteral s
+            | AST.StringExpr e -> e
+        match parts with
+        | [] ->
+            // Empty interpolated string → empty string
+            Ok (ANF.Return (ANF.StringLiteral ""), varGen)
+        | [single] ->
+            // Single part → convert directly
+            toANFCore sumTypeNames inertScopes (partToExpr single) varGen env typeReg variantLookup funcReg moduleRegistry
+        | first :: rest ->
+            // Multiple parts → fold with StringConcat
+            let desugared =
+                rest
+                |> List.fold (fun acc part ->
+                    AST.BinOp (AST.StringConcat, acc, partToExpr part))
+                    (partToExpr first)
+            toANFCore sumTypeNames inertScopes desugared varGen env typeReg variantLookup funcReg moduleRegistry
+
+    | AST.Lambda (_parameters, _, _body) ->
+        // Lambda in expression position - closures not yet fully implemented
+        Error "Lambda expressions (closures) are not yet fully implemented"
+
+    | AST.IndirectApply (func, args) ->
+        toAtomCore sumTypeNames inertScopes func varGen env typeReg variantLookup funcReg moduleRegistry
+        |> Result.bind (fun (funcAtom, funcBindings, varGen1) ->
+            let rec convertArgs remaining vg acc =
+                match remaining with
+                | [] -> Ok (List.rev acc, vg)
+                | arg :: rest ->
+                    toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
+                    |> Result.bind (fun (argAtom, argBindings, vg') ->
+                        convertArgs rest vg' ((argAtom, argBindings) :: acc))
+            convertArgs (exprArgsToList args) varGen1 []
+            |> Result.map (fun (argResults, varGen2) ->
+                let argAtoms = argResults |> List.map fst
+                let bindings = funcBindings @ (argResults |> List.collect snd)
+                let (resultId, varGen3) = ANF.freshVar varGen2
+                let resultExpr =
+                    ANF.Let (resultId, ANF.IndirectCall (funcAtom, argAtoms), ANF.Return (ANF.Var resultId))
+                (wrapBindings bindings resultExpr, varGen3)))
+
+    | AST.Apply (func, args) ->
+        // Apply a function expression to arguments
+        // For now, only support immediate application of lambdas
+        let argsList = exprArgsToList args
+        match func with
+        | AST.Lambda (parameters, returnAnnotation, body) ->
+            // Immediate application becomes one non-recursive let per binder.
+            let parameterList = AST.NonEmptyList.toList parameters
+            if List.length argsList <> List.length parameterList then
+                Error $"Expected {List.length parameterList} arguments, got {List.length argsList}"
+            else
+                // Build nested let bindings: let p1 = arg1 in let p2 = arg2 in ... body
+                let rec buildLets (ps: AST.LambdaParameter list) (as': AST.Expr list) : AST.Expr =
+                    match ps, as' with
+                    | [], [] -> body
+                    | parameter :: restPs, argExpr :: restAs ->
+                        AST.Let (parameter.Pattern, argExpr, buildLets restPs restAs)
+                    | _ -> body  // Should not happen due to length check
+                let desugared = buildLets parameterList argsList
+                toANFCore sumTypeNames inertScopes desugared varGen env typeReg variantLookup funcReg moduleRegistry
+        | AST.Var name ->
+            // Calling a variable that might hold a closure
+            match Map.tryFind name env with
+            | Some (tempId, _) ->
+                // Variable exists - treat as closure call
+                let rec convertArgs (remaining: AST.Expr list) (vg: ANF.VarGen) (acc: (ANF.Atom * (ANF.TempId * ANF.CExpr) list) list) =
+                    match remaining with
+                    | [] -> Ok (List.rev acc, vg)
+                    | arg :: rest ->
+                        toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
+                        |> Result.bind (fun (argAtom, argBindings, vg') ->
+                            convertArgs rest vg' ((argAtom, argBindings) :: acc))
+                convertArgs argsList varGen []
+                |> Result.bind (fun (argResults, varGen1) ->
+                    let argAtoms = argResults |> List.map fst
+                    let allBindings = argResults |> List.collect snd
+                    // Generate closure call
+                    let (resultId, varGen2) = ANF.freshVar varGen1
+                    let closureCall = ANF.ClosureCall (ANF.Var tempId, argAtoms)
+                    let finalBindings = allBindings @ [(resultId, closureCall)]
+                    Ok (ANF.Return (ANF.Var resultId), varGen2)
+                    |> Result.map (fun (expr, vg) ->
+                        (wrapBindings finalBindings expr, vg)))
+            | None ->
+                Error $"Cannot apply variable '{name}' as function - variable not in scope"
+
+        | AST.Apply (_, _) ->
+            // Nested application: (fun x -> fun y -> ...)(a)(b)(c)...
+            // Flatten all nested applies first, then desugar from innermost out
+            let rec flattenApplies expr argLists =
+                match expr with
+                | AST.Apply (innerFunc, innerArgs) ->
+                    flattenApplies innerFunc (exprArgsToList innerArgs :: argLists)
+                | other -> (other, argLists)
+
+            let (baseFunc, allArgLists) = flattenApplies func [argsList]
+            // allArgLists is a list of arg lists, from innermost to outermost
+            // e.g., for f(1)(2)(3), we get ([1], [2], [3])
+
+            match baseFunc with
+            | AST.Lambda _ ->
+                // Desugar all nested lambda applications at once
+                let rec desugaAll (currentFunc: AST.Expr) (remainingArgLists: AST.Expr list list) : AST.Expr =
+                    match remainingArgLists with
+                    | [] -> currentFunc
+                    | currentArgs :: restArgLists ->
+                        match currentFunc with
+                        | AST.Lambda (lambdaParams, returnAnnotation, body) ->
+                            let lambdaParamList = AST.NonEmptyList.toList lambdaParams
+                            if List.length currentArgs <> List.length lambdaParamList then
+                                // Will error later, just wrap in Apply for now
+                                desugaAll (AST.Apply (currentFunc, exprArgsFromList currentArgs)) restArgLists
+                            else
+                                // Desugar: let p1 = a1 in let p2 = a2 in ... body
+                                let rec buildLets (ps: AST.LambdaParameter list) (as': AST.Expr list) : AST.Expr =
+                                    match ps, as' with
+                                    | [], [] -> body
+                                    | parameter :: restPs, argExpr :: restAs ->
+                                        AST.Let (parameter.Pattern, argExpr, buildLets restPs restAs)
+                                    | _ -> body
+                                let desugared = buildLets lambdaParamList currentArgs
+                                desugaAll desugared restArgLists
+                        | AST.Let (name, value, innerBody) ->
+                            // Float let out: Apply(let x = v in body, args) → let x = v in Apply(body, args)
+                            AST.Let (name, value, desugaAll innerBody (currentArgs :: restArgLists))
+                        | _ ->
+                            // Non-lambda function - wrap remaining in Apply
+                            let applied = AST.Apply (currentFunc, exprArgsFromList currentArgs)
+                            desugaAll applied restArgLists
+
+                let desugared = desugaAll baseFunc allArgLists
+                toANFCore sumTypeNames inertScopes desugared varGen env typeReg variantLookup funcReg moduleRegistry
+
+            | _ ->
+                // Base function is not a lambda - use toAtom which handles nested applies
+                // Reconstruct the full nested apply, then delegate to toAtom
+                let rec applyAll (currentExpr: AST.Expr) (remainingArgLists: AST.Expr list list) : AST.Expr =
+                    match remainingArgLists with
+                    | [] -> currentExpr
+                    | currentArgs :: rest ->
+                        applyAll (AST.Apply (currentExpr, exprArgsFromList currentArgs)) rest
+                let fullApply = applyAll baseFunc allArgLists
+
+                toAtomCore sumTypeNames inertScopes fullApply varGen env typeReg variantLookup funcReg moduleRegistry
+                |> Result.map (fun (resultAtom, bindings, vg) ->
+                    (wrapBindings bindings (ANF.Return resultAtom), vg))
+
+        | AST.Let (letName, letValue, letBody) ->
+            // Apply(let x = v in body, args) → let x = v in Apply(body, args)
+            // Float the let binding out
+            toANFCore sumTypeNames inertScopes (AST.Let (letName, letValue, AST.Apply (letBody, args))) varGen env typeReg variantLookup funcReg moduleRegistry
+
+        | AST.Closure (funcName, captures) ->
+            // Closure being called directly - convert to ClosureCall
+            // First, convert captures to atoms
+            let rec convertCaptures (caps: AST.Expr list) (vg: ANF.VarGen) (acc: (ANF.Atom * (ANF.TempId * ANF.CExpr) list) list) =
+                match caps with
+                | [] -> Ok (List.rev acc, vg)
+                | AST.FuncRef funcName :: rest ->
+                    convertCaptures rest vg ((ANF.FuncRef funcName, []) :: acc)
+                | cap :: rest ->
+                    toAtomCore sumTypeNames inertScopes cap vg env typeReg variantLookup funcReg moduleRegistry
+                    |> Result.bind (fun (capAtom, capBindings, vg') ->
+                        convertCaptures rest vg' ((capAtom, capBindings) :: acc))
+            convertCaptures captures varGen []
+            |> Result.bind (fun (captureResults, varGen1) ->
+                let captureAtoms = captureResults |> List.map fst
+                let captureBindings = captureResults |> List.collect snd
+                // Allocate closure
+                let (closureId, varGen2) = ANF.freshVar varGen1
+                let closureAlloc = ANF.ClosureAlloc (funcName, captureAtoms)
+                // Convert args
+                let rec convertArgs (remaining: AST.Expr list) (vg: ANF.VarGen) (acc: (ANF.Atom * (ANF.TempId * ANF.CExpr) list) list) =
+                    match remaining with
+                    | [] -> Ok (List.rev acc, vg)
+                    | arg :: rest ->
+                        toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
+                        |> Result.bind (fun (argAtom, argBindings, vg') ->
+                            convertArgs rest vg' ((argAtom, argBindings) :: acc))
+                convertArgs argsList varGen2 []
+                |> Result.bind (fun (argResults, varGen3) ->
+                    let argAtoms = argResults |> List.map fst
+                    let argBindings = argResults |> List.collect snd
+                    // Generate closure call
+                    let (resultId, varGen4) = ANF.freshVar varGen3
+                    let closureCall = ANF.ClosureCall (ANF.Var closureId, argAtoms)
+                    let allBindings = captureBindings @ [(closureId, closureAlloc)] @ argBindings @ [(resultId, closureCall)]
+                    Ok (wrapBindings allBindings (ANF.Return (ANF.Var resultId)), varGen4)))
+
+        | _ ->
+            // General function-expression application (for example record field access):
+            // evaluate function expression to a closure value, then invoke it.
+            toAtomCore sumTypeNames inertScopes func varGen env typeReg variantLookup funcReg moduleRegistry
+            |> Result.bind (fun (funcAtom, funcBindings, varGen1) ->
+                let rec convertArgs
+                    (remaining: AST.Expr list)
+                    (vg: ANF.VarGen)
+                    (acc: (ANF.Atom * (ANF.TempId * ANF.CExpr) list) list)
+                    =
+                    match remaining with
+                    | [] -> Ok (List.rev acc, vg)
+                    | arg :: rest ->
+                        toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
+                        |> Result.bind (fun (argAtom, argBindings, vg') ->
+                            convertArgs rest vg' ((argAtom, argBindings) :: acc))
+
+                convertArgs argsList varGen1 []
+                |> Result.map (fun (argResults, varGen2) ->
+                    let argAtoms = argResults |> List.map fst
+                    let argBindings = argResults |> List.collect snd
+                    let (resultId, varGen3) = ANF.freshVar varGen2
+                    let closureCall = ANF.ClosureCall (funcAtom, argAtoms)
+                    let allBindings = funcBindings @ argBindings @ [(resultId, closureCall)]
+                    (wrapBindings allBindings (ANF.Return (ANF.Var resultId)), varGen3)))
