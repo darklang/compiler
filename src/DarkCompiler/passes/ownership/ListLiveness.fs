@@ -2,19 +2,21 @@
 
 module ListLiveness
 
+open HIR
+
 open ListRegion
 
 /// Region aliases are canonical identities. Opaque scalar evaluations cannot
 /// access them; callbacks cannot capture them. These are value-edge contracts,
 /// not permission to reorder scalar effects or to mutate a borrowed parameter.
-let rec internal valueContract operation : SemanticIR.ValueContract<ListId> =
+let rec internal valueContract operation : ValueLiveness.Contract<ListId> =
     let uses =
         match operation with
         | Branch (_, _, yes, no) -> Set.union (entryLive yes Set.empty) (entryLive no Set.empty)
         | _ -> source operation |> Option.toList |> Set.ofList
     { Uses = uses; Defines = result operation |> Option.toList |> Set.ofList }
 and private entryLive (FunctionalBlock block) liveAfter =
-    List.foldBack (fun operation live -> SemanticIR.liveBefore (valueContract operation) live) block.Operations liveAfter
+    List.foldBack (fun operation live -> ValueLiveness.liveBefore (valueContract operation) live) block.Operations liveAfter
 
 /// No physical ownership is needed to check the region's incoming value
 /// interface. The current representation permits no external collection roots.

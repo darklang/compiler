@@ -812,7 +812,7 @@ type InlineScope = FunctionScope | JoinEntryScope
 /// boundaries may move relative to the old continuation tree, so only inline
 /// bodies whose newly owned temporaries have structurally inert destruction.
 let private hasInertInlineLifetime (funcs: Map<string, FunctionInfo>) (func: Function) =
-    let inert = SemanticIR.hasInertDestruction
+    let inert = DestructionAnalysis.hasInertDestruction
     let knownCall name =
         Map.tryFind name funcs |> Option.exists (fun info -> inert info.Func.ReturnType)
     let operation = function

@@ -2,6 +2,8 @@
 
 module ExtractListRegions
 
+open HIR
+
 open ListRegion
 
 type private ScalarLifetime = EnclosingLifetime | JoinEntryLifetime
@@ -9,7 +11,7 @@ type private ScalarLifetime = EnclosingLifetime | JoinEntryLifetime
 type private Extraction = {
     Lists: Map<string, ListId>
     Types: Map<string, AST.Type>
-    Operations: Operation<Transform, FunctionalBlock> list
+    Operations: HIR.Operation<Operation<Transform>, FunctionalBlock> list
     NextId: int
     Lifetime: ScalarLifetime
 }
@@ -21,7 +23,7 @@ let private listCall = function
 /// Prove scope destruction separately from evaluation effects. Calls use an
 /// explicit contract; nominal payloads and unknown closures remain unproven.
 let private inertExpression infer callIsInert =
-    let inertType = SemanticIR.hasInertDestruction
+    let inertType = DestructionAnalysis.hasInertDestruction
     let rec check types expr =
         let typedInert () =
             match infer types expr with
@@ -75,12 +77,12 @@ let scopeContracts infer (functions: AST.FunctionDef list) =
         let parameters = AST.NonEmptyList.toList func.Params
         let types = Map.ofList parameters
         let localInert =
-            SemanticIR.hasInertDestruction func.ReturnType
-            && List.forall (snd >> SemanticIR.hasInertDestruction) parameters
+            DestructionAnalysis.hasInertDestruction func.ReturnType
+            && List.forall (snd >> DestructionAnalysis.hasInertDestruction) parameters
             && inertExpression infer (fun _ -> true) types func.Body
         func.Name,
-        ({ LocalDestruction = if localInert then SemanticIR.InertScope else SemanticIR.UnprovenScope
-           Calls = calls func.Body }: SemanticIR.FunctionScopeContract))
+        ({ LocalDestruction = if localInert then DestructionAnalysis.InertScope else DestructionAnalysis.UnprovenScope
+           Calls = calls func.Body }: DestructionAnalysis.FunctionScopeContract))
     |> Map.ofList
 
 /// A failed recognition is semantic absence, not a compiler failure. The
@@ -140,22 +142,22 @@ let tryExtract
         | AST.ListLiteral elements when List.length elements <= maxCapacity ->
             let values = elements |> List.map (fun value -> scalar state value |> Option.filter (fun typed -> typed.Type = AST.TInt64))
             if values |> List.forall Option.isSome then
-                Some (addList state (fun output -> Construct (output, Literal (List.choose id values))))
+                Some (addList state (fun output -> Leaf (Construct (output, Literal (List.choose id values)))))
             else None
         | _ ->
             match listCall expr with
             | Some ("Stdlib.List.repeatUnsafe_i64", [count; value]) ->
                 match operand state ((=) AST.TInt) count, operand state ((=) AST.TInt64) value with
-                | Some count, Some value -> Some (addList state (fun output -> Construct (output, Repeat (count, value))))
+                | Some count, Some value -> Some (addList state (fun output -> Leaf (Construct (output, Repeat (count, value)))))
                 | _ -> None
             | Some ("Stdlib.List.map_i64_i64", [input; fn]) ->
                 list state input
                 |> Option.bind (fun (source, next) ->
                     callback state (AST.TFunction ([AST.TInt64], AST.TInt64)) fn
-                    |> Option.map (fun fn -> addList next (fun id -> Transform (id, source, Map fn))))
+                    |> Option.map (fun fn -> addList next (fun id -> Leaf (Transform (id, source, Map fn)))))
             | Some ("Stdlib.List.reverse_i64", [input]) ->
                 list state input
-                |> Option.map (fun (source, next) -> addList next (fun id -> Transform (id, source, Reverse)))
+                |> Option.map (fun (source, next) -> addList next (fun id -> Leaf (Transform (id, source, Reverse))))
             | _ -> None
 
     let rec bindScalar state name expr =
@@ -185,7 +187,7 @@ let tryExtract
                     Some { next with
                              Types = Map.add name AST.TInt64 next.Types
                              Lists = Map.remove name next.Lists
-                             Operations = Fold (name, source, initial, fn) :: next.Operations }
+                             Operations = Leaf (Fold (name, source, initial, fn)) :: next.Operations }
                 | _ -> None)
         | _ ->
             scalar state expr

@@ -4,7 +4,7 @@ module ListRegion
 
 type ListId = ListId of int
 
-type Scalar = SemanticIR.Operand
+type Scalar = HIR.Operand
 
 type Transform =
     | Map of callback: Scalar
@@ -14,14 +14,11 @@ type Construction =
     | Literal of elements: Scalar list
     | Repeat of count: Scalar * value: Scalar
 
-type Operation<'transform, 'block> =
+type Operation<'transform> =
     | Construct of result: ListId * construction: Construction
     | Transform of result: ListId * source: ListId * operation: 'transform
     | Fold of name: string * source: ListId * initial: Scalar * callback: Scalar
-    | ScalarBinding of name: string * value: Scalar
-    | Branch of name: string * condition: Scalar * ifTrue: 'block * ifFalse: 'block
-
-type FunctionalBlock = internal FunctionalBlock of SemanticIR.Block<Operation<Transform, FunctionalBlock>>
+type FunctionalBlock = internal FunctionalBlock of HIR.Block<HIR.Operation<Operation<Transform>, FunctionalBlock>>
 type FunctionalRegion = internal FunctionalRegion of FunctionalBlock
 
 /// Runtime extent identity survives aliases and consuming transformations.
@@ -69,14 +66,8 @@ type StorageRegion = internal StorageRegion of FunctionalRegion * Map<ListId, Ar
 /// Runtime uniqueness checks belong to the later escaping-array storage class.
 type Ownership = Consume | BorrowAndCopy
 
-type OwnedOperation = {
-    Operation: Operation<Transform * Ownership, OwnedBlock>
-    Releases: ListId list
-}
-and OwnedBlock = {
-    EntryReleases: ListId list
-    Body: SemanticIR.Block<OwnedOperation>
-}
+type OwnedOperation = OwnedIR.Step<Operation<Transform * Ownership>, ListId>
+type OwnedBlock = OwnedIR.Block<Operation<Transform * Ownership>, ListId>
 
 type OwnedRegion = internal OwnedRegion of OwnedBlock * Map<ListId, ArrayLayout>
 
@@ -100,15 +91,13 @@ let internal lookup name key map =
     | None -> Crash.crash $"List HIR: missing {name} for {key}"
 
 let internal source = function
-    | Transform (_, input, _) | Fold (_, input, _, _) -> Some input
-    | Construct _ | ScalarBinding _ | Branch _ -> None
+    | HIR.Leaf (Transform (_, input, _) | Fold (_, input, _, _)) -> Some input
+    | HIR.Leaf (Construct _) | HIR.ScalarBinding _ | HIR.Branch _ -> None
 
 let internal result = function
-    | Construct (output, _) | Transform (output, _, _) -> Some output
-    | Fold _ | ScalarBinding _ | Branch _ -> None
+    | HIR.Leaf (Construct (output, _) | Transform (output, _, _)) -> Some output
+    | HIR.Leaf (Fold _) | HIR.ScalarBinding _ | HIR.Branch _ -> None
 
 let internal immediate = function
     | AST.TInt64 | AST.TBool -> true
     | _ -> false
-
-/// Recognition uses canonical, monomorphized identities, never suffix guesses.

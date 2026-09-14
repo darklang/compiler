@@ -66,13 +66,16 @@ let private testLoweredBudget () =
         else Error $"Expected one native array allocation and release, got {counts body}")
 
 let private rejectsOwnership operations () =
-    match VerifyListOwnership.verifyOwnership operations with
+    let block : ListRegion.OwnedBlock =
+        { EntryReleases = []
+          Body = { Operations = operations; Result = { Expression = AST.Int64Literal 0L; Type = AST.TInt64 } } }
+    match VerifyListOwnership.verifyBlockOwnership block with
     | Error _ -> Ok ()
     | Ok () -> Error "Ownership verifier accepted an invalid lifetime"
 
 let private root = ListRegion.ListId 0
 let private construct releases : ListRegion.OwnedOperation =
-    { Operation = ListRegion.Construct (root, ListRegion.Literal []); Releases = releases }
+    { Operation = HIR.Leaf (ListRegion.Construct (root, ListRegion.Literal [])); Releases = releases }
 
 let private zero : ListRegion.AllocationSummary = { Allocations = 0; AllocatedBytes = bytes 0L; Copies = 0; ReusedTransforms = 0; Releases = 0 }
 let private allocated = { zero with Allocations = 1; AllocatedBytes = bytes 56L }
@@ -86,33 +89,33 @@ let private ownedBlock releases operations : ListRegion.OwnedBlock =
     { EntryReleases = releases
       Body = { Operations = operations; Result = { Expression = AST.Int64Literal 0L; Type = AST.TInt64 } } }
 let private ownedBranch yes no : ListRegion.OwnedOperation =
-    { Operation = ListRegion.Branch ("joined", { Expression = AST.BoolLiteral true; Type = AST.TBool }, yes, no); Releases = [] }
+    { Operation = HIR.Branch ("joined", { Expression = AST.BoolLiteral true; Type = AST.TBool }, yes, no); Releases = [] }
 
 let tests = [
     "Scope destruction rejects transitive callers and accepts safe recursive components", (fun () ->
-        let contract local calls : SemanticIR.FunctionScopeContract =
+        let contract local calls : DestructionAnalysis.FunctionScopeContract =
             { LocalDestruction = local; Calls = Set.ofList calls }
         let contracts = Map.ofList [
-            "resource", contract SemanticIR.UnprovenScope []
-            "indirect", contract SemanticIR.InertScope ["resource"]
-            "caller", contract SemanticIR.InertScope ["indirect"]
-            "unknown", contract SemanticIR.InertScope ["external"]
-            "left", contract SemanticIR.InertScope ["right"]
-            "right", contract SemanticIR.InertScope ["left"; "Builtin.printLine"]
+            "resource", contract DestructionAnalysis.UnprovenScope []
+            "indirect", contract DestructionAnalysis.InertScope ["resource"]
+            "caller", contract DestructionAnalysis.InertScope ["indirect"]
+            "unknown", contract DestructionAnalysis.InertScope ["external"]
+            "left", contract DestructionAnalysis.InertScope ["right"]
+            "right", contract DestructionAnalysis.InertScope ["left"; "Builtin.printLine"]
         ]
-        let actual = SemanticIR.inertFunctionScopes contracts
+        let actual = DestructionAnalysis.inertFunctionScopes contracts
         let expected = Set.ofList ["left"; "right"; "Builtin.print"; "Builtin.printLine"]
         if actual = expected then Ok () else Error $"Unexpected inert scopes: {actual}")
     "Scope destruction replacement revokes caller proofs", (fun () ->
-        let safe : SemanticIR.FunctionScopeContract = { LocalDestruction = SemanticIR.InertScope; Calls = Set.empty }
+        let safe : DestructionAnalysis.FunctionScopeContract = { LocalDestruction = DestructionAnalysis.InertScope; Calls = Set.empty }
         let contracts = Map.ofList ["callee", safe; "caller", { safe with Calls = Set.singleton "callee" }]
-        let replaced = Map.add "callee" { safe with LocalDestruction = SemanticIR.UnprovenScope } contracts
-        if Set.contains "caller" (SemanticIR.inertFunctionScopes contracts)
-           && not (Set.contains "caller" (SemanticIR.inertFunctionScopes replaced)) then Ok ()
+        let replaced = Map.add "callee" { safe with LocalDestruction = DestructionAnalysis.UnprovenScope } contracts
+        if Set.contains "caller" (DestructionAnalysis.inertFunctionScopes contracts)
+           && not (Set.contains "caller" (DestructionAnalysis.inertFunctionScopes replaced)) then Ok ()
         else Error "Replacing a definition did not revoke its transitive scope proof")
     "Scope destruction does not trust a shadowed primitive", (fun () ->
-        let contracts = Map.ofList ["Builtin.printLine", { SemanticIR.LocalDestruction = SemanticIR.UnprovenScope; SemanticIR.Calls = Set.empty }]
-        if Set.contains "Builtin.printLine" (SemanticIR.inertFunctionScopes contracts) then Error "Shadowed primitive retained its built-in contract"
+        let contracts = Map.ofList ["Builtin.printLine", { DestructionAnalysis.LocalDestruction = DestructionAnalysis.UnprovenScope; DestructionAnalysis.Calls = Set.empty }]
+        if Set.contains "Builtin.printLine" (DestructionAnalysis.inertFunctionScopes contracts) then Error "Shadowed primitive retained its built-in contract"
         else Ok ())
     "List HIR accepts deep shared continuations", (fun () ->
         match extract (manyBranches 64) with
@@ -146,5 +149,5 @@ let tests = [
     "List HIR verifier rejects duplicate release", rejectsOwnership [construct [root; root]]
     "List HIR verifier rejects leaked roots", rejectsOwnership [construct []]
     "List HIR verifier rejects reused identities", rejectsOwnership [construct [root]; construct [root]]
-    "List HIR verifier rejects mutation after release", rejectsOwnership [construct [root]; { Operation = ListRegion.Transform (ListRegion.ListId 1, root, (ListRegion.Reverse, ListRegion.Consume)); Releases = [ListRegion.ListId 1] }]
+    "List HIR verifier rejects mutation after release", rejectsOwnership [construct [root]; { Operation = HIR.Leaf (ListRegion.Transform (ListRegion.ListId 1, root, (ListRegion.Reverse, ListRegion.Consume))); Releases = [ListRegion.ListId 1] }]
 ]

@@ -2,6 +2,9 @@
 
 module ListAllocationBudget
 
+open HIR
+open OwnedIR
+
 open ListRegion
 
 let allocationBudget (OwnedRegion (block, layouts)) : AllocationBudget =
@@ -16,14 +19,14 @@ let allocationBudget (OwnedRegion (block, layouts)) : AllocationBudget =
         | step :: rest ->
             let allocations, bytes, copies, reused =
                 match step.Operation with
-                | Construct (output, _)
-                | Transform (output, _, (_, BorrowAndCopy)) ->
+                | Leaf (Construct (output, _))
+                | Leaf (Transform (output, _, (_, BorrowAndCopy))) ->
                     let layout =
                         match Map.tryFind output layouts with
                         | Some layout -> layout
                         | None -> Crash.crash "List HIR: missing allocation layout"
-                    1, requestedBytes layout, (match step.Operation with Transform _ -> 1 | _ -> 0), 0
-                | Transform (_, _, (_, Consume)) -> 0, constantBytes 0L, 0, 1
+                    1, requestedBytes layout, (match step.Operation with Leaf (Transform _) -> 1 | _ -> 0), 0
+                | Leaf (Transform (_, _, (_, Consume))) -> 0, constantBytes 0L, 0, 1
                 | _ -> 0, constantBytes 0L, 0, 0
             loop { Allocations = summary.Allocations + allocations
                    AllocatedBytes = addBytes summary.AllocatedBytes bytes

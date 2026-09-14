@@ -40,7 +40,7 @@ builders and pooled large buffers are not implemented.
 
 ## Typed stages and ownership
 
-The region IR has three private program types:
+The region IR has three stage-specific program types.
 
 Their compact shared model lives in `ir/hir/ListRegion.fs`. Constructors are
 internal to the compiler; extraction, storage selection, ownership solving,
@@ -53,13 +53,16 @@ FunctionalRegion: typed blocks + semantic collection edges + scalar joins
   -> existing ANF primitives -> MIR -> existing native backends
 ```
 
-`ir/semantic/SemanticIR.fs` defines shared typed operands, blocks, and value-edge contracts
-independent of array layouts and ANF. It is a foundation used by ListHIR, not
-yet a whole-program semantic IR or a primitive effect registry. Opaque scalar
-expressions and callbacks retain their original evaluation order; their types
-are not evidence of purity.
+`ir/hir/HIR.fs` defines shared typed operands, scalar bindings, branches, and
+blocks independent of array layouts and ANF. `ir/owned/OwnedIR.fs` defines
+ownership-bearing steps/blocks and explicit unit-transfer contracts. Value-edge
+liveness and destruction proofs live separately in `analysis/`. These interfaces
+are used by the list dialect, not yet a whole-program normalized semantic IR
+or a primitive effect registry. Opaque scalar expressions and callbacks retain
+their original evaluation order; their types are not evidence of purity.
 
-The stages share an `Operation<'transform, 'block>` family. Only owned transforms carry
+The list stages share a leaf `Operation<'transform>` family inside the common
+HIR control flow. Only owned transforms carry
 an ownership decision. Collection identities are monotonic and separate from
 ANF temporary identifiers; lexical aliases resolve to the same collection
 identity before liveness solving. Runtime extents name their originating
@@ -81,7 +84,8 @@ region graph. A borrowed parameter with RC=1 is **not** evidence of uniqueness;
 borrowed external lists are ineligible.
 
 `verifyFunctional` checks the closed region's incoming collection interface
-using representation-independent value contracts. `verifyOwnership` checks
+using representation-independent value contracts. `verifyBlockOwnership`
+supplies list operation contracts to the shared `VerifyOwnership.verifyClosed`, which checks
 live inputs, globally unique identities (including between sibling branches),
 balanced releases, identical surviving ownership at joins, and absence of
 leaked region roots. The stage verifier also checks
@@ -120,7 +124,7 @@ target visibility, argument types, and entry control transfers.
 
 Moving a cleanup boundary can be observable even when an expression returns
 an integer. Entry-local scalar expressions and callbacks therefore require
-inert-destruction evidence. `SemanticIR` describes structural destruction and
+inert-destruction evidence. `DestructionAnalysis` describes structural destruction and
 function-scope contracts; ListHIR collects local evidence and direct-call
 dependencies from resolved source functions. Unproven scopes and unknown
 callees reject all transitive callers; safe recursive components need no

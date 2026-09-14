@@ -42,6 +42,9 @@ not a target-independent runtime layer.
 | Source type rules or diagnostics | `frontend/checking/` |
 | Generic identity or closure preparation | `passes/preparation/` |
 | Collection recognition and array selection | `passes/hir/`, `passes/storage/` |
+| Structured semantic control flow | `ir/hir/HIR.fs` |
+| Unit-ownership contracts and independent verification | `ir/owned/OwnedIR.fs`, `passes/ownership/VerifyOwnership.fs` |
+| Value liveness and destruction scope proofs | `analysis/ValueLiveness.fs`, `analysis/Destruction.fs` |
 | Region liveness, reuse, or verification | `passes/ownership/` |
 | Existing ANF lifetime insertion | `passes/anf/ownership/` |
 | Shared destruction shapes and release plans | `memory/` |
@@ -76,6 +79,37 @@ not accomplished by moving files. Do not create empty future stages or duplicate
 ownership authorities. Generated printing must precede general ownership
 elaboration. Changes to aliasing and lifetime after elaboration require proof
 preservation and verification.
+
+## Shared HIR and ownership interfaces
+
+`HIR.Operation` owns scalar bindings and typed branches independently of a leaf
+operation dialect. `HIR.Block` retains a single sequence after each branch;
+the list dialect no longer defines its own control-flow cases. Operands still
+carry checked AST expressions. This is a used structured-region interface, not
+a claim that arbitrary source programs have been normalized into HIR.
+
+`OwnedIR` supplies the shared recursive step/block representation and explicit
+borrow/consume/produce contracts. Contracts retain operand multiplicity so
+duplicate consumes and duplicate definitions cannot disappear into sets.
+`VerifyOwnership.verifyClosed` checks scalar accesses, leaf uses, edge cleanup,
+fresh definitions, join agreement, and final ownership balance. Dialects must
+provide scalar-use accounting explicitly. List extraction proves its opaque
+scalars cannot reference canonical list identities, so its adapter reports no
+such uses; a future dialect cannot inherit that assumption by default.
+
+The old `SemanticIR` container is removed: HIR owns control-flow data,
+`ValueLiveness` owns backward edge transfer, and `DestructionAnalysis` owns
+inert-destruction proofs. Storage layouts and consume-or-copy selection remain
+in the list dialect. Region ownership accounting has one verifier, with list
+layout/type verification layered around it.
+
+Future whole-program work must introduce normalized value identities,
+primitive effects/alias contracts, managed block arguments, function ownership
+signatures, loops, and explicit borrowed/escaping boundaries. The closed-region
+verifier does not model RC credits, runtime uniqueness, or constructor reset
+tokens. ANF lifetime insertion remains authoritative outside these regions;
+moving generated printing before general ownership is a separate semantic
+migration. No empty future passes or compatibility IR conversions are added.
 
 Each refactoring chunk preserves algorithms, evaluation order, and emitted-code
 behavior. Semantic migrations require focused failing E2E coverage before their

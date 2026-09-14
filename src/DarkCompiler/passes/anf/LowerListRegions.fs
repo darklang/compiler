@@ -2,6 +2,9 @@
 
 module LowerListRegions
 
+open HIR
+open OwnedIR
+
 open ListRegion
 open VerifyListOwnership
 
@@ -118,7 +121,7 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (block, layouts) as reg
                         lowerRest (Map.add name (id, value.Type) env) buffers next
                         |> Result.map (fun (body, final) -> bindReturns expr (fun _ -> body), final)
                     | _ -> Crash.crash "List HIR: scalar lowering must bind its result")
-            | Construct (output, Repeat (count, value)) ->
+            | Leaf (Construct (output, Repeat (count, value))) ->
                 lowerValue env vg count |> Result.bind (fun (countExpr, countAtom, afterCount) ->
                     lowerValue env afterCount value |> Result.bind (fun (valueExpr, valueAtom, afterValue) ->
                         let pointer, allocation, afterAllocation = emit (ANF.Call ("Stdlib.List.__arrayRepeat", [countAtom; valueAtom])) afterValue
@@ -127,7 +130,7 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (block, layouts) as reg
                         lowerRest env (Map.add output buffer buffers) afterLoad
                         |> Result.map (fun (body, final) ->
                             bindReturns countExpr (fun _ -> bindReturns valueExpr (fun _ -> wrap (allocation @ load) body)), final)))
-            | Construct (output, Literal elements) ->
+            | Leaf (Construct (output, Literal elements)) ->
                 let rec evaluate vg expressions values =
                     match expressions with
                     | [] -> Ok (ANF.Return ANF.UnitLiteral, List.rev values, vg)
@@ -144,7 +147,7 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (block, layouts) as reg
                     let buffer = { Pointer = pointer; Length = length; Layout = layout }
                     lowerRest env (Map.add output buffer buffers) afterInit
                     |> Result.map (fun (body, final) -> bindReturns evaluation (fun _ -> wrap (allocation @ List.concat writes @ initialized) body), final))
-            | Transform (output, input, (operation, ownership)) ->
+            | Leaf (Transform (output, input, (operation, ownership))) ->
                 let buffer = lookup "transform buffer" input buffers
                 let callback =
                     match operation with
@@ -182,7 +185,7 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (block, layouts) as reg
                         bindReturns evaluation (fun _ ->
                             bindReturns preparation (fun selected ->
                                 ANF.Let (destination, ANF.TypedAtom (selected, AST.TRawPtr), wrap (List.concat mutations) body))), final))
-            | Fold (name, input, initial, fn) ->
+            | Leaf (Fold (name, input, initial, fn)) ->
                 lowerValue env vg initial |> Result.bind (fun (initialExpr, accumulator, next) ->
                     lowerValue env next fn |> Result.bind (fun (callbackExpr, callback, afterCallback) ->
                         let buffer = lookup "fold buffer" input buffers

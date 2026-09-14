@@ -26,7 +26,7 @@ let toANF
     : Result<ANF.AExpr * ANF.VarGen, string> =
     toANFCore
         (sumTypeNamesFromVariantLookup variantLookup)
-        (SemanticIR.inertFunctionScopes Map.empty)
+        (DestructionAnalysis.inertFunctionScopes Map.empty)
         expr
         varGen
         env
@@ -88,7 +88,7 @@ let convertFunction
     : Result<ANF.Function * ANF.VarGen, string> =
     convertFunctionWithSumTypeNames
         (sumTypeNamesFromVariantLookup variantLookup)
-        (SemanticIR.inertFunctionScopes Map.empty)
+        (DestructionAnalysis.inertFunctionScopes Map.empty)
         funcDef
         varGen
         typeReg
@@ -113,7 +113,7 @@ type ConversionResult = {
 /// Result type for user-only ANF conversion (functions not merged with stdlib)
 /// Used for compiling user code separately from the prebuilt stdlib
 type UserOnlyResult = {
-    ScopeContracts: Map<string, SemanticIR.FunctionScopeContract>
+    ScopeContracts: Map<string, DestructionAnalysis.FunctionScopeContract>
     UserFunctions: ANF.Function list   // Only user functions, not merged with stdlib
     NonInlineableFunctionNames: Set<string> // Late external specializations compiled in this unit
     MainExpr: ANF.AExpr                // User's main expression
@@ -134,7 +134,7 @@ type UserOnlyResult = {
 
 /// Registry bundle used during ANF conversion
 type Registries = {
-    ScopeContracts: Map<string, SemanticIR.FunctionScopeContract>
+    ScopeContracts: Map<string, DestructionAnalysis.FunctionScopeContract>
     TypeReg: TypeRegistry
     RecordFieldsReg: Map<string, (string * AST.Type) list>
     RecordTypeParamsReg: Map<string, string list>
@@ -362,7 +362,7 @@ let convertFunctions
     (functions: AST.FunctionDef list)
     : Result<ANF.Function list * ANF.VarGen, string> =
     let sumTypeNames = registries.SumTypeNames
-    let inertScopes = SemanticIR.inertFunctionScopes registries.ScopeContracts
+    let inertScopes = DestructionAnalysis.inertFunctionScopes registries.ScopeContracts
     let rec loop funcs vg acc =
         match funcs with
         | [] -> Ok (List.rev acc, vg)
@@ -388,7 +388,7 @@ let convertExprToAnf
     : Result<ANF.AExpr * ANF.VarGen, string> =
     let emptyEnv : VarEnv = Map.empty
     let sumTypeNames = registries.SumTypeNames
-    toANFCore sumTypeNames (SemanticIR.inertFunctionScopes registries.ScopeContracts) expr varGen emptyEnv registries.TypeReg registries.VariantLookup registries.FuncReg registries.ModuleRegistry
+    toANFCore sumTypeNames (DestructionAnalysis.inertFunctionScopes registries.ScopeContracts) expr varGen emptyEnv registries.TypeReg registries.VariantLookup registries.FuncReg registries.ModuleRegistry
 
 /// Synthesize an entrypoint function from a main expression
 let synthesizeEntryFunction (name: string) (returnType: AST.Type) (body: ANF.AExpr) : ANF.Function =
