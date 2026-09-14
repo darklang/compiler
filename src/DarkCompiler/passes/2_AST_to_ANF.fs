@@ -1984,6 +1984,7 @@ let private collectInitialMonomorphizationSpecs (program: AST.Program) : Set<Spe
     topLevels
     |> List.map (function
         | AST.FunctionDef f when List.isEmpty f.TypeParams -> collectTypeAppsFromFunc f
+        | AST.ValueDef valueDef -> collectTypeApps (AST.valueDefBody valueDef)
         | AST.Expression e -> collectTypeApps e
         | _ -> Set.empty)
     |> List.fold Set.union Set.empty
@@ -2609,6 +2610,7 @@ let rec simpleInferType
     | AST.UInt128Literal _ -> Some AST.TUInt128
     | AST.BoolLiteral _ -> Some AST.TBool
     | AST.StringLiteral _ -> Some AST.TString
+    | AST.InterpolatedString _ -> Some AST.TString
     | AST.CharLiteral _ -> Some AST.TChar
     | AST.FloatLiteral _ -> Some AST.TFloat64
     | AST.UnitLiteral -> Some AST.TUnit
@@ -2766,22 +2768,25 @@ let rec simpleInferType
         | AST.StringConcat -> Some AST.TString
     | AST.Call (funcName, args) ->
         // Look up the function's return type, checking local bindings first
-        match Map.tryFind funcName typeEnv with
-        | Some (AST.TFunction (paramTypes, returnType)) ->
-            let argCount = args |> exprArgsToList |> List.length
-            let paramCount = List.length paramTypes
-            if argCount = paramCount then
-                Some returnType
-            elif argCount < paramCount then
-                Some (AST.TFunction (paramTypes |> List.skip argCount, returnType))
-            else
-                None
-        | Some (AST.TVar funcTypeVar) ->
-            // Higher-order generic values can remain unresolved in public source.
-            // Keep lambda lifting moving by modeling a symbolic return type.
-            Some (AST.TVar $"__call_result_{funcTypeVar}")
-        | _ ->
-            Map.tryFind funcName funcReturnTypes
+        if isRuntimeFailureName funcName then
+            Some AST.TRuntimeError
+        else
+            match Map.tryFind funcName typeEnv with
+            | Some (AST.TFunction (paramTypes, returnType)) ->
+                let argCount = args |> exprArgsToList |> List.length
+                let paramCount = List.length paramTypes
+                if argCount = paramCount then
+                    Some returnType
+                elif argCount < paramCount then
+                    Some (AST.TFunction (paramTypes |> List.skip argCount, returnType))
+                else
+                    None
+            | Some (AST.TVar funcTypeVar) ->
+                // Higher-order generic values can remain unresolved in public source.
+                // Keep lambda lifting moving by modeling a symbolic return type.
+                Some (AST.TVar $"__call_result_{funcTypeVar}")
+            | _ ->
+                Map.tryFind funcName funcReturnTypes
     | AST.TypeApp (funcName, typeArgs, _) ->
         // Look up the generic function's definition and apply type substitution
         match Map.tryFind funcName genericFuncDefs with
@@ -2875,6 +2880,7 @@ let rec simpleInferType
 
 let inferLambdaReturnType (body: AST.Expr) (state: LiftState) : Result<AST.Type, string> =
     match simpleInferType body state.TypeEnv state.FuncParams state.FuncReturnTypes state.GenericFuncDefs state.TypeReg state.VariantLookup with
+    | Some AST.TRuntimeError -> Ok AST.TUnit
     | Some returnType -> Ok returnType
     | None -> Error "Lambda lifting could not infer return type for lambda body"
 
@@ -9390,22 +9396,30 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 let (closureId, varGen2) = ANF.freshVar varGen1
                 let closureAlloc = ANF.ClosureAlloc (funcName, captureAtoms)
                 // Convert args
-                let rec convertArgs (remaining: AST.Expr list) (vg: ANF.VarGen) (acc: (ANF.Atom * (ANF.TempId * ANF.CExpr) list) list) =
+                let rec convertArgs
+                    (remaining: AST.Expr list)
+                    (vg: ANF.VarGen)
+                    (acc: (ANF.AExpr * ANF.Atom) list)
+                    =
                     match remaining with
                     | [] -> Ok (List.rev acc, vg)
                     | arg :: rest ->
-                        toAtomCore sumTypeNames arg vg env typeReg variantLookup funcReg moduleRegistry
-                        |> Result.bind (fun (argAtom, argBindings, vg') ->
-                            convertArgs rest vg' ((argAtom, argBindings) :: acc))
+                        toANFBoundAtomCore sumTypeNames arg vg env typeReg variantLookup funcReg moduleRegistry
+                        |> Result.bind (fun (argExpr, argAtom, vg') ->
+                            convertArgs rest vg' ((argExpr, argAtom) :: acc))
                 convertArgs argsList varGen2 []
                 |> Result.bind (fun (argResults, varGen3) ->
-                    let argAtoms = argResults |> List.map fst
-                    let argBindings = argResults |> List.collect snd
+                    let argAtoms = argResults |> List.map snd
                     // Generate closure call
                     let (resultId, varGen4) = ANF.freshVar varGen3
                     let closureCall = ANF.ClosureCall (ANF.Var closureId, argAtoms)
-                    let allBindings = captureBindings @ [(closureId, closureAlloc)] @ argBindings @ [(resultId, closureCall)]
-                    Ok (wrapBindings allBindings (ANF.Return (ANF.Var resultId)), varGen4)))
+                    let callExpr = ANF.Let (resultId, closureCall, ANF.Return (ANF.Var resultId))
+                    let withArguments =
+                        argResults
+                        |> List.map fst
+                        |> List.foldBack (fun argExpr continuation -> bindReturns argExpr (fun _ -> continuation)) <| callExpr
+                    let withClosure = ANF.Let (closureId, closureAlloc, withArguments)
+                    Ok (wrapBindings captureBindings withClosure, varGen4)))
 
         | _ ->
             // General function-expression application (for example record field access):

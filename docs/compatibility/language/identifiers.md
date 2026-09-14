@@ -44,7 +44,7 @@ resolver; `NameSyntax.QualifiedName` remains segment-aware until that boundary.
 | glued number (`123abc`, `1.5abc`, `12l3`) | Same rejection as one unit | no number/name split | compiler/interpreter syntax probes | numeric defaults are out of scope |
 | adjacent `Name<T>` | Same generic interpretation | name plus type arguments | generic and apostrophe call tests | none |
 | spaced or comment-separated `Name < T` | Same comparison interpretation | `TSpacedLt`, lowered as comparison | spaced and comment-separated declaration-generic rejection in syntax fixtures | comments preserve the non-adjacent boundary |
-| `let f`, `val x`, module header/block | All declaration starters recognized | module path typed, functions/types normalized | module and `val` boundary probes | top-level value execution is absent |
+| `let f`, `val x`, module header/block | All declaration starters recognized | module path typed; functions, values, and types normalized | module and `val` boundary probes | none |
 ## Printing and normalization
 
 `NameSyntax.isBareIdentifier` and `formatIdentifier` are shared by both syntax
@@ -61,8 +61,9 @@ boundary.
 
 - Source modules flatten before AOT typing/resolution; module-open environments
   are not implemented.
-- `val` reaches an explicit unsupported normalization error because native
-  top-level value initialization/execution is absent. It is not a `let` alias.
+- `val` declarations are first-class values and are not function declarations
+  or a spelling alias for `let`. Required values materialize as lexical bindings
+  before ANF.
 - Content-addressed package loading is absent. Package lookup-name validation
   remains resolver behavior, matching interpreter `NameResolver.fs:12-29`.
 - AOT unresolved/ambiguous diagnostics occur before execution.

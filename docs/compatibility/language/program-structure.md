@@ -21,7 +21,7 @@ parser passes, the whole-program section of `1.5_TypeChecking.fs`,
 | --- | --- | --- |
 | source composition | a compile request contains a non-empty, ordered collection of named units; each unit is parsed independently | AOT extension |
 | unit purpose | executable, library, and package purposes are explicit; dependency units cannot contain entries | AOT extension |
-| declarations | `let` declares functions, `val` is retained by the recursive source tree, and `type` declares types | parity at the source boundary |
+| declarations | `let` declares functions, `val` declares first-class values, and `type` declares types | parity at the source boundary |
 | modules | file modules and nested source modules retain typed paths until validated composition; lowering uses deterministic qualified native symbols | parity with an internal AOT symbol boundary |
 | ordering | all declarations are inventoried before bodies are checked, so supported sibling function and type references are order-independent | parity |
 | duplicates | the last declaration at the same category and qualified location wins; type, value, and function categories are distinct | parity |
@@ -37,9 +37,10 @@ parser passes, the whole-program section of `1.5_TypeChecking.fs`,
 Top-level value declarations are represented explicitly by `SourceValue`,
 `AST.ValueDef`, and checked value definitions. They participate in source-tree,
 name-resolution, type-checking, separate-compilation, and entry validation.
-Before ANF, required values are materialized as ordinary lexical bindings, so
-their bodies use the same ownership and lowering paths as any other expression.
-No parser or ANF registry hard-codes particular module values.
+Before ANF, required values are materialized once per execution scope as
+ordinary lexical bindings, so their bodies use the same ownership and lowering
+paths as any other expression. No parser or ANF registry hard-codes particular
+module values.
 
 ## Focused probes
 

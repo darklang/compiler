@@ -2466,6 +2466,7 @@ let private collectLocalSpecs
         topLevels
         |> List.map (function
             | AST.FunctionDef f when List.isEmpty f.TypeParams -> AST_to_ANF.collectTypeAppsFromFunc f
+            | AST.ValueDef valueDef -> AST_to_ANF.collectTypeApps (AST.valueDefBody valueDef)
             | AST.Expression e -> AST_to_ANF.collectTypeApps e
             | _ -> Set.empty)
         |> List.fold Set.union Set.empty
@@ -2517,9 +2518,29 @@ let private materializeProgramValues
                 if AST_to_ANF.varOccursInExpr name body then Set.add name names else names) Set.empty
         let needed = required direct
         let selected = eligible |> List.filter (fun (name, _) -> Set.contains name needed)
+        let rec orderByDependencies ordered remaining =
+            match remaining with
+            | [] -> ordered
+            | _ ->
+                let remainingNames = remaining |> List.map fst |> Set.ofList
+                let ready =
+                    remaining
+                    |> List.filter (fun (name, value) ->
+                        remainingNames
+                        |> Set.remove name
+                        |> Set.forall (fun candidate ->
+                            not (AST_to_ANF.varOccursInExpr candidate value)))
+                match ready with
+                | [] ->
+                    Crash.crash "Checked top-level values contain a cyclic materialization dependency"
+                | _ ->
+                    let readyNames = ready |> List.map fst |> Set.ofList
+                    let pending = remaining |> List.filter (fun (name, _) -> not (Set.contains name readyNames))
+                    orderByDependencies (ordered @ ready) pending
+        let ordered = orderByDependencies [] selected
         List.foldBack (fun (name, value) result ->
             if Set.contains name excluded then result
-            else AST.Let (AST.LPVariable name, value, result)) selected body
+            else AST.Let (AST.LPVariable name, value, result)) ordered body
     let materialized =
         topLevels
         |> List.choose (function

@@ -556,6 +556,15 @@ let testDoesNotBatchTestsWithProcessInputs () : TestResult =
         | Ok tests -> Error $"Expected exactly 1 parsed test, got {tests.Length}"
         | Error msg -> Error $"Expected process-input fixture to parse, but got error: {msg}")
 
+let testDoesNotBatchIsolatedTests () : TestResult =
+    let testSource = "1 = 1 isolated=true\n"
+    withTempFileNamed "ordinary.e2e" testSource (fun path ->
+        match parseE2ETestFile path with
+        | Ok [test] when test.Isolated && Option.isNone (tryPrepareBatchTest test) -> Ok ()
+        | Ok [test] -> Error $"Expected explicitly isolated test to remain unbatched: {test}"
+        | Ok tests -> Error $"Expected exactly 1 parsed test, got {tests.Length}"
+        | Error msg -> Error $"Expected isolated fixture to parse, but got error: {msg}")
+
 let testBatchesEqualityInsideExplicitResultBinding () : TestResult =
     let testSource =
         "let identityInt (value: Int) : Int = value identityInt 9223372036854775808 = 9223372036854775808\n"
@@ -593,5 +602,6 @@ let tests = [
     ("rejects invalid batch bitmask results", testRejectsInvalidBatchBitmaskResults)
     ("rejects invalid multi-chunk batch bitmask results", testRejectsInvalidMultiChunkBatchBitmaskResults)
     ("does not batch tests with process inputs", testDoesNotBatchTestsWithProcessInputs)
+    ("does not batch explicitly isolated tests", testDoesNotBatchIsolatedTests)
     ("batches equality inside explicit result binding", testBatchesEqualityInsideExplicitResultBinding)
 ]

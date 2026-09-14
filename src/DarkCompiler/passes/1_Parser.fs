@@ -1958,6 +1958,12 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                                     TypeApp (funcName, typeArgs, NonEmptyList.singleton leftExpr)
                                 | _ ->
                                     TypeApp (funcName, typeArgs, NonEmptyList.cons leftExpr args)
+                            | Constructor (reference, variantName, None) ->
+                                Constructor (reference, variantName, Some leftExpr)
+                            | Constructor (reference, variantName, Some (TupleLiteral fields)) ->
+                                Constructor (reference, variantName, Some (TupleLiteral (leftExpr :: fields)))
+                            | Constructor (reference, variantName, Some field) ->
+                                Constructor (reference, variantName, Some (TupleLiteral [leftExpr; field]))
                             | _ ->
                                 // Lambda or other expression: apply left to it
                                 Apply (right, NonEmptyList.singleton leftExpr)
@@ -2228,12 +2234,16 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
             parseFunParameters rest []
             |> Result.bind (fun (parsedParameters, bodyStart) ->
                 parseExpr bodyStart
-                |> Result.map (fun (body, remaining) ->
+                |> Result.bind (fun (body, remaining) ->
                     let parameters =
                         parsedParameters
+                        |> List.filter ((<>) (LPVariable ""))
                         |> List.map lambdaParameter
-                        |> NonEmptyList.fromList
-                    (Lambda (parameters, None, body), remaining)))
+                    match NonEmptyList.tryFromList parameters with
+                    | Some nonEmptyParameters ->
+                        Ok (Lambda (nonEmptyParameters, None, body), remaining)
+                    | None ->
+                        Error "Lambda must have at least one non-blank parameter"))
         // Qualified identifier: Stdlib.Int64.add, Module.func, or Stdlib.Result.Result.Ok
         | TIdent name :: TDot :: TIdent nextName :: rest when name.Length > 0 && System.Char.IsUpper(name.[0]) ->
             let firstSegment = NameSyntax.identifierFromText name
@@ -2902,6 +2912,99 @@ type private TopLevelFunctionLayout =
     | ReadingTopLevelFunctionHeader
     | ReadingTopLevelFunctionBody
 
+/// Retain the indentation boundary between a top-level value initializer and
+/// its following declaration or executable entry before lexing drops columns.
+let private insertTopLevelValueLayoutSeparators (input: string) : string =
+    let lines = input.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n') |> Array.toList
+    let leadingSpaces (line: string) = line.Length - line.TrimStart().Length
+    let isSignificant (line: string) =
+        let trimmed = line.Trim()
+        trimmed <> "" && not (trimmed.StartsWith("//"))
+    let isValueDeclaration (line: string) =
+        let trimmed = line.TrimStart()
+        trimmed.StartsWith("val ") && trimmed.Contains("=")
+    let rec loop activeIndent remaining acc =
+        match remaining with
+        | [] -> acc |> List.rev |> String.concat "\n"
+        | line :: rest when not (isSignificant line) -> loop activeIndent rest (line :: acc)
+        | line :: rest ->
+            let indent = leadingSpaces line
+            let closesValue = activeIndent |> Option.exists (fun declarationIndent -> indent <= declarationIndent)
+            let rewritten =
+                if closesValue then line.Substring(0, indent) + "; " + line.Substring(indent)
+                else line
+            let nextActive =
+                if isValueDeclaration line then Some indent
+                elif closesValue then None
+                else activeIndent
+            loop nextActive rest (rewritten :: acc)
+    loop None lines []
+
+/// Materialize the implicit `in` that terminates a newline-delimited
+/// lambda-valued let. Without source columns, both the lambda body and its
+/// continuation are legal space applications and no token-only split can
+/// recover the intended boundary.
+let private insertLambdaLetLayoutSeparators (input: string) : string =
+    let lines = input.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n') |> Array.toList
+    let leadingSpaces (line: string) = line.Length - line.TrimStart().Length
+    let isSignificant (line: string) =
+        let trimmed = line.Trim()
+        trimmed <> "" && not (trimmed.StartsWith("//"))
+    let nextSignificant lines = lines |> List.tryFind isSignificant
+    let tryLambdaLetIndent (line: string) (remaining: string list) : int option =
+        let letIndex = line.IndexOf("let ", System.StringComparison.Ordinal)
+        let equalsIndex = line.IndexOf('=', max 0 letIndex)
+        if letIndex < 0 || equalsIndex < letIndex then
+            None
+        else
+            let declarationHead = line.Substring(letIndex + 4, equalsIndex - letIndex - 4)
+            let rhs = line.Substring(equalsIndex + 1).TrimStart()
+            if declarationHead.Contains("(") || declarationHead.Contains("<") then
+                None
+            elif rhs.TrimEnd().EndsWith(" in") then
+                None
+            elif rhs.StartsWith("fun ") then
+                Some letIndex
+            elif rhs = "" then
+                match nextSignificant remaining with
+                | Some next when
+                    leadingSpaces next > letIndex
+                    && next.TrimStart().StartsWith("fun ") -> Some letIndex
+                | _ -> None
+            else
+                None
+
+    let rec closeCompleted indent active prefixes =
+        match active with
+        | declarationIndent :: rest when indent <= declarationIndent + 1 ->
+            closeCompleted indent rest ("in " :: prefixes)
+        | _ -> (active, prefixes |> List.rev |> String.concat "")
+
+    let rec loop active remaining acc =
+        match remaining with
+        | [] -> acc |> List.rev |> String.concat "\n"
+        | line :: rest when not (isSignificant line) ->
+            loop active rest (line :: acc)
+        | line :: rest ->
+            let indent = leadingSpaces line
+            let explicitIn = line.TrimStart().StartsWith("in ")
+            let (remainingActive, prefix) =
+                if explicitIn then
+                    match active with
+                    | _ :: outer -> (outer, "")
+                    | [] -> ([], "")
+                else
+                    closeCompleted indent active []
+            let rewritten =
+                if prefix = "" then line
+                else line.Substring(0, indent) + prefix + line.Substring(indent)
+            let nextActive =
+                match tryLambdaLetIndent line rest with
+                | Some declarationIndent -> declarationIndent :: remainingActive
+                | None -> remainingActive
+            loop nextActive rest (rewritten :: acc)
+    loop [] lines []
+
 let private insertNestedFunctionLayoutSeparators (input: string) : string =
     let lines = input.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n') |> Array.toList
     let leadingSpaces (line: string) = line.Length - line.TrimStart().Length
@@ -3017,7 +3120,12 @@ let parseSourceString (allowInternal: bool) (input: string) : Result<NameSyntax.
         | Some (moduleName, body) -> extractModules body (moduleName :: modules)
         | None -> (List.rev modules, source)
     let (sourceModules, sourceBody) = extractModules input []
-    let sourceBody = sourceBody |> insertNestedFunctionLayoutSeparators |> preserveIndentedMatchBoundaries
+    let sourceBody =
+        sourceBody
+        |> insertLambdaLetLayoutSeparators
+        |> insertNestedFunctionLayoutSeparators
+        |> insertTopLevelValueLayoutSeparators
+        |> preserveIndentedMatchBoundaries
     lex sourceBody
     |> Result.bind (fun tokens ->
         if allowInternal then parse tokens

@@ -180,6 +180,7 @@ let tryPrepareBatchTest (test: E2ETest) : PreparedE2EBatchTest option =
         && List.isEmpty test.Arguments
         && List.isEmpty test.Environment
         && test.Stdin = TestDSL.E2EFormat.Closed
+        && not test.Isolated
         && test.ExpectedExitCode = 0
         && not test.ExpectCompileError
         && Option.isNone test.SkipReason
@@ -256,6 +257,7 @@ let private collectTypeAppsFromProgram (program: Program) : Set<SpecKey> =
     topLevels
     |> List.map (function
         | FunctionDef f when List.isEmpty f.TypeParams -> collectTypeAppsFromFunc f
+        | ValueDef valueDef -> collectTypeApps (valueDefBody valueDef)
         | Expression e -> collectTypeApps e
         | _ -> Set.empty)
     |> List.fold Set.union Set.empty

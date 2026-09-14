@@ -1,0 +1,15 @@
+// Verifies that interpreter-style top-level values initialize once and are available to expressions.
+
+val parityAnswer = 41L
+val parityWords = ["compiler"; "interpreter"]
+val parityWordCount = Stdlib.List.length parityWords
+val initializedOnce = Stdlib.Int64.random (-9223372036854775808L) 9223372036854775807L
+val parityOffset = 40L
+let addParityOffset (value: Int64): Int64 = parityOffset + value
+let parityIdentity<'a> (value: a): a = value
+
+parityAnswer + 1L = 42L
+parityWordCount = 2
+initializedOnce == initializedOnce = true
+addParityOffset 2L = 42L
+parityIdentity<Int64> parityAnswer = 41L

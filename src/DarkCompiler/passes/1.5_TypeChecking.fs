@@ -759,6 +759,26 @@ let rec private applySubstWithSeen (seen: Set<string>) (subst: Substitution) (ty
 let applySubst (subst: Substitution) (typ: Type) : Type =
     applySubstWithSeen Set.empty subst typ
 
+/// Instantiate declared type parameters simultaneously. A replacement may use
+/// the same name as a parameter in a nested declaration and must not itself be
+/// substituted (for example Outer<'a> = Inner<String, 'a>).
+let rec private applyTypeArguments (subst: Substitution) (typ: Type) : Type =
+    match typ with
+    | TVar name -> Map.tryFind name subst |> Option.defaultValue typ
+    | TFunction (paramTypes, returnType) ->
+        TFunction (List.map (applyTypeArguments subst) paramTypes, applyTypeArguments subst returnType)
+    | TTuple elemTypes -> TTuple (List.map (applyTypeArguments subst) elemTypes)
+    | TEnumFields fieldTypes -> TEnumFields (List.map (applyTypeArguments subst) fieldTypes)
+    | TRecord (name, typeArgs) -> TRecord (name, List.map (applyTypeArguments subst) typeArgs)
+    | TList elemType -> TList (applyTypeArguments subst elemType)
+    | TStream elemType -> TStream (applyTypeArguments subst elemType)
+    | TSum (name, typeArgs) -> TSum (name, List.map (applyTypeArguments subst) typeArgs)
+    | TDict (keyType, valueType) ->
+        TDict (applyTypeArguments subst keyType, applyTypeArguments subst valueType)
+    | TInt8 | TInt16 | TInt32 | TInt64 | TInt128 | TInt
+    | TUInt8 | TUInt16 | TUInt32 | TUInt64 | TUInt128
+    | TBool | TFloat64 | TString | TBlob | TChar | TDateTime | TUnit | TRuntimeError | TRawPtr -> typ
+
 /// Collect type variable names in first-seen order.
 let rec collectTypeVarsInType (typ: Type) (acc: string list) : string list =
     let add name =
@@ -820,14 +840,14 @@ let rec private resolveAliasTargetType (aliasReg: AliasRegistry) (typ: Type) : T
         match Map.tryFind name aliasReg with
         | Some (typeParams, targetType) when List.length typeArgs <= List.length typeParams ->
             let subst = List.zip (List.take (List.length typeArgs) typeParams) typeArgs |> Map.ofList
-            targetType |> applySubst subst |> resolveAliasTargetType aliasReg
+            targetType |> applyTypeArguments subst |> resolveAliasTargetType aliasReg
         | _ ->
             TRecord (name, List.map (resolveAliasTargetType aliasReg) typeArgs)
     | TSum (name, typeArgs) ->
         match Map.tryFind name aliasReg with
         | Some (typeParams, targetType) when List.length typeArgs <= List.length typeParams ->
             let subst = List.zip (List.take (List.length typeArgs) typeParams) typeArgs |> Map.ofList
-            targetType |> applySubst subst |> resolveAliasTargetType aliasReg
+            targetType |> applyTypeArguments subst |> resolveAliasTargetType aliasReg
         | _ ->
             TSum (name, List.map (resolveAliasTargetType aliasReg) typeArgs)
     | TFunction (paramTypes, returnType) ->
@@ -861,7 +881,7 @@ let private tryResolveGenericRecordAliasFields
             | Ok subst ->
                 let fields =
                     targetInfo.Fields
-                    |> List.map (fun (fieldName, fieldType) -> (fieldName, applySubst subst fieldType))
+                    |> List.map (fun (fieldName, fieldType) -> (fieldName, applyTypeArguments subst fieldType))
                 Some (targetName, fields)
             | Error _ ->
                 None
@@ -995,7 +1015,7 @@ let rec resolveType (aliasReg: AliasRegistry) (typ: Type) : Type =
             else
                 // Build substitution and apply to target type
                 let subst = List.zip typeParams resolvedArgs |> Map.ofList
-                let substituted = applySubst subst targetType
+                let substituted = applyTypeArguments subst targetType
                 // Recursively resolve in case target is also an alias
                 resolveType aliasReg substituted
         | None ->
@@ -1012,7 +1032,7 @@ let rec resolveType (aliasReg: AliasRegistry) (typ: Type) : Type =
             else
                 // Build substitution and apply to target type
                 let subst = List.zip typeParams typeArgs |> Map.ofList
-                let substituted = applySubst subst targetType
+                let substituted = applyTypeArguments subst targetType
                 // Recursively resolve in case target is also an alias
                 resolveType aliasReg substituted
         | None ->
@@ -2307,11 +2327,34 @@ let rec private checkExprWithParamNamesAndSumTypeNames
         let fromCall (functionName: string) (arguments: Expr list) =
             match Map.tryFind functionName env with
             | Some (TFunction (parameterTypes, _)) when List.length parameterTypes = List.length arguments ->
-                List.zip parameterTypes arguments
-                |> List.tryPick (fun (parameterType, argument) ->
-                    match argument with
-                    | Var name when name = targetName -> Some parameterType
-                    | _ -> tryFindFunctionValueExpectation targetName argument)
+                let parameterArguments = List.zip parameterTypes arguments
+                match
+                    parameterArguments
+                    |> List.tryPick (fun (parameterType, argument) ->
+                        match argument with
+                        | Var name when name = targetName -> Some parameterType
+                        | _ -> None)
+                with
+                | Some targetParameterType ->
+                    let siblingBindings =
+                        parameterArguments
+                        |> ResultList.traverse (fun (parameterType, argument) ->
+                            match argument with
+                            | Var name when name = targetName -> Ok []
+                            | _ ->
+                                checkExpr argument env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg None
+                                |> Result.bind (fun (argumentType, _) ->
+                                    match matchTypes parameterType argumentType with
+                                    | Ok bindings -> Ok bindings
+                                    | Error _ -> Ok []))
+                        |> Result.map List.concat
+                        |> Result.bind (consolidateBindings >> Result.mapError GenericError)
+                        |> Result.toOption
+                        |> Option.defaultValue Map.empty
+                    Some (applySubst siblingBindings targetParameterType)
+                | None ->
+                    parameterArguments
+                    |> List.tryPick (fun (_, argument) -> tryFindFunctionValueExpectation targetName argument)
             | _ -> tryChildren arguments
 
         match candidate with
@@ -3331,6 +3374,7 @@ let rec private checkExprWithParamNamesAndSumTypeNames
                 |> Result.bind (fun (_argType, argExpr') ->
                     let outputType =
                         match expectedType with
+                        | Some (TVar _) -> TUnit
                         | Some expected -> expected
                         | None -> TRuntimeError
                     Ok (outputType, Call (funcName, NonEmptyList.singleton argExpr')))
@@ -4269,7 +4313,7 @@ let rec private checkExprWithParamNamesAndSumTypeNames
                     |> List.map (fun (fieldName, fieldType) ->
                         (fieldName,
                          fieldType
-                         |> applySubst initialSubstitution))
+                         |> applyTypeArguments initialSubstitution))
 
                 // Check that all fields are present and have correct types
                 let fieldMap = Map.ofList normalizedFields
@@ -4400,11 +4444,9 @@ let rec private checkExprWithParamNamesAndSumTypeNames
         // Check the record expression to get its type
         checkExpr recordExpr env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg None
         |> Result.bind (fun (recordType, recordExpr') ->
-            match recordType with
+            match resolveAliasTargetType aliasReg recordType with
             | TRecord (typeName, typeArgs) ->
-                // Resolve type alias before looking up in typeReg
-                let resolvedTypeName = resolveTypeName aliasReg typeName
-                match Map.tryFind resolvedTypeName typeReg with
+                match Map.tryFind typeName typeReg with
                 | None ->
                     Error (GenericError $"Unknown record type: {typeName}")
                 | Some recordInfo ->
@@ -4436,7 +4478,7 @@ let rec private checkExprWithParamNamesAndSumTypeNames
                                 | (fname, updateExpr) :: rest ->
                                     match Map.tryFind fname recordInfo.FieldTypes with
                                     | Some fieldTypePattern ->
-                                        let expectedFieldType = applySubst subst fieldTypePattern
+                                        let expectedFieldType = applyTypeArguments subst fieldTypePattern
                                         checkExpr updateExpr env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg (Some expectedFieldType)
                                         |> Result.bind (fun (actualType, updateExpr') ->
                                             if typesCompatibleWithAliases aliasReg expectedFieldType actualType then
@@ -4447,7 +4489,7 @@ let rec private checkExprWithParamNamesAndSumTypeNames
                                         Crash.crash $"Validated record update field '{fname}' disappeared"
 
                             checkUpdates normalizedUpdates []
-                            |> Result.map (fun updates' -> (TRecord (resolvedTypeName, typeArgs), RecordUpdate (recordExpr', updates')))
+                            |> Result.map (fun updates' -> (TRecord (typeName, typeArgs), RecordUpdate (recordExpr', updates')))
             | other ->
                 Error (GenericError $"Cannot use record update syntax on non-record type {typeToString other}"))
 
@@ -4459,11 +4501,9 @@ let rec private checkExprWithParamNamesAndSumTypeNames
         // Check the record expression
         checkExpr recordExpr env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg None
         |> Result.bind (fun (recordType, recordExpr') ->
-            match recordType with
+            match resolveAliasTargetType aliasReg recordType with
             | TRecord (typeName, typeArgs) ->
-                // Resolve type alias before looking up in typeReg
-                let resolvedTypeName = resolveTypeName aliasReg typeName
-                match Map.tryFind resolvedTypeName typeReg with
+                match Map.tryFind typeName typeReg with
                 | None ->
                     Error (GenericError $"Unknown record type: {typeName}")
                 | Some recordInfo ->
@@ -4475,7 +4515,7 @@ let rec private checkExprWithParamNamesAndSumTypeNames
                         | Error msg ->
                             Error (GenericError msg)
                         | Ok subst ->
-                            let fieldType = applySubst subst fieldTypePattern
+                            let fieldType = applyTypeArguments subst fieldTypePattern
                             match expectedType with
                             | Some expected when not (typesCompatibleWithAliases aliasReg expected fieldType) ->
                                 Error (TypeMismatch (expected, fieldType, $"field access .{fieldName}"))
@@ -5932,7 +5972,15 @@ let rec private checkExprWithParamNamesAndSumTypeNames
                             | None ->
                                 Error (TypeMismatch (expectedRet, bodyType, "lambda return type"))
                             | Some reconciledRetType ->
-                                Ok (TFunction (paramTypes, reconciledRetType), lambdaExpr)
+                                let concreteReturnType =
+                                    if bodyType = TRuntimeError && containsTVar expectedRet then
+                                        // Bottom has no runtime payload representation. Unit is
+                                        // the canonical monomorphic witness when the result is
+                                        // otherwise unconstrained.
+                                        TUnit
+                                    else
+                                        reconciledRetType
+                                Ok (TFunction (paramTypes, concreteReturnType), lambdaExpr)
                         | _ ->
                             Error (GenericError "Internal error: lambda did not type-check to a function")))
         | Some other ->
@@ -6204,7 +6252,7 @@ let rec private buildEqHelperExpr
             let concreteFields =
                 match buildRecordFieldSubstitutionFromParams recordInfo.TypeParams typeArgs with
                 | Ok subst ->
-                    fields |> List.map (fun (name, fieldType) -> (name, resolveType aliasReg (applySubst subst fieldType)))
+                    fields |> List.map (fun (name, fieldType) -> (name, resolveType aliasReg (applyTypeArguments subst fieldType)))
                 | Error _ ->
                     fields |> List.map (fun (name, fieldType) -> (name, resolveType aliasReg fieldType))
 
@@ -6440,7 +6488,7 @@ let rec private buildCompareHelperExpr
                 | Ok subst ->
                     recordInfo.Fields
                     |> List.map (fun (name, fieldType) ->
-                        (name, resolveType aliasReg (applySubst subst fieldType)))
+                        (name, resolveType aliasReg (applyTypeArguments subst fieldType)))
                 | Error _ ->
                     recordInfo.Fields
                     |> List.map (fun (name, fieldType) -> (name, resolveType aliasReg fieldType))
@@ -6542,7 +6590,7 @@ let private collectDirectEqHelperDeps
                 let concreteFields =
                     match buildRecordFieldSubstitutionFromParams recordInfo.TypeParams typeArgs with
                     | Ok subst ->
-                        fields |> List.map (fun (_, fieldType) -> resolveType aliasReg (applySubst subst fieldType))
+                        fields |> List.map (fun (_, fieldType) -> resolveType aliasReg (applyTypeArguments subst fieldType))
                     | Error _ ->
                         fields |> List.map (fun (_, fieldType) -> resolveType aliasReg fieldType)
                 concreteFields |> List.choose addIfHelperType
@@ -8442,6 +8490,44 @@ let private checkResolvedProgramInternal
         | Some existingEnv ->
             Map.fold (fun env name typ -> Map.add name typ env) existingEnv.FuncEnv programFuncEnv
         | None -> programFuncEnv
+    let initialValueFuncParamNames =
+        match baseEnv with
+        | Some existingEnv ->
+            Map.fold
+                (fun names name parameters -> Map.add name parameters names)
+                existingEnv.FuncParamNames
+                declarationSummary.FuncParamNames
+        | None -> declarationSummary.FuncParamNames
+    let initialValueIndexedTypeReg =
+        match baseEnv with
+        | Some existingEnv ->
+            Map.fold
+                (fun registry name info -> Map.add name info registry)
+                existingEnv.IndexedTypeReg
+                programIndexedTypeReg
+        | None -> programIndexedTypeReg
+    let initialValueIndexedSumTypeReg =
+        match baseEnv with
+        | Some existingEnv ->
+            Map.fold
+                (fun registry name info -> Map.add name info registry)
+                existingEnv.IndexedSumTypeReg
+                programIndexedSumTypeReg
+        | None -> programIndexedSumTypeReg
+    let initialValueGenericFuncReg =
+        match baseEnv with
+        | Some existingEnv ->
+            {
+                Functions =
+                    Map.fold
+                        (fun functions name typeParams -> Map.add name typeParams functions)
+                        existingEnv.GenericFuncReg.Functions
+                        programGenericFuncReg.Functions
+                RequireExplicitTypeArgsForBareCalls =
+                    existingEnv.GenericFuncReg.RequireExplicitTypeArgsForBareCalls
+                    || programGenericFuncReg.RequireExplicitTypeArgsForBareCalls
+            }
+        | None -> programGenericFuncReg
     let initialValues = baseEnv |> Option.map (fun env -> env.Values) |> Option.defaultValue Map.empty
     let checkedValuesResult =
         topLevels
@@ -8451,14 +8537,14 @@ let private checkResolvedProgramInternal
                 match topLevel with
                 | ValueDef (UncheckedValueDef (name, body)) ->
                     checkExprWithParamNamesAndSumTypeNames
-                        declarationSummary.FuncParamNames
+                        initialValueFuncParamNames
                         availableSumTypeNames
-                        programIndexedSumTypeReg
+                        initialValueIndexedSumTypeReg
                         body
                         valueFuncEnv
-                        programIndexedTypeReg
-                        canonicalProgramVariantLookup
-                        programGenericFuncReg
+                        initialValueIndexedTypeReg
+                        canonicalVariantLookup
+                        initialValueGenericFuncReg
                         warningSettings
                         moduleRegistry
                         functionAliasReg

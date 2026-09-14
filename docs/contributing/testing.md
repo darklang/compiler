@@ -5,6 +5,10 @@ fixture formats cover repetitive syntax, encoding, algorithm, formatting, and
 small executable-backend cases without requiring a new F# test function for
 every input.
 
+Value-equality E2E checks normally share a generated executable. Add
+`isolated=true` to a check that must own its process or bounded heap state; the
+runner then compiles and executes that check separately.
+
 ## Syntax fixtures
 
 Place `.syntax` files under `src/Tests/syntax/`. A file can contain multiple

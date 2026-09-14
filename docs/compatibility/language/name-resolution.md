@@ -93,7 +93,8 @@ name`, and `Ambiguous <context> reference`.
   remain an intentional, documented program-model divergence.
 - `val` declarations are first-class program declarations. Module, inherited,
   and builtin values resolve in the value namespace, are type-checked once, and
-  are materialized as lexical bindings before ANF. Upstream constants such as
+  are materialized once per execution scope as lexical bindings before ANF.
+  Upstream constants such as
   `Stdlib.Math.pi`, `Stdlib.List.empty`, and `Stdlib.Blob.empty` are values and
   are referenced without `()`.
 - Repeated flattened type declarations with the same canonical type identity

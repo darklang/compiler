@@ -40,11 +40,11 @@ match Stdlib.Cli.Sys.hostname () with | Ok hostname -> Stdlib.String.length host
 
 match Stdlib.Cli.Sys.currentUser () with | Some user -> user | None -> "missing" = "native user  " env="USER=native user  " env="PATH="
 
-match Stdlib.Cli.Process.runIn "/" "pwd" [] with | Ok output -> Stdlib.String.trimEnd output.stdout | Error error -> error.message = "/"
+match Stdlib.Cli.Process.runIn "/" "pwd" [] with | Ok output -> Stdlib.String.trimEnd output.stdout | Error error -> error.message = "/" isolated=true
 
-match Stdlib.Cli.Process.runWithEnv "/bin/sh" (["-c", "printf %s \"$CLI_PARITY_VALUE\""]) ([("CLI_PARITY_VALUE", "inherited")]) with | Ok output -> output.stdout | Error error -> error = "inherited"
+match Stdlib.Cli.Process.runWithEnv "/bin/sh" (["-c", "printf %s \"$CLI_PARITY_VALUE\""]) ([("CLI_PARITY_VALUE", "inherited")]) with | Ok output -> output.stdout | Error error -> error = "inherited" isolated=true
 
-match Stdlib.Cli.Process.pipe "printf" (["abc"]) "tr" (["a-z", "A-Z"]) with | Ok output -> output.stdout | Error error -> error.message = "ABC"
+match Stdlib.Cli.Process.pipe "printf" (["abc"]) "tr" (["a-z", "A-Z"]) with | Ok output -> output.stdout | Error error -> error.message = "ABC" isolated=true
 
 match Stdlib.Cli.Process.runIn "/" "/bin/pwd" [] with | Ok output -> Stdlib.String.trimEnd output.stdout | Error error -> error.message = "/" env="SHELL=/definitely/missing" env="PATH="
 

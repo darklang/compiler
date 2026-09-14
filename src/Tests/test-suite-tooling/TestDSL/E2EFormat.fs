@@ -43,6 +43,8 @@ type E2ETest = {
     Environment: (string * string) list
     Stdin: TestStdin
     OutputMatch: OutputMatch
+    /// Run this test in its own executable instead of a shared E2E batch.
+    Isolated: bool
     ExpectedExitCode: int
     /// If true, expect the compiler to fail (type error, parse error, etc.)
     ExpectCompileError: bool
@@ -104,6 +106,7 @@ type private OptFlags = {
     Environment: (string * string) list
     Stdin: TestStdin
     OutputMatch: OutputMatch
+    Isolated: bool
 }
 
 let private defaultOptFlags = {
@@ -131,6 +134,7 @@ let private defaultOptFlags = {
     Environment = []
     Stdin = Closed
     OutputMatch = NormalizedText
+    Isolated = false
 }
 
 /// Extract function name from a definition line (e.g., "def buildTree(...)" -> "buildTree")
@@ -360,6 +364,7 @@ let private isAttributeKey (key: string) : bool =
     | "disable_leak_check"
     | "stdin"
     | "exact_bytes"
+    | "isolated"
     | "disable_opt_freelist"
     | "disable_opt_anf"
     | "disable_opt_anf_const_folding"
@@ -877,6 +882,10 @@ let private parseTestLineWithPreamble (line: string) (lineNumber: int) (filePath
                                             | Some true -> optFlags <- { optFlags with OutputMatch = ExactBytes }
                                             | Some false -> optFlags <- { optFlags with OutputMatch = NormalizedText }
                                             | None -> ()
+                                        | "isolated" ->
+                                            match parseBool value "isolated" with
+                                            | Some b -> optFlags <- { optFlags with Isolated = b }
+                                            | None -> ()
                                         | _ -> errors <- $"Unknown attribute: {key}" :: errors
                                     | Error e -> errors <- e :: errors
 
@@ -929,6 +938,7 @@ let private parseTestLineWithPreamble (line: string) (lineNumber: int) (filePath
                 Environment = optFlags.Environment
                 Stdin = optFlags.Stdin
                 OutputMatch = optFlags.OutputMatch
+                Isolated = optFlags.Isolated
                 ExpectedExitCode = exitCode
                 ExpectCompileError = expectError
                 ExpectedErrorMessage = errorMessage
