@@ -13,12 +13,13 @@
 #                            already passed it on the exact unchanged commit
 #   --reset-dark-baseline    Replace Dark full snapshot from one complete successful run
 #   --refresh-baseline=rust  Independently refresh audited Rust reference rows
-#   --jobs, --jobs=N         Run up to N benchmarks in parallel (default: 1)
+#   --jobs, --jobs=N         Build and measure up to N benchmarks in parallel (default: 1)
 #   --list                   Print the benchmarks that would run and exit
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 source "$SCRIPT_DIR/infrastructure/pretty.sh"
+source "$SCRIPT_DIR/infrastructure/parallel_jobs.sh"
 
 machine_arch() {
     case "$(uname -m)" in
@@ -310,8 +311,6 @@ if [ "$QUIET_MODE" != true ]; then
     echo ""
 fi
 
-JOB_PIDS=()
-
 build_benchmark_job() {
     local bench="$1"
     local status_file="$STATUS_DIR/${bench}.status"
@@ -377,44 +376,10 @@ run_benchmark_job() {
     fi
 }
 
-reap_finished_job() {
-    local i
-    for i in "${!JOB_PIDS[@]}"; do
-        local pid="${JOB_PIDS[$i]}"
-        local state
-        state=$(ps -p "$pid" -o stat= 2>/dev/null | tr -d '[:space:]')
-        if [ -z "$state" ] || [[ "$state" == Z* ]]; then
-            wait "$pid" || true
-            unset 'JOB_PIDS[$i]'
-            JOB_PIDS=("${JOB_PIDS[@]}")
-            return 0
-        fi
-    done
-    return 1
-}
-
-wait_for_available_slot() {
-    while [ "${#JOB_PIDS[@]}" -ge "$JOB_COUNT" ]; do
-        if ! reap_finished_job; then
-            sleep 0.1
-        fi
-    done
-}
-
-wait_for_all_jobs() {
-    local pid
-    for pid in "${JOB_PIDS[@]}"; do
-        wait "$pid" || true
-    done
-    JOB_PIDS=()
-}
-
 if [ "$QUIET_MODE" != true ]; then
     pretty_section "Build gate"
 fi
-for bench in $BENCHMARKS; do
-    build_benchmark_job "$bench"
-done
+run_parallel_jobs "$JOB_COUNT" build_benchmark_job "${FILTERED_BENCHMARKS[@]}"
 
 for bench in $BENCHMARKS; do
     status_file="$STATUS_DIR/${bench}.status"
@@ -441,19 +406,7 @@ fi
 if [ "$QUIET_MODE" != true ]; then
     pretty_section "Measurement gate"
 fi
-for bench in $BENCHMARKS; do
-    if [ "$JOB_COUNT" -le 1 ]; then
-        run_benchmark_job "$bench"
-    else
-        wait_for_available_slot
-        run_benchmark_job "$bench" &
-        JOB_PIDS+=("$!")
-    fi
-done
-
-if [ "$JOB_COUNT" -gt 1 ]; then
-    wait_for_all_jobs
-fi
+run_parallel_jobs "$JOB_COUNT" run_benchmark_job "${FILTERED_BENCHMARKS[@]}"
 
 for bench in $BENCHMARKS; do
     status_file="$STATUS_DIR/${bench}.status"

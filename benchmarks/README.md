@@ -277,10 +277,11 @@ Benchmarks can execute concurrently:
 ./benchmarks/run_benchmarks.sh --jobs 8
 ```
 
-The default is `--jobs 1`. Cachegrind instruction counts are reproducible when
-benchmarks run concurrently, so full recording and verification may use
-more jobs. The runner builds the current Dark compiler once before spawning
-benchmark jobs, preventing stale compiler artifacts from being measured.
+The default is `--jobs 1`. The runner builds the current Dark compiler once,
+then applies the selected job limit to both benchmark compilation and
+measurement. Cachegrind instruction counts are reproducible when benchmarks run
+concurrently, so full recording and verification may use more jobs without
+changing their counts.
 Hyperfine should remain at one job when avoiding timing skew matters.
 
 ## Directory Structure
