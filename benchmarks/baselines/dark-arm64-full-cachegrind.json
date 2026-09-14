@@ -9,20 +9,20 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs"
   },
-  "contract_sha256": "192b215fe4cb83b04d99c505183d561edf9e0ef149a430e4153b3e9ff95d8c16",
-  "generated_at": "2026-09-14T20:51:15+00:00",
+  "contract_sha256": "7a187054fa812f1f89d35f3dd3176db95059371d4c096ff03227313ac338038d",
+  "generated_at": "2026-09-14T21:31:26+00:00",
   "compiler": {
-    "commit": "652b5c5c8a4a24bc4dd7b6d30e4525b601fe3a8d",
-    "subject": "Parallelize benchmark builds"
+    "commit": "750de683dc06d9df4dd5b83d550fd55210bcc7b3",
+    "subject": "Count benchmark instructions without cache simulation"
   },
   "benchmarks": [
     {
       "name": "ackermann",
-      "instructions": 9303381642
+      "instructions": 145114326
     },
     {
       "name": "binary_trees",
-      "instructions": 537695282
+      "instructions": 11053279
     },
     {
       "name": "collatz",
@@ -30,7 +30,7 @@
     },
     {
       "name": "edigits",
-      "instructions": 1724752465
+      "instructions": 52884224
     },
     {
       "name": "factorial",
@@ -38,27 +38,27 @@
     },
     {
       "name": "fannkuch",
-      "instructions": 23918821535
+      "instructions": 239915558
     },
     {
       "name": "fasta",
-      "instructions": 7719486910
+      "instructions": 157197960
     },
     {
       "name": "fft",
-      "instructions": 4578662331
+      "instructions": 413128617
     },
     {
       "name": "fib",
-      "instructions": 388194915
+      "instructions": 8268703
     },
     {
       "name": "huffman",
-      "instructions": 6442997915
+      "instructions": 408375089
     },
     {
       "name": "leibniz",
-      "instructions": 850007272
+      "instructions": 17006924
     },
     {
       "name": "mandelbrot",
@@ -66,31 +66,31 @@
     },
     {
       "name": "matmul",
-      "instructions": 2130138761
+      "instructions": 43156675
     },
     {
       "name": "merkletrees",
-      "instructions": 193340287
+      "instructions": 3877645
     },
     {
       "name": "myers_diff",
-      "instructions": 30802188851
+      "instructions": 2480164309
     },
     {
       "name": "nbody",
-      "instructions": 726507592
+      "instructions": 14537406
     },
     {
       "name": "nqueen",
-      "instructions": 207721884
+      "instructions": 7420529
     },
     {
       "name": "nsieve",
-      "instructions": 4305616573
+      "instructions": 131518105
     },
     {
       "name": "pisum",
-      "instructions": 40024117
+      "instructions": 812677
     },
     {
       "name": "primes",
@@ -102,11 +102,11 @@
     },
     {
       "name": "raytracer",
-      "instructions": 2496915202
+      "instructions": 49546721
     },
     {
       "name": "regex_lite",
-      "instructions": 4408024171
+      "instructions": 69462277
     },
     {
       "name": "spectral_norm",
@@ -114,7 +114,7 @@
     },
     {
       "name": "string_equality",
-      "instructions": 58060641
+      "instructions": 1220167
     },
     {
       "name": "sum_to_n",
@@ -126,11 +126,11 @@
     },
     {
       "name": "tinytemplate",
-      "instructions": 34888976276
+      "instructions": 8881984620
     },
     {
       "name": "warden",
-      "instructions": 2105453216
+      "instructions": 45956223
     }
   ]
 }

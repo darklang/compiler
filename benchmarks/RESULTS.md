@@ -2,41 +2,41 @@
 
 Best-known compatible full-profile Dark performance vs audited Rust references (instruction counts).
 
-**Snapshot timestamp:** 2026-09-14T20:51:15+00:00
+**Snapshot timestamp:** 2026-09-14T21:31:26+00:00
 **Architecture:** `arm64`
 **Profile:** `full` (schema 2)
 **Measurement policy:** `cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs`
-**Workload contract:** `192b215fe4cb83b04d99c505183d561edf9e0ef149a430e4153b3e9ff95d8c16`
-**Compiler commit:** `652b5c5c8a4a24bc4dd7b6d30e4525b601fe3a8d` - Parallelize benchmark builds
+**Workload contract:** `7a187054fa812f1f89d35f3dd3176db95059371d4c096ff03227313ac338038d`
+**Compiler commit:** `750de683dc06d9df4dd5b83d550fd55210bcc7b3` - Count benchmark instructions without cache simulation
 
-| Benchmark | Dark (17.4x) | Rust |
+| Benchmark | Dark (10.9x) | Rust |
 |---|---:|---:|
-| ackermann | 9,303,381,642 (1.62x) | 5,725,442,001 |
-| binary_trees | 537,695,282 (0.17x) | 3,186,862,486 |
-| collatz | 70,194,528 (0.91x) | 76,735,859 |
-| edigits | 1,724,752,465 (122x) | 14,174,361 |
-| factorial | 63,745 (0.07x) | 972,619 |
-| fannkuch | 23,918,821,535 (186x) | 128,622,475 |
-| fasta | 7,719,486,910 (360x) | 21,447,429 |
-| fft | 4,578,662,331 (2148x) | 2,131,783 |
-| fib | 388,194,915 (1.42x) | 272,529,831 |
-| huffman | 6,442,997,915 (148x) | 43,624,468 |
-| leibniz | 850,007,272 (1.21x) | 700,259,051 |
-| mandelbrot | 15,227,643 (1.21x) | 12,557,401 |
-| matmul | 2,130,138,761 (126x) | 16,952,036 |
-| merkletrees | 193,340,287 (1.71x) | 113,308,410 |
-| myers_diff | 30,802,188,851 (26745x) | 1,151,692 |
-| nbody | 726,507,592 (3.64x) | 199,759,607 |
-| nqueen | 207,721,884 (1.31x) | 158,617,689 |
-| nsieve | 4,305,616,573 (1509x) | 2,852,993 |
-| pisum | 40,024,117 (0.88x) | 45,262,023 |
-| primes | 1,468,580 (1.17x) | 1,260,314 |
-| quicksort | 192,723,619 (31.5x) | 6,115,178 |
-| raytracer | 2,496,915,202 (13.0x) | 192,123,273 |
-| regex_lite | 4,408,024,171 (1400x) | 3,147,470 |
-| spectral_norm | 229,725,034 (45.0x) | 5,106,615 |
-| string_equality | 58,060,641 (0.96x) | 60,769,660 |
-| sum_to_n | 62,220 (0.24x) | 260,513 |
-| tak | 48,017,359 (0.12x) | 391,111,104 |
-| tinytemplate | 34,888,976,276 (56194x) | 620,867 |
-| warden | 2,105,453,216 (6056x) | 347,689 |
+| ackermann | 145,114,326 (1.62x) | 89,558,784 |
+| binary_trees | 11,053,279 (0.17x) | 63,993,594 |
+| collatz | 70,194,528 (0.91x) | 76,735,737 |
+| edigits | 52,884,224 (76.8x) | 688,749 |
+| factorial | 63,745 (0.07x) | 970,290 |
+| fannkuch | 239,915,558 (136x) | 1,760,885 |
+| fasta | 157,197,960 (229x) | 686,768 |
+| fft | 413,128,617 (909x) | 454,262 |
+| fib | 8,268,703 (1.37x) | 6,054,417 |
+| huffman | 408,375,089 (142x) | 2,868,263 |
+| leibniz | 17,006,924 (1.19x) | 14,258,894 |
+| mandelbrot | 15,227,643 (1.21x) | 12,557,270 |
+| matmul | 43,156,675 (66.5x) | 649,416 |
+| merkletrees | 3,877,645 (1.54x) | 2,523,420 |
+| myers_diff | 2,480,164,309 (3609x) | 687,142 |
+| nbody | 14,537,406 (3.42x) | 4,249,498 |
+| nqueen | 7,420,529 (1.25x) | 5,914,962 |
+| nsieve | 131,518,105 (346x) | 380,354 |
+| pisum | 812,677 (0.70x) | 1,160,413 |
+| primes | 1,468,580 (1.17x) | 1,260,125 |
+| quicksort | 192,723,619 (31.6x) | 6,095,209 |
+| raytracer | 49,546,721 (12.2x) | 4,067,427 |
+| regex_lite | 69,462,277 (169x) | 409,856 |
+| spectral_norm | 229,725,034 (45.0x) | 5,106,524 |
+| string_equality | 1,220,167 (0.82x) | 1,479,564 |
+| sum_to_n | 62,220 (0.24x) | 260,246 |
+| tak | 48,017,359 (0.12x) | 391,110,808 |
+| tinytemplate | 8,881,984,620 (21130x) | 420,354 |
+| warden | 45,956,223 (170x) | 270,345 |

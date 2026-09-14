@@ -16,7 +16,7 @@ class PrebuiltSmokeTests(unittest.TestCase):
             binaries = Path(temporary)
             binary = binaries / "ackermann" / "dark" / "main"
             binary.parent.mkdir(parents=True)
-            binary.write_text("#!/bin/sh\nprintf '32765\\n'\n")
+            binary.write_text("#!/bin/sh\nprintf '4093\\n'\n")
             binary.chmod(0o755)
 
             result = subprocess.run(

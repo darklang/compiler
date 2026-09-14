@@ -18,7 +18,7 @@ class CachegrindRunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             binary = root / "benchmark"
-            binary.write_text("#!/bin/sh\nprintf '32765\\n'\n")
+            binary.write_text("#!/bin/sh\nprintf '4093\\n'\n")
             binary.chmod(0o755)
 
             tool_dir = root / "bin"

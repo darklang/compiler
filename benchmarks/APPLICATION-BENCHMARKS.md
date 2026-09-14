@@ -86,7 +86,7 @@ setup once and scales or repeats the hot computation enough to amortize it.
   a fixed LCG seed, build a correct min-priority Huffman tree, encode and decode
   it, verify the decoded checksum, and print a checksum incorporating encoded
   length and contents. Quick uses 200 symbols and two round trips; full uses
-  10,000 symbols and 30 round trips. Generation and codec construction happen
+  10,000 symbols and one round trip. Generation and codec construction happen
   once per whole-process measurement.
 - **Adaptation:** both checked-in implementations use a deterministic sorted
   priority queue, making construction O(k²); k is explicitly capped at 32, so
