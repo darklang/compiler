@@ -512,6 +512,7 @@ type ReturnOwnership =
 /// Typed native effects retained after the portable Stdlib.Cli wrappers lower.
 type CliOperation =
     | Execute
+    | RunProcess
     | HostOS
     | HostArchitecture
     | Hostname

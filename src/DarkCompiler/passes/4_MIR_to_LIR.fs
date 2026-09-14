@@ -17,6 +17,7 @@ module MIR_to_LIR
 let convertCliOperation (operation: MIR.CliOperation) : LIR.CliOperation =
     match operation with
     | MIR.Execute -> LIR.Execute
+    | MIR.RunProcess -> LIR.RunProcess
     | MIR.HostOS -> LIR.HostOS
     | MIR.HostArchitecture -> LIR.HostArchitecture
     | MIR.Hostname -> LIR.Hostname

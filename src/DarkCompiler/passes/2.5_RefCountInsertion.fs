@@ -245,6 +245,7 @@ let inferCExprType (ctx: TypeContext) (cexpr: CExpr) : AST.Type option =
     | CliNative (operation, _) ->
         match operation with
         | Execute | ProcessIO | TerminateProcess -> Some (AST.TRecord ("Stdlib.Cli.NativeOutput", []))
+        | RunProcess -> Some (AST.TRecord ("Stdlib.Cli.NativeProcessOutput", []))
         | GetEnv | GetArgv -> Some (AST.TSum ("Stdlib.Option.Option", [AST.TString]))
         | Kill -> Some (AST.TSum ("Stdlib.Result.Result", [AST.TUnit; AST.TRecord ("Stdlib.Cli.NativePosixError", [])]))
         | Hostname -> Some (AST.TSum ("Stdlib.Result.Result", [AST.TString; AST.TRecord ("Stdlib.Cli.NativePosixError", [])]))

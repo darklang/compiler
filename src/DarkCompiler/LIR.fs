@@ -69,6 +69,7 @@ type RcKind =
 
 type CliOperation =
     | Execute
+    | RunProcess
     | HostOS
     | HostArchitecture
     | Hostname
@@ -362,6 +363,8 @@ type FunctionCodegenFacts = {
     NeedsCliRuntimeState: bool
     NeedsCliArgvHelper: bool
     NeedsCliExecuteHelper: bool
+    NeedsCliRunProcessHelper: bool
+    NeedsCliProcessLifecycleHelpers: bool
     /// The function can terminate through a runtime error or allocation
     /// failure and therefore needs the backend's shared error routine.
     NeedsRuntimeErrorHelper: bool
@@ -403,6 +406,8 @@ let analyzeFunctionCodegenFacts (func: Function) : FunctionCodegenFacts =
     let mutable needsCliRuntimeState = false
     let mutable needsCliArgvHelper = false
     let mutable needsCliExecuteHelper = false
+    let mutable needsCliRunProcessHelper = false
+    let mutable needsCliProcessLifecycleHelpers = false
 
     for KeyValue (_, block) in func.CFG.Blocks do
         for instr in block.Instrs do
@@ -436,6 +441,9 @@ let analyzeFunctionCodegenFacts (func: Function) : FunctionCodegenFacts =
                 needsCliRuntimeState <- true
                 if operation = GetArgv then needsCliArgvHelper <- true
                 if operation = Execute then needsCliExecuteHelper <- true
+                if operation = RunProcess then needsCliRunProcessHelper <- true
+                if operation = SpawnProcess || operation = ProcessIO || operation = TerminateProcess then
+                    needsCliProcessLifecycleHelpers <- true
             | _ ->
                 ()
 
@@ -451,6 +459,8 @@ let analyzeFunctionCodegenFacts (func: Function) : FunctionCodegenFacts =
         NeedsCliRuntimeState = needsCliRuntimeState
         NeedsCliArgvHelper = needsCliArgvHelper
         NeedsCliExecuteHelper = needsCliExecuteHelper
+        NeedsCliRunProcessHelper = needsCliRunProcessHelper
+        NeedsCliProcessLifecycleHelpers = needsCliProcessLifecycleHelpers
         NeedsRuntimeErrorHelper =
             func.CFG.Blocks
             |> Map.exists (fun _ block ->

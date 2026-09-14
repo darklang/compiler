@@ -5361,7 +5361,21 @@ let private translateInstr
                     @ genLeakCounterInc ctx
                     @ [X86_64.Label completeLabel])
                 | _ -> Ok (loadImm64 destReg 0L)
-            | LIR.ProcessIO | LIR.TerminateProcess ->
+            | LIR.RunProcess ->
+                Ok (emitStringLiteral X86_64.R8 ""
+                @ emitStringLiteral X86_64.R9 "native process execution unavailable"
+                @ [X86_64.MOV_reg (destReg, heapPtr); X86_64.ADD_imm (heapPtr, 48)]
+                @ loadImm64 X86_64.RCX 38L
+                @ [X86_64.MOV_store (destReg, 0, X86_64.RCX)]
+                @ loadImm64 X86_64.RCX -1L
+                @ [ X86_64.MOV_store (destReg, 8, X86_64.RCX)
+                    X86_64.MOV_store (destReg, 16, X86_64.R8)
+                    X86_64.MOV_store (destReg, 24, X86_64.R9)
+                    X86_64.XOR_reg (X86_64.RCX, X86_64.RCX)
+                    X86_64.MOV_store (destReg, 32, X86_64.RCX)
+                    X86_64.MOV_imm32 (X86_64.RCX, 1)
+                    X86_64.MOV_store (destReg, 40, X86_64.RCX) ])
+            | LIR.Execute | LIR.ProcessIO | LIR.TerminateProcess ->
                 let errorMessage =
                     match operation with
                     | LIR.ProcessIO | LIR.TerminateProcess -> "Invalid process handle"

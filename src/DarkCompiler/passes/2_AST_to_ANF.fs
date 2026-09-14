@@ -213,6 +213,7 @@ let tryCliIntrinsic (funcName: string) (args: ANF.Atom list) : ANF.CExpr option 
         let operation =
             match funcName with
             | "Stdlib.Cli.__execute" -> Some ANF.Execute
+            | "Stdlib.Cli.__runProcess" -> Some ANF.RunProcess
             | "Stdlib.Cli.__hostOSCode" -> Some ANF.HostOS
             | "Stdlib.Cli.__hostArchitectureCode" -> Some ANF.HostArchitecture
             | "Stdlib.Cli.__hostname" -> Some ANF.Hostname

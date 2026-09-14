@@ -71,6 +71,7 @@ type RcKind =
 
 type CliOperation =
     | Execute
+    | RunProcess
     | HostOS
     | HostArchitecture
     | Hostname

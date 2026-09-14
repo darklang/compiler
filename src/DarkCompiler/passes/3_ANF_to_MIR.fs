@@ -120,6 +120,7 @@ let convertUnaryOp (op: ANF.UnaryOp) : MIR.UnaryOp =
 let convertCliOperation (operation: ANF.CliOperation) : MIR.CliOperation =
     match operation with
     | ANF.Execute -> MIR.Execute
+    | ANF.RunProcess -> MIR.RunProcess
     | ANF.HostOS -> MIR.HostOS
     | ANF.HostArchitecture -> MIR.HostArchitecture
     | ANF.Hostname -> MIR.Hostname

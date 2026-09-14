@@ -5,10 +5,14 @@ module Stdlib.Cli
 type ExecutionOutcome = { exitCode: Int, stdout: String, stderr: String }
 type NativeOutput = { exitCode: Int64, stdout: String, stderr: String }
 type NativePosixError = { errno: Int64, message: String }
+type NativeProcessRequest = { mode: Int64, argv: String, cwd: String, environment: String, timeoutMs: Int64, pipelineArgv: String }
+type NativeProcessOutput = { errno: Int64, exitCode: Int64, stdout: String, stderr: String, timedOut: Bool }
 
 // Replaced by the native CLI effect during AST-to-ANF conversion.
 let __execute (command: String) : Stdlib.Cli.NativeOutput =
     Stdlib.Cli.NativeOutput { exitCode = -1L, stdout = "", stderr = "native CLI execution unavailable" }
+let __runProcess (request: Stdlib.Cli.NativeProcessRequest) : Stdlib.Cli.NativeProcessOutput =
+    Stdlib.Cli.NativeProcessOutput { errno = 38L, exitCode = -1L, stdout = "", stderr = "native process execution unavailable", timedOut = false }
 
 let __hostOSCode () : Int64 = -1L
 let __hostArchitectureCode () : Int64 = -1L

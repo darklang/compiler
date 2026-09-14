@@ -61,6 +61,7 @@ let cliIntrinsicModule : ModuleDef = {
     Name = "Stdlib.Cli"
     Functions = [
         { Name = "__execute"; TypeParams = []; ParamTypes = [TString]; ReturnType = TRecord ("Stdlib.Cli.NativeOutput", []) }
+        { Name = "__runProcess"; TypeParams = []; ParamTypes = [TRecord ("Stdlib.Cli.NativeProcessRequest", [])]; ReturnType = TRecord ("Stdlib.Cli.NativeProcessOutput", []) }
         { Name = "__hostOSCode"; TypeParams = []; ParamTypes = []; ReturnType = TInt64 }
         { Name = "__hostArchitectureCode"; TypeParams = []; ParamTypes = []; ReturnType = TInt64 }
         { Name = "__hostname"; TypeParams = []; ParamTypes = []; ReturnType = TSum ("Stdlib.Result.Result", [TString; TRecord ("Stdlib.Cli.NativePosixError", [])]) }
