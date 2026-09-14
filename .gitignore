@@ -69,3 +69,6 @@ __pycache__/
 *.pyc
 *.pyo
 scripts/.unicode_cache/
+
+# Local merge-train state and integration worktrees
+.mergetrain/
