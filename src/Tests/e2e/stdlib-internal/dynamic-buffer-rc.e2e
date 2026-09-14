@@ -1,0 +1,22 @@
+// dynamic-buffer-rc.e2e - Literal protection and balanced dynamic buffer ownership.
+// Keep helper calls opaque so literal arguments reach the register-based RC path.
+let bufferStringCount (s: String): Int64 = __raw_get<Int64> (__string_to_rawptr (s)) (0L)
+let bufferStringProbe (s: String): Bool =
+    let before = bufferStringCount (s) in
+    let _ = __refcount_inc_string (s) in
+    let retained = bufferStringCount (s) in
+    let _ = __refcount_dec_string (s) in
+    let released = bufferStringCount (s) in
+    if before == 9223372036854775807L then retained == before && released == before
+    else before == 1L && retained == 2L && released == 1L
+
+let bufferPair (b: Blob): (Blob * Blob) = (b, b)
+let bufferBlobCount (b: Blob): Int64 = __raw_get<Int64> (__blob_to_rawptr (b)) (0L)
+let bufferBlobProbe (b: Blob): Int64 = let kept = bufferPair (b) in bufferBlobCount (kept.0)
+
+bufferStringProbe ("literal") = stdout="true\n" stderr="" disable_opt_inline=true
+bufferStringProbe ("literal") = stdout="true\n" stderr="" disable_opt_inline=true disable_leak_check=true
+bufferStringProbe (Stdlib.String.append ("dy") ("namic")) = stdout="true\n" stderr="" disable_opt_inline=true
+bufferStringProbe (Stdlib.String.append ("dy") ("namic")) = stdout="true\n" stderr="" disable_opt_inline=true disable_leak_check=true
+let b = Stdlib.Blob.__createZeroed (3L) in let retained = bufferBlobProbe (b) in retained * 10L + bufferBlobCount (b) = stdout="31\n" stderr="" disable_opt_inline=true
+let b = Stdlib.Blob.__createZeroed (3L) in let retained = bufferBlobProbe (b) in retained * 10L + bufferBlobCount (b) = stdout="31\n" stderr="" disable_opt_inline=true disable_leak_check=true

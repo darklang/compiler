@@ -872,12 +872,20 @@ let private generateListRefCountDecHelperWith
             @ leakDec
             @ [ARM64Symbolic.Label leafPayloadDone]
 
-    [
-        ARM64Symbolic.Label helperLabel
+    // Primitive elements have no payload-release code and cannot clobber the
+    // current node. Only helpers with actual payload work need X19-X21 or a
+    // callee-save frame; the separate DFS work stack is unchanged.
+    let preserveForPayloadRelease instructions =
+        if List.isEmpty releaseLeafPayload then [] else instructions
+
+    [ARM64Symbolic.Label helperLabel]
+    @ preserveForPayloadRelease [
         // Preserve callee-saved registers used to keep the current node stable
         // across payload-release helpers. Pending DFS entries are pushed above.
         ARM64Symbolic.STP_pre (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, -32s)
         ARM64Symbolic.STR (ARM64Symbolic.X21, ARM64Symbolic.SP, 16s)
+    ]
+    @ [
         // X0 = current tagged list pointer to process, X1 = number of pending stack entries.
         ARM64Symbolic.MOVZ (ARM64Symbolic.X1, 0us, 0)
         ARM64Symbolic.B_label loopCheck
@@ -1025,17 +1033,21 @@ let private generateListRefCountDecHelperWith
         ARM64Symbolic.Label collectLeaf
         ARM64Symbolic.MOVZ (ARM64Symbolic.X0, 0us, 0)
         ARM64Symbolic.Label releaseValue
+    ]
+    @ preserveForPayloadRelease [
         ARM64Symbolic.MOV_reg (ARM64Symbolic.X19, ARM64Symbolic.X2)
         ARM64Symbolic.MOV_reg (ARM64Symbolic.X20, ARM64Symbolic.X3)
         ARM64Symbolic.MOV_reg (ARM64Symbolic.X21, ARM64Symbolic.X4)
     ]
     @ releaseLeafPayload
-    @ [
+    @ preserveForPayloadRelease [
         // Leaves are done after payload release. Internal nodes still own two
         // complete-tree edges.
         ARM64Symbolic.MOV_reg (ARM64Symbolic.X2, ARM64Symbolic.X19)
         ARM64Symbolic.MOV_reg (ARM64Symbolic.X3, ARM64Symbolic.X20)
         ARM64Symbolic.MOV_reg (ARM64Symbolic.X4, ARM64Symbolic.X21)
+    ]
+    @ [
         ARM64Symbolic.CMP_imm (ARM64Symbolic.X2, 3us)
         ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, freeNode)
         ARM64Symbolic.Label collectNodeChildren
@@ -1066,10 +1078,12 @@ let private generateListRefCountDecHelperWith
         ARM64Symbolic.B_label loopCheck
 
         ARM64Symbolic.Label helperRet
+    ]
+    @ preserveForPayloadRelease [
         ARM64Symbolic.LDR (ARM64Symbolic.X21, ARM64Symbolic.SP, 16s)
         ARM64Symbolic.LDP_post (ARM64Symbolic.X19, ARM64Symbolic.X20, ARM64Symbolic.SP, 32s)
-        ARM64Symbolic.RET
     ]
+    @ [ARM64Symbolic.RET]
 
 type private ListRefCountDecHelperSpec = {
     Label: string
@@ -6355,11 +6369,11 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                         addrReg, []
                 preserveAddr @ [
                     ARM64Symbolic.LDR (ARM64Symbolic.X15, refAddrReg, 0s)             // X15 = refcount
-                    // Load sentinel value 0x7FFFFFFFFFFFFFFF (INT64_MAX) into X13
-                    ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
-                    ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
-                    ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
-                    ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0x7FFFus, 48)
+                ]
+                // INT64_MAX fits a single MOVN; retain the exact sentinel test
+                // without a four-instruction constant on every buffer RC edge.
+                @ loadImmediate ARM64Symbolic.X13 System.Int64.MaxValue
+                @ [
                     ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)             // Compare with sentinel
                     ARM64Symbolic.B_cond (ARM64Symbolic.EQ, 3)                       // If literal string, skip to end
                     ARM64Symbolic.ADD_imm (ARM64Symbolic.X15, ARM64Symbolic.X15, 1us)        // X15++
@@ -6401,11 +6415,9 @@ let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symb
                         ] @ leakDec
                 preserveAddr @ [
                     ARM64Symbolic.LDR (ARM64Symbolic.X15, refAddrReg, 0s)             // X15 = refcount
-                    // Load sentinel value 0x7FFFFFFFFFFFFFFF (INT64_MAX) into X13
-                    ARM64Symbolic.MOVZ (ARM64Symbolic.X13, 0xFFFFus, 0)
-                    ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 16)
-                    ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0xFFFFus, 32)
-                    ARM64Symbolic.MOVK (ARM64Symbolic.X13, 0x7FFFus, 48)
+                ]
+                @ loadImmediate ARM64Symbolic.X13 System.Int64.MaxValue
+                @ [
                     ARM64Symbolic.CMP_reg (ARM64Symbolic.X15, ARM64Symbolic.X13)             // Compare with sentinel
                     ARM64Symbolic.B_cond (ARM64Symbolic.EQ, bcondOffset)             // If literal string, skip to end
                 ] @ refcountUpdate)

@@ -509,6 +509,57 @@ let testSharedReturnTransferCost () : TestResult =
         if List.length transfers = 1 then Ok ()
         else Error $"Common-return diamond needs one unconditional transfer, got {transfers}")
 
+/// Count the whole RC operation, including literal protection and scratch
+/// preservation. Executable RC tests cover the heap/literal outcomes.
+let testDynamicBufferRcInstructionCost () : TestResult =
+    let ctx : CodeGen.CodeGenContext = {
+        Target = target; Options = CodeGen.defaultOptions; SumShapeRegistry = Map.empty; RecordRegistry = Map.empty
+        RawSlotInitRetainTargets = None
+        ClosurePayloadSizes = Map.empty; ClosureCaptureTypes = Map.empty
+        FunctionName = "buffer_rc_cost"; InstructionSite = ""; StackSize = 0; UsedCalleeSaved = []
+        HeapOverflowLabel = "__heap_oom_buffer_rc_cost"
+        RecordLirOpExpansion = None
+    }
+    let operations = [LIR.RefCountIncString; LIR.RefCountDecString; LIR.RefCountIncBlob; LIR.RefCountDecBlob]
+    let operands = [LIR.X0, 6; LIR.X13, 7; LIR.X14, 6; LIR.X15, 7]
+    operations
+    |> List.collect (fun operation -> operands |> List.map (fun (reg, cost) -> operation (LIR.Reg (LIR.Physical reg)), cost))
+    |> List.fold (fun result (operation, cost) ->
+        result |> Result.bind (fun () ->
+            CodeGen.convertInstr ctx operation
+            |> Result.bind (fun instrs ->
+                if List.length instrs = cost then Ok ()
+                else Error $"{operation}: expected {cost} instructions, got {List.length instrs}"))) (Ok ())
+
+let testPrimitiveListPayloadPreservationCost () : TestResult =
+    let helper = "__dark_list_refcount_dec_helper"
+    let program =
+        makeSimpleProgramWithVariants
+            [LIR.RefCountDec (LIR.Physical LIR.X0, 0, LIR.TaggedList, Some (rcMetadata (AST.TList AST.TInt64)))]
+            Map.empty
+    generatePreparedARM64 target program
+    |> Result.bind (fun instrs ->
+        match instrs |> List.skipWhile ((<>) (ARM64Symbolic.Label helper)) with
+        | [] -> Error "Primitive list release code was not emitted"
+        | _ :: rest ->
+            let body =
+                rest |> List.takeWhile (function
+                    | ARM64Symbolic.Label name -> name.StartsWith(helper + "_")
+                    | _ -> true)
+            // The DFS work stack remains necessary. Only spills and copies
+            // protecting node state across payload destruction are redundant.
+            let preservation =
+                body |> List.filter (function
+                    | ARM64Symbolic.STP_pre (ARM64.X19, ARM64.X20, ARM64.SP, _)
+                    | ARM64Symbolic.LDP_post (ARM64.X19, ARM64.X20, ARM64.SP, _)
+                    | ARM64Symbolic.STR (ARM64.X21, ARM64.SP, _)
+                    | ARM64Symbolic.LDR (ARM64.X21, ARM64.SP, _)
+                    | ARM64Symbolic.MOV_reg ((ARM64.X19 | ARM64.X20 | ARM64.X21), _)
+                    | ARM64Symbolic.MOV_reg (_, (ARM64.X19 | ARM64.X20 | ARM64.X21)) -> true
+                    | _ -> false)
+            if List.isEmpty preservation then Ok ()
+            else Error $"Primitive list release needs no payload preservation instructions, got {List.length preservation}")
+
 let private makeEmptyFunction
     (name: string)
     (typedParams: LIR.TypedLIRParam list)
@@ -2468,6 +2519,8 @@ let tests : (string * (unit -> TestResult)) list = [
     ("ARM64 UInt64 runtime preserves trailing newline", testPrintUInt64RuntimePreservesNewline)
     ("ARM64 branch false edge falls through", testBranchFalseEdgeFallsThrough)
     ("ARM64 common-return transfer cost", testSharedReturnTransferCost)
+    ("ARM64 dynamic buffer RC instruction cost", testDynamicBufferRcInstructionCost)
+    ("ARM64 primitive list payload preservation cost", testPrimitiveListPayloadPreservationCost)
     ("ARM64 FLoad encodable constants use immediate", testArm64FLoadEncodableConstantsUseImmediate)
     ("RawAlloc uses shared heap overflow path", testRawAllocUsesSharedHeapOverflowPath)
     ("Runtime print string length uses full immediate", testRuntimePrintStringLengthUsesFullImmediate)
