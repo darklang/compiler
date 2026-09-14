@@ -25,6 +25,9 @@ contains only rules specific to agents changing this repository.
   file-purpose comment.
 - Use command-line flags rather than environment variables; use `python3` for
   scripts.
+- Do not run x64 tests on an ARM64 host unless explicitly testing x64 work.
+  Likewise, do not run ARM64 tests on an x64 host unless explicitly testing
+  ARM64 work.
 - Fix compiler warnings and errors before committing.
 
 ## Git workflow
