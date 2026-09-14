@@ -23,6 +23,10 @@
 
 module ANF_Inlining
 
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+
 open ANF
 
 /// Inlining configuration

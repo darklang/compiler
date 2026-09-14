@@ -7,6 +7,10 @@
 
 module TestDSL.PassTestRunner
 
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+
 open System.IO
 open TestDSL.Common
 open TestDSL.ANFParser

@@ -8,6 +8,10 @@
 
 module ANF_HigherOrderSpecialization
 
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+
 open ANF
 
 type private KnownClosure = {

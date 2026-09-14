@@ -84,7 +84,7 @@ let rec private inferFixtureVariantsFromType (typ: AST.Type) : LIR.VariantRegist
     | AST.TVar _ ->
         Map.empty
 
-let private inferFixtureVariantsFromRcMetadata (metadata: ANF.RcMetadata option) : LIR.VariantRegistry =
+let private inferFixtureVariantsFromRcMetadata (metadata: MemoryModel.RcMetadata option) : LIR.VariantRegistry =
     metadata
     |> Option.bind (fun rcMetadata -> rcMetadata.SourceType)
     |> Option.map inferFixtureVariantsFromType
@@ -304,24 +304,24 @@ let private assertCallsPlannedDictHelper (context: string) (program: LIR.Program
         else
             Error $"{context} did not call a planned dict helper; calls were {labels}"
 
-let private rcMetadata (typ: AST.Type) : ANF.RcMetadata =
-    { ANF.ReleasePlanCacheKey = None
-      ANF.ReleasePlan = None
-      ANF.SourceType = Some typ }
+let private rcMetadata (typ: AST.Type) : MemoryModel.RcMetadata =
+    { MemoryModel.ReleasePlanCacheKey = None
+      MemoryModel.ReleasePlan = None
+      MemoryModel.SourceType = Some typ }
 
-let private rcMetadataWithSumShapes (sumShapes: ANF.RcSumShapeRegistry) (typ: AST.Type) : ANF.RcMetadata =
-    let releasePlan = ANF.rcReleasePlanOfTypeWithSums Map.empty sumShapes typ
-    { ANF.ReleasePlanCacheKey = ANF.rcReleasePlanCacheKey typ releasePlan
-      ANF.ReleasePlan = Some releasePlan
-      ANF.SourceType = Some typ }
+let private rcMetadataWithSumShapes (sumShapes: MemoryModel.RcSumShapeRegistry) (typ: AST.Type) : MemoryModel.RcMetadata =
+    let releasePlan = MemoryPlanning.rcReleasePlanOfTypeWithSums Map.empty sumShapes typ
+    { MemoryModel.ReleasePlanCacheKey = ReleasePlanFingerprint.rcReleasePlanCacheKey typ releasePlan
+      MemoryModel.ReleasePlan = Some releasePlan
+      MemoryModel.SourceType = Some typ }
 
-let private completeRcMetadata (records: LIR.RecordRegistry) (metadata: ANF.RcMetadata option) : ANF.RcMetadata option =
+let private completeRcMetadata (records: LIR.RecordRegistry) (metadata: MemoryModel.RcMetadata option) : MemoryModel.RcMetadata option =
     match metadata with
     | Some ({ ReleasePlan = None; SourceType = Some sourceType } as value) ->
-        let releasePlan = ANF.rcReleasePlanOfType records sourceType
+        let releasePlan = MemoryPlanning.rcReleasePlanOfType records sourceType
         Some {
             value with
-                ReleasePlanCacheKey = ANF.rcReleasePlanCacheKey sourceType releasePlan
+                ReleasePlanCacheKey = ReleasePlanFingerprint.rcReleasePlanCacheKey sourceType releasePlan
                 ReleasePlan = Some releasePlan
         }
     | _ ->
@@ -853,8 +853,8 @@ let testGenericRefCountDecMixedSumPayloadUsesVariantDispatch () : Result<unit, s
     let sumShapes =
         variants
         |> Map.map (fun _ typeVariants ->
-            { ANF.TypeParams = typeVariants.TypeParams
-              ANF.Payloads =
+            { MemoryModel.TypeParams = typeVariants.TypeParams
+              MemoryModel.Payloads =
                 typeVariants.Variants
                 |> List.sortBy (fun variant -> variant.Tag)
                 |> List.map (fun variant -> variant.Tag, variant.Payload) })
@@ -913,8 +913,8 @@ let testGenericRefCountDecNestedMixedSumPayloadUsesVariantDispatch () : Result<u
     let sumShapes =
         variants
         |> Map.map (fun _ typeVariants ->
-            { ANF.TypeParams = typeVariants.TypeParams
-              ANF.Payloads =
+            { MemoryModel.TypeParams = typeVariants.TypeParams
+              MemoryModel.Payloads =
                 typeVariants.Variants
                 |> List.sortBy (fun variant -> variant.Tag)
                 |> List.map (fun variant -> variant.Tag, variant.Payload) })
@@ -1476,8 +1476,8 @@ let testTaggedListRefCountDecMixedSumDynamicPayloadUsesVariantDispatch () : Resu
     let sumShapes =
         variants
         |> Map.map (fun _ typeVariants ->
-            { ANF.TypeParams = typeVariants.TypeParams
-              ANF.Payloads =
+            { MemoryModel.TypeParams = typeVariants.TypeParams
+              MemoryModel.Payloads =
                 typeVariants.Variants
                 |> List.sortBy (fun variant -> variant.Tag)
                 |> List.map (fun variant -> variant.Tag, variant.Payload) })

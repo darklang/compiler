@@ -6,7 +6,7 @@ ownership annotation, public list type, or external calling convention changes.
 
 ## Implemented boundary
 
-`ListHIR.fs` recognizes structured regions beginning with a list literal or
+`passes/hir/ExtractListRegions.fs` recognizes structured regions beginning with a list literal or
 a supported list operation after monomorphization and lambda lifting, before
 AST-to-ANF lowering destroys collection semantics. Supported operations are
 `List.map<Int64, Int64>`, `List.reverse<Int64>`, and
@@ -41,6 +41,10 @@ builders and pooled large buffers are not implemented.
 ## Typed stages and ownership
 
 The region IR has three private program types:
+
+Their compact shared model lives in `ir/hir/ListRegion.fs`. Constructors are
+internal to the compiler; extraction, storage selection, ownership solving,
+independent verification, budget analysis, and ANF lowering have separate modules.
 
 ```text
 FunctionalRegion: typed blocks + semantic collection edges + scalar joins

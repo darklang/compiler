@@ -472,8 +472,8 @@ let testArm64EmissionChunkGroupCacheUsesGroupIdentity (_: CompilerLibrary.Stdlib
 
 let testArm64ReleasePlanSummaryCacheConfirmsPlanShape (_: CompilerLibrary.StdlibResult) () : TestResult =
     use session = new CompilerLibrary.CompilationSession()
-    let firstPlan = ANF.NoReleasePlan
-    let secondPlan = ANF.DynamicBufferRelease ANF.DynamicStringBuffer
+    let firstPlan = MemoryModel.NoReleasePlan
+    let secondPlan = MemoryModel.DynamicBufferRelease MemoryModel.DynamicStringBuffer
     let summary needsClosure needsStream : LIR.Arm64ReleasePlanSummary = {
         ListDecHelperLabels = Set.empty
         PlannedListDecHelpers = Map.empty

@@ -6,6 +6,10 @@
 
 module ANF_DirectCallSpecialization
 
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+
 open ANF
 
 type private ParameterRewrite =

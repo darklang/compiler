@@ -20,6 +20,10 @@
 
 module ANF_Optimize
 
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+
 open ANF
 
 /// Environment mapping TempIds to their constant values (for propagation)

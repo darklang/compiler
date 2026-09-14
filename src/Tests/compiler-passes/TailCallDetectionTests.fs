@@ -5,6 +5,10 @@
 
 module TailCallDetectionTests
 
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+
 open ANF
 open TailCallDetection
 

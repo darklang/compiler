@@ -657,7 +657,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
     let arm64ReleasePlanSummaries =
         Dictionary<
             bool * string,
-            (ANF.RcReleasePlan * LIR.Arm64ReleasePlanSummary) list>()
+            (MemoryModel.RcReleasePlan * LIR.Arm64ReleasePlanSummary) list>()
     let arm64CodegenMetrics = ResizeArray<CodegenFunctionMetric>()
     let arm64LirOpMetrics =
         Dictionary<struct (string * string * string), struct (int * int * int64)>()
@@ -1011,7 +1011,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
     member _.Arm64ReleasePlanSummary
         (includeStaticRootDependencies: bool)
         (releasePlanCacheKey: string)
-        (releasePlan: ANF.RcReleasePlan)
+        (releasePlan: MemoryModel.RcReleasePlan)
         (generate: unit -> LIR.Arm64ReleasePlanSummary)
         : LIR.Arm64ReleasePlanSummary =
         if disposed then
@@ -1986,7 +1986,7 @@ let private generateBinary
     (programContextIdentity: obj)
     (functionGroups: CodeGen.FunctionGroup list)
     (metadataGroups: CodeGen.MetadataGroup list)
-    (arm64SumShapeRegistry: ANF.RcSumShapeRegistry)
+    (arm64SumShapeRegistry: MemoryModel.RcSumShapeRegistry)
     (allocatedProgram: LIR.Program)
     : Result<byte array, string> =
 

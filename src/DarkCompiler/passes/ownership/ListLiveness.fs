@@ -1,0 +1,23 @@
+// ListLiveness.fs - Representation-independent collection liveness and entry verification.
+
+module ListLiveness
+
+open ListRegion
+
+/// Region aliases are canonical identities. Opaque scalar evaluations cannot
+/// access them; callbacks cannot capture them. These are value-edge contracts,
+/// not permission to reorder scalar effects or to mutate a borrowed parameter.
+let rec internal valueContract operation : SemanticIR.ValueContract<ListId> =
+    let uses =
+        match operation with
+        | Branch (_, _, yes, no) -> Set.union (entryLive yes Set.empty) (entryLive no Set.empty)
+        | _ -> source operation |> Option.toList |> Set.ofList
+    { Uses = uses; Defines = result operation |> Option.toList |> Set.ofList }
+and private entryLive (FunctionalBlock block) liveAfter =
+    List.foldBack (fun operation live -> SemanticIR.liveBefore (valueContract operation) live) block.Operations liveAfter
+
+/// No physical ownership is needed to check the region's incoming value
+/// interface. The current representation permits no external collection roots.
+let verifyFunctional (FunctionalRegion block) : Result<unit, string> =
+    if Set.isEmpty (entryLive block Set.empty) then Ok ()
+    else Error "List HIR: external collection roots in a closed region"

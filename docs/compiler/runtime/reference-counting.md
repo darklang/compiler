@@ -33,8 +33,14 @@ non-retaining `RawWriteWord` and removes the producer's pending release.
 
 ## Ownership Insertion
 
-Pass 2.5, `src/DarkCompiler/passes/anf/RefCountInsertion.fs`, inserts retains
+`src/DarkCompiler/passes/anf/RefCountInsertion.fs` orchestrates insertion of retains
 and releases after ANF lowering.
+
+The `passes/anf/ownership/` modules separate type facts, return/alias analysis,
+shape planning, cleanup placement, and expression insertion. Shared shapes and
+release plans live in `memory/MemoryModel.fs`; classification and plan building
+live in `memory/MemoryPlanning.fs`, and stable keys in
+`memory/ReleasePlanFingerprint.fs`. None of these memory modules depends on ANF.
 
 Important current rules:
 

@@ -171,10 +171,10 @@ type Instr =
     | HeapAlloc of dest:Reg * sizeBytes:int
     | HeapStore of addr:Reg * offset:int * src:Operand * valueType:AST.Type option
     | HeapLoad of dest:Reg * addr:Reg * offset:int
-    | RefCountInc of addr:Reg * payloadSize:int * kind:RcKind * metadata:ANF.RcMetadata option
-    | RefCountDec of addr:Reg * payloadSize:int * kind:RcKind * metadata:ANF.RcMetadata option
+    | RefCountInc of addr:Reg * payloadSize:int * kind:RcKind * metadata:MemoryModel.RcMetadata option
+    | RefCountDec of addr:Reg * payloadSize:int * kind:RcKind * metadata:MemoryModel.RcMetadata option
     | StringConcat of dest:Reg * left:Operand * right:Operand
-    | CanonicalBufferEq of dest:Reg * kind:ANF.CanonicalBufferKind * left:Operand * right:Operand
+    | CanonicalBufferEq of dest:Reg * kind:MemoryModel.CanonicalBufferKind * left:Operand * right:Operand
     | PrintHeapString of Reg
     | LoadFuncAddr of dest:Reg * funcName:string
     | FileReadText of dest:Reg * path:Operand
@@ -309,9 +309,9 @@ let layoutBlocks (cfg: CFG) : Result<BasicBlock list, string> =
 /// comparing them is cheaper than hashing; large plans carry a compact key.
 type RcReleasePlanMemoKey =
     | FingerprintedReleasePlan of string
-    | StructuralReleasePlan of ANF.RcReleasePlan option
+    | StructuralReleasePlan of MemoryModel.RcReleasePlan option
 
-let rcReleasePlanMemoKey (metadata: ANF.RcMetadata option) : RcReleasePlanMemoKey =
+let rcReleasePlanMemoKey (metadata: MemoryModel.RcMetadata option) : RcReleasePlanMemoKey =
     match metadata |> Option.bind (fun value -> value.ReleasePlanCacheKey) with
     | Some cacheKey -> FingerprintedReleasePlan cacheKey
     | None ->
@@ -322,10 +322,10 @@ let rcReleasePlanMemoKey (metadata: ANF.RcMetadata option) : RcReleasePlanMemoKe
 /// ARM64 helpers implied by traversing one reference-count release plan.
 type Arm64ReleasePlanSummary = {
     ListDecHelperLabels: Set<string>
-    PlannedListDecHelpers: Map<string, int * ANF.RcReleasePlan>
-    ExpensiveGenericDecHelper: (string * int * ANF.RcReleasePlan) option
+    PlannedListDecHelpers: Map<string, int * MemoryModel.RcReleasePlan>
+    ExpensiveGenericDecHelper: (string * int * MemoryModel.RcReleasePlan) option
     DictDecHelperLabels: Set<string>
-    PlannedDictDecHelpers: Map<string, ANF.RcReleasePlan>
+    PlannedDictDecHelpers: Map<string, MemoryModel.RcReleasePlan>
     NeedsClosureRcDecHelper: bool
     NeedsStreamRcDecHelper: bool
 }
@@ -336,7 +336,7 @@ type Arm64ReleasePlanSummary = {
 type Arm64PlannedGenericDecHelper = {
     ReleasePlanMemoKeys: Set<RcReleasePlanMemoKey>
     PayloadSize: int
-    ReleasePlan: ANF.RcReleasePlan
+    ReleasePlan: MemoryModel.RcReleasePlan
     OwnsSinglePayloadSum: bool
 }
 
@@ -345,9 +345,9 @@ type Arm64PlannedGenericDecHelper = {
 /// reachable functions are combined.
 type Arm64RcHelperRequirements = {
     ListDecHelperLabels: Set<string>
-    PlannedListDecHelpers: Map<string, int * ANF.RcReleasePlan>
+    PlannedListDecHelpers: Map<string, int * MemoryModel.RcReleasePlan>
     PlannedGenericDecHelpers: Map<string, Arm64PlannedGenericDecHelper>
-    PlannedDictDecHelpers: Map<string, ANF.RcReleasePlan>
+    PlannedDictDecHelpers: Map<string, MemoryModel.RcReleasePlan>
     DictDecHelperLabels: Set<string>
     NeedsListRcIncHelper: bool
     NeedsDictRcIncHelper: bool
@@ -381,7 +381,7 @@ type FunctionCodegenFacts = {
     RecursiveReleaseTypes: Set<AST.Type>
     /// Deduplicated by kind and compact plan identity. Keeping recursive
     /// metadata out of the ordered key prevents deep structural comparisons.
-    RefCountDecRequirements: Map<RcKind * RcReleasePlanMemoKey, ANF.RcMetadata option>
+    RefCountDecRequirements: Map<RcKind * RcReleasePlanMemoKey, MemoryModel.RcMetadata option>
     RefCountIncRequirements: Set<RcKind>
     RawSlotInitTypes: Set<AST.Type>
     /// Some after ARM64 preparation. Values are None for slot types that do
@@ -450,7 +450,7 @@ let analyzeFunctionCodegenFacts (func: Function) : FunctionCodegenFacts =
                 recursiveReleaseTypes <-
                     metadata
                     |> Option.bind (fun metadata -> metadata.ReleasePlan)
-                    |> Option.map ANF.recursiveReleaseTypes
+                    |> Option.map MemoryPlanning.recursiveReleaseTypes
                     |> Option.defaultValue Set.empty
                     |> Set.union recursiveReleaseTypes
             | RefCountInc (_, _, kind, _) ->

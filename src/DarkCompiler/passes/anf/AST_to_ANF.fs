@@ -16,6 +16,10 @@
 
 module AST_to_ANF
 
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+
 open ANF
 open Output
 
@@ -23,10 +27,10 @@ open Output
 /// bodies until monomorphization has substituted a concrete operand type.
 let private eqHelperDispatchMarker = "__dark_internal_eq_helper_dispatch"
 
-let private canonicalBufferKindForType (typ: AST.Type) : ANF.CanonicalBufferKind option =
+let private canonicalBufferKindForType (typ: AST.Type) : MemoryModel.CanonicalBufferKind option =
     match typ with
-    | AST.TString -> Some ANF.Utf8String
-    | AST.TChar -> Some ANF.GraphemeCluster
+    | AST.TString -> Some MemoryModel.Utf8String
+    | AST.TChar -> Some MemoryModel.GraphemeCluster
     | _ -> None
 
 let private materializeComparisonPlan (targetType: AST.Type) (args: AST.Expr list) : AST.Expr =
@@ -451,7 +455,7 @@ let tryRawMemoryIntrinsic
     | "__mapped_free", [ptrAtom] ->
         Some (ANF.MappedFree ptrAtom)
     | "__list_array_release_small", [ptrAtom] ->
-        Some (ListHIR.releaseRuntimeSmall ptrAtom)
+        Some (LowerListRegions.releaseRuntimeSmall ptrAtom)
     | "__raw_get_byte", [ptrAtom; offsetAtom] ->
         // Read single byte at offset, returns Int64 (zero-extended)
         // IMPORTANT: Must come before the generic __raw_get_* pattern
@@ -647,7 +651,7 @@ let recordFieldsRegistry (typeReg: TypeRegistry) : Map<string, (string * AST.Typ
 let recordTypeParamsRegistry (typeReg: TypeRegistry) : Map<string, string list> =
     typeReg |> Map.map (fun _ info -> info.TypeParams)
 
-let rcSumShapeRegistryFromVariantLookup (variantLookup: VariantLookup) : ANF.RcSumShapeRegistry =
+let rcSumShapeRegistryFromVariantLookup (variantLookup: VariantLookup) : MemoryModel.RcSumShapeRegistry =
     let sumTypeNames =
         variantLookup
         |> Map.toList
@@ -682,8 +686,8 @@ let rcSumShapeRegistryFromVariantLookup (variantLookup: VariantLookup) : ANF.RcS
                 Map.add typeName (existingTypeParams, (tag, payloadType) :: variants) acc
 
     let toSumShapeInfo _typeName (typeParams, variants) =
-        { ANF.TypeParams = typeParams
-          ANF.Payloads =
+        { MemoryModel.TypeParams = typeParams
+          MemoryModel.Payloads =
             variants
             |> List.sortBy fst
             |> List.map (fun (tag, payload) ->
@@ -5348,11 +5352,11 @@ let rec toANFCore (sumTypeNames: Set<string>) (inertScopes: Set<string>) (expr: 
     let infer localTypes value =
         let types = Map.fold (fun types name typ -> Map.add name typ types) (typeEnvFromVarEnv env) localTypes
         inferTypeCore sumTypeNames value types typeReg variantLookup funcReg moduleRegistry
-    match ListHIR.tryExtract inertScopes infer (fun value -> freeVars value Set.empty) expr with
+    match ExtractListRegions.tryExtract inertScopes infer (fun value -> freeVars value Set.empty) expr with
     | Some region ->
         let lower value vg environment = toANFUnplannedCore sumTypeNames inertScopes value vg environment typeReg variantLookup funcReg moduleRegistry
-        ListHIR.verifyFunctional region |> Result.bind (fun () ->
-            region |> ListHIR.selectStorage |> ListHIR.elaborateOwnership |> ListHIR.lower lower env varGen)
+        ListLiveness.verifyFunctional region |> Result.bind (fun () ->
+            region |> SelectListStorage.selectStorage |> ElaborateListOwnership.elaborateOwnership |> LowerListRegions.lower lower env varGen)
     | None -> toANFUnplannedCore sumTypeNames inertScopes expr varGen env typeReg variantLookup funcReg moduleRegistry
 
 and private toANFUnplannedCore (sumTypeNames: Set<string>) (inertScopes: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen) (env: VarEnv) (typeReg: TypeRegistry) (variantLookup: VariantLookup) (funcReg: FunctionRegistry) (moduleRegistry: AST.ModuleRegistry) : Result<ANF.AExpr * ANF.VarGen, string> =
@@ -7524,12 +7528,12 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (inertScopes: Set<str
                 | AST.PString s ->
                     // String patterns must use byte-wise equality, not pointer equality.
                     let (cmpVar, vg1) = ANF.freshVar vg
-                    let cmpExpr = ANF.CanonicalBufferEq (ANF.Utf8String, scrutAtom, ANF.StringLiteral (s.Normalize(System.Text.NormalizationForm.FormC)))
+                    let cmpExpr = ANF.CanonicalBufferEq (MemoryModel.Utf8String, scrutAtom, ANF.StringLiteral (s.Normalize(System.Text.NormalizationForm.FormC)))
                     Ok (Some (ANF.Var cmpVar, [(cmpVar, cmpExpr)], vg1))
                 | AST.PChar c ->
                     // Char values are represented as single-EGC strings at runtime.
                     let (cmpVar, vg1) = ANF.freshVar vg
-                    let cmpExpr = ANF.CanonicalBufferEq (ANF.GraphemeCluster, scrutAtom, ANF.StringLiteral (c.Normalize(System.Text.NormalizationForm.FormC)))
+                    let cmpExpr = ANF.CanonicalBufferEq (MemoryModel.GraphemeCluster, scrutAtom, ANF.StringLiteral (c.Normalize(System.Text.NormalizationForm.FormC)))
                     Ok (Some (ANF.Var cmpVar, [(cmpVar, cmpExpr)], vg1))
                 | AST.PFloat f ->
                     if f = 0.0 then
@@ -10737,7 +10741,7 @@ type ConversionResult = {
     RecordFieldsReg: Map<string, (string * AST.Type) list>
     RecordTypeParamsReg: Map<string, string list>
     VariantLookup: VariantLookup
-    RcSumShapeReg: ANF.RcSumShapeRegistry
+    RcSumShapeReg: MemoryModel.RcSumShapeRegistry
     FuncReg: FunctionRegistry
     FuncParams: Map<string, (string * AST.Type) list>  // Function name -> param list with types
     ModuleRegistry: AST.ModuleRegistry
@@ -10757,7 +10761,7 @@ type UserOnlyResult = {
     SumTypeNames: Set<string>
     LocalRecordFieldsReg: Map<string, (string * AST.Type) list>
     LocalVariantLookup: VariantLookup
-    RcSumShapeReg: ANF.RcSumShapeRegistry
+    RcSumShapeReg: MemoryModel.RcSumShapeRegistry
     FuncReg: FunctionRegistry
     LocalReturnTypes: Map<string, AST.Type>
     FuncParams: Map<string, (string * AST.Type) list>
@@ -10773,7 +10777,7 @@ type Registries = {
     RecordTypeParamsReg: Map<string, string list>
     VariantLookup: VariantLookup
     SumTypeNames: Set<string>
-    RcSumShapeReg: ANF.RcSumShapeRegistry
+    RcSumShapeReg: MemoryModel.RcSumShapeRegistry
     FuncReg: FunctionRegistry
     FuncParams: Map<string, (string * AST.Type) list>
     ModuleRegistry: AST.ModuleRegistry
@@ -10937,7 +10941,7 @@ let private buildRegistriesInternal
     {
         TypeReg = typeReg
         ScopeContracts =
-            ListHIR.scopeContracts
+            ExtractListRegions.scopeContracts
                 (fun types expr -> inferTypeCore sumTypeNames expr types typeReg variantLookup funcReg moduleRegistry)
                 functions
         RecordFieldsReg = recordFieldsRegistry typeReg

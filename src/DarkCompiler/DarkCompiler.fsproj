@@ -29,29 +29,44 @@
     <Compile Include="frontend/ValueRendering.fs" />
     <Compile Include="frontend/JsonPlanning.fs" />
 
-    <!-- Pass 2: AST -> ANF -->
+    <!-- AST -> ANF -->
+    <Compile Include="memory/MemoryModel.fs" />
+    <Compile Include="memory/ReleasePlanFingerprint.fs" />
+    <Compile Include="memory/MemoryPlanning.fs" />
     <Compile Include="ANF.fs" />
     <Compile Include="passes/anf/ANFDeadCodeElimination.fs" />
     <Compile Include="SemanticIR.fs" />
-    <Compile Include="ListHIR.fs" />
+    <Compile Include="ir/hir/ListRegion.fs" />
+    <Compile Include="passes/ownership/ListAllocationBudget.fs" />
+    <Compile Include="passes/hir/ExtractListRegions.fs" />
+    <Compile Include="passes/storage/SelectListStorage.fs" />
+    <Compile Include="passes/ownership/ListLiveness.fs" />
+    <Compile Include="passes/ownership/ElaborateListOwnership.fs" />
+    <Compile Include="passes/ownership/VerifyListOwnership.fs" />
+    <Compile Include="passes/anf/LowerListRegions.fs" />
     <Compile Include="passes/anf/AST_to_ANF.fs" />
     <Compile Include="passes/anf/ANF_Optimize.fs" />
     <Compile Include="passes/anf/ANF_Inlining.fs" />
     <Compile Include="passes/anf/ANF_HigherOrderSpecialization.fs" />
     <Compile Include="passes/anf/ANF_DirectCallSpecialization.fs" />
     <Compile Include="passes/anf/ANF_EscapeAnalysis.fs" />
+    <Compile Include="passes/anf/ownership/TypeFacts.fs" />
+    <Compile Include="passes/anf/ownership/ReturnAnalysis.fs" />
+    <Compile Include="passes/anf/ownership/ShapePlanning.fs" />
+    <Compile Include="passes/anf/ownership/Cleanup.fs" />
+    <Compile Include="passes/anf/ownership/InsertExpression.fs" />
     <Compile Include="passes/anf/RefCountInsertion.fs" />
     <Compile Include="passes/anf/PrintInsertion.fs" />
     <Compile Include="passes/anf/TailCallDetection.fs" />
 
-    <!-- Pass 3: ANF -> MIR -->
+    <!-- ANF -> MIR -->
     <Compile Include="MIR.fs" />
     <Compile Include="LiteralPool.fs" />
     <Compile Include="passes/anf/ANF_to_MIR.fs" />
     <Compile Include="passes/mir/SSA_Construction.fs" />
     <Compile Include="passes/mir/MIR_Optimize.fs" />
 
-    <!-- Pass 4: MIR -> LIR -->
+    <!-- MIR -> LIR -->
     <Compile Include="LIR.fs" />
     <Compile Include="ParallelMoves.fs" />
     <Compile Include="passes/mir/MIR_to_LIR.fs" />

@@ -5,9 +5,17 @@
 
 module RefCountInsertionTests
 
-open ANF
-open RefCountInsertion
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
 
+open ANF
+open RcTypeFacts
+open RcReturnAnalysis
+open RcShapePlanning
+open RcCleanup
+open RcInsertExpression
+open RefCountInsertion
 type TestResult = Result<unit, string>
 
 let testRcShapeConstructionAndEquality () : TestResult =

@@ -4,6 +4,10 @@
 
 module LambdaLiftingTests
 
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+
 open AST
 open ANF
 open AST_to_ANF

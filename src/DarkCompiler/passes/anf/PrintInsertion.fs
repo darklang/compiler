@@ -7,25 +7,29 @@
 
 module PrintInsertion
 
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+
 open ANF
 
 let unsupportedListDisplay (elemType: AST.Type) : 'a =
     Crash.crash $"Unsupported list result display element type: {TypeChecking.typeToString elemType}"
 
-let private metadataForPrintRelease (valueType: AST.Type) : ANF.RcMetadata =
-    let releasePlan = ANF.rcReleasePlanOfType Map.empty valueType
-    { ReleasePlanCacheKey = ANF.rcReleasePlanCacheKey valueType releasePlan
+let private metadataForPrintRelease (valueType: AST.Type) : MemoryModel.RcMetadata =
+    let releasePlan = MemoryPlanning.rcReleasePlanOfType Map.empty valueType
+    { ReleasePlanCacheKey = ReleasePlanFingerprint.rcReleasePlanCacheKey valueType releasePlan
       ReleasePlan = Some releasePlan
       SourceType = Some valueType }
 
 let private releasePrintedRoot (atom: Atom) (valueType: AST.Type) (body: AExpr) (varGen: VarGen) : AExpr * VarGen =
-    match ANF.rcShapeReleaseOperation (ANF.rcShapeOfType Map.empty valueType) with
-    | Some (ANF.FixedSizeRoot (payloadSize, kind)) ->
+    match MemoryPlanning.rcShapeReleaseOperation (MemoryPlanning.rcShapeOfType Map.empty valueType) with
+    | Some (MemoryModel.FixedSizeRoot (payloadSize, kind)) ->
         let (releaseTmp, varGen') = freshVar varGen
         let releaseExpr = RefCountDec (atom, payloadSize, kind, Some (metadataForPrintRelease valueType))
         (Let (releaseTmp, releaseExpr, body), varGen')
-    | Some ANF.DynamicStringBuffer
-    | Some ANF.DynamicBlobBuffer
+    | Some MemoryModel.DynamicStringBuffer
+    | Some MemoryModel.DynamicBlobBuffer
     | None ->
         (body, varGen)
 

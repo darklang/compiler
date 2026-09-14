@@ -24,6 +24,10 @@
 
 module TailCallDetection
 
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+
 open ANF
 
 /// Check if a CExpr is a RefCountDec operation

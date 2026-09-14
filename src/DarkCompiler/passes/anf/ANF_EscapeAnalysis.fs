@@ -10,6 +10,10 @@
 
 module ANF_EscapeAnalysis
 
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+
 open ANF
 
 type private ScalarAggregate = {

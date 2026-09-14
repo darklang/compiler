@@ -127,7 +127,7 @@ let rec private collectVariants (typed: TypedShape) : LIR.VariantRegistry =
         | _ -> Crash.crash "Described sum fixture did not have one payload"
     | _ -> nested
 
-let private sumShapes (variants: LIR.VariantRegistry) : ANF.RcSumShapeRegistry =
+let private sumShapes (variants: LIR.VariantRegistry) : MemoryModel.RcSumShapeRegistry =
     variants
     |> Map.map (fun _ typeVariants ->
         { TypeParams = typeVariants.TypeParams
@@ -277,9 +277,9 @@ let private buildProgram test =
     let records = collectRecords typed
     let variants = collectVariants typed
     let shapes = sumShapes variants
-    let releasePlan = ANF.rcReleasePlanOfTypeWithSums records shapes typed.Type
-    let metadata : ANF.RcMetadata =
-        { ReleasePlanCacheKey = ANF.rcReleasePlanCacheKey typed.Type releasePlan
+    let releasePlan = MemoryPlanning.rcReleasePlanOfTypeWithSums records shapes typed.Type
+    let metadata : MemoryModel.RcMetadata =
+        { ReleasePlanCacheKey = ReleasePlanFingerprint.rcReleasePlanCacheKey typed.Type releasePlan
           ReleasePlan = Some releasePlan
           SourceType = Some typed.Type }
 

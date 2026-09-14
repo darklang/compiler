@@ -18,23 +18,23 @@ let private generatePreparedARM64WithOptions target options program =
 let private generatePreparedARM64 target program =
     generatePreparedARM64WithOptions target CodeGen.defaultOptions program
 
-let private rcMetadata (typ: AST.Type) : ANF.RcMetadata =
-    let releasePlan = ANF.rcReleasePlanOfTypeWithSums Map.empty Map.empty typ
-    { ANF.ReleasePlanCacheKey = ANF.rcReleasePlanCacheKey typ releasePlan
-      ANF.ReleasePlan = Some releasePlan
-      ANF.SourceType = Some typ }
+let private rcMetadata (typ: AST.Type) : MemoryModel.RcMetadata =
+    let releasePlan = MemoryPlanning.rcReleasePlanOfTypeWithSums Map.empty Map.empty typ
+    { MemoryModel.ReleasePlanCacheKey = ReleasePlanFingerprint.rcReleasePlanCacheKey typ releasePlan
+      MemoryModel.ReleasePlan = Some releasePlan
+      MemoryModel.SourceType = Some typ }
 
-let private rcMetadataWithSumShapes (sumShapes: ANF.RcSumShapeRegistry) (typ: AST.Type) : ANF.RcMetadata =
-    let releasePlan = ANF.rcReleasePlanOfTypeWithSums Map.empty sumShapes typ
-    { ANF.ReleasePlanCacheKey = ANF.rcReleasePlanCacheKey typ releasePlan
-      ANF.ReleasePlan = Some releasePlan
-      ANF.SourceType = Some typ }
+let private rcMetadataWithSumShapes (sumShapes: MemoryModel.RcSumShapeRegistry) (typ: AST.Type) : MemoryModel.RcMetadata =
+    let releasePlan = MemoryPlanning.rcReleasePlanOfTypeWithSums Map.empty sumShapes typ
+    { MemoryModel.ReleasePlanCacheKey = ReleasePlanFingerprint.rcReleasePlanCacheKey typ releasePlan
+      MemoryModel.ReleasePlan = Some releasePlan
+      MemoryModel.SourceType = Some typ }
 
-let private rcMetadataWithRecords (records: LIR.RecordRegistry) (typ: AST.Type) : ANF.RcMetadata =
-    let releasePlan = ANF.rcReleasePlanOfTypeWithSums records Map.empty typ
-    { ANF.ReleasePlanCacheKey = ANF.rcReleasePlanCacheKey typ releasePlan
-      ANF.ReleasePlan = Some releasePlan
-      ANF.SourceType = Some typ }
+let private rcMetadataWithRecords (records: LIR.RecordRegistry) (typ: AST.Type) : MemoryModel.RcMetadata =
+    let releasePlan = MemoryPlanning.rcReleasePlanOfTypeWithSums records Map.empty typ
+    { MemoryModel.ReleasePlanCacheKey = ReleasePlanFingerprint.rcReleasePlanCacheKey typ releasePlan
+      MemoryModel.ReleasePlan = Some releasePlan
+      MemoryModel.SourceType = Some typ }
 
 let private makeSimpleProgramWithVariants
     (instrs: LIR.Instr list)
@@ -325,7 +325,7 @@ let testGenericReleaseHelpersPreserveOwnershipPolicy () : TestResult =
                    { Name = "Only"; Tag = 0; Payload = Some payloadType }
                ] })
         ]
-    let sumShapes : ANF.RcSumShapeRegistry =
+    let sumShapes : MemoryModel.RcSumShapeRegistry =
         Map.ofList [
             (sumName,
              { TypeParams = []
@@ -1607,7 +1607,7 @@ let private assertListSumPayloadUsesTypedDictListHelper (payloadType: AST.Type) 
                         { Name = $"{sumName}Case"; Tag = 0; Payload = Some payloadType }
                     ] })
         ]
-    let sumShapes : ANF.RcSumShapeRegistry =
+    let sumShapes : MemoryModel.RcSumShapeRegistry =
         Map.ofList [
             (sumName,
                 { TypeParams = []
@@ -2188,8 +2188,8 @@ let testGenericFixedBlockNestedMixedBoxedSumBytesPayloadUsesVariantDispatch () :
     let sumShapes =
         variants
         |> Map.map (fun _ typeVariants ->
-            { ANF.TypeParams = typeVariants.TypeParams
-              ANF.Payloads =
+            { MemoryModel.TypeParams = typeVariants.TypeParams
+              MemoryModel.Payloads =
                 typeVariants.Variants
                 |> List.sortBy (fun variant -> variant.Tag)
                 |> List.map (fun variant -> variant.Tag, variant.Payload) })
@@ -2236,8 +2236,8 @@ let testGenericMixedBoxedSumPayloadDispatchSkipsRemainingCases () : TestResult =
     let sumShapes =
         variants
         |> Map.map (fun _ typeVariants ->
-            { ANF.TypeParams = typeVariants.TypeParams
-              ANF.Payloads =
+            { MemoryModel.TypeParams = typeVariants.TypeParams
+              MemoryModel.Payloads =
                 typeVariants.Variants
                 |> List.sortBy (fun variant -> variant.Tag)
                 |> List.map (fun variant -> variant.Tag, variant.Payload) })
@@ -2298,8 +2298,8 @@ let testRecursiveSumReleaseSkipsVariantWithoutManagedFields () : TestResult =
     let sumShapes =
         variants
         |> Map.map (fun _ typeVariants ->
-            { ANF.TypeParams = typeVariants.TypeParams
-              ANF.Payloads =
+            { MemoryModel.TypeParams = typeVariants.TypeParams
+              MemoryModel.Payloads =
                 typeVariants.Variants
                 |> List.sortBy (fun variant -> variant.Tag)
                 |> List.map (fun variant -> variant.Tag, variant.Payload) })

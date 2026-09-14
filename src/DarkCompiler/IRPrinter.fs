@@ -4,6 +4,10 @@
 
 module IRPrinter
 
+open MemoryModel
+open ReleasePlanFingerprint
+open MemoryPlanning
+
 open ANF
 open MIR
 open LIR
@@ -77,15 +81,15 @@ let private prettyPrintANFUnaryOp = function
     | ANF.BitNot -> "~~~"
 
 let private prettyPrintANFRcKind = function
-    | ANF.GenericHeap -> "generic"
-    | ANF.StreamHeap -> "stream"
-    | ANF.TaggedList -> "list"
-    | ANF.DictHeap -> "dict"
-    | ANF.ClosureHeap -> "closure"
+    | MemoryModel.GenericHeap -> "generic"
+    | MemoryModel.StreamHeap -> "stream"
+    | MemoryModel.TaggedList -> "list"
+    | MemoryModel.DictHeap -> "dict"
+    | MemoryModel.ClosureHeap -> "closure"
 
 let private prettyPrintCanonicalBufferKind = function
-    | ANF.Utf8String -> "utf8-string"
-    | ANF.GraphemeCluster -> "grapheme-cluster"
+    | MemoryModel.Utf8String -> "utf8-string"
+    | MemoryModel.GraphemeCluster -> "grapheme-cluster"
 
 /// Pretty-print ANF complex expression
 let private prettyPrintANFCExpr = function

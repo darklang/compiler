@@ -433,13 +433,13 @@ let atomToOperand (builder: CFGBuilder) (atom: ANF.Atom) : Result<MIR.Operand, s
     | ANF.Var tempId -> Ok (MIR.Register (tempToVReg tempId))
     | ANF.FuncRef funcName -> Ok (MIR.FuncAddr funcName)
 
-let private rcKindToMIR (kind: ANF.RcKind) : MIR.RcKind =
+let private rcKindToMIR (kind: MemoryModel.RcKind) : MIR.RcKind =
     match kind with
-    | ANF.GenericHeap -> MIR.GenericHeap
-    | ANF.StreamHeap -> MIR.StreamHeap
-    | ANF.TaggedList -> MIR.TaggedList
-    | ANF.DictHeap -> MIR.DictHeap
-    | ANF.ClosureHeap -> MIR.ClosureHeap
+    | MemoryModel.GenericHeap -> MIR.GenericHeap
+    | MemoryModel.StreamHeap -> MIR.StreamHeap
+    | MemoryModel.TaggedList -> MIR.TaggedList
+    | MemoryModel.DictHeap -> MIR.DictHeap
+    | MemoryModel.ClosureHeap -> MIR.ClosureHeap
 
 /// Get the type of an ANF Atom (for generating type-specific instructions)
 let atomType (builder: CFGBuilder) (atom: ANF.Atom) : AST.Type =
@@ -745,7 +745,7 @@ let refCountIncForOverlappingArgs
     let rec findCleanupTargetAlias
         (vreg: MIR.VReg)
         (visited: Set<MIR.VReg>)
-        : (MIR.VReg * (int * MIR.RcKind * ANF.RcMetadata option)) option =
+        : (MIR.VReg * (int * MIR.RcKind * MemoryModel.RcMetadata option)) option =
         if Set.contains vreg visited then
             None
         else

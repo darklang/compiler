@@ -105,11 +105,11 @@ let freshTempFReg (state: TempState) : LIR.FReg * TempState =
     let reg = LIR.FVirtual state.NextFRegId
     (reg, { state with NextFRegId = state.NextFRegId + 1 })
 
-let private rcSumShapeRegistryFromVariantRegistry (variantRegistry: MIR.VariantRegistry) : ANF.RcSumShapeRegistry =
+let private rcSumShapeRegistryFromVariantRegistry (variantRegistry: MIR.VariantRegistry) : MemoryModel.RcSumShapeRegistry =
     variantRegistry
     |> Map.map (fun _typeName typeVariants ->
-        { ANF.TypeParams = typeVariants.TypeParams
-          ANF.Payloads =
+        { MemoryModel.TypeParams = typeVariants.TypeParams
+          MemoryModel.Payloads =
             typeVariants.Variants
             |> List.sortBy (fun variant -> variant.Tag)
             |> List.map (fun variant -> variant.Tag, variant.Payload) })
@@ -117,7 +117,7 @@ let private rcSumShapeRegistryFromVariantRegistry (variantRegistry: MIR.VariantR
 type PrintRcContext = {
     RecordFields: Map<string, (string * AST.Type) list>
     RecordTypeParams: Map<string, string list>
-    SumShapes: ANF.RcSumShapeRegistry
+    SumShapes: MemoryModel.RcSumShapeRegistry
 }
 
 let private printRcContextFromMirRegistries
@@ -130,22 +130,22 @@ let private printRcContextFromMirRegistries
             fields |> List.map (fun field -> field.Name, field.Type))
     {
         RecordFields = recordFields
-        RecordTypeParams = ANF.inferredRecordTypeParamsRegistry recordFields
+        RecordTypeParams = MemoryPlanning.inferredRecordTypeParamsRegistry recordFields
         SumShapes = rcSumShapeRegistryFromVariantRegistry variantRegistry
     }
 
 let private rcMetadataForPrintType
     (rcContext: PrintRcContext)
     (typ: AST.Type)
-    : ANF.RcMetadata =
+    : MemoryModel.RcMetadata =
     let releasePlan =
-        ANF.rcReleasePlanOfTypeWithSums
+        MemoryPlanning.rcReleasePlanOfTypeWithSums
             rcContext.RecordFields
             rcContext.SumShapes
             typ
-    { ANF.ReleasePlanCacheKey = ANF.rcReleasePlanCacheKey typ releasePlan
-      ANF.ReleasePlan = Some releasePlan
-      ANF.SourceType = Some typ }
+    { MemoryModel.ReleasePlanCacheKey = ReleasePlanFingerprint.rcReleasePlanCacheKey typ releasePlan
+      MemoryModel.ReleasePlan = Some releasePlan
+      MemoryModel.SourceType = Some typ }
 
 let private releasePrintedValueFromReg
     (rcContext: PrintRcContext)
@@ -153,24 +153,24 @@ let private releasePrintedValueFromReg
     (typ: AST.Type)
     : LIR.Instr list =
     let shape =
-        ANF.rcShapeOfTypeWithSums
+        MemoryPlanning.rcShapeOfTypeWithSums
             rcContext.RecordFields
             rcContext.RecordTypeParams
             rcContext.SumShapes
             typ
-    match ANF.rcShapeReleaseOperation shape with
-    | Some ANF.DynamicStringBuffer ->
+    match MemoryPlanning.rcShapeReleaseOperation shape with
+    | Some MemoryModel.DynamicStringBuffer ->
         [LIR.RefCountDecString (LIR.Reg reg)]
-    | Some ANF.DynamicBlobBuffer ->
+    | Some MemoryModel.DynamicBlobBuffer ->
         [LIR.RefCountDecBlob (LIR.Reg reg)]
-    | Some (ANF.FixedSizeRoot (payloadSize, kind)) ->
+    | Some (MemoryModel.FixedSizeRoot (payloadSize, kind)) ->
         let lirKind =
             match kind with
-            | ANF.GenericHeap -> LIR.GenericHeap
-            | ANF.StreamHeap -> LIR.StreamHeap
-            | ANF.TaggedList -> LIR.TaggedList
-            | ANF.DictHeap -> LIR.DictHeap
-            | ANF.ClosureHeap -> LIR.ClosureHeap
+            | MemoryModel.GenericHeap -> LIR.GenericHeap
+            | MemoryModel.StreamHeap -> LIR.StreamHeap
+            | MemoryModel.TaggedList -> LIR.TaggedList
+            | MemoryModel.DictHeap -> LIR.DictHeap
+            | MemoryModel.ClosureHeap -> LIR.ClosureHeap
         [LIR.RefCountDec (
             reg,
             payloadSize,
@@ -2323,7 +2323,7 @@ let toLIRFunctionsForWithTraceAndRcRegistries
     (arch: Platform.Arch)
     (recordFields: Map<string, (string * AST.Type) list>)
     (recordTypeParams: Map<string, string list>)
-    (sumShapes: ANF.RcSumShapeRegistry)
+    (sumShapes: MemoryModel.RcSumShapeRegistry)
     (MIR.Program (mirFuncs, variantRegistry, recordRegistry))
     : Result<LIR.Function list, string> =
     let printRcContext = {
