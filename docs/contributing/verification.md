@@ -12,6 +12,7 @@ target. For ordinary host-target compiler changes, the default verification
 commands are:
 
 ```bash
+./build --ai
 ./run-tests --ai
 ./benchmarks/run_benchmarks.sh --verify full
 ```
@@ -32,9 +33,10 @@ comparisons do not confuse logical coverage with compiler invocations.
 
 Agents may run narrower checks while developing a change, but a change is not verified until the full verification policy has passed or the agent explicitly reports why full verification could not be completed.
 
-`./run-tests --ai` bounds failure summaries and retains the complete captured
-output under `TestResults/ai/` when a test or build fails. Search that artifact
-for the relevant diagnostic instead of streaming or reading it in full.
+`./build --ai` bounds build diagnostics and retains a complete failed log under
+`TestResults/ai/`. `./run-tests --ai` performs no build; it bounds test failure
+summaries and retains complete failed test output in the same directory. Search
+those artifacts for the relevant diagnostic instead of reading them in full.
 
 Target support is intentionally allowed to advance independently. A feature
 developed for one target may land after that target's applicable tests and

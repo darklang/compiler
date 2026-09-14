@@ -6,18 +6,22 @@ document is the short CLI reference.
 ## Build
 
 ```bash
-dotnet build
+./build --ai                       # Bounded output for automated work
+./build                            # Human-readable minimal build output
+./build --ai -- src/DarkCompiler/DarkCompiler.fsproj
 ```
+
+Arguments after `--` are passed to `dotnet build`. Complete failed AI build
+logs are retained under `TestResults/ai/`.
 
 ## Test
 
 ```bash
-./run-tests --ai                 # Build and run the full suite with bounded output
+./run-tests --ai                 # Run the already-built full suite with bounded output
 ./run-tests --ai --target=linux-x86_64 # Explicit x64 suite (QEMU when cross-target)
 ./run-tests --quiet              # Less output
 ./run-tests --ai --filter=tuple    # Filter by case-insensitive substring
 ./run-tests --ai --filter=List.map # Filter by test name fragment
-./run-tests --build-only         # Just build, don't run
 ./run-tests --help               # All options
 ```
 

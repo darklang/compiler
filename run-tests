@@ -1,100 +1,18 @@
 #!/bin/bash
-# run-tests - Build and execute the F# Dark compiler test suite.
+# run-tests - Execute an already-built Dark compiler test suite.
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-build_tests() {
-    local build_args=(
-        --verbosity quiet
-        -m:1
-        /nodeReuse:false
-        --disable-build-servers
-        --configfile "$SCRIPT_DIR/NuGet.Config"
-    )
-
-    echo "Building..."
-    if ! timeout 120 dotnet build "${build_args[@]}" 2>&1; then
-        echo "Build failed!"
-        return 1
-    fi
-    echo "Build complete."
-    echo ""
-}
-
-BUILD_ONLY=false
-QUIET_BUILD=false
-AI_BUILD=false
-TEST_ARGS=()
-
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --build-only)
-            BUILD_ONLY=true
-            shift
-            ;;
-        --quiet)
-            QUIET_BUILD=true
-            TEST_ARGS+=("$1")
-            shift
-            ;;
-        --ai)
-            AI_BUILD=true
-            TEST_ARGS+=("$1")
-            shift
-            ;;
-        *)
-            TEST_ARGS+=("$1")
-            shift
-            ;;
-    esac
-done
-
-if [ "$AI_BUILD" = true ]; then
-    echo "building"
-    mkdir -p "$SCRIPT_DIR/TestResults/ai"
-    BUILD_OUTPUT="$SCRIPT_DIR/TestResults/ai/build-$(date -u +%Y%m%dT%H%M%SZ)-$$.log"
-    if ! build_tests > "$BUILD_OUTPUT" 2>&1; then
-        echo "build failed"
-        echo "essential diagnostics:"
-        { grep -E '(: error |Build FAILED|Unhandled exception|error [A-Z][A-Z0-9]+:)' "$BUILD_OUTPUT" || true; } \
-            | awk '!seen[$0]++' \
-            | sed -n '1,12p' \
-            | cut -c1-512
-        echo ""
-        echo "full output: ${BUILD_OUTPUT#"$SCRIPT_DIR/"}"
-        printf 'reproduce: ./run-tests'
-        printf ' %q' "${TEST_ARGS[@]}"
-        printf '\n'
-        exit 1
-    fi
-    rm -f "$BUILD_OUTPUT"
-    echo "build complete"
-elif [ "$QUIET_BUILD" = true ]; then
-    if ! build_tests > /dev/null 2>&1; then
-        echo "build failed"
-        exit 1
-    fi
-else
-    build_tests
-fi
-
-if [ "$BUILD_ONLY" = true ]; then
-    if [ "$QUIET_BUILD" != true ]; then
-        echo "Build-only mode, skipping tests."
-    fi
-    exit 0
-fi
-
 TEST_EXE="$SCRIPT_DIR/bin/Tests/Debug/net10.0/Tests"
 if [ ! -f "$TEST_EXE" ]; then
     echo "Error: Test executable not found at $TEST_EXE"
-    echo "Try running the build first."
+    echo "Run './build --ai' first."
     exit 1
 fi
 # Expected-error cases can terminate either the test host or generated native
 # programs abnormally. Keep OS crash dumps from dirtying the worktree.
 ulimit -c 0
-exec "$TEST_EXE" "${TEST_ARGS[@]}"
+exec "$TEST_EXE" "$@"

@@ -307,4 +307,5 @@ The compiler generates:
    inventory or `--dump-ir-output=FILE` for complete retained evidence.
 3. **Write minimal test case**: Reduce to smallest failing example
 4. **Check exhaustiveness warnings**: F# compiler shows all missing cases
-5. **Run tests frequently**: `./run-tests --ai` catches regressions early
+5. **Build, then run tests frequently**: `./build --ai && ./run-tests --ai`
+   catches regressions early without rebuilding inside the test launcher.

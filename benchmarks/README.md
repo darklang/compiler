@@ -84,7 +84,7 @@ measurement details. These diagnostics do not update canonical benchmark
 baselines.
 
 The test executable still provides opt-in JSON compiler profiling. Build it
-first with `./run-tests --ai --build-only`, then run:
+first with `./build --ai`, then run:
 
 ```bash
 bin/Tests/Debug/net10.0/Tests --ai --filter=json \

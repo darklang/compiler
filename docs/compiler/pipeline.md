@@ -452,4 +452,4 @@ Each pass can be tested in isolation:
 - **ANF**: PassTestRunner validates ANF output
 - **End-to-end**: `.e2e` files test full pipeline
 
-Run all tests: `./run-tests --ai`
+Build and run all tests: `./build --ai && ./run-tests --ai`

@@ -55,7 +55,7 @@ diagnostic substring.
 
 Keep direct F# tests for internal helper APIs and programs that require richer
 binary layout or execution setup. Run all fixtures and unit tests with
-`./run-tests --ai`.
+`./build --ai && ./run-tests --ai`.
 
 ## Graph-coloring fixtures
 
