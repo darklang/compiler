@@ -174,3 +174,150 @@ Ret
 ---LEAK-CHECK---
 true
 ---EXPECT-STDERR---
+
+---NAME---
+Heap allocation reuses a block into X3
+---INPUT-LIR---
+X1 <- HeapAlloc(16)
+RefCountDec(X1, 16, generic)
+X3 <- HeapAlloc(16)
+HeapStore(X3, 0, Imm 1)
+HeapStore(X3, 8, Imm 2)
+HeapStore(X3, 16, Imm 12852)
+PrintHeapStringNoNewline(X3)
+RefCountDecString(Reg X3)
+Ret
+---LEAK-CHECK---
+true
+---EXPECT-EXIT---
+0
+---EXPECT-STDOUT---
+42
+---EXPECT-STDERR---
+
+---NAME---
+Raw allocation reuse balances leak counter
+---INPUT-LIR---
+X1 <- Mov(Imm 8)
+X2 <- RawAlloc(X1)
+RawFree(X2)
+X3 <- RawAlloc(X1)
+RawFree(X3)
+Ret
+---LEAK-CHECK---
+true
+---EXPECT-EXIT---
+0
+---EXPECT-STDERR---
+
+---NAME---
+String refcount supports X3
+---INPUT-LIR---
+X3 <- HeapAlloc(16)
+HeapStore(X3, 0, Imm 1)
+HeapStore(X3, 8, Imm 2)
+HeapStore(X3, 16, Imm 12852)
+RefCountIncString(Reg X3)
+RefCountDecString(Reg X3)
+PrintHeapStringNoNewline(X3)
+RefCountDecString(Reg X3)
+Ret
+---LEAK-CHECK---
+true
+---EXPECT-EXIT---
+0
+---EXPECT-STDOUT---
+42
+---EXPECT-STDERR---
+
+---NAME---
+String refcount supports X12
+---INPUT-LIR---
+X12 <- HeapAlloc(16)
+HeapStore(X12, 0, Imm 1)
+HeapStore(X12, 8, Imm 2)
+HeapStore(X12, 16, Imm 12852)
+RefCountIncString(Reg X12)
+RefCountDecString(Reg X12)
+PrintHeapStringNoNewline(X12)
+RefCountDecString(Reg X12)
+Ret
+---LEAK-CHECK---
+true
+---EXPECT-EXIT---
+0
+---EXPECT-STDOUT---
+42
+---EXPECT-STDERR---
+
+---NAME---
+String literal supports X12 destination
+---INPUT-LIR---
+X12 <- Mov(str[hello])
+PrintHeapStringNoNewline(X12)
+Ret
+---EXPECT-EXIT---
+0
+---EXPECT-STDOUT---
+hello
+
+---NAME---
+String concat preserves X4 across literal right operand
+---INPUT-LIR---
+X4 <- StringConcat(str[\"], str[42])
+X5 <- StringConcat(Reg X4, str[\"])
+PrintHeapStringNoNewline(X5)
+RefCountDecString(Reg X5)
+RefCountDecString(Reg X4)
+Ret
+---LEAK-CHECK---
+true
+---EXPECT-EXIT---
+0
+---EXPECT-STDOUT---
+"42"
+---EXPECT-STDERR---
+
+---NAME---
+Full-width AND immediate preserves mask bits
+---INPUT-LIR---
+X1 <- Mov(Imm 4607182418800017408)
+X0 <- AndImm(X1, 4503599627370495)
+PrintUInt64(X0)
+Ret
+---EXPECT-STDOUT---
+0
+---EXPECT-STDERR---
+
+---NAME---
+Multiply-add and subtract support X11 destination
+---INPUT-LIR---
+X19 <- Mov(Imm 7)
+X4 <- Mov(Imm 6)
+X21 <- Mov(Imm 5)
+X11 <- Madd(X19, X4, X21)
+X0 <- Mov(Reg X11)
+PrintInt64(X0)
+X19 <- Mov(Imm 7)
+X4 <- Mov(Imm 6)
+X21 <- Mov(Imm 5)
+X11 <- Msub(X19, X4, X21)
+X0 <- Mov(Reg X11)
+PrintInt64(X0)
+Ret
+---EXPECT-STDOUT---
+47
+-37
+---EXPECT-STDERR---
+
+---NAME---
+RandomInt64 preserves syscall-clobbered X2
+---INPUT-LIR---
+X2 <- Mov(Imm 1)
+X1 <- RandomInt64
+X0 <- Mov(Reg X2)
+PrintInt64(X0)
+Ret
+---EXPECT-STDOUT---
+1
+---EXPECT-STDERR---

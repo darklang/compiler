@@ -160,9 +160,10 @@ Use `EXPECT-CODEGEN-ERROR` instead of process expectations when translation
 should fail, with the expected diagnostic substring as its value. Codegen-error
 and process expectations cannot be combined in one case.
 
-The supported LIR subset covers scalar moves/arithmetic, integer printing,
-fixed-block allocation/load/refcount operations, string concatenation, and
-string decrements. Keep direct F# tests for multi-block CFGs, condition-state
-isolation across translations, malformed compiler data,
+The supported LIR subset covers scalar moves/arithmetic, integer and heap-string
+printing, fixed-block allocation/load/store/refcount operations, raw
+allocation/free, string concatenation and refcounts, and random integers. Keep
+direct F# tests for multi-block CFGs, condition-state isolation across
+translations, malformed compiler data,
 type/variant/record metadata, and ownership tests whose correctness depends on
 rich nested runtime shapes.

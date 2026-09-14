@@ -130,12 +130,36 @@ let parseInstructionOrTerminator (lineNum: int) (line: string) : Result<Choice<I
         Ok (Choice1Of2 Exit)
     else
 
+    // Try RandomInt64: "X1 <- RandomInt64"
+    let randomInt64Match = Regex.Match(line, @"^(.+?)\s*<-\s*RandomInt64$")
+    if randomInt64Match.Success then
+        parseRegister randomInt64Match.Groups.[1].Value
+        |> Result.mapError (fun e -> $"Line {lineNum}: {e}")
+        |> Result.map (fun dest -> Choice1Of2 (RandomInt64 dest))
+    else
+
     // Try PrintInt64: "PrintInt64(X0)" or "PrintInt64(v0)"
     let printIntMatch = Regex.Match(line, @"^PrintInt64\((.+)\)$")
     if printIntMatch.Success then
         match parseRegister printIntMatch.Groups.[1].Value with
         | Error e -> Error $"Line {lineNum}: {e}"
         | Ok reg -> Ok (Choice1Of2 (PrintInt64 reg))
+    else
+
+    // Try PrintUInt64: "PrintUInt64(X0)" or "PrintUInt64(v0)"
+    let printUIntMatch = Regex.Match(line, @"^PrintUInt64\((.+)\)$")
+    if printUIntMatch.Success then
+        match parseRegister printUIntMatch.Groups.[1].Value with
+        | Error e -> Error $"Line {lineNum}: {e}"
+        | Ok reg -> Ok (Choice1Of2 (PrintUInt64 reg))
+    else
+
+    // Try PrintHeapStringNoNewline: "PrintHeapStringNoNewline(X0)"
+    let printHeapStringMatch = Regex.Match(line, @"^PrintHeapStringNoNewline\((.+)\)$")
+    if printHeapStringMatch.Success then
+        match parseRegister printHeapStringMatch.Groups.[1].Value with
+        | Error e -> Error $"Line {lineNum}: {e}"
+        | Ok reg -> Ok (Choice1Of2 (PrintHeapStringNoNewline reg))
     else
 
     // Try PrintBool: "PrintBool(X0)" or "PrintBool(v0)"
@@ -167,6 +191,35 @@ let parseInstructionOrTerminator (lineNum: int) (line: string) : Result<Choice<I
         | _, _, Error e -> Error $"Line {lineNum}: {e}"
     else
 
+    // Try HeapStore: "HeapStore(X2, 8, Imm 42)"
+    let heapStoreMatch = Regex.Match(line, @"^HeapStore\((.+?),\s*(-?\d+),\s*(.+)\)$")
+    if heapStoreMatch.Success then
+        match parseRegister heapStoreMatch.Groups.[1].Value,
+              parseInt32Field "heap store offset" heapStoreMatch.Groups.[2].Value,
+              parseOperand heapStoreMatch.Groups.[3].Value with
+        | Ok addr, Ok offset, Ok src -> Ok (Choice1Of2 (HeapStore (addr, offset, src, None)))
+        | Error e, _, _
+        | _, Error e, _
+        | _, _, Error e -> Error $"Line {lineNum}: {e}"
+    else
+
+    // Try RawAlloc: "X2 <- RawAlloc(X1)"
+    let rawAllocMatch = Regex.Match(line, @"^(.+?)\s*<-\s*RawAlloc\((.+)\)$")
+    if rawAllocMatch.Success then
+        match parseRegister rawAllocMatch.Groups.[1].Value, parseRegister rawAllocMatch.Groups.[2].Value with
+        | Ok dest, Ok numBytes -> Ok (Choice1Of2 (RawAlloc (dest, numBytes)))
+        | Error e, _
+        | _, Error e -> Error $"Line {lineNum}: {e}"
+    else
+
+    // Try RawFree: "RawFree(X2)"
+    let rawFreeMatch = Regex.Match(line, @"^RawFree\((.+)\)$")
+    if rawFreeMatch.Success then
+        parseRegister rawFreeMatch.Groups.[1].Value
+        |> Result.mapError (fun e -> $"Line {lineNum}: {e}")
+        |> Result.map (fun addr -> Choice1Of2 (RawFree addr))
+    else
+
     // Try StringConcat: "X2 <- StringConcat(str[a], str[b])"
     let stringConcatMatch = Regex.Match(line, @"^(.+?)\s*<-\s*StringConcat\((.+?),\s*(.+)\)$")
     if stringConcatMatch.Success then
@@ -193,12 +246,16 @@ let parseInstructionOrTerminator (lineNum: int) (line: string) : Result<Choice<I
         | _, _, Error e -> Error $"Line {lineNum}: {e}"
     else
 
-    // Try RefCountDecString: "RefCountDecString(Reg X2)"
-    let refCountDecStringMatch = Regex.Match(line, @"^RefCountDecString\((.+)\)$")
-    if refCountDecStringMatch.Success then
-        parseOperand refCountDecStringMatch.Groups.[1].Value
+    // Try RefCountIncString/RefCountDecString: "RefCountIncString(Reg X2)"
+    let stringRefCountMatch = Regex.Match(line, @"^(RefCountIncString|RefCountDecString)\((.+)\)$")
+    if stringRefCountMatch.Success then
+        parseOperand stringRefCountMatch.Groups.[2].Value
         |> Result.mapError (fun e -> $"Line {lineNum}: {e}")
-        |> Result.map (fun operand -> Choice1Of2 (RefCountDecString operand))
+        |> Result.map (fun operand ->
+            if stringRefCountMatch.Groups.[1].Value = "RefCountIncString" then
+                Choice1Of2 (RefCountIncString operand)
+            else
+                Choice1Of2 (RefCountDecString operand))
     else
 
     // Try FileReadText: "X0 <- FileReadText(str[path])"
@@ -287,6 +344,35 @@ let parseInstructionOrTerminator (lineNum: int) (line: string) : Result<Choice<I
                 match parseRegister divMatch.Groups.[3].Value with
                 | Error e -> Error $"Line {lineNum}: {e}"
                 | Ok right -> Ok (Choice1Of2 (Sdiv (dest, left, right)))
+    else
+
+    // Try AndImm: "X0 <- AndImm(X1, 42)"
+    let andImmMatch = Regex.Match(line, @"^(.+?)\s*<-\s*AndImm\((.+?),\s*(-?\d+)\)$")
+    if andImmMatch.Success then
+        match parseRegister andImmMatch.Groups.[1].Value,
+              parseRegister andImmMatch.Groups.[2].Value,
+              parseInt64Field "AND immediate" andImmMatch.Groups.[3].Value with
+        | Ok dest, Ok src, Ok imm -> Ok (Choice1Of2 (And_imm (dest, src, imm)))
+        | Error e, _, _
+        | _, Error e, _
+        | _, _, Error e -> Error $"Line {lineNum}: {e}"
+    else
+
+    // Try Madd/Msub: "X0 <- Madd(X1, X2, X3)"
+    let multiplyAddMatch = Regex.Match(line, @"^(.+?)\s*<-\s*(Madd|Msub)\((.+?),\s*(.+?),\s*(.+)\)$")
+    if multiplyAddMatch.Success then
+        match parseRegister multiplyAddMatch.Groups.[1].Value,
+              parseRegister multiplyAddMatch.Groups.[3].Value,
+              parseRegister multiplyAddMatch.Groups.[4].Value,
+              parseRegister multiplyAddMatch.Groups.[5].Value with
+        | Ok dest, Ok left, Ok right, Ok addend when multiplyAddMatch.Groups.[2].Value = "Madd" ->
+            Ok (Choice1Of2 (Madd (dest, left, right, addend)))
+        | Ok dest, Ok left, Ok right, Ok minuend ->
+            Ok (Choice1Of2 (Msub (dest, left, right, minuend)))
+        | Error e, _, _, _
+        | _, Error e, _, _
+        | _, _, Error e, _
+        | _, _, _, Error e -> Error $"Line {lineNum}: {e}"
     else
         Error $"Line {lineNum}: Invalid instruction format '{line}'"
 

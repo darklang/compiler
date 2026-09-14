@@ -367,112 +367,6 @@ let private makeSimpleProgramWithRecords (instrs: LIR.Instr list) (term: LIR.Ter
 let private makeSimpleProgram (instrs: LIR.Instr list) (term: LIR.Terminator) : LIR.Program =
     makeSimpleProgramWithRecords instrs term Map.empty
 
-/// A free-list hit must still return the reused block when the allocation
-/// destination is X3/RCX, which is also an x64 allocator scratch register.
-let testHeapAllocReusesBlockIntoX3 () : Result<unit, string> =
-    let scalarPairType = AST.TTuple [AST.TInt64; AST.TInt64]
-    let program =
-        makeSimpleProgram
-            [ LIR.HeapAlloc (LIR.Physical LIR.X1, 16)
-              LIR.RefCountDec
-                  (LIR.Physical LIR.X1, 16, LIR.GenericHeap, Some (rcMetadata scalarPairType))
-              LIR.HeapAlloc (LIR.Physical LIR.X3, 16)
-              LIR.HeapStore (LIR.Physical LIR.X3, 0, LIR.Imm 1L, None)
-              LIR.HeapStore (LIR.Physical LIR.X3, 8, LIR.Imm 2L, None)
-              LIR.HeapStore (LIR.Physical LIR.X3, 16, LIR.Imm 0x3234L, None)
-              LIR.PrintHeapStringNoNewline (LIR.Physical LIR.X3)
-              LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X3)) ]
-            LIR.Ret
-
-    match runLIRProgramFullWithOptions program true with
-    | Error error -> Error error
-    | Ok (exitCode, stdout, stderr) ->
-        if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}: {stderr}"
-        elif stdout <> "42" then Error $"Expected reused X3 block to contain '42', got '{stdout}'"
-        elif stderr.Trim() <> "" then Error $"Expected reused HeapAlloc block to balance leak accounting, got '{stderr.Trim()}'"
-        else Ok ()
-
-/// RawAlloc uses the same size-class free lists as typed HeapAlloc. Reusing a
-/// raw block must create a new live allocation for leak accounting purposes.
-let testRawAllocReuseBalancesLeakCounter () : Result<unit, string> =
-    let program =
-        makeSimpleProgram
-            [ LIR.Mov (LIR.Physical LIR.X1, LIR.Imm 8L)
-              LIR.RawAlloc (LIR.Physical LIR.X2, LIR.Physical LIR.X1)
-              LIR.RawFree (LIR.Physical LIR.X2)
-              LIR.RawAlloc (LIR.Physical LIR.X3, LIR.Physical LIR.X1)
-              LIR.RawFree (LIR.Physical LIR.X3) ]
-            LIR.Ret
-
-    match runLIRProgramFullWithOptions program true with
-    | Error error -> Error error
-    | Ok (exitCode, _, stderr) ->
-        if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}: {stderr}"
-        elif stderr.Trim() <> "" then Error $"Expected reused RawAlloc block to balance leak accounting, got '{stderr.Trim()}'"
-        else Ok ()
-
-/// String RC lowering must support an X3/RCX string pointer while accessing the
-/// leading refcount word directly.
-let testStringRefCountSupportsX3 () : Result<unit, string> =
-    let program =
-        makeSimpleProgram
-            [ LIR.HeapAlloc (LIR.Physical LIR.X3, 16)
-              LIR.HeapStore (LIR.Physical LIR.X3, 0, LIR.Imm 1L, None)
-              LIR.HeapStore (LIR.Physical LIR.X3, 8, LIR.Imm 2L, None)
-              LIR.HeapStore (LIR.Physical LIR.X3, 16, LIR.Imm 0x3234L, None)
-              LIR.RefCountIncString (LIR.Reg (LIR.Physical LIR.X3))
-              LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X3))
-              LIR.PrintHeapStringNoNewline (LIR.Physical LIR.X3)
-              LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X3)) ]
-            LIR.Ret
-
-    match runLIRProgramFullWithOptions program true with
-    | Error error -> Error error
-    | Ok (exitCode, stdout, stderr) ->
-        if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}: {stderr}"
-        elif stdout <> "42" then Error $"Expected X3 string to contain '42', got '{stdout}'"
-        elif stderr.Trim() <> "" then Error $"Expected balanced X3 string RC, got '{stderr.Trim()}'"
-        else Ok ()
-
-/// String RC lowering must preserve an X12/R11 value pointer while R11 is used
-/// to materialize the immutable-buffer sentinel.
-let testStringRefCountSupportsX12 () : Result<unit, string> =
-    let program =
-        makeSimpleProgram
-            [ LIR.HeapAlloc (LIR.Physical LIR.X12, 16)
-              LIR.HeapStore (LIR.Physical LIR.X12, 0, LIR.Imm 1L, None)
-              LIR.HeapStore (LIR.Physical LIR.X12, 8, LIR.Imm 2L, None)
-              LIR.HeapStore (LIR.Physical LIR.X12, 16, LIR.Imm 0x3234L, None)
-              LIR.RefCountIncString (LIR.Reg (LIR.Physical LIR.X12))
-              LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X12))
-              LIR.PrintHeapStringNoNewline (LIR.Physical LIR.X12)
-              LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X12)) ]
-            LIR.Ret
-
-    match runLIRProgramFullWithOptions program true with
-    | Error error -> Error error
-    | Ok (exitCode, stdout, stderr) ->
-        if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}: {stderr}"
-        elif stdout <> "42" then Error $"Expected X12 string to contain '42', got '{stdout}'"
-        elif stderr.Trim() <> "" then Error $"Expected balanced X12 string RC, got '{stderr.Trim()}'"
-        else Ok ()
-
-/// Literal materialization uses X12/R11 as its usual byte-copy temporary, so
-/// an X12 destination must select a different temporary register.
-let testStringLiteralSupportsX12Destination () : Result<unit, string> =
-    let program =
-        makeSimpleProgram
-            [ LIR.Mov (LIR.Physical LIR.X12, LIR.StringSymbol "hello")
-              LIR.PrintHeapStringNoNewline (LIR.Physical LIR.X12) ]
-            LIR.Ret
-
-    match runLIRProgramFullWithOptions program false with
-    | Error error -> Error error
-    | Ok (exitCode, stdout, stderr) ->
-        if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}: {stderr}"
-        elif stdout <> "hello" then Error $"Expected X12 literal 'hello', got '{stdout}'"
-        else Ok ()
-
 /// Literal strings belong in the executable's immutable literal pool. Emitting
 /// bump-allocation instructions here leaks one heap object per execution and can
 /// exhaust the runtime heap in string-heavy code.
@@ -534,28 +428,6 @@ let testRawSlotInitRetainsX12Value () : Result<unit, string> =
         if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}: {stderr}"
         elif stdout = "owned" then Ok ()
         else Error $"Expected X12 RawSlotInit value to remain owned, got stdout '{stdout}' and stderr '{stderr}'"
-
-/// Loading a literal right operand uses X4/X5 and scratch. Preserve a left
-/// operand already in X4 across that setup before concatenating into X5.
-let testStringConcatPreservesX4LeftAcrossLiteralRight () : Result<unit, string> =
-    let program =
-        makeSimpleProgram
-            [ LIR.StringConcat
-                  (LIR.Physical LIR.X4, LIR.StringSymbol "\"", LIR.StringSymbol "42")
-              LIR.StringConcat
-                  (LIR.Physical LIR.X5, LIR.Reg (LIR.Physical LIR.X4), LIR.StringSymbol "\"")
-              LIR.PrintHeapStringNoNewline (LIR.Physical LIR.X5)
-              LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X5))
-              LIR.RefCountDecString (LIR.Reg (LIR.Physical LIR.X4)) ]
-            LIR.Ret
-
-    match runLIRProgramFullWithOptions program true with
-    | Error error -> Error error
-    | Ok (exitCode, stdout, stderr) ->
-        if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}: {stderr}"
-        elif stdout <> "\"42\"" then Error $"Expected quoted x64 string, got '{stdout}'"
-        elif stderr.Trim() <> "" then Error $"Expected balanced concat string RC, got '{stderr.Trim()}'"
-        else Ok ()
 
 let testStringConcatLoadsStackSlotOperand () : Result<unit, string> =
     let withStackFrame program =
@@ -809,71 +681,6 @@ let testNonCommutativeFloatAliasesPreserveScratch () : Result<unit, string> =
         let output = stdout.Trim()
         if output = "857" && stderr = "" then Ok ()
         else Error $"Expected aliased x64 float operations to print 857, got stdout '{output}' and stderr '{stderr}'"
-
-let testLargeAndImmediatePreservesAllMaskBits () : Result<unit, string> =
-    let program =
-        makeSimpleProgram
-            [ LIR.Mov (LIR.Physical LIR.X1, LIR.Imm 0x3FF0000000000000L)
-              LIR.And_imm (LIR.Physical LIR.X0, LIR.Physical LIR.X1, 0x000FFFFFFFFFFFFFL)
-              LIR.PrintUInt64 (LIR.Physical LIR.X0) ]
-            LIR.Ret
-
-    match runLIRProgramFullWithOptions program false with
-    | Error error -> Error error
-    | Ok (_, stdout, stderr) ->
-        let output = stdout.Trim()
-        if output = "0" && stderr = "" then Ok ()
-        else Error $"Expected full-width x64 AND mask to print 0, got stdout '{output}' and stderr '{stderr}'"
-
-let testMultiplyAddSubtractSupportScratchDestination () : Result<unit, string> =
-    let program =
-        makeSimpleProgram
-            [ LIR.Mov (LIR.Physical LIR.X19, LIR.Imm 7L)
-              LIR.Mov (LIR.Physical LIR.X4, LIR.Imm 6L)
-              LIR.Mov (LIR.Physical LIR.X21, LIR.Imm 5L)
-              LIR.Madd (
-                  LIR.Physical LIR.X11,
-                  LIR.Physical LIR.X19,
-                  LIR.Physical LIR.X4,
-                  LIR.Physical LIR.X21
-              )
-              LIR.Mov (LIR.Physical LIR.X0, LIR.Reg (LIR.Physical LIR.X11))
-              LIR.PrintInt64 (LIR.Physical LIR.X0)
-              LIR.Mov (LIR.Physical LIR.X19, LIR.Imm 7L)
-              LIR.Mov (LIR.Physical LIR.X4, LIR.Imm 6L)
-              LIR.Mov (LIR.Physical LIR.X21, LIR.Imm 5L)
-              LIR.Msub (
-                  LIR.Physical LIR.X11,
-                  LIR.Physical LIR.X19,
-                  LIR.Physical LIR.X4,
-                  LIR.Physical LIR.X21
-              )
-              LIR.Mov (LIR.Physical LIR.X0, LIR.Reg (LIR.Physical LIR.X11))
-              LIR.PrintInt64 (LIR.Physical LIR.X0) ]
-            LIR.Ret
-
-    match runLIRProgramFullWithOptions program false with
-    | Error error -> Error error
-    | Ok (_, stdout, stderr) ->
-        let output = stdout.Trim()
-        if output = "47\n-37" && stderr = "" then Ok ()
-        else Error $"Expected scratch-destination multiply-add/subtract to print 47 and -37, got stdout '{output}' and stderr '{stderr}'"
-
-let testRandomInt64PreservesSyscallClobbers () : Result<unit, string> =
-    let program =
-        makeSimpleProgram
-            [ LIR.Mov (LIR.Physical LIR.X2, LIR.Imm 1L)
-              LIR.RandomInt64 (LIR.Physical LIR.X1)
-              LIR.Mov (LIR.Physical LIR.X0, LIR.Reg (LIR.Physical LIR.X2))
-              LIR.PrintInt64 (LIR.Physical LIR.X0) ]
-            LIR.Ret
-
-    match runLIRProgramFullWithOptions program false with
-    | Error error -> Error error
-    | Ok (_, stdout, stderr) ->
-        let output = stdout.Trim()
-        if output = "1" && stderr = "" then Ok ()
-        else Error $"Expected random syscall to preserve X2=1, got stdout '{output}' and stderr '{stderr}'"
 
 let private runInNamedFunction (name: string) (instrs: LIR.Instr list) (term: LIR.Terminator) : LIR.Program =
     match makeSimpleProgram [LIR.Call (LIR.Physical LIR.X0, name, [])] LIR.Ret with
@@ -5874,15 +5681,9 @@ let tests : (string * (unit -> Result<unit, string>)) list = [
     ("LIR CLI argv x64 returns managed Option String", testCliArgvReturnsManagedOptionString)
     ("LIR CLI host operations execute under x64", testCliHostOperationsExecute)
     ("LIR CLI native call preserves live x64 caller register", testCliNativePreservesLiveCallerRegister)
-    ("LIR HeapAlloc x64 reuses a block into X3", testHeapAllocReusesBlockIntoX3)
-    ("LIR RawAlloc x64 reuse balances leak counter", testRawAllocReuseBalancesLeakCounter)
-    ("LIR string x64 refcount supports X3", testStringRefCountSupportsX3)
-    ("LIR string x64 refcount supports X12", testStringRefCountSupportsX12)
-    ("LIR string literal x64 supports X12 destination", testStringLiteralSupportsX12Destination)
     ("LIR string literal x64 uses static storage", testStringLiteralUsesStaticStorage)
     ("LIR string literal x64 heap store preserves X3", testStringLiteralHeapStorePreservesX3)
     ("LIR x64 RawSlotInit retains X12 value", testRawSlotInitRetainsX12Value)
-    ("LIR StringConcat x64 preserves X4 left across literal right", testStringConcatPreservesX4LeftAcrossLiteralRight)
     ("LIR StringConcat x64 loads stack-slot operand", testStringConcatLoadsStackSlotOperand)
     ("LIR x64 codegen reports missing entry block", testReportsMissingEntryBlock)
     ("LIR x64 codegen rejects conditions without block comparison", testRejectsConditionsWithoutBlockComparison)
@@ -5891,9 +5692,6 @@ let tests : (string * (unit -> Result<unit, string>)) list = [
     ("LIR float x64 argument moves resolve cycles", testFloatArgumentMovesResolveCycles)
     ("LIR high x64 float registers execute", testHighFloatRegistersExecute)
     ("LIR x64 noncommutative float aliases preserve scratch", testNonCommutativeFloatAliasesPreserveScratch)
-    ("LIR x64 full-width AND immediate preserves mask", testLargeAndImmediatePreservesAllMaskBits)
-    ("LIR x64 multiply-add/subtract support scratch destination", testMultiplyAddSubtractSupportScratchDestination)
-    ("LIR x64 RandomInt64 preserves syscall-clobbered registers", testRandomInt64PreservesSyscallClobbers)
     ("LIR conditional branch", testBranch)
     ("LIR generic RefCountDec releases string field", testGenericRefCountDecStringField)
     ("LIR generic RefCountDec skips literal string field release", testGenericRefCountDecLiteralStringFieldSkipsRelease)
