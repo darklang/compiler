@@ -4,6 +4,10 @@
 
 module TestRunnerArgs
 
+type TestTarget =
+    | Host
+    | Explicit of Platform.Target
+
 let private parsePrefixedArg (prefix: string) (args: string array) : string option =
     args
     |> Array.tryFind (fun arg -> arg.StartsWith(prefix))
@@ -12,6 +16,26 @@ let private parsePrefixedArg (prefix: string) (args: string array) : string opti
 // Parse command line for --filter=PATTERN option
 let parseFilterArg (args: string array) : string option =
     parsePrefixedArg "--filter=" args
+
+// Select the architecture whose backend and E2E behavior this invocation
+// validates. Host remains the default so cross-target work is always opt-in.
+let parseTargetArg (args: string array) : Result<TestTarget, string> =
+    let values =
+        args
+        |> Array.choose (fun arg ->
+            if arg.StartsWith("--target=") then
+                Some (arg.Substring("--target=".Length))
+            else
+                None)
+        |> Array.toList
+
+    match values with
+    | []
+    | ["host"] -> Ok Host
+    | ["linux-x86_64"] -> Ok (Explicit Platform.LinuxX86_64)
+    | [value] ->
+        Error $"Unsupported test target '{value}' (expected 'host' or 'linux-x86_64')"
+    | _ -> Error "--target may be specified only once"
 
 // Check if --coverage flag is present (show inline coverage after tests)
 let hasCoverageArg (args: string array) : bool =

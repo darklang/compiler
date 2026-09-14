@@ -680,26 +680,40 @@ let testArm64HelpersAreReused
         else
             Error $"Expected identical helper programs to be reused, got hits={session.Arm64HelperHitCount}, misses={session.Arm64HelperMissCount}")
 
-let tests (stdlib: CompilerLibrary.StdlibResult) = [
-    ("compilation session reuses ARM64 code for nested JSON", testArm64HitWithNestedJson stdlib)
-    ("compilation session segregates ARM64 target options and coverage", testArm64CodegenCacheSegregatesTargetOptionsAndCoverage stdlib)
-    ("compilation session codegen metrics are opt-in", testArm64CodegenMetricsAreOptIn stdlib)
-    ("compilation session reuses structural SSA functions", testSsaFunctionCacheReusesStructuralFunctions stdlib)
-    ("compilation session ignores function-local MIR register offsets", testSsaFunctionCacheIgnoresFunctionLocalRegisterOffsets stdlib)
-    ("compilation session reuses structural MIR optimizations", testMirOptimizationCacheReusesStructuralFunctions stdlib)
-    ("compilation session reuses structural LIR allocation", testAllocatedLirFunctionCacheReusesStructuralFunctions stdlib)
-    ("compilation session segregates ARM64 registry contexts", testArm64CodegenCacheSegregatesCompilationContexts stdlib)
-    ("compilation session reuses registry-independent ARM64 functions", testArm64CodegenCacheReusesContextIndependentFunctions stdlib)
-    ("compilation session reuses planned ARM64 slot-init functions", testArm64CodegenCacheReusesPlannedSlotInitFunctions stdlib)
-    ("compilation session reuses prepared ARM64 chunks by identity", testArm64EmissionChunkCacheUsesChunkIdentity stdlib)
-    ("compilation session reuses prepared ARM64 chunk groups by identity", testArm64EmissionChunkGroupCacheUsesGroupIdentity stdlib)
-    ("compilation session confirms ARM64 release-plan cache shapes", testArm64ReleasePlanSummaryCacheConfirmsPlanShape stdlib)
-    ("expression-only type checking reuses base registries", testExpressionTypeCheckingReusesBaseRegistries stdlib)
-    ("compilation session isolates and disposes registries", testSessionIsolationAndDisposal stdlib)
-    ("compilation session segregates canonical JSON declaration shapes", testJsonPlanCacheSegregatesNominalShapes stdlib)
-    ("compilation session reuses JSON dependencies before lowering", testJsonDependenciesAreReusedBeforeLowering stdlib)
-    ("compilation session reuses the stable start trampoline", testStableStartTrampolineIsReused stdlib)
-    ("compilation session composes cached dependency metadata", testDependencyMetadataIsReusedCompositionally stdlib)
-    ("compilation session reuses stdlib reachability", testStdlibReachabilityIsReused stdlib)
-    ("compilation session reuses identical ARM64 helper programs", testArm64HelpersAreReused stdlib)
-]
+let tests (target: Platform.Target) (stdlib: CompilerLibrary.StdlibResult) =
+    let allTests = [
+        ("compilation session reuses ARM64 code for nested JSON", testArm64HitWithNestedJson stdlib)
+        ("compilation session segregates ARM64 target options and coverage", testArm64CodegenCacheSegregatesTargetOptionsAndCoverage stdlib)
+        ("compilation session codegen metrics are opt-in", testArm64CodegenMetricsAreOptIn stdlib)
+        ("compilation session reuses structural SSA functions", testSsaFunctionCacheReusesStructuralFunctions stdlib)
+        ("compilation session ignores function-local MIR register offsets", testSsaFunctionCacheIgnoresFunctionLocalRegisterOffsets stdlib)
+        ("compilation session reuses structural MIR optimizations", testMirOptimizationCacheReusesStructuralFunctions stdlib)
+        ("compilation session reuses structural LIR allocation", testAllocatedLirFunctionCacheReusesStructuralFunctions stdlib)
+        ("compilation session segregates ARM64 registry contexts", testArm64CodegenCacheSegregatesCompilationContexts stdlib)
+        ("compilation session reuses registry-independent ARM64 functions", testArm64CodegenCacheReusesContextIndependentFunctions stdlib)
+        ("compilation session reuses planned ARM64 slot-init functions", testArm64CodegenCacheReusesPlannedSlotInitFunctions stdlib)
+        ("compilation session reuses prepared ARM64 chunks by identity", testArm64EmissionChunkCacheUsesChunkIdentity stdlib)
+        ("compilation session reuses prepared ARM64 chunk groups by identity", testArm64EmissionChunkGroupCacheUsesGroupIdentity stdlib)
+        ("compilation session confirms ARM64 release-plan cache shapes", testArm64ReleasePlanSummaryCacheConfirmsPlanShape stdlib)
+        ("expression-only type checking reuses base registries", testExpressionTypeCheckingReusesBaseRegistries stdlib)
+        ("compilation session isolates and disposes registries", testSessionIsolationAndDisposal stdlib)
+        ("compilation session segregates canonical JSON declaration shapes", testJsonPlanCacheSegregatesNominalShapes stdlib)
+        ("compilation session reuses JSON dependencies before lowering", testJsonDependenciesAreReusedBeforeLowering stdlib)
+        ("compilation session reuses the stable start trampoline", testStableStartTrampolineIsReused stdlib)
+        ("compilation session composes cached dependency metadata", testDependencyMetadataIsReusedCompositionally stdlib)
+        ("compilation session reuses stdlib reachability", testStdlibReachabilityIsReused stdlib)
+        ("compilation session reuses identical ARM64 helper programs", testArm64HelpersAreReused stdlib)
+    ]
+    match target with
+    | Platform.ARM64Backend _ -> allTests
+    | Platform.LinuxX86_64 ->
+        let arm64OnlyInfrastructure =
+            Set.ofList [
+                "compilation session isolates and disposes registries"
+                "compilation session reuses the stable start trampoline"
+                "compilation session composes cached dependency metadata"
+            ]
+        allTests
+        |> List.filter (fun (name, _) ->
+            not (name.Contains("ARM64"))
+            && not (Set.contains name arm64OnlyInfrastructure))

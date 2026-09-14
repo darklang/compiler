@@ -557,6 +557,36 @@ let testStringConcatPreservesX4LeftAcrossLiteralRight () : Result<unit, string> 
         elif stderr.Trim() <> "" then Error $"Expected balanced concat string RC, got '{stderr.Trim()}'"
         else Ok ()
 
+let testStringConcatLoadsStackSlotOperand () : Result<unit, string> =
+    let withStackFrame program =
+        match program with
+        | LIR.Program ([func], variants, records) ->
+            LIR.Program ([{ func with StackSize = 16 }], variants, records)
+        | _ -> Crash.crash "StringConcat stack-slot fixture expected one function"
+
+    let program =
+        makeSimpleProgram
+            [ LIR.StringConcat
+                  (LIR.Physical LIR.X1, LIR.StringSymbol "1", LIR.StringSymbol "")
+              LIR.Store (-8, LIR.Physical LIR.X1)
+              LIR.StringConcat
+                  (LIR.Physical LIR.X2, LIR.StringSymbol "2", LIR.StringSymbol "")
+              LIR.Store (-16, LIR.Physical LIR.X2)
+              LIR.Mov (LIR.Physical LIR.X12, LIR.StackSlot -8)
+              LIR.StringConcat
+                  (LIR.Physical LIR.X11, LIR.Reg (LIR.Physical LIR.X12), LIR.StackSlot -16)
+              LIR.Mov (LIR.Physical LIR.X0, LIR.Reg (LIR.Physical LIR.X11))
+              LIR.PrintHeapStringNoNewline (LIR.Physical LIR.X0) ]
+            LIR.Ret
+        |> withStackFrame
+
+    match runLIRProgramFullWithOptions program false with
+    | Error error -> Error error
+    | Ok (exitCode, stdout, stderr) ->
+        if exitCode <> 0 then Error $"Expected exit code 0, got {exitCode}: {stderr}"
+        elif stdout = "12" then Ok ()
+        else Error $"Expected x64 stack-slot concatenation to print '12', got stdout '{stdout}' and stderr '{stderr}'"
+
 /// CLI argv is implemented by an in-binary runtime helper. Its call must
 /// resolve as a code label rather than being deferred as an ELF data fixup.
 let testCliArgvHelperResolvesAsCodeLabel () : Result<unit, string> =
@@ -676,11 +706,11 @@ let testSleepLowersToNormalizedInterruptSafeNanosleep () : Result<unit, string> 
         let hasNormalization =
             instrs
             |> List.exists (function
-                | X86_64.MULSD (X86_64.XMM15, X86_64.XMM0) -> true
+                | X86_64.MULSD (X86_64.XMM1, X86_64.XMM0) -> true
                 | _ -> false)
             && instrs
                |> List.exists (function
-                   | X86_64.CVTTSD2SI (X86_64.R11, X86_64.XMM15) -> true
+                   | X86_64.CVTTSD2SI (X86_64.R11, X86_64.XMM1) -> true
                    | _ -> false)
             && instrs
                |> List.exists (function
@@ -738,10 +768,10 @@ let testHighFloatRegistersExecute () : Result<unit, string> =
     let program =
         makeSimpleProgram
             [ LIR.FLoad (LIR.FPhysical LIR.D0, 0.01)
-              LIR.FMov (LIR.FPhysical LIR.D11, LIR.FPhysical LIR.D0)
+              LIR.FMov (LIR.FPhysical LIR.D15, LIR.FPhysical LIR.D0)
               LIR.FLoad (LIR.FPhysical LIR.D2, 2000.0)
-              LIR.FMul (LIR.FPhysical LIR.D10, LIR.FPhysical LIR.D11, LIR.FPhysical LIR.D2)
-              LIR.FloatToInt64 (LIR.Physical LIR.X0, LIR.FPhysical LIR.D10)
+              LIR.FMul (LIR.FPhysical LIR.D15, LIR.FPhysical LIR.D15, LIR.FPhysical LIR.D2)
+              LIR.FloatToInt64 (LIR.Physical LIR.X0, LIR.FPhysical LIR.D15)
               LIR.PrintInt64 (LIR.Physical LIR.X0) ]
             LIR.Ret
 
@@ -751,6 +781,99 @@ let testHighFloatRegistersExecute () : Result<unit, string> =
         let output = stdout.Trim()
         if output = "20" && stderr = "" then Ok ()
         else Error $"Expected high x64 float registers to print 20, got stdout '{output}' and stderr '{stderr}'"
+
+let testNonCommutativeFloatAliasesPreserveScratch () : Result<unit, string> =
+    let program =
+        makeSimpleProgram
+            [ LIR.FLoad (LIR.FPhysical LIR.D0, 7.0)
+              LIR.FLoad (LIR.FPhysical LIR.D1, 10.0)
+              LIR.FLoad (LIR.FPhysical LIR.D2, 2.0)
+              LIR.FSub (LIR.FPhysical LIR.D2, LIR.FPhysical LIR.D1, LIR.FPhysical LIR.D2)
+              LIR.FloatToInt64 (LIR.Physical LIR.X1, LIR.FPhysical LIR.D2)
+              LIR.FLoad (LIR.FPhysical LIR.D2, 2.0)
+              LIR.FDiv (LIR.FPhysical LIR.D2, LIR.FPhysical LIR.D1, LIR.FPhysical LIR.D2)
+              LIR.FloatToInt64 (LIR.Physical LIR.X2, LIR.FPhysical LIR.D2)
+              LIR.FloatToInt64 (LIR.Physical LIR.X3, LIR.FPhysical LIR.D0)
+              LIR.Mov (LIR.Physical LIR.X4, LIR.Imm 100L)
+              LIR.Mul (LIR.Physical LIR.X1, LIR.Physical LIR.X1, LIR.Physical LIR.X4)
+              LIR.Mov (LIR.Physical LIR.X4, LIR.Imm 10L)
+              LIR.Mul (LIR.Physical LIR.X2, LIR.Physical LIR.X2, LIR.Physical LIR.X4)
+              LIR.Add (LIR.Physical LIR.X0, LIR.Physical LIR.X1, LIR.Reg (LIR.Physical LIR.X2))
+              LIR.Add (LIR.Physical LIR.X0, LIR.Physical LIR.X0, LIR.Reg (LIR.Physical LIR.X3))
+              LIR.PrintInt64 (LIR.Physical LIR.X0) ]
+            LIR.Ret
+
+    match runLIRProgramFullWithOptions program false with
+    | Error error -> Error error
+    | Ok (_, stdout, stderr) ->
+        let output = stdout.Trim()
+        if output = "857" && stderr = "" then Ok ()
+        else Error $"Expected aliased x64 float operations to print 857, got stdout '{output}' and stderr '{stderr}'"
+
+let testLargeAndImmediatePreservesAllMaskBits () : Result<unit, string> =
+    let program =
+        makeSimpleProgram
+            [ LIR.Mov (LIR.Physical LIR.X1, LIR.Imm 0x3FF0000000000000L)
+              LIR.And_imm (LIR.Physical LIR.X0, LIR.Physical LIR.X1, 0x000FFFFFFFFFFFFFL)
+              LIR.PrintUInt64 (LIR.Physical LIR.X0) ]
+            LIR.Ret
+
+    match runLIRProgramFullWithOptions program false with
+    | Error error -> Error error
+    | Ok (_, stdout, stderr) ->
+        let output = stdout.Trim()
+        if output = "0" && stderr = "" then Ok ()
+        else Error $"Expected full-width x64 AND mask to print 0, got stdout '{output}' and stderr '{stderr}'"
+
+let testMultiplyAddSubtractSupportScratchDestination () : Result<unit, string> =
+    let program =
+        makeSimpleProgram
+            [ LIR.Mov (LIR.Physical LIR.X19, LIR.Imm 7L)
+              LIR.Mov (LIR.Physical LIR.X4, LIR.Imm 6L)
+              LIR.Mov (LIR.Physical LIR.X21, LIR.Imm 5L)
+              LIR.Madd (
+                  LIR.Physical LIR.X11,
+                  LIR.Physical LIR.X19,
+                  LIR.Physical LIR.X4,
+                  LIR.Physical LIR.X21
+              )
+              LIR.Mov (LIR.Physical LIR.X0, LIR.Reg (LIR.Physical LIR.X11))
+              LIR.PrintInt64 (LIR.Physical LIR.X0)
+              LIR.Mov (LIR.Physical LIR.X19, LIR.Imm 7L)
+              LIR.Mov (LIR.Physical LIR.X4, LIR.Imm 6L)
+              LIR.Mov (LIR.Physical LIR.X21, LIR.Imm 5L)
+              LIR.Msub (
+                  LIR.Physical LIR.X11,
+                  LIR.Physical LIR.X19,
+                  LIR.Physical LIR.X4,
+                  LIR.Physical LIR.X21
+              )
+              LIR.Mov (LIR.Physical LIR.X0, LIR.Reg (LIR.Physical LIR.X11))
+              LIR.PrintInt64 (LIR.Physical LIR.X0) ]
+            LIR.Ret
+
+    match runLIRProgramFullWithOptions program false with
+    | Error error -> Error error
+    | Ok (_, stdout, stderr) ->
+        let output = stdout.Trim()
+        if output = "47\n-37" && stderr = "" then Ok ()
+        else Error $"Expected scratch-destination multiply-add/subtract to print 47 and -37, got stdout '{output}' and stderr '{stderr}'"
+
+let testRandomInt64PreservesSyscallClobbers () : Result<unit, string> =
+    let program =
+        makeSimpleProgram
+            [ LIR.Mov (LIR.Physical LIR.X2, LIR.Imm 1L)
+              LIR.RandomInt64 (LIR.Physical LIR.X1)
+              LIR.Mov (LIR.Physical LIR.X0, LIR.Reg (LIR.Physical LIR.X2))
+              LIR.PrintInt64 (LIR.Physical LIR.X0) ]
+            LIR.Ret
+
+    match runLIRProgramFullWithOptions program false with
+    | Error error -> Error error
+    | Ok (_, stdout, stderr) ->
+        let output = stdout.Trim()
+        if output = "1" && stderr = "" then Ok ()
+        else Error $"Expected random syscall to preserve X2=1, got stdout '{output}' and stderr '{stderr}'"
 
 let private runInNamedFunction (name: string) (instrs: LIR.Instr list) (term: LIR.Terminator) : LIR.Program =
     match makeSimpleProgram [LIR.Call (LIR.Physical LIR.X0, name, [])] LIR.Ret with
@@ -5760,12 +5883,17 @@ let tests : (string * (unit -> Result<unit, string>)) list = [
     ("LIR string literal x64 heap store preserves X3", testStringLiteralHeapStorePreservesX3)
     ("LIR x64 RawSlotInit retains X12 value", testRawSlotInitRetainsX12Value)
     ("LIR StringConcat x64 preserves X4 left across literal right", testStringConcatPreservesX4LeftAcrossLiteralRight)
+    ("LIR StringConcat x64 loads stack-slot operand", testStringConcatLoadsStackSlotOperand)
     ("LIR x64 codegen reports missing entry block", testReportsMissingEntryBlock)
     ("LIR x64 codegen rejects conditions without block comparison", testRejectsConditionsWithoutBlockComparison)
     ("LIR DateTimeNow x64 lowering uses 100ns Unix ticks", testDateTimeNowLowersTo100nsUnixTicks)
     ("LIR Sleep x64 lowering normalizes timeout and retries nanosleep", testSleepLowersToNormalizedInterruptSafeNanosleep)
     ("LIR float x64 argument moves resolve cycles", testFloatArgumentMovesResolveCycles)
     ("LIR high x64 float registers execute", testHighFloatRegistersExecute)
+    ("LIR x64 noncommutative float aliases preserve scratch", testNonCommutativeFloatAliasesPreserveScratch)
+    ("LIR x64 full-width AND immediate preserves mask", testLargeAndImmediatePreservesAllMaskBits)
+    ("LIR x64 multiply-add/subtract support scratch destination", testMultiplyAddSubtractSupportScratchDestination)
+    ("LIR x64 RandomInt64 preserves syscall-clobbered registers", testRandomInt64PreservesSyscallClobbers)
     ("LIR conditional branch", testBranch)
     ("LIR generic RefCountDec releases string field", testGenericRefCountDecStringField)
     ("LIR generic RefCountDec skips literal string field release", testGenericRefCountDecLiteralStringFieldSkipsRelease)

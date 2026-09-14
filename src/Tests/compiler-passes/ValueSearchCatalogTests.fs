@@ -120,6 +120,9 @@ let private compile
         Session = None
     }
 
+let private execute (report: CompilerLibrary.CompileReport) (binary: byte array) =
+    TestDSL.E2ETestRunner.executeBinaryForTarget report.Target binary
+
 let testCatalogParity (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
     let source =
         $"""
@@ -162,16 +165,13 @@ let testCatalogParity (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
     match report.Result with
     | Error error -> Error $"Catalog parity program did not compile: {error}"
     | Ok binary ->
-        let output =
-            CompilerLibrary.executeCaptured
-                report.Target
-                0
-                CompilerLibrary.ExecutionInput.Closed
-                binary
-        if output.ExitCode = 0 && output.Stdout = "true\n" && output.Stderr = "" then
-            Ok ()
-        else
-            Error $"Unexpected catalog parity output: exit={output.ExitCode}, stdout={output.Stdout}, stderr={output.Stderr}"
+        match execute report binary with
+        | Error error -> Error $"Catalog parity program did not execute: {error}"
+        | Ok output ->
+            if output.ExitCode = 0 && output.Stdout = "true\n" && output.Stderr = "" then
+                Ok ()
+            else
+                Error $"Unexpected catalog parity output: exit={output.ExitCode}, stdout={output.Stdout}, stderr={output.Stderr}"
 
 let testCatalogRejectsIllTypedAvailableValue
     (stdlib: CompilerLibrary.StdlibResult)
@@ -202,10 +202,11 @@ let testInt8PackageProbeParity (stdlib: CompilerLibrary.StdlibResult) () : TestR
     match report.Result with
     | Error error -> Error $"Int8 package probe did not compile: {error}"
     | Ok binary ->
-        let output =
-            CompilerLibrary.executeCaptured report.Target 0 CompilerLibrary.ExecutionInput.Closed binary
-        if output.ExitCode = 0 && output.Stdout = "true\n" && output.Stderr = "" then Ok ()
-        else Error $"Unexpected Int8 package probe output: exit={output.ExitCode}, stdout={output.Stdout}, stderr={output.Stderr}"
+        match execute report binary with
+        | Error error -> Error $"Int8 package probe did not execute: {error}"
+        | Ok output ->
+            if output.ExitCode = 0 && output.Stdout = "true\n" && output.Stderr = "" then Ok ()
+            else Error $"Unexpected Int8 package probe output: exit={output.ExitCode}, stdout={output.Stdout}, stderr={output.Stderr}"
 
 let tests (stdlib: CompilerLibrary.StdlibResult) = [
     ("catalog-backed ValueSearch preserves interpreter lookup order and filtering", testCatalogParity stdlib)

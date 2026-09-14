@@ -193,22 +193,24 @@ match Stdlib.List.partition ([1L, 2L, 3L, 4L, 5L]) (fun x -> x > 2L) with | (tru
 // ===================================================================
 // List memory reclamation regression
 // ===================================================================
-// Disabled pending the cross-backend memory matrix even though x86-64
-// reference-counting support is implemented. See
-// docs/compiler/backend/x64.md.
-//
-// let memReclaimMakeHelper(n: Int64, acc: List<Int64>) : List<Int64> =
-//     if n <= 0 then acc
-//     else memReclaimMakeHelper(n - 1, Stdlib.List.push(acc, n))
-//
-// let memReclaimMake(n: Int64) : List<Int64> =
-//     memReclaimMakeHelper(n, [])
-//
-// let memReclaimBurn(iters: Int64, total: Int64) : Int64 =
-//     if iters <= 0 then total
-//     else
-//         let l = memReclaimMake(400) in
-//         let len = Stdlib.List.length<Int64>(l) in
-//         memReclaimBurn(iters - 1, total + len)
-//
-// memReclaimBurn(10000, 0) = 4000000
+let memReclaimMakeHelper(n: Int64, acc: List<Int64>) : List<Int64> =
+    if n <= 0L then acc
+    else memReclaimMakeHelper(n - 1L, Stdlib.List.push(acc, n))
+
+let memReclaimMake(n: Int64) : List<Int64> =
+    memReclaimMakeHelper(n, [])
+
+let memReclaimBurn(iters: Int, total: Int) : Int =
+    if iters <= 0I then total
+    else
+        let l = memReclaimMake(400L) in
+        let len = Stdlib.List.length<Int64>(l) in
+        memReclaimBurn(iters - 1I, total + len)
+
+memReclaimBurn(10000I, 0I) = stdout="4000000\n" stderr=""
+
+// ===================================================================
+// NOTE: Functions disabled due to compiler bugs
+// ===================================================================
+
+// Stdlib.List.zip - disabled due to tuple recursion bug

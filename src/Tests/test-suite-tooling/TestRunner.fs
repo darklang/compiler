@@ -32,6 +32,7 @@ let printHelp () =
     println "  --roundtrip-all-dark  Include all upstream .dark files in parser/pretty corpus roundtrip"
     println "  --all-test-timings  Print timing for every test in final timing summary"
     println "  --e2e-batch-size=N  Compile up to N compatible E2E checks together (default/max 8192; 1 disables)"
+    println "  --target=TARGET     Validate host (default) or linux-x86_64"
     println "  --timings-json=PATH  Write machine-readable timing data to PATH"
     println "  --codegen-profile-json=PATH  Write opt-in per-function ARM64 codegen metrics"
     println "  --quiet            Quiet mode: print 'success' or list failed tests"
@@ -48,6 +49,7 @@ let printHelp () =
     println "  Tests --parser-pretty-roundtrip  Legacy no-op (corpus roundtrip already enabled)"
     println "  Tests --roundtrip-all-dark  Roundtrip all upstream .dark files and stop on first error"
     println "  Tests --all-test-timings  Show timing for every test at the end"
+    println "  Tests --target=linux-x86_64  Run x64 backend and E2E tests (QEMU when cross-target)"
     println "  Tests --timings-json=/tmp/timings.json  Write timing data as JSON"
 
 type private TestRunResult =
@@ -238,6 +240,19 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
         | Ok size -> size
         | Error msg -> Crash.crash msg
 
+    let targetSelection =
+        match parseTargetArg args with
+        | Ok selection -> selection
+        | Error msg -> Crash.crash msg
+
+    let target =
+        match targetSelection with
+        | Host ->
+            match Platform.detectHostTarget () with
+            | Ok detected -> detected
+            | Error err -> Crash.crash $"Host target detection failed: {err}"
+        | Explicit selected -> selected
+
     println $"{Colors.bold}{Colors.cyan}🧪 Running DSL-based Tests{Colors.reset}"
     match filter with
     | Some pattern -> println $"{Colors.gray}  Filter: {pattern}{Colors.reset}"
@@ -250,6 +265,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
     if showAllTestTimings then
         println $"{Colors.gray}  Per-test timings: all tests (mode enabled){Colors.reset}"
     println $"{Colors.gray}  E2E batch size: {e2eBatchSize}{Colors.reset}"
+    println $"{Colors.gray}  Development target: {target}{Colors.reset}"
     match timingsJsonPath with
     | Some path ->
         println $"{Colors.gray}  Timing JSON output: {path}{Colors.reset}"
@@ -502,9 +518,18 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
     let typecheckTestFiles = getTestFiles "typecheck" "typecheck"
     let anf2mirTestFiles  = getTestFiles "passes/anf2mir" "anf2mir"
     let mir2lirTestFiles  = getTestFiles "passes/mir2lir" "mir2lir"
-    let lir2arm64TestFiles  = getTestFiles "passes/lir2arm64" "lir2arm64"
-    let arm64encTestFiles  = getTestFiles "passes/arm64enc" "arm64enc"
-    let x64encTestFiles = getTestFiles "passes/x64enc" "x64enc"
+    let lir2arm64TestFiles =
+        match target with
+        | Platform.ARM64Backend _ -> getTestFiles "passes/lir2arm64" "lir2arm64"
+        | Platform.LinuxX86_64 -> [||]
+    let arm64encTestFiles =
+        match target with
+        | Platform.ARM64Backend _ -> getTestFiles "passes/arm64enc" "arm64enc"
+        | Platform.LinuxX86_64 -> [||]
+    let x64encTestFiles =
+        match target with
+        | Platform.ARM64Backend _ -> [||]
+        | Platform.LinuxX86_64 -> getTestFiles "passes/x64enc" "x64enc"
     let graphColorTestFiles = getTestFiles "algorithms/graph-color" "graphcolor"
     let parallelMoveTestFiles = getTestFiles "algorithms/parallel-moves" "parallelmoves"
     let irFormatSnapshotTestFiles = getTestFiles "formatting/ir" "irformat"
@@ -520,7 +545,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
         { Name = "ValueSearch Catalog Tests"; Tests = ValueSearchCatalogTests.tests stdlib }
         { Name = "Program Structure Tests"; Tests = ProgramStructureTests.tests stdlib }
         { Name = "Stdlib Optimization Tests"; Tests = StdlibOptimizationTests.tests stdlib }
-        { Name = "Compilation Session Tests"; Tests = CompilationSessionTests.tests stdlib }
+        { Name = "Compilation Session Tests"; Tests = CompilationSessionTests.tests target stdlib }
         { Name = "JSON Planning Tests"; Tests = JsonPlanningTests.tests stdlib }
         { Name = "List HIR Tests"; Tests = ListHIRTests.tests }
         { Name = "Runtime Data Layout Tests"; Tests = RuntimeDataLayoutTests.tests }
@@ -674,10 +699,6 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
 
     let stdlibPassTimingStart = passTimingTotal ()
     let timer = Stopwatch.StartNew()
-    let target =
-        match Platform.detectHostTarget () with
-        | Ok target -> target
-        | Error err -> Crash.crash $"Host target detection failed: {err}"
     let stdlib =
         match CompilerLibrary.buildStdlibWithTrace target (Some recordPassTiming) with
         | Ok stdlib -> stdlib
@@ -688,6 +709,26 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
     let optionalRoundtripSuites : UnitTestSuite array = [||]
 
     let allUnitTests = Array.append (buildUnitTests stdlib) optionalRoundtripSuites
+
+    let unitSuiteSupportsTarget (suiteName: string) : bool =
+        let arm64Suites =
+            Set.ofList [
+                "ARM64 Encoding Tests"
+                "ARM64 Binary Tests"
+                "ARM64 CodeGen Tests"
+                "Parallel Move Fixture Tests"
+            ]
+        let x64Suites =
+            Set.ofList [
+                "LIR Execution Fixture Tests"
+                "x64 Encoding Fixture Tests"
+                "x64 Binary Tests"
+                "x64 Resolve Tests"
+                "x64 CodeGen Tests"
+            ]
+        match target with
+        | Platform.ARM64Backend _ -> not (Set.contains suiteName x64Suites)
+        | Platform.LinuxX86_64 -> not (Set.contains suiteName arm64Suites)
 
     // Upstream enablement is intentionally incremental: keep tests discoverable, but
     // only run line-allowlisted cases for files currently being enabled.
@@ -1374,6 +1415,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
 
     let unitTests =
         allUnitTests
+        |> Array.filter (fun suite -> unitSuiteSupportsTarget suite.Name)
         |> Array.choose (fun suite ->
             if matchesFilter filter suite.Name then
                 Some suite

@@ -2,12 +2,14 @@
 
 This policy applies to all agents when they verify a proposed commit, change, fix, workflow update, or integration step.
 
-Verification means both:
+Verification means both, for the active development target:
 
 - All tests pass.
 - Benchmarks do not regress.
 
-For compiler repository changes, the default verification commands are:
+The active target is the host unless the work explicitly declares another
+target. For ordinary host-target compiler changes, the default verification
+commands are:
 
 ```bash
 ./run-tests --ai
@@ -30,6 +32,24 @@ comparisons do not confuse logical coverage with compiler invocations.
 
 Agents may run narrower checks while developing a change, but a change is not verified until the full verification policy has passed or the agent explicitly reports why full verification could not be completed.
 
+Target support is intentionally allowed to advance independently. A feature
+developed for one target may land after that target's applicable tests and
+benchmarks pass; an architecture outside the declared scope is not an
+integration blocker. Cross-target parity work must name every target in scope
+and is a dated audit of those targets at that revision, not a permanent
+requirement that future changes validate every architecture.
+
+On an ARM64 host, Linux x86_64 tests are explicit and execute generated ELF
+binaries through the pinned QEMU installation:
+
+```bash
+./run-tests --ai --target=linux-x86_64
+```
+
+Omitting `--target` validates ARM64 only. Conversely, an x86_64-target change
+must pass the x86_64 suite and its relevant x86_64 benchmark gate; a host ARM64
+run is required only when ARM64 is also declared in scope.
+
 Verification mode compares the complete routine run with the compatible
 architecture-specific canonical Dark snapshot, not `RESULTS.md`. The decision is
 the exact comparison of the products of every positive instruction count; the
@@ -51,10 +71,10 @@ separate via `--refresh-baseline=rust`.
 
 When reporting verification, include the exact commands run, whether they passed or failed, and any residual risk.
 
-For changes limited to the Linux x86_64 backend on an ARM64 worker, use the
+For Linux x86_64 benchmark validation on an ARM64 worker, use the
 canonical `benchmarks/x86_64_check.py` quick track. DCB measures the exact base
 with Dark and audited Rust, measures the candidate with Dark, and retains the
 structured comparison outside either worktree. A `partial-*` decision is useful
-diagnostic evidence but is never a verified win. Shared compiler/runtime
-changes require both the host routine gate and the x86_64 QEMU gate; a
-regression on either track rejects the aggregate result.
+diagnostic evidence but is never a verified win. Run both the host routine gate
+and the x86_64 QEMU gate only when both targets were explicitly included in the
+change; each declared target must pass its own gate.

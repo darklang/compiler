@@ -13,12 +13,18 @@ dotnet build
 
 ```bash
 ./run-tests --ai                 # Build and run the full suite with bounded output
+./run-tests --ai --target=linux-x86_64 # Explicit x64 suite (QEMU when cross-target)
 ./run-tests --quiet              # Less output
 ./run-tests --ai --filter=tuple    # Filter by case-insensitive substring
 ./run-tests --ai --filter=List.map # Filter by test name fragment
 ./run-tests --build-only         # Just build, don't run
 ./run-tests --help               # All options
 ```
+
+Tests follow the selected development target. With no `--target`, the suite
+uses the host architecture and does not also run another backend's tests or
+benchmarks. Use the explicit x64 target for x64 work; generated Linux x64 E2Es
+run through `/opt/dcb/qemu/qemu-x86_64` when the host is ARM64.
 
 ## Compile and run Dark code
 

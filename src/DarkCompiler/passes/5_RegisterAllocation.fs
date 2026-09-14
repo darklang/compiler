@@ -2011,13 +2011,10 @@ let floatCalleeSavedRegs : LIR.PhysFPReg list = [
 /// All allocatable float registers - caller-saved first, then callee-saved
 let allocatableFloatRegs : LIR.PhysFPReg list = floatCallerSavedRegs @ floatCalleeSavedRegs
 
-/// XMM15 is the x86-64 floating-point scratch register used for non-commutative
-/// operations and parallel-move cycle breaking, so it must not hold an allocated
-/// value. ARM64 uses D16 for those operations and can allocate the full D0-D15 set.
-let allocatableFloatRegsFor (arch: Platform.Arch) : LIR.PhysFPReg list =
-    match arch with
-    | Platform.X86_64 -> allocatableFloatRegs |> List.filter ((<>) LIR.D15)
-    | Platform.ARM64 -> allocatableFloatRegs
+/// Both backends expose the complete abstract D0-D15 register set. Backend-local
+/// scratch operations must preserve any physical register they borrow.
+let allocatableFloatRegsFor (_arch: Platform.Arch) : LIR.PhysFPReg list =
+    allocatableFloatRegs
 
 /// AArch64 preserves D8-D15 across calls, while the System V x86-64 ABI treats
 /// every XMM register as caller-saved.

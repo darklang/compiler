@@ -26,6 +26,9 @@ let private compile
         Session = None
     }
 
+let private execute (report: CompilerLibrary.CompileReport) (binary: byte array) =
+    TestDSL.E2ETestRunner.executeBinaryForTarget report.Target binary
+
 let private expectCompileError (expected: string) (report: CompilerLibrary.CompileReport) : TestResult =
     match report.Result with
     | Error error when error.Contains expected -> Ok ()
@@ -43,10 +46,11 @@ let testOrderedSourceComposition (stdlib: CompilerLibrary.StdlibResult) () : Tes
     match report.Result with
     | Error error -> Error error
     | Ok binary ->
-        let output =
-            CompilerLibrary.executeCaptured report.Target 0 CompilerLibrary.Closed binary
-        if output.ExitCode = 0 && output.Stdout = "42\n" then Ok ()
-        else Error $"Unexpected multi-unit output: exit={output.ExitCode}; stdout={output.Stdout}; stderr={output.Stderr}"
+        match execute report binary with
+        | Error error -> Error $"Multi-unit program did not execute: {error}"
+        | Ok output ->
+            if output.ExitCode = 0 && output.Stdout = "42\n" then Ok ()
+            else Error $"Unexpected multi-unit output: exit={output.ExitCode}; stdout={output.Stdout}; stderr={output.Stderr}"
 
 let testLastFunctionDeclarationWins (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
     let report =
@@ -61,9 +65,11 @@ let testLastFunctionDeclarationWins (stdlib: CompilerLibrary.StdlibResult) () : 
     match report.Result with
     | Error error -> Error error
     | Ok binary ->
-        let output = CompilerLibrary.executeCaptured report.Target 0 CompilerLibrary.Closed binary
-        if output.ExitCode = 0 && output.Stdout = "42\n" then Ok ()
-        else Error $"Unexpected overlay output: exit={output.ExitCode}; stdout={output.Stdout}; stderr={output.Stderr}"
+        match execute report binary with
+        | Error error -> Error $"Overlay program did not execute: {error}"
+        | Ok output ->
+            if output.ExitCode = 0 && output.Stdout = "42\n" then Ok ()
+            else Error $"Unexpected overlay output: exit={output.ExitCode}; stdout={output.Stdout}; stderr={output.Stderr}"
 
 let testDependencyEntryRejected (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
     compile stdlib CompilerLibrary.FullProgram

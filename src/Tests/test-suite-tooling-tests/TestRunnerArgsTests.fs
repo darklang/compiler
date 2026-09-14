@@ -47,6 +47,21 @@ let testE2EBatchSizeRejectsInvalidValues () : TestResult =
     if results |> List.forall Result.isError then Ok ()
     else Error $"Expected invalid E2E batch sizes to fail, got {results}"
 
+let testTargetDefaultsToHost () : TestResult =
+    parseTargetArg [||] |> Result.bind (expectEqual Host)
+
+let testTargetParsesLinuxX86_64 () : TestResult =
+    parseTargetArg [| "--target=linux-x86_64" |]
+    |> Result.bind (expectEqual (Explicit Platform.LinuxX86_64))
+
+let testTargetRejectsUnsupportedAndDuplicateValues () : TestResult =
+    let results =
+        [ [| "--target=linux-arm64" |]
+          [| "--target=host"; "--target=linux-x86_64" |] ]
+        |> List.map parseTargetArg
+    if results |> List.forall Result.isError then Ok ()
+    else Error $"Expected invalid test target selections to fail, got {results}"
+
 let tests = [
     ("timings JSON parses path", testTimingsJsonParsesPath)
     ("timings JSON rejects empty path", testTimingsJsonRejectsEmptyPath)
@@ -54,4 +69,7 @@ let tests = [
     ("E2E batch size parses a bounded size", testE2EBatchSizeParsesBoundedSize)
     ("E2E batch size defaults to batching", testE2EBatchSizeDefaultsToBatching)
     ("E2E batch size rejects invalid values", testE2EBatchSizeRejectsInvalidValues)
+    ("test target defaults to host", testTargetDefaultsToHost)
+    ("test target parses Linux x86_64", testTargetParsesLinuxX86_64)
+    ("test target rejects unsupported and duplicate values", testTargetRejectsUnsupportedAndDuplicateValues)
 ]

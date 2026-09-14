@@ -4232,11 +4232,45 @@ let private compileUserWithPlan (plan: UserCompilePlan) : CompileReport =
                                                 recordPassTiming plan.PassTimingRecorder "Function Tree Shaking" treeShakeElapsed
                                                 shakenStdlib
 
-                                    // Combine reachable stdlib functions with user functions
+                                    // Concrete helper and Stdlib specialization names encode their
+                                    // complete type arguments. A user unit can request a function already
+                                    // supplied by the prebuilt stdlib, with context-specific lowering
+                                    // making the allocated bodies differ. Keep the stdlib copy, which is
+                                    // first and has the complete stdlib registries.
+                                    let mergeFunctionsByName (functions: LIR.Function list) : LIR.Function list =
+                                        functions
+                                        |> List.fold
+                                            (fun (names, retainedRev) func ->
+                                                match Map.tryFind func.Name names with
+                                                | None ->
+                                                    (Map.add func.Name func names, func :: retainedRev)
+                                                | Some existing when existing = func ->
+                                                    (names, retainedRev)
+                                                | Some _
+                                                    when func.Name.StartsWith("__dark_eq_")
+                                                         || func.Name.StartsWith("__dark_compare_")
+                                                         || func.Name.StartsWith("Stdlib.") ->
+                                                    (names, retainedRev)
+                                                | Some _ ->
+                                                    Crash.crash $"Conflicting allocated LIR functions named '{func.Name}'")
+                                            (Map.empty, [])
+                                        |> snd
+                                        |> List.rev
+
+                                    // Combine reachable stdlib functions with user functions.
                                     let allFuncs =
                                         reachableStdlib @ finalUserFuncs
-                                    let reachableDependencyFuncs, reachableProgramFuncs =
+                                        |> mergeFunctionsByName
+                                    let retainedStdlibNames =
+                                        reachableStdlib
+                                        |> List.map (fun func -> func.Name)
+                                        |> Set.ofList
+                                    let retainedUserFuncs =
                                         finalUserFuncs
+                                        |> List.filter (fun func ->
+                                            not (Set.contains func.Name retainedStdlibNames))
+                                    let reachableDependencyFuncs, reachableProgramFuncs =
+                                        retainedUserFuncs
                                         |> List.partition (fun func ->
                                             Set.contains func.Name dependencyNames)
                                     let lirVariantRegistry : LIR.VariantRegistry =

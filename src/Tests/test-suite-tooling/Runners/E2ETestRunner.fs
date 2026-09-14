@@ -1025,13 +1025,97 @@ let private tryExecuteBinary
     (stdin: TestDSL.E2EFormat.TestStdin)
     (binary: byte array)
     : Result<CompilerLibrary.ExecutionOutput, string> =
+    // QEMU makes the intentional 500,000-iteration TCO stress case much
+    // slower than native execution while still completing reliably.
+    let crossTargetExecutionTimeout = System.TimeSpan.FromSeconds 120.0
     let input =
         match stdin with
         | TestDSL.E2EFormat.Closed -> CompilerLibrary.Closed
         | TestDSL.E2EFormat.Bytes value ->
             value |> System.Text.Encoding.UTF8.GetBytes |> CompilerLibrary.Bytes
-    try Ok (CompilerLibrary.executeCapturedWithArgumentsAndEnvironment target 0 arguments environment input binary)
-    with ex -> Error ex.Message
+    let executeLinuxX86_64WithQemu () : Result<CompilerLibrary.ExecutionOutput, string> =
+        let qemuPath = "/opt/dcb/qemu/qemu-x86_64"
+        if not (System.IO.File.Exists qemuPath) then
+            Error $"Pinned x86_64 QEMU is unavailable at {qemuPath}"
+        else
+            let tempPath =
+                System.IO.Path.Combine(
+                    System.IO.Path.GetTempPath(),
+                    System.Guid.NewGuid().ToString("N"))
+            let result =
+                try
+                    try
+                        do
+                            use stream =
+                                new System.IO.FileStream(
+                                    tempPath,
+                                    System.IO.FileMode.Create,
+                                    System.IO.FileAccess.Write,
+                                    System.IO.FileShare.None)
+                            stream.Write(binary, 0, binary.Length)
+                            stream.Flush(true)
+                        let permissions = System.IO.File.GetUnixFileMode(tempPath)
+                        System.IO.File.SetUnixFileMode(
+                            tempPath,
+                            permissions ||| System.IO.UnixFileMode.UserExecute)
+
+                        let processInfo = System.Diagnostics.ProcessStartInfo(qemuPath)
+                        processInfo.ArgumentList.Add(tempPath)
+                        arguments |> List.iter processInfo.ArgumentList.Add
+                        processInfo.UseShellExecute <- false
+                        processInfo.RedirectStandardInput <- true
+                        processInfo.RedirectStandardOutput <- true
+                        processInfo.RedirectStandardError <- true
+                        environment
+                        |> List.iter (fun (name, value) -> processInfo.Environment.[name] <- value)
+
+                        let stopwatch = System.Diagnostics.Stopwatch.StartNew()
+                        use proc = System.Diagnostics.Process.Start(processInfo)
+                        match input with
+                        | CompilerLibrary.Closed -> proc.StandardInput.Close()
+                        | CompilerLibrary.Bytes bytes ->
+                            proc.StandardInput.BaseStream.Write(bytes, 0, bytes.Length)
+                            proc.StandardInput.Close()
+                        let stdoutTask = proc.StandardOutput.ReadToEndAsync()
+                        let stderrTask = proc.StandardError.ReadToEndAsync()
+                        if proc.WaitForExit(int crossTargetExecutionTimeout.TotalMilliseconds) then
+                            stopwatch.Stop()
+                            let output : CompilerLibrary.ExecutionOutput = {
+                                ExitCode = proc.ExitCode
+                                Stdout = stdoutTask.Result
+                                Stderr = stderrTask.Result
+                                RuntimeTime = stopwatch.Elapsed
+                            }
+                            Ok output
+                        else
+                            proc.Kill(true)
+                            proc.WaitForExit()
+                            Error
+                                $"Cross-target execution exceeded {crossTargetExecutionTimeout.TotalSeconds:F0}s"
+                    with ex ->
+                        Error ex.Message
+                finally
+                    try System.IO.File.Delete(tempPath) with _ -> ()
+            result
+
+    match Platform.detectHostTarget () with
+    | Ok hostTarget when Platform.archFor hostTarget = Platform.archFor target ->
+        try Ok (CompilerLibrary.executeCapturedWithArgumentsAndEnvironment target 0 arguments environment input binary)
+        with ex -> Error ex.Message
+    | Ok _ ->
+        match target with
+        | Platform.LinuxX86_64 -> executeLinuxX86_64WithQemu ()
+        | Platform.ARM64Backend _ -> Error $"Cross-target execution is unavailable for {target}"
+    | Error error -> Error error
+
+/// Execute a compiler-library result on its declared target. Unit integration
+/// tests use the same explicit QEMU boundary as E2E tests when the target does
+/// not match the development host.
+let executeBinaryForTarget
+    (target: Platform.Target)
+    (binary: byte array)
+    : Result<CompilerLibrary.ExecutionOutput, string> =
+    tryExecuteBinary target [] [] TestDSL.E2EFormat.Closed binary
 
 let private compileAndRun
     (arguments: string list)

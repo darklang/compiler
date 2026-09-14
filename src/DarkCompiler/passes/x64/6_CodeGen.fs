@@ -114,11 +114,9 @@ let lirFRegToX86 (freg: LIR.PhysFPReg) : X86_64.FReg =
     | LIR.D14 -> X86_64.XMM14 | LIR.D15 -> X86_64.XMM15
 
 /// Resolve a LIR.FReg to x86-64 XMM register.
-/// FVirtual 2000 is used as a temp for parallel float move resolution.
 let private resolveFreg (freg: LIR.FReg) : Result<X86_64.FReg, string> =
     match freg with
     | LIR.FPhysical fp -> Ok (lirFRegToX86 fp)
-    | LIR.FVirtual 2000 -> Ok X86_64.XMM15
     | LIR.FVirtual id -> Error $"Unresolved virtual float register f{id} in x86-64 codegen"
 
 /// Resolve a LIR.Reg (Physical or Virtual) to x86-64 register.
@@ -138,6 +136,46 @@ let private loadImm64 (dest: X86_64.Reg) (value: int64) : X86_64.Instr list =
 
 /// Scratch register for temporaries in codegen
 let private scratch = X86_64.R11
+
+let private arithmeticTempExcluding (excluded: X86_64.Reg list) : X86_64.Reg =
+    [ X86_64.R11
+      X86_64.RCX
+      X86_64.R10
+      X86_64.RAX
+      X86_64.RDX
+      X86_64.RDI
+      X86_64.RSI
+      X86_64.R8
+      X86_64.R9
+      X86_64.RBX
+      X86_64.R12
+      X86_64.R13 ]
+    |> List.tryFind (fun candidate -> not (List.contains candidate excluded))
+    |> function
+        | Some temp -> temp
+        | None -> Crash.crash "x64 arithmetic lowering could not find a temporary register"
+
+let private allFloatRegs : X86_64.FReg list =
+    [ X86_64.XMM0; X86_64.XMM1; X86_64.XMM2; X86_64.XMM3
+      X86_64.XMM4; X86_64.XMM5; X86_64.XMM6; X86_64.XMM7
+      X86_64.XMM8; X86_64.XMM9; X86_64.XMM10; X86_64.XMM11
+      X86_64.XMM12; X86_64.XMM13; X86_64.XMM14; X86_64.XMM15 ]
+
+/// Borrow an XMM register for a short lowering sequence without reserving one
+/// globally from allocation. The 16-byte slot preserves stack alignment.
+let private withPreservedFloatScratch
+    (excluded: X86_64.FReg list)
+    (build: X86_64.FReg -> X86_64.Instr list)
+    : X86_64.Instr list =
+    let temp =
+        allFloatRegs
+        |> List.tryFind (fun candidate -> not (List.contains candidate excluded))
+        |> Option.defaultWith (fun () -> Crash.crash "x64 float lowering has no scratch register")
+    [ X86_64.SUB_imm (X86_64.RSP, 16)
+      X86_64.MOVSD_store (X86_64.RSP, 0, temp) ]
+    @ build temp
+    @ [ X86_64.MOVSD_load (temp, X86_64.RSP, 0)
+        X86_64.ADD_imm (X86_64.RSP, 16) ]
 
 /// Heap bump pointer register (codegen-internal, reserved; not allocatable).
 let private heapPtr = X86_64.R14
@@ -190,6 +228,32 @@ let private heapMmapSizeBytes = 512L * 1024L * 1024L
 /// Generate x86-64 write(fd, buf, len) syscall
 let private genWriteSyscall : X86_64.Instr list =
     loadImm64 X86_64.RAX (int64 syscalls.Write) @ [X86_64.SYSCALL]
+
+/// Write a small compile-time byte sequence to stdout from a balanced stack
+/// buffer. The generated syscall may clobber RAX, RCX, and R11.
+let private genPrintChars (bytes: byte list) : X86_64.Instr list =
+    let len = List.length bytes
+    if len = 0 then
+        []
+    else
+        let padded = ((len + 7) / 8) * 8
+        let paddedBytes = bytes @ List.replicate (padded - len) 0uy
+        let pushes =
+            paddedBytes
+            |> List.chunkBySize 8
+            |> List.rev
+            |> List.collect (fun chunk ->
+                let value =
+                    chunk
+                    |> List.mapi (fun index value -> int64 value <<< (index * 8))
+                    |> List.fold (|||) 0L
+                loadImm64 scratch value @ [X86_64.PUSH scratch])
+        pushes
+        @ [ X86_64.MOV_imm32 (X86_64.RDI, 1)
+            X86_64.MOV_reg (X86_64.RSI, X86_64.RSP) ]
+        @ loadImm64 X86_64.RDX (int64 len)
+        @ genWriteSyscall
+        @ [X86_64.ADD_imm (X86_64.RSP, int32 padded)]
 
 /// Generate x86-64 exit(code) syscall.
 /// Exit code must already be in RDI.
@@ -693,6 +757,231 @@ let private generateCliGetEnvHelper (enableLeakCheck: bool) : X86_64.Instr list 
     @ leakInc
     @ [ X86_64.RET ]
 
+/// Execute a managed command through /bin/bash and return NativeOutput. The
+/// helper drains stdout and stderr concurrently so a child cannot block on a
+/// full pipe. R14 remains the managed heap pointer across the native syscalls.
+let private generateLinuxCliExecuteHelper (enableLeakCheck: bool) : X86_64.Instr list =
+    let label = "__dark_cli_execute"
+    let syscall number = loadImm64 X86_64.RAX number @ [X86_64.SYSCALL]
+    let loadFd stackOffset highHalf =
+        [ X86_64.MOV_load (X86_64.RDI, X86_64.RSP, stackOffset) ]
+        @ (if highHalf then [X86_64.SHR_imm (X86_64.RDI, 32)]
+           else [X86_64.MOV_reg32 (X86_64.RDI, X86_64.RDI)])
+    let closeFd stackOffset highHalf = loadFd stackOffset highHalf @ syscall 3L
+    let setNonblocking stackOffset =
+        loadFd stackOffset false
+        @ loadImm64 X86_64.RSI 4L
+        @ loadImm64 X86_64.RDX 2048L
+        @ syscall 72L
+    let readPipe stackOffset buffer lengthOffset nextLabel =
+        loadFd stackOffset false
+        @ [ X86_64.LEA (X86_64.RSI, buffer, 16)
+            X86_64.MOV_load (X86_64.R10, X86_64.RSP, lengthOffset)
+            X86_64.ADD_reg (X86_64.RSI, X86_64.R10) ]
+        @ loadImm64 X86_64.RDX 1048576L
+        @ [ X86_64.SUB_reg (X86_64.RDX, X86_64.R10) ]
+        @ syscall 0L
+        @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+            X86_64.Jcc (X86_64.LE, nextLabel)
+            X86_64.ADD_reg (X86_64.R10, X86_64.RAX)
+            X86_64.MOV_store (X86_64.RSP, lengthOffset, X86_64.R10) ]
+    let finalizeString buffer lengthOffset =
+        [ X86_64.MOV_imm32 (X86_64.R11, 1)
+          X86_64.MOV_store (buffer, 0, X86_64.R11)
+          X86_64.MOV_load (X86_64.R10, X86_64.RSP, lengthOffset)
+          X86_64.MOV_store (buffer, 8, X86_64.R10) ]
+    let leakInc =
+        if enableLeakCheck then
+            [ X86_64.LEA_rip (X86_64.R11, "_leak_count")
+              X86_64.MOV_load (X86_64.R10, X86_64.R11, 0)
+              X86_64.ADD_imm (X86_64.R10, 3)
+              X86_64.MOV_store (X86_64.R11, 0, X86_64.R10) ]
+        else
+            []
+
+    [ X86_64.Label label
+      X86_64.PUSH X86_64.RBP
+      X86_64.MOV_reg (X86_64.RBP, X86_64.RSP)
+      X86_64.PUSH X86_64.RBX
+      X86_64.PUSH X86_64.R12
+      X86_64.PUSH X86_64.R13
+      // CliNative has no explicit SaveRegs/RestoreRegs pair in LIR. Preserve
+      // every allocatable x64 caller-saved register across this hidden call.
+      X86_64.PUSH X86_64.RDI
+      X86_64.PUSH X86_64.RSI
+      X86_64.PUSH X86_64.RCX
+      X86_64.PUSH X86_64.R8
+      X86_64.PUSH X86_64.R9
+      X86_64.PUSH X86_64.R10
+      X86_64.PUSH X86_64.RDX
+      X86_64.SUB_imm (X86_64.RSP, 112)
+      // Copy [refcount][length][bytes] to a native NUL-terminated command buffer.
+      X86_64.MOV_reg (X86_64.RBX, heapPtr)
+      X86_64.MOV_load (X86_64.RCX, X86_64.RDI, 8)
+      X86_64.LEA (X86_64.RSI, X86_64.RDI, 16)
+      X86_64.XOR_reg (X86_64.R8, X86_64.R8)
+      X86_64.Label "__dark_cli_command_copy"
+      X86_64.CMP_reg (X86_64.R8, X86_64.RCX)
+      X86_64.Jcc (X86_64.GE, "__dark_cli_command_copied")
+      X86_64.MOV_load_byte (X86_64.R9, X86_64.RSI, 0)
+      X86_64.MOV_reg (X86_64.R10, X86_64.RBX)
+      X86_64.ADD_reg (X86_64.R10, X86_64.R8)
+      X86_64.MOV_store_byte (X86_64.R10, 0, X86_64.R9)
+      X86_64.ADD_imm (X86_64.RSI, 1)
+      X86_64.ADD_imm (X86_64.R8, 1)
+      X86_64.JMP "__dark_cli_command_copy"
+      X86_64.Label "__dark_cli_command_copied"
+      X86_64.MOV_reg (X86_64.R10, X86_64.RBX)
+      X86_64.ADD_reg (X86_64.R10, X86_64.RCX)
+      X86_64.XOR_reg (X86_64.R9, X86_64.R9)
+      X86_64.MOV_store_byte (X86_64.R10, 0, X86_64.R9)
+      X86_64.ADD_imm (X86_64.RCX, 8)
+      X86_64.AND_imm (X86_64.RCX, -8)
+      X86_64.ADD_reg (heapPtr, X86_64.RCX)
+      // Reserve bounded managed buffers for captured stdout and stderr.
+      X86_64.MOV_reg (X86_64.R12, heapPtr) ]
+    @ loadImm64 X86_64.R10 1048592L
+    @ [ X86_64.ADD_reg (heapPtr, X86_64.R10)
+        X86_64.MOV_reg (X86_64.R13, heapPtr)
+        X86_64.ADD_reg (heapPtr, X86_64.R10)
+        X86_64.XOR_reg (X86_64.R10, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 32, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 40, X86_64.R10)
+        // pipe2(stdout), pipe2(stderr)
+        X86_64.LEA (X86_64.RDI, X86_64.RSP, 0)
+        X86_64.XOR_reg (X86_64.RSI, X86_64.RSI) ]
+    @ syscall 293L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.LT, "__dark_cli_spawn_error")
+        X86_64.LEA (X86_64.RDI, X86_64.RSP, 8)
+        X86_64.XOR_reg (X86_64.RSI, X86_64.RSI) ]
+    @ syscall 293L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.LT, "__dark_cli_spawn_error_close_stdout") ]
+    @ syscall 57L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.EQ, "__dark_cli_child")
+        X86_64.Jcc (X86_64.LT, "__dark_cli_spawn_error_close_all")
+        X86_64.MOV_store (X86_64.RSP, 24, X86_64.RAX)
+        X86_64.XOR_reg (X86_64.R10, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 16, X86_64.R10) ]
+    @ closeFd 0 true
+    @ closeFd 8 true
+    @ setNonblocking 0
+    @ setNonblocking 8
+    @ [ X86_64.Label "__dark_cli_drain_wait" ]
+    @ readPipe 0 X86_64.R12 32 "__dark_cli_read_stderr"
+    @ [ X86_64.Label "__dark_cli_read_stderr" ]
+    @ readPipe 8 X86_64.R13 40 "__dark_cli_wait"
+    @ [ X86_64.Label "__dark_cli_wait"
+        X86_64.MOV_load (X86_64.RDI, X86_64.RSP, 24)
+        X86_64.LEA (X86_64.RSI, X86_64.RSP, 16)
+        X86_64.MOV_imm32 (X86_64.RDX, 1)
+        X86_64.XOR_reg (X86_64.R10, X86_64.R10) ]
+    @ syscall 61L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.LT, "__dark_cli_drain_wait")
+        X86_64.Jcc (X86_64.NE, "__dark_cli_finished")
+        X86_64.XOR_reg (X86_64.R10, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 48, X86_64.R10) ]
+    @ loadImm64 X86_64.R10 1000000L
+    @ [ X86_64.MOV_store (X86_64.RSP, 56, X86_64.R10)
+        X86_64.LEA (X86_64.RDI, X86_64.RSP, 48)
+        X86_64.XOR_reg (X86_64.RSI, X86_64.RSI) ]
+    @ syscall 35L
+    @ [ X86_64.JMP "__dark_cli_drain_wait"
+        X86_64.Label "__dark_cli_finished" ]
+    @ readPipe 0 X86_64.R12 32 "__dark_cli_final_stderr"
+    @ [ X86_64.Label "__dark_cli_final_stderr" ]
+    @ readPipe 8 X86_64.R13 40 "__dark_cli_final_close"
+    @ [ X86_64.Label "__dark_cli_final_close" ]
+    @ closeFd 0 false
+    @ closeFd 8 false
+    @ [ X86_64.MOV_load (X86_64.R10, X86_64.RSP, 16)
+        X86_64.MOV_reg (X86_64.R11, X86_64.R10)
+        X86_64.AND_imm (X86_64.R11, 0x7f)
+        X86_64.CMP_imm (X86_64.R11, 0)
+        X86_64.Jcc (X86_64.NE, "__dark_cli_signaled")
+        X86_64.SHR_imm (X86_64.R10, 8)
+        X86_64.JMP "__dark_cli_build_result"
+        X86_64.Label "__dark_cli_signaled"
+        X86_64.MOV_reg (X86_64.R10, X86_64.R11)
+        X86_64.ADD_imm (X86_64.R10, 128)
+        X86_64.JMP "__dark_cli_build_result"
+        X86_64.Label "__dark_cli_spawn_error_close_all" ]
+    @ closeFd 8 false
+    @ closeFd 8 true
+    @ [ X86_64.Label "__dark_cli_spawn_error_close_stdout" ]
+    @ closeFd 0 false
+    @ closeFd 0 true
+    @ [ X86_64.Label "__dark_cli_spawn_error" ]
+    @ loadImm64 X86_64.R10 127L
+    @ [ X86_64.Label "__dark_cli_build_result"
+        X86_64.MOV_store (X86_64.RSP, 104, X86_64.R10) ]
+    @ finalizeString X86_64.R12 32
+    @ finalizeString X86_64.R13 40
+    @ [ X86_64.MOV_load (X86_64.R10, X86_64.RSP, 104)
+        X86_64.MOV_reg (X86_64.RAX, heapPtr)
+        X86_64.ADD_imm (heapPtr, 32)
+        X86_64.MOV_store (X86_64.RAX, 0, X86_64.R10)
+        X86_64.MOV_store (X86_64.RAX, 8, X86_64.R12)
+        X86_64.MOV_store (X86_64.RAX, 16, X86_64.R13)
+        X86_64.MOV_imm32 (X86_64.R11, 1)
+        X86_64.MOV_store (X86_64.RAX, 24, X86_64.R11) ]
+    @ leakInc
+    @ [ X86_64.ADD_imm (X86_64.RSP, 112)
+        X86_64.POP X86_64.RDX
+        X86_64.POP X86_64.R10
+        X86_64.POP X86_64.R9
+        X86_64.POP X86_64.R8
+        X86_64.POP X86_64.RCX
+        X86_64.POP X86_64.RSI
+        X86_64.POP X86_64.RDI
+        X86_64.POP X86_64.R13
+        X86_64.POP X86_64.R12
+        X86_64.POP X86_64.RBX
+        X86_64.POP X86_64.RBP
+        X86_64.RET
+        X86_64.Label "__dark_cli_child" ]
+    @ loadFd 0 true
+    @ loadImm64 X86_64.RSI 1L
+    @ syscall 33L
+    @ loadFd 8 true
+    @ loadImm64 X86_64.RSI 2L
+    @ syscall 33L
+    @ closeFd 0 false
+    @ closeFd 0 true
+    @ closeFd 8 false
+    @ closeFd 8 true
+    @ emitStringLiteral X86_64.RDI "/bin/bash"
+    @ [ X86_64.ADD_imm (X86_64.RDI, 16)
+        // Recover envp from _start's root frame.
+        X86_64.MOV_reg (X86_64.RAX, X86_64.RBP)
+        X86_64.Label "__dark_cli_find_root_for_exec"
+        X86_64.MOV_load (X86_64.RCX, X86_64.RAX, 0)
+        X86_64.CMP_imm (X86_64.RCX, 0)
+        X86_64.Jcc (X86_64.EQ, "__dark_cli_exec_root_found")
+        X86_64.MOV_reg (X86_64.RAX, X86_64.RCX)
+        X86_64.JMP "__dark_cli_find_root_for_exec"
+        X86_64.Label "__dark_cli_exec_root_found"
+        X86_64.MOV_load (X86_64.RCX, X86_64.RAX, 8)
+        X86_64.SHL_imm (X86_64.RCX, 3)
+        X86_64.ADD_reg (X86_64.RAX, X86_64.RCX)
+        X86_64.ADD_imm (X86_64.RAX, 24)
+        X86_64.MOV_store (X86_64.RSP, 96, X86_64.RAX)
+        X86_64.MOV_store (X86_64.RSP, 64, X86_64.RDI) ]
+    @ emitStringLiteral X86_64.R10 "-c"
+    @ [ X86_64.ADD_imm (X86_64.R10, 16)
+        X86_64.MOV_store (X86_64.RSP, 72, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 80, X86_64.RBX)
+        X86_64.XOR_reg (X86_64.R10, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 88, X86_64.R10)
+        X86_64.LEA (X86_64.RSI, X86_64.RSP, 64)
+        X86_64.MOV_load (X86_64.RDX, X86_64.RSP, 96) ]
+    @ syscall 59L
+    @ loadImm64 X86_64.RDI 127L
+    @ syscall 60L
+
 /// Function context for instructions that need stack frame info (TailCall, etc.)
 type private FuncCtx = {
     FunctionName: string
@@ -1095,10 +1384,8 @@ let rec private listDecHelperForReleasePlan (releasePlan: ANF.RcReleasePlan) : s
             plannedListDecHelperLabelForReleasePlan (ANF.RecursiveRelease sourceType)
         | ANF.RootRelease (_, ANF.TaggedList, _) ->
             listRefCountDecListHelperLabel
-        | ANF.RootRelease (_, ANF.DictHeap, ANF.DictPayloadRelease (_, ANF.RootRelease (_, ANF.TaggedList, _))) ->
-            listRefCountDecDictListHelperLabel
         | ANF.RootRelease (_, ANF.DictHeap, _) ->
-            listRefCountDecDictHelperLabel
+            plannedListDecHelperLabelForReleasePlan elementRelease
         | ANF.RootRelease (_, ANF.ClosureHeap, _) ->
             listRefCountDecClosureHelperLabel
         | ANF.RootRelease (_, ANF.StreamHeap, _) ->
@@ -1464,6 +1751,7 @@ type private ListLeafPayloadRelease =
     | ClosureLeafPayload
     | DictLeafPayload
     | DictListLeafPayload
+    | PlannedDictLeafPayload of releasePlan: ANF.RcReleasePlan
     | DynamicBufferLeafPayload
 
 /// Generate the TaggedList RefCountDec helper function.
@@ -1601,6 +1889,16 @@ let private generateListRefCountDecHelperWith
              X86_64.POP X86_64.RSI
              X86_64.POP X86_64.RDI
              X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)]
+        | PlannedDictLeafPayload releasePlan ->
+            [ X86_64.PUSH X86_64.RDI
+              X86_64.PUSH X86_64.RSI
+              X86_64.PUSH X86_64.RCX
+              X86_64.MOV_load (X86_64.RAX, X86_64.RDI, 0)
+              X86_64.CALL (dictDecHelperForReleasePlan releasePlan)
+              X86_64.POP X86_64.RCX
+              X86_64.POP X86_64.RSI
+              X86_64.POP X86_64.RDI
+              X86_64.XOR_reg (X86_64.RAX, X86_64.RAX) ]
         | DynamicBufferLeafPayload ->
             [X86_64.MOV_load (X86_64.R8, X86_64.RDI, 0)
              X86_64.TEST_reg (X86_64.R8, X86_64.R8)
@@ -1836,6 +2134,8 @@ let private listLeafPayloadNeedsDictDecHelper (leafPayloadRelease: ListLeafPaylo
         false
     | DictListLeafPayload ->
         false
+    | PlannedDictLeafPayload _ ->
+        false
     | NoLeafPayloadRelease
     | ListLeafPayload
     | ClosureLeafPayload
@@ -1846,6 +2146,8 @@ let private listLeafPayloadNeedsDictListValueDecHelper (leafPayloadRelease: List
     match leafPayloadRelease with
     | DictListLeafPayload ->
         true
+    | PlannedDictLeafPayload _ ->
+        false
     | FixedBlockPlannedLeafPayload (_, releasePlan) ->
         rcReleasePlanContains releasePlanIsDictWithListValue releasePlan
     | RecursivePlannedLeafPayload _ ->
@@ -1869,6 +2171,7 @@ let private listLeafPayloadNeedsClosureDecHelper (leafPayloadRelease: ListLeafPa
     | ListLeafPayload
     | DictLeafPayload
     | DictListLeafPayload
+    | PlannedDictLeafPayload _
     | DynamicBufferLeafPayload ->
         false
 
@@ -1895,6 +2198,7 @@ let private generateNeededListRefCountDecHelpers
                 let leafPayloadRelease =
                     match releasePlan with
                     | ANF.RecursiveRelease sourceType -> RecursivePlannedLeafPayload sourceType
+                    | ANF.RootRelease (_, ANF.DictHeap, _) -> PlannedDictLeafPayload releasePlan
                     | _ -> FixedBlockPlannedLeafPayload (payloadSize, releasePlan)
                 generateListRefCountDecHelperWith
                     helperLabel
@@ -2884,7 +3188,8 @@ let private translateInstr
 
     | LIR.Msub (dest, mulLeft, mulRight, sub) ->
         // dest = sub - mulLeft * mulRight
-        // No fused instruction on x86_64: IMUL tmp, mulLeft, mulRight; MOV dest, sub; SUB dest, tmp
+        // No fused instruction on x86_64. Preserve a nonoperand temporary so
+        // physical X11 remains valid as an allocated destination.
         resolveReg dest
         |> Result.bind (fun destReg ->
             resolveReg mulLeft
@@ -2893,9 +3198,13 @@ let private translateInstr
                 |> Result.bind (fun mrReg ->
                     resolveReg sub
                     |> Result.map (fun subReg ->
-                        [X86_64.MOV_reg (scratch, mlReg); X86_64.IMUL_reg (scratch, mrReg)]
+                        let temp = arithmeticTempExcluding [destReg; mlReg; mrReg; subReg]
+                        [ X86_64.PUSH temp
+                          X86_64.MOV_reg (temp, mlReg)
+                          X86_64.IMUL_reg (temp, mrReg) ]
                         @ (if destReg <> subReg then [X86_64.MOV_reg (destReg, subReg)] else [])
-                        @ [X86_64.SUB_reg (destReg, scratch)]))))
+                        @ [ X86_64.SUB_reg (destReg, temp)
+                            X86_64.POP temp ]))))
 
     | LIR.Cmp (left, right) ->
         resolveReg left
@@ -2978,8 +3287,16 @@ let private translateInstr
 
     | LIR.And_imm (dest, src, imm) ->
         resolveReg dest |> Result.bind (fun d -> resolveReg src |> Result.map (fun s ->
-            (if d <> s then [X86_64.MOV_reg (d, s)] else [])
-            @ [X86_64.AND_imm (d, int32 imm)]))
+            let setup = if d <> s then [X86_64.MOV_reg (d, s)] else []
+            if imm >= int64 System.Int32.MinValue && imm <= int64 System.Int32.MaxValue then
+                setup @ [X86_64.AND_imm (d, int32 imm)]
+            elif d = scratch then
+                [X86_64.PUSH X86_64.RCX]
+                @ setup
+                @ loadImm64 X86_64.RCX imm
+                @ [X86_64.AND_reg (d, X86_64.RCX); X86_64.POP X86_64.RCX]
+            else
+                setup @ loadImm64 scratch imm @ [X86_64.AND_reg (d, scratch)]))
 
     | LIR.Orr (dest, left, right) ->
         resolveReg dest |> Result.bind (fun d -> resolveReg left |> Result.bind (fun l -> resolveReg right |> Result.map (fun r ->
@@ -3032,27 +3349,7 @@ let private translateInstr
         Ok genExitSyscall
 
     | LIR.PrintChars bytes ->
-        // Write literal bytes to stdout: write(1, buf, len)
-        // Push bytes onto stack, write from RSP, then pop
-        let len = List.length bytes
-        let padded = ((len + 7) / 8) * 8  // 8-byte aligned
-        let paddedBytes = bytes @ List.replicate (padded - len) 0uy
-        // Push bytes in reverse 8-byte chunks
-        let pushInstrs =
-            paddedBytes
-            |> List.chunkBySize 8
-            |> List.rev
-            |> List.collect (fun chunk ->
-                let value =
-                    chunk |> List.mapi (fun i b -> int64 b <<< (i * 8)) |> List.fold (|||) 0L
-                loadImm64 scratch value @ [X86_64.PUSH scratch])
-        let writeInstrs =
-            [X86_64.MOV_imm32 (X86_64.RDI, 1)]  // fd = stdout
-            @ [X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)]  // buf = stack
-            @ loadImm64 X86_64.RDX (int64 len)  // len
-            @ genWriteSyscall
-            @ [X86_64.ADD_imm (X86_64.RSP, int32 padded)]  // pop
-        Ok (pushInstrs @ writeInstrs)
+        Ok (genPrintChars bytes)
 
     | LIR.PrintInt64 reg ->
         resolveReg reg
@@ -3106,9 +3403,15 @@ let private translateInstr
         // Print data + newline (exit handled by subsequent Ret → epilogue)
         resolveReg reg
         |> Result.map (fun srcReg ->
-            [X86_64.MOV_load (X86_64.RDX, srcReg, 8)
-             X86_64.LEA (X86_64.RSI, srcReg, 16)
-             X86_64.MOV_imm32 (X86_64.RDI, 1)]
+            [X86_64.PUSH srcReg]
+            @ (if srcReg = X86_64.RDX then
+                 [ X86_64.MOV_reg (X86_64.R10, srcReg)
+                   X86_64.MOV_load (X86_64.RDX, X86_64.R10, 8)
+                   X86_64.LEA (X86_64.RSI, X86_64.R10, 16) ]
+             else
+                 [ X86_64.MOV_load (X86_64.RDX, srcReg, 8)
+                   X86_64.LEA (X86_64.RSI, srcReg, 16) ])
+            @ [X86_64.MOV_imm32 (X86_64.RDI, 1)]
             @ genWriteSyscall
             @ [X86_64.SUB_imm (X86_64.RSP, 8)]
             @ loadImm64 scratch 10L
@@ -3117,15 +3420,23 @@ let private translateInstr
                X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)
                X86_64.MOV_imm32 (X86_64.RDX, 1)]
             @ genWriteSyscall
-            @ [X86_64.ADD_imm (X86_64.RSP, 8)])
+            @ [X86_64.ADD_imm (X86_64.RSP, 8)
+               X86_64.POP srcReg])
 
     | LIR.PrintHeapStringNoNewline reg ->
         resolveReg reg
         |> Result.map (fun srcReg ->
-            [X86_64.MOV_load (X86_64.RDX, srcReg, 8)
-             X86_64.LEA (X86_64.RSI, srcReg, 16)
-             X86_64.MOV_imm32 (X86_64.RDI, 1)]
-            @ genWriteSyscall)
+            [X86_64.PUSH srcReg]
+            @ (if srcReg = X86_64.RDX then
+                 [ X86_64.MOV_reg (X86_64.R10, srcReg)
+                   X86_64.MOV_load (X86_64.RDX, X86_64.R10, 8)
+                   X86_64.LEA (X86_64.RSI, X86_64.R10, 16) ]
+               else
+                 [ X86_64.MOV_load (X86_64.RDX, srcReg, 8)
+                   X86_64.LEA (X86_64.RSI, srcReg, 16) ])
+            @ [X86_64.MOV_imm32 (X86_64.RDI, 1)]
+            @ genWriteSyscall
+            @ [X86_64.POP srcReg])
 
     | LIR.PrintString str ->
         // Write a literal string to stdout and exit(0)
@@ -3279,7 +3590,7 @@ let private translateInstr
             @ [ X86_64.MOV_load (destReg, X86_64.RSP, -savedBytes) ])
 
     | LIR.RuntimeError msg ->
-        Ok (emitStringLiteral X86_64.R8 (msg + "\n")
+        Ok (emitStringLiteral X86_64.R8 msg
             @ [X86_64.JMP runtimeErrorHandlerLabel])
 
     | LIR.RuntimeErrorString messageReg ->
@@ -3290,14 +3601,6 @@ let private translateInstr
                X86_64.LEA (X86_64.RSI, X86_64.R8, 16)
                X86_64.MOV_imm32 (X86_64.RDI, 2)]
             @ genWriteSyscall
-            @ [X86_64.SUB_imm (X86_64.RSP, 8)]
-            @ loadImm64 scratch 10L
-            @ [X86_64.MOV_store (X86_64.RSP, 0, scratch)
-               X86_64.MOV_imm32 (X86_64.RDI, 2)
-               X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)
-               X86_64.MOV_imm32 (X86_64.RDX, 1)]
-            @ genWriteSyscall
-            @ [X86_64.ADD_imm (X86_64.RSP, 8)]
             @ loadImm64 X86_64.RDI 1L
             @ genExitSyscall)
 
@@ -3339,7 +3642,6 @@ let private translateInstr
         //
         // Strategy: save all source registers that will be clobbered to scratch stack,
         // then perform all moves using saved values where needed.
-        let destRegs = moves |> List.choose (fun (d, _) -> Some d) |> Set.ofList
         let generateMove (destPhys: LIR.PhysReg, srcOp: LIR.Operand) : Result<X86_64.Instr list, string> =
             let destX86 = lirRegToX86 destPhys
             match srcOp with
@@ -3489,7 +3791,7 @@ let private translateInstr
 
     | LIR.FArgMoves moves ->
         // Float arguments are parallel moves: a source may be overwritten by an
-        // earlier destination, so cycles must be broken through reserved XMM15.
+        // earlier destination, so cycles are broken through a stack slot.
         let resolvedMoves =
             moves
             |> List.map (fun (destPhys, srcFreg) ->
@@ -3503,11 +3805,13 @@ let private translateInstr
         ParallelMoves.resolve resolvedMoves getSrcReg
         |> List.collect (function
             | ParallelMoves.SaveToTemp src ->
-                [X86_64.MOVSD_reg (X86_64.XMM15, src)]
+                [ X86_64.SUB_imm (X86_64.RSP, 16)
+                  X86_64.MOVSD_store (X86_64.RSP, 0, src) ]
             | ParallelMoves.Move (dest, src) ->
                 [X86_64.MOVSD_reg (dest, src)]
             | ParallelMoves.MoveFromTemp dest ->
-                [X86_64.MOVSD_reg (dest, X86_64.XMM15)])
+                [ X86_64.MOVSD_load (dest, X86_64.RSP, 0)
+                  X86_64.ADD_imm (X86_64.RSP, 16) ])
         |> Ok
 
     | LIR.Phi (dest, _, _) ->
@@ -3669,18 +3973,22 @@ let private translateInstr
     // --- Floating-point operations ---
 
     | LIR.FMov (dest, src) ->
-        // Handle both physical and virtual FP registers.
-        // FVirtual 2000 is used as a temp for parallel float move resolution.
-        let resolveF (freg: LIR.FReg) : Result<X86_64.FReg, string> =
-            match freg with
-            | LIR.FPhysical fp -> Ok (lirFRegToX86 fp)
-            | LIR.FVirtual 2000 -> Ok X86_64.XMM15  // Reserved parallel-move temp
-            | LIR.FVirtual id -> Error $"Unresolved virtual float register f{id} in x86-64 codegen"
-        resolveF dest
-        |> Result.bind (fun d ->
-            resolveF src
-            |> Result.map (fun s ->
-                if d = s then [] else [X86_64.MOVSD_reg (d, s)]))
+        // Register allocation represents a parallel-move cycle temp as f2000.
+        // Keep that value on the stack so every XMM register remains allocatable.
+        match dest, src with
+        | LIR.FVirtual 2000, LIR.FPhysical srcPhys ->
+            let s = lirFRegToX86 srcPhys
+            Ok [ X86_64.SUB_imm (X86_64.RSP, 16)
+                 X86_64.MOVSD_store (X86_64.RSP, 0, s) ]
+        | LIR.FPhysical destPhys, LIR.FVirtual 2000 ->
+            let d = lirFRegToX86 destPhys
+            Ok [ X86_64.MOVSD_load (d, X86_64.RSP, 0)
+                 X86_64.ADD_imm (X86_64.RSP, 16) ]
+        | LIR.FPhysical destPhys, LIR.FPhysical srcPhys ->
+            let d = lirFRegToX86 destPhys
+            let s = lirFRegToX86 srcPhys
+            Ok (if d = s then [] else [X86_64.MOVSD_reg (d, s)])
+        | _ -> Error "FMov with unresolved virtual FP register"
 
     | LIR.FLoad (dest, value) ->
         match dest with
@@ -3711,10 +4019,11 @@ let private translateInstr
             let l = lirFRegToX86 lp
             let r = lirFRegToX86 rp
             if d = r && d <> l then
-                // NOT commutative: use XMM15 as temp
-                Ok [X86_64.MOVSD_reg (X86_64.XMM15, l)
-                    X86_64.SUBSD (X86_64.XMM15, r)
-                    X86_64.MOVSD_reg (d, X86_64.XMM15)]
+                Ok (
+                    withPreservedFloatScratch [d; l; r] (fun temp ->
+                        [ X86_64.MOVSD_reg (temp, l)
+                          X86_64.SUBSD (temp, r)
+                          X86_64.MOVSD_reg (d, temp) ]))
             else
                 let setup = if d <> l then [X86_64.MOVSD_reg (d, l)] else []
                 Ok (setup @ [X86_64.SUBSD (d, r)])
@@ -3740,10 +4049,11 @@ let private translateInstr
             let l = lirFRegToX86 lp
             let r = lirFRegToX86 rp
             if d = r && d <> l then
-                // NOT commutative: use XMM15 as temp
-                Ok [X86_64.MOVSD_reg (X86_64.XMM15, l)
-                    X86_64.DIVSD (X86_64.XMM15, r)
-                    X86_64.MOVSD_reg (d, X86_64.XMM15)]
+                Ok (
+                    withPreservedFloatScratch [d; l; r] (fun temp ->
+                        [ X86_64.MOVSD_reg (temp, l)
+                          X86_64.DIVSD (temp, r)
+                          X86_64.MOVSD_reg (d, temp) ]))
             else
                 let setup = if d <> l then [X86_64.MOVSD_reg (d, l)] else []
                 Ok (setup @ [X86_64.DIVSD (d, r)])
@@ -3754,12 +4064,12 @@ let private translateInstr
         | LIR.FPhysical dp, LIR.FPhysical sp ->
             let d = lirFRegToX86 dp
             let s = lirFRegToX86 sp
-            // Negate by XOR with sign bit mask
-            // Load 0x8000000000000000 into scratch, move to XMM, XOR
-            Ok (loadImm64 scratch (System.Int64.MinValue)
-                @ [X86_64.MOVQ_from_gp (X86_64.XMM15, scratch)
-                   X86_64.MOVSD_reg (d, s)
-                   X86_64.XORPD (d, X86_64.XMM15)])
+            Ok (
+                withPreservedFloatScratch [d; s] (fun temp ->
+                    loadImm64 scratch System.Int64.MinValue
+                    @ [ X86_64.MOVQ_from_gp (temp, scratch)
+                        X86_64.MOVSD_reg (d, s)
+                        X86_64.XORPD (d, temp) ]))
         | _ -> Error "FNeg with virtual FP register"
 
     | LIR.FAbs (dest, src) ->
@@ -4123,6 +4433,11 @@ let private translateInstr
                     let instrs = emitStringLiteralNoRefCount addrDest value
                     let setResults = loadImm64 lenDest (int64 len) @ [X86_64.LEA (addrDest, addrDest, 16)]
                     Ok (instrs @ setResults)
+                | LIR.StackSlot stackOffset ->
+                    let adjustedOffset = int32 (adjustStackOffset ctx stackOffset)
+                    Ok [ X86_64.MOV_load (scratch, X86_64.RBP, adjustedOffset)
+                         X86_64.MOV_load (lenDest, scratch, 0)
+                         X86_64.LEA (addrDest, scratch, 8) ]
                 | _ -> Ok (loadImm64 lenDest 0L @ loadImm64 addrDest 0L)
 
             let copy1 = freshLabel "strcat_c1"
@@ -4135,14 +4450,14 @@ let private translateInstr
             // (which might allocate for StringSymbol). This avoids clobbering
             // the right source register during left's heap allocation.
             //
-            // If left is in R8 or R9, loading right will clobber left's register.
-            // Preserve the pointer on the stack because literal materialization
-            // also uses scratch (R11).
+            // Loading the right operand owns R8/R9 and may also use scratch for
+            // a stack slot, literal, or aliased R8 source. Preserve a left
+            // pointer held in any of those registers before that setup.
             let leftConflictReg =
                 match left with
                 | LIR.Reg reg ->
                     match resolveReg reg with
-                    | Ok r when r = X86_64.R8 || r = X86_64.R9 -> Some r
+                    | Ok r when r = X86_64.R8 || r = X86_64.R9 || r = scratch -> Some r
                     | _ -> None
                 | _ -> None
 
@@ -4716,14 +5031,26 @@ let private translateInstr
         // getrandom(buf, 8, 0) syscall
         resolveReg dest
         |> Result.map (fun destReg ->
-            [X86_64.SUB_imm (X86_64.RSP, 8)]
+            let clobbered =
+                [ X86_64.RAX
+                  X86_64.RDI
+                  X86_64.RSI
+                  X86_64.RDX
+                  X86_64.RCX
+                  scratch ]
+            let preserved = List.filter ((<>) destReg) clobbered
+            let saves = List.map X86_64.PUSH preserved
+            let restores = preserved |> List.rev |> List.map X86_64.POP
+            saves
+            @ [X86_64.SUB_imm (X86_64.RSP, 8)]
             @ [X86_64.MOV_reg (X86_64.RDI, X86_64.RSP)]  // buf
             @ loadImm64 X86_64.RSI 8L                      // len = 8
             @ loadImm64 X86_64.RDX 0L                      // flags = 0
             @ loadImm64 X86_64.RAX (int64 syscalls.Getrandom)
             @ [X86_64.SYSCALL
                X86_64.MOV_load (destReg, X86_64.RSP, 0)
-               X86_64.ADD_imm (X86_64.RSP, 8)])
+               X86_64.ADD_imm (X86_64.RSP, 8)]
+            @ restores)
 
     | LIR.DateTimeNow dest ->
         // clock_gettime(CLOCK_REALTIME=0, &ts), converted to 100ns Unix ticks.
@@ -4755,11 +5082,12 @@ let private translateInstr
             let completeLabel = label "complete"
             let millionBits = System.BitConverter.DoubleToInt64Bits 1000000.0
             Ok (
-                loadImm64 scratch millionBits
-                @ [ X86_64.MOVQ_from_gp (X86_64.XMM15, scratch)
-                    X86_64.MULSD (X86_64.XMM15, delayReg)
-                    X86_64.CVTTSD2SI (scratch, X86_64.XMM15)
-                    X86_64.CMP_imm (scratch, 0)
+                withPreservedFloatScratch [delayReg] (fun temp ->
+                    loadImm64 scratch millionBits
+                    @ [ X86_64.MOVQ_from_gp (temp, scratch)
+                        X86_64.MULSD (temp, delayReg)
+                        X86_64.CVTTSD2SI (scratch, temp) ])
+                @ [ X86_64.CMP_imm (scratch, 0)
                     X86_64.Jcc (X86_64.LE, completeLabel)
                     X86_64.SUB_imm (X86_64.RSP, 32)
                     X86_64.MOV_reg (X86_64.RAX, scratch)
@@ -4792,10 +5120,21 @@ let private translateInstr
 
     | LIR.CliNative (dest, operation, args) ->
         resolveReg dest
-        |> Result.map (fun destReg ->
+        |> Result.bind (fun destReg ->
+            let loadCliOperand dest operand =
+                match operand with
+                | LIR.Imm value -> Ok (loadImm64 dest value)
+                | LIR.Reg source ->
+                    resolveReg source
+                    |> Result.map (fun sourceReg ->
+                        if sourceReg = dest then [] else [X86_64.MOV_reg (dest, sourceReg)])
+                | LIR.StackSlot offset ->
+                    Ok [X86_64.MOV_load (dest, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
+                | LIR.StringSymbol value -> Ok (emitStringLiteral dest value)
+                | _ -> Error "CLI native operation received a non-integer operand"
             match operation with
-            | LIR.HostOS -> loadImm64 destReg 1L
-            | LIR.HostArchitecture -> loadImm64 destReg 1L
+            | LIR.HostOS -> Ok (loadImm64 destReg 1L)
+            | LIR.HostArchitecture -> Ok (loadImm64 destReg 1L)
             | LIR.Hostname ->
                 let failureLabel = freshLabel $"hostname_{ctx.FunctionName}_failure"
                 let lengthLabel = freshLabel $"hostname_{ctx.FunctionName}_length"
@@ -4803,8 +5142,8 @@ let private translateInstr
                 let copyLabel = freshLabel $"hostname_{ctx.FunctionName}_copy"
                 let copyDoneLabel = freshLabel $"hostname_{ctx.FunctionName}_copy_done"
                 let completeLabel = freshLabel $"hostname_{ctx.FunctionName}_complete"
-                [ X86_64.SUB_imm (X86_64.RSP, 400)
-                  X86_64.MOV_reg (X86_64.RDI, X86_64.RSP) ]
+                Ok ([ X86_64.SUB_imm (X86_64.RSP, 400)
+                      X86_64.MOV_reg (X86_64.RDI, X86_64.RSP) ]
                 @ loadImm64 X86_64.RAX 63L
                 @ [ X86_64.SYSCALL
                     X86_64.CMP_imm (X86_64.RAX, 0)
@@ -4871,15 +5210,24 @@ let private translateInstr
                     X86_64.MOV_store (destReg, 8, X86_64.R8)
                     X86_64.MOV_store (destReg, 16, X86_64.R10) ]
                 @ genLeakCounterInc ctx
-                @ [X86_64.Label completeLabel]
+                @ [X86_64.Label completeLabel])
+            | LIR.Execute ->
+                match args with
+                | [command] ->
+                    loadCliOperand X86_64.RDI command
+                    |> Result.map (fun loads ->
+                        loads
+                        @ [X86_64.CALL "__dark_cli_execute"]
+                        @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)]))
+                | _ -> Error "CLI execute expects exactly one command"
             | LIR.GetPid ->
-                loadImm64 X86_64.RAX 39L
+                Ok (loadImm64 X86_64.RAX 39L
                 @ [X86_64.SYSCALL]
-                @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)])
+                @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)]))
             | LIR.GetUid ->
-                loadImm64 X86_64.RAX 102L
+                Ok (loadImm64 X86_64.RAX 102L
                 @ [X86_64.SYSCALL]
-                @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)])
+                @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)]))
             | LIR.CpuCount ->
                 let byteLoop = freshLabel $"cpu_count_{ctx.FunctionName}_byte"
                 let bitLoop = freshLabel $"cpu_count_{ctx.FunctionName}_bit"
@@ -4890,8 +5238,8 @@ let private translateInstr
                 let zeroMask =
                     [0 .. 15]
                     |> List.map (fun index -> X86_64.MOV_store (X86_64.RSP, int32 (index * 8), X86_64.R10))
-                [ X86_64.SUB_imm (X86_64.RSP, 128)
-                  X86_64.XOR_reg (X86_64.R10, X86_64.R10) ]
+                Ok ([ X86_64.SUB_imm (X86_64.RSP, 128)
+                      X86_64.XOR_reg (X86_64.R10, X86_64.R10) ]
                 @ zeroMask
                 @ loadImm64 X86_64.RDI 0L
                 @ loadImm64 X86_64.RSI 128L
@@ -4925,21 +5273,21 @@ let private translateInstr
                     X86_64.Label fallbackLabel
                     X86_64.MOV_imm32 (destReg, 1)
                     X86_64.Label completeLabel
-                    X86_64.ADD_imm (X86_64.RSP, 128) ]
+                    X86_64.ADD_imm (X86_64.RSP, 128) ])
             | LIR.GetArgv ->
                 match args with
                 | [LIR.Imm index] when index >= 0L ->
-                    loadImm64 X86_64.RDI index
+                    Ok (loadImm64 X86_64.RDI index
                     @ [X86_64.CALL "__dark_cli_argv"]
-                    @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)])
+                    @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)]))
                 | [LIR.Reg index] ->
                     match resolveReg index with
                     | Ok indexReg ->
-                        [X86_64.MOV_reg (X86_64.RDI, indexReg)
-                         X86_64.CALL "__dark_cli_argv"]
-                        @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)])
-                    | Error _ -> loadImm64 destReg 0L
-                | _ -> loadImm64 destReg 0L
+                        Ok ([X86_64.MOV_reg (X86_64.RDI, indexReg)
+                             X86_64.CALL "__dark_cli_argv"]
+                            @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)]))
+                    | Error _ -> Ok (loadImm64 destReg 0L)
+                | _ -> Ok (loadImm64 destReg 0L)
             | LIR.GetEnv ->
                 let loadName =
                     match args with
@@ -4952,9 +5300,9 @@ let private translateInstr
                     | [LIR.StackSlot offset] ->
                         [X86_64.MOV_load (X86_64.RDI, X86_64.RBP, int32 (adjustStackOffset ctx offset))]
                     | _ -> []
-                loadName
+                Ok (loadName
                 @ [X86_64.CALL "__dark_cli_getenv"]
-                @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)])
+                @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)]))
             | LIR.Kill ->
                 let successLabel = freshLabel $"kill_{ctx.FunctionName}_success"
                 let completeLabel = freshLabel $"kill_{ctx.FunctionName}_complete"
@@ -4971,7 +5319,7 @@ let private translateInstr
                     | _ -> []
                 match args with
                 | [pid; signal] ->
-                    pushOperand pid
+                    Ok (pushOperand pid
                     @ pushOperand signal
                     @ [ X86_64.POP X86_64.RSI
                         X86_64.POP X86_64.RDI ]
@@ -5006,14 +5354,14 @@ let private translateInstr
                         X86_64.MOV_imm32 (X86_64.R10, 1)
                         X86_64.MOV_store (destReg, 16, X86_64.R10) ]
                     @ genLeakCounterInc ctx
-                    @ [X86_64.Label completeLabel]
-                | _ -> loadImm64 destReg 0L
-            | LIR.Execute | LIR.ProcessIO | LIR.TerminateProcess ->
+                    @ [X86_64.Label completeLabel])
+                | _ -> Ok (loadImm64 destReg 0L)
+            | LIR.ProcessIO | LIR.TerminateProcess ->
                 let errorMessage =
                     match operation with
                     | LIR.ProcessIO | LIR.TerminateProcess -> "Invalid process handle"
                     | _ -> "native CLI operation unavailable"
-                emitStringLiteral X86_64.R8 ""
+                Ok (emitStringLiteral X86_64.R8 ""
                 @ emitStringLiteral X86_64.R9 errorMessage
                 @ [X86_64.MOV_reg (destReg, heapPtr); X86_64.ADD_imm (heapPtr, 32)]
                 @ loadImm64 X86_64.RCX -1L
@@ -5021,8 +5369,8 @@ let private translateInstr
                    X86_64.MOV_store (destReg, 8, X86_64.R8)
                    X86_64.MOV_store (destReg, 16, X86_64.R9)]
                 @ loadImm64 X86_64.RCX 1L
-                @ [X86_64.MOV_store (destReg, 24, X86_64.RCX)]
-            | LIR.SpawnProcess -> loadImm64 destReg 1L)
+                @ [X86_64.MOV_store (destReg, 24, X86_64.RCX)])
+            | LIR.SpawnProcess -> Ok (loadImm64 destReg 1L))
 
     | LIR.Madd (dest, mulLeft, mulRight, add) ->
         // dest = add + mulLeft * mulRight
@@ -5030,9 +5378,13 @@ let private translateInstr
             resolveReg mulLeft |> Result.bind (fun ml ->
                 resolveReg mulRight |> Result.bind (fun mr ->
                     resolveReg add |> Result.map (fun addReg ->
-                        [X86_64.MOV_reg (scratch, ml); X86_64.IMUL_reg (scratch, mr)]
+                        let temp = arithmeticTempExcluding [d; ml; mr; addReg]
+                        [ X86_64.PUSH temp
+                          X86_64.MOV_reg (temp, ml)
+                          X86_64.IMUL_reg (temp, mr) ]
                         @ (if d <> addReg then [X86_64.MOV_reg (d, addReg)] else [])
-                        @ [X86_64.ADD_reg (d, scratch)]))))
+                        @ [ X86_64.ADD_reg (d, temp)
+                            X86_64.POP temp ]))))
 
     | LIR.PrintFloat freg ->
         // Call Stdlib.Float.toString(D0), print result as heap string
@@ -5466,21 +5818,37 @@ let private translateTerminator
         | None ->
             Error "x64 codegen: CondBranch without a preceding comparison in the same block"
         | Some comparisonContext ->
-            let x86Cond =
-                if comparisonContext = FloatComparison then
+            if comparisonContext = FloatComparison then
+                // UCOMISD sets PF for unordered operands. EQ, below, and
+                // below-or-equal otherwise also match NaN and need an explicit
+                // ordered guard; NE deliberately treats unordered as true.
+                let branches =
                     match cond with
-                    | LIR.EQ -> X86_64.EQ | LIR.NE -> X86_64.NE
-                    | LIR.LT | LIR.ULT -> X86_64.B  | LIR.GT | LIR.UGT -> X86_64.A
-                    | LIR.LE | LIR.ULE -> X86_64.BE | LIR.GE | LIR.UGE -> X86_64.AE
-                else
+                    | LIR.EQ ->
+                        [ X86_64.Jcc (X86_64.P, falseLabel)
+                          X86_64.Jcc (X86_64.EQ, trueLabel) ]
+                    | LIR.NE ->
+                        [ X86_64.Jcc (X86_64.P, trueLabel)
+                          X86_64.Jcc (X86_64.NE, trueLabel) ]
+                    | LIR.LT | LIR.ULT ->
+                        [ X86_64.Jcc (X86_64.P, falseLabel)
+                          X86_64.Jcc (X86_64.B, trueLabel) ]
+                    | LIR.LE | LIR.ULE ->
+                        [ X86_64.Jcc (X86_64.P, falseLabel)
+                          X86_64.Jcc (X86_64.BE, trueLabel) ]
+                    | LIR.GT | LIR.UGT -> [X86_64.Jcc (X86_64.A, trueLabel)]
+                    | LIR.GE | LIR.UGE -> [X86_64.Jcc (X86_64.AE, trueLabel)]
+                Ok (branches @ [X86_64.JMP falseLabel])
+            else
+                let x86Cond =
                     match cond with
                     | LIR.EQ -> X86_64.EQ | LIR.NE -> X86_64.NE
                     | LIR.LT -> X86_64.LT | LIR.GT -> X86_64.GT
                     | LIR.LE -> X86_64.LE | LIR.GE -> X86_64.GE
                     | LIR.ULT -> X86_64.B | LIR.UGT -> X86_64.A
                     | LIR.ULE -> X86_64.BE | LIR.UGE -> X86_64.AE
-            Ok ([X86_64.Jcc (x86Cond, trueLabel)]
-                @ (if nextLabel = Some falseLabel then [] else [X86_64.JMP falseLabel]))
+                Ok ([X86_64.Jcc (x86Cond, trueLabel)]
+                    @ (if nextLabel = Some falseLabel then [] else [X86_64.JMP falseLabel]))
     | LIR.BranchBitZero (reg, bit, LIR.Label zeroLabel, LIR.Label nonZeroLabel) ->
         resolveReg reg
         |> Result.map (fun regX86 ->
@@ -5624,6 +5992,15 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry)) 
                 |> List.exists (function
                     | LIR.CliNative (_, LIR.GetEnv, _) -> true
                     | _ -> false)))
+    let needsCliExecuteHelper =
+        functions
+        |> List.exists (fun func ->
+            func.CFG.Blocks
+            |> Map.exists (fun _ block ->
+                block.Instrs
+                |> List.exists (function
+                    | LIR.CliNative (_, LIR.Execute, _) -> true
+                    | _ -> false)))
 
     let rec translateFuncs acc remaining =
         match remaining with
@@ -5729,6 +6106,12 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry)) 
                     (payloadSize, elementRelease)
                 |> mergePlannedListDecHelperMaps nestedHelpers
             | ANF.RecursiveRelease _ ->
+                Map.empty
+                |> Map.add
+                    (plannedListDecHelperLabelForReleasePlan elementRelease)
+                    (8, elementRelease)
+                |> mergePlannedListDecHelperMaps nestedHelpers
+            | ANF.RootRelease (_, ANF.DictHeap, _) ->
                 Map.empty
                 |> Map.add
                     (plannedListDecHelperLabelForReleasePlan elementRelease)
@@ -6296,4 +6679,4 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry)) 
                 }
             else
                 []
-        allInstrs @ listIncHelper @ listDecHelpers @ dictIncHelper @ plannedDictDecHelpers @ dictDecHelper @ dictDecDynamicKeyHelper @ dictDecDynamicValueHelper @ dictDecDynamicKeyValueHelper @ dictDecDynamicKeyDictValueHelper @ dictDecDynamicKeyDictListValueHelper @ dictDecListValueHelper @ dictDecDictValueHelper @ dictDecDictListValueHelper @ dictDecTupleStringListValueHelper @ dictDecTupleStringListDictValueHelper @ dictDecDynamicKeyTupleStringListDictValueHelper @ dictDecSumStringValueHelper @ closureIncHelper @ closureDecHelper @ streamDecHelper @ recursiveSumRcDecHelpers @ generateCliArgvHelper enableLeakCheck @ (if needsCliGetEnvHelper then generateCliGetEnvHelper enableLeakCheck else []) @ genOomHandler () @ genRuntimeErrorHandler ())
+        allInstrs @ listIncHelper @ listDecHelpers @ dictIncHelper @ plannedDictDecHelpers @ dictDecHelper @ dictDecDynamicKeyHelper @ dictDecDynamicValueHelper @ dictDecDynamicKeyValueHelper @ dictDecDynamicKeyDictValueHelper @ dictDecDynamicKeyDictListValueHelper @ dictDecListValueHelper @ dictDecDictValueHelper @ dictDecDictListValueHelper @ dictDecTupleStringListValueHelper @ dictDecTupleStringListDictValueHelper @ dictDecDynamicKeyTupleStringListDictValueHelper @ dictDecSumStringValueHelper @ closureIncHelper @ closureDecHelper @ streamDecHelper @ recursiveSumRcDecHelpers @ generateCliArgvHelper enableLeakCheck @ (if needsCliGetEnvHelper then generateCliGetEnvHelper enableLeakCheck else []) @ (if needsCliExecuteHelper then generateLinuxCliExecuteHelper enableLeakCheck else []) @ genOomHandler () @ genRuntimeErrorHandler ())
