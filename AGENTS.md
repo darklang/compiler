@@ -25,6 +25,11 @@ contains only rules specific to agents changing this repository.
   file-purpose comment.
 - Use command-line flags rather than environment variables; use `python3` for
   scripts.
+- Build the .NET/F# projects with `./build --ai`; it keeps automated output
+  bounded and retains complete failure logs under `TestResults/ai/`.
+- `./run-tests` only executes an already-built test binary; it must never invoke
+  a .NET/F# project build. Run `./build --ai` first, and rebuild after changing
+  source or project files before treating a test result as current.
 - Do not run x64 tests on an ARM64 host unless explicitly testing x64 work.
   Likewise, do not run ARM64 tests on an x64 host unless explicitly testing
   ARM64 work.

@@ -16,6 +16,10 @@ logs are retained under `TestResults/ai/`.
 
 ## Test
 
+`./run-tests` never invokes a .NET/F# project build. Run `./build --ai` first,
+and run it again after changing source or project files so the test binary is
+current.
+
 ```bash
 ./run-tests --ai                 # Run the already-built full suite with bounded output
 ./run-tests --ai --target=linux-x86_64 # Explicit x64 suite (QEMU when cross-target)

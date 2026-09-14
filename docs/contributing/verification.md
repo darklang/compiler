@@ -53,6 +53,7 @@ On an ARM64 host, Linux x86_64 tests are explicit and execute generated ELF
 binaries through the pinned QEMU installation:
 
 ```bash
+./build --ai
 ./run-tests --ai --target=linux-x86_64
 ```
 
