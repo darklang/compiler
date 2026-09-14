@@ -3,9 +3,6 @@
 module X64ReleaseSelection
 
 open X64Operands
-open X64Printing
-open X64Frames
-open X64Process
 open X64CodeGenTypes
 
 // ============================================================================

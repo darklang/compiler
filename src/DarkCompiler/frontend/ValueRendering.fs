@@ -8,9 +8,9 @@ module ValueRendering
 
 open AST
 
-type private SumVariant = TypeChecking.SumVariantInfo
-type private SumInfo = TypeChecking.SumTypeInfo
-type private RecordInfo = TypeChecking.RecordTypeInfo
+type private SumVariant = CheckingTypes.SumVariantInfo
+type private SumInfo = CheckingTypes.SumTypeInfo
+type private RecordInfo = CheckingTypes.RecordTypeInfo
 
 type private RenderEnv = {
     Records: Lazy<Map<string, RecordInfo>>
@@ -44,15 +44,15 @@ let private stableHash (value: string) : uint64 =
         14695981039346656037UL
 
 let private rendererName (typ: Type) : string =
-    let text = TypeChecking.typeToString typ
+    let text = CheckingDiagnostics.typeToString typ
     $"__dark_render_value_{stableHash text:x16}"
 
 let private listItemsRendererName (typ: Type) : string =
-    let text = TypeChecking.typeToString typ
+    let text = CheckingDiagnostics.typeToString typ
     $"__dark_render_list_items_{stableHash text:x16}"
 
 let private dictItemsRendererName (typ: Type) : string =
-    let text = TypeChecking.typeToString typ
+    let text = CheckingDiagnostics.typeToString typ
     $"__dark_render_dict_items_{stableHash text:x16}"
 
 let private applySubstitution (subst: Map<string, Type>) (typ: Type) : Type =
@@ -278,7 +278,7 @@ and private renderBody
         Crash.crash "TEnumFields is declaration metadata and cannot be rendered as a value type"
     | TList elemType ->
         let (itemsName, nextState) = ensureListItemsRenderer env elemType state
-        let typeName = TypeChecking.typeToString typ
+        let typeName = CheckingDiagnostics.typeToString typ
         let body =
             Match (
                 value,
@@ -349,7 +349,7 @@ and private renderBody
                     let prefix = if index = 0 then "" else ", "
                     [StringLiteral $"{prefix}{fieldName}: "; rendered])
                 |> List.concat
-            let typeText = TypeChecking.typeToString typ
+            let typeText = CheckingDiagnostics.typeToString typ
             let short = concat (StringLiteral $"{typeText} {{ " :: shortParts @ [StringLiteral " }"])
             let longParts =
                 renderedFields
@@ -378,7 +378,7 @@ and private renderBody
         | None -> Crash.crash $"Missing sum metadata for value renderer: {typeName}"
         | Some sumInfo ->
             let subst = typeSubstitution sumInfo.TypeParams typeArgs
-            let typeText = TypeChecking.typeToString typ
+            let typeText = CheckingDiagnostics.typeToString typ
             let rec buildCases (remaining: SumVariant list) currentState acc =
                 match remaining with
                 | [] -> (List.rev acc, currentState)
@@ -418,13 +418,13 @@ and private renderBody
     | TRawPtr ->
         (call "Stdlib.Int64.toString" [value], state)
     | TDict (keyType, _) ->
-        Crash.crash $"Public Dict renderer received non-String key type {TypeChecking.typeToString keyType}"
+        Crash.crash $"Public Dict renderer received non-String key type {CheckingDiagnostics.typeToString keyType}"
     | TRuntimeError -> (StringLiteral "()", state)
     | TVar name -> Crash.crash $"Unresolved type variable in value renderer: {name}"
 
 let rewriteProgram
-    (recordMetadata: TypeChecking.IndexedTypeRegistry)
-    (sumMetadata: TypeChecking.IndexedSumTypeRegistry)
+    (recordMetadata: CheckingTypes.IndexedTypeRegistry)
+    (sumMetadata: CheckingTypes.IndexedSumTypeRegistry)
     (baseFunctions: Map<string, Type>)
     (programType: Type)
     (Program topLevels)

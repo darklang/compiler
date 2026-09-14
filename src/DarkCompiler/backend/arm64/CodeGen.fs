@@ -8,19 +8,13 @@ open ARM64ListReferenceCounts
 open ARM64ClosureReferenceCounts
 open ARM64ReleaseSelection
 open ARM64DictReferenceCounts
-open ARM64LeakAccounting
-open ARM64Operands
-open ARM64Frames
-open ARM64Instructions
 open ARM64GenericReferenceCounts
-open ARM64Blocks
 open ARM64ProcessLifecycle
 open ARM64RunProcess
 open ARM64ExecuteProcess
 open ARM64Functions
 open ARM64Peephole
 open ARM64ReleasePlanSummary
-open ARM64PrepareFunctions
 
 /// Convert LIR program to ARM64 instructions with options
 /// Caller-owned conversion cache. Program-wide helper and layout generation is

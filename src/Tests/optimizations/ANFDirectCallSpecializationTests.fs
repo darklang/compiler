@@ -5,10 +5,6 @@
 
 module ANFDirectCallSpecializationTests
 
-open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
-
 open ANF
 
 type TestResult = Result<unit, string>
@@ -419,7 +415,7 @@ let testSpecializedRecursiveSignaturesReachMirAndLir () : TestResult =
             mirClones
             |> List.forall (fun func -> List.length func.TypedParams = 2)
         if List.length mirClones <> 2 || not validMir then
-            Error $"Expected two reduced-signature recursive clones in MIR:\n{IRPrinter.formatMIR mirProgram}"
+            Error $"Expected two reduced-signature recursive clones in MIR:\n{MIRPrinter.formatMIR mirProgram}"
         else
             match MIR_to_LIR.toLIR mirProgram with
             | Error err -> Error $"Expected specialized MIR to lower to LIR: {err}"

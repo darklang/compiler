@@ -2,8 +2,6 @@
 
 module ARM64RuntimeImmediates
 
-
-
 let internal generateLoadUInt64Immediate (dest: ARM64.Reg) (value: uint64) : ARM64.Instr list =
     let chunk shift =
         uint16 ((value >>> shift) &&& 0xFFFFUL)

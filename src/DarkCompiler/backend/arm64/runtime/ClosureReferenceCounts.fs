@@ -4,7 +4,6 @@ module ARM64ClosureReferenceCounts
 
 open ARM64CodeGenTypes
 open ARM64HeapAllocation
-open ARM64ListReferenceCounts
 
 let private generateClosurePayloadSizeResolver
     (ctx: CodeGenContext)

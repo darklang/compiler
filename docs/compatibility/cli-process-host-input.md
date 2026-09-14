@@ -93,7 +93,7 @@ Native interpreter behavior is in
 The compiler public wrappers are in the `src/DarkCompiler/stdlib/Cli*.dark`
 module files.
 The registry is `src/DarkCompiler/Stdlib.fs`; typed lowering starts in
-`passes/anf/AST_to_ANF.fs`, passes through `ANF.fs`, `MIR.fs`, and `LIR.fs`, and
+`passes/anf/AST_to_ANF.fs`, passes through `ir/anf/ANF.fs`, `ir/mir/MIR.fs`, and `ir/lir/LIR.fs`, and
 ends in both architecture code generators. Focused native evidence is
 `src/Tests/e2e/cli_process_host_input.e2e` plus the enabled pinned
 `src/Tests/e2e/upstream/stdlib/cli-process.dark` corpus. Target-ABI coverage is

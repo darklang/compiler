@@ -45,13 +45,13 @@ type PlanningSession() =
             artifacts.Clear()
             disposed <- true
 
-type private SumVariant = TypeChecking.SumVariantInfo
-type private SumInfo = TypeChecking.SumTypeInfo
+type private SumVariant = CheckingTypes.SumVariantInfo
+type private SumInfo = CheckingTypes.SumTypeInfo
 
 type private Env = {
-    Records: TypeChecking.IndexedTypeRegistry
+    Records: CheckingTypes.IndexedTypeRegistry
     Sums: Map<string, SumInfo>
-    Aliases: TypeChecking.AliasRegistry
+    Aliases: CheckingTypes.AliasRegistry
 }
 
 type private State = { Functions: Map<string, FunctionDef> }
@@ -216,7 +216,7 @@ let rec private typeReference typ =
     | TSum (name, typeArgs) -> custom name typeArgs
     | TVar name -> unary "TVariable" (StringLiteral name)
     | TTuple [] | TTuple [_] | TEnumFields _ | TRawPtr | TRuntimeError | TDict _ ->
-        unary "TVariable" (StringLiteral (TypeChecking.typeToString typ))
+        unary "TVariable" (StringLiteral (CheckingDiagnostics.typeToString typ))
 
 let private cantMatch typ raw path =
     constructor
@@ -500,7 +500,7 @@ and private serializeBody env typ value writer state : Result<Expr * State, stri
              nextState))
     | TRecord (typeName, typeArgs) ->
         match Map.tryFind typeName env.Records with
-        | None -> Error $"Unsupported type in JSON: {TypeChecking.typeToString typ}"
+        | None -> Error $"Unsupported type in JSON: {CheckingDiagnostics.typeToString typ}"
         | Some recordInfo ->
             substitution recordInfo.TypeParams typeArgs
             |> Result.bind (fun subst ->
@@ -521,7 +521,7 @@ and private serializeBody env typ value writer state : Result<Expr * State, stri
                     (writerEndObject encoded, nextState)))
     | TSum (typeName, typeArgs) ->
         match Map.tryFind typeName env.Sums with
-        | None -> Error $"Unsupported type in JSON: {TypeChecking.typeToString typ}"
+        | None -> Error $"Unsupported type in JSON: {CheckingDiagnostics.typeToString typ}"
         | Some sumInfo ->
             substitution sumInfo.TypeParams typeArgs
             |> Result.bind (fun subst ->
@@ -570,7 +570,7 @@ and private serializeBody env typ value writer state : Result<Expr * State, stri
     | TFunction _ | TBlob | TRawPtr | TRuntimeError | TStream _ | TVar _ | TEnumFields _
     | TDict _ ->
         Error
-            $"Unsupported type in JSON: {TypeChecking.typeToString typ}. Some types are not supported in Json serialization"
+            $"Unsupported type in JSON: {CheckingDiagnostics.typeToString typ}. Some types are not supported in Json serialization"
 
 let private optionDecoder typ functionName =
     let failure = cantMatch typ (rawSource (Var "__source") (Var "__view")) (Var "__path")
@@ -893,7 +893,7 @@ and private decodeBody env typ state : Result<Expr * State, string> =
              nextState))
     | TRecord (typeName, typeArgs) ->
         match Map.tryFind typeName env.Records with
-        | None -> Error $"Unsupported type in JSON: {TypeChecking.typeToString typ}"
+        | None -> Error $"Unsupported type in JSON: {CheckingDiagnostics.typeToString typ}"
         | Some recordInfo ->
             substitution recordInfo.TypeParams typeArgs
             |> Result.bind (fun subst ->
@@ -961,7 +961,7 @@ and private decodeBody env typ state : Result<Expr * State, string> =
              nextState))
     | TSum (typeName, typeArgs) ->
         match Map.tryFind typeName env.Sums with
-        | None -> Error $"Unsupported type in JSON: {TypeChecking.typeToString typ}"
+        | None -> Error $"Unsupported type in JSON: {CheckingDiagnostics.typeToString typ}"
         | Some sumInfo ->
             substitution sumInfo.TypeParams typeArgs
             |> Result.bind (fun subst ->
@@ -1006,7 +1006,7 @@ and private decodeBody env typ state : Result<Expr * State, string> =
                               makeCase PWildcard failure ])
                     (objectBody, nextState)))
     | TFunction _ | TBlob | TRawPtr | TRuntimeError | TStream _ | TVar _ | TEnumFields _ | TDict _ ->
-        Error $"Unsupported type in JSON: {TypeChecking.typeToString typ}. Some types are not supported in Json serialization"
+        Error $"Unsupported type in JSON: {CheckingDiagnostics.typeToString typ}. Some types are not supported in Json serialization"
 
 let rec private mapExpr rewrite expr =
     let recurse = mapExpr rewrite
@@ -1046,7 +1046,7 @@ let rec private mapExpr rewrite expr =
 
 let rewriteProgramWithSession
     (session: PlanningSession option)
-    (env: TypeChecking.TypeCheckEnv)
+    (env: CheckingTypes.TypeCheckEnv)
     (Program topLevels)
     : Program =
     let (serializerTypes, parserTypes) =
@@ -1210,5 +1210,5 @@ let rewriteProgramWithSession
             let generated = state.Functions |> Map.toList |> List.map (snd >> FunctionDef)
             Program (generated @ rewritten)
 
-let rewriteProgram (env: TypeChecking.TypeCheckEnv) (program: Program) : Program =
+let rewriteProgram (env: CheckingTypes.TypeCheckEnv) (program: Program) : Program =
     rewriteProgramWithSession None env program

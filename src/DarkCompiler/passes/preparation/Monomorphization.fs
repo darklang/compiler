@@ -3,12 +3,8 @@
 module Monomorphization
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 open ANF
-open Output
 open LoweringPrimitives
-open TypeRegistries
 open SpecializationIdentity
 open TypeSubstitution
 
@@ -228,7 +224,7 @@ let rec replaceTypeApps (expr: AST.Expr) : AST.Expr =
             match typeArgs, replacedArgs with
             | [targetType], [leftExpr; rightExpr] when not hasTypeVars ->
                 AST.Call (
-                    TypeChecking.compareHelperName targetType,
+                    ComparisonPlanning.compareHelperName targetType,
                     exprArgsFromList [leftExpr; rightExpr]
                 )
             | _, evaluatedArgs ->
@@ -392,7 +388,7 @@ let replaceTypeAppsWithRegistry (specRegistry: SpecRegistry) (expr: AST.Expr) : 
                     | _ -> Error "Comparison helper remained polymorphic after monomorphization"
                 elif funcName = "__compare" then
                     match typeArgs with
-                    | [targetType] when not hasTypeVars -> Ok (TypeChecking.compareHelperName targetType)
+                    | [targetType] when not hasTypeVars -> Ok (ComparisonPlanning.compareHelperName targetType)
                     | _ -> Error "Canonical comparison remained polymorphic after monomorphization"
                 elif isGenericKeyIntrinsicName funcName then
                     Ok (specName funcName typeArgs)

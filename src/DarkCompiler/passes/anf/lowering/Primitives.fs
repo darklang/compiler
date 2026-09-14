@@ -3,10 +3,7 @@
 module LoweringPrimitives
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 open ANF
-open Output
 
 let internal eqHelperDispatchMarker = "__dark_internal_eq_helper_dispatch"
 
@@ -35,7 +32,7 @@ let internal materializeComparisonPlan (targetType: AST.Type) (args: AST.Expr li
         | AST.TRecord _
         | AST.TSum _ ->
             AST.Call (
-                TypeChecking.eqHelperName targetType,
+                ComparisonPlanning.eqHelperName targetType,
                 AST.NonEmptyList.fromList [leftExpr; rightExpr]
             )
         | AST.TFunction _ ->

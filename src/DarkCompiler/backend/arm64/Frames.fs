@@ -2,13 +2,6 @@
 
 module ARM64Frames
 
-open ARM64CodeGenTypes
-open ARM64HeapAllocation
-open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
-open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
-open ARM64LeakAccounting
 open ARM64Operands
 
 /// Generate STP instructions to save callee-saved register pairs

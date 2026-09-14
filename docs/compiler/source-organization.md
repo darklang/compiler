@@ -35,6 +35,29 @@ Target runtime generators live under each backend's `runtime/`; shared memory
 plans contain no ISA instructions. The former root `Runtime.fs` was ARM64 code,
 not a target-independent runtime layer.
 
+## Finding an owner
+
+| Change | Start here |
+|---|---|
+| Source type rules or diagnostics | `frontend/checking/` |
+| Generic identity or closure preparation | `passes/preparation/` |
+| Collection recognition and array selection | `passes/hir/`, `passes/storage/` |
+| Region liveness, reuse, or verification | `passes/ownership/` |
+| Existing ANF lifetime insertion | `passes/anf/ownership/` |
+| Shared destruction shapes and release plans | `memory/` |
+| Expression, atom, or pattern lowering | `passes/anf/lowering/` |
+| ANF or MIR optimization | `passes/anf/optimization/`, `passes/mir/optimization/` |
+| Liveness, spilling, coloring, phi edges | `passes/lir/allocation/` |
+| Native operation expansion | `backend/<target>/instructions/` |
+| Native allocation and destruction helpers | `backend/<target>/runtime/` |
+| Pipeline scheduling or cache identity | `driver/` |
+| IR definitions and scoped printers | `ir/<representation>/` |
+
+Ownership and ARM64 test registries retain their existing suite entry points;
+their cases are grouped under `src/Tests/compiler-passes/ownership/` and
+`src/Tests/compiler-passes/arm64/`. Test selection and observable assertions are
+unchanged by that grouping.
+
 ## Migration sequence
 
 1. Remove numeric filenames, group passes, and name driver diagnostics without

@@ -3,10 +3,7 @@
 module TypeRegistries
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 open ANF
-open Output
 open LoweringPrimitives
 
 type RecordTypeInfo = {

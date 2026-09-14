@@ -125,7 +125,7 @@ unit character exactly:
 
 | Contract | Compiler evidence at `882f633f…` | Interpreter evidence at `04fbe9dc…` | Result |
 | --- | --- | --- | --- |
-| Distinct value/type traversal | `AST.fs`, `Parser.fs`, `TypeChecking.fs`, `ANF.fs`, `AST_to_ANF.fs`, `RefCountInsertion.fs`, `MIR_to_LIR.fs`, `RegisterAllocation.fs` | `backend/src/LibExecution/RuntimeTypes.fs:133-153,948-969` | Aligned |
+| Distinct value/type traversal | `AST.fs`, `Parser.fs`, `TypeChecking.fs`, `ir/anf/ANF.fs`, `AST_to_ANF.fs`, `RefCountInsertion.fs`, `MIR_to_LIR.fs`, `RegisterAllocation.fs` | `backend/src/LibExecution/RuntimeTypes.fs:133-153,948-969` | Aligned |
 | Clock and tick precision | `Runtime.fs:2450-2525`, `backend/x64/CodeGen.fs:4102-4124` | `Builtins.Time/Libs/DateTime.fs:14-45`, `DarkDateTime.fs` | Aligned to available host precision |
 | Public signatures and behavior | `stdlib/DateTime.dark:1-390` | `packages/darklang/stdlib/dateTime.dark:4-136`, `Builtins.Pure/Libs/DateTime.fs:13-536` | Aligned |
 | Duration grammar and errors | `stdlib/Duration.dark:1-21`, `stdlib/Int.dark:399-416` | `packages/darklang/stdlib/duration.dark:6-28`, `Builtins.Pure/Libs/Int.fs:359-379` | Aligned for the documented grammar |

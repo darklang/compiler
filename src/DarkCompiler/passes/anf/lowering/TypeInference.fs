@@ -3,22 +3,14 @@
 module LoweringTypeInference
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 open ANF
-open Output
 open LoweringPrimitives
 open TypeRegistries
 open SpecializationIdentity
 open TypeSubstitution
-open Monomorphization
-open InlineLambdas
 open ClosureAnalysis
-open ClosureComparisons
 open LiftExpressions
 open LiftFunctions
-open PrepareFunctions
-open LoweringOperators
 
 let rec inferTypeCore (sumTypeNames: Set<string>) (expr: AST.Expr) (typeEnv: Map<string, AST.Type>) (typeReg: TypeRegistry) (variantLookup: VariantLookup) (funcReg: FunctionRegistry) (moduleRegistry: AST.ModuleRegistry) : Result<AST.Type, string> =
     match expr with

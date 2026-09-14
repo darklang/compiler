@@ -3,15 +3,8 @@
 module X64Blocks
 
 open X64Operands
-open X64Printing
-open X64Frames
-open X64Process
 open X64CodeGenTypes
-open X64ReleaseSelection
 open X64FieldReferenceCounts
-open X64ListReferenceCounts
-open X64DictReferenceCounts
-open X64ClosureReferenceCounts
 open X64InstructionContext
 open X64Instructions
 

@@ -5,7 +5,9 @@
 module TestDSL.IRFormatSnapshotTestRunner
 
 open System.IO
-open IRPrinter
+open ANFPrinter
+open MIRPrinter
+open LIRPrinter
 open TestDSL.Common
 open TestDSL.IRFormatSnapshotFormat
 open TestDSL.PassTestRunner

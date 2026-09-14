@@ -3,22 +3,6 @@
 module ARM64PrepareFunctions
 
 open ARM64CodeGenTypes
-open ARM64HeapAllocation
-open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
-open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
-open ARM64LeakAccounting
-open ARM64Operands
-open ARM64Frames
-open ARM64Instructions
-open ARM64GenericReferenceCounts
-open ARM64Blocks
-open ARM64ProcessLifecycle
-open ARM64RunProcess
-open ARM64ExecuteProcess
-open ARM64Functions
-open ARM64Peephole
 open ARM64ReleasePlanSummary
 
 /// Attach backend-specific helper planning to a compilation batch. Release

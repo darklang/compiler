@@ -6,28 +6,26 @@
 module ANFOptimizeTests
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 
 open ANF
 
 type TestResult = Result<unit, string>
 
-let private dceOnlyOptions : ANF_Optimize.OptimizeOptions =
-    { ANF_Optimize.defaultOptimizeOptions with
+let private dceOnlyOptions : ANFConstants.OptimizeOptions =
+    { ANFConstants.defaultOptimizeOptions with
         EnableConstFolding = false
         EnableConstProp = false
         EnableCopyProp = false
         EnableDCE = true
         EnableStrengthReduction = false }
 
-let private optimizeMain (context: ANF_Optimize.OptimizeContext) (expr: AExpr) : AExpr =
+let private optimizeMain (context: ANFConstants.OptimizeContext) (expr: AExpr) : AExpr =
     let program = Program ([], expr)
     let (Program (_, optimizedMain)) =
         ANF_Optimize.optimizeProgramWithOptions context dceOnlyOptions program
     optimizedMain
 
-let private markerContext : ANF_Optimize.OptimizeContext =
+let private markerContext : ANFConstants.OptimizeContext =
     { TypeReg = Map.empty
       RecordTypeParams = Map.empty
       SumShapeReg =

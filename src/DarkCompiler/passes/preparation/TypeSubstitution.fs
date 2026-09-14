@@ -3,10 +3,7 @@
 module TypeSubstitution
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 open ANF
-open Output
 open LoweringPrimitives
 open TypeRegistries
 open SpecializationIdentity

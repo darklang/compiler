@@ -2,13 +2,7 @@
 
 module SpecializationIdentity
 
-open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 open ANF
-open Output
-open LoweringPrimitives
-open TypeRegistries
 
 /// Generic function registry - maps generic function names to their definitions
 type GenericFuncDefs = Map<string, AST.FunctionDef>

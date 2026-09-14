@@ -7,29 +7,29 @@ open AST
 type TestResult = Result<unit, string>
 
 let private compile
-    (stdlib: CompilerLibrary.StdlibResult)
-    (session: CompilerLibrary.CompilationSession)
-    (options: CompilerLibrary.CompilerOptions)
+    (stdlib: CompilationContexts.StdlibResult)
+    (session: CompilationSession.CompilationSession)
+    (options: CompilerOptions.CompilerOptions)
     (source: string)
-    : CompilerLibrary.CompileReport =
+    : CompilerOptions.CompileReport =
     CompilerLibrary.compile {
-        Context = CompilerLibrary.StdlibOnly stdlib
-        Mode = CompilerLibrary.TestExpression
+        Context = CompilationContexts.StdlibOnly stdlib
+        Mode = CompilerOptions.TestExpression
         Sources =
             NonEmptyList.singleton {
-                CompilerLibrary.SourceUnit.Name = "CompilationSessionTests.dark"
+                CompilationContexts.SourceUnit.Name = "CompilationSessionTests.dark"
                 Purpose = NameSyntax.SourceUnitPurpose.Executable
                 Source = source
             }
         AllowInternal = false
         Verbosity = 0
         Options = options
-        PackageValues = CompilerLibrary.emptyPackageValueCatalog
+        PackageValues = CompilationContexts.emptyPackageValueCatalog
         PassTimingRecorder = None
         Session = Some session
     }
 
-let private expectCompiled (report: CompilerLibrary.CompileReport) : TestResult =
+let private expectCompiled (report: CompilerOptions.CompileReport) : TestResult =
     match report.Result with
     | Ok _ -> Ok ()
     | Error error -> Error error
@@ -72,10 +72,10 @@ let private fakeMirFunction : MIR.Function =
     }
 
 let testSsaFunctionCacheReusesStructuralFunctions
-    (_: CompilerLibrary.StdlibResult)
+    (_: CompilationContexts.StdlibResult)
     ()
     : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+    use session = new CompilationSession.CompilationSession()
     let conversions = ResizeArray<unit>()
     let convert () =
         conversions.Add ()
@@ -93,10 +93,10 @@ let testSsaFunctionCacheReusesStructuralFunctions
         Error $"Expected structurally identical MIR functions to share SSA conversion, got conversions={conversions.Count}, cached={session.CachedSsaFunctionCount}, hits={session.SsaFunctionHitCount}, misses={session.SsaFunctionMissCount}"
 
 let testSsaFunctionCacheIgnoresFunctionLocalRegisterOffsets
-    (_: CompilerLibrary.StdlibResult)
+    (_: CompilationContexts.StdlibResult)
     ()
     : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+    use session = new CompilationSession.CompilationSession()
     let makeFunction registerOffset : MIR.Function =
         let entry = MIR.Label "offset_mir_function_entry"
         let parameter = MIR.VReg registerOffset
@@ -139,14 +139,14 @@ let testSsaFunctionCacheIgnoresFunctionLocalRegisterOffsets
         Error $"Expected function-local MIR register offsets to share SSA conversion, got conversions={conversions.Count}, cached={session.CachedSsaFunctionCount}, hits={session.SsaFunctionHitCount}, misses={session.SsaFunctionMissCount}"
 
 let testMirOptimizationCacheReusesStructuralFunctions
-    (_: CompilerLibrary.StdlibResult)
+    (_: CompilationContexts.StdlibResult)
     ()
     : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+    use session = new CompilationSession.CompilationSession()
     let optimizations = ResizeArray<unit>()
-    let key : CompilerLibrary.MirOptimizationKey = {
+    let key : CompilationCacheIdentity.MirOptimizationKey = {
         Function = fakeMirFunction
-        Options = MIR_Optimize.defaultOptimizeOptions
+        Options = MIROptimizationFacts.defaultOptimizeOptions
         EffectFreeCalls = Set.empty
     }
     let optimize () =
@@ -172,10 +172,10 @@ let testMirOptimizationCacheReusesStructuralFunctions
         Error $"Expected structurally identical SSA functions to share MIR optimization, got optimizations={optimizations.Count}, cached={session.CachedMirOptimizationCount}, hits={session.MirOptimizationHitCount}, misses={session.MirOptimizationMissCount}"
 
 let testAllocatedLirFunctionCacheReusesStructuralFunctions
-    (_: CompilerLibrary.StdlibResult)
+    (_: CompilationContexts.StdlibResult)
     ()
     : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+    use session = new CompilationSession.CompilationSession()
     let allocations = ResizeArray<unit>()
     let allocate () =
         allocations.Add ()
@@ -197,11 +197,11 @@ let testAllocatedLirFunctionCacheReusesStructuralFunctions
     else
         Error $"Expected structurally identical LIR functions to share register allocation, got allocations={allocations.Count}, cached={session.CachedAllocatedLirFunctionCount}, hits={session.AllocatedLirFunctionHitCount}, misses={session.AllocatedLirFunctionMissCount}"
 
-let testArm64HitWithNestedJson (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+let testArm64HitWithNestedJson (stdlib: CompilationContexts.StdlibResult) () : TestResult =
+    use session = new CompilationSession.CompilationSession()
     let source = "Stdlib.Json.parse<List<List<Int64>>>(\"[[1,2],[3]]\")"
-    match expectCompiled (compile stdlib session CompilerLibrary.defaultOptions source),
-          expectCompiled (compile stdlib session CompilerLibrary.defaultOptions source) with
+    match expectCompiled (compile stdlib session CompilerOptions.defaultOptions source),
+          expectCompiled (compile stdlib session CompilerOptions.defaultOptions source) with
     | Ok (), Ok () when
         session.Arm64CodegenHitCount > 0
         && session.Arm64CodegenMissCount > 0
@@ -219,8 +219,8 @@ let testArm64HitWithNestedJson (stdlib: CompilerLibrary.StdlibResult) () : TestR
     | Error error, _
     | _, Error error -> Error error
 
-let testArm64CodegenCacheSegregatesTargetOptionsAndCoverage (_: CompilerLibrary.StdlibResult) () : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+let testArm64CodegenCacheSegregatesTargetOptionsAndCoverage (_: CompilationContexts.StdlibResult) () : TestResult =
+    use session = new CompilationSession.CompilationSession()
     let macOS = ARM64.targetConfigFor Platform.MacOSARM64
     let linux = ARM64.targetConfigFor Platform.LinuxARM64
     let changedOptions = { ARM64CodeGenTypes.defaultOptions with DisableFreeList = true }
@@ -243,9 +243,9 @@ let testArm64CodegenCacheSegregatesTargetOptionsAndCoverage (_: CompilerLibrary.
     else
         Error $"Expected reference and structural hits while target/options entries segregate and coverage bypasses the cache, got calls={calls.Count}, cached={session.CachedArm64FunctionCount}, hits={session.Arm64CodegenHitCount}, misses={session.Arm64CodegenMissCount}"
 
-let testArm64CodegenMetricsAreOptIn (_: CompilerLibrary.StdlibResult) () : TestResult =
-    use ordinary = new CompilerLibrary.CompilationSession()
-    use profiled = new CompilerLibrary.CompilationSession(true)
+let testArm64CodegenMetricsAreOptIn (_: CompilationContexts.StdlibResult) () : TestResult =
+    use ordinary = new CompilationSession.CompilationSession()
+    use profiled = new CompilationSession.CompilationSession(true)
     let target = ARM64.targetConfigFor Platform.MacOSARM64
     let contextIdentity = System.Object()
     let generate () = Ok [ARM64Symbolic.RET]
@@ -260,8 +260,8 @@ let testArm64CodegenMetricsAreOptIn (_: CompilerLibrary.StdlibResult) () : TestR
     | ordinaryMetrics, profiledMetrics ->
         Error $"Expected only the opted-in session to retain one function metric, got ordinary={ordinaryMetrics.Length}, profiled={profiledMetrics.Length}"
 
-let testArm64CodegenCacheSegregatesCompilationContexts (_: CompilerLibrary.StdlibResult) () : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+let testArm64CodegenCacheSegregatesCompilationContexts (_: CompilationContexts.StdlibResult) () : TestResult =
+    use session = new CompilationSession.CompilationSession()
     let target = ARM64.targetConfigFor Platform.MacOSARM64
     let firstContext = System.Object()
     let secondContext = System.Object()
@@ -309,10 +309,10 @@ let testArm64CodegenCacheSegregatesCompilationContexts (_: CompilerLibrary.Stdli
         Error $"Expected structurally equal functions to reuse only within one registry context, got calls={calls.Count}, cached={session.CachedArm64FunctionCount}, hits={session.Arm64CodegenHitCount}, misses={session.Arm64CodegenMissCount}"
 
 let testArm64CodegenCacheReusesContextIndependentFunctions
-    (_: CompilerLibrary.StdlibResult)
+    (_: CompilationContexts.StdlibResult)
     ()
     : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+    use session = new CompilationSession.CompilationSession()
     let target = ARM64.targetConfigFor Platform.MacOSARM64
     let firstContext = System.Object()
     let secondContext = System.Object()
@@ -346,10 +346,10 @@ let testArm64CodegenCacheReusesContextIndependentFunctions
         Error $"Expected registry-independent functions to reuse ARM64 code across compilation contexts, got calls={calls.Count}, cached={session.CachedArm64FunctionCount}, hits={session.Arm64CodegenHitCount}, misses={session.Arm64CodegenMissCount}"
 
 let testArm64CodegenCacheReusesPlannedSlotInitFunctions
-    (_: CompilerLibrary.StdlibResult)
+    (_: CompilationContexts.StdlibResult)
     ()
     : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+    use session = new CompilationSession.CompilationSession()
     let target = ARM64.targetConfigFor Platform.MacOSARM64
     let firstContext = System.Object()
     let secondContext = System.Object()
@@ -413,8 +413,8 @@ let testArm64CodegenCacheReusesPlannedSlotInitFunctions
     else
         Error $"Expected planned RawSlotInit functions to reuse ARM64 code across compilation contexts, got calls={calls.Count}, cached={session.CachedArm64FunctionCount}, hits={session.Arm64CodegenHitCount}, misses={session.Arm64CodegenMissCount}"
 
-let testArm64EmissionChunkCacheUsesChunkIdentity (_: CompilerLibrary.StdlibResult) () : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+let testArm64EmissionChunkCacheUsesChunkIdentity (_: CompilationContexts.StdlibResult) () : TestResult =
+    use session = new CompilationSession.CompilationSession()
     let instructions = [ARM64Symbolic.MOVZ (ARM64.X0, 42us, 0)]
     let structurallyEquivalentInstructions =
         [ARM64Symbolic.MOVZ (ARM64.X0, 42us, 0)]
@@ -438,8 +438,8 @@ let testArm64EmissionChunkCacheUsesChunkIdentity (_: CompilerLibrary.StdlibResul
     else
         Error $"Expected identity-based prepared chunk reuse, got preparations={preparations.Count}, cached={session.CachedArm64EmissionChunkCount}, repeated={System.Object.ReferenceEquals(first, repeated)}, structural={System.Object.ReferenceEquals(first, structurallyEquivalent)}"
 
-let testArm64EmissionChunkGroupCacheUsesGroupIdentity (_: CompilerLibrary.StdlibResult) () : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+let testArm64EmissionChunkGroupCacheUsesGroupIdentity (_: CompilationContexts.StdlibResult) () : TestResult =
+    use session = new CompilationSession.CompilationSession()
     let instructionParts =
         [[ARM64Symbolic.MOVZ (ARM64.X0, 42us, 0)]; [ARM64Symbolic.RET]]
     let structurallyEquivalentParts =
@@ -470,8 +470,8 @@ let testArm64EmissionChunkGroupCacheUsesGroupIdentity (_: CompilerLibrary.Stdlib
     else
         Error $"Expected identity-based prepared chunk-group reuse, got preparations={preparations.Count}, cached={session.CachedArm64EmissionChunkCount}, repeated={System.Object.ReferenceEquals(first, repeated)}, structural={System.Object.ReferenceEquals(first, structurallyEquivalent)}"
 
-let testArm64ReleasePlanSummaryCacheConfirmsPlanShape (_: CompilerLibrary.StdlibResult) () : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+let testArm64ReleasePlanSummaryCacheConfirmsPlanShape (_: CompilationContexts.StdlibResult) () : TestResult =
+    use session = new CompilationSession.CompilationSession()
     let firstPlan = MemoryModel.NoReleasePlan
     let secondPlan = MemoryModel.DynamicBufferRelease MemoryModel.DynamicStringBuffer
     let summary needsClosure needsStream : LIR.Arm64ReleasePlanSummary = {
@@ -507,20 +507,20 @@ let testArm64ReleasePlanSummaryCacheConfirmsPlanShape (_: CompilerLibrary.Stdlib
         Error $"Expected release-plan cache to confirm complete shapes and segregate static dependencies, got generated={generated.Count}, cached={session.CachedArm64ReleasePlanSummaryCount}, hits={session.Arm64ReleasePlanSummaryHitCount}, misses={session.Arm64ReleasePlanSummaryMissCount}"
 
 let testExpressionTypeCheckingReusesBaseRegistries
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     ()
     : TestResult =
     let baseEnv = stdlib.Context.TypeCheckEnv
     let source =
         "Stdlib.List.map<Int64, Int64> [1L, 2L] (fun x -> x + 1L) == [2L, 3L]"
-    CompilerLibrary.parseProgram false source
+    PackageCatalog.parseProgram false source
     |> Result.bind (fun program ->
         TypeChecking.checkProgramWithBaseEnvAndSettings
             baseEnv
             true
-            CompilerLibrary.defaultWarningSettings
+            CompilerOptions.defaultWarningSettings
             program
-        |> Result.mapError TypeChecking.typeErrorToString)
+        |> Result.mapError CheckingDiagnostics.typeErrorToString)
     |> Result.bind (fun (programType, Program topLevels, checkedEnv) ->
         let hasEqualityHelper =
             topLevels
@@ -539,14 +539,14 @@ let testExpressionTypeCheckingReusesBaseRegistries
         if programType = TBool && hasEqualityHelper && reusesBaseRegistries then
             Ok ()
         else
-            Error $"Expected expression-only checking to preserve generic/equality processing while reusing base registries, got type={TypeChecking.typeToString programType}, equalityHelper={hasEqualityHelper}, reused={reusesBaseRegistries}")
+            Error $"Expected expression-only checking to preserve generic/equality processing while reusing base registries, got type={CheckingDiagnostics.typeToString programType}, equalityHelper={hasEqualityHelper}, reused={reusesBaseRegistries}")
 
-let testSessionIsolationAndDisposal (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
-    let first = new CompilerLibrary.CompilationSession()
-    let second = new CompilerLibrary.CompilationSession()
+let testSessionIsolationAndDisposal (stdlib: CompilationContexts.StdlibResult) () : TestResult =
+    let first = new CompilationSession.CompilationSession()
+    let second = new CompilationSession.CompilationSession()
     let source = "Stdlib.Json.parse<Int64>(\"42\")"
-    let firstResult = expectCompiled (compile stdlib first CompilerLibrary.defaultOptions source)
-    let secondResult = expectCompiled (compile stdlib second CompilerLibrary.defaultOptions source)
+    let firstResult = expectCompiled (compile stdlib first CompilerOptions.defaultOptions source)
+    let secondResult = expectCompiled (compile stdlib second CompilerOptions.defaultOptions source)
     (first :> System.IDisposable).Dispose()
     match firstResult, secondResult with
     | Ok (), Ok () when
@@ -577,17 +577,17 @@ let testSessionIsolationAndDisposal (stdlib: CompilerLibrary.StdlibResult) () : 
     | Error error, _
     | _, Error error -> Error error
 
-let testJsonPlanCacheSegregatesNominalShapes (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+let testJsonPlanCacheSegregatesNominalShapes (stdlib: CompilationContexts.StdlibResult) () : TestResult =
+    use session = new CompilationSession.CompilationSession()
     let first =
         "type CachedJsonShape = { value: Int64 }\n"
         + "Stdlib.Json.parse<CachedJsonShape>(\"{\\\"value\\\":1}\")"
     let second =
         "type CachedJsonShape = { text: String }\n"
         + "Stdlib.Json.parse<CachedJsonShape>(\"{\\\"text\\\":\\\"ok\\\"}\")"
-    match expectCompiled (compile stdlib session CompilerLibrary.defaultOptions first),
-          expectCompiled (compile stdlib session CompilerLibrary.defaultOptions second),
-          expectCompiled (compile stdlib session CompilerLibrary.defaultOptions first) with
+    match expectCompiled (compile stdlib session CompilerOptions.defaultOptions first),
+          expectCompiled (compile stdlib session CompilerOptions.defaultOptions second),
+          expectCompiled (compile stdlib session CompilerOptions.defaultOptions first) with
     | Ok (), Ok (), Ok () when
         session.CachedJsonPlanCount = 2
         && session.JsonPlanMissCount = 2
@@ -604,13 +604,13 @@ let testJsonPlanCacheSegregatesNominalShapes (stdlib: CompilerLibrary.StdlibResu
     | _, _, Error error -> Error error
 
 let testJsonDependenciesAreReusedBeforeLowering
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     ()
     : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+    use session = new CompilationSession.CompilationSession()
     let source = "Stdlib.Json.parse<List<List<Int64>>>(\"[[1,2],[3]]\")"
-    expectCompiled (compile stdlib session CompilerLibrary.defaultOptions source)
-    |> Result.bind (fun () -> expectCompiled (compile stdlib session CompilerLibrary.defaultOptions source))
+    expectCompiled (compile stdlib session CompilerOptions.defaultOptions source)
+    |> Result.bind (fun () -> expectCompiled (compile stdlib session CompilerOptions.defaultOptions source))
     |> Result.bind (fun () ->
         if session.AnfDependencyHitCount > 0
            && session.CompiledDependencyHitCount > 0 then
@@ -619,12 +619,12 @@ let testJsonDependenciesAreReusedBeforeLowering
             Error $"Expected repeated JSON dependencies to bypass conversion and lowering, got ANF hits={session.AnfDependencyHitCount}, compiled hits={session.CompiledDependencyHitCount}")
 
 let testStableStartTrampolineIsReused
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     ()
     : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
-    expectCompiled (compile stdlib session CompilerLibrary.defaultOptions "1L + 1L")
-    |> Result.bind (fun () -> expectCompiled (compile stdlib session CompilerLibrary.defaultOptions "2L + 2L"))
+    use session = new CompilationSession.CompilationSession()
+    expectCompiled (compile stdlib session CompilerOptions.defaultOptions "1L + 1L")
+    |> Result.bind (fun () -> expectCompiled (compile stdlib session CompilerOptions.defaultOptions "2L + 2L"))
     |> Result.bind (fun () ->
         if session.CompiledStartHitCount > 0
            && session.CompiledStartMissCount = 1
@@ -634,30 +634,30 @@ let testStableStartTrampolineIsReused
             Error $"Expected source-independent _start lowering and codegen to be reused, got lowering hits={session.CompiledStartHitCount}, misses={session.CompiledStartMissCount}, codegen hits={session.Arm64StartCodegenHitCount}")
 
 let testDependencyMetadataIsReusedCompositionally
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     ()
     : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+    use session = new CompilationSession.CompilationSession()
     let source = "Stdlib.Json.parse<List<Int64>>(\"[1,2,3]\")"
-    expectCompiled (compile stdlib session CompilerLibrary.defaultOptions source)
-    |> Result.bind (fun () -> expectCompiled (compile stdlib session CompilerLibrary.defaultOptions source))
+    expectCompiled (compile stdlib session CompilerOptions.defaultOptions source)
+    |> Result.bind (fun () -> expectCompiled (compile stdlib session CompilerOptions.defaultOptions source))
     |> Result.bind (fun () ->
         if session.Arm64MetadataGroupHitCount > 0 then Ok ()
         else Error "Expected cached dependency metadata to be merged without rescanning its functions")
 
 let testStdlibReachabilityIsReused
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     ()
     : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+    use session = new CompilationSession.CompilationSession()
     let source functionName =
         $"let {functionName} (value: Int64) : String =\n"
         + $"    if value <= 0L then Stdlib.Int64.toString value\n"
         + $"    else {functionName} (value - 1L)\n\n"
         + $"{functionName} 1L"
-    expectCompiled (compile stdlib session CompilerLibrary.defaultOptions (source "first_user_function"))
+    expectCompiled (compile stdlib session CompilerOptions.defaultOptions (source "first_user_function"))
     |> Result.bind (fun () ->
-        expectCompiled (compile stdlib session CompilerLibrary.defaultOptions (source "second_user_function")))
+        expectCompiled (compile stdlib session CompilerOptions.defaultOptions (source "second_user_function")))
     |> Result.bind (fun () ->
         if session.StdlibReachabilityHitCount > 0
            && session.StdlibReachabilityMissCount > 0 then
@@ -666,13 +666,13 @@ let testStdlibReachabilityIsReused
             Error $"Expected equivalent stdlib roots with different user-local calls to reuse reachability, got hits={session.StdlibReachabilityHitCount}, misses={session.StdlibReachabilityMissCount}")
 
 let testArm64HelpersAreReused
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     ()
     : TestResult =
-    use session = new CompilerLibrary.CompilationSession()
+    use session = new CompilationSession.CompilationSession()
     let source = "Stdlib.Json.parse<List<Int64>>(\"[1,2,3]\")"
-    expectCompiled (compile stdlib session CompilerLibrary.defaultOptions source)
-    |> Result.bind (fun () -> expectCompiled (compile stdlib session CompilerLibrary.defaultOptions source))
+    expectCompiled (compile stdlib session CompilerOptions.defaultOptions source)
+    |> Result.bind (fun () -> expectCompiled (compile stdlib session CompilerOptions.defaultOptions source))
     |> Result.bind (fun () ->
         if session.Arm64HelperHitCount > 0
            && session.Arm64HelperMissCount > 0 then
@@ -680,7 +680,7 @@ let testArm64HelpersAreReused
         else
             Error $"Expected identical helper programs to be reused, got hits={session.Arm64HelperHitCount}, misses={session.Arm64HelperMissCount}")
 
-let tests (target: Platform.Target) (stdlib: CompilerLibrary.StdlibResult) =
+let tests (target: Platform.Target) (stdlib: CompilationContexts.StdlibResult) =
     let allTests = [
         ("compilation session reuses ARM64 code for nested JSON", testArm64HitWithNestedJson stdlib)
         ("compilation session segregates ARM64 target options and coverage", testArm64CodegenCacheSegregatesTargetOptionsAndCoverage stdlib)

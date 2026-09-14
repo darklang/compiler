@@ -5,8 +5,7 @@
 module IRPrinterTests
 
 open MIR
-open IRPrinter
-
+open MIRPrinter
 type TestResult = Result<unit, string>
 
 let private expectFormatted (label: string) (expected: string) (actual: string) : TestResult =

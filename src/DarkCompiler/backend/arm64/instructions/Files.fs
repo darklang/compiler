@@ -4,14 +4,8 @@ module ARM64EmitFiles
 
 open ARM64CodeGenTypes
 open ARM64HeapAllocation
-open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
-open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
 open ARM64LeakAccounting
 open ARM64Operands
-open ARM64Frames
-open ARM64InstructionContext
 
 let internal emitFileReadText (ctx: CodeGenContext) (dest: LIR.Reg) (path: LIR.Operand) : Result<ARM64Symbolic.Instr list, string> =
     // File reading: generates syscall sequence to read file contents

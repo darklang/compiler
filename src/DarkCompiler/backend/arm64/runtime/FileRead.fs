@@ -2,11 +2,6 @@
 
 module ARM64FileRead
 
-open ARM64RuntimeImmediates
-open ARM64PrintAndExit
-open ARM64PrintValues
-open ARM64FileMetadata
-
 /// Generate ARM64 instructions to read file contents and return Result<String, String>
 /// destReg: destination register for the Result pointer
 /// pathReg: register containing heap string pointer to file path

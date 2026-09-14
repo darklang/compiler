@@ -8,8 +8,9 @@
 module TypeCheckingTests
 
 open AST
+open CheckingDiagnostics
+open CheckingTypes
 open TypeChecking
-
 /// Test result type
 type TestResult = Result<unit, string>
 

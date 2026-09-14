@@ -158,7 +158,7 @@ let private parseTargetValue (value: string) : Result<TargetSelection, string> =
     | _ -> Error $"Invalid target '{value}' (expected 'linux-x86_64')"
 
 /// Build compiler options from CLI options
-let buildCompilerOptions (cliOpts: CliOptions) : CompilerLibrary.CompilerOptions = {
+let buildCompilerOptions (cliOpts: CliOptions) : CompilerOptions.CompilerOptions = {
     DisableFreeList = cliOpts.DisableFreeList
     DisableANFOpt = cliOpts.DisableANFOpt
     DisableANFConstFolding = cliOpts.DisableANFConstFolding
@@ -180,7 +180,7 @@ let buildCompilerOptions (cliOpts: CliOptions) : CompilerLibrary.CompilerOptions
     DisableFunctionTreeShaking = cliOpts.DisableFunctionTreeShaking
     EnableCoverage = false
     EnableLeakCheck = cliOpts.LeakCheck
-    Warnings = CompilerLibrary.defaultWarningSettings
+    Warnings = CompilerOptions.defaultWarningSettings
     DumpANF = cliOpts.DumpANF
     DumpMIR = cliOpts.DumpMIR
     DumpLIR = cliOpts.DumpLIR
@@ -559,7 +559,7 @@ let private selectedTarget (selection: TargetSelection) : Result<Platform.Target
     | ExplicitTarget target -> Ok target
 
 let private compileWithStdlib
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     (source: string)
     (outputPath: string)
     (verbosity: VerbosityLevel)
@@ -572,20 +572,20 @@ let private compileWithStdlib
 
     let options = buildCompilerOptions cliOpts
     let sourceFile = sourceFileForDiagnostics cliOpts
-    let request : CompilerLibrary.CompileRequest = {
-        Context = CompilerLibrary.StdlibOnly stdlib
+    let request : CompilationContexts.CompileRequest = {
+        Context = CompilationContexts.StdlibOnly stdlib
         Mode =
-            if cliOpts.IsExpression || cliOpts.EmitResult then CompilerLibrary.CompileMode.TestExpression
-            else CompilerLibrary.CompileMode.FullProgram
+            if cliOpts.IsExpression || cliOpts.EmitResult then CompilerOptions.CompileMode.TestExpression
+            else CompilerOptions.CompileMode.FullProgram
         Sources =
             AST.NonEmptyList.singleton
-                { CompilerLibrary.SourceUnit.Name = sourceFile
+                { CompilationContexts.SourceUnit.Name = sourceFile
                   Purpose = NameSyntax.SourceUnitPurpose.Executable
                   Source = source }
         AllowInternal = cliOpts.AllowInternal
         Verbosity = verbosityToInt verbosity
         Options = options
-        PackageValues = CompilerLibrary.emptyPackageValueCatalog
+        PackageValues = CompilationContexts.emptyPackageValueCatalog
         PassTimingRecorder = None
         Session = None
     }
@@ -614,7 +614,7 @@ let compile (source: string) (outputPath: string) (verbosity: VerbosityLevel) (c
         eprintln $"Target detection failed: {err}"
         1
     | Ok target ->
-        match CompilerLibrary.buildStdlib target with
+        match StdlibCompilation.buildStdlib target with
         | Error err ->
             eprintln $"Compilation failed: {err}"
             1
@@ -653,7 +653,7 @@ let compileBatch (options: BatchCliOptions) : int =
         eprintln err
         1
     | Ok target, Ok sources ->
-        match CompilerLibrary.buildStdlib target with
+        match StdlibCompilation.buildStdlib target with
         | Error err ->
             eprintln $"Compilation failed: {err}"
             1
@@ -694,7 +694,7 @@ let run (source: string) (verbosity: VerbosityLevel) (cliOpts: CliOptions) : int
 
     // Use library for compile and run
     let options = buildCompilerOptions cliOpts
-    let execResult : CompilerLibrary.ExecutionOutput =
+    let execResult : CompilerOptions.ExecutionOutput =
         let sourceFile = sourceFileForDiagnostics cliOpts
 
         match Platform.detectHostTarget () with
@@ -704,27 +704,27 @@ let run (source: string) (verbosity: VerbosityLevel) (cliOpts: CliOptions) : int
               Stderr = $"Target detection failed: {err}"
               RuntimeTime = TimeSpan.Zero }
         | Ok target ->
-            match CompilerLibrary.buildStdlib target with
+            match StdlibCompilation.buildStdlib target with
             | Error err ->
                 { ExitCode = 1
                   Stdout = ""
                   Stderr = err
                   RuntimeTime = TimeSpan.Zero }
             | Ok stdlib ->
-                let request : CompilerLibrary.CompileRequest = {
-                    Context = CompilerLibrary.StdlibOnly stdlib
+                let request : CompilationContexts.CompileRequest = {
+                    Context = CompilationContexts.StdlibOnly stdlib
                     Mode =
-                        if cliOpts.IsExpression || cliOpts.EmitResult then CompilerLibrary.CompileMode.TestExpression
-                        else CompilerLibrary.CompileMode.FullProgram
+                        if cliOpts.IsExpression || cliOpts.EmitResult then CompilerOptions.CompileMode.TestExpression
+                        else CompilerOptions.CompileMode.FullProgram
                     Sources =
                         AST.NonEmptyList.singleton
-                            { CompilerLibrary.SourceUnit.Name = sourceFile
+                            { CompilationContexts.SourceUnit.Name = sourceFile
                               Purpose = NameSyntax.SourceUnitPurpose.Executable
                               Source = source }
                     AllowInternal = cliOpts.AllowInternal
                     Verbosity = verbosityToInt verbosity
                     Options = options
-                    PackageValues = CompilerLibrary.emptyPackageValueCatalog
+                    PackageValues = CompilationContexts.emptyPackageValueCatalog
                     PassTimingRecorder = None
                     Session = None
                 }
@@ -741,7 +741,7 @@ let run (source: string) (verbosity: VerbosityLevel) (cliOpts: CliOptions) : int
                       Stderr = err
                       RuntimeTime = TimeSpan.Zero }
                 | Ok { Result = Ok binary; Target = compiledTarget } ->
-                    CompilerLibrary.executeAttached compiledTarget (verbosityToInt verbosity) binary
+                    CompilerExecution.executeAttached compiledTarget (verbosityToInt verbosity) binary
 
     if showNormal then
         println "---"

@@ -101,7 +101,8 @@ Type substitution walks the AST and replaces type variables with concrete types:
 
 ## Related Files
 
-- `src/DarkCompiler/passes/anf/AST_to_ANF.fs` - Monomorphization helpers and entry points (`specializeFromSpecs`, `monomorphize`, `monomorphizeWithExternalDefs`)
+- `src/DarkCompiler/passes/preparation/Monomorphization.fs` - Reachable specialization solving and type-application replacement.
+- `src/DarkCompiler/passes/preparation/PrepareFunctions.fs` - Program specialization entry points.
 - `src/DarkCompiler/frontend/TypeChecking.fs` - Generic type validation
 - `src/DarkCompiler/AST.fs` - `TVar`, `TypeApp` type definitions
 - `src/Tests/e2e/generics.e2e` - Test cases

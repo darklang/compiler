@@ -3,16 +3,10 @@
 module ClosureComparisons
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 open ANF
-open Output
 open LoweringPrimitives
 open TypeRegistries
 open SpecializationIdentity
-open TypeSubstitution
-open Monomorphization
-open InlineLambdas
 open ClosureAnalysis
 
 type internal LambdaComparisonPlan = {
@@ -148,7 +142,7 @@ let private comparisonForCapturedValue
         | AST.TFunction _ | AST.TList _ | AST.TDict _ | AST.TTuple _ | AST.TRecord _ | AST.TSum _ -> true
         | _ -> false
     if needsStructuralHelper then
-        AST.Call (TypeChecking.eqHelperName typ, exprArgsFromList [left; right])
+        AST.Call (ComparisonPlanning.eqHelperName typ, exprArgsFromList [left; right])
     elif typ = AST.TString then
         AST.Call ("Stdlib.String.equals", exprArgsFromList [left; right])
     elif typ = AST.TInt then

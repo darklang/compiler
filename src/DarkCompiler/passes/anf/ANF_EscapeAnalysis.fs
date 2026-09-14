@@ -10,10 +10,6 @@
 
 module ANF_EscapeAnalysis
 
-open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
-
 open ANF
 
 type private ScalarAggregate = {
@@ -48,11 +44,11 @@ let private atomIsScalar (scalarTemps: Set<TempId>) (atom: Atom) : bool =
 
 let private atomsUseTracked (tracked: Set<TempId>) (atoms: Atom list) : bool =
     tracked
-    |> Set.exists (fun id -> ANF_Optimize.atomsUseTemp id atoms)
+    |> Set.exists (fun id -> ANFEffects.atomsUseTemp id atoms)
 
 let private cexprUsesTracked (tracked: Set<TempId>) (cexpr: CExpr) : bool =
     tracked
-    |> Set.exists (fun id -> ANF_Optimize.cexprUsesTemp id cexpr)
+    |> Set.exists (fun id -> ANFEffects.cexprUsesTemp id cexpr)
 
 let rec private exprUsesTracked (tracked: Set<TempId>) (expr: AExpr) : bool =
     match expr with

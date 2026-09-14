@@ -4,13 +4,6 @@ module ARM64InstructionContext
 
 open ARM64CodeGenTypes
 open ARM64HeapAllocation
-open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
-open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
-open ARM64LeakAccounting
-open ARM64Operands
-open ARM64Frames
 
 let generatePrintListInstrs (ctx: CodeGenContext) (listReg: ARM64Symbolic.Reg) (elemType: AST.Type) (includeNewline: bool) : ARM64Symbolic.Instr list =
     let syscalls = ARM64.targetSyscalls ctx.Target

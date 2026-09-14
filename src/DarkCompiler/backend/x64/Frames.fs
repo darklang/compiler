@@ -3,7 +3,6 @@
 module X64Frames
 
 open X64Operands
-open X64Printing
 
 // ============================================================================
 // LIR Instruction Translation

@@ -3,8 +3,6 @@
 module X64Process
 
 open X64Operands
-open X64Printing
-open X64Frames
 
 /// Return argv[index + 1] as a boxed Option<String>. RDI carries the zero-based
 /// positional index. Native argv entries are zero-terminated, so present

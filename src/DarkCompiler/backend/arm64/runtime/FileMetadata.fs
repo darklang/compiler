@@ -2,10 +2,6 @@
 
 module ARM64FileMetadata
 
-open ARM64RuntimeImmediates
-open ARM64PrintAndExit
-open ARM64PrintValues
-
 /// Generate ARM64 instructions for Stdlib.File.exists
 /// Input: pathReg contains heap string pointer (format: [refcount:8][len:8][data:N])
 /// Output: destReg = 1 if file exists, 0 if not

@@ -1,4 +1,4 @@
-// Binary_ELF.fs - ELF Binary Format Types
+// ELF.fs - ELF Binary Format Types
 //
 // Defines data structures for the ELF (Executable and Linkable Format)
 // used by Linux and other Unix-like systems.

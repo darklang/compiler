@@ -2,12 +2,6 @@
 
 module ARM64FileWrite
 
-open ARM64RuntimeImmediates
-open ARM64PrintAndExit
-open ARM64PrintValues
-open ARM64FileMetadata
-open ARM64FileRead
-
 /// Generate ARM64 instructions to write content to a file
 /// pathReg: register containing pointer to heap string (path)
 /// contentReg: register containing pointer to heap string (content)

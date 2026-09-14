@@ -111,7 +111,7 @@ ownership planning do not add record syntax or structural compatibility.
 | `src/DarkCompiler/frontend/TypeChecking.fs` | metadata, substitution, validation |
 | `src/DarkCompiler/frontend/ValueRendering.fs` | record rendering |
 | `src/DarkCompiler/passes/anf/AST_to_ANF.fs` | record allocation, clone, and projection |
-| `src/DarkCompiler/ANF.fs` | descriptors and ownership shapes |
+| `src/DarkCompiler/ir/anf/ANF.fs` | descriptors and ownership shapes |
 | `src/Tests/e2e/records.e2e` | public behavior regressions |
 
 See [record parity](../../compatibility/language/records.md) for revision-stamped evidence.

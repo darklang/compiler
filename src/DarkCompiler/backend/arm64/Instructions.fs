@@ -3,15 +3,6 @@
 module ARM64Instructions
 
 open ARM64CodeGenTypes
-open ARM64HeapAllocation
-open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
-open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
-open ARM64LeakAccounting
-open ARM64Operands
-open ARM64Frames
-open ARM64InstructionContext
 
 let rec convertInstr (ctx: CodeGenContext) (instr: LIR.Instr) : Result<ARM64Symbolic.Instr list, string> =
     match instr with

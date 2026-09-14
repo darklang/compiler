@@ -1,4 +1,4 @@
-// ARM64.fs - ARM64 Instruction Types
+// ISA.fs - ARM64 Instruction Types
 //
 // Defines ARM64 instruction and register types.
 //

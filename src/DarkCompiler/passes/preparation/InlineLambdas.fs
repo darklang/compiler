@@ -3,15 +3,8 @@
 module InlineLambdas
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 open ANF
-open Output
-open LoweringPrimitives
-open TypeRegistries
 open SpecializationIdentity
-open TypeSubstitution
-open Monomorphization
 
 type LambdaEnv = Map<string, AST.Expr>
 

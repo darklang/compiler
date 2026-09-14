@@ -3,22 +3,8 @@
 module ARM64ReleasePlanSummary
 
 open ARM64CodeGenTypes
-open ARM64HeapAllocation
-open ARM64ListReferenceCounts
 open ARM64ClosureReferenceCounts
 open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
-open ARM64LeakAccounting
-open ARM64Operands
-open ARM64Frames
-open ARM64Instructions
-open ARM64GenericReferenceCounts
-open ARM64Blocks
-open ARM64ProcessLifecycle
-open ARM64RunProcess
-open ARM64ExecuteProcess
-open ARM64Functions
-open ARM64Peephole
 
 // Plan the expensive, registry-independent portion of ARM64 RC helper
 // selection once per finalized LIR function. The result is carried through

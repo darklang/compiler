@@ -1,4 +1,4 @@
-// ARM64Symbolic.fs - Symbolic ARM64 Instruction Types
+// Symbolic.fs - Symbolic ARM64 Instruction Types
 //
 // Defines ARM64 instructions with explicit data label references so that
 // string/float literals can stay symbolic until final emission.

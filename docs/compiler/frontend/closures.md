@@ -93,7 +93,7 @@ in f(5)
 
 ## ANF Representation
 
-From `ANF.fs`:
+From `ir/anf/ANF.fs`:
 
 ```fsharp
 type CExpr =

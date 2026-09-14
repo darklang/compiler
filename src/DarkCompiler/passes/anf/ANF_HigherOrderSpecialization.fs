@@ -8,10 +8,6 @@
 
 module ANF_HigherOrderSpecialization
 
-open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
-
 open ANF
 
 type private KnownClosure = {
@@ -140,17 +136,17 @@ let rec private targetBodyUsesOnlyCaptures
         match cexpr with
         | TupleGet (Var tupleId, index) when tupleId = closureId ->
             index >= 1 && index <= captureCount
-        | _ -> not (ANF_Optimize.cexprUsesTemp closureId cexpr)
+        | _ -> not (ANFEffects.cexprUsesTemp closureId cexpr)
 
     match expr with
     | Jump (_, atom)
-    | Return atom -> not (ANF_Optimize.atomUsesTemp closureId atom)
+    | Return atom -> not (ANFEffects.atomUsesTemp closureId atom)
     | Let (_, cexpr, body) ->
         captureAccess cexpr && targetBodyUsesOnlyCaptures closureId captureCount body
     | Join (_, continuation, entry) ->
         targetBodyUsesOnlyCaptures closureId captureCount continuation && targetBodyUsesOnlyCaptures closureId captureCount entry
     | If (condition, thenBranch, elseBranch) ->
-        not (ANF_Optimize.atomUsesTemp closureId condition)
+        not (ANFEffects.atomUsesTemp closureId condition)
         && targetBodyUsesOnlyCaptures closureId captureCount thenBranch
         && targetBodyUsesOnlyCaptures closureId captureCount elseBranch
 
@@ -185,27 +181,27 @@ let rec private helperUsesParameterOnlyForClosureOperations
         | ClosureCall (Var id, args)
         | ClosureTailCall (Var id, args)
             when id = functionParameterId
-                 && not (ANF_Optimize.atomsUseTemp functionParameterId args) -> true
+                 && not (ANFEffects.atomsUseTemp functionParameterId args) -> true
         | Call (name, args)
         | BorrowedCall (name, args)
         | TailCall (name, args)
             when name = helperName
-                 && not (ANF_Optimize.atomsUseTemp functionParameterId (List.removeAt argumentIndex args)) ->
+                 && not (ANFEffects.atomsUseTemp functionParameterId (List.removeAt argumentIndex args)) ->
             match List.tryItem argumentIndex args with
             | Some (Var id) -> id = functionParameterId
             | _ -> false
-        | _ -> not (ANF_Optimize.cexprUsesTemp functionParameterId cexpr)
+        | _ -> not (ANFEffects.cexprUsesTemp functionParameterId cexpr)
 
     match expr with
     | Jump (_, atom)
-    | Return atom -> not (ANF_Optimize.atomUsesTemp functionParameterId atom)
+    | Return atom -> not (ANFEffects.atomUsesTemp functionParameterId atom)
     | Let (_, cexpr, body) ->
         allowed cexpr
         && helperUsesParameterOnlyForClosureOperations helperName functionParameterId argumentIndex body
     | Join (_, continuation, entry) ->
         helperUsesParameterOnlyForClosureOperations helperName functionParameterId argumentIndex continuation && helperUsesParameterOnlyForClosureOperations helperName functionParameterId argumentIndex entry
     | If (condition, thenBranch, elseBranch) ->
-        not (ANF_Optimize.atomUsesTemp functionParameterId condition)
+        not (ANFEffects.atomUsesTemp functionParameterId condition)
         && helperUsesParameterOnlyForClosureOperations helperName functionParameterId argumentIndex thenBranch
         && helperUsesParameterOnlyForClosureOperations helperName functionParameterId argumentIndex elseBranch
 
@@ -392,13 +388,13 @@ let rec private rewriteHelperBody
 let rec private exprUsesTemp (tempId: TempId) (expr: AExpr) : bool =
     match expr with
     | Jump (_, atom)
-    | Return atom -> ANF_Optimize.atomUsesTemp tempId atom
+    | Return atom -> ANFEffects.atomUsesTemp tempId atom
     | Let (_, cexpr, body) ->
-        ANF_Optimize.cexprUsesTemp tempId cexpr || exprUsesTemp tempId body
+        ANFEffects.cexprUsesTemp tempId cexpr || exprUsesTemp tempId body
     | Join (parameter, continuation, entry) ->
         exprUsesTemp tempId entry || (parameter.Id <> tempId && exprUsesTemp tempId continuation)
     | If (condition, thenBranch, elseBranch) ->
-        ANF_Optimize.atomUsesTemp tempId condition
+        ANFEffects.atomUsesTemp tempId condition
         || exprUsesTemp tempId thenBranch
         || exprUsesTemp tempId elseBranch
 

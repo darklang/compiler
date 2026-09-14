@@ -3,16 +3,10 @@
 module LiftExpressions
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 open ANF
-open Output
 open LoweringPrimitives
 open TypeRegistries
 open SpecializationIdentity
-open TypeSubstitution
-open Monomorphization
-open InlineLambdas
 open ClosureAnalysis
 open ClosureComparisons
 

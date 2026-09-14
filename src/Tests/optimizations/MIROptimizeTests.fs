@@ -6,9 +6,13 @@
 module MIROptimizeTests
 
 open MIR
+open MIROptimizationFacts
+open MIRLoopInvariantMotion
+open MIRControlFlow
+open MIRConstants
+open MIRCommonExpressions
 open MIR_Optimize
-open IRPrinter
-
+open MIRPrinter
 type TestResult = Result<unit, string>
 
 let private singleOptimizedFunction (testName: string) (functions: Function list) : Result<Function, string> =

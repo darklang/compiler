@@ -155,8 +155,8 @@ Code generation handles these differences at the MIR/CodeGen level.
 | `backend/arm64/Binary_Generation_MachO.fs` | ARM64 Mach-O generation |
 | `backend/arm64/Binary_Generation_ELF.fs` | ARM64 ELF generation |
 | `backend/x64/Binary_Generation_ELF.fs` | x86-64 ELF generation |
-| `Binary.fs` | Common types for binary structures |
-| `Binary_ELF.fs` | ELF-specific type definitions |
+| `backend/binary/Binary.fs` | Common types for binary structures |
+| `backend/binary/ELF.fs` | ELF-specific type definitions |
 
 ## How It Works
 

@@ -377,7 +377,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
     let syntaxTestFiles = getTestFiles "syntax" "syntax"
 
     let unitStdlibSuites = [ "Stdlib Compile Tests"; "Preamble Build Tests" ]
-    let buildUnitTests (stdlib: CompilerLibrary.StdlibResult) : UnitTestSuite array = [|
+    let buildUnitTests (stdlib: CompilationContexts.StdlibResult) : UnitTestSuite array = [|
         { Name = "Parser Tests"; Tests = ParserTests.tests }
         { Name = "Platform Tests"; Tests = PlatformTests.tests }
         { Name = "Program CLI Tests"; Tests = ProgramCliTests.tests }
@@ -451,8 +451,8 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
           SectionPrefix = "└─" }
 
     let runState = TestFramework.createStateWithProgressReporter completedTestReporter
-    let codegenMetrics = ResizeArray<CompilerLibrary.CodegenFunctionMetric>()
-    let codegenLirOpMetrics = ResizeArray<CompilerLibrary.CodegenLirOpMetric>()
+    let codegenMetrics = ResizeArray<CompilerOptions.CodegenFunctionMetric>()
+    let codegenLirOpMetrics = ResizeArray<CompilerOptions.CodegenLirOpMetric>()
     let mutable codegenCacheHits = 0
     let mutable codegenCacheMisses = 0
     let mutable releasePlanSummaryCacheHits = 0
@@ -541,7 +541,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
     let stdlibPassTimingStart = passTimingTotal ()
     let timer = Stopwatch.StartNew()
     let stdlib =
-        match CompilerLibrary.buildStdlibWithTrace target (Some recordPassTiming) with
+        match StdlibCompilation.buildStdlibWithTrace target (Some recordPassTiming) with
         | Ok stdlib -> stdlib
         | Error err -> Crash.crash $"Stdlib did not build with error: {err}"
     let elapsed = timer.Elapsed
@@ -730,7 +730,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
             recordResults 0 1 [{ File = filePath; Name = $"{suiteName}: {fileName}"; Message = msg; Details = [] }]
 
     let runE2ESuite
-        (baseStdlib: CompilerLibrary.StdlibResult)
+        (baseStdlib: CompilationContexts.StdlibResult)
         (suiteName: string)
         (progressLabel: string)
         (testsArray: E2ETest array)
@@ -739,7 +739,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
         let numTests = testsArray.Length
         if numTests > 0 then
             use compilationSession =
-                new CompilerLibrary.CompilationSession(Option.isSome codegenProfileJsonPath)
+                new CompilationSession.CompilationSession(Option.isSome codegenProfileJsonPath)
             let suitePassTimingStart = passTimingTotal ()
             let suiteContextTimer = Stopwatch.StartNew()
             let suiteContextsResult =
@@ -1208,7 +1208,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
                     ProgressBar.finish progress
                     let typeDesc =
                         match result.ExpectedType with
-                        | Some t -> TypeChecking.typeToString t
+                        | Some t -> CheckingDiagnostics.typeToString t
                         | None -> "error"
                     println $"  {typeDesc} ({fileName})... {Colors.red}✗ FAIL{Colors.reset}"
                     println $"    {result.Message}"
@@ -1346,7 +1346,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
     let unitTestsOrdered = Array.append unitTestsNoStdlib unitTestsWithStdlib
 
     let runE2EAndVerification
-        (baseStdlib: CompilerLibrary.StdlibResult)
+        (baseStdlib: CompilationContexts.StdlibResult)
         : unit =
         if e2eTestFiles.Length > 0 then
                 let sectionTimer = Stopwatch.StartNew()
@@ -1426,7 +1426,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
     let coveragePercent =
         if not showCoverage then None
         else
-            let allStdlibFuncs = CompilerLibrary.getAllStdlibFunctionNamesFromStdlib stdlib
+            let allStdlibFuncs = CompilerReachability.getAllStdlibFunctionNamesFromStdlib stdlib
             let coveredFuncs = System.Collections.Generic.HashSet<string>()
             if e2eTestFiles.Length > 0 then
                 for testFile in e2eTestFiles do
@@ -1435,7 +1435,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
                     | Ok tests ->
                         for test in tests do
                             if Option.isNone test.SkipReason then
-                                match CompilerLibrary.getReachableStdlibFunctionsFromStdlib stdlib test.Source with
+                                match CompilerReachability.getReachableStdlibFunctionsFromStdlib stdlib test.Source with
                                 | Error _ -> ()
                                 | Ok reachable ->
                                     for func in reachable do

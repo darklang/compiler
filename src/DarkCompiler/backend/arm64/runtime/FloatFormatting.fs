@@ -2,16 +2,6 @@
 
 module ARM64FloatFormatting
 
-open ARM64RuntimeImmediates
-open ARM64PrintAndExit
-open ARM64PrintValues
-open ARM64FileMetadata
-open ARM64FileRead
-open ARM64FileWrite
-open ARM64HostValues
-open ARM64WriteFromPointer
-open ARM64Coverage
-
 /// Generate ARM64 instructions to convert a float to a heap string
 /// destReg: destination register for the heap string pointer
 /// valueReg: FP register containing the float value

@@ -4,16 +4,8 @@ module ARM64ProcessLifecycle
 
 open ARM64CodeGenTypes
 open ARM64HeapAllocation
-open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
-open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
 open ARM64LeakAccounting
 open ARM64Operands
-open ARM64Frames
-open ARM64Instructions
-open ARM64GenericReferenceCounts
-open ARM64Blocks
 
 /// Generate heap initialization code for _start function
 /// Uses mmap to allocate 512MB of heap space and initializes X27/X28

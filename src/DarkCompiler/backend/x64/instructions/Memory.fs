@@ -3,15 +3,10 @@
 module X64EmitMemory
 
 open X64Operands
-open X64Printing
-open X64Frames
-open X64Process
 open X64CodeGenTypes
 open X64ReleaseSelection
 open X64FieldReferenceCounts
 open X64ListReferenceCounts
-open X64DictReferenceCounts
-open X64ClosureReferenceCounts
 open X64InstructionContext
 
 let internal emitHeapAlloc (ctx: FuncCtx) (dest: LIR.Reg) (sizeBytes: int) : Result<X86_64.Instr list, string> =

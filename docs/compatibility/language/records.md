@@ -20,7 +20,7 @@ differences are excluded.
 | Access/update | type-checker access/update and ANF projection/clone | `Interpreter.fs:1985-2002,2260-2288`; pinned fixtures | Same behavior, with earlier AOT diagnostics |
 | Patterns | parser, type checker, and lowering | pinned program/runtime pattern unions; CLI record docs | Bind the record then access fields |
 | Runtime identity | record allocation/access operations | `RuntimeTypes.fs:790-804,984-990`; `Interpreter.fs:2236-2288` | Distinct descriptor slot and record-specific ANF operations |
-| Ownership | `ANF.fs`, `passes/anf/RefCountInsertion.fs`, both backends | runtime `DRecord` owns its field values | Descriptor is immediate; concrete fields retain/release recursively |
+| Ownership | `ir/anf/ANF.fs`, `passes/anf/RefCountInsertion.fs`, both backends | runtime `DRecord` owns its field values | Descriptor is immediate; concrete fields retain/release recursively |
 | Equality | generated equality helpers | `NoModule.fs:80-94` | Nominal compatibility AOT; aliases resolve together; recursive named fields |
 | Rendering | `frontend/ValueRendering.fs` | `prettyPrinter/runtimeTypes.dark:500-525` | Resolved name/args, ordinal keys, recursive values, 80-character layout |
 

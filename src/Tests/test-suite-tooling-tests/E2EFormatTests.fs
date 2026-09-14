@@ -488,7 +488,7 @@ let testBuildsParseableUniversalBatchSource () : TestResult =
                 Error "Expected adjacent tests with the same context and options to batch together"
             else
                 let source = buildBatchSource prepared
-                match CompilerLibrary.parseProgram false source with
+                match PackageCatalog.parseProgram false source with
                 | Error msg -> Error $"Generated batch source did not parse: {msg}\n{source}"
                 | Ok _ when not (source.Contains("_Check0 (seed: Int64) : Bool =")) ->
                     Error $"Generated batch did not isolate each check in a function:\n{source}"
@@ -510,7 +510,7 @@ let testBuildsParseableMultiChunkBatchSource () : TestResult =
             match tests |> List.choose tryPrepareBatchTest with
             | [ prepared ] ->
                 let source = buildBatchSource (List.replicate 33 prepared)
-                match CompilerLibrary.parseProgram false source with
+                match PackageCatalog.parseProgram false source with
                 | Error msg -> Error $"Generated multi-chunk batch source did not parse: {msg}\n{source}"
                 | Ok _ when not (source.EndsWith("then 1L else 0L)))")) ->
                     Error $"Generated batch did not encode its second result chunk:\n{source}"

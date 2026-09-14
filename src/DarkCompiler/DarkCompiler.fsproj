@@ -12,7 +12,7 @@
     <Compile Include="Crash.fs" />
     <Compile Include="Output.fs" />
     <Compile Include="Platform.fs" />
-    <Compile Include="RuntimeDataLayout.fs" />
+    <Compile Include="memory/RuntimeDataLayout.fs" />
     <Compile Include="AST.fs" />
     <Compile Include="NameSyntax.fs" />
     <Compile Include="ASTPrettyPrinter.fs" />
@@ -25,6 +25,26 @@
 
     <!-- Parsing and type checking -->
     <Compile Include="frontend/Parser.fs" />
+    <Compile Include="frontend/checking/Diagnostics.fs" />
+    <Compile Include="frontend/checking/Types.fs" />
+    <Compile Include="frontend/checking/ComparisonPlanning.fs" />
+    <Compile Include="frontend/checking/FreeVariables.fs" />
+    <Compile Include="frontend/checking/Unification.fs" />
+    <Compile Include="frontend/checking/ExpressionSupport.fs" />
+    <Compile Include="frontend/checking/CheckBinaryOperations.fs" />
+    <Compile Include="frontend/checking/CheckCalls.fs" />
+    <Compile Include="frontend/checking/CheckRecordLiterals.fs" />
+    <Compile Include="frontend/checking/CheckMatches.fs" />
+    <Compile Include="frontend/checking/CheckLambdas.fs" />
+    <Compile Include="frontend/checking/Expressions.fs" />
+    <Compile Include="frontend/checking/EqualityHelpers.fs" />
+    <Compile Include="frontend/checking/OrderingHelpers.fs" />
+    <Compile Include="frontend/checking/HelperDependencies.fs" />
+    <Compile Include="frontend/checking/MaterializeHelpers.fs" />
+    <Compile Include="frontend/checking/Functions.fs" />
+    <Compile Include="frontend/checking/ResolveDeclarations.fs" />
+    <Compile Include="frontend/checking/Declarations.fs" />
+    <Compile Include="frontend/checking/ResolvedProgram.fs" />
     <Compile Include="frontend/TypeChecking.fs" />
     <Compile Include="frontend/ValueRendering.fs" />
     <Compile Include="frontend/JsonPlanning.fs" />
@@ -33,10 +53,10 @@
     <Compile Include="memory/MemoryModel.fs" />
     <Compile Include="memory/ReleasePlanFingerprint.fs" />
     <Compile Include="memory/MemoryPlanning.fs" />
-    <Compile Include="ANF.fs" />
+    <Compile Include="ir/anf/ANF.fs" />
     <Compile Include="ir/anf/Continuations.fs" />
     <Compile Include="passes/anf/ANFDeadCodeElimination.fs" />
-    <Compile Include="SemanticIR.fs" />
+    <Compile Include="ir/semantic/SemanticIR.fs" />
     <Compile Include="ir/hir/ListRegion.fs" />
     <Compile Include="passes/ownership/ListAllocationBudget.fs" />
     <Compile Include="passes/hir/ExtractListRegions.fs" />
@@ -65,6 +85,11 @@
     <Compile Include="passes/anf/lowering/AtomLowering.fs" />
     <Compile Include="passes/anf/lowering/Expressions.fs" />
     <Compile Include="passes/anf/AST_to_ANF.fs" />
+    <Compile Include="passes/anf/optimization/Constants.fs" />
+    <Compile Include="passes/anf/optimization/Effects.fs" />
+    <Compile Include="passes/anf/optimization/Substitution.fs" />
+    <Compile Include="passes/anf/optimization/Expressions.fs" />
+    <Compile Include="passes/anf/optimization/Accumulators.fs" />
     <Compile Include="passes/anf/ANF_Optimize.fs" />
     <Compile Include="passes/anf/ANF_Inlining.fs" />
     <Compile Include="passes/anf/ANF_HigherOrderSpecialization.fs" />
@@ -80,14 +105,24 @@
     <Compile Include="passes/anf/TailCallDetection.fs" />
 
     <!-- ANF -> MIR -->
-    <Compile Include="MIR.fs" />
-    <Compile Include="LiteralPool.fs" />
+    <Compile Include="ir/mir/MIR.fs" />
+    <Compile Include="backend/binary/LiteralPool.fs" />
     <Compile Include="passes/anf/ANF_to_MIR.fs" />
     <Compile Include="passes/mir/SSA_Construction.fs" />
+    <Compile Include="passes/mir/optimization/Facts.fs" />
+    <Compile Include="passes/mir/optimization/LoopTopology.fs" />
+    <Compile Include="passes/mir/optimization/Induction.fs" />
+    <Compile Include="passes/mir/optimization/Unrolling.fs" />
+    <Compile Include="passes/mir/optimization/LoopInvariantMotion.fs" />
+    <Compile Include="passes/mir/optimization/DeadCode.fs" />
+    <Compile Include="passes/mir/optimization/CopyPropagation.fs" />
+    <Compile Include="passes/mir/optimization/ControlFlow.fs" />
+    <Compile Include="passes/mir/optimization/Constants.fs" />
+    <Compile Include="passes/mir/optimization/CommonExpressions.fs" />
     <Compile Include="passes/mir/MIR_Optimize.fs" />
 
     <!-- MIR -> LIR -->
-    <Compile Include="LIR.fs" />
+    <Compile Include="ir/lir/LIR.fs" />
     <Compile Include="ParallelMoves.fs" />
     <Compile Include="passes/mir/MIR_to_LIR.fs" />
     <Compile Include="passes/lir/LIR_Peephole.fs" />
@@ -95,12 +130,24 @@
     <Compile Include="passes/lir/FunctionTreeShaking.fs" />
 
     <!-- Register allocation -->
+    <Compile Include="passes/lir/allocation/Model.fs" />
+    <Compile Include="passes/lir/allocation/RegisterFacts.fs" />
+    <Compile Include="passes/lir/allocation/Liveness.fs" />
+    <Compile Include="passes/lir/allocation/RegisterPolicy.fs" />
+    <Compile Include="passes/lir/allocation/Interference.fs" />
+    <Compile Include="passes/lir/allocation/Coalescing.fs" />
+    <Compile Include="passes/lir/allocation/Coloring.fs" />
+    <Compile Include="passes/lir/allocation/FloatAllocation.fs" />
+    <Compile Include="passes/lir/allocation/SpillOperands.fs" />
+    <Compile Include="passes/lir/allocation/ApplyInstructions.fs" />
+    <Compile Include="passes/lir/allocation/ApplyBlocks.fs" />
+    <Compile Include="passes/lir/allocation/PhiResolution.fs" />
     <Compile Include="passes/lir/RegisterAllocation.fs" />
 
     <!-- Architecture support: ISA types, calling conventions, runtime -->
-    <Compile Include="ARM64.fs" />
-    <Compile Include="X86_64.fs" />
-    <Compile Include="ARM64Symbolic.fs" />
+    <Compile Include="backend/arm64/ISA.fs" />
+    <Compile Include="backend/x64/ISA.fs" />
+    <Compile Include="backend/arm64/Symbolic.fs" />
     <Compile Include="backend/arm64/runtime/Immediates.fs" />
     <Compile Include="backend/arm64/runtime/PrintAndExit.fs" />
     <Compile Include="backend/arm64/runtime/PrintValues.fs" />
@@ -175,8 +222,8 @@
     <Compile Include="backend/x64/Resolve.fs" />
 
     <!-- Shared binary output helpers -->
-    <Compile Include="Binary.fs" />
-    <Compile Include="Binary_ELF.fs" />
+    <Compile Include="backend/binary/Binary.fs" />
+    <Compile Include="backend/binary/ELF.fs" />
 
     <!-- ARM64 binary generation -->
     <Compile Include="backend/arm64/Binary_Generation_MachO.fs" />
@@ -187,8 +234,27 @@
     <Compile Include="backend/x64/Binary_Generation_ELF.fs" />
 
     <!-- Top-level driver -->
-    <Compile Include="IRPrinter.fs" />
+    <Compile Include="ir/Printing.fs" />
+    <Compile Include="ir/anf/Printer.fs" />
+    <Compile Include="ir/mir/Printer.fs" />
+    <Compile Include="ir/lir/Printer.fs" />
+    <Compile Include="driver/Options.fs" />
+    <Compile Include="driver/CacheIdentity.fs" />
+    <Compile Include="driver/CompilationSession.fs" />
+    <Compile Include="driver/Diagnostics.fs" />
+    <Compile Include="driver/NativePipeline.fs" />
+    <Compile Include="driver/ANFPipeline.fs" />
+    <Compile Include="driver/BinaryOutput.fs" />
+    <Compile Include="driver/Contexts.fs" />
+    <Compile Include="driver/SourcePreparation.fs" />
+    <Compile Include="driver/PreambleAnalysis.fs" />
+    <Compile Include="driver/StdlibCompilation.fs" />
+    <Compile Include="driver/PackageCatalog.fs" />
+    <Compile Include="driver/UserCompilation.fs" />
+    <Compile Include="driver/PreambleCompilation.fs" />
     <Compile Include="CompilerLibrary.fs" />
+    <Compile Include="driver/Execution.fs" />
+    <Compile Include="driver/Reachability.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

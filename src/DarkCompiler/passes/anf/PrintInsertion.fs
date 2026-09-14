@@ -14,7 +14,7 @@ open MemoryPlanning
 open ANF
 
 let unsupportedListDisplay (elemType: AST.Type) : 'a =
-    Crash.crash $"Unsupported list result display element type: {TypeChecking.typeToString elemType}"
+    Crash.crash $"Unsupported list result display element type: {CheckingDiagnostics.typeToString elemType}"
 
 let private metadataForPrintRelease (valueType: AST.Type) : MemoryModel.RcMetadata =
     let releasePlan = MemoryPlanning.rcReleasePlanOfType Map.empty valueType

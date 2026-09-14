@@ -4,8 +4,6 @@ module ARM64DictReferenceCounts
 
 open ARM64CodeGenTypes
 open ARM64HeapAllocation
-open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
 open ARM64ReleaseSelection
 
 let internal generateDictRefCountIncHelper () : ARM64Symbolic.Instr list =

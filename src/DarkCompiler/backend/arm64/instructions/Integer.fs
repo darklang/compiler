@@ -4,14 +4,8 @@ module ARM64EmitInteger
 
 open ARM64CodeGenTypes
 open ARM64HeapAllocation
-open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
-open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
 open ARM64LeakAccounting
 open ARM64Operands
-open ARM64Frames
-open ARM64InstructionContext
 
 let internal emitPhi (ctx: CodeGenContext) : Result<ARM64Symbolic.Instr list, string> =
     // Phi nodes should be eliminated before code generation (by register allocation)

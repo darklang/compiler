@@ -53,7 +53,7 @@ FunctionalRegion: typed blocks + semantic collection edges + scalar joins
   -> existing ANF primitives -> MIR -> existing native backends
 ```
 
-`SemanticIR.fs` defines shared typed operands, blocks, and value-edge contracts
+`ir/semantic/SemanticIR.fs` defines shared typed operands, blocks, and value-edge contracts
 independent of array layouts and ANF. It is a foundation used by ListHIR, not
 yet a whole-program semantic IR or a primitive effect registry. Opaque scalar
 expressions and callbacks retain their original evaluation order; their types

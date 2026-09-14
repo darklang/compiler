@@ -7,23 +7,23 @@ open AST
 type TestResult = Result<unit, string>
 
 let private plannedSource
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     (source: string)
     : Result<string, string> =
-    CompilerLibrary.parseProgram false source
+    PackageCatalog.parseProgram false source
     |> Result.bind (fun program ->
         TypeChecking.checkPublicProgramWithBaseEnvAndSettings
             stdlib.Context.TypeCheckEnv
             true
-            CompilerLibrary.defaultWarningSettings
+            CompilerOptions.defaultWarningSettings
             program
-        |> Result.mapError TypeChecking.typeErrorToString)
+        |> Result.mapError CheckingDiagnostics.typeErrorToString)
     |> Result.map (fun (_, typedProgram, env) ->
         JsonPlanning.rewriteProgram env typedProgram
         |> ASTPrettyPrinter.formatProgram)
 
 let testTypedDecodingUsesSharedViews
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     ()
     : TestResult =
     let source =
@@ -52,7 +52,7 @@ let testTypedDecodingUsesSharedViews
             Ok ())
 
 let testTypedEncodingUsesSharedWriter
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     ()
     : TestResult =
     let source =
@@ -73,23 +73,23 @@ let testTypedEncodingUsesSharedWriter
             Ok ())
 
 let testNonJsonProgramIsUnchanged
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     ()
     : TestResult =
-    CompilerLibrary.parseProgram false "1L + 2L"
+    PackageCatalog.parseProgram false "1L + 2L"
     |> Result.bind (fun program ->
         TypeChecking.checkPublicProgramWithBaseEnvAndSettings
             stdlib.Context.TypeCheckEnv
             true
-            CompilerLibrary.defaultWarningSettings
+            CompilerOptions.defaultWarningSettings
             program
-        |> Result.mapError TypeChecking.typeErrorToString)
+        |> Result.mapError CheckingDiagnostics.typeErrorToString)
     |> Result.bind (fun (_, typedProgram, env) ->
         let planned = JsonPlanning.rewriteProgram env typedProgram
         if planned = typedProgram then Ok ()
         else Error "Expected JSON planning to leave a program without JSON intrinsics unchanged")
 
-let tests (stdlib: CompilerLibrary.StdlibResult) = [
+let tests (stdlib: CompilationContexts.StdlibResult) = [
     ("typed JSON decoding uses shared value views", testTypedDecodingUsesSharedViews stdlib)
     ("typed JSON encoding uses the shared writer", testTypedEncodingUsesSharedWriter stdlib)
     ("JSON planning leaves non-JSON programs unchanged", testNonJsonProgramIsUnchanged stdlib)

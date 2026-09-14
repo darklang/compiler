@@ -1,4 +1,4 @@
-// X86_64.fs - x86-64 Instruction Types
+// ISA.fs - x86-64 Instruction Types
 //
 // Defines x86-64 instruction and register types.
 //

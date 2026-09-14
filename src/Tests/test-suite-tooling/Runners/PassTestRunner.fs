@@ -8,8 +8,6 @@
 module TestDSL.PassTestRunner
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 
 open System.IO
 open TestDSL.Common
@@ -23,28 +21,12 @@ open LIR
 open ARM64Symbolic
 open ANF_to_MIR
 open MIR_to_LIR
-open ARM64CodeGenTypes
-open ARM64HeapAllocation
 open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
-open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
-open ARM64LeakAccounting
-open ARM64Operands
-open ARM64Frames
-open ARM64Instructions
-open ARM64GenericReferenceCounts
-open ARM64Blocks
-open ARM64ProcessLifecycle
-open ARM64RunProcess
-open ARM64ExecuteProcess
-open ARM64Functions
-open ARM64Peephole
-open ARM64ReleasePlanSummary
 open ARM64PrepareFunctions
 open CodeGen
-open IRPrinter
-
+open ANFPrinter
+open MIRPrinter
+open LIRPrinter
 /// Result of running a pass test
 type PassTestResult = {
     Success: bool

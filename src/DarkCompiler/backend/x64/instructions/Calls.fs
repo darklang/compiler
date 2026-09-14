@@ -3,16 +3,9 @@
 module X64EmitCalls
 
 open X64Operands
-open X64Printing
 open X64Frames
-open X64Process
 open X64CodeGenTypes
-open X64ReleaseSelection
 open X64FieldReferenceCounts
-open X64ListReferenceCounts
-open X64DictReferenceCounts
-open X64ClosureReferenceCounts
-open X64InstructionContext
 
 let internal emitSaveRegs (ctx: FuncCtx) (intRegs: LIR.PhysReg list) (floatRegs: LIR.PhysFPReg list) : Result<X86_64.Instr list, string> =
     // Save caller-saved registers that are live across a call.

@@ -54,7 +54,7 @@ boundary, storage contract, and remaining general HIR migration.
   - **Monomorphization**: Generate specialized code for each generic instantiation
   - **Lambda lifting**: Convert closures to top-level functions
   - **Reference count insertion**: Add memory management operations
-- Types defined in `ANF.fs`
+- Types defined in `ir/anf/ANF.fs`
 
 ### MIR (Mid-level IR)
 
@@ -62,14 +62,14 @@ boundary, storage contract, and remaining general HIR migration.
 - Basic blocks with explicit jumps
 - Platform-independent
 - SSA form for optimizations
-- Types defined in `MIR.fs`
+- Types defined in `ir/mir/MIR.fs`
 
 ### LIR (Low-level IR)
 
 - Close to machine instructions but still target-independent
 - Virtual registers (unlimited)
 - Calling convention handling (via `Platform.Arch`)
-- Types defined in `LIR.fs`
+- Types defined in `ir/lir/LIR.fs`
 
 ## Memory Management
 
@@ -88,7 +88,7 @@ Why ref counting?
 
 - **Monomorphization**: Generics are expanded at compile time
 - No runtime type information for generics
-- Types are fully erased after ANF pass
+- Type and layout metadata remain available where ownership and native lowering need them
 - Supports: primitives, tuples, records, ADTs, lists, functions
 
 ## Platform Support
@@ -102,21 +102,21 @@ Why ref counting?
   before stdlib construction. Register allocation, backend selection, runtime
   generation, and binary emission receive that target explicitly.
 - Adding a new architecture: add a case to `Platform.Arch`, create
-  `backend/<arch>/{6_CodeGen,7_Encoding,7_Resolve,8_Binary_Generation_*}.fs`,
-  and wire it into `CompilerLibrary.generateBinary`.
+  `backend/<arch>/` instruction selection, encoding, resolution, and binary output,
+  and wire it into `BinaryOutput.generateBinary`.
 
 ## Compiler Library API
 
-`CompilerLibrary.fs` exposes a narrow surface for tools/tests:
+`CompilerLibrary.compile` accepts a `CompilationContexts.CompileRequest`. The
+supporting APIs have explicit owners under `driver/`:
 
-- `buildStdlib` for target-specific stdlib prebuilding in test harnesses and tooling
-- `buildStdlibSpecializations` for suite-level stdlib specializations
-- `buildPreambleContext` for ad-hoc preamble reuse
-- `analyzePreamble` + `buildPreambleContextFromAnalysis` for suite-level preamble specialization
-- `compile` for in-memory compilation via `CompileRequest`
-- `execute` for running compiled binaries with their selected target and timing
+- `StdlibCompilation`: stdlib prebuilding and concrete specializations.
+- `PreambleAnalysis` and `PreambleCompilation`: reusable source environments.
+- `CompilationSession`: bounded dependency, lowering, and backend caches.
+- `CompilerExecution`: running generated binaries with target and timing.
+- `CompilerReachability`: stdlib function inventory and reachability queries.
 
-This driver `execute` is distinct from the Dark `Stdlib.Cli.execute` effect.
+The driver `execute` is distinct from the Dark `Stdlib.Cli.execute` effect.
 CLI/process operations remain typed through ANF, MIR, and LIR and reach the
 native syscall/ABI boundary only in the selected backend. See
 [CLI/process/host/input parity](../compatibility/cli-process-host-input.md).

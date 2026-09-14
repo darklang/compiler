@@ -12,12 +12,12 @@ type TestResult = Result<unit, string>
 
 let private errorType = AST.TRecord ("Stdlib.Cli.Posix.Error", [])
 
-let private customType hash typeArguments : CompilerLibrary.PackageCustomType = {
+let private customType hash typeArguments : CompilationContexts.PackageCustomType = {
     Hash = hash
     TypeArguments = typeArguments
 }
 
-let private location branches owner modules name : CompilerLibrary.CatalogPackageLocation = {
+let private location branches owner modules name : CompilationContexts.CatalogPackageLocation = {
     VisibleInBranches = branches
     Owner = owner
     Modules = modules
@@ -33,12 +33,12 @@ let private errorValue (errno: int) (message: string) =
         ]
     )
 
-let private evaluator state : CompilerLibrary.TypedPackageValueEvaluator = {
+let private evaluator state : CompilationContexts.TypedPackageValueEvaluator = {
     ResultType = errorType
     State = state
 }
 
-let private entry hash runtimeType locations state : CompilerLibrary.PackageValueCatalogEntry = {
+let private entry hash runtimeType locations state : CompilationContexts.PackageValueCatalogEntry = {
     ValueHash = hash
     RuntimeType = runtimeType
     Locations = locations
@@ -49,13 +49,13 @@ let private entry hash runtimeType locations state : CompilerLibrary.PackageValu
 /// interpreter resolves that package global to 5y; AOT receives the same value
 /// as an immutable catalog evaluator, never through live package lookup.
 let private int8ProbeCatalog =
-    CompilerLibrary.PackageValueCatalog [
+    CompilationContexts.PackageValueCatalog [
         { ValueHash = "darklang-test-values-int8Value"
           RuntimeType = customType "type-int8" []
           Locations = [location ["test"] "Darklang" ["Test"; "Values"] "int8Value"]
           Evaluator =
             { ResultType = AST.TInt8
-              State = CompilerLibrary.Available (AST.Int8Literal 5y) } }
+              State = CompilationContexts.Available (AST.Int8Literal 5y) } }
     ]
 
 let private mainBranch = ["branch-main"]
@@ -65,65 +65,65 @@ let private parityCatalog =
     let target = customType "type-error" []
     let other = customType "type-other" []
     let parameterized = customType "type-error" [customType "argument-type" []]
-    CompilerLibrary.PackageValueCatalog [
+    CompilationContexts.PackageValueCatalog [
         entry "value-first" target
             [location mainBranch "Owner" ["Nested"] "first"]
-            (CompilerLibrary.Available (errorValue 1 "first"))
+            (CompilationContexts.Available (errorValue 1 "first"))
         entry "value-other-type" other
             [location mainBranch "Owner" [] "other"]
-            (CompilerLibrary.Available (errorValue 20 "other"))
+            (CompilationContexts.Available (errorValue 20 "other"))
         entry "value-parameterized" parameterized
             [location mainBranch "Owner" [] "parameterized"]
-            (CompilerLibrary.Available (errorValue 30 "parameterized"))
+            (CompilationContexts.Available (errorValue 30 "parameterized"))
         entry "value-second" target
             [location mainBranch "Owner" ["Nested"; "Deep"] "second"]
-            (CompilerLibrary.Available (errorValue 2 "second"))
+            (CompilationContexts.Available (errorValue 2 "second"))
         entry "value-multiple" target
             [ location mainBranch "Owner" ["Nested"; "Long"] "long"
               location mainBranch "Owner" ["Nested"] "short" ]
-            (CompilerLibrary.Available (errorValue 3 "multiple"))
+            (CompilationContexts.Available (errorValue 3 "multiple"))
         entry "value-alternate-loses" target
             [ location mainBranch "Owner" ["Nested"] "matching"
               location mainBranch "Owner" [] "selected" ]
-            (CompilerLibrary.Available (errorValue 4 "alternate"))
+            (CompilationContexts.Available (errorValue 4 "alternate"))
         entry "value-missing-location" target []
-            (CompilerLibrary.Available (errorValue 5 "missing"))
+            (CompilationContexts.Available (errorValue 5 "missing"))
         entry "value-unavailable" target
             [location mainBranch "Owner" ["Nested"] "unavailable"]
-            CompilerLibrary.Unavailable
+            CompilationContexts.Unavailable
         entry "value-failure" target
             [location mainBranch "Owner" ["Nested"] "failure"]
-            CompilerLibrary.EvaluationFailure
+            CompilationContexts.EvaluationFailure
         entry "value-other-branch" target
             [location otherBranch "Other" ["Nested"] "branchValue"]
-            (CompilerLibrary.Available (errorValue 8 "branch"))
+            (CompilationContexts.Available (errorValue 8 "branch"))
     ]
 
 let private compile
-    (stdlib: CompilerLibrary.StdlibResult)
-    (catalog: CompilerLibrary.PackageValueCatalog)
+    (stdlib: CompilationContexts.StdlibResult)
+    (catalog: CompilationContexts.PackageValueCatalog)
     (source: string)
-    : CompilerLibrary.CompileReport =
+    : CompilerOptions.CompileReport =
     CompilerLibrary.compile {
-        Context = CompilerLibrary.StdlibOnly stdlib
-        Mode = CompilerLibrary.FullProgram
+        Context = CompilationContexts.StdlibOnly stdlib
+        Mode = CompilerOptions.FullProgram
         Sources =
             AST.NonEmptyList.singleton
-                { CompilerLibrary.SourceUnit.Name = "ValueSearchCatalogTests.dark"
+                { CompilationContexts.SourceUnit.Name = "ValueSearchCatalogTests.dark"
                   Purpose = NameSyntax.SourceUnitPurpose.Executable
                   Source = source }
         AllowInternal = false
         Verbosity = 0
-        Options = CompilerLibrary.defaultOptions
+        Options = CompilerOptions.defaultOptions
         PackageValues = catalog
         PassTimingRecorder = None
         Session = None
     }
 
-let private execute (report: CompilerLibrary.CompileReport) (binary: byte array) =
+let private execute (report: CompilerOptions.CompileReport) (binary: byte array) =
     TestDSL.E2ETestRunner.executeBinaryForTarget report.Target binary
 
-let testCatalogParity (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
+let testCatalogParity (stdlib: CompilationContexts.StdlibResult) () : TestResult =
     let source =
         $"""
         let target = Darklang.LanguageTools.ProgramTypes.Hash.Hash ("type-error") in
@@ -174,14 +174,14 @@ let testCatalogParity (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
                 Error $"Unexpected catalog parity output: exit={output.ExitCode}, stdout={output.Stdout}, stderr={output.Stderr}"
 
 let testCatalogRejectsIllTypedAvailableValue
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     ()
     : TestResult =
     let catalog =
-        CompilerLibrary.PackageValueCatalog [
+        CompilationContexts.PackageValueCatalog [
             entry "bad-value" (customType "type-error" [])
                 [location mainBranch "Owner" [] "bad"]
-                (CompilerLibrary.Available (AST.StringLiteral "not an Error"))
+                (CompilationContexts.Available (AST.StringLiteral "not an Error"))
         ]
     let source =
         "let ignored = Darklang.Stdlib.ValueSearch.findByType<Stdlib.Cli.Posix.Error> \"branch-main\" \"\" (Darklang.LanguageTools.ProgramTypes.Hash.Hash \"type-error\") in ()"
@@ -191,7 +191,7 @@ let testCatalogRejectsIllTypedAvailableValue
     | Error error -> Error $"Expected catalog validation failure, got: {error}"
     | Ok _ -> Error "Expected an ill-typed available package value to fail compilation"
 
-let testInt8PackageProbeParity (stdlib: CompilerLibrary.StdlibResult) () : TestResult =
+let testInt8PackageProbeParity (stdlib: CompilationContexts.StdlibResult) () : TestResult =
     let source =
         """
         match Builtin.pmEvaluateValue<Int8> (Darklang.LanguageTools.ProgramTypes.Hash.Hash "darklang-test-values-int8Value") with
@@ -208,7 +208,7 @@ let testInt8PackageProbeParity (stdlib: CompilerLibrary.StdlibResult) () : TestR
             if output.ExitCode = 0 && output.Stdout = "true\n" && output.Stderr = "" then Ok ()
             else Error $"Unexpected Int8 package probe output: exit={output.ExitCode}, stdout={output.Stdout}, stderr={output.Stderr}"
 
-let tests (stdlib: CompilerLibrary.StdlibResult) = [
+let tests (stdlib: CompilationContexts.StdlibResult) = [
     ("catalog-backed ValueSearch preserves interpreter lookup order and filtering", testCatalogParity stdlib)
     ("catalog evaluator is statically validated at its concrete specialization", testCatalogRejectsIllTypedAvailableValue stdlib)
     ("Int8 package-value probe supplies the interpreter value through the AOT catalog", testInt8PackageProbeParity stdlib)

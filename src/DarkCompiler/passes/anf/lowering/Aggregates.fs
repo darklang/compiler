@@ -3,23 +3,10 @@
 module LoweringAggregates
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 open ANF
-open Output
-open LoweringPrimitives
 open TypeRegistries
-open SpecializationIdentity
-open TypeSubstitution
-open Monomorphization
-open InlineLambdas
-open ClosureAnalysis
-open ClosureComparisons
 open LiftExpressions
 open LiftFunctions
-open PrepareFunctions
-open LoweringOperators
-open LoweringTypeInference
 
 let internal buildSkewListLiteral
     (listType: AST.Type)

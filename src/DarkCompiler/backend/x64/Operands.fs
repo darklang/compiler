@@ -2,8 +2,6 @@
 
 module X64Operands
 
-
-
 let internal syscalls = Platform.linuxX86_64SyscallNumbers
 
 let private invalidX64PhysRegReason (reg: LIR.PhysReg) : string option =

@@ -2,13 +2,7 @@
 
 module ARM64Operands
 
-open ARM64CodeGenTypes
 open ARM64HeapAllocation
-open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
-open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
-open ARM64LeakAccounting
 
 /// Convert LIR.PhysReg to ARM64Symbolic.Reg
 let lirPhysRegToARM64Reg (physReg: LIR.PhysReg) : ARM64Symbolic.Reg =

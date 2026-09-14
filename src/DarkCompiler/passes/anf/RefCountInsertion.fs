@@ -3,24 +3,11 @@
 module RefCountInsertion
 
 open MemoryModel
-open ReleasePlanFingerprint
 open MemoryPlanning
 open ANF
-open LoweringPrimitives
-open TypeRegistries
-open SpecializationIdentity
-open TypeSubstitution
-open Monomorphization
-open InlineLambdas
-open ClosureAnalysis
 open ClosureComparisons
 open LiftExpressions
 open LiftFunctions
-open PrepareFunctions
-open LoweringOperators
-open LoweringTypeInference
-open LoweringAggregates
-open ANFContinuations
 open LoweringExpressions
 open AST_to_ANF
 open RcTypeFacts
@@ -305,7 +292,7 @@ let verifyJoinInterfaces (ctx: TypeContext) (program: Program) : Result<unit, st
                 | Some expected, Some actual when expected = actual -> Ok ()
                 | Some expected, actual -> Error $"ANF join interface: target {target} expects {expected}, got {actual}")
         | Let (id, operation, body) ->
-            checkUses visible (ANF_Optimize.cexprTempUses operation)
+            checkUses visible (ANFEffects.cexprTempUses operation)
             |> Result.bind (fun () ->
                 match operation with
                 | RuntimeError _ | RuntimeErrorString _ -> Ok ()

@@ -4,14 +4,8 @@ module ARM64EmitCalls
 
 open ARM64CodeGenTypes
 open ARM64HeapAllocation
-open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
-open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
-open ARM64LeakAccounting
 open ARM64Operands
 open ARM64Frames
-open ARM64InstructionContext
 
 let internal emitCall (ctx: CodeGenContext) (dest: LIR.Reg) (funcName: string) (args: LIR.Operand list) : Result<ARM64Symbolic.Instr list, string> =
     // Function call: arguments already moved to X0-X7 by preceding MOVs

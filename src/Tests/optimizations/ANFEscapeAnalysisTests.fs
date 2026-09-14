@@ -5,10 +5,6 @@
 
 module ANFEscapeAnalysisTests
 
-open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
-
 open ANF
 
 type TestResult = Result<unit, string>

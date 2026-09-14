@@ -10,8 +10,6 @@
 module TestDSL.ANFParser
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 
 open System
 open System.Text.RegularExpressions

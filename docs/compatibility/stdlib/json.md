@@ -145,7 +145,7 @@ JSON extensions. There are no JSON-specific compiler-only serialized types.
 - Late specialization integration and stdlib loading:
   `src/DarkCompiler/CompilerLibrary.fs`.
 - Recursive ownership shapes and native release helpers:
-  `src/DarkCompiler/ANF.fs`,
+  `src/DarkCompiler/ir/anf/ANF.fs`,
   `src/DarkCompiler/passes/anf/RefCountInsertion.fs`, and the architecture
   backends.
 

@@ -5,19 +5,22 @@
 
 module ChordalGraphTests
 
-open RegisterAllocation
+open AllocationModel
+open RegisterInterference
+open RegisterCoalescing
+open RegisterColoring
 open LIR
 
 type TestResult = Result<unit, string>
 
 let colorOf (result: ColoringResult) (vregId: int) : int option =
-    RegisterAllocation.colorOf result vregId
+    AllocationModel.colorOf result vregId
 
 let graphNeighbors (graph: InterferenceGraph) (vregId: int) : Set<int> =
-    RegisterAllocation.graphNeighbors graph vregId |> Set.ofList
+    AllocationModel.graphNeighbors graph vregId |> Set.ofList
 
 let graphHasVertex (graph: InterferenceGraph) (vregId: int) : bool =
-    RegisterAllocation.graphHasVertex graph vregId
+    AllocationModel.graphHasVertex graph vregId
 
 /// Test 16: Build interference graph from real LIR CFG
 /// Simulates `fun a b -> a * b`, where parameters should interfere.
@@ -46,7 +49,7 @@ let testBuildFromCFG () : TestResult =
     }
 
     // Build interference graph
-    let graph = RegisterAllocation.buildInterferenceGraphBitset cfg [0; 1]
+    let graph = RegisterInterference.buildInterferenceGraphBitset cfg [0; 1]
 
     // v0 and v1 should both be in the graph
     if not (graphHasVertex graph 0) then
@@ -115,7 +118,7 @@ let testBuildFromCFGBitsetMatches () : TestResult =
         ]
     }
 
-    let bitsetGraph = RegisterAllocation.buildInterferenceGraphBitset cfg [0]
+    let bitsetGraph = RegisterInterference.buildInterferenceGraphBitset cfg [0]
     let expectedVertices = Set.ofList [0; 1; 2; 3; 4]
 
     let neighbors v = graphNeighbors bitsetGraph v
@@ -153,7 +156,7 @@ let testFullChordalPipeline () : TestResult =
     }
 
     // Build interference graph and run chordal coloring
-    let graph = RegisterAllocation.buildInterferenceGraphBitset cfg [0; 1]
+    let graph = RegisterInterference.buildInterferenceGraphBitset cfg [0; 1]
     let colorResult = chordalGraphColor graph [] 16 [] []  // 16 available colors
 
     // v0 and v1 must have different colors (they interfere)
@@ -196,7 +199,7 @@ let testApply2Pattern () : TestResult =
     }
 
     // Build interference graph
-    let graph = RegisterAllocation.buildInterferenceGraphBitset cfg [0; 1; 2]
+    let graph = RegisterInterference.buildInterferenceGraphBitset cfg [0; 1; 2]
 
     // All of v0, v1, v2 should be in the graph and interfere with each other
     let v0Neighbors = graphNeighbors graph 0
@@ -249,7 +252,7 @@ let testMoveCoalescingPreference () : TestResult =
     }
 
     let blocks = cfg.Blocks |> Seq.toArray |> Array.map (fun kvp -> kvp.Value)
-    let pairs = RegisterAllocation.collectMovePairs blocks
+    let pairs = RegisterCoalescing.collectMovePairs blocks
     let normalize (a: int, b: int) = if a < b then (a, b) else (b, a)
     let normalized = pairs |> List.map normalize
     if List.contains (0, 1) normalized then

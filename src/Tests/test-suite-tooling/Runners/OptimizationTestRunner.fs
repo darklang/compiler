@@ -8,8 +8,9 @@ module TestDSL.OptimizationTestRunner
 open System
 open AST
 open TestDSL.OptimizationFormat
-open IRPrinter
-
+open ANFPrinter
+open MIRPrinter
+open LIRPrinter
 /// Result of running an optimization test
 type OptimizationTestResult = {
     Success: bool
@@ -29,9 +30,9 @@ let private externalReturnTypes : Map<string, AST.Type> =
         ("__string_hash", TInt64)
     ]
 
-let private typeCheckWithStdlib (stdlib: CompilerLibrary.StdlibResult) (ast: AST.Program) : Result<AST.Type * AST.Program, string> =
+let private typeCheckWithStdlib (stdlib: CompilationContexts.StdlibResult) (ast: AST.Program) : Result<AST.Type * AST.Program, string> =
     match TypeChecking.checkProgramWithBaseEnv stdlib.Context.TypeCheckEnv ast with
-    | Error e -> Error $"Type error: {TypeChecking.typeErrorToString e}"
+    | Error e -> Error $"Type error: {CheckingDiagnostics.typeErrorToString e}"
     | Ok (programType, typedAst, _env) -> Ok (programType, typedAst)
 
 let private hasTopLevelExpression (AST.Program topLevels: AST.Program) : bool =
@@ -80,7 +81,7 @@ let private convertTypedProgram (typedAst: AST.Program) : Result<AST_to_ANF.Conv
                         ModuleRegistry = registries.ModuleRegistry
                     }))))
 
-let private optimizeContextFromConversionResult (convResult: AST_to_ANF.ConversionResult) : ANF_Optimize.OptimizeContext =
+let private optimizeContextFromConversionResult (convResult: AST_to_ANF.ConversionResult) : ANFConstants.OptimizeContext =
     { TypeReg = convResult.RecordFieldsReg
       RecordTypeParams = convResult.RecordTypeParamsReg
       SumShapeReg = convResult.RcSumShapeReg }
@@ -136,7 +137,7 @@ let private formatLIRForOptimizationTest (syntheticMain: bool) (program: LIR.Pro
         formatLIR program
 
 /// Compile source and get ANF after optimization
-let getOptimizedANF (stdlib: CompilerLibrary.StdlibResult) (source: string) : Result<string, string> =
+let getOptimizedANF (stdlib: CompilationContexts.StdlibResult) (source: string) : Result<string, string> =
     match parseOptimizationSource source with
     | Error e -> Error e
     | Ok (ast, syntheticMain) ->
@@ -152,14 +153,14 @@ let getOptimizedANF (stdlib: CompilerLibrary.StdlibResult) (source: string) : Re
                 let optimized =
                     ANF_Optimize.optimizeProgramWithOptions
                         (optimizeContextFromConversionResult convResult)
-                        ANF_Optimize.defaultOptimizeOptions
+                        ANFConstants.defaultOptimizeOptions
                         convResult.Program
 
                 // Pretty-print the result
                 Ok (formatANFForOptimizationTest syntheticMain optimized)
 
 /// Compile source and get MIR after optimization
-let getOptimizedMIR (stdlib: CompilerLibrary.StdlibResult) (source: string) : Result<string, string> =
+let getOptimizedMIR (stdlib: CompilationContexts.StdlibResult) (source: string) : Result<string, string> =
     match parseOptimizationSource source with
     | Error e -> Error e
     | Ok (ast, syntheticMain) ->
@@ -175,7 +176,7 @@ let getOptimizedMIR (stdlib: CompilerLibrary.StdlibResult) (source: string) : Re
                 let optimized =
                     ANF_Optimize.optimizeProgramWithOptions
                         (optimizeContextFromConversionResult convResult)
-                        ANF_Optimize.defaultOptimizeOptions
+                        ANFConstants.defaultOptimizeOptions
                         convResult.Program
 
                 // Reference counting and print insertion
@@ -202,7 +203,7 @@ let getOptimizedMIR (stdlib: CompilerLibrary.StdlibResult) (source: string) : Re
                         Ok (formatMIRForOptimizationTest syntheticMain optimizedMir)
 
 /// Compile source and get LIR after optimization
-let getOptimizedLIR (stdlib: CompilerLibrary.StdlibResult) (source: string) : Result<string, string> =
+let getOptimizedLIR (stdlib: CompilationContexts.StdlibResult) (source: string) : Result<string, string> =
     match parseOptimizationSource source with
     | Error e -> Error e
     | Ok (ast, syntheticMain) ->
@@ -218,7 +219,7 @@ let getOptimizedLIR (stdlib: CompilerLibrary.StdlibResult) (source: string) : Re
                 let optimized =
                     ANF_Optimize.optimizeProgramWithOptions
                         (optimizeContextFromConversionResult convResult)
-                        ANF_Optimize.defaultOptimizeOptions
+                        ANFConstants.defaultOptimizeOptions
                         convResult.Program
 
                 // Reference counting and print insertion
@@ -249,7 +250,7 @@ let getOptimizedLIR (stdlib: CompilerLibrary.StdlibResult) (source: string) : Re
                             Ok (formatLIRForOptimizationTest syntheticMain optimizedLir)
 
 /// Run a single optimization test
-let runOptimizationTest (stdlib: CompilerLibrary.StdlibResult) (test: OptimizationTest) : OptimizationTestResult =
+let runOptimizationTest (stdlib: CompilationContexts.StdlibResult) (test: OptimizationTest) : OptimizationTestResult =
     let irResult =
         match test.Stage with
         | ANF -> getOptimizedANF stdlib test.Source
@@ -278,7 +279,7 @@ let runOptimizationTest (stdlib: CompilerLibrary.StdlibResult) (test: Optimizati
               Actual = Some normalizedActual }
 
 /// Load and run tests from a file
-let runTestFile (stdlib: CompilerLibrary.StdlibResult) (stage: IRStage) (path: string) : Result<(OptimizationTest * OptimizationTestResult) list, string> =
+let runTestFile (stdlib: CompilationContexts.StdlibResult) (stage: IRStage) (path: string) : Result<(OptimizationTest * OptimizationTestResult) list, string> =
     match parseTestFile stage path with
     | Error e -> Error e
     | Ok tests ->

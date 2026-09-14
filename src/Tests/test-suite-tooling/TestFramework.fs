@@ -92,7 +92,7 @@ let createState () : TestRunState =
 let recordTiming (state: TestRunState) (timing: TestTiming) : unit =
     state.Timings.Add timing
 
-let recordPassTiming (state: TestRunState) (timing: CompilerLibrary.PassTiming) : unit =
+let recordPassTiming (state: TestRunState) (timing: CompilerOptions.PassTiming) : unit =
     if not (Map.containsKey timing.Pass state.PassTimings) then
         state.PassTimingOrder.Add timing.Pass
     let existing =

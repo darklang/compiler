@@ -44,50 +44,50 @@ let makeCFG (entry: Label) (blocks: BasicBlock list) : CFG =
 
 /// Check if a VReg is in the LiveIn set
 let isLiveIn
-    (domain: RegisterAllocation.VRegDomain)
-    (blockIndex: RegisterAllocation.BlockIndex)
-    (liveness: RegisterAllocation.BlockLiveness array)
+    (domain: AllocationModel.VRegDomain)
+    (blockIndex: AllocationModel.BlockIndex)
+    (liveness: AllocationModel.BlockLiveness array)
     (label: Label)
     (vregId: int)
     : bool =
-    match RegisterAllocation.blockLivenessForLabel blockIndex liveness label with
-    | Some bl -> RegisterAllocation.vregBitsContains domain bl.LiveIn vregId
+    match AllocationModel.blockLivenessForLabel blockIndex liveness label with
+    | Some bl -> AllocationModel.vregBitsContains domain bl.LiveIn vregId
     | None -> false
 
 /// Check if a VReg is in the LiveOut set
 let isLiveOut
-    (domain: RegisterAllocation.VRegDomain)
-    (blockIndex: RegisterAllocation.BlockIndex)
-    (liveness: RegisterAllocation.BlockLiveness array)
+    (domain: AllocationModel.VRegDomain)
+    (blockIndex: AllocationModel.BlockIndex)
+    (liveness: AllocationModel.BlockLiveness array)
     (label: Label)
     (vregId: int)
     : bool =
-    match RegisterAllocation.blockLivenessForLabel blockIndex liveness label with
-    | Some bl -> RegisterAllocation.vregBitsContains domain bl.LiveOut vregId
+    match AllocationModel.blockLivenessForLabel blockIndex liveness label with
+    | Some bl -> AllocationModel.vregBitsContains domain bl.LiveOut vregId
     | None -> false
 
 /// Check if an FVirtual is in the LiveIn set
 let isFloatLiveIn
-    (domain: RegisterAllocation.VRegDomain)
-    (blockIndex: RegisterAllocation.BlockIndex)
-    (liveness: RegisterAllocation.BlockLiveness array)
+    (domain: AllocationModel.VRegDomain)
+    (blockIndex: AllocationModel.BlockIndex)
+    (liveness: AllocationModel.BlockLiveness array)
     (label: Label)
     (fregId: int)
     : bool =
-    match RegisterAllocation.blockLivenessForLabel blockIndex liveness label with
-    | Some bl -> RegisterAllocation.vregBitsContains domain bl.LiveIn fregId
+    match AllocationModel.blockLivenessForLabel blockIndex liveness label with
+    | Some bl -> AllocationModel.vregBitsContains domain bl.LiveIn fregId
     | None -> false
 
 /// Check if an FVirtual is in the LiveOut set
 let isFloatLiveOut
-    (domain: RegisterAllocation.VRegDomain)
-    (blockIndex: RegisterAllocation.BlockIndex)
-    (liveness: RegisterAllocation.BlockLiveness array)
+    (domain: AllocationModel.VRegDomain)
+    (blockIndex: AllocationModel.BlockIndex)
+    (liveness: AllocationModel.BlockLiveness array)
     (label: Label)
     (fregId: int)
     : bool =
-    match RegisterAllocation.blockLivenessForLabel blockIndex liveness label with
-    | Some bl -> RegisterAllocation.vregBitsContains domain bl.LiveOut fregId
+    match AllocationModel.blockLivenessForLabel blockIndex liveness label with
+    | Some bl -> AllocationModel.vregBitsContains domain bl.LiveOut fregId
     | None -> false
 
 // =============================================================================
@@ -124,7 +124,7 @@ let testPhiDefAtBlockEntry () : TestResult =
     let blockE = makeRetBlock labelE [Mov (vr 3, vreg 2)]
 
     let cfg = makeCFG labelA [blockA; blockB; blockC; blockD; blockE]
-    let (domain, blockIndex, liveness) = RegisterAllocation.computeLivenessBits cfg
+    let (domain, blockIndex, liveness) = RegisterLiveness.computeLivenessBits cfg
 
     // v0 should be live-out of B (used by phi in D)
     if not (isLiveOut domain blockIndex liveness labelB 0) then
@@ -170,7 +170,7 @@ let testPhiSourceLivenessScoped () : TestResult =
     let blockD = makeRetBlock labelD [phiInstr; Mov (vr 3, vreg 2)]
 
     let cfg = makeCFG labelA [blockA; blockB; blockC; blockD]
-    let (domain, blockIndex, liveness) = RegisterAllocation.computeLivenessBits cfg
+    let (domain, blockIndex, liveness) = RegisterLiveness.computeLivenessBits cfg
 
     // v0 should be live-out of B (used by phi from B)
     if not (isLiveOut domain blockIndex liveness labelB 0) then
@@ -217,7 +217,7 @@ let testMultiplePhisSameBlock () : TestResult =
     let blockD = makeRetBlock labelD [phi1; phi2; useInstr; Mov (vr 7, vreg 6)]
 
     let cfg = makeCFG labelA [blockA; blockB; blockC; blockD]
-    let (domain, blockIndex, liveness) = RegisterAllocation.computeLivenessBits cfg
+    let (domain, blockIndex, liveness) = RegisterLiveness.computeLivenessBits cfg
 
     // v0 and v4 should be live-out of B
     if not (isLiveOut domain blockIndex liveness labelB 0) then
@@ -268,7 +268,7 @@ let testLoopPhi () : TestResult =
     let blockD = makeRetBlock labelD [Mov (vr 3, vreg 1)]
 
     let cfg = makeCFG labelA [blockA; blockB; blockC; blockD]
-    let (domain, blockIndex, liveness) = RegisterAllocation.computeLivenessBits cfg
+    let (domain, blockIndex, liveness) = RegisterLiveness.computeLivenessBits cfg
 
     // v0 should be live-out of A (used by phi in B)
     if not (isLiveOut domain blockIndex liveness labelA 0) then
@@ -300,7 +300,7 @@ let testBitsetLivenessBehavior () : TestResult =
     let blockE = makeRetBlock labelE [Mov (vr 4, vreg 3)]
 
     let cfg = makeCFG labelA [blockA; blockB; blockC; blockD; blockE]
-    let (domain, blockIndex, bitset) = RegisterAllocation.computeLivenessBits cfg
+    let (domain, blockIndex, bitset) = RegisterLiveness.computeLivenessBits cfg
     let liveOutB = isLiveOut domain blockIndex bitset labelB 0
     let liveOutC = isLiveOut domain blockIndex bitset labelC 1
     if liveOutB && liveOutC then
@@ -325,7 +325,7 @@ let testFloatPhiSourceLivenessScoped () : TestResult =
     let blockD = makeRetBlock labelD [phiInstr; FAdd (fvr 3, fvr 2, fvr 2)]
 
     let cfg = makeCFG labelA [blockA; blockB; blockC; blockD]
-    let (domain, blockIndex, liveness) = RegisterAllocation.computeFloatLivenessBits cfg
+    let (domain, blockIndex, liveness) = RegisterLiveness.computeFloatLivenessBits cfg
 
     if not (isFloatLiveOut domain blockIndex liveness labelB 0) then
         Error "f0 should be live-out of B (used by float phi)"

@@ -11,7 +11,7 @@ Two passes handle code generation:
 
 ## ARM64 Instruction Types
 
-Defined in `ARM64.fs`:
+Defined in `backend/arm64/ISA.fs`:
 
 ```fsharp
 type Instr =
@@ -203,8 +203,8 @@ FCVTZS X0, D0      // X0 = (int)D0
 | `backend/arm64/CodeGen.fs` | Assemble planned functions and runtime helpers |
 | `backend/arm64/Resolve.fs` | Symbolic data-label pool resolution |
 | `backend/arm64/Encoding.fs` | ARM64 → bytes |
-| `ARM64.fs` | Concrete ARM64 instruction types |
-| `ARM64Symbolic.fs` | ARM64 instruction types with symbolic data references |
+| `backend/arm64/ISA.fs` | Concrete ARM64 instruction types |
+| `backend/arm64/Symbolic.fs` | ARM64 instruction types with symbolic data references |
 | `backend/arm64/runtime/` | Target-specific runtime instruction generators |
 
 ## Key Functions

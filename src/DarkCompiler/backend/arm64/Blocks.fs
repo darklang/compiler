@@ -3,16 +3,8 @@
 module ARM64Blocks
 
 open ARM64CodeGenTypes
-open ARM64HeapAllocation
-open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
-open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
-open ARM64LeakAccounting
 open ARM64Operands
-open ARM64Frames
 open ARM64Instructions
-open ARM64GenericReferenceCounts
 
 /// Convert LIR terminator to ARM64 instructions
 /// epilogueLabel: the label to jump to for function return (handles stack cleanup)
@@ -113,7 +105,7 @@ let private lirInstructionProfileDetail (instr: LIR.Instr) : string =
         let sourceType =
             metadata
             |> Option.bind (fun value -> value.SourceType)
-            |> Option.map TypeChecking.typeToString
+            |> Option.map CheckingDiagnostics.typeToString
             |> Option.defaultValue "unknown"
         $"{kind}:{payloadSize}:{sourceType}"
     | _ -> ""

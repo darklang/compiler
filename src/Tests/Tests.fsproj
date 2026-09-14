@@ -87,6 +87,12 @@
     <Compile Include="compiler-passes/ListHIRTests.fs" />
     <Compile Include="compiler-passes/RuntimeDataLayoutTests.fs" />
     <Compile Include="compiler-passes/MonomorphizationTests.fs" />
+    <Compile Include="compiler-passes/ownership/MemoryShapeTests.fs" />
+    <Compile Include="compiler-passes/ownership/TypeFactTests.fs" />
+    <Compile Include="compiler-passes/ownership/CleanupTests.fs" />
+    <Compile Include="compiler-passes/ownership/TransferTests.fs" />
+    <Compile Include="compiler-passes/ownership/CallTests.fs" />
+    <Compile Include="compiler-passes/ownership/JoinTests.fs" />
     <Compile Include="compiler-passes/RefCountInsertionTests.fs" />
     <Compile Include="compiler-passes/TailCallDetectionTests.fs" />
     <Compile Include="compiler-passes/LambdaLiftingTests.fs" />
@@ -94,6 +100,12 @@
     <!-- ARM64 backend tests -->
     <Compile Include="compiler-passes/ARM64EncodingTests.fs" />
     <Compile Include="compiler-passes/ARM64BinaryTests.fs" />
+    <Compile Include="compiler-passes/arm64/Fixtures.fs" />
+    <Compile Include="compiler-passes/arm64/ReleasePlanningTests.fs" />
+    <Compile Include="compiler-passes/arm64/ControlFlowTests.fs" />
+    <Compile Include="compiler-passes/arm64/AllocationTests.fs" />
+    <Compile Include="compiler-passes/arm64/DestructionTests.fs" />
+    <Compile Include="compiler-passes/arm64/PlanningBoundaryTests.fs" />
     <Compile Include="compiler-passes/ARM64CodeGenTests.fs" />
 
     <!-- x64 backend tests -->

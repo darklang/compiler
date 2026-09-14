@@ -47,7 +47,7 @@ The arbitrary-width implementation is in
 eight fixed-width module files, `Int128.dark`, and `UInt128.dark`. The 128-bit
 modules perform limb arithmetic directly and use arbitrary-width values only
 at operations and conversions that require them. Typed representation views
-are ownership-neutral, while newly computed fixed blocks are owned. `ANF.fs`
+are ownership-neutral, while newly computed fixed blocks are owned. `ir/anf/ANF.fs`
 classifies `Int` as a managed dynamic value and both 128-bit types as managed
 16-byte fixed blocks, including when nested in closures and heap shapes. Fixed-width
 shifts and arithmetic lower in `MIR_to_LIR.fs`; signed right shift is

@@ -2,8 +2,6 @@
 
 module ARM64CodeGenTypes
 
-
-
 type CodeGenOptions = {
     /// Disable free list memory reuse (always bump allocate)
     DisableFreeList: bool

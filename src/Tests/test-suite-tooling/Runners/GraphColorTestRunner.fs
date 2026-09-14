@@ -5,7 +5,9 @@
 module TestDSL.GraphColorTestRunner
 
 open System.IO
-open RegisterAllocation
+open AllocationModel
+open RegisterCoalescing
+open RegisterColoring
 open TestDSL.GraphColorFormat
 open TestDSL.PassTestRunner
 

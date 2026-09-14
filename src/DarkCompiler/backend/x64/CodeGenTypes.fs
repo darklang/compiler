@@ -3,9 +3,6 @@
 module X64CodeGenTypes
 
 open X64Operands
-open X64Printing
-open X64Frames
-open X64Process
 
 /// Function context for instructions that need stack frame info (TailCall, etc.)
 type internal FuncCtx = {

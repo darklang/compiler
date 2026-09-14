@@ -2,16 +2,8 @@
 
 module X64InstructionContext
 
-open X64Operands
-open X64Printing
-open X64Frames
-open X64Process
 open X64CodeGenTypes
-open X64ReleaseSelection
 open X64FieldReferenceCounts
-open X64ListReferenceCounts
-open X64DictReferenceCounts
-open X64ClosureReferenceCounts
 
 /// Adjust a stack slot offset to account for callee-saved registers pushed after RBP.
 /// LIR stack slots are byte offsets from FP (e.g., -8, -16), but callee-saved pushes

@@ -6,8 +6,6 @@
 module ANFInliningTests
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 
 open ANF
 

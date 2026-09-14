@@ -3,8 +3,6 @@
 module ARM64ReleaseSelection
 
 open ARM64CodeGenTypes
-open ARM64HeapAllocation
-open ARM64ListReferenceCounts
 open ARM64ClosureReferenceCounts
 
 let private releasePlanIsRootKind (kind: MemoryModel.RcKind) (releasePlan: MemoryModel.RcReleasePlan) : bool =

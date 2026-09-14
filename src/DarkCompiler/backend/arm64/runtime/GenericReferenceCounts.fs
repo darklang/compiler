@@ -3,14 +3,7 @@
 module ARM64GenericReferenceCounts
 
 open ARM64CodeGenTypes
-open ARM64HeapAllocation
 open ARM64ListReferenceCounts
-open ARM64ClosureReferenceCounts
-open ARM64ReleaseSelection
-open ARM64DictReferenceCounts
-open ARM64LeakAccounting
-open ARM64Operands
-open ARM64Frames
 open ARM64Instructions
 
 let internal generatePlannedGenericRefCountDecHelper

@@ -2,10 +2,6 @@
 
 module StdlibOptimizationTests
 
-open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
-
 open ANF
 
 type TestResult = Result<unit, string>
@@ -20,7 +16,7 @@ let rec private containsBinOp (target: BinOp) (expr: AExpr) : bool =
     | Jump _ | Return _ -> false
 
 let private testStdlibANFStrengthReduction
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     ()
     : TestResult =
     match Map.tryFind "Stdlib.Int64.__powerLoop" stdlib.StdlibANFFunctions with
@@ -33,6 +29,6 @@ let private testStdlibANFStrengthReduction
         else
             Ok ()
 
-let tests (stdlib: CompilerLibrary.StdlibResult) = [
+let tests (stdlib: CompilationContexts.StdlibResult) = [
     ("prebuilt stdlib ANF applies strength reduction", testStdlibANFStrengthReduction stdlib)
 ]

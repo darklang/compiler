@@ -83,15 +83,15 @@ let countFloatMoves (block: BasicBlock) : int =
         | _ -> false) |> List.length
 
 /// Empty float allocation for tests that don't use float phis
-let emptyFloatAllocation : RegisterAllocation.FAllocationResult =
+let emptyFloatAllocation : FloatAllocation.FAllocationResult =
     { Domain = { Ids = [||]; IndexOf = [||]; IndexOffset = 0; WordCount = 0 }
       Allocations = [||]
       UsedCalleeSavedF = [] }
 
 let buildAllocationResult
-    (domain: RegisterAllocation.VRegDomain)
-    (pairs: (int * RegisterAllocation.Allocation) list)
-    : RegisterAllocation.AllocationResult =
+    (domain: AllocationModel.VRegDomain)
+    (pairs: (int * AllocationModel.Allocation) list)
+    : AllocationModel.AllocationResult =
     let allocationById = pairs |> Map.ofList
     let allocations =
         domain.Ids
@@ -101,11 +101,11 @@ let buildAllocationResult
 let cfgFromBlocks (entry: Label) (labels: Label array) (blocks: BasicBlock array) : CFG =
     { Entry = entry; Blocks = Array.zip labels blocks |> Map.ofArray }
 
-let resolvePhiCFG (cfg: CFG) (allocations: (int * RegisterAllocation.Allocation) list) : CFG =
-    let (domain, blockIndex, _liveness) = RegisterAllocation.computeLivenessBits cfg
+let resolvePhiCFG (cfg: CFG) (allocations: (int * AllocationModel.Allocation) list) : CFG =
+    let (domain, blockIndex, _liveness) = RegisterLiveness.computeLivenessBits cfg
     let blocks = blockIndex.Labels |> Array.map (fun label -> Map.find label cfg.Blocks)
     let allocationResult = buildAllocationResult domain allocations
-    let resolvedBlocks = RegisterAllocation.resolvePhiNodes blockIndex blocks allocationResult emptyFloatAllocation
+    let resolvedBlocks = PhiResolution.resolvePhiNodes blockIndex blocks allocationResult emptyFloatAllocation
     cfgFromBlocks cfg.Entry blockIndex.Labels resolvedBlocks
 
 /// Check if a block has a specific move instruction
@@ -148,11 +148,11 @@ let testSimplePhiResolution () : TestResult =
     // Simple allocation: v1->X1, v2->X2, v3->X3, v4->X4
     let allocation =
         [
-            (0, RegisterAllocation.PhysReg X1)
-            (1, RegisterAllocation.PhysReg X2)
-            (2, RegisterAllocation.PhysReg X3)
-            (3, RegisterAllocation.PhysReg X4)
-            (4, RegisterAllocation.PhysReg X5)
+            (0, AllocationModel.PhysReg X1)
+            (1, AllocationModel.PhysReg X2)
+            (2, AllocationModel.PhysReg X3)
+            (3, AllocationModel.PhysReg X4)
+            (4, AllocationModel.PhysReg X5)
         ]
 
     let resolvedCFG = resolvePhiCFG cfg allocation
@@ -200,13 +200,13 @@ let testMultiplePhisParallel () : TestResult =
 
     let allocation =
         [
-            (0, RegisterAllocation.PhysReg X1)
-            (1, RegisterAllocation.PhysReg X2)
-            (2, RegisterAllocation.PhysReg X3)
-            (3, RegisterAllocation.PhysReg X4)
-            (4, RegisterAllocation.PhysReg X5)
-            (5, RegisterAllocation.PhysReg X6)
-            (6, RegisterAllocation.PhysReg X7)
+            (0, AllocationModel.PhysReg X1)
+            (1, AllocationModel.PhysReg X2)
+            (2, AllocationModel.PhysReg X3)
+            (3, AllocationModel.PhysReg X4)
+            (4, AllocationModel.PhysReg X5)
+            (5, AllocationModel.PhysReg X6)
+            (6, AllocationModel.PhysReg X7)
         ]
 
     let resolvedCFG = resolvePhiCFG cfg allocation
@@ -257,13 +257,13 @@ let testPhiSwap () : TestResult =
     // From B: X1←X2, X2←X1 (swap!)
     let allocation =
         [
-            (0, RegisterAllocation.PhysReg X3)
-            (1, RegisterAllocation.PhysReg X1)  // v1 in X1
-            (2, RegisterAllocation.PhysReg X2)  // v2 in X2
-            (3, RegisterAllocation.PhysReg X1)  // v3 wants X1 (gets v2=X2)
-            (4, RegisterAllocation.PhysReg X2)  // v4 wants X2 (gets v1=X1)
-            (5, RegisterAllocation.PhysReg X1)
-            (6, RegisterAllocation.PhysReg X2)
+            (0, AllocationModel.PhysReg X3)
+            (1, AllocationModel.PhysReg X1)  // v1 in X1
+            (2, AllocationModel.PhysReg X2)  // v2 in X2
+            (3, AllocationModel.PhysReg X1)  // v3 wants X1 (gets v2=X2)
+            (4, AllocationModel.PhysReg X2)  // v4 wants X2 (gets v1=X1)
+            (5, AllocationModel.PhysReg X1)
+            (6, AllocationModel.PhysReg X2)
         ]
 
     let resolvedCFG = resolvePhiCFG cfg allocation
@@ -306,10 +306,10 @@ let testPhiWithImmediate () : TestResult =
 
     let allocation =
         [
-            (0, RegisterAllocation.PhysReg X1)
-            (1, RegisterAllocation.PhysReg X2)
-            (2, RegisterAllocation.PhysReg X3)
-            (3, RegisterAllocation.PhysReg X4)
+            (0, AllocationModel.PhysReg X1)
+            (1, AllocationModel.PhysReg X2)
+            (2, AllocationModel.PhysReg X3)
+            (3, AllocationModel.PhysReg X4)
         ]
 
     let resolvedCFG = resolvePhiCFG cfg allocation
@@ -354,10 +354,10 @@ let testLoopPhi () : TestResult =
 
     let allocation =
         [
-            (0, RegisterAllocation.PhysReg X1)
-            (1, RegisterAllocation.PhysReg X2)
-            (2, RegisterAllocation.PhysReg X3)
-            (99, RegisterAllocation.PhysReg X4)
+            (0, AllocationModel.PhysReg X1)
+            (1, AllocationModel.PhysReg X2)
+            (2, AllocationModel.PhysReg X3)
+            (99, AllocationModel.PhysReg X4)
         ]
 
     let resolvedCFG = resolvePhiCFG cfg allocation
@@ -397,14 +397,14 @@ let testDeadPhiPruned () : TestResult =
 
     let allocation =
         [
-            (0, RegisterAllocation.PhysReg X1)
-            (1, RegisterAllocation.PhysReg X2)
-            (2, RegisterAllocation.PhysReg X3)
-            (3, RegisterAllocation.PhysReg X4)
-            (4, RegisterAllocation.PhysReg X5)
-            (5, RegisterAllocation.PhysReg X6)
-            (6, RegisterAllocation.PhysReg X7)
-            (7, RegisterAllocation.PhysReg X19)
+            (0, AllocationModel.PhysReg X1)
+            (1, AllocationModel.PhysReg X2)
+            (2, AllocationModel.PhysReg X3)
+            (3, AllocationModel.PhysReg X4)
+            (4, AllocationModel.PhysReg X5)
+            (5, AllocationModel.PhysReg X6)
+            (6, AllocationModel.PhysReg X7)
+            (7, AllocationModel.PhysReg X19)
         ]
 
     let resolvedCFG = resolvePhiCFG cfg allocation
@@ -501,10 +501,10 @@ let testFloatLoopPhiCoalesced () : TestResult =
         CodegenFacts = None
     }
 
-    let floatAllocation = RegisterAllocation.chordalFloatAllocation cfg []
-    let phiDest = RegisterAllocation.applyFloatAllocationToFReg floatAllocation (fvr 0)
-    let arithmeticResult = RegisterAllocation.applyFloatAllocationToFReg floatAllocation (fvr 1)
-    let backedgeSource = RegisterAllocation.applyFloatAllocationToFReg floatAllocation (fvr 2)
+    let floatAllocation = FloatAllocation.chordalFloatAllocation cfg []
+    let phiDest = FloatAllocation.applyFloatAllocationToFReg floatAllocation (fvr 0)
+    let arithmeticResult = FloatAllocation.applyFloatAllocationToFReg floatAllocation (fvr 1)
+    let backedgeSource = FloatAllocation.applyFloatAllocationToFReg floatAllocation (fvr 2)
     if phiDest <> backedgeSource then
         Error "Non-interfering FPhi destination and backedge source should share a register"
     else if arithmeticResult <> backedgeSource then
@@ -586,18 +586,18 @@ let testCallerSaveExcludesDeadArguments () : TestResult =
              Mov (vr 3, Reg (phys LIR.X0))
              Add (vr 4, vr 2, vreg 3)]
     let cfg = makeCFG label [block]
-    let (domain, blockIndex, liveness) = RegisterAllocation.computeLivenessBits cfg
-    let (_, _, floatLiveness) = RegisterAllocation.computeFloatLivenessBits cfg
+    let (domain, blockIndex, liveness) = RegisterLiveness.computeLivenessBits cfg
+    let (_, _, floatLiveness) = RegisterLiveness.computeFloatLivenessBits cfg
     let allocation =
         buildAllocationResult
             domain
-            [(0, RegisterAllocation.PhysReg LIR.X1)
-             (1, RegisterAllocation.PhysReg LIR.X2)
-             (2, RegisterAllocation.PhysReg LIR.X3)
-             (3, RegisterAllocation.PhysReg LIR.X19)
-             (4, RegisterAllocation.PhysReg LIR.X20)]
+            [(0, AllocationModel.PhysReg LIR.X1)
+             (1, AllocationModel.PhysReg LIR.X2)
+             (2, AllocationModel.PhysReg LIR.X3)
+             (3, AllocationModel.PhysReg LIR.X19)
+             (4, AllocationModel.PhysReg LIR.X20)]
     let allocated =
-        RegisterAllocation.applyToBlockWithLiveness
+        ApplyBlockAllocation.applyToBlockWithLiveness
             Platform.ARM64
             allocation
             emptyFloatAllocation
@@ -624,16 +624,16 @@ let testCallerSavePreservesArgumentCycle () : TestResult =
              RestoreRegs ([], [])
              Mov (vr 2, Reg (phys LIR.X0))]
     let cfg = makeCFG label [block]
-    let (domain, blockIndex, liveness) = RegisterAllocation.computeLivenessBits cfg
-    let (_, _, floatLiveness) = RegisterAllocation.computeFloatLivenessBits cfg
+    let (domain, blockIndex, liveness) = RegisterLiveness.computeLivenessBits cfg
+    let (_, _, floatLiveness) = RegisterLiveness.computeFloatLivenessBits cfg
     let allocation =
         buildAllocationResult
             domain
-            [(0, RegisterAllocation.PhysReg LIR.X1)
-             (1, RegisterAllocation.PhysReg LIR.X2)
-             (2, RegisterAllocation.PhysReg LIR.X19)]
+            [(0, AllocationModel.PhysReg LIR.X1)
+             (1, AllocationModel.PhysReg LIR.X2)
+             (2, AllocationModel.PhysReg LIR.X19)]
     let allocated =
-        RegisterAllocation.applyToBlockWithLiveness
+        ApplyBlockAllocation.applyToBlockWithLiveness
             Platform.ARM64
             allocation
             emptyFloatAllocation

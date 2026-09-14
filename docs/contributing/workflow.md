@@ -68,7 +68,7 @@ Add type rules for the operator:
     checkBinOp left right AST.TInt64 AST.TInt64
 ```
 
-### Step 5: ANF Representation (`src/DarkCompiler/ANF.fs`)
+### Step 5: ANF Representation (`src/DarkCompiler/ir/anf/ANF.fs`)
 
 Add to ANF.BinOp:
 
@@ -88,7 +88,7 @@ Add conversion in `convertBinOp`:
 
 Also update any functions that pattern match on BinOp (the compiler will warn you).
 
-### Step 7: MIR Representation (`src/DarkCompiler/MIR.fs`)
+### Step 7: MIR Representation (`src/DarkCompiler/ir/mir/MIR.fs`)
 
 Add to MIR.BinOp:
 
@@ -104,7 +104,7 @@ Add conversion - usually straightforward:
 | ANF.Mod -> MIR.Mod
 ```
 
-### Step 9: LIR Representation (`src/DarkCompiler/LIR.fs`)
+### Step 9: LIR Representation (`src/DarkCompiler/ir/lir/LIR.fs`)
 
 For ARM64, modulo requires special handling (no native instruction):
 

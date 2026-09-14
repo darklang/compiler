@@ -6,25 +6,10 @@ open MemoryModel
 open ReleasePlanFingerprint
 open MemoryPlanning
 open ANF
-open LoweringPrimitives
 open TypeRegistries
-open SpecializationIdentity
-open TypeSubstitution
-open Monomorphization
-open InlineLambdas
-open ClosureAnalysis
-open ClosureComparisons
 open LiftExpressions
 open LiftFunctions
-open PrepareFunctions
-open LoweringOperators
-open LoweringTypeInference
-open LoweringAggregates
-open ANFContinuations
-open LoweringExpressions
-open AST_to_ANF
 open RcTypeFacts
-open RcReturnAnalysis
 
 let private canonicalRcTypeForShape (ctx: TypeContext) (typ: AST.Type) : AST.Type =
     let canonicalBareSum name =

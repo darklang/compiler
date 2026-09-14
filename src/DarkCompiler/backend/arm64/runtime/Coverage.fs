@@ -3,13 +3,6 @@
 module ARM64Coverage
 
 open ARM64RuntimeImmediates
-open ARM64PrintAndExit
-open ARM64PrintValues
-open ARM64FileMetadata
-open ARM64FileRead
-open ARM64FileWrite
-open ARM64HostValues
-open ARM64WriteFromPointer
 
 /// Generate ARM64 instructions to flush coverage data to file
 /// Writes coverage counters to /tmp/dark_cov.bin before program exit

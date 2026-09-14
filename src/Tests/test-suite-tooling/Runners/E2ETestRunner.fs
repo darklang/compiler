@@ -9,18 +9,10 @@ open AST
 open LoweringPrimitives
 open TypeRegistries
 open SpecializationIdentity
-open TypeSubstitution
 open Monomorphization
-open InlineLambdas
 open ClosureAnalysis
-open ClosureComparisons
 open LiftExpressions
 open LiftFunctions
-open PrepareFunctions
-open LoweringOperators
-open LoweringTypeInference
-open LoweringAggregates
-open ANFContinuations
 open LoweringExpressions
 open AST_to_ANF
 open TestDSL.E2EFormat
@@ -61,7 +53,7 @@ let private tryFormatProgramIfStable
     (program: Program)
     : string option =
     let formatted = ASTPrettyPrinter.formatProgram program
-    match CompilerLibrary.parseProgram allowInternal formatted with
+    match PackageCatalog.parseProgram allowInternal formatted with
     | Ok _ ->
         // Stable recursive identities include structural declaration paths.
         // Test synthesis inserts a checker declaration, so a valid reparse can
@@ -94,8 +86,8 @@ let private trySynthesizeValueEqualitySource
     (source: string)
     (rhsExpr: string)
     : string option =
-    let sourceProgramResult = CompilerLibrary.parseProgram allowInternal source
-    let rhsProgramResult = CompilerLibrary.parseProgram allowInternal rhsExpr
+    let sourceProgramResult = PackageCatalog.parseProgram allowInternal source
+    let rhsProgramResult = PackageCatalog.parseProgram allowInternal rhsExpr
 
     match sourceProgramResult, rhsProgramResult with
     | Ok (Program sourceTopLevels), Ok rhsProgram ->
@@ -124,7 +116,7 @@ let private sourceToExecute
             // AST pretty-print roundtrips even though the direct source is valid.
             // Fall back to textual wrapping and parse-validate before execution.
             let fallbackSource = $"({test.Source}) == ({rhsExpr})"
-            match CompilerLibrary.parseProgram allowInternal fallbackSource with
+            match PackageCatalog.parseProgram allowInternal fallbackSource with
             | Ok _ -> Ok fallbackSource
             | Error _ ->
                 Error (
@@ -183,7 +175,7 @@ let private canEmbedBatchEqualitySource
         + "  let e2eBatchEligibilityFence = fun value -> if seed == 0L then value else false in\n"
         + "  e2eBatchEligibilityFence (e2eBatchEligibilityResult)\n\n"
         + "e2eBatchEligibilityCheck (0L)"
-    CompilerLibrary.parseProgram allowInternal probe |> Result.isOk
+    PackageCatalog.parseProgram allowInternal probe |> Result.isOk
 
 /// Only value-equality tests with no process contract can share a process. The
 /// compiler path and options remain production-identical; only the synthesized
@@ -208,7 +200,7 @@ let tryPrepareBatchTest (test: E2ETest) : PreparedE2EBatchTest option =
         match sourceToExecute allowInternal test with
         | Error _ -> None
         | Ok equalitySource ->
-            match CompilerLibrary.parseProgram allowInternal equalitySource with
+            match PackageCatalog.parseProgram allowInternal equalitySource with
             | Ok (Program [Expression _]) when canEmbedBatchEqualitySource allowInternal equalitySource ->
                 Some { Test = test; EqualitySource = equalitySource }
             | Ok _
@@ -229,7 +221,7 @@ type private PreambleBuildSpec = {
 /// Map of built preamble contexts and their matching stdlib specialization set,
 /// keyed by source file + preamble text.
 type PreambleContextMap =
-    Map<PreambleContextKey, CompilerLibrary.StdlibResult * CompilerLibrary.PreambleContext>
+    Map<PreambleContextKey, CompilationContexts.StdlibResult * CompilationContexts.PreambleContext>
 
 type SuiteContext = {
     PreambleContexts: PreambleContextMap
@@ -237,7 +229,7 @@ type SuiteContext = {
 
 type private PreamblePlan = {
     Spec: PreambleBuildSpec
-    Analysis: CompilerLibrary.PreambleAnalysis option
+    Analysis: CompilationContexts.PreambleAnalysis option
     Specialization: SpecializationResult
     StdlibSpecs: Set<SpecKey>
     ExternalTypeReg: TypeRegistries.TypeRegistry
@@ -595,7 +587,7 @@ let private parsePreambleAsProgram
     (allowInternal: bool)
     (preamble: string)
     : Result<Program, string> =
-    CompilerLibrary.parseProgram allowInternal preamble
+    PackageCatalog.parseProgram allowInternal preamble
 
 let private countLeadingSpaces (lineText: string) : int =
     lineText
@@ -639,10 +631,10 @@ let private sanitizePreambleForReducedFallback (preamble: string) : string =
     loop None [] lines |> String.concat "\n"
 
 let private analyzePreambleWithReducedFunctionSet
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     (spec: PreambleBuildSpec)
     (tests: E2ETest list)
-    : Result<CompilerLibrary.PreambleAnalysis, string> =
+    : Result<CompilationContexts.PreambleAnalysis, string> =
     let parseResult =
         match parsePreambleAsProgram spec.AllowInternal spec.Preamble with
         | Ok program -> Ok program
@@ -678,7 +670,7 @@ let private analyzePreambleWithReducedFunctionSet
             runnableTests
             |> List.exists (fun test ->
                 sourceToExecute spec.AllowInternal test
-                |> Result.bind (CompilerLibrary.parseProgram spec.AllowInternal)
+                |> Result.bind (PackageCatalog.parseProgram spec.AllowInternal)
                 |> Result.isError)
 
         let seedFunctions =
@@ -688,7 +680,7 @@ let private analyzePreambleWithReducedFunctionSet
                 runnableTests
                 |> List.map (fun test ->
                     sourceToExecute spec.AllowInternal test
-                    |> Result.bind (CompilerLibrary.parseProgram spec.AllowInternal)
+                    |> Result.bind (PackageCatalog.parseProgram spec.AllowInternal)
                     |> Result.map (collectProgramReferencedPreambleFuncs preambleFunctionNames))
                 |> List.choose Result.toOption
                 |> List.fold Set.union Set.empty
@@ -706,9 +698,9 @@ let private analyzePreambleWithReducedFunctionSet
         TypeChecking.checkSyntheticPreambleWithBaseEnvAndSettings
             stdlib.Context.TypeCheckEnv
             true
-            CompilerLibrary.defaultWarningSettings
+            CompilerOptions.defaultWarningSettings
             reducedProgram
-        |> Result.mapError TypeChecking.typeErrorToString
+        |> Result.mapError CheckingDiagnostics.typeErrorToString
         |> Result.map (fun (_programType, typedPreambleAst, preambleTypeCheckEnv) ->
             let preambleGenericDefs = SpecializationIdentity.extractGenericFuncDefs typedPreambleAst
             {
@@ -718,14 +710,14 @@ let private analyzePreambleWithReducedFunctionSet
             }))
 
 let private analyzePreambleForPlan
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     (spec: PreambleBuildSpec)
     (tests: E2ETest list)
-    : Result<CompilerLibrary.PreambleAnalysis option, string> =
+    : Result<CompilationContexts.PreambleAnalysis option, string> =
     if String.IsNullOrWhiteSpace spec.Preamble then
         Ok None
     else
-        match CompilerLibrary.analyzePreamble spec.AllowInternal stdlib spec.Preamble with
+        match PreambleAnalysis.analyzePreamble spec.AllowInternal stdlib spec.Preamble with
         | Ok analysis ->
             Ok (Some analysis)
         | Error primaryErr when isUpstreamDarkTestFile spec.SourceFile ->
@@ -737,7 +729,7 @@ let private analyzePreambleForPlan
             Error $"Preamble parse error in {spec.SourceFile}: {primaryErr}"
 
 let private buildPreamblePlan
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     (spec: PreambleBuildSpec)
     (tests: E2ETest list)
     : Result<PreamblePlan, string> =
@@ -791,9 +783,9 @@ let private buildPreamblePlan
 
 /// Build suite stdlib specializations and per-file/per-preamble contexts
 let buildSuiteContexts
-    (stdlib: CompilerLibrary.StdlibResult)
+    (stdlib: CompilationContexts.StdlibResult)
     (tests: E2ETest array)
-    (passTimingRecorder: CompilerLibrary.PassTimingRecorder option)
+    (passTimingRecorder: CompilerOptions.PassTimingRecorder option)
     : Result<SuiteContext, string> =
     let recordTiming name (elapsed: TimeSpan) =
         passTimingRecorder
@@ -815,7 +807,7 @@ let buildSuiteContexts
         let nestedRecorder =
             passTimingRecorder
             |> Option.map (fun outer ->
-                fun (timing: CompilerLibrary.PassTiming) ->
+                fun (timing: CompilerOptions.PassTiming) ->
                     if
                         not (Set.contains timing.Pass overlappingTimingNames)
                         && not (timing.Pass.StartsWith("TypeCheck: "))
@@ -864,7 +856,7 @@ let buildSuiteContexts
                         (fun acc (contextKey, plan) ->
                             acc
                             |> Result.bind (fun specializedPlans ->
-                                CompilerLibrary.buildStdlibSpecializations
+                                StdlibCompilation.buildStdlibSpecializations
                                     stdlib
                                     plan.StdlibSpecs
                                     plan.ExternalTypeReg
@@ -891,9 +883,9 @@ let buildSuiteContexts
                                                 ANFFunctions = []
                                                 TypeMap = specializedStdlib.StdlibTypeMap
                                                 SymbolicFunctions = []
-                                            } : CompilerLibrary.PreambleContext)
+                                            } : CompilationContexts.PreambleContext)
                                     | Some analysis ->
-                                        CompilerLibrary.buildPreambleContextFromAnalysis
+                                        PreambleCompilation.buildPreambleContextFromAnalysis
                                             specializedStdlib
                                             analysis
                                             plan.Specialization
@@ -1021,8 +1013,8 @@ let evaluateExpectations (test: E2ETest) (run: E2ERun) : E2ETestResult =
                 $"Output mismatch. stdout expected '{visibleOutput expectedStdout}', actual '{visibleOutput (stdoutFromRun run)}'; stderr expected '{visibleOutput expectedStderr}', actual '{visibleOutput (stderrFromRun run)}'"
 
 let private buildCompilerOptions (test: E2ETest)
-    : CompilerLibrary.CompilerOptions =
-    { CompilerLibrary.defaultOptions with
+    : CompilerOptions.CompilerOptions =
+    { CompilerOptions.defaultOptions with
         DisableFreeList = test.DisableFreeList
         DisableANFOpt = test.DisableANFOpt
         DisableANFConstFolding = test.DisableANFConstFolding
@@ -1044,7 +1036,7 @@ let private buildCompilerOptions (test: E2ETest)
         DisableFunctionTreeShaking = test.DisableFunctionTreeShaking
         EnableCoverage = false
         EnableLeakCheck = not test.DisableLeakCheck
-        Warnings = CompilerLibrary.defaultWarningSettings
+        Warnings = CompilerOptions.defaultWarningSettings
         DumpANF = false
         DumpMIR = false
         DumpLIR = false
@@ -1056,16 +1048,16 @@ let private tryExecuteBinary
     (environment: (string * string) list)
     (stdin: TestDSL.E2EFormat.TestStdin)
     (binary: byte array)
-    : Result<CompilerLibrary.ExecutionOutput, string> =
+    : Result<CompilerOptions.ExecutionOutput, string> =
     // QEMU makes the intentional 500,000-iteration TCO stress case much
     // slower than native execution while still completing reliably.
     let crossTargetExecutionTimeout = System.TimeSpan.FromSeconds 120.0
     let input =
         match stdin with
-        | TestDSL.E2EFormat.Closed -> CompilerLibrary.Closed
+        | TestDSL.E2EFormat.Closed -> CompilerOptions.Closed
         | TestDSL.E2EFormat.Bytes value ->
-            value |> System.Text.Encoding.UTF8.GetBytes |> CompilerLibrary.Bytes
-    let executeLinuxX86_64WithQemu () : Result<CompilerLibrary.ExecutionOutput, string> =
+            value |> System.Text.Encoding.UTF8.GetBytes |> CompilerOptions.Bytes
+    let executeLinuxX86_64WithQemu () : Result<CompilerOptions.ExecutionOutput, string> =
         let qemuPath = "/opt/dcb/qemu/qemu-x86_64"
         if not (System.IO.File.Exists qemuPath) then
             Error $"Pinned x86_64 QEMU is unavailable at {qemuPath}"
@@ -1104,15 +1096,15 @@ let private tryExecuteBinary
                         let stopwatch = System.Diagnostics.Stopwatch.StartNew()
                         use proc = System.Diagnostics.Process.Start(processInfo)
                         match input with
-                        | CompilerLibrary.Closed -> proc.StandardInput.Close()
-                        | CompilerLibrary.Bytes bytes ->
+                        | CompilerOptions.Closed -> proc.StandardInput.Close()
+                        | CompilerOptions.Bytes bytes ->
                             proc.StandardInput.BaseStream.Write(bytes, 0, bytes.Length)
                             proc.StandardInput.Close()
                         let stdoutTask = proc.StandardOutput.ReadToEndAsync()
                         let stderrTask = proc.StandardError.ReadToEndAsync()
                         if proc.WaitForExit(int crossTargetExecutionTimeout.TotalMilliseconds) then
                             stopwatch.Stop()
-                            let output : CompilerLibrary.ExecutionOutput = {
+                            let output : CompilerOptions.ExecutionOutput = {
                                 ExitCode = proc.ExitCode
                                 Stdout = stdoutTask.Result
                                 Stderr = stderrTask.Result
@@ -1132,7 +1124,7 @@ let private tryExecuteBinary
 
     match Platform.detectHostTarget () with
     | Ok hostTarget when Platform.archFor hostTarget = Platform.archFor target ->
-        try Ok (CompilerLibrary.executeCapturedWithArgumentsAndEnvironment target 0 arguments environment input binary)
+        try Ok (CompilerExecution.executeCapturedWithArgumentsAndEnvironment target 0 arguments environment input binary)
         with ex -> Error ex.Message
     | Ok _ ->
         match target with
@@ -1146,14 +1138,14 @@ let private tryExecuteBinary
 let executeBinaryForTarget
     (target: Platform.Target)
     (binary: byte array)
-    : Result<CompilerLibrary.ExecutionOutput, string> =
+    : Result<CompilerOptions.ExecutionOutput, string> =
     tryExecuteBinary target [] [] TestDSL.E2EFormat.Closed binary
 
 let private compileAndRun
     (arguments: string list)
     (environment: (string * string) list)
     (stdin: TestDSL.E2EFormat.TestStdin)
-    (request: CompilerLibrary.CompileRequest)
+    (request: CompilationContexts.CompileRequest)
     : E2ERun =
     let compileReport = CompilerLibrary.compile request
     match compileReport.Result with
@@ -1332,11 +1324,11 @@ let private splitRun
         )
 
 let runE2ETestBatchWithPreambleContext
-    (stdlib: CompilerLibrary.StdlibResult)
-    (preambleCtx: CompilerLibrary.PreambleContext)
-    (session: CompilerLibrary.CompilationSession option)
+    (stdlib: CompilationContexts.StdlibResult)
+    (preambleCtx: CompilationContexts.PreambleContext)
+    (session: CompilationSession.CompilationSession option)
     (tests: PreparedE2EBatchTest list)
-    (passTimingRecorder: CompilerLibrary.PassTimingRecorder option)
+    (passTimingRecorder: CompilerOptions.PassTimingRecorder option)
     : E2EBatchExecution =
     match tests with
     | [] ->
@@ -1344,18 +1336,18 @@ let runE2ETestBatchWithPreambleContext
         { AggregateRun = run; Results = [] }
     | first :: _ ->
         let count = tests.Length
-        let request : CompilerLibrary.CompileRequest = {
-            Context = CompilerLibrary.StdlibWithPreamble (stdlib, preambleCtx)
-            Mode = CompilerLibrary.CompileMode.TestExpression
+        let request : CompilationContexts.CompileRequest = {
+            Context = CompilationContexts.StdlibWithPreamble (stdlib, preambleCtx)
+            Mode = CompilerOptions.CompileMode.TestExpression
             Sources =
                 NonEmptyList.singleton
-                    { CompilerLibrary.SourceUnit.Name = first.Test.SourceFile
+                    { CompilationContexts.SourceUnit.Name = first.Test.SourceFile
                       Purpose = NameSyntax.SourceUnitPurpose.Executable
                       Source = buildBatchSource tests }
             AllowInternal = isInternalTestFile first.Test.SourceFile
             Verbosity = 0
             Options = buildCompilerOptions first.Test
-            PackageValues = CompilerLibrary.emptyPackageValueCatalog
+            PackageValues = CompilationContexts.emptyPackageValueCatalog
             PassTimingRecorder = passTimingRecorder
             Session = session
         }
@@ -1402,7 +1394,7 @@ let private tryBuildReducedPreambleForTest
     (testSource: string)
     : string option =
     let parsePreambleResult = parsePreambleAsProgram allowInternal preamble
-    let parseTestResult = CompilerLibrary.parseProgram allowInternal testSource
+    let parseTestResult = PackageCatalog.parseProgram allowInternal testSource
 
     match parsePreambleResult, parseTestResult with
     | Ok (Program preambleTopLevels), Ok testProgram ->
@@ -1437,27 +1429,27 @@ let private tryBuildReducedPreambleForTest
         None
 
 let private runE2ETestSourceWithPreambleContext
-    (stdlib: CompilerLibrary.StdlibResult)
-    (preambleCtx: CompilerLibrary.PreambleContext)
-    (session: CompilerLibrary.CompilationSession option)
+    (stdlib: CompilationContexts.StdlibResult)
+    (preambleCtx: CompilationContexts.PreambleContext)
+    (session: CompilationSession.CompilationSession option)
     (test: E2ETest)
     (source: string)
-    (passTimingRecorder: CompilerLibrary.PassTimingRecorder option)
+    (passTimingRecorder: CompilerOptions.PassTimingRecorder option)
     : E2ETestResult =
     let allowInternal = isInternalTestFile test.SourceFile
     let options = buildCompilerOptions test
-    let request : CompilerLibrary.CompileRequest = {
-        Context = CompilerLibrary.StdlibWithPreamble (stdlib, preambleCtx)
-        Mode = CompilerLibrary.CompileMode.TestExpression
+    let request : CompilationContexts.CompileRequest = {
+        Context = CompilationContexts.StdlibWithPreamble (stdlib, preambleCtx)
+        Mode = CompilerOptions.CompileMode.TestExpression
         Sources =
             NonEmptyList.singleton
-                { CompilerLibrary.SourceUnit.Name = test.SourceFile
+                { CompilationContexts.SourceUnit.Name = test.SourceFile
                   Purpose = NameSyntax.SourceUnitPurpose.Executable
                   Source = source }
         AllowInternal = allowInternal
         Verbosity = 0
         Options = options
-        PackageValues = CompilerLibrary.emptyPackageValueCatalog
+        PackageValues = CompilationContexts.emptyPackageValueCatalog
         PassTimingRecorder = passTimingRecorder
         Session = session
     }
@@ -1478,21 +1470,21 @@ let private runE2ETestSourceWithPreambleContext
         let fallbackPreamble =
             tryBuildReducedPreambleForTest allowInternal test.Preamble source
             |> Option.defaultValue test.Preamble
-        let fallbackRequest : CompilerLibrary.CompileRequest = {
-            Context = CompilerLibrary.StdlibOnly stdlib
-            Mode = CompilerLibrary.CompileMode.FullProgram
+        let fallbackRequest : CompilationContexts.CompileRequest = {
+            Context = CompilationContexts.StdlibOnly stdlib
+            Mode = CompilerOptions.CompileMode.FullProgram
             Sources =
                 NonEmptyList.fromList
-                    [{ CompilerLibrary.SourceUnit.Name = $"{test.SourceFile}:preamble"
+                    [{ CompilationContexts.SourceUnit.Name = $"{test.SourceFile}:preamble"
                        Purpose = NameSyntax.SourceUnitPurpose.Library
                        Source = fallbackPreamble }
-                     { CompilerLibrary.SourceUnit.Name = test.SourceFile
+                     { CompilationContexts.SourceUnit.Name = test.SourceFile
                        Purpose = NameSyntax.SourceUnitPurpose.Executable
                        Source = source }]
             AllowInternal = allowInternal
             Verbosity = 0
             Options = options
-            PackageValues = CompilerLibrary.emptyPackageValueCatalog
+            PackageValues = CompilationContexts.emptyPackageValueCatalog
             PassTimingRecorder = passTimingRecorder
             Session = session
         }
@@ -1507,11 +1499,11 @@ let private runE2ETestSourceWithPreambleContext
 
 /// Run E2E test using a prebuilt preamble context.
 let runE2ETestWithPreambleContext
-    (stdlib: CompilerLibrary.StdlibResult)
-    (preambleCtx: CompilerLibrary.PreambleContext)
-    (session: CompilerLibrary.CompilationSession option)
+    (stdlib: CompilationContexts.StdlibResult)
+    (preambleCtx: CompilationContexts.PreambleContext)
+    (session: CompilationSession.CompilationSession option)
     (test: E2ETest)
-    (passTimingRecorder: CompilerLibrary.PassTimingRecorder option)
+    (passTimingRecorder: CompilerOptions.PassTimingRecorder option)
     : E2ETestResult =
     let allowInternal = isInternalTestFile test.SourceFile
     match sourceToExecute allowInternal test with
@@ -1530,11 +1522,11 @@ let runE2ETestWithPreambleContext
 /// Run a prepared equality test singularly without reparsing its synthesized
 /// source. This keeps batch-size comparisons from charging preparation twice.
 let runPreparedE2ETestWithPreambleContext
-    (stdlib: CompilerLibrary.StdlibResult)
-    (preambleCtx: CompilerLibrary.PreambleContext)
-    (session: CompilerLibrary.CompilationSession option)
+    (stdlib: CompilationContexts.StdlibResult)
+    (preambleCtx: CompilationContexts.PreambleContext)
+    (session: CompilationSession.CompilationSession option)
     (prepared: PreparedE2EBatchTest)
-    (passTimingRecorder: CompilerLibrary.PassTimingRecorder option)
+    (passTimingRecorder: CompilerOptions.PassTimingRecorder option)
     : E2ETestResult =
     runE2ETestSourceWithPreambleContext
         stdlib

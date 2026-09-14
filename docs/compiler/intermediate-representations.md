@@ -15,7 +15,7 @@ ANF → MIR → LIR → target ISA → Binary
 - **LIR**: Shared low-level instructions with virtual registers and abstract
   physical register names that each backend maps to its target ISA
 
-Before ANF, `SemanticIR.fs` supplies typed block results and representation-
+Before ANF, `ir/semantic/SemanticIR.fs` supplies typed block results and representation-
 independent value contracts. ListHIR uses these for structured collection
 regions, storage selection, and branch-aware ownership elaboration. This is
 not yet the general program IR; see
@@ -231,7 +231,7 @@ Key differences from older indexed LIR:
 
 ## Constant Pools
 
-Literal pools are defined in `LiteralPool.fs` and built during ARM64 resolution
+Literal pools are defined in `backend/binary/LiteralPool.fs` and built during ARM64 resolution
 (`backend/arm64/Resolve.fs`). The x64 backend does not use them.
 
 ### String Pool
@@ -284,8 +284,8 @@ according to the backend's calling convention and reserved-register rules.
 
 | File | Purpose |
 |------|---------|
-| `MIR.fs` | MIR types |
-| `LIR.fs` | LIR types |
+| `ir/mir/MIR.fs` | MIR types |
+| `ir/lir/LIR.fs` | LIR types |
 | `ANF_to_MIR.fs` | ANF → MIR |
 | `MIR_to_LIR.fs` | MIR → LIR |
 | `SSA_Construction.fs` | SSA form |

@@ -7,6 +7,7 @@ module TestDSL.TypeCheckingTestRunner
 
 open System.IO
 open TestDSL.TypeCheckingFormat
+open CheckingDiagnostics
 open TypeChecking
 open AST
 open Parser

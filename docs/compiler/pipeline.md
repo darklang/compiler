@@ -19,7 +19,7 @@ The Dark compiler transforms source code through a series of passes, each with a
 | 1    | Parser                  | `frontend/Parser.fs`                             | Source → AST                                  |
 | 1.5  | Type checking           | `frontend/TypeChecking.fs`                                | AST → Typed AST                               |
 | 2    | AST → ANF               | `passes/anf/AST_to_ANF.fs`                                    | AST → ANF                                     |
-| 2 (regions) | List representation and ownership | `ListHIR.fs`, called by AST → ANF | Closed semantic lists → storage → owned arrays → ANF |
+| 2 (regions) | List representation and ownership | `passes/hir/`, `passes/storage/`, `passes/ownership/`, `passes/anf/LowerListRegions.fs` | Closed semantic lists → storage → owned arrays → ANF |
 | 2.3  | ANF optimizations       | `passes/anf/ANF_Optimize.fs`                                | ANF → ANF                                     |
 | 2.4  | ANF inlining            | `passes/anf/ANF_Inlining.fs`                                | ANF → ANF                                     |
 | 2.4.4 | Known closure specialization | `passes/anf/ANF_HigherOrderSpecialization.fs`       | ANF → ANF                                     |
@@ -41,7 +41,7 @@ The Dark compiler transforms source code through a series of passes, each with a
 
 Passes 1–5 are shared across targets. Passes 6–8 live under
 `backend/arm64/` or `backend/x64/`. The host is validated once as a
-`Platform.Target` before stdlib construction, and `CompilerLibrary.generateBinary`
+`Platform.Target` before stdlib construction, and `BinaryOutput.generateBinary`
 selects the backend from that explicit target.
 
 ---
@@ -432,14 +432,14 @@ the allocator is aware of this via `isX86_64 arch` checks.
 | File               | Purpose                               |
 |--------------------|---------------------------------------|
 | `AST.fs`           | Abstract Syntax Tree types            |
-| `ANF.fs`           | A-Normal Form types                   |
-| `MIR.fs`           | Mid-level IR types                    |
-| `LIR.fs`           | Low-level IR types                    |
+| `ir/anf/ANF.fs`           | A-Normal Form types                   |
+| `ir/mir/MIR.fs`           | Mid-level IR types                    |
+| `ir/lir/LIR.fs`           | Low-level IR types                    |
 | `Platform.fs`      | OS/Arch DUs and per-target syscall tables |
-| `ARM64.fs`         | ARM64 instruction and register types  |
-| `ARM64Symbolic.fs` | Symbolic ARM64 instructions (pre-encoding) |
-| `X86_64.fs`        | x86_64 instruction and register types |
-| `Binary_ELF.fs`    | Shared ELF header/segment types       |
+| `backend/arm64/ISA.fs`         | ARM64 instruction and register types  |
+| `backend/arm64/Symbolic.fs` | Symbolic ARM64 instructions (pre-encoding) |
+| `backend/x64/ISA.fs`        | x86_64 instruction and register types |
+| `backend/binary/ELF.fs`    | Shared ELF header/segment types       |
 
 ---
 

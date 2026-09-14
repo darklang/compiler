@@ -3,27 +3,10 @@
 module RcReturnAnalysis
 
 open MemoryModel
-open ReleasePlanFingerprint
-open MemoryPlanning
 open ANF
-open LoweringPrimitives
-open TypeRegistries
-open SpecializationIdentity
-open TypeSubstitution
-open Monomorphization
-open InlineLambdas
-open ClosureAnalysis
-open ClosureComparisons
 open LiftExpressions
 open LiftFunctions
-open PrepareFunctions
-open LoweringOperators
-open LoweringTypeInference
-open LoweringAggregates
-open ANFContinuations
 open LoweringExpressions
-open AST_to_ANF
-open RcTypeFacts
 
 type ReturnAnnotatedExpr =
     | RReturn of Atom * Set<TempId>
@@ -126,7 +109,7 @@ let private aggregateAliasFieldCount
     | RecordClone (_, source, fields) ->
         let sourceUsesAlias =
             aliases
-            |> Set.exists (fun target -> ANF_Optimize.atomUsesTemp target source)
+            |> Set.exists (fun target -> ANFEffects.atomUsesTemp target source)
         if sourceUsesAlias then 0 else countFields fields
     | _ ->
         0
@@ -145,7 +128,7 @@ let rec private returnAnnotatedExprUsesAnyAlias
     : bool =
     let atomUsesAnyAlias atom =
         aliases
-        |> Set.exists (fun target -> ANF_Optimize.atomUsesTemp target atom)
+        |> Set.exists (fun target -> ANFEffects.atomUsesTemp target atom)
 
     match body with
     | RReturn (atom, _) -> atomUsesAnyAlias atom
@@ -154,7 +137,7 @@ let rec private returnAnnotatedExprUsesAnyAlias
         returnAnnotatedExprUsesAnyAlias (Set.remove parameter.Id aliases) continuation
         || returnAnnotatedExprUsesAnyAlias aliases entry
     | RLet (_, cexpr, nextBody, _) ->
-        (aliases |> Set.exists (fun target -> ANF_Optimize.cexprUsesTemp target cexpr))
+        (aliases |> Set.exists (fun target -> ANFEffects.cexprUsesTemp target cexpr))
         || returnAnnotatedExprUsesAnyAlias aliases nextBody
     | RIf (cond, thenBranch, elseBranch, _) ->
         atomUsesAnyAlias cond
@@ -167,7 +150,7 @@ let private cexprReleasesAnyAlias (aliases: Set<TempId>) (cexpr: CExpr) : bool =
     | RefCountDecString atom
     | RefCountDecBlob atom ->
         aliases
-        |> Set.exists (fun target -> ANF_Optimize.atomUsesTemp target atom)
+        |> Set.exists (fun target -> ANFEffects.atomUsesTemp target atom)
     | _ ->
         false
 

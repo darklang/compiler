@@ -2,14 +2,6 @@
 
 module ARM64WriteFromPointer
 
-open ARM64RuntimeImmediates
-open ARM64PrintAndExit
-open ARM64PrintValues
-open ARM64FileMetadata
-open ARM64FileRead
-open ARM64FileWrite
-open ARM64HostValues
-
 /// Generate code for FileWriteFromPtr: write raw bytes to a file
 /// pathReg: register containing heap string pointer to file path
 /// ptrReg: register containing raw pointer to bytes
