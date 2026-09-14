@@ -91,6 +91,9 @@ type CliOptions = {
     DumpANF: bool
     DumpMIR: bool
     DumpLIR: bool
+    DumpFunction: string option
+    DumpIRSummary: bool
+    DumpIROutput: string option
 }
 
 /// Default empty options
@@ -128,6 +131,9 @@ let defaultOptions = {
     DumpANF = false
     DumpMIR = false
     DumpLIR = false
+    DumpFunction = None
+    DumpIRSummary = false
+    DumpIROutput = None
 }
 
 let private parseTargetValue (value: string) : Result<TargetSelection, string> =
@@ -162,6 +168,8 @@ let buildCompilerOptions (cliOpts: CliOptions) : CompilerLibrary.CompilerOptions
     DumpANF = cliOpts.DumpANF
     DumpMIR = cliOpts.DumpMIR
     DumpLIR = cliOpts.DumpLIR
+    DumpFunction = cliOpts.DumpFunction
+    DumpIRSummary = cliOpts.DumpIRSummary
 }
 
 /// Parse command-line flags into options
@@ -248,6 +256,49 @@ let parseArgs (argv: string array) : Result<CliOptions, string> =
 
         | "--dump-lir" :: rest ->
             parseFlags rest { opts with DumpLIR = true } lastVerbosity
+
+        | "--dump-function" :: value :: rest ->
+            if opts.DumpFunction.IsSome then
+                Error "Dump function filter specified multiple times"
+            elif String.IsNullOrWhiteSpace value then
+                Error "--dump-function requires a non-empty value"
+            else
+                parseFlags rest { opts with DumpFunction = Some value } lastVerbosity
+
+        | "--dump-function" :: [] ->
+            Error "Missing value for --dump-function"
+
+        | flag :: rest when flag.StartsWith("--dump-function=") ->
+            let value = flag.Substring(16)
+            if opts.DumpFunction.IsSome then
+                Error "Dump function filter specified multiple times"
+            elif String.IsNullOrWhiteSpace value then
+                Error "--dump-function requires a non-empty value"
+            else
+                parseFlags rest { opts with DumpFunction = Some value } lastVerbosity
+
+        | "--dump-ir-summary" :: rest ->
+            parseFlags rest { opts with DumpIRSummary = true } lastVerbosity
+
+        | "--dump-ir-output" :: value :: rest ->
+            if opts.DumpIROutput.IsSome then
+                Error "IR dump output specified multiple times"
+            elif String.IsNullOrWhiteSpace value then
+                Error "--dump-ir-output requires a non-empty value"
+            else
+                parseFlags rest { opts with DumpIROutput = Some value } lastVerbosity
+
+        | "--dump-ir-output" :: [] ->
+            Error "Missing value for --dump-ir-output"
+
+        | flag :: rest when flag.StartsWith("--dump-ir-output=") ->
+            let value = flag.Substring(17)
+            if opts.DumpIROutput.IsSome then
+                Error "IR dump output specified multiple times"
+            elif String.IsNullOrWhiteSpace value then
+                Error "--dump-ir-output requires a non-empty value"
+            else
+                parseFlags rest { opts with DumpIROutput = Some value } lastVerbosity
 
         | "--leak-check" :: rest ->
             parseFlags rest { opts with LeakCheck = true } lastVerbosity
@@ -381,6 +432,11 @@ let validateOptions (opts: CliOptions) : Result<CliOptions, string> =
             Error "Cannot specify output file with run mode (-r)"
         else if opts.Run && opts.Target <> HostTarget then
             Error "Explicit compiler targets are compile-only; remove --run"
+        else if
+            (opts.DumpFunction.IsSome || opts.DumpIRSummary || opts.DumpIROutput.IsSome)
+            && not (opts.DumpANF || opts.DumpMIR || opts.DumpLIR || opts.Verbosity = DumpIR)
+        then
+            Error "--dump-function, --dump-ir-summary, and --dump-ir-output require an IR dump selection"
         else
             Ok opts
 
@@ -391,12 +447,46 @@ let private sourceFileForDiagnostics (cliOpts: CliOptions) : string =
     | false, None ->
         Crash.crash "sourceFileForDiagnostics: compile/run called without a validated input source"
 
+let private sourceDescription (cliOpts: CliOptions) : string =
+    match cliOpts.IsExpression, cliOpts.Argument with
+    | true, _ -> "<expression>"
+    | false, Some sourceFile -> sourceFile
+    | false, None ->
+        Crash.crash "sourceDescription: compile/run called without a validated input source"
+
+/// Redirect compiler diagnostics and IR dumps at the CLI boundary. Explicit
+/// dump flags do not otherwise enable pass chatter, so their files contain
+/// only the requested representations.
+let private withIRDumpOutput
+    (cliOpts: CliOptions)
+    (runCompiler: unit -> 'result)
+    : Result<'result, string> =
+    match cliOpts.DumpIROutput with
+    | None -> Ok (runCompiler ())
+    | Some path ->
+        let writerResult =
+            try Ok (new StreamWriter(path, false))
+            with ex -> Error $"Failed to open IR dump '{path}': {ex.Message}"
+        match writerResult with
+        | Error error -> Error error
+        | Ok writer ->
+            use dumpWriter = writer
+            let originalOut = Console.Out
+            Console.SetOut(writer)
+            let result =
+                try runCompiler ()
+                finally Console.SetOut(originalOut)
+            try
+                writer.Flush()
+                Ok result
+            with ex -> Error $"Failed to write IR dump to '{path}': {ex.Message}"
+
 /// Compile source expression to executable
 let compile (source: string) (outputPath: string) (verbosity: VerbosityLevel) (cliOpts: CliOptions) : int =
     let showNormal = shouldShowNormal verbosity
 
     if showNormal then
-        println $"Compiling: {source}"
+        println $"Compiling: {sourceDescription cliOpts}"
 
     // Use library for compilation
     let options = buildCompilerOptions cliOpts
@@ -434,14 +524,17 @@ let compile (source: string) (outputPath: string) (verbosity: VerbosityLevel) (c
                 PassTimingRecorder = None
                 Session = None
             }
-            let compileReport = CompilerLibrary.compile request
-            match compileReport.Result with
+            let compileReport = withIRDumpOutput cliOpts (fun () -> CompilerLibrary.compile request)
+            match compileReport with
             | Error err ->
+                eprintln err
+                1
+            | Ok { Result = Error err } ->
                 eprintln $"Compilation failed: {err}"
                 1
-            | Ok binary ->
+            | Ok { Result = Ok binary; Target = compiledTarget } ->
                 let writeResult =
-                    match compileReport.Target with
+                    match compiledTarget with
                     | Platform.ARM64Backend Platform.MacOSARM64 ->
                         Binary_Generation_MachO.writeToFile outputPath binary
                     | Platform.ARM64Backend Platform.LinuxARM64
@@ -460,7 +553,7 @@ let run (source: string) (verbosity: VerbosityLevel) (cliOpts: CliOptions) : int
     let showNormal = shouldShowNormal verbosity
 
     if showNormal then
-        println $"Compiling and running: {source}"
+        println $"Compiling and running: {sourceDescription cliOpts}"
         println "---"
 
     // Use library for compile and run
@@ -499,15 +592,20 @@ let run (source: string) (verbosity: VerbosityLevel) (cliOpts: CliOptions) : int
                     PassTimingRecorder = None
                     Session = None
                 }
-                let compileReport = CompilerLibrary.compile request
-                match compileReport.Result with
+                let compileReport = withIRDumpOutput cliOpts (fun () -> CompilerLibrary.compile request)
+                match compileReport with
                 | Error err ->
                     { ExitCode = 1
                       Stdout = ""
                       Stderr = err
                       RuntimeTime = TimeSpan.Zero }
-                | Ok binary ->
-                    CompilerLibrary.executeAttached compileReport.Target (verbosityToInt verbosity) binary
+                | Ok { Result = Error err } ->
+                    { ExitCode = 1
+                      Stdout = ""
+                      Stderr = err
+                      RuntimeTime = TimeSpan.Zero }
+                | Ok { Result = Ok binary; Target = compiledTarget } ->
+                    CompilerLibrary.executeAttached compiledTarget (verbosityToInt verbosity) binary
 
     if showNormal then
         println "---"
@@ -551,6 +649,9 @@ let printUsage () =
     println "  --dump-anf           Dump ANF (all ANF stages)"
     println "  --dump-mir           Dump MIR (control-flow graph)"
     println "  --dump-lir           Dump LIR (before and after register allocation)"
+    println "  --dump-function TEXT Restrict IR dumps to matching function names"
+    println "  --dump-ir-summary    Emit function/block/instruction counts instead of full IR"
+    println "  --dump-ir-output FILE  Write compiler IR output to FILE instead of stdout"
     println "  --leak-check         Enable leak checking (debug builds only)"
     println "  -h, --help           Show this help message"
     println "  --version            Show version information"

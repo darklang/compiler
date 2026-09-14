@@ -49,9 +49,3 @@ grouped by purpose; each subject has one canonical source.
 maintained from their named interpreter revision, source implementation, and
 focused tests. Other documentation should link to those sources instead of
 copying their current-state claims.
-
-## Operational data
-
-`agents/*/agent.json` and the executable tools they name are operational data,
-not contributor documentation. Historical investigations, journals, and
-duplicate playbooks are not retained as current documentation.

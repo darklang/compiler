@@ -31,9 +31,46 @@ let testEmitResultModeIsExplicit () : TestResult =
     | Ok _ -> Error "Expected --emit-result to select observable file-result compilation"
     | Error error -> Error $"Expected --emit-result parsing to succeed, got: {error}"
 
+let testScopedIRDumpOptions () : TestResult =
+    match
+        Program.parseArgs
+            [| "--dump-anf"
+               "--dump-function=map"
+               "--dump-ir-summary"
+               "--dump-ir-output=artifacts/map.ir"
+               "program.dark" |]
+        |> Result.bind Program.validateOptions
+    with
+    | Ok options when
+        options.DumpANF
+        && options.DumpFunction = Some "map"
+        && options.DumpIRSummary
+        && options.DumpIROutput = Some "artifacts/map.ir" ->
+        Ok ()
+    | Ok options -> Error $"Unexpected scoped IR dump options: {options}"
+    | Error error -> Error $"Expected scoped IR dump options to parse, got: {error}"
+
+let testIRDumpModifiersRequireDumpSelection () : TestResult =
+    match
+        Program.parseArgs [| "--dump-function=map"; "program.dark" |]
+        |> Result.bind Program.validateOptions
+    with
+    | Error error when error.Contains "require an IR dump" -> Ok ()
+    | Error error -> Error $"Expected IR dump selection guidance, got: {error}"
+    | Ok _ -> Error "Expected a dump function filter without an IR selection to fail"
+
+let testEmptyIRDumpValuesRejected () : TestResult =
+    match Program.parseArgs [| "--dump-anf"; "--dump-function="; "program.dark" |] with
+    | Error error when error.Contains "non-empty" -> Ok ()
+    | Error error -> Error $"Expected non-empty dump filter guidance, got: {error}"
+    | Ok _ -> Error "Expected an empty dump function filter to fail"
+
 let tests = [
     ("parse explicit Linux x86_64 target", testExplicitLinuxX86_64Target)
     ("reject unknown compiler target", testUnknownTargetRejected)
     ("reject cross-target run mode", testCrossTargetRunRejected)
     ("parse explicit file-result mode", testEmitResultModeIsExplicit)
+    ("parse scoped IR dump options", testScopedIRDumpOptions)
+    ("require an IR selection for dump modifiers", testIRDumpModifiersRequireDumpSelection)
+    ("reject empty IR dump values", testEmptyIRDumpValuesRejected)
 ]

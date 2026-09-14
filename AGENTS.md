@@ -30,6 +30,24 @@ contains only rules specific to agents changing this repository.
   ARM64 work.
 - Fix compiler warnings and errors before committing.
 
+## Bounded inspection
+
+- Search with `rg` before reading source, then inspect the smallest relevant
+  range. Do not dump a whole large source file when a symbol or bounded range
+  answers the question.
+- Keep source and documentation reads to roughly 250 lines per command unless
+  the additional context is demonstrably necessary.
+- Start history and review inspection with bounded summaries such as
+  `git status --short`, `git diff --stat`, `git diff --numstat`, or
+  `git show --no-patch`. Never run an unbounded `git show`, `git diff`, or
+  `git log -p`; select explicit paths or bounded ranges before reading patches.
+- Capture verbose compiler, test, benchmark, disassembly, and profiling output
+  in an ignored artifact. Return only a bounded diagnostic excerpt and the
+  artifact path; expand it with a targeted search rather than reading it whole.
+- Prefer `--dump-function`, `--dump-ir-summary`, and `--dump-ir-output` when
+  inspecting compiler IR. Use complete program dumps only when the relationship
+  between multiple functions is itself under investigation.
+
 ## Git workflow
 
 - Perform all work in a dedicated git worktree, never in the primary checkout,

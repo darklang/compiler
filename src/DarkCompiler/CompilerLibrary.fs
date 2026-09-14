@@ -104,6 +104,10 @@ type CompilerOptions = {
     DumpMIR: bool
     /// Dump LIR representations to stdout (before and after register allocation)
     DumpLIR: bool
+    /// Restrict IR dumps to function names containing this text.
+    DumpFunction: string option
+    /// Emit only function and instruction counts for selected IR dumps.
+    DumpIRSummary: bool
 }
 
 /// Default compiler options
@@ -133,6 +137,8 @@ let defaultOptions : CompilerOptions = {
     DumpANF = false
     DumpMIR = false
     DumpLIR = false
+    DumpFunction = None
+    DumpIRSummary = false
 }
 
 /// Explicit lifetime for reuse across a bounded group of compilations (the E2E
@@ -1362,21 +1368,21 @@ let private formatPassGroup (label: string) (passes: (string * bool) list) : str
     | _ -> $"{label} ({enabledNames})"
 
 /// Print ANF program in a consistent, human-readable format
-let private printANFProgram (title: string) (program: ANF.Program) : unit =
+let private printANFProgram (options: CompilerOptions) (title: string) (program: ANF.Program) : unit =
     println title
-    println (formatANF program)
+    println (formatANFDump options.DumpFunction options.DumpIRSummary program)
     println ""
 
 /// Print MIR program (with CFG) in a consistent format
-let private printMIRProgram (title: string) (program: MIR.Program) : unit =
+let private printMIRProgram (options: CompilerOptions) (title: string) (program: MIR.Program) : unit =
     println title
-    println (formatMIR program)
+    println (formatMIRDump options.DumpFunction options.DumpIRSummary program)
     println ""
 
 /// Print symbolic LIR program (with CFG) in a consistent format
-let private printLIRProgram (title: string) (program: LIR.Program) : unit =
+let private printLIRProgram (options: CompilerOptions) (title: string) (program: LIR.Program) : unit =
     println title
-    println (formatLIR program)
+    println (formatLIRDump options.DumpFunction options.DumpIRSummary program)
     println ""
 
 /// Run SSA + MIR/LIR optimizations, returning an optimized LIR program
@@ -1492,7 +1498,7 @@ let private compileMirToLir
     let mirOptElapsed = sw.Elapsed.TotalMilliseconds - mirOptStart
     recordPassTiming passTimingRecorder "MIR Optimizations" mirOptElapsed
     if shouldDumpIR verbosity options.DumpMIR then
-        printMIRProgram "=== MIR (Control Flow Graph) ===" optimizedProgram
+        printMIRProgram options "=== MIR (Control Flow Graph) ===" optimizedProgram
     if verbosity >= 2 then
         let t = System.Math.Round(mirOptElapsed, 1)
         println $"        {t}ms"
@@ -1541,7 +1547,7 @@ let private compileMirToLir
                         fields |> List.map (fun field -> (field.Name, field.Type)))
                 LIR.Program (lirFuncs, variants, records))
         if shouldDumpIR verbosity options.DumpLIR then
-            printLIRProgram "=== LIR (Low-level IR with CFG) ===" lirProgramForDump.Value
+            printLIRProgram options "=== LIR (Low-level IR with CFG) ===" lirProgramForDump.Value
         if verbosity >= 2 then
             let t = System.Math.Round(lirElapsed, 1)
             println $"        {t}ms"
@@ -1829,7 +1835,7 @@ let private buildAnf
     if verbosity >= 1 then println $"  [2.3/7] {anfPassLabel}..."
     let anfProgram = ANF.Program (functions, ANF.Return ANF.UnitLiteral)
     if shouldDumpIR verbosity options.DumpANF then
-        printANFProgram "=== ANF (before optimization) ===" anfProgram
+        printANFProgram options "=== ANF (before optimization) ===" anfProgram
     let anfOptStart = sw.Elapsed.TotalMilliseconds
     let anfOptimizeContext : ANF_Optimize.OptimizeContext =
         { TypeReg = registries.RecordFieldsReg
@@ -1846,7 +1852,7 @@ let private buildAnf
         let t = System.Math.Round(anfOptElapsed, 1)
         println $"        {t}ms"
     if shouldDumpIR verbosity options.DumpANF then
-        printANFProgram "=== ANF (after optimization) ===" anfOptimized
+        printANFProgram options "=== ANF (after optimization) ===" anfOptimized
 
     if verbosity >= 1 then println "  [2.4/7] ANF Inlining..."
     let inlineStart = sw.Elapsed.TotalMilliseconds
@@ -1933,7 +1939,7 @@ let private buildAnf
             let t = System.Math.Round(rcElapsed, 1)
             println $"        {t}ms"
         if shouldDumpIR verbosity options.DumpANF then
-            printANFProgram "=== ANF (after RC insertion) ===" anfAfterRC
+            printANFProgram options "=== ANF (after RC insertion) ===" anfAfterRC
 
         let (ANF.Program (finalFunctions, _)) = anfAfterRC
         Ok (finalFunctions, typeMap)
@@ -1961,7 +1967,7 @@ let private applyTco
         let t = System.Math.Round(tcoElapsed, 1)
         println $"        {t}ms"
     if shouldDumpIR verbosity options.DumpANF then
-        printANFProgram "=== ANF (after Tail Call Detection) ===" anfAfterTCO
+        printANFProgram options "=== ANF (after Tail Call Detection) ===" anfAfterTCO
     let (ANF.Program (tcoFunctions, _)) = anfAfterTCO
     tcoFunctions
 
@@ -4072,7 +4078,7 @@ let private compileUserWithPlan (plan: UserCompilePlan) : CompileReport =
                                     println $"        {t}ms"
                                 if shouldDumpIR plan.Verbosity plan.Options.DumpANF then
                                     let printProgram = ANF.Program (printedFunctions, ANF.Return ANF.UnitLiteral)
-                                    printANFProgram "=== ANF (after Print insertion) ===" printProgram
+                                    printANFProgram plan.Options "=== ANF (after Print insertion) ===" printProgram
 
                                 let tcoProgramFunctions =
                                     applyTco
@@ -4324,7 +4330,7 @@ let private compileUserWithPlan (plan: UserCompilePlan) : CompileReport =
                                         ]
                                         |> List.filter (fun group -> not (List.isEmpty group.Functions))
                                     if shouldDumpIR plan.Verbosity plan.Options.DumpLIR then
-                                        printLIRProgram "=== LIR (After Register Allocation) ===" allocatedProgram
+                                        printLIRProgram plan.Options "=== LIR (After Register Allocation) ===" allocatedProgram
 
                                     let binaryResult =
                                         generateBinary

@@ -21,54 +21,23 @@ if [ -z "$EXPR" ]; then
     exit 1
 fi
 
-TMPFILE="$(mktemp -t dark-lir-dump.XXXXXX)"
 OUTFILE="$(mktemp -t dark-lir-output.XXXXXX)"
 
 cleanup() {
-    rm -f "$TMPFILE" "$OUTFILE"
+    rm -f "$OUTFILE"
 }
 
 trap cleanup EXIT
 
-# Compile and dump LIR. Keep the captured compiler output for filtering on
-# success, but print it when the dump itself fails.
+dump_args=(--dump-lir)
+if [ -n "$FUNC" ]; then
+    dump_args+=("--dump-function=$FUNC")
+fi
+
+# Filtering happens before formatting in the compiler, so a focused request
+# never materializes the full LIR dump.
 if [ -f "$EXPR" ]; then
-    if ./dark --dump-lir "$EXPR" -o "$OUTFILE" > "$TMPFILE" 2>&1; then
-        compile_status=0
-    else
-        compile_status=$?
-    fi
+    ./dark "${dump_args[@]}" "$EXPR" -o "$OUTFILE"
 else
-    if ./dark --dump-lir -e "$EXPR" -o "$OUTFILE" > "$TMPFILE" 2>&1; then
-        compile_status=0
-    else
-        compile_status=$?
-    fi
-fi
-
-if [ "$compile_status" -ne 0 ]; then
-    cat "$TMPFILE"
-    exit "$compile_status"
-fi
-
-if [ -z "$FUNC" ]; then
-    cat "$TMPFILE"
-else
-    echo "=== Pre-Register-Allocation: $FUNC ==="
-    # Find function before "After Register Allocation"
-    awk -v func="^${FUNC}:" '
-        /After Register Allocation/ {in_post=1}
-        !in_post && $0 ~ func {found=1}
-        found && /^$/ {found=0}
-        found {print}
-    ' "$TMPFILE"
-
-    echo ""
-    echo "=== Post-Register-Allocation: $FUNC ==="
-    awk -v func="^${FUNC}:" '
-        /After Register Allocation/ {in_post=1}
-        in_post && $0 ~ func {found=1}
-        found && /^$/ {found=0}
-        found {print}
-    ' "$TMPFILE"
+    ./dark "${dump_args[@]}" -e "$EXPR" -o "$OUTFILE"
 fi

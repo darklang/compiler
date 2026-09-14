@@ -54,11 +54,20 @@ done
 
 if [ "$AI_BUILD" = true ]; then
     echo "building"
-    BUILD_OUTPUT="$(mktemp)"
+    mkdir -p "$SCRIPT_DIR/TestResults/ai"
+    BUILD_OUTPUT="$SCRIPT_DIR/TestResults/ai/build-$(date -u +%Y%m%dT%H%M%SZ)-$$.log"
     if ! build_tests > "$BUILD_OUTPUT" 2>&1; then
         echo "build failed"
-        cat "$BUILD_OUTPUT"
-        rm -f "$BUILD_OUTPUT"
+        echo "essential diagnostics:"
+        { grep -E '(: error |Build FAILED|Unhandled exception|error [A-Z][A-Z0-9]+:)' "$BUILD_OUTPUT" || true; } \
+            | awk '!seen[$0]++' \
+            | sed -n '1,12p' \
+            | cut -c1-512
+        echo ""
+        echo "full output: ${BUILD_OUTPUT#"$SCRIPT_DIR/"}"
+        printf 'reproduce: ./run-tests'
+        printf ' %q' "${TEST_ARGS[@]}"
+        printf '\n'
         exit 1
     fi
     rm -f "$BUILD_OUTPUT"

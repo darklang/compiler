@@ -34,6 +34,19 @@ Use the CLI to dump textual IRs while compiling:
 
 `-vvv` dumps all IRs in sequence.
 
+Large programs should normally use a scoped dump:
+
+```bash
+./dark --dump-anf --dump-function=List.map prog.dark
+./dark --dump-mir --dump-function=List.map --dump-ir-summary prog.dark
+./dark --dump-lir --dump-function=List.map --dump-ir-output=/tmp/list-map.lir prog.dark
+```
+
+Function matching is case-insensitive and happens before formatting, so
+unrelated functions do not consume memory or terminal context. Summary mode
+prints the selected function count and, for MIR and LIR, block and instruction
+counts. File output is replaced for each compiler invocation.
+
 ## MIR (Mid-level IR)
 
 ### Purpose

@@ -20,6 +20,31 @@ open TestDSL.OptimizationTestRunner
 open TestRunnerArgs
 open TestFramework
 
+let private aiFailureLimit = 5
+let private aiMessageCharacterLimit = 1200
+let private aiDetailsCharacterLimit = 2400
+
+let private truncateDiagnostic (maxCharacters: int) (text: string) : string =
+    let boundedMaximum = max 0 maxCharacters
+    if text.Length <= boundedMaximum then
+        text
+    elif boundedMaximum = 0 then
+        ""
+    else
+        let suffix = $"... [truncated {text.Length - boundedMaximum} characters]"
+        if suffix.Length >= boundedMaximum then suffix.Substring(0, boundedMaximum)
+        else text.Substring(0, boundedMaximum - suffix.Length) + suffix
+
+let private truncateDiagnosticDetails (maxCharacters: int) (values: string list) : string list =
+    let rec loop remaining acc pending =
+        match pending with
+        | [] -> List.rev acc
+        | _ when remaining <= 0 -> List.rev acc
+        | value :: rest ->
+            let rendered = truncateDiagnostic remaining value
+            loop (remaining - rendered.Length) (rendered :: acc) rest
+    loop maxCharacters [] values
+
 // Print help message
 let printHelp () =
     println "Usage: Tests [OPTIONS]"
@@ -1968,6 +1993,18 @@ let private printStructuredFailures (state: TestRunState) (limit: int) : unit =
     if moreCount > 0 then
         println $"... and {moreCount} more failing test(s)"
 
+let private printBoundedStructuredFailures (state: TestRunState) : unit =
+    let displayCount = min aiFailureLimit state.FailedTests.Count
+    for i in 0 .. displayCount - 1 do
+        let test = state.FailedTests.[i]
+        println $"{i + 1}. {formatFailureDisplayName test}"
+        println $"   {truncateDiagnostic aiMessageCharacterLimit test.Message}"
+        for detail in truncateDiagnosticDetails aiDetailsCharacterLimit test.Details do
+            println $"   {detail}"
+    let moreCount = state.FailedTests.Count - displayCount
+    if moreCount > 0 then
+        println $"... and {moreCount} more failing test(s)"
+
 let private printQuietResult (result: TestRunResult) : int =
     if result.ExitCode = 0 then
         println "success"
@@ -1983,13 +2020,19 @@ let private printQuietResult (result: TestRunResult) : int =
 let private runAiMode (args: string array) : int =
     let originalOut = Console.Out
     let originalError = Console.Error
+    let artifactDirectory = Path.Combine(Environment.CurrentDirectory, "TestResults", "ai")
+    Directory.CreateDirectory artifactDirectory |> ignore
+    let timestamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmssfffZ", CultureInfo.InvariantCulture)
+    let artifactPath = Path.Combine(artifactDirectory, $"test-run-{timestamp}.log")
+    use artifactWriter = new StreamWriter(artifactPath, false)
+    let synchronizedArtifactWriter = TextWriter.Synchronized artifactWriter
     let reportCompletedTest completed =
         if completed % aiProgressTestInterval = 0 then
             originalOut.Write(".")
             originalOut.Flush()
 
-    Console.SetOut(TextWriter.Null)
-    Console.SetError(TextWriter.Null)
+    Console.SetOut(synchronizedArtifactWriter)
+    Console.SetError(synchronizedArtifactWriter)
     originalOut.WriteLine("running tests (AI mode)")
     let task =
         Task.Run(fun () ->
@@ -1999,6 +2042,7 @@ let private runAiMode (args: string array) : int =
         try
             task.GetAwaiter().GetResult()
         finally
+            synchronizedArtifactWriter.Flush()
             Console.SetOut(originalOut)
             Console.SetError(originalError)
 
@@ -2009,11 +2053,13 @@ let private runAiMode (args: string array) : int =
     let totalSecondsText =
         result.TotalTime.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture)
     if result.ExitCode = 0 then
+        File.Delete artifactPath
         originalOut.WriteLine($"success: {result.State.Passed}/{total} passed in {totalSecondsText}s")
     else
         originalOut.WriteLine("failed")
         originalOut.WriteLine($"summary: {result.State.Passed} passed, {result.State.Failed} failed, {totalSecondsText}s")
-        printStructuredFailures result.State 20
+        printBoundedStructuredFailures result.State
+        originalOut.WriteLine($"full output: {Path.GetRelativePath(Environment.CurrentDirectory, artifactPath)}")
 
     result.ExitCode
 

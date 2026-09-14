@@ -29,6 +29,16 @@ let private appendTypeSuffix (typOpt: AST.Type option) (value: string) : string 
 let private commaSeparated (printer: 'a -> string) (values: 'a list) : string =
     values |> List.map printer |> String.concat ", "
 
+let private functionNameMatches (filter: string option) (name: string) : bool =
+    match filter with
+    | None -> true
+    | Some pattern -> name.Contains(pattern, System.StringComparison.OrdinalIgnoreCase)
+
+let private noFunctionMatchText (filter: string option) : string =
+    match filter with
+    | Some pattern -> $"No functions matched '{pattern}'."
+    | None -> "Functions: 0"
+
 /// Pretty-print ANF atom
 let private prettyPrintANFAtom = function
     | ANF.UnitLiteral -> "()"
@@ -260,6 +270,16 @@ let formatANF (ANF.Program (functions, mainExpr)) : string =
         mainStr
     else
         funcStrs + "\n\nMain:\n" + mainStr
+
+/// Format only matching ANF functions, optionally as a compact inventory.
+let formatANFDump (filter: string option) (summary: bool) (ANF.Program (functions, mainExpr)) : string =
+    let selected = functions |> List.filter (fun func -> functionNameMatches filter func.Name)
+    match selected, summary with
+    | [], _ when Option.isSome filter -> noFunctionMatchText filter
+    | _, true ->
+        let names = selected |> List.map (fun func -> func.Name)
+        String.concat "\n" ($"Functions: {List.length selected}" :: names)
+    | _, false -> formatANF (ANF.Program (selected, mainExpr))
 
 /// Pretty-print MIR operand
 let private prettyPrintMIROperand = function
@@ -502,6 +522,24 @@ let formatMIR (program: MIR.Program) : string =
     functions
     |> List.map prettyPrintFunction
     |> String.concat "\n\n"
+
+/// Format only matching MIR functions, optionally as block/instruction counts.
+let formatMIRDump (filter: string option) (summary: bool) (MIR.Program (functions, variants, records)) : string =
+    let selected = functions |> List.filter (fun func -> functionNameMatches filter func.Name)
+    match selected, summary with
+    | [], _ when Option.isSome filter -> noFunctionMatchText filter
+    | _, true ->
+        let functionLines =
+            selected
+            |> List.map (fun func ->
+                let blockCount = Map.count func.CFG.Blocks
+                let instructionCount =
+                    func.CFG.Blocks
+                    |> Map.toList
+                    |> List.sumBy (fun (_, block) -> List.length block.Instrs)
+                $"{func.Name}: {blockCount} blocks, {instructionCount} instructions")
+        String.concat "\n" ($"Functions: {List.length selected}" :: functionLines)
+    | _, false -> formatMIR (MIR.Program (selected, variants, records))
 
 /// Pretty-print LIR physical register
 let private prettyPrintLIRPhysReg = function
@@ -843,3 +881,21 @@ let formatLIR (LIR.Program (functions, _, _)) : string =
             $"{func.Name}:\n  StackSize: {func.StackSize}\n  UsedCalleeSaved: [{calleeSavedText}]\n{blockStrs}")
         |> String.concat "\n\n"
     funcStrs
+
+/// Format only matching LIR functions, optionally as block/instruction counts.
+let formatLIRDump (filter: string option) (summary: bool) (LIR.Program (functions, variants, records)) : string =
+    let selected = functions |> List.filter (fun func -> functionNameMatches filter func.Name)
+    match selected, summary with
+    | [], _ when Option.isSome filter -> noFunctionMatchText filter
+    | _, true ->
+        let functionLines =
+            selected
+            |> List.map (fun func ->
+                let blockCount = Map.count func.CFG.Blocks
+                let instructionCount =
+                    func.CFG.Blocks
+                    |> Map.toList
+                    |> List.sumBy (fun (_, block) -> List.length block.Instrs)
+                $"{func.Name}: {blockCount} blocks, {instructionCount} instructions")
+        String.concat "\n" ($"Functions: {List.length selected}" :: functionLines)
+    | _, false -> formatLIR (LIR.Program (selected, variants, records))

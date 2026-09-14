@@ -73,8 +73,17 @@ launching the produced executable.
 ./dark --dump-anf prog.dark    # ANF stages
 ./dark --dump-mir prog.dark    # MIR CFG
 ./dark --dump-lir prog.dark    # LIR before and after register allocation
+./dark --dump-lir --dump-function=List.map prog.dark
+./dark --dump-mir --dump-function=List.map --dump-ir-summary prog.dark
+./dark --dump-anf --dump-function=List.map --dump-ir-output=/tmp/list-map.anf prog.dark
 ./dark -vvv prog.dark          # Dump everything
 ```
+
+`--dump-function=TEXT` performs a case-insensitive function-name filter before
+formatting the selected representations. `--dump-ir-summary` reports only
+function, block, and instruction counts. `--dump-ir-output=FILE` writes the
+compiler's requested IR output to a file instead of stdout. These modifiers
+require `--dump-anf`, `--dump-mir`, `--dump-lir`, or `-vvv`.
 
 ## Clean
 
