@@ -3,6 +3,12 @@ version: 2
 project:
   name: dark-compiler
 
+git:
+  remote: mergetrain-local
+  integration_branch: main
+  push_refs:
+    - main
+
 gates:
   - name: build
     run: ./build --ai
