@@ -18,12 +18,12 @@ Purpose: Serialize committed local task branches through one merge/test/push/ver
 1. Work on a task-specific branch and worktree.
 2. Commit a clean HEAD before handing work off.
 3. Read mergetrain status --json and follow its next action before changing queue state.
-4. Enqueue every named finished branch in the requested order using only its task and branch; mergetrain resolves the worktree and captures the exact commits. Stop after the last successful enqueue unless the user explicitly authorized validation or the complete validation-and-deployment workflow.
+4. Enqueue every named finished branch in the requested order with `mergetrain enqueue --auto`, using only its task and branch otherwise; mergetrain resolves the worktree, captures the exact commits, and binds unattended approval to the configured destination and execution policy. Stop after the last successful enqueue unless the user explicitly authorized validation or the complete validation-and-deployment workflow.
 5. Never push configured integration refs directly. One authorized runner owns validation and deployment; recovery and destructive actions require their stated approval.
 
 ## Safety boundary
 
-- A task agent enqueues every named finished branch, then stops. "Queue for validation" authorizes enqueue only; only an explicit request to run validation or the complete end-to-end workflow authorizes `validate`.
+- A task agent enqueues every named finished branch with `--auto`, then stops. The flag authorizes only the configured runner's bounded unattended validation and deployment; it does not authorize the task agent to run either operation.
 - Only a separately authorized runner uses `deploy` or a daemon.
 - Deployment requires either confirmation of the human-readable exact plan or prior bounded unattended approval. Agents never select train IDs or supply plan hashes; structured evidence may include identifiers for inspection.
 - Unattended approval is bound to the exact destination and execution policy. Any change blocks before push.

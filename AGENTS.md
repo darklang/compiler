@@ -61,14 +61,15 @@ this repository and takes precedence where it is stricter.
   and rebase the worktree branch on the configured integration ref
   (`origin/main` by default) before starting. Task agents never push.
 - When work is complete, commit the intended changes automatically.
-- Enqueue the committed branch automatically only when it is ready: the
+- Enqueue the committed branch with `mergetrain enqueue --auto` automatically
+  only when it is ready: the
   requested scope is complete, the final diff has been substantively reviewed,
   all relevant tests pass, relevant benchmarks show no regression, and no known
   issue or unresolved uncertainty remains. Once enqueued, stop; do not rebase
   merely because the integration ref advanced after work began.
-- Only a separately and explicitly authorized merge-train runner may validate
-  or deploy queued work. Deployment permission is not implied by an ordinary
-  task request; no task agent may integrate `main` directly.
+- `--auto` grants the configured merge-train runner bounded unattended approval
+  for that exact destination and execution policy. It does not authorize the
+  task agent itself to validate, deploy, push, or integrate `main` directly.
 - If readiness cannot be established, leave the commit on its worktree branch
   without enqueueing it and report `Merge train: ❌ not ready — <reason>`. Do
   not use a low-value mechanical check as a substitute for relevant
