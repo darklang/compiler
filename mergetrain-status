@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# mergetrain-status - Continuously refresh the local merge-train status.
+
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+interval_seconds=2
+clear_screen=true
+run_once=false
+
+usage() {
+  echo "Usage: ./mergetrain-status [--repo PATH] [--interval SECONDS] [--no-clear] [--once]"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo)
+      repo_root="$2"
+      shift 2
+      ;;
+    --interval)
+      interval_seconds="$2"
+      shift 2
+      ;;
+    --no-clear)
+      clear_screen=false
+      shift
+      ;;
+    --once)
+      run_once=true
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      echo "Unknown argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ ! "$interval_seconds" =~ ^[1-9][0-9]*$ ]]; then
+  echo "--interval must be a positive integer" >&2
+  exit 2
+fi
+if ! command -v mergetrain >/dev/null 2>&1; then
+  echo "Required command not found: mergetrain" >&2
+  exit 1
+fi
+
+repo_root="$(cd "$repo_root" && pwd -P)"
+
+while true; do
+  if [[ "$clear_screen" == true && -t 1 ]]; then
+    printf '\033[H\033[2J'
+  fi
+
+  if ! mergetrain --repo "$repo_root" status; then
+    echo "Status refresh failed; retrying in $interval_seconds second(s)" >&2
+  fi
+
+  if [[ "$run_once" == true ]]; then
+    exit 0
+  fi
+  sleep "$interval_seconds"
+done
