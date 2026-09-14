@@ -76,9 +76,9 @@ else:
 ' "$path"
 }
 
-repair_conflict() {
+repair_job() {
   local snapshot="$1"
-  local job_id details category worktree branch old_head attempt_marker output_file
+  local job_id details category reason worktree branch old_head attempt_marker output_file
   local current_branch new_head dirty
 
   job_id="$(json_value next_action.target_job_id <<<"$snapshot")"
@@ -89,8 +89,15 @@ repair_conflict() {
 
   details="$(mergetrain --repo "$repo_root" inspect "$job_id" --json)"
   category="$(json_value outcome.failure_category <<<"$details")"
+  reason="$(json_value outcome.message <<<"$details")"
   case "$category" in
     merge_conflict|semantic_conflict)
+      ;;
+    push_rejected)
+      if [[ "$reason" != *non-fast-forward* ]]; then
+        echo "Job #$job_id has a non-recoverable push rejection: $reason" >&2
+        exit 1
+      fi
       ;;
     *)
       echo "Job #$job_id needs operator attention ($category); refusing an automatic repair" >&2
@@ -121,17 +128,18 @@ repair_conflict() {
       --approve-for-me \
       --ephemeral \
       --output-last-message "$output_file" \
-      "Repair mergetrain job #$job_id on branch $branch.
+      "Repair mergetrain job #$job_id on branch $branch after a $category failure.
 
 Read and follow AGENTS.md and the repository documentation. The mergetrain
 inspection JSON is provided on stdin. Fetch the configured integration ref,
-understand both sides of the conflict, and resolve it without discarding either
-change. Work only in this job's owning worktree. Run all relevant verification
-and commit the repair.
+rebase this task branch onto it, understand both sides of any conflict, and
+resolve it without discarding either change. Work only in this job's owning
+worktree. Run all relevant verification and commit the repair.
 
-Do not push, deploy, enqueue, retry, reconcile, cancel, dismiss, or modify
-mergetrain queue state. If a confident repair is not possible, leave the branch
-unchanged and explain the blocker."; then
+For this recovery run, do not invoke ./land. Do not push, deploy, enqueue,
+retry, reconcile, cancel, dismiss, or modify mergetrain queue state; the
+integrator owns the retry. If a confident repair is not possible, leave the
+branch unchanged and explain the blocker."; then
     echo "Codex failed while repairing job #$job_id; see $output_file" >&2
     exit 1
   fi
@@ -163,7 +171,7 @@ while true; do
 
   case "$next_action" in
     fix_blocked_job)
-      repair_conflict "$snapshot"
+      repair_job "$snapshot"
       ;;
     enqueue_clean_branch|gc_available|run_daemon_when_approved)
       ;;
