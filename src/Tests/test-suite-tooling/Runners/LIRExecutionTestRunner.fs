@@ -112,10 +112,10 @@ let private executeX64Program program leakCheck =
 let private executeARM64Program armTarget program leakCheck =
     let enableLeakCheck = leakCheck = LeakCheckEnabled
     let target = ARM64.targetConfigFor armTarget
-    let options = { CodeGen.defaultOptions with EnableLeakCheck = enableLeakCheck }
+    let options = { ARM64CodeGenTypes.defaultOptions with EnableLeakCheck = enableLeakCheck }
 
     executableProgram program
-    |> Result.map CodeGen.prepareARM64Program
+    |> Result.map ARM64PrepareFunctions.prepareARM64Program
     |> Result.bind (CodeGen.generateARM64WithOptions target options)
     |> Result.mapError (fun msg -> $"Codegen error: {msg}")
     |> Result.bind (fun generated ->

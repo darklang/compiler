@@ -223,8 +223,8 @@ let testArm64CodegenCacheSegregatesTargetOptionsAndCoverage (_: CompilerLibrary.
     use session = new CompilerLibrary.CompilationSession()
     let macOS = ARM64.targetConfigFor Platform.MacOSARM64
     let linux = ARM64.targetConfigFor Platform.LinuxARM64
-    let changedOptions = { CodeGen.defaultOptions with DisableFreeList = true }
-    let coverageOptions = { CodeGen.defaultOptions with EnableCoverage = true; CoverageExprCount = 1 }
+    let changedOptions = { ARM64CodeGenTypes.defaultOptions with DisableFreeList = true }
+    let coverageOptions = { ARM64CodeGenTypes.defaultOptions with EnableCoverage = true; CoverageExprCount = 1 }
     let contextIdentity = System.Object()
     let calls = ResizeArray<unit>()
     let generate () =
@@ -232,10 +232,10 @@ let testArm64CodegenCacheSegregatesTargetOptionsAndCoverage (_: CompilerLibrary.
         Ok []
     let structurallyEquivalentFunction =
         { fakeFunction with Name = fakeFunction.Name }
-    let _ = session.CodegenFunction contextIdentity macOS CodeGen.defaultOptions fakeFunction generate
-    let _ = session.CodegenFunction contextIdentity macOS CodeGen.defaultOptions fakeFunction generate
-    let _ = session.CodegenFunction contextIdentity macOS CodeGen.defaultOptions structurallyEquivalentFunction generate
-    let _ = session.CodegenFunction contextIdentity linux CodeGen.defaultOptions fakeFunction generate
+    let _ = session.CodegenFunction contextIdentity macOS ARM64CodeGenTypes.defaultOptions fakeFunction generate
+    let _ = session.CodegenFunction contextIdentity macOS ARM64CodeGenTypes.defaultOptions fakeFunction generate
+    let _ = session.CodegenFunction contextIdentity macOS ARM64CodeGenTypes.defaultOptions structurallyEquivalentFunction generate
+    let _ = session.CodegenFunction contextIdentity linux ARM64CodeGenTypes.defaultOptions fakeFunction generate
     let _ = session.CodegenFunction contextIdentity macOS changedOptions fakeFunction generate
     let _ = session.CodegenFunction contextIdentity macOS coverageOptions fakeFunction generate
     if calls.Count = 4 && session.CachedArm64FunctionCount = 3 && session.Arm64CodegenHitCount = 2 && session.Arm64CodegenMissCount = 3 then
@@ -249,8 +249,8 @@ let testArm64CodegenMetricsAreOptIn (_: CompilerLibrary.StdlibResult) () : TestR
     let target = ARM64.targetConfigFor Platform.MacOSARM64
     let contextIdentity = System.Object()
     let generate () = Ok [ARM64Symbolic.RET]
-    let _ = ordinary.CodegenFunction contextIdentity target CodeGen.defaultOptions fakeFunction generate
-    let _ = profiled.CodegenFunction contextIdentity target CodeGen.defaultOptions fakeFunction generate
+    let _ = ordinary.CodegenFunction contextIdentity target ARM64CodeGenTypes.defaultOptions fakeFunction generate
+    let _ = profiled.CodegenFunction contextIdentity target ARM64CodeGenTypes.defaultOptions fakeFunction generate
     match ordinary.Arm64CodegenMetrics, profiled.Arm64CodegenMetrics with
     | [], [metric] when
         metric.FunctionName = fakeFunction.Name
@@ -297,9 +297,9 @@ let testArm64CodegenCacheSegregatesCompilationContexts (_: CompilerLibrary.Stdli
         |> LIR.attachFunctionCodegenFacts
     let structurallyEquivalentFunction =
         { registryDependentFunction with Name = registryDependentFunction.Name }
-    let _ = session.CodegenFunction firstContext target CodeGen.defaultOptions registryDependentFunction generate
-    let _ = session.CodegenFunction firstContext target CodeGen.defaultOptions structurallyEquivalentFunction generate
-    let _ = session.CodegenFunction secondContext target CodeGen.defaultOptions structurallyEquivalentFunction generate
+    let _ = session.CodegenFunction firstContext target ARM64CodeGenTypes.defaultOptions registryDependentFunction generate
+    let _ = session.CodegenFunction firstContext target ARM64CodeGenTypes.defaultOptions structurallyEquivalentFunction generate
+    let _ = session.CodegenFunction secondContext target ARM64CodeGenTypes.defaultOptions structurallyEquivalentFunction generate
     if calls.Count = 2
        && session.CachedArm64FunctionCount = 2
        && session.Arm64CodegenHitCount = 1
@@ -327,14 +327,14 @@ let testArm64CodegenCacheReusesContextIndependentFunctions
         session.CodegenFunction
             firstContext
             target
-            CodeGen.defaultOptions
+            ARM64CodeGenTypes.defaultOptions
             preparedFunction
             generate
     let _ =
         session.CodegenFunction
             secondContext
             target
-            CodeGen.defaultOptions
+            ARM64CodeGenTypes.defaultOptions
             structurallyEquivalentFunction
             generate
     if calls.Count = 1
@@ -387,7 +387,7 @@ let testArm64CodegenCacheReusesPlannedSlotInitFunctions
             [slotInitFunction],
             Map.empty,
             Map.ofList [("UserRecord", [("value", TString)])])
-        |> CodeGen.prepareARM64Program
+        |> ARM64PrepareFunctions.prepareARM64Program
         |> fun (LIR.Program (functions, _, _)) -> List.head functions
     let structurallyEquivalentFunction =
         { preparedFunction with Name = preparedFunction.Name }
@@ -395,14 +395,14 @@ let testArm64CodegenCacheReusesPlannedSlotInitFunctions
         session.CodegenFunction
             firstContext
             target
-            CodeGen.defaultOptions
+            ARM64CodeGenTypes.defaultOptions
             preparedFunction
             generate
     let _ =
         session.CodegenFunction
             secondContext
             target
-            CodeGen.defaultOptions
+            ARM64CodeGenTypes.defaultOptions
             structurallyEquivalentFunction
             generate
     if calls.Count = 1

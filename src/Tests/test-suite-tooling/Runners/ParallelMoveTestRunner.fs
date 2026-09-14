@@ -8,9 +8,9 @@ open System.IO
 open TestDSL.ParallelMoveFormat
 open TestDSL.PassTestRunner
 
-let private context : CodeGen.CodeGenContext = {
+let private context : ARM64CodeGenTypes.CodeGenContext = {
     Target = ARM64.targetConfigFor Platform.LinuxARM64
-    Options = CodeGen.defaultOptions
+    Options = ARM64CodeGenTypes.defaultOptions
     SumShapeRegistry = Map.empty
     RecordRegistry = Map.empty
     RawSlotInitRetainTargets = None
@@ -28,7 +28,7 @@ let private render instructions =
     instructions |> List.map prettyPrintARM64Instr |> String.concat "\n"
 
 let runParallelMoveTest (test: ParallelMoveTest) : PassTestResult =
-    match CodeGen.convertInstr context (LIR.TailArgMoves test.Moves) with
+    match ARM64Instructions.convertInstr context (LIR.TailArgMoves test.Moves) with
     | Error msg ->
         { Success = false; Message = $"Parallel-move lowering failed: {msg}"; Expected = None; Actual = None }
     | Ok actual when actual = test.Expected ->

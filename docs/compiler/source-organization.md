@@ -28,6 +28,13 @@ entry points together; atom, ordinary-expression, and pattern handlers cannot
 depend on that driver. Pattern matching retains its cohesive recursive pattern
 compiler and source-order failure rendering in one larger module.
 
+Backend `Instructions.fs` files retain exhaustive LIR dispatch. Their
+`instructions/` children receive typed operands, not arbitrary instructions to
+redispatch. Recursive ARM64 expansion receives an explicit lowering callback.
+Target runtime generators live under each backend's `runtime/`; shared memory
+plans contain no ISA instructions. The former root `Runtime.fs` was ARM64 code,
+not a target-independent runtime layer.
+
 ## Migration sequence
 
 1. Remove numeric filenames, group passes, and name driver diagnostics without

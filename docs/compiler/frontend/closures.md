@@ -167,8 +167,8 @@ in add(10)(32)  // 42
 |------|---------|
 | `AST_to_ANF.fs:696-1011` | Lambda lifting (freeVars, liftLambdasInExpr) |
 | `ANF.fs:76-78` | ClosureAlloc, ClosureCall, ClosureTailCall types |
-| `src/DarkCompiler/backend/arm64/CodeGen.fs` | ARM64 closure runtime code generation |
-| `src/DarkCompiler/backend/x64/CodeGen.fs` | x64 closure runtime code generation |
+| `src/DarkCompiler/backend/arm64/runtime/ClosureReferenceCounts.fs` | ARM64 closure lifetime helpers |
+| `src/DarkCompiler/backend/x64/runtime/ClosureReferenceCounts.fs` | x64 closure lifetime helpers |
 
 ## Tests
 

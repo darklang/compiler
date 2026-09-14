@@ -23,6 +23,25 @@ open LIR
 open ARM64Symbolic
 open ANF_to_MIR
 open MIR_to_LIR
+open ARM64CodeGenTypes
+open ARM64HeapAllocation
+open ARM64ListReferenceCounts
+open ARM64ClosureReferenceCounts
+open ARM64ReleaseSelection
+open ARM64DictReferenceCounts
+open ARM64LeakAccounting
+open ARM64Operands
+open ARM64Frames
+open ARM64Instructions
+open ARM64GenericReferenceCounts
+open ARM64Blocks
+open ARM64ProcessLifecycle
+open ARM64RunProcess
+open ARM64ExecuteProcess
+open ARM64Functions
+open ARM64Peephole
+open ARM64ReleasePlanSummary
+open ARM64PrepareFunctions
 open CodeGen
 open IRPrinter
 
@@ -390,7 +409,7 @@ let loadLIR2ARM64Test (path: string) : Result<LIR.Program * ARM64Symbolic.Instr 
 /// Run LIR→ARM64 test
 let runLIR2ARM64Test (input: LIR.Program) (expected: ARM64Symbolic.Instr list) : PassTestResult =
     let target = ARM64.targetConfigFor Platform.LinuxARM64
-    let preparedInput = CodeGen.prepareARM64Program input
+    let preparedInput = ARM64PrepareFunctions.prepareARM64Program input
     match CodeGen.generateARM64 target preparedInput with
     | Error err ->
         { Success = false

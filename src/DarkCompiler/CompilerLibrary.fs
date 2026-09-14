@@ -5,6 +5,25 @@
 
 module CompilerLibrary
 
+open ARM64CodeGenTypes
+open ARM64HeapAllocation
+open ARM64ListReferenceCounts
+open ARM64ClosureReferenceCounts
+open ARM64ReleaseSelection
+open ARM64DictReferenceCounts
+open ARM64LeakAccounting
+open ARM64Operands
+open ARM64Frames
+open ARM64Instructions
+open ARM64GenericReferenceCounts
+open ARM64Blocks
+open ARM64ProcessLifecycle
+open ARM64RunProcess
+open ARM64ExecuteProcess
+open ARM64Functions
+open ARM64Peephole
+open ARM64ReleasePlanSummary
+open ARM64PrepareFunctions
 open CodeGen
 open IRPrinter
 
@@ -548,7 +567,7 @@ type private Arm64MetadataGroupKeyComparer() =
 [<NoComparison>]
 type private Arm64HelperCacheKey = {
     Target: ARM64.TargetConfig
-    Options: CodeGen.CodeGenOptions
+    Options: ARM64CodeGenTypes.CodeGenOptions
     Helper: CodeGen.HelperCacheKey
 }
 
@@ -610,18 +629,18 @@ type CompilationSession(collectCodegenMetrics: bool) =
             obj,
             Dictionary<
                 Arm64MetadataGroupKey,
-                CodeGen.Arm64ProgramMetadata>>(ObjectReferenceComparer())
+                ARM64CodeGenTypes.Arm64ProgramMetadata>>(ObjectReferenceComparer())
     let arm64FunctionGroupsByContext =
         Dictionary<
             obj,
             Dictionary<
-                ARM64.TargetConfig * CodeGen.CodeGenOptions,
+                ARM64.TargetConfig * ARM64CodeGenTypes.CodeGenOptions,
                 Result<CodeGen.GeneratedChunk list, string>>>(ObjectReferenceComparer())
     let arm64FunctionsByContext =
         Dictionary<
             obj,
             Dictionary<
-                LIR.Function * ARM64.TargetConfig * CodeGen.CodeGenOptions,
+                LIR.Function * ARM64.TargetConfig * ARM64CodeGenTypes.CodeGenOptions,
                 Result<ARM64Symbolic.Instr list, string>>>(ObjectReferenceComparer())
     let arm64HelpersByContext =
         Dictionary<
@@ -637,7 +656,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
             Dictionary<
                 LIR.Function,
                 Dictionary<
-                    ARM64.TargetConfig * CodeGen.CodeGenOptions,
+                    ARM64.TargetConfig * ARM64CodeGenTypes.CodeGenOptions,
                     Result<ARM64Symbolic.Instr list, string>>>>(ObjectReferenceComparer())
     let arm64StartContextIdentity = System.Object()
     // Finalized functions carry every input needed by ARM64 conversion except
@@ -753,7 +772,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
                 result
 
     member internal _.Arm64LirOpExpansionRecorder
-        : CodeGen.LirOpExpansionRecorder option =
+        : ARM64CodeGenTypes.LirOpExpansionRecorder option =
         if disposed || not collectCodegenMetrics then
             None
         else
@@ -951,8 +970,8 @@ type CompilationSession(collectCodegenMetrics: bool) =
     member internal _.Arm64MetadataGroup
         (contextIdentity: obj)
         (functions: LIR.Function list)
-        (summarize: unit -> CodeGen.Arm64ProgramMetadata)
-        : CodeGen.Arm64ProgramMetadata =
+        (summarize: unit -> ARM64CodeGenTypes.Arm64ProgramMetadata)
+        : ARM64CodeGenTypes.Arm64ProgramMetadata =
         if disposed then
             summarize ()
         else
@@ -961,7 +980,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
                 | true, entries -> entries
                 | false, _ ->
                     let entries =
-                        Dictionary<Arm64MetadataGroupKey, CodeGen.Arm64ProgramMetadata>(
+                        Dictionary<Arm64MetadataGroupKey, ARM64CodeGenTypes.Arm64ProgramMetadata>(
                             Arm64MetadataGroupKeyComparer()
                         )
                     arm64MetadataGroupsByContext.[contextIdentity] <- entries
@@ -980,7 +999,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
     member internal _.CodegenFunctionGroup
         (contextIdentity: obj)
         (target: ARM64.TargetConfig)
-        (options: CodeGen.CodeGenOptions)
+        (options: ARM64CodeGenTypes.CodeGenOptions)
         (_functions: LIR.Function list)
         (generate: unit -> Result<CodeGen.GeneratedChunk list, string>)
         : Result<CodeGen.GeneratedChunk list, string> =
@@ -993,7 +1012,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
                 | false, _ ->
                     let entries =
                         Dictionary<
-                            ARM64.TargetConfig * CodeGen.CodeGenOptions,
+                            ARM64.TargetConfig * ARM64CodeGenTypes.CodeGenOptions,
                             Result<CodeGen.GeneratedChunk list, string>>()
                     arm64FunctionGroupsByContext.[contextIdentity] <- entries
                     entries
@@ -1045,7 +1064,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
     member _.CodegenFunction
         (contextIdentity: obj)
         (target: ARM64.TargetConfig)
-        (options: CodeGen.CodeGenOptions)
+        (options: ARM64CodeGenTypes.CodeGenOptions)
         (func: LIR.Function)
         (generate: unit -> Result<ARM64Symbolic.Instr list, string>)
         : Result<ARM64Symbolic.Instr list, string> =
@@ -1067,7 +1086,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
                 | false, _ ->
                     let entries =
                         Dictionary<
-                            LIR.Function * ARM64.TargetConfig * CodeGen.CodeGenOptions,
+                            LIR.Function * ARM64.TargetConfig * ARM64CodeGenTypes.CodeGenOptions,
                             Result<ARM64Symbolic.Instr list, string>>()
                     arm64FunctionsByContext.[contextIdentity] <- entries
                     entries
@@ -1079,7 +1098,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
                         Dictionary<
                             LIR.Function,
                             Dictionary<
-                                ARM64.TargetConfig * CodeGen.CodeGenOptions,
+                                ARM64.TargetConfig * ARM64CodeGenTypes.CodeGenOptions,
                                 Result<ARM64Symbolic.Instr list, string>>>(LirFunctionReferenceComparer())
                     arm64FunctionsByReferenceAndContext.[contextIdentity] <- entries
                     entries
@@ -1133,7 +1152,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
                         match referenceEntriesForContext.TryGetValue func with
                         | true, entries -> entries
                         | false, _ ->
-                            let entries = Dictionary<ARM64.TargetConfig * CodeGen.CodeGenOptions, Result<ARM64Symbolic.Instr list, string>>()
+                            let entries = Dictionary<ARM64.TargetConfig * ARM64CodeGenTypes.CodeGenOptions, Result<ARM64Symbolic.Instr list, string>>()
                             referenceEntriesForContext.[func] <- entries
                             entries
                     referenceEntries.[targetOptions] <- result
@@ -1143,7 +1162,7 @@ type CompilationSession(collectCodegenMetrics: bool) =
     member _.Arm64Helpers
         (contextIdentity: obj)
         (target: ARM64.TargetConfig)
-        (options: CodeGen.CodeGenOptions)
+        (options: ARM64CodeGenTypes.CodeGenOptions)
         (helperKey: CodeGen.HelperCacheKey)
         (generate: unit -> ARM64Symbolic.Instr list)
         : ARM64Symbolic.Instr list =
@@ -1604,7 +1623,7 @@ let private lowerToAllocatedLir
     (sw: Stopwatch)
     (passTimingRecorder: PassTimingRecorder option)
     (functionCaches: FunctionCompilationCaches option)
-    (releasePlanSummaryCache: CodeGen.ReleasePlanSummaryCache option)
+    (releasePlanSummaryCache: ARM64CodeGenTypes.ReleasePlanSummaryCache option)
     (stageSuffix: string)
     (functions: ANF.Function list)
     (typeMap: ANF.TypeMap)
@@ -1673,7 +1692,7 @@ let private lowerToAllocatedLir
                     let funcsPreparedForAllocation =
                         match Platform.archFor target with
                         | Platform.ARM64 ->
-                            CodeGen.prepareARM64FunctionsForAllocationWithCache
+                            ARM64PrepareFunctions.prepareARM64FunctionsForAllocationWithCache
                                 releasePlanSummaryCache
                                 (passTimingRecorder
                                  |> Option.map (fun recorder ->
@@ -2051,7 +2070,7 @@ let private generateBinary
         if verbosity >= 1 then println codegenLabel
         let codegenStart = sw.Elapsed.TotalMilliseconds
         let coverageExprCount = if options.EnableCoverage then LIR.countCoverageHits allocatedProgram else 0
-        let codegenOptions : CodeGen.CodeGenOptions = {
+        let codegenOptions : ARM64CodeGenTypes.CodeGenOptions = {
             DisableFreeList = options.DisableFreeList
             EnableCoverage = options.EnableCoverage
             CoverageExprCount = coverageExprCount
@@ -2070,7 +2089,7 @@ let private generateBinary
             |> Option.map (fun current ->
                 fun func generate ->
                     let contextIdentity =
-                        if CodeGen.isPlannedGenericRefCountDecHelperCacheKey func then
+                        if ARM64GenericReferenceCounts.isPlannedGenericRefCountDecHelperCacheKey func then
                             current.Arm64GenericReleaseHelperContextIdentity
                         else
                             match functionContexts.TryGetValue func with

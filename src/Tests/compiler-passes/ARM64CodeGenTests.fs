@@ -11,12 +11,12 @@ let private target = ARM64.targetConfigFor Platform.LinuxARM64
 
 let private generatePreparedARM64WithOptions target options program =
     program
-    |> CodeGen.prepareARM64Program
+    |> ARM64PrepareFunctions.prepareARM64Program
     |> CodeGen.generateARM64WithOptions target options
     |> Result.map CodeGen.generatedProgramInstructions
 
 let private generatePreparedARM64 target program =
-    generatePreparedARM64WithOptions target CodeGen.defaultOptions program
+    generatePreparedARM64WithOptions target ARM64CodeGenTypes.defaultOptions program
 
 let private rcMetadata (typ: AST.Type) : MemoryModel.RcMetadata =
     let releasePlan = MemoryPlanning.rcReleasePlanOfTypeWithSums Map.empty Map.empty typ
@@ -131,7 +131,7 @@ let testSmallGenericReleasePlanRemainsInline () : TestResult =
                     Some (rcMetadata valueType))
             ]
             Map.empty
-        |> CodeGen.prepareARM64Program
+        |> ARM64PrepareFunctions.prepareARM64Program
     let generatedCacheEntries = ResizeArray<string>()
     let cache
         (func: LIR.Function)
@@ -142,7 +142,7 @@ let testSmallGenericReleasePlanRemainsInline () : TestResult =
 
     match CodeGen.generateARM64WithOptionsAndCache
               target
-              CodeGen.defaultOptions
+              ARM64CodeGenTypes.defaultOptions
               (Some cache)
               None
               program with
@@ -166,7 +166,7 @@ let testExpensiveGenericReleaseIsPreparedAsCall () : TestResult =
                     Some (rcMetadata valueType))
             ]
             Map.empty
-        |> CodeGen.prepareARM64Program
+        |> ARM64PrepareFunctions.prepareARM64Program
     let (LIR.Program (functions, _, _)) = program
     let instructions =
         functions
@@ -197,7 +197,7 @@ let testGenericReleaseHelperPreservesCachedInstructions () : TestResult =
                 LIR.RefCountDec (LIR.Physical LIR.X0, 256, LIR.GenericHeap, Some metadata)
             ]
             Map.empty
-        |> CodeGen.prepareARM64Program
+        |> ARM64PrepareFunctions.prepareARM64Program
     let target = ARM64.targetConfigFor Platform.LinuxARM64
     let generatedFunctions = ResizeArray<string>()
     let entries =
@@ -217,10 +217,10 @@ let testGenericReleaseHelperPreservesCachedInstructions () : TestResult =
             entries.[func] <- result
             result
 
-    match CodeGen.generateARM64WithOptions target CodeGen.defaultOptions program,
+    match CodeGen.generateARM64WithOptions target ARM64CodeGenTypes.defaultOptions program,
           CodeGen.generateARM64WithOptionsAndCache
               target
-              CodeGen.defaultOptions
+              ARM64CodeGenTypes.defaultOptions
               (Some cache)
               None
               program with
@@ -276,7 +276,7 @@ let testOutlinedGenericReleaseUsesAllocatorLiveness () : TestResult =
                 LIR.Add (result, liveAcrossCall, LIR.Imm 1L)
             ]
             Map.empty
-        |> CodeGen.prepareARM64Program
+        |> ARM64PrepareFunctions.prepareARM64Program
     let (LIR.Program (functions, variants, records)) = prepared
     let allocatedFunctions =
         functions
@@ -360,7 +360,7 @@ let testGenericReleaseHelpersPreserveOwnershipPolicy () : TestResult =
             [ makeFunction "User.owns"; makeFunction "Stdlib.List.borrows" ],
             variants,
             Map.empty)
-        |> CodeGen.prepareARM64Program
+        |> ARM64PrepareFunctions.prepareARM64Program
     let (LIR.Program (functions, _, _)) = prepared
     let helperInfo
         (func: LIR.Function)
@@ -402,8 +402,8 @@ let private uint64ZeroBranchTargetsDigit (instrs: ARM64.Instr list) : bool =
         | _ -> false)
 
 let testPrintUInt64RuntimeZeroBranches () : TestResult =
-    let withNewline = Runtime.generatePrintUInt64NoExit target
-    let withoutNewline = Runtime.generatePrintUInt64NoNewline target
+    let withNewline = ARM64PrintValues.generatePrintUInt64NoExit target
+    let withoutNewline = ARM64PrintValues.generatePrintUInt64NoNewline target
 
     if not (uint64ZeroBranchTargetsDigit withNewline) then
         Error "ARM64 UInt64 newline printer zero branch does not target the zero digit handler"
@@ -414,7 +414,7 @@ let testPrintUInt64RuntimeZeroBranches () : TestResult =
 
 let testPrintUInt64RuntimePreservesNewline () : TestResult =
     let preservesNewline =
-        Runtime.generatePrintUInt64NoExit target
+        ARM64PrintValues.generatePrintUInt64NoExit target
         |> List.windowed 3
         |> List.exists (function
             | [ ARM64.MOVZ (ARM64.X3, 10us, 0)
@@ -447,15 +447,15 @@ let testBranchFalseEdgeFallsThrough () : TestResult =
         UsedCalleeSaved = []
         CodegenFacts = None
     }
-    let ctx : CodeGen.CodeGenContext = {
-        Target = target; Options = CodeGen.defaultOptions; SumShapeRegistry = Map.empty; RecordRegistry = Map.empty
+    let ctx : ARM64CodeGenTypes.CodeGenContext = {
+        Target = target; Options = ARM64CodeGenTypes.defaultOptions; SumShapeRegistry = Map.empty; RecordRegistry = Map.empty
         RawSlotInitRetainTargets = None
         ClosurePayloadSizes = Map.empty; ClosureCaptureTypes = Map.empty
         FunctionName = func.Name; InstructionSite = ""; StackSize = 0; UsedCalleeSaved = []
         HeapOverflowLabel = "__heap_oom_arm64_layout"
         RecordLirOpExpansion = None
     }
-    match CodeGen.convertFunction [] ctx func with
+    match ARM64Functions.convertFunction [] ctx func with
     | Error e -> Error e
     | Ok instrs ->
         let falseJump = ARM64Symbolic.B_label "arm64_layout_false"
@@ -495,15 +495,15 @@ let testSharedReturnTransferCost () : TestResult =
         UsedCalleeSaved = []
         CodegenFacts = None
     }
-    let ctx : CodeGen.CodeGenContext = {
-        Target = target; Options = CodeGen.defaultOptions; SumShapeRegistry = Map.empty; RecordRegistry = Map.empty
+    let ctx : ARM64CodeGenTypes.CodeGenContext = {
+        Target = target; Options = ARM64CodeGenTypes.defaultOptions; SumShapeRegistry = Map.empty; RecordRegistry = Map.empty
         RawSlotInitRetainTargets = None
         ClosurePayloadSizes = Map.empty; ClosureCaptureTypes = Map.empty
         FunctionName = func.Name; InstructionSite = ""; StackSize = 0; UsedCalleeSaved = []
         HeapOverflowLabel = "__heap_oom_common_return"
         RecordLirOpExpansion = None
     }
-    CodeGen.convertFunction [] ctx func
+    ARM64Functions.convertFunction [] ctx func
     |> Result.bind (fun instrs ->
         let transfers = instrs |> List.filter (function ARM64Symbolic.B_label _ -> true | _ -> false)
         if List.length transfers = 1 then Ok ()
@@ -512,8 +512,8 @@ let testSharedReturnTransferCost () : TestResult =
 /// Count the whole RC operation, including literal protection and scratch
 /// preservation. Executable RC tests cover the heap/literal outcomes.
 let testDynamicBufferRcInstructionCost () : TestResult =
-    let ctx : CodeGen.CodeGenContext = {
-        Target = target; Options = CodeGen.defaultOptions; SumShapeRegistry = Map.empty; RecordRegistry = Map.empty
+    let ctx : ARM64CodeGenTypes.CodeGenContext = {
+        Target = target; Options = ARM64CodeGenTypes.defaultOptions; SumShapeRegistry = Map.empty; RecordRegistry = Map.empty
         RawSlotInitRetainTargets = None
         ClosurePayloadSizes = Map.empty; ClosureCaptureTypes = Map.empty
         FunctionName = "buffer_rc_cost"; InstructionSite = ""; StackSize = 0; UsedCalleeSaved = []
@@ -526,7 +526,7 @@ let testDynamicBufferRcInstructionCost () : TestResult =
     |> List.collect (fun operation -> operands |> List.map (fun (reg, cost) -> operation (LIR.Reg (LIR.Physical reg)), cost))
     |> List.fold (fun result (operation, cost) ->
         result |> Result.bind (fun () ->
-            CodeGen.convertInstr ctx operation
+            ARM64Instructions.convertInstr ctx operation
             |> Result.bind (fun instrs ->
                 if List.length instrs = cost then Ok ()
                 else Error $"{operation}: expected {cost} instructions, got {List.length instrs}"))) (Ok ())
@@ -613,9 +613,9 @@ let private makeAllocatedEntryFunction
 let private generatedEntryTransfers
     (func: LIR.Function)
     : Result<ARM64Symbolic.Instr list, string> =
-    let ctx : CodeGen.CodeGenContext = {
+    let ctx : ARM64CodeGenTypes.CodeGenContext = {
         Target = target
-        Options = CodeGen.defaultOptions
+        Options = ARM64CodeGenTypes.defaultOptions
         SumShapeRegistry = Map.empty
         RecordRegistry = Map.empty
         RawSlotInitRetainTargets = None
@@ -629,7 +629,7 @@ let private generatedEntryTransfers
         RecordLirOpExpansion = None
     }
 
-    CodeGen.convertFunction [] ctx func
+    ARM64Functions.convertFunction [] ctx func
     |> Result.map (List.filter (function
         | ARM64Symbolic.MOV_reg (ARM64.X29, ARM64.SP) -> false
         | ARM64Symbolic.MOV_reg _
@@ -755,9 +755,9 @@ let private convertRawAlloc
     (dest: LIR.PhysReg)
     (numBytes: LIR.PhysReg)
     : Result<ARM64Symbolic.Instr list, string> =
-    let ctx : CodeGen.CodeGenContext = {
+    let ctx : ARM64CodeGenTypes.CodeGenContext = {
         Target = target
-        Options = CodeGen.defaultOptions
+        Options = ARM64CodeGenTypes.defaultOptions
         SumShapeRegistry = Map.empty
         RecordRegistry = Map.empty
         RawSlotInitRetainTargets = None
@@ -770,7 +770,7 @@ let private convertRawAlloc
         HeapOverflowLabel = "__heap_oom_test"
         RecordLirOpExpansion = None
     }
-    CodeGen.convertInstr ctx (LIR.RawAlloc (LIR.Physical dest, LIR.Physical numBytes))
+    ARM64Instructions.convertInstr ctx (LIR.RawAlloc (LIR.Physical dest, LIR.Physical numBytes))
 
 let testGeneratedCodeEliminatesSelfMoves () : TestResult =
     let program =
@@ -1128,7 +1128,7 @@ let testPeepholeFusesBitClearSequence () : TestResult =
         before @ [ARM64Symbolic.MOV_reg (ARM64.X9, ARM64.X4)]
     let expectedWithOverwrite =
         expected @ [ARM64Symbolic.MOV_reg (ARM64.X9, ARM64.X4)]
-    let actual = CodeGen.peepholeOptimize before
+    let actual = ARM64Peephole.peepholeOptimize before
 
     if actual <> expected then
         let rendered =
@@ -1136,11 +1136,11 @@ let testPeepholeFusesBitClearSequence () : TestResult =
             |> List.map TestDSL.PassTestRunner.prettyPrintARM64Instr
             |> String.concat "; "
         Error $"Expected BIC_reg(X10, X1, X2), got {rendered}"
-    elif CodeGen.peepholeOptimize liveTemporary <> liveTemporary then
+    elif ARM64Peephole.peepholeOptimize liveTemporary <> liveTemporary then
         Error "Bit-clear peephole fused a sequence whose inverted temporary remains live"
-    elif CodeGen.peepholeOptimize liveMask <> liveMask then
+    elif ARM64Peephole.peepholeOptimize liveMask <> liveMask then
         Error "Bit-clear peephole fused a sequence whose all-ones mask remains live"
-    elif CodeGen.peepholeOptimize overwrittenMask <> expectedWithOverwrite then
+    elif ARM64Peephole.peepholeOptimize overwrittenMask <> expectedWithOverwrite then
         Error "Bit-clear peephole did not fuse a sequence whose all-ones mask is overwritten"
     else
         Ok ()
@@ -1158,7 +1158,7 @@ let testPeepholeFallsThroughToTrueTarget () : TestResult =
         ARM64Symbolic.Label "true_target"
     ]
 
-    match CodeGen.peepholeOptimize before with
+    match ARM64Peephole.peepholeOptimize before with
     | actual when actual = expected -> Ok ()
     | actual ->
         let rendered =
@@ -1280,7 +1280,7 @@ let testRawAllocUsesSharedHeapOverflowPath () : TestResult =
             Ok ()
 
 let testRuntimePrintStringLengthUsesFullImmediate () : TestResult =
-    let instrs = Runtime.generatePrintString target 65537
+    let instrs = ARM64PrintAndExit.generatePrintString target 65537
 
     let hasLowerLengthChunk =
         instrs
@@ -2466,9 +2466,9 @@ let testRejectsUnpreparedCodegenFacts () : TestResult =
 
 let testLirOpExpansionRecorderAttributesGeneratedInstructions () : TestResult =
     let observations = ResizeArray<string * string * string * int * int64>()
-    let ctx : CodeGen.CodeGenContext = {
+    let ctx : ARM64CodeGenTypes.CodeGenContext = {
         Target = target
-        Options = CodeGen.defaultOptions
+        Options = ARM64CodeGenTypes.defaultOptions
         SumShapeRegistry = Map.empty
         RecordRegistry = Map.empty
         RawSlotInitRetainTargets = None
@@ -2490,7 +2490,7 @@ let testLirOpExpansionRecorderAttributesGeneratedInstructions () : TestResult =
         Terminator = LIR.Ret
     }
 
-    match CodeGen.convertBlock ctx "_epilogue_lir_op_profile" None block with
+    match ARM64Blocks.convertBlock ctx "_epilogue_lir_op_profile" None block with
     | Error error -> Error error
     | Ok _ ->
         match observations |> Seq.toList with

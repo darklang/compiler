@@ -199,12 +199,13 @@ FCVTZS X0, D0      // X0 = (int)D0
 
 | File | Purpose |
 |------|---------|
-| `backend/arm64/CodeGen.fs` | LIR → symbolic ARM64 |
+| `backend/arm64/Instructions.fs`, `backend/arm64/instructions/` | LIR → symbolic ARM64 |
+| `backend/arm64/CodeGen.fs` | Assemble planned functions and runtime helpers |
 | `backend/arm64/Resolve.fs` | Symbolic data-label pool resolution |
 | `backend/arm64/Encoding.fs` | ARM64 → bytes |
 | `ARM64.fs` | Concrete ARM64 instruction types |
 | `ARM64Symbolic.fs` | ARM64 instruction types with symbolic data references |
-| `Runtime.fs` | Runtime support |
+| `backend/arm64/runtime/` | Target-specific runtime instruction generators |
 
 ## Key Functions
 
