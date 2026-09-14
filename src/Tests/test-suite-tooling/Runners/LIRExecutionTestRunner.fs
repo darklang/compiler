@@ -12,26 +12,29 @@ open TestDSL.LIRExecutionFormat
 
 let private executableProgram program =
     match program with
-    | LIR.Program ([ func ], variants, records) ->
-        match func.CFG.Blocks |> Map.toList with
-        | [ (_, body) ] ->
-            let entryLabel = LIR.Label "_start_entry"
-            let bodyLabel = LIR.Label "_start_body"
-            let entryBlock: LIR.BasicBlock =
-                { Label = entryLabel
-                  Instrs = []
-                  Terminator = LIR.Jump bodyLabel }
-            let bodyBlock = { body with Label = bodyLabel }
-            let executableFunction =
-                { func with
-                    Name = "_start"
-                    CFG =
-                        { Entry = entryLabel
-                          Blocks = Map.ofList [ (entryLabel, entryBlock); (bodyLabel, bodyBlock) ] } }
-            Ok (LIR.Program ([ executableFunction ], variants, records))
-        | blocks -> Error $"Executable LIR fixture requires one input block, got {List.length blocks}"
-    | LIR.Program (functions, _, _) ->
-        Error $"Executable LIR fixture requires one input function, got {List.length functions}"
+    | LIR.Program (functions, variants, records) ->
+        let entryFunctions, otherFunctions =
+            functions |> List.partition (fun func -> func.Name = "_start")
+        match entryFunctions with
+        | [ func ] ->
+            match func.CFG.Blocks |> Map.toList with
+            | [ (_, body) ] ->
+                let entryLabel = LIR.Label "_start_entry"
+                let bodyLabel = LIR.Label "_start_body"
+                let entryBlock: LIR.BasicBlock =
+                    { Label = entryLabel
+                      Instrs = []
+                      Terminator = LIR.Jump bodyLabel }
+                let bodyBlock = { body with Label = bodyLabel }
+                let executableFunction =
+                    { func with
+                        Name = "_start"
+                        CFG =
+                            { Entry = entryLabel
+                              Blocks = Map.ofList [ (entryLabel, entryBlock); (bodyLabel, bodyBlock) ] } }
+                Ok (LIR.Program (executableFunction :: otherFunctions, variants, records))
+            | blocks -> Error $"Executable LIR fixture requires one input block, got {List.length blocks}"
+        | entries -> Error $"Executable LIR fixture requires one _start function, got {List.length entries}"
 
 let private patchDeferredLabels
     (stringPool: LiteralPool.StringPool)
@@ -83,7 +86,7 @@ let private translate program leakCheck =
     |> Result.bind (fun executable ->
         CodeGen_X86_64.translateProgram executable enableLeakCheck)
 
-let private execute program leakCheck =
+let internal executeProgram program leakCheck =
     let enableLeakCheck = leakCheck = LeakCheckEnabled
     translate program leakCheck
     |> Result.mapError (fun msg -> $"Codegen error: {msg}")
@@ -112,7 +115,7 @@ let private checkExpectation (exitCode: int, stdout: string, stderr: string) exp
     | ExpectedStderr expected -> Error $"Expected stderr '{expected}', got '{stderr.Trim()}'"
 
 let private checkProcessExpectations test expectations =
-    execute test.Program test.LeakCheck
+    executeProgram test.Program test.LeakCheck
     |> Result.bind (fun actual ->
         let rec loop remaining =
             match remaining with

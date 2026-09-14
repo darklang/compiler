@@ -167,3 +167,40 @@ direct F# tests for multi-block CFGs, condition-state isolation across
 translations, malformed compiler data,
 type/variant/record metadata, and ownership tests whose correctness depends on
 rich nested runtime shapes.
+
+## Reference-release fixtures
+
+Place multi-case `.rcrelease` files under `src/Tests/backend/x64/`. Each case
+describes a canonical managed object graph whose final root reference is
+released:
+
+```text
+---NAME---
+List field release preserves X0
+---ROOT-REGISTER---
+X4
+---ROOT---
+tuple(list(i64))
+---PRESERVE---
+X0 = 123
+```
+
+Successful execution implicitly requires a clean exit and no leaked heap
+allocations. There are no `ACTION`, `EXPECT-LEAKS`, or `EXPECT-STDOUT`
+sections: releasing the final root, observing zero leaks, and checking any
+preserved register values are the semantics of every case.
+
+`ROOT` accepts the leaf shapes `i64`, `enum`, `string`, `literal-string`, and
+`blob`, plus `list(shape)`, `dict(key, value)`, `tuple(...)`, `record(...)`,
+`sum(payload)`, and `closure(...)`. Shapes can be nested. The root itself must
+be managed; scalar shapes are useful only as fields or payloads.
+
+By default the runner chooses the root register. Use `ROOT-REGISTER` when
+register placement is observable behavior, and pair it with `PRESERVE` lines
+of the form `X0 = 123` to verify that releasing the root does not clobber live
+registers.
+
+Keep direct F# tests for collision-node dictionary layouts, malformed or mixed
+variant metadata, release-helper selection and instruction-shape assertions,
+special named-function contexts, and tests that require multiple independently
+live managed objects or noncanonical heap layouts.

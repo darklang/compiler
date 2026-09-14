@@ -1,0 +1,635 @@
+// Canonical managed graphs must be reclaimed by one final root release.
+
+---NAME---
+Generic tuple releases dynamic string field
+---ROOT---
+tuple(string)
+
+---NAME---
+Generic tuple skips literal string release
+---ROOT---
+tuple(literal-string)
+
+---NAME---
+Generic tuple releases dynamic blob field
+---ROOT---
+tuple(blob)
+
+---NAME---
+Generic tuple releases nested tuple field
+---ROOT---
+tuple(tuple(string))
+
+---NAME---
+Generic tuple releases string list and dict fields
+---ROOT---
+tuple(string, list(i64), dict(i64, i64))
+
+---NAME---
+Generic tuple releases dict with list value
+---ROOT---
+tuple(dict(i64, list(i64)))
+
+---NAME---
+Generic tuple skips enum field release
+---ROOT---
+tuple(enum)
+
+---NAME---
+Generic record releases string field
+---ROOT---
+record(string)
+
+---NAME---
+Generic record releases dict field
+---ROOT---
+record(dict(i64, i64))
+
+---NAME---
+Generic record releases closure field
+---ROOT---
+record(closure())
+
+---NAME---
+Generic record releases string list and dict fields
+---ROOT---
+record(string, list(i64), dict(i64, i64))
+
+---NAME---
+Generic sum releases string payload
+---ROOT---
+sum(string)
+
+---NAME---
+Generic sum releases blob payload
+---ROOT---
+sum(blob)
+
+---NAME---
+Generic tuple releases nested sum string field
+---ROOT---
+tuple(sum(string))
+
+---NAME---
+Generic sum releases list payload
+---ROOT---
+sum(list(i64))
+
+---NAME---
+Generic sum releases dict payload
+---ROOT---
+sum(dict(i64, i64))
+
+---NAME---
+Generic sum releases tuple payload
+---ROOT---
+sum(tuple(string, list(i64), dict(i64, i64)))
+
+---NAME---
+Generic sum releases record payload
+---ROOT---
+sum(record(string, list(i64), dict(i64, i64)))
+
+---NAME---
+Generic tuple releases dict field
+---ROOT---
+tuple(dict(i64, i64))
+
+---NAME---
+Generic tuple releases closure field
+---ROOT---
+tuple(closure())
+
+---NAME---
+Generic sum releases closure payload
+---ROOT---
+sum(closure())
+
+---NAME---
+Dictionary releases list value
+---ROOT---
+dict(i64, list(i64))
+
+---NAME---
+Dictionary releases string key
+---ROOT---
+dict(string, i64)
+
+---NAME---
+Dictionary releases string value
+---ROOT---
+dict(i64, string)
+
+---NAME---
+Dictionary releases string key and value
+---ROOT---
+dict(string, string)
+
+---NAME---
+Dictionary releases blob key and value
+---ROOT---
+dict(blob, blob)
+
+---NAME---
+Dictionary releases string key and list value
+---ROOT---
+dict(string, list(i64))
+
+---NAME---
+Dictionary releases string key and dict value
+---ROOT---
+dict(string, dict(i64, i64))
+
+---NAME---
+Dictionary releases string key and dict-list value
+---ROOT---
+dict(string, dict(i64, list(i64)))
+
+---NAME---
+Dictionary releases nested dict value
+---ROOT---
+dict(i64, dict(i64, i64))
+
+---NAME---
+Dictionary releases nested dict-list value
+---ROOT---
+dict(i64, dict(i64, list(i64)))
+
+---NAME---
+Dictionary releases tuple string-list value
+---ROOT---
+dict(i64, tuple(string, list(i64)))
+
+---NAME---
+Dictionary releases tuple string-list-dict value
+---ROOT---
+dict(i64, tuple(string, list(i64), dict(i64, i64)))
+
+---NAME---
+Dictionary releases string key and tuple value
+---ROOT---
+dict(string, tuple(string, list(i64), dict(i64, i64)))
+
+---NAME---
+Dictionary releases sum-string value
+---ROOT---
+dict(i64, sum(string))
+
+---NAME---
+List field release preserves X0
+---ROOT-REGISTER---
+X4
+---ROOT---
+tuple(list(i64))
+---PRESERVE---
+X0 = 123
+
+---NAME---
+List field release preserves argument registers
+---ROOT-REGISTER---
+X4
+---ROOT---
+tuple(list(i64))
+---PRESERVE---
+X1 = 123
+X2 = 456
+
+---NAME---
+Dict field release preserves X0
+---ROOT-REGISTER---
+X4
+---ROOT---
+tuple(dict(i64, i64))
+---PRESERVE---
+X0 = 456
+
+---NAME---
+Closure field release preserves X0
+---ROOT-REGISTER---
+X3
+---ROOT---
+tuple(closure())
+---PRESERVE---
+X0 = 789
+
+---NAME---
+String field release preserves X0
+---ROOT-REGISTER---
+X3
+---ROOT---
+tuple(string)
+---PRESERVE---
+X0 = 321
+
+---NAME---
+Blob field release preserves X0
+---ROOT-REGISTER---
+X3
+---ROOT---
+tuple(blob)
+---PRESERVE---
+X0 = 654
+
+---NAME---
+Nested fixed block release preserves X0
+---ROOT-REGISTER---
+X4
+---ROOT---
+tuple(tuple(string))
+---PRESERVE---
+X0 = 987
+
+---NAME---
+Closure allocation and release balance
+---ROOT---
+closure()
+
+---NAME---
+Closure releases string capture
+---ROOT---
+closure(string)
+
+---NAME---
+Closure releases blob capture
+---ROOT---
+closure(blob)
+
+---NAME---
+Closure releases list capture
+---ROOT---
+closure(list(i64))
+
+---NAME---
+Closure releases dict capture
+---ROOT---
+closure(dict(i64, i64))
+
+---NAME---
+Closure releases dict-list capture
+---ROOT---
+closure(dict(i64, list(i64)))
+
+---NAME---
+Closure releases closure capture
+---ROOT---
+closure(closure())
+
+---NAME---
+Closure releases tuple-string capture
+---ROOT---
+closure(tuple(string, i64))
+
+---NAME---
+Closure releases tuple string-list-dict capture
+---ROOT---
+closure(tuple(string, list(i64), dict(i64, i64)))
+
+---NAME---
+Closure releases tuple string-blob-list-dict-list capture
+---ROOT---
+closure(tuple(string, blob, list(i64), dict(i64, list(i64))))
+
+---NAME---
+Closure releases record-string capture
+---ROOT---
+closure(record(string))
+
+---NAME---
+Closure releases record string-list-dict capture
+---ROOT---
+closure(record(string, list(i64), dict(i64, i64)))
+
+---NAME---
+Closure releases record string-blob-list-dict-list capture
+---ROOT---
+closure(record(string, blob, list(i64), dict(i64, list(i64))))
+
+---NAME---
+Closure releases sum-string capture
+---ROOT---
+closure(sum(string))
+
+---NAME---
+Closure releases sum tuple capture
+---ROOT---
+closure(sum(tuple(string, list(i64), dict(i64, i64))))
+
+---NAME---
+Closure releases sum-record capture
+---ROOT---
+closure(sum(record(string, list(i64), dict(i64, i64))))
+
+---NAME---
+Closure releases multiple captures
+---ROOT---
+closure(string, list(i64), dict(i64, i64))
+
+---NAME---
+List releases closure payload
+---ROOT---
+list(closure())
+
+---NAME---
+List releases dict payload
+---ROOT---
+list(dict(i64, i64))
+
+---NAME---
+List releases dict-list payload
+---ROOT---
+list(dict(i64, list(i64)))
+
+---NAME---
+List releases string payload
+---ROOT---
+list(string)
+
+---NAME---
+List releases tuple-string payload
+---ROOT---
+list(tuple(string, i64))
+
+---NAME---
+List releases tuple dynamic payloads
+---ROOT---
+list(tuple(string, blob, i64))
+
+---NAME---
+List releases tuple middle dynamic payload
+---ROOT---
+list(tuple(i64, string, i64))
+
+---NAME---
+List releases tuple string-list-dict payload
+---ROOT---
+list(tuple(string, list(i64), dict(i64, i64)))
+
+---NAME---
+List releases tuple string-list-dict-list payload
+---ROOT---
+list(tuple(string, list(i64), dict(i64, list(i64))))
+
+---NAME---
+List releases tuple closure-list-dict payload
+---ROOT---
+list(tuple(closure(), list(i64), dict(i64, i64)))
+
+---NAME---
+List releases record-string payload
+---ROOT---
+list(record(string))
+
+---NAME---
+List releases record dynamic payloads
+---ROOT---
+list(record(string, i64, blob))
+
+---NAME---
+List releases sum-string payload
+---ROOT---
+list(sum(string))
+
+---NAME---
+List releases sum-list payload
+---ROOT---
+list(sum(list(i64)))
+
+---NAME---
+List releases sum-dict payload
+---ROOT---
+list(sum(dict(i64, i64)))
+
+---NAME---
+List releases sum-closure payload
+---ROOT---
+list(sum(closure()))
+
+---NAME---
+Dictionary releases string key and tuple-list value
+---ROOT---
+dict(string, tuple(list(i64)))
+
+---NAME---
+List releases tuple closure-list-dict-list payload
+---ROOT---
+list(tuple(closure(), list(i64), dict(i64, list(i64))))
+
+---NAME---
+List releases record string-list-dict payload
+---ROOT---
+list(record(string, list(i64), dict(i64, i64)))
+
+---NAME---
+List releases record blob-list-dict payload
+---ROOT---
+list(record(blob, list(i64), dict(i64, i64)))
+
+---NAME---
+List releases record closure-list-dict payload
+---ROOT---
+list(record(closure(), list(i64), dict(i64, i64)))
+
+---NAME---
+List releases record string-blob-list-dict payload
+---ROOT---
+list(record(string, blob, list(i64), dict(i64, i64)))
+
+---NAME---
+List releases record closure-blob-list-dict payload
+---ROOT---
+list(record(closure(), blob, list(i64), dict(i64, i64)))
+
+---NAME---
+List releases record with nested tuple string-list-dict payload
+---ROOT---
+list(record(i64, i64, i64, tuple(string, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases record with nested tuple string-list-dict-list payload
+---ROOT---
+list(record(i64, i64, i64, tuple(string, list(i64), dict(i64, list(i64)))))
+
+---NAME---
+List releases record with nested tuple string payload
+---ROOT---
+list(record(i64, i64, i64, tuple(string)))
+
+---NAME---
+List releases record with nested tuple closure-blob-list-dict payload
+---ROOT---
+list(record(i64, i64, i64, tuple(closure(), blob, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases record with nested tuple closure-blob-list-dict-list payload
+---ROOT---
+list(record(i64, i64, i64, tuple(closure(), blob, list(i64), dict(i64, list(i64)))))
+
+---NAME---
+List releases tuple string-blob-list-dict payload
+---ROOT---
+list(tuple(string, blob, list(i64), dict(i64, i64)))
+
+---NAME---
+List releases tuple string-blob-list-dict-list payload
+---ROOT---
+list(tuple(string, blob, list(i64), dict(i64, list(i64))))
+
+---NAME---
+List releases tuple closure-blob-list-dict payload
+---ROOT---
+list(tuple(closure(), blob, list(i64), dict(i64, i64)))
+
+---NAME---
+List releases tuple closure-blob-list-dict-list payload
+---ROOT---
+list(tuple(closure(), blob, list(i64), dict(i64, list(i64))))
+
+---NAME---
+List releases tuple containing tuple-string payload
+---ROOT---
+list(tuple(i64, tuple(string)))
+
+---NAME---
+List releases tuple with nested tuple-string payload
+---ROOT---
+list(tuple(i64, i64, i64, tuple(string)))
+
+---NAME---
+List releases tuple with nested tuple string-list-dict payload
+---ROOT---
+list(tuple(i64, i64, i64, tuple(string, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases tuple with nested record string-list-dict payload
+---ROOT---
+list(tuple(i64, i64, i64, record(i64, string, i64, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases tuple with nested record string-list-dict-list payload
+---ROOT---
+list(tuple(i64, i64, i64, record(i64, string, i64, list(i64), dict(i64, list(i64)))))
+
+---NAME---
+List releases tuple with nested tuple closure-blob-list-dict payload
+---ROOT---
+list(tuple(i64, i64, i64, tuple(closure(), blob, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases nested tuple string-list-dict payload
+---ROOT---
+list(tuple(i64, tuple(string, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases nested tuple list-dict payload
+---ROOT---
+list(tuple(i64, tuple(list(i64), dict(i64, i64))))
+
+---NAME---
+List releases nested tuple dict payload
+---ROOT---
+list(tuple(i64, tuple(dict(i64, i64))))
+
+---NAME---
+List releases nested tuple closure payload
+---ROOT---
+list(tuple(i64, tuple(closure())))
+
+---NAME---
+List releases nested tuple string-blob-list-dict payload
+---ROOT---
+list(tuple(i64, tuple(string, blob, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases nested tuple string-blob-list-dict-list payload
+---ROOT---
+list(tuple(i64, tuple(string, blob, list(i64), dict(i64, list(i64)))))
+
+---NAME---
+List releases record with middle string payload
+---ROOT---
+list(record(i64, string, i64))
+
+---NAME---
+List releases sum tuple-string payload
+---ROOT---
+list(sum(tuple(string, i64)))
+
+---NAME---
+List releases sum tuple string-list-dict payload
+---ROOT---
+list(sum(tuple(string, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases sum tuple string-list-dict-list payload
+---ROOT---
+list(sum(tuple(string, list(i64), dict(i64, list(i64)))))
+
+---NAME---
+List releases sum tuple closure-list-dict payload
+---ROOT---
+list(sum(tuple(closure(), list(i64), dict(i64, i64))))
+
+---NAME---
+List releases sum tuple closure-list-dict-list payload
+---ROOT---
+list(sum(tuple(closure(), list(i64), dict(i64, list(i64)))))
+
+---NAME---
+List releases sum tuple string-blob-list-dict payload
+---ROOT---
+list(sum(tuple(string, blob, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases sum tuple nested string-list-dict payload
+---ROOT---
+list(sum(tuple(i64, i64, i64, tuple(string, list(i64), dict(i64, i64)))))
+
+---NAME---
+List releases sum tuple string-blob-list-dict-list payload
+---ROOT---
+list(sum(tuple(string, blob, list(i64), dict(i64, list(i64)))))
+
+---NAME---
+List releases sum tuple closure-blob-list-dict payload
+---ROOT---
+list(sum(tuple(closure(), blob, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases sum tuple closure-string-list-dict-list payload
+---ROOT---
+list(sum(tuple(closure(), string, list(i64), dict(i64, list(i64)))))
+
+---NAME---
+List releases sum record-string payload
+---ROOT---
+list(sum(record(string)))
+
+---NAME---
+List releases sum record string-list-dict payload
+---ROOT---
+list(sum(record(string, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases sum record string-blob-list-dict payload
+---ROOT---
+list(sum(record(string, blob, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases sum record string-blob-list-dict-list payload
+---ROOT---
+list(sum(record(string, blob, list(i64), dict(i64, list(i64)))))
+
+---NAME---
+List releases sum record closure-blob-list-dict payload
+---ROOT---
+list(sum(record(closure(), blob, list(i64), dict(i64, i64))))
+
+---NAME---
+List releases sum record with middle string payload
+---ROOT---
+list(sum(record(i64, string, i64)))
+
+---NAME---
+List releases nested sum string payload
+---ROOT---
+list(sum(sum(string)))
