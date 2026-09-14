@@ -125,7 +125,6 @@ repair_job() {
     codex exec \
       -C "$worktree" \
       --sandbox workspace-write \
-      --approve-for-me \
       --ephemeral \
       --output-last-message "$output_file" \
       "Repair mergetrain job #$job_id on branch $branch after a $category failure.
