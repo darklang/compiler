@@ -1,17 +1,17 @@
 #!/bin/bash
 # Main entry point for running benchmarks
-# Usage: ./benchmarks/run_benchmarks.sh [--hyperfine] [--verify|--verify-fresh] [--quiet|--verbose] [--skip-smoke] [--reset-dark-baseline] [--refresh-baseline=rust] [--jobs[=N]] [routine|benchmark_name|all]
+# Usage: ./benchmarks/run_benchmarks.sh [--hyperfine] [--verify|--verify-fresh] [--quiet|--verbose] [--skip-smoke] [--reset-dark-baseline] [--refresh-baseline=rust] [--jobs[=N]] [full|benchmark_name|all]
 #
 # Options:
 #   --help                   Show this help message and exit
 #   --hyperfine              Use hyperfine for timing (default: cachegrind for instruction counts)
-#   --verify                 Read-only routine verification; equal or improved suites pass
+#   --verify                 Read-only full verification; equal or improved suites pass
 #   --verify-fresh           Read-only integration gate; an unrecorded improvement fails
 #   --quiet                  Print only phase summaries, failures, and result locations
 #   --verbose                Print per-benchmark details (verification is quiet by default)
 #   --skip-smoke             Skip the cache-free smoke gate only when the caller has
 #                            already passed it on the exact unchanged commit
-#   --reset-dark-baseline    Replace Dark routine snapshot from one complete successful run
+#   --reset-dark-baseline    Replace Dark full snapshot from one complete successful run
 #   --refresh-baseline=rust  Independently refresh audited Rust reference rows
 #   --jobs, --jobs=N         Run up to N benchmarks in parallel (default: 1)
 #   --list                   Print the benchmarks that would run and exit
@@ -28,7 +28,7 @@ machine_arch() {
     esac
 }
 
-ROUTINE_TRACK="$(machine_arch)-routine-cachegrind"
+FULL_TRACK="$(machine_arch)-full-cachegrind"
 
 show_help() {
     sed -n '/^# Usage:/,/^$/ {
@@ -40,7 +40,7 @@ show_help() {
 # Parse options
 USE_CACHEGRIND=true
 REFRESH_BASELINE=false
-BENCHMARK="routine"
+BENCHMARK="full"
 BUILD_FAILURES=()
 RUN_FAILURES=()
 PROCESS_FAILURES=()
@@ -159,24 +159,24 @@ if [ "$REFRESH_BASELINE" != "false" ] && [ "$REFRESH_BASELINE" != "rust" ]; then
     exit 1
 fi
 
-if [ "$VERIFY_RESULTS" = true ] && [ "$BENCHMARK" != "routine" ]; then
-    pretty_fail "--verify requires the routine benchmark profile"
+if [ "$VERIFY_RESULTS" = true ] && [ "$BENCHMARK" != "full" ]; then
+    pretty_fail "--verify requires the full benchmark profile"
     exit 1
 fi
 
-if [ "$RESET_DARK_BASELINE" = true ] && [ "$BENCHMARK" != "routine" ]; then
-    pretty_fail "--reset-dark-baseline requires the complete routine profile"
+if [ "$RESET_DARK_BASELINE" = true ] && [ "$BENCHMARK" != "full" ]; then
+    pretty_fail "--reset-dark-baseline requires the full profile"
     exit 1
 fi
 
-if [ "$USE_CACHEGRIND" = true ] && [ "$REFRESH_BASELINE" != "false" ] && [ "$BENCHMARK" != "routine" ]; then
-    pretty_fail "cachegrind baseline refresh requires the routine benchmark profile"
+if [ "$USE_CACHEGRIND" = true ] && [ "$REFRESH_BASELINE" != "false" ] && [ "$BENCHMARK" != "full" ]; then
+    pretty_fail "cachegrind baseline refresh requires the full benchmark profile"
     exit 1
 fi
 
 # Get list of benchmarks to run
-if [ "$BENCHMARK" = "routine" ]; then
-    PROFILE="routine"
+if [ "$BENCHMARK" = "full" ]; then
+    PROFILE="full"
     if ! BENCHMARKS=$(python3 "$SCRIPT_DIR/infrastructure/benchmark_profiles.py" "$PROFILE"); then
         exit 1
     fi
@@ -200,12 +200,12 @@ else
     fi
 fi
 
-if [ "$PROFILE" = "routine" ] && [ "$USE_CACHEGRIND" = true ] && [ "$RESET_DARK_BASELINE" = false ] && [ "$LIST_ONLY" = false ]; then
+if [ "$PROFILE" = "full" ] && [ "$USE_CACHEGRIND" = true ] && [ "$RESET_DARK_BASELINE" = false ] && [ "$LIST_ONLY" = false ]; then
     if [ "$QUIET_MODE" = true ]; then
         run_quiet_on_success python3 "$SCRIPT_DIR/infrastructure/benchmark_baseline.py" validate \
-            --benchmarks-dir "$SCRIPT_DIR" --language dark --track "$ROUTINE_TRACK" || exit 1
+            --benchmarks-dir "$SCRIPT_DIR" --language dark --track "$FULL_TRACK" || exit 1
     elif ! python3 "$SCRIPT_DIR/infrastructure/benchmark_baseline.py" validate \
-        --benchmarks-dir "$SCRIPT_DIR" --language dark --track "$ROUTINE_TRACK"; then
+        --benchmarks-dir "$SCRIPT_DIR" --language dark --track "$FULL_TRACK"; then
         exit 1
     fi
 fi
@@ -360,21 +360,21 @@ run_benchmark_job() {
 
     if [ "$USE_CACHEGRIND" = true ]; then
         if [ "$QUIET_MODE" = true ]; then
-            if ! "$SCRIPT_DIR/infrastructure/cachegrind_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$REFRESH_BASELINE" "$dark_binary" routine >"$measurement_log" 2>&1; then
+            if ! "$SCRIPT_DIR/infrastructure/cachegrind_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$REFRESH_BASELINE" "$dark_binary" full >"$measurement_log" 2>&1; then
                 echo "RUN_FAIL" >> "$status_file"
                 pretty_warn "Cachegrind failed for $bench (log: $measurement_log)"
             fi
-        elif ! "$SCRIPT_DIR/infrastructure/cachegrind_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$REFRESH_BASELINE" "$dark_binary" routine; then
+        elif ! "$SCRIPT_DIR/infrastructure/cachegrind_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$REFRESH_BASELINE" "$dark_binary" full; then
             echo "RUN_FAIL" >> "$status_file"
             pretty_warn "Cachegrind failed for $bench (continuing)"
         fi
     else
         if [ "$QUIET_MODE" = true ]; then
-            if ! "$SCRIPT_DIR/infrastructure/hyperfine_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$dark_binary" routine >"$measurement_log" 2>&1; then
+            if ! "$SCRIPT_DIR/infrastructure/hyperfine_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$dark_binary" full >"$measurement_log" 2>&1; then
                 echo "RUN_FAIL" >> "$status_file"
                 pretty_warn "Hyperfine failed for $bench (log: $measurement_log)"
             fi
-        elif ! "$SCRIPT_DIR/infrastructure/hyperfine_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$dark_binary" routine; then
+        elif ! "$SCRIPT_DIR/infrastructure/hyperfine_runner.sh" "$bench" "$OUTPUT_DIR" "$parity_status" "$dark_binary" full; then
             echo "RUN_FAIL" >> "$status_file"
             pretty_warn "Hyperfine failed for $bench (continuing)"
         fi
@@ -507,8 +507,8 @@ fi
                 PROCESS_FAILURES+=("benchmark_verifier")
                 pretty_warn "benchmark verification failed"
             fi
-        elif [ "$PROFILE" = "routine" ]; then
-            # Only a complete routine run updates canonical current-state files.
+        elif [ "$PROFILE" = "full" ]; then
+            # Only a successful full run updates canonical current-state files.
             HISTORY_REFRESH_ARGS=()
             if [ "$REFRESH_BASELINE" != "false" ]; then
                 HISTORY_REFRESH_ARGS+=(--refresh-baseline)

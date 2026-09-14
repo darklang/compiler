@@ -93,5 +93,5 @@ the migrated local suites, and the activated pinned
 `src/Tests/e2e/upstream/stdlib/{bytes,base64,crypto,x509}.dark` sources. During
 implementation the focused filters passed: Blob 37/37, Base64 70/70, Crypto
 125/125, and X509 20/20. The complete native suite passed 5961/5961 after the
-focused work. Routine benchmark and integration verification remain the
+focused work. Full benchmark and integration verification remain the
 worker-owned post-commit gate.

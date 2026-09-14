@@ -8,7 +8,7 @@
 #                          never starts Cachegrind or changes a snapshot
 #   --benchmarks=NAMES     Comma-separated workload selection. Non-smoke runs
 #                          produce targeted evidence and never update a snapshot
-#   --profile=NAME         Benchmark profile used by smoke mode (default: routine)
+#   --profile=NAME         Benchmark profile used by smoke mode (default: full)
 #   --fast                 Run the declared quick-fast projection; never advances a snapshot
 #   --reset-dark-baseline  Replace the architecture's Dark snapshot from a complete quick run
 #   --decision-json=PATH    Persist the machine-readable suite or targeted decision
@@ -119,7 +119,7 @@ if [ "$FAST_MODE" = true ]; then
     PROFILE="quick-fast"
 fi
 if [ "$SMOKE_MODE" = true ]; then
-    PROFILE="${PROFILE_OVERRIDE:-routine}"
+    PROFILE="${PROFILE_OVERRIDE:-full}"
 elif [ -n "$PROFILE_OVERRIDE" ]; then
     pretty_fail "--profile is supported only with --smoke"
     exit 1

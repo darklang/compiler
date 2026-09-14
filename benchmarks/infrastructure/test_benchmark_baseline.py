@@ -93,6 +93,12 @@ class BenchmarkTrackTests(unittest.TestCase):
         self.assertNotEqual(cachegrind, qemu)
         self.assertEqual(qemu.name, "dark-x86_64-quick-qemu.json")
 
+    def test_canonical_complete_profile_is_named_full(self) -> None:
+        full = TRACKS["arm64-full-cachegrind"]
+
+        self.assertEqual(full.profile, "full")
+        self.assertNotIn("arm64-routine-cachegrind", TRACKS)
+
     def test_profile_invocation_owns_arguments_and_expected_stdout(self) -> None:
         invocation = load_invocation(self.benchmarks, "quick-fast", "alpha")
         self.assertEqual(invocation.args, ("10",))

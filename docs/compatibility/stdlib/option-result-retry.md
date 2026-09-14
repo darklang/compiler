@@ -88,7 +88,7 @@ After integration rebase onto compiler main
 `f1e769453ef41309d056ae386351939ce1eb83b9`, `./run-tests --ai` passed
 6,819/6,819 tests in 167.8 seconds. The additional main-side ARM64
 entry-transfer test and this work's sleep test both remain registered. The
-routine benchmark profile verified all 19 workload outputs and parity
+full benchmark profile verified all 19 workload outputs and parity
 contracts against exact Dark baseline
 `153d9588152ac5ba7b98ce8d699eacea1abc3b0e`, with every current instruction
 count equal and a current/baseline geometric ratio of `1.000000`. The table

@@ -55,7 +55,7 @@ def main() -> int:
     except (BaselineError, OSError, ValueError) as error:
         print(f"Dark benchmark verification requires a baseline reset: {error}")
         print(
-            "Run a complete successful routine suite with "
+            "Run a complete successful full suite with "
             "--reset-dark-baseline. No tracked benchmark files were changed."
         )
         return 1
@@ -67,7 +67,7 @@ def main() -> int:
     else:
         action = "preserved-stronger-baseline"
     print_comparison(comparison, baseline, details=not args.quiet)
-    print(f"Dark routine snapshot: {action}")
+    print(f"Dark full snapshot: {action}")
     atomic_write_json(
         results_dir / "dark_suite_decision.json",
         comparison_dict(comparison, args.profile, baseline, action),
@@ -76,7 +76,7 @@ def main() -> int:
     if comparison.decision == "regressed":
         return 1
     if comparison.decision == "improved":
-        print("Routine improvement must be recorded before integration.")
+        print("Full improvement must be recorded before integration.")
     if comparison.decision == "improved" and args.require_recorded:
         return 1
     return 0

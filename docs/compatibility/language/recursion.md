@@ -103,6 +103,6 @@ generic, and recursive-closure sources were inspected with `--dump-anf`,
 `--dump-mir`, and `--dump-lir`; mutual and self calls retain tail-call lowering
 while shadowed calls remain ordinary closure calls.
 
-The full suite passed `6893/6893` with `./run-tests --ai`. The canonical routine
+The full suite passed `6893/6893` with `./run-tests --ai`. The canonical full
 profile passed all 19 benchmarks with no count changes. Performance ratio:
 **2.25x** versus the audited Rust references (`benchmarks/RESULTS.md`).

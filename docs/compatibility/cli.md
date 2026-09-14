@@ -38,10 +38,10 @@ longer depend on a test filter.
 ## Repository verification
 
 - `./run-tests --ai`: 6,057/6,057 tests passed in 33.7 seconds.
-- `./benchmarks/run_benchmarks.sh --verify routine`: all 19 parity contracts
+- `./benchmarks/run_benchmarks.sh --verify full`: all 19 parity contracts
   and benchmark workloads passed. The current instruction counts were equal to
   the audited Dark baseline for every workload (geometric ratio `1.000000`).
-  The routine Performance ratio reported by `benchmarks/RESULTS.md` is `2.75x`.
+  The full-profile performance ratio reported by `benchmarks/RESULTS.md` is `2.75x`.
 
 These commands exercised compiler revision
 `041f466c2827fd16de70ce34d3ca7910350f92b8` on the Linux arm64 host recorded

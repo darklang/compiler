@@ -46,7 +46,7 @@ def _track(
 
 CACHEGRIND_POLICIES = {
     "quick": "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs",
-    "routine": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs",
+    "full": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs",
 }
 QEMU_QUICK_POLICY = "qemu-tcg-plugin-guest-insns-v1:qemu-11.1.1:rustc-1.89.0"
 TRACKS = {

@@ -99,7 +99,7 @@ def update_results(benchmarks_dir: Path, snapshot) -> None:
     ratios = [dark / rust for _, dark, rust in rows if rust]
     geometric = __import__("math").prod(ratios) ** (1 / len(ratios))
     lines = [
-        "# Benchmark Results", "", "Best-known compatible routine-profile Dark performance vs audited Rust references (instruction counts).", "",
+        "# Benchmark Results", "", "Best-known compatible full-profile Dark performance vs audited Rust references (instruction counts).", "",
         f"**Snapshot timestamp:** {snapshot.generated_at}", f"**Architecture:** `{snapshot.architecture}`",
         f"**Profile:** `{snapshot.profile}` (schema {snapshot.schema_version})",
         f"**Measurement policy:** `{snapshot.measurement_policy}`", f"**Workload contract:** `{snapshot.contract_sha256}`",
@@ -158,10 +158,10 @@ def main() -> int:
         if decision in {"improved", "reset"} or args.refresh_baseline:
             update_results(benchmarks_dir, active)
         atomic_write_json(results_dir / "dark_suite_decision.json", document)
-        print(f"Dark routine snapshot: {action}")
+        print(f"Dark full snapshot: {action}")
         return 1 if decision == "regressed" else 0
     except (BaselineError, OSError, ValueError, json.JSONDecodeError) as error:
-        print(f"Dark routine recording failed: {error}")
+        print(f"Dark full recording failed: {error}")
         return 1
 
 

@@ -2,7 +2,7 @@
 
 These diagnostic suites isolate compiler/runtime subsystems. They are separate
 from the audited application workloads in `../problems`, do not participate in
-the canonical `routine` profile, and never update its baselines.
+the canonical `full` profile, and never update its baselines.
 
 Run one suite and write its measurements to a JSON file:
 

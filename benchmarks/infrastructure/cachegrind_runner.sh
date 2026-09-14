@@ -14,7 +14,7 @@ OUTPUT_DIR=$2
 PARITY_STATUS=${3:-comparable}
 REFRESH_BASELINE=${4:-false}
 DARK_BINARY=${5:-}
-PROFILE=${6:-routine}
+PROFILE=${6:-full}
 source "$SCRIPT_DIR/pretty.sh"
 
 if [ -z "$BENCHMARK" ] || [ -z "$OUTPUT_DIR" ]; then

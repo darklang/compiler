@@ -107,7 +107,7 @@ The implementation was rebased onto compiler commit
 `fb61d714723f34d6c43e9bdc03dd96fb46f0c4ea`. Compiler commit
 `252f1af6b6dcb4a3b9b2eca3eeaaed5f69c81ae9` passed the complete test suite
 (`6338/6338`) with a zero-warning, zero-error build. Before
-that final rebase, the process implementation verified equal to the routine
+that final rebase, the process implementation verified equal to the full
 baseline. Current main's exact-byte presentation repair adds one observable
 final LF write (nine instructions) to every benchmark, so the old snapshot
 reported `1.000019`. After the required compatibility reset, all 19 programs

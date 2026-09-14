@@ -27,7 +27,7 @@ let nsieve (n: Int64) : Int64 =
     let composites = sieveLoop (2L) (n) (Stdlib.Dict.empty) in
     countPrimes (2L) (n) (composites) (0L)
 
-// The routine profile runs one full-size sieve in both Dark and Rust.
+// The full profile runs one full-size sieve in both Dark and Rust.
 let repeat (remaining: Int64) (n: Int64) (result: Int64) : Int64 =
     if remaining <= 0L then result
     else repeat (remaining - 1L) (n) (nsieve (n))

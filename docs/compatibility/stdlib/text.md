@@ -106,7 +106,7 @@ for the post-rebase comparisons was
 - `bin/Tests/Debug/net10.0/Tests --ai` passed 7,760/7,760 tests.
 - `python3 scripts/generate_unicode_tables.py --check` passed against the
   pinned Unicode 17.0.0 inputs.
-- `./benchmarks/run_benchmarks.sh --verify routine` completed all 19 ARM64
+- `./benchmarks/run_benchmarks.sh --verify full` completed all 19 ARM64
   workloads with no failures and an exact current/baseline geometric ratio of
   1.000000. The displayed Dark/Rust performance ratio remained 2.25x.
 

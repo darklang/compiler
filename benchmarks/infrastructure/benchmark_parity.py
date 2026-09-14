@@ -84,7 +84,7 @@ def validate_entry(
                 f"(expected {expected_tree_hash}, got {actual_tree_hash})"
             )
 
-    for mode in ("routine", "quick"):
+    for mode in ("full", "quick"):
         try:
             load_invocation(benchmarks_dir, mode, benchmark)
         except ValueError as error:

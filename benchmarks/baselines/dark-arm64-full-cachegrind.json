@@ -3,13 +3,13 @@
   "suite": "dark-compiler",
   "language": "dark",
   "track": {
-    "id": "arm64-routine-cachegrind",
-    "profile": "routine",
+    "id": "arm64-full-cachegrind",
+    "profile": "full",
     "architecture": "arm64",
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs"
   },
-  "contract_sha256": "89f422ad73b37c96ebbf41bf5d3a03790439b6aa6876fc780147a5d344c43e42",
+  "contract_sha256": "192b215fe4cb83b04d99c505183d561edf9e0ef149a430e4153b3e9ff95d8c16",
   "generated_at": "2026-09-14T00:25:36+00:00",
   "compiler": {
     "commit": "e6db8ae33491b8749fa655c186076b5b1bf46ba6",

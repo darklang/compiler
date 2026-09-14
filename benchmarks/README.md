@@ -34,7 +34,7 @@ the compiler's other Linux target.
 ## Quick Start
 
 ```bash
-# Record the routine profile. Improved Dark suites advance automatically;
+# Record the full profile. Improved Dark suites advance automatically;
 # equal suites keep the snapshot; regressed suites are logged and fail.
 ./benchmarks/run_benchmarks.sh
 
@@ -51,14 +51,14 @@ the compiler's other Linux target.
 # Run benchmarks in parallel
 ./benchmarks/run_benchmarks.sh --jobs 4
 
-# Verify the canonical routine profile without updating tracked files
-./benchmarks/run_benchmarks.sh --verify routine
+# Verify the canonical full profile without updating tracked files
+./benchmarks/run_benchmarks.sh --verify full
 
 # Stream per-workload details when diagnosing a verification run
-./benchmarks/run_benchmarks.sh --verify --verbose routine
+./benchmarks/run_benchmarks.sh --verify --verbose full
 
 # Establish a Dark baseline after an intentional contract/policy reset
-./benchmarks/run_benchmarks.sh --reset-dark-baseline routine
+./benchmarks/run_benchmarks.sh --reset-dark-baseline full
 ./benchmarks/quick_check.sh --reset-dark-baseline
 
 # Validate every reduced Dark/Rust pair and compare instruction counts
@@ -105,7 +105,7 @@ size, and leak behavior.
 The codegen profile attributes ARM64 cache misses by function and reports the
 remaining whole-program codegen time separately. Profiling is disabled unless
 the output flag is present. These diagnostics do not replace the canonical
-routine benchmark gate.
+full benchmark gate.
 
 ## Benchmark Modes
 
@@ -114,10 +114,10 @@ routine benchmark gate.
 `PARITY.json` records whether each Dark/Rust source pair is comparable and locks
 the SHA-256 hashes of the audited sources. `profiles.json` is the single
 authority for ordered suite membership, positional argv workloads, and expected
-stdout for the `routine`, `quick`, and `quick-fast` profiles. Every implementation
+stdout for the `full`, `quick`, and `quick-fast` profiles. Every implementation
 reads those workload values from the command line, so profiles select different
 sizes without creating different source programs. Every run checks the source
-hashes and invocation contract before recording numbers. The routine profile accepts only `comparable`
+hashes and invocation contract before recording numbers. The full profile accepts only `comparable`
 pairs; reduced, Dark-only, and incomparable programs remain available for
 diagnostics without contributing to canonical ratios.
 
@@ -138,16 +138,16 @@ Uses **Valgrind Cachegrind** to count instructions. Slower (~50x) but determinis
 
 This is the primary way we are tracking performance.
 
-The `routine` profile is the canonical comparable benchmark set and currently
+The `full` profile is the canonical comparable benchmark set and currently
 contains 29 pairs. Fannkuch runs the complete n=9 traversal in both languages,
 and nsieve runs one complete sieve in each language using their ordinary public
 data-structure APIs. Binary trees uses the same recursive allocation and
 traversal shape as Rust.
 Full-size quicksort and spectral norm are included. A
-completed routine Cachegrind run records its measurements in
+completed full Cachegrind run records its measurements in
 the architecture-specific canonical JSON snapshot and `HISTORY.md`; targeted
 runs and `all` are diagnostic and do not update canonical files. `RESULTS.md` is
-presentation regenerated from that routine snapshot plus `BASELINES.md`'s
+presentation regenerated from that full snapshot plus `BASELINES.md`'s
 audited Rust references. Recording accepts an optional `--machine` ID from
 the registry in `HISTORY.md`; omitted machine metadata is left blank rather than
 guessing the runner's identity. Verification does not update history.
@@ -188,7 +188,7 @@ Missing, malformed, incomplete, or incompatible snapshots fail and require an
 explicit complete `--reset-dark-baseline` run. Rust counts and Dark/Rust ratios
 remain correctness/comparison diagnostics and never enter the Dark decision.
 Pass `--decision-json=PATH` to retain the machine-readable quick decision;
-routine runs retain the same document in their generated results directory.
+full runs retain the same document in their generated results directory.
 
 `--fast` uses the declared five-workload `quick-fast` profile and projects those
 names from the compatible complete quick snapshot. It applies the same aggregate
@@ -241,13 +241,13 @@ Recording regenerates `RESULTS.x86_64.json`, `RESULTS.x86_64.md`, and appends
 
 ### Verification Mode (`--verify`)
 
-`./benchmarks/run_benchmarks.sh --verify routine` compares a complete successful
-run to the routine snapshot using the shared aggregate rule. Equal and improved
+`./benchmarks/run_benchmarks.sh --verify full` compares a complete successful
+run to the full snapshot using the shared aggregate rule. Equal and improved
 runs pass; regressions fail. It writes only generated run artifacts (including a
 machine-readable decision) and leaves the snapshot, `RESULTS.md`, `BASELINES.md`,
 and `HISTORY.md` unchanged.
 
-Normal routine recording appends every valid Dark run to `HISTORY.md` with a
+Normal full recording appends every valid Dark run to `HISTORY.md` with a
 unique timestamp/run identity and decision. An improvement atomically advances
 the snapshot and regenerates every Dark `RESULTS.md` row; equality changes only
 history; regression changes only history and returns failure. Thus snapshots are
@@ -273,7 +273,7 @@ Benchmarks can execute concurrently:
 ```
 
 The default is `--jobs 1`. Cachegrind instruction counts are reproducible when
-benchmarks run concurrently, so routine recording and verification may use
+benchmarks run concurrently, so full recording and verification may use
 more jobs. The runner builds the current Dark compiler once before spawning
 benchmark jobs, preventing stale compiler artifacts from being measured.
 Hyperfine should remain at one job when avoiding timing skew matters.
@@ -295,7 +295,7 @@ benchmarks/
     result_processor.py      # Generate timing summary
     cachegrind_processor.py  # Generate instruction count summary
     benchmark_baseline.py    # Snapshot contract and exact shared comparison
-    history_updater.py       # Monotonic routine recorder and history writer
+    history_updater.py       # Monotonic full recorder and history writer
 
   problems/
     fib/                     # Each benchmark has its own directory

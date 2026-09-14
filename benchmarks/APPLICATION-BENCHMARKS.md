@@ -40,7 +40,7 @@ The benchmark renders an inventory report through that complete surface.
 The Rust implementation is the complete published 1.2.1 crate source, not a
 facsimile or a dependency on a moving release. The Dark implementation is a
 functional port of the same value model, grammar, public registry operations,
-rendering semantics, and error categories. Routine and quick modes invoke the
+rendering semantics, and error categories. Full and quick modes invoke the
 same source with profile-declared row and repetition arguments.
 
 Future additions should prefer another pinned real codebase with a different
@@ -85,7 +85,7 @@ setup once and scales or repeats the hot computation enough to amortize it.
 - **Dark workload:** deterministically generate a skewed 32-symbol stream from
   a fixed LCG seed, build a correct min-priority Huffman tree, encode and decode
   it, verify the decoded checksum, and print a checksum incorporating encoded
-  length and contents. Quick uses 200 symbols and two round trips; routine uses
+  length and contents. Quick uses 200 symbols and two round trips; full uses
   10,000 symbols and 30 round trips. Generation and codec construction happen
   once per whole-process measurement.
 - **Adaptation:** both checked-in implementations use a deterministic sorted
