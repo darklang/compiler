@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# land - Enqueue the current committed branch and wait for its local deployment.
+
+set -euo pipefail
+
+poll_seconds=5
+task=""
+
+usage() {
+  echo "Usage: ./land [--task TEXT] [--poll-seconds SECONDS]"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --task)
+      task="$2"
+      shift 2
+      ;;
+    --poll-seconds)
+      poll_seconds="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      echo "Unknown argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ ! "$poll_seconds" =~ ^[1-9][0-9]*$ ]]; then
+  echo "--poll-seconds must be a positive integer" >&2
+  exit 2
+fi
+
+for required_command in git mergetrain python3; do
+  if ! command -v "$required_command" >/dev/null 2>&1; then
+    echo "Required command not found: $required_command" >&2
+    exit 1
+  fi
+done
+
+repo_root="$(git rev-parse --show-toplevel)"
+branch="$(git -C "$repo_root" branch --show-current)"
+head_sha="$(git -C "$repo_root" rev-parse HEAD)"
+
+if [[ -z "$branch" || "$branch" == "main" ]]; then
+  echo "Run ./land from a task branch, not main or a detached HEAD" >&2
+  exit 1
+fi
+if [[ -n "$(git -C "$repo_root" status --porcelain)" ]]; then
+  echo "Commit every intended change before running ./land" >&2
+  exit 1
+fi
+if [[ -z "$task" ]]; then
+  task="$(git -C "$repo_root" log -1 --format=%s)"
+fi
+
+json_value() {
+  local path="$1"
+  python3 -c '
+import json
+import sys
+
+value = json.load(sys.stdin)
+for component in sys.argv[1].split("."):
+    value = value.get(component) if isinstance(value, dict) else None
+if value is None:
+    print("")
+elif isinstance(value, bool):
+    print("true" if value else "false")
+else:
+    print(value)
+' "$path"
+}
+
+snapshot="$(mergetrain --repo "$repo_root" status --json)"
+contract_version="$(json_value contract_version <<<"$snapshot")"
+attention_count="$(json_value counts.attention <<<"$snapshot")"
+health="$(json_value health <<<"$snapshot")"
+
+if [[ "$contract_version" != "4" ]]; then
+  echo "Unsupported mergetrain contract version: $contract_version" >&2
+  exit 1
+fi
+if [[ "$health" != "healthy" || "$attention_count" != "0" ]]; then
+  echo "Mergetrain needs operator attention before this branch can land" >&2
+  echo "$snapshot" >&2
+  exit 1
+fi
+
+enqueue_payload="$(
+  mergetrain --repo "$repo_root" enqueue \
+    --task "$task" \
+    --branch "$branch" \
+    --worktree "$repo_root" \
+    --auto \
+    --json
+)"
+job_id="$(json_value job.id <<<"$enqueue_payload")"
+queued_head="$(json_value job.head_sha <<<"$enqueue_payload")"
+if [[ -z "$job_id" || "$queued_head" != "$head_sha" ]]; then
+  echo "Mergetrain did not enqueue the expected commit" >&2
+  echo "$enqueue_payload" >&2
+  exit 1
+fi
+
+echo "landing"
+
+while true; do
+  details="$(mergetrain --repo "$repo_root" inspect "$job_id" --json)"
+  status="$(json_value job.status <<<"$details")"
+
+  case "$status" in
+    deployed)
+      echo "landed"
+      exit 0
+      ;;
+    queued|in_progress|validated)
+      sleep "$poll_seconds"
+      ;;
+    blocked|canceled|failed)
+      reason="$(json_value outcome.message <<<"$details")"
+      echo "Landing failed for job #$job_id ($status): $reason" >&2
+      exit 1
+      ;;
+    *)
+      echo "Unknown mergetrain status for job #$job_id: $status" >&2
+      echo "$details" >&2
+      exit 1
+      ;;
+  esac
+done

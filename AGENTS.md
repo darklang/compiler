@@ -61,13 +61,15 @@ this repository and takes precedence where it is stricter.
   and rebase the worktree branch on the configured integration ref
   (`origin/main` by default) before starting. Task agents never push.
 - When work is complete, commit the intended changes automatically.
-- Enqueue the committed branch with `mergetrain enqueue --auto` automatically
-  only when it is ready: the
-  requested scope is complete, the final diff has been substantively reviewed,
+- Run `./land --task "<brief task description>"` only when the committed branch
+  is ready: the requested scope is complete, the final diff has been
+  substantively reviewed,
   all relevant tests pass, relevant benchmarks show no regression, and no known
-  issue or unresolved uncertainty remains. Once enqueued, stop; do not rebase
-  merely because the integration ref advanced after work began.
-- `--auto` grants the configured merge-train runner bounded unattended approval
+  issue or unresolved uncertainty remains. The script enqueues the exact commit
+  with bounded unattended approval, prints `landing`, and waits until it prints
+  `landed`. While waiting, do not rebase or otherwise change the branch merely
+  because the integration ref advanced.
+- `./land` grants the configured merge-train runner bounded unattended approval
   for that exact destination and execution policy. It does not authorize the
   task agent itself to validate, deploy, push, or integrate `main` directly.
 - If readiness cannot be established, leave the commit on its worktree branch
@@ -86,7 +88,7 @@ failure or incomplete step, followed by the reason.
 Work complete: <brief description of the outcome and important details>
 
 Committed: `<short hash>` — <commit subject>
-Merge train: ✅ enqueued `<branch>` at `<short hash>`
+Merge train: ✅ landed `<branch>` to local `main` at `<short hash>`
 Tests: ✅ <passed>/<total> passed — `<exact command>`
 Benchmarks: ✅ no regression, ratio <ratio> — `<exact command>`
 Other validation: ✅ <result> — `<exact command>`

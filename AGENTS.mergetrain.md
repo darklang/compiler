@@ -4,7 +4,7 @@ Purpose: Serialize committed local task branches through one merge/test/push/ver
 
 ## Existing queues and explanations
 
-- Existing mergetrain repositories keep status → enqueue → stop even for one branch. Queue counts alone do not establish health, runner ownership, or recovery needs; read `health`, `state`, and `next_action` together.
+- This repository uses status → `./land` → wait even for one branch. Queue counts alone do not establish health, runner ownership, or recovery needs; read `health`, `state`, and `next_action` together.
 - For explanation-only requests, read the skill documentation when permitted and explain the procedure without Git or product commands. Distinguish hypothetical steps from observed state.
 
 ## Current command reference
@@ -18,12 +18,12 @@ Purpose: Serialize committed local task branches through one merge/test/push/ver
 1. Work on a task-specific branch and worktree.
 2. Commit a clean HEAD before handing work off.
 3. Read mergetrain status --json and follow its next action before changing queue state.
-4. Enqueue every named finished branch in the requested order with `mergetrain enqueue --auto`, using only its task and branch otherwise; mergetrain resolves the worktree, captures the exact commits, and binds unattended approval to the configured destination and execution policy. Stop after the last successful enqueue unless the user explicitly authorized validation or the complete validation-and-deployment workflow.
+4. Land every named finished branch in the requested order with `./land --task "TASK"`; the script resolves the branch and worktree, enqueues the exact commit with bounded unattended approval, and waits for deployment. Do not continue until it prints `landed` unless it exits with a reported failure.
 5. Never push configured integration refs directly. One authorized runner owns validation and deployment; recovery and destructive actions require their stated approval.
 
 ## Safety boundary
 
-- A task agent enqueues every named finished branch with `--auto`, then stops. The flag authorizes only the configured runner's bounded unattended validation and deployment; it does not authorize the task agent to run either operation.
+- A task agent runs `./land` and waits for its exact job. The script's internal `--auto` enqueue authorizes only the configured runner's bounded unattended validation and deployment; it does not authorize the task agent to run either operation.
 - Only a separately authorized runner uses `deploy` or a daemon.
 - Deployment requires either confirmation of the human-readable exact plan or prior bounded unattended approval. Agents never select train IDs or supply plan hashes; structured evidence may include identifiers for inspection.
 - Unattended approval is bound to the exact destination and execution policy. Any change blocks before push.
