@@ -311,17 +311,11 @@ if [ "$QUIET_MODE" != true ]; then
     echo ""
 fi
 
-build_benchmark_job() {
+build_baseline_job() {
     local bench="$1"
     local status_file="$STATUS_DIR/${bench}.status"
-    local dark_binary="$OUTPUT_DIR/binaries/$bench/dark/main"
     local build_log="$LOG_DIR/build/${bench}.log"
-    : > "$status_file"
-    local build_args=()
-    if [ "$USE_CACHEGRIND" = true ] && [ "$REFRESH_BASELINE" = "false" ]; then
-        build_args+=(--skip-baselines)
-    fi
-    build_args+=(--dark-output="$dark_binary")
+    local build_args=(--skip-dark)
     if [ "$QUIET_MODE" = true ]; then
         if ! "$SCRIPT_DIR/infrastructure/build_all.sh" "$bench" "${build_args[@]}" >"$build_log" 2>&1; then
             echo "BUILD_FAIL" >> "$status_file"
@@ -379,7 +373,41 @@ run_benchmark_job() {
 if [ "$QUIET_MODE" != true ]; then
     pretty_section "Build gate"
 fi
-run_parallel_jobs "$JOB_COUNT" build_benchmark_job "${FILTERED_BENCHMARKS[@]}"
+
+for bench in "${FILTERED_BENCHMARKS[@]}"; do
+    : > "$STATUS_DIR/${bench}.status"
+done
+
+DARK_BATCH_LOG="$LOG_DIR/build/dark-batch.log"
+if [ "$QUIET_MODE" = true ]; then
+    if ! "$SCRIPT_DIR/infrastructure/build_dark_batch.sh" \
+        --output-dir="$OUTPUT_DIR/binaries" "${FILTERED_BENCHMARKS[@]}" >"$DARK_BATCH_LOG" 2>&1; then
+        pretty_warn "Dark batch build failed (log: $DARK_BATCH_LOG)"
+        for bench in "${FILTERED_BENCHMARKS[@]}"; do
+            echo "BUILD_FAIL" >> "$STATUS_DIR/${bench}.status"
+        done
+    fi
+else
+    pretty_info "Building Dark benchmarks with one shared stdlib..."
+    if "$SCRIPT_DIR/infrastructure/build_dark_batch.sh" \
+        --output-dir="$OUTPUT_DIR/binaries" "${FILTERED_BENCHMARKS[@]}"; then
+        pretty_ok "Dark batch build complete"
+    else
+        pretty_warn "Dark batch build failed"
+        for bench in "${FILTERED_BENCHMARKS[@]}"; do
+            echo "BUILD_FAIL" >> "$STATUS_DIR/${bench}.status"
+        done
+    fi
+fi
+
+BUILD_BASELINES=false
+if [ "$USE_CACHEGRIND" != true ] || [ "$REFRESH_BASELINE" != "false" ]; then
+    BUILD_BASELINES=true
+fi
+
+if [ "$BUILD_BASELINES" = true ] && ! grep -q "BUILD_FAIL" "$STATUS_DIR"/*.status; then
+    run_parallel_jobs "$JOB_COUNT" build_baseline_job "${FILTERED_BENCHMARKS[@]}"
+fi
 
 for bench in $BENCHMARKS; do
     status_file="$STATUS_DIR/${bench}.status"

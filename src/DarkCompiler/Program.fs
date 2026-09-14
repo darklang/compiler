@@ -37,6 +37,17 @@ type TargetSelection =
     | HostTarget
     | ExplicitTarget of Platform.Target
 
+/// One independently linked executable in a batch compiler invocation.
+type BatchCompileItem = { SourceFile: string; OutputFile: string }
+
+/// Batch mode shares immutable stdlib preparation while preserving a separate
+/// compilation request and executable for every source.
+type BatchCliOptions = {
+    Target: TargetSelection
+    Verbosity: VerbosityLevel
+    Items: BatchCompileItem * BatchCompileItem list
+}
+
 /// Convert VerbosityLevel to integer for library
 /// Library verbosity: 0=silent, 1=pass names, 2=pass names + timing, 3=dump all IRs
 let verbosityToInt (level: VerbosityLevel) : int =
@@ -95,6 +106,10 @@ type CliOptions = {
     DumpIRSummary: bool
     DumpIROutput: string option
 }
+
+type CliCommand =
+    | SingleCommand of CliOptions
+    | BatchCommand of BatchCliOptions
 
 /// Default empty options
 let defaultOptions = {
@@ -440,6 +455,55 @@ let validateOptions (opts: CliOptions) : Result<CliOptions, string> =
         else
             Ok opts
 
+let parseBatchArgs (argv: string array) : Result<BatchCliOptions, string> =
+    let parseItems (args: string list) : Result<BatchCompileItem * BatchCompileItem list, string> =
+        let rec loop (reversed: BatchCompileItem list) (remaining: string list) =
+            match remaining with
+            | [] ->
+                match List.rev reversed with
+                | [] -> Error "Batch compilation requires at least one SOURCE OUTPUT pair"
+                | first :: rest -> Ok (first, rest)
+            | [_] -> Error "Batch compilation requires an output path after every source path"
+            | source :: output :: rest ->
+                if String.IsNullOrWhiteSpace source || String.IsNullOrWhiteSpace output then
+                    Error "Batch source and output paths must be non-empty"
+                else
+                    loop ({ SourceFile = source; OutputFile = output } :: reversed) rest
+        loop [] args
+
+    let rec parseOptions
+        (target: TargetSelection)
+        (verbosity: VerbosityLevel)
+        (args: string list)
+        : Result<BatchCliOptions, string> =
+        match args with
+        | "--" :: itemArgs ->
+            parseItems itemArgs
+            |> Result.map (fun items -> { Target = target; Verbosity = verbosity; Items = items })
+        | ("-q" | "--quiet") :: rest -> parseOptions target Quiet rest
+        | "--target" :: value :: rest ->
+            match target with
+            | ExplicitTarget _ -> Error "Target specified multiple times"
+            | HostTarget ->
+                parseTargetValue value
+                |> Result.bind (fun parsedTarget -> parseOptions parsedTarget verbosity rest)
+        | "--target" :: [] -> Error "Missing value for --target (expected 'linux-x86_64')"
+        | flag :: rest when flag.StartsWith("--target=") ->
+            match target with
+            | ExplicitTarget _ -> Error "Target specified multiple times"
+            | HostTarget ->
+                parseTargetValue (flag.Substring(9))
+                |> Result.bind (fun parsedTarget -> parseOptions parsedTarget verbosity rest)
+        | [] -> Error "Batch compilation requires '--' before SOURCE OUTPUT pairs"
+        | flag :: _ -> Error $"Unknown batch flag: {flag}"
+
+    parseOptions HostTarget Normal (Array.toList argv)
+
+let parseCommand (argv: string array) : Result<CliCommand, string> =
+    match Array.toList argv with
+    | "--batch" :: rest -> parseBatchArgs (Array.ofList rest) |> Result.map BatchCommand
+    | _ -> parseArgs argv |> Result.bind validateOptions |> Result.map SingleCommand
+
 let private sourceFileForDiagnostics (cliOpts: CliOptions) : string =
     match cliOpts.IsExpression, cliOpts.Argument with
     | true, _ -> ""
@@ -481,23 +545,63 @@ let private withIRDumpOutput
                 Ok result
             with ex -> Error $"Failed to write IR dump to '{path}': {ex.Message}"
 
-/// Compile source expression to executable
-let compile (source: string) (outputPath: string) (verbosity: VerbosityLevel) (cliOpts: CliOptions) : int =
+let private selectedTarget (selection: TargetSelection) : Result<Platform.Target, string> =
+    match selection with
+    | HostTarget -> Platform.detectHostTarget ()
+    | ExplicitTarget target -> Ok target
+
+let private compileWithStdlib
+    (stdlib: CompilerLibrary.StdlibResult)
+    (source: string)
+    (outputPath: string)
+    (verbosity: VerbosityLevel)
+    (cliOpts: CliOptions)
+    : Result<unit, string> =
     let showNormal = shouldShowNormal verbosity
 
     if showNormal then
         println $"Compiling: {sourceDescription cliOpts}"
 
-    // Use library for compilation
     let options = buildCompilerOptions cliOpts
     let sourceFile = sourceFileForDiagnostics cliOpts
+    let request : CompilerLibrary.CompileRequest = {
+        Context = CompilerLibrary.StdlibOnly stdlib
+        Mode =
+            if cliOpts.IsExpression || cliOpts.EmitResult then CompilerLibrary.CompileMode.TestExpression
+            else CompilerLibrary.CompileMode.FullProgram
+        Sources =
+            AST.NonEmptyList.singleton
+                { CompilerLibrary.SourceUnit.Name = sourceFile
+                  Purpose = NameSyntax.SourceUnitPurpose.Executable
+                  Source = source }
+        AllowInternal = cliOpts.AllowInternal
+        Verbosity = verbosityToInt verbosity
+        Options = options
+        PackageValues = CompilerLibrary.emptyPackageValueCatalog
+        PassTimingRecorder = None
+        Session = None
+    }
+    withIRDumpOutput cliOpts (fun () -> CompilerLibrary.compile request)
+    |> Result.bind (fun compileReport ->
+        match compileReport.Result with
+        | Error err -> Error $"Compilation failed: {err}"
+        | Ok binary ->
+            let writeResult =
+                match compileReport.Target with
+                | Platform.ARM64Backend Platform.MacOSARM64 ->
+                    Binary_Generation_MachO.writeToFile outputPath binary
+                | Platform.ARM64Backend Platform.LinuxARM64
+                | Platform.LinuxX86_64 ->
+                    Binary_Generation_ELF.writeToFile outputPath binary
+            writeResult
+            |> Result.mapError (fun err -> $"Failed to write binary: {err}")
+            |> Result.map (fun () ->
+                if showNormal then
+                    println $"Successfully wrote {binary.Length} bytes to {outputPath}"))
 
-    let selectedTarget =
-        match cliOpts.Target with
-        | HostTarget -> Platform.detectHostTarget ()
-        | ExplicitTarget target -> Ok target
-
-    match selectedTarget with
+/// Compile source expression to executable
+let compile (source: string) (outputPath: string) (verbosity: VerbosityLevel) (cliOpts: CliOptions) : int =
+    match selectedTarget cliOpts.Target with
     | Error err ->
         eprintln $"Target detection failed: {err}"
         1
@@ -507,46 +611,69 @@ let compile (source: string) (outputPath: string) (verbosity: VerbosityLevel) (c
             eprintln $"Compilation failed: {err}"
             1
         | Ok stdlib ->
-            let request : CompilerLibrary.CompileRequest = {
-                Context = CompilerLibrary.StdlibOnly stdlib
-                Mode =
-                    if cliOpts.IsExpression || cliOpts.EmitResult then CompilerLibrary.CompileMode.TestExpression
-                    else CompilerLibrary.CompileMode.FullProgram
-                Sources =
-                    AST.NonEmptyList.singleton
-                        { CompilerLibrary.SourceUnit.Name = sourceFile
-                          Purpose = NameSyntax.SourceUnitPurpose.Executable
-                          Source = source }
-                AllowInternal = cliOpts.AllowInternal
-                Verbosity = verbosityToInt verbosity
-                Options = options
-                PackageValues = CompilerLibrary.emptyPackageValueCatalog
-                PassTimingRecorder = None
-                Session = None
-            }
-            let compileReport = withIRDumpOutput cliOpts (fun () -> CompilerLibrary.compile request)
-            match compileReport with
+            match compileWithStdlib stdlib source outputPath verbosity cliOpts with
             | Error err ->
                 eprintln err
                 1
-            | Ok { Result = Error err } ->
-                eprintln $"Compilation failed: {err}"
-                1
-            | Ok { Result = Ok binary; Target = compiledTarget } ->
-                let writeResult =
-                    match compiledTarget with
-                    | Platform.ARM64Backend Platform.MacOSARM64 ->
-                        Binary_Generation_MachO.writeToFile outputPath binary
-                    | Platform.ARM64Backend Platform.LinuxARM64
-                    | Platform.LinuxX86_64 ->
-                        Binary_Generation_ELF.writeToFile outputPath binary
-                match writeResult with
+            | Ok () -> 0
+
+let private readSourceFile (path: string) : Result<string, string> =
+    if not (File.Exists path) then
+        Error $"File not found: {path}"
+    else
+        try Ok (File.ReadAllText path)
+        with ex -> Error $"Failed to read file '{path}': {ex.Message}"
+
+let compileBatch (options: BatchCliOptions) : int =
+    let items = fst options.Items :: snd options.Items
+    let sourcesResult =
+        items
+        |> List.fold
+            (fun state item ->
+                state
+                |> Result.bind (fun reversed ->
+                    readSourceFile item.SourceFile
+                    |> Result.map (fun source -> (item, source) :: reversed)))
+            (Ok [])
+        |> Result.map List.rev
+
+    match selectedTarget options.Target, sourcesResult with
+    | Error err, _ ->
+        eprintln $"Target detection failed: {err}"
+        1
+    | _, Error err ->
+        eprintln err
+        1
+    | Ok target, Ok sources ->
+        match CompilerLibrary.buildStdlib target with
+        | Error err ->
+            eprintln $"Compilation failed: {err}"
+            1
+        | Ok stdlib ->
+            sources
+            |> List.fold
+                (fun state (item, source) ->
+                    state
+                    |> Result.bind (fun () ->
+                        let cliOpts = {
+                            defaultOptions with
+                                Argument = Some item.SourceFile
+                                OutputFile = Some item.OutputFile
+                                Verbosity = options.Verbosity
+                                Target = options.Target
+                        }
+                        compileWithStdlib
+                            stdlib
+                            source
+                            item.OutputFile
+                            options.Verbosity
+                            cliOpts))
+                (Ok ())
+            |> function
+                | Ok () -> 0
                 | Error err ->
-                    eprintln $"Failed to write binary: {err}"
+                    eprintln err
                     1
-                | Ok () ->
-                    if showNormal then println $"Successfully wrote {binary.Length} bytes to {outputPath}"
-                    0
 
 /// Run an expression (compile to temp and execute)
 let run (source: string) (verbosity: VerbosityLevel) (cliOpts: CliOptions) : int =
@@ -635,6 +762,7 @@ let printUsage () =
     println "  dark -e <expression> [-o <output>]  Compile expression to executable"
     println "  dark -r -e <expression>             Run expression"
     println "  dark -r -e -                        Read expression from stdin and run"
+    println "  dark --batch [OPTIONS] -- SOURCE OUTPUT [SOURCE OUTPUT ...]"
     println ""
     println "Flags:"
     println "  -r, --run            Run instead of compile (shows exit code)"
@@ -679,6 +807,7 @@ let printUsage () =
     printf "  dark -qr -e \"6 * 7\"                Run quietly (exit code: 42)\n"
     println "  dark --target=linux-x86_64 prog.dark -o prog-x86_64"
     println "  dark -v prog.dark -o output        Compile with verbose output"
+    println "  dark --batch -q -- a.dark a.out b.dark b.out"
     println "  dark -r -e - < input.txt           Run expression from stdin"
     println ""
     println "Note: Generated executables may require code signing to run on macOS"
@@ -686,22 +815,24 @@ let printUsage () =
 [<EntryPoint>]
 let main argv =
     try
-        match parseArgs argv |> Result.bind validateOptions with
+        match parseCommand argv with
         | Error msg ->
             println $"Error: {msg}"
             println ""
             printUsage()
             1
 
-        | Ok options when options.Help ->
+        | Ok (SingleCommand options) when options.Help ->
             printUsage()
             0
 
-        | Ok options when options.Version ->
+        | Ok (SingleCommand options) when options.Version ->
             printVersion()
             0
 
-        | Ok options ->
+        | Ok (BatchCommand options) -> compileBatch options
+
+        | Ok (SingleCommand options) ->
             // Get source code (from stdin, file, or inline expression)
             let getSource () : Result<string, string> =
                 match options.Argument with

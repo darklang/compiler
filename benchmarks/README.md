@@ -286,10 +286,11 @@ Benchmarks can execute concurrently:
 ```
 
 The default is `--jobs 1`. The runner builds the current Dark compiler once,
-then applies the selected job limit to both benchmark compilation and
-measurement. Cachegrind instruction counts are reproducible when benchmarks run
-concurrently, so full recording and verification may use more jobs without
-changing their counts.
+then compiles all selected Dark programs as independent outputs in one process
+that prepares the standard library once. The selected job limit applies to
+reference-language compilation and measurement. Cachegrind instruction counts
+are reproducible when benchmarks run concurrently, so full recording and
+verification may use more jobs without changing their counts.
 Hyperfine should remain at one job when avoiding timing skew matters.
 
 ## Directory Structure
@@ -303,6 +304,7 @@ benchmarks/
   profiles.json              # Membership, argv, and expected stdout contract
 
   infrastructure/
+    build_dark_batch.sh      # Compile Dark programs with one prepared stdlib
     build_all.sh             # Compile Dark and Rust implementations
     cachegrind_runner.sh     # Run cachegrind + output validation
     hyperfine_runner.sh      # Run hyperfine timing benchmarks

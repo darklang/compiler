@@ -65,6 +65,37 @@ let testEmptyIRDumpValuesRejected () : TestResult =
     | Error error -> Error $"Expected non-empty dump filter guidance, got: {error}"
     | Ok _ -> Error "Expected an empty dump function filter to fail"
 
+let testBatchCompileParsesIndependentOutputs () : TestResult =
+    match
+        Program.parseCommand
+            [| "--batch"
+               "--quiet"
+               "--"
+               "first.dark"
+               "first.out"
+               "second.dark"
+               "second.out" |]
+    with
+    | Ok (Program.BatchCommand options) ->
+        let items = fst options.Items :: snd options.Items
+        match items with
+        | [ first; second ] when
+            options.Verbosity = Program.Quiet
+            && first.SourceFile = "first.dark"
+            && first.OutputFile = "first.out"
+            && second.SourceFile = "second.dark"
+            && second.OutputFile = "second.out" ->
+            Ok ()
+        | _ -> Error $"Unexpected batch compile items: {items}"
+    | Ok command -> Error $"Expected batch command, got: {command}"
+    | Error error -> Error $"Expected batch command to parse, got: {error}"
+
+let testBatchCompileRejectsMissingOutput () : TestResult =
+    match Program.parseCommand [| "--batch"; "--"; "only-source.dark" |] with
+    | Error error when error.Contains "output path" -> Ok ()
+    | Error error -> Error $"Expected missing-output guidance, got: {error}"
+    | Ok _ -> Error "Expected an unmatched batch source to be rejected"
+
 let tests = [
     ("parse explicit Linux x86_64 target", testExplicitLinuxX86_64Target)
     ("reject unknown compiler target", testUnknownTargetRejected)
@@ -73,4 +104,6 @@ let tests = [
     ("parse scoped IR dump options", testScopedIRDumpOptions)
     ("require an IR selection for dump modifiers", testIRDumpModifiersRequireDumpSelection)
     ("reject empty IR dump values", testEmptyIRDumpValuesRejected)
+    ("parse independent batch compile outputs", testBatchCompileParsesIndependentOutputs)
+    ("reject batch source without output", testBatchCompileRejectsMissingOutput)
 ]

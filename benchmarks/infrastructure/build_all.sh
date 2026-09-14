@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build all implementations for a given benchmark
-# Usage: ./build_all.sh <benchmark_name> [--skip-baselines] [--dark-output=PATH]
+# Usage: ./build_all.sh <benchmark_name> [--skip-dark] [--skip-baselines] [--dark-output=PATH]
 
 set -e
 
@@ -10,12 +10,14 @@ PROJECT_ROOT="$(dirname "$BENCHMARKS_DIR")"
 BENCHMARK=$1
 shift
 BUILD_BASELINES=true
+BUILD_DARK=true
 DARK_OUTPUT=""
 while [ $# -gt 0 ]; do
     case "$1" in
+        --skip-dark) BUILD_DARK=false ;;
         --skip-baselines) BUILD_BASELINES=false ;;
         --dark-output=*) DARK_OUTPUT="${1#*=}" ;;
-        *) echo "Usage: $0 <benchmark_name> [--skip-baselines] [--dark-output=PATH]"; exit 1 ;;
+        *) echo "Usage: $0 <benchmark_name> [--skip-dark] [--skip-baselines] [--dark-output=PATH]"; exit 1 ;;
     esac
     shift
 done
@@ -37,7 +39,7 @@ fi
 pretty_section "Building $BENCHMARK..."
 
 # Build Dark implementation
-if [ -f "$PROBLEM_DIR/dark/main.dark" ]; then
+if [ "$BUILD_DARK" = "true" ] && [ -f "$PROBLEM_DIR/dark/main.dark" ]; then
     pretty_info "Building Dark..."
     # A failed compiler invocation must never leave a previously built binary
     # available for a later correctness check or measurement.

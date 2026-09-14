@@ -50,6 +50,9 @@ selected target unless the change explicitly includes another architecture.
 # Compile to a specific output path
 ./dark prog.dark -o output
 
+# Compile independent programs while preparing the standard library once
+./dark --batch -q -- first.dark first.out second.dark second.out
+
 # Run a file (compile + exec)
 ./dark -r prog.dark
 
@@ -74,6 +77,10 @@ launching the produced executable.
 - `-o PATH` / `--output`     — output path (default `dark.out`)
 - `-q` / `--quiet`           — suppress progress output
 - `-v`, `-vv`, `-vvv`        — verbose (pass names, timing, all IRs)
+
+Batch mode accepts one or more `SOURCE OUTPUT` pairs after `--`. Every pair is
+compiled and linked independently, but the process reuses one prepared standard
+library across all pairs.
 
 ## Dump intermediate representations
 
