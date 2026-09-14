@@ -121,13 +121,6 @@ let x = 3.5 in -x
 return -3.5
 
 ---NAME---
-const_fold_float_abs
----INPUT---
-let x = -3.5 in Stdlib.Float.abs (x)
----EXPECTED---
-return 3.5
-
----NAME---
 const_fold_float_sqrt
 ---INPUT---
 let x = 9.0 in Stdlib.Float.sqrt (x)
@@ -142,16 +135,9 @@ let x = 42L in Stdlib.Int64.toFloat (x)
 return 42
 
 ---NAME---
-const_fold_float_to_int64
----INPUT---
-let x = 42.9 in Stdlib.Float.toInt (x)
----EXPECTED---
-return 42
-
----NAME---
 const_fold_float_to_bits
 ---INPUT---
-let x = 1.0 in Stdlib.Float.toBits (x)
+let x = 1.0 in Stdlib.Float.__toBits (x)
 ---EXPECTED---
 return 4607182418800017408
 
@@ -1487,14 +1473,6 @@ Function f:
 return false
 
 ---NAME---
-stdlib_string_equals_self_folded
----INPUT---
-let f (x: String) : Bool = Stdlib.String.equals (x) (x)
----EXPECTED---
-Function f:
-return true
-
----NAME---
 identity_bitwise_double_not
 ---INPUT---
 let f (x: Int64) : Int64 = Stdlib.Int64.bitwiseNot (Stdlib.Int64.bitwiseNot x)
@@ -1577,24 +1555,6 @@ let f (x: Float) : Float = -(-x)
 ---EXPECTED---
 Function f:
 return t0
-
----NAME---
-identity_float_abs_idempotent
----INPUT---
-let f (x: Float) : Float = Stdlib.Float.abs (Stdlib.Float.abs (x))
----EXPECTED---
-Function f:
-let TempId 2 = FloatAbs(t0)
-return t2
-
----NAME---
-identity_float_abs_negation
----INPUT---
-let f (x: Float) : Float = Stdlib.Float.abs (-x)
----EXPECTED---
-Function f:
-let TempId 2 = FloatAbs(t0)
-return t2
 
 ---NAME---
 cse_reuses_duplicate_float_neg
@@ -2206,24 +2166,6 @@ let TempId 3 = t1.0
 return t3
 
 ---NAME---
-cse_reuses_duplicate_float_to_int64
----INPUT---
-let f (x: Float) : Int64 =
-  let y = Stdlib.Float.toInt (x) in
-  let z = Stdlib.Float.toInt (x) in
-  y + z
-f (42.5)
----EXPECTED---
-Function f:
-let TempId 1 = FloatToInt64(t0)
-let TempId 5 = t1 + t1
-return t5
-
-Main:
-let TempId 6 = f(42.5)
-return t6
-
----NAME---
 cse_reuses_duplicate_int64_to_float
 ---INPUT---
 let f (x: Int64) : Float =
@@ -2240,8 +2182,8 @@ return t5
 cse_reuses_duplicate_float_to_bits
 ---INPUT---
 let f (x: Float) : (UInt64 * UInt64) =
-  let a = Stdlib.Float.toBits (x) in
-  let b = Stdlib.Float.toBits (x) in
+  let a = Stdlib.Float.__toBits (x) in
+  let b = Stdlib.Float.__toBits (x) in
   (a, b)
 f (1.5)
 ---EXPECTED---
@@ -2252,24 +2194,6 @@ return t5
 
 Main:
 let TempId 6 = f(1.5)
-return t6
-
----NAME---
-cse_reuses_duplicate_float_abs
----INPUT---
-let f (x: Float) : Float =
-  let a = Stdlib.Float.abs (x) in
-  let b = Stdlib.Float.abs (x) in
-  a + b
-f (-3.5)
----EXPECTED---
-Function f:
-let TempId 1 = FloatAbs(t0)
-let TempId 5 = t1 + t1
-return t5
-
-Main:
-let TempId 6 = f(-3.5)
 return t6
 
 ---NAME---
@@ -2396,10 +2320,10 @@ hoist_identical_leading_branch_binding_preserves_effects
 ---INPUT---
 let f (x: Int64) : Int64 =
   if x > 0L then
-    let value = Stdlib.Random.int64 () in
+    let value = Stdlib.Int.__randomInt64Word () in
     value + 1L
   else
-    let value = Stdlib.Random.int64 () in
+    let value = Stdlib.Int.__randomInt64Word () in
     value - 1L
 ---EXPECTED---
 Function f:

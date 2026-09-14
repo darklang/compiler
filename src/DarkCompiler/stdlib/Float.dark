@@ -23,16 +23,19 @@ let __sum (values: List<Float>) (total: Float) : Float =
     | [] -> total
     | head :: tail -> Stdlib.Float.__sum tail (total + head)
 
-// Intrinsics retained as compiler extensions.
-let toBits (f: Float) : UInt64 = 0UL
+// Private native representation primitive; the public upstream API returns Int.
+let __toBits (f: Float) : UInt64 = 0UL
+
+let toBits (value: Float) : Int = Stdlib.Int.fromUInt64 (Stdlib.Float.__toBits value)
+let toInt (value: Float) : Int = Stdlib.Float.roundTowardsZero value
 
 let isNaN (value: Float) : Bool = value != value
 
 let __isNegative (value: Float) : Bool =
-    Stdlib.UInt64.shiftRight (Stdlib.Float.toBits value) 63UL == 1UL
+    Stdlib.UInt64.shiftRight (Stdlib.Float.__toBits value) 63UL == 1UL
 
 let __isInfinite (value: Float) : Bool =
-    let exponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight (Stdlib.Float.toBits value) 52UL) 2047UL in
+    let exponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight (Stdlib.Float.__toBits value) 52UL) 2047UL in
     exponent == 2047UL && Stdlib.Bool.not (Stdlib.Float.isNaN value)
 
 let __infinity () : Float = 1.0 / 0.0
@@ -98,7 +101,7 @@ let __scanExponentDigits (value: String) (index: Int64) (magnitude: Int64) (sawD
     if index >= Stdlib.String.__byteLength value then
         if sawDigit then Ok magnitude else Error Stdlib.Float.ParseError.BadFormat
     else
-        let byte = Stdlib.String.getByteAt value index in
+        let byte = Stdlib.String.__byteAtUnchecked value index in
         if Stdlib.Float.__isDigit byte then
             let next = if magnitude >= 1000L then 10000L else magnitude * 10L + byte - 48L in
             Stdlib.Float.__scanExponentDigits value (index + 1L) next true
@@ -107,7 +110,7 @@ let __scanExponentDigits (value: String) (index: Int64) (magnitude: Int64) (sawD
 let __scanExponent (value: String) (index: Int64) : Stdlib.Result.Result<Int64, Stdlib.Float.ParseError> =
     if index >= Stdlib.String.__byteLength value then Error Stdlib.Float.ParseError.BadFormat
     else
-        let byte = Stdlib.String.getByteAt value index in
+        let byte = Stdlib.String.__byteAtUnchecked value index in
         let negative = byte == 45L in
         let hasSign = negative || byte == 43L in
         let digitsStart = if hasSign then index + 1L else index in
@@ -120,7 +123,7 @@ let __scanMantissa (value: String) (index: Int64) (digits: String) (fractionalDi
         if sawDigit then Ok ((digits, fractionalDigits, 0L))
         else Error Stdlib.Float.ParseError.BadFormat
     else
-        let byte = Stdlib.String.getByteAt value index in
+        let byte = Stdlib.String.__byteAtUnchecked value index in
         if Stdlib.Float.__isDigit byte then
             let digit = Stdlib.String.__byteSlice value index (index + 1L) in
             Stdlib.Float.__scanMantissa value (index + 1L) (digits ++ digit) (if sawDot then fractionalDigits + 1L else fractionalDigits) sawDot true
@@ -202,7 +205,7 @@ let __ratioToFloat (numerator: Int) (denominator: Int) : Float =
 
 let __decimalToFloat (digits: String) (decimalExponent: Int64) (negative: Bool) : Float =
     let normalized = Stdlib.Int.__normalizeMagnitude digits in
-    if normalized == "0" then if negative then (-0.0) else 0.0
+    if normalized == "0" then if negative then -0.0 else 0.0
     else
         let decimalMagnitude = Stdlib.String.__byteLength normalized + decimalExponent in
         let magnitude =
@@ -225,7 +228,7 @@ let parse (input: String) : Stdlib.Result.Result<Float, Stdlib.Float.ParseError>
     else if value == "-Infinity" then Ok (Stdlib.Float.__negativeInfinity ())
     else if Stdlib.String.__byteLength value == 0L then Error Stdlib.Float.ParseError.BadFormat
     else
-        let first = Stdlib.String.getByteAt value 0L in
+        let first = Stdlib.String.__byteAtUnchecked value 0L in
         let negative = first == 45L in
         let hasSign = negative || first == 43L in
         let start = if hasSign then 1L else 0L in
@@ -236,7 +239,7 @@ let parse (input: String) : Stdlib.Result.Result<Float, Stdlib.Float.ParseError>
 
 let __stripDecimalTrailingZeros (value: String) : String =
     let length = Stdlib.String.__byteLength value in
-    if length > 1L && Stdlib.String.getByteAt value (length - 1L) == 48L then
+    if length > 1L && Stdlib.String.__byteAtUnchecked value (length - 1L) == 48L then
         Stdlib.Float.__stripDecimalTrailingZeros (Stdlib.String.__byteTake value (length - 1L))
     else value
 
@@ -259,7 +262,7 @@ let __renderDecimalCandidate (digits: String) (decimalExponent: Int64) (negative
 
 let __hasNonzeroDigit (value: String) (index: Int64) : Bool =
     if index >= Stdlib.String.__byteLength value then false
-    else if Stdlib.String.getByteAt value index != 48L then true
+    else if Stdlib.String.__byteAtUnchecked value index != 48L then true
     else Stdlib.Float.__hasNonzeroDigit value (index + 1L)
 
 let __roundedSignificand (exactText: String) (precision: Int64) : String =
@@ -268,8 +271,8 @@ let __roundedSignificand (exactText: String) (precision: Int64) : String =
         exactText ++ Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 (precision - exactLength))
     else
         let prefix = Stdlib.String.__byteTake exactText precision in
-        let nextDigit = Stdlib.String.getByteAt exactText precision - (48L) in
-        let lastKeptDigit = Stdlib.String.getByteAt prefix (precision - 1L) - (48L) in
+        let nextDigit = Stdlib.String.__byteAtUnchecked exactText precision - (48L) in
+        let lastKeptDigit = Stdlib.String.__byteAtUnchecked prefix (precision - 1L) - (48L) in
         let roundsUp =
             nextDigit > 5L
             || (nextDigit == 5L
@@ -288,7 +291,7 @@ let __shortestCandidate (originalBits: UInt64) (exactText: String) (scale: Int64
     let digits = Stdlib.Float.__stripDecimalTrailingZeros roundedText in
     let parsed =
         Stdlib.Float.__decimalToFloat digits (exponent - Stdlib.String.__byteLength digits + 1L) negative in
-    if Stdlib.Float.toBits parsed == originalBits then
+    if Stdlib.Float.__toBits parsed == originalBits then
         Stdlib.Float.__renderDecimalCandidate digits exponent negative
     else if precision >= 17L then Builtin.testRuntimeError "Float.toString failed to find a round-trip decimal"
     else Stdlib.Float.__shortestCandidate originalBits exactText scale negative (precision + 1L)
@@ -296,7 +299,7 @@ let __shortestCandidate (originalBits: UInt64) (exactText: String) (scale: Int64
 let __decimalProductCarry (value: String) (index: Int64) (digit: Int64) (carry: Int64) : Int64 =
     if index < 0L then carry
     else
-        let product = (Stdlib.String.getByteAt value index - (48L)) * digit + carry in
+        let product = (Stdlib.String.__byteAtUnchecked value index - (48L)) * digit + carry in
         Stdlib.Float.__decimalProductCarry value (index - 1L) digit (product / 10L)
 
 let __writeDecimalProduct (value: String) (index: Int64) (digit: Int64) (carry: Int64) (ptr: RawPtr) (outputIndex: Int64) : Unit =
@@ -304,7 +307,7 @@ let __writeDecimalProduct (value: String) (index: Int64) (digit: Int64) (carry: 
         if carry == 0L then ()
         else __raw_write_byte ptr (outputIndex + 16L) (carry + 48L)
     else
-        let product = (Stdlib.String.getByteAt value index - (48L)) * digit + carry in
+        let product = (Stdlib.String.__byteAtUnchecked value index - (48L)) * digit + carry in
         let _ = __raw_write_byte ptr (outputIndex + 16L) (product % 10L + 48L) in
         Stdlib.Float.__writeDecimalProduct value (index - 1L) digit (product / 10L) ptr (outputIndex - 1L)
 
@@ -326,7 +329,7 @@ let __multiplyTextByDigit (value: String) (digit: Int64) (count: Int64) : String
         Stdlib.Float.__multiplyTextByDigit product digit (count - 1L)
 
 let toString (value: Float) : String =
-    let bits = Stdlib.Float.toBits value in
+    let bits = Stdlib.Float.__toBits value in
     let negative = Stdlib.UInt64.shiftRight bits 63UL == 1UL in
     let rawExponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
     let mantissa = Stdlib.UInt64.bitwiseAnd bits 4503599627370495UL in
@@ -370,8 +373,8 @@ let __log (value: Float) : Float =
     else if Stdlib.Float.__isInfinite value then Stdlib.Float.__infinity ()
     else
         let normalized = Stdlib.Float.__normalizeLog value 0L in
-        let mantissa = Stdlib.Tuple2.first normalized in
-        let exponent = Stdlib.Tuple2.second normalized in
+        let mantissa = Stdlib.Tuple2.first<Float, Int64> normalized in
+        let exponent = Stdlib.Tuple2.second<Float, Int64> normalized in
         let z = (mantissa - 1.0) / (mantissa + 1.0) in
         let series = z + Stdlib.Float.__logSeries z (z * z) 1L 26L z 0.0 in
         Stdlib.Int64.toFloat exponent * 0.6931471805599453 + 2.0 * series
@@ -383,11 +386,14 @@ let __exp (value: Float) : Float =
     else
         // fdlibm range reduction and minimax kernel. Keeping this in Dark
         // gives both native targets the same operation order and rounding.
-        let absValue = Stdlib.Float.abs value in
+        let absValue = Stdlib.Float.absoluteValue value in
         let exponent =
             if absValue > 0.5 * 0.6931471805599453 then
                 if absValue < 1.5 * 0.6931471805599453 then if value > 0.0 then 1L else -1L
-                else Stdlib.Float.toInt (1.4426950408889634 * value + (if value > 0.0 then 0.5 else -0.5))
+                else
+                    match Stdlib.Int.toInt64 (Stdlib.Float.toInt (1.4426950408889634 * value + (if value > 0.0 then 0.5 else -0.5))) with
+                    | Some converted -> converted
+                    | None -> Builtin.crash "Internal Float exponent conversion invariant failed"
             else 0L in
         let exponentFloat = Stdlib.Int64.toFloat exponent in
         let high = value - exponentFloat * 0.6931471803691238 in
@@ -416,7 +422,7 @@ let power (base: Float) (exponent: Float) : Float =
     if exponent == 0.0 || base == 1.0 then 1.0
     else if Stdlib.Float.isNaN base || Stdlib.Float.isNaN exponent then Stdlib.Float.__nan ()
     else
-        let absBase = Stdlib.Float.abs base in
+        let absBase = Stdlib.Float.absoluteValue base in
         if Stdlib.Float.__isInfinite exponent then
             if absBase == 1.0 then 1.0
             else if (absBase > 1.0) == (exponent > 0.0) then Stdlib.Float.__infinity ()

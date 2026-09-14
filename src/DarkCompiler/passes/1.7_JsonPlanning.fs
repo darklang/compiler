@@ -1085,6 +1085,7 @@ let rewriteProgramWithSession
         |> List.fold (fun acc topLevel ->
             match topLevel with
             | FunctionDef fn -> collect fn.Body acc
+            | ValueDef valueDef -> collect (valueDefBody valueDef) acc
             | Expression expr -> collect expr acc
             | TypeDef _ -> acc) ([], [])
         |> fun (serializers, parsers) -> (List.distinct serializers, List.distinct parsers)

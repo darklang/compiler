@@ -38,7 +38,7 @@ let private hasTopLevelExpression (AST.Program topLevels: AST.Program) : bool =
     topLevels
     |> List.exists (function
         | AST.Expression _ -> true
-        | AST.FunctionDef _ | AST.TypeDef _ -> false)
+        | AST.FunctionDef _ | AST.TypeDef _ | AST.ValueDef _ -> false)
 
 let private addSyntheticMainExpressionIfNeeded (AST.Program topLevels: AST.Program) : AST.Program * bool =
     if hasTopLevelExpression (AST.Program topLevels) then

@@ -1,6 +1,9 @@
-// Stdlib.Cli.Posix.Error.dark - Display helpers for canonical POSIX errors.
+// CliPosixError.dark - upstream POSIX errno values.
 
-module Stdlib.Cli.Posix.Error
+module Stdlib.Cli.Posix.Errno
 
-let toString (error: Stdlib.Cli.Posix.Error) : String =
-    error.message
+val einval = 22
+val esrch = 3
+val eperm = 1
+val enoent = 2
+val eexist = 17

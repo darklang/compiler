@@ -1,16 +1,6 @@
-// Builtin.dark - Legacy Builtin compatibility helpers for upstream tests
-//
-// Provides no-op/internal test helpers that old upstream programs still call.
+// Builtin.dark - portable implementations of upstream builtin comparisons.
 
 module Builtin
-
-// Legacy harness helper; current runtime does not track exception counts.
-let testSetExpectedExceptionCount (_count: Int64) : Unit =
-    ()
-
-// Legacy DarkInternal helper used by upstream tests.
-let darkInternalInfraSchedulingRuleList () : Unit =
-    Builtin.testRuntimeError "Unknown error"
 
 // Current interpreter integer probes call these primitive comparison names.
 // The compiler keeps their typed behavior while implementing them portably.

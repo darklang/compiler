@@ -18,22 +18,22 @@ let __isHexByte (byte: Int64) : Bool =
 // System.Guid.TryParse, the pinned interpreter implementation, recognizes
 // the X-format marker case-insensitively.
 let __hasHexPrefixAt (s: String) (index: Int64) : Bool =
-    Stdlib.String.getByteAt s index == 48L &&
-    (Stdlib.String.getByteAt s (index + 1L) == 120L || Stdlib.String.getByteAt s (index + 1L) == 88L)
+    Stdlib.String.__byteAtUnchecked s index == 48L &&
+    (Stdlib.String.__byteAtUnchecked s (index + 1L) == 120L || Stdlib.String.__byteAtUnchecked s (index + 1L) == 88L)
 
 let __hasHexAt (s: String) (index: Int64) (count: Int64) : Bool =
     if count == 0L then
         true
     else
-        let byte = Stdlib.String.getByteAt s index in
+        let byte = Stdlib.String.__byteAtUnchecked s index in
         Stdlib.Uuid.__isHexByte byte && Stdlib.Uuid.__hasHexAt s (index + 1L) (count - 1L)
 
 let __isHyphenated (s: String) : Bool =
     Stdlib.String.__byteLength s == 36L &&
-    Stdlib.String.getByteAt s 8L == 45L &&
-    Stdlib.String.getByteAt s 13L == 45L &&
-    Stdlib.String.getByteAt s 18L == 45L &&
-    Stdlib.String.getByteAt s 23L == 45L &&
+    Stdlib.String.__byteAtUnchecked s 8L == 45L &&
+    Stdlib.String.__byteAtUnchecked s 13L == 45L &&
+    Stdlib.String.__byteAtUnchecked s 18L == 45L &&
+    Stdlib.String.__byteAtUnchecked s 23L == 45L &&
     Stdlib.Uuid.__hasHexAt s 0L 8L &&
     Stdlib.Uuid.__hasHexAt s 9L 4L &&
     Stdlib.Uuid.__hasHexAt s 14L 4L &&
@@ -59,13 +59,13 @@ let __removeXWhitespace (parts: List<String>) (acc: String) : String =
 
 let __xHexEnd (s: String) (index: Int64) : Int64 =
     if index == Stdlib.String.__byteLength s then index
-    else if Stdlib.Uuid.__isHexByte (Stdlib.String.getByteAt s index) then
+    else if Stdlib.Uuid.__isHexByte (Stdlib.String.__byteAtUnchecked s index) then
         Stdlib.Uuid.__xHexEnd s (index + 1L)
     else index
 
 let __dropLeadingZeroesAt (digits: String) (index: Int64) : String =
     if index == Stdlib.String.__byteLength digits then ""
-    else if Stdlib.String.getByteAt digits index == 48L then
+    else if Stdlib.String.__byteAtUnchecked digits index == 48L then
         Stdlib.Uuid.__dropLeadingZeroesAt digits (index + 1L)
     else Stdlib.String.__byteSlice digits index (Stdlib.String.__byteLength digits)
 
@@ -93,19 +93,19 @@ let __xFields (s: String) (index: Int64) (fieldIndex: Int64) (acc: String) : Std
             let nextAcc = acc ++ digits in
             if fieldIndex == 10L then
                 if digitsEnd + 2L == length &&
-                   Stdlib.String.getByteAt s digitsEnd == 125L &&
-                   Stdlib.String.getByteAt s (digitsEnd + 1L) == 125L then Some nextAcc
+                   Stdlib.String.__byteAtUnchecked s digitsEnd == 125L &&
+                   Stdlib.String.__byteAtUnchecked s (digitsEnd + 1L) == 125L then Some nextAcc
                 else None
-            else if digitsEnd >= length || Stdlib.String.getByteAt s digitsEnd != 44L then None
+            else if digitsEnd >= length || Stdlib.String.__byteAtUnchecked s digitsEnd != 44L then None
             else if fieldIndex == 2L then
-                if digitsEnd + 1L < length && Stdlib.String.getByteAt s (digitsEnd + 1L) == 123L then
+                if digitsEnd + 1L < length && Stdlib.String.__byteAtUnchecked s (digitsEnd + 1L) == 123L then
                     Stdlib.Uuid.__xFields s (digitsEnd + 2L) (fieldIndex + 1L) nextAcc
                 else None
             else Stdlib.Uuid.__xFields s (digitsEnd + 1L) (fieldIndex + 1L) nextAcc
 
 let __xDigits (s: String) : Stdlib.Option.Option<String> =
-    let compact = Stdlib.Uuid.__removeXWhitespace (Stdlib.String.toGraphemes s) "" in
-    if Stdlib.String.__byteLength compact > 0L && Stdlib.String.getByteAt compact 0L == 123L then
+    let compact = Stdlib.Uuid.__removeXWhitespace (Stdlib.String.__toGraphemes s) "" in
+    if Stdlib.String.__byteLength compact > 0L && Stdlib.String.__byteAtUnchecked compact 0L == 123L then
         Stdlib.Uuid.__xFields compact 1L 0L ""
     else None
 
@@ -119,7 +119,7 @@ let __hexDigitUInt64 (byte: Int64) : UInt64 =
 
 let __hexWordAt (digits: String) (index: Int64) (endIndex: Int64) (value: UInt64) : UInt64 =
     if index == endIndex then value
-    else Stdlib.Uuid.__hexWordAt digits (index + 1L) endIndex (Stdlib.UInt64.shiftLeft value 4UL + Stdlib.Uuid.__hexDigitUInt64 (Stdlib.String.getByteAt digits index))
+    else Stdlib.Uuid.__hexWordAt digits (index + 1L) endIndex (Stdlib.UInt64.shiftLeft value 4UL + Stdlib.Uuid.__hexDigitUInt64 (Stdlib.String.__byteAtUnchecked digits index))
 
 let __parseDigits (digits: String) : Stdlib.Result.Result<Uuid, Stdlib.Uuid.ParseError> =
     let high = Stdlib.Uuid.__hexWordAt digits 0L 16L 0UL in
@@ -131,7 +131,7 @@ let parse (value: String) : Stdlib.Result.Result<Uuid, Stdlib.Uuid.ParseError> =
     let length = Stdlib.String.__byteLength s in
     if length == 32L && Stdlib.Uuid.__hasHexAt s 0L 32L then Stdlib.Uuid.__parseDigits s
     else if Stdlib.Uuid.__isHyphenated s then Stdlib.Uuid.__parseDigits (Stdlib.Uuid.__hyphenatedDigits s)
-    else if length == 38L && ((Stdlib.String.getByteAt s 0L == 123L && Stdlib.String.getByteAt s 37L == 125L) || (Stdlib.String.getByteAt s 0L == 40L && Stdlib.String.getByteAt s 37L == 41L)) then
+    else if length == 38L && ((Stdlib.String.__byteAtUnchecked s 0L == 123L && Stdlib.String.__byteAtUnchecked s 37L == 125L) || (Stdlib.String.__byteAtUnchecked s 0L == 40L && Stdlib.String.__byteAtUnchecked s 37L == 41L)) then
         let inner = Stdlib.String.__byteSlice s 1L 37L in
         if Stdlib.Uuid.__isHyphenated inner then Stdlib.Uuid.__parseDigits (Stdlib.Uuid.__hyphenatedDigits inner) else Error Stdlib.Uuid.ParseError.BadFormat
     else
@@ -179,8 +179,8 @@ let toString (uuid: Uuid) : String =
 // Generate UUID v4: xxxxxxxx-xxxx-4xxx-Nxxx-xxxxxxxxxxxx
 // where N is 8, 9, a, or b (variant bits)
 let generate () : Uuid =
-    let high = Stdlib.Random.int64 () in
-    let low = Stdlib.Random.int64 () in
+    let high = Stdlib.Int64.random (-9223372036854775808L) 9223372036854775807L in
+    let low = Stdlib.Int64.random (-9223372036854775808L) 9223372036854775807L in
     // Set version (4) in byte 6: clear upper nibble, set to 4
     // Using XOR since we cleared the bits first with AND
     // Mask -61441 = 0xFFFFFFFFFFFF0FFF (clears bits 12-15)

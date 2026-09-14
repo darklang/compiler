@@ -71,425 +71,8 @@ let __int64ToLE (v: Int64) : List<Int64> =
     [Stdlib.Int64.bitwiseAnd v 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 8L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 16L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 24L) 255L,
      Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 32L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 40L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 48L) 255L, Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight v 56L) 255L]
 
-// =============================================================================
-// Hex Encoding (for test output)
-// =============================================================================
-
-let __nibbleToHex (n: Int64) : String =
-    match n with
-    | 0L -> "0" | 1L -> "1" | 2L -> "2" | 3L -> "3"
-    | 4L -> "4" | 5L -> "5" | 6L -> "6" | 7L -> "7"
-    | 8L -> "8" | 9L -> "9" | 10L -> "A" | 11L -> "B"
-    | 12L -> "C" | 13L -> "D" | 14L -> "E" | 15L -> "F"
-    | _ -> "?"
-
-let __byteToHex (b: Int64) : String =
-    Stdlib.Crypto.__nibbleToHex (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight b 4L) 15L) ++ Stdlib.Crypto.__nibbleToHex (Stdlib.Int64.bitwiseAnd b 15L)
-
-let __bytesToHexHelper (b: Blob) (index: Int64) (len: Int64) (acc: String) : String =
-    if index >= len then
-        acc
-    else
-        let byte = Stdlib.Blob.__getByte b index in
-        Stdlib.Crypto.__bytesToHexHelper b (index + 1L) len (acc ++ Stdlib.Crypto.__byteToHex byte)
-
-// Convert bytes to uppercase hex string (public API for testing)
-let bytesToHex (b: Blob) : String =
-    Stdlib.Crypto.__bytesToHexHelper b 0L (Stdlib.Blob.__byteLength b) ""
-
-// Debug function: test rotl32
-let debugRotl32 (x: Int64) (n: Int64) : Int64 =
-    Stdlib.Crypto.__rotl32 x n
-
-// Debug: components of rotl32 calculation
-let debugRotl32Parts (x: Int64) (n: Int64) : (Int64 * Int64 * Int64) =
-    let masked = Stdlib.Int64.bitwiseAnd x (Stdlib.Crypto.__mask32 ()) in
-    let leftPart = Stdlib.Int64.shiftLeft masked n in
-    let rightPart = Stdlib.Int64.shiftRight masked (32L - n) in
-    (leftPart, rightPart, Stdlib.Int64.bitwiseAnd leftPart (Stdlib.Crypto.__mask32 ()))
-
-// Debug: full rotl32 trace showing all intermediate values
-// Returns (masked, leftPart, rightPart, orResult, finalResult)
-let debugRotl32Full (x: Int64) (n: Int64) : (Int64 * Int64 * Int64 * Int64 * Int64) =
-    let masked = Stdlib.Int64.bitwiseAnd x (Stdlib.Crypto.__mask32 ()) in
-    let leftPart = Stdlib.Int64.shiftLeft masked n in
-    let rightPart = Stdlib.Int64.shiftRight masked (32L - n) in
-    let orResult = Stdlib.Int64.bitwiseOr leftPart rightPart in
-    let finalResult = Stdlib.Int64.bitwiseAnd orResult (Stdlib.Crypto.__mask32 ()) in
-    (masked, leftPart, rightPart, orResult, finalResult)
-
-// Debug function: test rotr32
-let debugRotr32 (x: Int64) (n: Int64) : Int64 =
-    Stdlib.Crypto.__rotr32 x n
-
-// Debug function: test add32
-let debugAdd32 (a: Int64) (b: Int64) : Int64 =
-    Stdlib.Crypto.__add32 a b
-
-// Debug function: test getLE32 on bytes
-let debugGetLE32 (b: Blob) (offset: Int64) : Int64 =
-    Stdlib.Crypto.__getLE32 b offset
-
-// Debug function: test getBE32 on bytes
-let debugGetBE32 (b: Blob) (offset: Int64) : Int64 =
-    Stdlib.Crypto.__getBE32 b offset
-
-// Debug function: show first 4 message words from padded data
-let debugMd5Words (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let m0 = Stdlib.Crypto.__md5GetWord padded 0L 0L in
-    let m1 = Stdlib.Crypto.__md5GetWord padded 0L 1L in
-    let m2 = Stdlib.Crypto.__md5GetWord padded 0L 2L in
-    let m3 = Stdlib.Crypto.__md5GetWord padded 0L 3L in
-    (m0, m1, m2, m3)
-
-// Debug function: show message words 11-14 from padded data
-let debugMd5Words11to14 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let m11 = Stdlib.Crypto.__md5GetWord padded 0L 11L in
-    let m12 = Stdlib.Crypto.__md5GetWord padded 0L 12L in
-    let m13 = Stdlib.Crypto.__md5GetWord padded 0L 13L in
-    let m14 = Stdlib.Crypto.__md5GetWord padded 0L 14L in
-    (m11, m12, m13, m14)
-
-// Debug function: return the padded message that MD5 would process
-let debugMd5Padded (data: Blob) : Blob =
-    let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
-    let padding = Stdlib.Crypto.__md5BuildPadding dataLen in
-    // Use Stdlib.List.append instead of Stdlib.List.flatten to avoid compiler bug with list-of-lists
-    let paddedList = Stdlib.List.append dataList padding in
-    Stdlib.Blob.__fromInt64List paddedList
-
-// Debug function: return the length of the padded message
-let debugMd5PaddedLen (data: Blob) : Int64 =
-    Stdlib.Blob.__byteLength (Stdlib.Crypto.debugMd5Padded data)
-
-// Debug function: copy first 4 bytes from Blob to List
-let debugCopyFirst4 (data: Blob) : List<Int64> =
-    let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
-    Stdlib.List.take dataList 4
-
-// Debug function: copy data and flatten with empty list, take first 4
-let debugFlattenFirst4 (data: Blob) : List<Int64> =
-    let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
-    let paddedList = Stdlib.List.flatten ([dataList, []]) in
-    Stdlib.List.take paddedList 4
-
-// Debug: just wrap in list-of-lists and access first element, no flatten
-let debugListOfLists (data: Blob) : List<Int64> =
-    let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
-    let listOfLists = [dataList, []] in
-    match Stdlib.List.getAt listOfLists 0 with
-    | Some first -> Stdlib.List.take first 4
-    | None -> []
-
-// Debug: use ++ instead of flatten
-let debugAppendFirst4 (data: Blob) : List<Int64> =
-    let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
-    let combined = Stdlib.List.append dataList ([]) in
-    Stdlib.List.take combined 4
-
-// Debug: wrap in single-element list-of-lists
-let debugSingleListOfLists (data: Blob) : List<Int64> =
-    let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
-    let listOfLists = [dataList] in
-    match Stdlib.List.getAt listOfLists 0 with
-    | Some first -> Stdlib.List.take first 4
-    | None -> []
-
-// Debug: what if we just read back the list after assigning to a variable?
-let debugJustAssign (data: Blob) : List<Int64> =
-    let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
-    let same = dataList in
-    Stdlib.List.take same 4
-
-// Debug function: convert data to list, flatten, convert to bytes, read back first 4 bytes
-let debugRoundtrip4 (data: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
-    let paddedList = Stdlib.List.flatten ([dataList, []]) in
-    let result = Stdlib.Blob.__fromInt64List paddedList in
-    (Stdlib.Blob.__getByte result 0L, Stdlib.Blob.__getByte result 1L, Stdlib.Blob.__getByte result 2L, Stdlib.Blob.__getByte result 3L)
-
-// Debug function: compute MD5 F function for round 0
-let debugMd5F (b: Int64) (c: Int64) (d: Int64) : Int64 =
-    Stdlib.Crypto.__md5F 0L b c d
-
-// Debug: trace through F function components for specific inputs
-// Returns (b_and_c, not_b, not_b_and_d, result)
-let debugMd5FTrace (b: Int64) (c: Int64) (d: Int64) : (Int64 * Int64 * Int64 * Int64) =
-    let b_and_c = Stdlib.Int64.bitwiseAnd b c in
-    let not_b = Stdlib.Crypto.__not32 b in
-    let not_b_and_d = Stdlib.Int64.bitwiseAnd not_b d in
-    let result = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseOr b_and_c not_b_and_d) (Stdlib.Crypto.__mask32 ()) in
-    (b_and_c, not_b, not_b_and_d, result)
-
-// Debug: test not32 function
-let debugNot32 (x: Int64) : Int64 =
-    Stdlib.Crypto.__not32 x
-
-// Debug: test raw bitwise NOT before masking
-let debugRawNot (x: Int64) : Int64 =
-    Stdlib.Int64.bitwiseNot x
-
-// Debug function: compute one MD5 step and return new B value
-let debugMd5OneStep (a: Int64) (b: Int64) (c: Int64) (d: Int64) (m: Int64) : Int64 =
-    // Round 0: F = (B & C) | (~B & D), g=0, K[0]=3614090360, s=7
-    let f = Stdlib.Crypto.__md5F 0L b c d in
-    let k = 3614090360L in
-    let temp = Stdlib.Crypto.__add32 (Stdlib.Crypto.__add32 (Stdlib.Crypto.__add32 a f) k) m in
-    Stdlib.Crypto.__add32 b (Stdlib.Crypto.__rotl32 temp 7L)
-
-// Debug: run 64 MD5 rounds and return the state as a tuple
-let debugMd5AllRounds (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__md5Rounds h0 h1 h2 h3 0L padded 0L
-
-// Debug: run full MD5 block processing (64 rounds + add back to h0-h3)
-let debugMd5ProcessBlock (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__md5ProcessBlock h0 h1 h2 h3 padded 0L
-
-// Debug: run just 1 MD5 round (round 0) and return the state
-let debugMd5Round0 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__md5Step h0 h1 h2 h3 0L padded 0L
-
-// Debug: helper to run N rounds
-let __debugMd5NRounds (a: Int64) (b: Int64) (c: Int64) (d: Int64) (i: Int64) (n: Int64) (block: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    if i >= n then
-        (a, b, c, d)
-    else
-        let result = Stdlib.Crypto.__md5Step a b c d i block 0L in
-        match result with
-        | (na, nb, nc, nd) -> Stdlib.Crypto.__debugMd5NRounds na nb nc nd (i + 1L) n block
-
-// Debug: run 2 MD5 rounds and return the state
-let debugMd5Round2 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 2L padded
-
-// Debug: run 16 MD5 rounds and return the state
-let debugMd5Round16 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 16L padded
-
-// Debug: run 32 MD5 rounds and return the state
-let debugMd5Round32 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 32L padded
-
-// Debug: run 48 MD5 rounds and return the state
-let debugMd5Round48 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 48L padded
-
-// Debug: trace round 48 (first I function round)
-// Returns (f, g, m, k, s, temp, rotated, newB)
-let debugMd5Round48Trace (padded: Blob) : (Int64 * Int64 * Int64 * Int64 * Int64 * Int64 * Int64 * Int64) =
-    // State after 48 rounds: (1062596093, 3397201341, 1759006370, 581115732)
-    let a = 1062596093L in
-    let b = 3397201341L in
-    let c = 1759006370L in
-    let d = 581115732L in
-    let i = 48L in
-    let f = Stdlib.Crypto.__md5F i b c d in
-    let g = Stdlib.Crypto.__md5G i in
-    let m = Stdlib.Crypto.__md5GetWord padded 0L g in
-    let k = Stdlib.Crypto.__md5K i in
-    let s = Stdlib.Crypto.__md5Shift i in
-    let temp = Stdlib.Crypto.__add32 (Stdlib.Crypto.__add32 (Stdlib.Crypto.__add32 a f) k) m in
-    let rotated = Stdlib.Crypto.__rotl32 temp s in
-    let newB = Stdlib.Crypto.__add32 b rotated in
-    (f, g, m, k, s, temp, rotated, newB)
-
-// Debug: test I function components
-// SHA-1 I(b, c, d) combines c with the complement of d using XOR and OR.
-let debugMd5I (b: Int64) (c: Int64) (d: Int64) : (Int64 * Int64 * Int64 * Int64) =
-    let not_d = Stdlib.Crypto.__not32 d in
-    let b_or_not_d = Stdlib.Int64.bitwiseOr b not_d in
-    let result = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.bitwiseXor c b_or_not_d) (Stdlib.Crypto.__mask32 ()) in
-    (not_d, b_or_not_d, c, result)
-
-// Debug: run 49 MD5 rounds and return the state
-let debugMd5Round49 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 49L padded
-
-// Debug: run 50 MD5 rounds and return the state
-let debugMd5Round50 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 50L padded
-
-// Debug: run 51 MD5 rounds
-let debugMd5Round51 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 51L padded
-
-// Debug: run 52 MD5 rounds
-let debugMd5Round52 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 52L padded
-
-// Debug: trace round 52 intermediate values
-// State before round 52: a=2477401463, b=1444808329, c=3448092875, d=378068101
-// Returns (f, g, m, k, s, temp, rotated, newB)
-let debugMd5Round52Trace (padded: Blob) : (Int64 * Int64 * Int64 * Int64 * Int64 * Int64 * Int64 * Int64) =
-    let a = 2477401463L in
-    let b = 1444808329L in
-    let c = 3448092875L in
-    let d = 378068101L in
-    let i = 52L in
-    let f = Stdlib.Crypto.__md5F i b c d in
-    let g = Stdlib.Crypto.__md5G i in
-    let m = Stdlib.Crypto.__md5GetWord padded 0L g in
-    let k = Stdlib.Crypto.__md5K i in
-    let s = Stdlib.Crypto.__md5Shift i in
-    let temp = Stdlib.Crypto.__add32 (Stdlib.Crypto.__add32 (Stdlib.Crypto.__add32 a f) k) m in
-    let rotated = Stdlib.Crypto.__rotl32 temp s in
-    let newB = Stdlib.Crypto.__add32 b rotated in
-    (f, g, m, k, s, temp, rotated, newB)
-
-// Debug: run 53 MD5 rounds
-let debugMd5Round53 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 53L padded
-
-// Debug: run 54 MD5 rounds
-let debugMd5Round54 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 54L padded
-
-// Debug: run 56 MD5 rounds
-let debugMd5Round56 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 56L padded
-
-// Debug: run 60 MD5 rounds
-let debugMd5Round60 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 60L padded
-
-// Debug: run 64 MD5 rounds using debugMd5NRounds (for comparison with __md5Rounds)
-let debugMd5Round64 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    let h0 = 1732584193L in
-    let h1 = 4023233417L in
-    let h2 = 2562383102L in
-    let h3 = 271733878L in
-    Stdlib.Crypto.__debugMd5NRounds h0 h1 h2 h3 0L 64L padded
-
-// Debug: run rounds 55-64 starting from correct round 54 state
-let debugMd5Round55to64 (padded: Blob) : (Int64 * Int64 * Int64 * Int64) =
-    // State after round 54 from Python: a=1444808329, b=959107280, c=877720619, d=1445306644
-    Stdlib.Crypto.__debugMd5NRounds 1444808329L 959107280L 877720619L 1445306644L 55L 64L padded
-
-// Debug: show K values for rounds 48-51
-let debugMd5K48to51 () : (Int64 * Int64 * Int64 * Int64) =
-    (Stdlib.Crypto.__md5K 48L, Stdlib.Crypto.__md5K 49L, Stdlib.Crypto.__md5K 50L, Stdlib.Crypto.__md5K 51L)
-
-// Debug: show S values for rounds 48-51
-let debugMd5S48to51 () : (Int64 * Int64 * Int64 * Int64) =
-    (Stdlib.Crypto.__md5Shift 48L, Stdlib.Crypto.__md5Shift 49L, Stdlib.Crypto.__md5Shift 50L, Stdlib.Crypto.__md5Shift 51L)
-
-// Debug: show g values for rounds 48-51
-let debugMd5G48to51 () : (Int64 * Int64 * Int64 * Int64) =
-    (Stdlib.Crypto.__md5G 48L, Stdlib.Crypto.__md5G 49L, Stdlib.Crypto.__md5G 50L, Stdlib.Crypto.__md5G 51L)
-
-// Debug: trace round 49 (second I function round)
-// Returns (f, g, m, k, s, temp, rotated, newB)
-let debugMd5Round49Trace (padded: Blob) : (Int64 * Int64 * Int64 * Int64 * Int64 * Int64 * Int64 * Int64) =
-    // State after 49 rounds: (581115732, 2477401463, 3397201341, 1759006370)
-    let a = 581115732L in
-    let b = 2477401463L in
-    let c = 3397201341L in
-    let d = 1759006370L in
-    let i = 49L in
-    let f = Stdlib.Crypto.__md5F i b c d in
-    let g = Stdlib.Crypto.__md5G i in
-    let m = Stdlib.Crypto.__md5GetWord padded 0L g in
-    let k = Stdlib.Crypto.__md5K i in
-    let s = Stdlib.Crypto.__md5Shift i in
-    let temp = Stdlib.Crypto.__add32 (Stdlib.Crypto.__add32 (Stdlib.Crypto.__add32 a f) k) m in
-    let rotated = Stdlib.Crypto.__rotl32 temp s in
-    let newB = Stdlib.Crypto.__add32 b rotated in
-    (f, g, m, k, s, temp, rotated, newB)
-
-// Debug: trace through round 1 intermediate values
-// Returns (f, g, m, k, s, temp, rotated, newB)
-let debugMd5Round1Trace (padded: Blob) : (Int64 * Int64 * Int64 * Int64 * Int64 * Int64 * Int64 * Int64) =
-    // State after round 0: a=271733878, b=2770347892, c=4023233417, d=2562383102
-    let a = 271733878L in
-    let b = 2770347892L in
-    let c = 4023233417L in
-    let d = 2562383102L in
-    let i = 1L in
-    let f = Stdlib.Crypto.__md5F i b c d in
-    let g = Stdlib.Crypto.__md5G i in
-    let m = Stdlib.Crypto.__md5GetWord padded 0L g in
-    let k = Stdlib.Crypto.__md5K i in
-    let s = Stdlib.Crypto.__md5Shift i in
-    let temp = Stdlib.Crypto.__add32 (Stdlib.Crypto.__add32 (Stdlib.Crypto.__add32 a f) k) m in
-    let rotated = Stdlib.Crypto.__rotl32 temp s in
-    let newB = Stdlib.Crypto.__add32 b rotated in
-    (f, g, m, k, s, temp, rotated, newB)
-
-// =============================================================================
-// List Utilities
-// =============================================================================
-
-// Unsafe list access - returns 0 if index out of bounds (should never happen in hash algorithms)
 let __listGet (list: List<Int64>) (index: Int64) : Int64 =
-    match Stdlib.List.getAt list (Stdlib.Int.fromInt64 index) with
+    match Stdlib.List.getAt<Int64> list (Stdlib.Int.fromInt64 index) with
     | Some v -> v
     | None -> 0L
 
@@ -500,31 +83,31 @@ let __listGet (list: List<Int64>) (index: Int64) : Int64 =
 // Copy bytes to list starting at index
 let __bytesToListFrom (b: Blob) (index: Int64) (len: Int64) (acc: List<Int64>) : List<Int64> =
     if index >= len then
-        Stdlib.List.reverse acc
+        Stdlib.List.reverse<Int64> acc
     else
         let byte = Stdlib.Blob.__getByte b index in
-        Stdlib.Crypto.__bytesToListFrom b (index + 1L) len (Stdlib.List.push acc byte)
+        Stdlib.Crypto.__bytesToListFrom b (index + 1L) len (Stdlib.List.push<Int64> acc byte)
 
 // XOR two byte lists of same length
 // Note: Using nested matches because tuple+cons patterns in recursive functions with accumulators
-// can cause issues. The simple debugTupleMatch() test passes, but this recursive version crashes.
+// can cause issues. A simple tuple match passes, but this recursive version crashes.
 let __xorByteLists (a: List<Int64>) (b: List<Int64>) (acc: List<Int64>) : List<Int64> =
     match a with
-    | [] -> Stdlib.List.reverse acc
+    | [] -> Stdlib.List.reverse<Int64> acc
     | x :: xs ->
         match b with
-        | [] -> Stdlib.List.reverse acc
-        | y :: ys -> Stdlib.Crypto.__xorByteLists xs ys (Stdlib.List.push acc (Stdlib.Int64.bitwiseXor x y))
+        | [] -> Stdlib.List.reverse<Int64> acc
+        | y :: ys -> Stdlib.Crypto.__xorByteLists xs ys (Stdlib.List.push<Int64> acc (Stdlib.Int64.bitwiseXor x y))
 
 // Create a list of N zeros
 let __zeros (n: Int64) (acc: List<Int64>) : List<Int64> =
     if n <= 0L then acc
-    else Stdlib.Crypto.__zeros (n - 1L) (Stdlib.List.push acc 0L)
+    else Stdlib.Crypto.__zeros (n - 1L) (Stdlib.List.push<Int64> acc 0L)
 
 // Create a list of N copies of a byte
 let __repeat (byte: Int64) (n: Int64) (acc: List<Int64>) : List<Int64> =
     if n <= 0L then acc
-    else Stdlib.Crypto.__repeat byte (n - 1L) (Stdlib.List.push acc byte)
+    else Stdlib.Crypto.__repeat byte (n - 1L) (Stdlib.List.push<Int64> acc byte)
 
 // =============================================================================
 // MD5 Implementation
@@ -656,19 +239,19 @@ let __md5BuildPadding (dataLen: Int64) : List<Int64> =
     let padded = dataLen + 1L in
     let remainder = padded % 64L in
     let zerosNeeded = if remainder <= 56L then 56L - remainder else 120L - remainder in
-    let zeros = Stdlib.Crypto.__zeros zerosNeeded ([]) in
+    let zeros = Stdlib.Crypto.__zeros zerosNeeded [] in
     // 0x80 + zeros + 8-byte little-endian length
     // Use cons and append instead of flatten to avoid compiler bug with list-of-lists
-    let part1 = Stdlib.List.push zeros 128L in
-    Stdlib.List.append part1 (Stdlib.Crypto.__int64ToLE bitLen)
+    let part1 = Stdlib.List.push<Int64> zeros 128L in
+    Stdlib.List.append<Int64> part1 (Stdlib.Crypto.__int64ToLE bitLen)
 
 // Copy data bytes to list
 let __copyDataToList (data: Blob) (index: Int64) (len: Int64) (acc: List<Int64>) : List<Int64> =
     if index >= len then
-        Stdlib.List.reverse acc
+        Stdlib.List.reverse<Int64> acc
     else
         let byte = Stdlib.Blob.__getByte data index in
-        Stdlib.Crypto.__copyDataToList data (index + 1L) len (Stdlib.List.push acc byte)
+        Stdlib.Crypto.__copyDataToList data (index + 1L) len (Stdlib.List.push<Int64> acc byte)
 
 // Process all 64-byte blocks
 let __md5ProcessBlocks (h0: Int64) (h1: Int64) (h2: Int64) (h3: Int64) (padded: Blob) (offset: Int64) (totalLen: Int64) : (Int64 * Int64 * Int64 * Int64) =
@@ -689,10 +272,10 @@ let md5 (data: Blob) : Blob =
     let h3 = 271733878L in    // 0x10325476
     let dataLen = Stdlib.Blob.__byteLength data in
     // Build padded message
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
+    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen [] in
     let padding = Stdlib.Crypto.__md5BuildPadding dataLen in
     // Use Stdlib.List.append instead of Stdlib.List.flatten to avoid compiler bug with list-of-lists
-    let paddedList = Stdlib.List.append dataList padding in
+    let paddedList = Stdlib.List.append<Int64> dataList padding in
     let padded = Stdlib.Blob.__fromInt64List paddedList in
     let paddedLen = Stdlib.Blob.__byteLength padded in
     // Process all blocks
@@ -701,9 +284,9 @@ let md5 (data: Blob) : Blob =
     | (rh0, rh1, rh2, rh3) ->
         // Output as little-endian bytes
         // Use multiple appends instead of flatten for output
-        let out1 = Stdlib.List.append (Stdlib.Crypto.__int32ToLE rh0) (Stdlib.Crypto.__int32ToLE rh1) in
-        let out2 = Stdlib.List.append out1 (Stdlib.Crypto.__int32ToLE rh2) in
-        let out3 = Stdlib.List.append out2 (Stdlib.Crypto.__int32ToLE rh3) in
+        let out1 = Stdlib.List.append<Int64> (Stdlib.Crypto.__int32ToLE rh0) (Stdlib.Crypto.__int32ToLE rh1) in
+        let out2 = Stdlib.List.append<Int64> out1 (Stdlib.Crypto.__int32ToLE rh2) in
+        let out3 = Stdlib.List.append<Int64> out2 (Stdlib.Crypto.__int32ToLE rh3) in
         Stdlib.Blob.__fromInt64List out3
 
 // =============================================================================
@@ -743,10 +326,10 @@ let __sha1Schedule (block: Blob) (blockOffset: Int64) (w: List<Int64>) (i: Int64
         w
     else if i < 16L then
         let word = Stdlib.Crypto.__getBE32 block (blockOffset + i * 4L) in
-        Stdlib.Crypto.__sha1Schedule block blockOffset (Stdlib.List.pushBack w word) (i + 1L)
+        Stdlib.Crypto.__sha1Schedule block blockOffset (Stdlib.List.pushBack<Int64> w word) (i + 1L)
     else
         let word = Stdlib.Crypto.__sha1ExpandWord w i in
-        Stdlib.Crypto.__sha1Schedule block blockOffset (Stdlib.List.pushBack w word) (i + 1L)
+        Stdlib.Crypto.__sha1Schedule block blockOffset (Stdlib.List.pushBack<Int64> w word) (i + 1L)
 
 // SHA-1 single round - uses paired tuples to avoid 5-tuple issues
 // state1 = (a, b, c), state2 = (d, e)
@@ -771,7 +354,7 @@ let __sha1Rounds (state1: (Int64 * Int64 * Int64)) (state2: (Int64 * Int64)) (i:
 
 // Process one 64-byte block of SHA-1
 let __sha1ProcessBlock (state1: (Int64 * Int64 * Int64)) (state2: (Int64 * Int64)) (block: Blob) (blockOffset: Int64) : ((Int64 * Int64 * Int64) * (Int64 * Int64)) =
-    let w = Stdlib.Crypto.__sha1Schedule block blockOffset ([]) 0L in
+    let w = Stdlib.Crypto.__sha1Schedule block blockOffset [] 0L in
     let result = Stdlib.Crypto.__sha1Rounds state1 state2 0L w in
     // Destructure sequentially to avoid complex nested pattern match
     match state1 with
@@ -792,10 +375,10 @@ let __sha256BuildPadding (dataLen: Int64) : List<Int64> =
     let padded = dataLen + 1L in
     let remainder = padded % 64L in
     let zerosNeeded = if remainder <= 56L then 56L - remainder else 120L - remainder in
-    let zeros = Stdlib.Crypto.__zeros zerosNeeded ([]) in
+    let zeros = Stdlib.Crypto.__zeros zerosNeeded [] in
     // Use cons and append instead of flatten to avoid compiler bug with list-of-lists
-    let part1 = Stdlib.List.push zeros 128L in
-    Stdlib.List.append part1 (Stdlib.Crypto.__int64ToBE bitLen)
+    let part1 = Stdlib.List.push<Int64> zeros 128L in
+    Stdlib.List.append<Int64> part1 (Stdlib.Crypto.__int64ToBE bitLen)
 
 // Process all 64-byte blocks for SHA-1 (using paired tuples)
 let __sha1ProcessBlocks (state1: (Int64 * Int64 * Int64)) (state2: (Int64 * Int64)) (padded: Blob) (offset: Int64) (totalLen: Int64) : ((Int64 * Int64 * Int64) * (Int64 * Int64)) =
@@ -807,25 +390,25 @@ let __sha1ProcessBlocks (state1: (Int64 * Int64 * Int64)) (state2: (Int64 * Int6
         | (ns1, ns2) -> Stdlib.Crypto.__sha1ProcessBlocks ns1 ns2 padded (offset + 64L) totalLen
 
 // SHA-1 hash function
-let sha1 (data: Blob) : Blob =
+let __sha1 (data: Blob) : Blob =
     // Initial hash values
     let state1 = (1732584193L, 4023233417L, 2562383102L) in   // h0, h1, h2
     let state2 = (271733878L, 3285377520L) in                // h3, h4
     let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
+    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen [] in
     let padding = Stdlib.Crypto.__sha256BuildPadding dataLen in
     // Use Stdlib.List.append instead of Stdlib.List.flatten to avoid compiler bug with list-of-lists
-    let paddedList = Stdlib.List.append dataList padding in
+    let paddedList = Stdlib.List.append<Int64> dataList padding in
     let padded = Stdlib.Blob.__fromInt64List paddedList in
     let paddedLen = Stdlib.Blob.__byteLength padded in
     let result = Stdlib.Crypto.__sha1ProcessBlocks state1 state2 padded 0L paddedLen in
     match result with
     | ((rh0, rh1, rh2), (rh3, rh4)) ->
         // Use multiple appends instead of flatten for output
-        let out1 = Stdlib.List.append (Stdlib.Crypto.__int32ToBE rh0) (Stdlib.Crypto.__int32ToBE rh1) in
-        let out2 = Stdlib.List.append out1 (Stdlib.Crypto.__int32ToBE rh2) in
-        let out3 = Stdlib.List.append out2 (Stdlib.Crypto.__int32ToBE rh3) in
-        let out4 = Stdlib.List.append out3 (Stdlib.Crypto.__int32ToBE rh4) in
+        let out1 = Stdlib.List.append<Int64> (Stdlib.Crypto.__int32ToBE rh0) (Stdlib.Crypto.__int32ToBE rh1) in
+        let out2 = Stdlib.List.append<Int64> out1 (Stdlib.Crypto.__int32ToBE rh2) in
+        let out3 = Stdlib.List.append<Int64> out2 (Stdlib.Crypto.__int32ToBE rh3) in
+        let out4 = Stdlib.List.append<Int64> out3 (Stdlib.Crypto.__int32ToBE rh4) in
         Stdlib.Blob.__fromInt64List out4
 
 // =============================================================================
@@ -888,10 +471,10 @@ let __sha256Schedule (block: Blob) (blockOffset: Int64) (w: List<Int64>) (i: Int
         w
     else if i < 16L then
         let word = Stdlib.Crypto.__getBE32 block (blockOffset + i * 4L) in
-        Stdlib.Crypto.__sha256Schedule block blockOffset (Stdlib.List.pushBack w word) (i + 1L)
+        Stdlib.Crypto.__sha256Schedule block blockOffset (Stdlib.List.pushBack<Int64> w word) (i + 1L)
     else
         let word = Stdlib.Crypto.__sha256ExpandWord w i in
-        Stdlib.Crypto.__sha256Schedule block blockOffset (Stdlib.List.pushBack w word) (i + 1L)
+        Stdlib.Crypto.__sha256Schedule block blockOffset (Stdlib.List.pushBack<Int64> w word) (i + 1L)
 
 // SHA-256 single round - uses two 4-tuples for state (ARM64 8-param limit)
 let __sha256Round (state1: (Int64 * Int64 * Int64 * Int64)) (state2: (Int64 * Int64 * Int64 * Int64)) (i: Int64) (w: List<Int64>) : ((Int64 * Int64 * Int64 * Int64) * (Int64 * Int64 * Int64 * Int64)) =
@@ -924,7 +507,7 @@ let __sha256Rounds (state1: (Int64 * Int64 * Int64 * Int64)) (state2: (Int64 * I
 
 // Process one 64-byte block of SHA-256 (using tuples for state)
 let __sha256ProcessBlock (state1: (Int64 * Int64 * Int64 * Int64)) (state2: (Int64 * Int64 * Int64 * Int64)) (block: Blob) (blockOffset: Int64) : ((Int64 * Int64 * Int64 * Int64) * (Int64 * Int64 * Int64 * Int64)) =
-    let w = Stdlib.Crypto.__sha256Schedule block blockOffset ([]) 0L in
+    let w = Stdlib.Crypto.__sha256Schedule block blockOffset [] 0L in
     let result = Stdlib.Crypto.__sha256Rounds state1 state2 0L w in
     // Destructure sequentially to avoid complex nested pattern match
     match state1 with
@@ -957,23 +540,23 @@ let sha256 (data: Blob) : Blob =
     let state1 = (1779033703L, 3144134277L, 1013904242L, 2773480762L) in   // h0-h3
     let state2 = (1359893119L, 2600822924L, 528734635L, 1541459225L) in    // h4-h7
     let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
+    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen [] in
     let padding = Stdlib.Crypto.__sha256BuildPadding dataLen in
     // Use Stdlib.List.append instead of Stdlib.List.flatten to avoid compiler bug with list-of-lists
-    let paddedList = Stdlib.List.append dataList padding in
+    let paddedList = Stdlib.List.append<Int64> dataList padding in
     let padded = Stdlib.Blob.__fromInt64List paddedList in
     let paddedLen = Stdlib.Blob.__byteLength padded in
     let result = Stdlib.Crypto.__sha256ProcessBlocks state1 state2 padded 0L paddedLen in
     match result with
     | ((rh0, rh1, rh2, rh3), (rh4, rh5, rh6, rh7)) ->
         // Use multiple appends instead of flatten for output
-        let out1 = Stdlib.List.append (Stdlib.Crypto.__int32ToBE rh0) (Stdlib.Crypto.__int32ToBE rh1) in
-        let out2 = Stdlib.List.append out1 (Stdlib.Crypto.__int32ToBE rh2) in
-        let out3 = Stdlib.List.append out2 (Stdlib.Crypto.__int32ToBE rh3) in
-        let out4 = Stdlib.List.append out3 (Stdlib.Crypto.__int32ToBE rh4) in
-        let out5 = Stdlib.List.append out4 (Stdlib.Crypto.__int32ToBE rh5) in
-        let out6 = Stdlib.List.append out5 (Stdlib.Crypto.__int32ToBE rh6) in
-        let out7 = Stdlib.List.append out6 (Stdlib.Crypto.__int32ToBE rh7) in
+        let out1 = Stdlib.List.append<Int64> (Stdlib.Crypto.__int32ToBE rh0) (Stdlib.Crypto.__int32ToBE rh1) in
+        let out2 = Stdlib.List.append<Int64> out1 (Stdlib.Crypto.__int32ToBE rh2) in
+        let out3 = Stdlib.List.append<Int64> out2 (Stdlib.Crypto.__int32ToBE rh3) in
+        let out4 = Stdlib.List.append<Int64> out3 (Stdlib.Crypto.__int32ToBE rh4) in
+        let out5 = Stdlib.List.append<Int64> out4 (Stdlib.Crypto.__int32ToBE rh5) in
+        let out6 = Stdlib.List.append<Int64> out5 (Stdlib.Crypto.__int32ToBE rh6) in
+        let out7 = Stdlib.List.append<Int64> out6 (Stdlib.Crypto.__int32ToBE rh7) in
         Stdlib.Blob.__fromInt64List out7
 
 // =============================================================================
@@ -983,9 +566,6 @@ let sha256 (data: Blob) : Blob =
 // It's essentially SHA-512 with different initial values and truncated output
 
 // 64-bit mask
-let __mask64 () : Int64 = -1L
-
-// 64-bit addition (just regular addition since Int64 wraps naturally)
 let __add64 (a: Int64) (b: Int64) : Int64 = a + b
 
 // 64-bit logical right shift (zero-extends instead of sign-extends)
@@ -1068,10 +648,10 @@ let __sha512Schedule (block: Blob) (blockOffset: Int64) (w: List<Int64>) (i: Int
         w
     else if i < 16L then
         let word = Stdlib.Crypto.__sha384GetWord block (blockOffset + i * 8L) in
-        Stdlib.Crypto.__sha512Schedule block blockOffset (Stdlib.List.pushBack w word) (i + 1L)
+        Stdlib.Crypto.__sha512Schedule block blockOffset (Stdlib.List.pushBack<Int64> w word) (i + 1L)
     else
         let word = Stdlib.Crypto.__sha512ExpandWord w i in
-        Stdlib.Crypto.__sha512Schedule block blockOffset (Stdlib.List.pushBack w word) (i + 1L)
+        Stdlib.Crypto.__sha512Schedule block blockOffset (Stdlib.List.pushBack<Int64> w word) (i + 1L)
 
 // SHA-384/512 single round - uses two 4-tuples for state (ARM64 8-param limit)
 let __sha512Round (state1: (Int64 * Int64 * Int64 * Int64)) (state2: (Int64 * Int64 * Int64 * Int64)) (i: Int64) (w: List<Int64>) : ((Int64 * Int64 * Int64 * Int64) * (Int64 * Int64 * Int64 * Int64)) =
@@ -1100,7 +680,7 @@ let __sha512Rounds (state1: (Int64 * Int64 * Int64 * Int64)) (state2: (Int64 * I
 
 // Process one 128-byte block of SHA-384 (using tuples for state)
 let __sha384ProcessBlock (state1: (Int64 * Int64 * Int64 * Int64)) (state2: (Int64 * Int64 * Int64 * Int64)) (block: Blob) (blockOffset: Int64) : ((Int64 * Int64 * Int64 * Int64) * (Int64 * Int64 * Int64 * Int64)) =
-    let w = Stdlib.Crypto.__sha512Schedule block blockOffset ([]) 0L in
+    let w = Stdlib.Crypto.__sha512Schedule block blockOffset [] 0L in
     let result = Stdlib.Crypto.__sha512Rounds state1 state2 0L w in
     // Destructure sequentially to avoid complex nested pattern match
     match state1 with
@@ -1124,13 +704,13 @@ let __sha384BuildPadding (dataLen: Int64) : List<Int64> =
     let padded = dataLen + 1L in
     let remainder = padded % 128L in
     let zerosNeeded = if remainder <= 112L then 112L - remainder else 240L - remainder in
-    let zeros = Stdlib.Crypto.__zeros zerosNeeded ([]) in
+    let zeros = Stdlib.Crypto.__zeros zerosNeeded [] in
     // 8 bytes of zeros for high 64 bits of length (we only support < 2^64 bit messages)
-    let highLen = Stdlib.Crypto.__zeros 8L ([]) in
+    let highLen = Stdlib.Crypto.__zeros 8L [] in
     // Use cons and append instead of flatten to avoid compiler bug with list-of-lists
-    let part1 = Stdlib.List.push zeros 128L in
-    let part2 = Stdlib.List.append part1 highLen in
-    Stdlib.List.append part2 (Stdlib.Crypto.__int64ToBE bitLen)
+    let part1 = Stdlib.List.push<Int64> zeros 128L in
+    let part2 = Stdlib.List.append<Int64> part1 highLen in
+    Stdlib.List.append<Int64> part2 (Stdlib.Crypto.__int64ToBE bitLen)
 
 // Process all 128-byte blocks for SHA-384 (using tuples for state)
 let __sha384ProcessBlocks (state1: (Int64 * Int64 * Int64 * Int64)) (state2: (Int64 * Int64 * Int64 * Int64)) (padded: Blob) (offset: Int64) (totalLen: Int64) : ((Int64 * Int64 * Int64 * Int64) * (Int64 * Int64 * Int64 * Int64)) =
@@ -1147,10 +727,10 @@ let sha384 (data: Blob) : Blob =
     let state1 = ((-3766243637369397544L), 7105036623409894663L, (-7973340178411365097L), 1526699215303891257L) in   // h0-h3
     let state2 = (7436329637833083697L, (-8163818279084223215L), (-2662702644619276377L), 5167115440072839076L) in   // h4-h7
     let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
+    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen [] in
     let padding = Stdlib.Crypto.__sha384BuildPadding dataLen in
     // Use Stdlib.List.append instead of Stdlib.List.flatten to avoid compiler bug with list-of-lists
-    let paddedList = Stdlib.List.append dataList padding in
+    let paddedList = Stdlib.List.append<Int64> dataList padding in
     let padded = Stdlib.Blob.__fromInt64List paddedList in
     let paddedLen = Stdlib.Blob.__byteLength padded in
     let result = Stdlib.Crypto.__sha384ProcessBlocks state1 state2 padded 0L paddedLen in
@@ -1158,11 +738,11 @@ let sha384 (data: Blob) : Blob =
     | ((rh0, rh1, rh2, rh3), (rh4, rh5, _rh6, _rh7)) ->
         // SHA-384 outputs first 48 bytes (6 of the 8 64-bit words)
         // Use multiple appends instead of flatten for output
-        let out1 = Stdlib.List.append (Stdlib.Crypto.__int64ToBE rh0) (Stdlib.Crypto.__int64ToBE rh1) in
-        let out2 = Stdlib.List.append out1 (Stdlib.Crypto.__int64ToBE rh2) in
-        let out3 = Stdlib.List.append out2 (Stdlib.Crypto.__int64ToBE rh3) in
-        let out4 = Stdlib.List.append out3 (Stdlib.Crypto.__int64ToBE rh4) in
-        let out5 = Stdlib.List.append out4 (Stdlib.Crypto.__int64ToBE rh5) in
+        let out1 = Stdlib.List.append<Int64> (Stdlib.Crypto.__int64ToBE rh0) (Stdlib.Crypto.__int64ToBE rh1) in
+        let out2 = Stdlib.List.append<Int64> out1 (Stdlib.Crypto.__int64ToBE rh2) in
+        let out3 = Stdlib.List.append<Int64> out2 (Stdlib.Crypto.__int64ToBE rh3) in
+        let out4 = Stdlib.List.append<Int64> out3 (Stdlib.Crypto.__int64ToBE rh4) in
+        let out5 = Stdlib.List.append<Int64> out4 (Stdlib.Crypto.__int64ToBE rh5) in
         Stdlib.Blob.__fromInt64List out5
 
 // =============================================================================
@@ -1178,22 +758,22 @@ let __hmacPrepareKey (key: Blob) (blockSize: Int64) (hashFn: Blob -> Blob) : Lis
     if keyLen > blockSize then
         // Hash the key if it's too long
         let hashedKey = hashFn key in
-        let hashedKeyList = Stdlib.Crypto.__copyDataToList hashedKey 0L (Stdlib.Blob.__byteLength hashedKey) ([]) in
-        let padding = Stdlib.Crypto.__zeros (blockSize - Stdlib.Blob.__byteLength hashedKey) ([]) in
+        let hashedKeyList = Stdlib.Crypto.__copyDataToList hashedKey 0L (Stdlib.Blob.__byteLength hashedKey) [] in
+        let padding = Stdlib.Crypto.__zeros (blockSize - Stdlib.Blob.__byteLength hashedKey) [] in
         // Use Stdlib.List.append instead of Stdlib.List.flatten to avoid compiler bug with list-of-lists
-        Stdlib.List.append hashedKeyList padding
+        Stdlib.List.append<Int64> hashedKeyList padding
     else if keyLen < blockSize then
         // Pad with zeros
-        let keyList = Stdlib.Crypto.__copyDataToList key 0L keyLen ([]) in
-        let padding = Stdlib.Crypto.__zeros (blockSize - keyLen) ([]) in
+        let keyList = Stdlib.Crypto.__copyDataToList key 0L keyLen [] in
+        let padding = Stdlib.Crypto.__zeros (blockSize - keyLen) [] in
         // Use Stdlib.List.append instead of Stdlib.List.flatten to avoid compiler bug with list-of-lists
-        Stdlib.List.append keyList padding
+        Stdlib.List.append<Int64> keyList padding
     else
-        Stdlib.Crypto.__copyDataToList key 0L keyLen ([])
+        Stdlib.Crypto.__copyDataToList key 0L keyLen []
 
 // Create ipad (0x36 repeated) or opad (0x5c repeated)
 let __hmacCreatePad (padByte: Int64) (size: Int64) : List<Int64> =
-    Stdlib.Crypto.__repeat padByte size ([])
+    Stdlib.Crypto.__repeat padByte size []
 
 // Generic HMAC implementation
 let __hmac (key: Blob) (data: Blob) (blockSize: Int64) (hashFn: Blob -> Blob) : Blob =
@@ -1201,17 +781,17 @@ let __hmac (key: Blob) (data: Blob) (blockSize: Int64) (hashFn: Blob -> Blob) : 
     let ipad = Stdlib.Crypto.__hmacCreatePad 54L blockSize in  // 0x36
     let opad = Stdlib.Crypto.__hmacCreatePad 92L blockSize in  // 0x5c
     // XOR key with ipad and opad
-    let keyXorIpad = Stdlib.Crypto.__xorByteLists keyPadded ipad ([]) in
-    let keyXorOpad = Stdlib.Crypto.__xorByteLists keyPadded opad ([]) in
+    let keyXorIpad = Stdlib.Crypto.__xorByteLists keyPadded ipad [] in
+    let keyXorOpad = Stdlib.Crypto.__xorByteLists keyPadded opad [] in
     // Inner hash: H((K XOR ipad) || message)
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L (Stdlib.Blob.__byteLength data) ([]) in
+    let dataList = Stdlib.Crypto.__copyDataToList data 0L (Stdlib.Blob.__byteLength data) [] in
     // Use Stdlib.List.append instead of Stdlib.List.flatten to avoid compiler bug with list-of-lists
-    let innerInput = Stdlib.Blob.__fromInt64List (Stdlib.List.append keyXorIpad dataList) in
+    let innerInput = Stdlib.Blob.__fromInt64List (Stdlib.List.append<Int64> keyXorIpad dataList) in
     let innerHash = hashFn innerInput in
     // Outer hash: H((K XOR opad) || inner_hash)
-    let innerHashList = Stdlib.Crypto.__copyDataToList innerHash 0L (Stdlib.Blob.__byteLength innerHash) ([]) in
+    let innerHashList = Stdlib.Crypto.__copyDataToList innerHash 0L (Stdlib.Blob.__byteLength innerHash) [] in
     // Use Stdlib.List.append instead of Stdlib.List.flatten to avoid compiler bug with list-of-lists
-    let outerInput = Stdlib.Blob.__fromInt64List (Stdlib.List.append keyXorOpad innerHashList) in
+    let outerInput = Stdlib.Blob.__fromInt64List (Stdlib.List.append<Int64> keyXorOpad innerHashList) in
     hashFn outerInput
 
 // HMAC-SHA256
@@ -1220,174 +800,4 @@ let sha256hmac (key: Blob) (data: Blob) : Blob =
 
 // HMAC-SHA1
 let sha1hmac (key: Blob) (data: Blob) : Blob =
-    Stdlib.Crypto.__hmac key data 64L Stdlib.Crypto.sha1
-
-// =============================================================================
-// Debug functions (temporary)
-// =============================================================================
-
-let debugRotr64 (x: Int64) (n: Int64) : Int64 =
-    Stdlib.Crypto.__rotr64 x n
-
-let debugShr64 (x: Int64) (n: Int64) : Int64 =
-    Stdlib.Crypto.__shr64 x n
-
-// Debug: just the left shift part of rotation
-let debugLeftShift (x: Int64) (n: Int64) : Int64 =
-    Stdlib.Int64.shiftLeft x n
-
-// Debug: test bitwiseOr
-let debugBitwiseOr (a: Int64) (b: Int64) : Int64 =
-    Stdlib.Int64.bitwiseOr a b
-
-// Debug: Test HMAC key preparation with small key
-let debugHmacKeyLen (keyLen: Int64) (blockSize: Int64) : Int64 =
-    let key = Stdlib.Blob.__createZeroed keyLen in
-    let keyPadded = Stdlib.Crypto.__hmacPrepareKey key blockSize Stdlib.Crypto.sha256 in
-    Stdlib.List.__length keyPadded
-
-// Debug: Test HMAC ipad/opad generation
-let debugHmacPadLen (blockSize: Int64) : Int64 =
-    let pad = Stdlib.Crypto.__hmacCreatePad 54L blockSize in
-    Stdlib.List.__length pad
-
-// Debug: Test just the hash function call in HMAC context
-let debugHashCall () : Int64 =
-    let hashFn = Stdlib.Crypto.sha256 in
-    let data = Stdlib.Blob.__createZeroed 10L in
-    let result = hashFn data in
-    Stdlib.Blob.__byteLength result
-
-// Debug: Simplified HMAC that skips XOR steps
-let debugSimpleHmac () : Int64 =
-    let key = Stdlib.Blob.__fromInt64List ([1L, 2L, 3L]) in
-    let data = Stdlib.Blob.__fromInt64List ([4L, 5L, 6L]) in
-    let blockSize = 64L in
-    let hashFn = Stdlib.Crypto.sha256 in
-    let keyPadded = Stdlib.Crypto.__hmacPrepareKey key blockSize hashFn in
-    Stdlib.List.__length keyPadded
-
-// Debug: Test XOR of two lists
-let debugXorLists () : Int64 =
-    let list1 = [1L, 2L, 3L, 4L] in
-    let list2 = [5L, 6L, 7L, 8L] in
-    let result = Stdlib.Crypto.__xorByteLists list1 list2 ([]) in
-    Stdlib.List.__length result
-
-// Debug: Test tuple of lists pattern match
-let debugTupleMatch () : Int64 =
-    let a = [1L, 2L] in
-    let b = [3L, 4L] in
-    match (a, b) with
-    | ([], _) -> 0L
-    | (_, []) -> 1L
-    | (x :: xs, y :: ys) -> x + y
-
-// Debug: Test simple cons pattern on single list
-let debugConsMatch () : Int64 =
-    let a = [1L, 2L, 3L] in
-    match a with
-    | [] -> 0L
-    | x :: xs -> x
-
-// Debug: Full HMAC step by step
-let debugFullHmac () : Int64 =
-    let key = Stdlib.Blob.__fromInt64List ([1L, 2L, 3L]) in
-    let data = Stdlib.Blob.__fromInt64List ([4L, 5L, 6L]) in
-    let blockSize = 64L in
-    let hashFn = Stdlib.Crypto.sha256 in
-    let keyPadded = Stdlib.Crypto.__hmacPrepareKey key blockSize hashFn in
-    let ipad = Stdlib.Crypto.__hmacCreatePad 54L blockSize in
-    let opad = Stdlib.Crypto.__hmacCreatePad 92L blockSize in
-    let keyXorIpad = Stdlib.Crypto.__xorByteLists keyPadded ipad ([]) in
-    let keyXorOpad = Stdlib.Crypto.__xorByteLists keyPadded opad ([]) in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L (Stdlib.Blob.__byteLength data) ([]) in
-    let innerInputList = Stdlib.List.append keyXorIpad dataList in
-    let innerInput = Stdlib.Blob.__fromInt64List innerInputList in
-    let innerHash = hashFn innerInput in
-    let innerHashList = Stdlib.Crypto.__copyDataToList innerHash 0L (Stdlib.Blob.__byteLength innerHash) ([]) in
-    let outerInputList = Stdlib.List.append keyXorOpad innerHashList in
-    let outerInput = Stdlib.Blob.__fromInt64List outerInputList in
-    let result = hashFn outerInput in
-    Stdlib.Blob.__byteLength result
-
-// Debug: HMAC with a 20-byte key
-let debugHmac20ByteKey () : Int64 =
-    let key = Stdlib.Blob.__fromInt64List ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L]) in
-    let data = Stdlib.Blob.__fromInt64List ([4L, 5L, 6L]) in
-    let result = Stdlib.Crypto.sha256hmac key data in
-    Stdlib.Blob.__byteLength result
-
-// Debug: HMAC with AWS-style key (44 bytes)
-let debugHmacAwsKey () : String =
-    // AWS4wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY
-    let key = Stdlib.Blob.__fromInt64List ([65L, 87L, 83L, 52L, 119L, 74L, 97L, 108L, 114L, 88L, 85L, 116L, 110L, 70L, 69L, 77L, 73L, 47L, 75L, 55L, 77L, 68L, 69L, 78L, 71L, 43L, 98L, 80L, 120L, 82L, 102L, 105L, 67L, 89L, 69L, 88L, 65L, 77L, 80L, 76L, 69L, 75L, 69L, 89L]) in
-    // 20150830
-    let data = Stdlib.Blob.__fromInt64List ([50L, 48L, 49L, 53L, 48L, 56L, 51L, 48L]) in
-    let result = Stdlib.Crypto.sha256hmac key data in
-    Stdlib.Crypto.bytesToHex result
-
-let debugSha384FirstWord () : Int64 =
-    // Create empty message and pad it for SHA-384
-    let data = Stdlib.Blob.__createZeroed 0L in
-    let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
-    let padding = Stdlib.Crypto.__sha384BuildPadding dataLen in
-    let paddedList = Stdlib.List.append dataList padding in
-    let padded = Stdlib.Blob.__fromInt64List paddedList in
-    // Read first 64-bit word (big-endian)
-    Stdlib.Crypto.__getBE64 padded 0L
-
-// Debug: Return h0 after first block processing (before adding to initial state)
-let debugSha384RoundsH0 () : Int64 =
-    let state1 = ((-3766243637369397544L), 7105036623409894663L, (-7973340178411365097L), 1526699215303891257L) in
-    let state2 = (7436329637833083697L, (-8163818279084223215L), (-2662702644619276377L), 5167115440072839076L) in
-    let data = Stdlib.Blob.__createZeroed 0L in
-    let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
-    let padding = Stdlib.Crypto.__sha384BuildPadding dataLen in
-    let paddedList = Stdlib.List.append dataList padding in
-    let padded = Stdlib.Blob.__fromInt64List paddedList in
-    let w = Stdlib.Crypto.__sha512Schedule padded 0L ([]) 0L in
-    let result = Stdlib.Crypto.__sha512Rounds state1 state2 0L w in
-    match result with
-    | ((a, _b, _c, _d), (_e, _f, _g, _h)) -> a
-
-// Debug: Return a after just ONE round
-let debugSha384OneRound () : Int64 =
-    let state1 = ((-3766243637369397544L), 7105036623409894663L, (-7973340178411365097L), 1526699215303891257L) in
-    let state2 = (7436329637833083697L, (-8163818279084223215L), (-2662702644619276377L), 5167115440072839076L) in
-    let data = Stdlib.Blob.__createZeroed 0L in
-    let dataLen = Stdlib.Blob.__byteLength data in
-    let dataList = Stdlib.Crypto.__copyDataToList data 0L dataLen ([]) in
-    let padding = Stdlib.Crypto.__sha384BuildPadding dataLen in
-    let paddedList = Stdlib.List.append dataList padding in
-    let padded = Stdlib.Blob.__fromInt64List paddedList in
-    let w = Stdlib.Crypto.__sha512Schedule padded 0L ([]) 0L in
-    let result = Stdlib.Crypto.__sha512Round state1 state2 0L w in
-    match result with
-    | ((a, _b, _c, _d), (_e, _f, _g, _h)) -> a
-
-// Debug: Return T1 from first round (h + Sigma1(e) + Ch(e,f,g) + K[0] + W[0])
-let debugSha384T1 () : Int64 =
-    let h0 = (-3766243637369397544L) in  // a
-    let h1 = 7105036623409894663L in    // b
-    let h2 = (-7973340178411365097L) in  // c
-    let h3 = 1526699215303891257L in    // d
-    let h4 = 7436329637833083697L in    // e
-    let h5 = (-8163818279084223215L) in  // f
-    let h6 = (-2662702644619276377L) in  // g
-    let h7 = 5167115440072839076L in    // h
-    let w0 = (-9223372036854775808L) in  // 0x8000000000000000
-    let k0 = 4794697086780616226L in    // K[0]
-    let sig1 = Stdlib.Crypto.__sha512Sigma1 h4 in
-    let ch = Stdlib.Crypto.__sha512Ch h4 h5 h6 in
-    // T1 = h + sig1 + ch + K[0] + W[0]
-    Stdlib.Crypto.__add64 (Stdlib.Crypto.__add64 (Stdlib.Crypto.__add64 (Stdlib.Crypto.__add64 h7 sig1) ch) k0) w0
-
-// Debug: Return Sigma1(e) where e=h4
-let debugSha384Sigma1 () : Int64 =
-    let h4 = 7436329637833083697L in    // e = 0x67332667ffc00b31
-    Stdlib.Crypto.__sha512Sigma1 h4
-
-// =============================================================================
+    Stdlib.Crypto.__hmac key data 64L Stdlib.Crypto.__sha1

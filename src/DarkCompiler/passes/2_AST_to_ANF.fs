@@ -29,15 +29,6 @@ let private canonicalBufferKindForType (typ: AST.Type) : ANF.CanonicalBufferKind
     | AST.TChar -> Some ANF.GraphemeCluster
     | _ -> None
 
-let private tryCanonicalBufferEqualityIntrinsic
-    (funcName: string)
-    (args: ANF.Atom list)
-    : ANF.CExpr option =
-    match funcName, args with
-    | "Stdlib.String.equals", [left; right] ->
-        Some (ANF.CanonicalBufferEq (ANF.Utf8String, left, right))
-    | _ -> None
-
 let private materializeComparisonPlan (targetType: AST.Type) (args: AST.Expr list) : AST.Expr =
     match args with
     | [leftExpr; rightExpr] ->
@@ -378,17 +369,15 @@ let tryFloatIntrinsic (funcName: string) (args: ANF.Atom list) : ANF.CExpr optio
     match funcName, args with
     | "Stdlib.Float.sqrt", [xAtom] ->
         Some (ANF.FloatSqrt xAtom)
-    | "Stdlib.Float.abs", [xAtom] ->
-        Some (ANF.FloatAbs xAtom)
     | "Stdlib.Float.negate", [xAtom] ->
         Some (ANF.FloatNeg xAtom)
-    | "Stdlib.Float.toInt", [xAtom] ->
-        Some (ANF.FloatToInt64 xAtom)
     | "Stdlib.Int64.toFloat", [xAtom] ->
         Some (ANF.Int64ToFloat xAtom)
     // NOTE: Float.toString is now implemented in Dark, not as an intrinsic
-    | "Stdlib.Float.toBits", [xAtom] ->
+    | "Stdlib.Float.__toBits", [xAtom] ->
         Some (ANF.FloatToBits xAtom)
+    | "Stdlib.Float.__toInt64Unchecked", [xAtom] ->
+        Some (ANF.FloatToInt64 xAtom)
     | _ -> None
 
 /// Canonical named APIs whose AOT implementation maps directly to backend
@@ -580,7 +569,7 @@ let tryRawMemoryIntrinsic
 let tryRandomIntrinsic (funcName: string) (args: ANF.Atom list) : ANF.CExpr option =
     let args = normalizeNullaryIntrinsicArgs args
     match funcName, args with
-    | "Stdlib.Random.int64", [] ->
+    | "Stdlib.Int.__randomInt64Word", [] ->
         Some ANF.RandomInt64
     | _ -> None
 
@@ -611,6 +600,9 @@ let isRuntimeFailureName (funcName: string) : bool =
 
 let isBuiltinTestNanName (name: string) : bool =
     name = "Builtin.testNan"
+
+let isBuiltinBlobEmptyName (name: string) : bool =
+    name = "Builtin.blobEmpty"
 
 /// Look up a name already resolved and canonicalized by type checking.
 let private tryLookupResolved (name: string) (m: Map<string, 'a>) : ('a * string) option =
@@ -1974,6 +1966,14 @@ let replaceTypeAppsInProgramWithRegistry (specRegistry: SpecRegistry) (program: 
             | AST.Expression e ->
                 replaceTypeAppsWithRegistry specRegistry e
                 |> Result.bind (fun e' -> loop rest (AST.Expression e' :: acc))
+            | AST.ValueDef valueDef ->
+                replaceTypeAppsWithRegistry specRegistry (AST.valueDefBody valueDef)
+                |> Result.bind (fun body ->
+                    let valueDef' =
+                        match valueDef with
+                        | AST.UncheckedValueDef (name, _) -> AST.UncheckedValueDef (name, body)
+                        | AST.CheckedValueDef (name, typ, _) -> AST.CheckedValueDef (name, typ, body)
+                    loop rest (AST.ValueDef valueDef' :: acc))
             | AST.TypeDef td ->
                 loop rest (AST.TypeDef td :: acc)
 
@@ -2077,6 +2077,8 @@ let programNeedsLambdaLowering (knownFuncNames: Set<string>) (program: AST.Progr
                 if exprNeedsLambdaLowering paramNames f.Body then true else loop rest
             | AST.Expression e ->
                 if exprNeedsLambdaLowering Set.empty e then true else loop rest
+            | AST.ValueDef valueDef ->
+                if exprNeedsLambdaLowering Set.empty (AST.valueDefBody valueDef) then true else loop rest
             | AST.TypeDef _ ->
                 loop rest
 
@@ -2283,6 +2285,11 @@ let inlineLambdasInProgram (program: AST.Program) : AST.Program =
         |> List.map (function
             | AST.FunctionDef f -> AST.FunctionDef (inlineLambdasInFunc f)
             | AST.Expression e -> AST.Expression (inlineLambdas e Map.empty)
+            | AST.ValueDef valueDef ->
+                let body = inlineLambdas (AST.valueDefBody valueDef) Map.empty
+                match valueDef with
+                | AST.UncheckedValueDef (name, _) -> AST.ValueDef (AST.UncheckedValueDef (name, body))
+                | AST.CheckedValueDef (name, typ, _) -> AST.ValueDef (AST.CheckedValueDef (name, typ, body))
             | AST.TypeDef t -> AST.TypeDef t)
     AST.Program topLevels'
 
@@ -3006,7 +3013,7 @@ let private comparisonForCapturedValue
     if needsStructuralHelper then
         AST.Call (TypeChecking.eqHelperName typ, exprArgsFromList [left; right])
     elif typ = AST.TString then
-        AST.Call ("Stdlib.String.equals", exprArgsFromList [left; right])
+        AST.BinOp (AST.Eq, left, right)
     elif typ = AST.TInt then
         AST.Call ("Stdlib.Int.__equals", exprArgsFromList [left; right])
     else
@@ -4067,6 +4074,14 @@ let rec liftLambdasInProgram
                 liftLambdasInExpr e state
                 |> Result.bind (fun (e', state') ->
                     processTopLevels rest state' (AST.Expression e' :: acc))
+            | AST.ValueDef valueDef ->
+                liftLambdasInExpr (AST.valueDefBody valueDef) state
+                |> Result.bind (fun (body, state') ->
+                    let valueDef' =
+                        match valueDef with
+                        | AST.UncheckedValueDef (name, _) -> AST.UncheckedValueDef (name, body)
+                        | AST.CheckedValueDef (name, typ, _) -> AST.CheckedValueDef (name, typ, body)
+                    processTopLevels rest state' (AST.ValueDef valueDef' :: acc))
             | AST.TypeDef t ->
                 processTopLevels rest state (AST.TypeDef t :: acc)
 
@@ -4160,6 +4175,11 @@ and replaceFuncRefsWithWrappers (wrapperMap: Map<string, string>) (topLevel: AST
         AST.FunctionDef { f with Body = replaceInExpr wrapperMap f.Body }
     | AST.Expression e ->
         AST.Expression (replaceInExpr wrapperMap e)
+    | AST.ValueDef valueDef ->
+        let body = replaceInExpr wrapperMap (AST.valueDefBody valueDef)
+        match valueDef with
+        | AST.UncheckedValueDef (name, _) -> AST.ValueDef (AST.UncheckedValueDef (name, body))
+        | AST.CheckedValueDef (name, typ, _) -> AST.ValueDef (AST.CheckedValueDef (name, typ, body))
     | AST.TypeDef t -> AST.TypeDef t
 
 /// Replace function references with wrapper references in an expression
@@ -4579,17 +4599,16 @@ let rec inferTypeCore (sumTypeNames: Set<string>) (expr: AST.Expr) (typeEnv: Map
     | AST.Var name ->
         if isBuiltinTestNanName name then
             Ok AST.TFloat64
+        else if isBuiltinBlobEmptyName name then
+            Ok AST.TBlob
         else
             match tryLookupResolved name typeEnv with
             | Some (t, _) -> Ok t
             | None ->
-                match Stdlib.tryGetValue name with
-                | Some moduleValue -> Ok moduleValue.Type
-                | None ->
-                    // Check if it's a module function (e.g., Stdlib.Int64.add)
-                    match Stdlib.tryGetFunction moduleRegistry name with
-                    | Some (moduleFunc, _) -> Ok (Stdlib.getFunctionType moduleFunc)
-                    | None -> Error $"Cannot infer type: undefined variable '{name}'"
+                // Check if it's a module function (e.g., Stdlib.Int64.add)
+                match Stdlib.tryGetFunction moduleRegistry name with
+                | Some (moduleFunc, _) -> Ok (Stdlib.getFunctionType moduleFunc)
+                | None -> Error $"Cannot infer type: undefined variable '{name}'"
     | AST.DictLiteral (valueType, _) ->
         Ok (AST.TDict (AST.TString, valueType))
     | AST.RecordLiteral (reference, fields) ->
@@ -5406,19 +5425,8 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
     | AST.Var name ->
         if isBuiltinTestNanName name then
             Ok (ANF.Return (ANF.FloatLiteral System.Double.NaN), varGen)
-        else if name = "Stdlib.Blob.empty" then
-            // Blob.empty shares the immortal empty dynamic-buffer literal.
+        else if isBuiltinBlobEmptyName name then
             Ok (ANF.Return (ANF.StringLiteral ""), varGen)
-        else if name = "Darklang.LanguageTools.PackageManager.PickContext.empty" then
-            toANFCore sumTypeNames
-                (AST.RecordLiteral (
-                    AST.unresolvedRecordReference "Darklang.LanguageTools.PackageManager.PickContext" [],
-                    [("currentModule", AST.ListLiteral [])]
-                ))
-                varGen env typeReg variantLookup funcReg moduleRegistry
-        else if name = "Stdlib.List.empty" || name = "Stdlib.List.empty_v0" then
-            // The empty skew-list is the null pointer with tag zero.
-            Ok (ANF.Return (ANF.IntLiteral (ANF.Int64 0L)), varGen)
         else
             // Variable reference: look up in environment
             match tryLookupResolved name env with
@@ -5969,13 +5977,6 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
                 // Variable exists but is not a function type
                 Error $"Cannot call '{funcName}' - it has type {varType}, not a function type"
             | None ->
-                // Resolved stdlib equality APIs lower to the representation
-                // operation at the AST boundary, including calls from stdlib.
-                match tryCanonicalBufferEqualityIntrinsic funcName argAtoms with
-                | Some intrinsicExpr ->
-                    let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
-                    Ok (withArgSetups finalExpr, varGen2)
-                | None ->
                 // Not a variable - check explicit presentation effects first.
                 match tryPresentationIntrinsic funcName argAtoms with
                 | Some intrinsicExpr ->
@@ -9497,17 +9498,8 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
     | AST.Var name ->
         if isBuiltinTestNanName name then
             Ok (ANF.FloatLiteral System.Double.NaN, [], varGen)
-        else if name = "Stdlib.Blob.empty" then
+        else if isBuiltinBlobEmptyName name then
             Ok (ANF.StringLiteral "", [], varGen)
-        else if name = "Darklang.LanguageTools.PackageManager.PickContext.empty" then
-            toAtomCore sumTypeNames
-                (AST.RecordLiteral (
-                    AST.unresolvedRecordReference "Darklang.LanguageTools.PackageManager.PickContext" [],
-                    [("currentModule", AST.ListLiteral [])]
-                ))
-                varGen env typeReg variantLookup funcReg moduleRegistry
-        else if name = "Stdlib.List.empty" || name = "Stdlib.List.empty_v0" then
-            Ok (ANF.IntLiteral (ANF.Int64 0L), [], varGen)
         else
             // Variable reference: look up in environment
             match tryLookupResolved name env with
@@ -9854,13 +9846,6 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
                     // Variable exists but is not a function type
                     Error $"Cannot call '{funcName}' - it has type {varType}, not a function type"
                 | None ->
-                    // Resolved stdlib equality APIs lower to the representation
-                    // operation at the AST boundary, including calls from stdlib.
-                    match tryCanonicalBufferEqualityIntrinsic funcName argAtoms with
-                    | Some intrinsicExpr ->
-                        let allBindings = argBindings @ [(tempVar, intrinsicExpr)]
-                        Ok (ANF.Var tempVar, allBindings, varGen2)
-                    | None ->
                     // Not a variable - check explicit presentation effects first.
                     match tryPresentationIntrinsic funcName argAtoms with
                     | Some intrinsicExpr ->

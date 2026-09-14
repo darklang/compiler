@@ -4,7 +4,7 @@ module Stdlib.AltJson.Builder
 
 type Fields = List<(String * Stdlib.AltJson.Json)>
 
-let empty () : List<(String * Stdlib.AltJson.Json)> = []
+val empty = []
 
 let addString (fields: List<(String * Stdlib.AltJson.Json)>) (key: String) (value: String) : List<(String * Stdlib.AltJson.Json)> =
     Stdlib.List.append fields ([(key, Stdlib.AltJson.Json.String value)])

@@ -22,8 +22,6 @@ let min (a: UInt32) (b: UInt32) : UInt32 = if a < b then a else b
 
 let mod (a: UInt32) (b: UInt32) : UInt32 = if b == 0ul then Builtin.crash "Cannot evaluate modulus against 0" else a % b
 
-let absoluteValue (a: UInt32) : UInt32 = a
-let negate (a: UInt32) : UInt32 = 0ul - a
 
 
 let __powerLoop (base: UInt32) (exponent: UInt32) (result: UInt32) : UInt32 =

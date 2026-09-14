@@ -24,8 +24,9 @@ let kill (pid: Int) (signal: Int) : Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.
         | Error error -> Error (Stdlib.Cli.Posix.__error error)
     | _ -> Error (Stdlib.Cli.Posix.Error { errno = 22, message = "Invalid argument" })
 
-let sigterm () : Int = 15
-let sigkill () : Int = 9
+val sigterm = 15
+val sigkill = 9
+val sigint = 2
 
 let sleep (delayMs: Float) : Unit =
     Stdlib.Cli.__sleep delayMs

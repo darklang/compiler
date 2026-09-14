@@ -280,6 +280,9 @@ let private isRuntimeFailureName (funcName: string) : bool =
 let private isBuiltinTestNanName (name: string) : bool =
     name = "Builtin.testNan"
 
+let private isBuiltinBlobEmptyName (name: string) : bool =
+    name = "Builtin.blobEmpty"
+
 let private isRuntimeErrorType (typ: Type) : bool =
     match typ with
     | TRuntimeError -> true
@@ -674,6 +677,7 @@ type TypeCheckEnv = {
     IndexedSumTypeReg: IndexedSumTypeRegistry
     SumTypeNames: Set<string>
     FuncEnv: TypeEnv
+    Values: Map<string, Type * Expr>
     FuncParamNames: FuncParamNameRegistry
     GenericFuncReg: GenericFuncRegistry
     GenericFuncDefs: Map<string, FunctionDef>
@@ -694,6 +698,7 @@ let mergeTypeCheckEnv (baseEnv: TypeCheckEnv) (overlay: TypeCheckEnv) : TypeChec
         IndexedSumTypeReg = mergeMap baseEnv.IndexedSumTypeReg overlay.IndexedSumTypeReg
         SumTypeNames = Set.union baseEnv.SumTypeNames overlay.SumTypeNames
         FuncEnv = mergeMap baseEnv.FuncEnv overlay.FuncEnv
+        Values = mergeMap baseEnv.Values overlay.Values
         FuncParamNames = mergeMap baseEnv.FuncParamNames overlay.FuncParamNames
         GenericFuncReg = {
             Functions = mergeMap baseEnv.GenericFuncReg.Functions overlay.GenericFuncReg.Functions
@@ -1368,7 +1373,7 @@ let private buildEqExprForType
     | TFunction _ ->
         makeInternalTypeApp (EqHelperDispatchTypeApp (resolvedType, leftExpr, rightExpr))
     | TString ->
-        Call ("Stdlib.String.equals", NonEmptyList.fromList [leftExpr; rightExpr])
+        BinOp (Eq, leftExpr, rightExpr)
     | TInt ->
         Call ("Stdlib.Int.__equals", NonEmptyList.fromList [leftExpr; rightExpr])
     | TList elemType ->
@@ -3150,6 +3155,13 @@ let rec private checkExprWithParamNamesAndSumTypeNames
                 | Some reconciledType -> Ok (reconciledType, builtinExpr)
                 | None -> Error (TypeMismatch (expected, TFloat64, $"variable {name}"))
             | None -> Ok (TFloat64, builtinExpr)
+        else if isBuiltinBlobEmptyName name then
+            match expectedType with
+            | Some expected ->
+                match reconcileTypes (Some aliasReg) expected TBlob with
+                | Some reconciledType -> Ok (reconciledType, Var "Builtin.blobEmpty")
+                | None -> Error (TypeMismatch (expected, TBlob, $"variable {name}"))
+            | None -> Ok (TBlob, Var "Builtin.blobEmpty")
         else
             // Variable reference: look up in environment
             match tryLookupResolved name env with
@@ -3163,27 +3175,17 @@ let rec private checkExprWithParamNamesAndSumTypeNames
                     | None -> Error (TypeMismatch (expected, varType, $"variable {name}"))
                 | None -> Ok (varType, Var resolvedName)
             | None ->
-                match Stdlib.tryGetValue name with
-                | Some moduleValue ->
+                // Check if it's a module function (e.g., Stdlib.Int64.add)
+                match Stdlib.tryGetFunction moduleRegistry name with
+                | Some (moduleFunc, resolvedName) ->
+                    let funcType = Stdlib.getFunctionType moduleFunc
                     match expectedType with
                     | Some expected ->
-                        match reconcileTypes (Some aliasReg) expected moduleValue.Type with
-                        | Some reconciledType -> Ok (reconciledType, Var moduleValue.Name)
-                        | None -> Error (TypeMismatch (expected, moduleValue.Type, $"variable {name}"))
-                    | None -> Ok (moduleValue.Type, Var moduleValue.Name)
-                | None ->
-                    // Check if it's a module function (e.g., Stdlib.Int64.add)
-                    match Stdlib.tryGetFunction moduleRegistry name with
-                    | Some (moduleFunc, resolvedName) ->
-                        let funcType = Stdlib.getFunctionType moduleFunc
-                        match expectedType with
-                        | Some expected ->
-                            match reconcileTypes (Some aliasReg) expected funcType with
-                            | Some reconciledType -> Ok (reconciledType, Var resolvedName)
-                            | None -> Error (TypeMismatch (expected, funcType, $"variable {name}"))
-                        | None -> Ok (funcType, Var resolvedName)
-                    | None ->
-                        Error (UndefinedVariable name)
+                        match reconcileTypes (Some aliasReg) expected funcType with
+                        | Some reconciledType -> Ok (reconciledType, Var resolvedName)
+                        | None -> Error (TypeMismatch (expected, funcType, $"variable {name}"))
+                    | None -> Ok (funcType, Var resolvedName)
+                | None -> Error (UndefinedVariable name)
 
     | If (cond, thenBranch, elseBranch) ->
         // If expression: condition must be bool, branches must have same type
@@ -6156,7 +6158,7 @@ let rec private buildEqHelperExpr
         BinOp (Eq, leftExpr, rightExpr)
 
     | _, TString ->
-        Call ("Stdlib.String.equals", NonEmptyList.fromList [leftExpr; rightExpr])
+        BinOp (Eq, leftExpr, rightExpr)
 
     | _, TInt ->
         Call ("Stdlib.Int.__equals", NonEmptyList.fromList [leftExpr; rightExpr])
@@ -7003,6 +7005,8 @@ let private materializeHelpersInTopLevels
             Set.empty
         | Expression expr ->
             collectEqHelperTypesFromExpr aliasReg expr
+        | ValueDef valueDef ->
+            collectEqHelperTypesFromExpr aliasReg (valueDefBody valueDef)
         | TypeDef _ ->
             Set.empty
 
@@ -7012,6 +7016,7 @@ let private materializeHelpersInTopLevels
             collectCompareHelperTypesFromExpr aliasReg funcDef.Body
         | FunctionDef _ -> Set.empty
         | Expression expr -> collectCompareHelperTypesFromExpr aliasReg expr
+        | ValueDef valueDef -> collectCompareHelperTypesFromExpr aliasReg (valueDefBody valueDef)
         | TypeDef _ -> Set.empty
 
     let rewriteTopLevel (topLevel: TopLevel) : TopLevel =
@@ -7025,6 +7030,11 @@ let private materializeHelpersInTopLevels
             topLevel
         | Expression expr ->
             Expression (materializeHelperCallsInExpr includeEquality aliasReg variantLookup expr)
+        | ValueDef valueDef ->
+            let body = materializeHelperCallsInExpr includeEquality aliasReg variantLookup (valueDefBody valueDef)
+            match valueDef with
+            | UncheckedValueDef (name, _) -> ValueDef (UncheckedValueDef (name, body))
+            | CheckedValueDef (name, typ, _) -> ValueDef (CheckedValueDef (name, typ, body))
         | TypeDef _ ->
             topLevel
 
@@ -7409,6 +7419,7 @@ let private declarationResolutionEnvironment
     let declarationKey topLevel =
         match topLevel with
         | FunctionDef funcDef -> Some ("function", funcDef.Name)
+        | ValueDef valueDef -> Some ("value", valueDefName valueDef)
         | TypeDef (RecordDef (name, _, _))
         | TypeDef (SumTypeDef (name, _, _))
         | TypeDef (TypeAlias (name, _, _)) -> Some ("type", name)
@@ -7443,6 +7454,13 @@ let private declarationResolutionEnvironment
                         visibleName
                         identity
                         (NameResolution.SourceDeclaration funcDef.Name))
+            | ValueDef valueDef ->
+                let name = valueDefName valueDef
+                let (namespaceIdentity, terminal) = splitDeclaredName name
+                [ requiredCandidate
+                    name
+                    (NameResolution.ModuleValue (namespaceIdentity, terminal))
+                    (NameResolution.SourceDeclaration name) ]
             | TypeDef typeDef ->
                 let (typeName, variants) =
                     match typeDef with
@@ -7490,15 +7508,6 @@ let private declarationResolutionEnvironment
                     identity
                     (NameResolution.CompilerExtension qualifiedName)))
 
-    let stdlibValueCandidates =
-        Stdlib.allValues
-        |> List.map (fun value ->
-            let (namespaceIdentity, terminal) = splitDeclaredName value.Name
-            requiredCandidate
-                value.Name
-                (NameResolution.ModuleValue (namespaceIdentity, terminal))
-                (NameResolution.ModuleDeclaration value.Name))
-
     let builtinCandidates =
         [ requiredCandidate
             "Builtin.unwrap"
@@ -7519,10 +7528,14 @@ let private declarationResolutionEnvironment
           requiredCandidate
             "Builtin.testNan_v0"
             (NameResolution.BuiltinValue ("testNan", 0))
-            (NameResolution.BuiltinRegistration "Builtin.testNan") ]
+            (NameResolution.BuiltinRegistration "Builtin.testNan")
+          requiredCandidate
+            "Builtin.blobEmpty"
+            (NameResolution.BuiltinValue ("blobEmpty", 0))
+            (NameResolution.BuiltinRegistration "Builtin.blobEmpty") ]
 
     NameResolution.empty
-    |> NameResolution.addCandidates (sourceCandidates @ intrinsicCandidates @ stdlibValueCandidates @ builtinCandidates)
+    |> NameResolution.addCandidates (sourceCandidates @ intrinsicCandidates @ builtinCandidates)
 
 /// Collect resolved callable dependencies for declaration grouping. Local
 /// availability has already been decided by name resolution, so only canonical
@@ -7981,6 +7994,12 @@ let private resolveProgramNames
                                 Body = body'
                                 Recursion = recursion' })))
         | TypeDef typeDef -> resolveTypeDef typeDef |> Result.map TypeDef
+        | ValueDef valueDef ->
+            resolveExpr Set.empty (valueDefBody valueDef)
+            |> Result.map (fun body ->
+                match valueDef with
+                | UncheckedValueDef (name, _) -> ValueDef (UncheckedValueDef (name, body))
+                | CheckedValueDef (name, typ, _) -> ValueDef (CheckedValueDef (name, typ, body)))
         | Expression expr -> resolveExpr Set.empty expr |> Result.map Expression
 
     let (Program topLevels) = program
@@ -8246,6 +8265,7 @@ let private summarizeTopLevelDeclarations
         |> List.choose (fun (index, topLevel) ->
             match topLevel with
             | FunctionDef definition -> Some (("function", definition.Name), index)
+            | ValueDef definition -> Some (("value", valueDefName definition), index)
             | TypeDef definition -> Some (("type", typeDefName definition), index)
             | Expression _ -> None)
         |> Map.ofList
@@ -8257,6 +8277,7 @@ let private summarizeTopLevelDeclarations
             let key =
                 match topLevel with
                 | FunctionDef definition -> Some ("function", definition.Name)
+                | ValueDef definition -> Some ("value", valueDefName definition)
                 | TypeDef definition -> Some ("type", typeDefName definition)
                 | Expression _ -> None
             match key with
@@ -8305,6 +8326,7 @@ let private summarizeTopLevelDeclarations
                         Map.add funcDef.Name (List.map fst parameters) summary.FuncParamNames
                     GenericFuncs = genericFuncs
             }
+        | ValueDef _ -> summary
         | Expression _ ->
             summary) empty
 
@@ -8415,6 +8437,55 @@ let private checkResolvedProgramInternal
             declarationSummary.RecordTypeParams
             canonicalProgramTypeReg
 
+    let initialValueFuncEnv =
+        match baseEnv with
+        | Some existingEnv ->
+            Map.fold (fun env name typ -> Map.add name typ env) existingEnv.FuncEnv programFuncEnv
+        | None -> programFuncEnv
+    let initialValues = baseEnv |> Option.map (fun env -> env.Values) |> Option.defaultValue Map.empty
+    let checkedValuesResult =
+        topLevels
+        |> List.fold (fun result topLevel ->
+            result
+            |> Result.bind (fun (valueFuncEnv, values, checkedDefs) ->
+                match topLevel with
+                | ValueDef (UncheckedValueDef (name, body)) ->
+                    checkExprWithParamNamesAndSumTypeNames
+                        declarationSummary.FuncParamNames
+                        availableSumTypeNames
+                        programIndexedSumTypeReg
+                        body
+                        valueFuncEnv
+                        programIndexedTypeReg
+                        canonicalProgramVariantLookup
+                        programGenericFuncReg
+                        warningSettings
+                        moduleRegistry
+                        functionAliasReg
+                        None
+                    |> Result.map (fun (typ, checkedBody) ->
+                        (Map.add name typ valueFuncEnv,
+                         Map.add name (typ, checkedBody) values,
+                         Map.add name (CheckedValueDef (name, typ, checkedBody)) checkedDefs))
+                | ValueDef (CheckedValueDef (name, typ, body)) ->
+                    Ok (
+                        Map.add name typ valueFuncEnv,
+                        Map.add name (typ, body) values,
+                        Map.add name (CheckedValueDef (name, typ, body)) checkedDefs)
+                | _ -> Ok (valueFuncEnv, values, checkedDefs)))
+            (Ok (initialValueFuncEnv, initialValues, Map.empty))
+
+    checkedValuesResult
+    |> Result.bind (fun (valueFuncEnv, values, checkedValues) ->
+    let topLevels =
+        topLevels
+        |> List.map (function
+            | ValueDef valueDef ->
+                match Map.tryFind (valueDefName valueDef) checkedValues with
+                | Some checkedValue -> ValueDef checkedValue
+                | None -> Crash.crash $"Checked value '{valueDefName valueDef}' was not retained"
+            | other -> other)
+
     // Build the type check environment for THIS program
     let programEnv : TypeCheckEnv = {
         TypeReg = canonicalProgramTypeReg
@@ -8423,7 +8494,8 @@ let private checkResolvedProgramInternal
         VariantLookup = canonicalProgramVariantLookup
         IndexedSumTypeReg = programIndexedSumTypeReg
         SumTypeNames = programSumTypeNames
-        FuncEnv = programFuncEnv
+        FuncEnv = valueFuncEnv
+        Values = values
         FuncParamNames = declarationSummary.FuncParamNames
         GenericFuncReg = programGenericFuncReg
         // Checked bodies are installed after the function-definition pass.
@@ -8468,6 +8540,8 @@ let private checkResolvedProgramInternal
                 mergedAliasReg
             |> Result.map (fun funcDef' -> (None, FunctionDef funcDef'))
         | TypeDef _ ->
+            Ok (None, topLevel)
+        | ValueDef _ ->
             Ok (None, topLevel)
         | Expression expr ->
             checkExprWithParamNamesAndSumTypeNames
@@ -8613,7 +8687,7 @@ let private checkResolvedProgramInternal
             | true, [] -> Error (GenericError "Executable program must contain exactly one entry expression; found 0")
             | true, entries -> Error (GenericError $"Executable program must contain exactly one entry expression; found {entries.Length}")
             | false, [] -> Ok (TUnit, Program topLevelsWithEqHelpers, checkedTypeCheckEnv)
-            | false, entries -> Error (GenericError $"Declaration-only program must not contain entry expressions; found {entries.Length}")))
+            | false, entries -> Error (GenericError $"Declaration-only program must not contain entry expressions; found {entries.Length}"))))
 
 /// Check the common separate-compilation case without constructing and then
 /// merging an empty declaration environment. Name resolution has already run,
@@ -8716,13 +8790,8 @@ let private checkProgramInternalWithTrace
     // become candidates while resolving a separately compiled source program.
     let compilerImplementationNames =
         Set.ofList [
-            "Stdlib.String.getByteAt"; "Stdlib.String.substring"; "Stdlib.String.take"; "Stdlib.String.drop"
-            "Stdlib.String.toCodepoints"; "Stdlib.String.codepointLength"; "Stdlib.String.fromCodepoints"
-            "Stdlib.String.toUpperCase"; "Stdlib.String.toGraphemes"; "Stdlib.String.graphemeLength"
-            "Stdlib.String.replace"; "Stdlib.String.equals"
-            "Stdlib.Float.abs"; "Stdlib.Float.toInt"; "Stdlib.Float.toBits"
-            "Stdlib.Math.e"; "Stdlib.Math.abs"; "Stdlib.Math.sqrt"; "Stdlib.Math.truncate"; "Stdlib.Math.floor"; "Stdlib.Math.ceiling"; "Stdlib.Math.round"
-            "Stdlib.Base64.urlDecode"; "Stdlib.Crypto.sha1"; "Stdlib.Crypto.bytesToHex"
+            "Stdlib.String.__byteAtUnchecked"; "Stdlib.String.__toCodepoints"; "Stdlib.String.__codepointLength"
+            "Stdlib.Float.__toBits"; "Stdlib.Float.__toInt64Unchecked"
             "Stdlib.File.readText"; "Stdlib.File.exists"; "Stdlib.File.writeText"; "Stdlib.File.appendText"; "Stdlib.File.delete"; "Stdlib.File.setExecutable"; "Stdlib.File.writeFromPtr" ]
     let isCompilerImplementationCandidate (candidate: NameResolution.Candidate) =
         match candidate.Provenance with

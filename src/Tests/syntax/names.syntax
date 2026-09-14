@@ -128,8 +128,7 @@ module Outer =
 ---ROUNDTRIP---
 
 ---NAME---
-top level val reaches the unsupported execution boundary
+top level val roundtrips
 ---SOURCE---
 val answer = 42
----EXPECT-ERROR---
-Top-level value declarations are parsed but native execution is not supported
+---ROUNDTRIP---

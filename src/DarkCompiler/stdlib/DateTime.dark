@@ -185,15 +185,15 @@ let __daysSinceEpoch (date: DateTime) : Int64 =
 
 let year (date: DateTime) : Int =
     let parts = Stdlib.DateTime.__civilFromDays (Stdlib.DateTime.__daysSinceEpoch date) in
-    Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.first parts)
+    Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.first<Int64, Int64, Int64> parts)
 
 let month (date: DateTime) : Int =
     let parts = Stdlib.DateTime.__civilFromDays (Stdlib.DateTime.__daysSinceEpoch date) in
-    Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.second parts)
+    Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.second<Int64, Int64, Int64> parts)
 
 let day (date: DateTime) : Int =
     let parts = Stdlib.DateTime.__civilFromDays (Stdlib.DateTime.__daysSinceEpoch date) in
-    Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.third parts)
+    Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.third<Int64, Int64, Int64> parts)
 
 let weekday (date: DateTime) : Int =
     Stdlib.DateTime.__int64ToInt (
@@ -246,31 +246,41 @@ let __calendarParts (date: DateTime) : (Int64 * Int64 * Int64) =
 
 let toString (date: DateTime) : String =
     let parts = Stdlib.DateTime.__calendarParts date in
-    let year = Stdlib.Tuple3.first parts in
-    let month = Stdlib.Tuple3.second parts in
-    let day = Stdlib.Tuple3.third parts in
+    let year = Stdlib.Tuple3.first<Int64, Int64, Int64> parts in
+    let month = Stdlib.Tuple3.second<Int64, Int64, Int64> parts in
+    let day = Stdlib.Tuple3.third<Int64, Int64, Int64> parts in
     let withinDay = Stdlib.DateTime.__ticksWithinDay date in
     let hour = withinDay / Stdlib.DateTime.__ticksPerHour () in
     let minute = (withinDay / Stdlib.DateTime.__ticksPerMinute ()) % 60L in
     let second = (withinDay / Stdlib.DateTime.__ticksPerSecond ()) % 60L in
     let millisecond = (withinDay / Stdlib.DateTime.__ticksPerMillisecond ()) % 1000L in
     let dateAndTime =
-        $"{Stdlib.DateTime.__padZero4 year}-{Stdlib.DateTime.__padZero2 month}-{Stdlib.DateTime.__padZero2 day}T{Stdlib.DateTime.__padZero2 hour}:{Stdlib.DateTime.__padZero2 minute}:{Stdlib.DateTime.__padZero2 second}" in
-    if millisecond == 0L then $"{dateAndTime}Z"
-    else $"{dateAndTime}.{Stdlib.DateTime.__padZero3 millisecond}Z"
+        Stdlib.DateTime.__padZero4 year ++ "-" ++
+        Stdlib.DateTime.__padZero2 month ++ "-" ++
+        Stdlib.DateTime.__padZero2 day ++ "T" ++
+        Stdlib.DateTime.__padZero2 hour ++ ":" ++
+        Stdlib.DateTime.__padZero2 minute ++ ":" ++
+        Stdlib.DateTime.__padZero2 second in
+    if millisecond == 0L then dateAndTime ++ "Z"
+    else dateAndTime ++ "." ++ Stdlib.DateTime.__padZero3 millisecond ++ "Z"
 
 let toStringISO8601BasicDate (date: DateTime) : String =
     let parts = Stdlib.DateTime.__calendarParts date in
-    $"{Stdlib.DateTime.__padZero4 (Stdlib.Tuple3.first parts)}{Stdlib.DateTime.__padZero2 (Stdlib.Tuple3.second parts)}{Stdlib.DateTime.__padZero2 (Stdlib.Tuple3.third parts)}"
+    Stdlib.DateTime.__padZero4 (Stdlib.Tuple3.first<Int64, Int64, Int64> parts) ++
+    Stdlib.DateTime.__padZero2 (Stdlib.Tuple3.second<Int64, Int64, Int64> parts) ++
+    Stdlib.DateTime.__padZero2 (Stdlib.Tuple3.third<Int64, Int64, Int64> parts)
 
 let toStringISO8601BasicDateTime (date: DateTime) : String =
     let withinDay = Stdlib.DateTime.__ticksWithinDay date in
-    $"{Stdlib.DateTime.toStringISO8601BasicDate date}T{Stdlib.DateTime.__padZero2 (withinDay / Stdlib.DateTime.__ticksPerHour ())}{Stdlib.DateTime.__padZero2 ((withinDay / Stdlib.DateTime.__ticksPerMinute ()) % 60L)}{Stdlib.DateTime.__padZero2 ((withinDay / Stdlib.DateTime.__ticksPerSecond ()) % 60L)}Z"
+    Stdlib.DateTime.toStringISO8601BasicDate date ++ "T" ++
+    Stdlib.DateTime.__padZero2 (withinDay / Stdlib.DateTime.__ticksPerHour ()) ++
+    Stdlib.DateTime.__padZero2 ((withinDay / Stdlib.DateTime.__ticksPerMinute ()) % 60L) ++
+    Stdlib.DateTime.__padZero2 ((withinDay / Stdlib.DateTime.__ticksPerSecond ()) % 60L) ++ "Z"
 
 let __digitAt (value: String) (index: Int64) : Stdlib.Result.Result<Int64, String> =
     if index >= Stdlib.String.__byteLength value then Error "Invalid date format"
     else
-        let byte = Stdlib.String.getByteAt value index in
+        let byte = Stdlib.String.__byteAtUnchecked value index in
         if byte >= 48L && byte <= 57L then Ok (byte - 48L)
         else Error "Invalid date format"
 
@@ -283,7 +293,7 @@ let __parseDigits (value: String) (index: Int64) (remaining: Int64) (total: Int6
             Stdlib.DateTime.__parseDigits value (index + 1L) (remaining - 1L) (total * 10L + digit)
 
 let __hasByte (value: String) (index: Int64) (expected: Int64) : Bool =
-    index < Stdlib.String.__byteLength value && Stdlib.String.getByteAt value index == expected
+    index < Stdlib.String.__byteLength value && Stdlib.String.__byteAtUnchecked value index == expected
 
 let __isLeapYear (year: Int64) : Bool =
     if year % 4L != 0L then false

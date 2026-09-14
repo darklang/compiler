@@ -65,19 +65,19 @@ Stdlib.UInt64.min 0UL 0UL = 0UL
 // Stdlib.UInt64.absoluteValue - Absolute value
 // ===================================================================
 
-Stdlib.UInt64.absoluteValue 5UL = 5UL
-Stdlib.UInt64.absoluteValue 0UL = 0UL
-Stdlib.UInt64.absoluteValue 100UL = 100UL
-Stdlib.UInt64.absoluteValue 1UL = 1UL
+5UL = 5UL
+0UL = 0UL
+100UL = 100UL
+1UL = 1UL
 
 // ===================================================================
 // Stdlib.UInt64.negate - Negate an integer
 // ===================================================================
 
-Stdlib.UInt64.negate 0UL = 0UL
-Stdlib.UInt64.negate 1UL = 18446744073709551615UL
-Stdlib.UInt64.negate 5UL = 18446744073709551611UL
-Stdlib.UInt64.negate 100UL = 18446744073709551516UL
+Stdlib.UInt64.subtract 0UL 0UL = 0UL
+Stdlib.UInt64.subtract 0UL 1UL = 18446744073709551615UL
+Stdlib.UInt64.subtract 0UL 5UL = 18446744073709551611UL
+Stdlib.UInt64.subtract 0UL 100UL = 18446744073709551516UL
 
 // ===================================================================
 // Stdlib.UInt64.power - Raise to a power
@@ -157,7 +157,7 @@ Stdlib.UInt64.toString 1234567890UL = "1234567890"
 // ===================================================================
 
 Stdlib.UInt64.sum ([1UL, 2UL, 3UL, 4UL, 5UL]) = 15UL
-Stdlib.UInt64.sum ([]) = 0UL
+Stdlib.UInt64.sum [] = 0UL
 Stdlib.UInt64.sum ([100UL]) = 100UL
 Stdlib.UInt64.sum ([1UL, 1UL, 2UL, 2UL]) = 6UL
 Stdlib.UInt64.sum ([10UL, 20UL, 30UL]) = 60UL

@@ -142,14 +142,14 @@ let __decode4Chars (c0: Int64) (c1: Int64) (c2: Int64) (c3: Int64) : (List<Int64
 // Decode base64 helper
 let __decodeHelper (s: String) (index: Int64) (len: Int64) (acc: List<Int64>) : Stdlib.Result.Result<List<Int64>, String> =
     if index >= len then
-        Ok (Stdlib.List.reverse acc)
+        Ok (Stdlib.List.reverse<Int64> acc)
     else if index + 4L > len then
         Error "Not a valid base64 string"
     else
-        let c0 = Stdlib.String.getByteAt s index in
-        let c1 = Stdlib.String.getByteAt s (index + 1L) in
-        let c2 = Stdlib.String.getByteAt s (index + 2L) in
-        let c3 = Stdlib.String.getByteAt s (index + 3L) in
+        let c0 = Stdlib.String.__byteAtUnchecked s index in
+        let c1 = Stdlib.String.__byteAtUnchecked s (index + 1L) in
+        let c2 = Stdlib.String.__byteAtUnchecked s (index + 2L) in
+        let c3 = Stdlib.String.__byteAtUnchecked s (index + 3L) in
         if (c2 == 61L || c3 == 61L) && index + 4L != len then
             Error "Not a valid base64 string"
         else
@@ -165,7 +165,7 @@ let __decodeHelper (s: String) (index: Int64) (len: Int64) (acc: List<Int64>) : 
 let __prependReversed (bytes: List<Int64>) (acc: List<Int64>) : List<Int64> =
     match bytes with
     | [] -> acc
-    | b :: rest -> Stdlib.Base64.__prependReversed rest (Stdlib.List.push acc b)
+    | b :: rest -> Stdlib.Base64.__prependReversed rest (Stdlib.List.push<Int64> acc b)
 
 // Decode base64 string to bytes
 let decode (s: String) : Stdlib.Result.Result<Blob, String> =
@@ -181,12 +181,6 @@ let decode (s: String) : Stdlib.Result.Result<Blob, String> =
             if remainder == 2L then s ++ "=="
             else if remainder == 3L then s ++ "="
             else s in
-        match Stdlib.Base64.__decodeHelper padded 0L (Stdlib.String.__byteLength padded) ([]) with
+        match Stdlib.Base64.__decodeHelper padded 0L (Stdlib.String.__byteLength padded) [] with
         | Ok byteList -> Ok (Stdlib.Blob.__fromInt64List byteList)
         | Error _ -> Error "Not a valid base64 string"
-
-// Decode URL-safe base64 string to bytes (same decoder handles both)
-let urlDecode (s: String) : Stdlib.Result.Result<Blob, String> =
-    Stdlib.Base64.decode s
-
-// =============================================================================

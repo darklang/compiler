@@ -1,0 +1,28 @@
+// First-class value declarations and upstream stdlib value parity.
+
+val answer = 40L
+let addAnswer (amount: Int64) : Int64 = answer + amount
+let genericAnswer<'a> (_ignored: 'a) : Int64 = answer
+
+addAnswer 2L = 42L
+genericAnswer<String> "ignored" = 40L
+
+Stdlib.String.newline = "\n"
+Stdlib.Math.pi = 3.141592653589793
+Stdlib.Math.tau = 6.283185307179586
+Stdlib.Math.e = 2.718281828459045
+Stdlib.Cli.Posix.sigterm = 15
+Stdlib.Cli.Posix.sigkill = 9
+Stdlib.List.isEmpty<Int64> Stdlib.List.empty = true
+Stdlib.Dict.isEmpty<String> Stdlib.Dict.empty = true
+Stdlib.AltJson.Builder.empty = []
+Stdlib.Blob.length Stdlib.Blob.empty = 0
+Stdlib.Cli.Posix.sigint = 2
+Stdlib.Cli.Posix.Modes.defaultDir = 493
+Stdlib.Cli.Posix.Modes.defaultFile = 420
+Stdlib.HttpClient.ContentType.json = ("content-type", "application/json")
+Stdlib.HttpServer.Config.defaultMaxBodyBytes = 31457280
+Stdlib.Pretty.empty = Stdlib.Pretty.Doc.Empty
+Stdlib.Cli.UI.TextField.empty = Stdlib.Cli.UI.TextField.State { text = "", cursor = 0 }
+Stdlib.Cli.Tui.TerminalSession.Ansi.restoreInline = "\u001b[?2026l\u001b[0m\u001b[r\u001b[?25h"
+Darklang.LanguageTools.PackageManager.PickContext.empty.currentModule = []

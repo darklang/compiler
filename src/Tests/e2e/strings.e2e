@@ -145,24 +145,26 @@ let x = "one" in let y = "two" in $"{x} and {y}" = "one and two"
 // =============================================================================
 
 // Get bytes from ASCII string "abc" = 97, 98, 99
-Stdlib.String.getByteAt "abc" 0L = 97L
-Stdlib.String.getByteAt "abc" 1L = 98L
-Stdlib.String.getByteAt "abc" 2L = 99L
+Stdlib.String.getByteAt "abc" 0 = Some 97uy
+Stdlib.String.getByteAt "abc" 1 = Some 98uy
+Stdlib.String.getByteAt "abc" 2 = Some 99uy
 
 // Get bytes from uppercase "ABC" = 65, 66, 67
-Stdlib.String.getByteAt "ABC" 0L = 65L
-Stdlib.String.getByteAt "ABC" 1L = 66L
-Stdlib.String.getByteAt "ABC" 2L = 67L
+Stdlib.String.getByteAt "ABC" 0 = Some 65uy
+Stdlib.String.getByteAt "ABC" 1 = Some 66uy
+Stdlib.String.getByteAt "ABC" 2 = Some 67uy
 
 // Get byte from single character
-Stdlib.String.getByteAt "x" 0L = 120L
+Stdlib.String.getByteAt "x" 0 = Some 120uy
 
 // Get space character (ASCII 32)
-Stdlib.String.getByteAt " " 0L = 32L
+Stdlib.String.getByteAt " " 0 = Some 32uy
 
 // Get digits
-Stdlib.String.getByteAt "0" 0L = 48L
-Stdlib.String.getByteAt "9" 0L = 57L
+Stdlib.String.getByteAt "0" 0 = Some 48uy
+Stdlib.String.getByteAt "9" 0 = Some 57uy
+Stdlib.String.getByteAt "abc" (-1) = None
+Stdlib.String.getByteAt "abc" 3 = None
 
 // =============================================================================
 // Stdlib.String.startsWith Tests
@@ -253,24 +255,24 @@ Stdlib.String.slice "hello" 10 15 = ""
 Stdlib.String.slice "hello" 4 2 = ""
 
 // =============================================================================
-// Stdlib.String.take and drop Tests
+// Stdlib.String.first and drop Tests
 // =============================================================================
 
 // take
-Stdlib.String.take "hello world" 5L = "hello"
-Stdlib.String.take "hello" 0L = ""
-Stdlib.String.take "hello" 100L = "hello"
-Stdlib.String.take "hello" (-1L) = ""
+Stdlib.String.first "hello world" 5 = "hello"
+Stdlib.String.first "hello" 0 = ""
+Stdlib.String.first "hello" 100 = "hello"
+Stdlib.String.first "hello" (-1) = ""
 
 // drop
-Stdlib.String.drop "hello world" 6L = "world"
-Stdlib.String.drop "hello" 0L = "hello"
-Stdlib.String.drop "hello" 100L = ""
-Stdlib.String.drop "hello" (-1L) = "hello"
+Stdlib.String.dropFirst "hello world" 6 = "world"
+Stdlib.String.dropFirst "hello" 0 = "hello"
+Stdlib.String.dropFirst "hello" 100 = ""
+Stdlib.String.dropFirst "hello" (-1) = "hello"
 
 // =============================================================================
-// Stdlib.String.substring Tests
+// Stdlib.String.slice Tests
 // =============================================================================
 
-Stdlib.String.substring "hello world" 0L 5L = "hello"
-Stdlib.String.substring "hello world" 6L 11L = "world"
+Stdlib.String.slice "hello world" 0 5 = "hello"
+Stdlib.String.slice "hello world" 6 11 = "world"

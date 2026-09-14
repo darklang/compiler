@@ -16,7 +16,7 @@ match Stdlib.Cli.Posix.kill (Stdlib.Cli.Sys.currentPid ()) 99999 with | Error er
 
 match Stdlib.Cli.Process.exec "printf" (["%s", "direct execution"]) with | Ok output -> output | Error message -> message = "direct execution"
 
-match Stdlib.Cli.Process.run "/definitely/missing/cli-parity" ([]) with | Error error -> (error.errno, error.message) | Ok _ -> (0, "unexpected") = (2, "No such file or directory")
+match Stdlib.Cli.Process.run "/definitely/missing/cli-parity" [] with | Error error -> (error.errno, error.message) | Ok _ -> (0, "unexpected") = (2, "No such file or directory")
 
 // Argv execution is a process primitive, not shell evaluation. A broken
 // configured shell must not affect an absolute executable.
@@ -40,36 +40,13 @@ match Stdlib.Cli.Sys.hostname () with | Ok hostname -> Stdlib.String.length host
 
 match Stdlib.Cli.Sys.currentUser () with | Some user -> user | None -> "missing" = "native user  " env="USER=native user  " env="PATH="
 
-// Arguments are positional (excluding the executable name) and parsing errors
-// are values, so command-line programs must handle absent or invalid input.
-match Stdlib.Cli.Args.int64 999 with | Error message -> Stdlib.String.length message > 0 | Ok _ -> false = true
-
-let benchmarkArgForCleanup (index: Int): Int64 = match Stdlib.Cli.Args.int64 index with | Ok value -> value | Error message -> Builtin.testRuntimeError message let result = benchmarkArgForCleanup 0 + benchmarkArgForCleanup 1 in Builtin.printLine (Stdlib.Int64.toString result) = stdout="10100\n" arg="100" arg="10000" // inlined successful integer arguments survive cleanup
-
-match (Stdlib.Cli.Args.int64 0, Stdlib.Cli.Args.int64 1) with | (Ok maximum, Ok minimum) -> maximum == 9223372036854775807L && minimum == -9223372036854775808L | _ -> false = true arg="9223372036854775807" arg="-9223372036854775808" // Int64 argv fast path accepts both bounds
-
-match (Stdlib.Cli.Args.int64 0, Stdlib.Cli.Args.int64 1) with | (Ok positive, Ok negative) -> positive == 42L && negative == -17L | _ -> false = true arg=" +42 " arg=" -17 " // Int64 argv preserves trimmed-input fallback
-
-match Stdlib.Cli.Args.int64 0 with | Error message -> message == "invalid Int64 command-line argument at index 0: twelve" | Ok _ -> false = true arg="twelve" // invalid Int64 argv preserves its diagnostic
-
-match Stdlib.Cli.Args.int64 0 with | Error message -> message == "Int64 command-line argument is out of range at index 0" | Ok _ -> false = true arg="9223372036854775808" // overflowing Int64 argv preserves its diagnostic
-
-// CLI argument lookup must work from a nested non-tail frame: argv is process
-// state, rather than state held in an allocator-visible register.
-let argvMissingFromNestedFrame (depth: Int64): Bool =
-    if depth == 0L then
-        match Stdlib.Cli.Args.int64 999 with | Error _ -> true | Ok _ -> false
-    else
-        let retained = depth in argvMissingFromNestedFrame (depth - 1L) && retained > 0L
-argvMissingFromNestedFrame 3L = true
-
-match Stdlib.Cli.Process.runIn "/" "pwd" ([]) with | Ok output -> Stdlib.String.trimEnd output.stdout | Error error -> error.message = "/"
+match Stdlib.Cli.Process.runIn "/" "pwd" [] with | Ok output -> Stdlib.String.trimEnd output.stdout | Error error -> error.message = "/"
 
 match Stdlib.Cli.Process.runWithEnv "/bin/sh" (["-c", "printf %s \"$CLI_PARITY_VALUE\""]) ([("CLI_PARITY_VALUE", "inherited")]) with | Ok output -> output.stdout | Error error -> error = "inherited"
 
 match Stdlib.Cli.Process.pipe "printf" (["abc"]) "tr" (["a-z", "A-Z"]) with | Ok output -> output.stdout | Error error -> error.message = "ABC"
 
-match Stdlib.Cli.Process.runIn "/" "/bin/pwd" ([]) with | Ok output -> Stdlib.String.trimEnd output.stdout | Error error -> error.message = "/" env="SHELL=/definitely/missing" env="PATH="
+match Stdlib.Cli.Process.runIn "/" "/bin/pwd" [] with | Ok output -> Stdlib.String.trimEnd output.stdout | Error error -> error.message = "/" env="SHELL=/definitely/missing" env="PATH="
 
 match Stdlib.Cli.Process.runWithEnv "/bin/sh" (["-c", "printf %s \"$CLI_PARITY_VALUE\""]) ([("CLI_PARITY_VALUE", "native env")]) with | Ok output -> output.stdout | Error error -> error = "native env" env="SHELL=/definitely/missing"
 
@@ -79,7 +56,7 @@ match Stdlib.Cli.Process.pipe "/usr/bin/printf" (["abc"]) "/usr/bin/tr" (["a-z",
 // implementation times out first and prints "sequential" instead.
 let marker = $"/tmp/dark-native-pipe-{Stdlib.Int.toString (Stdlib.Cli.Sys.currentPid ())}" in let quoted = Stdlib.Cli.Process.shellQuote marker in let _ = Stdlib.Cli.Process.run "/bin/rm" (["-f", marker]) in match Stdlib.Cli.Process.pipe "/bin/sh" (["-c", $"marker={quoted}; count=0; while [ ! -e \"$marker\" ] && [ $count -lt 100 ]; do /bin/sleep 0.01; count=$((count + 1)); done; if [ -e \"$marker\" ]; then printf concurrent; else printf sequential; fi"]) "/bin/sh" (["-c", $"/usr/bin/touch {quoted}; /bin/cat; /bin/rm -f {quoted}"]) with | Ok output -> output.stdout | Error error -> error.message = "concurrent" env="SHELL=/definitely/missing" env="PATH="
 
-match Stdlib.Cli.Process.runWithTimeout 0 "true" ([]) with | Error error -> error | Ok _ -> "unexpected" = "timeoutMs must be positive"
+match Stdlib.Cli.Process.runWithTimeout 0 "true" [] with | Error error -> error | Ok _ -> "unexpected" = "timeoutMs must be positive"
 
 match Stdlib.Cli.Process.runWithTimeout 5 "/bin/sh" (["-c", "sleep 1"]) with | Error error -> error | Ok _ -> "unexpected" = "Process timed out"
 

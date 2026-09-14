@@ -33,7 +33,7 @@ type Three = A | B of Int64 | C match B 77L with | A -> 0L | B x -> x | C -> 0L 
 
 // Sum type with string payload
 type Message = NoMessage | Text of String
-match Text "hello" with | Text s -> s | NoMessage -> "none" = "hello"
+match Message.Text "hello" with | Text s -> s | NoMessage -> "none" = "hello"
 match NoMessage with | Text s -> s | NoMessage -> "none" = "none"
 
 // String payload in let binding

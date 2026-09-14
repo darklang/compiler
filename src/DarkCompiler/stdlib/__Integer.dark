@@ -10,7 +10,7 @@ let __text (value: Int) : String = __int_to_string value
 let __value (value: String) : Int = __string_to_int value
 
 let __isNegativeText (value: String) : Bool =
-    Stdlib.String.__byteLength value > 0L && Stdlib.String.getByteAt value 0L == 45L
+    Stdlib.String.__byteLength value > 0L && Stdlib.String.__byteAtUnchecked value 0L == 45L
 
 let __magnitudeText (value: String) : String =
     if Stdlib.Int.__isNegativeText value then
@@ -21,7 +21,7 @@ let __magnitudeText (value: String) : String =
 let __dropLeadingZeros (value: String) (index: Int64) : String =
     let length = Stdlib.String.__byteLength value in
     if index >= length then "0"
-    else if Stdlib.String.getByteAt value index == 48L then
+    else if Stdlib.String.__byteAtUnchecked value index == 48L then
         Stdlib.Int.__dropLeadingZeros value (index + 1L)
     else
         Stdlib.String.__byteDrop value index
@@ -40,8 +40,8 @@ let __withSign (negative: Bool) (magnitude: String) : String =
 let __compareMagnitudeAt (a: String) (b: String) (index: Int64) (length: Int64) : Int64 =
     if index >= length then 0L
     else
-        let da = Stdlib.String.getByteAt a index in
-        let db = Stdlib.String.getByteAt b index in
+        let da = Stdlib.String.__byteAtUnchecked a index in
+        let db = Stdlib.String.__byteAtUnchecked b index in
         if da < db then -1L
         else if da > db then 1L
         else Stdlib.Int.__compareMagnitudeAt a b (index + 1L) length
@@ -78,8 +78,8 @@ let __addMagnitudeAt (a: String) (ai: Int64) (b: String) (bi: Int64) (carry: Int
     if ai < 0L && bi < 0L then
         if carry == 0L then acc else Stdlib.Int64.__digitToString carry ++ acc
     else
-        let da = if ai < 0L then 0L else Stdlib.String.getByteAt a ai - (48L) in
-        let db = if bi < 0L then 0L else Stdlib.String.getByteAt b bi - (48L) in
+        let da = if ai < 0L then 0L else Stdlib.String.__byteAtUnchecked a ai - (48L) in
+        let db = if bi < 0L then 0L else Stdlib.String.__byteAtUnchecked b bi - (48L) in
         let sum = da + db + carry in
         Stdlib.Int.__addMagnitudeAt a (ai - 1L) b (bi - 1L) (sum / 10L) (Stdlib.Int64.__digitToString (sum % 10L) ++ acc)
 
@@ -89,8 +89,8 @@ let __addMagnitude (a: String) (b: String) : String =
 let __subtractMagnitudeAt (a: String) (ai: Int64) (b: String) (bi: Int64) (borrow: Int64) (acc: String) : String =
     if ai < 0L then Stdlib.Int.__normalizeMagnitude acc
     else
-        let da = Stdlib.String.getByteAt a ai - (48L) - borrow in
-        let db = if bi < 0L then 0L else Stdlib.String.getByteAt b bi - (48L) in
+        let da = Stdlib.String.__byteAtUnchecked a ai - (48L) - borrow in
+        let db = if bi < 0L then 0L else Stdlib.String.__byteAtUnchecked b bi - (48L) in
         let needsBorrow = da < db in
         let digit = if needsBorrow then da + 10L - db else da - db in
         Stdlib.Int.__subtractMagnitudeAt a (ai - 1L) b (bi - 1L) (if needsBorrow then 1L else 0L) (Stdlib.Int64.__digitToString digit ++ acc)
@@ -129,7 +129,7 @@ let __multiplyMagnitudeByDigitAt (value: String) (index: Int64) (digit: Int64) (
         if carry == 0L then Stdlib.Int.__normalizeMagnitude acc
         else Stdlib.Int64.toString carry ++ acc
     else
-        let product = (Stdlib.String.getByteAt value index - (48L)) * digit + carry in
+        let product = (Stdlib.String.__byteAtUnchecked value index - (48L)) * digit + carry in
         Stdlib.Int.__multiplyMagnitudeByDigitAt value (index - 1L) digit (product / 10L) (Stdlib.Int64.__digitToString (product % 10L) ++ acc)
 
 let __multiplyMagnitudeByDigit (value: String) (digit: Int64) : String =
@@ -139,7 +139,7 @@ let __multiplyMagnitudeByDigit (value: String) (digit: Int64) : String =
 let __multiplyMagnitudeAt (a: String) (index: Int64) (b: String) (zeros: String) (acc: String) : String =
     if index < 0L then Stdlib.Int.__normalizeMagnitude acc
     else
-        let digit = Stdlib.String.getByteAt a index - (48L) in
+        let digit = Stdlib.String.__byteAtUnchecked a index - (48L) in
         let row = Stdlib.Int.__multiplyMagnitudeByDigit b digit ++ zeros in
         Stdlib.Int.__multiplyMagnitudeAt a (index - 1L) b (zeros ++ "0") (Stdlib.Int.__addMagnitude acc row)
 
@@ -169,10 +169,10 @@ let __divideMagnitudeAt (dividend: String) (index: Int64) (divisor: String) (quo
         (Stdlib.Int.__normalizeMagnitude quotient, Stdlib.Int.__normalizeMagnitude remainder)
     else
         let nextRemainder =
-            Stdlib.Int.__appendMagnitudeDigit remainder (Stdlib.String.getByteAt dividend index - (48L)) in
+            Stdlib.Int.__appendMagnitudeDigit remainder (Stdlib.String.__byteAtUnchecked dividend index - (48L)) in
         let step = Stdlib.Int.__quotientDigit nextRemainder divisor 0L in
-        let quotientDigit = Stdlib.Tuple2.first step in
-        let remaining = Stdlib.Tuple2.second step in
+        let quotientDigit = Stdlib.Tuple2.first<Int64, String> step in
+        let remaining = Stdlib.Tuple2.second<Int64, String> step in
         Stdlib.Int.__divideMagnitudeAt dividend (index + 1L) divisor (quotient ++ Stdlib.Int64.__digitToString quotientDigit) remaining
 
 let __divideMagnitude (dividend: String) (divisor: String) : (String * String) =
@@ -185,7 +185,7 @@ let __divide (a: Int) (b: Int) : Int =
     if divisor == "0" then Builtin.crash "Cannot divide by 0"
     else
         let result = Stdlib.Int.__divideMagnitude (Stdlib.Int.__magnitudeText at) divisor in
-        let quotient = Stdlib.Tuple2.first result in
+        let quotient = Stdlib.Tuple2.first<String, String> result in
         let negative = Stdlib.Int.__isNegativeText at != Stdlib.Int.__isNegativeText bt in
         Stdlib.Int.__value (Stdlib.Int.__withSign negative quotient)
 
@@ -195,7 +195,7 @@ let __remainder (a: Int) (b: Int) : Stdlib.Result.Result<Int, String> =
     if divisor == "0" then Error "Cannot divide by 0"
     else
         let result = Stdlib.Int.__divideMagnitude (Stdlib.Int.__magnitudeText at) divisor in
-        let remainder = Stdlib.Tuple2.second result in
+        let remainder = Stdlib.Tuple2.second<String, String> result in
         Ok (Stdlib.Int.__value (Stdlib.Int.__withSign (Stdlib.Int.__isNegativeText at) remainder))
 
 let __mod (value: Int) (modulus: Int) : Int =
@@ -209,14 +209,14 @@ let __mod (value: Int) (modulus: Int) : Int =
         | Ok result -> if Stdlib.Int.__lessThan result (Stdlib.Int.__value "0") then Stdlib.Int.__add result modulus else result
 
 let __isOddMagnitude (value: String) : Bool =
-    let last = Stdlib.String.getByteAt value (Stdlib.String.__byteLength value - (1L)) - 48L in
+    let last = Stdlib.String.__byteAtUnchecked value (Stdlib.String.__byteLength value - (1L)) - (48L) in
     last % 2L == 1L
 
 let __powerLoop (base: Int) (exponentMagnitude: String) (result: Int) : Int =
     if exponentMagnitude == "0" then result
     else
         let halfStep = Stdlib.Int.__divideMagnitude exponentMagnitude "2" in
-        let half = Stdlib.Tuple2.first halfStep in
+        let half = Stdlib.Tuple2.first<String, String> halfStep in
         let nextResult = if Stdlib.Int.__isOddMagnitude exponentMagnitude then Stdlib.Int.__multiply result base else result in
         Stdlib.Int.__powerLoop (Stdlib.Int.__multiply base base) half nextResult
 
@@ -273,11 +273,11 @@ let __bitwiseAndNonnegative (a: String) (b: String) (place: Int) (acc: Int) : In
         let aStep = Stdlib.Int.__divideMagnitude a "2" in
         let bStep = Stdlib.Int.__divideMagnitude b "2" in
         let nextAcc =
-            if Stdlib.Tuple2.second aStep == "1"
-               && Stdlib.Tuple2.second bStep == "1" then
+            if Stdlib.Tuple2.second<String, String> aStep == "1"
+               && Stdlib.Tuple2.second<String, String> bStep == "1" then
                 Stdlib.Int.__add acc place
             else acc in
-        Stdlib.Int.__bitwiseAndNonnegative (Stdlib.Tuple2.first aStep) (Stdlib.Tuple2.first bStep) (Stdlib.Int.__add place place) nextAcc
+        Stdlib.Int.__bitwiseAndNonnegative (Stdlib.Tuple2.first<String, String> aStep) (Stdlib.Tuple2.first<String, String> bStep) (Stdlib.Int.__add place place) nextAcc
 
 let __bitwiseOrNonnegative (a: String) (b: String) (place: Int) (acc: Int) : Int =
     if a == "0" && b == "0" then acc
@@ -285,11 +285,11 @@ let __bitwiseOrNonnegative (a: String) (b: String) (place: Int) (acc: Int) : Int
         let aStep = Stdlib.Int.__divideMagnitude a "2" in
         let bStep = Stdlib.Int.__divideMagnitude b "2" in
         let nextAcc =
-            if Stdlib.Tuple2.second aStep == "1"
-               || Stdlib.Tuple2.second bStep == "1" then
+            if Stdlib.Tuple2.second<String, String> aStep == "1"
+               || Stdlib.Tuple2.second<String, String> bStep == "1" then
                 Stdlib.Int.__add acc place
             else acc in
-        Stdlib.Int.__bitwiseOrNonnegative (Stdlib.Tuple2.first aStep) (Stdlib.Tuple2.first bStep) (Stdlib.Int.__add place place) nextAcc
+        Stdlib.Int.__bitwiseOrNonnegative (Stdlib.Tuple2.first<String, String> aStep) (Stdlib.Tuple2.first<String, String> bStep) (Stdlib.Int.__add place place) nextAcc
 
 let __bitwiseXorNonnegative (a: String) (b: String) (place: Int) (acc: Int) : Int =
     if a == "0" && b == "0" then acc
@@ -297,11 +297,11 @@ let __bitwiseXorNonnegative (a: String) (b: String) (place: Int) (acc: Int) : In
         let aStep = Stdlib.Int.__divideMagnitude a "2" in
         let bStep = Stdlib.Int.__divideMagnitude b "2" in
         let nextAcc =
-            if (Stdlib.Tuple2.second aStep == "1")
-               != (Stdlib.Tuple2.second bStep == "1") then
+            if (Stdlib.Tuple2.second<String, String> aStep == "1")
+               != (Stdlib.Tuple2.second<String, String> bStep == "1") then
                 Stdlib.Int.__add acc place
             else acc in
-        Stdlib.Int.__bitwiseXorNonnegative (Stdlib.Tuple2.first aStep) (Stdlib.Tuple2.first bStep) (Stdlib.Int.__add place place) nextAcc
+        Stdlib.Int.__bitwiseXorNonnegative (Stdlib.Tuple2.first<String, String> aStep) (Stdlib.Tuple2.first<String, String> bStep) (Stdlib.Int.__add place place) nextAcc
 
 let __bitwiseAndPositive (a: Int) (b: Int) : Int =
     Stdlib.Int.__bitwiseAndNonnegative (Stdlib.Int.__text a) (Stdlib.Int.__text b) (Stdlib.Int.__value "1") (Stdlib.Int.__value "0")
@@ -356,13 +356,13 @@ let __toString (value: Int) : String = Stdlib.Int.__text value
 let __validDigits (value: String) (index: Int64) : Bool =
     if index >= Stdlib.String.__byteLength value then true
     else
-        let byte = Stdlib.String.getByteAt value index in
+        let byte = Stdlib.String.__byteAtUnchecked value index in
         byte >= 48L && byte <= 57L && Stdlib.Int.__validDigits value (index + 1L)
 
 let __parse (value: String) : Stdlib.Result.Result<Int, Bool> =
     let input = Stdlib.String.trim value in
     let length = Stdlib.String.__byteLength input in
-    let first = if length > 0L then Stdlib.String.getByteAt input 0L else 0L in
+    let first = if length > 0L then Stdlib.String.__byteAtUnchecked input 0L else 0L in
     let negative = first == 45L in
     let hasSign = negative || first == 43L in
     let digitStart = if hasSign then 1L else 0L in
@@ -385,7 +385,7 @@ let __fromUInt128 (value: UInt128) : Int = __uint128_to_int value
 
 let __parsePositiveInt64At (value: String) (index: Int64) (acc: Int64) : Int64 =
     if index >= Stdlib.String.__byteLength value then acc
-    else Stdlib.Int.__parsePositiveInt64At value (index + 1L) (acc * 10L + Stdlib.String.getByteAt value index - (48L))
+    else Stdlib.Int.__parsePositiveInt64At value (index + 1L) (acc * 10L + Stdlib.String.__byteAtUnchecked value index - (48L))
 
 let __toInt64Unchecked (value: Int) : Int64 =
     let text = Stdlib.Int.__text value in
@@ -442,7 +442,7 @@ let __digitToUInt64 (digit: Int64) : UInt64 =
 let __parsePositiveUInt64At (value: String) (index: Int64) (acc: UInt64) : UInt64 =
     if index >= Stdlib.String.__byteLength value then acc
     else
-        let digit = Stdlib.String.getByteAt value index - (48L) in
+        let digit = Stdlib.String.__byteAtUnchecked value index - (48L) in
         Stdlib.Int.__parsePositiveUInt64At value (index + 1L) (acc * 10UL + Stdlib.Int.__digitToUInt64 digit)
 
 let __toUInt64 (value: Int) : Stdlib.Option.Option<UInt64> =
@@ -463,7 +463,7 @@ let __toUInt128 (value: Int) : Stdlib.Option.Option<UInt128> =
 let __magnitudeToFloatAt (value: String) (index: Int64) (acc: Float) : Float =
     if index >= Stdlib.String.__byteLength value then acc
     else
-        let digit = Stdlib.String.getByteAt value index - (48L) in
+        let digit = Stdlib.String.__byteAtUnchecked value index - (48L) in
         Stdlib.Int.__magnitudeToFloatAt value (index + 1L) (acc * 10.0 + Stdlib.Int64.toFloat digit)
 
 let __toFloat (value: Int) : Float =
@@ -480,7 +480,7 @@ let __toFloat (value: Int) : Float =
 let __sqrt (value: Int) : Float = Stdlib.Float.sqrt (Stdlib.Int.__toFloat value)
 
 let __fromFloat (value: Float) : Int =
-    let bits = Stdlib.Float.toBits value in
+    let bits = Stdlib.Float.__toBits value in
     let rawExponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
     if rawExponent == 2047UL then
         Builtin.crash "Encountered out-of-range value for type of Int"
@@ -498,9 +498,10 @@ let __fromFloat (value: Float) : Int =
         if Stdlib.UInt64.shiftRight bits 63UL == 1UL then Stdlib.Int.__negate truncated else truncated
 
 // Build an unsigned 64L-bit entropy word in Int without overflowing machine
-// arithmetic. Random.int64 returns the native word with its sign bit intact.
+// arithmetic. The private entropy intrinsic returns the native word with its
+// sign bit intact; public randomness is exposed through upstream numeric APIs.
 let __randomWord () : Int =
-    let word = Stdlib.Random.int64 () in
+    let word = Stdlib.Int.__randomInt64Word () in
     let value = Stdlib.Int.__fromInt64 word in
     if word < 0L then
         Stdlib.Int.__add value (Stdlib.Int.__value "18446744073709551616")

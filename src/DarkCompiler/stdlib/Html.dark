@@ -13,8 +13,12 @@ type HtmlTag = {
 
 type Node = String of String | HtmlTag of Stdlib.Html.HtmlTag
 
+val voidElements =
+    [ "area"; "base"; "br"; "col"; "command"; "embed"; "hr"; "img"
+      "input"; "keygen"; "link"; "meta"; "param"; "source"; "track"; "wbr" ]
+
 let escapeHtml (str: String) : String =
-    Stdlib.String.replace (Stdlib.String.replace (Stdlib.String.replace (Stdlib.String.replace (Stdlib.String.replace str "&" "&amp;") "<" "&lt;") ">" "&gt;") "\"" "&quot;") "'" "&#x27;"
+    Stdlib.String.replaceAll (Stdlib.String.replaceAll (Stdlib.String.replaceAll (Stdlib.String.replaceAll (Stdlib.String.replaceAll str "&" "&amp;") "<" "&lt;") ">" "&gt;") "\"" "&quot;") "'" "&#x27;"
 
 let text (str: String) : Stdlib.Html.Node =
     Stdlib.Html.Node.String (Stdlib.Html.escapeHtml str)
@@ -32,15 +36,14 @@ let htmlTagNode (name: String) (attrs: Stdlib.Html.Attributes) (children: List<S
 
 let __attributeToString (attr: (String * Stdlib.Option.Option<String>)) : String =
     match attr with
-    | (key, Some value) -> $"{key}=\"{value}\""
+    | (key, Some value) -> key ++ "=\"" ++ value ++ "\""
     | (key, None) -> key
 
 let __attributesToString (attrs: Stdlib.Html.Attributes) : String =
-    Stdlib.String.join (Stdlib.List.map attrs Stdlib.Html.__attributeToString) " "
+    Stdlib.String.join (Stdlib.List.map<(String * Stdlib.Option.Option<String>), String> attrs Stdlib.Html.__attributeToString) " "
 
 let __isVoidElement (name: String) : Bool =
-    Stdlib.List.member ([ "area"; "base"; "br"; "col"; "command"; "embed"; "hr"; "img"
-          "input"; "keygen"; "link"; "meta"; "param"; "source"; "track"; "wbr" ]) name
+    Stdlib.List.member<String> Stdlib.Html.voidElements name
 
 let nodeToString (node: Stdlib.Html.Node) : String =
     match node with
@@ -48,35 +51,35 @@ let nodeToString (node: Stdlib.Html.Node) : String =
     | HtmlTag tag ->
         let attributesText = Stdlib.Html.__attributesToString tag.attrs in
         let startTag =
-            if attributesText == "" then $"<{tag.name}>"
-            else $"<{tag.name} {attributesText}>" in
+            if attributesText == "" then "<" ++ tag.name ++ ">"
+            else "<" ++ tag.name ++ " " ++ attributesText ++ ">" in
         if Stdlib.Html.__isVoidElement tag.name then
             startTag
         else
             let childHtml =
-                Stdlib.String.join (Stdlib.List.map tag.children Stdlib.Html.nodeToString) "" in
-            $"{startTag}{childHtml}</{tag.name}>"
+                Stdlib.String.join (Stdlib.List.map<Stdlib.Html.Node, String> tag.children Stdlib.Html.nodeToString) "" in
+            startTag ++ childHtml ++ "</" ++ tag.name ++ ">"
 
 let comment (value: String) : Stdlib.Html.Node =
-    Stdlib.Html.stringNode ($"<!-- {value} -->")
+    Stdlib.Html.stringNode ("<!-- " ++ value ++ " -->")
 
 let classes (classList: List<String>) : (String * Stdlib.Option.Option<String>) =
     ("class", Some (Stdlib.String.join classList " "))
 
 let __styleProperty (property: (String * String)) : String =
-    let (name, value) = property in $"{name}: {value}"
+    let (name, value) = property in name ++ ": " ++ value
 
 let style (properties: List<(String * String)>) : (String * Stdlib.Option.Option<String>) =
     let rendered =
-        Stdlib.List.map properties Stdlib.Html.__styleProperty in
+        Stdlib.List.map<(String * String), String> properties Stdlib.Html.__styleProperty in
     ("style", Some (Stdlib.String.join rendered "; "))
 
 let dataAttr (name: String) (value: String) : (String * Stdlib.Option.Option<String>) =
-    ($"data-{name}", Some value)
+    ("data-" ++ name, Some value)
 
 let __emptyAttributes () : Stdlib.Html.Attributes = []
 
-let br () : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "br" (Stdlib.Html.__emptyAttributes ()) ([])
+let br () : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "br" (Stdlib.Html.__emptyAttributes ()) []
 let html (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "html" attrs children
 let body (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "body" attrs children
 let head (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "head" attrs children
@@ -105,13 +108,13 @@ let caption (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) :
 let colgroup (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "colgroup" attrs children
 let col (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "col" attrs children
 let button (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "button" attrs children
-let img (attrs: Stdlib.Html.Attributes) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "img" attrs ([])
+let img (attrs: Stdlib.Html.Attributes) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "img" attrs []
 let svg (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "svg" attrs children
-let path (attrs: Stdlib.Html.Attributes) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "path" attrs ([])
-let meta (attrs: Stdlib.Html.Attributes) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "meta" attrs ([])
-let link (attrs: Stdlib.Html.Attributes) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "link" attrs ([])
+let path (attrs: Stdlib.Html.Attributes) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "path" attrs []
+let meta (attrs: Stdlib.Html.Attributes) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "meta" attrs []
+let link (attrs: Stdlib.Html.Attributes) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "link" attrs []
 let script (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "script" attrs children
-let input (attrs: Stdlib.Html.Attributes) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "input" attrs ([])
+let input (attrs: Stdlib.Html.Attributes) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "input" attrs []
 let label (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "label" attrs children
 let form (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "form" attrs children
 let section (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : Stdlib.Html.Node = Stdlib.Html.htmlTagNode "section" attrs children
@@ -151,4 +154,4 @@ let dialog (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : 
 
 let document (nodes: List<Stdlib.Html.Node>) : String =
     "<!DOCTYPE html>" ++
-    Stdlib.String.join (Stdlib.List.map nodes Stdlib.Html.nodeToString) ""
+    Stdlib.String.join (Stdlib.List.map<Stdlib.Html.Node, String> nodes Stdlib.Html.nodeToString) ""

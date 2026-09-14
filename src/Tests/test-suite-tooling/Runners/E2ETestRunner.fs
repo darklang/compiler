@@ -516,6 +516,8 @@ let private collectProgramReferencedPreambleFuncs
             collectExprReferencedPreambleFuncsWithBound knownPreambleFunctions paramBoundVars funcDef.Body
         | Expression expr ->
             collectExprReferencedPreambleFuncs knownPreambleFunctions expr
+        | ValueDef valueDef ->
+            collectExprReferencedPreambleFuncs knownPreambleFunctions (valueDefBody valueDef)
         | TypeDef _ ->
             Set.empty)
     |> List.fold Set.union Set.empty
@@ -567,6 +569,7 @@ let private reducePreambleTopLevelsToRequiredFunctions
     preambleTopLevels
     |> List.filter (function
         | TypeDef _ -> true
+        | ValueDef _ -> true
         | FunctionDef funcDef -> Set.contains funcDef.Name requiredFunctions
         | Expression _ -> false)
 
@@ -583,6 +586,7 @@ let private countLeadingSpaces (lineText: string) : int =
 
 let private isTopLevelPreambleDefinitionStart (trimmedLine: string) : bool =
     trimmedLine.StartsWith("let ")
+    || trimmedLine.StartsWith("val ")
     || trimmedLine.StartsWith("type ")
     || trimmedLine.StartsWith("def ")
 

@@ -82,7 +82,7 @@ let private typeSubstitution (typeParams: string list) (typeArgs: Type list) : M
 
 let private escapedString (quote: string) (value: Expr) : Expr =
     let replace oldValue newValue input =
-        call "Stdlib.String.replace" [input; StringLiteral oldValue; StringLiteral newValue]
+        call "Stdlib.String.replaceAll" [input; StringLiteral oldValue; StringLiteral newValue]
 
     let escaped =
         value

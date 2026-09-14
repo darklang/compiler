@@ -19,7 +19,7 @@ let isUppercase (char: Char) : Bool =
     Stdlib.Char.toLowercase char != char && Stdlib.Char.toUppercase char == char
 
 let __firstCodepoint (char: Char) : Stdlib.Option.Option<Int64> =
-    Stdlib.List.head (Stdlib.String.toCodepoints (Stdlib.Char.toString char))
+    Stdlib.List.head<Int64> (Stdlib.String.__toCodepoints (Stdlib.Char.toString char))
 
 let isDigit (char: Char) : Bool =
     match Stdlib.Char.__firstCodepoint char with
@@ -44,14 +44,14 @@ let isASCII (char: Char) : Bool =
 
 let __utf16Units (codepoints: List<Int64>) (acc: List<Int64>) : List<Int64> =
     match codepoints with
-    | [] -> Stdlib.List.reverse acc
+    | [] -> Stdlib.List.reverse<Int64> acc
     | codepoint :: rest ->
-        if codepoint <= 65535L then Stdlib.Char.__utf16Units rest (Stdlib.List.push acc codepoint)
+        if codepoint <= 65535L then Stdlib.Char.__utf16Units rest (Stdlib.List.push<Int64> acc codepoint)
         else
             let adjusted = codepoint - 65536L in
             let high = 55296L + Stdlib.Int64.shiftRight adjusted 10L in
             let low = 56320L + Stdlib.Int64.bitwiseAnd adjusted 1023L in
-            Stdlib.Char.__utf16Units rest (Stdlib.List.push (Stdlib.List.push acc high) low)
+            Stdlib.Char.__utf16Units rest (Stdlib.List.push<Int64> (Stdlib.List.push<Int64> acc high) low)
 
 let __compareUnits (left: List<Int64>) (right: List<Int64>) : Int64 =
     match (left, right) with
@@ -64,7 +64,7 @@ let __compareUnits (left: List<Int64>) (right: List<Int64>) : Int64 =
         else Stdlib.Char.__compareUnits leftRest rightRest
 
 let __compare (left: Char) (right: Char) : Int64 =
-    Stdlib.Char.__compareUnits (Stdlib.Char.__utf16Units (Stdlib.String.toCodepoints (Stdlib.Char.toString left)) ([])) (Stdlib.Char.__utf16Units (Stdlib.String.toCodepoints (Stdlib.Char.toString right)) ([]))
+    Stdlib.Char.__compareUnits (Stdlib.Char.__utf16Units (Stdlib.String.__toCodepoints (Stdlib.Char.toString left)) []) (Stdlib.Char.__utf16Units (Stdlib.String.__toCodepoints (Stdlib.Char.toString right)) [])
 
 let isLessThan (left: Char) (right: Char) : Bool = Stdlib.Char.__compare left right < 0L
 let isLessThanOrEqualTo (left: Char) (right: Char) : Bool = Stdlib.Char.__compare left right <= 0L
@@ -75,5 +75,5 @@ let fromCodepoint (codepoint: Int) : Stdlib.Option.Option<Char> =
     match Stdlib.Int.toInt64 codepoint with
     | None -> None
     | Some value ->
-        if Unicode.isScalar value then Some (Stdlib.Char.__asChar (Stdlib.String.fromCodepoints ([value])))
+        if Unicode.isScalar value then Some (Stdlib.Char.__asChar (Stdlib.String.__fromCodepoints ([value])))
         else None

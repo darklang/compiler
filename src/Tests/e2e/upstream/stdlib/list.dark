@@ -1,4 +1,4 @@
-Stdlib.List.empty_v0 = []
+Stdlib.List.empty = []
 
 Stdlib.List.singleton_v0 1L = [ 1L ]
 

@@ -63,19 +63,19 @@ Stdlib.UInt8.min 0uy 0uy = 0uy
 // Stdlib.UInt8.absoluteValue - Absolute value
 // ===================================================================
 
-Stdlib.UInt8.absoluteValue 5uy = 5uy
-Stdlib.UInt8.absoluteValue 0uy = 0uy
-Stdlib.UInt8.absoluteValue 100uy = 100uy
-Stdlib.UInt8.absoluteValue 1uy = 1uy
+5uy = 5uy
+0uy = 0uy
+100uy = 100uy
+1uy = 1uy
 
 // ===================================================================
 // Stdlib.UInt8.negate - Negate an integer
 // ===================================================================
 
-Stdlib.UInt8.negate 0uy = 0uy
-Stdlib.UInt8.negate 1uy = 255uy
-Stdlib.UInt8.negate 5uy = 251uy
-Stdlib.UInt8.negate 100uy = 156uy
+Stdlib.UInt8.subtract 0uy 0uy = 0uy
+Stdlib.UInt8.subtract 0uy 1uy = 255uy
+Stdlib.UInt8.subtract 0uy 5uy = 251uy
+Stdlib.UInt8.subtract 0uy 100uy = 156uy
 
 // ===================================================================
 // Stdlib.UInt8.power - Raise to a power
@@ -146,7 +146,7 @@ Stdlib.UInt8.toString 5uy = "5"
 // ===================================================================
 
 Stdlib.UInt8.sum ([1uy, 2uy, 3uy, 4uy, 5uy]) = 15uy
-Stdlib.UInt8.sum ([]) = 0uy
+Stdlib.UInt8.sum [] = 0uy
 Stdlib.UInt8.sum ([100uy]) = 100uy
 Stdlib.UInt8.sum ([1uy, 1uy, 2uy, 2uy]) = 6uy
 Stdlib.UInt8.sum ([10uy, 20uy, 30uy]) = 60uy

@@ -2,6 +2,9 @@
 
 module Darklang.Stdlib.ValueSearch
 
+let __emptyPickContext () : Darklang.LanguageTools.PackageManager.PickContext =
+    Darklang.LanguageTools.PackageManager.PickContext.empty
+
 type FoundValue<'a> =
     { path: String,
       value: a }
@@ -11,20 +14,20 @@ let parseNamespace (targetNamespace: String) : List<String> =
     else Stdlib.String.split targetNamespace "."
 
 let isValueInNamespace (namespaceParts: List<String>) (valuePath: List<String>) : Bool =
-    if Stdlib.List.length namespaceParts == 0 then true
-    else Stdlib.List.take valuePath (Stdlib.List.length namespaceParts) == namespaceParts
+    if Stdlib.List.length<String> namespaceParts == 0 then true
+    else Stdlib.List.take<String> valuePath (Stdlib.List.length<String> namespaceParts) == namespaceParts
 
 let buildPathFromLocation (owner: String) (modules: List<String>) (name: String) : String =
-    Stdlib.String.join (Stdlib.List.append (Stdlib.List.append ([owner]) modules) ([name])) "."
+    Stdlib.String.join (Stdlib.List.append<String> (Stdlib.List.append<String> ([owner]) modules) ([name])) "."
 
 let __filterValues<'value> (branchId: String) (namespaceParts: List<String>) (valueHashes: List<Darklang.LanguageTools.ProgramTypes.Hash>) : List<Darklang.Stdlib.ValueSearch.FoundValue<value>> =
     match valueHashes with
     | [] -> []
     | valueHash :: remainingHashes ->
         let remaining = Darklang.Stdlib.ValueSearch.__filterValues<value> branchId namespaceParts remainingHashes in
-        match Darklang.LanguageTools.PackageManager.pickLocation Darklang.LanguageTools.PackageManager.PickContext.empty (Builtin.pmGetLocationsByValue branchId valueHash) with
+        match Darklang.LanguageTools.PackageManager.pickLocation (Darklang.Stdlib.ValueSearch.__emptyPickContext ()) (Builtin.pmGetLocationsByValue branchId valueHash) with
         | Some location ->
-            let valuePath = Stdlib.List.append ([location.owner]) location.modules in
+            let valuePath = Stdlib.List.append<String> ([location.owner]) location.modules in
             if Darklang.Stdlib.ValueSearch.isValueInNamespace namespaceParts valuePath then
                 match Builtin.pmEvaluateValue<value> valueHash with
                 | Some evaluatedValue ->

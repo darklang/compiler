@@ -2477,6 +2477,64 @@ type private MonomorphizationMode =
     | ReplaceTypeApps of AST_to_ANF.SpecRegistry
     | SpecializeLocalAndReplace of AST_to_ANF.SpecRegistry
 
+/// Materialize checked module values as one lexical binding per execution
+/// scope. This gives every reference ordinary value semantics through the
+/// existing ANF ownership pipeline and leaves no value-only lowering cases.
+let private materializeProgramValues
+    (inheritedValues: Map<string, AST.Type * AST.Expr>)
+    (AST.Program topLevels)
+    : AST.Program =
+    let currentValues =
+        topLevels
+        |> List.choose (function
+            | AST.ValueDef (AST.CheckedValueDef (name, typ, body)) -> Some (name, (typ, body))
+            | AST.ValueDef (AST.UncheckedValueDef (name, _)) ->
+                Crash.crash $"Unchecked value '{name}' reached ANF preparation"
+            | _ -> None)
+    let currentNames = currentValues |> List.map fst |> Set.ofList
+    let bindings =
+        (inheritedValues
+         |> Map.toList
+         |> List.filter (fun (name, _) -> not (Set.contains name currentNames)))
+        @ currentValues
+        |> List.map (fun (name, (_, body)) -> (name, body))
+    let wrap excluded body =
+        let eligible = bindings |> List.filter (fun (name, _) -> not (Set.contains name excluded))
+        let rec required fixedPoint =
+            let next =
+                eligible
+                |> List.fold (fun names (name, value) ->
+                    if Set.contains name names then
+                        eligible
+                        |> List.fold (fun dependencies (candidate, _) ->
+                            if AST_to_ANF.varOccursInExpr candidate value then Set.add candidate dependencies
+                            else dependencies) names
+                    else names) fixedPoint
+            if Set.count next = Set.count fixedPoint then next else required next
+        let direct =
+            eligible
+            |> List.fold (fun names (name, _) ->
+                if AST_to_ANF.varOccursInExpr name body then Set.add name names else names) Set.empty
+        let needed = required direct
+        let selected = eligible |> List.filter (fun (name, _) -> Set.contains name needed)
+        List.foldBack (fun (name, value) result ->
+            if Set.contains name excluded then result
+            else AST.Let (AST.LPVariable name, value, result)) selected body
+    let materialized =
+        topLevels
+        |> List.choose (function
+            | AST.ValueDef _ -> None
+            | AST.FunctionDef funcDef ->
+                let parameters =
+                    funcDef.Params
+                    |> AST.NonEmptyList.toList
+                    |> List.map fst
+                    |> Set.ofList
+                Some (AST.FunctionDef { funcDef with Body = wrap parameters funcDef.Body })
+            | AST.Expression expr -> Some (AST.Expression (wrap Set.empty expr))
+            | AST.TypeDef typeDef -> Some (AST.TypeDef typeDef))
+    AST.Program materialized
+
 let private prepareProgramForAnf
     (monomorphization: MonomorphizationMode)
     (baseTypeReg: AST_to_ANF.TypeRegistry)
@@ -2484,9 +2542,11 @@ let private prepareProgramForAnf
     (baseFuncNames: Set<string>)
     (baseFuncParams: Map<string, (string * AST.Type) list>)
     (baseFuncReturnTypes: Map<string, AST.Type>)
+    (inheritedValues: Map<string, AST.Type * AST.Expr>)
     (passTimingRecorder: PassTimingRecorder option)
     (program: AST.Program)
     : Result<AST.Program, string> =
+    let program = materializeProgramValues inheritedValues program
     let measure name operation =
         let timer = Stopwatch.StartNew()
         let result = operation ()
@@ -2619,6 +2679,7 @@ let private convertTypedDeclarations
         baseFuncNames
         baseFuncParams
         baseFuncReturnTypes
+        (baseContext |> Option.map (fun context -> context.TypeCheckEnv.Values) |> Option.defaultValue Map.empty)
         None
         typedProgram
     |> Result.bind (fun liftedProgram ->
@@ -2649,6 +2710,7 @@ let private convertTypedProgramToConversionResult
         Map.empty
         baseFuncNames
         baseRegistries.FuncParams
+        Map.empty
         Map.empty
         None
         typedProgram
@@ -2762,6 +2824,7 @@ let private convertTypedProgramToUserOnlyWithMode
             baseFuncNames
             baseContext.LambdaLiftFuncParams
             baseContext.ReturnTypes
+            baseContext.TypeCheckEnv.Values
             passTimingRecorder
             typedProgram)
     |> Result.bind (fun liftedProgram ->
@@ -2949,11 +3012,12 @@ let private loadStdlib () : Result<AST.Program, string> =
         "stdlib/Fun.dark"
         "stdlib/Float.dark"
         "stdlib/CliPosix.dark"
-        "stdlib/Retry.dark"
+        "stdlib/CliPosixMode.dark"
         "stdlib/CliPosixError.dark"
+        "stdlib/CliPosixStat.dark"
+        "stdlib/Retry.dark"
         "stdlib/CliPath.dark"
         "stdlib/CliFile.dark"
-        "stdlib/Path.dark"
         "unicode_data.dark"
         "unicode_data_index/00.dark"
         "unicode_data_index/01.dark"
@@ -3032,16 +3096,18 @@ let private loadStdlib () : Result<AST.Program, string> =
         "stdlib/Dict.dark"
         "stdlib/__HAMT.dark"
         "stdlib/Uuid.dark"
-        "stdlib/UuidCompatibility.dark"
         "stdlib/Diff.dark"
         "stdlib/ProgramTypes.dark"
         "stdlib/RuntimeTypes.dark"
         "stdlib/RuntimeTypesBase.dark"
         "stdlib/RuntimeFQTypeName.dark"
         "stdlib/RuntimeTypeReference.dark"
+        "stdlib/PrettyPrinterRuntimeTypes.dark"
         "stdlib/RuntimeValueType.dark"
         "stdlib/RuntimeValueTypeSupport.dark"
         "stdlib/PackageManager.dark"
+        "stdlib/PackageManagerPickContext.dark"
+        "stdlib/SCMBranch.dark"
         "stdlib/ValueSearch.dark"
         "stdlib/DateTime.dark"
         "stdlib/Duration.dark"
@@ -3050,10 +3116,11 @@ let private loadStdlib () : Result<AST.Program, string> =
         "stdlib/Html.dark"
         "stdlib/Http.dark"
         "stdlib/HttpRequest.dark"
+        "stdlib/HttpClientValues.dark"
+        "stdlib/HttpServerValues.dark"
+        "stdlib/Pretty.dark"
         "stdlib/Char.dark"
         "stdlib/Regex.dark"
-        "stdlib/AWS.dark"
-        "stdlib/Twitter.dark"
         "stdlib/Base64.dark"
         "stdlib/X509.dark"
         "stdlib/Crypto.dark"
@@ -3061,6 +3128,8 @@ let private loadStdlib () : Result<AST.Program, string> =
         "stdlib/__SkewList.dark"
         "stdlib/__ListArray.dark"
         "stdlib/CliColor.dark"
+        "stdlib/CliTextField.dark"
+        "stdlib/CliTerminalSession.dark"
         "stdlib/CliLog.dark"
         "stdlib/CliProgress.dark"
         "stdlib/CliPrompt.dark"
@@ -3295,6 +3364,7 @@ let buildStdlibSpecializations
                     stdlib.Context.BaseFuncNames
                     stdlib.Context.LambdaLiftFuncParams
                     stdlib.Context.ReturnTypes
+                    stdlib.Context.TypeCheckEnv.Values
                     passTimingRecorder
                     specializationProgram
                 |> Result.bind AST_to_ANF.splitDeclarations
@@ -3447,6 +3517,7 @@ let private applyDeclarationOverlays (topLevels: AST.TopLevel list) : AST.TopLev
     let declarationKey topLevel =
         match topLevel with
         | AST.FunctionDef definition -> Some ("function", definition.Name)
+        | AST.ValueDef definition -> Some ("value", AST.valueDefName definition)
         | AST.TypeDef (AST.RecordDef (name, _, _))
         | AST.TypeDef (AST.SumTypeDef (name, _, _))
         | AST.TypeDef (AST.TypeAlias (name, _, _)) -> Some ("type", name)
@@ -3583,6 +3654,7 @@ let private collectProgramCalls (program: AST.Program) : Set<string> =
     topLevels
     |> List.map (function
         | AST.FunctionDef func -> AST_to_ANF.collectCalledFunctions func.Body
+        | AST.ValueDef valueDef -> AST_to_ANF.collectCalledFunctions (AST.valueDefBody valueDef)
         | AST.Expression expr -> AST_to_ANF.collectCalledFunctions expr
         | AST.TypeDef _ -> Set.empty)
     |> List.fold Set.union Set.empty
@@ -3656,7 +3728,7 @@ let private materializeReachablePackageValueCatalog
                 |> List.map (fun (catalogType, hashes) ->
                     let condition =
                         call
-                            "Darklang.LanguageTools.RuntimeTypes.isCustomTypeWithNoTypeArguments"
+                            "Darklang.LanguageTools.RuntimeTypes.__isCustomTypeWithNoTypeArguments"
                             [AST.Var "valueType"; AST.StringLiteral catalogType.Hash]
                     let result = hashes |> List.map packageHashExpr |> AST.ListLiteral
                     (condition, result))

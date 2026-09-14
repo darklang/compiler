@@ -190,59 +190,59 @@ genericTail2<Int64, String> 99L "test" 3L = 99L
 
 // Bug 12: Compare with function calls before tail call (like __compareBytes)
 // This is the exact pattern that fails in stdlib String operations
-let compareBytesLike (s1: String) (i: Int64) (s2: String) (j: Int64) (count: Int64) : Bool =
-    if count <= 0L then true
+let compareBytesLike (s1: String) (i: Int) (s2: String) (j: Int) (count: Int) : Bool =
+    if count <= 0 then true
     else
         let b1 = Stdlib.String.getByteAt s1 i in
         let b2 = Stdlib.String.getByteAt s2 j in
         if b1 != b2 then false
-        else compareBytesLike s1 (i + 1L) s2 (j + 1L) (count - 1L)
+        else compareBytesLike s1 (i + 1) s2 (j + 1) (count - 1)
 
-compareBytesLike "hello" 0L "hello" 0L 5L = true
+compareBytesLike "hello" 0 "hello" 0 5 = true
 
-let compareBytesLikeFail (s1: String) (i: Int64) (s2: String) (j: Int64) (count: Int64) : Bool =
-    if count <= 0L then true
+let compareBytesLikeFail (s1: String) (i: Int) (s2: String) (j: Int) (count: Int) : Bool =
+    if count <= 0 then true
     else
         let b1 = Stdlib.String.getByteAt s1 i in
         let b2 = Stdlib.String.getByteAt s2 j in
         if b1 != b2 then false
-        else compareBytesLikeFail s1 (i + 1L) s2 (j + 1L) (count - 1L)
+        else compareBytesLikeFail s1 (i + 1) s2 (j + 1) (count - 1)
 
-compareBytesLikeFail "hello" 0L "world" 0L 5L = false
+compareBytesLikeFail "hello" 0 "world" 0 5 = false
 
 // Bug 13: Cross-function tail call (A tail-calls B, B tail-calls itself)
 // This mimics startsWith calling __compareBytes
-let myCompare (s1: String) (i: Int64) (s2: String) (j: Int64) (count: Int64) : Bool =
-    if count <= 0L then true
+let myCompare (s1: String) (i: Int) (s2: String) (j: Int) (count: Int) : Bool =
+    if count <= 0 then true
     else
         let b1 = Stdlib.String.getByteAt s1 i in
         let b2 = Stdlib.String.getByteAt s2 j in
         if b1 != b2 then false
-        else myCompare s1 (i + 1L) s2 (j + 1L) (count - 1L)
+        else myCompare s1 (i + 1) s2 (j + 1) (count - 1)
 
 let myStartsWith2 (s: String) (prefix: String) : Bool =
     // These ASCII-only extension probes have one byte per codepoint.
     let sLen = Stdlib.String.codepointLength s in
     let prefixLen = Stdlib.String.codepointLength prefix in
     if prefixLen > sLen then false
-    else myCompare s 0L prefix 0L prefixLen
+    else myCompare s 0 prefix 0 prefixLen
 
 myStartsWith2 "hello world" "hello" = true
 
-let myCompare2 (s1: String) (i: Int64) (s2: String) (j: Int64) (count: Int64) : Bool =
-    if count <= 0L then true
+let myCompare2 (s1: String) (i: Int) (s2: String) (j: Int) (count: Int) : Bool =
+    if count <= 0 then true
     else
         let b1 = Stdlib.String.getByteAt s1 i in
         let b2 = Stdlib.String.getByteAt s2 j in
         if b1 != b2 then false
-        else myCompare2 s1 (i + 1L) s2 (j + 1L) (count - 1L)
+        else myCompare2 s1 (i + 1) s2 (j + 1) (count - 1)
 
 let myStartsWith2Fail (s: String) (prefix: String) : Bool =
     // These ASCII-only extension probes have one byte per codepoint.
     let sLen = Stdlib.String.codepointLength s in
     let prefixLen = Stdlib.String.codepointLength prefix in
     if prefixLen > sLen then false
-    else myCompare2 s 0L prefix 0L prefixLen
+    else myCompare2 s 0 prefix 0 prefixLen
 
 myStartsWith2Fail "hello world" "world" = false
 

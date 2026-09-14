@@ -45,6 +45,7 @@ type BatchCompileItem = { SourceFile: string; OutputFile: string }
 type BatchCliOptions = {
     Target: TargetSelection
     Verbosity: VerbosityLevel
+    AllowInternal: bool
     Items: BatchCompileItem * BatchCompileItem list
 }
 
@@ -474,30 +475,37 @@ let parseBatchArgs (argv: string array) : Result<BatchCliOptions, string> =
     let rec parseOptions
         (target: TargetSelection)
         (verbosity: VerbosityLevel)
+        (allowInternal: bool)
         (args: string list)
         : Result<BatchCliOptions, string> =
         match args with
         | "--" :: itemArgs ->
             parseItems itemArgs
-            |> Result.map (fun items -> { Target = target; Verbosity = verbosity; Items = items })
-        | ("-q" | "--quiet") :: rest -> parseOptions target Quiet rest
+            |> Result.map (fun items -> {
+                Target = target
+                Verbosity = verbosity
+                AllowInternal = allowInternal
+                Items = items
+            })
+        | ("-q" | "--quiet") :: rest -> parseOptions target Quiet allowInternal rest
+        | "--allow-internal" :: rest -> parseOptions target verbosity true rest
         | "--target" :: value :: rest ->
             match target with
             | ExplicitTarget _ -> Error "Target specified multiple times"
             | HostTarget ->
                 parseTargetValue value
-                |> Result.bind (fun parsedTarget -> parseOptions parsedTarget verbosity rest)
+                |> Result.bind (fun parsedTarget -> parseOptions parsedTarget verbosity allowInternal rest)
         | "--target" :: [] -> Error "Missing value for --target (expected 'linux-x86_64')"
         | flag :: rest when flag.StartsWith("--target=") ->
             match target with
             | ExplicitTarget _ -> Error "Target specified multiple times"
             | HostTarget ->
                 parseTargetValue (flag.Substring(9))
-                |> Result.bind (fun parsedTarget -> parseOptions parsedTarget verbosity rest)
+                |> Result.bind (fun parsedTarget -> parseOptions parsedTarget verbosity allowInternal rest)
         | [] -> Error "Batch compilation requires '--' before SOURCE OUTPUT pairs"
         | flag :: _ -> Error $"Unknown batch flag: {flag}"
 
-    parseOptions HostTarget Normal (Array.toList argv)
+    parseOptions HostTarget Normal false (Array.toList argv)
 
 let parseCommand (argv: string array) : Result<CliCommand, string> =
     match Array.toList argv with
@@ -661,6 +669,7 @@ let compileBatch (options: BatchCliOptions) : int =
                                 OutputFile = Some item.OutputFile
                                 Verbosity = options.Verbosity
                                 Target = options.Target
+                                AllowInternal = options.AllowInternal
                         }
                         compileWithStdlib
                             stdlib

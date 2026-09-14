@@ -37,9 +37,8 @@ Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") = stdo
 let uuid = Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") in (uuid, [uuid]) = stdout="(3700adbc-7a46-4ff4-81d3-45afb03f6e2d, [3700adbc-7a46-4ff4-81d3-45afb03f6e2d])\n"
 
 // v4 output is a UUID value whose canonical spelling has RFC-4122 bits.
-Stdlib.String.getByteAt (Stdlib.Uuid.toString (Stdlib.Uuid.generate ())) 14L == 52L = true
+Stdlib.String.getByteAt (Stdlib.Uuid.toString (Stdlib.Uuid.generate ())) 14 == Some 52uy = true
 
-// The legacy String parser remains a deliberately isolated compatibility API;
-// canonical callers must use Stdlib.Uuid.parse above.
-Stdlib.Uuid.Compatibility.parse_v0 "3700adbc-7a46-4ff4-81d3-45afb03f6e2d" = Ok "3700adbc-7a46-4ff4-81d3-45afb03f6e2d"
-Stdlib.Uuid.Compatibility.parse_v0 "not a uuid" = Error Stdlib.Uuid.Compatibility.ParseError.BadFormat
+// Invalid canonical input is reported through the upstream parser Result.
+match Stdlib.Uuid.parse "3700adbc-7a46-4ff4-81d3-45afb03f6e2d" with | Ok uuid -> Stdlib.Uuid.toString uuid | Error _ -> "" = "3700adbc-7a46-4ff4-81d3-45afb03f6e2d"
+Stdlib.Result.isError<Uuid, Stdlib.Uuid.ParseError> (Stdlib.Uuid.parse "not a uuid") = true

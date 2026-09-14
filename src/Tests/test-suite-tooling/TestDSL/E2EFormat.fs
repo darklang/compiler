@@ -338,6 +338,7 @@ let private isExpectationCandidate (rest: string) : bool =
         let lowered = stripQuotedContent trimmed |> fun s -> s.ToLowerInvariant()
         let hasKeyword =
             lowered.StartsWith("let ") || lowered.Contains(" let ")
+            || lowered.StartsWith("val ") || lowered.Contains(" val ")
             || lowered.StartsWith("if ") || lowered.Contains(" if ")
             || lowered.StartsWith("match ") || lowered.Contains(" match ")
             || lowered.StartsWith("then ") || lowered.Contains(" then ")
@@ -592,6 +593,7 @@ let private isTestLine (lineWithoutComment: string) : bool =
         trimmed.StartsWith("def ")
         || trimmed.StartsWith("type ")
         || trimmed.StartsWith("let ")
+        || trimmed.StartsWith("val ")
         || trimmed.StartsWith("[<")
     let (idxOpt, count) = findSeparatorIndexAndCount lineWithoutComment
     match idxOpt with
@@ -1114,6 +1116,7 @@ let parseE2ETestFile (path: string) : Result<E2ETest list, string> =
                         nextWithoutComment.StartsWith("def ")
                         || nextWithoutComment.StartsWith("type ")
                         || nextWithoutComment.StartsWith("let ")
+                        || nextWithoutComment.StartsWith("val ")
                         || nextWithoutComment.StartsWith("module ")
                         || nextWithoutComment.StartsWith("[<")
                     not nextStartsDefinition
@@ -1206,6 +1209,7 @@ let parseE2ETestFile (path: string) : Result<E2ETest list, string> =
                             lineWithoutComment.StartsWith("def ")
                             || lineWithoutComment.StartsWith("type ")
                             || lineWithoutComment.StartsWith("let ")
+                            || lineWithoutComment.StartsWith("val ")
                             || lineWithoutComment.StartsWith("module ")
                             || lineWithoutComment.StartsWith("[<")
 
@@ -1260,6 +1264,7 @@ let parseE2ETestFile (path: string) : Result<E2ETest list, string> =
                                                 nextWithoutComment.StartsWith("def ")
                                                 || nextWithoutComment.StartsWith("type ")
                                                 || nextWithoutComment.StartsWith("let ")
+                                                || nextWithoutComment.StartsWith("val ")
                                                 || nextWithoutComment.StartsWith("module ")
                                                 || nextWithoutComment.StartsWith("[<")
                                             let needsDelimiterContinuation =

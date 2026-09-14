@@ -1,8 +1,8 @@
 # Program structure parity
 
 This ledger records the program-level comparison against compiler evidence
-revision `b2e1f3d1e4ce0338d4c4662db9a1326f2e2cb899` and darklang/dark revision
-`04fbe9dcc995c6188757d583e273cbd30a3e2d3d`. Implementation and source
+revision `b2e1f3d1e4ce0338d4c4662db9a1326f2e2cb899` and darklang/dark release
+`v0.0.35`, revision `0b3888d8e4f30d48ecd738f5cbe5cc2b8d958460`. Implementation and source
 revalidation started from compiler HEAD
 `a78567efd773de86265e55a54445ddf5a5a8911c`. DCB1 report `8a402797` and the
 existing parity documents were used only as finding inventories.
@@ -34,13 +34,12 @@ parser passes, the whole-program section of `1.5_TypeChecking.fs`,
 | eval completion | explicit eval mode renders non-`Unit` values and does not alter file entry selection | compiler interface behavior |
 | packages | package inputs are immutable compile-request snapshots rather than live package-manager queries | AOT extension |
 
-Top-level value declarations are represented explicitly by `SourceValue` and
-participate in source-tree and entry validation. Native materialization remains
-an explicit lowering boundary: programs that reach the expression AST
-with a source value receive the deterministic diagnostic “Top-level value
-declarations are parsed but native execution is not supported.” This is not
-claimed as runtime parity; it remains the contained follow-up boundary rather
-than being hidden by flattening or a magic declaration form.
+Top-level value declarations are represented explicitly by `SourceValue`,
+`AST.ValueDef`, and checked value definitions. They participate in source-tree,
+name-resolution, type-checking, separate-compilation, and entry validation.
+Before ANF, required values are materialized as ordinary lexical bindings, so
+their bodies use the same ownership and lowering paths as any other expression.
+No parser or ANF registry hard-codes particular module values.
 
 ## Focused probes
 

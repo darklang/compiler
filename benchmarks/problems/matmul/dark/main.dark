@@ -10,10 +10,10 @@ let generateMatrixValues (remaining: Int64) (index: Int64) (seed: Int64) (values
     if remaining <= 0L then values
     else
         let next = nextRand seed in
-        generateMatrixValues (remaining - 1L) (index + 1L) next (Stdlib.Dict.setOverridingDuplicates values (Stdlib.Int64.toString index) (next % 100L))
+        generateMatrixValues (remaining - 1L) (index + 1L) next (Stdlib.Dict.setOverridingDuplicates<Int64> values (Stdlib.Int64.toString index) (next % 100L))
 
 let matrixValue (values: Dict<Int64>) (index: Int64) : Int64 =
-    match Stdlib.Dict.get values (Stdlib.Int64.toString index) with
+    match Stdlib.Dict.get<Int64> values (Stdlib.Int64.toString index) with
     | Some value -> value
     | None -> 0L
 
@@ -30,7 +30,7 @@ let multiplyCells (a: Dict<Int64>) (b: Dict<Int64>) (n: Int64) (i: Int64) (j: In
     else
         let cell = dotCell a b n i j 0L 0L in
         let index = i * n + j in
-        let updated = Stdlib.Dict.setOverridingDuplicates result (Stdlib.Int64.toString index) cell in
+        let updated = Stdlib.Dict.setOverridingDuplicates<Int64> result (Stdlib.Int64.toString index) cell in
         multiplyCells a b n i (j + 1L) updated
 
 let checksumCells (result: Dict<Int64>) (total: Int64) (index: Int64) (acc: Int64) : Int64 =
@@ -46,7 +46,7 @@ let matmulChecksum (n: Int64) : Int64 =
     checksumCells result (n * n) 0L 0L
 
 let benchmarkArg (index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64 index with
+    match Stdlib.Cli.__benchmarkArgInt64 index with
     | Ok value -> value
     | Error message -> Builtin.testRuntimeError message
 

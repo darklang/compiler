@@ -9,7 +9,7 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs"
   },
-  "contract_sha256": "09f346afea4df8be4d00308725bcfbe79f310fe81b4a1e8f859a9235b926af6d",
+  "contract_sha256": "4efd0c2330fbe360b4d9fb060515cd16222d400b0186e8ade17e98a04edc9f97",
   "generated_at": "2026-09-14T21:59:17+00:00",
   "compiler": {
     "commit": "69be2d8b6c942bed414496ed0180b254b15bfc82",

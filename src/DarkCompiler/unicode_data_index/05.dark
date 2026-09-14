@@ -77,7 +77,9 @@ let __graphemeBreakLookupGroup2 (codepoint: Int64) : Stdlib.Option.Option<Int64>
 
 let __hex (data: String) (index: Int64) (remaining: Int64) (acc: Int64) : Int64 =
     if remaining == 0L then acc
-    else Unicode.Data.__hex data (index + 1L) (remaining - 1L) (acc * 16L + Unicode.Data.__hexDigit (Stdlib.String.getByteAt data index))
+    else
+        let byte = Stdlib.String.__byteAtUnchecked data index in
+        Unicode.Data.__hex data (index + 1L) (remaining - 1L) (acc * 16L + Unicode.Data.__hexDigit byte)
 
 let __casedLookup (codepoint: Int64) : Stdlib.Option.Option<Int64> =
     match Unicode.Data.__casedLookupGroup0 codepoint with

@@ -1,0 +1,21 @@
+// Pretty.dark - upstream document type and first-class empty/break values.
+
+module Stdlib.Pretty
+
+type Doc =
+    Empty
+    | Text of String
+    | Line
+    | HardLine
+    | SoftLine
+    | Concat of Stdlib.Pretty.Doc * Stdlib.Pretty.Doc
+    | Nest of Int * Stdlib.Pretty.Doc
+    | Group of Stdlib.Pretty.Doc
+    | Styled of opening: String * text: String * closing: String
+
+type Mode = Flat | Break
+
+val empty = Stdlib.Pretty.Doc.Empty
+val line = Stdlib.Pretty.Doc.Line
+val hardLine = Stdlib.Pretty.Doc.HardLine
+val softLine = Stdlib.Pretty.Doc.SoftLine

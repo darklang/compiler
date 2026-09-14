@@ -224,7 +224,7 @@ Function loop:
 licm_keeps_effecting_recursive_call_in_loop
 ---INPUT---
 let readRandom (n: Int64) : Int64 =
-    if n <= 0L then Stdlib.Random.int64 ()
+    if n <= 0L then Stdlib.Int.__randomInt64Word ()
     else readRandom (n - 1L)
 
 let loop (n: Int64) (acc: Int64) : Int64 =

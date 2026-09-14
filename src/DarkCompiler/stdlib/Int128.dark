@@ -75,7 +75,7 @@ let greaterThanOrEqualTo (a: Int128) (b: Int128) : Bool = Stdlib.Int128.lessThan
 
 let sqrt (value: Int128) : Float = Stdlib.Int.__sqrt (Stdlib.Int128.__toInt value)
 let toFloat (value: Int128) : Float = Stdlib.Int.__toFloat (Stdlib.Int128.__toInt value)
-let sum (values: List<Int128>) : Int128 = Stdlib.List.fold values 0Q (fun acc value -> Stdlib.Int128.add acc value)
+let sum (values: List<Int128>) : Int128 = Stdlib.List.fold<Int128, Int128> values (0Q) (fun acc value -> Stdlib.Int128.add acc value)
 let max (a: Int128) (b: Int128) : Int128 = if Stdlib.Int128.greaterThan a b then a else b
 let min (a: Int128) (b: Int128) : Int128 = if Stdlib.Int128.lessThan a b then a else b
 let clamp (value: Int128) (limitA: Int128) (limitB: Int128) : Int128 =
@@ -97,7 +97,7 @@ let parse (value: String) : Stdlib.Result.Result<Int128, Stdlib.Int128.ParseErro
     let length = Stdlib.String.__byteLength trimmed in
     if length == 0L then Error Stdlib.Int128.ParseError.BadFormat
     else
-        let first = Stdlib.String.getByteAt trimmed 0L in
+        let first = Stdlib.String.__byteAtUnchecked trimmed 0L in
         let negative = first == 45L in
         let start = if negative || first == 43L then 1L else 0L in
         if start == length then Error Stdlib.Int128.ParseError.BadFormat

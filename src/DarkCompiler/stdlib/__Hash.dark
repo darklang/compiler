@@ -15,7 +15,7 @@ let __string_hash_loop (s: String) (idx: Int64) (len: Int64) (acc: Int64) : Int6
     if idx >= len then
         acc
     else
-        let byte = Stdlib.String.getByteAt s idx in
+        let byte = Stdlib.String.__byteAtUnchecked s idx in
         let next = Stdlib.Int64.bitwiseXor acc byte * __hash_prime () in
         __string_hash_loop s (idx + 1L) len next
 
@@ -45,7 +45,7 @@ let __hash_blob (value: Blob) : Int64 = __blob_hash value
 // Key equality specializations (monomorphized by compiler)
 let __key_eq_i64 (left: Int64) (right: Int64) : Bool = left == right
 let __key_eq_bool (left: Bool) (right: Bool) : Bool = left == right
-let __key_eq_str (left: String) (right: String) : Bool = Stdlib.String.equals left right
+let __key_eq_str (left: String) (right: String) : Bool = left == right
 let __key_eq_blob (left: Blob) (right: Blob) : Bool = __blob_eq left right
 
 // Unresolved generic __hash/__key_eq calls are handled in compiler lowering by

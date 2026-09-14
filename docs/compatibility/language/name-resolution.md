@@ -2,8 +2,8 @@
 
 This document is the checked-in semantic matrix for callable and namespace
 resolution. The comparison is pinned to compiler
-`b2e1f3d1e4ce0338d4c4662db9a1326f2e2cb899` and darklang/dark
-`04fbe9dcc995c6188757d583e273cbd30a3e2d3d`. Implementation began from
+`b2e1f3d1e4ce0338d4c4662db9a1326f2e2cb899` and darklang/dark release
+`v0.0.35`, revision `0b3888d8e4f30d48ecd738f5cbe5cc2b8d958460`. Implementation began from
 compiler HEAD `b3a301203bd0377e37887995f49bf0880315df28` after rebasing on local
 `main`. DCB1 report `8a402797` was used only to locate likely gaps; every row
 below was revalidated against the pinned sources and focused compiler probes.
@@ -81,23 +81,21 @@ name`, and `Ambiguous <context> reference`.
 
 ## Extensions and intentional divergences
 
-- The compiler's native `File`, `Path`, `Platform`, `Random`, raw-memory, and
-  related intrinsic catalog remains a compiler-only extension. Each entry is an
-  explicit `CompilerExtension` candidate under its full registered spelling.
+- Native file, process, entropy, raw-memory, and representation primitives are
+  private implementation names. Public compiler-only catalog entries were
+  removed; public names resolve only to upstream functions, values, types, or
+  builtins.
 - The canonical parser accepts module headers and blocks and retains their typed
   paths through source-unit composition, then lower them to deterministic
   qualified backend symbols. The compiler does
   not load content-addressed packages. Imported compilation environments model
   the same precedence boundary, but package hashes and dependency traversal
   remain an intentional, documented program-model divergence.
-- The compiler AST has no top-level value declaration. Value identities remain
-  explicit in the resolver for lexical, inherited package, and registered
-  builtin candidates. The parser recognizes `val` and reports the unsupported
-  AOT initialization boundary explicitly; source constants such as
-  `Stdlib.Math.pi` are compiler nullary functions and must be called with `()`.
-  `Stdlib.List.empty` is the narrow exception: it is a registered polymorphic
-  module-value identity lowered directly to the empty skew-list representation,
-  not general source-level constant support.
+- `val` declarations are first-class program declarations. Module, inherited,
+  and builtin values resolve in the value namespace, are type-checked once, and
+  are materialized as lexical bindings before ANF. Upstream constants such as
+  `Stdlib.Math.pi`, `Stdlib.List.empty`, and `Stdlib.Blob.empty` are values and
+  are referenced without `()`.
 - Repeated flattened type declarations with the same canonical type identity
   are identity-deduplicated. This preserves existing module-adapter behavior;
   distinct type identities and distinct constructor owners remain ambiguous.
@@ -107,8 +105,7 @@ name`, and `Ambiguous <context> reference`.
 
 The immutable package-value snapshot used by `ValueSearch` is specified in
 [Diff and ValueSearch compatibility](../stdlib/diff-and-value-search.md). It is an explicit
-AOT bridge and does not add live package lookup or top-level values to this
-resolution model.
+AOT bridge and does not add live package lookup to this resolution model.
 
 Performance-only differences are outside this matrix.
 

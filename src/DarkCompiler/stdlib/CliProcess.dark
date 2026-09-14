@@ -6,7 +6,7 @@ type ProcessHandle = Int
 type Output = { exitCode: Int, stdout: String, stderr: String }
 
 let __replaceQuotes (s: String) : String =
-    Stdlib.String.replace s "'" "'\\''"
+    Stdlib.String.replaceAll s "'" "'\\''"
 
 let shellQuote (s: String) : String =
     $"'{Stdlib.Cli.Process.__replaceQuotes s}'"
@@ -123,10 +123,10 @@ let exec (program: String) (args: List<String>) : Stdlib.Result.Result<String, S
             else Error error
 
 let kill (pid: Int) : Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
-    Stdlib.Cli.Posix.kill pid (Stdlib.Cli.Posix.sigterm ())
+    Stdlib.Cli.Posix.kill pid Stdlib.Cli.Posix.sigterm
 
 let forceKill (pid: Int) : Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
-    Stdlib.Cli.Posix.kill pid (Stdlib.Cli.Posix.sigkill ())
+    Stdlib.Cli.Posix.kill pid Stdlib.Cli.Posix.sigkill
 
 let runIn
     (directory: String)

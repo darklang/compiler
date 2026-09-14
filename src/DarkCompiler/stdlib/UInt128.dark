@@ -87,7 +87,7 @@ let greaterThanOrEqualTo (a: UInt128) (b: UInt128) : Bool = Stdlib.UInt128.lessT
 
 let sqrt (value: UInt128) : Float = Stdlib.Int.__sqrt (Stdlib.UInt128.__toInt value)
 let toFloat (value: UInt128) : Float = Stdlib.Int.__toFloat (Stdlib.UInt128.__toInt value)
-let sum (values: List<UInt128>) : UInt128 = Stdlib.List.fold values 0Z (fun acc value -> Stdlib.UInt128.add acc value)
+let sum (values: List<UInt128>) : UInt128 = Stdlib.List.fold<UInt128, UInt128> values (0Z) (fun acc value -> Stdlib.UInt128.add acc value)
 let max (a: UInt128) (b: UInt128) : UInt128 = if Stdlib.UInt128.greaterThan a b then a else b
 let min (a: UInt128) (b: UInt128) : UInt128 = if Stdlib.UInt128.lessThan a b then a else b
 let clamp (value: UInt128) (limitA: UInt128) (limitB: UInt128) : UInt128 =
@@ -129,7 +129,7 @@ let __digitByteToUInt64 (byte: Int64) : UInt64 =
 let __parseDigits (value: String) (index: Int64) (length: Int64) (low: UInt64) (high: UInt64) : Stdlib.Result.Result<UInt128, Stdlib.UInt128.ParseError> =
     if index >= length then Ok (Stdlib.UInt128.__fromWords low high)
     else
-        let byte = Stdlib.String.getByteAt value index in
+        let byte = Stdlib.String.__byteAtUnchecked value index in
         if byte < 48L || byte > 57L then Error Stdlib.UInt128.ParseError.BadFormat
         else
             let highTimesTen = high * 10UL in
@@ -150,7 +150,7 @@ let parse (value: String) : Stdlib.Result.Result<UInt128, Stdlib.UInt128.ParseEr
     let length = Stdlib.String.__byteLength trimmed in
     if length == 0L then Error Stdlib.UInt128.ParseError.BadFormat
     else
-        let first = Stdlib.String.getByteAt trimmed 0L in
+        let first = Stdlib.String.__byteAtUnchecked trimmed 0L in
         let start = if first == 43L || first == 45L then 1L else 0L in
         if start == length then Error Stdlib.UInt128.ParseError.BadFormat
         else

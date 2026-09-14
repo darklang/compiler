@@ -468,30 +468,6 @@ class Validator:
         # === SEMANTIC BUGS (compiler produces wrong output) ===
         if re.search(r'-?\d+\.\d{3,}', expr):
             return "eval:float_precision"
-        # Stdlib functions missing from interpreter
-        missing_stdlib_map = {
-            'Random.': 'stdlib:random',              # Random.int64
-            '.getByteAt': 'stdlib:byte_ops',         # String.getByteAt
-            '.take': 'stdlib:missing',               # List.take, String.take
-            '.drop': 'stdlib:missing',               # List.drop, String.drop
-            '.substring': 'stdlib:missing',          # String.substring
-            '.slice': 'stdlib:slice',                # String.slice (different semantics)
-            'Int64.sub': 'stdlib:int64_math',
-            'Int64.mul': 'stdlib:int64_math',
-            'Int64.div': 'stdlib:int64_math',
-            'Int64.isEven': 'stdlib:int64_math',
-            'Int64.isOdd': 'stdlib:int64_math',
-            'Float.toBits': 'stdlib:float_ops',      # Float.toBits - IEEE 754 bit representation
-            'Float.toString': 'stdlib:float_ops',    # Float.toString - full precision float to string
-            'Float.toInt': 'stdlib:float_ops',       # Float.toInt - conversion
-            'Float.abs': 'stdlib:float_ops',         # Float.abs - absolute value
-            'Float.negate': 'stdlib:float_ops',      # Float.negate - displays -0.0 as 0.0
-            'Float.sqrt': 'stdlib:float_ops',        # Float.sqrt - interpreter uses different function
-        }
-        for pattern, reason in missing_stdlib_map.items():
-            if pattern in expr:
-                return reason
-
         # === COMPILER-ONLY INTERNAL FEATURES ===
         if 'Stdlib.__SkewList' in expr or 'Stdlib.__HAMT' in expr:
             return "internal:data_structure"

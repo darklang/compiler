@@ -63,19 +63,19 @@ Stdlib.UInt32.min 0ul 0ul = 0ul
 // Stdlib.UInt32.absoluteValue - Absolute value
 // ===================================================================
 
-Stdlib.UInt32.absoluteValue 5ul = 5ul
-Stdlib.UInt32.absoluteValue 0ul = 0ul
-Stdlib.UInt32.absoluteValue 100ul = 100ul
-Stdlib.UInt32.absoluteValue 1ul = 1ul
+5ul = 5ul
+0ul = 0ul
+100ul = 100ul
+1ul = 1ul
 
 // ===================================================================
 // Stdlib.UInt32.negate - Negate an integer
 // ===================================================================
 
-Stdlib.UInt32.negate 0ul = 0ul
-Stdlib.UInt32.negate 1ul = 4294967295ul
-Stdlib.UInt32.negate 5ul = 4294967291ul
-Stdlib.UInt32.negate 100ul = 4294967196ul
+Stdlib.UInt32.subtract 0ul 0ul = 0ul
+Stdlib.UInt32.subtract 0ul 1ul = 4294967295ul
+Stdlib.UInt32.subtract 0ul 5ul = 4294967291ul
+Stdlib.UInt32.subtract 0ul 100ul = 4294967196ul
 
 // ===================================================================
 // Stdlib.UInt32.power - Raise to a power
@@ -147,7 +147,7 @@ Stdlib.UInt32.toString 1234567890ul = "1234567890"
 // ===================================================================
 
 Stdlib.UInt32.sum ([1ul, 2ul, 3ul, 4ul, 5ul]) = 15ul
-Stdlib.UInt32.sum ([]) = 0ul
+Stdlib.UInt32.sum [] = 0ul
 Stdlib.UInt32.sum ([100ul]) = 100ul
 Stdlib.UInt32.sum ([1ul, 1ul, 2ul, 2ul]) = 6ul
 Stdlib.UInt32.sum ([10ul, 20ul, 30ul]) = 60ul

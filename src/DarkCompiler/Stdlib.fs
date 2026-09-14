@@ -38,16 +38,10 @@ let int64IntrinsicModule : ModuleDef = {
 let floatIntrinsicModule : ModuleDef = {
     Name = "Stdlib.Float"
     Functions = [
-        // sqrt : (Float) -> Float
         { Name = "sqrt"; TypeParams = []; ParamTypes = [TFloat64]; ReturnType = TFloat64 }
-        // abs : (Float) -> Float
-        { Name = "abs"; TypeParams = []; ParamTypes = [TFloat64]; ReturnType = TFloat64 }
-        // negate : (Float) -> Float
         { Name = "negate"; TypeParams = []; ParamTypes = [TFloat64]; ReturnType = TFloat64 }
-        // toInt : (Float) -> Int64
-        { Name = "toInt"; TypeParams = []; ParamTypes = [TFloat64]; ReturnType = TInt64 }
-        // toBits : (Float) -> UInt64
-        { Name = "toBits"; TypeParams = []; ParamTypes = [TFloat64]; ReturnType = TUInt64 }
+        { Name = "__toBits"; TypeParams = []; ParamTypes = [TFloat64]; ReturnType = TUInt64 }
+        { Name = "__toInt64Unchecked"; TypeParams = []; ParamTypes = [TFloat64]; ReturnType = TInt64 }
     ]
 }
 
@@ -85,13 +79,11 @@ let fileIntrinsicModule : ModuleDef = {
     ]
 }
 
-/// Stdlib.Random module - random number generation (intrinsics)
-/// These are special-cased in the compiler and generate syscalls
+/// Private entropy primitive used to implement the upstream numeric random APIs.
 let randomModule : ModuleDef = {
-    Name = "Stdlib.Random"
+    Name = "Stdlib.Int"
     Functions = [
-        // int64 : () -> Int64 - returns 8 random bytes as Int64
-        { Name = "int64"; TypeParams = []; ParamTypes = []; ReturnType = TInt64 }
+        { Name = "__randomInt64Word"; TypeParams = []; ParamTypes = []; ReturnType = TInt64 }
     ]
 }
 
@@ -256,22 +248,6 @@ let allModules : ModuleDef list = [
     builtinPresentationModule
     packageCatalogModule
 ]
-
-/// Compiler-visible values are registered separately from functions so a value
-/// cannot accidentally acquire nullary-call semantics.
-let allValues : ModuleValue list = [
-    { Name = "Stdlib.Blob.empty"; Type = TBlob }
-    { Name = "Darklang.LanguageTools.PackageManager.PickContext.empty"
-      Type = TRecord ("Darklang.LanguageTools.PackageManager.PickContext", []) }
-    { Name = "Stdlib.List.empty"; Type = TList(TVar "a") }
-    { Name = "Stdlib.List.empty_v0"; Type = TList(TVar "a") }
-]
-
-let private valueRegistry : ModuleValueRegistry =
-    allValues |> List.map (fun value -> (value.Name, value)) |> Map.ofList
-
-let tryGetValue (qualifiedName: string) : ModuleValue option =
-    Map.tryFind qualifiedName valueRegistry
 
 /// Build the module registry from all modules
 /// Maps qualified function names (e.g., "Stdlib.Int64.add") to their definitions

@@ -192,10 +192,10 @@ let testExcludedLocalFunctionRemainsCall () : TestResult =
     else
         Error "Expected excluded late external specialization to remain a call"
 
-let testExternalInlineCandidateRemovesFloatToIntCall () : TestResult =
+let testExternalInlineCandidateRemovesFloatConversionCall () : TestResult =
     let param = { Id = TempId 0; Type = AST.TFloat64 }
-    let stdlibFloatToInt =
-        { Name = "Stdlib.Float.toInt"
+    let stdlibFloatConversion =
+        { Name = "Stdlib.Float.__toInt64ForInliningTest"
           TypedParams = [param]
           ReturnType = AST.TInt64
           ReturnOwnership = OwnedReturn
@@ -208,15 +208,15 @@ let testExternalInlineCandidateRemovesFloatToIntCall () : TestResult =
     let main =
         Let (
             TempId 2,
-            Call ("Stdlib.Float.toInt", [FloatLiteral 41.0]),
+            Call (stdlibFloatConversion.Name, [FloatLiteral 41.0]),
             Return (Var (TempId 2))
         )
     let (Program (_, inlinedMain)) =
         ANF_Inlining.inlineProgramWithExternalCandidates
             ANF_Inlining.defaultConfig
-            (externalCandidates [stdlibFloatToInt])
+            (externalCandidates [stdlibFloatConversion])
             (Program ([], main))
-    if containsCall "Stdlib.Float.toInt" inlinedMain then
+    if containsCall stdlibFloatConversion.Name inlinedMain then
         Error "Expected external float-to-int wrapper to be inlined, but Call remained in main expression"
     else
         Ok ()
@@ -532,7 +532,7 @@ let tests = [
     ("Inlining underscore-named functions", testInliningUnderscoreFunctionName)
     ("Excluded local functions remain calls", testExcludedLocalFunctionRemainsCall)
     ("Inlining external shift candidate", testExternalInlineCandidateRemovesShiftCall)
-    ("Inlining external float-to-int candidate", testExternalInlineCandidateRemovesFloatToIntCall)
+    ("Inlining external float conversion candidate", testExternalInlineCandidateRemovesFloatConversionCall)
     ("External raw allocation candidates are not inlined", testExternalInlineCandidateRejectsRawAllocBody)
     ("External control-flow candidates are not inlined", testExternalInlineCandidateRejectsControlFlowBody)
     ("External inlining honors caller budget", testExternalInliningHonorsCallerBudget)

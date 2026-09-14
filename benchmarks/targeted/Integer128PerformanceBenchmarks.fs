@@ -221,7 +221,7 @@ let private uuidGeneration : BenchmarkCase =
                 "    if remaining <= 0L then checksum"
                 "    else"
                 "        let text = Stdlib.Uuid.toString(Stdlib.Uuid.generate()) in"
-                "        let valid = Stdlib.String.getByteAt(text, 14L) == 52L && Stdlib.String.__byteLength(text) == 36L in"
+                "        let valid = Stdlib.String.__byteAtUnchecked(text, 14L) == 52L && Stdlib.String.__byteLength(text) == 36L in"
                 "        benchmark(remaining - 1L, checksum + (if valid then 1L else 1000L))"
                 $"benchmark({iterations}L, 0L)"
             ]

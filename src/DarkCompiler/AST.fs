@@ -476,6 +476,21 @@ type TypeDef =
     | SumTypeDef of name:string * typeParams:string list * variants:Variant list       // type Result<T, E> = Ok of T | Error of E
     | TypeAlias of name:string * typeParams:string list * targetType:Type              // type Id = String
 
+/// A source value before and after its body has been type checked.
+type ValueDef =
+    | UncheckedValueDef of name:string * body:Expr
+    | CheckedValueDef of name:string * typ:Type * body:Expr
+
+let valueDefName (valueDef: ValueDef) : string =
+    match valueDef with
+    | UncheckedValueDef (name, _)
+    | CheckedValueDef (name, _, _) -> name
+
+let valueDefBody (valueDef: ValueDef) : Expr =
+    match valueDef with
+    | UncheckedValueDef (_, body)
+    | CheckedValueDef (_, _, body) -> body
+
 /// Case names that require a nominal native tag because they occur in more
 /// than one declaring type in the same compilation unit.
 let collidingConstructorCaseNames (typeDefs: TypeDef list) : Set<string> =
@@ -494,6 +509,7 @@ let collidingConstructorCaseNames (typeDefs: TypeDef list) : Set<string> =
 type TopLevel =
     | FunctionDef of FunctionDef
     | TypeDef of TypeDef
+    | ValueDef of ValueDef
     | Expression of Expr
 
 /// Program is a list of top-level definitions (functions and/or expressions)
@@ -515,11 +531,3 @@ type ModuleDef = {
 
 /// Module registry - maps full function paths to their definitions
 type ModuleRegistry = Map<string, ModuleFunc>
-
-/// A typed compiler-visible value supplied by the standard library.
-type ModuleValue = {
-    Name: string
-    Type: Type
-}
-
-type ModuleValueRegistry = Map<string, ModuleValue>

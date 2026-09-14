@@ -29,20 +29,24 @@ String concatenation lowers to `LIR.StringConcat`, which allocates a new dynamic
 string, copies both inputs, initializes refcount to 1, and participates in leak
 accounting when leak checking is enabled.
 
-The stdlib exposes byte-oriented operations directly over this layout:
+Private stdlib helpers operate directly over this layout:
 
-- `Stdlib.String.length` returns the byte length stored at offset 8.
-- `Stdlib.String.getByteAt` reads a byte from the data region at offset 16.
-- `startsWith`, `endsWith`, `indexOf`, `contains`, `slice`, `substring`,
-  `take`, and `drop` operate on byte offsets.
+- `Stdlib.String.__byteLength` returns the byte length stored at offset 8.
+- `Stdlib.String.__byteAtUnchecked` reads a byte from the data region at offset
+  16 without bounds checking.
+- `Stdlib.String.__byteSlice`, `__byteTake`, and `__byteDrop` use byte offsets.
+
+The public `String.getByteAt : String -> Int -> Option<UInt8>` validates and
+converts its index before using those helpers. Public text traversal such as
+`length`, `slice`, `dropFirst`, and `dropLast` uses extended grapheme clusters.
 
 Unicode helpers are layered on top of the byte representation:
 
-- `toCodepoints` decodes UTF-8 to `List<Int64>`.
+- `toCodepoints` decodes UTF-8 to `List<Int>`.
 - `fromCodepoints` allocates a dynamic string and encodes UTF-8 bytes.
-- `codepointLength`, `toUpperCase`, `toLowercase`, and `reverse` use the
+- `codepointLength`, `toUppercase`, `toLowercase`, and `reverse` use the
   codepoint conversion helpers.
-- `toGraphemes` and `graphemeLength` use a simplified UAX #29-style segmenter.
+- Private grapheme helpers use the shared UAX #29 segmenter.
   It keeps combining marks, variation selectors, selected emoji modifiers, and
   CR/LF with their surrounding cluster, but it does not implement the full UAX
   #29 rules needed for complex skin-tone and zero-width-joiner emoji sequences.

@@ -13,8 +13,8 @@ let leibnizPi (n: Int64) : Float =
 // Use 100 million iterations for timing
 // Output as integer (multiply by large factor for precision)
 let benchmarkArg (index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64 index with
+    match Stdlib.Cli.__benchmarkArgInt64 index with
     | Ok value -> value
     | Error message -> Builtin.testRuntimeError message
 
-Builtin.printLine (Stdlib.Int64.toString (Stdlib.Float.toInt (leibnizPi (benchmarkArg 0) * 100000000.0)))
+Builtin.printLine (Stdlib.Int64.toString (Stdlib.Float.__toInt64Unchecked (leibnizPi (benchmarkArg 0) * 100000000.0)))

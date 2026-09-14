@@ -24,14 +24,14 @@ let join (parts: List<String>) : String =
 
 let __lastSeparator (path: String) (index: Int64) (found: Int64) : Int64 =
     if index >= Stdlib.String.__byteLength path then found
-    else if Stdlib.String.getByteAt path index == 47L then
+    else if Stdlib.String.__byteAtUnchecked path index == 47L then
         Stdlib.Cli.Path.__lastSeparator path (index + 1L) index
     else
         Stdlib.Cli.Path.__lastSeparator path (index + 1L) found
 
 let __lastDot (path: String) (index: Int64) (found: Int64) : Int64 =
     if index >= Stdlib.String.__byteLength path then found
-    else if Stdlib.String.getByteAt path index == 46L then
+    else if Stdlib.String.__byteAtUnchecked path index == 46L then
         Stdlib.Cli.Path.__lastDot path (index + 1L) index
     else
         Stdlib.Cli.Path.__lastDot path (index + 1L) found
@@ -72,21 +72,21 @@ let __normalizeParts (parts: List<String>) (absolute: Bool) (acc: List<String>) 
         if part == "" || part == "." then
             Stdlib.Cli.Path.__normalizeParts rest absolute acc
         else if part == ".." then
-            match Stdlib.List.last acc with
+            match Stdlib.List.last<String> acc with
             | Some previous ->
                 if previous == ".." then
-                    Stdlib.Cli.Path.__normalizeParts rest absolute (Stdlib.List.append acc ([".."]))
+                    Stdlib.Cli.Path.__normalizeParts rest absolute (Stdlib.List.append<String> acc ([".."]))
                 else
-                    Stdlib.Cli.Path.__normalizeParts rest absolute (Stdlib.List.dropLast acc)
+                    Stdlib.Cli.Path.__normalizeParts rest absolute (Stdlib.List.dropLast<String> acc)
             | None ->
-                if absolute then Stdlib.Cli.Path.__normalizeParts rest absolute ([])
+                if absolute then Stdlib.Cli.Path.__normalizeParts rest absolute []
                 else Stdlib.Cli.Path.__normalizeParts rest absolute ([".."])
         else
-            Stdlib.Cli.Path.__normalizeParts rest absolute (Stdlib.List.append acc ([part]))
+            Stdlib.Cli.Path.__normalizeParts rest absolute (Stdlib.List.append<String> acc ([part]))
 
 let normalize (path: String) : String =
     let absolute = Stdlib.Cli.Path.isAbsolute path in
-    let parts = Stdlib.Cli.Path.__normalizeParts (Stdlib.String.split path "/") absolute ([]) in
+    let parts = Stdlib.Cli.Path.__normalizeParts (Stdlib.String.split path "/") absolute [] in
     let joined = Stdlib.String.join parts "/" in
     if absolute then "/" ++ joined else if joined == "" then "." else joined
 
@@ -111,7 +111,7 @@ let __nonEmpty (parts: List<String>) : List<String> =
     | [] -> []
     | part :: rest ->
         if part == "" then Stdlib.Cli.Path.__nonEmpty rest
-        else Stdlib.List.push (Stdlib.Cli.Path.__nonEmpty rest) part
+        else Stdlib.List.push<String> (Stdlib.Cli.Path.__nonEmpty rest) part
 
 let relativeTo (fromPath: String) (toPath: String) : Stdlib.Result.Result<String, Stdlib.Cli.Posix.Error> =
     match (Stdlib.Cli.Path.resolveToAbsolute fromPath, Stdlib.Cli.Path.resolveToAbsolute toPath) with
@@ -119,11 +119,11 @@ let relativeTo (fromPath: String) (toPath: String) : Stdlib.Result.Result<String
         let fromParts = Stdlib.Cli.Path.__nonEmpty (Stdlib.String.split absFrom "/") in
         let toParts = Stdlib.Cli.Path.__nonEmpty (Stdlib.String.split absTo "/") in
         let commonLength = Stdlib.Cli.Path.__commonPrefixLength fromParts toParts 0 in
-        let upCount = Stdlib.List.length fromParts - commonLength in
-        let ups = Stdlib.List.repeatUnsafe upCount ".." in
-        let tail = Stdlib.List.drop toParts commonLength in
-        let parts = Stdlib.List.append ups tail in
-        if Stdlib.List.length parts == 0 then Ok "."
+        let upCount = Stdlib.List.length<String> fromParts - commonLength in
+        let ups = Stdlib.List.repeatUnsafe<String> upCount ".." in
+        let tail = Stdlib.List.drop<String> toParts commonLength in
+        let parts = Stdlib.List.append<String> ups tail in
+        if Stdlib.List.length<String> parts == 0 then Ok "."
         else Ok (Stdlib.String.join parts "/")
     | (Error error, _) -> Error error
     | (_, Error error) -> Error error

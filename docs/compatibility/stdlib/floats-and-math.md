@@ -9,11 +9,11 @@ Every interpreter comparison in this change used:
 
 - compiler baseline `C@fb61d714723f34d6c43e9bdc03dd96fb46f0c4ea`
   (the exact rebased HEAD before implementation);
-- interpreter `I@04fbe9dcc995c6188757d583e273cbd30a3e2d3d`;
+- interpreter release `v0.0.35`,
+  `I@0b3888d8e4f30d48ecd738f5cbe5cc2b8d958460`;
 - historical inventory `DCB1@8a402797` only as starting evidence.
 
-`git ls-remote https://github.com/darklang/dark.git refs/heads/main` was
-rechecked on 2026-08-14 and returned the pinned interpreter revision. The
+The release and revision were rechecked on 2026-09-15. The
 interpreter surface is anchored at
 `packages/darklang/stdlib/float.dark:4-146` and
 `packages/darklang/stdlib/math.dark:4-92`. Its runtime behavior is anchored at
@@ -99,7 +99,7 @@ x64 execute the same binary64 operation sequence. `acos` and `asin` return
 functions preserve the tested NaN, infinity, quadrant, overflow, and signed-zero
 behavior.
 
-At `I@04fbe9dcc995c6188757d583e273cbd30a3e2d3d`, `mathTanh` calls
+At `I@0b3888d8e4f30d48ecd738f5cbe5cc2b8d958460`, `mathTanh` calls
 `System.Math.Sinh` (`Math.fs:201-209`). This revision-specific anomaly is
 intentionally reproduced: `Math.tanh(1.0)` equals the sinh result, not the
 mathematical hyperbolic tangent. A nonzero E2E probe prevents accidental

@@ -329,7 +329,7 @@ module IsEmpty =
 
 module NewLine =
   // The compiler retains its pre-existing nullary-function spelling.
-  Stdlib.String.newline () = "\n"
+  Stdlib.String.newline = "\n"
 
 
 module Length =

@@ -1,8 +1,8 @@
 # Blob, Base64, Crypto, and X509 parity
 
 This contract records the binary API comparison made from compiler HEAD
-`bcd4d46f49a12aaab8588844b72a9afa1f34a0db` and darklang/dark revision
-`04fbe9dcc995c6188757d583e273cbd30a3e2d3d`. DCB1 report commit `8a402797`
+`bcd4d46f49a12aaab8588844b72a9afa1f34a0db` and darklang/dark release
+`v0.0.35`, revision `0b3888d8e4f30d48ecd738f5cbe5cc2b8d958460`. DCB1 report commit `8a402797`
 and the earlier compiler evidence revision
 `51093e0a8e31fe45a9aa79a317fbefd6b74fbcc3` were used only to locate
 candidates. Every retained result was revalidated against the pinned sources
@@ -65,7 +65,9 @@ process-local address.
 
 ## Implementation boundary
 
-Blob parity operations use private byte-layout helpers within the Blob module.
+The legacy `Base64.urlDecode` and all `Crypto.debug*` compiler APIs were
+removed. Blob parity operations use private byte-layout helpers within the Blob
+module; there is no separate Bytes type or namespace.
 
 ## Source evidence and probes
 

@@ -96,6 +96,19 @@ let testBatchCompileRejectsMissingOutput () : TestResult =
     | Error error -> Error $"Expected missing-output guidance, got: {error}"
     | Ok _ -> Error "Expected an unmatched batch source to be rejected"
 
+let testBatchCompileAllowsCompilerOwnedSources () : TestResult =
+    match
+        Program.parseCommand
+            [| "--batch"
+               "--allow-internal"
+               "--"
+               "benchmark.dark"
+               "benchmark.out" |]
+    with
+    | Ok (Program.BatchCommand options) when options.AllowInternal -> Ok ()
+    | Ok command -> Error $"Expected internal batch compilation, got: {command}"
+    | Error error -> Error $"Expected --allow-internal to parse in batch mode, got: {error}"
+
 let tests = [
     ("parse explicit Linux x86_64 target", testExplicitLinuxX86_64Target)
     ("reject unknown compiler target", testUnknownTargetRejected)
@@ -106,4 +119,5 @@ let tests = [
     ("reject empty IR dump values", testEmptyIRDumpValuesRejected)
     ("parse independent batch compile outputs", testBatchCompileParsesIndependentOutputs)
     ("reject batch source without output", testBatchCompileRejectsMissingOutput)
+    ("allow compiler-owned sources in batch mode", testBatchCompileAllowsCompilerOwnedSources)
 ]

@@ -1,7 +1,8 @@
 # Darklang Compatibility
 
-The compiler's public parser follows darklang/dark revision
-`04fbe9dcc995c6188757d583e273cbd30a3e2d3d`. Repository Dark source is
+The compiler's public parser and standard-library surface follow darklang/dark
+release `v0.0.35`, revision
+`0b3888d8e4f30d48ecd738f5cbe5cc2b8d958460`. Repository Dark source is
 validated directly against that interpreter; there is no
 compiler-to-interpreter syntax conversion layer. Compiler source and E2E tests
 are authoritative for implemented behavior, and the revision-pinned ledgers in
@@ -62,18 +63,13 @@ shortest-roundtrip rendering intentionally differs from the pinned
 interpreter. The [float and math ledger](stdlib/floats-and-math.md) owns that
 contract.
 
-## Compiler extensions
+## AOT-only boundaries
 
 The compiler supports integer `/` with truncation toward zero; the interpreter
-uses `/` for Float and named functions for integer division. Private
-SkewList/HAMT helpers and selected standard-library additions remain extensions,
-not alternate public parser spellings.
-
-The validator also recognizes standard-library extensions such as selected
-Random functions, byte access, list/string slicing helpers, and Float
-conversion helpers. The exact executable classification is in
-`scripts/validate-darklang.py`; public behavior belongs in the relevant
-[standard-library ledger](stdlib/).
+uses `/` for Float and named functions for integer division. Private native
+intrinsics and SkewList/HAMT helpers remain implementation details and require
+internal compilation mode. There are no intentionally retained public
+compiler-only standard-library functions, modules, or values.
 
 ## Intentional AOT differences
 

@@ -691,6 +691,8 @@ let private formatTopLevel (topLevel: TopLevel) : string =
     match topLevel with
     | FunctionDef funcDef -> formatFunctionDef funcDef
     | TypeDef typeDef -> formatTypeDef typeDef
+    | ValueDef valueDef ->
+        $"val {formatIdentifierSegment (valueDefName valueDef)} = {formatExpr (valueDefBody valueDef)}"
     | Expression expr -> formatExpr expr
 
 let private tryRestoreModuleDeclaration (topLevel: TopLevel) : (NameSyntax.QualifiedName * TopLevel) option =
@@ -704,6 +706,14 @@ let private tryRestoreModuleDeclaration (topLevel: TopLevel) : (NameSyntax.Quali
         splitName definition.Name
         |> Option.map (fun (moduleName, declarationName) ->
             (moduleName, FunctionDef { definition with Name = declarationName }))
+    | ValueDef valueDef ->
+        splitName (valueDefName valueDef)
+        |> Option.map (fun (moduleName, declarationName) ->
+            let restored =
+                match valueDef with
+                | UncheckedValueDef (_, body) -> UncheckedValueDef (declarationName, body)
+                | CheckedValueDef (_, typ, body) -> CheckedValueDef (declarationName, typ, body)
+            (moduleName, ValueDef restored))
     | TypeDef (RecordDef (name, typeParams, fields)) ->
         splitName name
         |> Option.map (fun (moduleName, declarationName) ->

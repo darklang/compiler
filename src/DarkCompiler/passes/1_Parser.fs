@@ -2293,15 +2293,6 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                 else
                     // Not type args, treat as variable reference and leave < for comparison
                     Ok (Var fullName, TLt :: typeArgsStart)
-            | _ when fullName = "Stdlib.Dict.empty" ->
-                Ok (DictLiteral (TVar "dictValue", []), afterQualified)
-            | _ when fullName = "Stdlib.AltJson.Builder.empty" ->
-                Ok (ListLiteral [], afterQualified)
-            | _ when fullName = "Darklang.SCM.Branch.mainBranchId" ->
-                // Json.ParseError.toString retains this public compatibility
-                // parameter, but AOT type names are resolved from compiler
-                // metadata and do not consult a branch.
-                Ok (StringLiteral "00000000-0000-0000-0000-000000000000", afterQualified)
             | _ ->
                 // Qualified variable reference (function as value)
                 Ok (Var fullName, afterQualified)
@@ -2878,6 +2869,9 @@ let private validateNoInternalIdentifiers (Program items) : Result<Program, stri
                 |> List.fold (fun acc (name, _) -> Result.bind (fun () -> validateNoInternalIdentifier name) acc) (Ok ()))
             |> Result.bind (fun () -> validateExpr def.Body)
         | TypeDef _ -> Ok ()
+        | ValueDef valueDef ->
+            validateNoInternalIdentifier (valueDefName valueDef)
+            |> Result.bind (fun () -> validateExpr (valueDefBody valueDef))
         | Expression expr -> validateExpr expr
     items
     |> List.fold (fun acc item -> Result.bind (fun () -> validateTopLevel item) acc) (Ok ())

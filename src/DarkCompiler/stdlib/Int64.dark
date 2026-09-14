@@ -61,8 +61,7 @@ let lessThanOrEqualTo (a: Int64) (b: Int64) : Bool = a <= b
 
 // Count number of set bits (population count)
 // Uses parallel bit counting algorithm (Brian Kernighan / SWAR)
-// Historical compiler extension retained for the existing public bit-count API.
-// It is deliberately outside the interpreter parity surface.
+// Private population count used by the fixed-width implementation.
 let __popcount (x: Int64) : Int64 =
     // Constants (in decimal):
     // 0x5555555555555555 = 6148914691236517205L

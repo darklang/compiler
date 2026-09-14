@@ -424,6 +424,12 @@ let private assignParsedRecursiveIdentities (Program topLevels) : Program =
                 | Some (RecursiveBindingCandidate candidate) -> Some (parsedMember [] path candidate)
                 | other -> other
             FunctionDef { funcDef with Body = assignExpr path (path @ [0]) funcDef.Body; Recursion = recursion }
+        | ValueDef valueDef ->
+            match valueDef with
+            | UncheckedValueDef (name, body) ->
+                ValueDef (UncheckedValueDef (name, assignExpr path (path @ [0]) body))
+            | CheckedValueDef (name, typ, body) ->
+                ValueDef (CheckedValueDef (name, typ, assignExpr path (path @ [0]) body))
         | Expression expr -> Expression (assignExpr path (path @ [0]) expr)
         | TypeDef _ -> topLevel
 
@@ -465,7 +471,8 @@ let normalizeSource (source: ParsedSource) : Result<Program, string> =
                     normalize (Some nestedPrefix) body
                     |> Result.bind (fun (Program nestedItems) ->
                         declarationsToProgram (List.rev nestedItems @ acc) rest)
-                | SourceValue _ :: _ ->
-                    Error "Top-level value declarations are parsed but native execution is not supported"
+                | SourceValue (identifier, body) :: rest ->
+                    let normalized = UncheckedValueDef (nameAtPrefix prefix identifier, body)
+                    declarationsToProgram (ValueDef normalized :: acc) rest
             declarations |> NonEmptyList.toList |> declarationsToProgram []
     normalize None source |> Result.map assignParsedRecursiveIdentities

@@ -8,14 +8,14 @@ type OracleDetails = { category: String, price: Int64 }
 
 type OracleRow = { name: String, featured: Bool, details: OracleDetails, tags: List<String>, rawHtml: String }
 
-let escapeParts (parts: List<String>) : String =
+let escapeParts (parts: List<Char>) : String =
     match parts with
     | [] -> ""
     | part :: rest ->
-        let escaped = match part with | ">" -> "&gt;" | "<" -> "&lt;" | "&" -> "&amp;" | "'" -> "&#39;" | "\"" -> "&quot;" | _ -> part in
+        let escaped = match part with | '>' -> "&gt;" | '<' -> "&lt;" | '&' -> "&amp;" | '\'' -> "&#39;" | '\"' -> "&quot;" | _ -> Stdlib.Char.toString part in
         escaped ++ escapeParts rest
 
-let escape (value: String) : String = escapeParts (Stdlib.String.toGraphemes value)
+let escape (value: String) : String = escapeParts (Stdlib.String.toList value)
 
 let renderItems (items: List<TemplateItem>) : String =
     match items with
@@ -52,9 +52,9 @@ let renderReport (title: String) (rows: List<OracleRow>) (footer: String) : Stri
     "<main>\n<h1>" ++ escape title ++ "</h1>\n" ++ body ++ "\n<footer>" ++ escape footer ++ "</footer>\n</main>"
 
 renderDashboard "Ada" true ([TemplateItem { name = "book", price = 12L }, TemplateItem { name = "lamp", price = 7L }]) = "Hello Ada!\nRole: administrator\nItems:\n- book: 12\n- lamp: 7\n"
-renderDashboard "Lin" false ([]) = "Hello Lin!\nRole: member\nItems:\n"
+renderDashboard "Lin" false [] = "Hello Lin!\nRole: member\nItems:\n"
 
-renderDashboard "Ada <admin>" true ([]) = "Hello Ada &lt;admin&gt;!\nRole: administrator\nItems:\n"
+renderDashboard "Ada <admin>" true [] = "Hello Ada &lt;admin&gt;!\nRole: administrator\nItems:\n"
 
 renderReport "Inventory <nightly>" ([OracleRow {
         name = "Item <0>",

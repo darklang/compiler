@@ -1,0 +1,5 @@
+// HttpServerValues.dark - upstream default HTTP request body limit.
+
+module Stdlib.HttpServer.Config
+
+val defaultMaxBodyBytes = 31457280

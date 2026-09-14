@@ -462,7 +462,7 @@ let testParsesEscapedBackslashBeforeNAsLiteralText () : TestResult =
                 Error $"Expected exactly 1 parsed test, got {tests.Length}")
 
 let testParsesRepeatedProcessArgumentsInOrder () : TestResult =
-    let testSource = "Stdlib.Cli.Args.int64 0 = Ok (100L) arg=\"100\" arg=\"two words\"\n"
+    let testSource = "1 = 1 arg=\"100\" arg=\"two words\"\n"
 
     withTempFileNamed "test.e2e" testSource (fun path ->
         match parseE2ETestFile path with
@@ -548,7 +548,7 @@ let testRejectsInvalidMultiChunkBatchBitmaskResults () : TestResult =
     | other -> Error $"Expected invalid multi-chunk result vectors to be rejected, got {other}"
 
 let testDoesNotBatchTestsWithProcessInputs () : TestResult =
-    let testSource = "Stdlib.Cli.Args.int64 0 = Ok (100L) arg=\"100\"\n"
+    let testSource = "1 = 1 arg=\"100\"\n"
     withTempFileNamed "ordinary.e2e" testSource (fun path ->
         match parseE2ETestFile path with
         | Ok [test] when Option.isNone (tryPrepareBatchTest test) -> Ok ()
