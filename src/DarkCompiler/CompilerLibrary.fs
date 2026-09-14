@@ -4257,18 +4257,22 @@ let private compileUserWithPlan (plan: UserCompilePlan) : CompileReport =
                                         |> snd
                                         |> List.rev
 
-                                    // Combine reachable stdlib functions with user functions.
-                                    let allFuncs =
-                                        reachableStdlib @ finalUserFuncs
-                                        |> mergeFunctionsByName
-                                    let retainedStdlibNames =
-                                        reachableStdlib
-                                        |> List.map (fun func -> func.Name)
-                                        |> Set.ofList
-                                    let retainedUserFuncs =
-                                        finalUserFuncs
-                                        |> List.filter (fun func ->
-                                            not (Set.contains func.Name retainedStdlibNames))
+                                    // x64 emits one ELF symbol per function name, so discard duplicate
+                                    // specializations there. ARM64 emission has historically retained the
+                                    // user copies; preserving that selection also preserves specialization.
+                                    let allFuncs, retainedUserFuncs =
+                                        match plan.BaseContext.Target with
+                                        | Platform.LinuxX86_64 ->
+                                            let retainedStdlibNames =
+                                                reachableStdlib
+                                                |> List.map (fun func -> func.Name)
+                                                |> Set.ofList
+                                            (reachableStdlib @ finalUserFuncs |> mergeFunctionsByName,
+                                             finalUserFuncs
+                                             |> List.filter (fun func ->
+                                                 not (Set.contains func.Name retainedStdlibNames)))
+                                        | Platform.ARM64Backend _ ->
+                                            (reachableStdlib @ finalUserFuncs, finalUserFuncs)
                                     let reachableDependencyFuncs, reachableProgramFuncs =
                                         retainedUserFuncs
                                         |> List.partition (fun func ->

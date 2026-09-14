@@ -7,9 +7,9 @@ compiler bugs belong in [known issues](known-issues.md).
 
 ## Current work
 
-- Complete the dual-backend memory-management matrix described in the
-  [x86-64 backend status](../compiler/backend/x64.md), including the disabled
-  `memReclaimBurn` coverage and shared raw-memory policy.
+- Deepen the memory-management matrix described in the
+  [x86-64 backend status](../compiler/backend/x64.md), especially recursive
+  HAMT payloads, allocator reuse, and the shared raw-memory policy.
 - Expand byte-level x86-64 instruction-encoding coverage and replace the
   hand-maintained coverage count with a test-derived report.
 - Finish upstream-test enablement. `TestRunner.fs` is the source of truth:

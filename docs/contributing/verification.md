@@ -39,6 +39,10 @@ integration blocker. Cross-target parity work must name every target in scope
 and is a dated audit of those targets at that revision, not a permanent
 requirement that future changes validate every architecture.
 
+Calling two targets "at parity" never widens the default verification scope.
+Each later change validates the target being developed; it validates another
+architecture only when that architecture is explicitly part of the change.
+
 On an ARM64 host, Linux x86_64 tests are explicit and execute generated ELF
 binaries through the pinned QEMU installation:
 

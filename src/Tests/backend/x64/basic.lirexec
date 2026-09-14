@@ -57,6 +57,18 @@ Ret
 42
 
 ---NAME---
+SDIV preserves a quotient allocated to X7
+---INPUT-LIR---
+X1 <- Mov(Imm 42)
+X2 <- Mov(Imm 6)
+X7 <- Sdiv(X1, Reg X2)
+X1 <- Mov(Reg X7)
+Exit
+Ret
+---EXPECT-EXIT---
+7
+
+---NAME---
 Print positive Int64
 ---INPUT-LIR---
 X0 <- Mov(Imm 42)

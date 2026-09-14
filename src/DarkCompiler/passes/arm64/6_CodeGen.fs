@@ -1676,6 +1676,8 @@ let private generateClosureRefCountDecHelper (ctx: CodeGenContext) : ARM64Symbol
                     let fieldOffset = (captureIndex + 1) * 8
                     match captureType with
                     | AST.TString
+                    | AST.TChar
+                    | AST.TInt
                     | AST.TBlob ->
                         releaseDynamicCapture fieldOffset $"captures_{index}_{captureIndex}"
                     | _ ->

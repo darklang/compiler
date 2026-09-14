@@ -60,7 +60,10 @@ if [[ "$qemu_version" != "11.1.1" ]]; then
     exit 1
 fi
 
-exec /usr/bin/timeout --signal=KILL 20s \
+# Full application workloads can take materially longer under the instruction
+# plugin than under QEMU alone; keep the bound finite without rejecting a
+# validated quick-profile workload such as tinytemplate.
+exec /usr/bin/timeout --signal=KILL 120s \
     "$qemu" \
     -L "$sysroot" \
     -d plugin \

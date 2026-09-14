@@ -2349,6 +2349,20 @@ let private aliasesX86ScratchReg (reg: LIR.PhysReg) : bool =
     | LIR.X13 | LIR.X14 | LIR.X15 | LIR.X16 | LIR.X17 -> true
     | _ -> false
 
+let private x86SpillTempExcluding (excluded: LIR.Reg list) : LIR.PhysReg =
+    let excludedPhysical =
+        excluded
+        |> List.choose (function
+            | LIR.Physical reg -> Some reg
+            | LIR.Virtual _ -> None)
+        |> Set.ofList
+    [ LIR.X3; LIR.X4; LIR.X5; LIR.X6; LIR.X7
+      LIR.X19; LIR.X20; LIR.X21; LIR.X0; LIR.X1; LIR.X2 ]
+    |> List.tryFind (fun reg -> not (Set.contains reg excludedPhysical))
+    |> function
+        | Some reg -> reg
+        | None -> Crash.crash "x86_64 spill repair could not find a preserved temporary register"
+
 /// On x86_64, when loading two spilled Reg-typed operands, the first must go to a
 /// register that won't be clobbered by the second load (into X12=R11). This function
 /// picks a safe register by checking what physical register the right operand uses.
@@ -2476,23 +2490,30 @@ let applyToInstr (arch: Platform.Arch) (mapping: AllocationResult) (instr: LIR.I
         let (destReg, destAlloc) = applyToReg mapping dest
         if isX86_64 arch then
             // On x86_64, X12/X13/X14 all alias R11. Use loadSpilledPair for mul
-            // operands (uses dest as safe temp), and X3 (RCX) for sub if it would
-            // conflict with mulRight in R11.
+            // operands (uses dest as a safe temp), and preserve a distinct physical
+            // register for a spilled third operand when either multiplicand uses R11.
             let ((mulLeftReg, mulLeftLoads), (mulRightReg, mulRightLoads)) =
                 loadSpilledPair arch mapping mulLeft mulRight destReg
             let subIsSpilled =
                 match sub with
                 | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
                 | _ -> false
-            let mulRightIsR11 = (mulRightReg = LIR.Physical LIR.X12 || mulRightReg = LIR.Physical LIR.X11)
-            let subTemp = if subIsSpilled && mulRightIsR11 then LIR.X3 else LIR.X12
+            let mulOperandAliasesScratch =
+                [mulLeftReg; mulRightReg]
+                |> List.exists (function
+                    | LIR.Physical reg -> aliasesX86ScratchReg reg
+                    | LIR.Virtual _ -> false)
+            let preservedTemp = x86SpillTempExcluding [destReg; mulLeftReg; mulRightReg]
+            let subTemp = if subIsSpilled && mulOperandAliasesScratch then preservedTemp else LIR.X12
             let (subReg, subLoads) = loadSpilled mapping sub subTemp
             let msubInstr = LIR.Msub (destReg, mulLeftReg, mulRightReg, subReg)
             let storeInstrs =
                 match destAlloc with
                 | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
                 | _ -> []
-            mulLeftLoads @ mulRightLoads @ subLoads @ [msubInstr] @ storeInstrs
+            let preserveTemp = if subIsSpilled && mulOperandAliasesScratch then [LIR.SaveRegs ([preservedTemp], [])] else []
+            let restoreTemp = if subIsSpilled && mulOperandAliasesScratch then [LIR.RestoreRegs ([preservedTemp], [])] else []
+            preserveTemp @ mulLeftLoads @ mulRightLoads @ subLoads @ [msubInstr] @ storeInstrs @ restoreTemp
         else
             let (mulLeftReg, mulLeftLoads) = loadSpilled mapping mulLeft LIR.X12
             let (mulRightReg, mulRightLoads) = loadSpilled mapping mulRight LIR.X13
@@ -2513,15 +2534,22 @@ let applyToInstr (arch: Platform.Arch) (mapping: AllocationResult) (instr: LIR.I
                 match add with
                 | LIR.Virtual id -> match tryAllocation mapping id with Some (StackSlot _) -> true | _ -> false
                 | _ -> false
-            let mulRightIsR11 = (mulRightReg = LIR.Physical LIR.X12 || mulRightReg = LIR.Physical LIR.X11)
-            let addTemp = if addIsSpilled && mulRightIsR11 then LIR.X3 else LIR.X12
+            let mulOperandAliasesScratch =
+                [mulLeftReg; mulRightReg]
+                |> List.exists (function
+                    | LIR.Physical reg -> aliasesX86ScratchReg reg
+                    | LIR.Virtual _ -> false)
+            let preservedTemp = x86SpillTempExcluding [destReg; mulLeftReg; mulRightReg]
+            let addTemp = if addIsSpilled && mulOperandAliasesScratch then preservedTemp else LIR.X12
             let (addReg, addLoads) = loadSpilled mapping add addTemp
             let maddInstr = LIR.Madd (destReg, mulLeftReg, mulRightReg, addReg)
             let storeInstrs =
                 match destAlloc with
                 | Some (StackSlot offset) -> [LIR.Store (offset, LIR.Physical LIR.X11)]
                 | _ -> []
-            mulLeftLoads @ mulRightLoads @ addLoads @ [maddInstr] @ storeInstrs
+            let preserveTemp = if addIsSpilled && mulOperandAliasesScratch then [LIR.SaveRegs ([preservedTemp], [])] else []
+            let restoreTemp = if addIsSpilled && mulOperandAliasesScratch then [LIR.RestoreRegs ([preservedTemp], [])] else []
+            preserveTemp @ mulLeftLoads @ mulRightLoads @ addLoads @ [maddInstr] @ storeInstrs @ restoreTemp
         else
             let (mulLeftReg, mulLeftLoads) = loadSpilled mapping mulLeft LIR.X12
             let (mulRightReg, mulRightLoads) = loadSpilled mapping mulRight LIR.X13

@@ -179,6 +179,7 @@ match Stdlib.List.repeatUnsafe (3) (7L) with | [a, b, c] -> a + b + c | _ -> 0L 
 // Sum of index + value for [10, 20, 30] = (0+10) + (1+20) + (2+30) = 63
 Stdlib.List.fold (Stdlib.List.indexedMap<Int64, Int64> ([10L, 20L, 30L]) (fun i x -> let index = Builtin.unwrap (Stdlib.Int.toInt64 (i)) in Stdlib.Int64.add (x) (index))) (0L) (fun acc x -> acc + x) = 63L
 Stdlib.List.length (Stdlib.List.indexedMap<Int64, Int64> ([1L, 2L, 3L, 4L]) (fun i x -> x)) = 4
+let target = Stdlib.Int.fromInt64 (10L) in Stdlib.List.length (Stdlib.List.indexedMap<Int64, Int64> ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L]) (fun i x -> if i == target then 99L else x)) = stdout="11\n" stderr="" disable_opt_inline=true
 // ===================================================================
 // Stdlib.List.partition - Split list by predicate
 // ===================================================================
@@ -193,21 +194,21 @@ match Stdlib.List.partition ([1L, 2L, 3L, 4L, 5L]) (fun x -> x > 2L) with | (tru
 // ===================================================================
 // List memory reclamation regression
 // ===================================================================
-let memReclaimMakeHelper(n: Int64, acc: List<Int64>) : List<Int64> =
+let memReclaimMakeHelper (n: Int64) (acc: List<Int64>) : List<Int64> =
     if n <= 0L then acc
-    else memReclaimMakeHelper(n - 1L, Stdlib.List.push(acc, n))
+    else memReclaimMakeHelper (n - 1L) (Stdlib.List.push (acc) (n))
 
-let memReclaimMake(n: Int64) : List<Int64> =
-    memReclaimMakeHelper(n, [])
+let memReclaimMake (n: Int64) : List<Int64> =
+    memReclaimMakeHelper (n) ([])
 
-let memReclaimBurn(iters: Int, total: Int) : Int =
-    if iters <= 0I then total
+let memReclaimBurn (iters: Int64) (total: Int64) : Int64 =
+    if iters <= 0L then total
     else
-        let l = memReclaimMake(400L) in
-        let len = Stdlib.List.length<Int64>(l) in
-        memReclaimBurn(iters - 1I, total + len)
+        let l = memReclaimMake (400L) in
+        let len = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.List.length<Int64> (l))) in
+        memReclaimBurn (iters - 1L) (total + len)
 
-memReclaimBurn(10000I, 0I) = stdout="4000000\n" stderr=""
+memReclaimBurn (10000L) (0L) = stdout="4000000\n" stderr=""
 
 // ===================================================================
 // NOTE: Functions disabled due to compiler bugs

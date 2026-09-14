@@ -26,6 +26,10 @@ uses the host architecture and does not also run another backend's tests or
 benchmarks. Use the explicit x64 target for x64 work; generated Linux x64 E2Es
 run through `/opt/dcb/qemu/qemu-x86_64` when the host is ARM64.
 
+Architecture parity is recorded at a particular revision; it does not make
+cross-target testing the default for later work. Develop and verify on the
+selected target unless the change explicitly includes another architecture.
+
 ## Compile and run Dark code
 
 ```bash

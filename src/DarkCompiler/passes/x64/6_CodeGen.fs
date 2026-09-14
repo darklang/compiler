@@ -2891,6 +2891,8 @@ let private generateClosureRefCountDecHelper
                     let fieldOffset = (captureIndex + 1) * 8
                     match captureType with
                     | AST.TString
+                    | AST.TChar
+                    | AST.TInt
                     | AST.TBlob ->
                         releaseDynamicBufferCapture fieldOffset $"{index}_{captureIndex}"
                     | AST.TList _ ->
@@ -3153,9 +3155,12 @@ let private translateInstr
                     @ (if leftReg <> X86_64.RAX then [X86_64.MOV_reg (X86_64.RAX, leftReg)] else [])
                     @ [X86_64.MOV_store (X86_64.RSP, -8, X86_64.RDX)]
                     @ [X86_64.CQO; X86_64.IDIV divisor]
-                    @ (if destReg <> X86_64.RAX then [X86_64.MOV_reg (destReg, X86_64.RAX)] else [])
-                    @ [X86_64.MOV_load (X86_64.RDX, X86_64.RSP, -8)
-                       X86_64.JMP (overflowLabel + "_end")]
+                    @ (if destReg = X86_64.RDX then [X86_64.MOV_reg (scratch, X86_64.RAX)]
+                       elif destReg <> X86_64.RAX then [X86_64.MOV_reg (destReg, X86_64.RAX)]
+                       else [])
+                    @ [X86_64.MOV_load (X86_64.RDX, X86_64.RSP, -8)]
+                    @ (if destReg = X86_64.RDX then [X86_64.MOV_reg (X86_64.RDX, scratch)] else [])
+                    @ [X86_64.JMP (overflowLabel + "_end")]
                     // Overflow path: return INT64_MIN
                     @ [X86_64.Label overflowLabel]
                     @ loadImm64 destReg System.Int64.MinValue
@@ -4436,8 +4441,8 @@ let private translateInstr
                 | LIR.StackSlot stackOffset ->
                     let adjustedOffset = int32 (adjustStackOffset ctx stackOffset)
                     Ok [ X86_64.MOV_load (scratch, X86_64.RBP, adjustedOffset)
-                         X86_64.MOV_load (lenDest, scratch, 0)
-                         X86_64.LEA (addrDest, scratch, 8) ]
+                         X86_64.MOV_load (lenDest, scratch, 8)
+                         X86_64.LEA (addrDest, scratch, 16) ]
                 | _ -> Ok (loadImm64 lenDest 0L @ loadImm64 addrDest 0L)
 
             let copy1 = freshLabel "strcat_c1"
