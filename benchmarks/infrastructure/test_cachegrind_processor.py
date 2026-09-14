@@ -17,11 +17,6 @@ class CachegrindProcessorTests(unittest.TestCase):
                 {
                     "language": "dark",
                     "instructions": 100,
-                    "data_refs": 50,
-                    "d1_misses": 2,
-                    "ll_misses": 1,
-                    "branches": 10,
-                    "branch_mispredicts": 1,
                 }
             ]
         }
@@ -32,7 +27,11 @@ class CachegrindProcessorTests(unittest.TestCase):
                 generate_summary(results, output_dir, quiet=True)
 
             report = output_dir / "cachegrind_summary.md"
-            self.assertIn("## alpha", report.read_text())
+            report_text = report.read_text()
+            self.assertIn("## alpha", report_text)
+            self.assertIn("| Language | Instructions | vs Rust |", report_text)
+            self.assertNotIn("Data Refs", report_text)
+            self.assertNotIn("Branches", report_text)
             self.assertEqual(
                 output.getvalue(), f"Cachegrind summary written to: {report}\n"
             )

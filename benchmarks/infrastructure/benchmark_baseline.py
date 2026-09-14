@@ -44,18 +44,15 @@ def _track(
     )
 
 
-CACHEGRIND_POLICIES = {
-    "quick": "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs",
-    "full": "cachegrind-ir-v1:cache-sim=yes,branch-sim=yes,extract=summary-I-refs",
-}
+CACHEGRIND_POLICY = "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs"
 QEMU_QUICK_POLICY = "qemu-tcg-plugin-guest-insns-v1:qemu-11.1.1:rustc-1.89.0"
 TRACKS = {
     track.id: track
     for track in (
         *(
-            _track(architecture, profile, "cachegrind", policy)
+            _track(architecture, profile, "cachegrind", CACHEGRIND_POLICY)
             for architecture in ("arm64", "x86_64")
-            for profile, policy in CACHEGRIND_POLICIES.items()
+            for profile in ("quick", "full")
         ),
         _track("x86_64", "quick", "qemu", QEMU_QUICK_POLICY),
     )

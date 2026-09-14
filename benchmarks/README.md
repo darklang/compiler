@@ -130,7 +130,10 @@ opportunities—not forcing either compiler to miss legitimate optimizations.
 
 ### Cachegrind Mode (default)
 
-Uses **Valgrind Cachegrind** to count instructions. Slower (~50x) but deterministic - same input always produces identical counts. Useful for:
+Uses **Valgrind Cachegrind** to count instructions with cache and branch
+simulation disabled. The resulting instruction count is deterministic—the same
+binary and input produce the same count—without spending time calculating
+metrics that the benchmark policy does not consume. Useful for:
 
 - Detecting performance regressions in CI
 - Comparing instruction efficiency between languages
@@ -139,11 +142,16 @@ Uses **Valgrind Cachegrind** to count instructions. Slower (~50x) but determinis
 This is the primary way we are tracking performance.
 
 The `full` profile is the canonical comparable benchmark set and currently
-contains 29 pairs. Fannkuch runs the complete n=9 traversal in both languages,
-and nsieve runs one complete sieve in each language using their ordinary public
-data-structure APIs. Binary trees uses the same recursive allocation and
-traversal shape as Rust.
-Full-size quicksort and spectral norm are included. A
+contains 29 pairs. Its workload sizes are chosen in descending order of Dark
+execution cost: repeated identical work is removed first, then inputs are
+reduced only while preserving the benchmark's defining algorithm, generated
+data variants, and meaningful control-flow paths. Fannkuch still runs a
+complete permutation traversal, nsieve still performs a complete sieve through
+the ordinary public data-structure APIs, and binary trees retains depth 15 and
+the same recursive allocation/traversal shape as Rust. TinyTemplate uses four
+rows so both conditional outcomes, both category variants, and all four batch
+variants remain present. Full-size quicksort and spectral norm are retained
+because reducing cheaper workloads is unnecessary once the suite target is met. A
 completed full Cachegrind run records its measurements in
 the architecture-specific canonical JSON snapshot and `HISTORY.md`; targeted
 runs and `all` are diagnostic and do not update canonical files. `RESULTS.md` is
@@ -312,7 +320,6 @@ benchmarks/
   results/                   # Benchmark results by timestamp
     YYYY-MM-DD_HHMMSS/
       compiler_version.txt   # Git commit of compiler
-      cachegrind/            # Temporary cachegrind output files (cleaned after run)
       *_hyperfine.json       # Raw hyperfine output
       *_summary.md           # Per-benchmark markdown
       summary.md             # Overall summary
