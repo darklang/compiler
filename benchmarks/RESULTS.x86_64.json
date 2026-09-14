@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "suite": "dark-compiler",
+  "track": {
+    "id": "x86_64-quick-qemu",
+    "profile": "quick",
+    "architecture": "x86_64",
+    "backend": "qemu",
+    "measurement_policy": "qemu-tcg-plugin-guest-insns-v1:qemu-11.1.1:rustc-1.89.0"
+  },
+  "contract_sha256": "339490eeab99c1035ea9cceb8880493879cba15d9f73c1a0dd4bf5e4c66cf4bc",
+  "compiler": {
+    "commit": "b25efe54556edbd12c839f2bbef1c98b1288ba7e",
+    "subject": "Complete point-in-time x64 parity audit"
+  },
+  "generated_at": "2026-09-14T02:49:16.367224+00:00",
+  "overall_dark_rust_ratio": 4.5539316228729065,
+  "benchmarks": [
+    {
+      "name": "ackermann",
+      "dark": 2849810,
+      "rust": 1751854,
+      "dark_rust_ratio": 1.6267394428987805
+    },
+    {
+      "name": "binary_trees",
+      "dark": 1278194,
+      "rust": 4497159,
+      "dark_rust_ratio": 0.28422255028118865
+    },
+    {
+      "name": "collatz",
+      "dark": 926709,
+      "rust": 840256,
+      "dark_rust_ratio": 1.1028888814837383
+    },
+    {
+      "name": "edigits",
+      "dark": 6698480,
+      "rust": 318276,
+      "dark_rust_ratio": 21.046136058012543
+    },
+    {
+      "name": "factorial",
+      "dark": 17787,
+      "rust": 297458,
+      "dark_rust_ratio": 0.05979667717795453
+    },
+    {
+      "name": "fannkuch",
+      "dark": 845201,
+      "rust": 293133,
+      "dark_rust_ratio": 2.8833362330409744
+    },
+    {
+      "name": "fasta",
+      "dark": 11912187,
+      "rust": 319976,
+      "dark_rust_ratio": 37.22837650323774
+    },
+    {
+      "name": "fft",
+      "dark": 528598657,
+      "rust": 492957,
+      "dark_rust_ratio": 1072.3017565426599
+    },
+    {
+      "name": "fib",
+      "dark": 346092,
+      "rust": 510019,
+      "dark_rust_ratio": 0.6785864840329477
+    },
+    {
+      "name": "huffman",
+      "dark": 23161076,
+      "rust": 333601,
+      "dark_rust_ratio": 69.42747773537849
+    },
+    {
+      "name": "leibniz",
+      "dark": 2158649,
+      "rust": 988518,
+      "dark_rust_ratio": 2.183722501765269
+    },
+    {
+      "name": "mandelbrot",
+      "dark": 1378291,
+      "rust": 1252738,
+      "dark_rust_ratio": 1.100222871821562
+    },
+    {
+      "name": "matmul",
+      "dark": 74981,
+      "rust": 297209,
+      "dark_rust_ratio": 0.2522837464545152
+    },
+    {
+      "name": "merkletrees",
+      "dark": 602837,
+      "rust": 647831,
+      "dark_rust_ratio": 0.9305467012230042
+    },
+    {
+      "name": "myers_diff",
+      "dark": 2204891807,
+      "rust": 528834,
+      "dark_rust_ratio": 4169.3457814739595
+    },
+    {
+      "name": "nbody",
+      "dark": 225893,
+      "rust": 350096,
+      "dark_rust_ratio": 0.6452315936200357
+    },
+    {
+      "name": "nqueen",
+      "dark": 533649,
+      "rust": 689923,
+      "dark_rust_ratio": 0.773490664900286
+    },
+    {
+      "name": "nsieve",
+      "dark": 1155278,
+      "rust": 291805,
+      "dark_rust_ratio": 3.9590754099484244
+    },
+    {
+      "name": "pisum",
+      "dark": 166006,
+      "rust": 415114,
+      "dark_rust_ratio": 0.3999046045182769
+    },
+    {
+      "name": "primes",
+      "dark": 147690,
+      "rust": 326061,
+      "dark_rust_ratio": 0.4529520549835767
+    },
+    {
+      "name": "quicksort",
+      "dark": 697448,
+      "rust": 307761,
+      "dark_rust_ratio": 2.266200070834186
+    },
+    {
+      "name": "raytracer",
+      "dark": 2783847,
+      "rust": 488449,
+      "dark_rust_ratio": 5.6993606292570975
+    },
+    {
+      "name": "regex_lite",
+      "dark": 26407486,
+      "rust": 341526,
+      "dark_rust_ratio": 77.32203697522297
+    },
+    {
+      "name": "spectral_norm",
+      "dark": 776631,
+      "rust": 298184,
+      "dark_rust_ratio": 2.6045361253454242
+    },
+    {
+      "name": "string_equality",
+      "dark": 810743,
+      "rust": 743734,
+      "dark_rust_ratio": 1.0900980726980345
+    },
+    {
+      "name": "sum_to_n",
+      "dark": 64787,
+      "rust": 290077,
+      "dark_rust_ratio": 0.22334414655419077
+    },
+    {
+      "name": "tak",
+      "dark": 54879270,
+      "rust": 42360536,
+      "dark_rust_ratio": 1.2955282246664679
+    },
+    {
+      "name": "tinytemplate",
+      "dark": 47135884452,
+      "rust": 670619,
+      "dark_rust_ratio": 70287.12943116733
+    },
+    {
+      "name": "warden",
+      "dark": 19554113,
+      "rust": 266488,
+      "dark_rust_ratio": 73.37708639788659
+    }
+  ]
+}

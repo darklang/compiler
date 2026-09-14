@@ -1,0 +1,136 @@
+{
+  "schema_version": 2,
+  "suite": "dark-compiler",
+  "language": "rust",
+  "track": {
+    "id": "x86_64-quick-qemu",
+    "profile": "quick",
+    "architecture": "x86_64",
+    "backend": "qemu",
+    "measurement_policy": "qemu-tcg-plugin-guest-insns-v1:qemu-11.1.1:rustc-1.89.0"
+  },
+  "contract_sha256": "339490eeab99c1035ea9cceb8880493879cba15d9f73c1a0dd4bf5e4c66cf4bc",
+  "generated_at": "2026-09-14T02:49:16.367224+00:00",
+  "compiler": {
+    "commit": "b25efe54556edbd12c839f2bbef1c98b1288ba7e",
+    "subject": "Complete point-in-time x64 parity audit"
+  },
+  "benchmarks": [
+    {
+      "name": "ackermann",
+      "instructions": 1751854
+    },
+    {
+      "name": "binary_trees",
+      "instructions": 4497159
+    },
+    {
+      "name": "collatz",
+      "instructions": 840256
+    },
+    {
+      "name": "edigits",
+      "instructions": 318276
+    },
+    {
+      "name": "factorial",
+      "instructions": 297458
+    },
+    {
+      "name": "fannkuch",
+      "instructions": 293133
+    },
+    {
+      "name": "fasta",
+      "instructions": 319976
+    },
+    {
+      "name": "fft",
+      "instructions": 492957
+    },
+    {
+      "name": "fib",
+      "instructions": 510019
+    },
+    {
+      "name": "huffman",
+      "instructions": 333601
+    },
+    {
+      "name": "leibniz",
+      "instructions": 988518
+    },
+    {
+      "name": "mandelbrot",
+      "instructions": 1252738
+    },
+    {
+      "name": "matmul",
+      "instructions": 297209
+    },
+    {
+      "name": "merkletrees",
+      "instructions": 647831
+    },
+    {
+      "name": "myers_diff",
+      "instructions": 528834
+    },
+    {
+      "name": "nbody",
+      "instructions": 350096
+    },
+    {
+      "name": "nqueen",
+      "instructions": 689923
+    },
+    {
+      "name": "nsieve",
+      "instructions": 291805
+    },
+    {
+      "name": "pisum",
+      "instructions": 415114
+    },
+    {
+      "name": "primes",
+      "instructions": 326061
+    },
+    {
+      "name": "quicksort",
+      "instructions": 307761
+    },
+    {
+      "name": "raytracer",
+      "instructions": 488449
+    },
+    {
+      "name": "regex_lite",
+      "instructions": 341526
+    },
+    {
+      "name": "spectral_norm",
+      "instructions": 298184
+    },
+    {
+      "name": "string_equality",
+      "instructions": 743734
+    },
+    {
+      "name": "sum_to_n",
+      "instructions": 290077
+    },
+    {
+      "name": "tak",
+      "instructions": 42360536
+    },
+    {
+      "name": "tinytemplate",
+      "instructions": 670619
+    },
+    {
+      "name": "warden",
+      "instructions": 266488
+    }
+  ]
+}
