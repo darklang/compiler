@@ -170,9 +170,10 @@ rich nested runtime shapes.
 
 ## Reference-release fixtures
 
-Place multi-case `.rcrelease` files under `src/Tests/backend/x64/`. Each case
-describes a canonical managed object graph whose final root reference is
-released:
+Place multi-case `.rcrelease` files under
+`src/Tests/backend/reference-release/`. Each case describes a canonical
+managed object graph whose final root reference is released on the active
+ARM64 or x64 backend:
 
 ```text
 ---NAME---
@@ -198,7 +199,8 @@ be managed; scalar shapes are useful only as fields or payloads.
 By default the runner chooses the root register. Use `ROOT-REGISTER` when
 register placement is observable behavior, and pair it with `PRESERVE` lines
 of the form `X0 = 123` to verify that releasing the root does not clobber live
-registers.
+registers. These checks run on both backends; choose placements that express a
+valid preservation requirement on each architecture.
 
 Keep direct F# tests for collision-node dictionary layouts, malformed or mixed
 variant metadata, release-helper selection and instruction-shape assertions,

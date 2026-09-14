@@ -314,10 +314,10 @@ let private buildProgram test =
                   CodegenFacts = None }
             LIR.Program (main :: collectClosureFunctions typed, variants, records), preserved))
 
-let runRCReleaseTest test =
+let runRCReleaseTest target test =
     buildProgram test
     |> Result.bind (fun (program, preserved) ->
-        TestDSL.LIRExecutionTestRunner.executeProgram program LeakCheckEnabled
+        TestDSL.LIRExecutionTestRunner.executeProgram target program LeakCheckEnabled
         |> Result.bind (fun (exitCode, stdout, stderr) ->
             let expectedOutput =
                 match preserved with
@@ -335,9 +335,9 @@ let loadRCReleaseTests path =
         try File.ReadAllText path |> parseRCReleaseFileContent path
         with ex -> Error $"Failed to read reference-release fixture {path}: {ex.Message}"
 
-let tests (testFiles: string array) : (string * (unit -> Result<unit, string>)) list =
+let tests target (testFiles: string array) : (string * (unit -> Result<unit, string>)) list =
     let testsForFile path =
         match loadRCReleaseTests path with
         | Error msg -> [ $"parse {Path.GetFileName path}", fun () -> Error msg ]
-        | Ok cases -> cases |> List.map (fun test -> test.Name, fun () -> runRCReleaseTest test)
+        | Ok cases -> cases |> List.map (fun test -> test.Name, fun () -> runRCReleaseTest target test)
     testFiles |> Array.sort |> Array.toList |> List.collect testsForFile

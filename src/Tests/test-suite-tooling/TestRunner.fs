@@ -559,7 +559,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
     let parallelMoveTestFiles = getTestFiles "algorithms/parallel-moves" "parallelmoves"
     let irFormatSnapshotTestFiles = getTestFiles "formatting/ir" "irformat"
     let lirExecutionTestFiles = getTestFiles "backend/x64" "lirexec"
-    let rcReleaseTestFiles = getTestFiles "backend/x64" "rcrelease"
+    let rcReleaseTestFiles = getTestFiles "backend/reference-release" "rcrelease"
     let formattingRoundtripTestFiles = getTestFiles "formatting-roundtrip" "roundtrip"
     let syntaxTestFiles = getTestFiles "syntax" "syntax"
 
@@ -597,9 +597,9 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
         { Name = "IR Format Snapshot DSL Tests"; Tests = IRFormatSnapshotDSLTests.tests }
         { Name = "IR Format Snapshot Fixture Tests"; Tests = TestDSL.IRFormatSnapshotTestRunner.tests irFormatSnapshotTestFiles }
         { Name = "LIR Execution DSL Tests"; Tests = LIRExecutionDSLTests.tests }
-        { Name = "Reference Release DSL Tests"; Tests = RCReleaseDSLTests.tests }
+        { Name = "Reference Release DSL Tests"; Tests = RCReleaseDSLTests.tests target }
         { Name = "LIR Execution Fixture Tests"; Tests = TestDSL.LIRExecutionTestRunner.tests lirExecutionTestFiles }
-        { Name = "Reference Release Fixture Tests"; Tests = TestDSL.RCReleaseTestRunner.tests rcReleaseTestFiles }
+        { Name = "Reference Release Fixture Tests"; Tests = TestDSL.RCReleaseTestRunner.tests target rcReleaseTestFiles }
         { Name = "ARM64 Encoding Tests"; Tests = ARM64EncodingTests.tests }
         { Name = "ARM64 Binary Tests"; Tests = ARM64BinaryTests.tests }
         { Name = "ARM64 CodeGen Tests"; Tests = ARM64CodeGenTests.tests }
@@ -749,7 +749,6 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
         let x64Suites =
             Set.ofList [
                 "LIR Execution Fixture Tests"
-                "Reference Release Fixture Tests"
                 "x64 Encoding Fixture Tests"
                 "x64 Binary Tests"
                 "x64 Resolve Tests"

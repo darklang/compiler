@@ -50,7 +50,7 @@ dict(string)
     | Error msg -> Error $"Expected dict arity error, got: {msg}"
     | Ok _ -> Error "Expected one-argument dict shape to fail"
 
-let testRunsNestedReleaseCase () : TestResult =
+let testRunsNestedReleaseCase target () : TestResult =
     let content =
         """---NAME---
 release nested graph
@@ -59,13 +59,13 @@ tuple(string, list(i64), dict(i64, string))
 """
 
     match parseRCReleaseFileContent "release.rcrelease" content with
-    | Ok [ test ] -> runRCReleaseTest test
+    | Ok [ test ] -> runRCReleaseTest target test
     | Ok tests -> Error $"Expected one release case, got {List.length tests}"
     | Error msg -> Error $"Expected release case to parse: {msg}"
 
-let tests = [
+let tests target = [
     ("Reference-release DSL parses nested managed shapes", testParsesNestedManagedShape)
     ("Reference-release DSL rejects preservation without root placement", testRejectsPreserveWithoutRootRegister)
     ("Reference-release DSL rejects invalid shape arity", testRejectsInvalidShapeArity)
-    ("Reference-release DSL executes nested release", testRunsNestedReleaseCase)
+    ("Reference-release DSL executes nested release", testRunsNestedReleaseCase target)
 ]

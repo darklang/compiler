@@ -1,6 +1,6 @@
-// LIRExecutionTestRunner.fs - Compiles and executes single-block LIR fixtures.
+// LIRExecutionTestRunner.fs - Compiles and executes single-block LIR programs.
 //
-// Checks typed codegen failures or runs a minimal x64 ELF for process results.
+// Checks typed x64 failures and provides shared backend executable support.
 
 module TestDSL.LIRExecutionTestRunner
 
@@ -47,7 +47,7 @@ let private patchDeferredLabels
             X86_64_Resolve.dataLabelOffsets codeFileOffset codeSize stringPool
         X86_64_Resolve.patchDataLabels resolveResult dataLabels codeFileOffset
 
-let private writeAndRun binary =
+let private writeAndRun target binary =
     let tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
     try
         do
@@ -58,10 +58,14 @@ let private writeAndRun binary =
         let permissions = File.GetUnixFileMode(tempPath)
         File.SetUnixFileMode(tempPath, permissions ||| UnixFileMode.UserExecute)
         let startInfo =
-            match Platform.detectArch () with
-            | Ok Platform.X86_64 -> ProcessStartInfo(tempPath)
-            | _ ->
+            match target, Platform.detectArch () with
+            | Platform.LinuxX86_64, Ok Platform.X86_64
+            | Platform.ARM64Backend _, Ok Platform.ARM64 ->
+                ProcessStartInfo(tempPath)
+            | Platform.LinuxX86_64, _ ->
                 ProcessStartInfo("/opt/dcb/qemu/qemu-x86_64", tempPath)
+            | Platform.ARM64Backend _, _ ->
+                ProcessStartInfo("/opt/dcb/qemu/qemu-aarch64", tempPath)
         startInfo.UseShellExecute <- false
         startInfo.RedirectStandardOutput <- true
         startInfo.RedirectStandardError <- true
@@ -86,7 +90,7 @@ let private translate program leakCheck =
     |> Result.bind (fun executable ->
         CodeGen_X86_64.translateProgram executable enableLeakCheck)
 
-let internal executeProgram program leakCheck =
+let private executeX64Program program leakCheck =
     let enableLeakCheck = leakCheck = LeakCheckEnabled
     translate program leakCheck
     |> Result.mapError (fun msg -> $"Codegen error: {msg}")
@@ -103,7 +107,45 @@ let internal executeProgram program leakCheck =
             LiteralPool.emptyFloatPool
             enableLeakCheck
             0
-        |> writeAndRun)
+        |> writeAndRun Platform.LinuxX86_64)
+
+let private executeARM64Program armTarget program leakCheck =
+    let enableLeakCheck = leakCheck = LeakCheckEnabled
+    let target = ARM64.targetConfigFor armTarget
+    let options = { CodeGen.defaultOptions with EnableLeakCheck = enableLeakCheck }
+
+    executableProgram program
+    |> Result.map CodeGen.prepareARM64Program
+    |> Result.bind (CodeGen.generateARM64WithOptions target options)
+    |> Result.mapError (fun msg -> $"Codegen error: {msg}")
+    |> Result.bind (fun generated ->
+        let instructions = CodeGen.generatedProgramInstructions generated
+        let labels =
+            instructions
+            |> List.choose (function | ARM64Symbolic.Label label -> Some label | _ -> None)
+            |> Set.ofList
+        match
+            instructions
+            |> List.tryPick (function
+                | ARM64Symbolic.BL label when not (Set.contains label labels) -> Some label
+                | _ -> None)
+        with
+        | Some label -> Error $"Codegen error: ARM64 call target '{label}' was not generated"
+        | None ->
+            Ok
+                (ARM64_Emit.emitBinary
+                    generated
+                    (ARM64.targetOS target)
+                    enableLeakCheck
+                    None
+                    None
+                    None))
+    |> Result.bind (fun emitted -> writeAndRun (Platform.ARM64Backend armTarget) emitted.Binary)
+
+let internal executeProgram target program leakCheck =
+    match target with
+    | Platform.LinuxX86_64 -> executeX64Program program leakCheck
+    | Platform.ARM64Backend armTarget -> executeARM64Program armTarget program leakCheck
 
 let private checkExpectation (exitCode: int, stdout: string, stderr: string) expectation =
     match expectation with
@@ -115,7 +157,7 @@ let private checkExpectation (exitCode: int, stdout: string, stderr: string) exp
     | ExpectedStderr expected -> Error $"Expected stderr '{expected}', got '{stderr.Trim()}'"
 
 let private checkProcessExpectations test expectations =
-    executeProgram test.Program test.LeakCheck
+    executeProgram Platform.LinuxX86_64 test.Program test.LeakCheck
     |> Result.bind (fun actual ->
         let rec loop remaining =
             match remaining with

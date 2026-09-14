@@ -1401,7 +1401,10 @@ let private generateRecursiveSumRefCountDecHelper
     | _ ->
         Crash.crash $"ARM64 recursive sum RC helper requires a generic root release plan, got {releasePlan}"
 
-let private generateClosureRefCountDecHelper (ctx: CodeGenContext) : ARM64Symbolic.Instr list =
+let private generateClosureRefCountDecHelper
+    (dictHelperForReleasePlan: ANF.RcReleasePlan -> string)
+    (ctx: CodeGenContext)
+    : ARM64Symbolic.Instr list =
     let label (name: string) : string = $"__dark_closure_rc_dec_{name}"
     let ready = label "payload_ready"
     let helperRet = label "ret"
@@ -1710,8 +1713,12 @@ let private generateClosureRefCountDecHelper (ctx: CodeGenContext) : ARM64Symbol
                                 | ANF.RootRelease (_, ANF.GenericHeap, _) ->
                                     plannedListDecHelperLabelForReleasePlan elementRelease
                             releaseManagedRootChildField ARM64Symbolic.X0 fieldOffset helper $"captures_{index}_{captureIndex}"
-                        | Some (ANF.RootRelease (_, ANF.DictHeap, _)) ->
-                            releaseManagedRootChildField ARM64Symbolic.X0 fieldOffset dictRefCountDecHelperLabel $"captures_{index}_{captureIndex}"
+                        | Some (ANF.RootRelease (_, ANF.DictHeap, _) as releasePlan) ->
+                            releaseManagedRootChildField
+                                ARM64Symbolic.X0
+                                fieldOffset
+                                (dictHelperForReleasePlan releasePlan)
+                                $"captures_{index}_{captureIndex}"
                         | Some (ANF.RootRelease (_, ANF.ClosureHeap, _)) ->
                             releaseManagedRootChildField ARM64Symbolic.X0 fieldOffset closureRefCountDecHelperLabel $"captures_{index}_{captureIndex}"
                         | Some (ANF.RootRelease (_, ANF.StreamHeap, _)) ->
@@ -9202,11 +9209,19 @@ let private generatePreparedARM64WithOptionsAndCache
                     rcHelperRequirements.DictDecHelperLabels
                     |> Set.union listHelperDictLabels
 
-                directLabels
-                |> Set.toList
-                |> List.map dictDecHelperDependencyLabels
-                |> unionLabelSets
-                |> Set.union directLabels
+                let rec expandDependencies selectedLabels pendingLabels =
+                    match pendingLabels with
+                    | [] -> selectedLabels
+                    | helperLabel :: rest ->
+                        let dependencies =
+                            dictDecHelperDependencyLabels helperLabel
+                            |> Set.filter (fun dependency ->
+                                not (Set.contains dependency selectedLabels))
+                        expandDependencies
+                            (Set.union selectedLabels dependencies)
+                            (rest @ Set.toList dependencies)
+
+                expandDependencies directLabels (Set.toList directLabels)
 
             let listRcDecHelperLabelsFromDictHelpers =
                 neededDictRcDecHelperLabels
@@ -9344,7 +9359,7 @@ let private generatePreparedARM64WithOptionsAndCache
             let closureHelperTimer = startPhase ()
             let closureRcHelpers =
                 (if rcHelperRequirements.NeedsClosureRcIncHelper then generateClosureRefCountIncHelper ctx else [])
-                @ (if emitClosureRcDecHelper then generateClosureRefCountDecHelper ctx else [])
+                @ (if emitClosureRcDecHelper then generateClosureRefCountDecHelper dictDecHelperForReleasePlan ctx else [])
             let streamRcHelpers =
                 if needsStreamRcDecHelper then generateStreamRefCountDecHelper ctx else []
             recordPhase "ARM64 Helper Closure Stream Generation" closureHelperTimer
