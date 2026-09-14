@@ -9,11 +9,11 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs"
   },
-  "contract_sha256": "7a187054fa812f1f89d35f3dd3176db95059371d4c096ff03227313ac338038d",
-  "generated_at": "2026-09-14T21:31:26+00:00",
+  "contract_sha256": "09f346afea4df8be4d00308725bcfbe79f310fe81b4a1e8f859a9235b926af6d",
+  "generated_at": "2026-09-14T21:59:17+00:00",
   "compiler": {
-    "commit": "750de683dc06d9df4dd5b83d550fd55210bcc7b3",
-    "subject": "Count benchmark instructions without cache simulation"
+    "commit": "69be2d8b6c942bed414496ed0180b254b15bfc82",
+    "subject": "Merge smaller full benchmark workloads"
   },
   "benchmarks": [
     {
@@ -74,7 +74,7 @@
     },
     {
       "name": "myers_diff",
-      "instructions": 2480164309
+      "instructions": 2480167561
     },
     {
       "name": "nbody",
@@ -126,7 +126,7 @@
     },
     {
       "name": "tinytemplate",
-      "instructions": 8881984620
+      "instructions": 8881984677
     },
     {
       "name": "warden",

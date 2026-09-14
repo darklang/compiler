@@ -2,12 +2,12 @@
 
 Best-known compatible full-profile Dark performance vs audited Rust references (instruction counts).
 
-**Snapshot timestamp:** 2026-09-14T21:31:26+00:00
+**Snapshot timestamp:** 2026-09-14T21:59:17+00:00
 **Architecture:** `arm64`
 **Profile:** `full` (schema 2)
 **Measurement policy:** `cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs`
-**Workload contract:** `7a187054fa812f1f89d35f3dd3176db95059371d4c096ff03227313ac338038d`
-**Compiler commit:** `750de683dc06d9df4dd5b83d550fd55210bcc7b3` - Count benchmark instructions without cache simulation
+**Workload contract:** `09f346afea4df8be4d00308725bcfbe79f310fe81b4a1e8f859a9235b926af6d`
+**Compiler commit:** `69be2d8b6c942bed414496ed0180b254b15bfc82` - Merge smaller full benchmark workloads
 
 | Benchmark | Dark (10.9x) | Rust |
 |---|---:|---:|
@@ -25,7 +25,7 @@ Best-known compatible full-profile Dark performance vs audited Rust references (
 | mandelbrot | 15,227,643 (1.21x) | 12,557,270 |
 | matmul | 43,156,675 (66.5x) | 649,416 |
 | merkletrees | 3,877,645 (1.54x) | 2,523,420 |
-| myers_diff | 2,480,164,309 (3609x) | 687,142 |
+| myers_diff | 2,480,167,561 (3609x) | 687,142 |
 | nbody | 14,537,406 (3.42x) | 4,249,498 |
 | nqueen | 7,420,529 (1.25x) | 5,914,962 |
 | nsieve | 131,518,105 (346x) | 380,354 |
@@ -38,5 +38,5 @@ Best-known compatible full-profile Dark performance vs audited Rust references (
 | string_equality | 1,220,167 (0.82x) | 1,479,564 |
 | sum_to_n | 62,220 (0.24x) | 260,246 |
 | tak | 48,017,359 (0.12x) | 391,110,808 |
-| tinytemplate | 8,881,984,620 (21130x) | 420,354 |
+| tinytemplate | 8,881,984,677 (21130x) | 420,354 |
 | warden | 45,956,223 (170x) | 270,345 |

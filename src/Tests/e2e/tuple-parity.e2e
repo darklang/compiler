@@ -13,4 +13,4 @@ match ((1L, 2L), Some ((3L, 4L))) with | ((1L, x), Some ((y, 4L))) -> x + y | _ 
 match (1L, 2L) with | (_, _, _) -> 99L | _ -> 0L = 0L
 match (1L, 2L) with | (a, b) -> a + b | _ -> 0L = 3L
 ((1L, "two"), [3L, 4L]) == ((1L, "two"), [3L, 4L]) = true
-let tupleParityTrace (label: String) (value: Int64) : Int64 = let _ = Builtin.print (label) in value let (a, b, c) = (tupleParityTrace ("a") (1L), tupleParityTrace ("b") (2L), tupleParityTrace ("c") (3L)) in a + b + c = stdout="abc6\n" stderr="" exact_bytes=true
+let tupleParityTrace (label: String) (value: Int64) : Int64 = let _ = Builtin.print label in value let (a, b, c) = (tupleParityTrace "a" 1L, tupleParityTrace "b" 2L, tupleParityTrace "c" 3L) in a + b + c = stdout="abc6\n" stderr="" exact_bytes=true

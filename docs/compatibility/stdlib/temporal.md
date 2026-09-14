@@ -51,9 +51,8 @@ DateTime API.
 
 ## Canonical public API
 
-The compiler exposes the same unversioned wrapper names and numeric types as
-the pinned package `packages/darklang/stdlib/dateTime.dark`. Obsolete public
-`_v0` aliases were removed.
+The compiler exposes the same wrapper names and numeric types as the pinned
+package `packages/darklang/stdlib/dateTime.dark`.
 
 | Function family | Signature |
 | --- | --- |

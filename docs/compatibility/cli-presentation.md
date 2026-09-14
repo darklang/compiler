@@ -63,12 +63,6 @@ checking even where the interpreter would reach an equivalent error during
 evaluation. That timing is the intentional phase difference; presentation
 functions do not add runtime type dispatch to imitate it.
 
-The packaged implementations use canonical Dark syntax with fully qualified
-names and explicit generic arguments where required. Private Int-to-Int64
-adapters used by List/String internals are implementation details and do not
-change the public `Int` signatures. No legacy compiler presentation syntax is
-retained.
-
 ## Native implementation anchors
 
 The typed intrinsic registry is

@@ -1,8 +1,8 @@
 # Arbitrary-Precision and 128-bit Integers
 
-The `Int` type is a signed integer with no fixed-width overflow boundary. An
+The `Int` type is a signed integer with no fixed-width overflow boundary.
 Unsuffixed integer literals select it, so `9223372036854775808` is an `Int`.
-The retired `I` suffix is rejected; `L` explicitly selects `Int64`.
+The `L` suffix selects `Int64`.
 
 `Int` supports arithmetic, truncating division, nonnegative-exponent power,
 comparison, remainder and modulus, shifts, and infinite two's-complement

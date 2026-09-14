@@ -7,17 +7,17 @@
 (let first = Builtin.stdinReadLine (()) in let second = Builtin.stdinReadLine (()) in first ++ "|" ++ second) = stdout="\"one|two\"\n" stderr="" stdin="one\r\ntwo" exact_bytes=true
 
 // Public String-only presentation prelude. Final Unit values never add output.
-Stdlib.print ("") = stdout="" stderr="" exact_bytes=true
-(Stdlib.print ("hé🙂"); ()) = stdout="hé🙂" stderr="" exact_bytes=true
-Stdlib.print ("left\nright\n") = stdout="left\nright\n" stderr="" exact_bytes=true
-Stdlib.printLine ("") = stdout="\n" stderr="" exact_bytes=true
-Stdlib.printLine ("hé🙂") = stdout="hé🙂\n" stderr="" exact_bytes=true
-Stdlib.printLine ("line\n") = stdout="line\n\n" stderr="" exact_bytes=true
+Stdlib.print "" = stdout="" stderr="" exact_bytes=true
+(Stdlib.print "hé🙂"; ()) = stdout="hé🙂" stderr="" exact_bytes=true
+Stdlib.print "left\nright\n" = stdout="left\nright\n" stderr="" exact_bytes=true
+Stdlib.printLine "" = stdout="\n" stderr="" exact_bytes=true
+Stdlib.printLine "hé🙂" = stdout="hé🙂\n" stderr="" exact_bytes=true
+Stdlib.printLine "line\n" = stdout="line\n\n" stderr="" exact_bytes=true
 Stdlib.printLines ([]) = stdout="" stderr="" exact_bytes=true
 Stdlib.printLines (["one", "", "三\n"]) = stdout="one\n\n三\n\n" stderr="" exact_bytes=true
-(Stdlib.print ("a"); Stdlib.printLine ("b"); Stdlib.printLines (["c", "d"]); Stdlib.print ("e"); ()) = stdout="ab\nc\nd\ne" stderr="" exact_bytes=true
-(Stdlib.print ("optimized"); Stdlib.printLine (" path"); ()) = stdout="optimized path\n" stderr="" exact_bytes=true
-(Stdlib.print ("unoptimized"); Stdlib.printLine (" path"); ()) = stdout="unoptimized path\n" stderr="" exact_bytes=true disable_opt_anf=true disable_opt_mir=true disable_opt_lir=true
+(Stdlib.print "a"; Stdlib.printLine "b"; Stdlib.printLines (["c", "d"]); Stdlib.print "e"; ()) = stdout="ab\nc\nd\ne" stderr="" exact_bytes=true
+(Stdlib.print "optimized"; Stdlib.printLine " path"; ()) = stdout="optimized path\n" stderr="" exact_bytes=true
+(Stdlib.print "unoptimized"; Stdlib.printLine " path"; ()) = stdout="unoptimized path\n" stderr="" exact_bytes=true disable_opt_anf=true disable_opt_mir=true disable_opt_lir=true
 
 (Stdlib.Cli.Log.info "hello"; Stdlib.Cli.Log.warn "careful"; Stdlib.Cli.Log.error "bad"; Stdlib.Cli.Log.debug "trace"; Stdlib.Cli.Log.success "good"; ()) = stdout="\u001b[32m[INFO]\u001b[0m hello\n\u001b[33m[WARN]\u001b[0m careful\n\u001b[31m[ERROR]\u001b[0m bad\n\u001b[90m[DEBUG]\u001b[0m trace\n\u001b[32m[OK]\u001b[0m good\n" stderr="" exact_bytes=true
 
@@ -33,8 +33,8 @@ Stdlib.Cli.UI.Prompt.confirm "Continue?" = stdout="Continue? [y/N] false\n" stde
 Stdlib.Cli.UI.Prompt.select "Pick" ["alpha"; "beta"] = stdout="Pick\n  \u001b[1m1\u001b[0m. alpha\n  \u001b[1m2\u001b[0m. beta\nEnter number: \u001b[31mPlease enter a number\u001b[0m\nPick\n  \u001b[1m1\u001b[0m. alpha\n  \u001b[1m2\u001b[0m. beta\nEnter number: \"beta\"\n" stderr="" stdin="wat\n +2 \n" exact_bytes=true
 Stdlib.Cli.UI.Prompt.select "Pick" ["alpha"; "beta"] = stdout="Pick\n  \u001b[1m1\u001b[0m. alpha\n  \u001b[1m2\u001b[0m. beta\nEnter number: \u001b[31mInvalid selection\u001b[0m\nPick\n  \u001b[1m1\u001b[0m. alpha\n  \u001b[1m2\u001b[0m. beta\nEnter number: \"alpha\"\n" stderr="" stdin="3\n1\n" exact_bytes=true
 
-Stdlib.Cli.UI.Spinner.run<Int64> "Working" (fun () -> 7L) = stdout="Working... \u001b[32mdone\u001b[0m\n7\n" stderr="" exact_bytes=true
-Stdlib.Cli.UI.Spinner.run<Int64> "Working" (fun () -> let _ = Builtin.testRuntimeError "boom" in 0L) = exit=1 stdout="Working... " stderr="Uncaught exception: boom" exact_bytes=true
+Stdlib.Cli.UI.Spinner.run "Working" (fun () -> 7L) = stdout="Working... \u001b[32mdone\u001b[0m\n7\n" stderr="" exact_bytes=true
+Stdlib.Cli.UI.Spinner.run "Working" (fun () -> let _ = Builtin.testRuntimeError "boom" in 0L) = exit=1 stdout="Working... " stderr="Uncaught exception: boom" exact_bytes=true
 
 (Stdlib.Cli.UI.Table.print ["Name"; "Value"] [["e\u0301"; "x"]; ["long"]]; ()) = stdout="\u001b[1mName  Value\u001b[0m\n----  -----\né     x    \nlong       \n" stderr="" exact_bytes=true
 (Stdlib.Cli.UI.Table.print ["G"] [["🇺🇸"]; ["가"]; ["1️⃣"]]; ()) = stdout="\u001b[1mG\u001b[0m\n-\n🇺🇸\n가\n1️⃣\n" stderr="" exact_bytes=true

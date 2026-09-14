@@ -21,7 +21,7 @@ parser passes, the whole-program section of `1.5_TypeChecking.fs`,
 | --- | --- | --- |
 | source composition | a compile request contains a non-empty, ordered collection of named units; each unit is parsed independently | AOT extension |
 | unit purpose | executable, library, and package purposes are explicit; dependency units cannot contain entries | AOT extension |
-| declarations | `let` declares functions, `val` is retained by the recursive source tree, and `type` declares types; public `def` is rejected | parity at the source boundary |
+| declarations | `let` declares functions, `val` is retained by the recursive source tree, and `type` declares types | parity at the source boundary |
 | modules | file modules and nested source modules retain typed paths until validated composition; lowering uses deterministic qualified native symbols | parity with an internal AOT symbol boundary |
 | ordering | all declarations are inventoried before bodies are checked, so supported sibling function and type references are order-independent | parity |
 | duplicates | the last declaration at the same category and qualified location wins; type, value, and function categories are distinct | parity |
@@ -36,7 +36,7 @@ parser passes, the whole-program section of `1.5_TypeChecking.fs`,
 
 Top-level value declarations are represented explicitly by `SourceValue` and
 participate in source-tree and entry validation. Native materialization remains
-an explicit lowering boundary: programs that reach the legacy expression AST
+an explicit lowering boundary: programs that reach the expression AST
 with a source value receive the deterministic diagnostic “Top-level value
 declarations are parsed but native execution is not supported.” This is not
 claimed as runtime parity; it remains the contained follow-up boundary rather
@@ -49,7 +49,7 @@ entry rejection, zero/multiple entry cardinality, last-wins function overlays,
 and file-result validation. Canonical syntax fixtures cover retained module
 shape and declaration boundaries. `name-resolution.e2e` covers contextual
 lookup, last-wins duplicates, constructor identity, exact qualification, and
-missing names. Legacy `def` remains only in explicit rejection/tooling probes.
+missing names.
 
 Performance-only differences and native object/executable layout are outside
 this ledger.

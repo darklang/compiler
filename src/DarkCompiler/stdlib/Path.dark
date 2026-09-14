@@ -9,11 +9,11 @@ module Stdlib.Path
 // Combine two path segments
 let combine (a: String) (b: String) : String =
     if a == "/" then
-        "/" ++ b
-    else if Stdlib.String.endsWith (a) ("/") then
+        $"/{b}"
+    else if Stdlib.String.endsWith a "/" then
         a ++ b
     else
-        a ++ "/" ++ b
+        $"{a}/{b}"
 
 // The portable implementation is deliberately ordinary Dark code.
 let tempDir () : String = "/tmp"

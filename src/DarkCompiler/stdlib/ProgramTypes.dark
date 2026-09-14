@@ -6,7 +6,7 @@ type Hash = Hash of String
 
 let hashToString (hash: Darklang.LanguageTools.ProgramTypes.Hash) : String =
     match hash with
-    | Hash (value) -> value
+    | Hash value -> value
 
 type PackageLocation =
     { owner: String,

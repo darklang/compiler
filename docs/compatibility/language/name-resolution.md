@@ -43,7 +43,7 @@ Candidates at the same winning precedence are sorted by rendered identity.
 | `f` applied | callable | value only | value, validated as callable by typing | parity |
 | `A.B.f` | value | exact qualified value + function | value | parity |
 | `A.B.f` applied | callable | exact qualified function + value | function | parity |
-| `A.B.f` | any | only `Stdlib.A.B.f` exists | unresolved | parity; implicit compiler insertion removed |
+| `A.B.f` | any | only `Stdlib.A.B.f` exists | unresolved | parity; qualified names resolve exactly |
 | `Builtin.f` | callable | registered builtin function | builtin `(f, version)` identity | parity |
 | `Builtin.v` | value | registered builtin value | builtin `(v, version)` identity | parity |
 | `f_v0` | value/callable | explicit version-zero inventory alias | registered version-zero identity | parity |

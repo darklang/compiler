@@ -1,8 +1,6 @@
 # Conditional and Sequence Parity
 
-This matrix records the revalidated behavior of conditional and sequential
-expressions. It supersedes conditional/statement implications in the historical
-DCB1 report at commit `8a402797`; that report was used only as an inventory.
+This matrix records the behavior of conditional and sequential expressions.
 
 ## Evidence revisions
 
@@ -64,12 +62,6 @@ same compiler source exercised through the full language pipeline.
 Repository-wide searches of the parser productions and language sources found no
 compiler-only conditional source form to migrate. Optional `else`, `else if`, and
 `elif` are all interpreter-supported at the pinned revision.
-
-The canonical parser formerly contained a compiler-only representation: a
-parenthesized statement followed by a trailing `let` was encoded as a wildcard
-`Match`. That production has been migrated to the explicit `Sequence` AST case,
-and its parser regression now asserts that shape. No standard-library, fixture,
-example, or documentation expression depended on the wildcard-match encoding.
 
 The compiler consumes the interpreter-compatible grammar through this single
 parser. Parenthesized semicolon sequences and layout-sensitive statement blocks

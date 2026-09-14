@@ -56,9 +56,8 @@ machine-width masks on both ARM64 and x86-64.
 
 ## Intentional difference
 
-The named parity API uses only the interpreter-declared functions. Historical
-integer aliases and compiler-only helper names have been removed. Internal
-representation helpers beginning with `__` remain implementation details.
+The named parity API uses the interpreter-declared functions. Internal
+representation helpers beginning with `__` are implementation details.
 Static operand and conversion type enforcement is the intentional AOT
 divergence; the compiler does not reproduce interpreter runtime dispatch
 errors for source that can be rejected during type checking.

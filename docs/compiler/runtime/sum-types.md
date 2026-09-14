@@ -56,11 +56,6 @@ Pair.Pair 1L "one"
 OneTuple.OneTuple (1L, "one")
 ```
 
-The canonical parser rejects the removed compiler declaration dialect: omitted
-leading bars, qualified declaration names, bare declaration type parameters,
-and legacy function declarations. Public declarations use the interpreter spellings
-shown above.
-
 ## Declaration and resolution model
 
 `AST.TEnumFields` preserves the difference between several enum fields and one
@@ -159,5 +154,5 @@ recursive types, multiple fields versus a tuple field, qualification,
 same-case collisions across nominal types, exact arity, left-to-right payload
 failure, rendering, and nominal equality. Compiler-pass tests cover duplicate
 types, parameters, constructors and fields, undeclared parameters, empty
-declarations, unknown type references, generic reference arity, removed legacy
-syntax forms, and resolved-reference AST shape.
+declarations, unknown type references, generic reference arity, and
+resolved-reference AST shape.

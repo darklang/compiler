@@ -5,4 +5,4 @@ let wrapAfterMask (a: Int8) : Int8 =
     let masked = Stdlib.Int8.bitwiseAnd a 3y in
     masked + 127y
 
-wrapAfterMask (2y) = -127y
+wrapAfterMask 2y = -127y

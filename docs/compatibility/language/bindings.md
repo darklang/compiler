@@ -55,9 +55,7 @@ the retained compiler extension: early static type failure, not a different
 binding or evaluation rule.
 
 The compiler's native-code target, static type checking, and early diagnostics
-remain extensions. Fat-arrow lambdas, typed lambda binders, general-pattern
-lets, last-wins duplicate binders, and the duplicate-warning override are not
-extensions and have been removed.
+remain extensions.
 
 ## Verification
 

@@ -1,5 +1,4 @@
 // Named bitwise API and backend-lowering coverage.
-// Symbolic bitwise expression syntax is rejected by operator_parity.e2e.
 
 Stdlib.Int64.shiftLeft 1L 8L = 256L
 Stdlib.Int64.shiftRight 256L 8L = 1L

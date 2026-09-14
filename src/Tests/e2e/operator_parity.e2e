@@ -5,10 +5,3 @@
 2L ^ 3L = 8L
 2.0 ^ 3.0 = 8.0
 (^) 2 3 = 8
-
-1L << 2L = error="Operator '<<' is reserved but not supported by the expression grammar"
-1L >> 1L = error="Operator '>>' is reserved but not supported by the expression grammar"
-1L & 1L = error="Operator '&' is reserved but not supported by the expression grammar"
-1L ||| 1L = error="Operator '|||' is reserved but not supported by the expression grammar"
-~~~1L = error="Operator '~~~' is reserved but not supported by the expression grammar"
-!true = error="Operator '!' is reserved but not supported by the expression grammar"

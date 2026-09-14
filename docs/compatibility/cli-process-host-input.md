@@ -33,8 +33,7 @@ Only `Posix.Error`, `kill`, `sigterm`, `sigkill`, `sleep`,
 `isProcessRunning`, and `Env.get` are claimed from the much larger interpreter
 Posix/Env API. The remainder is outside this parity scope. F#
 `Platform.Target` and `CompilerLibrary.execute` are AOT driver internals, not
-Dark extensions. The former public `Stdlib.Platform.isMacOS/isLinux` extension
-was removed in favor of `Stdlib.Cli.OS.getOS`.
+Dark extensions.
 
 ## Native boundary
 

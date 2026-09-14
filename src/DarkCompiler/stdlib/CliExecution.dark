@@ -27,17 +27,17 @@ let __processIO (handle: Int64) (input: String) : Stdlib.Cli.NativeOutput = Stdl
 let __terminateProcess (handle: Int64) : Stdlib.Cli.NativeOutput = Stdlib.Cli.NativeOutput { exitCode = -1L, stdout = "", stderr = "Invalid process handle" }
 
 let execute (command: String) : Stdlib.Cli.ExecutionOutcome =
-    let result = Stdlib.Cli.__execute (command) in
+    let result = Stdlib.Cli.__execute command in
     Stdlib.Cli.ExecutionOutcome {
-        exitCode = Stdlib.Int.fromInt64 (result.exitCode),
+        exitCode = Stdlib.Int.fromInt64 result.exitCode,
         stdout = result.stdout,
         stderr = result.stderr
     }
 
 let executeWithUnitOrStdErr (command: String) : Stdlib.Result.Result<Unit, String> =
-    let result = Stdlib.Cli.execute (command) in
-    if result.exitCode == 0 then Ok (()) else Error (result.stderr)
+    let result = Stdlib.Cli.execute command in
+    if result.exitCode == 0 then Ok (()) else Error result.stderr
 
 let executeWithStdOutOrStdErr (command: String) : Stdlib.Result.Result<String, String> =
-    let result = Stdlib.Cli.execute (command) in
-    if result.exitCode == 0 then Ok (result.stdout) else Error (result.stderr)
+    let result = Stdlib.Cli.execute command in
+    if result.exitCode == 0 then Ok result.stdout else Error result.stderr

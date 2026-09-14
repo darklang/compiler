@@ -6,4 +6,4 @@ type Hash = Hash of String
 
 let hashToString (hash: Darklang.LanguageTools.RuntimeTypes.Hash) : String =
     match hash with
-    | Hash (value) -> value
+    | Hash value -> value

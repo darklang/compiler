@@ -65,9 +65,7 @@ process-local address.
 
 ## Implementation boundary
 
-The legacy `Base64.urlDecode` and compiler diagnostic Crypto helpers are not
-source APIs. Blob parity operations use private byte-layout helpers within the
-Blob module; there is no separate Bytes type or namespace.
+Blob parity operations use private byte-layout helpers within the Blob module.
 
 ## Source evidence and probes
 

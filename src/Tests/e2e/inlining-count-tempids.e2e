@@ -18,8 +18,8 @@ let ifWithLets (flag: Bool) : Int64 =
     let x = 10L in x
   else
     let y = 20L in y
-ifWithLets (true) = 10L
-ifWithLets (false) = 20L
+ifWithLets true = 10L
+ifWithLets false = 20L
 
 // Multiple Lets in each branch (should sum both counts)
 let ifWithMultipleLets (flag: Bool) : Int64 =
@@ -32,8 +32,8 @@ let ifWithMultipleLets (flag: Bool) : Int64 =
     let x = 10L in
     let y = 20L in
     x + y
-ifWithMultipleLets (true) = 6L
-ifWithMultipleLets (false) = 30L
+ifWithMultipleLets true = 6L
+ifWithMultipleLets false = 30L
 
 // ===================================================================
 // Nested If expressions
@@ -52,10 +52,10 @@ let nestedIf (outer: Bool) (inner: Bool) : Int64 =
     let d = 4L in
     let e = 5L in
     d + e
-nestedIf (true) (true) = 3L
-nestedIf (true) (false) = 3L
-nestedIf (false) (true) = 9L
-nestedIf (false) (false) = 9L
+nestedIf true true = 3L
+nestedIf true false = 3L
+nestedIf false true = 9L
+nestedIf false false = 9L
 
 // ===================================================================
 // Functions with large If bodies (near inlining threshold)
@@ -91,8 +91,8 @@ let largeIfFunction (flag: Bool) : Int64 =
     let b10 = 100L in
     b1 + b2 + b3 + b4 + b5 + b6 + b7 + b8 + b9 + b10
 
-largeIfFunction (true) = 55L
-largeIfFunction (false) = 550L
+largeIfFunction true = 55L
+largeIfFunction false = 550L
 
 // Function with asymmetric branches (to test + vs - in counting)
 // then-branch: 15 Lets, else-branch: 5 Lets
@@ -124,8 +124,8 @@ let asymmetricIfFunction (flag: Bool) : Int64 =
     let b5 = 500L in
     b1 + b2 + b3 + b4 + b5
 
-asymmetricIfFunction (true) = 120L
-asymmetricIfFunction (false) = 1500L
+asymmetricIfFunction true = 120L
+asymmetricIfFunction false = 1500L
 
 // ===================================================================
 // Function calling another function with If and Lets
@@ -139,11 +139,11 @@ let helperWithIf (x: Int64) : Int64 =
     let neg = x * -1L in neg
 
 let callerOfHelper (n: Int64) : Int64 =
-  let a = helperWithIf (n) in
+  let a = helperWithIf n in
   let b = helperWithIf (-n) in
   a + b
 
-callerOfHelper (5L) = 15L
+callerOfHelper 5L = 15L
 callerOfHelper (-3L) = 9L
 
 // ===================================================================
@@ -169,14 +169,14 @@ let complexNested (a: Bool) (b: Bool) (c: Bool) : Int64 =
     else
       let y3 = y1 + 40L in y3
 
-complexNested (true) (true) (true) = 111L
-complexNested (true) (true) (false) = 112L
-complexNested (true) (false) (true) = 120L
-complexNested (true) (false) (false) = 120L
-complexNested (false) (true) (true) = 230L
-complexNested (false) (true) (false) = 230L
-complexNested (false) (false) (true) = 240L
-complexNested (false) (false) (false) = 240L
+complexNested true true true = 111L
+complexNested true true false = 112L
+complexNested true false true = 120L
+complexNested true false false = 120L
+complexNested false true true = 230L
+complexNested false true false = 230L
+complexNested false false true = 240L
+complexNested false false false = 240L
 
 // ===================================================================
 // Inlining in If Expression Branches
@@ -191,13 +191,13 @@ let addTwo (x: Int64) : Int64 = x + 2L
 // The else-branch is a simple expression with no function calls
 let ifWithInlineInThenOnly (flag: Bool) (n: Int64) : Int64 =
   if flag then
-    let result = addTwo (n) in  // This call will be inlined
+    let result = addTwo n in  // This call will be inlined
     result
   else
     n * 3L                      // No call to inline
 
-ifWithInlineInThenOnly (true) (10L) = 12L
-ifWithInlineInThenOnly (false) (10L) = 30L
+ifWithInlineInThenOnly true 10L = 12L
+ifWithInlineInThenOnly false 10L = 30L
 
 // If expression where only the else-branch has a call that gets inlined
 // The then-branch is a simple expression with no function calls
@@ -205,27 +205,27 @@ let ifWithInlineInElseOnly (flag: Bool) (n: Int64) : Int64 =
   if flag then
     n * 4L                      // No call to inline
   else
-    let result = addTwo (n) in  // This call will be inlined
+    let result = addTwo n in  // This call will be inlined
     result
 
-ifWithInlineInElseOnly (true) (5L) = 20L
-ifWithInlineInElseOnly (false) (5L) = 7L
+ifWithInlineInElseOnly true 5L = 20L
+ifWithInlineInElseOnly false 5L = 7L
 
 // Nested If where inner If has inlining only in one branch
 // This tests inlining through nested structures
 let nestedIfWithPartialInline (outer: Bool) (inner: Bool) (n: Int64) : Int64 =
   if outer then
     if inner then
-      addTwo (n)    // Inlined
+      addTwo n    // Inlined
     else
       n + 100L      // Not a call
   else
     n * 5L          // No calls in outer else branch
 
-nestedIfWithPartialInline (true) (true) (10L) = 12L
-nestedIfWithPartialInline (true) (false) (10L) = 110L
-nestedIfWithPartialInline (false) (true) (10L) = 50L
-nestedIfWithPartialInline (false) (false) (10L) = 50L
+nestedIfWithPartialInline true true 10L = 12L
+nestedIfWithPartialInline true false 10L = 110L
+nestedIfWithPartialInline false true 10L = 50L
+nestedIfWithPartialInline false false 10L = 50L
 
 // ===================================================================
 // Program-Level Inlining Across Multiple Functions
@@ -238,8 +238,8 @@ let tiny (x: Int64) : Int64 = x + 1L
 
 // Function that calls tiny - the call will be inlined
 let callerWithInline (n: Int64) : Int64 =
-  let a = tiny (n) in
-  let b = tiny (a) in
+  let a = tiny n in
+  let b = tiny a in
   b
 
 // Function with no inlining opportunities (no calls to inline-able functions)
@@ -249,8 +249,8 @@ let noInline (n: Int64) : Int64 =
   y
 
 // Test that both functions work correctly when processed together.
-callerWithInline (5L) = 7L
-noInline (10L) = 23L
+callerWithInline 5L = 7L
+noInline 10L = 23L
 
 // Multiple functions with varying inlining behavior
 let helper1 (x: Int64) : Int64 = x * 3L
@@ -258,8 +258,8 @@ let helper2 (x: Int64) : Int64 = x - 1L
 
 // This function has inlining (calls helper1 and helper2)
 let mixedCaller (n: Int64) : Int64 =
-  let a = helper1 (n) in
-  let b = helper2 (a) in
+  let a = helper1 n in
+  let b = helper2 a in
   b
 
 // This function has no inlining opportunities
@@ -269,5 +269,5 @@ let pureComputation (n: Int64) : Int64 =
   cubed - squared
 
 // Verify behavior when multiple functions process through the fold
-mixedCaller (4L) = 11L
-pureComputation (3L) = 18L
+mixedCaller 4L = 11L
+pureComputation 3L = 18L

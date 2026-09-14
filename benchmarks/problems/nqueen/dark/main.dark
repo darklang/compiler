@@ -12,26 +12,26 @@ let nqueenSolve (allOnes: Int64) (cols: Int64) (diag1: Int64) (diag2: Int64) (av
     else
         let pos = Stdlib.Int64.bitwiseAnd avail (0L - avail) in
         let newAvail = avail - pos in
-        let newCols = Stdlib.Int64.bitwiseOr (cols) (pos) in
+        let newCols = Stdlib.Int64.bitwiseOr cols pos in
         let subCount =
             if newCols == allOnes then 1L
             else
                 let newDiag1 = Stdlib.Int64.shiftLeft (Stdlib.Int64.bitwiseOr diag1 pos) 1L in
                 let newDiag2 = Stdlib.Int64.shiftRight (Stdlib.Int64.bitwiseOr diag2 pos) 1L in
-                let blocked = Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr (newCols) (newDiag1)) (newDiag2) in
+                let blocked = Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseOr newCols newDiag1) newDiag2 in
                 let nextRowAvail = Stdlib.Int64.bitwiseAnd allOnes (Stdlib.Int64.bitwiseNot blocked) in
-                nqueenSolve (allOnes) (newCols) (newDiag1) (newDiag2) (nextRowAvail) (0L) in
-        nqueenSolve (allOnes) (cols) (diag1) (diag2) (newAvail) (count + subCount)
+                nqueenSolve allOnes newCols newDiag1 newDiag2 nextRowAvail 0L in
+        nqueenSolve allOnes cols diag1 diag2 newAvail (count + subCount)
 
 let nqueen (n: Int64) : Int64 =
     let shifted = Stdlib.Int64.shiftLeft 1L n in
     let allOnes = shifted - 1L in
-    nqueenSolve (allOnes) (0L) (0L) (0L) (allOnes) (0L)
+    nqueenSolve allOnes 0L 0L 0L allOnes 0L
 
 // N=13 gives reasonable runtime
 let benchmarkArg (index: Int) : Int64 =
-    match Stdlib.Cli.Args.int64 (index) with
-    | Ok (value) -> value
-    | Error (message) -> Builtin.testRuntimeError (message)
+    match Stdlib.Cli.Args.int64 index with
+    | Ok value -> value
+    | Error message -> Builtin.testRuntimeError message
 
-Builtin.printLine (Stdlib.Int64.toString (nqueen (benchmarkArg (0))))
+Builtin.printLine (Stdlib.Int64.toString (nqueen (benchmarkArg 0)))

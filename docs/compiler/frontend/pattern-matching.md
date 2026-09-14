@@ -222,12 +222,6 @@ body executes. The compiler requires every possible value to select an
 unguarded arm, so an unmatched value is a compile-time error rather than a
 runtime match failure.
 
-No compiler-only pattern form is retained in the public parity grammar. Record
-destructuring was removed; compiler-syntax comma separators in list patterns
-remain a syntax-mode alias, not a distinct pattern form. Arbitrary-precision
-`Int` literals and multi-field enum payload representation remain contained in
-their value/type owners.
-
 The compiler deliberately retains one AOT-only timing divergence: all arms are
 type checked, including arms which the interpreter would not reach. Invalid
 patterns, duplicate bindings, alternative binding-set differences, and

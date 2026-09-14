@@ -7,7 +7,7 @@
 // =====================================================
 
 let test (a: Int64) : (Int64 * Int64) = let t = (a, a * 2L) in t
-let r = test (5L) in r.0 = 5L
+let r = test 5L in r.0 = 5L
 
 let makeNext (t: (Int64 * Int64)) : (Int64 * Int64) = let next = (t.0+1L, t.1+2L) in next
 let r2 = makeNext ((0L, 0L)) in r2.0 = 1L
@@ -27,7 +27,7 @@ let r5 = addToTupleDirect ((0L, 0L)) in r5.1 = 2L
 // Accessing tuple elements inside the function
 // =====================================================
 let getFirst (a: Int64) : Int64 = let t = (a, a * 2L) in t.0
-getFirst (5L) = 5L
+getFirst 5L = 5L
 
 let getSecond (a: Int64) : Int64 = let t = (a, a * 2L) in t.1
-getSecond (5L) = 10L
+getSecond 5L = 10L
