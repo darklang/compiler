@@ -230,7 +230,32 @@ type CFG = {
 /// Arrange blocks into deterministic successor chains so the backends can use
 /// the lexical successor as a fallthrough edge. Entry remains first; each
 /// remaining chain starts in label order, and every block occurs exactly once.
+/// A single shared return is deferred to the end to fall into the epilogue.
 let layoutBlocks (cfg: CFG) : Result<BasicBlock list, string> =
+    let commonReturn =
+        let returns =
+            cfg.Blocks
+            |> Map.toList
+            |> List.choose (fun (label, block) -> if block.Terminator = Ret then Some label else None)
+        match returns with
+        | [label] when label <> cfg.Entry ->
+            let predecessors =
+                cfg.Blocks
+                |> Map.toList
+                |> List.filter (fun (_, block) ->
+                    match block.Terminator with
+                    | Ret -> false
+                    | Jump target -> target = label
+                    | Branch (_, yes, no)
+                    | BranchZero (_, yes, no)
+                    | BranchBitZero (_, _, yes, no)
+                    | BranchBitNonZero (_, _, yes, no)
+                    | CondBranch (_, yes, no) -> yes = label || no = label)
+            // Count predecessor blocks, not edges: a same-target conditional
+            // alone does not make a return shared.
+            if List.length predecessors >= 2 then Some label else None
+        | _ -> None
+
     let preferredSuccessor terminator =
         match terminator with
         | Ret -> None
@@ -256,6 +281,7 @@ let layoutBlocks (cfg: CFG) : Result<BasicBlock list, string> =
                 // does not mask a more specific backend diagnostic.
                 | Some successor when
                     not (Set.contains successor visited)
+                    && Some successor <> commonReturn
                     && Map.containsKey successor cfg.Blocks ->
                     followChain visited reversedBlocks successor
                 | _ -> Ok (visited, reversedBlocks)
@@ -268,6 +294,8 @@ let layoutBlocks (cfg: CFG) : Result<BasicBlock list, string> =
             cfg.Blocks
             |> Map.toList
             |> List.map fst
+            |> List.partition (fun label -> Some label <> commonReturn)
+            |> fun (ordinary, deferred) -> ordinary @ deferred
             |> List.fold
                 (fun state label ->
                     state

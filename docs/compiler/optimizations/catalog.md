@@ -128,6 +128,12 @@ backends own:
 - authoritative entry-parameter placement; and
 - CFG block placement that exposes native fallthroughs.
 
+`LIR.layoutBlocks` follows false and jump successor chains, but places a single
+non-entry return shared by multiple predecessor blocks last. This lets the
+return fall through into the native epilogue without duplicating its cleanup or
+instructions. Entry-return, multiple-return, and non-returning CFGs retain the
+ordinary successor-chain policy.
+
 The LIR fixtures, allocation tests, and target-specific generated-code tests
 own register-liveness, interference, flags, and instruction-encoding safety.
 

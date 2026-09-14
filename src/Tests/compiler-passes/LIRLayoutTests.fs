@@ -24,14 +24,54 @@ let private branchFixture () : LIR.CFG =
         ]
     }
 
-let testLayoutFollowsFalseAndJumpSuccessors () : TestResult =
-    match LIR.layoutBlocks (branchFixture ()) with
+let testLayoutDefersSharedReturn () : TestResult =
+    let cfg = branchFixture ()
+    match LIR.layoutBlocks cfg with
     | Error e -> Error e
     | Ok blocks ->
         let labels = blocks |> List.map (fun block -> block.Label)
-        let expected = [LIR.Label "entry"; LIR.Label "z_false"; LIR.Label "join"; LIR.Label "a_true"]
-        if labels = expected then Ok ()
+        let expected = [LIR.Label "entry"; LIR.Label "z_false"; LIR.Label "a_true"; LIR.Label "join"]
+        let preserved =
+            List.length blocks = Map.count cfg.Blocks
+            && (blocks |> List.map (fun block -> block.Label, block) |> Map.ofList) = cfg.Blocks
+        if not preserved then Error "Layout changed or duplicated CFG blocks"
+        elif labels = expected then Ok ()
         else Error $"Expected deterministic fallthrough layout {expected}, got {labels}"
+
+let testLayoutPreservesOtherReturnShapes () : TestResult =
+    let entry = LIR.Label "entry"
+    let middle = LIR.Label "z_middle"
+    let last = LIR.Label "a_last"
+    let block label terminator : LIR.BasicBlock = {
+        Label = label
+        Instrs = [LIR.Mov (LIR.Physical LIR.X0, LIR.Imm 7L)]
+        Terminator = terminator
+    }
+    let branch yes no = LIR.Branch (LIR.Physical LIR.X0, yes, no)
+    let fixtures = [
+        "single entry return", [entry, LIR.Ret], [entry]
+        "entry is shared return", [entry, LIR.Ret; middle, LIR.Jump entry; last, LIR.Jump entry], [entry; last; middle]
+        "multiple returns", [entry, branch last middle; middle, LIR.Ret; last, LIR.Ret], [entry; middle; last]
+        "no return loop", [entry, LIR.Jump middle; middle, LIR.Jump entry; last, LIR.Jump middle], [entry; middle; last]
+        "unshared return chain", [entry, LIR.Jump middle; middle, LIR.Jump last; last, LIR.Ret], [entry; middle; last]
+        "duplicate edges are one predecessor", [entry, branch middle middle; middle, LIR.Ret; last, LIR.Jump entry], [entry; middle; last]
+    ]
+    fixtures
+    |> List.fold (fun result (name, terminators, expected) ->
+        result |> Result.bind (fun () ->
+            let cfg : LIR.CFG = {
+                Entry = entry
+                Blocks = terminators |> List.map (fun (label, terminator) -> label, block label terminator) |> Map.ofList
+            }
+            LIR.layoutBlocks cfg
+            |> Result.bind (fun blocks ->
+                let labels = blocks |> List.map (fun block -> block.Label)
+                let preserved =
+                    List.length blocks = Map.count cfg.Blocks
+                    && (blocks |> List.map (fun block -> block.Label, block) |> Map.ofList) = cfg.Blocks
+                if not preserved then Error $"{name}: layout changed or duplicated CFG blocks"
+                elif labels = expected then Ok ()
+                else Error $"{name}: expected {expected}, got {labels}"))) (Ok ())
 
 let testLayoutLeavesMissingSuccessorValidationToConsumers () : TestResult =
     let entry = LIR.Label "entry"
@@ -58,7 +98,8 @@ let testLayoutReportsMissingEntryBlock () : TestResult =
     | Ok _ -> Error "Expected layout to reject a missing entry block"
 
 let tests : (string * (unit -> TestResult)) list = [
-    ("LIR layout follows false and jump successor chains", testLayoutFollowsFalseAndJumpSuccessors)
+    ("LIR layout defers shared return", testLayoutDefersSharedReturn)
+    ("LIR layout preserves other return shapes", testLayoutPreservesOtherReturnShapes)
     ("LIR layout leaves missing successor validation to consumers", testLayoutLeavesMissingSuccessorValidationToConsumers)
     ("LIR layout reports missing entry block", testLayoutReportsMissingEntryBlock)
 ]

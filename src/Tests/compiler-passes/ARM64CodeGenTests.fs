@@ -470,6 +470,45 @@ let testBranchFalseEdgeFallsThrough () : TestResult =
             | Some epilogue, Some overflow -> Error $"ARM64 heap-overflow trap at {overflow} blocks final return fallthrough to epilogue at {epilogue}"
             | _ -> Error "ARM64 allocation fixture did not emit both epilogue and heap-overflow labels"
 
+/// A diamond needs one jump over the sibling branch, but neither a backward
+/// jump from that sibling nor a return-to-epilogue jump. Count emitted transfers
+/// rather than merely asserting a particular order of LIR labels.
+let testSharedReturnTransferCost () : TestResult =
+    let entry = LIR.Label "common_return_entry"
+    let yes = LIR.Label "a_common_return_true"
+    let no = LIR.Label "z_common_return_false"
+    let join = LIR.Label "common_return_join"
+    let block label instrs terminator : LIR.BasicBlock = { Label = label; Instrs = instrs; Terminator = terminator }
+    let func : LIR.Function = {
+        Name = "common_return"
+        TypedParams = []
+        CFG = {
+            Entry = entry
+            Blocks = Map.ofList [
+                entry, block entry [] (LIR.Branch (LIR.Physical LIR.X0, yes, no))
+                yes, block yes [LIR.Mov (LIR.Physical LIR.X0, LIR.Imm 11L)] (LIR.Jump join)
+                no, block no [LIR.Mov (LIR.Physical LIR.X0, LIR.Imm 22L)] (LIR.Jump join)
+                join, block join [] LIR.Ret
+            ]
+        }
+        StackSize = 0
+        UsedCalleeSaved = []
+        CodegenFacts = None
+    }
+    let ctx : CodeGen.CodeGenContext = {
+        Target = target; Options = CodeGen.defaultOptions; SumShapeRegistry = Map.empty; RecordRegistry = Map.empty
+        RawSlotInitRetainTargets = None
+        ClosurePayloadSizes = Map.empty; ClosureCaptureTypes = Map.empty
+        FunctionName = func.Name; InstructionSite = ""; StackSize = 0; UsedCalleeSaved = []
+        HeapOverflowLabel = "__heap_oom_common_return"
+        RecordLirOpExpansion = None
+    }
+    CodeGen.convertFunction [] ctx func
+    |> Result.bind (fun instrs ->
+        let transfers = instrs |> List.filter (function ARM64Symbolic.B_label _ -> true | _ -> false)
+        if List.length transfers = 1 then Ok ()
+        else Error $"Common-return diamond needs one unconditional transfer, got {transfers}")
+
 let private makeEmptyFunction
     (name: string)
     (typedParams: LIR.TypedLIRParam list)
@@ -2428,6 +2467,7 @@ let tests : (string * (unit -> TestResult)) list = [
     ("ARM64 UInt64 runtime zero branches target digit handlers", testPrintUInt64RuntimeZeroBranches)
     ("ARM64 UInt64 runtime preserves trailing newline", testPrintUInt64RuntimePreservesNewline)
     ("ARM64 branch false edge falls through", testBranchFalseEdgeFallsThrough)
+    ("ARM64 common-return transfer cost", testSharedReturnTransferCost)
     ("ARM64 FLoad encodable constants use immediate", testArm64FLoadEncodableConstantsUseImmediate)
     ("RawAlloc uses shared heap overflow path", testRawAllocUsesSharedHeapOverflowPath)
     ("Runtime print string length uses full immediate", testRuntimePrintStringLengthUsesFullImmediate)
