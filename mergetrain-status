@@ -7,6 +7,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 interval_seconds=2
 clear_screen=true
 run_once=false
+interactive_redraw=false
 
 usage() {
   echo "Usage: ./mergetrain-status [--repo PATH] [--interval SECONDS] [--no-clear] [--once]"
@@ -52,14 +53,22 @@ if ! command -v mergetrain >/dev/null 2>&1; then
 fi
 
 repo_root="$(cd "$repo_root" && pwd -P)"
+if [[ "$clear_screen" == true && -t 1 ]]; then
+  interactive_redraw=true
+  printf '\033[?25l'
+  trap 'printf "\033[?25h\n"' EXIT
+fi
 
 while true; do
-  if [[ "$clear_screen" == true && -t 1 ]]; then
-    printf '\033[H\033[2J'
+  if [[ "$interactive_redraw" == true ]]; then
+    printf '\033[H'
   fi
 
   if ! mergetrain --repo "$repo_root" status; then
     echo "Status refresh failed; retrying in $interval_seconds second(s)" >&2
+  fi
+  if [[ "$interactive_redraw" == true ]]; then
+    printf '\033[J'
   fi
 
   if [[ "$run_once" == true ]]; then
