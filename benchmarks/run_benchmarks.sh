@@ -238,14 +238,6 @@ if [ "$LIST_ONLY" = true ]; then
     exit 0
 fi
 
-if [ "$SKIP_SMOKE" != true ]; then
-    SMOKE_BENCHMARKS=$(IFS=,; echo "${FILTERED_BENCHMARKS[*]}")
-    if ! "$SCRIPT_DIR/quick_check.sh" --smoke --quiet --benchmarks="$SMOKE_BENCHMARKS"; then
-        pretty_fail "Canonical smoke gate failed; Cachegrind was not started"
-        exit 1
-    fi
-fi
-
 OUTPUT_DIR="$SCRIPT_DIR/results/$(date +%Y-%m-%d_%H%M%S)"
 mkdir -p "$OUTPUT_DIR"
 LOG_DIR="$OUTPUT_DIR/logs"
@@ -435,6 +427,15 @@ if [ ${#BUILD_FAILURES[@]} -ne 0 ]; then
     pretty_fail "Build failures: ${BUILD_FAILURES[*]}"
     pretty_fail "Build gate failed; Cachegrind was not started and canonical reports were not changed"
     exit 1
+fi
+
+if [ "$SKIP_SMOKE" != true ]; then
+    SMOKE_BENCHMARKS=$(IFS=,; echo "${FILTERED_BENCHMARKS[*]}")
+    if ! "$SCRIPT_DIR/quick_check.sh" --smoke --quiet \
+        --benchmarks="$SMOKE_BENCHMARKS" --prebuilt-dir="$OUTPUT_DIR/binaries"; then
+        pretty_fail "Canonical smoke gate failed; Cachegrind was not started"
+        exit 1
+    fi
 fi
 
 if [ "$QUIET_MODE" != true ]; then

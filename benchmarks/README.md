@@ -158,6 +158,11 @@ markdown and JSON reports in the timestamped results directory. Pass `--verbose`
 to stream those details to the terminal. Other modes retain their detailed output
 unless `--quiet` is passed explicitly.
 
+The full runner builds each Dark benchmark once into its results directory. Its
+native smoke gate validates those binaries before Cachegrind measures the same
+artifacts. Standalone `quick_check.sh --smoke` runs still compile into temporary
+storage unless a caller explicitly supplies `--prebuilt-dir`.
+
 Dark snapshots live under `baselines/` and contain a schema version, suite and
 profile identity, normalized architecture, measurement-policy identifier,
 ordered names/counts, full compiler attribution, timestamp, and SHA-256 workload

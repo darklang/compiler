@@ -1,11 +1,13 @@
 #!/bin/bash
 # Complete reduced-workload correctness and monotonic Dark benchmark gate.
-# Usage: ./benchmarks/quick_check.sh [--smoke] [--profile=NAME] [--benchmarks=NAMES] [--fast] [--reset-dark-baseline] [--decision-json=PATH] [--build] [--quiet]
+# Usage: ./benchmarks/quick_check.sh [--smoke] [--prebuilt-dir=PATH] [--profile=NAME] [--benchmarks=NAMES] [--fast] [--reset-dark-baseline] [--decision-json=PATH] [--build] [--quiet]
 #
 # Options:
 #   --smoke                Compile full Dark workloads in fresh storage, run them
 #                          natively, and validate their established output;
 #                          never starts Cachegrind or changes a snapshot
+#   --prebuilt-dir=PATH    In smoke mode, validate binaries already built under
+#                          PATH/<benchmark>/dark/main instead of compiling them
 #   --benchmarks=NAMES     Comma-separated workload selection. Non-smoke runs
 #                          produce targeted evidence and never update a snapshot
 #   --profile=NAME         Benchmark profile used by smoke mode (default: full)
@@ -44,10 +46,19 @@ RESET_DARK_BASELINE=false
 DECISION_OUTPUT=""
 BENCHMARK_SELECTION=""
 PROFILE_OVERRIDE=""
+PREBUILT_DIR=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --smoke) SMOKE_MODE=true; shift ;;
+        --prebuilt-dir=*)
+            PREBUILT_DIR="${1#*=}"
+            if [ -z "$PREBUILT_DIR" ]; then
+                pretty_fail "--prebuilt-dir requires a non-empty path"
+                exit 1
+            fi
+            shift
+            ;;
         --benchmarks=*)
             BENCHMARK_SELECTION="${1#*=}"
             if [ -z "$BENCHMARK_SELECTION" ]; then
@@ -105,6 +116,16 @@ if [ "$SMOKE_MODE" = true ] && { [ "$FAST_MODE" = true ] || [ "$RESET_DARK_BASEL
     exit 1
 fi
 
+if [ -n "$PREBUILT_DIR" ] && [ "$SMOKE_MODE" != true ]; then
+    pretty_fail "--prebuilt-dir is supported only with --smoke"
+    exit 1
+fi
+
+if [ -n "$PREBUILT_DIR" ] && [ "$FORCE_BUILD" = true ]; then
+    pretty_fail "--prebuilt-dir cannot be combined with --build"
+    exit 1
+fi
+
 if [ "$SMOKE_MODE" != true ] && ! command -v valgrind &> /dev/null; then
     pretty_fail "valgrind is not installed"
     exit 1
@@ -155,20 +176,22 @@ if [ "$SMOKE_MODE" != true ] && [ "$RESET_DARK_BASELINE" = false ]; then
     fi
 fi
 
-if [ "$QUIET_MODE" = true ]; then
-    if ! COMPILER_BUILD_OUTPUT=$(dotnet build "$PROJECT_ROOT/src/DarkCompiler/DarkCompiler.fsproj" --verbosity quiet 2>&1); then
-        printf '%s\n' "$COMPILER_BUILD_OUTPUT"
+if [ -z "$PREBUILT_DIR" ]; then
+    if [ "$QUIET_MODE" = true ]; then
+        if ! COMPILER_BUILD_OUTPUT=$(dotnet build "$PROJECT_ROOT/src/DarkCompiler/DarkCompiler.fsproj" --verbosity quiet 2>&1); then
+            printf '%s\n' "$COMPILER_BUILD_OUTPUT"
+            pretty_fail "Dark compiler build failed"
+            exit 1
+        fi
+    elif ! dotnet build "$PROJECT_ROOT/src/DarkCompiler/DarkCompiler.fsproj" --verbosity quiet; then
         pretty_fail "Dark compiler build failed"
         exit 1
     fi
-elif ! dotnet build "$PROJECT_ROOT/src/DarkCompiler/DarkCompiler.fsproj" --verbosity quiet; then
-    pretty_fail "Dark compiler build failed"
-    exit 1
-fi
-COMPILER_DLL="$PROJECT_ROOT/bin/DarkCompiler/Debug/net10.0/DarkCompiler.dll"
-if [ ! -f "$COMPILER_DLL" ]; then
-    pretty_fail "Dark compiler output is missing: $COMPILER_DLL"
-    exit 1
+    COMPILER_DLL="$PROJECT_ROOT/bin/DarkCompiler/Debug/net10.0/DarkCompiler.dll"
+    if [ ! -f "$COMPILER_DLL" ]; then
+        pretty_fail "Dark compiler output is missing: $COMPILER_DLL"
+        exit 1
+    fi
 fi
 
 TEMP_DIR="$(mktemp -d)"
@@ -209,16 +232,27 @@ if [ "$SMOKE_MODE" = true ]; then
     for bench in $BENCHMARKS; do
         PROBLEM_DIR="$SCRIPT_DIR/problems/$bench"
         MAIN_SOURCE="$PROBLEM_DIR/dark/main.dark"
-        MAIN_BINARY="$TEMP_DIR/${bench}-main"
+        if [ -n "$PREBUILT_DIR" ]; then
+            MAIN_BINARY="$PREBUILT_DIR/$bench/dark/main"
+        else
+            MAIN_BINARY="$TEMP_DIR/${bench}-main"
+        fi
 
         if [ ! -f "$MAIN_SOURCE" ]; then
             FAILURES+=("metadata|$bench|missing dark/main.dark")
             continue
         fi
 
-        if ! MAIN_BUILD_OUTPUT=$("$PROJECT_ROOT/dark" "$MAIN_SOURCE" -o "$MAIN_BINARY" -q 2>&1); then
-            BUILD_FAILURES+=("main|$bench|$(concise_failure "$MAIN_BUILD_OUTPUT")")
-            continue
+        if [ -n "$PREBUILT_DIR" ]; then
+            if [ ! -x "$MAIN_BINARY" ]; then
+                FAILURES+=("prebuilt|$bench|missing executable: $MAIN_BINARY")
+                continue
+            fi
+        else
+            if ! MAIN_BUILD_OUTPUT=$("$PROJECT_ROOT/dark" "$MAIN_SOURCE" -o "$MAIN_BINARY" -q 2>&1); then
+                BUILD_FAILURES+=("main|$bench|$(concise_failure "$MAIN_BUILD_OUTPUT")")
+                continue
+            fi
         fi
         EXPECTED_OUTPUT=$(python3 "$SCRIPT_DIR/infrastructure/benchmark_profiles.py" expected "$PROFILE" "$bench")
         mapfile -t MAIN_ARGUMENTS < <(python3 "$SCRIPT_DIR/infrastructure/benchmark_profiles.py" arguments "$PROFILE" "$bench")
