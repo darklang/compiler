@@ -280,6 +280,9 @@ let private isRuntimeFailureName (funcName: string) : bool =
 let private isBuiltinTestNanName (name: string) : bool =
     name = "Builtin.testNan"
 
+let private isBuiltinTestInfinityName (name: string) : bool =
+    name = "Builtin.testInfinity"
+
 let private isBuiltinBlobEmptyName (name: string) : bool =
     name = "Builtin.blobEmpty"
 
@@ -1396,6 +1399,10 @@ let private buildEqExprForType
         BinOp (Eq, leftExpr, rightExpr)
     | TInt ->
         Call ("Stdlib.Int.__equals", NonEmptyList.fromList [leftExpr; rightExpr])
+    | TInt128 ->
+        Call ("Stdlib.Int128.__equals", NonEmptyList.fromList [leftExpr; rightExpr])
+    | TUInt128 ->
+        Call ("Stdlib.UInt128.__equals", NonEmptyList.fromList [leftExpr; rightExpr])
     | TList elemType ->
         let resolvedElemType = resolveType aliasReg elemType
         makeInternalTypeApp (EqHelperDispatchTypeApp (TList resolvedElemType, leftExpr, rightExpr))
@@ -1690,7 +1697,7 @@ let rec collectFreeVars (expr: Expr) (bound: Set<string>) : Set<string> =
     | BoolLiteral _ | StringLiteral _ | CharLiteral _ | FloatLiteral _ | RuntimeError _ ->
         Set.empty
     | Var name ->
-        if Set.contains name bound || isBuiltinTestNanName name then
+        if Set.contains name bound || isBuiltinTestNanName name || isBuiltinTestInfinityName name then
             Set.empty
         else
             Set.singleton name
@@ -2567,8 +2574,8 @@ let rec private checkExprWithParamNamesAndSumTypeNames
 
             let tryAsNumericType (typ: Type) : Type option =
                 match resolveType aliasReg typ with
-                | TInt8 | TInt16 | TInt32 | TInt64 | TInt
-                | TUInt8 | TUInt16 | TUInt32 | TUInt64
+                | TInt8 | TInt16 | TInt32 | TInt64 | TInt128 | TInt
+                | TUInt8 | TUInt16 | TUInt32 | TUInt64 | TUInt128
                 | TFloat64 as numeric ->
                     Some numeric
                 | _ ->
@@ -2930,7 +2937,9 @@ let rec private checkExprWithParamNamesAndSumTypeNames
             checkExpr left env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg None
             |> Result.bind (fun (leftType, left') ->
                 if not (supportsPower leftType) then
-                    Error (InvalidOperation ("^", [leftType]))
+                    Error
+                        (GenericError
+                            $"Cannot perform numeric operation on {typeToString leftType} and {typeToString leftType}")
                 else
                     checkExpr right env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg (Some leftType)
                     |> Result.bind (fun (rightType, right') ->
@@ -3198,6 +3207,14 @@ let rec private checkExprWithParamNamesAndSumTypeNames
                 | Some reconciledType -> Ok (reconciledType, builtinExpr)
                 | None -> Error (TypeMismatch (expected, TFloat64, $"variable {name}"))
             | None -> Ok (TFloat64, builtinExpr)
+        else if isBuiltinTestInfinityName name then
+            let builtinExpr = Var "Builtin.testInfinity"
+            match expectedType with
+            | Some expected ->
+                match reconcileTypes (Some aliasReg) expected TFloat64 with
+                | Some reconciledType -> Ok (reconciledType, builtinExpr)
+                | None -> Error (TypeMismatch (expected, TFloat64, $"variable {name}"))
+            | None -> Ok (TFloat64, builtinExpr)
         else if isBuiltinBlobEmptyName name then
             match expectedType with
             | Some expected ->
@@ -3386,14 +3403,6 @@ let rec private checkExprWithParamNamesAndSumTypeNames
                 (
             // Check if this is a generic function.
             match tryLookupResolved resolvedFuncName genericFuncReg.Functions with
-            | Some (origTypeParams, _) when
-                genericFuncReg.RequireExplicitTypeArgsForBareCalls
-                && Option.isNone expectedType
-                && not (resolvedFuncName.Contains(".")) ->
-                // Bare user-defined generic calls must provide explicit type arguments.
-                // Module-scoped names (for example Stdlib.List.map) still infer type args.
-                let expectedTypeArgCount = List.length origTypeParams
-                Error (GenericError (formatTypeArgumentArityError funcName expectedTypeArgCount 0))
             | Some (origTypeParams, _) ->
                 // Freshen type params to avoid name clashes with caller's scope
                 let (freshTypeParams, renaming) = freshenTypeParams origTypeParams
@@ -7577,6 +7586,14 @@ let private declarationResolutionEnvironment
             "Builtin.testNan_v0"
             (NameResolution.BuiltinValue ("testNan", 0))
             (NameResolution.BuiltinRegistration "Builtin.testNan")
+          requiredCandidate
+            "Builtin.testInfinity"
+            (NameResolution.BuiltinValue ("testInfinity", 0))
+            (NameResolution.BuiltinRegistration "Builtin.testInfinity")
+          requiredCandidate
+            "Builtin.testInfinity_v0"
+            (NameResolution.BuiltinValue ("testInfinity", 0))
+            (NameResolution.BuiltinRegistration "Builtin.testInfinity")
           requiredCandidate
             "Builtin.blobEmpty"
             (NameResolution.BuiltinValue ("blobEmpty", 0))

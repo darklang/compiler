@@ -4,8 +4,8 @@
 Stdlib.Float.sqrt 4.0 = 2.0
 
 // The compiler no longer inserts an implicit Stdlib qualifier.
-Float.sqrt 4.0 = error="Unresolved callable name: Float.sqrt"
-Stdlib.Bytes.create 0L = error="Unresolved callable name: Stdlib.Bytes.create"
+Float.sqrt 4.0 = error="There is no variable named: Float.sqrt"
+Stdlib.Bytes.create 0L = error="There is no variable named: Stdlib.Bytes.create"
 
 // Lexical callable values shadow a same-spelled top-level function.
 let shadowed (x: Int64): Int64 = x + 10L let shadowed = fun x -> x + 20L in shadowed 1L = 21L
@@ -24,7 +24,7 @@ type QualifiedSecond = QualifiedShared | QualifiedSecondOnly
 QualifiedFirst.QualifiedShared == QualifiedFirst.QualifiedShared = true
 
 // Missing names retain their reference category in the diagnostic.
-doesNotExist 1L = error="Unresolved callable name: doesNotExist"
+doesNotExist 1L = error="There is no variable named: doesNotExist"
 
 // A function identity in value position is never coerced into a call.
 let nullaryIdentity (): Int64 = 1L let needsInt64 (): Int64 = nullaryIdentity; needsInt64 () = error="needsInt64's return value expects Int64, but got (Unit) -> Int64"

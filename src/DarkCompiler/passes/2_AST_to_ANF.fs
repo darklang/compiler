@@ -601,6 +601,9 @@ let isRuntimeFailureName (funcName: string) : bool =
 let isBuiltinTestNanName (name: string) : bool =
     name = "Builtin.testNan"
 
+let isBuiltinTestInfinityName (name: string) : bool =
+    name = "Builtin.testInfinity"
+
 let isBuiltinBlobEmptyName (name: string) : bool =
     name = "Builtin.blobEmpty"
 
@@ -4325,6 +4328,7 @@ let private integerFunctionForBinOp (operandType: AST.Type) (op: AST.BinOp) : st
         | AST.Pow, AST.TUInt32 -> Some "Stdlib.UInt32"
         | AST.Pow, AST.TUInt64 -> Some "Stdlib.UInt64"
         | AST.Pow, AST.TFloat64 -> Some "Stdlib.Float"
+        | AST.Mod, AST.TFloat64 -> Some "Stdlib.Float"
         | _, AST.TInt -> Some "Stdlib.Int"
         | _, AST.TInt128 -> Some "Stdlib.Int128"
         | _, AST.TUInt128 -> Some "Stdlib.UInt128"
@@ -4603,7 +4607,7 @@ let rec inferTypeCore (sumTypeNames: Set<string>) (expr: AST.Expr) (typeEnv: Map
     | AST.CharLiteral _ -> Ok AST.TChar
     | AST.FloatLiteral _ -> Ok AST.TFloat64
     | AST.Var name ->
-        if isBuiltinTestNanName name then
+        if isBuiltinTestNanName name || isBuiltinTestInfinityName name then
             Ok AST.TFloat64
         else if isBuiltinBlobEmptyName name then
             Ok AST.TBlob
@@ -4802,8 +4806,8 @@ let rec inferTypeCore (sumTypeNames: Set<string>) (expr: AST.Expr) (typeEnv: Map
             |> Result.bind (fun operandType ->
                 match operandType with
                 | AST.TInt8 | AST.TInt16 | AST.TInt32 | AST.TInt64
-                | AST.TInt
-                | AST.TUInt8 | AST.TUInt16 | AST.TUInt32 | AST.TUInt64
+                | AST.TInt128 | AST.TInt
+                | AST.TUInt8 | AST.TUInt16 | AST.TUInt32 | AST.TUInt64 | AST.TUInt128
                 | AST.TFloat64 -> Ok operandType
                 | _ -> Error $"Arithmetic operator requires numeric operands, got {operandType}")
         | AST.Shl | AST.Shr | AST.BitAnd | AST.BitOr | AST.BitXor ->
@@ -5431,6 +5435,8 @@ and private toANFUnplannedCore (sumTypeNames: Set<string>) (expr: AST.Expr) (var
     | AST.Var name ->
         if isBuiltinTestNanName name then
             Ok (ANF.Return (ANF.FloatLiteral System.Double.NaN), varGen)
+        else if isBuiltinTestInfinityName name then
+            Ok (ANF.Return (ANF.FloatLiteral System.Double.PositiveInfinity), varGen)
         else if isBuiltinBlobEmptyName name then
             Ok (ANF.Return (ANF.StringLiteral ""), varGen)
         else
@@ -9512,6 +9518,8 @@ and toAtomCore (sumTypeNames: Set<string>) (expr: AST.Expr) (varGen: ANF.VarGen)
     | AST.Var name ->
         if isBuiltinTestNanName name then
             Ok (ANF.FloatLiteral System.Double.NaN, [], varGen)
+        else if isBuiltinTestInfinityName name then
+            Ok (ANF.FloatLiteral System.Double.PositiveInfinity, [], varGen)
         else if isBuiltinBlobEmptyName name then
             Ok (ANF.StringLiteral "", [], varGen)
         else

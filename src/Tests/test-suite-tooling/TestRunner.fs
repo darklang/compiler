@@ -634,8 +634,7 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
     let disabledUpstreamLines : Map<string, Set<int>> =
         Map.ofList
             [
-                ("src/Tests/e2e/upstream/language/apply/eapply.dark", Set.ofList [ 88; 93; 120 ])
-                ("src/Tests/e2e/upstream/language/apply/einfix.dark", Set.ofList [ 16; 17; 33; 34; 44; 50 ])
+                ("src/Tests/e2e/upstream/language/apply/eapply.dark", Set.ofList [ 120 ])
                 ("src/Tests/e2e/upstream/language/basic/eand.dark", Set.ofList [ 5; 7; 11 ])
                 ("src/Tests/e2e/upstream/language/basic/elet.dark", Set.ofList [ 67 ])
                 ("src/Tests/e2e/upstream/language/basic/eor.dark", Set.ofList [ 6; 16; 17 ])
