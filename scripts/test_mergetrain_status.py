@@ -39,7 +39,14 @@ class MergetrainStatusTests(unittest.TestCase):
                 ["git", "config", "user.name", "Status Test"], cwd=repo, check=True
             )
             (repo / "benchmarks" / "RESULTS.md").write_text(
-                "| Benchmark | Dark (3.0x) | Rust |\n", encoding="utf-8"
+                "**Architecture:** `arm64`\n"
+                "**Profile:** `full`\n"
+                "**Measurement policy:** `test`\n"
+                "**Workload contract:** `test`\n"
+                "| Benchmark | Dark (3.0x) | Rust |\n"
+                "|---|---:|---:|\n"
+                "| sample | 300 (3.0x) | 100 |\n",
+                encoding="utf-8",
             )
             subprocess.run(["git", "add", "."], cwd=repo, check=True)
             subprocess.run(
@@ -76,11 +83,32 @@ class MergetrainStatusTests(unittest.TestCase):
                     check=True,
                 )
             (repo / "benchmarks" / "RESULTS.md").write_text(
-                "| Benchmark | Dark (2.8x) | Rust |\n", encoding="utf-8"
+                "**Architecture:** `arm64`\n"
+                "**Profile:** `full`\n"
+                "**Measurement policy:** `test`\n"
+                "**Workload contract:** `test`\n"
+                "| Benchmark | Dark (2.8x) | Rust |\n"
+                "|---|---:|---:|\n"
+                "| sample | 280 (2.8x) | 100 |\n",
+                encoding="utf-8",
             )
             subprocess.run(["git", "add", "benchmarks/RESULTS.md"], cwd=repo, check=True)
             subprocess.run(
                 ["git", "commit", "-q", "-m", "Record benchmark improvement"],
+                cwd=repo,
+                check=True,
+            )
+            results_path = repo / "benchmarks" / "RESULTS.md"
+            results_path.write_text(
+                results_path.read_text(encoding="utf-8").replace(
+                    "**Workload contract:** `test`",
+                    "**Workload contract:** `test-v2`",
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "benchmarks/RESULTS.md"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "commit", "-q", "-m", "Change benchmark contract"],
                 cwd=repo,
                 check=True,
             )
@@ -175,14 +203,15 @@ print(json.dumps({
             self.assertIn("benchmark ratio: 2.8x", completed.stdout)
             self.assertRegex(
                 completed.stdout,
-                r"recent merges:\n  [0-9a-f]{7,12} \d+s ago Merge feature train 6",
+                r"recent merges:\n  [0-9a-f]{7,12} \d+s ago feature-6 — Add feature 6",
             )
-            self.assertEqual(completed.stdout.count("Merge feature train"), 5)
-            self.assertNotIn("Merge feature train 1", completed.stdout)
+            self.assertEqual(completed.stdout.count(" — Add feature "), 5)
+            self.assertNotIn("feature-1 — Add feature 1", completed.stdout)
+            self.assertIn("Change benchmark contract — not comparable", completed.stdout)
             self.assertRegex(
                 completed.stdout,
-                r"recent benchmarks/RESULTS.md changes:\n"
-                r"  [0-9a-f]{7,12} \d+s ago Record benchmark improvement \(\+1/-1\)",
+                r"[0-9a-f]{7,12} \d+s ago Record benchmark improvement"
+                r" — 6.7% improvement",
             )
 
             colored = subprocess.run(

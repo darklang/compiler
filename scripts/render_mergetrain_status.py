@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -90,15 +91,98 @@ def active_jobs(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return [by_id[job_id] for job_id in sorted(by_id)]
 
 
-def benchmark_ratio(repo: Path) -> str | None:
+def displayed_benchmark_ratio(contents: str) -> str | None:
     header_prefix = "| Benchmark | Dark ("
-    results_path = repo / "benchmarks" / "RESULTS.md"
-    if not results_path.is_file():
-        return None
-    for line in results_path.read_text(encoding="utf-8").splitlines():
+    for line in contents.splitlines():
         if line.startswith(header_prefix) and ") |" in line:
             return line[len(header_prefix) :].split(") |", 1)[0]
     return None
+
+
+def benchmark_ratio(repo: Path) -> str | None:
+    results_path = repo / "benchmarks" / "RESULTS.md"
+    return (
+        displayed_benchmark_ratio(results_path.read_text(encoding="utf-8"))
+        if results_path.is_file()
+        else None
+    )
+
+
+def benchmark_rows(contents: str) -> dict[str, tuple[int, int]]:
+    rows: dict[str, tuple[int, int]] = {}
+    for line in contents.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) < 3 or cells[0] in {"Benchmark", "---"}:
+            continue
+        dark_text = cells[1].split(" ", 1)[0].replace(",", "")
+        rust_text = cells[2].replace(",", "")
+        try:
+            dark = int(dark_text)
+            rust = int(rust_text)
+        except ValueError:
+            continue
+        if dark > 0 and rust > 0:
+            rows[cells[0]] = (dark, rust)
+    return rows
+
+
+def benchmark_identity(contents: str) -> tuple[str, ...]:
+    prefixes = (
+        "**Architecture:**",
+        "**Profile:**",
+        "**Measurement policy:**",
+        "**Workload contract:**",
+    )
+    return tuple(line for line in contents.splitlines() if line.startswith(prefixes))
+
+
+def git_file(repo: Path, revision: str) -> str | None:
+    completed = subprocess.run(
+        ["git", "-C", str(repo), "show", f"{revision}:benchmarks/RESULTS.md"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    return completed.stdout if completed.returncode == 0 else None
+
+
+def benchmark_improvement(repo: Path, commit: str) -> str:
+    current_contents = git_file(repo, commit)
+    previous_contents = git_file(repo, f"{commit}^")
+    if current_contents is None:
+        return "improvement unavailable"
+    if previous_contents is None:
+        ratio = displayed_benchmark_ratio(current_contents)
+        return f"initial {ratio}" if ratio else "improvement unavailable"
+    current_identity = benchmark_identity(current_contents)
+    previous_identity = benchmark_identity(previous_contents)
+    if current_identity and current_identity != previous_identity:
+        return "not comparable"
+    current = benchmark_rows(current_contents)
+    previous = benchmark_rows(previous_contents)
+    if not current or current.keys() != previous.keys():
+        return "improvement unavailable"
+
+    current_dark = math.prod(dark for dark, _rust in current.values())
+    current_rust = math.prod(rust for _dark, rust in current.values())
+    previous_dark = math.prod(dark for dark, _rust in previous.values())
+    previous_rust = math.prod(rust for _dark, rust in previous.values())
+    exact_current = current_dark * previous_rust
+    exact_previous = previous_dark * current_rust
+    if exact_current == exact_previous:
+        return "unchanged"
+    log_change = math.fsum(
+        math.log(current[name][0] / current[name][1])
+        - math.log(previous[name][0] / previous[name][1])
+        for name in current
+    ) / len(current)
+    improvement = (1 - math.exp(log_change)) * 100
+    result = f"{abs(improvement):.2g}%"
+    outcome = "improvement" if exact_current < exact_previous else "regression"
+    return f"{result} {outcome}"
 
 
 def benchmark_changes(repo: Path, limit: int = 3) -> list[str]:
@@ -115,17 +199,59 @@ def benchmark_changes(repo: Path, limit: int = 3) -> list[str]:
 
     def render(line: str) -> str:
         commit, short_commit, date, subject = line.split("\t", 3)
-        numstat = git(
-            repo,
-            "show",
-            "--format=",
-            "--numstat",
-            commit,
-            "--",
-            "benchmarks/RESULTS.md",
-        ).splitlines()
-        additions, deletions, _path = numstat[0].split("\t", 2)
-        return f"{short_commit} {date} {subject} (+{additions}/-{deletions})"
+        improvement = benchmark_improvement(repo, commit)
+        return f"{short_commit} {date} {subject} — {improvement}"
+
+    return [render(line) for line in history.splitlines()]
+
+
+def merged_branch(repo: Path, commit: str) -> str:
+    refs = git(
+        repo,
+        "for-each-ref",
+        "--points-at",
+        commit,
+        "--format=%(refname)",
+        "refs/heads",
+        "refs/remotes",
+    ).splitlines()
+    local = sorted(
+        ref.removeprefix("refs/heads/")
+        for ref in refs
+        if ref.startswith("refs/heads/") and ref != "refs/heads/main"
+    )
+    if local:
+        return local[0]
+    remote = sorted(
+        ref.removeprefix("refs/remotes/").split("/", 1)[-1]
+        for ref in refs
+        if ref.startswith("refs/remotes/")
+        and not ref.endswith("/main")
+        and not ref.endswith("/HEAD")
+    )
+    return remote[0] if remote else commit[:10]
+
+
+def recent_merges(repo: Path, limit: int = 5) -> list[str]:
+    history = git(
+        repo,
+        "log",
+        f"-{limit}",
+        "--first-parent",
+        "--merges",
+        "--format=%h%x09%cI%x09%P",
+        "--",
+    )
+    if not history:
+        return []
+
+    def render(line: str) -> str:
+        merge, timestamp, parents_text = line.split("\t", 2)
+        parents = parents_text.split()
+        merged_commit = parents[1]
+        branch = merged_branch(repo, merged_commit)
+        subject = git(repo, "show", "-s", "--format=%s", merged_commit)
+        return f"{merge} {timestamp} {branch} — {subject}"
 
     return [render(line) for line in history.splitlines()]
 
@@ -169,18 +295,10 @@ def render(payload: dict[str, Any], repo: Path, *, color: bool) -> str:
         lines.append("  (empty)")
 
     now = datetime.now(timezone.utc)
-    recent_merges = git(
-        repo,
-        "log",
-        "-5",
-        "--first-parent",
-        "--merges",
-        "--format=%h %cI %s",
-        "--",
-    ).splitlines()
+    merges = recent_merges(repo)
     lines.append(styled("recent merges:", BOLD, color))
     lines.extend(
-        [f"  {history_line(merge, color, now=now)}" for merge in recent_merges]
+        [f"  {history_line(merge, color, now=now)}" for merge in merges]
         or ["  (none)"]
     )
 
