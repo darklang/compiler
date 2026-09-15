@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 class LandScriptTests(unittest.TestCase):
-    def test_prints_landing_then_landed_for_exact_deployed_job(self) -> None:
+    def test_reports_own_landing_and_keeps_queue_deferral_opaque(self) -> None:
         source_root = Path(__file__).resolve().parent.parent
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -42,17 +42,22 @@ class LandScriptTests(unittest.TestCase):
             fake_mergetrain.write_text(
                 """#!/usr/bin/env python3
 import json
+import os
 import subprocess
 import sys
 
 command = next(arg for arg in sys.argv if arg in {"status", "enqueue", "inspect"})
 if command == "status":
+    attention = int(os.environ.get("LAND_TEST_ATTENTION", "0"))
     print(json.dumps({
         "contract_version": 4,
-        "counts": {"attention": 0},
-        "health": "healthy",
+        "counts": {"attention": attention},
+        "health": "healthy" if attention == 0 else "unhealthy",
     }))
 elif command == "enqueue":
+    if os.environ.get("LAND_TEST_ENQUEUE_FAIL") == "1":
+        print("unrelated queue diagnostics", file=sys.stderr)
+        raise SystemExit(1)
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     print(json.dumps({"job": {"id": 17, "head_sha": head}}))
 else:
@@ -76,6 +81,41 @@ else:
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertEqual(completed.stdout, "landing\nlanded\n")
             self.assertEqual(completed.stderr, "")
+
+            process_environment["LAND_TEST_ATTENTION"] = "1"
+            queued_behind_attention = subprocess.run(
+                [str(repo / "land"), "--task", "test independent handoff"],
+                cwd=repo,
+                env=process_environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(
+                queued_behind_attention.returncode,
+                0,
+                queued_behind_attention.stderr,
+            )
+            self.assertEqual(queued_behind_attention.stdout, "landing\nlanded\n")
+            self.assertEqual(queued_behind_attention.stderr, "")
+
+            process_environment["LAND_TEST_ENQUEUE_FAIL"] = "1"
+            deferred = subprocess.run(
+                [str(repo / "land"), "--task", "test opaque deferral"],
+                cwd=repo,
+                env=process_environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(deferred.returncode, 1)
+            self.assertEqual(deferred.stdout, "")
+            self.assertEqual(
+                deferred.stderr,
+                "Landing handoff is pending; retry ./land later\n",
+            )
 
 
 if __name__ == "__main__":

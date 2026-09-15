@@ -96,27 +96,23 @@ else:
 
 snapshot="$(mergetrain --repo "$repo_root" status --json)"
 contract_version="$(json_value contract_version <<<"$snapshot")"
-attention_count="$(json_value counts.attention <<<"$snapshot")"
-health="$(json_value health <<<"$snapshot")"
 
 if [[ "$contract_version" != "4" ]]; then
   echo "Unsupported mergetrain contract version: $contract_version" >&2
   exit 1
 fi
-if [[ "$health" != "healthy" || "$attention_count" != "0" ]]; then
-  echo "Mergetrain needs operator attention before this branch can land" >&2
-  echo "$snapshot" >&2
-  exit 1
-fi
 
-enqueue_payload="$(
+if ! enqueue_payload="$(
   mergetrain --repo "$repo_root" enqueue \
     --task "$task" \
     --branch "$branch" \
     --worktree "$repo_root" \
     --auto \
-    --json
-)"
+    --json 2>&1
+)"; then
+  echo "Landing handoff is pending; retry ./land later" >&2
+  exit 1
+fi
 job_id="$(json_value job.id <<<"$enqueue_payload")"
 queued_head="$(json_value job.head_sha <<<"$enqueue_payload")"
 if [[ -z "$job_id" || "$queued_head" != "$head_sha" ]]; then

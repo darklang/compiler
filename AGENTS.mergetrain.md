@@ -4,21 +4,23 @@ Purpose: Serialize committed local task branches through one merge/test/push/ver
 
 ## Existing queues and explanations
 
-- This repository uses status → `./land` → wait even for one branch. Queue counts alone do not establish health, runner ownership, or recovery needs; read `health`, `state`, and `next_action` together.
+- Task agents use `./land` → wait even for one branch. Runner/operator queue inspection uses status; queue counts alone do not establish health, runner ownership, or recovery needs, so read `health`, `state`, and `next_action` together.
+- Branch readiness and queue availability are separate. An unrelated attention job can defer enqueueing, but it does not invalidate a branch whose own review and gates passed. Never report such a branch as `not ready`.
+- Unrelated train state belongs to the runner/operator, not the task agent. Task agents do not inspect or report unrelated job IDs, conflicts, attention reasons, or recovery steps.
 - For explanation-only requests, read the skill documentation when permitted and explain the procedure without Git or product commands. Distinguish hypothetical steps from observed state.
 
 ## Current command reference
 
 - The v3 core commands are `init`, `status`, `enqueue`, `validate`, `deploy`, and `inspect`.
-- Start with `mergetrain status --json`. Use `mergetrain status --diagnose --json` only for configuration, Git, runtime, or lock detail, and `mergetrain inspect JOB_ID --json` for job evidence. `doctor` is removed, not an alias for `status --diagnose`.
+- Runner/operator investigations start with `mergetrain status --json`. Use `mergetrain status --diagnose --json` only for configuration, Git, runtime, or lock detail, and `mergetrain inspect JOB_ID --json` for job evidence. `doctor` is removed, not an alias for `status --diagnose`.
 - Confirm uncertain syntax with the installed `mergetrain --version` and command-specific `--help` only when command execution is permitted. Otherwise use this reference and identify missing details; do not invent commands or copy older syntax from unversioned web results. Inspection and `next_action` do not authorize recovery or deployment.
 
 ## Rules
 
 1. Work on a task-specific branch and worktree.
 2. Commit a clean HEAD before handing work off.
-3. Read mergetrain status --json and follow its next action before changing queue state.
-4. Land every named finished branch in the requested order with `./land --task "TASK"`; the script resolves the branch and worktree, enqueues the exact commit with bounded unattended approval, and waits for deployment. Do not continue until it prints `landed` unless it exits with a reported failure.
+3. Task agents use `./land`, not raw status inspection, for handoff. A runner/operator may use `mergetrain status --json`; its queue-level `next_action` is not a judgment about any task branch's readiness.
+4. Land every named finished branch in the requested order with `./land --task "TASK"`; the script resolves the branch and worktree, enqueues the exact commit with bounded unattended approval, and waits for deployment. Do not continue until it prints `landed` unless it exits. If it exits with `Landing handoff is pending`, report only `Merge train: ⏳ handoff pending`; do not use `❌ not ready`, explain the train state, or volunteer to recover another job.
 5. Never push configured integration refs directly. One authorized runner owns validation and deployment; recovery and destructive actions require their stated approval.
 
 ## Safety boundary

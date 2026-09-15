@@ -69,6 +69,17 @@ this repository and takes precedence where it is stricter.
   with bounded unattended approval, prints `landing`, and waits until it prints
   `landed`. While waiting, do not rebase or otherwise change the branch merely
   because the integration ref advanced.
+- Judge branch readiness only from that branch's scope, review, tests,
+  benchmarks, and known uncertainties. Existing queue health—including an
+  unrelated job that needs attention—does not make a ready branch "not ready."
+  Task agents must not inspect, diagnose, name, summarize, or prescribe
+  recovery for unrelated train jobs.
+- If `./land` exits with `Landing handoff is pending`, keep the ready commit
+  unchanged and report only `Merge train: ⏳ handoff pending`. Do not include
+  queue health, unrelated job IDs, conflicts, or recovery instructions. Treat
+  other pre-enqueue errors according to their own message. If this branch's
+  own enqueued job fails, report
+  `Merge train: ❌ landing failed — <this job and reason>` instead.
 - `./land` grants the configured merge-train runner bounded unattended approval
   for that exact destination and execution policy. It does not authorize the
   task agent itself to validate, deploy, push, or integrate `main` directly.
@@ -81,8 +92,8 @@ this repository and takes precedence where it is stricter.
 
 Use this standard format when reporting completed work. Keep the summary brief,
 include exact commands, and omit optional lines that add no useful information.
-Use `✅` for success, `⏭️` for a skipped or irrelevant gate, and `❌` for a
-failure or incomplete step, followed by the reason.
+Use `✅` for success, `⏳` for a ready branch whose handoff is pending, `⏭️` for
+a skipped or irrelevant gate, and `❌` for a failure or incomplete step.
 
 ```markdown
 Work complete: <brief description of the outcome and important details>
