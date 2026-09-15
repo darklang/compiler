@@ -60,15 +60,14 @@ if [[ "$clear_screen" == true && -t 1 ]]; then
 fi
 
 while true; do
-  if [[ "$interactive_redraw" == true ]]; then
-    printf '\033[H'
-  fi
-
-  if ! mergetrain --repo "$repo_root" status; then
-    echo "Status refresh failed; retrying in $interval_seconds second(s)" >&2
+  status_output=""
+  if ! status_output="$(mergetrain --repo "$repo_root" status)"; then
+    status_output="Status refresh failed; retrying in $interval_seconds second(s)"
   fi
   if [[ "$interactive_redraw" == true ]]; then
-    printf '\033[J'
+    printf '\033[H\033[J%s\n' "$status_output"
+  else
+    printf '%s\n' "$status_output"
   fi
 
   if [[ "$run_once" == true ]]; then

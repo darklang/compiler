@@ -79,7 +79,7 @@ else:
 repair_job() {
   local snapshot="$1"
   local job_id details category reason worktree branch old_head attempt_marker output_file
-  local current_branch new_head dirty
+  local current_branch new_head dirty git_common_dir
 
   job_id="$(json_value next_action.target_job_id <<<"$snapshot")"
   if [[ -z "$job_id" ]]; then
@@ -121,10 +121,13 @@ repair_job() {
   fi
   touch "$attempt_marker"
 
+  git_common_dir="$(git -C "$worktree" rev-parse --path-format=absolute --git-common-dir)"
+
   if ! printf '%s\n' "$details" |
     codex exec \
       -C "$worktree" \
       --sandbox workspace-write \
+      --add-dir "$git_common_dir" \
       --ephemeral \
       --output-last-message "$output_file" \
       "Repair mergetrain job #$job_id on branch $branch after a $category failure.
