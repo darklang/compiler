@@ -9,128 +9,128 @@
     "backend": "qemu",
     "measurement_policy": "qemu-tcg-plugin-guest-insns-v1:qemu-11.1.1:rustc-1.89.0"
   },
-  "contract_sha256": "47284575765ee3555a953897da759f7cb5994263dfa1d2ab564b227eefe307c4",
-  "generated_at": "2026-09-14T02:49:16.367224+00:00",
+  "contract_sha256": "8ff76a1489130005454c01a346d8a6771889dd1a9ba52842232bcf19529e37fb",
+  "generated_at": "2026-09-15T20:39:24.365696+00:00",
   "compiler": {
-    "commit": "b25efe54556edbd12c839f2bbef1c98b1288ba7e",
-    "subject": "Complete point-in-time x64 parity audit"
+    "commit": "a83739b5da5f8a013876fd478cad7b71877f8a6e",
+    "subject": "Keep benchmarks on public stdlib APIs"
   },
   "benchmarks": [
     {
       "name": "ackermann",
-      "instructions": 1751854
+      "instructions": 1751820
     },
     {
       "name": "binary_trees",
-      "instructions": 4497159
+      "instructions": 4497789
     },
     {
       "name": "collatz",
-      "instructions": 840256
+      "instructions": 840205
     },
     {
       "name": "edigits",
-      "instructions": 318276
+      "instructions": 318369
     },
     {
       "name": "factorial",
-      "instructions": 297458
+      "instructions": 298180
     },
     {
       "name": "fannkuch",
-      "instructions": 293133
+      "instructions": 237180
     },
     {
       "name": "fasta",
-      "instructions": 319976
+      "instructions": 319196
     },
     {
       "name": "fft",
-      "instructions": 492957
+      "instructions": 492853
     },
     {
       "name": "fib",
-      "instructions": 510019
+      "instructions": 510153
     },
     {
       "name": "huffman",
-      "instructions": 333601
+      "instructions": 390542
     },
     {
       "name": "leibniz",
-      "instructions": 988518
+      "instructions": 988845
     },
     {
       "name": "mandelbrot",
-      "instructions": 1252738
+      "instructions": 1253128
     },
     {
       "name": "matmul",
-      "instructions": 297209
+      "instructions": 297381
     },
     {
       "name": "merkletrees",
-      "instructions": 647831
+      "instructions": 648332
     },
     {
       "name": "myers_diff",
-      "instructions": 528834
+      "instructions": 529042
     },
     {
       "name": "nbody",
-      "instructions": 350096
+      "instructions": 350109
     },
     {
       "name": "nqueen",
-      "instructions": 689923
+      "instructions": 690214
     },
     {
       "name": "nsieve",
-      "instructions": 291805
+      "instructions": 291688
     },
     {
       "name": "pisum",
-      "instructions": 415114
+      "instructions": 414545
     },
     {
       "name": "primes",
-      "instructions": 326061
+      "instructions": 382856
     },
     {
       "name": "quicksort",
-      "instructions": 307761
+      "instructions": 307853
     },
     {
       "name": "raytracer",
-      "instructions": 488449
+      "instructions": 432190
     },
     {
       "name": "regex_lite",
-      "instructions": 341526
+      "instructions": 285453
     },
     {
       "name": "spectral_norm",
-      "instructions": 298184
+      "instructions": 298183
     },
     {
       "name": "string_equality",
-      "instructions": 743734
+      "instructions": 743341
     },
     {
       "name": "sum_to_n",
-      "instructions": 290077
+      "instructions": 290038
     },
     {
       "name": "tak",
-      "instructions": 42360536
+      "instructions": 42395241
     },
     {
       "name": "tinytemplate",
-      "instructions": 670619
+      "instructions": 670683
     },
     {
       "name": "warden",
-      "instructions": 266488
+      "instructions": 301241
     }
   ]
 }

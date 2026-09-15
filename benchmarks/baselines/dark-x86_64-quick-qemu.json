@@ -9,11 +9,11 @@
     "backend": "qemu",
     "measurement_policy": "qemu-tcg-plugin-guest-insns-v1:qemu-11.1.1:rustc-1.89.0"
   },
-  "contract_sha256": "47284575765ee3555a953897da759f7cb5994263dfa1d2ab564b227eefe307c4",
-  "generated_at": "2026-09-14T02:49:16.367224+00:00",
+  "contract_sha256": "8ff76a1489130005454c01a346d8a6771889dd1a9ba52842232bcf19529e37fb",
+  "generated_at": "2026-09-15T20:45:50.212199+00:00",
   "compiler": {
-    "commit": "b25efe54556edbd12c839f2bbef1c98b1288ba7e",
-    "subject": "Complete point-in-time x64 parity audit"
+    "commit": "e7954cd317a4e9df891d8ccf93a03e47c243766c",
+    "subject": "Optimize public Int64 float conversion"
   },
   "benchmarks": [
     {
@@ -46,7 +46,7 @@
     },
     {
       "name": "fft",
-      "instructions": 528598657
+      "instructions": 528590727
     },
     {
       "name": "fib",
@@ -54,11 +54,11 @@
     },
     {
       "name": "huffman",
-      "instructions": 23161076
+      "instructions": 27214753
     },
     {
       "name": "leibniz",
-      "instructions": 2158649
+      "instructions": 2158704
     },
     {
       "name": "mandelbrot",
@@ -74,11 +74,11 @@
     },
     {
       "name": "myers_diff",
-      "instructions": 2204891807
+      "instructions": 3792789291
     },
     {
       "name": "nbody",
-      "instructions": 225893
+      "instructions": 225954
     },
     {
       "name": "nqueen",
@@ -90,11 +90,11 @@
     },
     {
       "name": "pisum",
-      "instructions": 166006
+      "instructions": 166064
     },
     {
       "name": "primes",
-      "instructions": 147690
+      "instructions": 174137
     },
     {
       "name": "quicksort",
@@ -102,15 +102,15 @@
     },
     {
       "name": "raytracer",
-      "instructions": 2783847
+      "instructions": 2903079
     },
     {
       "name": "regex_lite",
-      "instructions": 26407486
+      "instructions": 31947900
     },
     {
       "name": "spectral_norm",
-      "instructions": 776631
+      "instructions": 1693382
     },
     {
       "name": "string_equality",
@@ -126,11 +126,11 @@
     },
     {
       "name": "tinytemplate",
-      "instructions": 47135884452
+      "instructions": 10486538239
     },
     {
       "name": "warden",
-      "instructions": 19554113
+      "instructions": 20514739
     }
   ]
 }

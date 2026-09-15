@@ -9,128 +9,128 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs"
   },
-  "contract_sha256": "a3f0951d008a808f6dd71f5c8991d263f4eb1219618f6c801c33329c19cd5081",
-  "generated_at": "2026-09-15T18:11:48+00:00",
+  "contract_sha256": "6751ca8977c639512cdd772867f7d2bd0c73833716cddfcb79aa6f15a08f8cfe",
+  "generated_at": "2026-09-15T20:46:30+00:00",
   "compiler": {
-    "commit": "13ed01b4b84e5fbcbe71f0de80bafbd12d905bc5",
-    "subject": "Align compiler documentation with stage ownership"
+    "commit": "e7954cd317a4e9df891d8ccf93a03e47c243766c",
+    "subject": "Optimize public Int64 float conversion"
   },
   "benchmarks": [
     {
       "name": "ackermann",
-      "instructions": 145114137
+      "instructions": 145114139
     },
     {
       "name": "binary_trees",
-      "instructions": 11053078
+      "instructions": 11053080
     },
     {
       "name": "collatz",
-      "instructions": 70194399
+      "instructions": 70194400
     },
     {
       "name": "edigits",
-      "instructions": 51754907
+      "instructions": 51754909
     },
     {
       "name": "factorial",
-      "instructions": 63466
+      "instructions": 63468
     },
     {
       "name": "fannkuch",
-      "instructions": 233405898
+      "instructions": 233405899
     },
     {
       "name": "fasta",
-      "instructions": 154617365
+      "instructions": 154617366
     },
     {
       "name": "fft",
-      "instructions": 407130735
+      "instructions": 407133425
     },
     {
       "name": "fib",
-      "instructions": 8268586
+      "instructions": 8268587
     },
     {
       "name": "huffman",
-      "instructions": 400267806
+      "instructions": 518415869
     },
     {
       "name": "leibniz",
-      "instructions": 17006789
+      "instructions": 17006832
     },
     {
       "name": "mandelbrot",
-      "instructions": 15227448
+      "instructions": 15227450
     },
     {
       "name": "matmul",
-      "instructions": 42560590
+      "instructions": 42560591
     },
     {
       "name": "merkletrees",
-      "instructions": 3877426
+      "instructions": 3877428
     },
     {
       "name": "myers_diff",
-      "instructions": 2400143043
+      "instructions": 4637007013
     },
     {
       "name": "nbody",
-      "instructions": 14537286
+      "instructions": 14537331
     },
     {
       "name": "nqueen",
-      "instructions": 7420424
+      "instructions": 7420425
     },
     {
       "name": "nsieve",
-      "instructions": 131101393
+      "instructions": 131101395
     },
     {
       "name": "pisum",
-      "instructions": 812434
+      "instructions": 812478
     },
     {
       "name": "primes",
-      "instructions": 1468475
+      "instructions": 1678434
     },
     {
       "name": "quicksort",
-      "instructions": 188808247
+      "instructions": 188808249
     },
     {
       "name": "raytracer",
-      "instructions": 49162502
+      "instructions": 51734416
     },
     {
       "name": "regex_lite",
-      "instructions": 67502284
+      "instructions": 77891592
     },
     {
       "name": "spectral_norm",
-      "instructions": 221902869
+      "instructions": 931041805
     },
     {
       "name": "string_equality",
-      "instructions": 1219843
+      "instructions": 1219845
     },
     {
       "name": "sum_to_n",
-      "instructions": 62007
+      "instructions": 62009
     },
     {
       "name": "tak",
-      "instructions": 48017020
+      "instructions": 48017024
     },
     {
       "name": "tinytemplate",
-      "instructions": 8606428391
+      "instructions": 5864163848
     },
     {
       "name": "warden",
-      "instructions": 44489020
+      "instructions": 47041942
     }
   ]
 }
