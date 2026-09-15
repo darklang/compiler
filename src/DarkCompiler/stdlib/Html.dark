@@ -40,10 +40,10 @@ let __attributeToString (attr: (String * Stdlib.Option.Option<String>)) : String
     | (key, None) -> key
 
 let __attributesToString (attrs: Stdlib.Html.Attributes) : String =
-    Stdlib.String.join (Stdlib.List.map<(String * Stdlib.Option.Option<String>), String> attrs Stdlib.Html.__attributeToString) " "
+    Stdlib.String.join (Stdlib.List.map attrs Stdlib.Html.__attributeToString) " "
 
 let __isVoidElement (name: String) : Bool =
-    Stdlib.List.member<String> Stdlib.Html.voidElements name
+    Stdlib.List.member Stdlib.Html.voidElements name
 
 let nodeToString (node: Stdlib.Html.Node) : String =
     match node with
@@ -57,7 +57,7 @@ let nodeToString (node: Stdlib.Html.Node) : String =
             startTag
         else
             let childHtml =
-                Stdlib.String.join (Stdlib.List.map<Stdlib.Html.Node, String> tag.children Stdlib.Html.nodeToString) "" in
+                Stdlib.String.join (Stdlib.List.map tag.children Stdlib.Html.nodeToString) "" in
             startTag ++ childHtml ++ "</" ++ tag.name ++ ">"
 
 let comment (value: String) : Stdlib.Html.Node =
@@ -71,7 +71,7 @@ let __styleProperty (property: (String * String)) : String =
 
 let style (properties: List<(String * String)>) : (String * Stdlib.Option.Option<String>) =
     let rendered =
-        Stdlib.List.map<(String * String), String> properties Stdlib.Html.__styleProperty in
+        Stdlib.List.map properties Stdlib.Html.__styleProperty in
     ("style", Some (Stdlib.String.join rendered "; "))
 
 let dataAttr (name: String) (value: String) : (String * Stdlib.Option.Option<String>) =
@@ -154,4 +154,4 @@ let dialog (attrs: Stdlib.Html.Attributes) (children: List<Stdlib.Html.Node>) : 
 
 let document (nodes: List<Stdlib.Html.Node>) : String =
     "<!DOCTYPE html>" ++
-    Stdlib.String.join (Stdlib.List.map<Stdlib.Html.Node, String> nodes Stdlib.Html.nodeToString) ""
+    Stdlib.String.join (Stdlib.List.map nodes Stdlib.Html.nodeToString) ""

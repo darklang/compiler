@@ -87,7 +87,7 @@ let greaterThanOrEqualTo (a: UInt128) (b: UInt128) : Bool = Stdlib.UInt128.lessT
 
 let sqrt (value: UInt128) : Float = Stdlib.Int.__sqrt (Stdlib.UInt128.__toInt value)
 let toFloat (value: UInt128) : Float = Stdlib.Int.__toFloat (Stdlib.UInt128.__toInt value)
-let sum (values: List<UInt128>) : UInt128 = Stdlib.List.fold<UInt128, UInt128> values (0Z) (fun acc value -> Stdlib.UInt128.add acc value)
+let sum (values: List<UInt128>) : UInt128 = Stdlib.List.fold values (0Z) (fun acc value -> Stdlib.UInt128.add acc value)
 let max (a: UInt128) (b: UInt128) : UInt128 = if Stdlib.UInt128.greaterThan a b then a else b
 let min (a: UInt128) (b: UInt128) : UInt128 = if Stdlib.UInt128.lessThan a b then a else b
 let clamp (value: UInt128) (limitA: UInt128) (limitB: UInt128) : UInt128 =

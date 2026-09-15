@@ -28,12 +28,12 @@ let parsePiece (pattern: String) (index: Int64) : (Piece * Int64) =
 
 let parseAlternatives (pattern: String) (index: Int64) (reversedPieces: List<Piece>) (reversedAlternatives: List<List<Piece>>) : List<List<Piece>> =
     if index >= Stdlib.String.__codepointLength pattern then
-        Stdlib.List.reverse<List<Piece>> (Stdlib.List.push<List<Piece>> reversedAlternatives (Stdlib.List.reverse<Piece> reversedPieces))
+        Stdlib.List.reverse (Stdlib.List.push reversedAlternatives (Stdlib.List.reverse reversedPieces))
     else if Stdlib.String.__byteAtUnchecked pattern index == 124L then
-        parseAlternatives pattern (index + 1L) [] (Stdlib.List.push<List<Piece>> reversedAlternatives (Stdlib.List.reverse<Piece> reversedPieces))
+        parseAlternatives pattern (index + 1L) [] (Stdlib.List.push reversedAlternatives (Stdlib.List.reverse reversedPieces))
     else
         let parsed = parsePiece pattern index in
-        parseAlternatives pattern (parsed.1) (Stdlib.List.push<Piece> reversedPieces (parsed.0)) reversedAlternatives
+        parseAlternatives pattern (parsed.1) (Stdlib.List.push reversedPieces (parsed.0)) reversedAlternatives
 
 let atomMatches (atom: Atom) (byte: Int64) : Bool =
     match atom with
@@ -42,7 +42,7 @@ let atomMatches (atom: Atom) (byte: Int64) : Bool =
     | Range ((low, high)) -> byte >= low && byte <= high
 
 let addStarPositions (atom: Atom) (text: String) (length: Int64) (position: Int64) (reversed: List<Int64>) : List<Int64> =
-    let next = Stdlib.List.push<Int64> reversed position in
+    let next = Stdlib.List.push reversed position in
     if position < length && atomMatches atom (Stdlib.String.__byteAtUnchecked text position) then
         addStarPositions atom text length (position + 1L) next
     else next
@@ -55,14 +55,14 @@ let advancePositions (positions: List<Int64>) (piece: Piece) (text: String) (len
         | ExactlyOne ->
             let next =
                 if position < length && atomMatches piece.atom (Stdlib.String.__byteAtUnchecked text position) then
-                    Stdlib.List.push<Int64> reversed (position + 1L)
+                    Stdlib.List.push reversed (position + 1L)
                 else reversed in
             advancePositions rest piece text length next
         | ZeroOrOne ->
-            let withEmpty = Stdlib.List.push<Int64> reversed position in
+            let withEmpty = Stdlib.List.push reversed position in
             let next =
                 if position < length && atomMatches piece.atom (Stdlib.String.__byteAtUnchecked text position) then
-                    Stdlib.List.push<Int64> withEmpty (position + 1L)
+                    Stdlib.List.push withEmpty (position + 1L)
                 else withEmpty in
             advancePositions rest piece text length next
         | ZeroOrMore ->
@@ -76,10 +76,10 @@ let advancePositions (positions: List<Int64>) (piece: Piece) (text: String) (len
 
 let matchesSequence (pieces: List<Piece>) (positions: List<Int64>) (text: String) (length: Int64) : Bool =
     match pieces with
-    | [] -> Stdlib.Bool.not (Stdlib.List.isEmpty<Int64> positions)
+    | [] -> Stdlib.Bool.not (Stdlib.List.isEmpty positions)
     | piece :: rest ->
         let next = advancePositions positions piece text length [] in
-        if Stdlib.List.isEmpty<Int64> next then false
+        if Stdlib.List.isEmpty next then false
         else matchesSequence rest next text length
 
 let matchesAny (alternatives: List<List<Piece>>) (text: String) (length: Int64) (start: Int64) : Bool =

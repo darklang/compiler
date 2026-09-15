@@ -17,8 +17,8 @@ Stdlib.Json.parse<Bool> " true " = Stdlib.Result.Result.Ok true
 Stdlib.Json.serialize<String> "snowman ☃ and quote \"" = "\"snowman ☃ and quote \\\"\""
 Stdlib.Json.parse<Char> "\"👩‍👩‍👧‍👦\"" = Stdlib.Result.Result.Ok '👩‍👩‍👧‍👦'
 Stdlib.Json.parse<Int64> "1e2" = Stdlib.Result.Result.Ok 100L
-Stdlib.Json.serialize<Float> (1e20) = "1E+20"
-Stdlib.Json.serialize<Float> (1e-5) = "1E-05"
+Stdlib.Json.serialize (1e20) = "1E+20"
+Stdlib.Json.serialize (1e-5) = "1E-05"
 jsonParityError<Int64> (Stdlib.Json.parse<Int64> "1.2") = "Can't parse JSON `1.2` as type `Int64` at path: `root`"
 Stdlib.Json.serialize<List<Int64>> ([1L, 2L, 3L]) = "[1,2,3]"
 Stdlib.Json.parse<(Int64 * String)> "[42,\"answer\"]" = Stdlib.Result.Result.Ok ((42L, "answer"))
@@ -42,5 +42,5 @@ jsonParityError<JsonParityChoice> (Stdlib.Json.parse<JsonParityChoice> "{\"JsonP
 jsonParityError<List<JsonParityPerson>> (Stdlib.Json.parse<List<JsonParityPerson>> "[{\"Name\":\"Ada\",\"Age\":\"old\"}]") = "Can't parse JSON `\"old\"` as type `Int64` at path: `root[0].Age`"
 Stdlib.Json.parse<Int64> "not-json" = Stdlib.Result.Result.Error Stdlib.Json.ParseError.ParseError.NotJson
 Stdlib.Json.serialize<Int64 -> Int64> (fun value -> value) = error="Unsupported type in JSON"
-Stdlib.Json.serialize<Stream<Int64>> (Stdlib.Stream.fromList<Int64> []) = error="Unsupported type in JSON"
+Stdlib.Json.serialize (Stdlib.Stream.fromList []) = error="Unsupported type in JSON"
 Stdlib.Json.parse<Stream<Int64>> "[]" = error="Unsupported type in JSON"

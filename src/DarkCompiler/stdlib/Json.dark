@@ -34,7 +34,7 @@ let __scanStringChars (source: String) (index: Int64) (length: Int64) : Int64 =
         else if byte < 32L then -1L
         else if byte != 92L then
             let decoded = Stdlib.String.__decodeUtf8At source index in
-            let consumed = Stdlib.Tuple2.second<Int64, Int64> decoded in
+            let consumed = Stdlib.Tuple2.second decoded in
             Stdlib.Json.__scanStringChars source (index + consumed) length
         else if index + 1L >= length then -1L
         else
@@ -171,22 +171,22 @@ let __parseRoot (source: String) : Stdlib.Result.Result<Stdlib.Json.InternalValu
 // Concrete return types at these boundaries keep list projections unambiguous
 // for ownership lowering.
 let __viewListHead (items: List<Stdlib.Json.InternalValueView>) : Stdlib.Json.InternalValueView =
-    Stdlib.List.__headUnsafe<Stdlib.Json.InternalValueView> items
+    Stdlib.List.__headUnsafe items
 
 let __viewFieldListHead (items: List<(String * Stdlib.Json.InternalValueView)>) : (String * Stdlib.Json.InternalValueView) =
-    Stdlib.List.__headUnsafe<(String * Stdlib.Json.InternalValueView)> items
+    Stdlib.List.__headUnsafe items
 
 let __viewFieldName (field: (String * Stdlib.Json.InternalValueView)) : String =
-    Stdlib.Tuple2.first<String, Stdlib.Json.InternalValueView> field
+    Stdlib.Tuple2.first field
 
 let __viewFieldValue (field: (String * Stdlib.Json.InternalValueView)) : Stdlib.Json.InternalValueView =
-    Stdlib.Tuple2.second<String, Stdlib.Json.InternalValueView> field
+    Stdlib.Tuple2.second field
 
 let __viewListTail (items: List<Stdlib.Json.InternalValueView>) : List<Stdlib.Json.InternalValueView> =
-    Stdlib.List.__tail<Stdlib.Json.InternalValueView> items
+    Stdlib.List.__tail items
 
 let __viewListIsEmpty (items: List<Stdlib.Json.InternalValueView>) : Bool =
-    Stdlib.List.isEmpty<Stdlib.Json.InternalValueView> items
+    Stdlib.List.isEmpty items
 
 let __viewText (source: String) (view: Stdlib.Json.InternalValueView) : String =
     Stdlib.String.__byteSlice source (Stdlib.Json.__viewStart view) (Stdlib.Json.__viewEnd view)
@@ -247,7 +247,7 @@ let __collectArrayItems (source: String) (index: Int64) (limit: Int64) : Stdlib.
                     match Stdlib.Json.__collectArrayItems source (afterTrivia + 1L) limit with
                     | Some rest ->
                         Stdlib.Option.Option.Some (
-                            Stdlib.List.push<Stdlib.Json.InternalValueView> rest value)
+                            Stdlib.List.push rest value)
                     | None -> Stdlib.Option.Option.None
                 else Stdlib.Option.Option.None
 
@@ -322,7 +322,7 @@ let __collectObjectFields (source: String) (index: Int64) (limit: Int64) : Stdli
                             match Stdlib.Json.__collectObjectFields source (afterTrivia + 1L) limit with
                             | Some rest ->
                                 Stdlib.Option.Option.Some (
-                                    Stdlib.List.push<(String * Stdlib.Json.InternalValueView)> rest field)
+                                    Stdlib.List.push rest field)
                             | None -> Stdlib.Option.Option.None
                         else Stdlib.Option.Option.None
 
@@ -355,11 +355,11 @@ let __collectObjectFieldMap (source: String) (index: Int64) (limit: Int64) (acc:
                             Stdlib.Int64.bitwiseOr plainValue -9223372036854775808L
                         else plainValue in
                     let field =
-                        match Stdlib.Dict.get<Stdlib.Json.InternalValueView> acc key with
+                        match Stdlib.Dict.get acc key with
                         | None -> value
                         | Some _ -> Stdlib.Json.__markDuplicate value in
                     let nextAcc =
-                        Stdlib.Dict.setOverridingDuplicates<Stdlib.Json.InternalValueView> acc key field in
+                        Stdlib.Dict.setOverridingDuplicates acc key field in
                     let afterTrivia = Stdlib.AltJson.__skipTrivia source afterValue limit in
                     if afterTrivia < 0L || afterTrivia >= limit then Stdlib.Option.Option.None
                     else
@@ -375,11 +375,11 @@ let __objectFieldMap (source: String) (view: Stdlib.Json.InternalValueView) : St
         Stdlib.Json.__collectObjectFieldMap source (Stdlib.Json.__viewStart view + 1L) (Stdlib.Json.__viewEnd view) (Dict { })
 
 let __fieldNames (fields: List<(String * Stdlib.Json.InternalValueView)>) : List<String> =
-    if Stdlib.List.isEmpty<(String * Stdlib.Json.InternalValueView)> fields then []
+    if Stdlib.List.isEmpty fields then []
     else
-        let head = Stdlib.List.__headUnsafe<(String * Stdlib.Json.InternalValueView)> fields in
-        let tail = Stdlib.List.__tail<(String * Stdlib.Json.InternalValueView)> fields in
-        Stdlib.List.push<String> (Stdlib.Json.__fieldNames tail) (Stdlib.Tuple2.first<String, Stdlib.Json.InternalValueView> head)
+        let head = Stdlib.List.__headUnsafe fields in
+        let tail = Stdlib.List.__tail fields in
+        Stdlib.List.push (Stdlib.Json.__fieldNames tail) (Stdlib.Tuple2.first head)
 
 // The root scanner has already validated syntax. Optimistic enum decoding can
 // therefore borrow the bytes between the first colon and the final brace
@@ -424,8 +424,8 @@ let __enumObject (source: String) (view: Stdlib.Json.InternalValueView) : Stdlib
         | [] -> Stdlib.Json.InternalEnumObject.EnumNoFields
         | [field] ->
             Stdlib.Json.InternalEnumObject.EnumOneField (
-                Stdlib.Tuple2.first<String, Stdlib.Json.InternalValueView> field,
-                Stdlib.Tuple2.second<String, Stdlib.Json.InternalValueView> field)
+                Stdlib.Tuple2.first field,
+                Stdlib.Tuple2.second field)
         | _ ->
             Stdlib.Json.InternalEnumObject.EnumManyFields (
                 Stdlib.Json.__fieldNames fields)

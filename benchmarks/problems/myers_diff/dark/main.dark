@@ -7,7 +7,7 @@ type DiffResult = { distance: Int64, work: Int64 }
 let diagonalKey (value: Int64) : String = Stdlib.Int64.toString value
 
 let frontierGet (frontier: Dict<Int64>) (diagonal: Int64) : Int64 =
-    match Stdlib.Dict.get<Int64> frontier (diagonalKey diagonal) with
+    match Stdlib.Dict.get frontier (diagonalKey diagonal) with
     | Some value -> value
     | None -> Builtin.testRuntimeError ("missing Myers frontier diagonal " ++ diagonalKey diagonal)
 
@@ -33,7 +33,7 @@ let search (leftText: String) (rightText: String) (d: Int64) (k: Int64) (previou
                 let previousRight = frontierGet previous (k + 1L) in
                 if previousLeft < previousRight then previousRight else previousLeft + 1L in
         let endpoint = snake leftText rightText leftLength rightLength choice (choice - k) in
-        let next = Stdlib.Dict.setOverridingDuplicates<Int64> current (diagonalKey k) (endpoint.0) in
+        let next = Stdlib.Dict.setOverridingDuplicates current (diagonalKey k) (endpoint.0) in
         let nextWork = (outcome.1 + (endpoint.0 + 1L) * (endpoint.1 + 3L) + (k + d + 1L) * 17L) % 1000000007L in
         search leftText rightText d (k + 2L) previous next ((outcome.0 || (endpoint.0 >= leftLength && endpoint.1 >= rightLength), nextWork))
 

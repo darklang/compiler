@@ -41,4 +41,4 @@ Stdlib.String.getByteAt (Stdlib.Uuid.toString (Stdlib.Uuid.generate ())) 14 == S
 
 // Invalid canonical input is reported through the upstream parser Result.
 match Stdlib.Uuid.parse "3700adbc-7a46-4ff4-81d3-45afb03f6e2d" with | Ok uuid -> Stdlib.Uuid.toString uuid | Error _ -> "" = "3700adbc-7a46-4ff4-81d3-45afb03f6e2d"
-Stdlib.Result.isError<Uuid, Stdlib.Uuid.ParseError> (Stdlib.Uuid.parse "not a uuid") = true
+Stdlib.Result.isError (Stdlib.Uuid.parse "not a uuid") = true

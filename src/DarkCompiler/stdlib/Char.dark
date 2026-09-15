@@ -19,7 +19,7 @@ let isUppercase (char: Char) : Bool =
     Stdlib.Char.toLowercase char != char && Stdlib.Char.toUppercase char == char
 
 let __firstCodepoint (char: Char) : Stdlib.Option.Option<Int64> =
-    Stdlib.List.head<Int64> (Stdlib.String.__toCodepoints (Stdlib.Char.toString char))
+    Stdlib.List.head (Stdlib.String.__toCodepoints (Stdlib.Char.toString char))
 
 let isDigit (char: Char) : Bool =
     match Stdlib.Char.__firstCodepoint char with
@@ -44,14 +44,14 @@ let isASCII (char: Char) : Bool =
 
 let __utf16Units (codepoints: List<Int64>) (acc: List<Int64>) : List<Int64> =
     match codepoints with
-    | [] -> Stdlib.List.reverse<Int64> acc
+    | [] -> Stdlib.List.reverse acc
     | codepoint :: rest ->
-        if codepoint <= 65535L then Stdlib.Char.__utf16Units rest (Stdlib.List.push<Int64> acc codepoint)
+        if codepoint <= 65535L then Stdlib.Char.__utf16Units rest (Stdlib.List.push acc codepoint)
         else
             let adjusted = codepoint - 65536L in
             let high = 55296L + Stdlib.Int64.shiftRight adjusted 10L in
             let low = 56320L + Stdlib.Int64.bitwiseAnd adjusted 1023L in
-            Stdlib.Char.__utf16Units rest (Stdlib.List.push<Int64> (Stdlib.List.push<Int64> acc high) low)
+            Stdlib.Char.__utf16Units rest (Stdlib.List.push (Stdlib.List.push acc high) low)
 
 let __compareUnits (left: List<Int64>) (right: List<Int64>) : Int64 =
     match (left, right) with

@@ -29,7 +29,7 @@ let __copyPath (path: List<Stdlib.Json.ParseError.JsonPath.Part.Part>) : List<St
         Stdlib.Json.ParseError.JsonPath.Part.Part> path (fun part -> Stdlib.Json.ParseError.__copyPathPart part)
 
 let __quotedCases (cases: List<String>) : List<String> =
-    Stdlib.List.map<String, String> cases (fun caseName -> "`" ++ caseName ++ "`")
+    Stdlib.List.map cases (fun caseName -> "`" ++ caseName ++ "`")
 
 let toString (branchId: Uuid) (error: Stdlib.Json.ParseError.ParseError) : String =
     match error with

@@ -511,8 +511,8 @@ Stdlib.String.dropLast "abcdef" 3 = "abc"
 // Stdlib.String.head - Get first character as Option
 // ===================================================================
 
-Stdlib.Option.withDefault<Char> (Stdlib.String.head "hello") 'x' = 'h'
-Stdlib.Option.isNone<Char> (Stdlib.String.head "") = true
+Stdlib.Option.withDefault (Stdlib.String.head "hello") 'x' = 'h'
+Stdlib.Option.isNone (Stdlib.String.head "") = true
 
 // ===================================================================
 // Stdlib.String.padStart - Pad on the left

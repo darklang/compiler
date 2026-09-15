@@ -79,8 +79,8 @@ let __parseStringChars (source: String) (index: Int64) (length: Int64) (acc: Str
             Stdlib.AltJson.InternalParseStringResult.InvalidString
         else if byte != 92L then
             let decoded = Stdlib.String.__decodeUtf8At source index in
-            let codepoint = Stdlib.Tuple2.first<Int64, Int64> decoded in
-            let consumed = Stdlib.Tuple2.second<Int64, Int64> decoded in
+            let codepoint = Stdlib.Tuple2.first decoded in
+            let consumed = Stdlib.Tuple2.second decoded in
             Stdlib.AltJson.__parseStringChars source (index + consumed) length (acc ++ Stdlib.String.__fromCodepoints ([codepoint]))
         else if index + 1L >= length then
             Stdlib.AltJson.InternalParseStringResult.InvalidString
@@ -179,7 +179,7 @@ let __parseArrayItems (source: String) (index: Int64) (length: Int64) (acc: List
     let current = Stdlib.AltJson.__skipTrivia source index length in
     if current < 0L || current >= length then Stdlib.AltJson.InternalParseListResult.InvalidList
     else if Stdlib.String.__byteAtUnchecked source current == 93L then
-        Stdlib.AltJson.InternalParseListResult.ParsedList (Stdlib.List.reverse<Stdlib.AltJson.InternalRawJson> acc) (current + 1L)
+        Stdlib.AltJson.InternalParseListResult.ParsedList (Stdlib.List.reverse acc) (current + 1L)
     else
         match Stdlib.AltJson.__parseValue source current length with
         | ParsedValue (value, afterValue) ->
@@ -188,12 +188,12 @@ let __parseArrayItems (source: String) (index: Int64) (length: Int64) (acc: List
             else
                 let separator = Stdlib.String.__byteAtUnchecked source afterTrivia in
                 if separator == 93L then
-                    Stdlib.AltJson.InternalParseListResult.ParsedList (Stdlib.List.reverse<Stdlib.AltJson.InternalRawJson> (Stdlib.List.push<Stdlib.AltJson.InternalRawJson> acc value)) (afterTrivia + 1L)
+                    Stdlib.AltJson.InternalParseListResult.ParsedList (Stdlib.List.reverse (Stdlib.List.push acc value)) (afterTrivia + 1L)
                 else if separator == 44L then
                     let afterComma = Stdlib.AltJson.__skipTrivia source (afterTrivia + 1L) length in
                     if afterComma >= length || Stdlib.String.__byteAtUnchecked source afterComma == 93L then
                         Stdlib.AltJson.InternalParseListResult.InvalidList
-                    else Stdlib.AltJson.__parseArrayItems source afterComma length (Stdlib.List.push<Stdlib.AltJson.InternalRawJson> acc value)
+                    else Stdlib.AltJson.__parseArrayItems source afterComma length (Stdlib.List.push acc value)
                 else Stdlib.AltJson.InternalParseListResult.InvalidList
         | InvalidValue -> Stdlib.AltJson.InternalParseListResult.InvalidList
 
@@ -201,7 +201,7 @@ let __parseObjectFields (source: String) (index: Int64) (length: Int64) (acc: Li
     let current = Stdlib.AltJson.__skipTrivia source index length in
     if current < 0L || current >= length then Stdlib.AltJson.InternalParseFieldsResult.InvalidFields
     else if Stdlib.String.__byteAtUnchecked source current == 125L then
-        Stdlib.AltJson.InternalParseFieldsResult.ParsedFields (Stdlib.List.reverse<(String * Stdlib.AltJson.InternalRawJson)> acc) (current + 1L)
+        Stdlib.AltJson.InternalParseFieldsResult.ParsedFields (Stdlib.List.reverse acc) (current + 1L)
     else
         match Stdlib.AltJson.__parseString source current length with
         | ParsedString (key, afterKey) ->
@@ -216,12 +216,12 @@ let __parseObjectFields (source: String) (index: Int64) (length: Int64) (acc: Li
                     else
                         let separator = Stdlib.String.__byteAtUnchecked source afterTrivia in
                         if separator == 125L then
-                            Stdlib.AltJson.InternalParseFieldsResult.ParsedFields (Stdlib.List.reverse<(String * Stdlib.AltJson.InternalRawJson)> (Stdlib.List.push<(String * Stdlib.AltJson.InternalRawJson)> acc ((key, value)))) (afterTrivia + 1L)
+                            Stdlib.AltJson.InternalParseFieldsResult.ParsedFields (Stdlib.List.reverse (Stdlib.List.push acc ((key, value)))) (afterTrivia + 1L)
                         else if separator == 44L then
                             let afterComma = Stdlib.AltJson.__skipTrivia source (afterTrivia + 1L) length in
                             if afterComma >= length || Stdlib.String.__byteAtUnchecked source afterComma == 125L then
                                 Stdlib.AltJson.InternalParseFieldsResult.InvalidFields
-                            else Stdlib.AltJson.__parseObjectFields source afterComma length (Stdlib.List.push<(String * Stdlib.AltJson.InternalRawJson)> acc ((key, value)))
+                            else Stdlib.AltJson.__parseObjectFields source afterComma length (Stdlib.List.push acc ((key, value)))
                         else Stdlib.AltJson.InternalParseFieldsResult.InvalidFields
                 | InvalidValue -> Stdlib.AltJson.InternalParseFieldsResult.InvalidFields)
         | InvalidString -> Stdlib.AltJson.InternalParseFieldsResult.InvalidFields
@@ -386,21 +386,21 @@ let __numberToFloat (text: String) : Stdlib.Option.Option<Float> =
 
 let __projectRawList (values: List<Stdlib.AltJson.InternalRawJson>) (acc: List<Stdlib.AltJson.Json>) : Stdlib.Option.Option<List<Stdlib.AltJson.Json>> =
     match values with
-    | [] -> Stdlib.Option.Option.Some (Stdlib.List.reverse<Stdlib.AltJson.Json> acc)
+    | [] -> Stdlib.Option.Option.Some (Stdlib.List.reverse acc)
     | head :: tail ->
         match Stdlib.AltJson.__projectRaw head with
         | None -> Stdlib.Option.Option.None
-        | Some value -> Stdlib.AltJson.__projectRawList tail (Stdlib.List.push<Stdlib.AltJson.Json> acc value)
+        | Some value -> Stdlib.AltJson.__projectRawList tail (Stdlib.List.push acc value)
 
 let __projectRawFields (values: List<(String * Stdlib.AltJson.InternalRawJson)>) (acc: List<(String * Stdlib.AltJson.Json)>) : Stdlib.Option.Option<List<(String * Stdlib.AltJson.Json)>> =
     match values with
-    | [] -> Stdlib.Option.Option.Some (Stdlib.List.reverse<(String * Stdlib.AltJson.Json)> acc)
+    | [] -> Stdlib.Option.Option.Some (Stdlib.List.reverse acc)
     | head :: tail ->
-        let key = Stdlib.Tuple2.first<String, Stdlib.AltJson.InternalRawJson> head in
-        let raw = Stdlib.Tuple2.second<String, Stdlib.AltJson.InternalRawJson> head in
+        let key = Stdlib.Tuple2.first head in
+        let raw = Stdlib.Tuple2.second head in
         match Stdlib.AltJson.__projectRaw raw with
         | None -> Stdlib.Option.Option.None
-        | Some value -> Stdlib.AltJson.__projectRawFields tail (Stdlib.List.push<(String * Stdlib.AltJson.Json)> acc ((key, value)))
+        | Some value -> Stdlib.AltJson.__projectRawFields tail (Stdlib.List.push acc ((key, value)))
 
 let __projectRaw (value: Stdlib.AltJson.InternalRawJson) : Stdlib.Option.Option<Stdlib.AltJson.Json> =
     match value with
@@ -460,8 +460,8 @@ let __escapeStringAt (value: String) (index: Int64) (length: Int64) (acc: String
         else if byte < 32L then Stdlib.AltJson.__escapeStringAt value (index + 1L) length (acc ++ Stdlib.AltJson.__escapeControl byte)
         else
             let decoded = Stdlib.String.__decodeUtf8At value index in
-            let codepoint = Stdlib.Tuple2.first<Int64, Int64> decoded in
-            let consumed = Stdlib.Tuple2.second<Int64, Int64> decoded in
+            let codepoint = Stdlib.Tuple2.first decoded in
+            let consumed = Stdlib.Tuple2.second decoded in
             let escaped =
                 if codepoint <= 65535L then Stdlib.String.__byteSlice value index (index + consumed)
                 else
@@ -492,8 +492,8 @@ let __formatObject (values: List<(String * Stdlib.AltJson.Json)>) (first: Bool) 
     match values with
     | [] -> ""
     | head :: tail ->
-        let key = Stdlib.Tuple2.first<String, Stdlib.AltJson.Json> head in
-        let value = Stdlib.Tuple2.second<String, Stdlib.AltJson.Json> head in
+        let key = Stdlib.Tuple2.first head in
+        let value = Stdlib.Tuple2.second head in
         (if first then "" else ",") ++
         Stdlib.AltJson.__quote key ++ ":" ++ Stdlib.AltJson.format value ++
         Stdlib.AltJson.__formatObject tail false
