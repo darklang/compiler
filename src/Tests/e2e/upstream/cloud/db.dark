@@ -95,12 +95,12 @@ type TestNestedAliasRecord = AliasOfRecord
 module SetDoesUpsert =
   (let old = Stdlib.DB.set (X { x = "hello" }) "hello" XDB
    let newval = Stdlib.DB.set (X { x = "goodbye" }) "hello" XDB
-   Stdlib.DB.getAllWithKeys XDB) = Dict { hello = X { x = "goodbye" } }
+   Stdlib.DB.getAllWithKeys XDB) = Dict { "hello": X { x = "goodbye" } }
 
 module SetCharUpserts =
   (let old = Stdlib.DB.set (Z { x = 'a' }) "a" ZDB
    let newval = Stdlib.DB.set (Z { x = 'b' }) "a" ZDB
-   Stdlib.DB.getAllWithKeys ZDB) = Dict { a = Z { x = 'b' } }
+   Stdlib.DB.getAllWithKeys ZDB) = Dict { "a": Z { x = 'b' } }
 
 
 
@@ -115,32 +115,26 @@ module Get =
   (let _ = Stdlib.DB.set (X { x = "hello" }) "key" XDB in Stdlib.DB.get "key" XDB) = Stdlib
     .Option
     .Option
-    .Some (X { x = "hello" })
+    .Some(X { x = "hello" })
 
   // returns correct value given reassigned entry
   (let _ = Stdlib.DB.set (X { x = "hello" }) "key" XDB
    let _ = Stdlib.DB.set (X { x = "goodbye" }) "key" XDB
-   Stdlib.DB.get "key" XDB) = Stdlib.Option.Option.Some (X { x = "goodbye" })
+   Stdlib.DB.get "key" XDB) = Stdlib.Option.Option.Some(X { x = "goodbye" })
 
   // returns value given multiple entries
   (let _ = Stdlib.DB.set (X { x = "pancake" }) "key1" XDB
    let _ = Stdlib.DB.set (X { x = "waffle" }) "key2" XDB
    let _ = Stdlib.DB.set (X { x = "scone" }) "key3" XDB
-   Stdlib.DB.get "key2" XDB) = Stdlib.Option.Option.Some (X { x = "waffle" })
+   Stdlib.DB.get "key2" XDB) = Stdlib.Option.Option.Some(X { x = "waffle" })
 
 
 
 module NestedRecordFieldAccess =
   // can use lambda like (fun p -> p.details.numbers.age)
-  (Stdlib.DB.set
-    (OuterRecord { name = "joe"; details = InnerRecord { numbers = AliasOfVeryInnerRecord { age = 41L } } })
-    "jjj"
-    TestNestedRecord
+  (let _ = Stdlib.DB.set (OuterRecord { name = "joe"; details = InnerRecord { numbers = AliasOfVeryInnerRecord { age = 41L } } }) "jjj" TestNestedRecord
 
-   Stdlib.DB.set
-     (OuterRecord { name = "frank"; details = InnerRecord { numbers = VeryInnerRecord { age = 22L } } })
-     "fff"
-     TestNestedRecord
+   let _ = Stdlib.DB.set (OuterRecord { name = "frank"; details = InnerRecord { numbers = VeryInnerRecord { age = 22L } } }) "fff" TestNestedRecord
 
    let shouldBeJustJoe =
      Stdlib.DB.query TestNestedRecord (fun p -> p.details.numbers.age == 41L)
@@ -148,15 +142,9 @@ module NestedRecordFieldAccess =
    Stdlib.List.length shouldBeJustJoe) = 1
 
   // same as above, but with aliases
-  (Stdlib.DB.set
-    (AliasOfRecord { name = "jeremy"; details = InnerRecord { numbers = VeryInnerRecord { age = 38L } } })
-    "ignored"
-    TestNestedAliasRecord
+  (let _ = Stdlib.DB.set (AliasOfRecord { name = "jeremy"; details = InnerRecord { numbers = VeryInnerRecord { age = 38L } } }) "ignored" TestNestedAliasRecord
 
-   Stdlib.DB.set
-     (AliasOfRecord { name = "josephine"; details = InnerRecord { numbers = AliasOfVeryInnerRecord { age = 29L } } })
-     "alsoIgnored"
-     TestNestedAliasRecord
+   let _ = Stdlib.DB.set (AliasOfRecord { name = "josephine"; details = InnerRecord { numbers = AliasOfVeryInnerRecord { age = 29L } } }) "alsoIgnored" TestNestedAliasRecord
 
    let shouldBeJustJeremy =
      Stdlib.DB.query TestNestedAliasRecord (fun p -> p.details.numbers.age == 38L)
@@ -173,15 +161,9 @@ type RecordWithGenericThing = GenericThing<String>
 type TestRecordWithGenericThing = RecordWithGenericThing
 
 module AccessDataInGenericField =
-  (Stdlib.DB.set
-    (RecordWithGenericThing { name = "joe" })
-    "jjj"
-    TestRecordWithGenericThing
+  (let _ = Stdlib.DB.set (RecordWithGenericThing { name = "joe" }) "jjj" TestRecordWithGenericThing
 
-   Stdlib.DB.set
-     (RecordWithGenericThing { name = "frank" })
-     "fff"
-     TestRecordWithGenericThing
+   let _ = Stdlib.DB.set (RecordWithGenericThing { name = "frank" }) "fff" TestRecordWithGenericThing
 
    Stdlib.DB.query TestRecordWithGenericThing (fun p -> p.name == "joe")) = [ RecordWithGenericThing
                                                                                  { name =
@@ -194,15 +176,9 @@ module AccessRecordInGenericField =
   type TestDB = GenericThing<RecordThing>
 
 
-  (Stdlib.DB.set
-    (GenericThing { name = RecordThing { nested = "joe" } })
-    "jjj"
-    TestDB
+  (let _ = Stdlib.DB.set (GenericThing { name = RecordThing { nested = "joe" } }) "jjj" TestDB
 
-   Stdlib.DB.set
-     (GenericThing { name = RecordThing { nested = "frank" } })
-     "fff"
-     TestDB
+   let _ = Stdlib.DB.set (GenericThing { name = RecordThing { nested = "frank" } }) "fff" TestDB
 
    let nestedValue = RecordThing { nested = "joe" }
 
@@ -213,14 +189,14 @@ module AccessRecordInGenericField =
                                                                             "joe" } } ]
 
 module AccessEnumInGenericField =
-  type EnumThing = | A of String
+  type EnumThing = A of String
 
   [<DB>]
   type EnumThingDB = GenericThing<EnumThing>
 
 
-  (Stdlib.DB.set (GenericThing { name = EnumThing.A "joe" }) "jjj" EnumThingDB
-   Stdlib.DB.set (GenericThing { name = EnumThing.A "frank" }) "fff" EnumThingDB
+  (let _ = Stdlib.DB.set (GenericThing { name = EnumThing.A "joe" }) "jjj" EnumThingDB
+   let _ = Stdlib.DB.set (GenericThing { name = EnumThing.A "frank" }) "fff" EnumThingDB
 
    let nestedValue = EnumThing.A "joe"
 
@@ -256,17 +232,17 @@ module AddToTestEnumDBs =
        "test2"
        TestEnumDB
 
-   (Stdlib.DB.get "test1" TestEnumDB)) = Stdlib.Option.Option.Some (
+   (Stdlib.DB.get "test1" TestEnumDB)) = Stdlib.Option.Option.Some(
     EnumTestRecord { x = "hello"; y = MyEnum.A }
   )
 
   (let test1 = Stdlib.DB.set MyEnum.A "test1" TestEnumDB2
    let test2 = Stdlib.DB.set MyEnum.B "test2" TestEnumDB2
-   (Stdlib.DB.getAll TestEnumDB2) |> Stdlib.List.sort) = [ MyEnum.A; MyEnum.B ]
+   (Stdlib.DB.getAll TestEnumDB2) |> Stdlib.List.sort) = [ MyEnum.A, MyEnum.B ]
 
   (let test1 = Stdlib.DB.set MyEnum.C "test1" TestEnumDB2
    let test2 = Stdlib.DB.set MyEnum.B "test2" TestEnumDB2
-   (Stdlib.DB.get "test1" TestEnumDB2)) = Stdlib.Option.Option.Some (MyEnum.C)
+   (Stdlib.DB.get "test1" TestEnumDB2)) = Stdlib.Option.Option.Some(MyEnum.C)
 
   (let test1 = Stdlib.DB.set MyEnum2.D "test1" TestEnumDB3
    let test2 = Stdlib.DB.set MyEnum2.E "test2" TestEnumDB3
@@ -357,7 +333,7 @@ module Roundtrip =
         negInfinity = Builtin.testNegativeInfinity
         ``true`` = true
         ``false`` = false
-        list = [ 1L; 2L; 3L ]
+        list = [ 1L, 2L, 3L ]
         char = 'c'
         resultOk = Stdlib.Result.Result.Ok 5L
         resultError = Stdlib.Result.Result.Error "test"
@@ -392,7 +368,7 @@ module Roundtrip =
         negInfinity = -385.33
         ``true`` = false
         ``false`` = true
-        list = [ 1L; 3L; 45L ]
+        list = [ 1L, 3L, 45L ]
         char = 'd'
         resultOk = Stdlib.Result.Result.Ok 6L
         resultError = Stdlib.Result.Result.Error "other test"
@@ -406,11 +382,11 @@ module Roundtrip =
         datetime = (Stdlib.DateTime.parse "2011-11-11T11:11:11Z") |> Builtin.unwrap
         unit = () }
 
-  // TODO: Add roundtrip for bytes (Blob values not supported yet)
+  // TODO: Add roundtrip for bytes (Bytes values not supported yet)
   (let v = sample ()
    let z = Stdlib.DB.set v "all" SampleDB
    (z, Stdlib.DB.get "all" SampleDB)) =
-    (sample (), Stdlib.Option.Option.Some (sample ()))
+    (sample (), Stdlib.Option.Option.Some(sample ()))
 
   // QueryEquality tests - moved inside Roundtrip module to access sample() and SampleDB
 
@@ -484,7 +460,7 @@ module Params =
 
   (let _ = Stdlib.DB.set (Param { x = "hello"; b = 5L }) "key" ParamDB
    Stdlib.DB.get "key" ParamDB) =
-    Stdlib.Option.Option.Some (Param { x = "hello"; b = 5L })
+    Stdlib.Option.Option.Some(Param { x = "hello"; b = 5L })
 
 
 
@@ -492,7 +468,7 @@ module GetAll =
   (let _ = Stdlib.DB.set (SortedX { x = "hello"; sortBy = 0L }) "one" SortedXDB
    let _ = Stdlib.DB.set (SortedX { x = "goodbye"; sortBy = 1L }) "two" SortedXDB
    let _ = Stdlib.DB.set (SortedX { x = "howdy"; sortBy = 2L }) "three" SortedXDB
-   (Stdlib.DB.getAll SortedXDB) |> Stdlib.List.sortBy_v0 (fun x -> x.sortBy)) =
+   (Stdlib.DB.getAll SortedXDB) |> Stdlib.List.sortBy (fun x -> x.sortBy)) =
     [ SortedX { x = "hello";  sortBy = 0L }
       SortedX { x = "goodbye"; sortBy = 1L }
       SortedX { x = "howdy"; sortBy = 2L } ]
@@ -501,40 +477,40 @@ module GetAll =
 module GetAllKeys =
   (let one = Stdlib.DB.set (X { x = "hello" }) "one" XDB
    let two = Stdlib.DB.set (X { x = "goodbye" }) "two" XDB
-   (Stdlib.DB.keys XDB) |> Stdlib.List.sort_v0) = [ "one"; "two" ]
+   (Stdlib.DB.keys XDB) |> Stdlib.List.sort) = [ "one", "two" ]
 
 
 module GetAllWithKeys =
   (let one = Stdlib.DB.set (X { x = "hello" }) "one" XDB
    let two = Stdlib.DB.set (X { x = "goodbye" }) "two" XDB
    Stdlib.DB.getAllWithKeys XDB) =
-    Dict { one = X { x = "hello" }; two = X { x = "goodbye" } }
+    Dict { "one": X { x = "hello" }; "two": X { x = "goodbye" } }
 
 
 module GetManyWithKeys =
   (let one = Stdlib.DB.set (X { x = "hello" }) "one" XDB
    let two = Stdlib.DB.set (X { x = "goodbye" }) "two" XDB
-   Stdlib.DB.getManyWithKeys [ "one"; "two" ] XDB) =
+   Stdlib.DB.getManyWithKeys [ "one", "two" ] XDB) =
     Dict
-      { one = (X { x = "hello" })
-        two = (X { x = "goodbye" }) }
+      { "one": (X { x = "hello" })
+        "two": (X { x = "goodbye" }) }
 
 
 module GetExisting =
   (let one = Stdlib.DB.set (X { x = "hello" }) "one" XDB
    let two = Stdlib.DB.set (X { x = "goodbye" }) "two" XDB
-   Stdlib.DB.getExisting [ "three"; "two" ] XDB) = [ (X { x = "goodbye" }) ]
+   Stdlib.DB.getExisting [ "three", "two" ] XDB) = [ (X { x = "goodbye" }) ]
 
 
 module GetMany =
   (let one = Stdlib.DB.set (X { x = "hello" }) "one" XDB
    let two = Stdlib.DB.set (X { x = "goodbye" }) "two" XDB
-   Stdlib.DB.getMany [ "three"; "two" ] XDB) = Stdlib.Option.Option.None
+   Stdlib.DB.getMany [ "three", "two" ] XDB) = Stdlib.Option.Option.None
 
   (let one = Stdlib.DB.set (X { x = "hello" }) "one" XDB
    let two = Stdlib.DB.set (X { x = "goodbye" }) "two" XDB
 
-   (Stdlib.DB.getMany [ "one"; "two" ] XDB)
+   (Stdlib.DB.getMany [ "one", "two" ] XDB)
    |> Builtin.unwrap
    |> Stdlib.List.sortBy (fun v -> v.x)) =
     [ (X { x = "goodbye" })
@@ -549,13 +525,13 @@ module Delete =
   // delete nothing
   (let _ = Stdlib.DB.set (X { x = "hello" }) "one" XDB
    let _ = Stdlib.DB.delete "two" XDB
-   Stdlib.DB.getAllWithKeys XDB) = Dict { one = (X { x = "hello" }) }
+   Stdlib.DB.getAllWithKeys XDB) = Dict { "one": (X { x = "hello" }) }
 
   // deletes only one
   (let _ = Stdlib.DB.set (X { x = "hello" }) "one" XDB
    let _ = Stdlib.DB.set (X { x = "goodbye" }) "two" XDB
    let _ = Stdlib.DB.delete "one" XDB
-   Stdlib.DB.getAllWithKeys XDB) = Dict { two = (X { x = "goodbye" }) }
+   Stdlib.DB.getAllWithKeys XDB) = Dict { "two": (X { x = "goodbye" }) }
 
 module DeleteAll =
   (let _ = Stdlib.DB.set (X { x = "hello" }) "one" XDB
@@ -651,7 +627,7 @@ module FindAll =
   type T2 = { field2: Int64 }
   type T1 = { field1: T2 }
 
-  (friends (fun p -> true)) = [ " Chandler "; "GrumpyCat"; "Rachel"; "Ross" ]
+  (friends (fun p -> true)) = [ " Chandler ", "GrumpyCat", "Rachel", "Ross" ]
 
   // equality
   (friends (fun p -> p.name == "Ross")) = [ "Ross" ]
@@ -662,28 +638,28 @@ module FindAll =
   (friends (fun p -> p.dob == (rossDOB ()))) = [ "Ross" ]
 
   // with condition
-  (friends (fun p -> p.height > 3L)) = [ " Chandler "; "GrumpyCat"; "Rachel"; "Ross" ]
+  (friends (fun p -> p.height > 3L)) = [ " Chandler ", "GrumpyCat", "Rachel", "Ross" ]
 
   // boolean queries
-  (friends (fun p -> p.human)) = [ " Chandler "; "Rachel"; "Ross" ]
+  (friends (fun p -> p.human)) = [ " Chandler ", "Rachel", "Ross" ]
 
   // string inequality works
-  (friends (fun p -> p.name != "")) = [ " Chandler "; "GrumpyCat"; "Rachel"; "Ross" ]
+  (friends (fun p -> p.name != "")) = [ " Chandler ", "GrumpyCat", "Rachel", "Ross" ]
 
   // &&
-  (friends (fun p -> p.human && p.height > 66L)) = [ " Chandler "; "Ross" ]
+  (friends (fun p -> p.human && p.height > 66L)) = [ " Chandler ", "Ross" ]
 
   // ||
-  (friends (fun p -> p.human || p.height > 66L)) = [ " Chandler "; "Rachel"; "Ross" ]
+  (friends (fun p -> p.human || p.height > 66L)) = [ " Chandler ", "Rachel", "Ross" ]
 
   // inlining
-  (friends (fun p -> let x = 32L in p.height > x && true)) = [ " Chandler "; "Rachel"; "Ross" ]
+  (friends (fun p -> let x = 32L in p.height > x && true)) = [ " Chandler ", "Rachel", "Ross" ]
 
   // inlining field access
-  (friends (fun p -> let x = p.height in true && x > 32L)) = [ " Chandler "; "Rachel"; "Ross" ]
+  (friends (fun p -> let x = p.height in true && x > 32L)) = [ " Chandler ", "Rachel", "Ross" ]
 
   // inlining package functions
-  (friends (fun p -> let x = p.height in true && Stdlib.Int64.greaterThan x 32L)) = [ " Chandler "; "Rachel"; "Ross" ]
+  (friends (fun p -> let x = p.height in true && Stdlib.Int64.greaterThan x 32L)) = [ " Chandler ", "Rachel", "Ross" ]
 
   // inlining user functions
   let userAnd (a: Bool) (b: Bool) : Bool = Stdlib.Bool.``and`` a b
@@ -696,11 +672,11 @@ module FindAll =
 
   let userAdd (a: Int64) (b: Int64) : Int64 = a + b
 
-  (friends (fun p -> userAnd (true || false) (p.height > 66L))) = [ " Chandler "; "Ross" ]
+  (friends (fun p -> userAnd (true || false) (p.height > 66L))) = [ " Chandler ", "Ross" ]
 
-  (friends (fun p -> let a = true in (userAnd (a && a) (p.height > 66L)))) = [ " Chandler "; "Ross" ]
+  (friends (fun p -> let a = true in (userAnd (a && a) (p.height > 66L)))) = [ " Chandler ", "Ross" ]
 
-  (friends (fun p -> userAnd p.human true)) = [ " Chandler "; "Rachel"; "Ross" ]
+  (friends (fun p -> userAnd p.human true)) = [ " Chandler ", "Rachel", "Ross" ]
 
   (friends (fun p -> userStringContains p "Chandler")) = [ " Chandler " ]
 
@@ -757,11 +733,11 @@ module FindAll =
   // fieldaccess
   type IntField = { x: Int64 }
 
-  (friends (fun p -> let obj = IntField { x = 42L } in p.height > obj.x)) = [ " Chandler "; "Rachel"; "Ross" ]
+  (friends (fun p -> let obj = IntField { x = 42L } in p.height > obj.x)) = [ " Chandler ", "Rachel", "Ross" ]
 
   // nested fieldaccess
   (friends (fun p ->
-    let obj = T1 { field1 = T2 { field2 = 42L } } in p.height > obj.field1.field2)) = [ " Chandler "; "Rachel"; "Ross" ]
+    let obj = T1 { field1 = T2 { field2 = 42L } } in p.height > obj.field1.field2)) = [ " Chandler ", "Rachel", "Ross" ]
 
   // wrong type error
   // TODO: Re-enable once RTQueryCompiler supports type checking.
@@ -769,7 +745,7 @@ module FindAll =
   // compatible types when compared with DB fields.
   // (let x = "not int"
   //  friends (fun p -> p.height > x)) = sqlerror=
-  //   "Variable `x` should be an Stdlib.Int64. However, a String (\"not int\") was passed instead.\n\nExpected: (x: Int64)\nActual: a String: \"not int\""
+  //   "Variable `x` should be an Int64. However, a String (\"not int\") was passed instead.\n\nExpected: (x: Int64)\nActual: a String: \"not int\""
 
   // lambda doesnt return a bool
   friendsError (fun p -> "x") = sqlerror="Incorrect type in String \"x\", expected Bool, but got a String"
@@ -798,7 +774,7 @@ module FindAll =
   // storage is untouched: a >Int64 value round-trips through set/get fine
   // (it's only numeric *querying* that's restricted)
   (let _ = Stdlib.DB.set (IntFields { big = 9223372036854775808; sized = 5L }) "k" IntFieldsDB
-   Stdlib.DB.get "k" IntFieldsDB) = Stdlib.Option.Option.Some (IntFields { big = 9223372036854775808; sized = 5L })
+   Stdlib.DB.get "k" IntFieldsDB) = Stdlib.Option.Option.Some(IntFields { big = 9223372036854775808; sized = 5L })
 
   // sql injection
   (friendsError (fun p -> "; select * from users;" == p.name)) = []
@@ -855,12 +831,12 @@ module CompiledFunctions =
   // (friends (fun p -> Stdlib.String.reverse p.name == "lehcaR")) = [ "Rachel" ]
 
   // TODO: SQLite's LENGTH counts characters, not EGCs so we made it non queriable for now
-  // (friends (fun p -> Stdlib.String.length p.name > 5)) = [ " Chandler "
+  // (friends (fun p -> Stdlib.String.length p.name > 5I)) = [ " Chandler "
   //                                                           "GrumpyCat"
   //                                                           "Rachel" ]
   (friends (fun p -> Stdlib.String.contains p.name "ROSS")) = []
 
-  (friends (fun p -> Stdlib.String.contains p.name "R")) = [ "Rachel"; "Ross" ]
+  (friends (fun p -> Stdlib.String.contains p.name "R")) = [ "Rachel", "Ross" ]
 
   (friends (fun p -> Stdlib.String.contains p.name "ZZZ")) = []
 
@@ -1000,7 +976,7 @@ module PartialEvaluation =
 
    ((Stdlib.DB.query PersonDB (fun p -> x.y.z.a < p.height))
     |> Stdlib.List.map (fun p -> p.name)
-    |> Stdlib.List.sort)) = [ " Chandler "; "GrumpyCat"; "Rachel"; "Ross" ]
+    |> Stdlib.List.sort)) = [ " Chandler ", "GrumpyCat", "Rachel", "Ross" ]
 
   // fieldAccesses inside query
   (friends (fun p -> let x = Y { y = Z { z = A { a = 5L } } } in x.y.z.a < p.height)) = [ " Chandler "
@@ -1009,13 +985,13 @@ module PartialEvaluation =
                                                                                           "Ross" ]
 
   (friends (fun p ->
-    let x = YL { y = ZL { z = AL { a = [ 1L; 2L; 3L; 4L; 5L ] } } }
-    (Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.List.length x.y.z.a))) < p.height)) = [ " Chandler "; "GrumpyCat"; "Rachel"; "Ross" ]
+    let x = YL { y = ZL { z = AL { a = [ 1L, 2L, 3L, 4L, 5L ] } } }
+    (Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.List.length x.y.z.a))) < p.height)) = [ " Chandler ", "GrumpyCat", "Rachel", "Ross" ]
 
   // tuple destructuring inside query - requires tuple pattern support
   (friends (fun p ->
     let (a0, a1, a2, a3, ((b, c), d)) = (0L, 1L, 2L, 3L, ((5L, "aa"), 'a'))
-    b < p.height)) = [ " Chandler "; "GrumpyCat"; "Rachel"; "Ross" ]
+    b < p.height)) = [ " Chandler ", "GrumpyCat", "Rachel", "Ross" ]
 
 
 module QueryOne =
@@ -1055,3 +1031,7 @@ module QueryCount =
 
 
 ((Stdlib.DB.generateKey ()) |> Stdlib.String.length) = 36
+
+
+module DBAsDictKey =
+  Dict { XDB: 1L } = error="Cannot use <Datastore: XDB> as a dict key. Functions, streams, database references, blobs, and values containing them cannot be keys."

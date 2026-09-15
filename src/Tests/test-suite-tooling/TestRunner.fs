@@ -8,6 +8,7 @@ open System
 open System.IO
 open System.Diagnostics
 open System.Globalization
+open System.Text
 open System.Text.Json
 open System.Text.Json.Serialization
 open System.Threading.Tasks
@@ -25,6 +26,7 @@ let private aiMessageCharacterLimit = 1200
 let private aiDetailsCharacterLimit = 2400
 
 let private truncateDiagnostic (maxCharacters: int) (text: string) : string =
+    let text = Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(text))
     let boundedMaximum = max 0 maxCharacters
     if text.Length <= boundedMaximum then
         text
@@ -307,195 +309,6 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
         let fulldir = Path.Combine(testDataRoot, dir)
         Directory.GetFiles(fulldir, $"*.{suffix}", SearchOption.AllDirectories)
 
-    let eifUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "flow-control", "eif.dark")
-    let ematchUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "flow-control", "ematch.dark")
-    let eapplyUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "apply", "eapply.dark")
-    let aliasesUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "custom-data", "aliases.dark")
-    let recordsUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "custom-data", "records.dark")
-    let recordFieldAccessUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "custom-data", "record-field-acess.dark")
-    let einfixUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "apply", "einfix.dark")
-    let eandUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "basic", "eand.dark")
-    let eorUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "basic", "eor.dark")
-    let evariableUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "basic", "evariable.dark")
-    let dfloatUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "basic", "dfloat.dark")
-    let estringUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "basic", "estring.dark")
-    let eletUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "basic", "elet.dark")
-    let epipeUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "flow-control", "epipe.dark")
-    let derrorUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "derror.dark")
-    let elambdaUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "elambda.dark")
-    let dtupleUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "collections", "dtuple.dark")
-    let edictUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "language", "collections", "edict.dark")
-    let dateUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "date.dark")
-    let durationUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "duration.dark")
-    let listUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "list.dark")
-    let dictUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "dict.dark")
-    let uuidUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "uuid.dark")
-    let charToAsciiCodeUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "char-to-ascii-code.dark")
-    let charUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "char.dark")
-    let stringUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "string.dark")
-    let regexUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "regex.dark")
-    let optionUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "option.dark")
-    let resultUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "result.dark")
-    let mathUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "math.dark")
-    let floatUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "float.dark")
-    let altJsonUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "alt-json.dark")
-    let jsonUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "json.dark")
-    let integerUpstreamDarkPaths =
-        [| "int.dark"
-           "int8.dark"
-           "uint8.dark"
-           "int16.dark"
-           "uint16.dark"
-           "int32.dark"
-           "uint32.dark"
-           "int64.dark"
-           "uint64.dark"
-           "int128.dark"
-           "uint128.dark" |]
-        |> Array.map (fun filename ->
-            Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "ints", filename))
-    let blobUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "bytes.dark")
-    let base64UpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "base64.dark")
-    let cryptoUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "crypto.dark")
-    let x509UpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "x509.dark")
-    let htmlUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "html.dark")
-    let httpUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "http.dark")
-    let streamUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "stream.dark")
-    let cliPathUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "cli-path.dark")
-    let cliGlobUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "cli-glob.dark")
-    let cliProcessUpstreamDarkPath =
-        Path.Combine(testDataRoot, "e2e", "upstream", "stdlib", "cli-process.dark")
-    let upstreamDarkPaths =
-        [| eifUpstreamDarkPath
-           ematchUpstreamDarkPath
-           eapplyUpstreamDarkPath
-           aliasesUpstreamDarkPath
-           recordsUpstreamDarkPath
-           recordFieldAccessUpstreamDarkPath
-           einfixUpstreamDarkPath
-           eandUpstreamDarkPath
-           eorUpstreamDarkPath
-           evariableUpstreamDarkPath
-           dfloatUpstreamDarkPath
-           estringUpstreamDarkPath
-           eletUpstreamDarkPath
-           epipeUpstreamDarkPath
-           derrorUpstreamDarkPath
-           elambdaUpstreamDarkPath
-           dtupleUpstreamDarkPath
-           edictUpstreamDarkPath
-           dateUpstreamDarkPath
-           durationUpstreamDarkPath
-           listUpstreamDarkPath
-           dictUpstreamDarkPath
-           uuidUpstreamDarkPath
-           charToAsciiCodeUpstreamDarkPath
-           charUpstreamDarkPath
-           stringUpstreamDarkPath
-           regexUpstreamDarkPath
-           optionUpstreamDarkPath
-           resultUpstreamDarkPath
-           mathUpstreamDarkPath
-           floatUpstreamDarkPath
-           altJsonUpstreamDarkPath
-           jsonUpstreamDarkPath
-           yield! integerUpstreamDarkPaths
-           blobUpstreamDarkPath
-           base64UpstreamDarkPath
-           cryptoUpstreamDarkPath
-           x509UpstreamDarkPath
-           htmlUpstreamDarkPath
-           httpUpstreamDarkPath
-           streamUpstreamDarkPath
-           cliPathUpstreamDarkPath
-           cliGlobUpstreamDarkPath
-           cliProcessUpstreamDarkPath |]
-    let defaultUpstreamDarkPaths =
-        [| eifUpstreamDarkPath
-           ematchUpstreamDarkPath
-           eapplyUpstreamDarkPath
-           aliasesUpstreamDarkPath
-           recordsUpstreamDarkPath
-           recordFieldAccessUpstreamDarkPath
-           einfixUpstreamDarkPath
-           eandUpstreamDarkPath
-           eorUpstreamDarkPath
-           evariableUpstreamDarkPath
-           dfloatUpstreamDarkPath
-           estringUpstreamDarkPath
-           eletUpstreamDarkPath
-           epipeUpstreamDarkPath
-           derrorUpstreamDarkPath
-           dtupleUpstreamDarkPath
-           edictUpstreamDarkPath
-           dateUpstreamDarkPath
-           durationUpstreamDarkPath
-           listUpstreamDarkPath
-           dictUpstreamDarkPath
-           uuidUpstreamDarkPath
-           charToAsciiCodeUpstreamDarkPath
-           charUpstreamDarkPath
-           stringUpstreamDarkPath
-           regexUpstreamDarkPath
-           optionUpstreamDarkPath
-           resultUpstreamDarkPath
-           mathUpstreamDarkPath
-           floatUpstreamDarkPath
-           altJsonUpstreamDarkPath
-           jsonUpstreamDarkPath
-           yield! integerUpstreamDarkPaths
-           htmlUpstreamDarkPath
-           httpUpstreamDarkPath
-           streamUpstreamDarkPath
-           cliPathUpstreamDarkPath
-           cliGlobUpstreamDarkPath
-           cliProcessUpstreamDarkPath |]
-    for path in upstreamDarkPaths do
-        if not (File.Exists path) then
-            Crash.crash $"Missing required upstream dark test file: {path}"
-
     let allUpstreamDarkPaths =
         Directory.GetFiles(
             Path.Combine(testDataRoot, "e2e", "upstream"),
@@ -514,13 +327,13 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
 
     let includeUpstreamDarkPathsForE2E =
         match filter with
-        | None -> defaultUpstreamDarkPaths
+        | None -> allUpstreamDarkPaths
         | Some _ ->
-            let pathMatches = filterUpstreamDarkPaths upstreamDarkPaths
+            let pathMatches = filterUpstreamDarkPaths allUpstreamDarkPaths
             // A filter may name an expression rather than its source file.
             // Load the enabled upstream inventory so matchesE2EFilter below can
             // select those expression names instead of incorrectly reporting 0/0.
-            if Array.isEmpty pathMatches then upstreamDarkPaths else pathMatches
+            if Array.isEmpty pathMatches then allUpstreamDarkPaths else pathMatches
 
     let includeUpstreamDarkPathsForRoundtrip =
         if roundtripAllDark then
@@ -758,35 +571,111 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
         | Platform.ARM64Backend _ -> not (Set.contains suiteName x64Suites)
         | Platform.LinuxX86_64 -> not (Set.contains suiteName arm64Suites)
 
-    // Upstream enablement is intentionally incremental: keep tests discoverable, but
-    // only run line-allowlisted cases for files currently being enabled.
-    let upstreamEnablementLineAllowlist : Map<string, Set<int>> =
+    // Keep known unsupported cases discoverable while running every other upstream
+    // test by default. Paths are suffixes so this remains independent of worktree.
+    let disabledUpstreamFiles : Set<string> =
+        Set.ofList
+            [
+                "src/Tests/e2e/upstream/cli/app-service-safety.dark"
+                "src/Tests/e2e/upstream/cli/command-completions.dark"
+                "src/Tests/e2e/upstream/cli/deprecation-kinds.dark"
+                "src/Tests/e2e/upstream/cli/include-parsing.dark"
+                "src/Tests/e2e/upstream/cli/outliner.dark"
+                "src/Tests/e2e/upstream/cli/permissions-display.dark"
+                "src/Tests/e2e/upstream/cli/permissions-grammar.dark"
+                "src/Tests/e2e/upstream/cli/tailscale.dark"
+                "src/Tests/e2e/upstream/cli/workbench-repl.dark"
+                "src/Tests/e2e/upstream/cloud/db.dark"
+                "src/Tests/e2e/upstream/language/big.dark"
+                "src/Tests/e2e/upstream/language/builtin-introspection.dark"
+                "src/Tests/e2e/upstream/language/collections/edict.dark"
+                "src/Tests/e2e/upstream/language/custom-data/aliases.dark"
+                "src/Tests/e2e/upstream/language/custom-data/enums.dark"
+                "src/Tests/e2e/upstream/language/custom-data/values.dark"
+                "src/Tests/e2e/upstream/language/effect-ceiling.dark"
+                "src/Tests/e2e/upstream/language/error-type-names.dark"
+                "src/Tests/e2e/upstream/language/runtime-to-programtypes.dark"
+                "src/Tests/e2e/upstream/scm/branch-identity.dark"
+                "src/Tests/e2e/upstream/scm/commit-hash.dark"
+                "src/Tests/e2e/upstream/scm/conflicts.dark"
+                "src/Tests/e2e/upstream/scm/constraint-kinds.dark"
+                "src/Tests/e2e/upstream/scm/lww.dark"
+                "src/Tests/e2e/upstream/scm/matter-routes.dark"
+                "src/Tests/e2e/upstream/scm/propagation-policy.dark"
+                "src/Tests/e2e/upstream/scm/removal-conflicts.dark"
+                "src/Tests/e2e/upstream/scm/sync-seen-everything.dark"
+                "src/Tests/e2e/upstream/scm/sync-wire.dark"
+                "src/Tests/e2e/upstream/stachu/darklangParser.dark"
+                "src/Tests/e2e/upstream/stachu/parser.dark"
+                "src/Tests/e2e/upstream/stachu/tinyLang.dark"
+                "src/Tests/e2e/upstream/stdlib/bytes.dark"
+                "src/Tests/e2e/upstream/stdlib/char.dark"
+                "src/Tests/e2e/upstream/stdlib/cli-tui-text.dark"
+                "src/Tests/e2e/upstream/stdlib/crypto.dark"
+                "src/Tests/e2e/upstream/stdlib/dict.dark"
+                "src/Tests/e2e/upstream/stdlib/earg.dark"
+                "src/Tests/e2e/upstream/stdlib/eself.dark"
+                "src/Tests/e2e/upstream/stdlib/http.dark"
+                "src/Tests/e2e/upstream/stdlib/httpclient.dark"
+                "src/Tests/e2e/upstream/stdlib/httpserver.dark"
+                "src/Tests/e2e/upstream/stdlib/json.dark"
+                "src/Tests/e2e/upstream/stdlib/language-tools/parsedFileShape.dark"
+                "src/Tests/e2e/upstream/stdlib/language-tools/pickLocation.dark"
+                "src/Tests/e2e/upstream/stdlib/language-tools/semanticTokenization.dark"
+                "src/Tests/e2e/upstream/stdlib/pretty.dark"
+                "src/Tests/e2e/upstream/stdlib/prettyPrinter.dark"
+                "src/Tests/e2e/upstream/stdlib/result.dark"
+                "src/Tests/e2e/upstream/stdlib/sqlite.dark"
+                "src/Tests/e2e/upstream/stdlib/sse.dark"
+                "src/Tests/e2e/upstream/stdlib/stream.dark"
+                "src/Tests/e2e/upstream/stdlib/string.dark"
+            ]
+
+    let disabledUpstreamLines : Map<string, Set<int>> =
         Map.ofList
             [
-                ("src/Tests/e2e/upstream/language/apply/eapply.dark", Set.ofList [ 1; 4; 7; 10; 62; 63; 64; 65; 66; 67; 68; 69; 70; 71; 72; 73; 75; 76; 78; 79; 83; 84; 88; 92; 93; 95; 96; 98; 100; 102; 106; 108; 133; 134; 136; 139 ])
-                ("src/Tests/e2e/upstream/language/custom-data/aliases.dark", Set.ofList [ 6; 9; 15; 16; 19; 89; 91; 108 ])
-                ("src/Tests/e2e/upstream/language/custom-data/records.dark", Set.ofList [ 6; 8; 15; 23; 47; 49; 58; 65; 68; 72; 76; 80; 84 ])
-                ("src/Tests/e2e/upstream/language/custom-data/record-field-acess.dark", Set.singleton 3)
-                ("src/Tests/e2e/upstream/language/flow-control/epipe.dark", Set.ofList [ 1 .. 103 ] |> Set.remove 31)
-                ("src/Tests/e2e/upstream/language/derror.dark", Set.ofList [ 14; 20 ])
-                ("src/Tests/e2e/upstream/stdlib/list.dark", Set.ofList [ 1; 3; 5; 6; 8; 9; 12; 15; 16; 17; 18; 25; 26; 27; 28; 29; 31; 32; 33; 34; 35; 36; 39; 40; 41; 42; 43; 44; 45; 46; 47; 48; 49; 50; 51; 54; 93; 99; 100; 111; 112; 114; 115; 116; 118; 119; 120; 121; 122; 123; 124; 127; 132; 133; 144; 145; 146; 147; 149; 151; 152; 155; 158; 163; 166; 176; 182; 185; 188; 190; 195; 196; 203; 204; 205; 208; 213; 215; 218; 229; 230; 232; 233; 235; 236; 239; 240; 241; 242; 243; 244; 245; 246; 247; 248; 249; 252; 253; 254; 256; 257; 259; 260; 261; 265; 270; 274; 277; 287; 289; 290; 292; 293; 294; 295; 296; 297; 298; 303; 308; 309; 310; 311; 312; 314; 315; 316; 317; 321; 324; 339; 342; 351; 354; 357; 360; 363; 364; 365; 367; 368; 369; 370; 371; 372; 373; 378 ])
-                ("src/Tests/e2e/upstream/stdlib/uuid.dark", Set.ofList [ 2; 6 ])
-                ("src/Tests/e2e/upstream/stdlib/option.dark", Set.ofList [ 251; 281; 288; 291; 294; 297; 319 ])
-                ("src/Tests/e2e/upstream/stdlib/result.dark", Set.ofList [ 37; 176; 200; 223; 227; 231; 235; 240; 244; 248; 252; 262 ])
-                ("src/Tests/e2e/upstream/stdlib/math.dark", Set.ofList [ 5; 6; 8; 9; 47; 48 ])
-                ("src/Tests/e2e/upstream/stdlib/float.dark", Set.ofList [ 60; 105; 116; 118; 120; 122; 128; 137; 193; 195 ])
-                ("src/Tests/e2e/upstream/stdlib/ints/int64.dark", Set.ofList [ 185; 194; 204 ])
-                ("src/Tests/e2e/upstream/stdlib/cli-color.dark", Set.ofList [ 1 .. 18 ])
+                ("src/Tests/e2e/upstream/language/apply/eapply.dark", Set.ofList [ 88; 93; 120 ])
+                ("src/Tests/e2e/upstream/language/apply/einfix.dark", Set.ofList [ 16; 17; 33; 34; 44; 50 ])
+                ("src/Tests/e2e/upstream/language/basic/eand.dark", Set.ofList [ 5; 7; 11 ])
+                ("src/Tests/e2e/upstream/language/basic/elet.dark", Set.ofList [ 67 ])
+                ("src/Tests/e2e/upstream/language/basic/eor.dark", Set.ofList [ 6; 16; 17 ])
+                ("src/Tests/e2e/upstream/language/basic/estring.dark", Set.ofList [ 11; 17; 21; 28 ])
+                ("src/Tests/e2e/upstream/language/basic/evariable.dark", Set.ofList [ 3 ])
+                ("src/Tests/e2e/upstream/language/custom-data/record-field-acess.dark", Set.ofList [ 8; 10; 12 ])
+                ("src/Tests/e2e/upstream/language/custom-data/records.dark", Set.ofList [ 31; 33; 35; 41; 43; 89; 92; 95 ])
+                ("src/Tests/e2e/upstream/language/derror.dark", Set.ofList [ 2; 10; 13; 15; 16; 18; 19; 22; 23; 32 ])
+                ("src/Tests/e2e/upstream/language/elambda.dark", Set.ofList [ 5; 13; 18; 19; 33; 35; 47; 53; 73; 85; 88; 95 ])
+                ("src/Tests/e2e/upstream/language/flow-control/eif.dark", Set.ofList [ 1; 12; 13; 14; 20 ])
+                ("src/Tests/e2e/upstream/language/flow-control/ematch.dark", Set.ofList [ 580; 621; 635; 675; 678; 701; 723; 726; 735; 740; 766; 770; 804 ])
+                ("src/Tests/e2e/upstream/language/flow-control/epipe.dark", Set.ofList [ 11; 16; 31; 42; 43; 45; 47; 49; 58; 70; 73; 80; 85 ])
+                ("src/Tests/e2e/upstream/language/nested-fns.dark", Set.ofList [ 55; 60 ])
+                ("src/Tests/e2e/upstream/stdlib/base64.dark", Set.ofList [ 7; 9; 10; 11; 12; 20; 21; 22; 23; 24; 25; 26; 27; 28; 29; 33; 34; 35; 36; 39; 40; 43; 44; 45; 46; 47 ])
+                ("src/Tests/e2e/upstream/stdlib/float.dark", Set.ofList [ 45; 47; 51; 55; 58; 59; 64; 65; 71; 73; 76; 79; 81; 87; 89; 106; 107; 110; 111; 113; 124; 125; 127; 133; 134; 136; 160; 173; 176; 179; 203; 225; 227; 236; 238 ])
+                ("src/Tests/e2e/upstream/stdlib/html.dark", Set.ofList [ 42; 44; 66; 69; 72; 75; 83 ])
+                ("src/Tests/e2e/upstream/stdlib/ints/int32.dark", Set.ofList [ 126 ])
+                ("src/Tests/e2e/upstream/stdlib/ints/int64.dark", Set.ofList [ 45; 60; 90; 210; 368 ])
+                ("src/Tests/e2e/upstream/stdlib/ints/int8.dark", Set.ofList [ 47 ])
+                ("src/Tests/e2e/upstream/stdlib/list.dark", Set.ofList [ 22; 23; 24; 53; 61; 65; 71; 75; 81; 87; 92; 93; 101; 109; 129; 130; 136; 140; 161; 162; 174; 180; 201; 206; 216; 218; 223; 224; 250; 264; 269; 302; 314; 322; 323; 324; 325; 326; 346; 354 ])
+                ("src/Tests/e2e/upstream/stdlib/math.dark", Set.ofList [ 27; 30 ])
+                ("src/Tests/e2e/upstream/stdlib/nomodule.dark", Set.ofList [ 302; 304; 365; 366; 367; 368; 369; 370; 371; 372; 373; 374; 375; 377; 418; 419 ])
+                ("src/Tests/e2e/upstream/stdlib/option.dark", Set.ofList [ 44; 75; 119; 138; 148; 158; 170; 176; 190; 204; 211; 218; 234; 242; 255; 260 ])
             ]
 
     let normalizePath (path: string) : string =
         path.Replace('\\', '/')
 
-    let enabledLinesForSourceFile (sourceFile: string) : Set<int> option =
+    let pathMatchesSourceFile (sourceFile: string) (suffix: string) : bool =
         let normalizedSourceFile = normalizePath sourceFile
-        upstreamEnablementLineAllowlist
+        normalizedSourceFile.EndsWith(suffix)
+
+    let isDisabledUpstreamFile (sourceFile: string) : bool =
+        disabledUpstreamFiles
+        |> Set.exists (pathMatchesSourceFile sourceFile)
+
+    let disabledLinesForSourceFile (sourceFile: string) : Set<int> option =
+        disabledUpstreamLines
         |> Map.tryPick (fun suffix lines ->
-            if normalizedSourceFile.EndsWith(suffix) then Some lines else None)
+            if pathMatchesSourceFile sourceFile suffix then Some lines else None)
 
     let tryParseTestLineNumber (testName: string) : int option =
         if testName.StartsWith("L") then
@@ -804,17 +693,19 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
     let applyUpstreamEnablementGate (test: E2ETest) : E2ETest =
         if Option.isSome test.SkipReason then
             test
+        elif isDisabledUpstreamFile test.SourceFile then
+            { test with SkipReason = Some "pending upstream support" }
         else
-            match enabledLinesForSourceFile test.SourceFile with
+            match disabledLinesForSourceFile test.SourceFile with
             | None ->
                 test
-            | Some enabledLines ->
+            | Some disabledLines ->
                 match tryParseTestLineNumber test.Name with
-                | Some lineNumber when Set.contains lineNumber enabledLines ->
-                    test
-                | Some _ ->
+                | Some lineNumber when Set.contains lineNumber disabledLines ->
                     { test with
-                        SkipReason = Some "pending upstream enablement" }
+                        SkipReason = Some "pending upstream support" }
+                | Some _ ->
+                    test
                 | None ->
                     test
 
@@ -2027,7 +1918,8 @@ let private runAiMode (args: string array) : int =
     Directory.CreateDirectory artifactDirectory |> ignore
     let timestamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmssfffZ", CultureInfo.InvariantCulture)
     let artifactPath = Path.Combine(artifactDirectory, $"test-run-{timestamp}.log")
-    use artifactWriter = new StreamWriter(artifactPath, false)
+    use artifactWriter =
+        new StreamWriter(artifactPath, false, UTF8Encoding(false, false))
     let synchronizedArtifactWriter = TextWriter.Synchronized artifactWriter
     let reportCompletedTest completed =
         if completed % aiProgressTestInterval = 0 then

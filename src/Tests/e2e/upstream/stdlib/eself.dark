@@ -74,7 +74,7 @@ module ShadowingTest =
 
   let letBindingShadowing (x: Int) : List<Int> =
     let letBindingShadowing = (fun v -> v * 3)
-    let letBindingShadowing = [ 10; letBindingShadowing x ]
+    let letBindingShadowing = [ 10, letBindingShadowing x ]
     let letBindingShadowing = Stdlib.List.reverse letBindingShadowing
     letBindingShadowing
 
@@ -102,14 +102,17 @@ module ShadowingTest =
     | pipeWithShadowing -> x |> Stdlib.Int.add pipeWithShadowing
 
 
-  let valueShadowing = 120
+  // A location holds ONE item, whatever its kind: `val valueShadowing` and `fn valueShadowing` would be
+  // one name bound twice, and the second binding replaces the first, in the store and in the in-memory
+  // package manager alike. So the val has its own name.
+  val valueShadowingBase = 120
   let valueShadowing (x: Int) : Int =
     if x <= 0 then
       10
     else if x == 1 then
       (valueShadowing 0) + 1
     else
-      let result = valueShadowing + 1
+      let result = valueShadowingBase + 1
       (valueShadowing (x - 1)) + result
 
 
@@ -146,8 +149,8 @@ ShadowingTest.tupleMatchWithShadowing (1, 20) = 0
 ShadowingTest.tupleMatchWithShadowing (2, 3) = 30
 ShadowingTest.tupleMatchWithShadowing (4, 5) = 9
 
-ShadowingTest.letBindingShadowing 4 = [12; 10]
-ShadowingTest.letBindingShadowing 5 = [15; 10]
+ShadowingTest.letBindingShadowing 4 = [12, 10]
+ShadowingTest.letBindingShadowing 5 = [15, 10]
 
 ShadowingTest.conditionalShadowing 0 = 0
 ShadowingTest.conditionalShadowing 1 = 7
