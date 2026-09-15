@@ -4,7 +4,7 @@ Purpose: Serialize committed local task branches through one merge/test/push/ver
 
 ## Existing queues and explanations
 
-- Task agents use `./land` → wait even for one branch. Runner/operator queue inspection uses status; queue counts alone do not establish health, runner ownership, or recovery needs, so read `health`, `state`, and `next_action` together.
+- Task agents use `./land` → `queued` → stop, even for one branch. Runner/operator queue inspection uses status; queue counts alone do not establish health, runner ownership, or recovery needs, so read `health`, `state`, and `next_action` together.
 - Branch readiness and queue availability are separate. An unrelated attention job can defer enqueueing, but it does not invalidate a branch whose own review and gates passed. Never report such a branch as `not ready`.
 - Unrelated train state belongs to the runner/operator, not the task agent. Task agents do not inspect or report unrelated job IDs, conflicts, attention reasons, or recovery steps.
 - For explanation-only requests, read the skill documentation when permitted and explain the procedure without Git or product commands. Distinguish hypothetical steps from observed state.
@@ -20,12 +20,12 @@ Purpose: Serialize committed local task branches through one merge/test/push/ver
 1. Work on a task-specific branch and worktree.
 2. Commit a clean HEAD before handing work off.
 3. Task agents use `./land`, not raw status inspection, for handoff. A runner/operator may use `mergetrain status --json`; its queue-level `next_action` is not a judgment about any task branch's readiness.
-4. Land every named finished branch in the requested order with `./land --task "TASK"`; the script resolves the branch and worktree, enqueues the exact commit with bounded unattended approval, and waits for deployment. Do not continue until it prints `landed` unless it exits. If it exits with `Landing handoff is pending`, report only `Merge train: ⏳ handoff pending`; do not use `❌ not ready`, explain the train state, or volunteer to recover another job.
+4. Land every named finished branch in the requested order with `./land --task "TASK"`; the script resolves the branch and worktree and enqueues the exact commit with bounded unattended approval. Success is the single line `queued`. After that line, do not inspect the job, poll status, wait for deployment, or report a later outcome. If it exits with `Landing handoff is pending`, report only `Merge train: ⏳ handoff pending`; do not use `❌ not ready`, explain the train state, or volunteer to recover another job.
 5. Never push configured integration refs directly. One authorized runner owns validation and deployment; recovery and destructive actions require their stated approval.
 
 ## Safety boundary
 
-- A task agent runs `./land` and waits for its exact job. The script's internal `--auto` enqueue authorizes only the configured runner's bounded unattended validation and deployment; it does not authorize the task agent to run either operation.
+- A task agent runs `./land` and stops when it prints `queued`. The script's internal `--auto` enqueue authorizes only the configured runner's bounded unattended validation and deployment; it does not authorize the task agent to monitor, validate, deploy, or report the eventual outcome.
 - Only a separately authorized runner uses `deploy` or a daemon.
 - Deployment requires either confirmation of the human-readable exact plan or prior bounded unattended approval. Agents never select train IDs or supply plan hashes; structured evidence may include identifiers for inspection.
 - Unattended approval is bound to the exact destination and execution policy. Any change blocks before push.
