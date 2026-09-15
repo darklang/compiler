@@ -10,10 +10,10 @@
     "measurement_policy": "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs"
   },
   "contract_sha256": "4efd0c2330fbe360b4d9fb060515cd16222d400b0186e8ade17e98a04edc9f97",
-  "generated_at": "2026-09-14T21:59:17+00:00",
+  "generated_at": "2026-09-15T00:34:25+00:00",
   "compiler": {
-    "commit": "69be2d8b6c942bed414496ed0180b254b15bfc82",
-    "subject": "Merge smaller full benchmark workloads"
+    "commit": "d4dc28200becfd41e6e363d39ad21abfc33a6f6b",
+    "subject": "Align compiler APIs and add first-class values"
   },
   "benchmarks": [
     {
@@ -46,7 +46,7 @@
     },
     {
       "name": "fft",
-      "instructions": 413128617
+      "instructions": 413126892
     },
     {
       "name": "fib",
@@ -54,7 +54,7 @@
     },
     {
       "name": "huffman",
-      "instructions": 408375089
+      "instructions": 404402417
     },
     {
       "name": "leibniz",
@@ -74,7 +74,7 @@
     },
     {
       "name": "myers_diff",
-      "instructions": 2480167561
+      "instructions": 2478626395
     },
     {
       "name": "nbody",
@@ -106,11 +106,11 @@
     },
     {
       "name": "regex_lite",
-      "instructions": 69462277
+      "instructions": 68882287
     },
     {
       "name": "spectral_norm",
-      "instructions": 229725034
+      "instructions": 226841706
     },
     {
       "name": "string_equality",
@@ -126,11 +126,11 @@
     },
     {
       "name": "tinytemplate",
-      "instructions": 8881984677
+      "instructions": 8831495068
     },
     {
       "name": "warden",
-      "instructions": 45956223
+      "instructions": 45762039
     }
   ]
 }
