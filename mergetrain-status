@@ -9,6 +9,7 @@ interval_seconds=2
 clear_screen=true
 run_once=false
 interactive_redraw=false
+color_mode=auto
 
 usage() {
   cat <<EOF
@@ -23,6 +24,9 @@ Options:
                        Default: $repo_root
   --interval SECONDS   Delay between status refreshes.
                        Default: $interval_seconds
+  --color WHEN         Colorize output: auto, always, or never.
+                       Default: $color_mode
+  --no-color           Equivalent to --color never.
   --no-clear           Append each refresh instead of redrawing in place.
   --once               Display one status snapshot, then exit.
   -h, --help           Show this help and exit.
@@ -41,6 +45,18 @@ while [[ $# -gt 0 ]]; do
     --interval)
       interval_seconds="$2"
       shift 2
+      ;;
+    --color)
+      color_mode="$2"
+      shift 2
+      ;;
+    --color=*)
+      color_mode="${1#*=}"
+      shift
+      ;;
+    --no-color)
+      color_mode=never
+      shift
       ;;
     --no-clear)
       clear_screen=false
@@ -66,6 +82,10 @@ if [[ ! "$interval_seconds" =~ ^[1-9][0-9]*$ ]]; then
   echo "--interval must be a positive integer" >&2
   exit 2
 fi
+if [[ "$color_mode" != auto && "$color_mode" != always && "$color_mode" != never ]]; then
+  echo "--color must be auto, always, or never" >&2
+  exit 2
+fi
 for required_command in git mergetrain python3; do
   if ! command -v "$required_command" >/dev/null 2>&1; then
     echo "Required command not found: $required_command" >&2
@@ -74,6 +94,13 @@ for required_command in git mergetrain python3; do
 done
 
 repo_root="$(cd "$repo_root" && pwd -P)"
+if [[ "$color_mode" == auto ]]; then
+  if [[ -t 1 ]]; then
+    color_mode=always
+  else
+    color_mode=never
+  fi
+fi
 if [[ "$clear_screen" == true && -t 1 ]]; then
   interactive_redraw=true
   printf '\033[?25l'
@@ -82,9 +109,13 @@ fi
 
 while true; do
   status_output=""
+  renderer_args=(--repo "$repo_root")
+  if [[ "$color_mode" == always ]]; then
+    renderer_args+=(--color)
+  fi
   if ! status_output="$(
     mergetrain --repo "$repo_root" status --json --limit 1000 \
-      | python3 "$script_root/scripts/render_mergetrain_status.py" --repo "$repo_root"
+      | python3 "$script_root/scripts/render_mergetrain_status.py" "${renderer_args[@]}"
   )"; then
     status_output="Status refresh failed; retrying in $interval_seconds second(s)"
   fi

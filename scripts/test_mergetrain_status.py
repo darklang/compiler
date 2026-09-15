@@ -130,6 +130,7 @@ print(json.dumps({
 
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertEqual(completed.stderr, "")
+            self.assertNotIn("\x1b", completed.stdout)
             self.assertIn("health: healthy", completed.stdout)
             self.assertIn("RUNNING: 1 job(s) are running", completed.stdout)
             self.assertIn("in train:\n", completed.stdout)
@@ -154,6 +155,27 @@ print(json.dumps({
                 r"recent benchmarks/RESULTS.md changes:\n"
                 r"  [0-9a-f]{7,12} \d{4}-\d{2}-\d{2}T\S+ Record benchmark improvement \(\+2/-1\)",
             )
+
+            colored = subprocess.run(
+                [
+                    str(source_root / "mergetrain-status"),
+                    "--repo",
+                    str(repo),
+                    "--color=always",
+                    "--once",
+                ],
+                cwd=repo,
+                env=process_environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(colored.returncode, 0, colored.stderr)
+            self.assertIn("\x1b[1m", colored.stdout)
+            self.assertIn("\x1b[32mhealthy\x1b[0m", colored.stdout)
+            self.assertIn("\x1b[31mattention\x1b[0m", colored.stdout)
+            self.assertIn("\x1b[36mrunning\x1b[0m", colored.stdout)
 
 
 if __name__ == "__main__":

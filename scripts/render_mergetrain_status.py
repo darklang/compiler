@@ -11,6 +11,41 @@ from pathlib import Path
 from typing import Any
 
 
+RESET = "\033[0m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+RED = "\033[31m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+CYAN = "\033[36m"
+
+
+def styled(value: object, style: str, color: bool) -> str:
+    text = str(value)
+    return f"{style}{text}{RESET}" if color else text
+
+
+def state_style(state: str) -> str:
+    return {
+        "attention": RED,
+        "running": CYAN,
+        "ready": GREEN,
+        "waiting": YELLOW,
+        "idle": DIM,
+    }.get(state, RED)
+
+
+def history_line(line: str, color: bool) -> str:
+    parts = line.split(" ", 2)
+    if len(parts) < 3:
+        return line
+    commit, timestamp, description = parts
+    return (
+        f"{styled(commit, CYAN, color)} "
+        f"{styled(timestamp, DIM, color)} {description}"
+    )
+
+
 def git(repo: Path, *args: str) -> str:
     completed = subprocess.run(
         ["git", "-C", str(repo), *args],
@@ -60,7 +95,7 @@ def benchmark_changes(repo: Path, limit: int = 3) -> list[str]:
     return [render(line) for line in history.splitlines()]
 
 
-def render(payload: dict[str, Any], repo: Path) -> str:
+def render(payload: dict[str, Any], repo: Path, *, color: bool) -> str:
     if payload.get("contract_version") != 4:
         raise ValueError(
             f"unsupported mergetrain contract version: {payload.get('contract_version')}"
@@ -68,23 +103,30 @@ def render(payload: dict[str, Any], repo: Path) -> str:
 
     action = payload["next_action"]
     next_action = action.get("command") or str(action["code"]).replace("_", " ")
+    health = str(payload["health"])
+    health_style = GREEN if health == "healthy" else YELLOW
+    state = str(payload["state"])
     lines = [
-        f"health: {payload['health']}",
-        f"{str(payload['state']).upper()}: {payload['summary']}",
-        f"next: {next_action}",
+        f"health: {styled(health, health_style, color)}",
+        f"{styled(state.upper(), state_style(state), color)}: {payload['summary']}",
+        f"next: {styled(next_action, CYAN, color)}",
     ]
     if action.get("requires_approval") != "none":
         lines.append(f"approval: {action['requires_approval']}")
     lines.extend(
-        f"warning {warning['code']}: {warning['summary']}"
+        styled(f"warning {warning['code']}: {warning['summary']}", YELLOW, color)
         for warning in payload.get("warnings", [])
     )
 
-    lines.append("in train:")
+    lines.append(styled("in train:", BOLD, color))
     jobs = active_jobs(payload)
     if jobs:
         for job in jobs:
-            line = f"  #{job['id']} {job['state']} {job['task']} [{job['branch']}]"
+            job_state = str(job["state"])
+            line = (
+                f"  #{job['id']} {styled(job_state, state_style(job_state), color)} "
+                f"{job['task']} [{job['branch']}]"
+            )
             if job.get("reason"):
                 line += f" — {job['reason']}"
             lines.append(line)
@@ -100,21 +142,29 @@ def render(payload: dict[str, Any], repo: Path) -> str:
         "--format=%h %cI %s",
         "--",
     )
-    lines.extend(["recent merge:", f"  {recent_merge or '(none)'}"])
+    lines.extend(
+        [
+            styled("recent merge:", BOLD, color),
+            f"  {history_line(recent_merge, color) if recent_merge else '(none)'}",
+        ]
+    )
 
     changes = benchmark_changes(repo)
-    lines.append("recent benchmarks/RESULTS.md changes:")
-    lines.extend([f"  {change}" for change in changes] or ["  (none)"])
+    lines.append(styled("recent benchmarks/RESULTS.md changes:", BOLD, color))
+    lines.extend(
+        [f"  {history_line(change, color)}" for change in changes] or ["  (none)"]
+    )
     return "\n".join(lines)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", required=True, type=Path)
+    parser.add_argument("--color", action="store_true")
     args = parser.parse_args()
     try:
         payload = json.load(sys.stdin)
-        print(render(payload, args.repo.resolve()))
+        print(render(payload, args.repo.resolve(), color=args.color))
     except (
         json.JSONDecodeError,
         KeyError,
