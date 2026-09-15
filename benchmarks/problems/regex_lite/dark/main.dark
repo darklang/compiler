@@ -1,35 +1,47 @@
 // Compact regex parser and bounded, non-backtracking matcher benchmark.
 // The supported syntax is literals, '.', ranges, alternation, and * + ?.
 
+let byteAt (value: String) (index: Int64) : Int64 =
+    match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with
+    | Some byte -> Stdlib.Int64.fromUInt8 byte
+    | None -> Builtin.testRuntimeError "Regex byte index is out of range"
+
+let stringLengthFrom (value: String) (index: Int64) : Int64 =
+    match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with
+    | Some _ -> stringLengthFrom value (index + 1L)
+    | None -> index
+
+let stringLength (value: String) : Int64 = stringLengthFrom value 0L
+
 type Atom = Literal of Int64 | AnyByte | Range of (Int64 * Int64)
 type Quantifier = ExactlyOne | ZeroOrMore | OneOrMore | ZeroOrOne
 type Piece = { atom: Atom, quantifier: Quantifier }
 
 let parseQuantifier (pattern: String) (index: Int64) (atom: Atom) : (Piece * Int64) =
-    if index >= Stdlib.String.__codepointLength pattern then (Piece { atom = atom, quantifier = ExactlyOne }, index)
+    if index >= stringLength pattern then (Piece { atom = atom, quantifier = ExactlyOne }, index)
     else
-        match Stdlib.String.__byteAtUnchecked pattern index with
+        match byteAt pattern index with
         | 42L -> (Piece { atom = atom, quantifier = ZeroOrMore }, index + 1L)
         | 43L -> (Piece { atom = atom, quantifier = OneOrMore }, index + 1L)
         | 63L -> (Piece { atom = atom, quantifier = ZeroOrOne }, index + 1L)
         | _ -> (Piece { atom = atom, quantifier = ExactlyOne }, index)
 
 let parsePiece (pattern: String) (index: Int64) : (Piece * Int64) =
-    let byte = Stdlib.String.__byteAtUnchecked pattern index in
+    let byte = byteAt pattern index in
     if byte == 46L then parseQuantifier pattern (index + 1L) AnyByte
     else if byte == 91L then
-        if index + 4L >= Stdlib.String.__codepointLength pattern
-           || Stdlib.String.__byteAtUnchecked pattern (index + 2L) != 45L
-           || Stdlib.String.__byteAtUnchecked pattern (index + 4L) != 93L then
+        if index + 4L >= stringLength pattern
+           || byteAt pattern (index + 2L) != 45L
+           || byteAt pattern (index + 4L) != 93L then
             Builtin.testRuntimeError "regex range must have form [a-z]"
         else
-            parseQuantifier pattern (index + 5L) (Range ((Stdlib.String.__byteAtUnchecked pattern (index + 1L), Stdlib.String.__byteAtUnchecked pattern (index + 3L))))
+            parseQuantifier pattern (index + 5L) (Range ((byteAt pattern (index + 1L), byteAt pattern (index + 3L))))
     else parseQuantifier pattern (index + 1L) (Literal byte)
 
 let parseAlternatives (pattern: String) (index: Int64) (reversedPieces: List<Piece>) (reversedAlternatives: List<List<Piece>>) : List<List<Piece>> =
-    if index >= Stdlib.String.__codepointLength pattern then
+    if index >= stringLength pattern then
         Stdlib.List.reverse (Stdlib.List.push reversedAlternatives (Stdlib.List.reverse reversedPieces))
-    else if Stdlib.String.__byteAtUnchecked pattern index == 124L then
+    else if byteAt pattern index == 124L then
         parseAlternatives pattern (index + 1L) [] (Stdlib.List.push reversedAlternatives (Stdlib.List.reverse reversedPieces))
     else
         let parsed = parsePiece pattern index in
@@ -43,7 +55,7 @@ let atomMatches (atom: Atom) (byte: Int64) : Bool =
 
 let addStarPositions (atom: Atom) (text: String) (length: Int64) (position: Int64) (reversed: List<Int64>) : List<Int64> =
     let next = Stdlib.List.push reversed position in
-    if position < length && atomMatches atom (Stdlib.String.__byteAtUnchecked text position) then
+    if position < length && atomMatches atom (byteAt text position) then
         addStarPositions atom text length (position + 1L) next
     else next
 
@@ -54,14 +66,14 @@ let advancePositions (positions: List<Int64>) (piece: Piece) (text: String) (len
         match piece.quantifier with
         | ExactlyOne ->
             let next =
-                if position < length && atomMatches piece.atom (Stdlib.String.__byteAtUnchecked text position) then
+                if position < length && atomMatches piece.atom (byteAt text position) then
                     Stdlib.List.push reversed (position + 1L)
                 else reversed in
             advancePositions rest piece text length next
         | ZeroOrOne ->
             let withEmpty = Stdlib.List.push reversed position in
             let next =
-                if position < length && atomMatches piece.atom (Stdlib.String.__byteAtUnchecked text position) then
+                if position < length && atomMatches piece.atom (byteAt text position) then
                     Stdlib.List.push withEmpty (position + 1L)
                 else withEmpty in
             advancePositions rest piece text length next
@@ -69,7 +81,7 @@ let advancePositions (positions: List<Int64>) (piece: Piece) (text: String) (len
             advancePositions rest piece text length (addStarPositions piece.atom text length position reversed)
         | OneOrMore ->
             let next =
-                if position < length && atomMatches piece.atom (Stdlib.String.__byteAtUnchecked text position) then
+                if position < length && atomMatches piece.atom (byteAt text position) then
                     addStarPositions piece.atom text length (position + 1L) reversed
                 else reversed in
             advancePositions rest piece text length next
@@ -98,11 +110,11 @@ let scan (alternatives: List<List<Piece>>) (text: String) (length: Int64) (posit
 let run (remaining: Int64) (alternatives: List<List<Piece>>) (text: String) (result: Int64) : Int64 =
     if remaining <= 0L then result
     else
-        let found = scan alternatives text (Stdlib.String.__codepointLength text) 0L 0L 0L in
+        let found = scan alternatives text (stringLength text) 0L 0L 0L in
         run (remaining - 1L) alternatives text ((result + found.0 * 1000003L + found.1) % 1000000007L)
 
 let benchmarkArg (index: Int) : Int64 =
-    match Stdlib.Cli.__benchmarkArgInt64 index with
+    match Stdlib.Cli.Args.int64 index with
     | Ok value -> value
     | Error message -> Builtin.testRuntimeError message
 

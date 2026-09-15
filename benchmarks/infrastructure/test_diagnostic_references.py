@@ -17,25 +17,25 @@ from benchmark_profiles import load_invocation, load_profile
 class DiagnosticReferenceTests(unittest.TestCase):
     def test_interpreter_arguments_replace_each_cli_lookup(self) -> None:
         source = (
-            "match (Stdlib.Cli.__benchmarkArgInt64 0, "
-            "Stdlib.Cli.__benchmarkArgInt64 1) with\n"
+            "match (Stdlib.Cli.Args.int64 0, "
+            "Stdlib.Cli.Args.int64 1) with\n"
             "| (Ok first, Ok second) -> first + second\n"
         )
 
         transformed = inject_interpreter_arguments(source, ("4", "7"))
 
         self.assertIn("match (Ok 4L, Ok 7L) with", transformed)
-        self.assertNotIn("Stdlib.Cli.__benchmarkArgInt64", transformed)
+        self.assertNotIn("Stdlib.Cli.Args.int64", transformed)
 
     def test_interpreter_argument_injection_rejects_an_unknown_index(self) -> None:
         with self.assertRaisesRegex(ValueError, "argument index 2"):
             inject_interpreter_arguments(
-                "Stdlib.Cli.__benchmarkArgInt64 2", ("4", "7")
+                "Stdlib.Cli.Args.int64 2", ("4", "7")
             )
 
     def test_interpreter_arguments_support_the_shared_index_helper(self) -> None:
         transformed = inject_interpreter_arguments(
-            "match Stdlib.Cli.__benchmarkArgInt64 index with | Ok value -> value",
+            "match Stdlib.Cli.Args.int64 index with | Ok value -> value",
             ("4", "7"),
         )
 
@@ -50,7 +50,7 @@ class DiagnosticReferenceTests(unittest.TestCase):
         benchmarks_dir = Path(__file__).resolve().parent.parent
         patterns = {
             "darklang-interpreter": lambda index: (
-                rf"\b(?:benchmarkArg|Stdlib\.Cli\.__benchmarkArgInt64)\s+{index}\b"
+                rf"\b(?:benchmarkArg|Stdlib\.Cli\.Args\.int64)\s+{index}\b"
             ),
             "node": lambda index: rf"\bargument\(\s*{index}\s*\)",
             "ocaml": lambda index: rf"\bargument(?:64)?\s+{index}\b",
@@ -64,7 +64,8 @@ class DiagnosticReferenceTests(unittest.TestCase):
                     continue
                 contents = source.read_text()
                 if language == "darklang-interpreter":
-                    self.assertIn("Stdlib.Cli.__benchmarkArgInt64", contents)
+                    self.assertIn("Stdlib.Cli.Args.int64", contents)
+                    self.assertNotRegex(contents, r"Stdlib\.[A-Za-z0-9_.]*__")
                 for index in range(len(invocation.args)):
                     with self.subTest(name=name, language=language, index=index):
                         self.assertRegex(contents, re.compile(patterns[language](index)))
@@ -75,17 +76,12 @@ class DiagnosticReferenceTests(unittest.TestCase):
             "let f (values: Dict<Int64>) (pair: (Int64 * Int64)) = pair.0\n"
             "Stdlib.Dict.get<Int64> values \"key\"\n"
             "Stdlib.String.equals left right\n"
-            "Stdlib.String.__byteAtUnchecked text 0L\n"
-            "Stdlib.String.__substring text 0L 1L\n"
-            "Stdlib.String.__codepointLength text\n"
-            "Stdlib.Float.__toInt64Unchecked 1.0\n"
-            "Stdlib.List.__digitsGetAt<Float> v i\n"
             "| Ok closed ->\n"
             "            let nextState = moveCompiler (closed.0) next "
             "(closed.0.reversed) (closed.1) state.trimNext in\n"
             "            let withGoto = emit nextState (Goto (closed.2)) in\n"
             "| Ok closed -> use closed.0 closed.1\n"
-            "Stdlib.Cli.__benchmarkArgInt64 0\n"
+            "Stdlib.Cli.Args.int64 0\n"
         )
 
         transformed = adapt_interpreter_source(source, ("4",))
@@ -95,11 +91,6 @@ class DiagnosticReferenceTests(unittest.TestCase):
         self.assertIn("Stdlib.Dict.get<String, Int64>", transformed)
         self.assertIn("Stdlib.Tuple2.first pair", transformed)
         self.assertIn("left == right", transformed)
-        self.assertIn("interpreterFloatToInt64 1.0", transformed)
-        self.assertIn("interpreterGetByteAt text 0L", transformed)
-        self.assertIn("interpreterSubstring text 0L 1L", transformed)
-        self.assertIn("interpreterStringLength text", transformed)
-        self.assertIn("Stdlib.List.getAt v", transformed)
         self.assertIn("Stdlib.Tuple3.second closedFor", transformed)
         self.assertIn("Stdlib.Tuple2.second closed", transformed)
 

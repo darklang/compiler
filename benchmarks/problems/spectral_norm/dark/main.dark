@@ -7,7 +7,9 @@ let matA (i: Int64) (j: Int64) : Float =
 
 // All callers prove the index is within the fixed vector length.
 let getAt (v: List<Float>) (i: Int64) : Float =
-    Stdlib.List.__digitsGetAt v i
+    match Stdlib.List.getAt v (Stdlib.Int.fromInt64 i) with
+    | Some value -> value
+    | None -> Builtin.testRuntimeError "Spectral vector index is out of range"
 
 let setAt (list: List<Float>) (index: Int64) (value: Float) : List<Float> =
     match list with
@@ -59,8 +61,8 @@ let spectralNorm (n: Int64) (iterations: Int64) : Float =
     Stdlib.Float.sqrt (dot 0L n u v 0.0 / dot 0L n v v 0.0)
 
 let benchmarkArg (index: Int) : Int64 =
-    match Stdlib.Cli.__benchmarkArgInt64 index with
+    match Stdlib.Cli.Args.int64 index with
     | Ok value -> value
     | Error message -> Builtin.testRuntimeError message
 
-Builtin.printLine (Stdlib.Int64.toString (Stdlib.Float.__toInt64Unchecked (spectralNorm (benchmarkArg 0) (benchmarkArg 1) * 1000000000.0)))
+Builtin.printLine (Stdlib.Int64.toString (Stdlib.Int64.fromFloat (spectralNorm (benchmarkArg 0) (benchmarkArg 1) * 1000000000.0)))

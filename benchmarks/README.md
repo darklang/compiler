@@ -293,11 +293,10 @@ python3 benchmarks/infrastructure/diagnostic_references.py \
 The Darklang CLI currently accepts script arguments but does not expose them to
 the executed expression. The diagnostic runner therefore prepares a temporary
 copy of each Dark benchmark with its declared `profiles.json` integer arguments
-substituted at the `Stdlib.Cli.__benchmarkArgInt64` boundary. That copy also
+substituted at the `Stdlib.Cli.Args.int64` boundary. That copy also
 translates the compiler's documented interpreter-compatibility spellings where
 the latest interpreter surface has since changed (including dictionary type
-arguments, tuple projections, enum-value qualification, and integer-indexed
-string APIs).
+arguments, tuple projections, and enum-value qualification).
 Each parallel interpreter worker receives a private copy of the prepared
 rundir, preventing trace-store lock contention from affecting the measurement.
 The runner validates exact stdout before recording the instruction count. The

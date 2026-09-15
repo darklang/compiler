@@ -33,7 +33,7 @@ if [[ ! -x "$COMPILER" ]]; then
     exit 1
 fi
 
-BATCH_ARGS=(--batch --quiet --allow-internal --)
+BATCH_ARGS=(--batch --quiet --)
 OUTPUTS=()
 for benchmark in "${BENCHMARKS[@]}"; do
     source_path="$BENCHMARKS_DIR/problems/$benchmark/dark/main.dark"

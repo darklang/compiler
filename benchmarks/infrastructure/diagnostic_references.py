@@ -31,7 +31,7 @@ from history_updater import update_results
 
 LANGUAGES = ("darklang-interpreter", "node", "ocaml", "python")
 ARGUMENT_PATTERN = re.compile(
-    r"Stdlib\.Cli\.(?:Args\.int64|__benchmarkArgInt64)\s+([0-9]+|index)\b"
+    r"Stdlib\.Cli\.Args\.int64\s+([0-9]+|index)\b"
 )
 INSTRUCTION_PATTERN = re.compile(r"I refs:\s*([0-9][0-9,]*)")
 TUPLE_PROJECTION_PATTERN = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\.([012])\b")
@@ -42,7 +42,7 @@ SINGLE_VALUE_DICT_FUNCTION_PATTERN = re.compile(
 
 
 def inject_interpreter_arguments(source: str, arguments: tuple[str, ...]) -> str:
-    """Replace the compiler-only argv helper with equivalent literal Results."""
+    """Replace public CLI argument lookups with equivalent literal Results."""
 
     def replacement(match: re.Match[str]) -> str:
         if match.group(1) == "index":
@@ -68,22 +68,6 @@ def inject_interpreter_arguments(source: str, arguments: tuple[str, ...]) -> str
 def adapt_interpreter_source(source: str, arguments: tuple[str, ...]) -> str:
     """Translate compiler compatibility syntax to the current interpreter surface."""
     transformed = inject_interpreter_arguments(source, arguments)
-    transformed = transformed.replace(
-        "Stdlib.String.__byteAtUnchecked", "Stdlib.String.getByteAt"
-    )
-    transformed = transformed.replace(
-        "Stdlib.String.__substring", "Stdlib.String.substring"
-    )
-    transformed = transformed.replace(
-        "Stdlib.String.__codepointLength", "Stdlib.String.codepointLength"
-    )
-    transformed = transformed.replace(
-        "Stdlib.Float.__toInt64Unchecked", "Stdlib.Float.toInt"
-    )
-    transformed = transformed.replace(
-        "Stdlib.List.__digitsGetAt<Float> v i",
-        "Stdlib.List.getAtOrDefault v i 0.0",
-    )
     transformed = SINGLE_VALUE_DICT_PATTERN.sub(r"Dict<String, \1>", transformed)
     transformed = SINGLE_VALUE_DICT_FUNCTION_PATTERN.sub(
         r"\1<String, \2>", transformed
@@ -177,57 +161,9 @@ def adapt_interpreter_source(source: str, arguments: tuple[str, ...]) -> str:
         "(Stdlib.Tuple2.second (checksum data 0L 0L))",
     )
     transformed = transformed.replace("Stdlib.String.equals left right", "left == right")
-    transformed = transformed.replace(
-        "Stdlib.List.getAtOrDefault v i 0.0",
-        "(match Stdlib.List.getAt v (Stdlib.Int.fromInt64 i) with "
-        "| Some value -> value | None -> 0.0)",
-    )
-    needs_byte_adapter = "Stdlib.String.getByteAt" in transformed
-    if needs_byte_adapter:
-        transformed = transformed.replace("Stdlib.String.getByteAt", "interpreterGetByteAt")
-    needs_substring_adapter = "Stdlib.String.substring" in transformed
-    if needs_substring_adapter:
-        transformed = transformed.replace("Stdlib.String.substring", "interpreterSubstring")
     needs_grapheme_adapter = "Stdlib.String.toGraphemes" in transformed
     if needs_grapheme_adapter:
         transformed = transformed.replace("Stdlib.String.toGraphemes", "interpreterToGraphemes")
-    needs_int_conversion = "Stdlib.String.codepointLength" in transformed
-    if needs_int_conversion:
-        transformed = transformed.replace(
-            "Stdlib.String.codepointLength", "interpreterStringLength"
-        )
-    if "Stdlib.Float.toInt" in transformed:
-        transformed = transformed.replace("Stdlib.Float.toInt", "interpreterFloatToInt64")
-        transformed = (
-            "let interpreterFloatToInt64 (value: Float) : Int64 =\n"
-            "    match Stdlib.Int.toInt64 (Stdlib.Float.toInt value) with\n"
-            "    | Some converted -> converted\n"
-            "    | None -> Builtin.testRuntimeError \"Float result is outside Int64\"\n\n"
-            + transformed
-        )
-    if needs_int_conversion:
-        transformed = (
-            "let interpreterStringLength (value: String) : Int64 =\n"
-            "    match Stdlib.Int.toInt64 (Stdlib.String.codepointLength value) with\n"
-            "    | Some converted -> converted\n"
-            "    | None -> Builtin.testRuntimeError \"String length is outside Int64\"\n\n"
-            + transformed
-        )
-    if needs_byte_adapter:
-        transformed = (
-            "let interpreterGetByteAt (value: String) (index: Int64) : Int64 =\n"
-            "    match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with\n"
-            "    | Some byte -> Stdlib.Int64.fromUInt8 byte\n"
-            "    | None -> -1L\n\n"
-            + transformed
-        )
-    if needs_substring_adapter:
-        transformed = (
-            "let interpreterSubstring (value: String) (start_: Int64) (end_: Int64) : String =\n"
-            "    Stdlib.String.slice value (Stdlib.Int.fromInt64 start_) "
-            "(Stdlib.Int.fromInt64 end_)\n\n"
-            + transformed
-        )
     if needs_grapheme_adapter:
         transformed = (
             "let interpreterToGraphemesLoop (value: String) (index: Int) "
