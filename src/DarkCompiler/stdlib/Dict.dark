@@ -37,7 +37,7 @@ let __toUtf16Units (codepoints: List<Int64>) : List<Int64> =
     | [] -> []
     | codepoint :: tail ->
         let rest = Stdlib.Dict.__toUtf16Units tail in
-        if codepoint < 65536L then Stdlib.List.push<Int64> rest codepoint
+        if codepoint < 65536L then Stdlib.List.push rest codepoint
         else
             let supplementary = codepoint - 65536L in
             let highSurrogate = 55296L + Stdlib.Int64.shiftRight supplementary 10L in
@@ -117,7 +117,7 @@ let toList<'v> (dict: Dict<v>) : List<(String * v)> =
 let __keysFromEntries<'v> (entries: List<(String * v)>) : List<String> =
     match entries with
     | [] -> []
-    | head :: tail -> Stdlib.List.push<String> (Stdlib.Dict.__keysFromEntries<v> tail) (head.0)
+    | head :: tail -> Stdlib.List.push (Stdlib.Dict.__keysFromEntries tail) (head.0)
 
 let keys<'v> (dict: Dict<v>) : List<String> =
     Stdlib.Dict.__keysFromEntries<v> (Stdlib.Dict.toList<v> dict)
@@ -125,7 +125,7 @@ let keys<'v> (dict: Dict<v>) : List<String> =
 let __valuesFromEntries<'v> (entries: List<(String * v)>) : List<v> =
     match entries with
     | [] -> []
-    | head :: tail -> Stdlib.List.push<v> (Stdlib.Dict.__valuesFromEntries<v> tail) (head.1)
+    | head :: tail -> Stdlib.List.push (Stdlib.Dict.__valuesFromEntries tail) (head.1)
 
 let values<'v> (dict: Dict<v>) : List<v> =
     Stdlib.Dict.__valuesFromEntries<v> (Stdlib.Dict.toList<v> dict)
@@ -134,7 +134,7 @@ let __fromListOverwritingString<'v> (entries: List<(String * v)>) (dict: Dict<v>
     match entries with
     | [] -> dict
     | head :: tail ->
-        Stdlib.Dict.__fromListOverwritingString<v> tail (Stdlib.Dict.__setOverwriting<String, v> dict (head.0) (head.1))
+        Stdlib.Dict.__fromListOverwritingString tail (Stdlib.Dict.__setOverwriting dict (head.0) (head.1))
 
 let fromListOverwritingDuplicates<'v> (entries: List<(String * v)>) : Dict<v> =
     Stdlib.Dict.__fromListOverwritingString<v> entries (Stdlib.Dict.__empty<String, v> ())
@@ -143,9 +143,9 @@ let __fromListRejecting<'v> (entries: List<(String * v)>) (dict: Dict<v>) : Stdl
     match entries with
     | [] -> Some dict
     | head :: tail ->
-        if Stdlib.Dict.__contains<String, v> dict (head.0) then None
+        if Stdlib.Dict.__contains dict (head.0) then None
         else
-            Stdlib.Dict.__fromListRejecting<v> tail (Stdlib.Dict.__setOverwriting<String, v> dict (head.0) (head.1))
+            Stdlib.Dict.__fromListRejecting tail (Stdlib.Dict.__setOverwriting dict (head.0) (head.1))
 
 let fromList<'v> (entries: List<(String * v)>) : Stdlib.Option.Option<Dict<v>> =
     Stdlib.Dict.__fromListRejecting<v> entries (Stdlib.Dict.__empty<String, v> ())
@@ -157,7 +157,7 @@ let __mergeEntries<'v> (entries: List<(String * v)>) (result: Dict<v>) : Dict<v>
     match entries with
     | [] -> result
     | head :: tail ->
-        Stdlib.Dict.__mergeEntries<v> tail (Stdlib.Dict.__setOverwriting<String, v> result (head.0) (head.1))
+        Stdlib.Dict.__mergeEntries tail (Stdlib.Dict.__setOverwriting result (head.0) (head.1))
 
 let merge<'v> (left: Dict<v>) (right: Dict<v>) : Dict<v> =
     Stdlib.Dict.__mergeEntries<v> (Stdlib.Dict.toList<v> right) left
@@ -166,7 +166,7 @@ let __mapEntries<'a, 'b> (entries: List<(String * a)>) (fn: String -> a -> b) (r
     match entries with
     | [] -> result
     | head :: tail ->
-        Stdlib.Dict.__mapEntries<a, b> tail fn (Stdlib.Dict.__setOverwriting<String, b> result (head.0) (fn (head.0)(head.1)))
+        Stdlib.Dict.__mapEntries tail fn (Stdlib.Dict.__setOverwriting result (head.0) (fn (head.0)(head.1)))
 
 let map<'a, 'b> (dict: Dict<a>) (fn: String -> a -> b) : Dict<b> =
     Stdlib.Dict.__mapEntries<a, b> (Stdlib.Dict.toList<a> dict) fn (Stdlib.Dict.__empty<String, b> ())
@@ -186,7 +186,7 @@ let __filterEntries<'a> (entries: List<(String * a)>) (fn: (String) -> (a) -> Bo
     | [] -> result
     | head :: tail ->
         let next =
-            if fn (head.0)(head.1) then Stdlib.Dict.__setOverwriting<String, a> result (head.0) (head.1)
+            if fn (head.0)(head.1) then Stdlib.Dict.__setOverwriting result (head.0) (head.1)
             else result in
         Stdlib.Dict.__filterEntries<a> tail fn next
 
@@ -200,7 +200,7 @@ let __filterMapEntries<'a, 'b> (entries: List<(String * a)>) (fn: String -> a ->
         let next =
             match fn (head.0)(head.1) with
             | None -> result
-            | Some value -> Stdlib.Dict.__setOverwriting<String, b> result (head.0) value in
+            | Some value -> Stdlib.Dict.__setOverwriting result (head.0) value in
         Stdlib.Dict.__filterMapEntries<a, b> tail fn next
 
 let filterMap<'a, 'b> (dict: Dict<a>) (fn: String -> a -> Stdlib.Option.Option<b>) : Dict<b> =

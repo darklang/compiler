@@ -7,17 +7,17 @@ let matA (i: Int64) (j: Int64) : Float =
 
 // All callers prove the index is within the fixed vector length.
 let getAt (v: List<Float>) (i: Int64) : Float =
-    Stdlib.List.__digitsGetAt<Float> v i
+    Stdlib.List.__digitsGetAt v i
 
 let setAt (list: List<Float>) (index: Int64) (value: Float) : List<Float> =
     match list with
     | [] -> []
     | head :: tail ->
-        if index == 0L then Stdlib.List.push<Float> tail value
-        else Stdlib.List.push<Float> (setAt tail (index - 1L) value) head
+        if index == 0L then Stdlib.List.push tail value
+        else Stdlib.List.push (setAt tail (index - 1L) value) head
 
 let repeat (value: Float) (count: Int64) : List<Float> =
-    match Stdlib.List.repeat<Float> (Stdlib.Int.fromInt64 count) value with
+    match Stdlib.List.repeat (Stdlib.Int.fromInt64 count) value with
     | Ok values -> values
     | Error message -> Builtin.testRuntimeError message
 

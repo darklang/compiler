@@ -2,12 +2,12 @@
 
 Best-known compatible full-profile Dark performance vs audited Rust references, with diagnostic reference runtimes (instruction counts).
 
-**Snapshot timestamp:** 2026-09-15T00:34:25+00:00
+**Snapshot timestamp:** 2026-09-15T13:54:57+00:00
 **Architecture:** `arm64`
 **Profile:** `full` (schema 2)
 **Measurement policy:** `cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs`
-**Workload contract:** `4efd0c2330fbe360b4d9fb060515cd16222d400b0186e8ade17e98a04edc9f97`
-**Compiler commit:** `d4dc28200becfd41e6e363d39ad21abfc33a6f6b` - Align compiler APIs and add first-class values
+**Workload contract:** `a3f0951d008a808f6dd71f5c8991d263f4eb1219618f6c801c33329c19cd5081`
+**Compiler commit:** `51f32b38e5fa215fc80b8ba24026820929990b18` - Remove redundant explicit generic applications
 **Diagnostic references:** informational only; multipliers are instructions divided by Rust for the same workload.
 Every displayed diagnostic row matched the profile's expected stdout.
 
@@ -40,5 +40,5 @@ Every displayed diagnostic row matched the profile's expected stdout.
 | string_equality | 1,220,167 (0.82x) | 1,479,564 | 2,287,266,006 (1546x) | - | - | - |
 | sum_to_n | 62,220 (0.24x) | 260,246 | 29,651,727,831 (113937x) | 888,926,608 (3416x) | 9,549,026 (36.7x) | 942,028,993 (3620x) |
 | tak | 48,017,359 (0.12x) | 391,110,808 | 472,304,535,056 (1208x) | 2,191,746,728 (5.60x) | 499,216,513 (1.28x) | 10,868,859,617 (27.8x) |
-| tinytemplate | 8,831,495,068 (21010x) | 420,354 | 5,054,772,489 (12025x) | - | - | - |
+| tinytemplate | 8,831,495,075 (21010x) | 420,354 | 5,054,772,489 (12025x) | - | - | - |
 | warden | 45,762,039 (169x) | 270,345 | 29,400,568,988 (108752x) | - | - | - |

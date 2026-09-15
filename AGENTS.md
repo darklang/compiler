@@ -15,6 +15,13 @@ this repository and takes precedence where it is stricter.
 - Use `Crash.crash` for an impossible, undocumented state. Do not guess a
   default.
 
+## Dark conventions
+
+- Rely on type inference for module-scoped generic function and value uses.
+  Do not write explicit type arguments such as `Stdlib.List.getAt<Int64>`
+  unless inference is genuinely ambiguous and the explicit arguments are
+  required for the program to compile.
+
 ## Change rules
 
 - Create a failing, focused E2E test before fixing a compiler behavior.

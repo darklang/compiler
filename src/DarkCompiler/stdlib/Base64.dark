@@ -142,7 +142,7 @@ let __decode4Chars (c0: Int64) (c1: Int64) (c2: Int64) (c3: Int64) : (List<Int64
 // Decode base64 helper
 let __decodeHelper (s: String) (index: Int64) (len: Int64) (acc: List<Int64>) : Stdlib.Result.Result<List<Int64>, String> =
     if index >= len then
-        Ok (Stdlib.List.reverse<Int64> acc)
+        Ok (Stdlib.List.reverse acc)
     else if index + 4L > len then
         Error "Not a valid base64 string"
     else
@@ -165,7 +165,7 @@ let __decodeHelper (s: String) (index: Int64) (len: Int64) (acc: List<Int64>) : 
 let __prependReversed (bytes: List<Int64>) (acc: List<Int64>) : List<Int64> =
     match bytes with
     | [] -> acc
-    | b :: rest -> Stdlib.Base64.__prependReversed rest (Stdlib.List.push<Int64> acc b)
+    | b :: rest -> Stdlib.Base64.__prependReversed rest (Stdlib.List.push acc b)
 
 // Decode base64 string to bytes
 let decode (s: String) : Stdlib.Result.Result<Blob, String> =

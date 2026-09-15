@@ -185,15 +185,15 @@ let __daysSinceEpoch (date: DateTime) : Int64 =
 
 let year (date: DateTime) : Int =
     let parts = Stdlib.DateTime.__civilFromDays (Stdlib.DateTime.__daysSinceEpoch date) in
-    Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.first<Int64, Int64, Int64> parts)
+    Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.first parts)
 
 let month (date: DateTime) : Int =
     let parts = Stdlib.DateTime.__civilFromDays (Stdlib.DateTime.__daysSinceEpoch date) in
-    Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.second<Int64, Int64, Int64> parts)
+    Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.second parts)
 
 let day (date: DateTime) : Int =
     let parts = Stdlib.DateTime.__civilFromDays (Stdlib.DateTime.__daysSinceEpoch date) in
-    Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.third<Int64, Int64, Int64> parts)
+    Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.third parts)
 
 let weekday (date: DateTime) : Int =
     Stdlib.DateTime.__int64ToInt (
@@ -246,9 +246,9 @@ let __calendarParts (date: DateTime) : (Int64 * Int64 * Int64) =
 
 let toString (date: DateTime) : String =
     let parts = Stdlib.DateTime.__calendarParts date in
-    let year = Stdlib.Tuple3.first<Int64, Int64, Int64> parts in
-    let month = Stdlib.Tuple3.second<Int64, Int64, Int64> parts in
-    let day = Stdlib.Tuple3.third<Int64, Int64, Int64> parts in
+    let year = Stdlib.Tuple3.first parts in
+    let month = Stdlib.Tuple3.second parts in
+    let day = Stdlib.Tuple3.third parts in
     let withinDay = Stdlib.DateTime.__ticksWithinDay date in
     let hour = withinDay / Stdlib.DateTime.__ticksPerHour () in
     let minute = (withinDay / Stdlib.DateTime.__ticksPerMinute ()) % 60L in
@@ -266,9 +266,9 @@ let toString (date: DateTime) : String =
 
 let toStringISO8601BasicDate (date: DateTime) : String =
     let parts = Stdlib.DateTime.__calendarParts date in
-    Stdlib.DateTime.__padZero4 (Stdlib.Tuple3.first<Int64, Int64, Int64> parts) ++
-    Stdlib.DateTime.__padZero2 (Stdlib.Tuple3.second<Int64, Int64, Int64> parts) ++
-    Stdlib.DateTime.__padZero2 (Stdlib.Tuple3.third<Int64, Int64, Int64> parts)
+    Stdlib.DateTime.__padZero4 (Stdlib.Tuple3.first parts) ++
+    Stdlib.DateTime.__padZero2 (Stdlib.Tuple3.second parts) ++
+    Stdlib.DateTime.__padZero2 (Stdlib.Tuple3.third parts)
 
 let toStringISO8601BasicDateTime (date: DateTime) : String =
     let withinDay = Stdlib.DateTime.__ticksWithinDay date in

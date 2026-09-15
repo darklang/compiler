@@ -81,13 +81,13 @@ Stdlib.Float.clamp 0.0 Builtin.testNan 1.0 = Error "clamp requires arguments to 
 Stdlib.Float.parse " +.5\t" = Ok 0.5
 Stdlib.Float.parse "1.0000000000000002" = Ok 1.0000000000000002
 Stdlib.Float.parse "5e-324" = Ok (5e-324)
-Stdlib.Float.toBits (Stdlib.Result.withDefault<Float, Stdlib.Float.ParseError> (Stdlib.Float.parse "-0") 1.0) = 9223372036854775808
+Stdlib.Float.toBits (Stdlib.Result.withDefault (Stdlib.Float.parse "-0") 1.0) = 9223372036854775808
 Stdlib.Float.parse "" = Error Stdlib.Float.ParseError.BadFormat
 Stdlib.Float.parse "1e" = Error Stdlib.Float.ParseError.BadFormat
 Stdlib.Float.parse "1.8e308" = Ok (1.0 / 0.0)
 Stdlib.Float.parse "1.00000000000000011102230246251565404236316680908203125" = Ok 1.0
 Stdlib.Float.parse "2e-324" = Ok 0.0
-Stdlib.Float.isNaN (Stdlib.Result.withDefault<Float, Stdlib.Float.ParseError> (Stdlib.Float.parse "NaN") 0.0) = true
+Stdlib.Float.isNaN (Stdlib.Result.withDefault (Stdlib.Float.parse "NaN") 0.0) = true
 Stdlib.Float.parse "1.25" = stdout="Stdlib.Result.Result<Float, Stdlib.Float.ParseError>.Ok(1.25)\n"
 Stdlib.Float.parse "bad" = stdout="Stdlib.Result.Result<Float, Stdlib.Float.ParseError>.Error(Stdlib.Float.ParseError.BadFormat)\n"
 
@@ -102,8 +102,8 @@ Stdlib.Float.toString (5e-324) = "5e-324"
 Stdlib.Float.toString (1.0 / 0.0) = "Infinity"
 Stdlib.Float.toString (-1.0 / 0.0) = "-Infinity"
 Stdlib.Float.toString Builtin.testNan = "NaN"
-Stdlib.Float.toBits (Stdlib.Result.withDefault<Float, Stdlib.Float.ParseError> (Stdlib.Float.parse (Stdlib.Float.toString (1.7976931348623157e308))) 0.0) = Stdlib.Float.toBits (1.7976931348623157e308)
-Stdlib.Float.toBits (Stdlib.Result.withDefault<Float, Stdlib.Float.ParseError> (Stdlib.Float.parse (Stdlib.Float.toString (5e-324))) 0.0) = Stdlib.Float.toBits (5e-324)
+Stdlib.Float.toBits (Stdlib.Result.withDefault (Stdlib.Float.parse (Stdlib.Float.toString (1.7976931348623157e308))) 0.0) = Stdlib.Float.toBits (1.7976931348623157e308)
+Stdlib.Float.toBits (Stdlib.Result.withDefault (Stdlib.Float.parse (Stdlib.Float.toString (5e-324))) 0.0) = Stdlib.Float.toBits (5e-324)
 [1.0000000000000002] = stdout="[1.0000000000000002]\n"
 (0.1, 1.0000000000000002) = stdout="(0.1, 1.0000000000000002)\n"
 

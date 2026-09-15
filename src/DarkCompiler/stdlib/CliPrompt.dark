@@ -14,7 +14,7 @@ let confirm (question: String) : Bool =
 let select (question: String) (choices: List<String>) : String =
     let _ = Builtin.printLine question in
     let _ =
-        Stdlib.List.indexedMap<String, Unit> choices (fun i choice ->
+        Stdlib.List.indexedMap choices (fun i choice ->
             Builtin.printLine (
                 "  " ++
                 Stdlib.Cli.UI.Colors.boldText (Stdlib.Int.toString (i + 1)) ++
@@ -22,13 +22,13 @@ let select (question: String) (choices: List<String>) : String =
     let _ = Builtin.print "Enter number: " in
     let input = Builtin.stdinReadLine (()) in
     let parsed = Stdlib.Int.parse input in
-    if Stdlib.Result.isError<Int, Stdlib.Int.ParseError> parsed then
+    if Stdlib.Result.isError parsed then
         let _ = Builtin.printLine (Stdlib.Cli.UI.Colors.redText "Please enter a number") in
         Stdlib.Cli.UI.Prompt.select question choices
     else
-        let n = Stdlib.Result.withDefault<Int, Stdlib.Int.ParseError> parsed (Stdlib.Int.fromInt64 0L) in
+        let n = Stdlib.Result.withDefault parsed (Stdlib.Int.fromInt64 0L) in
         let index = Stdlib.Int.subtract n (Stdlib.Int.fromInt64 1L) in
-        match Stdlib.List.getAt<String> choices index with
+        match Stdlib.List.getAt choices index with
         | Some choice -> choice
         | None ->
             let _ = Builtin.printLine (Stdlib.Cli.UI.Colors.redText "Invalid selection") in

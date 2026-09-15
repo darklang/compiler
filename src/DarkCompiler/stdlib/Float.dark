@@ -373,8 +373,8 @@ let __log (value: Float) : Float =
     else if Stdlib.Float.__isInfinite value then Stdlib.Float.__infinity ()
     else
         let normalized = Stdlib.Float.__normalizeLog value 0L in
-        let mantissa = Stdlib.Tuple2.first<Float, Int64> normalized in
-        let exponent = Stdlib.Tuple2.second<Float, Int64> normalized in
+        let mantissa = Stdlib.Tuple2.first normalized in
+        let exponent = Stdlib.Tuple2.second normalized in
         let z = (mantissa - 1.0) / (mantissa + 1.0) in
         let series = z + Stdlib.Float.__logSeries z (z * z) 1L 26L z 0.0 in
         Stdlib.Int64.toFloat exponent * 0.6931471805599453 + 2.0 * series

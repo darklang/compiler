@@ -3,28 +3,28 @@
 // stores one decimal digit, matching Rust's Vec<u8> representation logically.
 
 let repeat (value: Int64) (count: Int64) : List<Int64> =
-    match Stdlib.List.repeat<Int64> (Stdlib.Int.fromInt64 count) value with
+    match Stdlib.List.repeat (Stdlib.Int.fromInt64 count) value with
     | Ok values -> values
     | Error message -> Builtin.testRuntimeError message
 
 // Divide the fixed-point digit vector by n in one left-to-right traversal.
 let divideByN (digits: List<Int64>) (n: Int64) (carry: Int64) (reversed: List<Int64>) : List<Int64> =
     match digits with
-    | [] -> Stdlib.List.reverse<Int64> reversed
+    | [] -> Stdlib.List.reverse reversed
     | digit :: tail ->
         let current = carry * 10L + digit in
-        divideByN tail n (current % n) (Stdlib.List.push<Int64> reversed (current / n))
+        divideByN tail n (current % n) (Stdlib.List.push reversed (current / n))
 
 // Add the current factorial term right-to-left, matching Rust's reverse loop.
 let addReversed (e: List<Int64>) (term: List<Int64>) (carry: Int64) (result: List<Int64>) : List<Int64> =
     match (e, term) with
     | (eDigit :: eTail, termDigit :: termTail) ->
         let total = eDigit + termDigit + carry in
-        addReversed eTail termTail (total / 10L) (Stdlib.List.push<Int64> result (total % 10L))
+        addReversed eTail termTail (total / 10L) (Stdlib.List.push result (total % 10L))
     | _ -> result
 
 let addWithCarry (e: List<Int64>) (term: List<Int64>) : List<Int64> =
-    addReversed (Stdlib.List.reverse<Int64> e) (Stdlib.List.reverse<Int64> term) 0L []
+    addReversed (Stdlib.List.reverse e) (Stdlib.List.reverse term) 0L []
 
 let addFactorialTerms (e: List<Int64>) (term: List<Int64>) (n: Int64) : List<Int64> =
     if n > 50L then e
@@ -34,7 +34,7 @@ let addFactorialTerms (e: List<Int64>) (term: List<Int64>) (n: Int64) : List<Int
         addFactorialTerms newE newTerm (n + 1L)
 
 let initDigits (len: Int64) : List<Int64> =
-    Stdlib.List.push<Int64> (repeat 0L (len - 1L)) 1L
+    Stdlib.List.push (repeat 0L (len - 1L)) 1L
 
 let computeEDigits (numDigits: Int64) : List<Int64> =
     // Rust uses indices 0..=precision, hence numDigits + 11 elements.

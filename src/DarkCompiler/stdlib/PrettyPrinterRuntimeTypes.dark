@@ -6,7 +6,7 @@ let __typeReferenceList
     (branchId: Uuid)
     (types: List<Darklang.LanguageTools.RuntimeTypes.TypeReference>)
     : List<String> =
-    Stdlib.List.map<Darklang.LanguageTools.RuntimeTypes.TypeReference, String>
+    Stdlib.List.map
         (types)
         (fun typ -> Darklang.PrettyPrinter.RuntimeTypes.typeReference (branchId) (typ))
 
@@ -39,8 +39,8 @@ let typeReference
         "Stream<" ++ Darklang.PrettyPrinter.RuntimeTypes.typeReference (branchId) (inner) ++ ">"
     | TTuple (first, second, rest) ->
         let all =
-            Stdlib.List.push<Darklang.LanguageTools.RuntimeTypes.TypeReference>
-                (Stdlib.List.push<Darklang.LanguageTools.RuntimeTypes.TypeReference> (rest) (second))
+            Stdlib.List.push
+                (Stdlib.List.push (rest) (second))
                 (first) in
         "(" ++ Stdlib.String.join (Darklang.PrettyPrinter.RuntimeTypes.__typeReferenceList (branchId) (all)) (" * ") ++ ")"
     | TList (inner) ->

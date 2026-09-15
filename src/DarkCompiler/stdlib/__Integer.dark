@@ -171,8 +171,8 @@ let __divideMagnitudeAt (dividend: String) (index: Int64) (divisor: String) (quo
         let nextRemainder =
             Stdlib.Int.__appendMagnitudeDigit remainder (Stdlib.String.__byteAtUnchecked dividend index - (48L)) in
         let step = Stdlib.Int.__quotientDigit nextRemainder divisor 0L in
-        let quotientDigit = Stdlib.Tuple2.first<Int64, String> step in
-        let remaining = Stdlib.Tuple2.second<Int64, String> step in
+        let quotientDigit = Stdlib.Tuple2.first step in
+        let remaining = Stdlib.Tuple2.second step in
         Stdlib.Int.__divideMagnitudeAt dividend (index + 1L) divisor (quotient ++ Stdlib.Int64.__digitToString quotientDigit) remaining
 
 let __divideMagnitude (dividend: String) (divisor: String) : (String * String) =
@@ -185,7 +185,7 @@ let __divide (a: Int) (b: Int) : Int =
     if divisor == "0" then Builtin.crash "Cannot divide by 0"
     else
         let result = Stdlib.Int.__divideMagnitude (Stdlib.Int.__magnitudeText at) divisor in
-        let quotient = Stdlib.Tuple2.first<String, String> result in
+        let quotient = Stdlib.Tuple2.first result in
         let negative = Stdlib.Int.__isNegativeText at != Stdlib.Int.__isNegativeText bt in
         Stdlib.Int.__value (Stdlib.Int.__withSign negative quotient)
 
@@ -195,7 +195,7 @@ let __remainder (a: Int) (b: Int) : Stdlib.Result.Result<Int, String> =
     if divisor == "0" then Error "Cannot divide by 0"
     else
         let result = Stdlib.Int.__divideMagnitude (Stdlib.Int.__magnitudeText at) divisor in
-        let remainder = Stdlib.Tuple2.second<String, String> result in
+        let remainder = Stdlib.Tuple2.second result in
         Ok (Stdlib.Int.__value (Stdlib.Int.__withSign (Stdlib.Int.__isNegativeText at) remainder))
 
 let __mod (value: Int) (modulus: Int) : Int =
@@ -216,7 +216,7 @@ let __powerLoop (base: Int) (exponentMagnitude: String) (result: Int) : Int =
     if exponentMagnitude == "0" then result
     else
         let halfStep = Stdlib.Int.__divideMagnitude exponentMagnitude "2" in
-        let half = Stdlib.Tuple2.first<String, String> halfStep in
+        let half = Stdlib.Tuple2.first halfStep in
         let nextResult = if Stdlib.Int.__isOddMagnitude exponentMagnitude then Stdlib.Int.__multiply result base else result in
         Stdlib.Int.__powerLoop (Stdlib.Int.__multiply base base) half nextResult
 
@@ -273,11 +273,11 @@ let __bitwiseAndNonnegative (a: String) (b: String) (place: Int) (acc: Int) : In
         let aStep = Stdlib.Int.__divideMagnitude a "2" in
         let bStep = Stdlib.Int.__divideMagnitude b "2" in
         let nextAcc =
-            if Stdlib.Tuple2.second<String, String> aStep == "1"
-               && Stdlib.Tuple2.second<String, String> bStep == "1" then
+            if Stdlib.Tuple2.second aStep == "1"
+               && Stdlib.Tuple2.second bStep == "1" then
                 Stdlib.Int.__add acc place
             else acc in
-        Stdlib.Int.__bitwiseAndNonnegative (Stdlib.Tuple2.first<String, String> aStep) (Stdlib.Tuple2.first<String, String> bStep) (Stdlib.Int.__add place place) nextAcc
+        Stdlib.Int.__bitwiseAndNonnegative (Stdlib.Tuple2.first aStep) (Stdlib.Tuple2.first bStep) (Stdlib.Int.__add place place) nextAcc
 
 let __bitwiseOrNonnegative (a: String) (b: String) (place: Int) (acc: Int) : Int =
     if a == "0" && b == "0" then acc
@@ -285,11 +285,11 @@ let __bitwiseOrNonnegative (a: String) (b: String) (place: Int) (acc: Int) : Int
         let aStep = Stdlib.Int.__divideMagnitude a "2" in
         let bStep = Stdlib.Int.__divideMagnitude b "2" in
         let nextAcc =
-            if Stdlib.Tuple2.second<String, String> aStep == "1"
-               || Stdlib.Tuple2.second<String, String> bStep == "1" then
+            if Stdlib.Tuple2.second aStep == "1"
+               || Stdlib.Tuple2.second bStep == "1" then
                 Stdlib.Int.__add acc place
             else acc in
-        Stdlib.Int.__bitwiseOrNonnegative (Stdlib.Tuple2.first<String, String> aStep) (Stdlib.Tuple2.first<String, String> bStep) (Stdlib.Int.__add place place) nextAcc
+        Stdlib.Int.__bitwiseOrNonnegative (Stdlib.Tuple2.first aStep) (Stdlib.Tuple2.first bStep) (Stdlib.Int.__add place place) nextAcc
 
 let __bitwiseXorNonnegative (a: String) (b: String) (place: Int) (acc: Int) : Int =
     if a == "0" && b == "0" then acc
@@ -297,11 +297,11 @@ let __bitwiseXorNonnegative (a: String) (b: String) (place: Int) (acc: Int) : In
         let aStep = Stdlib.Int.__divideMagnitude a "2" in
         let bStep = Stdlib.Int.__divideMagnitude b "2" in
         let nextAcc =
-            if (Stdlib.Tuple2.second<String, String> aStep == "1")
-               != (Stdlib.Tuple2.second<String, String> bStep == "1") then
+            if (Stdlib.Tuple2.second aStep == "1")
+               != (Stdlib.Tuple2.second bStep == "1") then
                 Stdlib.Int.__add acc place
             else acc in
-        Stdlib.Int.__bitwiseXorNonnegative (Stdlib.Tuple2.first<String, String> aStep) (Stdlib.Tuple2.first<String, String> bStep) (Stdlib.Int.__add place place) nextAcc
+        Stdlib.Int.__bitwiseXorNonnegative (Stdlib.Tuple2.first aStep) (Stdlib.Tuple2.first bStep) (Stdlib.Int.__add place place) nextAcc
 
 let __bitwiseAndPositive (a: Int) (b: Int) : Int =
     Stdlib.Int.__bitwiseAndNonnegative (Stdlib.Int.__text a) (Stdlib.Int.__text b) (Stdlib.Int.__value "1") (Stdlib.Int.__value "0")

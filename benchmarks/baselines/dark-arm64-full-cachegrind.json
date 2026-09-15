@@ -9,11 +9,11 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs"
   },
-  "contract_sha256": "4efd0c2330fbe360b4d9fb060515cd16222d400b0186e8ade17e98a04edc9f97",
-  "generated_at": "2026-09-15T00:34:25+00:00",
+  "contract_sha256": "a3f0951d008a808f6dd71f5c8991d263f4eb1219618f6c801c33329c19cd5081",
+  "generated_at": "2026-09-15T13:54:57+00:00",
   "compiler": {
-    "commit": "d4dc28200becfd41e6e363d39ad21abfc33a6f6b",
-    "subject": "Align compiler APIs and add first-class values"
+    "commit": "51f32b38e5fa215fc80b8ba24026820929990b18",
+    "subject": "Remove redundant explicit generic applications"
   },
   "benchmarks": [
     {
@@ -126,7 +126,7 @@
     },
     {
       "name": "tinytemplate",
-      "instructions": 8831495068
+      "instructions": 8831495075
     },
     {
       "name": "warden",
