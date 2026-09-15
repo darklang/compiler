@@ -80,6 +80,13 @@ one successful `--reset-dark-baseline` full run; partial, targeted,
 `all`, hyperfine, and failed runs cannot reset it. Audited Rust refreshes remain
 separate via `--refresh-baseline=rust`.
 
+If a rebase conflicts in generated `benchmarks/RESULTS.md`, resolve the source
+conflicts and run `./benchmarks/run_benchmarks.sh full` in recording mode. The
+run is the only valid resolution: it must prove an aggregate improvement,
+advance the canonical Dark snapshot, and replace `RESULTS.md` with fully
+regenerated results. Never hand-merge or select one conflicted version. If the
+run fails or does not advance and regenerate the files, abort the recovery.
+
 When reporting verification, include the exact commands run, whether they passed or failed, and any residual risk.
 
 For Linux x86_64 benchmark validation on an ARM64 worker, use the

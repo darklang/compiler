@@ -43,6 +43,13 @@ this repository and takes precedence where it is stricter.
   Likewise, do not run ARM64 tests on an x64 host unless explicitly testing
   ARM64 work.
 - Fix compiler warnings and errors before committing.
+- During merge-conflict recovery, never hand-merge, choose a side for, or edit
+  conflict markers in generated `benchmarks/RESULTS.md`. With all source
+  conflicts resolved in the rebased working tree, run
+  `./benchmarks/run_benchmarks.sh full`; recording mode must prove an aggregate
+  improvement, advance the canonical Dark snapshot, and regenerate
+  `RESULTS.md`. Stage the regenerated files. If the run fails or does not
+  replace the conflicted result, abort the recovery instead of guessing.
 
 ## Bounded inspection
 

@@ -67,9 +67,13 @@ else:
         fake_codex = fake_bin / "codex"
         fake_codex.write_text(
             """#!/usr/bin/env python3
+import os
 import pathlib
 import sys
 
+pathlib.Path(os.environ["INTEGRATOR_TEST_CODEX_ARGS"]).write_text(
+    "\\n".join(sys.argv), encoding="utf-8"
+)
 output_index = sys.argv.index("--output-last-message") + 1
 pathlib.Path(sys.argv[output_index]).write_text(
     "Could not resolve safely. Manual semantic decision required.\\n",
@@ -86,6 +90,7 @@ raise SystemExit(1)
         environment = dict(os.environ)
         environment["PATH"] = f"{fake_bin}:{environment['PATH']}"
         environment["INTEGRATOR_TEST_REPO"] = str(repo)
+        environment["INTEGRATOR_TEST_CODEX_ARGS"] = str(root / "codex-args.txt")
         environment["INTEGRATOR_SCRIPT"] = str(
             source_root / "scripts" / "run-mergetrain-integrator.sh"
         )
@@ -127,6 +132,13 @@ raise SystemExit(1)
             daemon_logs = list(attempts.glob("4-*.daemon.log"))
             self.assertEqual(len(daemon_logs), 1)
             self.assertIn("daemon noise 0", daemon_logs[0].read_text(encoding="utf-8"))
+            codex_args = Path(environment["INTEGRATOR_TEST_CODEX_ARGS"]).read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("benchmarks/RESULTS.md", codex_args)
+            self.assertIn("./benchmarks/run_benchmarks.sh full", codex_args)
+            self.assertIn("must prove an aggregate improvement", codex_args)
+            self.assertIn("do not hand-merge", codex_args)
 
     def test_daemon_failure_prints_only_a_bounded_excerpt(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -209,6 +209,16 @@ rebase this task branch onto it, understand both sides of any conflict, and
 resolve it without discarding either change. Work only in this job's owning
 worktree. Run all relevant verification and commit the repair.
 
+Special generated-benchmark rule: if the rebase conflicts in
+benchmarks/RESULTS.md, do not hand-merge it, choose ours/theirs, or edit its
+conflict markers. First resolve the source changes, then run
+./benchmarks/run_benchmarks.sh full in recording mode from the rebased tree.
+That run must prove an aggregate improvement, advance the canonical Dark
+snapshot, and regenerate benchmarks/RESULTS.md; stage the regenerated benchmark
+files. If it fails or does not replace the conflicted RESULTS.md, abort the
+rebase so failed recording artifacts are not committed, and explain that the
+required improvement was not established.
+
 For this recovery run, do not invoke ./land. Do not push, deploy, enqueue,
 retry, reconcile, cancel, dismiss, or modify mergetrain queue state; the
 integrator owns the retry. If a confident repair is not possible, leave the
