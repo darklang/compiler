@@ -2625,12 +2625,16 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                 | TRParen :: tail -> hasTopLevelComma (depth - 1) tail
                 | _ :: tail -> hasTopLevelComma depth tail
 
-            match rest with
-            | TRParen :: _ ->
+            match expr, rest with
+            | _, TRParen :: _ ->
                 Error "Parenthesized call syntax is not supported; use 'f ()'"
-            | _ when hasTopLevelComma 0 rest ->
+            | Constructor _, _ ->
+                // Upstream constructor expressions retain `Type.Variant(a, b)`;
+                // parse the parenthesized fields as their tuple payload.
+                Ok (expr, TLParen :: rest)
+            | _, _ when hasTopLevelComma 0 rest ->
                 Error "Parenthesized call syntax is not supported; use 'f a b'"
-            | _ ->
+            | _, _ ->
                 // Adjacency is immaterial for a single grouped argument.
                 Ok (expr, TLParen :: rest)
         | TLParen :: rest ->
