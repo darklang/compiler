@@ -28,6 +28,8 @@ Options:
 
 The integrator processes only jobs enqueued with --auto. It stops for manual
 jobs, unknown states, non-conflict failures, or a repeated Codex repair attempt.
+Daemon and Codex output is quiet by default. Failures print a bounded summary
+and paths to complete logs under --attempt-dir.
 
 Example:
   $0 --repo /Users/paulbiggar/projects/c4d-for-dcb
@@ -98,47 +100,94 @@ else:
 ' "$path"
 }
 
+print_log_excerpt() {
+  local log_file="$1"
+  local line_count="${2:-8}"
+
+  if [[ -s "$log_file" ]]; then
+    echo "Last $line_count log line(s):" >&2
+    tail -n "$line_count" "$log_file" | sed 's/^/  /' >&2
+  fi
+}
+
+last_message_summary() {
+  local message_file="$1"
+
+  python3 - "$message_file" <<'PY'
+import pathlib
+import sys
+
+text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+summary = " ".join(text.split())
+print(summary[:500] + ("…" if len(summary) > 500 else ""))
+PY
+}
+
 repair_job() {
   local snapshot="$1"
+  local daemon_output="$2"
   local job_id details category reason worktree branch old_head attempt_marker output_file
-  local current_branch new_head dirty git_common_dir
+  local current_branch new_head dirty git_common_dir codex_log daemon_log inspect_log
+  local summary retry_log
 
   job_id="$(json_value next_action.target_job_id <<<"$snapshot")"
   if [[ -z "$job_id" ]]; then
+    daemon_log="$attempt_dir/unknown-job-$(date -u +%Y%m%dT%H%M%SZ)-$$.daemon.log"
+    mv "$daemon_output" "$daemon_log"
     echo "Mergetrain requested conflict repair without a target job" >&2
+    echo "Daemon log: $daemon_log" >&2
     exit 1
   fi
 
-  details="$(mergetrain --repo "$repo_root" inspect "$job_id" --json)"
+  inspect_log="$attempt_dir/$job_id.inspect.log"
+  if ! details="$(
+    mergetrain --repo "$repo_root" inspect "$job_id" --json 2>"$inspect_log"
+  )"; then
+    daemon_log="$attempt_dir/$job_id-unknown.daemon.log"
+    mv "$daemon_output" "$daemon_log"
+    echo "Mergetrain inspection failed for job #$job_id" >&2
+    print_log_excerpt "$inspect_log"
+    echo "Full inspection log: $inspect_log" >&2
+    echo "Daemon log: $daemon_log" >&2
+    exit 1
+  fi
+  rm -f "$inspect_log"
   category="$(json_value outcome.failure_category <<<"$details")"
   reason="$(json_value outcome.message <<<"$details")"
+  old_head="$(json_value job.head_sha <<<"$details")"
+  daemon_log="$attempt_dir/$job_id-${old_head:-unknown}.daemon.log"
+  mv "$daemon_output" "$daemon_log"
   case "$category" in
     merge_conflict|semantic_conflict)
       ;;
     push_rejected)
       if [[ "$reason" != *non-fast-forward* ]]; then
         echo "Job #$job_id has a non-recoverable push rejection: $reason" >&2
+        echo "Daemon log: $daemon_log" >&2
         exit 1
       fi
       ;;
     *)
       echo "Job #$job_id needs operator attention ($category); refusing an automatic repair" >&2
+      echo "Daemon log: $daemon_log" >&2
       exit 1
       ;;
   esac
 
   worktree="$(json_value job.worktree_path <<<"$details")"
   branch="$(json_value job.branch <<<"$details")"
-  old_head="$(json_value job.head_sha <<<"$details")"
   if [[ -z "$worktree" || -z "$branch" || -z "$old_head" || ! -d "$worktree" ]]; then
     echo "Job #$job_id does not identify a usable owning worktree" >&2
+    echo "Daemon log: $daemon_log" >&2
     exit 1
   fi
 
   attempt_marker="$attempt_dir/$job_id-$old_head.attempted"
   output_file="$attempt_dir/$job_id-$old_head.last-message.txt"
+  codex_log="$attempt_dir/$job_id-$old_head.codex.log"
   if [[ -e "$attempt_marker" ]]; then
     echo "Codex already attempted job #$job_id at $old_head; operator review required" >&2
+    echo "Daemon log: $daemon_log" >&2
     exit 1
   fi
   touch "$attempt_marker"
@@ -163,8 +212,19 @@ worktree. Run all relevant verification and commit the repair.
 For this recovery run, do not invoke ./land. Do not push, deploy, enqueue,
 retry, reconcile, cancel, dismiss, or modify mergetrain queue state; the
 integrator owns the retry. If a confident repair is not possible, leave the
-branch unchanged and explain the blocker."; then
-    echo "Codex failed while repairing job #$job_id; see $output_file" >&2
+branch unchanged and explain the blocker." >"$codex_log" 2>&1; then
+    echo "Codex repair failed for job #$job_id ($category)" >&2
+    if [[ -s "$output_file" ]]; then
+      summary="$(last_message_summary "$output_file")"
+      if [[ -n "$summary" ]]; then
+        echo "Codex summary: $summary" >&2
+      fi
+      echo "Final message: $output_file" >&2
+    else
+      print_log_excerpt "$codex_log"
+    fi
+    echo "Full execution log: $codex_log" >&2
+    echo "Daemon log: $daemon_log" >&2
     exit 1
   fi
 
@@ -173,18 +233,47 @@ branch unchanged and explain the blocker."; then
   dirty="$(git -C "$worktree" status --porcelain)"
   if [[ "$current_branch" != "$branch" || "$new_head" == "$old_head" || -n "$dirty" ]]; then
     echo "Codex did not leave job #$job_id on a clean, newly committed $branch" >&2
-    echo "Review its result in $output_file" >&2
+    echo "Final message: $output_file" >&2
+    echo "Full execution log: $codex_log" >&2
+    echo "Daemon log: $daemon_log" >&2
     exit 1
   fi
 
-  mergetrain --repo "$repo_root" retry "$job_id" --json
+  retry_log="$attempt_dir/$job_id-$new_head.retry.log"
+  if ! mergetrain --repo "$repo_root" retry "$job_id" --json >"$retry_log" 2>&1; then
+    echo "Mergetrain retry failed for job #$job_id" >&2
+    print_log_excerpt "$retry_log"
+    echo "Full retry log: $retry_log" >&2
+    exit 1
+  fi
+  rm -f "$retry_log"
+  echo "Retried job #$job_id after Codex committed a repair"
 }
 
 while true; do
   # The native one-shot daemon owns queue locking, validation, and deployment.
-  mergetrain --repo "$repo_root" daemon --once
-
-  snapshot="$(mergetrain --repo "$repo_root" status --json)"
+  daemon_output="$(mktemp "$attempt_dir/.daemon.XXXXXX.log")"
+  if ! mergetrain --repo "$repo_root" daemon --once >"$daemon_output" 2>&1; then
+    daemon_log="$attempt_dir/daemon-failed-$(date -u +%Y%m%dT%H%M%SZ)-$$.log"
+    mv "$daemon_output" "$daemon_log"
+    echo "Mergetrain daemon command failed" >&2
+    print_log_excerpt "$daemon_log"
+    echo "Full daemon log: $daemon_log" >&2
+    exit 1
+  fi
+  status_log="$(mktemp "$attempt_dir/.status.XXXXXX.log")"
+  if ! snapshot="$(mergetrain --repo "$repo_root" status --json 2>"$status_log")"; then
+    failed_status_log="$attempt_dir/status-failed-$(date -u +%Y%m%dT%H%M%SZ)-$$.log"
+    daemon_log="$attempt_dir/status-failed-$(date -u +%Y%m%dT%H%M%SZ)-$$.daemon.log"
+    mv "$status_log" "$failed_status_log"
+    mv "$daemon_output" "$daemon_log"
+    echo "Mergetrain status command failed" >&2
+    print_log_excerpt "$failed_status_log"
+    echo "Full status log: $failed_status_log" >&2
+    echo "Daemon log: $daemon_log" >&2
+    exit 1
+  fi
+  rm -f "$status_log"
   contract_version="$(json_value contract_version <<<"$snapshot")"
   next_action="$(json_value next_action.code <<<"$snapshot")"
 
@@ -195,16 +284,17 @@ while true; do
 
   case "$next_action" in
     fix_blocked_job)
-      repair_job "$snapshot"
+      repair_job "$snapshot" "$daemon_output"
       ;;
     enqueue_clean_branch|gc_available|run_daemon_when_approved)
+      rm -f "$daemon_output"
       ;;
     wait_for_runner)
-      echo "Another mergetrain runner owns the queue; waiting"
+      rm -f "$daemon_output"
       ;;
     *)
+      rm -f "$daemon_output"
       echo "Mergetrain requires operator action: $next_action" >&2
-      echo "$snapshot" >&2
       exit 1
       ;;
   esac
