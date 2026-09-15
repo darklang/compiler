@@ -273,6 +273,47 @@ recorded.
 only the audited reference data in `BASELINES.md` after a complete successful
 run; Rust values do not affect the Dark monotonic decision.
 
+### Diagnostic reference runtimes
+
+`RESULTS.md` also shows instruction counts and Rust-relative multipliers for
+the Darklang interpreter, Node, OCaml, and Python wherever an implementation is
+available. These rows are informational: they do not participate in the Dark
+baseline decision, verification, or benchmark parity contract. Their
+architecture-specific measurements live in
+`baselines/diagnostic-<architecture>-full-cachegrind.json` and are regenerated
+independently:
+
+```bash
+python3 benchmarks/infrastructure/diagnostic_references.py \
+  --darklang-interpreter=/path/to/dark \
+  --darklang-rundir=/path/to/prepared-rundir \
+  --jobs=4 \
+  --allow-output-mismatch
+```
+
+The Darklang CLI currently accepts script arguments but does not expose them to
+the executed expression. The diagnostic runner therefore prepares a temporary
+copy of each Dark benchmark with its declared `profiles.json` integer arguments
+substituted at the `Stdlib.Cli.Args.int64` boundary. That copy also translates
+the compiler's documented interpreter-compatibility spellings where the latest
+interpreter surface has since changed (including dictionary type arguments,
+tuple projections, enum-value qualification, and integer-indexed string APIs).
+Each parallel interpreter worker receives a private copy of the prepared
+rundir, preventing trace-store lock contention from affecting the measurement.
+The runner validates exact stdout before recording the instruction count. The
+maintained benchmark sources are not changed. A full interpreter refresh can
+take tens of minutes per workload under Cachegrind, so the runner's default
+per-workload timeout is one hour.
+
+Some legacy Node, OCaml, and Python programs are no longer output-equivalent to
+the audited Dark/Rust pair. A diagnostic refresh can retain their measurements
+with `--allow-output-mismatch`; each affected JSON row is stamped
+`"output_valid": false`. This is another reason these columns must not be used
+as parity evidence or performance gates. Interpreter output remains strict.
+The runner also converts Node's tail-recursive Leibniz loop to the equivalent
+iterative loop because V8 does not implement proper tail calls at this workload
+size.
+
 ### Timing Mode (`--hyperfine`)
 
 Uses **hyperfine** to measure wall-clock execution time. Fast but results vary between runs.
@@ -300,7 +341,7 @@ benchmarks/
   run_benchmarks.sh          # Main entry point
   quick_check.sh             # Complete reduced-workload monotonic gate
   README.md                  # This file
-  baselines/                 # Typed architecture-specific Dark snapshots
+  baselines/                 # Canonical Dark and diagnostic reference snapshots
   profiles.json              # Membership, argv, and expected stdout contract
 
   infrastructure/
@@ -310,6 +351,7 @@ benchmarks/
     hyperfine_runner.sh      # Run hyperfine timing benchmarks
     result_processor.py      # Generate timing summary
     cachegrind_processor.py  # Generate instruction count summary
+    diagnostic_references.py # Refresh interpreter/Node/OCaml/Python counts
     benchmark_baseline.py    # Snapshot contract and exact shared comparison
     history_updater.py       # Monotonic full recorder and history writer
 

@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import math
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -26,6 +27,69 @@ def format_ratio(value: float) -> str:
     if value >= 10:
         return f"{value:.1f}x"
     return f"{value:.2f}x"
+
+
+DIAGNOSTIC_LANGUAGES = (
+    ("darklang-interpreter", "Darklang interpreter"),
+    ("node", "Node"),
+    ("ocaml", "OCaml"),
+    ("python", "Python"),
+)
+
+
+def load_diagnostic_references(
+    benchmarks_dir: Path, snapshot
+) -> dict[str, dict[str, tuple[int, bool]]]:
+    path = (
+        benchmarks_dir
+        / "baselines"
+        / f"diagnostic-{snapshot.architecture}-{snapshot.profile}-cachegrind.json"
+    )
+    if not path.is_file():
+        return {}
+    document = json.loads(path.read_text())
+    expected = {
+        "schema_version": 1,
+        "architecture": snapshot.architecture,
+        "profile": snapshot.profile,
+        "measurement_policy": snapshot.measurement_policy,
+        "contract_sha256": snapshot.contract_sha256,
+    }
+    for field, value in expected.items():
+        if document.get(field) != value:
+            # Diagnostic runtimes are never a canonical recording gate. A stale
+            # snapshot simply disappears from the generated comparison until it
+            # is refreshed for the active workload contract.
+            return {}
+    implementations = document.get("implementations")
+    if not isinstance(implementations, dict):
+        raise BaselineError("diagnostic reference snapshot implementations must be an object")
+    counts: dict[str, dict[str, tuple[int, bool]]] = {}
+    for language, _ in DIAGNOSTIC_LANGUAGES:
+        implementation = implementations.get(language)
+        if implementation is None:
+            continue
+        if not isinstance(implementation, dict) or not isinstance(
+            implementation.get("benchmarks"), list
+        ):
+            raise BaselineError(f"diagnostic {language} benchmark rows must be a list")
+        language_counts: dict[str, tuple[int, bool]] = {}
+        for row in implementation["benchmarks"]:
+            if not isinstance(row, dict) or not isinstance(row.get("name"), str):
+                raise BaselineError(f"diagnostic {language} row is malformed")
+            instructions = row.get("instructions")
+            if not isinstance(instructions, int) or instructions <= 0:
+                raise BaselineError(f"diagnostic {language} instruction count must be positive")
+            if row["name"] in language_counts:
+                raise BaselineError(f"diagnostic {language} repeats {row['name']}")
+            output_valid = row.get("output_valid")
+            if not isinstance(output_valid, bool):
+                raise BaselineError(
+                    f"diagnostic {language} output-valid marker must be boolean"
+                )
+            language_counts[row["name"]] = (instructions, output_valid)
+        counts[language] = language_counts
+    return counts
 
 
 def load_json_results(results_dir: Path) -> dict:
@@ -92,20 +156,64 @@ def update_baselines(benchmarks_dir: Path, json_results: dict) -> None:
 
 def update_results(benchmarks_dir: Path, snapshot) -> None:
     baselines = load_baselines(benchmarks_dir)
+    diagnostics = load_diagnostic_references(benchmarks_dir, snapshot)
     rows = [(row.name, row.instructions, baselines.get(row.name)) for row in snapshot.benchmarks]
     ratios = [dark / rust for _, dark, rust in rows if rust]
-    geometric = __import__("math").prod(ratios) ** (1 / len(ratios))
+    geometric = math.prod(ratios) ** (1 / len(ratios))
+    diagnostic_geometric = {}
+    for language, _ in DIAGNOSTIC_LANGUAGES:
+        language_ratios = [
+            diagnostics[language][name][0] / rust
+            for name, _, rust in rows
+            if rust and name in diagnostics.get(language, {})
+        ]
+        if language_ratios:
+            diagnostic_geometric[language] = math.prod(language_ratios) ** (
+                1 / len(language_ratios)
+            )
     lines = [
-        "# Benchmark Results", "", "Best-known compatible full-profile Dark performance vs audited Rust references (instruction counts).", "",
-        f"**Snapshot timestamp:** {snapshot.generated_at}", f"**Architecture:** `{snapshot.architecture}`",
+        "# Benchmark Results",
+        "",
+        "Best-known compatible full-profile Dark performance vs audited Rust "
+        "references, with diagnostic reference runtimes (instruction counts).",
+        "",
+        f"**Snapshot timestamp:** {snapshot.generated_at}",
+        f"**Architecture:** `{snapshot.architecture}`",
         f"**Profile:** `{snapshot.profile}` (schema {snapshot.schema_version})",
-        f"**Measurement policy:** `{snapshot.measurement_policy}`", f"**Workload contract:** `{snapshot.contract_sha256}`",
-        f"**Compiler commit:** `{snapshot.compiler.commit}`" + (f" - {snapshot.compiler.subject}" if snapshot.compiler.subject else ""), "",
-        f"| Benchmark | Dark ({format_ratio(geometric)}) | Rust |", "|---|---:|---:|",
+        f"**Measurement policy:** `{snapshot.measurement_policy}`",
+        f"**Workload contract:** `{snapshot.contract_sha256}`",
+        f"**Compiler commit:** `{snapshot.compiler.commit}`"
+        + (f" - {snapshot.compiler.subject}" if snapshot.compiler.subject else ""),
+        "**Diagnostic references:** informational only; multipliers are instructions "
+        "divided by Rust for the same workload.",
+        "Rows marked `†` completed but did not match the profile's expected stdout.",
+        "",
     ]
+    headers = ["Benchmark", f"Dark ({format_ratio(geometric)})", "Rust"]
+    headers.extend(
+        f"{label} ({format_ratio(diagnostic_geometric[language])})"
+        if language in diagnostic_geometric
+        else label
+        for language, label in DIAGNOSTIC_LANGUAGES
+    )
+    lines.extend(["| " + " | ".join(headers) + " |", "|---|" + "---:|" * (len(headers) - 1)])
     for name, dark, rust in rows:
-        dark_cell = format_number(dark) if rust is None else f"{format_number(dark)} ({format_ratio(dark / rust)})"
-        lines.append(f"| {name} | {dark_cell} | {format_number(rust) if rust else '-'} |")
+        dark_cell = (
+            format_number(dark)
+            if rust is None
+            else f"{format_number(dark)} ({format_ratio(dark / rust)})"
+        )
+        cells = [name, dark_cell, format_number(rust) if rust else "-"]
+        for language, _ in DIAGNOSTIC_LANGUAGES:
+            diagnostic = diagnostics.get(language, {}).get(name)
+            count = diagnostic[0] if diagnostic else None
+            marker = "" if diagnostic is None or diagnostic[1] else "†"
+            cells.append(
+                f"{format_number(count)} ({format_ratio(count / rust)}){marker}"
+                if count and rust
+                else "-"
+            )
+        lines.append("| " + " | ".join(cells) + " |")
     atomic_write_text(benchmarks_dir / "RESULTS.md", "\n".join(lines) + "\n")
 
 

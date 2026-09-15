@@ -1,0 +1,490 @@
+{
+  "schema_version": 1,
+  "architecture": "arm64",
+  "profile": "full",
+  "measurement_policy": "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs",
+  "contract_sha256": "09f346afea4df8be4d00308725bcfbe79f310fe81b4a1e8f859a9235b926af6d",
+  "generated_at": "2026-09-15T00:02:18.527671+00:00",
+  "implementations": {
+    "node": {
+      "version": "v26.8.2",
+      "benchmarks": [
+        {
+          "name": "ackermann",
+          "instructions": 1110162578,
+          "output_valid": true
+        },
+        {
+          "name": "binary_trees",
+          "instructions": 529893330,
+          "output_valid": true
+        },
+        {
+          "name": "collatz",
+          "instructions": 1312641320,
+          "output_valid": true
+        },
+        {
+          "name": "edigits",
+          "instructions": 531067847,
+          "output_valid": true
+        },
+        {
+          "name": "factorial",
+          "instructions": 667711461,
+          "output_valid": true
+        },
+        {
+          "name": "fannkuch",
+          "instructions": 539586956,
+          "output_valid": false
+        },
+        {
+          "name": "fasta",
+          "instructions": 556625195,
+          "output_valid": true
+        },
+        {
+          "name": "fib",
+          "instructions": 557455616,
+          "output_valid": true
+        },
+        {
+          "name": "leibniz",
+          "instructions": 565451342,
+          "output_valid": true
+        },
+        {
+          "name": "mandelbrot",
+          "instructions": 562280970,
+          "output_valid": true
+        },
+        {
+          "name": "matmul",
+          "instructions": 536020144,
+          "output_valid": false
+        },
+        {
+          "name": "merkletrees",
+          "instructions": 1484005619,
+          "output_valid": false
+        },
+        {
+          "name": "nbody",
+          "instructions": 598078135,
+          "output_valid": false
+        },
+        {
+          "name": "nqueen",
+          "instructions": 544906318,
+          "output_valid": true
+        },
+        {
+          "name": "nsieve",
+          "instructions": 533667737,
+          "output_valid": true
+        },
+        {
+          "name": "pisum",
+          "instructions": 547043331,
+          "output_valid": true
+        },
+        {
+          "name": "primes",
+          "instructions": 553085863,
+          "output_valid": true
+        },
+        {
+          "name": "quicksort",
+          "instructions": 588775868,
+          "output_valid": false
+        },
+        {
+          "name": "spectral_norm",
+          "instructions": 590943780,
+          "output_valid": true
+        },
+        {
+          "name": "sum_to_n",
+          "instructions": 701224503,
+          "output_valid": true
+        },
+        {
+          "name": "tak",
+          "instructions": 1747679172,
+          "output_valid": true
+        }
+      ]
+    },
+    "ocaml": {
+      "version": "5.4.0",
+      "benchmarks": [
+        {
+          "name": "ackermann",
+          "instructions": 162425122,
+          "output_valid": true
+        },
+        {
+          "name": "binary_trees",
+          "instructions": 2708839,
+          "output_valid": true
+        },
+        {
+          "name": "collatz",
+          "instructions": 259429920,
+          "output_valid": true
+        },
+        {
+          "name": "edigits",
+          "instructions": 1717795,
+          "output_valid": true
+        },
+        {
+          "name": "factorial",
+          "instructions": 11869686,
+          "output_valid": true
+        },
+        {
+          "name": "fannkuch",
+          "instructions": 3336623,
+          "output_valid": true
+        },
+        {
+          "name": "fasta",
+          "instructions": 34652065,
+          "output_valid": true
+        },
+        {
+          "name": "fib",
+          "instructions": 10716236,
+          "output_valid": true
+        },
+        {
+          "name": "leibniz",
+          "instructions": 50800291,
+          "output_valid": true
+        },
+        {
+          "name": "mandelbrot",
+          "instructions": 27495075,
+          "output_valid": true
+        },
+        {
+          "name": "matmul",
+          "instructions": 1390123,
+          "output_valid": true
+        },
+        {
+          "name": "merkletrees",
+          "instructions": 21266683,
+          "output_valid": true
+        },
+        {
+          "name": "nbody",
+          "instructions": 12868814,
+          "output_valid": true
+        },
+        {
+          "name": "nqueen",
+          "instructions": 11937954,
+          "output_valid": true
+        },
+        {
+          "name": "nsieve",
+          "instructions": 805558,
+          "output_valid": true
+        },
+        {
+          "name": "pisum",
+          "instructions": 2146906,
+          "output_valid": true
+        },
+        {
+          "name": "primes",
+          "instructions": 8789780,
+          "output_valid": true
+        },
+        {
+          "name": "quicksort",
+          "instructions": 41908196,
+          "output_valid": true
+        },
+        {
+          "name": "spectral_norm",
+          "instructions": 22765334,
+          "output_valid": true
+        },
+        {
+          "name": "sum_to_n",
+          "instructions": 9547796,
+          "output_valid": true
+        },
+        {
+          "name": "tak",
+          "instructions": 499217621,
+          "output_valid": true
+        }
+      ]
+    },
+    "python": {
+      "version": "Python 3.14.4",
+      "benchmarks": [
+        {
+          "name": "ackermann",
+          "instructions": 7435243382,
+          "output_valid": true
+        },
+        {
+          "name": "binary_trees",
+          "instructions": 340724034,
+          "output_valid": true
+        },
+        {
+          "name": "collatz",
+          "instructions": 8205454415,
+          "output_valid": true
+        },
+        {
+          "name": "edigits",
+          "instructions": 58939603,
+          "output_valid": true
+        },
+        {
+          "name": "factorial",
+          "instructions": 174987892,
+          "output_valid": true
+        },
+        {
+          "name": "fannkuch",
+          "instructions": 50108973,
+          "output_valid": false
+        },
+        {
+          "name": "fasta",
+          "instructions": 101449697,
+          "output_valid": true
+        },
+        {
+          "name": "fib",
+          "instructions": 328945486,
+          "output_valid": true
+        },
+        {
+          "name": "leibniz",
+          "instructions": 2143002640,
+          "output_valid": true
+        },
+        {
+          "name": "mandelbrot",
+          "instructions": 1379265172,
+          "output_valid": true
+        },
+        {
+          "name": "matmul",
+          "instructions": 53598585,
+          "output_valid": true
+        },
+        {
+          "name": "merkletrees",
+          "instructions": 2037365183,
+          "output_valid": true
+        },
+        {
+          "name": "nbody",
+          "instructions": 893660518,
+          "output_valid": true
+        },
+        {
+          "name": "nqueen",
+          "instructions": 496823858,
+          "output_valid": true
+        },
+        {
+          "name": "nsieve",
+          "instructions": 41177220,
+          "output_valid": true
+        },
+        {
+          "name": "pisum",
+          "instructions": 108243764,
+          "output_valid": true
+        },
+        {
+          "name": "primes",
+          "instructions": 87131647,
+          "output_valid": true
+        },
+        {
+          "name": "quicksort",
+          "instructions": 105063915,
+          "output_valid": true
+        },
+        {
+          "name": "spectral_norm",
+          "instructions": 748812217,
+          "output_valid": true
+        },
+        {
+          "name": "sum_to_n",
+          "instructions": 942046356,
+          "output_valid": true
+        },
+        {
+          "name": "tak",
+          "instructions": 10868820016,
+          "output_valid": true
+        }
+      ]
+    },
+    "darklang-interpreter": {
+      "version": "Darklang CLI alpha-0b3888d (unable to check for updates)",
+      "benchmarks": [
+        {
+          "name": "ackermann",
+          "instructions": 288830346450,
+          "output_valid": true
+        },
+        {
+          "name": "binary_trees",
+          "instructions": 6623142310,
+          "output_valid": true
+        },
+        {
+          "name": "collatz",
+          "instructions": 436770084719,
+          "output_valid": true
+        },
+        {
+          "name": "edigits",
+          "instructions": 1602800731,
+          "output_valid": true
+        },
+        {
+          "name": "factorial",
+          "instructions": 7060752102,
+          "output_valid": true
+        },
+        {
+          "name": "fannkuch",
+          "instructions": 6401946225,
+          "output_valid": true
+        },
+        {
+          "name": "fasta",
+          "instructions": 6211157644,
+          "output_valid": true
+        },
+        {
+          "name": "fft",
+          "instructions": 1071660385,
+          "output_valid": true
+        },
+        {
+          "name": "fib",
+          "instructions": 14483522270,
+          "output_valid": true
+        },
+        {
+          "name": "huffman",
+          "instructions": 8404883771,
+          "output_valid": true
+        },
+        {
+          "name": "leibniz",
+          "instructions": 147714775549,
+          "output_valid": true
+        },
+        {
+          "name": "mandelbrot",
+          "instructions": 76139153712,
+          "output_valid": true
+        },
+        {
+          "name": "matmul",
+          "instructions": 4325901348,
+          "output_valid": true
+        },
+        {
+          "name": "merkletrees",
+          "instructions": 48850046623,
+          "output_valid": true
+        },
+        {
+          "name": "myers_diff",
+          "instructions": 907758560,
+          "output_valid": true
+        },
+        {
+          "name": "nbody",
+          "instructions": 27062084317,
+          "output_valid": true
+        },
+        {
+          "name": "nqueen",
+          "instructions": 18140859893,
+          "output_valid": true
+        },
+        {
+          "name": "nsieve",
+          "instructions": 1376772420,
+          "output_valid": true
+        },
+        {
+          "name": "pisum",
+          "instructions": 4626740924,
+          "output_valid": true
+        },
+        {
+          "name": "primes",
+          "instructions": 4328859730,
+          "output_valid": true
+        },
+        {
+          "name": "quicksort",
+          "instructions": 3250273844,
+          "output_valid": true
+        },
+        {
+          "name": "raytracer",
+          "instructions": 31085809882,
+          "output_valid": true
+        },
+        {
+          "name": "regex_lite",
+          "instructions": 354575557,
+          "output_valid": true
+        },
+        {
+          "name": "spectral_norm",
+          "instructions": 49306577431,
+          "output_valid": true
+        },
+        {
+          "name": "string_equality",
+          "instructions": 771257996,
+          "output_valid": true
+        },
+        {
+          "name": "sum_to_n",
+          "instructions": 26365758322,
+          "output_valid": true
+        },
+        {
+          "name": "tak",
+          "instructions": 473512212660,
+          "output_valid": true
+        },
+        {
+          "name": "tinytemplate",
+          "instructions": 1185492697,
+          "output_valid": true
+        },
+        {
+          "name": "warden",
+          "instructions": 346561614,
+          "output_valid": true
+        }
+      ]
+    }
+  }
+}
