@@ -44,7 +44,9 @@ match Stdlib.Cli.Process.runIn "/" "pwd" [] with | Ok output -> Stdlib.String.tr
 
 match Stdlib.Cli.Process.runWithEnv "/bin/sh" (["-c", "printf %s \"$CLI_PARITY_VALUE\""]) ([("CLI_PARITY_VALUE", "inherited")]) with | Ok output -> output.stdout | Error error -> error = "inherited" isolated=true
 
-match Stdlib.Cli.Process.pipe "printf" (["abc"]) "tr" (["a-z", "A-Z"]) with | Ok output -> output.stdout | Error error -> error.message = "ABC" isolated=true
+// Each missing pair used to retain two 1 MiB capture buffers, so resolving
+// both executables late in PATH exhausted the fixed native heap.
+match Stdlib.Cli.Process.pipe "printf" (["abc"]) "tr" (["a-z", "A-Z"]) with | Ok output -> output.stdout | Error error -> error.message = "ABC" isolated=true env="PATH=/definitely/missing/01:/definitely/missing/02:/definitely/missing/03:/definitely/missing/04:/definitely/missing/05:/definitely/missing/06:/definitely/missing/07:/definitely/missing/08:/definitely/missing/09:/definitely/missing/10:/definitely/missing/11:/definitely/missing/12:/definitely/missing/13:/definitely/missing/14:/definitely/missing/15:/definitely/missing/16:/definitely/missing/17:/usr/bin"
 
 match Stdlib.Cli.Process.runIn "/" "/bin/pwd" [] with | Ok output -> Stdlib.String.trimEnd output.stdout | Error error -> error.message = "/" env="SHELL=/definitely/missing" env="PATH="
 

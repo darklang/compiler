@@ -7827,6 +7827,10 @@ let private generateLinuxCliRunProcessHelper () : ARM64Symbolic.Instr list =
       ARM64Symbolic.STP_pre (ARM64Symbolic.X23, ARM64Symbolic.X24, ARM64Symbolic.SP, -16s)
       ARM64Symbolic.STP_pre (ARM64Symbolic.X25, ARM64Symbolic.X26, ARM64Symbolic.SP, -16s)
       ARM64Symbolic.SUB_imm (ARM64Symbolic.SP, ARM64Symbolic.SP, 128us)
+      // ENOENT is recoverable policy input for PATH lookup. Remember the
+      // scratch-allocation boundary so a failed candidate attempt can return
+      // empty strings without permanently consuming its two 1 MiB buffers.
+      ARM64Symbolic.STR (ARM64Symbolic.X28, ARM64Symbolic.SP, 96s)
       ARM64Symbolic.MOV_reg (ARM64Symbolic.X25, ARM64Symbolic.X0)
       // Copy packed argv and add the terminating NUL required by execve.
       ARM64Symbolic.LDR (ARM64Symbolic.X0, ARM64Symbolic.X25, 8s)
@@ -8177,7 +8181,18 @@ let private generateLinuxCliRunProcessHelper () : ARM64Symbolic.Instr list =
     @ closeFd 0s 0 @ closeFd 0s 32
     @ [ ARM64Symbolic.Label "__dark_run_spawn_error"
         ARM64Symbolic.MOVZ (ARM64Symbolic.X12, 127us, 0)
-        ARM64Symbolic.Label "__dark_run_build_result" ]
+        ARM64Symbolic.Label "__dark_run_build_result"
+        ARM64Symbolic.LDR (ARM64Symbolic.X9, ARM64Symbolic.SP, 80s)
+        ARM64Symbolic.CMP_imm (ARM64Symbolic.X9, 2us)
+        ARM64Symbolic.B_cond_label (ARM64Symbolic.NE, "__dark_run_keep_capture_buffers")
+        ARM64Symbolic.LDR (ARM64Symbolic.X28, ARM64Symbolic.SP, 96s)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X20, ARM64Symbolic.X28)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 16us)
+        ARM64Symbolic.MOV_reg (ARM64Symbolic.X21, ARM64Symbolic.X28)
+        ARM64Symbolic.ADD_imm (ARM64Symbolic.X28, ARM64Symbolic.X28, 16us)
+        zero ARM64Symbolic.X22
+        zero ARM64Symbolic.X23
+        ARM64Symbolic.Label "__dark_run_keep_capture_buffers" ]
     @ finalizeString ARM64Symbolic.X20 ARM64Symbolic.X22
     @ finalizeString ARM64Symbolic.X21 ARM64Symbolic.X23
     @ [ ARM64Symbolic.MOV_reg (ARM64Symbolic.X0, ARM64Symbolic.X28)
