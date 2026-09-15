@@ -15,8 +15,13 @@ let private semantics : Semantics<Operation<Transform * Ownership>, ListId> = {
             let useMode = match ownership with Consume -> Consumed input.Id | BorrowAndCopy -> Borrowed input.Id
             { Inputs = [useMode]; Outputs = [output.Id] }
         | Fold (_, input, _, _) -> { Inputs = [Borrowed input.Id]; Outputs = [] }
-    ScalarUses = fun _ -> Set.empty
-    ValueUses = fun _ -> Set.empty
+    ScalarUses = fun operand ->
+        operand.Inputs
+        |> Map.values
+        |> Seq.choose (fun value -> if value.Type = AST.TList AST.TInt64 then Some value.Id else None)
+        |> Set.ofSeq
+    BlockArgument = fun value ->
+        if value.Type = AST.TList AST.TInt64 then Managed value.Id else Unmanaged
 }
 
 let verifyBlockOwnership (block: OwnedBlock) : Result<unit, string> =

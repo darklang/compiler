@@ -18,8 +18,8 @@ ANF → MIR → LIR → target ISA → Binary
 Before ANF, `ir/hir/HIR.fs` supplies typed value identities and structured
 control flow shared by semantic leaf dialects. `passes/hir/VerifyHIR.fs`
 independently checks definitions, uses, types, and branch results.
-`ir/owned/OwnedIR.fs` supplies ownership-bearing blocks
-and explicit borrow/consume/produce contracts, checked independently by
+`ir/owned/OwnedIR.fs` supplies ownership-bearing blocks, explicit
+borrow/consume/produce contracts, and managed block arguments, checked independently by
 `passes/ownership/VerifyOwnership.fs`. Representation-independent liveness and
 destruction proofs live in `analysis/`. The list dialect uses these interfaces
 for closed collection regions, storage selection, and branch-aware ownership.
@@ -43,8 +43,10 @@ Inlining freshens block identities along with value identities. Liveness keeps
 continuation captures live; reference counting releases branch-local owners at
 a jump and defers enclosing cleanup to the continuation. The post-RC interface
 verifier checks lexical operands/targets, scalar argument types, and that join
-entries transfer rather than return. Managed block arguments and general
-control-flow ownership interfaces remain future work.
+entries transfer rather than return. Managed arguments exist in semantic HIR
+ownership: each alternative transfers its path-local identity to one fresh
+join identity. Lowering those arguments through general ANF joins and RC
+insertion remains future work.
 
 ## Dumping IRs
 

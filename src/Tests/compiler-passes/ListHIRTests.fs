@@ -21,9 +21,11 @@ let private functions : TypeRegistries.FunctionRegistry =
         "Stdlib.List.fold_i64_i64", AST.TFunction ([AST.TList AST.TInt64; AST.TInt64; AST.TFunction ([AST.TInt64; AST.TInt64], AST.TInt64)], AST.TInt64)
     ]
 
-let private extract expression =
+let private extractWithParameters parameterTypes expression =
     let infer types expr = LoweringTypeInference.inferTypeCore Set.empty expr types Map.empty Map.empty functions Map.empty
-    ExtractListRegions.tryExtract (Set.ofList ["mapCallback"; "foldCallback"]) Map.empty infer (fun expr -> ClosureAnalysis.freeVars expr Set.empty) expression
+    ExtractListRegions.tryExtract (Set.ofList ["mapCallback"; "foldCallback"]) parameterTypes infer (fun expr -> ClosureAnalysis.freeVars expr Set.empty) expression
+
+let private extract expression = extractWithParameters Map.empty expression
 
 let private checkBudget expression expected () =
     match extract expression with
@@ -149,6 +151,11 @@ let tests = [
     "List HIR rejects escaping lists", rejects (bind "xs" (values 3) (AST.Var "xs"))
     "List HIR reclaims arrays beyond the fixed heap classes", checkSummary (fold (reverse (values 29))) { Allocations = 1; AllocatedBytes = bytes 272L; Copies = 0; ReusedTransforms = 1; Releases = 1 }
     "List HIR rejects borrowed input lists", rejects (fold (reverse (AST.Var "external")))
+    "List HIR rejects scalar wrappers around borrowed managed inputs", (fun () ->
+        let expression = AST.Let (AST.LPWildcard, reverse (AST.Var "external"), AST.Int64Literal 1L)
+        match extractWithParameters (Map.ofList ["external", AST.TList AST.TInt64]) expression with
+        | None -> Ok ()
+        | Some _ -> Error "A scalar wrapper admitted a borrowed list parameter")
     "List HIR rejects managed elements", rejects (bind "xs" (AST.ListLiteral [AST.StringLiteral "a"]) (AST.Int64Literal 0L))
     "List HIR rejects callbacks capturing region lists", rejects (bind "xs" (values 3) (fold (call "Stdlib.List.map_i64_i64" [AST.Var "xs"; AST.Closure ("mapCallback", [AST.Var "xs"])])))
     "List HIR verifier rejects duplicate release", rejectsOwnership [construct [root; root]]

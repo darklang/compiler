@@ -260,7 +260,14 @@ let tryExtract
                 (name, { Id = HIR.ValueId nextId; Type = typ }), nextId + 1) 0
             |> fun (values, nextId) -> Map.ofList values, nextId
         region finalName { Lists = Map.empty; Values = parameters; Operations = []; NextId = nextId; Lifetime = EnclosingLifetime } expression
-        |> Option.bind (fun (FunctionalBlock block, finalId) ->
-            if finalId = nextId then None
-            else Some (FunctionalRegion (FunctionalBlock { block with Parameters = parameters })))
+        |> Option.bind (fun (FunctionalBlock block, _) ->
+            let rec containsListOperation (FunctionalBlock block) =
+                block.Operations
+                |> List.exists (function
+                    | Leaf _ -> true
+                    | Branch (_, _, ifTrue, ifFalse) -> containsListOperation ifTrue || containsListOperation ifFalse
+                    | ScalarBinding _ -> false)
+            let root = FunctionalBlock { block with Parameters = parameters }
+            if not (containsListOperation root) then None
+            else Some (FunctionalRegion root))
     else None

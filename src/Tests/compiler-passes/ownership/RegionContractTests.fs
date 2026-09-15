@@ -19,20 +19,24 @@ let private semantics : Semantics<Contract<string>, string> = {
     Leaf = id
     ScalarUses = fun value ->
         value.Inputs |> Map.keys |> Set.ofSeq
-    ValueUses = fun value ->
+    BlockArgument = fun value ->
         match value.Id with
-        | HIR.ValueId 0 -> Set.singleton "a"
-        | HIR.ValueId 1 -> Set.singleton "b"
-        | HIR.ValueId 2 -> Set.singleton "c"
-        | _ -> Set.empty
+        | HIR.ValueId 0 -> Managed "a"
+        | HIR.ValueId 1 -> Managed "b"
+        | HIR.ValueId 2 -> Managed "c"
+        | _ -> Unmanaged
 }
 
 let private step inputs outputs releases : Step<Contract<string>, string> =
     { Operation = HIR.Leaf { Inputs = inputs; Outputs = outputs }; Releases = releases }
 let private block entry operations : Block<Contract<string>, string> =
     { EntryReleases = entry; Body = { Parameters = Map.empty; Operations = operations; Result = unitValue } }
+let private blockResult entry operations result : Block<Contract<string>, string> =
+    { EntryReleases = entry; Body = { Parameters = Map.empty; Operations = operations; Result = result } }
 let private branch predicate yes no : Step<Contract<string>, string> =
     { Operation = HIR.Branch ({ Id = HIR.ValueId 101; Type = AST.TUnit }, predicate, yes, no); Releases = [] }
+let private managedBranch result predicate yes no : Step<Contract<string>, string> =
+    { Operation = HIR.Branch (result, predicate, yes, no); Releases = [] }
 let private read name releases : Step<Contract<string>, string> =
     { Operation = HIR.ScalarBinding ({ Id = HIR.ValueId 102; Type = AST.TInt64 }, reference name); Releases = releases }
 let private check expected region () =
@@ -72,6 +76,33 @@ let tests = [
         (block [] [branch condition (block [] [step [] ["a"] ["a"]]) (block [] [step [] ["a"] ["a"]])])
     "Ownership contracts reject double edge release", check (Error (InvalidRelease "a"))
         (block [] [step [] ["a"] []; branch condition (block ["a"; "a"] []) (block ["a"] [])])
+    "Ownership contracts transfer distinct managed block arguments", check (Ok ())
+        (block [] [
+            managedBranch (value "c") condition
+                (blockResult [] [step [] ["a"] []] (value "a"))
+                (blockResult [] [step [] ["b"] []] (value "b"))
+            step [Consumed "c"] [] []
+        ])
+    "Ownership contracts rename one incoming value on exclusive edges", check (Ok ())
+        (block [] [
+            step [] ["a"] []
+            managedBranch (value "c") condition
+                (blockResult [] [] (value "a"))
+                (blockResult [] [] (value "a"))
+            step [Consumed "c"] [] []
+        ])
+    "Ownership contracts reject mixed managed block arguments", check (Error InconsistentBlockArgument)
+        (block [] [
+            managedBranch (value "c") condition
+                (blockResult [] [step [] ["a"] []] (value "a"))
+                (block [] [])
+        ])
+    "Ownership contracts reject a released block argument", check (Error (InvalidUse "a"))
+        (block [] [
+            managedBranch (value "c") condition
+                (blockResult [] [step [] ["a"] ["a"]] (value "a"))
+                (blockResult [] [step [] ["b"] []] (value "b"))
+        ])
     "Ownership contracts reject incoming roots in closed regions", check (Error (InvalidRelease "a"))
         (block ["a"] [])
     "Ownership contracts reject leaked units", check (Error (UnreleasedValues (Set.singleton "a")))

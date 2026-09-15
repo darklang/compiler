@@ -16,13 +16,22 @@ let elaborateOwnership (StorageRegion (FunctionalRegion block, layouts)) : Owned
             List.foldBack (fun operation (tail, live) ->
                 let ownedOperation, releases, before =
                     match operation with
-                    | Branch (name, condition, yes, no) ->
-                        let yes, yesLive = elaborate yes live
-                        let no, noLive = elaborate no live
+                    | Branch (result, condition, yes, no) ->
+                        let managed (value: HIR.Value) =
+                            if value.Type = AST.TList AST.TInt64 then Some value.Id else None
+                        let continuation = managed result |> Option.map (fun id -> Set.remove id live) |> Option.defaultValue live
+                        let branchLive (FunctionalBlock block) =
+                            managed block.Result |> Option.map (fun id -> Set.add id continuation) |> Option.defaultValue continuation
+                        let yes, yesLive = elaborate yes (branchLive yes)
+                        let no, noLive = elaborate no (branchLive no)
                         let before = Set.union yesLive noLive
                         let edge branch required =
                             { branch with EntryReleases = Set.difference before required |> Set.toList }
-                        Branch (name, condition, edge yes yesLive, edge no noLive), [], before
+                        let unusedResult =
+                            managed result
+                            |> Option.filter (fun id -> not (Set.contains id live))
+                            |> Option.toList
+                        Branch (result, condition, edge yes yesLive, edge no noLive), unusedResult, before
                     | _ ->
                         let unusedOutput = result operation |> Option.filter (fun output -> not (Set.contains output live)) |> Option.toList
                         let owned, releases =

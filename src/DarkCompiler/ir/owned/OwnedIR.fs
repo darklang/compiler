@@ -4,6 +4,8 @@ module OwnedIR
 
 type Input<'id> = Borrowed of 'id | Consumed of 'id
 
+type BlockArgument<'id> = Unmanaged | Managed of 'id
+
 /// Lists retain multiplicity: consuming one unit twice or defining a duplicate
 /// identity is invalid. This is unit ownership, not general RC credit arithmetic.
 type Contract<'id> = {
@@ -21,11 +23,12 @@ and Block<'leaf, 'id> = {
 }
 
 /// A dialect must describe every access, including opaque scalar operands and
-/// block results. No default marks unknown expressions as storage-independent.
+/// typed block results. A managed result transfers its ownership identity to
+/// the branch target; Unmanaged means the value has no ownership unit.
 type Semantics<'leaf, 'id when 'id: comparison> = {
     Leaf: 'leaf -> Contract<'id>
     ScalarUses: HIR.Operand -> Set<'id>
-    ValueUses: HIR.Value -> Set<'id>
+    BlockArgument: HIR.Value -> BlockArgument<'id>
 }
 
 type VerificationError<'id when 'id: comparison> =
@@ -33,4 +36,5 @@ type VerificationError<'id when 'id: comparison> =
     | InvalidRelease of 'id
     | DuplicateDefinition of 'id
     | InconsistentJoin
+    | InconsistentBlockArgument
     | UnreleasedValues of Set<'id>

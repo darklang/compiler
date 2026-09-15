@@ -10,11 +10,15 @@ open ListRegion
 /// access them; callbacks cannot capture them. These are value-edge contracts,
 /// not permission to reorder scalar effects or to mutate a borrowed parameter.
 let rec internal valueContract operation : ValueLiveness.Contract<ListId> =
-    let uses =
+    let managed (value: HIR.Value) =
+        if value.Type = AST.TList AST.TInt64 then Set.singleton value.Id else Set.empty
+    let uses, defines =
         match operation with
-        | Branch (_, _, yes, no) -> Set.union (entryLive yes Set.empty) (entryLive no Set.empty)
-        | _ -> source operation |> Option.toList |> Set.ofList
-    { Uses = uses; Defines = result operation |> Option.toList |> Set.ofList }
+        | Branch (output, _, yes, no) ->
+            let branchUses (FunctionalBlock body as block) = entryLive block (managed body.Result)
+            Set.union (branchUses yes) (branchUses no), managed output
+        | _ -> source operation |> Option.toList |> Set.ofList, result operation |> Option.toList |> Set.ofList
+    { Uses = uses; Defines = defines }
 and private entryLive (FunctionalBlock block) liveAfter =
     List.foldBack (fun operation live -> ValueLiveness.liveBefore (valueContract operation) live) block.Operations liveAfter
 

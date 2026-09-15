@@ -87,6 +87,13 @@ has one physical ownership unit, while all logical aliases are visible in the
 region graph. A borrowed parameter with RC=1 is **not** evidence of uniqueness;
 borrowed external lists are ineligible.
 
+The shared ownership interface also models managed block arguments beyond the
+current list extraction grammar. Mutually exclusive arms transfer their
+path-local ownership units to a fresh continuation identity after their
+residual live sets agree. Current list regions still return only immediate
+scalars from branches; managed ANF joins and escaping list boundaries are not
+enabled by this architecture change.
+
 `verifyFunctional` checks the closed region's incoming collection interface
 using representation-independent value contracts. `verifyBlockOwnership`
 supplies list operation contracts to the shared `VerifyOwnership.verifyClosed`, which checks

@@ -94,11 +94,16 @@ been converted to HIR.
 `OwnedIR` supplies the shared recursive step/block representation and explicit
 borrow/consume/produce contracts. Contracts retain operand multiplicity so
 duplicate consumes and duplicate definitions cannot disappear into sets.
+Its block-argument contract distinguishes unmanaged values from managed
+ownership identities. At a branch, each arm transfers its result identity, the
+verifier compares the residual path ownership, and the continuation receives
+one fresh identity.
 `VerifyOwnership.verifyClosed` checks scalar accesses, leaf uses, edge cleanup,
 fresh definitions, join agreement, and final ownership balance. Dialects must
 provide scalar-use accounting explicitly. List extraction proves its opaque
-scalars cannot reference canonical list identities, so its adapter reports no
-such uses; a future dialect cannot inherit that assumption by default.
+scalars cannot reference canonical list identities; its adapter still derives
+managed uses from explicit operand inputs, so a future dialect cannot inherit
+the extraction proof by default.
 
 The old `SemanticIR` container is removed: HIR owns control-flow data,
 `ValueLiveness` owns backward edge transfer, and `DestructionAnalysis` owns
@@ -107,11 +112,11 @@ in the list dialect. Region ownership accounting has one verifier, with list
 layout/type verification layered around it.
 
 Future whole-program work must extend this normalized value interface across
-all checked expressions, then add primitive effects/alias contracts, managed
-block arguments, function ownership
+all checked expressions, then add primitive effects/alias contracts, function ownership
 signatures, loops, and explicit borrowed/escaping boundaries. The closed-region
 verifier does not model RC credits, runtime uniqueness, or constructor reset
-tokens. ANF lifetime insertion remains authoritative outside these regions;
+tokens. General managed arguments still need lowering through ANF and RC
+insertion. ANF lifetime insertion remains authoritative outside these regions;
 moving generated printing before general ownership is a separate semantic
 migration. No empty future passes or compatibility IR conversions are added.
 
