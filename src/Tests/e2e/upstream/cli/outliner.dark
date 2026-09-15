@@ -406,4 +406,3 @@ module Wrapping =
 
   // Wrapping is measured in columns, so a wide glyph takes the two it occupies.
   (Darklang.Stdlib.Cli.Tui.Text.wrapAtWords "日本 語" 4) = [ "日本", "語" ]
-
