@@ -98,6 +98,32 @@ let private ownedBranch yes no : ListRegion.OwnedOperation =
     let condition: HIR.Operand = { Expression = AST.BoolLiteral true; Type = AST.TBool; Inputs = Map.empty }
     { Operation = HIR.Branch (result, condition, yes, no); Releases = [] }
 
+let private testPrimitiveContracts () =
+    let listValue id : HIR.Value = { Id = HIR.ValueId id; Type = AST.TList AST.TInt64 }
+    let scalarValue: HIR.Value = { Id = HIR.ValueId 2; Type = AST.TInt64 }
+    let input, output = listValue 0, listValue 1
+    let scalar: HIR.Operand = { Expression = AST.Int64Literal 0L; Type = AST.TInt64; Inputs = Map.empty }
+    let callback: HIR.Operand =
+        { Expression = AST.Closure ("mapCallback", [])
+          Type = AST.TFunction ([AST.TInt64], AST.TInt64)
+          Inputs = Map.empty }
+    let construct = ListRegion.primitiveContract (ListRegion.Construct (output, ListRegion.Literal [scalar]))
+    let transform = ListRegion.primitiveContract (ListRegion.Transform (output, input, ListRegion.Map callback))
+    let fold = ListRegion.primitiveContract (ListRegion.Fold (scalarValue, input, scalar, callback))
+    let alias (contract: HIR.PrimitiveContract) = contract.Outputs |> List.map (fun result -> result.Alias)
+    if alias construct <> [HIR.FreshManaged]
+       || construct.Effects <> Set.ofList [HIR.MayEvaluateOpaqueSource; HIR.MayAllocate] then
+        Error $"Unexpected construction contract: {construct}"
+    elif alias transform <> [HIR.MayReuseInput input]
+         || transform.Effects <>
+            Set.ofList [HIR.MayEvaluateOpaqueSource; HIR.MayAllocate; HIR.MayInvokeUserCode
+                        HIR.ReadsOwnedStorage; HIR.WritesOwnedStorage] then
+        Error $"Unexpected transformation contract: {transform}"
+    elif alias fold <> [HIR.NoManagedAlias]
+         || fold.Effects <> Set.ofList [HIR.MayEvaluateOpaqueSource; HIR.MayInvokeUserCode; HIR.ReadsOwnedStorage] then
+        Error $"Unexpected fold contract: {fold}"
+    else Ok ()
+
 let tests = [
     "Scope destruction rejects transitive callers and accepts safe recursive components", (fun () ->
         let contract local calls : DestructionAnalysis.FunctionScopeContract =
@@ -156,6 +182,7 @@ let tests = [
         match extractWithParameters (Map.ofList ["external", AST.TList AST.TInt64]) expression with
         | None -> Ok ()
         | Some _ -> Error "A scalar wrapper admitted a borrowed list parameter")
+    "List HIR declares primitive effects and alias provenance", testPrimitiveContracts
     "List HIR rejects managed elements", rejects (bind "xs" (AST.ListLiteral [AST.StringLiteral "a"]) (AST.Int64Literal 0L))
     "List HIR rejects callbacks capturing region lists", rejects (bind "xs" (values 3) (fold (call "Stdlib.List.map_i64_i64" [AST.Var "xs"; AST.Closure ("mapCallback", [AST.Var "xs"])])))
     "List HIR verifier rejects duplicate release", rejectsOwnership [construct [root; root]]

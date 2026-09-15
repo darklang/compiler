@@ -2,7 +2,7 @@
 
 module HIRVerificationTests
 
-type private TestBlock = TestBlock of HIR.Block<HIR.Operation<HIR.ValueContract, TestBlock>>
+type private TestBlock = TestBlock of HIR.Block<HIR.Operation<HIR.PrimitiveContract, TestBlock>>
 
 let private value id typ : HIR.Value = { Id = HIR.ValueId id; Type = typ }
 let private literal typ expression : HIR.Operand =
@@ -12,10 +12,16 @@ let private reference name input typ : HIR.Operand =
 let private block parameters operations result =
     TestBlock { Parameters = parameters; Operations = operations; Result = result }
 let private leaf inputs operands outputs =
-    let contract: HIR.ValueContract = { Inputs = inputs; Operands = operands; Outputs = outputs }
+    let outputs =
+        outputs
+        |> List.map (fun value -> ({ Value = value; Alias = HIR.NoManagedAlias }: HIR.OutputContract))
+    let contract: HIR.PrimitiveContract = { Inputs = inputs; Operands = operands; Outputs = outputs; Effects = Set.empty }
     HIR.Leaf contract
+let private contractedWithOperands inputs operands outputs effects =
+    HIR.Leaf ({ Inputs = inputs; Operands = operands; Outputs = outputs; Effects = Set.ofList effects }: HIR.PrimitiveContract)
+let private contracted inputs outputs effects = contractedWithOperands inputs [] outputs effects
 let private verify root =
-    let dialect: VerifyHIR.Dialect<HIR.ValueContract, TestBlock> = {
+    let dialect: VerifyHIR.Dialect<HIR.PrimitiveContract, TestBlock> = {
         Body = fun (TestBlock body) -> body
         Leaf = id
     }
@@ -30,6 +36,8 @@ let tests = [
     let condition = literal AST.TBool (AST.BoolLiteral true)
     let branchResult = value 2 AST.TInt64
     let branchLocal = value 3 AST.TInt64
+    let managedInput = value 5 (AST.TList AST.TInt64)
+    let managedResult = value 6 (AST.TList AST.TInt64)
 
     "HIR accepts normalized parameter and operand identities", check (Ok ())
         (block (Map.ofList ["input", parameter])
@@ -49,4 +57,31 @@ let tests = [
                 let boolean = value 4 AST.TBool
                 block Map.empty [leaf [] [] [boolean]] boolean)]
             branchResult)
+    "HIR accepts a result that may reuse a typed input", check (Ok ())
+        (block (Map.ofList ["input", managedInput])
+            [contracted [managedInput]
+                [{ Value = managedResult; Alias = HIR.MayReuseInput managedInput }]
+                [HIR.ReadsOwnedStorage; HIR.WritesOwnedStorage]]
+            managedResult)
+    "HIR rejects reuse provenance outside primitive inputs", check (Error (VerifyHIR.InvalidAliasSource (managedResult.Id, managedInput.Id)))
+        (block (Map.ofList ["input", managedInput])
+            [contracted [] [{ Value = managedResult; Alias = HIR.MayReuseInput managedInput }] []]
+            managedResult)
+    "HIR rejects reuse provenance with incompatible types", check (Error (VerifyHIR.IncompatibleAliasTypes (result.Id, managedInput.Id)))
+        (block (Map.ofList ["input", managedInput])
+            [contracted [managedInput] [{ Value = result; Alias = HIR.MayReuseInput managedInput }] []]
+            result)
+    "HIR rejects duplicate may-alias candidates", check (Error (VerifyHIR.DuplicateAliasSource (managedResult.Id, managedInput.Id)))
+        (block (Map.ofList ["input", managedInput])
+            [contracted [managedInput]
+                [{ Value = managedResult; Alias = HIR.MayAliasInputs (managedInput, [managedInput]) }]
+                []]
+            managedResult)
+    "HIR rejects unaccounted opaque operand effects", check (Error VerifyHIR.UnaccountedOpaqueEffects)
+        (block Map.empty
+            [contractedWithOperands []
+                [literal AST.TInt64 (AST.Int64Literal 1L)]
+                [{ Value = result; Alias = HIR.NoManagedAlias }]
+                []]
+            result)
 ]

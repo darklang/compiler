@@ -87,7 +87,10 @@ branches independently of a leaf operation dialect. `HIR.Block` retains a
 single sequence after each branch; the list dialect no longer defines its own
 control-flow cases. Operands carry checked AST evaluation payloads together
 with explicit maps from lexical inputs to value identities. `VerifyHIR` checks
-the identity and type interface separately from ownership. This is a used
+the identity, type, and alias interface separately from ownership. Leaf
+primitive contracts also record allocation, failure, callback, and owned-storage
+effects. List liveness derives managed definitions from the same output alias
+contracts used by verification, rather than a parallel operation table. This is a used
 structured-region interface, not a claim that arbitrary source programs have
 been converted to HIR.
 
@@ -112,8 +115,9 @@ in the list dialect. Region ownership accounting has one verifier, with list
 layout/type verification layered around it.
 
 Future whole-program work must extend this normalized value interface across
-all checked expressions, then add primitive effects/alias contracts, function ownership
-signatures, loops, and explicit borrowed/escaping boundaries. The closed-region
+all checked expressions, preserving conservative contracts for opaque source
+evaluation, then add function ownership signatures, loops, and explicit
+borrowed/escaping boundaries. The closed-region
 verifier does not model RC credits, runtime uniqueness, or constructor reset
 tokens. General managed arguments still need lowering through ANF and RC
 insertion. ANF lifetime insertion remains authoritative outside these regions;

@@ -65,6 +65,13 @@ are used by the list dialect, not yet a whole-program semantic IR
 or a primitive effect registry. Opaque scalar expressions and callbacks retain
 their original evaluation order; their types are not evidence of purity.
 
+Each list primitive has one HIR contract. Construction produces fresh managed
+storage and may allocate; map/reverse may reuse their list input and read/write
+owned storage; fold produces an unmanaged scalar. Callback-bearing operations
+declare user-code invocation. The verifier rejects reuse or may-alias sources
+that are not typed primitive inputs, and list liveness consumes these same
+contracts. Opaque operand evaluation remains ordered and conservative.
+
 The list stages share a leaf `Operation<'transform>` family inside the common
 HIR control flow. Only owned transforms carry
 an ownership decision. Collection identities are monotonic and separate from

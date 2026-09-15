@@ -16,8 +16,10 @@ ANF → MIR → LIR → target ISA → Binary
   physical register names that each backend maps to its target ISA
 
 Before ANF, `ir/hir/HIR.fs` supplies typed value identities and structured
-control flow shared by semantic leaf dialects. `passes/hir/VerifyHIR.fs`
-independently checks definitions, uses, types, and branch results.
+control flow shared by semantic leaf dialects. Primitive contracts expose
+ordered inputs and operands, execution effects, and result alias provenance.
+`passes/hir/VerifyHIR.fs` independently checks definitions, uses, types,
+branch results, and alias sources.
 `ir/owned/OwnedIR.fs` supplies ownership-bearing blocks, explicit
 borrow/consume/produce contracts, and managed block arguments, checked independently by
 `passes/ownership/VerifyOwnership.fs`. Representation-independent liveness and
@@ -29,6 +31,15 @@ is still limited to extracted closed regions; this is not yet a whole-program
 semantic HIR or a general RC solver. See
 [compiler-selected list arrays](runtime/list-array-reuse.md) for its boundary
 and the remaining general ownership work.
+
+Primitive effect sets distinguish conservative opaque-source evaluation,
+allocation, failure, user-code invocation, and reads or writes of
+compiler-owned storage. Empty sets are effect-free.
+Alias results distinguish unmanaged values, fresh managed storage, possible
+reuse of one input, and conservative aliasing among named inputs. Reuse is a
+capability for later storage/ownership selection, never a source-visible
+mutation guarantee. Opaque AST operands retain source order and are not
+silently treated as effect-free.
 
 ## ANF shared continuations
 
