@@ -15,9 +15,9 @@ usage() {
   cat <<EOF
 Usage: ./mergetrain-status [OPTIONS]
 
-Continuously display merge-train health, active jobs, the latest integration
-merge, and recent benchmarks/RESULTS.md changes. Interactive terminals are
-redrawn in place as complete frames.
+Continuously display merge-train health, active jobs, the five most recent
+integration merges, the benchmark ratio, and recent benchmarks/RESULTS.md
+changes. Interactive terminals are redrawn in place as complete frames.
 
 Options:
   --repo PATH          Repository whose merge-train status is displayed.

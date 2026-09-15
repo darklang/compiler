@@ -4,10 +4,21 @@ import os
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+from scripts.render_mergetrain_status import human_age
 
 
 class MergetrainStatusTests(unittest.TestCase):
+    def test_human_age_uses_compact_units(self) -> None:
+        now = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
+
+        self.assertEqual(human_age(now - timedelta(seconds=12), now=now), "12s ago")
+        self.assertEqual(human_age(now - timedelta(minutes=5), now=now), "5m ago")
+        self.assertEqual(human_age(now - timedelta(hours=2), now=now), "2h ago")
+        self.assertEqual(human_age(now - timedelta(days=3), now=now), "3d ago")
+
     def test_shows_active_train_recent_merge_and_benchmark_changes(self) -> None:
         source_root = Path(__file__).resolve().parent.parent
 
@@ -28,7 +39,7 @@ class MergetrainStatusTests(unittest.TestCase):
                 ["git", "config", "user.name", "Status Test"], cwd=repo, check=True
             )
             (repo / "benchmarks" / "RESULTS.md").write_text(
-                "ratio: 3.0x\n", encoding="utf-8"
+                "| Benchmark | Dark (3.0x) | Rust |\n", encoding="utf-8"
             )
             subprocess.run(["git", "add", "."], cwd=repo, check=True)
             subprocess.run(
@@ -37,20 +48,35 @@ class MergetrainStatusTests(unittest.TestCase):
                 check=True,
             )
 
-            subprocess.run(["git", "switch", "-q", "-c", "feature"], cwd=repo, check=True)
-            (repo / "feature.txt").write_text("ready\n", encoding="utf-8")
-            subprocess.run(["git", "add", "feature.txt"], cwd=repo, check=True)
-            subprocess.run(
-                ["git", "commit", "-q", "-m", "Add feature"], cwd=repo, check=True
-            )
-            subprocess.run(["git", "switch", "-q", "main"], cwd=repo, check=True)
-            subprocess.run(
-                ["git", "merge", "-q", "--no-ff", "feature", "-m", "Merge feature train"],
-                cwd=repo,
-                check=True,
-            )
+            for feature_number in range(1, 7):
+                branch = f"feature-{feature_number}"
+                feature_path = repo / f"{branch}.txt"
+                subprocess.run(
+                    ["git", "switch", "-q", "-c", branch], cwd=repo, check=True
+                )
+                feature_path.write_text("ready\n", encoding="utf-8")
+                subprocess.run(["git", "add", feature_path.name], cwd=repo, check=True)
+                subprocess.run(
+                    ["git", "commit", "-q", "-m", f"Add feature {feature_number}"],
+                    cwd=repo,
+                    check=True,
+                )
+                subprocess.run(["git", "switch", "-q", "main"], cwd=repo, check=True)
+                subprocess.run(
+                    [
+                        "git",
+                        "merge",
+                        "-q",
+                        "--no-ff",
+                        branch,
+                        "-m",
+                        f"Merge feature train {feature_number}",
+                    ],
+                    cwd=repo,
+                    check=True,
+                )
             (repo / "benchmarks" / "RESULTS.md").write_text(
-                "ratio: 2.8x\ndetails: improved\n", encoding="utf-8"
+                "| Benchmark | Dark (2.8x) | Rust |\n", encoding="utf-8"
             )
             subprocess.run(["git", "add", "benchmarks/RESULTS.md"], cwd=repo, check=True)
             subprocess.run(
@@ -146,14 +172,17 @@ print(json.dumps({
             self.assertLess(attention, running)
             self.assertLess(running, waiting)
             self.assertNotIn("Already deployed", completed.stdout)
+            self.assertIn("benchmark ratio: 2.8x", completed.stdout)
             self.assertRegex(
                 completed.stdout,
-                r"recent merge:\n  [0-9a-f]{7,12} \d{4}-\d{2}-\d{2}T\S+ Merge feature train",
+                r"recent merges:\n  [0-9a-f]{7,12} \d+s ago Merge feature train 6",
             )
+            self.assertEqual(completed.stdout.count("Merge feature train"), 5)
+            self.assertNotIn("Merge feature train 1", completed.stdout)
             self.assertRegex(
                 completed.stdout,
                 r"recent benchmarks/RESULTS.md changes:\n"
-                r"  [0-9a-f]{7,12} \d{4}-\d{2}-\d{2}T\S+ Record benchmark improvement \(\+2/-1\)",
+                r"  [0-9a-f]{7,12} \d+s ago Record benchmark improvement \(\+1/-1\)",
             )
 
             colored = subprocess.run(

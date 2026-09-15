@@ -7,6 +7,7 @@ import argparse
 import json
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -35,14 +36,37 @@ def state_style(state: str) -> str:
     }.get(state, RED)
 
 
-def history_line(line: str, color: bool) -> str:
+def human_age(timestamp: str | datetime, *, now: datetime | None = None) -> str:
+    instant = datetime.fromisoformat(timestamp) if isinstance(timestamp, str) else timestamp
+    reference = now or datetime.now(timezone.utc)
+    seconds = max(0, int((reference - instant).total_seconds()))
+    units = (
+        (365 * 24 * 60 * 60, "y"),
+        (30 * 24 * 60 * 60, "mo"),
+        (7 * 24 * 60 * 60, "w"),
+        (24 * 60 * 60, "d"),
+        (60 * 60, "h"),
+        (60, "m"),
+    )
+    for duration, suffix in units:
+        if seconds >= duration:
+            return f"{seconds // duration}{suffix} ago"
+    return f"{seconds}s ago"
+
+
+def history_line(
+    line: str,
+    color: bool,
+    *,
+    now: datetime,
+) -> str:
     parts = line.split(" ", 2)
     if len(parts) < 3:
         return line
     commit, timestamp, description = parts
     return (
         f"{styled(commit, CYAN, color)} "
-        f"{styled(timestamp, DIM, color)} {description}"
+        f"{styled(human_age(timestamp, now=now), DIM, color)} {description}"
     )
 
 
@@ -64,6 +88,17 @@ def active_jobs(payload: dict[str, Any]) -> list[dict[str, Any]]:
         if job.get("state") in {"waiting", "running", "ready", "attention"}
     }
     return [by_id[job_id] for job_id in sorted(by_id)]
+
+
+def benchmark_ratio(repo: Path) -> str | None:
+    header_prefix = "| Benchmark | Dark ("
+    results_path = repo / "benchmarks" / "RESULTS.md"
+    if not results_path.is_file():
+        return None
+    for line in results_path.read_text(encoding="utf-8").splitlines():
+        if line.startswith(header_prefix) and ") |" in line:
+            return line[len(header_prefix) :].split(") |", 1)[0]
+    return None
 
 
 def benchmark_changes(repo: Path, limit: int = 3) -> list[str]:
@@ -133,26 +168,29 @@ def render(payload: dict[str, Any], repo: Path, *, color: bool) -> str:
     else:
         lines.append("  (empty)")
 
-    recent_merge = git(
+    now = datetime.now(timezone.utc)
+    recent_merges = git(
         repo,
         "log",
-        "-1",
+        "-5",
         "--first-parent",
         "--merges",
         "--format=%h %cI %s",
         "--",
-    )
+    ).splitlines()
+    lines.append(styled("recent merges:", BOLD, color))
     lines.extend(
-        [
-            styled("recent merge:", BOLD, color),
-            f"  {history_line(recent_merge, color) if recent_merge else '(none)'}",
-        ]
+        [f"  {history_line(merge, color, now=now)}" for merge in recent_merges]
+        or ["  (none)"]
     )
 
     changes = benchmark_changes(repo)
+    ratio = benchmark_ratio(repo)
+    lines.append(f"benchmark ratio: {styled(ratio or 'unavailable', CYAN, color)}")
     lines.append(styled("recent benchmarks/RESULTS.md changes:", BOLD, color))
     lines.extend(
-        [f"  {history_line(change, color)}" for change in changes] or ["  (none)"]
+        [f"  {history_line(change, color, now=now)}" for change in changes]
+        or ["  (none)"]
     )
     return "\n".join(lines)
 
