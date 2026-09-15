@@ -3,7 +3,8 @@
 
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+repo_root="$script_root"
 interval_seconds=2
 clear_screen=true
 run_once=false
@@ -13,8 +14,9 @@ usage() {
   cat <<EOF
 Usage: ./mergetrain-status [OPTIONS]
 
-Continuously display human-readable merge-train status. Interactive terminals
-are redrawn in place as complete frames.
+Continuously display merge-train health, active jobs, the latest integration
+merge, and recent benchmarks/RESULTS.md changes. Interactive terminals are
+redrawn in place as complete frames.
 
 Options:
   --repo PATH          Repository whose merge-train status is displayed.
@@ -64,10 +66,12 @@ if [[ ! "$interval_seconds" =~ ^[1-9][0-9]*$ ]]; then
   echo "--interval must be a positive integer" >&2
   exit 2
 fi
-if ! command -v mergetrain >/dev/null 2>&1; then
-  echo "Required command not found: mergetrain" >&2
-  exit 1
-fi
+for required_command in git mergetrain python3; do
+  if ! command -v "$required_command" >/dev/null 2>&1; then
+    echo "Required command not found: $required_command" >&2
+    exit 1
+  fi
+done
 
 repo_root="$(cd "$repo_root" && pwd -P)"
 if [[ "$clear_screen" == true && -t 1 ]]; then
@@ -78,7 +82,10 @@ fi
 
 while true; do
   status_output=""
-  if ! status_output="$(mergetrain --repo "$repo_root" status)"; then
+  if ! status_output="$(
+    mergetrain --repo "$repo_root" status --json --limit 1000 \
+      | python3 "$script_root/scripts/render_mergetrain_status.py" --repo "$repo_root"
+  )"; then
     status_output="Status refresh failed; retrying in $interval_seconds second(s)"
   fi
   if [[ "$interactive_redraw" == true ]]; then
