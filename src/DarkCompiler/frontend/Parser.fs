@@ -2541,7 +2541,10 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
         let publicKey name = if name = "___" then "" else name
         match toks with
         | TRBrace :: rest -> Ok (DictLiteral (TVar "dictValue", List.rev acc), rest)
-        | TIdent keyName :: TEquals :: rest ->
+        // Canonical source uses identifier keys with `=`, while imported
+        // interpreter tests retain string keys with `:`.
+        | TIdent keyName :: TEquals :: rest
+        | TStringLit keyName :: TColon :: rest ->
             parseExpr rest
             |> Result.bind (fun (value, remaining) ->
                 let entry = (publicKey keyName, value)
@@ -2549,6 +2552,8 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                 | (TComma | TSemicolon) :: rest' ->
                     parseDictLiteralFields rest' (entry :: acc)
                 | TIdent _ :: TEquals :: _ ->
+                    parseDictLiteralFields remaining (entry :: acc)
+                | TStringLit _ :: TColon :: _ ->
                     parseDictLiteralFields remaining (entry :: acc)
                 | TRBrace :: rest' -> Ok (DictLiteral (TVar "dictValue", List.rev (entry :: acc)), rest')
                 | _ -> Error "Expected ',' or '}' after dictionary entry value")

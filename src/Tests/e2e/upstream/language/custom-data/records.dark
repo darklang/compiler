@@ -28,18 +28,23 @@ module InvalidCols =
 
   Cols2 { col1 = 2L; ___ = 3L } = error="Empty key in record creation"
 
+  #compileerror="Missing fields in record literal: col2"
   Cols2 { col1 = 2L } = error="Missing field `col2`"
 
+  #compileerror="Missing fields in record literal: col2"
   Cols2 { col1 = 2L; other = 3L } = error="No field named `other`"
 
+  #compileerror="Unknown fields in record literal: col3"
   Cols2 { col1 = 2L; col2 = 3L; col3 = 4L } = error="No field named `col3`"
 
   Cols1 { col1 = "" } = error="Failed to create record. Expected Int64 for field `col1`, but got \"\" (a String)"
 
 
 module InvalidType =
+  #compileerror="Unresolved type name: MyNonExistantType"
   (MyNonExistantType { col1 = 2L }) = error="MyNonExistantType not found"
 
+  #compileerror="Unknown record type: AnEnum"
   AnEnum { col1 = 2L } = error="Expected a record, but AnEnum is not one"
 
 module Polymorphism =
@@ -86,11 +91,14 @@ module Update =
     (RecordForUpdateMultiple { x = 42L; y = 11L; z = 3L })
 
   module Invalid =
+    #compileerror="Unknown fields in record update: p"
     (let myRec = RecordForUpdateMultiple { x = 4L; y = 1L; z = 0L }
      { myRec with z = 3L; x = 42L; y = 11L; p = 10L }) = error="No field named `p`"
 
+    #compileerror="Unknown fields in record update: other"
     (let myRec = RecordForUpdate { x = 4L; y = 1L }
      { myRec with other = 2L }) = error="No field named `other`"
 
+    #compileerror="Type mismatch in string literal: expected Int64, got String"
     (let myRec = RecordForUpdate { x = 4L; y = 1L }
      { myRec with y = "2" }) = error="Failed to create updated record. Expected Int64 for field `y`, but got \"2\" (a String)"
