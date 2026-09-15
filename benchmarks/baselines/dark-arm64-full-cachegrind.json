@@ -10,127 +10,127 @@
     "measurement_policy": "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs"
   },
   "contract_sha256": "a3f0951d008a808f6dd71f5c8991d263f4eb1219618f6c801c33329c19cd5081",
-  "generated_at": "2026-09-15T13:54:57+00:00",
+  "generated_at": "2026-09-15T18:11:48+00:00",
   "compiler": {
-    "commit": "51f32b38e5fa215fc80b8ba24026820929990b18",
-    "subject": "Remove redundant explicit generic applications"
+    "commit": "13ed01b4b84e5fbcbe71f0de80bafbd12d905bc5",
+    "subject": "Align compiler documentation with stage ownership"
   },
   "benchmarks": [
     {
       "name": "ackermann",
-      "instructions": 145114326
+      "instructions": 145114137
     },
     {
       "name": "binary_trees",
-      "instructions": 11053279
+      "instructions": 11053078
     },
     {
       "name": "collatz",
-      "instructions": 70194528
+      "instructions": 70194399
     },
     {
       "name": "edigits",
-      "instructions": 52884224
+      "instructions": 51754907
     },
     {
       "name": "factorial",
-      "instructions": 63745
+      "instructions": 63466
     },
     {
       "name": "fannkuch",
-      "instructions": 239915558
+      "instructions": 233405898
     },
     {
       "name": "fasta",
-      "instructions": 157197960
+      "instructions": 154617365
     },
     {
       "name": "fft",
-      "instructions": 413126892
+      "instructions": 407130735
     },
     {
       "name": "fib",
-      "instructions": 8268703
+      "instructions": 8268586
     },
     {
       "name": "huffman",
-      "instructions": 404402417
+      "instructions": 400267806
     },
     {
       "name": "leibniz",
-      "instructions": 17006924
+      "instructions": 17006789
     },
     {
       "name": "mandelbrot",
-      "instructions": 15227643
+      "instructions": 15227448
     },
     {
       "name": "matmul",
-      "instructions": 43156675
+      "instructions": 42560590
     },
     {
       "name": "merkletrees",
-      "instructions": 3877645
+      "instructions": 3877426
     },
     {
       "name": "myers_diff",
-      "instructions": 2478626395
+      "instructions": 2400143043
     },
     {
       "name": "nbody",
-      "instructions": 14537406
+      "instructions": 14537286
     },
     {
       "name": "nqueen",
-      "instructions": 7420529
+      "instructions": 7420424
     },
     {
       "name": "nsieve",
-      "instructions": 131518105
+      "instructions": 131101393
     },
     {
       "name": "pisum",
-      "instructions": 812677
+      "instructions": 812434
     },
     {
       "name": "primes",
-      "instructions": 1468580
+      "instructions": 1468475
     },
     {
       "name": "quicksort",
-      "instructions": 192723619
+      "instructions": 188808247
     },
     {
       "name": "raytracer",
-      "instructions": 49546721
+      "instructions": 49162502
     },
     {
       "name": "regex_lite",
-      "instructions": 68882287
+      "instructions": 67502284
     },
     {
       "name": "spectral_norm",
-      "instructions": 226841706
+      "instructions": 221902869
     },
     {
       "name": "string_equality",
-      "instructions": 1220167
+      "instructions": 1219843
     },
     {
       "name": "sum_to_n",
-      "instructions": 62220
+      "instructions": 62007
     },
     {
       "name": "tak",
-      "instructions": 48017359
+      "instructions": 48017020
     },
     {
       "name": "tinytemplate",
-      "instructions": 8831495075
+      "instructions": 8606428391
     },
     {
       "name": "warden",
-      "instructions": 45762039
+      "instructions": 44489020
     }
   ]
 }
