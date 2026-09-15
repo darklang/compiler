@@ -186,6 +186,11 @@ let private freeListBase = X86_64.R15
 /// Size of free list heads area (32 size classes × 8 bytes = 256 bytes)
 let private freeListSize = 256
 
+/// The process table is raw runtime state, not a managed allocation. Keeping
+/// it at a fixed address avoids aliasing a free-list head in batched programs.
+let private processTableOffset = freeListSize
+let private processTableSize = 4096
+
 /// Max payload size class for free list reuse (freeListSize - 8)
 let private maxFreeListPayload = freeListSize - 8
 
@@ -458,7 +463,7 @@ let private genHeapInit () : X86_64.Instr list =
     @ genExitSyscall
     @ [X86_64.Label okLabel
        X86_64.MOV_reg (freeListBase, X86_64.RAX)
-       X86_64.LEA (heapPtr, freeListBase, int32 freeListSize)]
+       X86_64.LEA (heapPtr, freeListBase, int32 (freeListSize + processTableSize))]
 
 /// Generate PrintBool + exit(0)
 let private genPrintBoolAndExit (srcReg: X86_64.Reg) : X86_64.Instr list =
@@ -760,6 +765,927 @@ let private generateCliGetEnvHelper (enableLeakCheck: bool) : X86_64.Instr list 
 /// Execute a managed command through /bin/bash and return NativeOutput. The
 /// helper drains stdout and stderr concurrently so a child cannot block on a
 /// full pipe. R14 remains the managed heap pointer across the native syscalls.
+/// Start a shell command and retain its pid, descriptors, and raw output in a
+/// fixed process table. The otherwise-unused first free-list slot owns the
+/// table pointer without consuming an allocatable register.
+let private generateLinuxCliSpawnProcessHelper () : X86_64.Instr list =
+    let syscall number = loadImm64 X86_64.RAX number @ [X86_64.SYSCALL]
+    let loadFd stackOffset highHalf =
+        [X86_64.MOV_load (X86_64.RDI, X86_64.RSP, stackOffset)]
+        @ (if highHalf then [X86_64.SHR_imm (X86_64.RDI, 32)] else [X86_64.MOV_reg32 (X86_64.RDI, X86_64.RDI)])
+    let closeFd stackOffset highHalf = loadFd stackOffset highHalf @ syscall 3L
+    let setNonblocking stackOffset =
+        loadFd stackOffset false
+        @ loadImm64 X86_64.RSI 4L
+        @ loadImm64 X86_64.RDX 2048L
+        @ syscall 72L
+    [ X86_64.Label "__dark_cli_spawn_process"
+      X86_64.PUSH X86_64.RBP
+      X86_64.MOV_reg (X86_64.RBP, X86_64.RSP)
+      X86_64.PUSH X86_64.RBX
+      X86_64.PUSH X86_64.R12
+      X86_64.PUSH X86_64.R13
+      X86_64.PUSH X86_64.RDI
+      X86_64.PUSH X86_64.RSI
+      X86_64.PUSH X86_64.RCX
+      X86_64.PUSH X86_64.R8
+      X86_64.PUSH X86_64.R9
+      X86_64.PUSH X86_64.R10
+      X86_64.PUSH X86_64.RDX
+      X86_64.SUB_imm (X86_64.RSP, 80)
+      X86_64.LEA (X86_64.R13, freeListBase, int32 processTableOffset)
+      X86_64.Label "__dark_spawn_table_ready"
+      // Copy the managed command to a native NUL-terminated buffer.
+      X86_64.MOV_reg (X86_64.RBX, heapPtr)
+      X86_64.MOV_load (X86_64.R10, X86_64.RDI, 8)
+      X86_64.LEA (X86_64.RSI, X86_64.RDI, 16)
+      X86_64.XOR_reg (X86_64.RCX, X86_64.RCX)
+      X86_64.Label "__dark_spawn_command_copy"
+      X86_64.CMP_reg (X86_64.RCX, X86_64.R10)
+      X86_64.Jcc (X86_64.GE, "__dark_spawn_command_copied")
+      X86_64.MOV_load_byte (X86_64.RAX, X86_64.RSI, 0)
+      X86_64.MOV_reg (X86_64.R11, X86_64.RBX)
+      X86_64.ADD_reg (X86_64.R11, X86_64.RCX)
+      X86_64.MOV_store_byte (X86_64.R11, 0, X86_64.RAX)
+      X86_64.ADD_imm (X86_64.RSI, 1)
+      X86_64.ADD_imm (X86_64.RCX, 1)
+      X86_64.JMP "__dark_spawn_command_copy"
+      X86_64.Label "__dark_spawn_command_copied"
+      X86_64.MOV_reg (X86_64.R11, X86_64.RBX)
+      X86_64.ADD_reg (X86_64.R11, X86_64.R10)
+      X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+      X86_64.MOV_store_byte (X86_64.R11, 0, X86_64.RAX)
+      X86_64.ADD_imm (X86_64.R10, 8)
+      X86_64.AND_imm (X86_64.R10, -8)
+      X86_64.ADD_reg (heapPtr, X86_64.R10)
+      // Recover inherited envp from the root frame.
+      X86_64.MOV_reg (X86_64.RAX, X86_64.RBP)
+      X86_64.Label "__dark_spawn_find_root"
+      X86_64.MOV_load (X86_64.RCX, X86_64.RAX, 0)
+      X86_64.CMP_imm (X86_64.RCX, 0)
+      X86_64.Jcc (X86_64.EQ, "__dark_spawn_root_found")
+      X86_64.MOV_reg (X86_64.RAX, X86_64.RCX)
+      X86_64.JMP "__dark_spawn_find_root"
+      X86_64.Label "__dark_spawn_root_found"
+      X86_64.MOV_load (X86_64.RCX, X86_64.RAX, 8)
+      X86_64.SHL_imm (X86_64.RCX, 3)
+      X86_64.ADD_reg (X86_64.RAX, X86_64.RCX)
+      X86_64.ADD_imm (X86_64.RAX, 24)
+      X86_64.MOV_reg (X86_64.R12, X86_64.RAX)
+      X86_64.LEA (X86_64.RDI, X86_64.RSP, 0)
+      X86_64.XOR_reg (X86_64.RSI, X86_64.RSI) ]
+    @ syscall 293L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.LT, "__dark_spawn_failed")
+        X86_64.LEA (X86_64.RDI, X86_64.RSP, 8)
+        X86_64.XOR_reg (X86_64.RSI, X86_64.RSI) ]
+    @ syscall 293L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.LT, "__dark_spawn_failed_close_stdin")
+        X86_64.LEA (X86_64.RDI, X86_64.RSP, 16)
+        X86_64.XOR_reg (X86_64.RSI, X86_64.RSI) ]
+    @ syscall 293L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.LT, "__dark_spawn_failed_close_output") ]
+    @ syscall 57L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.EQ, "__dark_spawn_child")
+        X86_64.Jcc (X86_64.LT, "__dark_spawn_failed_close_all")
+        X86_64.MOV_store (X86_64.RSP, 32, X86_64.RAX) ]
+    @ closeFd 0 false @ closeFd 8 true @ closeFd 16 true
+    @ setNonblocking 8 @ setNonblocking 16
+    @ [ X86_64.MOV_imm32 (X86_64.RAX, 1)
+        X86_64.Label "__dark_spawn_find_slot"
+        X86_64.CMP_imm (X86_64.RAX, 63)
+        X86_64.Jcc (X86_64.GT, "__dark_spawn_no_slot")
+        X86_64.MOV_reg (X86_64.R10, X86_64.RAX)
+        X86_64.SHL_imm (X86_64.R10, 6)
+        X86_64.ADD_reg (X86_64.R10, X86_64.R13)
+        X86_64.MOV_load (X86_64.R11, X86_64.R10, 0)
+        X86_64.CMP_imm (X86_64.R11, 0)
+        X86_64.Jcc (X86_64.EQ, "__dark_spawn_slot_found")
+        X86_64.ADD_imm (X86_64.RAX, 1)
+        X86_64.JMP "__dark_spawn_find_slot"
+        X86_64.Label "__dark_spawn_slot_found"
+        X86_64.MOV_store (X86_64.RSP, 72, X86_64.RAX)
+        X86_64.MOV_imm32 (X86_64.R11, 1)
+        X86_64.MOV_store (X86_64.R10, 0, X86_64.R11)
+        X86_64.MOV_load (X86_64.R11, X86_64.RSP, 32)
+        X86_64.MOV_store (X86_64.R10, 8, X86_64.R11)
+        X86_64.MOV_load (X86_64.R11, X86_64.RSP, 0)
+        X86_64.SHR_imm (X86_64.R11, 32)
+        X86_64.MOV_store (X86_64.R10, 16, X86_64.R11)
+        X86_64.MOV_load (X86_64.R11, X86_64.RSP, 8)
+        X86_64.MOV_reg32 (X86_64.R11, X86_64.R11)
+        X86_64.MOV_store (X86_64.R10, 24, X86_64.R11)
+        X86_64.MOV_load (X86_64.R11, X86_64.RSP, 16)
+        X86_64.MOV_reg32 (X86_64.R11, X86_64.R11)
+        X86_64.MOV_store (X86_64.R10, 32, X86_64.R11)
+        X86_64.MOV_reg (X86_64.R11, heapPtr)
+        X86_64.MOV_store (X86_64.R10, 48, X86_64.R11)
+        X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+        X86_64.MOV_store (X86_64.R11, 0, X86_64.RAX) ]
+    @ loadImm64 X86_64.R11 1048584L
+    @ [ X86_64.ADD_reg (heapPtr, X86_64.R11)
+        X86_64.MOV_reg (X86_64.R11, heapPtr)
+        X86_64.MOV_store (X86_64.R10, 56, X86_64.R11)
+        X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+        X86_64.MOV_store (X86_64.R11, 0, X86_64.RAX) ]
+    @ loadImm64 X86_64.R11 1048584L
+    @ [ X86_64.ADD_reg (heapPtr, X86_64.R11)
+        X86_64.MOV_load (X86_64.RAX, X86_64.RSP, 72)
+        X86_64.JMP "__dark_spawn_return"
+        X86_64.Label "__dark_spawn_no_slot"
+        X86_64.MOV_load (X86_64.RDI, X86_64.RSP, 32)
+        X86_64.MOV_imm32 (X86_64.RSI, 9) ]
+    @ syscall 62L
+    @ loadImm64 X86_64.RAX -1L
+    @ [ X86_64.JMP "__dark_spawn_return"
+        X86_64.Label "__dark_spawn_failed_close_all" ]
+    @ closeFd 16 false @ closeFd 16 true
+    @ [ X86_64.Label "__dark_spawn_failed_close_output" ]
+    @ closeFd 8 false @ closeFd 8 true
+    @ [ X86_64.Label "__dark_spawn_failed_close_stdin" ]
+    @ closeFd 0 false @ closeFd 0 true
+    @ [ X86_64.Label "__dark_spawn_failed" ]
+    @ loadImm64 X86_64.RAX -1L
+    @ [ X86_64.Label "__dark_spawn_return"
+        X86_64.ADD_imm (X86_64.RSP, 80)
+        X86_64.POP X86_64.RDX
+        X86_64.POP X86_64.R10
+        X86_64.POP X86_64.R9
+        X86_64.POP X86_64.R8
+        X86_64.POP X86_64.RCX
+        X86_64.POP X86_64.RSI
+        X86_64.POP X86_64.RDI
+        X86_64.POP X86_64.R13
+        X86_64.POP X86_64.R12
+        X86_64.POP X86_64.RBX
+        X86_64.POP X86_64.RBP
+        X86_64.RET
+        X86_64.Label "__dark_spawn_child" ]
+    @ loadFd 0 false @ loadImm64 X86_64.RSI 0L @ syscall 33L
+    @ loadFd 8 true @ loadImm64 X86_64.RSI 1L @ syscall 33L
+    @ loadFd 16 true @ loadImm64 X86_64.RSI 2L @ syscall 33L
+    @ closeFd 0 false @ closeFd 0 true @ closeFd 8 false @ closeFd 8 true @ closeFd 16 false @ closeFd 16 true
+    @ emitStringLiteral X86_64.RDI "/bin/bash"
+    @ emitStringLiteral X86_64.R11 "-c"
+    @ [ X86_64.ADD_imm (X86_64.RDI, 16)
+        X86_64.ADD_imm (X86_64.R11, 16)
+        X86_64.MOV_store (X86_64.RSP, 40, X86_64.RDI)
+        X86_64.MOV_store (X86_64.RSP, 48, X86_64.R11)
+        X86_64.MOV_store (X86_64.RSP, 56, X86_64.RBX)
+        X86_64.XOR_reg (X86_64.R11, X86_64.R11)
+        X86_64.MOV_store (X86_64.RSP, 64, X86_64.R11)
+        X86_64.LEA (X86_64.RSI, X86_64.RSP, 40)
+        X86_64.MOV_reg (X86_64.RDX, X86_64.R12) ]
+    @ syscall 59L
+    @ loadImm64 X86_64.RDI 127L
+    @ syscall 60L
+
+/// Communicate with process-table children and collect their final output.
+let private generateLinuxCliProcessLifecycleHelpers (enableLeakCheck: bool) : X86_64.Instr list =
+    let syscall number = loadImm64 X86_64.RAX number @ [X86_64.SYSCALL]
+    let leakInc count =
+        if enableLeakCheck then
+            [ X86_64.LEA_rip (X86_64.R11, "_leak_count")
+              X86_64.MOV_load (X86_64.R10, X86_64.R11, 0)
+              X86_64.ADD_imm (X86_64.R10, count)
+              X86_64.MOV_store (X86_64.R11, 0, X86_64.R10) ]
+        else []
+    let epilogue =
+        [ X86_64.ADD_imm (X86_64.RSP, 80)
+          X86_64.POP X86_64.RDX; X86_64.POP X86_64.R10; X86_64.POP X86_64.R9
+          X86_64.POP X86_64.R8; X86_64.POP X86_64.RCX; X86_64.POP X86_64.RSI
+          X86_64.POP X86_64.RDI; X86_64.POP X86_64.R13; X86_64.POP X86_64.R12
+          X86_64.POP X86_64.RBX; X86_64.POP X86_64.RBP; X86_64.RET ]
+    let prologue label =
+        [ X86_64.Label label
+          X86_64.PUSH X86_64.RBP; X86_64.MOV_reg (X86_64.RBP, X86_64.RSP)
+          X86_64.PUSH X86_64.RBX; X86_64.PUSH X86_64.R12; X86_64.PUSH X86_64.R13
+          X86_64.PUSH X86_64.RDI; X86_64.PUSH X86_64.RSI; X86_64.PUSH X86_64.RCX
+          X86_64.PUSH X86_64.R8; X86_64.PUSH X86_64.R9; X86_64.PUSH X86_64.R10
+          X86_64.PUSH X86_64.RDX; X86_64.SUB_imm (X86_64.RSP, 80) ]
+    let invalidOutcome returnLabel =
+        emitStringLiteral X86_64.R8 ""
+        @ emitStringLiteral X86_64.R9 "Process not found"
+        @ [ X86_64.MOV_reg (X86_64.RAX, heapPtr); X86_64.ADD_imm (heapPtr, 32) ]
+        @ loadImm64 X86_64.R10 -1L
+        @ [ X86_64.MOV_store (X86_64.RAX, 0, X86_64.R10)
+            X86_64.MOV_store (X86_64.RAX, 8, X86_64.R8)
+            X86_64.MOV_store (X86_64.RAX, 16, X86_64.R9)
+            X86_64.MOV_imm32 (X86_64.R10, 1)
+            X86_64.MOV_store (X86_64.RAX, 24, X86_64.R10) ]
+        @ leakInc 1
+        @ [X86_64.JMP returnLabel]
+    let copySuffix rawBuffer startOffset managedBuffer lengthOffset prefix =
+        [ X86_64.MOV_load (X86_64.R10, rawBuffer, 0)
+          X86_64.MOV_load (X86_64.R11, X86_64.RSP, startOffset)
+          X86_64.SUB_reg (X86_64.R10, X86_64.R11)
+          X86_64.MOV_store (X86_64.RSP, lengthOffset, X86_64.R10)
+          X86_64.XOR_reg (X86_64.RCX, X86_64.RCX)
+          X86_64.Label $"__dark_process_io_copy_{prefix}"
+          X86_64.CMP_reg (X86_64.RCX, X86_64.R10)
+          X86_64.Jcc (X86_64.GE, $"__dark_process_io_{prefix}_copied")
+          X86_64.LEA (X86_64.RDX, rawBuffer, 8)
+          X86_64.ADD_reg (X86_64.RDX, X86_64.R11)
+          X86_64.ADD_reg (X86_64.RDX, X86_64.RCX)
+          X86_64.MOV_load_byte (X86_64.RAX, X86_64.RDX, 0)
+          X86_64.LEA (X86_64.RDX, managedBuffer, 16)
+          X86_64.ADD_reg (X86_64.RDX, X86_64.RCX)
+          X86_64.MOV_store_byte (X86_64.RDX, 0, X86_64.RAX)
+          X86_64.ADD_imm (X86_64.RCX, 1)
+          X86_64.JMP $"__dark_process_io_copy_{prefix}"
+          X86_64.Label $"__dark_process_io_{prefix}_copied" ]
+    let communicate =
+        prologue "__dark_cli_process_io"
+        @ [ X86_64.MOV_store (X86_64.RSP, 72, X86_64.RSI)
+            X86_64.MOV_store (X86_64.RSP, 24, X86_64.RDX)
+            X86_64.CMP_imm (X86_64.RDI, 1)
+            X86_64.Jcc (X86_64.LT, "__dark_process_io_invalid")
+            X86_64.CMP_imm (X86_64.RDI, 63)
+            X86_64.Jcc (X86_64.GT, "__dark_process_io_invalid")
+            X86_64.LEA (X86_64.RBX, freeListBase, int32 processTableOffset)
+            X86_64.SHL_imm (X86_64.RDI, 6)
+            X86_64.ADD_reg (X86_64.RBX, X86_64.RDI)
+            X86_64.MOV_load (X86_64.RAX, X86_64.RBX, 0)
+            X86_64.CMP_imm (X86_64.RAX, 0)
+            X86_64.Jcc (X86_64.EQ, "__dark_process_io_invalid")
+            X86_64.MOV_load (X86_64.R12, X86_64.RBX, 48)
+            X86_64.MOV_load (X86_64.R13, X86_64.RBX, 56)
+            X86_64.MOV_load (X86_64.RAX, X86_64.R12, 0)
+            X86_64.MOV_store (X86_64.RSP, 0, X86_64.RAX)
+            X86_64.MOV_load (X86_64.RAX, X86_64.R13, 0)
+            X86_64.MOV_store (X86_64.RSP, 8, X86_64.RAX)
+            X86_64.MOV_load (X86_64.RAX, X86_64.RSP, 24)
+            X86_64.CMP_imm (X86_64.RAX, 0)
+            X86_64.Jcc (X86_64.EQ, "__dark_process_io_suffix_ready")
+            X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+            X86_64.MOV_store (X86_64.RSP, 0, X86_64.RAX)
+            X86_64.MOV_store (X86_64.RSP, 8, X86_64.RAX)
+            X86_64.Label "__dark_process_io_suffix_ready"
+            X86_64.MOV_load (X86_64.RSI, X86_64.RSP, 72)
+            X86_64.MOV_load (X86_64.RDX, X86_64.RSI, 8)
+            X86_64.MOV_store (X86_64.RSP, 16, X86_64.RDX)
+            X86_64.CMP_imm (X86_64.RDX, 0)
+            X86_64.Jcc (X86_64.EQ, "__dark_process_io_read_stdout")
+            X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 16)
+            X86_64.ADD_imm (X86_64.RSI, 16) ]
+        @ syscall 1L
+        @ [ X86_64.MOV_imm32 (X86_64.RAX, 10)
+            X86_64.MOV_store_byte (X86_64.RSP, 64, X86_64.RAX)
+            X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 16)
+            X86_64.LEA (X86_64.RSI, X86_64.RSP, 64)
+            X86_64.MOV_imm32 (X86_64.RDX, 1) ]
+        @ syscall 1L
+        @ [ X86_64.XOR_reg (X86_64.RCX, X86_64.RCX)
+            X86_64.MOV_store (X86_64.RSP, 40, X86_64.RCX)
+            X86_64.Label "__dark_process_io_read_stdout"
+            X86_64.MOV_load (X86_64.R10, X86_64.R12, 0)
+            X86_64.LEA (X86_64.RSI, X86_64.R12, 8)
+            X86_64.ADD_reg (X86_64.RSI, X86_64.R10) ]
+        @ loadImm64 X86_64.RDX 1048576L
+        @ [ X86_64.SUB_reg (X86_64.RDX, X86_64.R10)
+            X86_64.CMP_imm (X86_64.RDX, 0)
+            X86_64.Jcc (X86_64.EQ, "__dark_process_io_read_stderr")
+            X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 24) ]
+        @ syscall 0L
+        @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+            X86_64.Jcc (X86_64.LE, "__dark_process_io_read_stderr")
+            X86_64.ADD_reg (X86_64.R10, X86_64.RAX)
+            X86_64.MOV_store (X86_64.R12, 0, X86_64.R10)
+            X86_64.JMP "__dark_process_io_read_stdout"
+            X86_64.Label "__dark_process_io_read_stderr"
+            X86_64.MOV_load (X86_64.R10, X86_64.R13, 0)
+            X86_64.LEA (X86_64.RSI, X86_64.R13, 8)
+            X86_64.ADD_reg (X86_64.RSI, X86_64.R10) ]
+        @ loadImm64 X86_64.RDX 1048576L
+        @ [ X86_64.SUB_reg (X86_64.RDX, X86_64.R10)
+            X86_64.CMP_imm (X86_64.RDX, 0)
+            X86_64.Jcc (X86_64.EQ, "__dark_process_io_status")
+            X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 32) ]
+        @ syscall 0L
+        @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+            X86_64.Jcc (X86_64.LE, "__dark_process_io_status")
+            X86_64.ADD_reg (X86_64.R10, X86_64.RAX)
+            X86_64.MOV_store (X86_64.R13, 0, X86_64.R10)
+            X86_64.JMP "__dark_process_io_read_stderr"
+            X86_64.Label "__dark_process_io_status"
+            X86_64.MOV_load (X86_64.RAX, X86_64.RBX, 0)
+            X86_64.CMP_imm (X86_64.RAX, 2)
+            X86_64.Jcc (X86_64.EQ, "__dark_process_io_stored_status")
+            X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 8)
+            X86_64.LEA (X86_64.RSI, X86_64.RSP, 32)
+            X86_64.MOV_imm32 (X86_64.RDX, 1)
+            X86_64.XOR_reg (X86_64.R10, X86_64.R10) ]
+        @ syscall 61L
+        @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+            X86_64.Jcc (X86_64.LT, "__dark_process_io_read_stdout")
+            X86_64.Jcc (X86_64.NE, "__dark_process_io_finished")
+            X86_64.MOV_load (X86_64.RAX, X86_64.RSP, 16)
+            X86_64.CMP_imm (X86_64.RAX, 0)
+            X86_64.Jcc (X86_64.EQ, "__dark_process_io_running")
+            X86_64.MOV_load (X86_64.R10, X86_64.RSP, 40)
+            X86_64.ADD_imm (X86_64.R10, 1)
+            X86_64.MOV_store (X86_64.RSP, 40, X86_64.R10)
+            X86_64.CMP_imm (X86_64.R10, 100)
+            X86_64.Jcc (X86_64.GE, "__dark_process_io_running")
+            X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+            X86_64.MOV_store (X86_64.RSP, 48, X86_64.RAX) ]
+        @ loadImm64 X86_64.RAX 10000000L
+        @ [ X86_64.MOV_store (X86_64.RSP, 56, X86_64.RAX)
+            X86_64.LEA (X86_64.RDI, X86_64.RSP, 48)
+            X86_64.XOR_reg (X86_64.RSI, X86_64.RSI) ]
+        @ syscall 35L
+        @ [ X86_64.JMP "__dark_process_io_read_stdout"
+            X86_64.Label "__dark_process_io_finished"
+            X86_64.MOV_load (X86_64.R10, X86_64.RSP, 32)
+            X86_64.MOV_reg (X86_64.R11, X86_64.R10)
+            X86_64.AND_imm (X86_64.R11, 0x7f)
+            X86_64.CMP_imm (X86_64.R11, 0)
+            X86_64.Jcc (X86_64.NE, "__dark_process_io_signaled")
+            X86_64.SHR_imm (X86_64.R10, 8)
+            X86_64.JMP "__dark_process_io_store_status"
+            X86_64.Label "__dark_process_io_signaled"
+            X86_64.MOV_reg (X86_64.R10, X86_64.R11)
+            X86_64.ADD_imm (X86_64.R10, 128)
+            X86_64.Label "__dark_process_io_store_status"
+            X86_64.MOV_imm32 (X86_64.RAX, 2)
+            X86_64.MOV_store (X86_64.RBX, 0, X86_64.RAX)
+            X86_64.MOV_store (X86_64.RBX, 40, X86_64.R10)
+            X86_64.JMP "__dark_process_io_build"
+            X86_64.Label "__dark_process_io_stored_status"
+            X86_64.MOV_load (X86_64.R10, X86_64.RBX, 40)
+            X86_64.JMP "__dark_process_io_build"
+            X86_64.Label "__dark_process_io_running"
+            X86_64.XOR_reg (X86_64.R10, X86_64.R10)
+            X86_64.Label "__dark_process_io_build"
+            X86_64.MOV_store (X86_64.RSP, 64, X86_64.R10)
+            X86_64.MOV_reg (X86_64.R8, heapPtr) ]
+        @ loadImm64 X86_64.R11 1048592L
+        @ [ X86_64.ADD_reg (heapPtr, X86_64.R11)
+            X86_64.MOV_reg (X86_64.R9, heapPtr) ]
+        @ loadImm64 X86_64.R11 1048592L
+        @ [ X86_64.ADD_reg (heapPtr, X86_64.R11) ]
+        @ copySuffix X86_64.R12 0 X86_64.R8 0 "stdout"
+        @ copySuffix X86_64.R13 8 X86_64.R9 8 "stderr"
+        @ [ X86_64.MOV_imm32 (X86_64.R11, 1)
+            X86_64.MOV_store (X86_64.R8, 0, X86_64.R11)
+            X86_64.MOV_load (X86_64.R10, X86_64.RSP, 0)
+            X86_64.MOV_store (X86_64.R8, 8, X86_64.R10)
+            X86_64.MOV_store (X86_64.R9, 0, X86_64.R11)
+            X86_64.MOV_load (X86_64.R10, X86_64.RSP, 8)
+            X86_64.MOV_store (X86_64.R9, 8, X86_64.R10)
+            X86_64.MOV_reg (X86_64.RAX, heapPtr)
+            X86_64.ADD_imm (heapPtr, 32)
+            X86_64.MOV_load (X86_64.R10, X86_64.RSP, 64)
+            X86_64.MOV_store (X86_64.RAX, 0, X86_64.R10)
+            X86_64.MOV_store (X86_64.RAX, 8, X86_64.R8)
+            X86_64.MOV_store (X86_64.RAX, 16, X86_64.R9)
+            X86_64.MOV_store (X86_64.RAX, 24, X86_64.R11) ]
+        @ leakInc 3
+        @ [ X86_64.JMP "__dark_process_io_return"
+            X86_64.Label "__dark_process_io_invalid" ]
+        @ invalidOutcome "__dark_process_io_return"
+        @ [X86_64.Label "__dark_process_io_return"]
+        @ epilogue
+    let terminate =
+        prologue "__dark_cli_terminate_process"
+        @ [ X86_64.CMP_imm (X86_64.RDI, 1)
+            X86_64.Jcc (X86_64.LT, "__dark_terminate_invalid")
+            X86_64.CMP_imm (X86_64.RDI, 63)
+            X86_64.Jcc (X86_64.GT, "__dark_terminate_invalid")
+            X86_64.LEA (X86_64.RBX, freeListBase, int32 processTableOffset)
+            X86_64.MOV_reg (X86_64.R10, X86_64.RDI)
+            X86_64.SHL_imm (X86_64.R10, 6)
+            X86_64.ADD_reg (X86_64.RBX, X86_64.R10)
+            X86_64.MOV_load (X86_64.RAX, X86_64.RBX, 0)
+            X86_64.CMP_imm (X86_64.RAX, 0)
+            X86_64.Jcc (X86_64.EQ, "__dark_terminate_invalid")
+            X86_64.CMP_imm (X86_64.RAX, 2)
+            X86_64.Jcc (X86_64.EQ, "__dark_terminate_collect")
+            X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 8)
+            X86_64.MOV_imm32 (X86_64.RSI, 15) ]
+        @ syscall 62L
+        @ [ X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 8)
+            X86_64.LEA (X86_64.RSI, X86_64.RSP, 32)
+            X86_64.XOR_reg (X86_64.RDX, X86_64.RDX)
+            X86_64.XOR_reg (X86_64.R10, X86_64.R10) ]
+        @ syscall 61L
+        @ [ X86_64.MOV_load (X86_64.R10, X86_64.RSP, 32)
+            X86_64.MOV_reg (X86_64.R11, X86_64.R10)
+            X86_64.AND_imm (X86_64.R11, 0x7f)
+            X86_64.CMP_imm (X86_64.R11, 0)
+            X86_64.Jcc (X86_64.NE, "__dark_terminate_signaled")
+            X86_64.SHR_imm (X86_64.R10, 8)
+            X86_64.JMP "__dark_terminate_store"
+            X86_64.Label "__dark_terminate_signaled"
+            X86_64.MOV_reg (X86_64.R10, X86_64.R11)
+            X86_64.ADD_imm (X86_64.R10, 128)
+            X86_64.Label "__dark_terminate_store"
+            X86_64.MOV_store (X86_64.RBX, 40, X86_64.R10)
+            X86_64.MOV_imm32 (X86_64.RAX, 2)
+            X86_64.MOV_store (X86_64.RBX, 0, X86_64.RAX)
+            X86_64.Label "__dark_terminate_collect"
+            X86_64.MOV_reg (X86_64.RDI, X86_64.RBX)
+            X86_64.LEA (X86_64.R10, freeListBase, int32 processTableOffset)
+            X86_64.SUB_reg (X86_64.RDI, X86_64.R10)
+            X86_64.SHR_imm (X86_64.RDI, 6) ]
+        @ emitStringLiteral X86_64.RSI ""
+        @ [ X86_64.MOV_imm32 (X86_64.RDX, 1)
+            X86_64.CALL "__dark_cli_process_io"
+            X86_64.MOV_store (X86_64.RSP, 64, X86_64.RAX)
+            X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 16) ]
+        @ syscall 3L
+        @ [X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 24)] @ syscall 3L
+        @ [X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 32)] @ syscall 3L
+        @ [ X86_64.XOR_reg (X86_64.R10, X86_64.R10)
+            X86_64.MOV_store (X86_64.RBX, 0, X86_64.R10)
+            X86_64.MOV_load (X86_64.RAX, X86_64.RSP, 64)
+            X86_64.JMP "__dark_terminate_return"
+            X86_64.Label "__dark_terminate_invalid" ]
+        @ invalidOutcome "__dark_terminate_return"
+        @ [X86_64.Label "__dark_terminate_return"]
+        @ epilogue
+    let cleanup =
+        [ X86_64.Label "__dark_cli_cleanup_processes"
+          X86_64.PUSH X86_64.RBX
+          X86_64.PUSH X86_64.R12
+          X86_64.SUB_imm (X86_64.RSP, 16)
+          X86_64.MOV_imm32 (X86_64.R12, 1)
+          X86_64.Label "__dark_cleanup_process_next"
+          X86_64.CMP_imm (X86_64.R12, 63)
+          X86_64.Jcc (X86_64.GT, "__dark_cleanup_process_done")
+          X86_64.LEA (X86_64.RBX, freeListBase, int32 processTableOffset)
+          X86_64.MOV_reg (X86_64.R10, X86_64.R12)
+          X86_64.SHL_imm (X86_64.R10, 6)
+          X86_64.ADD_reg (X86_64.RBX, X86_64.R10)
+          X86_64.MOV_load (X86_64.RAX, X86_64.RBX, 0)
+          X86_64.CMP_imm (X86_64.RAX, 0)
+          X86_64.Jcc (X86_64.EQ, "__dark_cleanup_process_advance")
+          X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 8)
+          X86_64.MOV_imm32 (X86_64.RSI, 9) ]
+        @ syscall 62L
+        @ [ X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 8)
+            X86_64.MOV_reg (X86_64.RSI, X86_64.RSP)
+            X86_64.XOR_reg (X86_64.RDX, X86_64.RDX)
+            X86_64.XOR_reg (X86_64.R10, X86_64.R10) ]
+        @ syscall 61L
+        @ [X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 16)] @ syscall 3L
+        @ [X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 24)] @ syscall 3L
+        @ [X86_64.MOV_load (X86_64.RDI, X86_64.RBX, 32)] @ syscall 3L
+        @ [ X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+            X86_64.MOV_store (X86_64.RBX, 0, X86_64.RAX)
+            X86_64.Label "__dark_cleanup_process_advance"
+            X86_64.ADD_imm (X86_64.R12, 1)
+            X86_64.JMP "__dark_cleanup_process_next"
+            X86_64.Label "__dark_cleanup_process_done"
+            X86_64.ADD_imm (X86_64.RSP, 16)
+            X86_64.POP X86_64.R12
+            X86_64.POP X86_64.RBX
+            X86_64.RET ]
+    communicate @ terminate @ cleanup
+
+/// Execute a packed argv request directly through Linux process syscalls. The
+/// request layout is shared with the ARM64 backend and keeps shell policy in
+/// the Dark standard library rather than reinterpreting arguments here.
+let private generateLinuxCliRunProcessHelper (enableLeakCheck: bool) : X86_64.Instr list =
+    let syscall number = loadImm64 X86_64.RAX number @ [X86_64.SYSCALL]
+    let loadFd stackOffset highHalf =
+        [ X86_64.MOV_load (X86_64.RDI, X86_64.RSP, stackOffset) ]
+        @ (if highHalf then [X86_64.SHR_imm (X86_64.RDI, 32)]
+           else [X86_64.MOV_reg32 (X86_64.RDI, X86_64.RDI)])
+    let closeFd stackOffset highHalf = loadFd stackOffset highHalf @ syscall 3L
+    let setNonblocking stackOffset =
+        loadFd stackOffset false
+        @ loadImm64 X86_64.RSI 4L
+        @ loadImm64 X86_64.RDX 2048L
+        @ syscall 72L
+    let readPipe stackOffset buffer lengthOffset nextLabel =
+        loadFd stackOffset false
+        @ [ X86_64.LEA (X86_64.RSI, buffer, 16)
+            X86_64.MOV_load (X86_64.R10, X86_64.RSP, lengthOffset)
+            X86_64.ADD_reg (X86_64.RSI, X86_64.R10) ]
+        @ loadImm64 X86_64.RDX 1048576L
+        @ [ X86_64.SUB_reg (X86_64.RDX, X86_64.R10) ]
+        @ syscall 0L
+        @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+            X86_64.Jcc (X86_64.LE, nextLabel)
+            X86_64.ADD_reg (X86_64.R10, X86_64.RAX)
+            X86_64.MOV_store (X86_64.RSP, lengthOffset, X86_64.R10) ]
+    let finalizeString buffer lengthOffset =
+        [ X86_64.MOV_imm32 (X86_64.R11, 1)
+          X86_64.MOV_store (buffer, 0, X86_64.R11)
+          X86_64.MOV_load (X86_64.R10, X86_64.RSP, lengthOffset)
+          X86_64.MOV_store (buffer, 8, X86_64.R10) ]
+    let leakInc =
+        if enableLeakCheck then
+            [ X86_64.LEA_rip (X86_64.R11, "_leak_count")
+              X86_64.MOV_load (X86_64.R10, X86_64.R11, 0)
+              X86_64.ADD_imm (X86_64.R10, 3)
+              X86_64.MOV_store (X86_64.R11, 0, X86_64.R10) ]
+        else
+            []
+    let copyManagedString managedReg bufferReg lengthReg prefix =
+        let loopLabel = $"__dark_run_{prefix}_copy"
+        let doneLabel = $"__dark_run_{prefix}_copied"
+        [ X86_64.MOV_load (lengthReg, managedReg, 8)
+          X86_64.MOV_reg (bufferReg, heapPtr)
+          X86_64.LEA (X86_64.RDX, managedReg, 16)
+          X86_64.XOR_reg (X86_64.RCX, X86_64.RCX)
+          X86_64.Label loopLabel
+          X86_64.CMP_reg (X86_64.RCX, lengthReg)
+          X86_64.Jcc (X86_64.GE, doneLabel)
+          X86_64.MOV_load_byte (X86_64.RAX, X86_64.RDX, 0)
+          X86_64.MOV_reg (X86_64.R11, bufferReg)
+          X86_64.ADD_reg (X86_64.R11, X86_64.RCX)
+          X86_64.MOV_store_byte (X86_64.R11, 0, X86_64.RAX)
+          X86_64.ADD_imm (X86_64.RDX, 1)
+          X86_64.ADD_imm (X86_64.RCX, 1)
+          X86_64.JMP loopLabel
+          X86_64.Label doneLabel
+          X86_64.MOV_reg (X86_64.R11, bufferReg)
+          X86_64.ADD_reg (X86_64.R11, lengthReg)
+          X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+          X86_64.MOV_store_byte (X86_64.R11, 0, X86_64.RAX)
+          X86_64.MOV_reg (X86_64.R11, lengthReg)
+          X86_64.ADD_imm (X86_64.R11, 8)
+          X86_64.AND_imm (X86_64.R11, -8)
+          X86_64.ADD_reg (heapPtr, X86_64.R11) ]
+    let buildPointerVector bufferReg lengthReg vectorReg prefix =
+        let loopLabel = $"__dark_run_{prefix}_scan"
+        let nextLabel = $"__dark_run_{prefix}_next"
+        let doneLabel = $"__dark_run_{prefix}_done"
+        [ X86_64.MOV_reg (vectorReg, heapPtr)
+          X86_64.MOV_reg (X86_64.R11, lengthReg)
+          X86_64.ADD_imm (X86_64.R11, 2)
+          X86_64.SHL_imm (X86_64.R11, 3)
+          X86_64.ADD_reg (heapPtr, X86_64.R11)
+          X86_64.XOR_reg (X86_64.RCX, X86_64.RCX)
+          X86_64.XOR_reg (X86_64.RDX, X86_64.RDX)
+          X86_64.MOV_store (vectorReg, 0, bufferReg)
+          X86_64.Label loopLabel
+          X86_64.CMP_reg (X86_64.RCX, lengthReg)
+          X86_64.Jcc (X86_64.GE, doneLabel)
+          X86_64.MOV_reg (X86_64.R11, bufferReg)
+          X86_64.ADD_reg (X86_64.R11, X86_64.RCX)
+          X86_64.MOV_load_byte (X86_64.RAX, X86_64.R11, 0)
+          X86_64.CMP_imm (X86_64.RAX, 0)
+          X86_64.Jcc (X86_64.NE, nextLabel)
+          X86_64.ADD_imm (X86_64.RDX, 8)
+          X86_64.MOV_reg (X86_64.R11, bufferReg)
+          X86_64.ADD_reg (X86_64.R11, X86_64.RCX)
+          X86_64.ADD_imm (X86_64.R11, 1)
+          X86_64.MOV_reg (X86_64.RAX, vectorReg)
+          X86_64.ADD_reg (X86_64.RAX, X86_64.RDX)
+          X86_64.MOV_store (X86_64.RAX, 0, X86_64.R11)
+          X86_64.Label nextLabel
+          X86_64.ADD_imm (X86_64.RCX, 1)
+          X86_64.JMP loopLabel
+          X86_64.Label doneLabel
+          X86_64.ADD_imm (X86_64.RDX, 8)
+          X86_64.MOV_reg (X86_64.R11, vectorReg)
+          X86_64.ADD_reg (X86_64.R11, X86_64.RDX)
+          X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+          X86_64.MOV_store (X86_64.R11, 0, X86_64.RAX) ]
+
+    [ X86_64.Label "__dark_cli_run_process"
+      X86_64.PUSH X86_64.RBP
+      X86_64.MOV_reg (X86_64.RBP, X86_64.RSP)
+      X86_64.PUSH X86_64.RBX
+      X86_64.PUSH X86_64.R12
+      X86_64.PUSH X86_64.R13
+      X86_64.PUSH X86_64.R15
+      // CliNative has no explicit SaveRegs/RestoreRegs pair in LIR.
+      X86_64.PUSH X86_64.RDI
+      X86_64.PUSH X86_64.RSI
+      X86_64.PUSH X86_64.RCX
+      X86_64.PUSH X86_64.R8
+      X86_64.PUSH X86_64.R9
+      X86_64.PUSH X86_64.R10
+      X86_64.PUSH X86_64.RDX
+      X86_64.SUB_imm (X86_64.RSP, 160)
+      X86_64.MOV_reg (X86_64.R15, X86_64.RDI)
+      // Remember the scratch boundary so an ENOENT candidate can be retried
+      // without retaining its argv, environment, cwd, and capture buffers.
+      X86_64.MOV_store (X86_64.RSP, 80, heapPtr)
+      X86_64.MOV_load (X86_64.RAX, X86_64.R15, 8) ]
+    @ copyManagedString X86_64.RAX X86_64.RBX X86_64.R10 "argv"
+    @ buildPointerVector X86_64.RBX X86_64.R10 X86_64.R12 "argv"
+    @ [ X86_64.MOV_load (X86_64.RAX, X86_64.R15, 0)
+        X86_64.CMP_imm (X86_64.RAX, 4)
+        X86_64.Jcc (X86_64.NE, "__dark_run_pipeline_argv_prepared")
+        X86_64.MOV_load (X86_64.RAX, X86_64.R15, 40) ]
+    @ copyManagedString X86_64.RAX X86_64.R8 X86_64.R10 "pipeline_argv"
+    @ buildPointerVector X86_64.R8 X86_64.R10 X86_64.R9 "pipeline_argv"
+    @ [ X86_64.MOV_store (X86_64.RSP, 88, X86_64.R9)
+        X86_64.Label "__dark_run_pipeline_argv_prepared"
+        X86_64.MOV_reg (X86_64.RAX, X86_64.RBP)
+        X86_64.Label "__dark_run_find_root"
+        X86_64.MOV_load (X86_64.RCX, X86_64.RAX, 0)
+        X86_64.CMP_imm (X86_64.RCX, 0)
+        X86_64.Jcc (X86_64.EQ, "__dark_run_root_found")
+        X86_64.MOV_reg (X86_64.RAX, X86_64.RCX)
+        X86_64.JMP "__dark_run_find_root"
+        X86_64.Label "__dark_run_root_found"
+        X86_64.MOV_load (X86_64.RCX, X86_64.RAX, 8)
+        X86_64.SHL_imm (X86_64.RCX, 3)
+        X86_64.ADD_reg (X86_64.RAX, X86_64.RCX)
+        X86_64.ADD_imm (X86_64.RAX, 24)
+        X86_64.MOV_reg (X86_64.R13, X86_64.RAX)
+        X86_64.MOV_store (X86_64.RSP, 64, X86_64.R13)
+        X86_64.MOV_load (X86_64.RAX, X86_64.R15, 24)
+        X86_64.MOV_load (X86_64.R10, X86_64.RAX, 8)
+        X86_64.CMP_imm (X86_64.R10, 0)
+        X86_64.Jcc (X86_64.EQ, "__dark_run_environment_done") ]
+    @ copyManagedString X86_64.RAX X86_64.RBX X86_64.R10 "environment"
+    @ [ X86_64.MOV_load (X86_64.R11, X86_64.RSP, 64)
+        X86_64.XOR_reg (X86_64.RCX, X86_64.RCX)
+        X86_64.Label "__dark_run_environment_count"
+        X86_64.MOV_load (X86_64.RAX, X86_64.R11, 0)
+        X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.EQ, "__dark_run_environment_counted")
+        X86_64.ADD_imm (X86_64.RCX, 1)
+        X86_64.ADD_imm (X86_64.R11, 8)
+        X86_64.JMP "__dark_run_environment_count"
+        X86_64.Label "__dark_run_environment_counted"
+        X86_64.MOV_reg (X86_64.R13, heapPtr)
+        X86_64.MOV_reg (X86_64.R11, X86_64.R10)
+        X86_64.ADD_reg (X86_64.R11, X86_64.RCX)
+        X86_64.ADD_imm (X86_64.R11, 2)
+        X86_64.SHL_imm (X86_64.R11, 3)
+        X86_64.ADD_reg (heapPtr, X86_64.R11)
+        X86_64.XOR_reg (X86_64.RCX, X86_64.RCX)
+        X86_64.XOR_reg (X86_64.RDX, X86_64.RDX)
+        X86_64.MOV_store (X86_64.R13, 0, X86_64.RBX)
+        X86_64.Label "__dark_run_environment_scan"
+        X86_64.CMP_reg (X86_64.RCX, X86_64.R10)
+        X86_64.Jcc (X86_64.GE, "__dark_run_environment_append_inherited")
+        X86_64.MOV_reg (X86_64.R11, X86_64.RBX)
+        X86_64.ADD_reg (X86_64.R11, X86_64.RCX)
+        X86_64.MOV_load_byte (X86_64.RAX, X86_64.R11, 0)
+        X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.NE, "__dark_run_environment_next")
+        X86_64.ADD_imm (X86_64.RDX, 8)
+        X86_64.ADD_imm (X86_64.R11, 1)
+        X86_64.MOV_reg (X86_64.RAX, X86_64.R13)
+        X86_64.ADD_reg (X86_64.RAX, X86_64.RDX)
+        X86_64.MOV_store (X86_64.RAX, 0, X86_64.R11)
+        X86_64.Label "__dark_run_environment_next"
+        X86_64.ADD_imm (X86_64.RCX, 1)
+        X86_64.JMP "__dark_run_environment_scan"
+        X86_64.Label "__dark_run_environment_append_inherited"
+        X86_64.ADD_imm (X86_64.RDX, 8)
+        X86_64.MOV_load (X86_64.R11, X86_64.RSP, 64)
+        X86_64.Label "__dark_run_environment_append_next"
+        X86_64.MOV_load (X86_64.RAX, X86_64.R11, 0)
+        X86_64.MOV_reg (X86_64.RCX, X86_64.R13)
+        X86_64.ADD_reg (X86_64.RCX, X86_64.RDX)
+        X86_64.MOV_store (X86_64.RCX, 0, X86_64.RAX)
+        X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.EQ, "__dark_run_environment_done")
+        X86_64.ADD_imm (X86_64.RDX, 8)
+        X86_64.ADD_imm (X86_64.R11, 8)
+        X86_64.JMP "__dark_run_environment_append_next"
+        X86_64.Label "__dark_run_environment_done"
+        X86_64.MOV_load (X86_64.RAX, X86_64.R15, 16) ]
+    @ copyManagedString X86_64.RAX X86_64.RBX X86_64.R10 "cwd"
+    @ [ X86_64.MOV_store (X86_64.RSP, 72, X86_64.RBX)
+        X86_64.MOV_reg (X86_64.R8, heapPtr) ]
+    @ loadImm64 X86_64.R10 1048592L
+    @ [ X86_64.ADD_reg (heapPtr, X86_64.R10)
+        X86_64.MOV_reg (X86_64.R9, heapPtr)
+        X86_64.ADD_reg (heapPtr, X86_64.R10)
+        X86_64.XOR_reg (X86_64.R10, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 24, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 40, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 48, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 56, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 104, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 120, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 128, X86_64.R10)
+        X86_64.LEA (X86_64.RDI, X86_64.RSP, 0)
+        X86_64.XOR_reg (X86_64.RSI, X86_64.RSI) ]
+    @ syscall 293L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.LT, "__dark_run_spawn_error")
+        X86_64.LEA (X86_64.RDI, X86_64.RSP, 8)
+        X86_64.XOR_reg (X86_64.RSI, X86_64.RSI) ]
+    @ syscall 293L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.LT, "__dark_run_spawn_error_close_stdout")
+        X86_64.LEA (X86_64.RDI, X86_64.RSP, 16) ]
+    @ loadImm64 X86_64.RSI 524288L
+    @ syscall 293L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.LT, "__dark_run_spawn_error_close_output")
+        X86_64.LEA (X86_64.RDI, X86_64.RSP, 96)
+        X86_64.XOR_reg (X86_64.RSI, X86_64.RSI) ]
+    @ syscall 293L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.LT, "__dark_run_spawn_error_close_errno")
+        X86_64.MOV_load (X86_64.RAX, X86_64.R15, 0)
+        X86_64.CMP_imm (X86_64.RAX, 4)
+        X86_64.Jcc (X86_64.NE, "__dark_run_fork_consumer") ]
+    @ syscall 57L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.EQ, "__dark_run_pipeline_producer")
+        X86_64.Jcc (X86_64.LT, "__dark_run_spawn_error_close_pipeline")
+        X86_64.MOV_store (X86_64.RSP, 104, X86_64.RAX)
+        X86_64.Label "__dark_run_fork_consumer" ]
+    @ syscall 57L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.EQ, "__dark_run_child")
+        X86_64.Jcc (X86_64.LT, "__dark_run_spawn_error_close_all")
+        X86_64.MOV_store (X86_64.RSP, 32, X86_64.RAX) ]
+    @ closeFd 0 true @ closeFd 8 true @ closeFd 16 true @ closeFd 96 false @ closeFd 96 true
+    @ setNonblocking 0 @ setNonblocking 8
+    @ [ X86_64.Label "__dark_run_drain_wait" ]
+    @ readPipe 0 X86_64.R8 120 "__dark_run_read_stderr"
+    @ [ X86_64.Label "__dark_run_read_stderr" ]
+    @ readPipe 8 X86_64.R9 128 "__dark_run_wait"
+    @ [ X86_64.Label "__dark_run_wait"
+        X86_64.MOV_load (X86_64.RDI, X86_64.RSP, 32)
+        X86_64.LEA (X86_64.RSI, X86_64.RSP, 24)
+        X86_64.MOV_imm32 (X86_64.RDX, 1)
+        X86_64.XOR_reg (X86_64.R10, X86_64.R10) ]
+    @ syscall 61L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.NE, "__dark_run_finished")
+        X86_64.MOV_load (X86_64.RAX, X86_64.R15, 0)
+        X86_64.CMP_imm (X86_64.RAX, 3)
+        X86_64.Jcc (X86_64.NE, "__dark_run_sleep")
+        X86_64.MOV_load (X86_64.R10, X86_64.RSP, 40)
+        X86_64.MOV_load (X86_64.R11, X86_64.R15, 32)
+        X86_64.CMP_reg (X86_64.R10, X86_64.R11)
+        X86_64.Jcc (X86_64.LT, "__dark_run_timeout_next")
+        X86_64.MOV_load (X86_64.RDI, X86_64.RSP, 32)
+        X86_64.MOV_imm32 (X86_64.RSI, 9) ]
+    @ syscall 62L
+    @ [ X86_64.MOV_imm32 (X86_64.R10, 1)
+        X86_64.MOV_store (X86_64.RSP, 48, X86_64.R10)
+        X86_64.JMP "__dark_run_blocking_wait"
+        X86_64.Label "__dark_run_timeout_next"
+        X86_64.ADD_imm (X86_64.R10, 1)
+        X86_64.MOV_store (X86_64.RSP, 40, X86_64.R10)
+        X86_64.Label "__dark_run_sleep"
+        X86_64.XOR_reg (X86_64.R10, X86_64.R10)
+        X86_64.MOV_store (X86_64.RSP, 136, X86_64.R10) ]
+    @ loadImm64 X86_64.R10 1000000L
+    @ [ X86_64.MOV_store (X86_64.RSP, 144, X86_64.R10)
+        X86_64.LEA (X86_64.RDI, X86_64.RSP, 136)
+        X86_64.XOR_reg (X86_64.RSI, X86_64.RSI) ]
+    @ syscall 35L
+    @ [ X86_64.JMP "__dark_run_drain_wait"
+        X86_64.Label "__dark_run_blocking_wait"
+        X86_64.MOV_load (X86_64.RDI, X86_64.RSP, 32)
+        X86_64.LEA (X86_64.RSI, X86_64.RSP, 24)
+        X86_64.XOR_reg (X86_64.RDX, X86_64.RDX)
+        X86_64.XOR_reg (X86_64.R10, X86_64.R10) ]
+    @ syscall 61L
+    @ [ X86_64.Label "__dark_run_finished"
+        X86_64.MOV_load (X86_64.RAX, X86_64.R15, 0)
+        X86_64.CMP_imm (X86_64.RAX, 4)
+        X86_64.Jcc (X86_64.NE, "__dark_run_all_children_finished")
+        X86_64.MOV_load (X86_64.RDI, X86_64.RSP, 104)
+        X86_64.LEA (X86_64.RSI, X86_64.RSP, 112)
+        X86_64.XOR_reg (X86_64.RDX, X86_64.RDX)
+        X86_64.XOR_reg (X86_64.R10, X86_64.R10) ]
+    @ syscall 61L
+    @ [ X86_64.Label "__dark_run_all_children_finished" ]
+    @ readPipe 0 X86_64.R8 120 "__dark_run_final_stderr"
+    @ [ X86_64.Label "__dark_run_final_stderr" ]
+    @ readPipe 8 X86_64.R9 128 "__dark_run_final_close"
+    @ [ X86_64.Label "__dark_run_final_close" ]
+    @ closeFd 0 false @ closeFd 8 false
+    @ loadFd 16 false
+    @ [ X86_64.LEA (X86_64.RSI, X86_64.RSP, 56)
+        X86_64.MOV_imm32 (X86_64.RDX, 8) ]
+    @ syscall 0L
+    @ closeFd 16 false
+    @ [ X86_64.MOV_load (X86_64.R10, X86_64.RSP, 24)
+        X86_64.MOV_reg (X86_64.R11, X86_64.R10)
+        X86_64.AND_imm (X86_64.R11, 0x7f)
+        X86_64.CMP_imm (X86_64.R11, 0)
+        X86_64.Jcc (X86_64.NE, "__dark_run_signaled")
+        X86_64.SHR_imm (X86_64.R10, 8)
+        X86_64.JMP "__dark_run_build_result"
+        X86_64.Label "__dark_run_signaled"
+        X86_64.MOV_reg (X86_64.R10, X86_64.R11)
+        X86_64.ADD_imm (X86_64.R10, 128)
+        X86_64.JMP "__dark_run_build_result"
+        X86_64.Label "__dark_run_spawn_error_close_all" ]
+    @ closeFd 96 false @ closeFd 96 true
+    @ [ X86_64.Label "__dark_run_spawn_error_close_pipeline"
+        X86_64.Label "__dark_run_spawn_error_close_errno" ]
+    @ closeFd 16 false @ closeFd 16 true
+    @ [ X86_64.Label "__dark_run_spawn_error_close_output" ]
+    @ closeFd 8 false @ closeFd 8 true
+    @ [ X86_64.Label "__dark_run_spawn_error_close_stdout" ]
+    @ closeFd 0 false @ closeFd 0 true
+    @ [ X86_64.Label "__dark_run_spawn_error" ]
+    @ loadImm64 X86_64.R10 127L
+    @ [ X86_64.Label "__dark_run_build_result"
+        X86_64.MOV_load (X86_64.R11, X86_64.RSP, 56)
+        X86_64.CMP_imm (X86_64.R11, 2)
+        X86_64.Jcc (X86_64.NE, "__dark_run_keep_capture_buffers")
+        X86_64.MOV_load (heapPtr, X86_64.RSP, 80)
+        X86_64.MOV_reg (X86_64.R8, heapPtr)
+        X86_64.ADD_imm (heapPtr, 16)
+        X86_64.MOV_reg (X86_64.R9, heapPtr)
+        X86_64.ADD_imm (heapPtr, 16)
+        X86_64.XOR_reg (X86_64.RAX, X86_64.RAX)
+        X86_64.MOV_store (X86_64.RSP, 120, X86_64.RAX)
+        X86_64.MOV_store (X86_64.RSP, 128, X86_64.RAX)
+        X86_64.Label "__dark_run_keep_capture_buffers"
+        X86_64.MOV_store (X86_64.RSP, 152, X86_64.R10) ]
+    @ finalizeString X86_64.R8 120
+    @ finalizeString X86_64.R9 128
+    @ [ X86_64.MOV_reg (X86_64.RAX, heapPtr)
+        X86_64.ADD_imm (heapPtr, 48)
+        X86_64.MOV_load (X86_64.R11, X86_64.RSP, 56)
+        X86_64.MOV_store (X86_64.RAX, 0, X86_64.R11)
+        X86_64.MOV_load (X86_64.R10, X86_64.RSP, 152)
+        X86_64.MOV_store (X86_64.RAX, 8, X86_64.R10)
+        X86_64.MOV_store (X86_64.RAX, 16, X86_64.R8)
+        X86_64.MOV_store (X86_64.RAX, 24, X86_64.R9)
+        X86_64.MOV_load (X86_64.R10, X86_64.RSP, 48)
+        X86_64.MOV_store (X86_64.RAX, 32, X86_64.R10)
+        X86_64.MOV_imm32 (X86_64.R10, 1)
+        X86_64.MOV_store (X86_64.RAX, 40, X86_64.R10) ]
+    @ leakInc
+    @ [ X86_64.ADD_imm (X86_64.RSP, 160)
+        X86_64.POP X86_64.RDX
+        X86_64.POP X86_64.R10
+        X86_64.POP X86_64.R9
+        X86_64.POP X86_64.R8
+        X86_64.POP X86_64.RCX
+        X86_64.POP X86_64.RSI
+        X86_64.POP X86_64.RDI
+        X86_64.POP X86_64.R15
+        X86_64.POP X86_64.R13
+        X86_64.POP X86_64.R12
+        X86_64.POP X86_64.RBX
+        X86_64.POP X86_64.RBP
+        X86_64.RET
+        X86_64.Label "__dark_run_child" ]
+    @ loadFd 0 true
+    @ loadImm64 X86_64.RSI 1L
+    @ syscall 33L
+    @ loadFd 8 true
+    @ loadImm64 X86_64.RSI 2L
+    @ syscall 33L
+    @ [ X86_64.MOV_load (X86_64.RAX, X86_64.R15, 0)
+        X86_64.CMP_imm (X86_64.RAX, 4)
+        X86_64.Jcc (X86_64.NE, "__dark_run_child_input_ready") ]
+    @ loadFd 96 false
+    @ loadImm64 X86_64.RSI 0L
+    @ syscall 33L
+    @ [ X86_64.Label "__dark_run_child_input_ready" ]
+    @ closeFd 0 false @ closeFd 0 true @ closeFd 8 false @ closeFd 8 true @ closeFd 16 false @ closeFd 96 false @ closeFd 96 true
+    @ [ X86_64.MOV_load (X86_64.RAX, X86_64.R15, 0)
+        X86_64.CMP_imm (X86_64.RAX, 1)
+        X86_64.Jcc (X86_64.NE, "__dark_run_child_exec")
+        X86_64.MOV_load (X86_64.RDI, X86_64.RSP, 72) ]
+    @ syscall 80L
+    @ [ X86_64.CMP_imm (X86_64.RAX, 0)
+        X86_64.Jcc (X86_64.LT, "__dark_run_child_fail")
+        X86_64.Label "__dark_run_child_exec"
+        X86_64.MOV_load (X86_64.RAX, X86_64.R15, 0)
+        X86_64.CMP_imm (X86_64.RAX, 4)
+        X86_64.Jcc (X86_64.NE, "__dark_run_child_first_argv")
+        X86_64.MOV_load (X86_64.RSI, X86_64.RSP, 88)
+        X86_64.MOV_load (X86_64.RDI, X86_64.RSI, 0)
+        X86_64.JMP "__dark_run_child_argv_ready"
+        X86_64.Label "__dark_run_child_first_argv"
+        X86_64.MOV_load (X86_64.RDI, X86_64.R12, 0)
+        X86_64.MOV_reg (X86_64.RSI, X86_64.R12)
+        X86_64.Label "__dark_run_child_argv_ready"
+        X86_64.MOV_reg (X86_64.RDX, X86_64.R13) ]
+    @ syscall 59L
+    @ [ X86_64.Label "__dark_run_child_fail"
+        X86_64.NEG X86_64.RAX
+        X86_64.MOV_store (X86_64.RSP, 56, X86_64.RAX) ]
+    @ loadFd 16 true
+    @ [ X86_64.LEA (X86_64.RSI, X86_64.RSP, 56)
+        X86_64.MOV_imm32 (X86_64.RDX, 8) ]
+    @ syscall 1L
+    @ loadImm64 X86_64.RDI 127L
+    @ syscall 60L
+    @ [ X86_64.Label "__dark_run_pipeline_producer" ]
+    @ loadFd 96 true
+    @ loadImm64 X86_64.RSI 1L
+    @ syscall 33L
+    @ loadFd 8 true
+    @ loadImm64 X86_64.RSI 2L
+    @ syscall 33L
+    @ closeFd 0 false @ closeFd 0 true @ closeFd 8 false @ closeFd 8 true @ closeFd 16 false @ closeFd 96 false @ closeFd 96 true
+    @ [ X86_64.MOV_load (X86_64.RDI, X86_64.R12, 0)
+        X86_64.MOV_reg (X86_64.RSI, X86_64.R12)
+        X86_64.MOV_reg (X86_64.RDX, X86_64.R13) ]
+    @ syscall 59L
+    @ [ X86_64.JMP "__dark_run_child_fail" ]
+
 let private generateLinuxCliExecuteHelper (enableLeakCheck: bool) : X86_64.Instr list =
     let label = "__dark_cli_execute"
     let syscall number = loadImm64 X86_64.RAX number @ [X86_64.SYSCALL]
@@ -5362,34 +6288,45 @@ let private translateInstr
                     @ [X86_64.Label completeLabel])
                 | _ -> Ok (loadImm64 destReg 0L)
             | LIR.RunProcess ->
-                Ok (emitStringLiteral X86_64.R8 ""
-                @ emitStringLiteral X86_64.R9 "native process execution unavailable"
-                @ [X86_64.MOV_reg (destReg, heapPtr); X86_64.ADD_imm (heapPtr, 48)]
-                @ loadImm64 X86_64.RCX 38L
-                @ [X86_64.MOV_store (destReg, 0, X86_64.RCX)]
-                @ loadImm64 X86_64.RCX -1L
-                @ [ X86_64.MOV_store (destReg, 8, X86_64.RCX)
-                    X86_64.MOV_store (destReg, 16, X86_64.R8)
-                    X86_64.MOV_store (destReg, 24, X86_64.R9)
-                    X86_64.XOR_reg (X86_64.RCX, X86_64.RCX)
-                    X86_64.MOV_store (destReg, 32, X86_64.RCX)
-                    X86_64.MOV_imm32 (X86_64.RCX, 1)
-                    X86_64.MOV_store (destReg, 40, X86_64.RCX) ])
-            | LIR.Execute | LIR.ProcessIO | LIR.TerminateProcess ->
-                let errorMessage =
-                    match operation with
-                    | LIR.ProcessIO | LIR.TerminateProcess -> "Invalid process handle"
-                    | _ -> "native CLI operation unavailable"
-                Ok (emitStringLiteral X86_64.R8 ""
-                @ emitStringLiteral X86_64.R9 errorMessage
-                @ [X86_64.MOV_reg (destReg, heapPtr); X86_64.ADD_imm (heapPtr, 32)]
-                @ loadImm64 X86_64.RCX -1L
-                @ [X86_64.MOV_store (destReg, 0, X86_64.RCX)
-                   X86_64.MOV_store (destReg, 8, X86_64.R8)
-                   X86_64.MOV_store (destReg, 16, X86_64.R9)]
-                @ loadImm64 X86_64.RCX 1L
-                @ [X86_64.MOV_store (destReg, 24, X86_64.RCX)])
-            | LIR.SpawnProcess -> Ok (loadImm64 destReg 1L))
+                match args with
+                | [request] ->
+                    loadCliOperand X86_64.RDI request
+                    |> Result.map (fun loads ->
+                        loads
+                        @ [X86_64.CALL "__dark_cli_run_process"]
+                        @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)]))
+                | _ -> Error "CLI run process expects one request"
+            | LIR.SpawnProcess ->
+                match args with
+                | [command] ->
+                    loadCliOperand X86_64.RDI command
+                    |> Result.map (fun loads ->
+                        loads
+                        @ [X86_64.CALL "__dark_cli_spawn_process"]
+                        @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)]))
+                | _ -> Error "CLI spawn process expects one command"
+            | LIR.ProcessIO ->
+                match args with
+                | [handle; input] ->
+                    loadCliOperand X86_64.RDI handle
+                    |> Result.bind (fun handleLoads ->
+                        loadCliOperand X86_64.RSI input
+                        |> Result.map (fun inputLoads ->
+                            handleLoads @ inputLoads
+                            @ [ X86_64.XOR_reg (X86_64.RDX, X86_64.RDX)
+                                X86_64.CALL "__dark_cli_process_io" ]
+                            @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)])))
+                | _ -> Error "CLI process IO expects a handle and input"
+            | LIR.TerminateProcess ->
+                match args with
+                | [handle] ->
+                    loadCliOperand X86_64.RDI handle
+                    |> Result.map (fun loads ->
+                        loads
+                        @ [X86_64.CALL "__dark_cli_terminate_process"]
+                        @ (if destReg = X86_64.RAX then [] else [X86_64.MOV_reg (destReg, X86_64.RAX)]))
+                | _ -> Error "CLI terminate process expects one handle"
+            )
 
     | LIR.Madd (dest, mulLeft, mulRight, add) ->
         // dest = add + mulLeft * mulRight
@@ -6020,6 +6957,24 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry)) 
                 |> List.exists (function
                     | LIR.CliNative (_, LIR.Execute, _) -> true
                     | _ -> false)))
+    let needsCliRunProcessHelper =
+        functions
+        |> List.exists (fun func ->
+            func.CFG.Blocks
+            |> Map.exists (fun _ block ->
+                block.Instrs
+                |> List.exists (function
+                    | LIR.CliNative (_, LIR.RunProcess, _) -> true
+                    | _ -> false)))
+    let needsCliProcessLifecycleHelpers =
+        functions
+        |> List.exists (fun func ->
+            func.CFG.Blocks
+            |> Map.exists (fun _ block ->
+                block.Instrs
+                |> List.exists (function
+                    | LIR.CliNative (_, (LIR.SpawnProcess | LIR.ProcessIO | LIR.TerminateProcess), _) -> true
+                    | _ -> false)))
 
     let rec translateFuncs acc remaining =
         match remaining with
@@ -6607,6 +7562,16 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry)) 
         |> List.collect (generateRecursiveSumRefCountDecHelper enableLeakCheck recordRegistry sumShapeRegistry)
     translateFuncs [] functions
     |> Result.map (fun allInstrs ->
+        let allInstrs =
+            if needsCliProcessLifecycleHelpers then
+                allInstrs
+                |> List.collect (fun instr ->
+                    if instr = X86_64.Label "_epilogue__start" then
+                        [instr; X86_64.CALL "__dark_cli_cleanup_processes"]
+                    else
+                        [instr])
+            else
+                allInstrs
         let listIncHelper =
             if needsListRcIncHelper then generateListRefCountIncHelper ()
             else []
@@ -6698,4 +7663,4 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry)) 
                 }
             else
                 []
-        allInstrs @ listIncHelper @ listDecHelpers @ dictIncHelper @ plannedDictDecHelpers @ dictDecHelper @ dictDecDynamicKeyHelper @ dictDecDynamicValueHelper @ dictDecDynamicKeyValueHelper @ dictDecDynamicKeyDictValueHelper @ dictDecDynamicKeyDictListValueHelper @ dictDecListValueHelper @ dictDecDictValueHelper @ dictDecDictListValueHelper @ dictDecTupleStringListValueHelper @ dictDecTupleStringListDictValueHelper @ dictDecDynamicKeyTupleStringListDictValueHelper @ dictDecSumStringValueHelper @ closureIncHelper @ closureDecHelper @ streamDecHelper @ recursiveSumRcDecHelpers @ generateCliArgvHelper enableLeakCheck @ (if needsCliGetEnvHelper then generateCliGetEnvHelper enableLeakCheck else []) @ (if needsCliExecuteHelper then generateLinuxCliExecuteHelper enableLeakCheck else []) @ genOomHandler () @ genRuntimeErrorHandler ())
+        allInstrs @ listIncHelper @ listDecHelpers @ dictIncHelper @ plannedDictDecHelpers @ dictDecHelper @ dictDecDynamicKeyHelper @ dictDecDynamicValueHelper @ dictDecDynamicKeyValueHelper @ dictDecDynamicKeyDictValueHelper @ dictDecDynamicKeyDictListValueHelper @ dictDecListValueHelper @ dictDecDictValueHelper @ dictDecDictListValueHelper @ dictDecTupleStringListValueHelper @ dictDecTupleStringListDictValueHelper @ dictDecDynamicKeyTupleStringListDictValueHelper @ dictDecSumStringValueHelper @ closureIncHelper @ closureDecHelper @ streamDecHelper @ recursiveSumRcDecHelpers @ generateCliArgvHelper enableLeakCheck @ (if needsCliGetEnvHelper then generateCliGetEnvHelper enableLeakCheck else []) @ (if needsCliProcessLifecycleHelpers then generateLinuxCliSpawnProcessHelper () @ generateLinuxCliProcessLifecycleHelpers enableLeakCheck else []) @ (if needsCliRunProcessHelper then generateLinuxCliRunProcessHelper enableLeakCheck else []) @ (if needsCliExecuteHelper then generateLinuxCliExecuteHelper enableLeakCheck else []) @ genOomHandler () @ genRuntimeErrorHandler ())

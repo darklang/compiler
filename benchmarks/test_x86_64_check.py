@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "infrastructure"))
 
@@ -18,7 +19,24 @@ from benchmark_baseline import (  # noqa: E402
     TRACKS,
     track_dict,
 )
-from x86_64_check import compare, render_results, validate_qemu_version  # noqa: E402
+from x86_64_check import build_dark, compare, render_results, validate_qemu_version  # noqa: E402
+
+
+class X86_64BuildTests(unittest.TestCase):
+    def test_benchmark_sources_are_compiled_as_compiler_owned(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "bin/DarkCompiler/Debug/net10.0").mkdir(parents=True)
+            (root / "bin/DarkCompiler/Debug/net10.0/DarkCompiler.dll").touch()
+            (root / "benchmarks/problems/example/dark").mkdir(parents=True)
+            (root / "benchmarks/problems/example/dark/main.dark").touch()
+
+            with patch("x86_64_check.command_result") as command:
+                command.return_value.returncode = 0
+
+                self.assertIsNone(build_dark(root, "example", root / "output"))
+
+            self.assertIn("--allow-internal", command.call_args.args[0])
 
 
 class QemuVersionTests(unittest.TestCase):
