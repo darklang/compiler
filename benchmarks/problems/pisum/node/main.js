@@ -19,7 +19,7 @@ function pisum(rounds, n) {
     return s;
 }
 
-// n=10000 gives reasonable runtime
+// Repetition count and series size are supplied by the runner.
 const result = pisum(argument(0), argument(1));
 // Output as integer (multiply by large factor for precision)
 console.log(Math.floor(result * 1000000000000));

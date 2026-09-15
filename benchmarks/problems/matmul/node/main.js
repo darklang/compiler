@@ -25,12 +25,12 @@ function matmul(a, b, n) {
 
 function generateMatrix(n, seed) {
     const matrix = [];
-    let x = seed;
+    let x = BigInt(seed);
     for (let i = 0; i < n; i++) {
         matrix[i] = [];
         for (let j = 0; j < n; j++) {
-            x = (x * 1103515245 + 12345) % (1 << 31);
-            matrix[i][j] = x % 100;
+            x = (x * 1103515245n + 12345n) % (2n ** 31n);
+            matrix[i][j] = Number(x % 100n);
         }
     }
     return matrix;
@@ -46,7 +46,7 @@ function checksum(m, n) {
     return result;
 }
 
-// Use 100x100 matrices for reasonable runtime
+// Matrix size is supplied by the runner.
 const n = argument(0);
 const a = generateMatrix(n, 42);
 const b = generateMatrix(n, 123);

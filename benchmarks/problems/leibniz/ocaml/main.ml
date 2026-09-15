@@ -14,6 +14,6 @@ let rec leibniz_loop i n sum sign =
 let leibniz_pi n =
   leibniz_loop 0 n 0.0 1.0
 
-(* Use 100 million iterations for timing *)
+(* Iteration count is supplied by the runner. *)
 (* Output as integer (multiply by large factor for precision) *)
 let () = Printf.printf "%Ld\n" (Int64.of_float (leibniz_pi (argument 0) *. 100000000.0))

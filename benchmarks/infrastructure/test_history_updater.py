@@ -77,12 +77,11 @@ class HistoryUpdaterTests(unittest.TestCase):
 
             report = (benchmarks_dir / "RESULTS.md").read_text()
             self.assertIn("Darklang interpreter (2.50x)", report)
-            self.assertIn("Node (4.00x)", report)
+            self.assertNotIn("Node (4.00x)", report)
             self.assertIn("OCaml (1.50x)", report)
             self.assertIn("Python (10.0x)", report)
             self.assertIn("250 (2.50x)", report)
-            self.assertIn("400 (4.00x)", report)
-            self.assertIn("400 (4.00x)†", report)
+            self.assertNotIn("400 (4.00x)", report)
             self.assertIn("150 (1.50x)", report)
             self.assertIn("1,000 (10.0x)", report)
 

@@ -30,10 +30,15 @@ from history_updater import update_results
 
 
 LANGUAGES = ("darklang-interpreter", "node", "ocaml", "python")
-ARGUMENT_PATTERN = re.compile(r"Stdlib\.Cli\.Args\.int64\s+([0-9]+|index)\b")
+ARGUMENT_PATTERN = re.compile(
+    r"Stdlib\.Cli\.(?:Args\.int64|__benchmarkArgInt64)\s+([0-9]+|index)\b"
+)
 INSTRUCTION_PATTERN = re.compile(r"I refs:\s*([0-9][0-9,]*)")
 TUPLE_PROJECTION_PATTERN = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\.([012])\b")
 SINGLE_VALUE_DICT_PATTERN = re.compile(r"\bDict<([^,<>]+)>")
+SINGLE_VALUE_DICT_FUNCTION_PATTERN = re.compile(
+    r"(Stdlib\.Dict\.[A-Za-z0-9_]+)<([^,<>]+)>"
+)
 
 
 def inject_interpreter_arguments(source: str, arguments: tuple[str, ...]) -> str:
@@ -63,7 +68,26 @@ def inject_interpreter_arguments(source: str, arguments: tuple[str, ...]) -> str
 def adapt_interpreter_source(source: str, arguments: tuple[str, ...]) -> str:
     """Translate compiler compatibility syntax to the current interpreter surface."""
     transformed = inject_interpreter_arguments(source, arguments)
+    transformed = transformed.replace(
+        "Stdlib.String.__byteAtUnchecked", "Stdlib.String.getByteAt"
+    )
+    transformed = transformed.replace(
+        "Stdlib.String.__substring", "Stdlib.String.substring"
+    )
+    transformed = transformed.replace(
+        "Stdlib.String.__codepointLength", "Stdlib.String.codepointLength"
+    )
+    transformed = transformed.replace(
+        "Stdlib.Float.__toInt64Unchecked", "Stdlib.Float.toInt"
+    )
+    transformed = transformed.replace(
+        "Stdlib.List.__digitsGetAt<Float> v i",
+        "Stdlib.List.getAtOrDefault v i 0.0",
+    )
     transformed = SINGLE_VALUE_DICT_PATTERN.sub(r"Dict<String, \1>", transformed)
+    transformed = SINGLE_VALUE_DICT_FUNCTION_PATTERN.sub(
+        r"\1<String, \2>", transformed
+    )
     transformed = transformed.replace(
         "| Ok closed ->\n"
         "            let nextState = moveCompiler closed.0 next "
@@ -73,6 +97,16 @@ def adapt_interpreter_source(source: str, arguments: tuple[str, ...]) -> str:
         "            let nextState = moveCompiler closedFor.0 next "
         "closedFor.0.reversed closedFor.1 state.trimNext in\n"
         "            let withGoto = emit nextState (Goto closedFor.2) in",
+    )
+    transformed = transformed.replace(
+        "| Ok closed ->\n"
+        "            let nextState = moveCompiler (closed.0) next "
+        "(closed.0.reversed) (closed.1) state.trimNext in\n"
+        "            let withGoto = emit nextState (Goto (closed.2)) in",
+        "| Ok closedFor ->\n"
+        "            let nextState = moveCompiler (closedFor.0) next "
+        "(closedFor.0.reversed) (closedFor.1) state.trimNext in\n"
+        "            let withGoto = emit nextState (Goto (closedFor.2)) in",
     )
     triple_names = {
         match.group(1)
@@ -218,25 +252,6 @@ def parse_instruction_count(stderr: str) -> int:
     return count
 
 
-def adapt_node_source(name: str, source: str) -> str:
-    """Keep legacy recursive JavaScript runnable on engines without tail calls."""
-    if name != "leibniz":
-        return source
-    start = source.index("function leibnizLoop")
-    end = source.index("\n}\n\nfunction leibnizPi", start) + len("\n}\n")
-    iterative = """function leibnizLoop(i, n, sum, sign) {
-    while (i < n) {
-        const term = sign / (2 * i + 1);
-        sum += term;
-        sign = -sign;
-        i += 1;
-    }
-    return sum * 4.0;
-}
-"""
-    return source[:start] + iterative + source[end:]
-
-
 def command_version(command: list[str], environment: dict[str, str] | None = None) -> str:
     result = subprocess.run(
         command,
@@ -285,7 +300,6 @@ def measure_one(
     interpreter: Path | None,
     interpreter_rundir: Path | None,
     timeout: int,
-    allow_output_mismatch: bool,
 ) -> dict[str, object] | None:
     source = source_path(benchmarks_dir, name, language)
     if not source.is_file():
@@ -304,15 +318,15 @@ def measure_one(
         shutil.copytree(interpreter_rundir, isolated_rundir)
         environment["DARK_CONFIG_RUNDIR"] = str(isolated_rundir.resolve()) + "/"
     elif language == "node":
-        prepared = build_dir / f"{name}.js"
-        prepared.write_text(adapt_node_source(name, source.read_text()))
-        command = ["node", "--stack-size=400000", str(prepared), *arguments]
+        command = ["node", "--stack-size=400000", str(source), *arguments]
     elif language == "python":
         command = ["python3", str(source), *arguments]
     else:
+        prepared = build_dir / f"{name}.ml"
+        shutil.copy2(source, prepared)
         binary = build_dir / f"{name}-ocaml"
         subprocess.run(
-            ["ocamlopt", "-O3", str(source), "-o", str(binary)],
+            ["ocamlopt", "-O3", str(prepared), "-o", str(binary)],
             check=True,
             capture_output=True,
             text=True,
@@ -340,7 +354,7 @@ def measure_one(
             f"{measured.stderr.strip()[-500:]}"
         )
     output_valid = measured.stdout == invocation.expected_stdout
-    if not output_valid and not allow_output_mismatch:
+    if not output_valid:
         raise ValueError(
             f"{name} {language} output mismatch: expected "
             f"{invocation.expected_stdout!r}, got {measured.stdout!r}"
@@ -363,7 +377,6 @@ def main() -> int:
     parser.add_argument("--jobs", type=int, default=1)
     parser.add_argument("--timeout", type=int, default=3600)
     parser.add_argument("--allow-partial", action="store_true")
-    parser.add_argument("--allow-output-mismatch", action="store_true")
     args = parser.parse_args()
     benchmarks_dir = Path(__file__).resolve().parent.parent
     architecture = normalize_architecture(platform.machine())
@@ -448,7 +461,6 @@ def main() -> int:
                             args.darklang_interpreter,
                             args.darklang_rundir,
                             args.timeout,
-                            args.allow_output_mismatch and language != "darklang-interpreter",
                         ): name
                         for name in measured_names
                     }

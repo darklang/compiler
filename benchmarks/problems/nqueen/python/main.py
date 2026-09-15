@@ -30,6 +30,6 @@ def nqueen(n):
     solve(0, 0, 0)
     return count
 
-# N=13 gives reasonable runtime
+# Board size is supplied by the runner.
 result = nqueen(argument(0))
 print(result)

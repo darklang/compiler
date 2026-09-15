@@ -40,7 +40,7 @@ def checksum(m, n):
             result = (result + m[i][j] * (i * n + j + 1)) % 1000000007
     return result
 
-# Use 100x100 matrices for reasonable runtime
+# Matrix size is supplied by the runner.
 n = argument(0)
 a = generate_matrix(n, 42)
 b = generate_matrix(n, 123)

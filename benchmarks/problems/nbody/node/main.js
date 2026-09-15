@@ -122,4 +122,4 @@ const bodies = [
 
 offsetMomentum(bodies);
 advance(bodies, 0.01, argument(0));
-console.log(Math.floor(energy(bodies) * 1000000));
+console.log(Math.trunc(energy(bodies) * 1000000));

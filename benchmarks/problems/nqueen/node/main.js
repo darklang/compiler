@@ -28,5 +28,5 @@ function nqueen(n) {
     return solve(0, 0, 0);
 }
 
-// N=13 gives reasonable runtime
+// Board size is supplied by the runner.
 console.log(nqueen(argument(0)));

@@ -54,5 +54,5 @@ let fannkuch n =
 
   !max_flips
 
-(* n=9 gives reasonable runtime *)
+(* Permutation size is supplied by the runner. *)
 let () = Printf.printf "%d\n" (fannkuch (argument 0))

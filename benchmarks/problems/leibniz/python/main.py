@@ -17,7 +17,7 @@ def leibniz_pi(n):
         sign = -sign
     return s * 4
 
-# Use 100 million iterations for timing
+# Iteration count is supplied by the runner.
 result = leibniz_pi(argument(0))
 # Output as integer (multiply by large factor for precision)
 print(int(result * 100000000))

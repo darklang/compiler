@@ -23,7 +23,7 @@ function hashVal(data) {
 
 function hashPair(left, right) {
     const combined = (left + (right * 31n)) & 0xFFFFFFFFFFFFFFFFn;
-    return hashVal(Number(combined & 0xFFFFFFFFFFFFFFFFn));
+    return hashVal(combined);
 }
 
 // Build a complete binary Merkle tree of given depth

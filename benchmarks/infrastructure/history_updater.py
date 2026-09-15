@@ -39,7 +39,7 @@ DIAGNOSTIC_LANGUAGES = (
 
 def load_diagnostic_references(
     benchmarks_dir: Path, snapshot
-) -> dict[str, dict[str, tuple[int, bool]]]:
+) -> dict[str, dict[str, int]]:
     path = (
         benchmarks_dir
         / "baselines"
@@ -64,7 +64,7 @@ def load_diagnostic_references(
     implementations = document.get("implementations")
     if not isinstance(implementations, dict):
         raise BaselineError("diagnostic reference snapshot implementations must be an object")
-    counts: dict[str, dict[str, tuple[int, bool]]] = {}
+    counts: dict[str, dict[str, int]] = {}
     for language, _ in DIAGNOSTIC_LANGUAGES:
         implementation = implementations.get(language)
         if implementation is None:
@@ -73,21 +73,24 @@ def load_diagnostic_references(
             implementation.get("benchmarks"), list
         ):
             raise BaselineError(f"diagnostic {language} benchmark rows must be a list")
-        language_counts: dict[str, tuple[int, bool]] = {}
+        language_counts: dict[str, int] = {}
+        seen_names: set[str] = set()
         for row in implementation["benchmarks"]:
             if not isinstance(row, dict) or not isinstance(row.get("name"), str):
                 raise BaselineError(f"diagnostic {language} row is malformed")
             instructions = row.get("instructions")
             if not isinstance(instructions, int) or instructions <= 0:
                 raise BaselineError(f"diagnostic {language} instruction count must be positive")
-            if row["name"] in language_counts:
+            if row["name"] in seen_names:
                 raise BaselineError(f"diagnostic {language} repeats {row['name']}")
+            seen_names.add(row["name"])
             output_valid = row.get("output_valid")
             if not isinstance(output_valid, bool):
                 raise BaselineError(
                     f"diagnostic {language} output-valid marker must be boolean"
                 )
-            language_counts[row["name"]] = (instructions, output_valid)
+            if output_valid:
+                language_counts[row["name"]] = instructions
         counts[language] = language_counts
     return counts
 
@@ -163,7 +166,7 @@ def update_results(benchmarks_dir: Path, snapshot) -> None:
     diagnostic_geometric = {}
     for language, _ in DIAGNOSTIC_LANGUAGES:
         language_ratios = [
-            diagnostics[language][name][0] / rust
+            diagnostics[language][name] / rust
             for name, _, rust in rows
             if rust and name in diagnostics.get(language, {})
         ]
@@ -186,7 +189,7 @@ def update_results(benchmarks_dir: Path, snapshot) -> None:
         + (f" - {snapshot.compiler.subject}" if snapshot.compiler.subject else ""),
         "**Diagnostic references:** informational only; multipliers are instructions "
         "divided by Rust for the same workload.",
-        "Rows marked `†` completed but did not match the profile's expected stdout.",
+        "Every displayed diagnostic row matched the profile's expected stdout.",
         "",
     ]
     headers = ["Benchmark", f"Dark ({format_ratio(geometric)})", "Rust"]
@@ -206,11 +209,9 @@ def update_results(benchmarks_dir: Path, snapshot) -> None:
         cells = [name, dark_cell, format_number(rust) if rust else "-"]
         for language, _ in DIAGNOSTIC_LANGUAGES:
             diagnostic = diagnostics.get(language, {}).get(name)
-            count = diagnostic[0] if diagnostic else None
-            marker = "" if diagnostic is None or diagnostic[1] else "†"
             cells.append(
-                f"{format_number(count)} ({format_ratio(count / rust)}){marker}"
-                if count and rust
+                f"{format_number(diagnostic)} ({format_ratio(diagnostic / rust)})"
+                if diagnostic and rust
                 else "-"
             )
         lines.append("| " + " | ".join(cells) + " |")

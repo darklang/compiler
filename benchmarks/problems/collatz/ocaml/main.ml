@@ -14,5 +14,5 @@ let rec sum_collatz_range i limit total =
   if i > limit then total
   else sum_collatz_range (Int64.add i 1L) limit (total + collatz_steps i 0)
 
-(* Sum steps for numbers 1 to 100000 *)
+(* The upper bound is supplied by the runner. *)
 let () = Printf.printf "%d\n" (sum_collatz_range 1L (argument64 0) 0)

@@ -13,7 +13,7 @@ function fannkuch(n) {
     const count = [];
     for (let i = 0; i < n; i++) {
         perm[i] = i;
-        count[i] = i;
+        count[i] = i + 1;
     }
     let maxFlips = 0;
 
@@ -50,7 +50,7 @@ function fannkuch(n) {
             if (count[i] > 0) {
                 break;
             }
-            count[i] = i;
+            count[i] = i + 1;
             i++;
         }
         if (i >= n) {
@@ -61,5 +61,5 @@ function fannkuch(n) {
     return maxFlips;
 }
 
-// n=9 gives reasonable runtime
+// Permutation size is supplied by the runner.
 console.log(fannkuch(argument(0)));

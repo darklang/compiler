@@ -8,22 +8,23 @@ function argument(index) {
 // Collatz Benchmark
 // Counts steps in Collatz sequences for numbers 1 to n
 
-function collatzSteps(n, steps) {
-    if (n === 1) {
-        return steps;
-    } else if (n % 2 === 0) {
-        return collatzSteps(n / 2, steps + 1);
-    } else {
-        return collatzSteps(3 * n + 1, steps + 1);
+function collatzSteps(start) {
+    let n = start;
+    let steps = 0;
+    while (n !== 1) {
+        n = n % 2 === 0 ? n / 2 : 3 * n + 1;
+        steps += 1;
     }
+    return steps;
 }
 
-function sumCollatzRange(i, limit, total) {
-    if (i > limit) {
-        return total;
+function sumCollatzRange(limit) {
+    let total = 0;
+    for (let i = 1; i <= limit; i++) {
+        total += collatzSteps(i);
     }
-    return sumCollatzRange(i + 1, limit, total + collatzSteps(i, 0));
+    return total;
 }
 
-// Sum steps for numbers 1 to 100000
-console.log(sumCollatzRange(1, argument(0), 0));
+// The upper bound is supplied by the runner.
+console.log(sumCollatzRange(argument(0)));

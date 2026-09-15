@@ -8,18 +8,16 @@ function argument(index) {
 // Leibniz Pi Benchmark
 // Computes pi using Leibniz formula: pi/4 = 1 - 1/3 + 1/5 - 1/7 + ...
 
-function leibnizLoop(i, n, sum, sign) {
-    if (i >= n) {
-        return sum * 4.0;
-    }
-    const term = sign / (2 * i + 1);
-    return leibnizLoop(i + 1, n, sum + term, -sign);
-}
-
 function leibnizPi(n) {
-    return leibnizLoop(0, n, 0.0, 1.0);
+    let sum = 0.0;
+    let sign = 1.0;
+    for (let i = 0; i < n; i++) {
+        sum += sign / (2 * i + 1);
+        sign = -sign;
+    }
+    return sum * 4.0;
 }
 
-// Use 100 million iterations for timing
+// Iteration count is supplied by the runner.
 // Output as integer (multiply by large factor for precision)
 console.log(Math.floor(leibnizPi(argument(0)) * 100000000));

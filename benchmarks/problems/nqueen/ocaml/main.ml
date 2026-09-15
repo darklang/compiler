@@ -24,5 +24,5 @@ let nqueen n =
 
   solve 0 0 0
 
-(* N=13 gives reasonable runtime *)
+(* Board size is supplied by the runner. *)
 let () = Printf.printf "%Ld\n" (nqueen (argument 0))

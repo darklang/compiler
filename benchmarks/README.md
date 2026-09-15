@@ -287,17 +287,17 @@ independently:
 python3 benchmarks/infrastructure/diagnostic_references.py \
   --darklang-interpreter=/path/to/dark \
   --darklang-rundir=/path/to/prepared-rundir \
-  --jobs=4 \
-  --allow-output-mismatch
+  --jobs=4
 ```
 
 The Darklang CLI currently accepts script arguments but does not expose them to
 the executed expression. The diagnostic runner therefore prepares a temporary
 copy of each Dark benchmark with its declared `profiles.json` integer arguments
-substituted at the `Stdlib.Cli.Args.int64` boundary. That copy also translates
-the compiler's documented interpreter-compatibility spellings where the latest
-interpreter surface has since changed (including dictionary type arguments,
-tuple projections, enum-value qualification, and integer-indexed string APIs).
+substituted at the `Stdlib.Cli.__benchmarkArgInt64` boundary. That copy also
+translates the compiler's documented interpreter-compatibility spellings where
+the latest interpreter surface has since changed (including dictionary type
+arguments, tuple projections, enum-value qualification, and integer-indexed
+string APIs).
 Each parallel interpreter worker receives a private copy of the prepared
 rundir, preventing trace-store lock contention from affecting the measurement.
 The runner validates exact stdout before recording the instruction count. The
@@ -305,14 +305,9 @@ maintained benchmark sources are not changed. A full interpreter refresh can
 take tens of minutes per workload under Cachegrind, so the runner's default
 per-workload timeout is one hour.
 
-Some legacy Node, OCaml, and Python programs are no longer output-equivalent to
-the audited Dark/Rust pair. A diagnostic refresh can retain their measurements
-with `--allow-output-mismatch`; each affected JSON row is stamped
-`"output_valid": false`. This is another reason these columns must not be used
-as parity evidence or performance gates. Interpreter output remains strict.
-The runner also converts Node's tail-recursive Leibniz loop to the equivalent
-iterative loop because V8 does not implement proper tail calls at this workload
-size.
+Every diagnostic implementation must match the profile's expected stdout
+exactly before its measurement can be recorded. Node, OCaml, and Python consume
+the same per-workload arguments supplied by the runner as the Dark compiler.
 
 ### Timing Mode (`--hyperfine`)
 

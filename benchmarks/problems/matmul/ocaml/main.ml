@@ -38,7 +38,7 @@ let checksum m n =
   done;
   !result
 
-(* Use 100x100 matrices for reasonable runtime *)
+(* Matrix size is supplied by the runner. *)
 let () =
   let n = argument 0 in
   let a = generate_matrix n 42L in

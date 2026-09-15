@@ -15,7 +15,7 @@ let pisum rounds n =
   done;
   !s
 
-(* n=10000 gives reasonable runtime *)
+(* Repetition count and series size are supplied by the runner. *)
 let () =
   let result = pisum (argument 0) (argument 1) in
   (* Output as integer (multiply by large factor for precision) *)

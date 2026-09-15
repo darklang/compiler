@@ -11,7 +11,7 @@ def argument(index):
 
 def fannkuch(n):
     perm = list(range(n))
-    count = list(range(n))
+    count = list(range(1, n + 1))
     max_flips = 0
     checksum = 0
     nperm = 0
@@ -38,7 +38,7 @@ def fannkuch(n):
             count[i] -= 1
             if count[i] > 0:
                 break
-            count[i] = i
+            count[i] = i + 1
             i += 1
         else:
             break
@@ -46,6 +46,6 @@ def fannkuch(n):
 
     return max_flips
 
-# n=9 gives reasonable runtime
+# Permutation size is supplied by the runner.
 result = fannkuch(argument(0))
 print(result)

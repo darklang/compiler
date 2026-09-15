@@ -26,6 +26,6 @@ def sum_collatz(limit):
         total += collatz_steps(i)
     return total
 
-# Sum steps for numbers 1 to 100000
+# The upper bound is supplied by the runner.
 result = sum_collatz(argument(0))
 print(result)

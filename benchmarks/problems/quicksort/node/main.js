@@ -21,10 +21,10 @@ function quicksort(arr) {
 
 function generateList(n, seed) {
     const result = [];
-    let x = seed;
+    let x = BigInt(seed);
     for (let i = 0; i < n; i++) {
-        x = (x * 1103515245 + 12345) % (1 << 31);
-        result.push(x % 10000);
+        x = (x * 1103515245n + 12345n) % (2n ** 31n);
+        result.push(Number(x % 10000n));
     }
     return result;
 }
