@@ -188,6 +188,8 @@ print(json.dumps({
             self.assertIn("health: healthy", completed.stdout)
             self.assertIn("RUNNING: 1 job(s) are running", completed.stdout)
             self.assertIn("in train:\n", completed.stdout)
+            self.assertIn("\n\nrecent merges:\n", completed.stdout)
+            self.assertIn("\n\nbenchmark ratio: 2.8x\n", completed.stdout)
             attention = completed.stdout.index(
                 "  #9 attention Repair benchmark conflict [agent/repair] — merge conflict"
             )
