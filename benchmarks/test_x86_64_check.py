@@ -23,7 +23,7 @@ from x86_64_check import build_dark, compare, render_results, validate_qemu_vers
 
 
 class X86_64BuildTests(unittest.TestCase):
-    def test_benchmark_sources_are_compiled_as_compiler_owned(self) -> None:
+    def test_benchmark_sources_use_the_public_parser_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "bin/DarkCompiler/Debug/net10.0").mkdir(parents=True)
@@ -36,7 +36,7 @@ class X86_64BuildTests(unittest.TestCase):
 
                 self.assertIsNone(build_dark(root, "example", root / "output"))
 
-            self.assertIn("--allow-internal", command.call_args.args[0])
+            self.assertNotIn("--allow-internal", command.call_args.args[0])
 
 
 class QemuVersionTests(unittest.TestCase):
