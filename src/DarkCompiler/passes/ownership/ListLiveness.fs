@@ -18,8 +18,28 @@ let rec internal valueContract operation : ValueLiveness.Contract<ListId> =
 and private entryLive (FunctionalBlock block) liveAfter =
     List.foldBack (fun operation live -> ValueLiveness.liveBefore (valueContract operation) live) block.Operations liveAfter
 
+let private hirContract operation : HIR.ValueContract =
+    match operation with
+    | Construct (output, Literal elements) ->
+        { Inputs = []; Operands = elements; Outputs = [output] }
+    | Construct (output, Repeat (count, value)) ->
+        { Inputs = []; Operands = [count; value]; Outputs = [output] }
+    | Transform (output, input, Map callback) ->
+        { Inputs = [input]; Operands = [callback]; Outputs = [output] }
+    | Transform (output, input, Reverse) ->
+        { Inputs = [input]; Operands = []; Outputs = [output] }
+    | Fold (output, input, initial, callback) ->
+        { Inputs = [input]; Operands = [initial; callback]; Outputs = [output] }
+
 /// No physical ownership is needed to check the region's incoming value
 /// interface. The current representation permits no external collection roots.
 let verifyFunctional (FunctionalRegion block) : Result<unit, string> =
-    if Set.isEmpty (entryLive block Set.empty) then Ok ()
-    else Error "List HIR: external collection roots in a closed region"
+    let dialect : VerifyHIR.Dialect<Operation<Transform>, FunctionalBlock> = {
+        Body = fun (FunctionalBlock block) -> block
+        Leaf = hirContract
+    }
+    VerifyHIR.verify dialect block
+    |> Result.mapError (fun error -> $"List HIR: {error}")
+    |> Result.bind (fun () ->
+        if Set.isEmpty (entryLive block Set.empty) then Ok ()
+        else Error "List HIR: external collection roots in a closed region")

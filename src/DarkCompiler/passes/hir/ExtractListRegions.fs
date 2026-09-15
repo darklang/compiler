@@ -9,8 +9,8 @@ open ListRegion
 type private ScalarLifetime = EnclosingLifetime | JoinEntryLifetime
 
 type private Extraction = {
-    Lists: Map<string, ListId>
-    Types: Map<string, AST.Type>
+    Lists: Map<string, HIR.Value>
+    Values: Map<string, HIR.Value>
     Operations: HIR.Operation<Operation<Transform>, FunctionalBlock> list
     NextId: int
     Lifetime: ScalarLifetime
@@ -89,11 +89,20 @@ let scopeContracts infer (functions: AST.FunctionDef list) =
 /// original checked expression then uses the supported persistent List path.
 let tryExtract
     (inertScopes: Set<string>)
+    (parameterTypes: Map<string, AST.Type>)
     (infer: Map<string, AST.Type> -> AST.Expr -> Result<AST.Type, string>)
     (freeVariables: AST.Expr -> Set<string>)
     (expression: AST.Expr)
     : FunctionalRegion option =
     let inertExpression = inertExpression infer (fun name -> Set.contains name inertScopes)
+    let types state = state.Values |> Map.map (fun _ value -> value.Type)
+    let normalizedOperand state expr typ =
+        let inputs =
+            freeVariables expr
+            |> Set.toList
+            |> List.choose (fun name -> Map.tryFind name state.Values |> Option.map (fun value -> name, value))
+            |> Map.ofList
+        { Expression = expr; Type = typ; Inputs = inputs }
 
     let operand state accepts expr : Scalar option =
         let referencesList =
@@ -101,11 +110,11 @@ let tryExtract
         let destructionIsInert =
             match state.Lifetime with
             | EnclosingLifetime -> true
-            | JoinEntryLifetime -> inertExpression state.Types expr
+            | JoinEntryLifetime -> inertExpression (types state) expr
         if referencesList || not destructionIsInert then None
         else
-            match infer state.Types expr with
-            | Ok typ when accepts typ -> Some { Expression = expr; Type = typ }
+            match infer (types state) expr with
+            | Ok typ when accepts typ -> Some (normalizedOperand state expr typ)
             | _ -> None
 
     let scalar state expr = operand state immediate expr
@@ -128,13 +137,16 @@ let tryExtract
             | _ -> false
         if not capturesAreImmediate || not scopeIsInert then None
         else
-            match infer state.Types expr with
-            | Ok typ when typ = expected -> Some { Expression = expr; Type = typ }
+            match infer (types state) expr with
+            | Ok typ when typ = expected -> Some (normalizedOperand state expr typ)
             | _ -> None
 
+    let fresh typ state =
+        { Id = HIR.ValueId state.NextId; Type = typ }, { state with NextId = state.NextId + 1 }
+
     let addList state operation =
-        let id = ListId state.NextId
-        id, { state with Operations = operation id :: state.Operations; NextId = state.NextId + 1 }
+        let value, next = fresh (AST.TList AST.TInt64) state
+        value, { next with Operations = operation value :: state.Operations }
 
     let rec list state expr =
         match expr with
@@ -170,11 +182,12 @@ let tryExtract
                     region name { state with Operations = []; NextId = afterYes; Lifetime = JoinEntryLifetime } no
                     |> Option.bind (fun (FunctionalBlock no as noBlock, afterNo) ->
                         if yes.Result.Type <> no.Result.Type then None
-                        else Some { state with
-                                      NextId = afterNo
-                                      Types = Map.add name yes.Result.Type state.Types
+                        else
+                            let result, next = fresh yes.Result.Type { state with NextId = afterNo }
+                            Some { next with
+                                      Values = Map.add name result state.Values
                                       Lists = Map.remove name state.Lists
-                                      Operations = Branch (name, condition, yesBlock, noBlock) :: state.Operations })))
+                                      Operations = Branch (result, condition, yesBlock, noBlock) :: state.Operations })))
         | _ -> bindSimpleScalar state name expr
 
     and bindSimpleScalar state name expr =
@@ -184,17 +197,19 @@ let tryExtract
             |> Option.bind (fun (source, next) ->
                 match scalar state initial, callback state (AST.TFunction ([AST.TInt64; AST.TInt64], AST.TInt64)) fn with
                 | Some initial, Some fn when initial.Type = AST.TInt64 ->
-                    Some { next with
-                             Types = Map.add name AST.TInt64 next.Types
+                    let result, afterResult = fresh AST.TInt64 next
+                    Some { afterResult with
+                             Values = Map.add name result next.Values
                              Lists = Map.remove name next.Lists
-                             Operations = Leaf (Fold (name, source, initial, fn)) :: next.Operations }
+                             Operations = Leaf (Fold (result, source, initial, fn)) :: next.Operations }
                 | _ -> None)
         | _ ->
             scalar state expr
             |> Option.map (fun value ->
-                { state with Types = Map.add name value.Type state.Types
-                             Lists = Map.remove name state.Lists
-                             Operations = ScalarBinding (name, value) :: state.Operations })
+                let result, next = fresh value.Type state
+                { next with Values = Map.add name result state.Values
+                            Lists = Map.remove name state.Lists
+                            Operations = ScalarBinding (result, value) :: state.Operations })
 
     and region finalName state expr =
         match expr with
@@ -202,15 +217,16 @@ let tryExtract
             match list state value with
             | Some (id, next) ->
                 region finalName { next with Lists = Map.add name id next.Lists
-                                             Types = Map.add name (AST.TList AST.TInt64) next.Types } body
+                                             Values = Map.add name id next.Values } body
             | None -> bindScalar state name value |> Option.bind (fun next -> region finalName next body)
         | _ ->
             bindScalar state finalName expr
             |> Option.bind (fun next ->
-                Map.tryFind finalName next.Types
-                |> Option.map (fun typ ->
-                    FunctionalBlock { Operations = List.rev next.Operations
-                                      Result = { Expression = AST.Var finalName; Type = typ } }, next.NextId))
+                Map.tryFind finalName next.Values
+                |> Option.map (fun result ->
+                    FunctionalBlock { Parameters = Map.empty
+                                      Operations = List.rev next.Operations
+                                      Result = result }, next.NextId))
 
     let rec collectNames expr =
         match expr with
@@ -235,6 +251,16 @@ let tryExtract
         | _ -> isListOperation expression
     if candidate then
         let finalName = resultName (collectNames expression) 0
-        region finalName { Lists = Map.empty; Types = Map.empty; Operations = []; NextId = 0; Lifetime = EnclosingLifetime } expression
-        |> Option.bind (fun (block, nextId) -> if nextId = 0 then None else Some (FunctionalRegion block))
+        let parameterNames = freeVariables expression |> Set.intersect (parameterTypes |> Map.keys |> Set.ofSeq)
+        let parameters, nextId =
+            parameterNames
+            |> Set.toList
+            |> List.mapFold (fun nextId name ->
+                let typ = Map.find name parameterTypes
+                (name, { Id = HIR.ValueId nextId; Type = typ }), nextId + 1) 0
+            |> fun (values, nextId) -> Map.ofList values, nextId
+        region finalName { Lists = Map.empty; Values = parameters; Operations = []; NextId = nextId; Lifetime = EnclosingLifetime } expression
+        |> Option.bind (fun (FunctionalBlock block, finalId) ->
+            if finalId = nextId then None
+            else Some (FunctionalRegion (FunctionalBlock { block with Parameters = parameters })))
     else None

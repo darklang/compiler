@@ -2,7 +2,7 @@
 
 module ListRegion
 
-type ListId = ListId of int
+type ListId = HIR.ValueId
 
 type Scalar = HIR.Operand
 
@@ -15,9 +15,9 @@ type Construction =
     | Repeat of count: Scalar * value: Scalar
 
 type Operation<'transform> =
-    | Construct of result: ListId * construction: Construction
-    | Transform of result: ListId * source: ListId * operation: 'transform
-    | Fold of name: string * source: ListId * initial: Scalar * callback: Scalar
+    | Construct of result: HIR.Value * construction: Construction
+    | Transform of result: HIR.Value * source: HIR.Value * operation: 'transform
+    | Fold of result: HIR.Value * source: HIR.Value * initial: Scalar * callback: Scalar
 type FunctionalBlock = internal FunctionalBlock of HIR.Block<HIR.Operation<Operation<Transform>, FunctionalBlock>>
 type FunctionalRegion = internal FunctionalRegion of FunctionalBlock
 
@@ -91,11 +91,11 @@ let internal lookup name key map =
     | None -> Crash.crash $"List HIR: missing {name} for {key}"
 
 let internal source = function
-    | HIR.Leaf (Transform (_, input, _) | Fold (_, input, _, _)) -> Some input
+    | HIR.Leaf (Transform (_, input, _) | Fold (_, input, _, _)) -> Some input.Id
     | HIR.Leaf (Construct _) | HIR.ScalarBinding _ | HIR.Branch _ -> None
 
 let internal result = function
-    | HIR.Leaf (Construct (output, _) | Transform (output, _, _)) -> Some output
+    | HIR.Leaf (Construct (output, _) | Transform (output, _, _)) -> Some output.Id
     | HIR.Leaf (Fold _) | HIR.ScalarBinding _ | HIR.Branch _ -> None
 
 let internal immediate = function

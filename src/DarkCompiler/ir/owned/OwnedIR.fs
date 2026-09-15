@@ -25,6 +25,7 @@ and Block<'leaf, 'id> = {
 type Semantics<'leaf, 'id when 'id: comparison> = {
     Leaf: 'leaf -> Contract<'id>
     ScalarUses: HIR.Operand -> Set<'id>
+    ValueUses: HIR.Value -> Set<'id>
 }
 
 type VerificationError<'id when 'id: comparison> =

@@ -15,14 +15,18 @@ ANF → MIR → LIR → target ISA → Binary
 - **LIR**: Shared low-level instructions with virtual registers and abstract
   physical register names that each backend maps to its target ISA
 
-Before ANF, `ir/hir/HIR.fs` supplies typed structured control flow shared by
-semantic leaf dialects. `ir/owned/OwnedIR.fs` supplies ownership-bearing blocks
+Before ANF, `ir/hir/HIR.fs` supplies typed value identities and structured
+control flow shared by semantic leaf dialects. `passes/hir/VerifyHIR.fs`
+independently checks definitions, uses, types, and branch results.
+`ir/owned/OwnedIR.fs` supplies ownership-bearing blocks
 and explicit borrow/consume/produce contracts, checked independently by
 `passes/ownership/VerifyOwnership.fs`. Representation-independent liveness and
 destruction proofs live in `analysis/`. The list dialect uses these interfaces
 for closed collection regions, storage selection, and branch-aware ownership.
-Opaque operands still contain checked AST; this is not yet a whole-program
-normalized HIR or a general RC solver. See
+Opaque operands still contain checked AST evaluation payloads, but their local
+inputs are normalized identities rather than lexical-name lookups. HIR coverage
+is still limited to extracted closed regions; this is not yet a whole-program
+semantic HIR or a general RC solver. See
 [compiler-selected list arrays](runtime/list-array-reuse.md) for its boundary
 and the remaining general ownership work.
 

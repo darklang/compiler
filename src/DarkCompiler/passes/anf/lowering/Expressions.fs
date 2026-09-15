@@ -15,7 +15,7 @@ let rec toANFCore (sumTypeNames: Set<string>) (inertScopes: Set<string>) (expr: 
     let infer localTypes value =
         let types = Map.fold (fun types name typ -> Map.add name typ types) (typeEnvFromVarEnv env) localTypes
         inferTypeCore sumTypeNames value types typeReg variantLookup funcReg moduleRegistry
-    match ExtractListRegions.tryExtract inertScopes infer (fun value -> freeVars value Set.empty) expr with
+    match ExtractListRegions.tryExtract inertScopes (typeEnvFromVarEnv env) infer (fun value -> freeVars value Set.empty) expr with
     | Some region ->
         let lower value vg environment = toANFUnplannedCore sumTypeNames inertScopes value vg environment typeReg variantLookup funcReg moduleRegistry
         ListLiveness.verifyFunctional region |> Result.bind (fun () ->

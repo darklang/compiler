@@ -4,27 +4,37 @@ module RegionContractTests
 
 open OwnedIR
 
-let private unitValue : HIR.Operand = { Expression = AST.UnitLiteral; Type = AST.TUnit }
-let private reference name : HIR.Operand = { Expression = AST.Var name; Type = AST.TInt64 }
-let private condition : HIR.Operand = { Expression = AST.BoolLiteral true; Type = AST.TBool }
+let private identity = function
+    | "a" -> HIR.ValueId 0
+    | "b" -> HIR.ValueId 1
+    | "c" -> HIR.ValueId 2
+    | name -> Crash.crash $"Unsupported ownership fixture identity {name}"
+let private value name : HIR.Value = { Id = identity name; Type = AST.TInt64 }
+let private unitValue : HIR.Value = { Id = HIR.ValueId 100; Type = AST.TUnit }
+let private reference name : HIR.Operand =
+    { Expression = AST.Var name; Type = AST.TInt64; Inputs = Map.ofList [name, value name] }
+let private condition : HIR.Operand = { Expression = AST.BoolLiteral true; Type = AST.TBool; Inputs = Map.empty }
 
 let private semantics : Semantics<Contract<string>, string> = {
     Leaf = id
     ScalarUses = fun value ->
-        match value.Expression with
-        | AST.Var name -> Set.singleton name
-        | AST.UnitLiteral | AST.BoolLiteral _ -> Set.empty
-        | _ -> Crash.crash "Unsupported operand in ownership contract fixture"
+        value.Inputs |> Map.keys |> Set.ofSeq
+    ValueUses = fun value ->
+        match value.Id with
+        | HIR.ValueId 0 -> Set.singleton "a"
+        | HIR.ValueId 1 -> Set.singleton "b"
+        | HIR.ValueId 2 -> Set.singleton "c"
+        | _ -> Set.empty
 }
 
 let private step inputs outputs releases : Step<Contract<string>, string> =
     { Operation = HIR.Leaf { Inputs = inputs; Outputs = outputs }; Releases = releases }
 let private block entry operations : Block<Contract<string>, string> =
-    { EntryReleases = entry; Body = { Operations = operations; Result = unitValue } }
+    { EntryReleases = entry; Body = { Parameters = Map.empty; Operations = operations; Result = unitValue } }
 let private branch predicate yes no : Step<Contract<string>, string> =
-    { Operation = HIR.Branch ("choice", predicate, yes, no); Releases = [] }
+    { Operation = HIR.Branch ({ Id = HIR.ValueId 101; Type = AST.TUnit }, predicate, yes, no); Releases = [] }
 let private read name releases : Step<Contract<string>, string> =
-    { Operation = HIR.ScalarBinding ("read", reference name); Releases = releases }
+    { Operation = HIR.ScalarBinding ({ Id = HIR.ValueId 102; Type = AST.TInt64 }, reference name); Releases = releases }
 let private check expected region () =
     let actual = VerifyOwnership.verifyClosed semantics region
     if actual = expected then Ok () else Error $"Expected {expected}, got {actual}"
@@ -47,7 +57,7 @@ let tests = [
     "Ownership contracts check branch conditions", check (Error (InvalidUse "a"))
         (block [] [branch (reference "a") (block [] []) (block [] [])])
     "Ownership contracts check block results", check (Error (InvalidUse "a"))
-        { EntryReleases = []; Body = { Operations = [step [] ["a"] ["a"]]; Result = reference "a" } }
+        { EntryReleases = []; Body = { Parameters = Map.empty; Operations = [step [] ["a"] ["a"]]; Result = value "a" } }
     "Ownership contracts allow consumption on exclusive paths", check (Ok ())
         (block [] [step [] ["a"] []; branch condition
             (block [] [step [Consumed "a"] [] []])

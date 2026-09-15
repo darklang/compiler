@@ -53,11 +53,15 @@ FunctionalRegion: typed blocks + semantic collection edges + scalar joins
   -> existing ANF primitives -> MIR -> existing native backends
 ```
 
-`ir/hir/HIR.fs` defines shared typed operands, scalar bindings, branches, and
-blocks independent of array layouts and ANF. `ir/owned/OwnedIR.fs` defines
+`ir/hir/HIR.fs` defines shared typed value identities, operands, scalar
+bindings, branches, and blocks independent of array layouts and ANF.
+Opaque scalar expressions retain their checked AST evaluation payload while
+their local inputs use normalized identities. `passes/hir/VerifyHIR.fs` checks
+definitions, uses, types, and structured branch results independently.
+`ir/owned/OwnedIR.fs` defines
 ownership-bearing steps/blocks and explicit unit-transfer contracts. Value-edge
 liveness and destruction proofs live separately in `analysis/`. These interfaces
-are used by the list dialect, not yet a whole-program normalized semantic IR
+are used by the list dialect, not yet a whole-program semantic IR
 or a primitive effect registry. Opaque scalar expressions and callbacks retain
 their original evaluation order; their types are not evidence of purity.
 

@@ -54,8 +54,12 @@ let private wrap bindings body = List.foldBack (fun (id, value) tail -> ANF.Let 
 /// Lower verified storage operations to existing raw memory and RC primitives.
 /// The raw pointer is never tagged as a source List or assigned a fake Blob type.
 let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (block, layouts) as region) =
-    let lowerValue env vg (value: Scalar) =
-        lowerScalar value.Expression vg env
+    let lowerValue values vg (value: Scalar) =
+        let sourceEnv =
+            value.Inputs
+            |> Map.fold (fun sourceEnv name input ->
+                Map.add name (lookup "scalar value" input.Id values) sourceEnv) env
+        lowerScalar value.Expression vg sourceEnv
         |> Result.map (fun (expr, next) ->
             let id, final = ANF.freshVar next
             bindReturns expr (fun atom -> ANF.Let (id, ANF.TypedAtom (atom, value.Type), ANF.Return (ANF.Var id))), ANF.Var id, final)
@@ -90,69 +94,71 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (block, layouts) as reg
             let _, initialized, final = write copy 16 buffer.Length afterCopy
             wrap (allocations @ List.concat copied @ initialized) (ANF.Return copy), final
 
-    let rec lowerBlock env buffers vg block =
+    let rec lowerBlock values buffers vg block =
         let releases, next = release buffers block.EntryReleases vg
-        loop block.Body.Result env buffers next block.Body.Operations
+        loop block.Body.Result values buffers next block.Body.Operations
         |> Result.map (fun (body, final) -> wrap releases body, final)
-    and loop finalValue env buffers vg (steps: OwnedOperation list) =
+    and loop finalValue values buffers vg (steps: OwnedOperation list) =
         match steps with
-        | [] -> lowerScalar finalValue.Expression vg env
+        | [] ->
+            let id, _ = lookup "block result" finalValue.Id values
+            Ok (ANF.Return (ANF.Var id), vg)
         | step :: rest ->
-            let lowerRest env buffers vg =
+            let lowerRest values buffers vg =
                 let releases, next = release buffers step.Releases vg
-                loop finalValue env buffers next rest |> Result.map (fun (body, final) -> wrap releases body, final)
+                loop finalValue values buffers next rest |> Result.map (fun (body, final) -> wrap releases body, final)
             match step.Operation with
-            | Branch (name, condition, yes, no) ->
-                lowerValue env vg condition |> Result.bind (fun (evaluation, condition, next) ->
-                    lowerBlock env buffers next yes |> Result.bind (fun (yesExpr, afterYes) ->
-                        lowerBlock env buffers afterYes no |> Result.bind (fun (noExpr, afterNo) ->
+            | Branch (result, condition, yes, no) ->
+                lowerValue values vg condition |> Result.bind (fun (evaluation, condition, next) ->
+                    lowerBlock values buffers next yes |> Result.bind (fun (yesExpr, afterYes) ->
+                        lowerBlock values buffers afterYes no |> Result.bind (fun (noExpr, afterNo) ->
                             let joined, afterJoin = ANF.freshVar afterNo
-                            let typ = yes.Body.Result.Type
-                            lowerRest (Map.add name (joined, typ) env) buffers afterJoin
+                            let typ = result.Type
+                            lowerRest (Map.add result.Id (joined, typ) values) buffers afterJoin
                             |> Result.map (fun (body, final) ->
                                 let jump atom = ANF.Jump (joined, atom)
                                 let entry = ANF.If (condition, bindReturns yesExpr jump, bindReturns noExpr jump)
                                 bindReturns evaluation (fun _ -> ANF.Join ({ Id = joined; Type = typ }, body, entry)), final))))
-            | ScalarBinding (name, value) ->
-                lowerValue env vg value
+            | ScalarBinding (result, value) ->
+                lowerValue values vg value
                 |> Result.bind (fun (expr, atom, next) ->
                     match atom with
                     | ANF.Var id ->
-                        lowerRest (Map.add name (id, value.Type) env) buffers next
+                        lowerRest (Map.add result.Id (id, value.Type) values) buffers next
                         |> Result.map (fun (body, final) -> bindReturns expr (fun _ -> body), final)
                     | _ -> Crash.crash "List HIR: scalar lowering must bind its result")
             | Leaf (Construct (output, Repeat (count, value))) ->
-                lowerValue env vg count |> Result.bind (fun (countExpr, countAtom, afterCount) ->
-                    lowerValue env afterCount value |> Result.bind (fun (valueExpr, valueAtom, afterValue) ->
+                lowerValue values vg count |> Result.bind (fun (countExpr, countAtom, afterCount) ->
+                    lowerValue values afterCount value |> Result.bind (fun (valueExpr, valueAtom, afterValue) ->
                         let pointer, allocation, afterAllocation = emit (ANF.Call ("Stdlib.List.__arrayRepeat", [countAtom; valueAtom])) afterValue
                         let length, load, afterLoad = emit (ANF.RawGet (pointer, word 0, Some AST.TInt64)) afterAllocation
-                        let buffer = { Pointer = pointer; Length = length; Layout = lookup "construction layout" output layouts }
-                        lowerRest env (Map.add output buffer buffers) afterLoad
+                        let buffer = { Pointer = pointer; Length = length; Layout = lookup "construction layout" output.Id layouts }
+                        lowerRest values (Map.add output.Id buffer buffers) afterLoad
                         |> Result.map (fun (body, final) ->
                             bindReturns countExpr (fun _ -> bindReturns valueExpr (fun _ -> wrap (allocation @ load) body)), final)))
             | Leaf (Construct (output, Literal elements)) ->
-                let rec evaluate vg expressions values =
+                let rec evaluate vg expressions evaluated =
                     match expressions with
-                    | [] -> Ok (ANF.Return ANF.UnitLiteral, List.rev values, vg)
+                    | [] -> Ok (ANF.Return ANF.UnitLiteral, List.rev evaluated, vg)
                     | value :: tail ->
-                        lowerValue env vg value |> Result.bind (fun (expr, atom, next) ->
-                            evaluate next tail (atom :: values)
+                        lowerValue values vg value |> Result.bind (fun (expr, atom, next) ->
+                            evaluate next tail (atom :: evaluated)
                             |> Result.map (fun (body, atoms, final) -> bindReturns expr (fun _ -> body), atoms, final))
                 evaluate vg elements [] |> Result.bind (fun (evaluation, atoms, next) ->
-                    let layout = lookup "construction layout" output layouts
+                    let layout = lookup "construction layout" output.Id layouts
                     let length = word (List.length elements)
                     let pointer, allocation, afterAllocation = allocate layout length next
                     let writes, afterWrites = atoms |> List.mapi (fun index atom -> index, atom) |> List.mapFold (fun state (index, atom) -> let _, bindings, next = write pointer (elementOffset index) atom state in bindings, next) afterAllocation
                     let _, initialized, afterInit = write pointer 16 length afterWrites
                     let buffer = { Pointer = pointer; Length = length; Layout = layout }
-                    lowerRest env (Map.add output buffer buffers) afterInit
+                    lowerRest values (Map.add output.Id buffer buffers) afterInit
                     |> Result.map (fun (body, final) -> bindReturns evaluation (fun _ -> wrap (allocation @ List.concat writes @ initialized) body), final))
             | Leaf (Transform (output, input, (operation, ownership))) ->
-                let buffer = lookup "transform buffer" input buffers
+                let buffer = lookup "transform buffer" input.Id buffers
                 let callback =
                     match operation with
                     | Reverse -> Ok (ANF.Return ANF.UnitLiteral, ANF.UnitLiteral, vg)
-                    | Map fn -> lowerValue env vg fn
+                    | Map fn -> lowerValue values vg fn
                 callback |> Result.bind (fun (evaluation, fn, next) ->
                     let preparation, afterPreparation = prepareMutation buffer ownership next
                     let destination, afterDestination = ANF.freshVar afterPreparation
@@ -180,15 +186,15 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (block, layouts) as reg
                                 let _, leftWrite, afterLeft = write target (elementOffset index) right afterRight
                                 let _, rightWrite, final = write target (elementOffset other) left afterLeft
                                 leftLoad @ rightLoad @ leftWrite @ rightWrite, final) afterDestination
-                    lowerRest env (Map.add output { buffer with Pointer = target } buffers) afterMutation
+                    lowerRest values (Map.add output.Id { buffer with Pointer = target } buffers) afterMutation
                     |> Result.map (fun (body, final) ->
                         bindReturns evaluation (fun _ ->
                             bindReturns preparation (fun selected ->
                                 ANF.Let (destination, ANF.TypedAtom (selected, AST.TRawPtr), wrap (List.concat mutations) body))), final))
-            | Leaf (Fold (name, input, initial, fn)) ->
-                lowerValue env vg initial |> Result.bind (fun (initialExpr, accumulator, next) ->
-                    lowerValue env next fn |> Result.bind (fun (callbackExpr, callback, afterCallback) ->
-                        let buffer = lookup "fold buffer" input buffers
+            | Leaf (Fold (result, input, initial, fn)) ->
+                lowerValue values vg initial |> Result.bind (fun (initialExpr, accumulator, next) ->
+                    lowerValue values next fn |> Result.bind (fun (callbackExpr, callback, afterCallback) ->
+                        let buffer = lookup "fold buffer" input.Id buffers
                         let bindings, (value, afterFold) =
                             match buffer.Layout with
                             | MappedArray _ | RuntimeArray _ ->
@@ -200,9 +206,12 @@ let lower (lowerScalar: LowerScalar) env vg (OwnedRegion (block, layouts) as reg
                                     let result, calls, final = emit (ANF.ClosureCall (callback, [acc; element])) next
                                     loads @ calls, (result, final)) (accumulator, afterCallback)
                         let id, afterId = ANF.freshVar afterFold
-                        lowerRest (Map.add name (id, AST.TInt64) env) buffers afterId
+                        lowerRest (Map.add result.Id (id, AST.TInt64) values) buffers afterId
                         |> Result.map (fun (body, final) ->
                             bindReturns initialExpr (fun _ -> bindReturns callbackExpr (fun _ ->
                                 wrap (List.concat bindings) (ANF.Let (id, ANF.TypedAtom (value, AST.TInt64), body)))), final)))
 
-    verify region |> Result.bind (fun () -> lowerBlock env Map.empty vg block)
+    let initialValues =
+        block.Body.Parameters
+        |> Map.fold (fun values name parameter -> Map.add parameter.Id (lookup "root parameter" name env) values) Map.empty
+    verify region |> Result.bind (fun () -> lowerBlock initialValues Map.empty vg block)

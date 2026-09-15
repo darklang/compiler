@@ -22,7 +22,7 @@ let allocationBudget (OwnedRegion (block, layouts)) : AllocationBudget =
                 | Leaf (Construct (output, _))
                 | Leaf (Transform (output, _, (_, BorrowAndCopy))) ->
                     let layout =
-                        match Map.tryFind output layouts with
+                        match Map.tryFind output.Id layouts with
                         | Some layout -> layout
                         | None -> Crash.crash "List HIR: missing allocation layout"
                     1, requestedBytes layout, (match step.Operation with Leaf (Transform _) -> 1 | _ -> 0), 0

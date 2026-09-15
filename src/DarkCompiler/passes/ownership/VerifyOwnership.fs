@@ -46,6 +46,6 @@ let verifyClosed (semantics: Semantics<'leaf, 'id>) (root: Block<'leaf, 'id>) =
     and block declared live body =
         release live body.EntryReleases |> Result.bind (fun live ->
             loop declared live body.Body.Operations |> Result.bind (fun (declared, live) ->
-                scalar live body.Body.Result |> Result.map (fun () -> declared, live)))
+                require live (semantics.ValueUses body.Body.Result) |> Result.map (fun () -> declared, live)))
     block Set.empty Set.empty root |> Result.bind (fun (_, live) ->
         if Set.isEmpty live then Ok () else Error (UnreleasedValues live))

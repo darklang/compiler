@@ -29,15 +29,16 @@ let elaborateOwnership (StorageRegion (FunctionalRegion block, layouts)) : Owned
                             match operation with
                             | Leaf (Construct (output, construction)) -> Leaf (Construct (output, construction)), []
                             | Leaf (Transform (output, input, transform)) ->
-                                let ownership = if Set.contains input live then BorrowAndCopy else Consume
+                                let ownership = if Set.contains input.Id live then BorrowAndCopy else Consume
                                 Leaf (Transform (output, input, (transform, ownership))), []
                             | Leaf (Fold (name, input, initial, callback)) ->
-                                Leaf (Fold (name, input, initial, callback)), (if Set.contains input live then [] else [input])
+                                Leaf (Fold (name, input, initial, callback)), (if Set.contains input.Id live then [] else [input.Id])
                             | ScalarBinding (name, value) -> ScalarBinding (name, value), []
                             | Branch _ -> Crash.crash "List HIR: branch handled before leaf ownership"
                         owned, releases @ unusedOutput, ValueLiveness.liveBefore (valueContract operation) live
                 { Operation = ownedOperation; Releases = releases } :: tail, before)
                 block.Operations ([], liveAfter)
-        { EntryReleases = []; Body = { Operations = operations; Result = block.Result } }, liveBefore
+        { EntryReleases = []
+          Body = { Parameters = block.Parameters; Operations = operations; Result = block.Result } }, liveBefore
     let owned, _ = elaborate block Set.empty
     OwnedRegion (owned, layouts)
