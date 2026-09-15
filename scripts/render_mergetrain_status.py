@@ -296,6 +296,7 @@ def render(payload: dict[str, Any], repo: Path, *, color: bool) -> str:
 
     now = datetime.now(timezone.utc)
     merges = recent_merges(repo)
+    lines.append("")
     lines.append(styled("recent merges:", BOLD, color))
     lines.extend(
         [f"  {history_line(merge, color, now=now)}" for merge in merges]
@@ -304,6 +305,7 @@ def render(payload: dict[str, Any], repo: Path, *, color: bool) -> str:
 
     changes = benchmark_changes(repo)
     ratio = benchmark_ratio(repo)
+    lines.append("")
     lines.append(f"benchmark ratio: {styled(ratio or 'unavailable', CYAN, color)}")
     lines.append(styled("recent benchmarks/RESULTS.md changes:", BOLD, color))
     lines.extend(
