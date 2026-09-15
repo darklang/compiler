@@ -73,11 +73,27 @@ type RenderEnvironment = {
 }
 
 
-let byteLength (value: String) : Int64 =
-    Stdlib.String.__codepointLength value
+let byteAt (value: String) (index: Int64) : Int64 =
+    match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with
+    | Some byte -> Stdlib.Int64.fromUInt8 byte
+    | None -> Builtin.testRuntimeError "Template byte index is out of range"
+
+let byteLengthFrom (value: String) (index: Int64) : Int64 =
+    match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with
+    | Some _ -> byteLengthFrom value (index + 1L)
+    | None -> index
+
+let byteLength (value: String) : Int64 = byteLengthFrom value 0L
+
+let sliceFrom (value: String) (index: Int64) (end_: Int64) (reversed: List<Char>) : String =
+    if index >= end_ then Stdlib.String.fromList (Stdlib.List.reverse reversed)
+    else
+        match Stdlib.Char.fromCodepoint (Stdlib.Int.fromInt64 (byteAt value index)) with
+        | Some char -> sliceFrom value (index + 1L) end_ (Stdlib.List.push reversed char)
+        | None -> Builtin.testRuntimeError "Template source is not ASCII"
 
 let slice (value: String) (start_: Int64) (end_: Int64) : String =
-    Stdlib.String.__substring value start_ end_
+    sliceFrom value start_ end_ []
 
 let startsAt (source: String) (position: Int64) (prefix: String) : Bool =
     let end_ = position + byteLength prefix in
@@ -91,7 +107,7 @@ let findFrom (source: String) (needle: String) (position: Int64) : Stdlib.Option
 
 let offsetLoop (source: String) (position: Int64) (index: Int64) (line: Int64) (column: Int64) : (Int64 * Int64) =
     if index >= position then (line, column)
-    else if Stdlib.String.__byteAtUnchecked source index == 10L then offsetLoop source position (index + 1L) (line + 1L) 0L
+    else if byteAt source index == 10L then offsetLoop source position (index + 1L) (line + 1L) 0L
     else offsetLoop source position (index + 1L) line (column + 1L)
 
 let offset (source: String) (position: Int64) : (Int64 * Int64) = offsetLoop source position 0L 1L 0L
@@ -113,7 +129,7 @@ let errorMessage (error: TemplateError) : String =
 let parseUnsignedAt (text: String) (index: Int64) (total: Int64) : Stdlib.Option.Option<Int64> =
     if index == byteLength text then if index == 0L then None else Some total
     else
-        let byte = Stdlib.String.__byteAtUnchecked text index in
+        let byte = byteAt text index in
         if byte < 48L || byte > 57L then None
         else parseUnsignedAt text (index + 1L) (total * 10L + byte - 48L)
 
@@ -150,7 +166,7 @@ let scanText (source: String) (position: Int64) (accumulated: String) : (String 
     match findFrom source "{" position with
     | None -> (accumulated ++ slice source position (byteLength source), byteLength source)
     | Some open_ ->
-        if open_ > position && Stdlib.String.__byteAtUnchecked source (open_ - 1L) == 92L then
+        if open_ > position && byteAt source (open_ - 1L) == 92L then
             scanText source (open_ + 1L) (accumulated ++ slice source position (open_ - 1L) ++ "{")
         else (accumulated ++ slice source position open_, open_)
 
@@ -726,22 +742,22 @@ let makeReport (rowCount: Int64) : Document =
     let withRows = Stdlib.List.push rowCollections ((rowsId, ArrayCollection rowValues)) in
     Document { root = ObjectValue reportId, collections = Stdlib.List.push withRows ((reportId, report)) }
 
-let checksumAt (text: String) (index: Int64) (total: Int64) : Int64 =
-    if index >= byteLength text then total
-    else checksumAt text (index + 1L) ((total * 31L + Stdlib.String.__byteAtUnchecked text index) % 1000000007L)
+let checksumAt (text: String) (index: Int64) (length: Int64) (total: Int64) : Int64 =
+    if index >= length then total
+    else checksumAt text (index + 1L) length ((total * 31L + byteAt text index) % 1000000007L)
 
 let benchmark (engine: TinyTemplate) (report: Document) (remaining: Int64) (total: Int64) : Stdlib.Result.Result<Int64, TemplateError> =
     if remaining == 0L then Ok total
     else
         match render engine "page" report with
         | Error error -> Error error
-        | Ok rendered -> benchmark engine report (remaining - 1L) ((total + checksumAt rendered 0L 0L) % 1000000007L)
+        | Ok rendered -> benchmark engine report (remaining - 1L) ((total + checksumAt rendered 0L (byteLength rendered) 0L) % 1000000007L)
 
 let pageTemplate = "{# TinyTemplate application benchmark #}<main>\n<h1>{ title }</h1>\n{{ if not empty }}<section>{{ for row in rows -}}\n{{ call row with row }}\n{{- endfor }}</section>{{ else }}<p>No inventory.</p>{{ endif }}\n{{ call footer with footer }}\n</main>" in
 let rowTemplate = "<article class=\"{{ if featured }}featured{{ else }}standard{{ endif }}\">\n<h2>{ name }</h2>\n{{ with details as detail }}<p>{ detail.category }: { detail.price | currency }</p>{{ endwith }}\n<ul>{{ for tag in tags }}<li data-first=\"{ @first }\" data-last=\"{ @last }\">{ @index }:{ tag }</li>{{ endfor }}</ul>\n<div>{ raw_html | unescaped }</div>\n</article>" in
 let footerTemplate = "<footer>{ @root }</footer>" in
 let configured = addFormatter (newTinyTemplate ()) "currency" CurrencyFormatter in
-match (Stdlib.Cli.__benchmarkArgInt64 0, Stdlib.Cli.__benchmarkArgInt64 1) with
+match (Stdlib.Cli.Args.int64 0, Stdlib.Cli.Args.int64 1) with
 | (Error message, _) -> Builtin.testRuntimeError message
 | (_, Error message) -> Builtin.testRuntimeError message
 | (Ok rowCount, Ok runs) ->
