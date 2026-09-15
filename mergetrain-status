@@ -10,7 +10,24 @@ run_once=false
 interactive_redraw=false
 
 usage() {
-  echo "Usage: ./mergetrain-status [--repo PATH] [--interval SECONDS] [--no-clear] [--once]"
+  cat <<EOF
+Usage: ./mergetrain-status [OPTIONS]
+
+Continuously display human-readable merge-train status. Interactive terminals
+are redrawn in place as complete frames.
+
+Options:
+  --repo PATH          Repository whose merge-train status is displayed.
+                       Default: $repo_root
+  --interval SECONDS   Delay between status refreshes.
+                       Default: $interval_seconds
+  --no-clear           Append each refresh instead of redrawing in place.
+  --once               Display one status snapshot, then exit.
+  -h, --help           Show this help and exit.
+
+Example:
+  ./mergetrain-status --interval 5
+EOF
 }
 
 while [[ $# -gt 0 ]]; do
