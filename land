@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# land - Enqueue the current committed branch and wait for its local deployment.
+# land - Enqueue the current committed branch for local deployment.
 
 set -euo pipefail
 
-poll_seconds=5
 task=""
 
 usage() {
@@ -11,14 +10,12 @@ usage() {
 Usage: ./land [OPTIONS]
 
 Enqueue the current clean, committed task branch with bounded --auto approval
-and wait for that exact merge-train job to deploy to local main. Prints
-"landing" after enqueue and "landed" only after successful deployment.
+for deployment to local main. Prints "queued" after the exact commit is
+accepted, then exits without monitoring the job.
 
 Options:
   --task TEXT           Queue description.
                         Default: current commit subject
-  --poll-seconds N      Delay between job-status checks.
-                        Default: $poll_seconds
   -h, --help            Show this help and exit.
 
 Example:
@@ -32,10 +29,6 @@ while [[ $# -gt 0 ]]; do
       task="$2"
       shift 2
       ;;
-    --poll-seconds)
-      poll_seconds="$2"
-      shift 2
-      ;;
     -h|--help)
       usage
       exit 0
@@ -47,11 +40,6 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-
-if [[ ! "$poll_seconds" =~ ^[1-9][0-9]*$ ]]; then
-  echo "--poll-seconds must be a positive integer" >&2
-  exit 2
-fi
 
 for required_command in git mergetrain python3; do
   if ! command -v "$required_command" >/dev/null 2>&1; then
@@ -121,29 +109,4 @@ if [[ -z "$job_id" || "$queued_head" != "$head_sha" ]]; then
   exit 1
 fi
 
-echo "landing"
-
-while true; do
-  details="$(mergetrain --repo "$repo_root" inspect "$job_id" --json)"
-  status="$(json_value job.status <<<"$details")"
-
-  case "$status" in
-    deployed)
-      echo "landed"
-      exit 0
-      ;;
-    queued|in_progress|validated)
-      sleep "$poll_seconds"
-      ;;
-    blocked|canceled|failed)
-      reason="$(json_value outcome.message <<<"$details")"
-      echo "Landing failed for job #$job_id ($status): $reason" >&2
-      exit 1
-      ;;
-    *)
-      echo "Unknown mergetrain status for job #$job_id: $status" >&2
-      echo "$details" >&2
-      exit 1
-      ;;
-  esac
-done
+echo "queued"

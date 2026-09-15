@@ -73,9 +73,9 @@ this repository and takes precedence where it is stricter.
   substantively reviewed,
   all relevant tests pass, relevant benchmarks show no regression, and no known
   issue or unresolved uncertainty remains. The script enqueues the exact commit
-  with bounded unattended approval, prints `landing`, and waits until it prints
-  `landed`. While waiting, do not rebase or otherwise change the branch merely
-  because the integration ref advanced.
+  with bounded unattended approval and prints `queued`. Once it prints
+  `queued`, stop: do not inspect the job, poll status, wait for deployment, or
+  report any later train outcome.
 - Judge branch readiness only from that branch's scope, review, tests,
   benchmarks, and known uncertainties. Existing queue health—including an
   unrelated job that needs attention—does not make a ready branch "not ready."
@@ -84,9 +84,7 @@ this repository and takes precedence where it is stricter.
 - If `./land` exits with `Landing handoff is pending`, keep the ready commit
   unchanged and report only `Merge train: ⏳ handoff pending`. Do not include
   queue health, unrelated job IDs, conflicts, or recovery instructions. Treat
-  other pre-enqueue errors according to their own message. If this branch's
-  own enqueued job fails, report
-  `Merge train: ❌ landing failed — <this job and reason>` instead.
+  other pre-enqueue errors according to their own message.
 - `./land` grants the configured merge-train runner bounded unattended approval
   for that exact destination and execution policy. It does not authorize the
   task agent itself to validate, deploy, push, or integrate `main` directly.
@@ -106,7 +104,7 @@ a skipped or irrelevant gate, and `❌` for a failure or incomplete step.
 Work complete: <brief description of the outcome and important details>
 
 Committed: `<short hash>` — <commit subject>
-Merge train: ✅ landed `<branch>` to local `main` at `<short hash>`
+Merge train: ✅ queued `<branch>` at `<short hash>`
 Tests: ✅ <passed>/<total> passed — `<exact command>`
 Benchmarks: ✅ no regression, ratio <ratio> — `<exact command>`
 Other validation: ✅ <result> — `<exact command>`

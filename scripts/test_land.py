@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 class LandScriptTests(unittest.TestCase):
-    def test_reports_own_landing_and_keeps_queue_deferral_opaque(self) -> None:
+    def test_queues_without_inspection_and_keeps_queue_deferral_opaque(self) -> None:
         source_root = Path(__file__).resolve().parent.parent
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -61,7 +61,7 @@ elif command == "enqueue":
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     print(json.dumps({"job": {"id": 17, "head_sha": head}}))
 else:
-    print(json.dumps({"job": {"status": "deployed"}}))
+    raise AssertionError("land must not inspect an accepted job")
 """,
                 encoding="utf-8",
             )
@@ -70,7 +70,7 @@ else:
             process_environment = dict(os.environ)
             process_environment["PATH"] = f"{fake_bin}:{process_environment['PATH']}"
             completed = subprocess.run(
-                [str(repo / "land"), "--task", "test landing output"],
+                [str(repo / "land"), "--task", "test queued output"],
                 cwd=repo,
                 env=process_environment,
                 text=True,
@@ -79,7 +79,7 @@ else:
             )
 
             self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertEqual(completed.stdout, "landing\nlanded\n")
+            self.assertEqual(completed.stdout, "queued\n")
             self.assertEqual(completed.stderr, "")
 
             process_environment["LAND_TEST_ATTENTION"] = "1"
@@ -97,7 +97,7 @@ else:
                 0,
                 queued_behind_attention.stderr,
             )
-            self.assertEqual(queued_behind_attention.stdout, "landing\nlanded\n")
+            self.assertEqual(queued_behind_attention.stdout, "queued\n")
             self.assertEqual(queued_behind_attention.stderr, "")
 
             process_environment["LAND_TEST_ENQUEUE_FAIL"] = "1"
