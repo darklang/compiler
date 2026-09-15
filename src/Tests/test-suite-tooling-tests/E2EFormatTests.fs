@@ -575,6 +575,48 @@ let testBatchesEqualityInsideExplicitResultBinding () : TestResult =
         | Ok tests -> Error $"Expected exactly 1 parsed test, got {tests.Length}"
         | Error msg -> Error $"Expected local-declaration fixture to parse, but got error: {msg}")
 
+let testCompileErrorDirectiveOverridesAnyUpstreamExpectation () : TestResult =
+    let testSource =
+        "#compileerror=\"first compile failure\"\n"
+        + "1L = 1L\n"
+        + "#compileerror=\"second compile failure\"\n"
+        + "Builtin.testRuntimeError \"runtime\" = error=\"runtime\"\n"
+
+    withTempFile testSource (fun path ->
+        match parseE2ETestFile path with
+        | Ok [first; second]
+            when first.ErrorExpectation = Some CompileError
+                 && first.ExpectedErrorMessage = Some "first compile failure"
+                 && first.ExpectedValueExpr = None
+                 && second.ErrorExpectation = Some CompileError
+                 && second.ExpectedErrorMessage = Some "second compile failure" ->
+            Ok ()
+        | Ok tests -> Error $"Expected two compile-error overrides, got: {tests}"
+        | Error msg -> Error $"Expected #compileerror overrides to parse, but got error: {msg}")
+
+let testCompileErrorExpectationRequiresCompileFailure () : TestResult =
+    let testSource = "1L = compileerror=\"compile failure\"\n"
+    withTempFile testSource (fun path ->
+        match parseE2ETestFile path with
+        | Error msg -> Error $"Expected compileerror= to parse, but got error: {msg}"
+        | Ok [test] ->
+            let runtimeFailure = Ran (1, "", "compile failure", TimeSpan.Zero, TimeSpan.Zero)
+            let compileFailure = CompileFailed (1, "compile failure", TimeSpan.Zero)
+            match evaluateExpectations test runtimeFailure, evaluateExpectations test compileFailure with
+            | Error runtimeResult, Ok _
+                when runtimeResult.Message.Contains("Expected compilation error but compilation succeeded") ->
+                Ok ()
+            | runtimeResult, compileResult ->
+                Error $"Expected only CompileFailed to satisfy compileerror=: runtime={runtimeResult}; compile={compileResult}"
+        | Ok tests -> Error $"Expected exactly 1 parsed test, got {tests.Length}")
+
+let testRejectsDanglingCompileErrorDirective () : TestResult =
+    withTempFile "#compileerror=\"missing test\"\n" (fun path ->
+        match parseE2ETestFile path with
+        | Error msg when msg.Contains("#compileerror must immediately precede a test") -> Ok ()
+        | Error msg -> Error $"Unexpected dangling-directive error: {msg}"
+        | Ok tests -> Error $"Expected dangling #compileerror rejection, got: {tests}")
+
 let tests = [
     ("parses multiline expectation on next line", testParsesMultilineExpectationOnNextLine)
     ("parses skip attribute", testParsesSkipAttribute)
@@ -604,4 +646,7 @@ let tests = [
     ("does not batch tests with process inputs", testDoesNotBatchTestsWithProcessInputs)
     ("does not batch explicitly isolated tests", testDoesNotBatchIsolatedTests)
     ("batches equality inside explicit result binding", testBatchesEqualityInsideExplicitResultBinding)
+    ("compile-error directive overrides any upstream expectation", testCompileErrorDirectiveOverridesAnyUpstreamExpectation)
+    ("compile-error expectation requires compile failure", testCompileErrorExpectationRequiresCompileFailure)
+    ("rejects dangling compile-error directive", testRejectsDanglingCompileErrorDirective)
 ]

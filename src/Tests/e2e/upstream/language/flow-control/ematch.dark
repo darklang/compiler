@@ -632,6 +632,7 @@ module Option =
 
 
 module Errors =
+  #compileerror="Non-exhaustive match expression for String"
   (match "nothing matches" with
    | "not this" -> "fail") = error="No matching case found for value \"nothing matches\" in match expression"
   (match Builtin.testRuntimeError "cond is error" with
@@ -672,9 +673,11 @@ module TypeErrors =
     | TwoArgs of Int64 * Int64
 
   // enum with more pattern params than actual args
+  #compileerror="Non-exhaustive match expression for TestType"
   (match TestType.NoArgs with
    | NoArgs _ -> "wrong number") = error="No matching case found for value TypeErrors.TestType.NoArgs in match expression"
   // enum with fewer pattern params than actual args
+  #compileerror="Non-exhaustive match expression for TestType"
   (match TestType.OneArg 1L with
    | OneArg -> "wrong number") = error="No matching case found for value TypeErrors.TestType.OneArg(1) in match expression"
   // TODO implement MPIgnored
@@ -698,6 +701,7 @@ module GuardClause =
    | 6L -> "pass"
    | var -> "fail") = "pass"
 
+  #compileerror="Type mismatch in match body: expected String, got Bool"
   (match 5L with
    | x when x > 0L -> "positive"
    | x when x < 0L -> "negative"
@@ -720,9 +724,11 @@ module GuardClause =
    | (x, y) when x > 0L && Stdlib.String.length y == 5 -> "pass"
    | _ -> "fail") = "pass"
 
+  #compileerror="Unresolved value name: y"
   (match -5L with
    | x when y > 0L -> true
    | _ -> false) = error="There is no variable named: y"
+  #compileerror="Unresolved value name: y"
   (match 5L with
    | 5L -> false
    | x when y > 0L -> true) = false
@@ -732,11 +738,13 @@ module GuardClause =
    | 5L -> false) =
     true
 
+  #compileerror="There is no variable named: x"
   (match 5L with
    | (x, y) when x > 0L -> true
    | _ -> false) =
      false
 
+  #compileerror="Unresolved value name: x"
   (match 5L with
    | 2L when x > 2L -> false
    | 3L -> true) = error="No matching case found for value 5 in match expression"
@@ -801,6 +809,7 @@ module PatternGrouping =
    | [x,y] | x::y -> "fail"
    | _ -> "pass") = "fail"
 
+  #compileerror="Type mismatch in string literal: expected Int64, got String"
   (match (1L, "test") with
    | (x, "test") | ("test", x) -> x
    | _ -> "fail") = 1L

@@ -229,6 +229,12 @@ non-Boolean guards therefore diagnose during compilation rather than becoming
 runtime decisions. This is an intentional compiler extension in diagnostic
 timing, not an additional runtime pattern form.
 
+This phase boundary is part of the compiler contract, not an enablement gap.
+Focused local cases use strict `compileerror=` expectations, while imported
+interpreter cases use adjacent `#compileerror=` overrides. Both forms reject a
+runtime failure, preventing exhaustiveness or arm validation from silently
+moving out of AOT type checking.
+
 ## Tuple Pattern Compilation
 
 ```dark

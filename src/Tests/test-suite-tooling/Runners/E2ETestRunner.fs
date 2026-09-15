@@ -182,7 +182,7 @@ let tryPrepareBatchTest (test: E2ETest) : PreparedE2EBatchTest option =
         && test.Stdin = TestDSL.E2EFormat.Closed
         && not test.Isolated
         && test.ExpectedExitCode = 0
-        && not test.ExpectCompileError
+        && Option.isNone test.ErrorExpectation
         && Option.isNone test.SkipReason
 
     if not eligibleExpectation then
@@ -656,7 +656,7 @@ let private analyzePreambleWithReducedFunctionSet
 
         let runnableTests =
             tests
-            |> List.filter (fun test -> not test.ExpectCompileError && Option.isNone test.SkipReason)
+            |> List.filter (fun test -> Option.isNone test.ErrorExpectation && Option.isNone test.SkipReason)
 
         let hasUnparsableTestSource =
             runnableTests
@@ -936,8 +936,18 @@ let private isRenderedResultError (expectedMessage: string option) (run: E2ERun)
             | None -> true
             | Some message -> output.Contains(message))
 
-let private evaluateExpectations (test: E2ETest) (run: E2ERun) : E2ETestResult =
-    if test.ExpectCompileError then
+let evaluateExpectations (test: E2ETest) (run: E2ERun) : E2ETestResult =
+    if test.ErrorExpectation = Some CompileError then
+        match run with
+        | Ran _ ->
+            failRun run "Expected compilation error but compilation succeeded"
+        | CompileFailed (_, error, _) ->
+            match test.ExpectedErrorMessage with
+            | Some expectedMsg when not (error.Contains(expectedMsg)) ->
+                failRun run $"Expected compile error message '{expectedMsg}' not found in stderr. Actual stderr: {error}"
+            | _ ->
+                Ok run
+    elif test.ErrorExpectation = Some AnyError then
         let signalExitCode =
             match run with
             | Ran (exitCode, _, _, _, _) when exitCode >= 128 -> Some exitCode
@@ -1443,7 +1453,7 @@ let private runE2ETestSourceWithPreambleContext
         | Ok _ ->
             false
         | Error failure ->
-            test.ExpectCompileError
+            Option.isSome test.ErrorExpectation
             && Option.isSome test.ExpectedErrorMessage
             && isUpstreamDarkTestFile test.SourceFile
             && failure.Message.StartsWith("Expected error message", StringComparison.Ordinal)

@@ -25,6 +25,7 @@ PAT_INLINE = re.compile(r'Builtin\.testDerrorMessage\s+"((?:[^"\\]|\\.)*)"')
 PAT_NEXT_LINE_MESSAGE = re.compile(
     r'^\s*"(?P<message>(?:[^"\\]|\\.)*)"\s*(?P<close>\)?)\s*$'
 )
+PAT_LOCAL_COMPILE_ERROR = re.compile(r'^\s*#compileerror(?:="(?:[^"\\]|\\.)*")?\s*$')
 
 ANSI_RESET = "\033[0m"
 ANSI_BOLD = "\033[1m"
@@ -91,6 +92,15 @@ def normalize_expected_derror_differences(text: str) -> str:
         i += 1
 
     return "\n".join(output)
+
+
+def strip_local_expectation_directives(text: str) -> str:
+    """Remove compiler-only metadata before comparing with the upstream corpus."""
+    return "".join(
+        line
+        for line in text.splitlines(keepends=True)
+        if not PAT_LOCAL_COMPILE_ERROR.match(line.rstrip("\r\n"))
+    )
 
 
 def collect_files(root: Path) -> dict[str, Path]:
@@ -197,7 +207,9 @@ def build_current_state(
         )
 
         upstream_normalized = normalize_expected_derror_differences(upstream_text)
-        local_normalized = normalize_expected_derror_differences(local_text)
+        local_normalized = normalize_expected_derror_differences(
+            strip_local_expectation_directives(local_text)
+        )
         if upstream_normalized != local_normalized:
             meaningful_diffs.append((rel_path, upstream_normalized, local_normalized))
 
@@ -216,46 +228,64 @@ def build_patch_text(
 ) -> str:
     rel_paths = sorted(set(upstream_files) | set(local_files))
     sections: list[str] = []
+    with tempfile.TemporaryDirectory() as sanitized_root:
+        sanitized_root_path = Path(sanitized_root)
 
-    for rel_path in rel_paths:
-        if rel_path in upstream_files and rel_path in local_files:
-            left_label = f"a/{rel_path}"
-            right_label = f"b/{rel_path}"
-            left_path = str(upstream_files[rel_path])
-            right_path = str(local_files[rel_path])
-        elif rel_path in upstream_files:
-            left_label = f"a/{rel_path}"
-            right_label = "/dev/null"
-            left_path = str(upstream_files[rel_path])
-            right_path = "/dev/null"
-        else:
-            left_label = "/dev/null"
-            right_label = f"b/{rel_path}"
-            left_path = "/dev/null"
-            right_path = str(local_files[rel_path])
+        for rel_path in rel_paths:
+            if rel_path in upstream_files and rel_path in local_files:
+                left_label = f"a/{rel_path}"
+                right_label = f"b/{rel_path}"
+                left_path = str(upstream_files[rel_path])
+                local_path = local_files[rel_path]
+                local_text = local_path.read_text(encoding="utf-8", errors="replace")
+                sanitized_text = strip_local_expectation_directives(local_text)
+                if sanitized_text == local_text:
+                    right_path = str(local_path)
+                else:
+                    sanitized_path = sanitized_root_path / rel_path
+                    sanitized_path.parent.mkdir(parents=True, exist_ok=True)
+                    sanitized_path.write_text(sanitized_text, encoding="utf-8")
+                    right_path = str(sanitized_path)
+            elif rel_path in upstream_files:
+                left_label = f"a/{rel_path}"
+                right_label = "/dev/null"
+                left_path = str(upstream_files[rel_path])
+                right_path = "/dev/null"
+            else:
+                left_label = "/dev/null"
+                right_label = f"b/{rel_path}"
+                left_path = "/dev/null"
+                local_path = local_files[rel_path]
+                local_text = local_path.read_text(encoding="utf-8", errors="replace")
+                sanitized_path = sanitized_root_path / rel_path
+                sanitized_path.parent.mkdir(parents=True, exist_ok=True)
+                sanitized_path.write_text(
+                    strip_local_expectation_directives(local_text), encoding="utf-8"
+                )
+                right_path = str(sanitized_path)
 
-        result = subprocess.run(
-            [
-                "diff",
-                "-u",
-                "--label",
-                left_label,
-                "--label",
-                right_label,
-                left_path,
-                right_path,
-            ],
-            text=True,
-            capture_output=True,
-        )
-        if result.returncode not in (0, 1):
-            raise RuntimeError(
-                f"Command failed ({result.returncode}): diff -u {left_path} {right_path}\n"
-                f"stdout:\n{result.stdout}\n"
-                f"stderr:\n{result.stderr}"
+            result = subprocess.run(
+                [
+                    "diff",
+                    "-u",
+                    "--label",
+                    left_label,
+                    "--label",
+                    right_label,
+                    left_path,
+                    right_path,
+                ],
+                text=True,
+                capture_output=True,
             )
-        if result.returncode == 1:
-            sections.append(result.stdout.rstrip("\n"))
+            if result.returncode not in (0, 1):
+                raise RuntimeError(
+                    f"Command failed ({result.returncode}): diff -u {left_path} {right_path}\n"
+                    f"stdout:\n{result.stdout}\n"
+                    f"stderr:\n{result.stderr}"
+                )
+            if result.returncode == 1:
+                sections.append(result.stdout.rstrip("\n"))
 
     if not sections:
         return ""

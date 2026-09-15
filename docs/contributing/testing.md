@@ -9,6 +9,13 @@ Value-equality E2E checks normally share a generated executable. Add
 `isolated=true` to a check that must own its process or bounded heap state; the
 runner then compiles and executes that check separately.
 
+Use `compileerror="message"` when a case must be rejected before native
+execution. Unlike the older `error="message"` expectation, a matching runtime
+failure does not satisfy `compileerror`. Imported upstream `.dark` files retain
+their original expectation and may put `#compileerror="message"` immediately
+before a test to override that expectation for the AOT compiler. The directive
+may override either an upstream success or error expectation.
+
 ## Syntax fixtures
 
 Place `.syntax` files under `src/Tests/syntax/`. A file can contain multiple
