@@ -7,7 +7,23 @@ poll_seconds=5
 task=""
 
 usage() {
-  echo "Usage: ./land [--task TEXT] [--poll-seconds SECONDS]"
+  cat <<EOF
+Usage: ./land [OPTIONS]
+
+Enqueue the current clean, committed task branch with bounded --auto approval
+and wait for that exact merge-train job to deploy to local main. Prints
+"landing" after enqueue and "landed" only after successful deployment.
+
+Options:
+  --task TEXT           Queue description.
+                        Default: current commit subject
+  --poll-seconds N      Delay between job-status checks.
+                        Default: $poll_seconds
+  -h, --help            Show this help and exit.
+
+Example:
+  ./land --task "implement dictionary literals"
+EOF
 }
 
 while [[ $# -gt 0 ]]; do

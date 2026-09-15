@@ -9,7 +9,29 @@ attempt_dir="/tmp/dark-compiler-mergetrain-codex-attempts"
 run_once=false
 
 usage() {
-  echo "Usage: $0 [--repo PATH] [--interval SECONDS] [--attempt-dir PATH] [--once]"
+  cat <<EOF
+Usage: $0 [OPTIONS]
+
+Continuously validate and deploy auto-approved merge-train jobs. When a job is
+blocked by a merge conflict or local non-fast-forward update, invoke Codex once
+for that exact job revision, verify its committed repair, and retry the job.
+
+Options:
+  --repo PATH          Repository whose merge-train queue is processed.
+                       Default: $repo_root
+  --interval SECONDS   Delay between completed queue passes.
+                       Default: $interval_seconds
+  --attempt-dir PATH   Directory for Codex attempt markers and final messages.
+                       Default: $attempt_dir
+  --once               Run one daemon/status/repair pass, then exit.
+  -h, --help           Show this help and exit.
+
+The integrator processes only jobs enqueued with --auto. It stops for manual
+jobs, unknown states, non-conflict failures, or a repeated Codex repair attempt.
+
+Example:
+  $0 --repo /Users/paulbiggar/projects/c4d-for-dcb
+EOF
 }
 
 while [[ $# -gt 0 ]]; do
