@@ -76,9 +76,17 @@ this repository and takes precedence where it is stricter.
 
 ## Git workflow
 
-- Perform all work in a dedicated git worktree, never in the primary checkout,
-  and rebase the worktree branch on the configured integration ref
-  (`origin/main` by default) before starting. Task agents never push.
+- Create a dedicated worktree once when beginning a new task and rebase its
+  branch on the configured integration ref (`origin/main` by default) before
+  making changes. Perform all task work there, never in the primary checkout.
+  After work begins, do not pull, merge, rebase, reset, or otherwise incorporate
+  later integration-ref changes into that task worktree merely because the
+  integration ref advanced or a new agent turn began. Once enqueued, keep the
+  exact commit and worktree unchanged; follow-up work uses a new task branch and
+  worktree based on the latest integration ref. The exceptions are an explicit
+  developer instruction to update that specific existing worktree and
+  authorized merge-conflict recovery under `AGENTS.mergetrain.md`. Task agents
+  never push.
 - When work is complete, commit the intended changes automatically.
 - Run `./land --task "<brief task description>"` only when the committed branch
   is ready: the requested scope is complete, the final diff has been
