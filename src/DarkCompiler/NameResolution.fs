@@ -335,7 +335,11 @@ let errorToString (error: ResolutionError) : string =
     | InvalidQualifiedName (name, context) ->
         $"Invalid {contextToString context} name: {name}"
     | UnresolvedName (name, context) ->
-        $"Unresolved {contextToString context} name: {qualifiedNameToString name}"
+        match context with
+        | ResolutionContext.Callable ->
+            $"There is no variable named: {qualifiedNameToString name}"
+        | _ ->
+            $"Unresolved {contextToString context} name: {qualifiedNameToString name}"
     | AmbiguousReference (name, context, identities) ->
         let candidates = identities |> List.map symbolIdentityToString |> String.concat ", "
         $"Ambiguous {contextToString context} reference '{qualifiedNameToString name}': {candidates}"

@@ -36,6 +36,14 @@ let tidyHtml (html: String) : String =
 // -- testing of simple html node helpers
 (Stdlib.Html.comment "hello") |> nodeToString = "<!-- hello -->"
 
+// `--` is the only sequence that can end a comment, and the grammar gives no way to escape it, so
+// content carrying one is rewritten. Without this, everything after `-->` lands on the page as
+// markup rather than staying inside the comment.
+(Stdlib.Html.comment "a --> b") |> nodeToString = "<!-- a - -> b -->"
+
+(Stdlib.Html.comment "<script>alert(1)</script> -- and more")
+|> nodeToString = "<!-- <script>alert(1)</script> - - and more -->"
+
 // -- testing HTML escaping
 Stdlib.Html.escapeHtml "<script>alert('xss')</script>" = "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;"
 
@@ -51,6 +59,30 @@ Stdlib.Html.escapeHtml "\"quoted\"" = "&quot;quoted&quot;"
 (Stdlib.Html.stringNode "<script>trusted</script>")
 |> nodeToString = "<script>trusted</script>"
 
+// -- attribute values are escaped, like text is
+//
+// The quote is the one that matters: an unescaped `"` closes the attribute, and everything
+// after it is parsed as markup rather than as part of the value.
+(htmlTag "a" [ ("href", Stdlib.Option.Option.Some "\" onmouseover=\"alert(1)") ] [])
+|> nodeToString = "<a href=\"&quot; onmouseover=&quot;alert(1)\"></a>"
+
+(htmlTag "div" [ ("title", Stdlib.Option.Option.Some "a & b") ] []) |> nodeToString =
+  "<div title=\"a &amp; b\"></div>"
+
+(htmlTag "div" [ ("title", Stdlib.Option.Option.Some "<script>") ] []) |> nodeToString =
+  "<div title=\"&lt;script&gt;\"></div>"
+
+(htmlTag "div" [ ("title", Stdlib.Option.Option.Some "it's") ] []) |> nodeToString =
+  "<div title=\"it&#x27;s\"></div>"
+
+// A boolean attribute has no value to escape. `input` is a void element, so no closing tag.
+(htmlTag "input" [ ("disabled", Stdlib.Option.Option.None) ] []) |> nodeToString =
+  "<input disabled>"
+
+// The attribute helpers feed the same path, so they are covered too.
+(Stdlib.Html.div [ Stdlib.Html.dataAttr "note" "a \"quoted\" one" ] [])
+|> nodeToString = "<div data-note=\"a &quot;quoted&quot; one\"></div>"
+
 // Using text() with div to prevent XSS
 (Stdlib.Html.div
   []
@@ -58,10 +90,10 @@ Stdlib.Html.escapeHtml "\"quoted\"" = "&quot;quoted&quot;"
 |> nodeToString = "<div>User said: &lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;</div>"
 
 // -- testing attribute helpers
-Stdlib.Html.classes [ "btn"; "btn-primary" ] =
+Stdlib.Html.classes [ "btn", "btn-primary" ] =
   ("class", Stdlib.Option.Option.Some "btn btn-primary")
 
-Stdlib.Html.style [ ("color", "red"); ("font-size", "14px") ] =
+Stdlib.Html.style [ ("color", "red"), ("font-size", "14px") ] =
   ("style", Stdlib.Option.Option.Some "color: red; font-size: 14px")
 
 Stdlib.Html.dataAttr "user-id" "123" =
@@ -69,14 +101,14 @@ Stdlib.Html.dataAttr "user-id" "123" =
 
 // Using attribute helpers with tags
 (Stdlib.Html.div
-  [ Stdlib.Html.classes [ "container"; "mx-auto" ]
+  [ Stdlib.Html.classes [ "container", "mx-auto" ]
     Stdlib.Html.dataAttr "testid" "main-container" ]
   [ stringNode "content" ])
 |> nodeToString =
   "<div class=\"container mx-auto\" data-testid=\"main-container\">content</div>"
 
 (Stdlib.Html.span
-  [ Stdlib.Html.style [ ("color", "blue"); ("font-weight", "bold") ] ]
+  [ Stdlib.Html.style [ ("color", "blue"), ("font-weight", "bold") ] ]
   [ stringNode "styled text" ])
 |> nodeToString = "<span style=\"color: blue; font-weight: bold\">styled text</span>"
 

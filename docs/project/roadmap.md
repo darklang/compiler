@@ -12,10 +12,9 @@ compiler bugs belong in [known issues](known-issues.md).
   HAMT payloads, allocator reuse, and the shared raw-memory policy.
 - Expand byte-level x86-64 instruction-encoding coverage and replace the
   hand-maintained coverage count with a test-derived report.
-- Finish upstream-test enablement. `TestRunner.fs` is the source of truth:
-  `eapply.dark`, `aliases.dark`, `epipe.dark`, and `derror.dark` remain
-  line-allowlisted, while `elambda.dark` is still excluded from the default
-  upstream set. Do not preserve dated failure counts here.
+- Finish upstream-test enablement. `TestRunner.fs` discovers the complete
+  upstream corpus and is the source of truth for the unsupported-file and
+  unsupported-line denysets. Do not preserve dated failure counts here.
 - Validate the compiler against the existing package repository and turn each
   discovered incompatibility into a focused test or compatibility-ledger item.
 - Establish or reject the reported high-register-pressure spill risk. The old

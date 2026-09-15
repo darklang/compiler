@@ -336,36 +336,36 @@ module Char =
 
 
 module List =
-  (match [ 1L; 2L; 3L ] with
+  (match [ 1L, 2L, 3L ] with
    | [] -> "fail"
-   | [ 1L; 2L; 3L ] -> "pass"
+   | [ 1L, 2L, 3L ] -> "pass"
    | var -> "fail") = "pass"
 
-  (match [ 1L; 2L; 3L ] with
-   | [ 1L; 2L; 3L ] -> "pass"
+  (match [ 1L, 2L, 3L ] with
+   | [ 1L, 2L, 3L ] -> "pass"
    | [] -> "fail"
    | var -> "fail") = "pass"
 
-  (match [ 1L; 2L; 3L ] with
+  (match [ 1L, 2L, 3L ] with
    | var ->
-    let length = (Stdlib.List.length var) |> Stdlib.Int.toString
+     let length = (Stdlib.List.length var) |> Stdlib.Int.toString
 
      $"pass with length: {length}"
-   | [ 1L; 2L; 3L ] -> "fail"
+   | [ 1L, 2L, 3L ] -> "fail"
    | [] -> "fail") = "pass with length: 3"
 
   (match [] with
    | [] -> "pass"
-   | [ 1L; 2L; 3L ] -> "fail"
+   | [ 1L, 2L, 3L ] -> "fail"
    | var -> "fail") = "pass"
 
-  (match [ 1L; 2L; 3L ] with
-   | [ 1L; 2L ] -> "fail"
-   | [ 1L; 2L; 3L; 4L ] -> "fail"
-   | [ 1L; 2L; 3L ] -> "pass"
+  (match [ 1L, 2L, 3L ] with
+   | [ 1L, 2L ] -> "fail"
+   | [ 1L, 2L, 3L, 4L ] -> "fail"
+   | [ 1L, 2L, 3L ] -> "pass"
    | var -> "fail") = "pass"
 
-  (match [ 1L; 2L; 3L ] with
+  (match [ 1L, 2L, 3L ] with
    | head :: tail -> $"pass"
    | [] -> "fail") = "pass"
 
@@ -373,64 +373,57 @@ module List =
    | head :: tail -> "fail"
    | [] -> "pass") = "pass"
 
-  // duplicate variable name
-  (match [ 1L; 2L; 5L ] with
-   | [ a; a; a ] -> a
-   | name -> name ++ "var") = error="Duplicate binding 'a' in the same pattern"
-
-
-
   module NestedList =
-    (match [ [ 1L; 2L ]; [ 3L; 4L ] ] with
+    (match [ [ 1L, 2L ], [ 3L, 4L ] ] with
      | [] -> "fail"
-     | [ [ 1L; 2L ]; [ 3L; 4L ] ] -> "pass"
+     | [ [ 1L, 2L ], [ 3L, 4L ] ] -> "pass"
      | var -> "fail") = "pass"
 
-    (match [ [ 1L; 2L ]; [ 3L; 4L ] ] with
-     | [ [ 1L; 2L ]; [ 3L; 4L ] ] -> "pass"
+    (match [ [ 1L, 2L ], [ 3L, 4L ] ] with
+     | [ [ 1L, 2L ], [ 3L, 4L ] ] -> "pass"
      | [] -> "fail"
      | var -> "fail") = "pass"
 
-    (match [ [ 1L; 2L ]; [ 3L; 4L ] ] with
-     | [ a; b ] -> $"pass"
+    (match [ [ 1L, 2L ], [ 3L, 4L ] ] with
+     | [ a, b ] -> $"pass"
      | [] -> "fail") = "pass"
 
-    (match [ [ 1L; 2L ]; [] ] with
-     | [ []; _ ] -> "fail"
-     | [ [ 1L; 2L ]; _ ] -> "pass"
+    (match [ [ 1L, 2L ], [] ] with
+     | [ [], _ ] -> "fail"
+     | [ [ 1L, 2L ], _ ] -> "pass"
      | _ -> "fail") = "pass"
 
-    (match [ [ 1L; 2L ]; [ 3L; 4L; 5L ] ] with
-     | [ [ 1L; 2L ]; [ _ ] ] -> "fail"
-     | [ [ 1L; 2L ]; [ _; _ ] ] -> "fail"
-     | [ [ 1L; 2L ]; [ _; _; _ ] ] -> "pass") = "pass"
+    (match [ [ 1L, 2L ], [ 3L, 4L, 5L ] ] with
+     | [ [ 1L, 2L ], [ _ ] ] -> "fail"
+     | [ [ 1L, 2L ], [ _, _ ] ] -> "fail"
+     | [ [ 1L, 2L ], [ _, _, _ ] ] -> "pass") = "pass"
 
-    (match [ [ 1L; 2L ]; [ 3L; 4L ] ] with
-     | [ [ 1L; 2L; 3L ]; [ 4L; 5L; 6L ] ] -> "fail"
-     | [ _; [ 3L; _ ] ] -> "pass"
+    (match [ [ 1L, 2L ], [ 3L, 4L ] ] with
+     | [ [ 1L, 2L, 3L ], [ 4L, 5L, 6L ] ] -> "fail"
+     | [ _, [ 3L, _ ] ] -> "pass"
      | _ -> "fail") = "pass"
 
 
   module ListCons =
-    (match [ 1L; 2L; 3L ] with
+    (match [ 1L, 2L, 3L ] with
      | 1L :: 2L :: [ 3L ] -> 42L) = 42L
 
-    (match [ 1L; 2L; 3L ] with
+    (match [ 1L, 2L, 3L ] with
      | 1L :: 2L :: [ 3L ] -> 42L
      | [] -> 4L
      | _ -> 2L) = 42L
 
-    (match [ 1L; 2L; 3L ] with
+    (match [ 1L, 2L, 3L ] with
      | [] -> 4L
      | 1L :: 2L :: [ 3L ] -> 42L
      | _ -> 2L) = 42L
 
-    (match [ 1L; 2L; 3L ] with
+    (match [ 1L, 2L, 3L ] with
      | _ -> 2L
      | 1L :: 2L :: [ 3L ] -> 42L
      | [] -> 4L) = 2L
 
-    (match [ 1L; 2L; 3L ] with
+    (match [ 1L, 2L, 3L ] with
      | head :: rest -> head + (rest |> Stdlib.List.head |> Builtin.unwrap)) = 3L
 
 
@@ -442,11 +435,11 @@ module List =
 
     (headTail []) = (0L, [])
     (headTail [ 1L ]) = (1L, [])
-    (headTail [ 1L; 2L ]) = (1L, [ 2L ])
-    (headTail [ 1L; 2L; 3L ]) = (1L, [ 2L; 3L ])
+    (headTail [ 1L, 2L ]) = (1L, [ 2L ])
+    (headTail [ 1L, 2L, 3L ]) = (1L, [ 2L, 3L ])
 
-    (match [ "dd"; "aa"; "fff"; "gg" ] with
-     | head :: tail -> (head, tail)) = ("dd", [ "aa"; "fff"; "gg" ])
+    (match [ "dd", "aa", "fff", "gg" ] with
+     | head :: tail -> (head, tail)) = ("dd", [ "aa", "fff", "gg" ])
 
     // heads tail
     let sequence (list: List<Int64>) : Int64 =
@@ -458,9 +451,9 @@ module List =
 
     (sequence []) = 0L
     (sequence [ 1L ]) = -1L
-    (sequence [ 1L; 2L ]) = 2L
-    (sequence [ 1L; 2L; 3L ]) = 6L
-    (sequence [ 1L; 2L; 3L; 0L ]) = 6L
+    (sequence [ 1L, 2L ]) = 2L
+    (sequence [ 1L, 2L, 3L ]) = 6L
+    (sequence [ 1L, 2L, 3L, 0L ]) = 6L
 
     // nested
     let complexSum (list: List<List<Int64>>) : Int64 =
@@ -471,23 +464,23 @@ module List =
       | _ -> 0L
 
     (complexSum []) = 0L
-    (complexSum [ [ 1L; 2L ]; [ 3L; 4L ] ]) = 4L
-    (complexSum [ [ 1L; 2L; 3L ]; [ 3L; 4L; 5L ]; [ 4L; 5L; 6L ] ]) = 14L
+    (complexSum [ [ 1L, 2L ], [ 3L, 4L ] ]) = 4L
+    (complexSum [ [ 1L, 2L, 3L ], [ 3L, 4L, 5L ], [ 4L, 5L, 6L ] ]) = 14L
 
     // wildcard
-    (match [ 1L; 2L; 3L; 4L ] with
-     | 1L :: a :: [ 4L; 3L ] -> a + 1L
+    (match [ 1L, 2L, 3L, 4L ] with
+     | 1L :: a :: [ 4L, 3L ] -> a + 1L
      | _ :: a :: _ -> a + 2L
      | 1L :: a :: rest -> a + 3L) = 4L
 
     // misc
-    (match [ 1L; 2L; 3L; 4L ] with
-     | 2L :: a :: [ 3L; 4L ] -> a + 1L
-     | 1L :: a :: [ 4L; 3L ] -> a + 2L
-     | 1L :: a :: [ 3L; 4L ] -> a + 3L
+    (match [ 1L, 2L, 3L, 4L ] with
+     | 2L :: a :: [ 3L, 4L ] -> a + 1L
+     | 1L :: a :: [ 4L, 3L ] -> a + 2L
+     | 1L :: a :: [ 3L, 4L ] -> a + 3L
      | 1L :: a :: rest -> a + 4L) = 5L
 
-    (match [ 1L; 2L; 3L; 4L ] with
+    (match [ 1L, 2L, 3L, 4L ] with
      | 2L :: a :: rest -> a - 1L
      | 1L :: a :: rest -> a * 2L) = 4L
 
@@ -516,19 +509,10 @@ module Tuple =
    | (1L, 'a', true) -> "fail"
    | (1L, 'a') -> "pass") = "pass"
 
-  (match (true, [ 1L; 2L ]) with
-   | (true, [ 1L; 2L; 3L ]) -> "fail"
+  (match (true, [ 1L, 2L ]) with
+   | (true, [ 1L, 2L, 3L ]) -> "fail"
    | (false, _) -> "fail"
-   | (true, [ 1L; 2L ]) -> "pass") = "pass"
-
-  // duplicate tuple variables
-  (let tpl = (1L, 2L, (3L, 4L), 5L)
-
-   match tpl with
-   | (a, b, (a, b), a) -> (a, b)
-   | name -> name ++ "var") = error="Duplicate binding 'a' in the same pattern"
-
-
+   | (true, [ 1L, 2L ]) -> "pass") = "pass"
 
   module NestedTuple =
 
@@ -587,15 +571,15 @@ module Result =
    | Ok var -> $"unexpected: {var}"
    | Error msg -> $"pass: {msg}") = "pass: failure"
 
-  (match Stdlib.Result.Result.Ok [ 1L; 2L; 3L ] with
-   | Ok [ 1L; 2L; 3L; 4L ] -> "fail"
+  (match Stdlib.Result.Result.Ok [ 1L, 2L, 3L ] with
+   | Ok [ 1L, 2L, 3L, 4L ] -> "fail"
    | Error _ -> "fail"
-   | Ok [ 1L; 2L; 3L ] -> "pass"
+   | Ok [ 1L, 2L, 3L ] -> "pass"
    | _ -> "fail") = "pass"
 
-  (match Stdlib.Result.Result.Ok ((1L, 'a')) with
-   | Ok ((2L, 'b')) -> "fail"
-   | Ok ((1L, 'a')) -> "pass"
+  (match Stdlib.Result.Result.Ok((1L, 'a')) with
+   | Ok((2L, 'b')) -> "fail"
+   | Ok((1L, 'a')) -> "pass"
    | _ -> "fail") = "pass"
 
   (match Stdlib.Result.Result.Ok 5.0 with
@@ -628,15 +612,15 @@ module Option =
    | None -> "fail"
    | Some msg -> $"pass: {msg}") = "pass: hello"
 
-  (match Stdlib.Option.Option.Some [ 1L; 2L; 3L ] with
-   | Some [ 1L; 2L; 3L; 4L ] -> "fail"
+  (match Stdlib.Option.Option.Some [ 1L, 2L, 3L ] with
+   | Some [ 1L, 2L, 3L, 4L ] -> "fail"
    | None -> "fail"
-   | Some [ 1L; 2L; 3L ] -> "pass"
+   | Some [ 1L, 2L, 3L ] -> "pass"
    | _ -> "fail") = "pass"
 
-  (match Stdlib.Option.Option.Some ((1L, 'a')) with
-   | Some ((2L, 'b')) -> "fail"
-   | Some ((1L, 'a')) -> "pass"
+  (match Stdlib.Option.Option.Some((1L, 'a')) with
+   | Some((2L, 'b')) -> "fail"
+   | Some((1L, 'a')) -> "pass"
    | _ -> "fail") = "pass"
 
 
@@ -649,7 +633,7 @@ module Option =
 
 module Errors =
   (match "nothing matches" with
-   | "not this" -> "fail") = error="Non-exhaustive match expression"
+   | "not this" -> "fail") = error="No matching case found for value \"nothing matches\" in match expression"
   (match Builtin.testRuntimeError "cond is error" with
    | 5L -> "fail"
    | 6L -> "pass"
@@ -689,13 +673,14 @@ module TypeErrors =
 
   // enum with more pattern params than actual args
   (match TestType.NoArgs with
-   | NoArgs _ -> "wrong number") = error="Non-exhaustive match expression"
+   | NoArgs _ -> "wrong number") = error="No matching case found for value TypeErrors.TestType.NoArgs in match expression"
   // enum with fewer pattern params than actual args
   (match TestType.OneArg 1L with
-   | OneArg -> "wrong number") = error="Non-exhaustive match expression"
-  // enum with a single wildcard
-  (match TestType.TwoArgs (1L) (2L) with
-   | TwoArgs _ -> "wildcards allowed") = "wildcards allowed"
+   | OneArg -> "wrong number") = error="No matching case found for value TypeErrors.TestType.OneArg(1) in match expression"
+  // TODO implement MPIgnored
+  // // enum with a single wildcard
+  // (match TestType.TwoArgs(1L, 2L) with
+  //  | TwoArgs _ -> "wildcards allowed") = "wildcards allowed"
 
 
 module GuardClause =
@@ -716,7 +701,7 @@ module GuardClause =
   (match 5L with
    | x when x > 0L -> "positive"
    | x when x < 0L -> "negative"
-   | _ -> false) = error="Type mismatch in match body: expected String, got Bool"
+   | _ -> false) = "positive"
 
   (match (5L, "hello") with
    | (x, y) when x > 0L && y == "hello" -> "pass"
@@ -737,10 +722,10 @@ module GuardClause =
 
   (match -5L with
    | x when y > 0L -> true
-   | _ -> false) = error="Unresolved value name: y"
+   | _ -> false) = error="There is no variable named: y"
   (match 5L with
    | 5L -> false
-   | x when y > 0L -> true) = error="Unresolved value name: y"
+   | x when y > 0L -> true) = false
 
   (match 5L with
    | x when (x + 1L) == 6L -> true
@@ -750,12 +735,11 @@ module GuardClause =
   (match 5L with
    | (x, y) when x > 0L -> true
    | _ -> false) =
-     error="There is no variable named: x"
+     false
 
   (match 5L with
    | 2L when x > 2L -> false
-   | 3L -> true) =
-    error="Unresolved value name: x"
+   | 3L -> true) = error="No matching case found for value 5 in match expression"
 
   (match Stdlib.Result.Result.Error 5L with
    | Ok x when x > 2L -> false
@@ -775,16 +759,16 @@ module PatternGrouping =
    | (1L,_) | (_,1L) -> "pass"
    | _ -> "fail") = "pass"
 
-  (match [1L;2L] with
-   | [1L;_] | [_;1L] -> "pass"
+  (match [1L,2L] with
+   | [1L,_] | [_,1L] -> "pass"
    | _ -> "fail") = "pass"
 
-  (match Stdlib.Option.Option.Some (1L) with
-   | Some (1L) | None -> "pass"
+  (match Stdlib.Option.Option.Some(1L) with
+   | Some(1L) | None -> "pass"
    | _ -> "fail") = "pass"
 
-  (match ([1L], Stdlib.Option.Option.Some (2L)) with
-   | ([1L], Some (_)) | ([_], Some (2L)) -> "pass"
+  (match ([1L], Stdlib.Option.Option.Some(2L)) with
+   | ([1L], Some(_)) | ([_], Some(2L)) -> "pass"
    | _ -> "fail") = "pass"
 
   (let x = 4L
@@ -809,24 +793,17 @@ module PatternGrouping =
    | (x, 2L, y) | (y, x, 2L) when x + y == 4L -> "pass"
    | _ -> "fail") = "pass"
 
-  (match ([1L;2L], 3L) with
-   | ([x], y) | (x :: xs, y) when x > 0L -> "pass"
-   | _ -> "fail") = error="Pattern matches require all branches to provide the same variables - expected [x, y], got [x, xs, y]"
+  (match ([1L,2L], 3L) with
+   | ([x], y) | (x :: _, y) when x > 0L -> "pass"
+   | _ -> "fail") = "pass"
 
-  (match (1L,2L) with
-   | (x,2L) | (2L,y) when x == y -> "fail"
-   | _ -> "fail") = error="Pattern matches require all branches to provide the same variables - expected [x], got [y]"
-  (match (1L,2L) with
-    | (x,y) | (x,_) when y > 0L -> "fail"
-    | _ -> "pass") = error="Pattern matches require all branches to provide the same variables - expected [x, y], got [x]"
-  // CLEANUP these should fail when we have at-rest checking
-  (match [1L;2L] with
-   | [x;y] | x::y -> "fail"
+  (match [1L,2L] with
+   | [x,y] | x::y -> "fail"
    | _ -> "pass") = "fail"
 
   (match (1L, "test") with
    | (x, "test") | ("test", x) -> x
-   | _ -> "fail") = error="Type mismatch in string literal: expected Int64, got String"
+   | _ -> "fail") = 1L
 
   (match (Stdlib.Result.Result.Ok 1L, Stdlib.Result.Result.Error "error") with
    | (Ok _ , Ok _) -> "pass"

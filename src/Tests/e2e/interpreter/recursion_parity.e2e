@@ -46,7 +46,7 @@ parityFirst 3L = 1L
    if n == 0L then true else forwardOdd (n - 1L) in
  let forwardOdd (n: Int64) : Bool =
    if n == 0L then false else forwardEven (n - 1L) in
- forwardEven 4L)) = error="Unresolved callable name: forwardOdd"
+ forwardEven 4L)) = error="There is no variable named: forwardOdd"
 
 // A source package function with the same visible name makes nested self
 // selection ambiguous instead of choosing by spelling.

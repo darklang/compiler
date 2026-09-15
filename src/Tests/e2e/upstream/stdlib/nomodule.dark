@@ -100,23 +100,23 @@ module Equals =
 
   (() == ()) = true
 
-  ([ 1L; 2L; 3L ] == [ 1L; 2L; 3L ]) = true
-  ([ 1L; 2L; 3L ] != [ 3L; 2L; 1L ]) = true
-  ([ 1l; 2l; 3l ] == [ 1l; 2l; 3l ]) = true
-  ([ 1l; 2l; 3l ] != [ 3l; 2l; 1l ]) = true
-  ([ 1ul; 2ul; 3ul ] == [ 1ul; 2ul; 3ul ]) = true
-  ([ 1ul; 2ul; 3ul ] != [ 3ul; 2ul; 1ul ]) = true
-  ([ 1s; 2s; 3s ] == [ 1s; 2s; 3s ]) = true
-  ([ 1s; 2s; 3s ] != [ 3s; 2s; 1s ]) = true
-  ([ 1us; 2us; 3us ] == [ 1us; 2us; 3us ]) = true
-  ([ 1us; 2us; 3us ] != [ 3us; 2us; 1us ]) = true
-  ([ 1y; 2y; 3y ] == [ 1y; 2y; 3y ]) = true
-  ([ 1y; 2y; 3y ] != [ 3y; 2y; 1y ]) = true
-  ([ 1uy; 2uy; 3uy ] == [ 1uy; 2uy; 3uy ]) = true
-  ([ 1uy; 2uy; 3uy ] != [ 3uy; 2uy; 1uy ]) = true
+  ([ 1L, 2L, 3L ] == [ 1L, 2L, 3L ]) = true
+  ([ 1L, 2L, 3L ] != [ 3L, 2L, 1L ]) = true
+  ([ 1l, 2l, 3l ] == [ 1l, 2l, 3l ]) = true
+  ([ 1l, 2l, 3l ] != [ 3l, 2l, 1l ]) = true
+  ([ 1ul, 2ul, 3ul ] == [ 1ul, 2ul, 3ul ]) = true
+  ([ 1ul, 2ul, 3ul ] != [ 3ul, 2ul, 1ul ]) = true
+  ([ 1s, 2s, 3s ] == [ 1s, 2s, 3s ]) = true
+  ([ 1s, 2s, 3s ] != [ 3s, 2s, 1s ]) = true
+  ([ 1us, 2us, 3us ] == [ 1us, 2us, 3us ]) = true
+  ([ 1us, 2us, 3us ] != [ 3us, 2us, 1us ]) = true
+  ([ 1y, 2y, 3y ] == [ 1y, 2y, 3y ]) = true
+  ([ 1y, 2y, 3y ] != [ 3y, 2y, 1y ]) = true
+  ([ 1uy, 2uy, 3uy ] == [ 1uy, 2uy, 3uy ]) = true
+  ([ 1uy, 2uy, 3uy ] != [ 3uy, 2uy, 1uy ]) = true
 
-  ((Stdlib.String.toBytes_v0 "🧑🏽‍🦰🧑🏼‍💻🧑🏻‍🍼")
-   == (Stdlib.String.toBytes_v0 "🧑🏽‍🦰🧑🏼‍💻🧑🏻‍🍼")) = true
+  ((Stdlib.String.toBytes "🧑🏽‍🦰🧑🏼‍💻🧑🏻‍🍼")
+   == (Stdlib.String.toBytes "🧑🏽‍🦰🧑🏼‍💻🧑🏻‍🍼")) = true
 
   ((Stdlib.DateTime.parse "2019-07-28T22:42:36Z")
    == (Stdlib.DateTime.parse "2019-07-28T22:42:36Z")) = true
@@ -282,8 +282,8 @@ module Equals =
   (Stdlib.Option.Option.None != Stdlib.Option.Option.Some Stdlib.Option.Option.None) = true
   (Stdlib.Option.Option.Some 5L == Stdlib.Option.Option.Some 5L) = true
   (Stdlib.Option.Option.Some 5L != Stdlib.Option.Option.Some 6L) = true
-  (Stdlib.Option.Option.Some (Stdlib.Option.Option.Some 0L) != Stdlib.Option.Option.Some (Stdlib.Option.Option.Some 1L)) = true
-  (Stdlib.Option.Option.Some (Stdlib.Option.Option.Some 0L) == Stdlib.Option.Option.Some (Stdlib.Option.Option.Some 0L)) = true
+  (Stdlib.Option.Option.Some(Stdlib.Option.Option.Some 0L) != Stdlib.Option.Option.Some(Stdlib.Option.Option.Some 1L)) = true
+  (Stdlib.Option.Option.Some(Stdlib.Option.Option.Some 0L) == Stdlib.Option.Option.Some(Stdlib.Option.Option.Some 0L)) = true
 
   (Stdlib.Result.Result.Error 0L == Stdlib.Result.Result.Error 0L) = true
   (Stdlib.Result.Result.Ok 0L == Stdlib.Result.Result.Ok 0L) = true
@@ -304,61 +304,61 @@ module Equals =
     (() != Stdlib.Option.Option.None) = error="Cannot perform equality check on Unit and Darklang.Stdlib.Option.Option<_>"
 
     (() != false) = error="Cannot perform equality check on Unit and Bool"
-    (() != 0) = error="Cannot perform equality check on Unit and Int32"
+    (() != 0l) = error="Cannot perform equality check on Unit and Int32"
     (() != 0.0) = error="Cannot perform equality check on Unit and Float"
     // CLEANUP follow up here when DB references are fully resolved at parse-time
   // Other ways to call it
-  Stdlib.equals_v0 1Q 1Q = true
+  Stdlib.equals 1Q 1Q = true
   (==) 1Q 1Q = true
   1Q == 1Q = true
 
-  Stdlib.equals_v0 1Z 1Z = true
+  Stdlib.equals 1Z 1Z = true
   (==) 1Z 1Z = true
   1Z == 1Z = true
 
-  Stdlib.equals_v0 1L 1L = true
+  Stdlib.equals 1L 1L = true
   (==) 1L 1L = true
   1L == 1L = true
 
-  Stdlib.equals_v0 1l 1l = true
+  Stdlib.equals 1l 1l = true
   (==) 1l 1l = true
   1l == 1l = true
 
-  Stdlib.equals_v0 1ul 1ul = true
+  Stdlib.equals 1ul 1ul = true
   (==) 1ul 1ul = true
   1ul == 1ul = true
 
-  Stdlib.equals_v0 1s 1s = true
+  Stdlib.equals 1s 1s = true
   (==) 1s 1s = true
   1s == 1s = true
 
-  Stdlib.equals_v0 1us 1us = true
+  Stdlib.equals 1us 1us = true
   (==) 1us 1us = true
   1us == 1us = true
 
-  Stdlib.equals_v0 1y 1y = true
+  Stdlib.equals 1y 1y = true
   (==) 1y 1y = true
   1y == 1y = true
 
-  Stdlib.equals_v0 1uy 1uy = true
+  Stdlib.equals 1uy 1uy = true
   (==) 1uy 1uy = true
   1uy == 1uy = true
 
 
 module NotEquals =
-  Stdlib.notEquals_v0 1Q 1Q = false
-  Stdlib.notEquals_v0 1Z 1Z = false
-  Stdlib.notEquals_v0 1L 1L = false
-  Stdlib.notEquals_v0 1l 1l = false
-  Stdlib.notEquals_v0 1ul 1ul = false
-  Stdlib.notEquals_v0 1s 1s = false
-  Stdlib.notEquals_v0 1us 1us = false
-  Stdlib.notEquals_v0 1y 1y = false
-  Stdlib.notEquals_v0 1uy 1uy = false
-  Stdlib.notEquals_v0 "abc" "abc" = false
-  Stdlib.notEquals_v0 "abd" "abc" = true
+  Stdlib.notEquals 1Q 1Q = false
+  Stdlib.notEquals 1Z 1Z = false
+  Stdlib.notEquals 1L 1L = false
+  Stdlib.notEquals 1l 1l = false
+  Stdlib.notEquals 1ul 1ul = false
+  Stdlib.notEquals 1s 1s = false
+  Stdlib.notEquals 1us 1us = false
+  Stdlib.notEquals 1y 1y = false
+  Stdlib.notEquals 1uy 1uy = false
+  Stdlib.notEquals "abc" "abc" = false
+  Stdlib.notEquals "abd" "abc" = true
 
-  Stdlib.notEquals_v0
+  Stdlib.notEquals
     (Stdlib.DateTime.parse "2021-07-28T22:42:36Z")
     (Stdlib.DateTime.parse "2019-07-28T22:42:36Z") = true
 
@@ -395,17 +395,17 @@ module NotEquals =
 
 
 // Moving to packages
-// AWS.urlencode_v0 "%" = ""
-// AWS.urlencode_v0 "%%" = ""
-// AWS.urlencode_v0 "%A" = "A"
-// AWS.urlencode_v0 "%AA" = "%AA"
-// AWS.urlencode_v0 "" = ""
-// AWS.urlencode_v0 "殢" = "%E6%AE%A2"
-// AWS.urlencode_v0 "https://google.com?q=left shark&l=en" = "https%3A//google.com%3Fq%3Dleft%20shark%26l%3Den" // Test fails without a comment here
-// AWS.urlencode_v0 "گچپژ" = "%DA%AF%DA%86%D9%BE%DA%98"
-// AWS.urlencode_v0 "<foo val=”bar“ />" = "%3Cfoo%20val%3D%E2%80%9Dbar%E2%80%9C%20/%3E"
-// AWS.urlencode_v0 "表ポあA鷗ŒéＢ逍Üßªąñ丂㐀𠀀" = "%E8%A1%A8%E3%83%9D%E3%81%82A%E9%B7%97%C5%92%C3%A9%EF%BC%A2%E9%80%8D%C3%9C%C3%9F%C2%AA%C4%85%C3%B1%E4%B8%82%E3%90%80%F0%A0%80%80"
-// Twitter.urlencode_v0 "https://google.com?q=left shark&l=en" = "https%3A%2F%2Fgoogle.com%3Fq%3Dleft%20shark%26l%3Den" // URL percent encoding
+// AWS.urlencode "%" = ""
+// AWS.urlencode "%%" = ""
+// AWS.urlencode "%A" = "A"
+// AWS.urlencode "%AA" = "%AA"
+// AWS.urlencode "" = ""
+// AWS.urlencode "殢" = "%E6%AE%A2"
+// AWS.urlencode "https://google.com?q=left shark&l=en" = "https%3A//google.com%3Fq%3Dleft%20shark%26l%3Den" // Test fails without a comment here
+// AWS.urlencode "گچپژ" = "%DA%AF%DA%86%D9%BE%DA%98"
+// AWS.urlencode "<foo val=”bar“ />" = "%3Cfoo%20val%3D%E2%80%9Dbar%E2%80%9C%20/%3E"
+// AWS.urlencode "表ポあA鷗ŒéＢ逍Üßªąñ丂㐀𠀀" = "%E8%A1%A8%E3%83%9D%E3%81%82A%E9%B7%97%C5%92%C3%A9%EF%BC%A2%E9%80%8D%C3%9C%C3%9F%C2%AA%C4%85%C3%B1%E4%B8%82%E3%90%80%F0%A0%80%80"
+// Twitter.urlencode "https://google.com?q=left shark&l=en" = "https%3A%2F%2Fgoogle.com%3Fq%3Dleft%20shark%26l%3Den" // URL percent encoding
 
 
 

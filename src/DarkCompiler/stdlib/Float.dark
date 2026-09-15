@@ -70,6 +70,9 @@ let ceiling (value: Float) : Int =
 
 let roundUp (value: Float) : Int = Stdlib.Float.ceiling value
 
+let mod (value: Float) (modulus: Float) : Float =
+    value - Stdlib.Int.toFloat (Stdlib.Float.floor (value / modulus)) * modulus
+
 let __isOdd (value: Int) : Bool =
     match Stdlib.Int.remainder value (Stdlib.Int.fromInt64 2L) with
     | Error message -> Builtin.testRuntimeError message
