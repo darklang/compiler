@@ -9,6 +9,10 @@ are authoritative for implemented behavior, and the revision-pinned ledgers in
 this directory record AOT compatibility boundaries and intentional runtime or
 standard-library extensions.
 
+The consolidated [remaining non-AOT differences](remaining-differences.md)
+ledger records verified language and standard-library gaps without conflating
+them with earlier AOT diagnostics or test-harness limitations.
+
 Run the compatibility validator with:
 
 ```bash

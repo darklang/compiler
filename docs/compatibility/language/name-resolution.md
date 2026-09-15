@@ -91,12 +91,14 @@ name`, and `Ambiguous <context> reference`.
   not load content-addressed packages. Imported compilation environments model
   the same precedence boundary, but package hashes and dependency traversal
   remain an intentional, documented program-model divergence.
-- `val` declarations are first-class program declarations. Module, inherited,
+- `val` declarations are first-class program declarations. Top-level, inherited,
   and builtin values resolve in the value namespace, are type-checked once, and
   are materialized once per execution scope as lexical bindings before ANF.
   Upstream constants such as
   `Stdlib.Math.pi`, `Stdlib.List.empty`, and `Stdlib.Blob.empty` are values and
-  are referenced without `()`.
+  are referenced without `()`. Qualified values declared in nested user modules
+  remain a compatibility gap recorded in
+  [remaining differences](../remaining-differences.md).
 - Repeated flattened type declarations with the same canonical type identity
   are identity-deduplicated. This preserves existing module-adapter behavior;
   distinct type identities and distinct constructor owners remain ambiguous.
