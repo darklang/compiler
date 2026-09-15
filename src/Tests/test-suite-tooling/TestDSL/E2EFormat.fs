@@ -25,9 +25,16 @@ type OutputMatch =
     | NormalizedText
     | ExactBytes
 
+/// Whether an error expectation accepts any language failure or specifically
+/// requires rejection before a native program is executed.
+type ErrorExpectation =
+    | AnyError
+    | CompileError
+
 /// End-to-end test specification
 type E2ETest = {
     Name: string
+    SourceLine: int
     /// The test expression only (NOT including preamble)
     Source: string
     /// Expected value expression on the right-hand side of `=`.
@@ -46,9 +53,8 @@ type E2ETest = {
     /// Run this test in its own executable instead of a shared E2E batch.
     Isolated: bool
     ExpectedExitCode: int
-    /// If true, expect the compiler to fail (type error, parse error, etc.)
-    ExpectCompileError: bool
-    /// Expected error message (substring match) when ExpectCompileError is true
+    ErrorExpectation: ErrorExpectation option
+    /// Expected diagnostic substring when ErrorExpectation is present.
     ExpectedErrorMessage: string option
     /// If set, test is skipped with this reason
     SkipReason: string option
@@ -328,6 +334,7 @@ let private isExpectationCandidate (rest: string) : bool =
     elif trimmed.StartsWith("\"")
          || trimmed.StartsWith("'")
          || trimmed.StartsWith("error")
+         || trimmed.StartsWith("compileerror")
          || trimmed.StartsWith("stdout")
          || trimmed.StartsWith("stderr")
          || trimmed.StartsWith("skip")
@@ -636,8 +643,8 @@ let private parseTestLineWithPreamble (line: string) (lineNumber: int) (filePath
         // - otherwise: RHS is an expression to compare with Source by value
         //
         // Returns:
-        // (expectedValueExpr, exitCode, stdout, stderr, optFlags, expectError, errorMessage, skipReason)
-        let parseExpectations (exp: string) : Result<string option * int * string option * string option * OptFlags * bool * string option * string option, string> =
+        // (expectedValueExpr, exitCode, stdout, stderr, optFlags, errorExpectation, errorMessage, skipReason)
+        let parseExpectations (exp: string) : Result<string option * int * string option * string option * OptFlags * ErrorExpectation option * string option * string option, string> =
             let trimmed = exp.Trim()
             let tokens = splitBySpacesRespectingQuotes trimmed
 
@@ -654,14 +661,15 @@ let private parseTestLineWithPreamble (line: string) (lineNumber: int) (filePath
 
                 loop attributeTokens defaultOptFlags
 
-            // Check for "error" keyword (compiler error expected)
+            // The legacy `error` form accepts either compiler rejection or a
+            // runtime language failure. Use `compileerror` to pin the phase.
             // Supports: error  or  error="message"
             match tokens with
             | firstToken :: restTokens when firstToken = "error" ->
                 parseErrorAttributeFlags restTokens
                 |> Result.map (fun optFlags ->
-                    // Expect compilation to fail with exit code 1, no specific message
-                    (None, 1, None, None, optFlags, true, None, None))
+                    // Expect a language failure with exit code 1 and no specific message.
+                    (None, 1, None, None, optFlags, Some AnyError, None, None))
             | firstToken :: restTokens when firstToken.StartsWith("error=", StringComparison.OrdinalIgnoreCase) ->
                 // error="message" format, optionally followed by attributes
                 let msgPart = firstToken.Substring(6)  // Skip "error="
@@ -669,29 +677,40 @@ let private parseTestLineWithPreamble (line: string) (lineNumber: int) (filePath
                 |> Result.mapError (fun e -> $"Invalid error message: {e}")
                 |> Result.bind (fun msg ->
                     parseErrorAttributeFlags restTokens
-                    |> Result.map (fun optFlags -> (None, 1, None, None, optFlags, true, Some msg, None)))
+                    |> Result.map (fun optFlags -> (None, 1, None, None, optFlags, Some AnyError, Some msg, None)))
+            | firstToken :: restTokens when firstToken = "compileerror" ->
+                parseErrorAttributeFlags restTokens
+                |> Result.map (fun optFlags ->
+                    (None, 1, None, None, optFlags, Some CompileError, None, None))
+            | firstToken :: restTokens when firstToken.StartsWith("compileerror=", StringComparison.OrdinalIgnoreCase) ->
+                let msgPart = firstToken.Substring(13)
+                parseStringLiteral msgPart
+                |> Result.mapError (fun e -> $"Invalid compile error message: {e}")
+                |> Result.bind (fun msg ->
+                    parseErrorAttributeFlags restTokens
+                    |> Result.map (fun optFlags -> (None, 1, None, None, optFlags, Some CompileError, Some msg, None)))
             | firstToken :: [] when firstToken.Equals("sqlerror", StringComparison.OrdinalIgnoreCase) ->
                 // Legacy runtime SQL error shorthand with no specific message.
-                Ok (None, 1, Some "", None, defaultOptFlags, false, None, None)
+                Ok (None, 1, Some "", None, defaultOptFlags, None, None, None)
             | firstToken :: [] when firstToken.StartsWith("sqlerror=", StringComparison.OrdinalIgnoreCase) ->
                 // Legacy runtime SQL error shorthand:
                 //   source = sqlerror="message"
                 let msgPart = firstToken.Substring(9)  // Skip "sqlerror="
                 parseStringLiteral msgPart
                 |> Result.mapError (fun e -> $"Invalid sqlerror message: {e}")
-                |> Result.map (fun msg -> (None, 1, Some "", Some msg, defaultOptFlags, false, None, None))
+                |> Result.map (fun msg -> (None, 1, Some "", Some msg, defaultOptFlags, None, None, None))
             | _ ->
                 if trimmed.ToLower() = "skip" then
-                    Ok (None, 0, None, None, defaultOptFlags, false, None, Some "Skipped by test")
+                    Ok (None, 0, None, None, defaultOptFlags, None, None, Some "Skipped by test")
                 elif trimmed.ToLower().StartsWith("skip=") then
                     let reasonPart = trimmed.Substring(5)
                     match parseStringLiteral reasonPart with
-                    | Ok reason -> Ok (None, 0, None, None, defaultOptFlags, false, None, Some reason)
+                    | Ok reason -> Ok (None, 0, None, None, defaultOptFlags, None, None, Some reason)
                     | Error e -> Error $"Invalid skip reason: {e}"
                 else
                     match tryParseBuiltinErrorExpectation trimmed with
                     | Some (Ok expectedErr) ->
-                        Ok (None, 1, Some "", expectedErr, defaultOptFlags, false, None, None)
+                        Ok (None, 1, Some "", expectedErr, defaultOptFlags, None, None, None)
                     | Some (Error e) ->
                         Error $"Invalid Builtin.testDerrorMessage expectation: {e}"
                     | None ->
@@ -726,7 +745,7 @@ let private parseTestLineWithPreamble (line: string) (lineNumber: int) (filePath
                         match attrStartIndex with
                         | None ->
                             // Bare RHS is always treated as a value expression.
-                            Ok (Some trimmed, 0, None, None, defaultOptFlags, false, None, None)
+                            Ok (Some trimmed, 0, None, None, defaultOptFlags, None, None, None)
                         | Some idx ->
                             let leadingTokens = tokens |> List.take idx
                             let attrTokens = tokens |> List.skip idx
@@ -894,7 +913,7 @@ let private parseTestLineWithPreamble (line: string) (lineNumber: int) (filePath
                             elif leadingText.IsSome && not sawRuntimeExpectationAttribute then
                                 // Value expectation with trailing compiler flags, e.g.:
                                 // `... = 5L disable_opt_anf=true`
-                                Ok (leadingText, exitCode, None, None, optFlags, false, None, skipReason)
+                                Ok (leadingText, exitCode, None, None, optFlags, None, None, skipReason)
                             else
                                 let leadingStdoutResult =
                                     match leadingText with
@@ -921,14 +940,15 @@ let private parseTestLineWithPreamble (line: string) (lineNumber: int) (filePath
 
                                     match combinedStdout with
                                     | Ok finalStdout ->
-                                        Ok (None, exitCode, finalStdout, stderr, optFlags, false, None, skipReason)
+                                        Ok (None, exitCode, finalStdout, stderr, optFlags, None, None, skipReason)
                                     | Error e -> Error e
 
         match parseExpectations expectationsStr with
-        | Ok (expectedValueExpr, exitCode, stdout, stderr, optFlags, expectError, errorMessage, skipReason) ->
+        | Ok (expectedValueExpr, exitCode, stdout, stderr, optFlags, errorExpectation, errorMessage, skipReason) ->
             let displayName = comment |> Option.defaultValue source
             Ok {
                 Name = $"L{lineNumber}: {displayName}"
+                SourceLine = lineNumber
                 Source = source
                 ExpectedValueExpr = expectedValueExpr
                 Preamble = preamble
@@ -940,7 +960,7 @@ let private parseTestLineWithPreamble (line: string) (lineNumber: int) (filePath
                 OutputMatch = optFlags.OutputMatch
                 Isolated = optFlags.Isolated
                 ExpectedExitCode = exitCode
-                ExpectCompileError = expectError
+                ErrorExpectation = errorExpectation
                 ExpectedErrorMessage = errorMessage
                 SkipReason = skipReason
                 DisableFreeList = optFlags.DisableFreeList
@@ -1062,6 +1082,49 @@ let private stripComment (line: string) : string =
     | Some commentIdx -> line.Substring(0, commentIdx).Trim()
     | None -> line.Trim()
 
+let private parseCompileErrorDirective (lineNumber: int) (line: string) : Result<string option, string> =
+    let trimmed = line.Trim()
+    if trimmed = "#compileerror" then
+        Ok None
+    elif trimmed.StartsWith("#compileerror=", StringComparison.Ordinal) then
+        trimmed.Substring(14)
+        |> parseStringLiteral
+        |> Result.map Some
+        |> Result.mapError (fun message -> $"Line {lineNumber}: Invalid #compileerror directive: {message}")
+    else
+        Error $"Line {lineNumber}: Invalid #compileerror directive"
+
+let private collectCompileErrorOverrides
+    (lines: string array)
+    : Result<Map<int, string option> * Set<int>, string> =
+    let rec loop
+        (index: int)
+        (overrides: Map<int, string option>)
+        (directiveLines: Set<int>)
+        : Result<Map<int, string option> * Set<int>, string> =
+        if index >= lines.Length then
+            Ok (overrides, directiveLines)
+        else
+            let trimmed = lines.[index].Trim()
+            if not (trimmed.StartsWith("#compileerror", StringComparison.Ordinal)) then
+                loop (index + 1) overrides directiveLines
+            elif index + 1 >= lines.Length then
+                Error $"Line {index + 1}: #compileerror must immediately precede a test"
+            else
+                let following = lines.[index + 1].Trim()
+                if following = ""
+                   || following.StartsWith("//", StringComparison.Ordinal)
+                   || following.StartsWith("#", StringComparison.Ordinal) then
+                    Error $"Line {index + 1}: #compileerror must immediately precede a test"
+                else
+                    parseCompileErrorDirective (index + 1) trimmed
+                    |> Result.bind (fun message ->
+                        loop
+                            (index + 1)
+                            (Map.add (index + 2) message overrides)
+                            (Set.add (index + 1) directiveLines))
+    loop 0 Map.empty Set.empty
+
 /// Parse all E2E tests from a single file
 /// Supports preamble definitions that are prepended to all tests.
 /// Lines that don't match the test format (expr = expectation) are treated as
@@ -1073,11 +1136,19 @@ let parseE2ETestFile (path: string) : Result<E2ETest list, string> =
     if not (System.IO.File.Exists path) then
         Error $"Test file not found: {path}"
     else
-        let lines = System.IO.File.ReadAllLines(path)
+        let rawLines = System.IO.File.ReadAllLines(path)
         let allowIndentedTests = path.EndsWith(".dark", StringComparison.OrdinalIgnoreCase)
+        let (compileErrorOverrides, directiveLines, directiveErrors) =
+            match collectCompileErrorOverrides rawLines with
+            | Ok (overrides, lines) -> (overrides, lines, [])
+            | Error message -> (Map.empty, Set.empty, [message])
+        let lines =
+            rawLines
+            |> Array.mapi (fun index line ->
+                if Set.contains (index + 1) directiveLines then "" else line)
 
         let mutable tests = []
-        let mutable errors = []
+        let mutable errors = directiveErrors
         let mutable preambleLines = []
         // Track function definitions for caching: funcName -> line number
         let mutable functionLineMap : Map<string, int> = Map.empty
@@ -1344,17 +1415,38 @@ let parseE2ETestFile (path: string) : Result<E2ETest list, string> =
             let keepPerTestPreamble =
                 allowIndentedTests
                 && normalizedPath.Contains("/e2e/upstream/")
+            let parsedTests = List.rev tests
+            let parsedSourceLines = parsedTests |> List.map _.SourceLine |> Set.ofList
+            let orphanedOverrides =
+                compileErrorOverrides
+                |> Map.toList
+                |> List.choose (fun (lineNumber, _) ->
+                    if Set.contains lineNumber parsedSourceLines then None else Some lineNumber)
             let normalizedTests =
-                tests
-                |> List.rev
+                parsedTests
                 |> List.map (fun test ->
-                    if keepPerTestPreamble then
-                        test
-                    else
-                        { test with
-                            Preamble = fullPreamble
-                            FunctionLineMap = fullFunctionLineMap })
-            Ok normalizedTests
+                    let withPreamble =
+                        if keepPerTestPreamble then
+                            test
+                        else
+                            { test with
+                                Preamble = fullPreamble
+                                FunctionLineMap = fullFunctionLineMap }
+                    match Map.tryFind test.SourceLine compileErrorOverrides with
+                    | None -> withPreamble
+                    | Some expectedMessage ->
+                        { withPreamble with
+                            ExpectedValueExpr = None
+                            ExpectedStdout = None
+                            ExpectedStderr = None
+                            ExpectedExitCode = 1
+                            ErrorExpectation = Some CompileError
+                            ExpectedErrorMessage = expectedMessage
+                            SkipReason = None })
+            match orphanedOverrides with
+            | [] -> Ok normalizedTests
+            | lineNumber :: _ ->
+                Error $"Line {lineNumber - 1}: #compileerror must immediately precede a test"
 
 /// Parse E2E test from old-format file (for backward compatibility during transition)
 let parseE2ETest (path: string) : Result<E2ETest, string> =

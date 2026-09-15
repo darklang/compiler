@@ -25,6 +25,11 @@ this repository and takes precedence where it is stricter.
 ## Change rules
 
 - Create a failing, focused E2E test before fixing a compiler behavior.
+- Preserve match validation as an ahead-of-time boundary: exhaustiveness,
+  pattern and guard validity, binding consistency, and arm result types must
+  fail during compilation when invalid. Never defer these failures to runtime.
+  Use `compileerror=` or an upstream `#compileerror=` override when test
+  correctness depends on the diagnostic phase.
 - Test observable language behavior, not incidental compiler structure. Do not
   add IR or backend tests whose assertion is merely that a particular helper or
   call is present or absent. Use E2E tests for correctness and benchmarks for

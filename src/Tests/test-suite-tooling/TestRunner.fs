@@ -645,7 +645,6 @@ let private runTestsWithProgressReporter (completedTestReporter: (int -> unit) o
                 ("src/Tests/e2e/upstream/language/derror.dark", Set.ofList [ 2; 10; 13; 15; 16; 18; 19; 22; 23; 32 ])
                 ("src/Tests/e2e/upstream/language/elambda.dark", Set.ofList [ 5; 13; 18; 19; 33; 35; 47; 53; 73; 85; 88; 95 ])
                 ("src/Tests/e2e/upstream/language/flow-control/eif.dark", Set.ofList [ 1; 12; 13; 14; 20 ])
-                ("src/Tests/e2e/upstream/language/flow-control/ematch.dark", Set.ofList [ 580; 621; 635; 675; 678; 701; 723; 726; 735; 740; 766; 770; 804 ])
                 ("src/Tests/e2e/upstream/language/flow-control/epipe.dark", Set.ofList [ 11; 16; 31; 42; 43; 45; 47; 49; 58; 70; 73; 80; 85 ])
                 ("src/Tests/e2e/upstream/language/nested-fns.dark", Set.ofList [ 55; 60 ])
                 ("src/Tests/e2e/upstream/stdlib/base64.dark", Set.ofList [ 7; 9; 10; 11; 12; 20; 21; 22; 23; 24; 25; 26; 27; 28; 29; 33; 34; 35; 36; 39; 40; 43; 44; 45; 46; 47 ])

@@ -1460,6 +1460,13 @@ let rec parsePattern (tokens: Token list) : Result<Pattern * Token list, string>
             parseListPattern rest []
         | TIdent typeName :: TLBrace :: _ when typeName.Length > 0 && System.Char.IsUpper(typeName.[0]) ->
             Error "Record patterns are not supported"
+        | TIdent name :: TAdjacentLParen :: rest when name.Length > 0 && System.Char.IsUpper(name.[0]) ->
+            // Upstream constructor patterns accept an adjacent parenthesized
+            // payload. The parentheses group one payload pattern; commas inside
+            // them form that payload's tuple pattern.
+            parseTuplePattern rest []
+            |> Result.map (fun (payloadPattern, remaining) ->
+                (PConstructor (name, Some payloadPattern), remaining))
         | TIdent name :: rest when name.Length > 0 && System.Char.IsUpper(name.[0]) ->
             // Constructor pattern, optionally with a space-applied payload: Some x
             if canStartPatternPayload rest then

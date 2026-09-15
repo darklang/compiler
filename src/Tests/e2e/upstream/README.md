@@ -26,6 +26,20 @@ right, and an equals sign in between. For runtime errors, you can use
 You can use parens around multiple expressions to group them into a single
 expression, eg `(5 |> toString)`.
 
+Compiler-only AOT expectations are kept beside the imported test without
+replacing its upstream expectation:
+
+```fsharp
+#compileerror="Non-exhaustive match expression"
+(match false with | true -> 1L) = error="No matching case found"
+```
+
+The directive applies only to the immediately following test and requires a
+compiler failure; a runtime failure never satisfies it. It can also override
+an upstream value expectation when source accepted by the interpreter is
+rejected by AOT validation. Upstream-diff tooling removes these local metadata
+lines before comparison.
+
 # Test file format
 
 Test file format is as follows:

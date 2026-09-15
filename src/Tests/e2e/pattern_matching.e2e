@@ -370,13 +370,13 @@ match (1L > 10L) || (10L > 1L) with | true -> 42L | false -> 0L = 42L
 
 // === Non-exhaustive pattern match test ===
 // A non-matching exact list pattern is rejected before lowering.
-match [1L, 2L, 3L] with | [a, b] -> a + b = error="Non-exhaustive match expression"
+match [1L, 2L, 3L] with | [a, b] -> a + b = compileerror="Non-exhaustive match expression"
 
 // Duplicate bindings in a single pattern should be rejected by type checking.
-match (1L, 2L) with | (x, x) -> x | _ -> 0L = error="Duplicate binding 'x' in the same pattern"
+match (1L, 2L) with | (x, x) -> x | _ -> 0L = compileerror="Duplicate binding 'x' in the same pattern"
 
 // Pattern groups must bind the same names in every alternative.
-match (1L, 2L) with | (x, _) | (_, _) -> x | _ -> 0L = error="Pattern matches require all branches to provide the same variables - expected [x], got []"
+match (1L, 2L) with | (x, _) | (_, _) -> x | _ -> 0L = compileerror="Pattern matches require all branches to provide the same variables - expected [x], got []"
 
 // Underscore-prefixed names bind locally but do not participate in the
 // alternative binding-set check, matching interpreter validation.
@@ -395,12 +395,12 @@ match (1L, 2L) with | (x, 0L) | ([x], _) -> x | _ -> 99L = 99L
 (match ("a" ++ "b", 1L) with | (x, _) | (x, _, _) -> x | _ -> "") == "ab" = true
 
 // Integer literal pattern on non-int scrutinee should be rejected
-match true with | 1L -> 42L | _ -> 0L = error="Cannot match Bool value true with an Int64 pattern"
+match true with | 1L -> 42L | _ -> 0L = compileerror="Cannot match Bool value true with an Int64 pattern"
 
 // List cons pattern on non-list type should be rejected (prevents TInt64 fallback in AST_to_ANF)
 // The type checker prevents this - without this check, the compiler would silently assume
 // TInt64 element type which would produce incorrect code
-match 42L with | h :: t -> h | _ -> 0L = error="Cannot match Int64 value 42 with a List pattern"
+match 42L with | h :: t -> h | _ -> 0L = compileerror="Cannot match Int64 value 42 with a List pattern"
 
 // === Nested pattern tests ===
 
@@ -460,7 +460,7 @@ let x = match false with | true -> [] | false -> [[1.5, 2.5], [3.0]] in match x 
 
 // Tuple arity mismatch inside constructor payload list pattern must not default missing tuple slots to Stdlib.Int64.
 // Regression: this previously matched and evaluated the branch body instead of surfacing the tuple arity issue.
-type TupleListBox = TupleListBox of List<(Int64 * Int64)> match TupleListBox ([(1L, 2L)]) with | TupleListBox ([(a, b, c)]) -> 1L | _ -> 2L = error="Tuple pattern expects 3 elements but got 2"
+type TupleListBox = TupleListBox of List<(Int64 * Int64)> match TupleListBox ([(1L, 2L)]) with | TupleListBox ([(a, b, c)]) -> 1L | _ -> 2L = compileerror="Tuple pattern expects 3 elements but got 2"
 
 // Constructor payload tuple pattern on non-tuple payload type must not match in list patterns.
 // Regression: this previously matched due nested tuple bindings defaulting to TInt64.
@@ -603,12 +603,12 @@ match 18446744073709551616Z with | 0Z -> true | _ -> false = false
 
 // Regression: list mismatch checks must not treat 64-bit literal patterns as 128-bit.
 // These are rejected before lowering rather than emitting a runtime match failure.
-match [1L] with | [1L, 2L] -> 0L = error="Non-exhaustive match expression"
-match [1UL] with | [1UL, 2UL] -> 0UL = error="Non-exhaustive match expression"
+match [1L] with | [1L, 2L] -> 0L = compileerror="Non-exhaustive match expression"
+match [1UL] with | [1UL, 2UL] -> 0UL = compileerror="Non-exhaustive match expression"
 
 // Int128/UInt128 list literal length mismatch should behave consistently with other int types.
-match [1Q] with | [1Q, 2Q] -> 0Q = error="Non-exhaustive match expression"
-match [1Z] with | [1Z, 2Z] -> 0Z = error="Non-exhaustive match expression"
+match [1Q] with | [1Q, 2Q] -> 0Q = compileerror="Non-exhaustive match expression"
+match [1Z] with | [1Z, 2Z] -> 0Z = compileerror="Non-exhaustive match expression"
 
 // Int128/UInt128 pattern coverage parity with other integer literal patterns.
 type I128Wrap = I128Wrap of Int128 | I128None
@@ -624,4 +624,4 @@ match 5Q with | 4Q | 5Q -> 1L | _ -> 0L = 1L
 match 5Z with | 4Z | 5Z -> 1L | _ -> 0L = 1L
 
 // A finite scrutinee with an uncovered case must fail during AOT type checking.
-match false with | true -> 1L = error="Non-exhaustive match expression"
+match false with | true -> 1L = compileerror="Non-exhaustive match expression"
