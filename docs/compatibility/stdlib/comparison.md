@@ -150,9 +150,9 @@ shared MIR-to-LIR pass and the ARM64/x64 backends. Focused executable evidence
 is in `src/Tests/e2e/comparison-parity.e2e`, alongside the existing
 `equality.e2e` and `interpreter_behavior_parity.e2e` suites.
 
-The root wrappers are `src/DarkCompiler/stdlib/NoModule.dark:3-11`, loaded at
-`CompilerLibrary.fs:1116-1118`. Separate stdlib specialization merges user
-record/sum metadata before materializing structural helpers at
-`CompilerLibrary.fs:1296-1378`; the indexed record view is built at
-`frontend/TypeChecking.fs:1046-1058`. Public probes are at
+The root wrappers are `src/DarkCompiler/stdlib/NoModule.dark`, loaded by
+`driver/StdlibCompilation.fs`. Separate stdlib specialization merges user
+record/sum metadata before materializing structural helpers in
+`driver/StdlibCompilation.fs`; the indexed record view is built in
+`frontend/checking/Types.fs`. Public probes are at
 `comparison-parity.e2e:35-110,148-156`.

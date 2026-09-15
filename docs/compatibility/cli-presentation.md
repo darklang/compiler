@@ -67,24 +67,22 @@ functions do not add runtime type dispatch to imitate it.
 
 The typed intrinsic registry is
 `src/DarkCompiler/Stdlib.fs:101-113`. Effect nodes begin at
-`ANF.fs:234`, `MIR.fs:97`, and `LIR.fs:122`; intrinsic lowering starts at
-`passes/anf/AST_to_ANF.fs:157`. Both native implementations are at
-`backend/arm64/CodeGen.fs:4367-4515` and
-`backend/x64/CodeGen.fs:2827-2950`. They are separate from the final-result
+the ANF, MIR, and LIR definitions; intrinsic lowering lives in
+`passes/anf/lowering/Primitives.fs`. Both native implementations are under
+`backend/{arm64,x64}/instructions/`. They are separate from the final-result
 print instructions and participate in optimization, liveness, allocation, and
 IR printing as ordered effects.
 
 The root presentation source is `stdlib/Print.dark:3-15`, loaded immediately
-after List at `CompilerLibrary.fs:1133-1136`. Its `printLines` composition uses
+after List by `driver/StdlibCompilation.fs`. Its `printLines` composition uses
 the portable ordered recursion at `stdlib/List.dark:441-446`; no native list
 traversal was added. The package load order is recorded in `CompilerLibrary.fs` and the
 adapted sources are `stdlib/CliColor.dark`, `CliLog.dark`, `CliProgress.dark`,
 `CliPrompt.dark`, `CliSpinner.dark`, and `CliTable.dark`. EGC measurement is
 routed through `stdlib/String.dark:419`; signed selection parsing is aligned at
 `stdlib/Int.dark:405`. Unit suppression is in
-`passes/anf/PrintInsertion.fs`, and the CLI's inherited-stream run path is
-`CompilerLibrary.fs:1987` plus `Program.fs:481`. Captured execution remains a
-separate test path at `CompilerLibrary.fs:1860`.
+`passes/anf/PrintInsertion.fs`, and CLI execution is coordinated by
+`driver/Execution.fs` and `Program.fs`.
 
 ## Revision-stamped probes
 

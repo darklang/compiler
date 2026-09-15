@@ -41,7 +41,7 @@ type Pattern =
 
 ## Match Compilation
 
-Implemented in `AST_to_ANF.fs`.
+Implemented in `passes/anf/lowering/PatternLowering.fs`.
 
 ### Algorithm
 
@@ -196,10 +196,9 @@ alternatives with failed-binding rollback),
 `backend/src/LibExecution/ProgramTypesToRuntimeTypes.fs:1009` (pattern then
 guard then body decision order), and `backend/src/LibExecution/Interpreter.fs:1961`
 plus `packages/darklang/prettyPrinter/runtimeError.dark:253` (observable
-non-exhaustive failure). Current compiler anchors are `AST.fs:162`,
-`frontend/Parser.fs:1312`, `frontend/TypeChecking.fs:4535`, and
-`passes/anf/AST_to_ANF.fs:7148` and `:8782`. Line numbers name the pinned/audited
-trees above and may move in later revisions.
+non-exhaustive failure). Current compiler anchors are `AST.fs`,
+`frontend/Parser.fs`, `frontend/checking/CheckMatches.fs`, and
+`passes/anf/lowering/PatternLowering.fs`.
 
 The public grammar accepts unit, literal, variable, wildcard, parenthesized or
 bare tuple, exact list, cons, constructor, nested, guarded, and recursive
@@ -335,7 +334,7 @@ match c with
 | File | Purpose |
 |------|---------|
 | `AST.fs` | Pattern type definitions |
-| `AST_to_ANF.fs` | Match compilation, exhaustiveness, and binding extraction |
+| `passes/anf/lowering/PatternLowering.fs` | Match compilation, exhaustiveness, and binding extraction |
 
 ## Tests
 

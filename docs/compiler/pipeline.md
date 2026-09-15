@@ -4,9 +4,9 @@ See the [recursion compatibility ledger](../compatibility/language/recursion.md)
 group invariants carried through parsing, typing, ANF lowering, and tail-call
 detection.
 
-Before expression typing, pass 1.5 builds a canonical immutable symbol
+Before expression typing, name resolution builds a canonical immutable symbol
 inventory and resolves value, callable, constructor, pattern, and type names.
-The checked AST contains canonical identity spellings; pass 2 performs exact
+The checked AST contains canonical identity spellings; ANF lowering performs exact
 identity lookup and never inserts namespaces or retries suffixes. The complete
 rule table is in [Name resolution parity](../compatibility/language/name-resolution.md).
 
@@ -37,7 +37,7 @@ The Dark compiler transforms source code through a series of passes, each with a
 | 5.5  | Function tree shaking   | `passes/lir/FunctionTreeShaking.fs`                         | LIR → pruned LIR                              |
 | 6    | Code generation         | `backend/{arm64,x64}/CodeGen.fs`                           | LIR → ISA instructions                        |
 | 7    | Encode & resolve        | `backend/{arm64,x64}/Encoding.fs` + `Resolve.fs`         | ISA → machine code bytes                      |
-| 8    | Binary generation       | `backend/{arm64,x64}/8_Binary_Generation_*.fs`               | Blob → Mach-O or ELF executable              |
+| 8    | Binary generation       | `backend/{arm64,x64}/Binary_Generation_*.fs`                 | Blob → Mach-O or ELF executable              |
 
 Passes 1–5 are shared across targets. Passes 6–8 live under
 `backend/arm64/` or `backend/x64/`. The host is validated once as a

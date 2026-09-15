@@ -23,7 +23,8 @@ interpolation. All literal text is normalized to NFC before it enters the AST.
 Focused acceptance and invalid-scalar coverage is in
 `src/Tests/e2e/literal_parity.e2e` and `src/Tests/syntax/literals.syntax`.
 
-Literal lowering remains in AST_to_ANF.fs:5084-5136. The existing
+Literal lowering remains in `passes/anf/lowering/AtomLowering.fs` and
+`passes/anf/lowering/ExpressionLowering.fs`. The existing
 ValueRendering.fs and PrintInsertion.fs paths remain the only
 eval-boundary rendering implementation.
 

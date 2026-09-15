@@ -90,14 +90,16 @@ Source → AST → ANF → MIR → LIR → target ISA → Binary
 - Use `Option` for missing values
 - Prefer string interpolation over printf-style formatting
 
-## Compiler Pass Numbering Convention
+## Compiler Pass Naming Convention
 
-**Decision**: Prefix pass files with their order in the pipeline (1_, 1.5_, 2_, 2.5_, etc.).
+**Decision**: Name pass files for their responsibility and group them by source
+stage. Express execution order in the typed pipeline driver and F# project order,
+not in filename prefixes.
 
 **Rationale**:
-- **Clear ordering**: Developers immediately see the compilation flow
-- **Easy navigation**: Files sort in pipeline order in file explorers
-- **Decimal numbering**: Allows inserting passes (1.5_TypeChecking) without renaming
+- **Stable names**: Inserting or reordering a pass does not rename unrelated files
+- **Clear ownership**: Paths identify the representation and responsibility a pass owns
+- **Explicit ordering**: Driver composition shows actual execution order without encoding it twice
 
 ## Type System Design
 

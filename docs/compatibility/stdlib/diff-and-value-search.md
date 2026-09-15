@@ -88,12 +88,12 @@ database. The compiler intentionally does not acquire that service: it has no
 content-addressed package traversal or ordinary top-level value initialization,
 as documented in `name-resolution.md:81-101`. Instead, each `CompileRequest`
 contains an explicit immutable `PackageValueCatalog` snapshot
-(`src/DarkCompiler/CompilerLibrary.fs:761-816`). This catalog is compiler-only
+(`src/DarkCompiler/driver/Contexts.fs`). This catalog is compiler-only
 machinery, not a new Dark-visible package model.
 
 The snapshot records value hash, recursive custom-type identity, branch-visible
 locations in their already-prioritized order, and typed evaluator state. During
-compilation, the bridge at `CompilerLibrary.fs:1528-1690` discovers reachable
+compilation, the bridge in `driver/PackageCatalog.fs` discovers reachable
 `ValueSearch` specializations, retains only entries for their concrete result
 types, and materializes the narrow `pmFindValuesByValueType`,
 `pmGetLocationsByValue`, and concrete `pmEvaluateValue<'a>` functions. The

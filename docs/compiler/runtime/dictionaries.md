@@ -36,8 +36,8 @@ Current source evidence at the compiler comparison point is
 `src/DarkCompiler/stdlib/Dict.dark:9-216` for the public wrappers and ordered
 higher-order operations, `src/DarkCompiler/stdlib/__HAMT.dark:10-60` for the
 private generic storage boundary, `src/DarkCompiler/frontend/Parser.fs:2034-2035`
-for the empty value, `src/DarkCompiler/frontend/TypeChecking.fs:5742-5747`
-for content equality, `src/DarkCompiler/frontend/ValueRendering.fs:219-258`
+for the empty value, `src/DarkCompiler/frontend/checking/EqualityHelpers.fs`
+for content equality, `src/DarkCompiler/frontend/ValueRendering.fs`
 for canonical rendering, and `src/DarkCompiler/Stdlib.fs:145-166` for the raw
 internal intrinsics. Interpreter evidence at the pinned revision is
 `packages/darklang/stdlib/dict.dark:4-127`,
