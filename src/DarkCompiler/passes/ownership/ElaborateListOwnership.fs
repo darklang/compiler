@@ -33,7 +33,15 @@ let elaborateOwnership (StorageRegion (FunctionalRegion block, layouts)) : Owned
                             |> Option.toList
                         Branch (result, condition, edge yes yesLive, edge no noLive), unusedResult, before
                     | _ ->
-                        let unusedOutput = result operation |> Option.filter (fun output -> not (Set.contains output live)) |> Option.toList
+                        let unusedOutput =
+                            match operation with
+                            | Leaf leaf ->
+                                primitiveContract leaf
+                                |> HIR.managedOutputs
+                                |> List.map (fun output -> output.Id)
+                                |> List.filter (fun output -> not (Set.contains output live))
+                            | ScalarBinding _ -> []
+                            | Branch _ -> Crash.crash "List HIR: branch handled before output accounting"
                         let owned, releases =
                             match operation with
                             | Leaf (Construct (output, construction)) -> Leaf (Construct (output, construction)), []

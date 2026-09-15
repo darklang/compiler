@@ -17,30 +17,21 @@ let rec internal valueContract operation : ValueLiveness.Contract<ListId> =
         | Branch (output, _, yes, no) ->
             let branchUses (FunctionalBlock body as block) = entryLive block (managed body.Result)
             Set.union (branchUses yes) (branchUses no), managed output
-        | _ -> source operation |> Option.toList |> Set.ofList, result operation |> Option.toList |> Set.ofList
+        | Leaf leaf ->
+            let contract = primitiveContract leaf
+            contract.Inputs |> List.map (fun value -> value.Id) |> Set.ofList,
+            HIR.managedOutputs contract |> List.map (fun value -> value.Id) |> Set.ofList
+        | ScalarBinding _ -> Set.empty, Set.empty
     { Uses = uses; Defines = defines }
 and private entryLive (FunctionalBlock block) liveAfter =
     List.foldBack (fun operation live -> ValueLiveness.liveBefore (valueContract operation) live) block.Operations liveAfter
-
-let private hirContract operation : HIR.ValueContract =
-    match operation with
-    | Construct (output, Literal elements) ->
-        { Inputs = []; Operands = elements; Outputs = [output] }
-    | Construct (output, Repeat (count, value)) ->
-        { Inputs = []; Operands = [count; value]; Outputs = [output] }
-    | Transform (output, input, Map callback) ->
-        { Inputs = [input]; Operands = [callback]; Outputs = [output] }
-    | Transform (output, input, Reverse) ->
-        { Inputs = [input]; Operands = []; Outputs = [output] }
-    | Fold (output, input, initial, callback) ->
-        { Inputs = [input]; Operands = [initial; callback]; Outputs = [output] }
 
 /// No physical ownership is needed to check the region's incoming value
 /// interface. The current representation permits no external collection roots.
 let verifyFunctional (FunctionalRegion block) : Result<unit, string> =
     let dialect : VerifyHIR.Dialect<Operation<Transform>, FunctionalBlock> = {
         Body = fun (FunctionalBlock block) -> block
-        Leaf = hirContract
+        Leaf = primitiveContract
     }
     VerifyHIR.verify dialect block
     |> Result.mapError (fun error -> $"List HIR: {error}")

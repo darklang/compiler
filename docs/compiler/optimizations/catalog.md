@@ -116,6 +116,12 @@ barriers remain conservative unless a focused proof says otherwise. `FloatNeg`
 remains a load-availability boundary because extending loads across long
 negated reductions exceeds the current non-spilling Float register allocator.
 
+Before ANF, semantic HIR leaf operations carry typed effect and alias
+contracts. These contracts currently drive list-region verification and
+liveness: constructors are fresh, map/reverse may reuse their source, and fold
+has no managed result. They establish the proof boundary for future HIR
+reordering and reuse passes; no optimizer treats opaque AST operands as pure.
+
 ## LIR, allocation, and backend optimization
 
 `passes/lir/LIR_Peephole.fs`, `passes/lir/RegisterAllocation.fs`, and the native

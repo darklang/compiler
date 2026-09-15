@@ -90,13 +90,37 @@ let internal lookup name key map =
     | Some value -> value
     | None -> Crash.crash $"List HIR: missing {name} for {key}"
 
-let internal source = function
-    | HIR.Leaf (Transform (_, input, _) | Fold (_, input, _, _)) -> Some input.Id
-    | HIR.Leaf (Construct _) | HIR.ScalarBinding _ | HIR.Branch _ -> None
-
-let internal result = function
-    | HIR.Leaf (Construct (output, _) | Transform (output, _, _)) -> Some output.Id
-    | HIR.Leaf (Fold _) | HIR.ScalarBinding _ | HIR.Branch _ -> None
+let primitiveContract (operation: Operation<Transform>) : HIR.PrimitiveContract =
+    let output value alias : HIR.OutputContract = { Value = value; Alias = alias }
+    let effects values = Set.ofList values
+    match operation with
+    | Construct (result, Literal elements) ->
+        { Inputs = []
+          Operands = elements
+          Outputs = [output result HIR.FreshManaged]
+          Effects = effects [HIR.MayEvaluateOpaqueSource; HIR.MayAllocate] }
+    | Construct (result, Repeat (count, value)) ->
+        { Inputs = []
+          Operands = [count; value]
+          Outputs = [output result HIR.FreshManaged]
+          Effects = effects [HIR.MayEvaluateOpaqueSource; HIR.MayAllocate; HIR.MayFail] }
+    | Transform (result, source, (Map callback)) ->
+        { Inputs = [source]
+          Operands = [callback]
+          Outputs = [output result (HIR.MayReuseInput source)]
+          Effects =
+              effects [HIR.MayEvaluateOpaqueSource; HIR.MayAllocate; HIR.MayInvokeUserCode
+                       HIR.ReadsOwnedStorage; HIR.WritesOwnedStorage] }
+    | Transform (result, source, Reverse) ->
+        { Inputs = [source]
+          Operands = []
+          Outputs = [output result (HIR.MayReuseInput source)]
+          Effects = effects [HIR.MayAllocate; HIR.ReadsOwnedStorage; HIR.WritesOwnedStorage] }
+    | Fold (result, source, initial, callback) ->
+        { Inputs = [source]
+          Operands = [initial; callback]
+          Outputs = [output result HIR.NoManagedAlias]
+          Effects = effects [HIR.MayEvaluateOpaqueSource; HIR.MayInvokeUserCode; HIR.ReadsOwnedStorage] }
 
 let internal immediate = function
     | AST.TInt64 | AST.TBool -> true

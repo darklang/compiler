@@ -11,10 +11,14 @@ type VerificationError =
     | BindingTypeMismatch of result: ValueId
     | InvalidBranchCondition of AST.Type
     | InconsistentBranchResult of result: ValueId
+    | InvalidAliasSource of result: ValueId * source: ValueId
+    | IncompatibleAliasTypes of result: ValueId * source: ValueId
+    | DuplicateAliasSource of result: ValueId * source: ValueId
+    | UnaccountedOpaqueEffects
 
 type Dialect<'leaf, 'block> = {
     Body: 'block -> Block<Operation<'leaf, 'block>>
-    Leaf: 'leaf -> ValueContract
+    Leaf: 'leaf -> PrimitiveContract
 }
 
 let verify (dialect: Dialect<'leaf, 'block>) (root: 'block) =
@@ -33,17 +37,44 @@ let verify (dialect: Dialect<'leaf, 'block>) (root: 'block) =
     let defineMany declared visible (values: Value list) =
         values
         |> List.fold (fun result value -> result |> Result.bind (fun (declared, visible) -> define declared visible value)) (Ok (declared, visible))
+    let aliases (contract: PrimitiveContract) =
+        let inputs = contract.Inputs |> List.map (fun value -> value.Id, value) |> Map.ofList
+        let validate output source =
+            match Map.tryFind source.Id inputs with
+            | None -> Error (InvalidAliasSource (output.Value.Id, source.Id))
+            | Some input when input.Type <> source.Type || output.Value.Type <> source.Type ->
+                Error (IncompatibleAliasTypes (output.Value.Id, source.Id))
+            | Some _ -> Ok ()
+        let validateMany output first rest =
+            let sources = first :: rest
+            match sources |> List.countBy (fun value -> value.Id) |> List.tryFind (fun (_, count) -> count > 1) with
+            | Some (source, _) -> Error (DuplicateAliasSource (output.Value.Id, source))
+            | None ->
+                sources
+                |> List.fold (fun result source -> result |> Result.bind (fun () -> validate output source)) (Ok ())
+        contract.Outputs
+        |> List.fold (fun result output ->
+            result |> Result.bind (fun () ->
+                match output.Alias with
+                | NoManagedAlias | FreshManaged -> Ok ()
+                | MayReuseInput source -> validate output source
+                | MayAliasInputs (first, rest) -> validateMany output first rest)) (Ok ())
+    let effects (contract: PrimitiveContract) =
+        if List.isEmpty contract.Operands || Set.contains MayEvaluateOpaqueSource contract.Effects then Ok ()
+        else Error UnaccountedOpaqueEffects
     let rec operations declared visible = function
         | [] -> Ok (declared, visible)
         | operation :: rest ->
             let next =
                 match operation with
                 | Leaf leaf ->
-                    let contract: ValueContract = dialect.Leaf leaf
+                    let contract: PrimitiveContract = dialect.Leaf leaf
                     requireMany visible contract.Inputs |> Result.bind (fun () ->
                         contract.Operands
                         |> List.fold (fun result value -> result |> Result.bind (fun () -> operand visible value)) (Ok ())
-                        |> Result.bind (fun () -> defineMany declared visible contract.Outputs))
+                        |> Result.bind (fun () -> effects contract)
+                        |> Result.bind (fun () -> aliases contract)
+                        |> Result.bind (fun () -> defineMany declared visible (contract.Outputs |> List.map (fun output -> output.Value))))
                 | ScalarBinding (result, value) ->
                     if result.Type <> value.Type then Error (BindingTypeMismatch result.Id)
                     else operand visible value |> Result.bind (fun () -> define declared visible result)

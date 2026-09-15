@@ -30,10 +30,42 @@ type Block<'operation> = {
     Result: Value
 }
 
-/// A leaf interface exposes normalized value edges and opaque scalar operands
-/// without assigning ownership or effects to either category.
-type ValueContract = {
+/// Effects constrain reordering independently of ownership. Owned-storage
+/// reads and writes describe compiler-selected representations, not visible
+/// source mutation.
+type PrimitiveEffect =
+    | MayEvaluateOpaqueSource
+    | MayAllocate
+    | MayFail
+    | MayInvokeUserCode
+    | ReadsOwnedStorage
+    | WritesOwnedStorage
+
+/// Alias provenance is a storage-selection capability, not a mutation
+/// guarantee. MayReuseInput permits either fresh storage or ownership transfer.
+type ResultAlias =
+    | NoManagedAlias
+    | FreshManaged
+    | MayReuseInput of Value
+    | MayAliasInputs of first: Value * rest: Value list
+
+type OutputContract = {
+    Value: Value
+    Alias: ResultAlias
+}
+
+/// A leaf interface exposes ordered value edges, opaque scalar operands,
+/// execution effects, and result provenance without assigning ownership.
+type PrimitiveContract = {
     Inputs: Value list
     Operands: Operand list
-    Outputs: Value list
+    Outputs: OutputContract list
+    Effects: Set<PrimitiveEffect>
 }
+
+let managedOutputs contract =
+    contract.Outputs
+    |> List.choose (fun output ->
+        match output.Alias with
+        | NoManagedAlias -> None
+        | FreshManaged | MayReuseInput _ | MayAliasInputs _ -> Some output.Value)
