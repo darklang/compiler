@@ -87,6 +87,7 @@ type TypeCheckEnv = {
     IndexedSumTypeReg: IndexedSumTypeRegistry
     SumTypeNames: Set<string>
     FuncEnv: TypeEnv
+    Values: Map<string, Type * Expr>
     FuncParamNames: FuncParamNameRegistry
     GenericFuncReg: GenericFuncRegistry
     GenericFuncDefs: Map<string, FunctionDef>
@@ -107,6 +108,7 @@ let mergeTypeCheckEnv (baseEnv: TypeCheckEnv) (overlay: TypeCheckEnv) : TypeChec
         IndexedSumTypeReg = mergeMap baseEnv.IndexedSumTypeReg overlay.IndexedSumTypeReg
         SumTypeNames = Set.union baseEnv.SumTypeNames overlay.SumTypeNames
         FuncEnv = mergeMap baseEnv.FuncEnv overlay.FuncEnv
+        Values = mergeMap baseEnv.Values overlay.Values
         FuncParamNames = mergeMap baseEnv.FuncParamNames overlay.FuncParamNames
         GenericFuncReg = {
             Functions = mergeMap baseEnv.GenericFuncReg.Functions overlay.GenericFuncReg.Functions
@@ -167,6 +169,26 @@ let rec private applySubstWithSeen (seen: Set<string>) (subst: Substitution) (ty
 let applySubst (subst: Substitution) (typ: Type) : Type =
     applySubstWithSeen Set.empty subst typ
 
+/// Instantiate declared type parameters simultaneously. A replacement may use
+/// the same name as a parameter in a nested declaration and must not itself be
+/// substituted (for example Outer<'a> = Inner<String, 'a>).
+let rec internal applyTypeArguments (subst: Substitution) (typ: Type) : Type =
+    match typ with
+    | TVar name -> Map.tryFind name subst |> Option.defaultValue typ
+    | TFunction (paramTypes, returnType) ->
+        TFunction (List.map (applyTypeArguments subst) paramTypes, applyTypeArguments subst returnType)
+    | TTuple elemTypes -> TTuple (List.map (applyTypeArguments subst) elemTypes)
+    | TEnumFields fieldTypes -> TEnumFields (List.map (applyTypeArguments subst) fieldTypes)
+    | TRecord (name, typeArgs) -> TRecord (name, List.map (applyTypeArguments subst) typeArgs)
+    | TList elemType -> TList (applyTypeArguments subst elemType)
+    | TStream elemType -> TStream (applyTypeArguments subst elemType)
+    | TSum (name, typeArgs) -> TSum (name, List.map (applyTypeArguments subst) typeArgs)
+    | TDict (keyType, valueType) ->
+        TDict (applyTypeArguments subst keyType, applyTypeArguments subst valueType)
+    | TInt8 | TInt16 | TInt32 | TInt64 | TInt128 | TInt
+    | TUInt8 | TUInt16 | TUInt32 | TUInt64 | TUInt128
+    | TBool | TFloat64 | TString | TBlob | TChar | TDateTime | TUnit | TRuntimeError | TRawPtr -> typ
+
 /// Collect type variable names in first-seen order.
 let rec collectTypeVarsInType (typ: Type) (acc: string list) : string list =
     let add name =
@@ -222,20 +244,20 @@ let internal buildRecordFieldSubstitutionFromParams
         Ok (List.zip typeParams typeArgs |> Map.ofList)
 
 /// Build a substitution for generic record fields from concrete type arguments.
-let rec private resolveAliasTargetType (aliasReg: AliasRegistry) (typ: Type) : Type =
+let rec internal resolveAliasTargetType (aliasReg: AliasRegistry) (typ: Type) : Type =
     match typ with
     | TRecord (name, typeArgs) ->
         match Map.tryFind name aliasReg with
         | Some (typeParams, targetType) when List.length typeArgs <= List.length typeParams ->
             let subst = List.zip (List.take (List.length typeArgs) typeParams) typeArgs |> Map.ofList
-            targetType |> applySubst subst |> resolveAliasTargetType aliasReg
+            targetType |> applyTypeArguments subst |> resolveAliasTargetType aliasReg
         | _ ->
             TRecord (name, List.map (resolveAliasTargetType aliasReg) typeArgs)
     | TSum (name, typeArgs) ->
         match Map.tryFind name aliasReg with
         | Some (typeParams, targetType) when List.length typeArgs <= List.length typeParams ->
             let subst = List.zip (List.take (List.length typeArgs) typeParams) typeArgs |> Map.ofList
-            targetType |> applySubst subst |> resolveAliasTargetType aliasReg
+            targetType |> applyTypeArguments subst |> resolveAliasTargetType aliasReg
         | _ ->
             TSum (name, List.map (resolveAliasTargetType aliasReg) typeArgs)
     | TFunction (paramTypes, returnType) ->
@@ -269,7 +291,7 @@ let private tryResolveGenericRecordAliasFields
             | Ok subst ->
                 let fields =
                     targetInfo.Fields
-                    |> List.map (fun (fieldName, fieldType) -> (fieldName, applySubst subst fieldType))
+                    |> List.map (fun (fieldName, fieldType) -> (fieldName, applyTypeArguments subst fieldType))
                 Some (targetName, fields)
             | Error _ ->
                 None
@@ -403,7 +425,7 @@ let rec resolveType (aliasReg: AliasRegistry) (typ: Type) : Type =
             else
                 // Build substitution and apply to target type
                 let subst = List.zip typeParams resolvedArgs |> Map.ofList
-                let substituted = applySubst subst targetType
+                let substituted = applyTypeArguments subst targetType
                 // Recursively resolve in case target is also an alias
                 resolveType aliasReg substituted
         | None ->
@@ -420,7 +442,7 @@ let rec resolveType (aliasReg: AliasRegistry) (typ: Type) : Type =
             else
                 // Build substitution and apply to target type
                 let subst = List.zip typeParams typeArgs |> Map.ofList
-                let substituted = applySubst subst targetType
+                let substituted = applyTypeArguments subst targetType
                 // Recursively resolve in case target is also an alias
                 resolveType aliasReg substituted
         | None ->

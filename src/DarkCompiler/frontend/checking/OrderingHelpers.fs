@@ -168,7 +168,7 @@ let rec internal buildCompareHelperExpr
                 | Ok subst ->
                     recordInfo.Fields
                     |> List.map (fun (name, fieldType) ->
-                        (name, resolveType aliasReg (applySubst subst fieldType)))
+                        (name, resolveType aliasReg (applyTypeArguments subst fieldType)))
                 | Error _ ->
                     recordInfo.Fields
                     |> List.map (fun (name, fieldType) -> (name, resolveType aliasReg fieldType))

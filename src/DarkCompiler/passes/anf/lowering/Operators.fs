@@ -50,6 +50,7 @@ let internal integerFunctionForBinOp (operandType: AST.Type) (op: AST.BinOp) : s
         | AST.Pow, AST.TUInt32 -> Some "Stdlib.UInt32"
         | AST.Pow, AST.TUInt64 -> Some "Stdlib.UInt64"
         | AST.Pow, AST.TFloat64 -> Some "Stdlib.Float"
+        | AST.Mod, AST.TFloat64 -> Some "Stdlib.Float"
         | _, AST.TInt -> Some "Stdlib.Int"
         | _, AST.TInt128 -> Some "Stdlib.Int128"
         | _, AST.TUInt128 -> Some "Stdlib.UInt128"

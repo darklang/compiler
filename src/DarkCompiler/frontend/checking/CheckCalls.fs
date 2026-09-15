@@ -59,6 +59,7 @@ let internal check (checkExpr: ExpressionChecker) (funcParamNameReg: Map<string,
             |> Result.bind (fun (_argType, argExpr') ->
                 let outputType =
                     match expectedType with
+                    | Some (TVar _) -> TUnit
                     | Some expected -> expected
                     | None -> TRuntimeError
                 Ok (outputType, Call (funcName, NonEmptyList.singleton argExpr')))
@@ -70,14 +71,6 @@ let internal check (checkExpr: ExpressionChecker) (funcParamNameReg: Map<string,
             (
         // Check if this is a generic function.
         match tryLookupResolved resolvedFuncName genericFuncReg.Functions with
-        | Some (origTypeParams, _) when
-            genericFuncReg.RequireExplicitTypeArgsForBareCalls
-            && Option.isNone expectedType
-            && not (resolvedFuncName.Contains(".")) ->
-            // Bare user-defined generic calls must provide explicit type arguments.
-            // Module-scoped names (for example Stdlib.List.map) still infer type args.
-            let expectedTypeArgCount = List.length origTypeParams
-            Error (GenericError (formatTypeArgumentArityError funcName expectedTypeArgCount 0))
         | Some (origTypeParams, _) ->
             // Freshen type params to avoid name clashes with caller's scope
             let (freshTypeParams, renaming) = freshenTypeParams origTypeParams

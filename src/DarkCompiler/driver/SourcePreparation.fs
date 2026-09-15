@@ -81,6 +81,7 @@ let private collectLocalSpecs
         topLevels
         |> List.map (function
             | AST.FunctionDef f when List.isEmpty f.TypeParams -> Monomorphization.collectTypeAppsFromFunc f
+            | AST.ValueDef valueDef -> Monomorphization.collectTypeApps (AST.valueDefBody valueDef)
             | AST.Expression e -> Monomorphization.collectTypeApps e
             | _ -> Set.empty)
         |> List.fold Set.union Set.empty
@@ -92,6 +93,84 @@ type internal MonomorphizationMode =
     | ReplaceTypeApps of SpecializationIdentity.SpecRegistry
     | SpecializeLocalAndReplace of SpecializationIdentity.SpecRegistry
 
+/// Materialize checked module values as one lexical binding per execution
+/// scope. This gives every reference ordinary value semantics through the
+/// existing ANF ownership pipeline and leaves no value-only lowering cases.
+let private materializeProgramValues
+    (inheritedValues: Map<string, AST.Type * AST.Expr>)
+    (AST.Program topLevels)
+    : AST.Program =
+    let currentValues =
+        topLevels
+        |> List.choose (function
+            | AST.ValueDef (AST.CheckedValueDef (name, typ, body)) -> Some (name, (typ, body))
+            | AST.ValueDef (AST.UncheckedValueDef (name, _)) ->
+                Crash.crash $"Unchecked value '{name}' reached ANF preparation"
+            | _ -> None)
+    let currentNames = currentValues |> List.map fst |> Set.ofList
+    let bindings =
+        (inheritedValues
+         |> Map.toList
+         |> List.filter (fun (name, _) -> not (Set.contains name currentNames)))
+        @ currentValues
+        |> List.map (fun (name, (_, body)) -> (name, body))
+    let wrap excluded body =
+        let eligible = bindings |> List.filter (fun (name, _) -> not (Set.contains name excluded))
+        let rec required fixedPoint =
+            let next =
+                eligible
+                |> List.fold (fun names (name, value) ->
+                    if Set.contains name names then
+                        eligible
+                        |> List.fold (fun dependencies (candidate, _) ->
+                            if InlineLambdas.varOccursInExpr candidate value then Set.add candidate dependencies
+                            else dependencies) names
+                    else names) fixedPoint
+            if Set.count next = Set.count fixedPoint then next else required next
+        let direct =
+            eligible
+            |> List.fold (fun names (name, _) ->
+                if InlineLambdas.varOccursInExpr name body then Set.add name names else names) Set.empty
+        let needed = required direct
+        let selected = eligible |> List.filter (fun (name, _) -> Set.contains name needed)
+        let rec orderByDependencies ordered remaining =
+            match remaining with
+            | [] -> ordered
+            | _ ->
+                let remainingNames = remaining |> List.map fst |> Set.ofList
+                let ready =
+                    remaining
+                    |> List.filter (fun (name, value) ->
+                        remainingNames
+                        |> Set.remove name
+                        |> Set.forall (fun candidate ->
+                            not (InlineLambdas.varOccursInExpr candidate value)))
+                match ready with
+                | [] ->
+                    Crash.crash "Checked top-level values contain a cyclic materialization dependency"
+                | _ ->
+                    let readyNames = ready |> List.map fst |> Set.ofList
+                    let pending = remaining |> List.filter (fun (name, _) -> not (Set.contains name readyNames))
+                    orderByDependencies (ordered @ ready) pending
+        let ordered = orderByDependencies [] selected
+        List.foldBack (fun (name, value) result ->
+            if Set.contains name excluded then result
+            else AST.Let (AST.LPVariable name, value, result)) ordered body
+    let materialized =
+        topLevels
+        |> List.choose (function
+            | AST.ValueDef _ -> None
+            | AST.FunctionDef funcDef ->
+                let parameters =
+                    funcDef.Params
+                    |> AST.NonEmptyList.toList
+                    |> List.map fst
+                    |> Set.ofList
+                Some (AST.FunctionDef { funcDef with Body = wrap parameters funcDef.Body })
+            | AST.Expression expr -> Some (AST.Expression (wrap Set.empty expr))
+            | AST.TypeDef typeDef -> Some (AST.TypeDef typeDef))
+    AST.Program materialized
+
 let internal prepareProgramForAnf
     (monomorphization: MonomorphizationMode)
     (baseTypeReg: TypeRegistries.TypeRegistry)
@@ -99,9 +178,11 @@ let internal prepareProgramForAnf
     (baseFuncNames: Set<string>)
     (baseFuncParams: Map<string, (string * AST.Type) list>)
     (baseFuncReturnTypes: Map<string, AST.Type>)
+    (inheritedValues: Map<string, AST.Type * AST.Expr>)
     (passTimingRecorder: PassTimingRecorder option)
     (program: AST.Program)
     : Result<AST.Program, string> =
+    let program = materializeProgramValues inheritedValues program
     let measure name operation =
         let timer = Stopwatch.StartNew()
         let result = operation ()
@@ -234,6 +315,7 @@ let internal convertTypedDeclarations
         baseFuncNames
         baseFuncParams
         baseFuncReturnTypes
+        (baseContext |> Option.map (fun context -> context.TypeCheckEnv.Values) |> Option.defaultValue Map.empty)
         None
         typedProgram
     |> Result.bind (fun liftedProgram ->
@@ -264,6 +346,7 @@ let private convertTypedProgramToConversionResult
         Map.empty
         baseFuncNames
         baseRegistries.FuncParams
+        Map.empty
         Map.empty
         None
         typedProgram
@@ -377,6 +460,7 @@ let internal convertTypedProgramToUserOnlyWithMode
             baseFuncNames
             baseContext.LambdaLiftFuncParams
             baseContext.ReturnTypes
+            baseContext.TypeCheckEnv.Values
             passTimingRecorder
             typedProgram)
     |> Result.bind (fun liftedProgram ->

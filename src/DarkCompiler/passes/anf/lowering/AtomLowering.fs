@@ -80,7 +80,9 @@ let lowerAtom (toANFCore: ExpressionLowerer) (toAtomCore: AtomLowerer) (toANFBou
     | AST.Var name ->
         if isBuiltinTestNanName name then
             Ok (ANF.FloatLiteral System.Double.NaN, [], varGen)
-        else if name = "Stdlib.Blob.empty" then
+        else if isBuiltinTestInfinityName name then
+            Ok (ANF.FloatLiteral System.Double.PositiveInfinity, [], varGen)
+        else if isBuiltinBlobEmptyName name then
             Ok (ANF.StringLiteral "", [], varGen)
         else if name = "Darklang.LanguageTools.PackageManager.PickContext.empty" then
             toAtomCore sumTypeNames inertScopes
@@ -437,13 +439,6 @@ let lowerAtom (toANFCore: ExpressionLowerer) (toAtomCore: AtomLowerer) (toANFBou
                     // Variable exists but is not a function type
                     Error $"Cannot call '{funcName}' - it has type {varType}, not a function type"
                 | None ->
-                    // Resolved stdlib equality APIs lower to the representation
-                    // operation at the AST boundary, including calls from stdlib.
-                    match tryCanonicalBufferEqualityIntrinsic funcName argAtoms with
-                    | Some intrinsicExpr ->
-                        let allBindings = argBindings @ [(tempVar, intrinsicExpr)]
-                        Ok (ANF.Var tempVar, allBindings, varGen2)
-                    | None ->
                     // Not a variable - check explicit presentation effects first.
                     match tryPresentationIntrinsic funcName argAtoms with
                     | Some intrinsicExpr ->

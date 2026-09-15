@@ -39,7 +39,7 @@ let private collectDirectEqHelperDeps
                 let concreteFields =
                     match buildRecordFieldSubstitutionFromParams recordInfo.TypeParams typeArgs with
                     | Ok subst ->
-                        fields |> List.map (fun (_, fieldType) -> resolveType aliasReg (applySubst subst fieldType))
+                        fields |> List.map (fun (_, fieldType) -> resolveType aliasReg (applyTypeArguments subst fieldType))
                     | Error _ ->
                         fields |> List.map (fun (_, fieldType) -> resolveType aliasReg fieldType)
                 concreteFields |> List.choose addIfHelperType
@@ -169,7 +169,7 @@ let private collectDirectCompareHelperDeps
                 match buildRecordFieldSubstitutionFromParams recordInfo.TypeParams typeArgs with
                 | Ok subst ->
                     recordInfo.Fields
-                    |> List.map (fun (_, fieldType) -> resolveType aliasReg (applySubst subst fieldType))
+                    |> List.map (fun (_, fieldType) -> resolveType aliasReg (applyTypeArguments subst fieldType))
                 | Error _ ->
                     recordInfo.Fields |> List.map (snd >> resolveType aliasReg)
         | TSum (sumTypeName, sumTypeArgs) ->

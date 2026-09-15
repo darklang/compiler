@@ -55,6 +55,7 @@ let internal declarationResolutionEnvironment
     let declarationKey topLevel =
         match topLevel with
         | FunctionDef funcDef -> Some ("function", funcDef.Name)
+        | ValueDef valueDef -> Some ("value", valueDefName valueDef)
         | TypeDef (RecordDef (name, _, _))
         | TypeDef (SumTypeDef (name, _, _))
         | TypeDef (TypeAlias (name, _, _)) -> Some ("type", name)
@@ -89,6 +90,13 @@ let internal declarationResolutionEnvironment
                         visibleName
                         identity
                         (NameResolution.SourceDeclaration funcDef.Name))
+            | ValueDef valueDef ->
+                let name = valueDefName valueDef
+                let (namespaceIdentity, terminal) = splitDeclaredName name
+                [ requiredCandidate
+                    name
+                    (NameResolution.ModuleValue (namespaceIdentity, terminal))
+                    (NameResolution.SourceDeclaration name) ]
             | TypeDef typeDef ->
                 let (typeName, variants) =
                     match typeDef with
@@ -136,15 +144,6 @@ let internal declarationResolutionEnvironment
                     identity
                     (NameResolution.CompilerExtension qualifiedName)))
 
-    let stdlibValueCandidates =
-        Stdlib.allValues
-        |> List.map (fun value ->
-            let (namespaceIdentity, terminal) = splitDeclaredName value.Name
-            requiredCandidate
-                value.Name
-                (NameResolution.ModuleValue (namespaceIdentity, terminal))
-                (NameResolution.ModuleDeclaration value.Name))
-
     let builtinCandidates =
         [ requiredCandidate
             "Builtin.unwrap"
@@ -165,10 +164,22 @@ let internal declarationResolutionEnvironment
           requiredCandidate
             "Builtin.testNan_v0"
             (NameResolution.BuiltinValue ("testNan", 0))
-            (NameResolution.BuiltinRegistration "Builtin.testNan") ]
+            (NameResolution.BuiltinRegistration "Builtin.testNan")
+          requiredCandidate
+            "Builtin.testInfinity"
+            (NameResolution.BuiltinValue ("testInfinity", 0))
+            (NameResolution.BuiltinRegistration "Builtin.testInfinity")
+          requiredCandidate
+            "Builtin.testInfinity_v0"
+            (NameResolution.BuiltinValue ("testInfinity", 0))
+            (NameResolution.BuiltinRegistration "Builtin.testInfinity")
+          requiredCandidate
+            "Builtin.blobEmpty"
+            (NameResolution.BuiltinValue ("blobEmpty", 0))
+            (NameResolution.BuiltinRegistration "Builtin.blobEmpty") ]
 
     NameResolution.empty
-    |> NameResolution.addCandidates (sourceCandidates @ intrinsicCandidates @ stdlibValueCandidates @ builtinCandidates)
+    |> NameResolution.addCandidates (sourceCandidates @ intrinsicCandidates @ builtinCandidates)
 
 /// Collect resolved callable dependencies for declaration grouping. Local
 /// availability has already been decided by name resolution, so only canonical
@@ -627,6 +638,12 @@ let internal resolveProgramNames
                                 Body = body'
                                 Recursion = recursion' })))
         | TypeDef typeDef -> resolveTypeDef typeDef |> Result.map TypeDef
+        | ValueDef valueDef ->
+            resolveExpr Set.empty (valueDefBody valueDef)
+            |> Result.map (fun body ->
+                match valueDef with
+                | UncheckedValueDef (name, _) -> ValueDef (UncheckedValueDef (name, body))
+                | CheckedValueDef (name, typ, _) -> ValueDef (CheckedValueDef (name, typ, body)))
         | Expression expr -> resolveExpr Set.empty expr |> Result.map Expression
 
     let (Program topLevels) = program

@@ -102,7 +102,7 @@ let rec internal buildEqHelperExpr
         BinOp (Eq, leftExpr, rightExpr)
 
     | _, TString ->
-        Call ("Stdlib.String.equals", NonEmptyList.fromList [leftExpr; rightExpr])
+        BinOp (Eq, leftExpr, rightExpr)
 
     | _, TInt ->
         Call ("Stdlib.Int.__equals", NonEmptyList.fromList [leftExpr; rightExpr])
@@ -148,7 +148,7 @@ let rec internal buildEqHelperExpr
             let concreteFields =
                 match buildRecordFieldSubstitutionFromParams recordInfo.TypeParams typeArgs with
                 | Ok subst ->
-                    fields |> List.map (fun (name, fieldType) -> (name, resolveType aliasReg (applySubst subst fieldType)))
+                    fields |> List.map (fun (name, fieldType) -> (name, resolveType aliasReg (applyTypeArguments subst fieldType)))
                 | Error _ ->
                     fields |> List.map (fun (name, fieldType) -> (name, resolveType aliasReg fieldType))
 

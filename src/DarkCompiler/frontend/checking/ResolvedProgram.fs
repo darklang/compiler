@@ -119,6 +119,93 @@ let internal checkResolvedProgramInternal
             declarationSummary.RecordTypeParams
             canonicalProgramTypeReg
 
+    let initialValueFuncEnv =
+        match baseEnv with
+        | Some existingEnv ->
+            Map.fold (fun env name typ -> Map.add name typ env) existingEnv.FuncEnv programFuncEnv
+        | None -> programFuncEnv
+    let initialValueFuncParamNames =
+        match baseEnv with
+        | Some existingEnv ->
+            Map.fold
+                (fun names name parameters -> Map.add name parameters names)
+                existingEnv.FuncParamNames
+                declarationSummary.FuncParamNames
+        | None -> declarationSummary.FuncParamNames
+    let initialValueIndexedTypeReg =
+        match baseEnv with
+        | Some existingEnv ->
+            Map.fold
+                (fun registry name info -> Map.add name info registry)
+                existingEnv.IndexedTypeReg
+                programIndexedTypeReg
+        | None -> programIndexedTypeReg
+    let initialValueIndexedSumTypeReg =
+        match baseEnv with
+        | Some existingEnv ->
+            Map.fold
+                (fun registry name info -> Map.add name info registry)
+                existingEnv.IndexedSumTypeReg
+                programIndexedSumTypeReg
+        | None -> programIndexedSumTypeReg
+    let initialValueGenericFuncReg =
+        match baseEnv with
+        | Some existingEnv ->
+            {
+                Functions =
+                    Map.fold
+                        (fun functions name typeParams -> Map.add name typeParams functions)
+                        existingEnv.GenericFuncReg.Functions
+                        programGenericFuncReg.Functions
+                RequireExplicitTypeArgsForBareCalls =
+                    existingEnv.GenericFuncReg.RequireExplicitTypeArgsForBareCalls
+                    || programGenericFuncReg.RequireExplicitTypeArgsForBareCalls
+            }
+        | None -> programGenericFuncReg
+    let initialValues = baseEnv |> Option.map (fun env -> env.Values) |> Option.defaultValue Map.empty
+    let checkedValuesResult =
+        topLevels
+        |> List.fold (fun result topLevel ->
+            result
+            |> Result.bind (fun (valueFuncEnv, values, checkedDefs) ->
+                match topLevel with
+                | ValueDef (UncheckedValueDef (name, body)) ->
+                    checkExprWithParamNamesAndSumTypeNames
+                        initialValueFuncParamNames
+                        availableSumTypeNames
+                        initialValueIndexedSumTypeReg
+                        body
+                        valueFuncEnv
+                        initialValueIndexedTypeReg
+                        canonicalVariantLookup
+                        initialValueGenericFuncReg
+                        warningSettings
+                        moduleRegistry
+                        functionAliasReg
+                        None
+                    |> Result.map (fun (typ, checkedBody) ->
+                        (Map.add name typ valueFuncEnv,
+                         Map.add name (typ, checkedBody) values,
+                         Map.add name (CheckedValueDef (name, typ, checkedBody)) checkedDefs))
+                | ValueDef (CheckedValueDef (name, typ, body)) ->
+                    Ok (
+                        Map.add name typ valueFuncEnv,
+                        Map.add name (typ, body) values,
+                        Map.add name (CheckedValueDef (name, typ, body)) checkedDefs)
+                | _ -> Ok (valueFuncEnv, values, checkedDefs)))
+            (Ok (initialValueFuncEnv, initialValues, Map.empty))
+
+    checkedValuesResult
+    |> Result.bind (fun (valueFuncEnv, values, checkedValues) ->
+    let topLevels =
+        topLevels
+        |> List.map (function
+            | ValueDef valueDef ->
+                match Map.tryFind (valueDefName valueDef) checkedValues with
+                | Some checkedValue -> ValueDef checkedValue
+                | None -> Crash.crash $"Checked value '{valueDefName valueDef}' was not retained"
+            | other -> other)
+
     // Build the type check environment for THIS program
     let programEnv : TypeCheckEnv = {
         TypeReg = canonicalProgramTypeReg
@@ -127,7 +214,8 @@ let internal checkResolvedProgramInternal
         VariantLookup = canonicalProgramVariantLookup
         IndexedSumTypeReg = programIndexedSumTypeReg
         SumTypeNames = programSumTypeNames
-        FuncEnv = programFuncEnv
+        FuncEnv = valueFuncEnv
+        Values = values
         FuncParamNames = declarationSummary.FuncParamNames
         GenericFuncReg = programGenericFuncReg
         // Checked bodies are installed after the function-definition pass.
@@ -172,6 +260,8 @@ let internal checkResolvedProgramInternal
                 mergedAliasReg
             |> Result.map (fun funcDef' -> (None, FunctionDef funcDef'))
         | TypeDef _ ->
+            Ok (None, topLevel)
+        | ValueDef _ ->
             Ok (None, topLevel)
         | Expression expr ->
             checkExprWithParamNamesAndSumTypeNames
@@ -317,7 +407,7 @@ let internal checkResolvedProgramInternal
             | true, [] -> Error (GenericError "Executable program must contain exactly one entry expression; found 0")
             | true, entries -> Error (GenericError $"Executable program must contain exactly one entry expression; found {entries.Length}")
             | false, [] -> Ok (TUnit, Program topLevelsWithEqHelpers, checkedTypeCheckEnv)
-            | false, entries -> Error (GenericError $"Declaration-only program must not contain entry expressions; found {entries.Length}")))
+            | false, entries -> Error (GenericError $"Declaration-only program must not contain entry expressions; found {entries.Length}"))))
 
 /// Check the common separate-compilation case without constructing and then
 /// merging an empty declaration environment. Name resolution has already run,

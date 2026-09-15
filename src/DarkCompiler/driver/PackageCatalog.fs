@@ -58,6 +58,7 @@ let private applyDeclarationOverlays (topLevels: AST.TopLevel list) : AST.TopLev
     let declarationKey topLevel =
         match topLevel with
         | AST.FunctionDef definition -> Some ("function", definition.Name)
+        | AST.ValueDef definition -> Some ("value", AST.valueDefName definition)
         | AST.TypeDef (AST.RecordDef (name, _, _))
         | AST.TypeDef (AST.SumTypeDef (name, _, _))
         | AST.TypeDef (AST.TypeAlias (name, _, _)) -> Some ("type", name)
@@ -194,6 +195,7 @@ let private collectProgramCalls (program: AST.Program) : Set<string> =
     topLevels
     |> List.map (function
         | AST.FunctionDef func -> Monomorphization.collectCalledFunctions func.Body
+        | AST.ValueDef valueDef -> Monomorphization.collectCalledFunctions (AST.valueDefBody valueDef)
         | AST.Expression expr -> Monomorphization.collectCalledFunctions expr
         | AST.TypeDef _ -> Set.empty)
     |> List.fold Set.union Set.empty
@@ -267,7 +269,7 @@ let private materializeReachablePackageValueCatalog
                 |> List.map (fun (catalogType, hashes) ->
                     let condition =
                         call
-                            "Darklang.LanguageTools.RuntimeTypes.isCustomTypeWithNoTypeArguments"
+                            "Darklang.LanguageTools.RuntimeTypes.__isCustomTypeWithNoTypeArguments"
                             [AST.Var "valueType"; AST.StringLiteral catalogType.Hash]
                     let result = hashes |> List.map packageHashExpr |> AST.ListLiteral
                     (condition, result))

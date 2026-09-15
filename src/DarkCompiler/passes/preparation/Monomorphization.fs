@@ -536,6 +536,14 @@ let replaceTypeAppsInProgramWithRegistry (specRegistry: SpecRegistry) (program: 
             | AST.Expression e ->
                 replaceTypeAppsWithRegistry specRegistry e
                 |> Result.bind (fun e' -> loop rest (AST.Expression e' :: acc))
+            | AST.ValueDef valueDef ->
+                replaceTypeAppsWithRegistry specRegistry (AST.valueDefBody valueDef)
+                |> Result.bind (fun body ->
+                    let valueDef' =
+                        match valueDef with
+                        | AST.UncheckedValueDef (name, _) -> AST.UncheckedValueDef (name, body)
+                        | AST.CheckedValueDef (name, typ, _) -> AST.CheckedValueDef (name, typ, body)
+                    loop rest (AST.ValueDef valueDef' :: acc))
             | AST.TypeDef td ->
                 loop rest (AST.TypeDef td :: acc)
 
@@ -546,6 +554,7 @@ let private collectInitialMonomorphizationSpecs (program: AST.Program) : Set<Spe
     topLevels
     |> List.map (function
         | AST.FunctionDef f when List.isEmpty f.TypeParams -> collectTypeAppsFromFunc f
+        | AST.ValueDef valueDef -> collectTypeApps (AST.valueDefBody valueDef)
         | AST.Expression e -> collectTypeApps e
         | _ -> Set.empty)
     |> List.fold Set.union Set.empty
@@ -639,6 +648,8 @@ let programNeedsLambdaLowering (knownFuncNames: Set<string>) (program: AST.Progr
                 if exprNeedsLambdaLowering paramNames f.Body then true else loop rest
             | AST.Expression e ->
                 if exprNeedsLambdaLowering Set.empty e then true else loop rest
+            | AST.ValueDef valueDef ->
+                if exprNeedsLambdaLowering Set.empty (AST.valueDefBody valueDef) then true else loop rest
             | AST.TypeDef _ ->
                 loop rest
 

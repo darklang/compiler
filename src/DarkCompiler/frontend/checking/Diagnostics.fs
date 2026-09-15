@@ -261,6 +261,12 @@ let internal isRuntimeFailureName (funcName: string) : bool =
 let internal isBuiltinTestNanName (name: string) : bool =
     name = "Builtin.testNan"
 
+let internal isBuiltinTestInfinityName (name: string) : bool =
+    name = "Builtin.testInfinity"
+
+let internal isBuiltinBlobEmptyName (name: string) : bool =
+    name = "Builtin.blobEmpty"
+
 let internal isRuntimeErrorType (typ: Type) : bool =
     match typ with
     | TRuntimeError -> true

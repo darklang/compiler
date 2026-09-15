@@ -56,7 +56,7 @@ let internal check (checkExpr: ExpressionChecker) (env: TypeEnv) (typeReg: Index
                 |> List.map (fun (fieldName, fieldType) ->
                     (fieldName,
                      fieldType
-                     |> applySubst initialSubstitution))
+                     |> applyTypeArguments initialSubstitution))
 
             // Check that all fields are present and have correct types
             let fieldMap = Map.ofList normalizedFields

@@ -144,7 +144,7 @@ let private comparisonForCapturedValue
     if needsStructuralHelper then
         AST.Call (ComparisonPlanning.eqHelperName typ, exprArgsFromList [left; right])
     elif typ = AST.TString then
-        AST.Call ("Stdlib.String.equals", exprArgsFromList [left; right])
+        AST.BinOp (AST.Eq, left, right)
     elif typ = AST.TInt then
         AST.Call ("Stdlib.Int.__equals", exprArgsFromList [left; right])
     else

@@ -33,19 +33,18 @@ let rec inferTypeCore (sumTypeNames: Set<string>) (expr: AST.Expr) (typeEnv: Map
     | AST.CharLiteral _ -> Ok AST.TChar
     | AST.FloatLiteral _ -> Ok AST.TFloat64
     | AST.Var name ->
-        if isBuiltinTestNanName name then
+        if isBuiltinTestNanName name || isBuiltinTestInfinityName name then
             Ok AST.TFloat64
+        else if isBuiltinBlobEmptyName name then
+            Ok AST.TBlob
         else
             match tryLookupResolved name typeEnv with
             | Some (t, _) -> Ok t
             | None ->
-                match Stdlib.tryGetValue name with
-                | Some moduleValue -> Ok moduleValue.Type
-                | None ->
-                    // Check if it's a module function (e.g., Stdlib.Int64.add)
-                    match Stdlib.tryGetFunction moduleRegistry name with
-                    | Some (moduleFunc, _) -> Ok (Stdlib.getFunctionType moduleFunc)
-                    | None -> Error $"Cannot infer type: undefined variable '{name}'"
+                // Check if it's a module function (e.g., Stdlib.Int64.add)
+                match Stdlib.tryGetFunction moduleRegistry name with
+                | Some (moduleFunc, _) -> Ok (Stdlib.getFunctionType moduleFunc)
+                | None -> Error $"Cannot infer type: undefined variable '{name}'"
     | AST.DictLiteral (valueType, _) ->
         Ok (AST.TDict (AST.TString, valueType))
     | AST.RecordLiteral (reference, fields) ->
@@ -233,8 +232,8 @@ let rec inferTypeCore (sumTypeNames: Set<string>) (expr: AST.Expr) (typeEnv: Map
             |> Result.bind (fun operandType ->
                 match operandType with
                 | AST.TInt8 | AST.TInt16 | AST.TInt32 | AST.TInt64
-                | AST.TInt
-                | AST.TUInt8 | AST.TUInt16 | AST.TUInt32 | AST.TUInt64
+                | AST.TInt128 | AST.TInt
+                | AST.TUInt8 | AST.TUInt16 | AST.TUInt32 | AST.TUInt64 | AST.TUInt128
                 | AST.TFloat64 -> Ok operandType
                 | _ -> Error $"Arithmetic operator requires numeric operands, got {operandType}")
         | AST.Shl | AST.Shr | AST.BitAnd | AST.BitOr | AST.BitXor ->

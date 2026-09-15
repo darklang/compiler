@@ -296,6 +296,7 @@ let rec simpleInferType
     | AST.UInt128Literal _ -> Some AST.TUInt128
     | AST.BoolLiteral _ -> Some AST.TBool
     | AST.StringLiteral _ -> Some AST.TString
+    | AST.InterpolatedString _ -> Some AST.TString
     | AST.CharLiteral _ -> Some AST.TChar
     | AST.FloatLiteral _ -> Some AST.TFloat64
     | AST.UnitLiteral -> Some AST.TUnit
@@ -453,22 +454,25 @@ let rec simpleInferType
         | AST.StringConcat -> Some AST.TString
     | AST.Call (funcName, args) ->
         // Look up the function's return type, checking local bindings first
-        match Map.tryFind funcName typeEnv with
-        | Some (AST.TFunction (paramTypes, returnType)) ->
-            let argCount = args |> exprArgsToList |> List.length
-            let paramCount = List.length paramTypes
-            if argCount = paramCount then
-                Some returnType
-            elif argCount < paramCount then
-                Some (AST.TFunction (paramTypes |> List.skip argCount, returnType))
-            else
-                None
-        | Some (AST.TVar funcTypeVar) ->
-            // Higher-order generic values can remain unresolved in public source.
-            // Keep lambda lifting moving by modeling a symbolic return type.
-            Some (AST.TVar $"__call_result_{funcTypeVar}")
-        | _ ->
-            Map.tryFind funcName funcReturnTypes
+        if isRuntimeFailureName funcName then
+            Some AST.TRuntimeError
+        else
+            match Map.tryFind funcName typeEnv with
+            | Some (AST.TFunction (paramTypes, returnType)) ->
+                let argCount = args |> exprArgsToList |> List.length
+                let paramCount = List.length paramTypes
+                if argCount = paramCount then
+                    Some returnType
+                elif argCount < paramCount then
+                    Some (AST.TFunction (paramTypes |> List.skip argCount, returnType))
+                else
+                    None
+            | Some (AST.TVar funcTypeVar) ->
+                // Higher-order generic values can remain unresolved in public source.
+                // Keep lambda lifting moving by modeling a symbolic return type.
+                Some (AST.TVar $"__call_result_{funcTypeVar}")
+            | _ ->
+                Map.tryFind funcName funcReturnTypes
     | AST.TypeApp (funcName, typeArgs, _) ->
         // Look up the generic function's definition and apply type substitution
         match Map.tryFind funcName genericFuncDefs with
@@ -562,5 +566,6 @@ let rec simpleInferType
 
 let inferLambdaReturnType (body: AST.Expr) (state: LiftState) : Result<AST.Type, string> =
     match simpleInferType body state.TypeEnv state.FuncParams state.FuncReturnTypes state.GenericFuncDefs state.TypeReg state.VariantLookup with
+    | Some AST.TRuntimeError -> Ok AST.TUnit
     | Some returnType -> Ok returnType
     | None -> Error "Lambda lifting could not infer return type for lambda body"

@@ -267,6 +267,7 @@ let internal summarizeTopLevelDeclarations
         |> List.choose (fun (index, topLevel) ->
             match topLevel with
             | FunctionDef definition -> Some (("function", definition.Name), index)
+            | ValueDef definition -> Some (("value", valueDefName definition), index)
             | TypeDef definition -> Some (("type", typeDefName definition), index)
             | Expression _ -> None)
         |> Map.ofList
@@ -278,6 +279,7 @@ let internal summarizeTopLevelDeclarations
             let key =
                 match topLevel with
                 | FunctionDef definition -> Some ("function", definition.Name)
+                | ValueDef definition -> Some ("value", valueDefName definition)
                 | TypeDef definition -> Some ("type", typeDefName definition)
                 | Expression _ -> None
             match key with
@@ -326,5 +328,6 @@ let internal summarizeTopLevelDeclarations
                         Map.add funcDef.Name (List.map fst parameters) summary.FuncParamNames
                     GenericFuncs = genericFuncs
             }
+        | ValueDef _ -> summary
         | Expression _ ->
             summary) empty

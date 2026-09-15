@@ -23,7 +23,7 @@ let rec collectFreeVars (expr: Expr) (bound: Set<string>) : Set<string> =
     | BoolLiteral _ | StringLiteral _ | CharLiteral _ | FloatLiteral _ | RuntimeError _ ->
         Set.empty
     | Var name ->
-        if Set.contains name bound || isBuiltinTestNanName name then
+        if Set.contains name bound || isBuiltinTestNanName name || isBuiltinTestInfinityName name then
             Set.empty
         else
             Set.singleton name

@@ -97,8 +97,9 @@ let lowerExpression (toANFCore: ExpressionLowerer) (toAtomCore: AtomLowerer) (to
     | AST.Var name ->
         if isBuiltinTestNanName name then
             Ok (ANF.Return (ANF.FloatLiteral System.Double.NaN), varGen)
-        else if name = "Stdlib.Blob.empty" then
-            // Blob.empty shares the immortal empty dynamic-buffer literal.
+        else if isBuiltinTestInfinityName name then
+            Ok (ANF.Return (ANF.FloatLiteral System.Double.PositiveInfinity), varGen)
+        else if isBuiltinBlobEmptyName name then
             Ok (ANF.Return (ANF.StringLiteral ""), varGen)
         else if name = "Darklang.LanguageTools.PackageManager.PickContext.empty" then
             toANFCore sumTypeNames inertScopes
@@ -666,13 +667,6 @@ let lowerExpression (toANFCore: ExpressionLowerer) (toAtomCore: AtomLowerer) (to
                 // Variable exists but is not a function type
                 Error $"Cannot call '{funcName}' - it has type {varType}, not a function type"
             | None ->
-                // Resolved stdlib equality APIs lower to the representation
-                // operation at the AST boundary, including calls from stdlib.
-                match tryCanonicalBufferEqualityIntrinsic funcName argAtoms with
-                | Some intrinsicExpr ->
-                    let finalExpr = ANF.Let (resultVar, intrinsicExpr, ANF.Return (ANF.Var resultVar))
-                    Ok (withArgSetups finalExpr, varGen2)
-                | None ->
                 // Not a variable - check explicit presentation effects first.
                 match tryPresentationIntrinsic funcName argAtoms with
                 | Some intrinsicExpr ->
@@ -1404,22 +1398,30 @@ let lowerExpression (toANFCore: ExpressionLowerer) (toAtomCore: AtomLowerer) (to
                 let (closureId, varGen2) = ANF.freshVar varGen1
                 let closureAlloc = ANF.ClosureAlloc (funcName, captureAtoms)
                 // Convert args
-                let rec convertArgs (remaining: AST.Expr list) (vg: ANF.VarGen) (acc: (ANF.Atom * (ANF.TempId * ANF.CExpr) list) list) =
+                let rec convertArgs
+                    (remaining: AST.Expr list)
+                    (vg: ANF.VarGen)
+                    (acc: (ANF.AExpr * ANF.Atom) list)
+                    =
                     match remaining with
                     | [] -> Ok (List.rev acc, vg)
                     | arg :: rest ->
-                        toAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
-                        |> Result.bind (fun (argAtom, argBindings, vg') ->
-                            convertArgs rest vg' ((argAtom, argBindings) :: acc))
+                        toANFBoundAtomCore sumTypeNames inertScopes arg vg env typeReg variantLookup funcReg moduleRegistry
+                        |> Result.bind (fun (argExpr, argAtom, vg') ->
+                            convertArgs rest vg' ((argExpr, argAtom) :: acc))
                 convertArgs argsList varGen2 []
                 |> Result.bind (fun (argResults, varGen3) ->
-                    let argAtoms = argResults |> List.map fst
-                    let argBindings = argResults |> List.collect snd
+                    let argAtoms = argResults |> List.map snd
                     // Generate closure call
                     let (resultId, varGen4) = ANF.freshVar varGen3
                     let closureCall = ANF.ClosureCall (ANF.Var closureId, argAtoms)
-                    let allBindings = captureBindings @ [(closureId, closureAlloc)] @ argBindings @ [(resultId, closureCall)]
-                    Ok (wrapBindings allBindings (ANF.Return (ANF.Var resultId)), varGen4)))
+                    let callExpr = ANF.Let (resultId, closureCall, ANF.Return (ANF.Var resultId))
+                    let withArguments =
+                        argResults
+                        |> List.map fst
+                        |> List.foldBack (fun argExpr continuation -> bindReturns argExpr (fun _ -> continuation)) <| callExpr
+                    let withClosure = ANF.Let (closureId, closureAlloc, withArguments)
+                    Ok (wrapBindings captureBindings withClosure, varGen4)))
 
         | _ ->
             // General function-expression application (for example record field access):

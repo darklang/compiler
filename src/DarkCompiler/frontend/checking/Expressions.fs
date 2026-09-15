@@ -164,11 +164,34 @@ let rec internal checkExprWithParamNamesAndSumTypeNames
         let fromCall (functionName: string) (arguments: Expr list) =
             match Map.tryFind functionName env with
             | Some (TFunction (parameterTypes, _)) when List.length parameterTypes = List.length arguments ->
-                List.zip parameterTypes arguments
-                |> List.tryPick (fun (parameterType, argument) ->
-                    match argument with
-                    | Var name when name = targetName -> Some parameterType
-                    | _ -> tryFindFunctionValueExpectation targetName argument)
+                let parameterArguments = List.zip parameterTypes arguments
+                match
+                    parameterArguments
+                    |> List.tryPick (fun (parameterType, argument) ->
+                        match argument with
+                        | Var name when name = targetName -> Some parameterType
+                        | _ -> None)
+                with
+                | Some targetParameterType ->
+                    let siblingBindings =
+                        parameterArguments
+                        |> ResultList.traverse (fun (parameterType, argument) ->
+                            match argument with
+                            | Var name when name = targetName -> Ok []
+                            | _ ->
+                                checkExpr argument env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg None
+                                |> Result.bind (fun (argumentType, _) ->
+                                    match matchTypes parameterType argumentType with
+                                    | Ok bindings -> Ok bindings
+                                    | Error _ -> Ok []))
+                        |> Result.map List.concat
+                        |> Result.bind (consolidateBindings >> Result.mapError GenericError)
+                        |> Result.toOption
+                        |> Option.defaultValue Map.empty
+                    Some (applySubst siblingBindings targetParameterType)
+                | None ->
+                    parameterArguments
+                    |> List.tryPick (fun (_, argument) -> tryFindFunctionValueExpectation targetName argument)
             | _ -> tryChildren arguments
 
         match candidate with
@@ -568,6 +591,21 @@ let rec internal checkExprWithParamNamesAndSumTypeNames
                 | Some reconciledType -> Ok (reconciledType, builtinExpr)
                 | None -> Error (TypeMismatch (expected, TFloat64, $"variable {name}"))
             | None -> Ok (TFloat64, builtinExpr)
+        else if isBuiltinTestInfinityName name then
+            let builtinExpr = Var "Builtin.testInfinity"
+            match expectedType with
+            | Some expected ->
+                match reconcileTypes (Some aliasReg) expected TFloat64 with
+                | Some reconciledType -> Ok (reconciledType, builtinExpr)
+                | None -> Error (TypeMismatch (expected, TFloat64, $"variable {name}"))
+            | None -> Ok (TFloat64, builtinExpr)
+        else if isBuiltinBlobEmptyName name then
+            match expectedType with
+            | Some expected ->
+                match reconcileTypes (Some aliasReg) expected TBlob with
+                | Some reconciledType -> Ok (reconciledType, Var "Builtin.blobEmpty")
+                | None -> Error (TypeMismatch (expected, TBlob, $"variable {name}"))
+            | None -> Ok (TBlob, Var "Builtin.blobEmpty")
         else
             // Variable reference: look up in environment
             match tryLookupResolved name env with
@@ -581,27 +619,17 @@ let rec internal checkExprWithParamNamesAndSumTypeNames
                     | None -> Error (TypeMismatch (expected, varType, $"variable {name}"))
                 | None -> Ok (varType, Var resolvedName)
             | None ->
-                match Stdlib.tryGetValue name with
-                | Some moduleValue ->
+                // Check if it's a module function (e.g., Stdlib.Int64.add)
+                match Stdlib.tryGetFunction moduleRegistry name with
+                | Some (moduleFunc, resolvedName) ->
+                    let funcType = Stdlib.getFunctionType moduleFunc
                     match expectedType with
                     | Some expected ->
-                        match reconcileTypes (Some aliasReg) expected moduleValue.Type with
-                        | Some reconciledType -> Ok (reconciledType, Var moduleValue.Name)
-                        | None -> Error (TypeMismatch (expected, moduleValue.Type, $"variable {name}"))
-                    | None -> Ok (moduleValue.Type, Var moduleValue.Name)
-                | None ->
-                    // Check if it's a module function (e.g., Stdlib.Int64.add)
-                    match Stdlib.tryGetFunction moduleRegistry name with
-                    | Some (moduleFunc, resolvedName) ->
-                        let funcType = Stdlib.getFunctionType moduleFunc
-                        match expectedType with
-                        | Some expected ->
-                            match reconcileTypes (Some aliasReg) expected funcType with
-                            | Some reconciledType -> Ok (reconciledType, Var resolvedName)
-                            | None -> Error (TypeMismatch (expected, funcType, $"variable {name}"))
-                        | None -> Ok (funcType, Var resolvedName)
-                    | None ->
-                        Error (UndefinedVariable name)
+                        match reconcileTypes (Some aliasReg) expected funcType with
+                        | Some reconciledType -> Ok (reconciledType, Var resolvedName)
+                        | None -> Error (TypeMismatch (expected, funcType, $"variable {name}"))
+                    | None -> Ok (funcType, Var resolvedName)
+                | None -> Error (UndefinedVariable name)
 
     | If (cond, thenBranch, elseBranch) ->
         // If expression: condition must be bool, branches must have same type
@@ -1136,11 +1164,9 @@ let rec internal checkExprWithParamNamesAndSumTypeNames
         // Check the record expression to get its type
         checkExpr recordExpr env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg None
         |> Result.bind (fun (recordType, recordExpr') ->
-            match recordType with
+            match resolveAliasTargetType aliasReg recordType with
             | TRecord (typeName, typeArgs) ->
-                // Resolve type alias before looking up in typeReg
-                let resolvedTypeName = resolveTypeName aliasReg typeName
-                match Map.tryFind resolvedTypeName typeReg with
+                match Map.tryFind typeName typeReg with
                 | None ->
                     Error (GenericError $"Unknown record type: {typeName}")
                 | Some recordInfo ->
@@ -1172,7 +1198,7 @@ let rec internal checkExprWithParamNamesAndSumTypeNames
                                 | (fname, updateExpr) :: rest ->
                                     match Map.tryFind fname recordInfo.FieldTypes with
                                     | Some fieldTypePattern ->
-                                        let expectedFieldType = applySubst subst fieldTypePattern
+                                        let expectedFieldType = applyTypeArguments subst fieldTypePattern
                                         checkExpr updateExpr env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg (Some expectedFieldType)
                                         |> Result.bind (fun (actualType, updateExpr') ->
                                             if typesCompatibleWithAliases aliasReg expectedFieldType actualType then
@@ -1183,7 +1209,7 @@ let rec internal checkExprWithParamNamesAndSumTypeNames
                                         Crash.crash $"Validated record update field '{fname}' disappeared"
 
                             checkUpdates normalizedUpdates []
-                            |> Result.map (fun updates' -> (TRecord (resolvedTypeName, typeArgs), RecordUpdate (recordExpr', updates')))
+                            |> Result.map (fun updates' -> (TRecord (typeName, typeArgs), RecordUpdate (recordExpr', updates')))
             | other ->
                 Error (GenericError $"Cannot use record update syntax on non-record type {typeToString other}"))
 
@@ -1195,11 +1221,9 @@ let rec internal checkExprWithParamNamesAndSumTypeNames
         // Check the record expression
         checkExpr recordExpr env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg None
         |> Result.bind (fun (recordType, recordExpr') ->
-            match recordType with
+            match resolveAliasTargetType aliasReg recordType with
             | TRecord (typeName, typeArgs) ->
-                // Resolve type alias before looking up in typeReg
-                let resolvedTypeName = resolveTypeName aliasReg typeName
-                match Map.tryFind resolvedTypeName typeReg with
+                match Map.tryFind typeName typeReg with
                 | None ->
                     Error (GenericError $"Unknown record type: {typeName}")
                 | Some recordInfo ->
@@ -1211,7 +1235,7 @@ let rec internal checkExprWithParamNamesAndSumTypeNames
                         | Error msg ->
                             Error (GenericError msg)
                         | Ok subst ->
-                            let fieldType = applySubst subst fieldTypePattern
+                            let fieldType = applyTypeArguments subst fieldTypePattern
                             match expectedType with
                             | Some expected when not (typesCompatibleWithAliases aliasReg expected fieldType) ->
                                 Error (TypeMismatch (expected, fieldType, $"field access .{fieldName}"))

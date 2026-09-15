@@ -421,6 +421,14 @@ let rec liftLambdasInProgram
                 liftLambdasInExpr e state
                 |> Result.bind (fun (e', state') ->
                     processTopLevels rest state' (AST.Expression e' :: acc))
+            | AST.ValueDef valueDef ->
+                liftLambdasInExpr (AST.valueDefBody valueDef) state
+                |> Result.bind (fun (body, state') ->
+                    let valueDef' =
+                        match valueDef with
+                        | AST.UncheckedValueDef (name, _) -> AST.UncheckedValueDef (name, body)
+                        | AST.CheckedValueDef (name, typ, _) -> AST.CheckedValueDef (name, typ, body)
+                    processTopLevels rest state' (AST.ValueDef valueDef' :: acc))
             | AST.TypeDef t ->
                 processTopLevels rest state (AST.TypeDef t :: acc)
 
@@ -514,6 +522,11 @@ and replaceFuncRefsWithWrappers (wrapperMap: Map<string, string>) (topLevel: AST
         AST.FunctionDef { f with Body = replaceInExpr wrapperMap f.Body }
     | AST.Expression e ->
         AST.Expression (replaceInExpr wrapperMap e)
+    | AST.ValueDef valueDef ->
+        let body = replaceInExpr wrapperMap (AST.valueDefBody valueDef)
+        match valueDef with
+        | AST.UncheckedValueDef (name, _) -> AST.ValueDef (AST.UncheckedValueDef (name, body))
+        | AST.CheckedValueDef (name, typ, _) -> AST.ValueDef (AST.CheckedValueDef (name, typ, body))
     | AST.TypeDef t -> AST.TypeDef t
 
 /// Replace function references with wrapper references in an expression

@@ -24,8 +24,8 @@ let internal check (checkExpr: ExpressionChecker) (indexedSumTypeReg: IndexedSum
 
         let tryAsNumericType (typ: Type) : Type option =
             match resolveType aliasReg typ with
-            | TInt8 | TInt16 | TInt32 | TInt64 | TInt
-            | TUInt8 | TUInt16 | TUInt32 | TUInt64
+            | TInt8 | TInt16 | TInt32 | TInt64 | TInt128 | TInt
+            | TUInt8 | TUInt16 | TUInt32 | TUInt64 | TUInt128
             | TFloat64 as numeric ->
                 Some numeric
             | _ ->
@@ -387,7 +387,9 @@ let internal check (checkExpr: ExpressionChecker) (indexedSumTypeReg: IndexedSum
         checkExpr left env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg None
         |> Result.bind (fun (leftType, left') ->
             if not (supportsPower leftType) then
-                Error (InvalidOperation ("^", [leftType]))
+                Error
+                    (GenericError
+                        $"Cannot perform numeric operation on {typeToString leftType} and {typeToString leftType}")
             else
                 checkExpr right env typeReg variantLookup genericFuncReg warningSettings moduleRegistry aliasReg (Some leftType)
                 |> Result.bind (fun (rightType, right') ->

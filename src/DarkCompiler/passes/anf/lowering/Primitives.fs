@@ -13,15 +13,6 @@ let internal canonicalBufferKindForType (typ: AST.Type) : MemoryModel.CanonicalB
     | AST.TChar -> Some MemoryModel.GraphemeCluster
     | _ -> None
 
-let internal tryCanonicalBufferEqualityIntrinsic
-    (funcName: string)
-    (args: ANF.Atom list)
-    : ANF.CExpr option =
-    match funcName, args with
-    | "Stdlib.String.equals", [left; right] ->
-        Some (ANF.CanonicalBufferEq (MemoryModel.Utf8String, left, right))
-    | _ -> None
-
 let internal materializeComparisonPlan (targetType: AST.Type) (args: AST.Expr list) : AST.Expr =
     match args with
     | [leftExpr; rightExpr] ->
@@ -362,17 +353,15 @@ let tryFloatIntrinsic (funcName: string) (args: ANF.Atom list) : ANF.CExpr optio
     match funcName, args with
     | "Stdlib.Float.sqrt", [xAtom] ->
         Some (ANF.FloatSqrt xAtom)
-    | "Stdlib.Float.abs", [xAtom] ->
-        Some (ANF.FloatAbs xAtom)
     | "Stdlib.Float.negate", [xAtom] ->
         Some (ANF.FloatNeg xAtom)
-    | "Stdlib.Float.toInt", [xAtom] ->
-        Some (ANF.FloatToInt64 xAtom)
     | "Stdlib.Int64.toFloat", [xAtom] ->
         Some (ANF.Int64ToFloat xAtom)
     // NOTE: Float.toString is now implemented in Dark, not as an intrinsic
-    | "Stdlib.Float.toBits", [xAtom] ->
+    | "Stdlib.Float.__toBits", [xAtom] ->
         Some (ANF.FloatToBits xAtom)
+    | "Stdlib.Float.__toInt64Unchecked", [xAtom] ->
+        Some (ANF.FloatToInt64 xAtom)
     | _ -> None
 
 /// Canonical named APIs whose AOT implementation maps directly to backend
@@ -564,7 +553,7 @@ let tryRawMemoryIntrinsic
 let tryRandomIntrinsic (funcName: string) (args: ANF.Atom list) : ANF.CExpr option =
     let args = normalizeNullaryIntrinsicArgs args
     match funcName, args with
-    | "Stdlib.Random.int64", [] ->
+    | "Stdlib.Int.__randomInt64Word", [] ->
         Some ANF.RandomInt64
     | _ -> None
 
@@ -595,6 +584,12 @@ let isRuntimeFailureName (funcName: string) : bool =
 
 let isBuiltinTestNanName (name: string) : bool =
     name = "Builtin.testNan"
+
+let isBuiltinTestInfinityName (name: string) : bool =
+    name = "Builtin.testInfinity"
+
+let isBuiltinBlobEmptyName (name: string) : bool =
+    name = "Builtin.blobEmpty"
 
 /// Look up a name already resolved and canonicalized by type checking.
 let internal tryLookupResolved (name: string) (m: Map<string, 'a>) : ('a * string) option =

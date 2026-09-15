@@ -253,7 +253,15 @@ let internal check (checkExpr: ExpressionChecker) (env: TypeEnv) (typeReg: Index
                         | None ->
                             Error (TypeMismatch (expectedRet, bodyType, "lambda return type"))
                         | Some reconciledRetType ->
-                            Ok (TFunction (paramTypes, reconciledRetType), lambdaExpr)
+                            let concreteReturnType =
+                                if bodyType = TRuntimeError && containsTVar expectedRet then
+                                    // Bottom has no runtime payload representation. Unit is
+                                    // the canonical monomorphic witness when the result is
+                                    // otherwise unconstrained.
+                                    TUnit
+                                else
+                                    reconciledRetType
+                            Ok (TFunction (paramTypes, concreteReturnType), lambdaExpr)
                     | _ ->
                         Error (GenericError "Internal error: lambda did not type-check to a function")))
     | Some other ->

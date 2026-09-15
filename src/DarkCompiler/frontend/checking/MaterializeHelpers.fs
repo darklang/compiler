@@ -111,6 +111,8 @@ let private materializeHelpersInTopLevels
             Set.empty
         | Expression expr ->
             collectEqHelperTypesFromExpr aliasReg expr
+        | ValueDef valueDef ->
+            collectEqHelperTypesFromExpr aliasReg (valueDefBody valueDef)
         | TypeDef _ ->
             Set.empty
 
@@ -120,6 +122,7 @@ let private materializeHelpersInTopLevels
             collectCompareHelperTypesFromExpr aliasReg funcDef.Body
         | FunctionDef _ -> Set.empty
         | Expression expr -> collectCompareHelperTypesFromExpr aliasReg expr
+        | ValueDef valueDef -> collectCompareHelperTypesFromExpr aliasReg (valueDefBody valueDef)
         | TypeDef _ -> Set.empty
 
     let rewriteTopLevel (topLevel: TopLevel) : TopLevel =
@@ -133,6 +136,11 @@ let private materializeHelpersInTopLevels
             topLevel
         | Expression expr ->
             Expression (materializeHelperCallsInExpr includeEquality aliasReg variantLookup expr)
+        | ValueDef valueDef ->
+            let body = materializeHelperCallsInExpr includeEquality aliasReg variantLookup (valueDefBody valueDef)
+            match valueDef with
+            | UncheckedValueDef (name, _) -> ValueDef (UncheckedValueDef (name, body))
+            | CheckedValueDef (name, typ, _) -> ValueDef (CheckedValueDef (name, typ, body))
         | TypeDef _ ->
             topLevel
 

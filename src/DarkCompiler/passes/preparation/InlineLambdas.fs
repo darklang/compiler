@@ -196,6 +196,11 @@ let inlineLambdasInProgram (program: AST.Program) : AST.Program =
         |> List.map (function
             | AST.FunctionDef f -> AST.FunctionDef (inlineLambdasInFunc f)
             | AST.Expression e -> AST.Expression (inlineLambdas e Map.empty)
+            | AST.ValueDef valueDef ->
+                let body = inlineLambdas (AST.valueDefBody valueDef) Map.empty
+                match valueDef with
+                | AST.UncheckedValueDef (name, _) -> AST.ValueDef (AST.UncheckedValueDef (name, body))
+                | AST.CheckedValueDef (name, typ, _) -> AST.ValueDef (AST.CheckedValueDef (name, typ, body))
             | AST.TypeDef t -> AST.TypeDef t)
     AST.Program topLevels'
 

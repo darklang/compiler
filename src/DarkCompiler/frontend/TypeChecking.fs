@@ -33,13 +33,8 @@ let private checkProgramInternalWithTrace
     // become candidates while resolving a separately compiled source program.
     let compilerImplementationNames =
         Set.ofList [
-            "Stdlib.String.getByteAt"; "Stdlib.String.substring"; "Stdlib.String.take"; "Stdlib.String.drop"
-            "Stdlib.String.toCodepoints"; "Stdlib.String.codepointLength"; "Stdlib.String.fromCodepoints"
-            "Stdlib.String.toUpperCase"; "Stdlib.String.toGraphemes"; "Stdlib.String.graphemeLength"
-            "Stdlib.String.replace"; "Stdlib.String.equals"
-            "Stdlib.Float.abs"; "Stdlib.Float.toInt"; "Stdlib.Float.toBits"
-            "Stdlib.Math.e"; "Stdlib.Math.abs"; "Stdlib.Math.sqrt"; "Stdlib.Math.truncate"; "Stdlib.Math.floor"; "Stdlib.Math.ceiling"; "Stdlib.Math.round"
-            "Stdlib.Base64.urlDecode"; "Stdlib.Crypto.sha1"; "Stdlib.Crypto.bytesToHex"
+            "Stdlib.String.__byteAtUnchecked"; "Stdlib.String.__toCodepoints"; "Stdlib.String.__codepointLength"
+            "Stdlib.Float.__toBits"; "Stdlib.Float.__toInt64Unchecked"
             "Stdlib.File.readText"; "Stdlib.File.exists"; "Stdlib.File.writeText"; "Stdlib.File.appendText"; "Stdlib.File.delete"; "Stdlib.File.setExecutable"; "Stdlib.File.writeFromPtr" ]
     let isCompilerImplementationCandidate (candidate: NameResolution.Candidate) =
         match candidate.Provenance with

@@ -189,9 +189,13 @@ let internal buildEqExprForType
     | TFunction _ ->
         makeInternalTypeApp (EqHelperDispatchTypeApp (resolvedType, leftExpr, rightExpr))
     | TString ->
-        Call ("Stdlib.String.equals", NonEmptyList.fromList [leftExpr; rightExpr])
+        BinOp (Eq, leftExpr, rightExpr)
     | TInt ->
         Call ("Stdlib.Int.__equals", NonEmptyList.fromList [leftExpr; rightExpr])
+    | TInt128 ->
+        Call ("Stdlib.Int128.__equals", NonEmptyList.fromList [leftExpr; rightExpr])
+    | TUInt128 ->
+        Call ("Stdlib.UInt128.__equals", NonEmptyList.fromList [leftExpr; rightExpr])
     | TList elemType ->
         let resolvedElemType = resolveType aliasReg elemType
         makeInternalTypeApp (EqHelperDispatchTypeApp (TList resolvedElemType, leftExpr, rightExpr))
