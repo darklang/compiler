@@ -2651,6 +2651,9 @@ let parse (tokens: Token list) : Result<NameSyntax.ParsedSource, string> =
                 | _ :: tail -> hasTopLevelComma depth tail
 
             match expr, rest with
+            | Constructor _, TRParen :: afterUnit ->
+                // `Type.Variant()`: the interpreter's spelling of a unit payload.
+                parsePostfix (appendCallArg expr UnitLiteral) afterUnit
             | _, TRParen :: _ ->
                 Error "Parenthesized call syntax is not supported; use 'f ()'"
             | Constructor _, _ ->
