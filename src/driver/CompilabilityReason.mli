@@ -7,3 +7,7 @@ val upstreamRenames : (string * string) list
    feature or name it uses that the compiler lacks, or the first line of any
    other compiler error. Empty for an empty diagnostic. *)
 val classify : string -> string
+
+(* True when the diagnostic says the probe could not decide, rather than that
+   the item cannot compile: a generic function referenced without a call. *)
+val undetermined : string -> bool

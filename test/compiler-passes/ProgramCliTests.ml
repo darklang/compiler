@@ -122,6 +122,15 @@ let formatCommand = function
       V.format (V.Union ("SingleCommand", [ optionsValue value ]))
   | P.BatchCommand value ->
       V.format (V.Union ("BatchCommand", [ batchValue value ]))
+  | P.CheckCommand value ->
+      V.format
+        (V.Union
+           ( "CheckCommand",
+             [
+               boolean value.P.checkJson;
+               optional (fun value -> V.Scalar value) value.P.checkPackageServer;
+               V.Sequence (List.map (fun name -> V.Scalar name) value.P.checkNames);
+             ] ))
 
 let testExplicitLinuxX86_64Target () =
   match P.parseArgs [| "--target=linux-x86_64"; "program.dark" |] with
@@ -327,13 +336,44 @@ let testBatchReasonNamesUnsupportedFeature () =
       "uses type Stdlib.Decimal.Decimal, which the compiler does not define"
   in
   let* () =
+    expect
+      "Compilation failed: ANF conversion error: Cannot infer specialization \
+       for function value 'Darklang.Stdlib.List.map'"
+      "Stdlib.List.map is generic; compiling it needs a call with concrete \
+       type arguments"
+  in
+  let* () =
     expect "Type mismatch: expected Int64\nat line 2"
       "compiler error: Type mismatch: expected Int64"
   in
   expect "" ""
 
+let testCheckParsesNamesInOrder () =
+  match
+    P.parseCommand
+      [|
+        "--check"; "Hosted.first"; "--json";
+        "--package-server=http://127.0.0.1:9090"; "Hosted.second";
+      |]
+  with
+  | Ok (P.CheckCommand options)
+    when options.P.checkJson
+         && options.P.checkNames = [ "Hosted.first"; "Hosted.second" ]
+         && options.P.checkPackageServer = Some "http://127.0.0.1:9090/" ->
+      Ok ()
+  | Ok command -> Error ("Expected check command, got: " ^ formatCommand command)
+  | Error error -> Error ("Expected check command to parse, got: " ^ error)
+
+let testCheckRequiresAName () =
+  match P.parseCommand [| "--check"; "--json" |] with
+  | Error error when Text.contains error "at least one" -> Ok ()
+  | Error error -> Error ("Expected missing-name guidance, got: " ^ error)
+  | Ok command -> Error ("Expected a nameless check to be rejected, got: " ^ formatCommand command)
+
 let tests =
   [
+    ("parse check names in order", testCheckParsesNamesInOrder);
+    ("reject check without a name", testCheckRequiresAName);
     ( "name what a failed batch item uses",
       testBatchReasonNamesUnsupportedFeature );
     ("parse explicit Linux x86_64 target", testExplicitLinuxX86_64Target);

@@ -126,8 +126,17 @@ def main():
             assert reasons == ["", "uses a record pattern, which this compiler does not support",
                 "uses function or value Stdlib.Dict.containsKey, which the compiler does not define;"
                 " the compiler's pinned name is Stdlib.Dict.member"], reasons
+            # --check answers per package item, without a caller or arguments.
+            checked = subprocess.run([compiler, "--check", "--package-server",
+                f"http://127.0.0.1:{server.server_port}", "Hosted.pipePlus", "Hosted.price"],
+                env=env, capture_output=True, text=True, timeout=300)
+            assert checked.returncode == 1, checked.stdout + checked.stderr
+            assert checked.stdout.splitlines() == [
+                "Hosted.pipePlus: compiles",
+                "Hosted.price: can't compile: uses the Decimal type, which this compiler does not support",
+            ], checked.stdout + checked.stderr
         server.shutdown()
-    print("Hosted operators, pipes, BigInt, Bytes and float patterns render; unsupported features name themselves, and batch reports give the reason")
+    print("Hosted operators, pipes, BigInt, Bytes and float patterns render; unsupported features name themselves, and batch and --check reports give the reason")
 
 
 if __name__ == "__main__":
