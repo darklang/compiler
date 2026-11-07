@@ -243,7 +243,15 @@ let parseUnchecked source =
    Parse for execution: syntax, structural, and file-purpose validation run
    once, and only a validated source file can be returned on success.
 *)
+(* `--syntax=current`: executable sources (scripts and tests, not the
+   embedded library) read literals as the current interpreter does. *)
+let currentSyntax = ref false
+
 let parseForUnchecked mode source =
+  let previous = !Lexer.bareIntegerIsInt64 in
+  Lexer.bareIntegerIsInt64 := !currentSyntax && mode <> Validation.Package;
+  Fun.protect ~finally:(fun () -> Lexer.bareIntegerIsInt64 := previous)
+  @@ fun () ->
   let scope =
     match mode with
     | Validation.Package -> ItemScope.Module

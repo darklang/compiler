@@ -385,7 +385,8 @@ let rec renderMatchPattern element =
   | "MPUInt64", [ _; value ] -> scalar "UL" value
   | "MPInt128", [ _; value ] -> scalar "Q" value
   | "MPUInt128", [ _; value ] -> scalar "Z" value
-  | "MPInt", [ _; value ] | "MPBigInt", [ _; value ] -> numberText value
+  (* `z` keeps a BigInt a BigInt under either reading of a bare integer. *)
+  | "MPInt", [ _; value ] | "MPBigInt", [ _; value ] -> scalar "z" value
   | "MPFloat", [ _; sign; whole; part ] -> floatText sign whole part
   | "MPFloat32", _ -> unsupportedFeature "a Float32 pattern"
   | "MPDecimal", _ -> unsupportedFeature "a Decimal pattern"
@@ -485,7 +486,7 @@ let rec renderExpr parameters selfName element =
   | "EUInt64", [ _; value ] -> scalar "UL" value
   | "EInt128", [ _; value ] -> scalar "Q" value
   | "EUInt128", [ _; value ] -> scalar "Z" value
-  | "EInt", [ _; value ] | "EBigInt", [ _; value ] -> numberText value
+  | "EInt", [ _; value ] | "EBigInt", [ _; value ] -> scalar "z" value
   | "EFloat", [ _; sign; whole; part ] -> floatText sign whole part
   | "EFloat32", _ -> unsupportedFeature "a Float32 literal"
   | "EDecimal", _ -> unsupportedFeature "a Decimal literal"
