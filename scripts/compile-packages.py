@@ -2,6 +2,7 @@
 """Pull the package catalog from an existing Dark server and compile probes."""
 
 import argparse
+from collections import Counter
 import json
 import subprocess
 import sys
@@ -241,6 +242,15 @@ def main() -> int:
 
     passed = len(items) - len(failures)
     print(f"Compiled: {passed}/{len(items)} succeeded", flush=True)
+    reasons = Counter(
+        str(report.get("reason") or "unknown failure")
+        for report in reports
+        if report.get("status") == "failed"
+    )
+    for reason, count in reasons.most_common(20):
+        print(f"{count:6d}  can't compile: {reason}", flush=True)
+    if len(reasons) > 20:
+        print(f"        ... {len(reasons) - 20} more reason(s)", flush=True)
     print(f"Complete report: {args.report}", flush=True)
     if result.returncode != 0 and not failures:
         diagnostic = (result.stderr + result.stdout).strip()

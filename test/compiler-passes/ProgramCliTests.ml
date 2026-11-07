@@ -303,8 +303,39 @@ let testBatchCompileAllowsCompilerOwnedSources () =
   | Error error ->
       Error ("Expected --allow-internal to parse in batch mode, got: " ^ error)
 
+(* A batch report names what a failed item uses that the compiler lacks. *)
+let testBatchReasonNamesUnsupportedFeature () =
+  let expect error reason =
+    let actual = CompilabilityReason.classify error in
+    if actual = reason then Ok ()
+    else Error ("Expected reason '" ^ reason ^ "', got '" ^ actual ^ "'")
+  in
+  let ( let* ) = Result.bind in
+  let* () =
+    expect
+      "Package Hosted.f could not be loaded: can't compile: uses a record \
+       pattern, which this compiler does not support\nmore"
+      "uses a record pattern, which this compiler does not support"
+  in
+  let* () =
+    expect "<entry>: Unknown function or value 'Darklang.Stdlib.Dict.containsKey'"
+      "uses function or value Stdlib.Dict.containsKey, which the compiler does \
+       not define; the compiler's pinned name is Stdlib.Dict.member"
+  in
+  let* () =
+    expect "x.dark: Unknown type 'Stdlib.Decimal.Decimal'"
+      "uses type Stdlib.Decimal.Decimal, which the compiler does not define"
+  in
+  let* () =
+    expect "Type mismatch: expected Int64\nat line 2"
+      "compiler error: Type mismatch: expected Int64"
+  in
+  expect "" ""
+
 let tests =
   [
+    ( "name what a failed batch item uses",
+      testBatchReasonNamesUnsupportedFeature );
     ("parse explicit Linux x86_64 target", testExplicitLinuxX86_64Target);
     ("reject unknown compiler target", testUnknownTargetRejected);
     ("reject cross-target run mode", testCrossTargetRunRejected);

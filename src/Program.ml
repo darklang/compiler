@@ -68,6 +68,7 @@ type batchReportItem = {
   output : string;
   status : string;
   error : string;
+  reason : string;
   milliseconds : float;
 }
 
@@ -817,6 +818,7 @@ let reportJson (value : batchReportItem) =
       ("output", jsonString value.output);
       ("status", jsonString value.status);
       ("error", jsonString value.error);
+      ("reason", jsonString value.reason);
       ("milliseconds", FloatFormat.roundTrip value.milliseconds);
     ]
   in
@@ -904,6 +906,7 @@ let compileBatch (options : batchCliOptions) =
                     output = item.outputFile;
                     status;
                     error;
+                    reason = CompilabilityReason.classify error;
                     milliseconds;
                   }
                 in

@@ -109,8 +109,25 @@ def main():
                 output = refused.stdout + refused.stderr
                 assert refused.returncode != 0, output
                 assert "can't compile: " + feature in output, output
+            # A batch report gives each failure a one-line reason an audit can count.
+            items = []
+            for index, text in enumerate(("Hosted.pipePlus 1L\n", "Hosted.recordPattern 1L\n",
+                                          'Stdlib.Dict.containsKey (Dict { a: 1L }) "a"\n')):
+                item = directory / f"item{index}.dark"
+                item.write_text(text)
+                items.append(dict(kind="function", name=f"item{index}", source=str(item),
+                                  output=str(directory / f"item{index}.out")))
+            manifest, report = directory / "manifest.json", directory / "report.jsonl"
+            manifest.write_text(json.dumps(items))
+            subprocess.run([compiler, "--batch", "-q", "--package-server",
+                f"http://127.0.0.1:{server.server_port}", "--manifest", str(manifest),
+                "--keep-going", "--report", str(report)], env=env, capture_output=True, timeout=300)
+            reasons = [json.loads(line)["reason"] for line in report.read_text().splitlines()]
+            assert reasons == ["", "uses a record pattern, which this compiler does not support",
+                "uses function or value Stdlib.Dict.containsKey, which the compiler does not define;"
+                " the compiler's pinned name is Stdlib.Dict.member"], reasons
         server.shutdown()
-    print("Hosted operators, pipes, BigInt, Bytes and float patterns render; unsupported features name themselves")
+    print("Hosted operators, pipes, BigInt, Bytes and float patterns render; unsupported features name themselves, and batch reports give the reason")
 
 
 if __name__ == "__main__":
