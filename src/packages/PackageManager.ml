@@ -1033,6 +1033,32 @@ let candidatePrefixes isKnownName names =
             (List.filteri (fun i _ -> i < List.length parts - index) parts)))
   |> distinct
 
+(* Browsing descends this many module levels below a module it was asked
+   about: enough for WrittenTypes.implMemberPath, which places an
+   implementation at <module>[.<Type>].<Trait>, without walking a whole
+   package tree for every name. *)
+let browseDepth = 2
+
+(* Where a written name's declaration and its trait implementations can
+   live: the name itself (a leaf, or a module), its parent (the module of a
+   function, or the type or trait of a case or method) and its grandparent
+   (the module holding that type or trait, whose children hold
+   implementations). Owners and other distant prefixes of deeper names are
+   not browsed: their subtrees hold the whole package tree. *)
+let nearbyModules isKnownName names =
+  names
+  |> List.filter (fun name -> not (isKnownName name))
+  |> List.concat_map (fun name ->
+      let parts = String.split_on_char '.' name in
+      let count = List.length parts in
+      List.filter_map
+        (fun drop ->
+          if count - drop < 1 then None
+          else Some (String.concat "." (List.take (count - drop) parts), 0))
+        [ 0; 1; 2 ])
+  |> List.filter (fun (name, _) -> not (isKnownName name))
+  |> distinct
+
 let escapeDataString text =
   let escaped = Buffer.create (String.length text) in
   String.iter
@@ -1129,9 +1155,10 @@ let parseBrowserTraitLeaf location json =
         [ entity ]
   with ex -> Error ("Invalid package browser trait item: " ^ message ex)
 
+(* The module that holds an item: its location without the leaf. *)
 let packageModule location =
   let parts = String.split_on_char '.' location in
-  String.concat "." (List.take (min 2 (max 1 (List.length parts - 1))) parts)
+  String.concat "." (List.take (max 1 (List.length parts - 1)) parts)
 
 let resolveNames config resolutionEnv knownTraits names =
   let client = PackageIO.create () in
@@ -1162,6 +1189,10 @@ let resolveNames config resolutionEnv knownTraits names =
       in
       let shadowedModules = ref StringOrder.Set.empty in
       let rec browse modules visited inventory =
+        let below depth names =
+          if depth >= browseDepth then []
+          else List.map (fun name -> (name, depth + 1)) names
+        in
         match modules with
         | [] ->
             (* WrittenTypes.implMemberPath fixes impl locations as
@@ -1188,10 +1219,11 @@ let resolveNames config resolutionEnv knownTraits names =
                   not (StringOrder.Set.mem name visited))
             in
             if probes = [] then Ok (visited, inventory)
-            else browse probes visited inventory
-        | name :: rest when StringOrder.Set.mem name visited ->
+            else
+              browse (List.map (fun name -> (name, 0)) probes) visited inventory
+        | (name, _) :: rest when StringOrder.Set.mem name visited ->
             browse rest visited inventory
-        | name :: rest -> (
+        | (name, depth) :: rest -> (
             let visited = StringOrder.Set.add name visited in
             match findByName client config ("/" ^ escapeDataString name) with
             | Error _ | Ok Missing -> browse rest visited inventory
@@ -1199,7 +1231,7 @@ let resolveNames config resolutionEnv knownTraits names =
                 let* parsed = parseModuleInventory name json in
                 let* entities, children =
                   match parsed with
-                  | Some inventory -> Ok inventory
+                  | Some (entities, children) -> Ok (entities, below depth children)
                   | None ->
                       let* entities = parseBrowserTraitLeaf name json in
                       if entities = [] then
@@ -1222,9 +1254,11 @@ let resolveNames config resolutionEnv knownTraits names =
                         String.split_on_char '.' name
                         |> List.rev |> List.tl |> List.rev |> String.concat "."
                       in
+                      (* A leaf's siblings sit at the leaf's own depth. *)
                       Ok
                         ( entities,
-                          children @ if parent = "" then [] else [ parent ] )
+                          below depth children
+                          @ if parent = "" then [] else [ (parent, depth) ] )
                 in
                 let* inventory =
                   List.fold_left
@@ -1283,7 +1317,7 @@ let resolveNames config resolutionEnv knownTraits names =
             let* browsed, inventory =
               match name with
               | Some name when not (StringOrder.Map.mem hash inventory) ->
-                  browse [ packageModule name ] browsed inventory
+                  browse [ (packageModule name, 0) ] browsed inventory
               | _ -> Ok (browsed, inventory)
             in
             let* entity =
@@ -1333,7 +1367,7 @@ let resolveNames config resolutionEnv knownTraits names =
       in
       let* browsed, inventory =
         browse
-          (List.map packageModule candidates |> distinct)
+          (nearbyModules isKnownName names)
           StringOrder.Set.empty StringOrder.Map.empty
       in
       let* roots = findRoots () in
@@ -1361,7 +1395,9 @@ let resolveNames config resolutionEnv knownTraits names =
         List.map (fun entity -> packageModule entity.location) rootEntities
         |> distinct
       in
-      let* browsed, inventory = browse modules browsed inventory in
+      let* browsed, inventory =
+        browse (List.map (fun name -> (name, 0)) modules) browsed inventory
+      in
       let inventory =
         List.fold_left
           (fun inventory entity ->
