@@ -41,6 +41,10 @@
  (action (run python3 %{dep:package_browse_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
+ (deps current_syntax_regression.py)
+ (action (run python3 %{dep:current_syntax_regression.py} %{exe:../../bin/dark.exe})))
+(rule
+ (alias runtest)
  (deps home_directory_regression.py)
  (action (run python3 %{dep:home_directory_regression.py} %{exe:../../bin/dark.exe})))
 (rule

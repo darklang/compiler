@@ -438,6 +438,11 @@ let letterOrDigit value = letter value || digit value
    Unterminated `$'…`: take to end of line.
    Unknown character: record it, skip it, and keep lexing.
 *)
+(* The current interpreter reads a bare integer as Int64 (darklang/dark@1d3a109);
+   the pinned one, and this compiler's own sources, read it as an Int. The
+   parser sets this while it reads a source that asked for current syntax. *)
+let bareIntegerIsInt64 = ref false
+
 let tokenize text =
   let source = units text in
   let length = Array.length source in
@@ -635,6 +640,8 @@ let tokenize text =
     | "y" -> parse 8 true (fun value -> TInt8 (Z.to_int value)) "Int8"
     | "s" -> parse 16 true (fun value -> TInt16 (Z.to_int value)) "Int16"
     | "l" -> parse 32 true (fun value -> TInt32 (Z.to_int32 value)) "Int32"
+    | _ when !bareIntegerIsInt64 ->
+        parse 64 true (fun value -> TInt64 (Z.to_int64 value)) "Int64"
     | _ -> if ascii then Ok (TInt (Z.of_string_base 10 digits), 0) else invalid
   in
   let rec scanString index closing =
