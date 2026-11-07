@@ -73,9 +73,22 @@ type cliOptions = {
   dumpIROutput : string option;
 }
 
+(*
+   Compilability analysis: whether each named package function or value
+   compiles, and if not, the one-line reason. One prepared stdlib serves
+   every name.
+*)
+type checkCliOptions = {
+  checkTarget : targetSelection;
+  checkPackageServer : string option;
+  checkJson : bool;
+  checkNames : string list;
+}
+
 type cliCommand =
   | SingleCommand of cliOptions
   | BatchCommand of batchCliOptions
+  | CheckCommand of checkCliOptions
 
 val verbosityToInt : verbosityLevel -> int
 val shouldShowNormal : verbosityLevel -> bool
@@ -87,6 +100,7 @@ val parseBatchArgs : string array -> (batchCliOptions, string) result
 val parseCommand : string array -> (cliCommand, string) result
 val compile : string -> string -> verbosityLevel -> cliOptions -> int
 val compileBatch : batchCliOptions -> int
+val checkItems : checkCliOptions -> int
 val run : string -> verbosityLevel -> cliOptions -> int
 val versionLines : unit -> string list
 val printVersion : unit -> unit

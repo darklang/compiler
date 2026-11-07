@@ -119,9 +119,22 @@ type cliOptions = {
   dumpIROutput : string option;
 }
 
+(*
+   Compilability analysis: whether each named package function or value
+   compiles, and if not, the one-line reason. One prepared stdlib serves
+   every name.
+*)
+type checkCliOptions = {
+  checkTarget : targetSelection;
+  checkPackageServer : string option;
+  checkJson : bool;
+  checkNames : string list;
+}
+
 type cliCommand =
   | SingleCommand of cliOptions
   | BatchCommand of batchCliOptions
+  | CheckCommand of checkCliOptions
 
 module X = CompilationContexts
 
@@ -588,8 +601,53 @@ let parseBatchArgs argv =
   in
   flags HostTarget Normal false None None false None args
 
+let parseCheckArgs args =
+  let rec flags options = function
+    | flag :: rest when String.starts_with ~prefix:"--package-server=" flag ->
+        flags options
+          ("--package-server" :: String.sub flag 17 (String.length flag - 17)
+         :: rest)
+    | flag :: rest when String.starts_with ~prefix:"--target=" flag ->
+        flags options
+          ("--target" :: String.sub flag 9 (String.length flag - 9) :: rest)
+    | [] ->
+        if options.checkNames = [] then
+          Error "--check requires at least one package function or value name"
+        else Ok { options with checkNames = List.rev options.checkNames }
+    | "--json" :: rest -> flags { options with checkJson = true } rest
+    | "--package-server" :: value :: rest ->
+        if Option.is_some options.checkPackageServer then
+          Error "Package server specified multiple times"
+        else
+          let* server = parsePackageServerValue value in
+          flags { options with checkPackageServer = Some server } rest
+    | [ "--package-server" ] -> Error "Missing value for --package-server"
+    | "--target" :: value :: rest -> (
+        match options.checkTarget with
+        | ExplicitTarget _ -> Error "Target specified multiple times"
+        | HostTarget ->
+            let* target = parseTargetValue value in
+            flags { options with checkTarget = target } rest)
+    | [ "--target" ] ->
+        Error "Missing value for --target (expected 'linux-x86_64')"
+    | flag :: _ when String.starts_with ~prefix:"-" flag ->
+        Error ("Unknown check flag: " ^ flag)
+    | name :: rest ->
+        flags { options with checkNames = name :: options.checkNames } rest
+  in
+  flags
+    {
+      checkTarget = HostTarget;
+      checkPackageServer = None;
+      checkJson = false;
+      checkNames = [];
+    }
+    args
+
 let parseCommand argv =
   match Array.to_list argv with
+  | "--check" :: rest ->
+      Result.map (fun value -> CheckCommand value) (parseCheckArgs rest)
   | "--batch" :: rest ->
       Result.map
         (fun value -> BatchCommand value)
@@ -932,6 +990,79 @@ let compileBatch (options : batchCliOptions) =
               1
           | Ok () -> if failed then 1 else 0))
 
+(* The probe references the item as a value, so the compiler must resolve,
+   check and lower it and everything it calls, without needing arguments. *)
+let checkProbe name = "let packageProbe = " ^ name ^ " in 0L\n"
+
+let checkReportJson name error =
+  let fields =
+    [
+      ("name", jsonString name);
+      ( "status",
+        jsonString
+          (if error = "" then "compiles"
+           else if CompilabilityReason.undetermined error then "undetermined"
+           else "failed") );
+      ("reason", jsonString (CompilabilityReason.classify error));
+      ("error", jsonString error);
+    ]
+  in
+  "{"
+  ^ String.concat ","
+      (List.map (fun (key, value) -> jsonString key ^ ":" ^ value) fields)
+  ^ "}"
+
+let checkItems (options : checkCliOptions) =
+  match selectedTarget options.checkTarget with
+  | Error message ->
+      prerr_endline ("Target detection failed: " ^ message);
+      1
+  | Ok target -> (
+      match StdlibCompilation.buildStdlib target with
+      | Error message ->
+          prerr_endline ("Compilation failed: " ^ message);
+          1
+      | Ok stdlib ->
+          let output = Filename.temp_file "dark-check-" ".out" in
+          Fun.protect
+            ~finally:(fun () ->
+              if Sys.file_exists output then Sys.remove output)
+            (fun () ->
+              List.fold_left
+                (fun failed name ->
+                  let cli =
+                    {
+                      defaultOptions with
+                      argument = Some ("<check " ^ name ^ ">");
+                      outputFile = Some output;
+                      verbosity = Quiet;
+                      target = options.checkTarget;
+                      packageServer = options.checkPackageServer;
+                    }
+                  in
+                  let error =
+                    match
+                      compileWithStdlib stdlib (checkProbe name) output Quiet
+                        cli
+                    with
+                    | Ok () -> ""
+                    | Error error -> error
+                  in
+                  (if options.checkJson then
+                     print_endline (checkReportJson name error)
+                   else if error = "" then print_endline (name ^ ": compiles")
+                   else if CompilabilityReason.undetermined error then
+                     print_endline
+                       (name ^ ": can't tell: "
+                       ^ CompilabilityReason.classify error)
+                   else
+                     print_endline
+                       (name ^ ": can't compile: "
+                       ^ CompilabilityReason.classify error));
+                  failed || error <> "")
+                false options.checkNames
+              |> fun failed -> if failed then 1 else 0))
+
 (*
    Run an expression (compile to temp and execute)
    Use library for compile and run
@@ -998,6 +1129,9 @@ let printUsage () =
   print_endline
     "  dark -r -e -                        Read expression from stdin and run";
   print_endline "  dark --batch [OPTIONS] -- SOURCE OUTPUT [SOURCE OUTPUT ...]";
+  print_endline
+    "  dark --check [--json] [--package-server URL] NAME...  Report whether \
+     each package function or value compiles, and why not";
   print_endline "  dark --batch [OPTIONS] --manifest FILE";
   print_endline "";
   print_endline "Flags:";
@@ -1111,6 +1245,7 @@ let main argv =
         printVersion ();
         0
     | Ok (BatchCommand options) -> compileBatch options
+    | Ok (CheckCommand options) -> checkItems options
     | Ok (SingleCommand options) -> (
         let source =
           match options.argument with

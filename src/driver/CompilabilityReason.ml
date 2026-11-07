@@ -52,6 +52,12 @@ let missingName kind name =
   in
   "uses " ^ kind ^ " " ^ bare ^ ", which the compiler does not define" ^ renamed
 
+let genericValue = "Cannot infer specialization for function value '"
+
+(* A generic function referenced without a call has no type arguments to
+   specialize with, so its probe says nothing about whether it compiles. *)
+let undetermined error = Option.is_some (after genericValue '\'' error)
+
 let classify error =
   let error = String.trim error in
   if error = "" then ""
@@ -64,4 +70,10 @@ let classify error =
         | None -> (
             match after "Unknown type '" '\'' error with
             | Some name -> missingName "type" name
-            | None -> "compiler error: " ^ firstLine error))
+            | None -> (
+                match after genericValue '\'' error with
+                | Some name ->
+                    withoutOwner name
+                    ^ " is generic; compiling it needs a call with concrete \
+                       type arguments"
+                | None -> "compiler error: " ^ firstLine error)))
