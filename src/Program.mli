@@ -31,6 +31,7 @@ type batchReportItem = {
   output : string;
   status : string;
   error : string;
+  reason : string;
   milliseconds : float;
 }
 
