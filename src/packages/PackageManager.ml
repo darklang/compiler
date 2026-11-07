@@ -198,6 +198,12 @@ let numberText = function
   | `Intlit text | `Floatlit text -> Ok text
   | element -> Error ("Expected a number, got " ^ Yojson.Raw.to_string element)
 
+(* A hosted item that uses a language feature this compiler has no lowering for
+   is refused with a reason naming that feature, so a package audit can report
+   "can't compile: uses X" instead of a decoding failure. *)
+let unsupportedFeature feature =
+  Error ("can't compile: uses " ^ feature ^ ", which this compiler does not support")
+
 let argumentIndex = function
   | `Intlit text -> Option.map Int32.to_int (Int32.of_string_opt text)
   | _ -> None
@@ -297,7 +303,13 @@ let rec renderType element =
       | "TChar" | "TString" | "TDateTime" | "TUuid" | "TBlob" ),
       [] ) ->
       Ok (String.sub name 1 (String.length name - 1))
+  (* The interpreter renamed Int to BigInt and Blob to Bytes after the pinned
+     revision; the compiler's written syntax keeps the pinned spellings. *)
+  | "TBigInt", [] -> Ok "Int"
+  | "TBytes", [] -> Ok "Blob"
   | "TFloat", [] -> Ok "Float"
+  | "TFloat32", [] -> unsupportedFeature "the Float32 type"
+  | "TDecimal", [] -> unsupportedFeature "the Decimal type"
   | "TStream", _ -> unary "Stream"
   | "TList", _ -> unary "List"
   | "TDB", _ -> unary "DB"
@@ -320,7 +332,7 @@ let rec renderType element =
       let* name = resolvedName name in
       let+ args = ResultList.mapResults renderType (arrayItems typeArgs) in
       name ^ if args = [] then "" else "<" ^ String.concat ", " args ^ ">"
-  | _ -> Error ("Unsupported package type " ^ name)
+  | _ -> unsupportedFeature ("the package type " ^ name)
 
 let rec renderLetPattern element =
   let* name, fields = enumCase element in
@@ -334,11 +346,17 @@ let rec renderLetPattern element =
           (first :: second :: arrayItems rest)
       in
       "(" ^ String.concat ", " values ^ ")"
-  | _ -> Error ("Unsupported package let pattern " ^ name)
+  | _ -> unsupportedFeature ("the let pattern " ^ name)
 
 let scalar suffix value =
   let+ number = numberText value in
   number ^ suffix
+
+let floatText sign whole part =
+  let* sign, _ = enumCase sign in
+  let* whole = stringValue whole in
+  let+ part = stringValue part in
+  (if sign = "Negative" then "-" else "") ^ whole ^ "." ^ part
 
 let rec renderMatchPattern element =
   let* name, fields = enumCase element in
@@ -358,7 +376,12 @@ let rec renderMatchPattern element =
   | "MPUInt64", [ _; value ] -> scalar "UL" value
   | "MPInt128", [ _; value ] -> scalar "Q" value
   | "MPUInt128", [ _; value ] -> scalar "Z" value
-  | "MPInt", [ _; value ] -> numberText value
+  | "MPInt", [ _; value ] | "MPBigInt", [ _; value ] -> numberText value
+  | "MPFloat", [ _; sign; whole; part ] -> floatText sign whole part
+  | "MPFloat32", _ -> unsupportedFeature "a Float32 pattern"
+  | "MPDecimal", _ -> unsupportedFeature "a Decimal pattern"
+  | "MPAs", _ -> unsupportedFeature "an `as` pattern"
+  | "MPRecord", _ -> unsupportedFeature "a record pattern"
   | "MPString", [ _; value ] ->
       let+ text = stringValue value in
       quoted text
@@ -391,7 +414,7 @@ let rec renderMatchPattern element =
         ResultList.mapResults renderMatchPattern (arrayItems values)
       in
       String.concat " | " values
-  | _ -> Error ("Unsupported package match pattern " ^ name)
+  | _ -> unsupportedFeature ("the match pattern " ^ name)
 
 let infixText element =
   let* name, fields = enumCase element in
@@ -401,7 +424,7 @@ let infixText element =
       match (name, fields) with
       | "BinOpAnd", [] -> Ok "&&"
       | "BinOpOr", [] -> Ok "||"
-      | _ -> Error ("Unsupported binary operation " ^ name))
+      | _ -> unsupportedFeature ("the binary operation " ^ name))
   | "InfixFnCall", [ operation ] -> (
       let* name, _ = enumCase operation in
       match name with
@@ -410,7 +433,12 @@ let infixText element =
       | "ArithmeticMultiply" -> Ok "*"
       | "ArithmeticDivide" -> Ok "/"
       | "ArithmeticModulo" -> Ok "%"
-      | "ArithmeticPower" -> Ok "^"
+      | "ArithmeticPower" -> Ok "**"
+      | "BitwiseAnd" -> Ok "&"
+      | "BitwiseOr" -> Ok "|"
+      | "BitwiseXor" -> Ok "^"
+      | "ShiftLeft" -> Ok "<<"
+      | "ShiftRight" -> Ok ">>"
       | "ComparisonGreaterThan" -> Ok ">"
       | "ComparisonGreaterThanOrEqual" -> Ok ">="
       | "ComparisonLessThan" -> Ok "<"
@@ -418,8 +446,8 @@ let infixText element =
       | "ComparisonEquals" -> Ok "=="
       | "ComparisonNotEquals" -> Ok "!="
       | "StringConcat" -> Ok "+"
-      | _ -> Error ("Unsupported infix function " ^ name))
-  | _ -> Error ("Unsupported infix " ^ name)
+      | _ -> unsupportedFeature ("the infix operator " ^ name))
+  | _ -> unsupportedFeature ("the infix " ^ name)
 
 let rec renderExpr parameters selfName element =
   let recurse = renderExpr parameters selfName in
@@ -448,12 +476,13 @@ let rec renderExpr parameters selfName element =
   | "EUInt64", [ _; value ] -> scalar "UL" value
   | "EInt128", [ _; value ] -> scalar "Q" value
   | "EUInt128", [ _; value ] -> scalar "Z" value
-  | "EInt", [ _; value ] -> numberText value
-  | "EFloat", [ _; sign; whole; part ] ->
-      let* sign, _ = enumCase sign in
-      let* whole = stringValue whole in
-      let+ part = stringValue part in
-      (if sign = "Negative" then "-" else "") ^ whole ^ "." ^ part
+  | "EInt", [ _; value ] | "EBigInt", [ _; value ] -> numberText value
+  | "EFloat", [ _; sign; whole; part ] -> floatText sign whole part
+  | "EFloat32", _ -> unsupportedFeature "a Float32 literal"
+  | "EDecimal", _ -> unsupportedFeature "a Decimal literal"
+  | "EUnwrap", [ _; value ] ->
+      let+ value = recurse value in
+      "(" ^ value ^ ")?"
   | "EChar", [ _; value ] ->
       let+ text = stringValue value in
       "'" ^ replace "'" "\\'" text ^ "'"
@@ -467,7 +496,7 @@ let rec renderExpr parameters selfName element =
         | "StringInterpolation", [ expr ] ->
             let+ text = recurse expr in
             "{" ^ text ^ "}"
-        | _ -> Error ("Unsupported string segment " ^ name)
+        | _ -> unsupportedFeature ("the string segment " ^ name)
       in
       let+ segments = ResultList.mapResults segment (arrayItems segments) in
       "$\"" ^ String.concat "" segments ^ "\""
@@ -515,7 +544,10 @@ let rec renderExpr parameters selfName element =
           "(if " ^ condition ^ " then " ^ yes ^ " else " ^ no ^ ")"
       | "None", [] -> Ok ("(if " ^ condition ^ " then " ^ yes ^ ")")
       | _ -> Error ("Invalid optional else case " ^ name))
-  | "EInfix", [ _; infix; left; right ] ->
+  (* The trailing field is the saved trait-implementation choice. Operators on
+     the compiler's own types resolve natively, so the choice is not needed. *)
+  | "EInfix", [ _; infix; left; right ] | "EInfix", [ _; infix; left; right; _ ]
+    ->
       let* op = infixText infix in
       let* left = recurse left in
       let+ right = recurse right in
@@ -616,7 +648,8 @@ let rec renderExpr parameters selfName element =
             in
             let+ body = recurse body in
             "fun " ^ String.concat " " patterns ^ " -> " ^ body
-        | "EPipeInfix", [ _; infix; argument ] ->
+        | "EPipeInfix", [ _; infix; argument ]
+        | "EPipeInfix", [ _; infix; argument; _ ] ->
             let* op = infixText infix in
             let+ argument = recurse argument in
             "(" ^ op ^ ") (" ^ argument ^ ")"
@@ -637,12 +670,12 @@ let rec renderExpr parameters selfName element =
             name ^ "." ^ leaf
             ^
             if values = [] then "" else " (" ^ String.concat ") (" values ^ ")"
-        | _ -> Error ("Unsupported package pipe part " ^ name)
+        | _ -> unsupportedFeature ("the pipe part " ^ name)
       in
       let* initial = recurse initial in
       let+ parts = ResultList.mapResults part (arrayItems parts) in
       "(" ^ String.concat " |> " (initial :: parts) ^ ")"
-  | _ -> Error ("Unsupported package expression " ^ name)
+  | _ -> unsupportedFeature ("the expression " ^ name)
 
 let parseLocatedEntity kind hash json =
   try
@@ -970,7 +1003,7 @@ let renderEntity entity =
                             in
                             prefix (head ^ String.concat " | " cases)
                         | _ ->
-                            Error ("Unsupported package type definition " ^ name)
+                            unsupportedFeature ("the type definition " ^ name)
                         )
                     | _ ->
                         Error
