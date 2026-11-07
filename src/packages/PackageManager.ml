@@ -1039,12 +1039,12 @@ let candidatePrefixes isKnownName names =
    package tree for every name. *)
 let browseDepth = 2
 
-(* Where a written name's declaration and its trait implementations can
-   live: the name itself (a leaf, or a module), its parent (the module of a
-   function, or the type or trait of a case or method) and its grandparent
-   (the module holding that type or trait, whose children hold
-   implementations). Owners and other distant prefixes of deeper names are
-   not browsed: their subtrees hold the whole package tree. *)
+(* Where a written name's declaration can live: the name itself (a leaf, or
+   a module) and its parent (the module of a function, or the type or trait
+   of a case or method). Browsing a leaf, or a listing with nothing in it,
+   continues at its parent, which is how a method's trait module is reached.
+   Owners and other distant prefixes are never browsed for their own sake:
+   their subtrees hold the whole package tree. *)
 let nearbyModules isKnownName names =
   names
   |> List.filter (fun name -> not (isKnownName name))
@@ -1055,7 +1055,7 @@ let nearbyModules isKnownName names =
         (fun drop ->
           if count - drop < 1 then None
           else Some (String.concat "." (List.take (count - drop) parts), 0))
-        [ 0; 1; 2 ])
+        [ 0; 1 ])
   |> List.filter (fun (name, _) -> not (isKnownName name))
   |> distinct
 
@@ -1086,7 +1086,20 @@ let parseModuleInventory moduleName json =
                 ResultList.mapResults stringValue (arrayItems parts)
               in
               let name = String.concat "." parts in
-              if String.starts_with ~prefix:(moduleName ^ ".") name then Ok name
+              (* The interpreter resolves `Stdlib.X` inside its own owner, so
+                 the children of a module asked for without the owner come
+                 back owner-qualified: `Darklang.Stdlib.X.Tests`. *)
+              let ownerQualified =
+                match parts with
+                | _owner :: rest ->
+                    String.starts_with ~prefix:(moduleName ^ ".")
+                      (String.concat "." rest)
+                | [] -> false
+              in
+              if
+                String.starts_with ~prefix:(moduleName ^ ".") name
+                || ownerQualified
+              then Ok name
               else Error ("Invalid package child module '" ^ name ^ "'"))
             (arrayItems modules)
         in
@@ -1161,6 +1174,19 @@ let packageModule location =
   String.concat "." (List.take (max 1 (List.length parts - 1)) parts)
 
 let resolveNames config resolutionEnv knownTraits names =
+  (* NameResolution reads `Stdlib.X` as `Darklang.Stdlib.X`, as the
+     interpreter does; look the owner-qualified name up too, so a Stdlib item
+     the compiler does not embed is fetched under its package location. *)
+  let names =
+    distinct
+      (names
+      @ List.filter_map
+          (fun name ->
+            if String.starts_with ~prefix:"Stdlib." name then
+              Some ("Darklang." ^ name)
+            else None)
+          names)
+  in
   let client = PackageIO.create () in
   Fun.protect
     ~finally:(fun () -> PackageIO.dispose client)
@@ -1231,6 +1257,14 @@ let resolveNames config resolutionEnv knownTraits names =
                 let* parsed = parseModuleInventory name json in
                 let* entities, children =
                   match parsed with
+                  | Some ([], []) ->
+                      (* An empty listing names no module: what the name means
+                         lives in its parent, as for a leaf. *)
+                      let parent =
+                        String.split_on_char '.' name
+                        |> List.rev |> List.tl |> List.rev |> String.concat "."
+                      in
+                      Ok ([], if parent = "" then [] else [ (parent, depth) ])
                   | Some (entities, children) -> Ok (entities, below depth children)
                   | None ->
                       let* entities = parseBrowserTraitLeaf name json in
@@ -1420,7 +1454,47 @@ let resolveNames config resolutionEnv knownTraits names =
           @ discovered)
           StringOrder.Set.empty browsed inventory []
       in
-      ResultList.mapResults renderEntity entities)
+      (* Trait implementations are loaded by discovery, beside whatever the
+         roots need; one of them over a type this compiler lacks (an impl for
+         Decimal, say) must not fail a program that never uses it. What the
+         roots reach by reference still fails with its reason. *)
+      let byHash =
+        List.fold_left
+          (fun map entity -> StringOrder.Map.add entity.hash entity map)
+          StringOrder.Map.empty entities
+      in
+      let rec reach seen = function
+        | [] -> seen
+        | hash :: rest when StringOrder.Set.mem hash seen -> reach seen rest
+        | hash :: rest -> (
+            let seen = StringOrder.Set.add hash seen in
+            match StringOrder.Map.find_opt hash byHash with
+            | None -> reach seen rest
+            | Some entity ->
+                let next =
+                  match dependencyRefs entity.json with
+                  | Ok refs -> List.map fst refs
+                  | Error _ -> []
+                in
+                reach seen (next @ rest))
+      in
+      let needed =
+        reach StringOrder.Set.empty
+          (List.map (fun entity -> entity.hash) rootEntities)
+      in
+      let* rendered =
+        ResultList.mapResults
+          (fun entity ->
+            match renderEntity entity with
+            | Ok source -> Ok (Some source)
+            | Error message
+              when (not (StringOrder.Set.mem entity.hash needed))
+                   && Text.contains message "can't compile: " ->
+                Ok None
+            | Error message -> Error message)
+          entities
+      in
+      Ok (List.filter_map Fun.id rendered))
 
 let resolveWritten ?(knownTraits = []) config resolutionEnv units =
   let* names = WrittenSource.qualifiedNames units in
