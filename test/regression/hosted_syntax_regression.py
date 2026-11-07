@@ -54,6 +54,20 @@ ENTITIES = {
 }
 
 
+def nested_adds(count):
+    # Each call level costs three JSON levels ({"EApply": [... [args]]}), so
+    # 180 nested calls, which the parser accepts, pass the old 512 bound.
+    add = {"EFnName": [1, dict(originalName=["Stdlib", "Int64", "add"],
+                                 resolved={"Error": ["unresolved"]}), []]}
+    body = ARG0
+    for _ in range(count):
+        body = {"EApply": [2, add, [], [body, {"EInt64": [3, 1]}]]}
+    return body
+
+
+ENTITIES["deep-hash"] = fn("Hosted.deepAdds", [("x", INT64)], INT64, nested_adds(180))
+
+
 def main():
     compiler = str(Path(sys.argv[1]).resolve())
     for hash_, (_, body) in ENTITIES.items():
@@ -99,6 +113,7 @@ def main():
 
             assert run("Hosted.operators 10L\n") == 1036
             assert run("Hosted.pipePlus 41L\n") == 42
+            assert run("Hosted.deepAdds 1L\n") == 181
             assert str(run("Hosted.doubleBig 12345678901234567890\n")) == "24691357802469135780"
             assert run("Hosted.isHalf 0.5\n") is True
             assert run("Hosted.isHalf 0.25\n") is False

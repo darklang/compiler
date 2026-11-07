@@ -35,8 +35,14 @@ let message = function
   | Unix.Unix_error (error, _, _) -> Unix.error_message error
   | ex -> Printexc.to_string ex
 
-(* Package expression trees have a finite nesting bound. Raw JSON keeps
-   numeric literal spellings, including integers wider than OCaml's int. *)
+(* Package expression trees have a finite nesting bound. The interpreter's
+   parser caps expressions at depth 200 and each expression level costs
+   several JSON levels ({"EApply":[..., [ ...), and a module inventory wraps
+   bodies in a few more, so the bound must sit well above 4 * 200. Raw JSON
+   keeps numeric literal spellings, including integers wider than OCaml's
+   int. *)
+let maxJsonDepth = 8192
+
 let parse source =
   let depth = ref 0 and quoted = ref false and escaped = ref false in
   String.iter
@@ -50,8 +56,11 @@ let parse source =
         | '"' -> quoted := true
         | '[' | '{' ->
             incr depth;
-            if !depth > 512 then
-              raise (Yojson.Json_error "Package JSON exceeds nesting depth 512")
+            if !depth > maxJsonDepth then
+              raise
+                (Yojson.Json_error
+                   ("Package JSON exceeds nesting depth "
+                   ^ string_of_int maxJsonDepth))
         | ']' | '}' -> decr depth
         | _ -> ())
     source;
