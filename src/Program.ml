@@ -793,7 +793,7 @@ let compile source outputPath verbosity (options : cliOptions) =
     let* stdlib =
       Result.map_error
         (fun message -> "Compilation failed: " ^ message)
-        (StdlibCompilation.buildStdlib target)
+        (StdlibCache.buildStdlib target)
     in
     compileWithStdlib stdlib source outputPath verbosity options
   in
@@ -926,7 +926,7 @@ let compileBatch (options : batchCliOptions) =
       prerr_endline message;
       1
   | Ok target, Ok sources -> (
-      match StdlibCompilation.buildStdlib target with
+      match StdlibCache.buildStdlib target with
       | Error message ->
           prerr_endline ("Compilation failed: " ^ message);
           1
@@ -1018,7 +1018,7 @@ let checkItems (options : checkCliOptions) =
       prerr_endline ("Target detection failed: " ^ message);
       1
   | Ok target -> (
-      match StdlibCompilation.buildStdlib target with
+      match StdlibCache.buildStdlib target with
       | Error message ->
           prerr_endline ("Compilation failed: " ^ message);
           1
@@ -1078,7 +1078,7 @@ let run source verbosity (options : cliOptions) =
         (fun message -> "Target detection failed: " ^ message)
         (Platform.detectHostTarget ())
     in
-    let* stdlib = StdlibCompilation.buildStdlib target in
+    let* stdlib = StdlibCache.buildStdlib target in
     let* report =
       withIRDumpOutput options (fun () ->
           CompilerLibrary.compile (request stdlib source verbosity options))

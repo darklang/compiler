@@ -33,6 +33,10 @@
  (action (run python3 %{dep:hosted_syntax_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
+ (deps stdlib_cache_regression.py)
+ (action (run python3 %{dep:stdlib_cache_regression.py} %{exe:../../bin/dark.exe})))
+(rule
+ (alias runtest)
  (deps home_directory_regression.py)
  (action (run python3 %{dep:home_directory_regression.py} %{exe:../../bin/dark.exe})))
 (rule
