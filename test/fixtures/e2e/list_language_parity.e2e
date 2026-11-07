@@ -2,8 +2,9 @@
 
 // Literal separators and trailing layout normalize to ordinary list literals.
 [1L, 2L, 3L] = [1L, 2L, 3L]
-[1L, ...[2L]] = compileerror="PARSE-UNEXPECTED"
-match [1L] with | [head, ...tail] -> head | _ -> 0L = compileerror="PARSE-UNEXPECTED"
+// Spreads and rest patterns, since darklang/dark@0781818.
+[1L, ...[2L]] = [1L, 2L]
+match [1L] with | [head, ...tail] -> head | _ -> 0L = 1L
 
 // Append is right-associative and retains homogeneous list typing.
 [1L] @ [2L] @ [3L] = [1L, 2L, 3L]
