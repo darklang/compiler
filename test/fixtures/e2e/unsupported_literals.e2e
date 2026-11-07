@@ -1,0 +1,5 @@
+// The current interpreter's Float32 and Decimal literals have no lowering
+// here; they are refused with the reason a compilability report names.
+
+19.99dec = compileerror="can't compile: uses a Decimal literal, which this compiler does not support"
+1.5f32 = compileerror="can't compile: uses a Float32 literal, which this compiler does not support"

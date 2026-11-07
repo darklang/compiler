@@ -717,6 +717,35 @@ let tokenize text =
       let stop = scanWhile continue (index + 1) in
       push (keyword (substring source index (stop - index))) stop None
     else if digit source.(index) then begin
+      (* The current interpreter's Float32 and Decimal literals
+         (darklang/dark@1d3a109) have no lowering here, so they are refused
+         with the reason a compilability report names. *)
+      let floatSuffix at =
+        List.find_opt
+          (fun suffix ->
+            matchesAt suffix at && not (continue (at + String.length suffix)))
+          [ "f32"; "dec" ]
+      in
+      let unsupportedFloatSuffix at =
+        match floatSuffix at with
+        | Some "f32" ->
+            Some
+              ( "f32",
+                "can't compile: uses a Float32 literal, which this compiler \
+                 does not support" )
+        | Some "dec" ->
+            Some
+              ( "dec",
+                "can't compile: uses a Decimal literal, which this compiler \
+                 does not support" )
+        | _ -> None
+      in
+      let refuseSuffix at =
+        match unsupportedFloatSuffix at with
+        | Some (suffix, message) ->
+            push (TFloat 0.) (at + String.length suffix) (Some message)
+        | None -> Crash.crash "refuseSuffix: no unsupported suffix"
+      in
       let digitEnd = scanWhile (fun scan -> digit source.(scan)) (index + 1) in
       let fraction =
         digitEnd + 1 < length
@@ -752,6 +781,8 @@ let tokenize text =
         in
         match value with
         | Some value when not (continue stop) -> push (TFloat value) stop None
+        | Some _ when Option.is_some (unsupportedFloatSuffix stop) ->
+            refuseSuffix stop
         | Some _ ->
             let stop = scanWhile continue stop in
             push (TFloat 0.) stop
@@ -767,6 +798,8 @@ let tokenize text =
         | Ok (token, suffixLength) when not (continue (digitEnd + suffixLength))
           ->
             push token (digitEnd + suffixLength) None
+        | _ when Option.is_some (unsupportedFloatSuffix digitEnd) ->
+            refuseSuffix digitEnd
         | Ok (_, suffixLength) ->
             let stop = scanWhile continue (digitEnd + suffixLength) in
             push (TInt64 0L) stop
