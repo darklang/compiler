@@ -19,14 +19,34 @@ FN = dict(hash={"Hash": ["inc-hash"]}, typeParams=[], bounds=[], returnType={"TI
           body={"EInfix": [1, {"InfixFnCall": [{"ArithmeticPlus": []}]}, {"EArg": [2, 0]},
                            {"EInt64": [3, 1]}, {"Unknown": []}]})
 LOCATION = dict(owner="Big", modules=["App", "Math"], name="inc")
+# A trait beside inc, with an implementation over Decimal that inc never uses.
+TRAIT = dict(hash={"Hash": ["show-hash"]}, typeParams=["a"], bounds=[], methods=[
+    dict(name="show", typeParams=[], bounds=[], parameters=[dict(name="v", typ={"TVariable": ["a"]})],
+         returnType={"TString": []})])
+SHOW_DECIMAL = dict(hash={"Hash": ["show-decimal-hash"]}, typeParams=[], bounds=[],
+                    parameters=[dict(name="v", typ={"TDecimal": []})], returnType={"TString": []},
+                    body={"EString": [1, [{"StringText": ["decimal"]}]]})
+SHOW_REF = dict(originalName=["Big", "App", "Math", "Show"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["show-hash"]}]},
+    location={"Some": [dict(owner="Big", modules=["App", "Math"], name="Show")]})]})
+DECIMAL_REF = dict(originalName=["Big", "App", "Math", "showDecimal"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["show-decimal-hash"]}]},
+    location={"Some": [dict(owner="Big", modules=["App", "Math"], name="showDecimal")]})]})
+IMPL = dict(hash={"Hash": ["impl-hash"]}, trait_=SHOW_REF, traitTypeArgs=[], self={"TDecimal": []},
+            typeParams=[], bounds=[], methods=[["show", DECIMAL_REF]])
 
 
 def inventory(module):
     # Like the interpreter's /:location browser: a module's direct items and children.
     parts = module.split(".")
     children = [m.split(".") for m in MODULES if m.split(".")[:-1] == parts]
-    fns = [dict(entity=FN, location=LOCATION)] if module == "Big.App.Math" else []
-    return dict(submodules=children, types=[], values=[], fns=fns, traits=[], impls=[], tests=[])
+    here = module == "Big.App.Math"
+    at = lambda name: dict(owner="Big", modules=["App", "Math"], name=name)
+    fns = [dict(entity=FN, location=LOCATION),
+           dict(entity=SHOW_DECIMAL, location=at("showDecimal"))] if here else []
+    traits = [dict(entity=TRAIT, location=at("Show"))] if here else []
+    impls = [dict(entity=IMPL, location=at("DecimalShow"))] if here else []
+    return dict(submodules=children, types=[], values=[], fns=fns, traits=traits, impls=impls, tests=[])
 
 
 def main():
@@ -44,6 +64,9 @@ def main():
                 payload = {"Hash": ["inc-hash"]}
             elif parts[:3] == ["function", "get", "with-location"] and parts[3] == "inc-hash":
                 payload = dict(entity=FN, location=LOCATION)
+            elif parts[:3] == ["function", "get", "with-location"] and parts[3] == "show-decimal-hash":
+                payload = dict(entity=SHOW_DECIMAL, location=dict(owner="Big", modules=["App", "Math"],
+                                                                   name="showDecimal"))
             elif len(parts) == 1 and parts[0] == "Big.App.Math.inc":
                 payload = FN
             elif len(parts) == 1 and parts[0].startswith("Big"):
@@ -78,7 +101,8 @@ def main():
                 unrelated = [r for r in requests if "Unrelated" in r]
                 assert unrelated == [], (text, len(unrelated), unrelated[:5])
         server.shutdown()
-    print("Hosted names resolve from their own modules without reading unrelated ones")
+    print("Hosted names resolve from their own modules without reading unrelated ones, "
+          "and an unused implementation over an unsupported type does not block them")
 
 
 if __name__ == "__main__":
