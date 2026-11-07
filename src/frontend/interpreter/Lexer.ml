@@ -563,7 +563,17 @@ let tokenize text =
     pendingTrivia := [];
     (spanned, stop, endPosition)
   in
-  let suffixes = [ "uy"; "us"; "ul"; "UL"; "L"; "Q"; "Z"; "y"; "s"; "l" ] in
+  (* The interpreter's width suffixes since darklang/dark@1d3a109 (`1s8`,
+     `1u64`, `1z` for BigInt) are accepted beside the pinned ones. Longer
+     suffixes come first, so `1s16` is not read as `1s` followed by `16`.
+     The pinned `s` (Int16) keeps its meaning; the current interpreter reads a
+     bare `s` as Int64, so that one spelling still differs. *)
+  let suffixes =
+    [
+      "s128"; "u128"; "s16"; "u16"; "s32"; "u32"; "s64"; "u64"; "s8"; "u8";
+      "uy"; "us"; "ul"; "UL"; "L"; "Q"; "Z"; "y"; "s"; "l"; "u"; "z";
+    ]
+  in
   let suffixAt index =
     List.find_opt (fun suffix -> matchesAt suffix index) suffixes
   in
@@ -589,7 +599,25 @@ let tokenize text =
           Ok (constructor (Z.neg bound), String.length suffix)
         else error
     in
+    let uint64 value =
+      TUInt64
+        (Z.to_int64
+           (if Z.testbit value 63 then Z.sub value (Z.shift_left Z.one 64)
+            else value))
+    in
     match suffix with
+    | "s8" -> parse 8 true (fun value -> TInt8 (Z.to_int value)) "Int8"
+    | "u8" -> parse 8 false (fun value -> TUInt8 (Z.to_int value)) "UInt8"
+    | "s16" -> parse 16 true (fun value -> TInt16 (Z.to_int value)) "Int16"
+    | "u16" -> parse 16 false (fun value -> TUInt16 (Z.to_int value)) "UInt16"
+    | "s32" -> parse 32 true (fun value -> TInt32 (Z.to_int32 value)) "Int32"
+    | "u32" -> parse 32 false (fun value -> TUInt32 (Z.to_int64 value)) "UInt32"
+    | "s64" -> parse 64 true (fun value -> TInt64 (Z.to_int64 value)) "Int64"
+    | "u64" | "u" -> parse 64 false uint64 "UInt64"
+    | "s128" -> parse 128 true (fun value -> TInt128 value) "Int128"
+    | "u128" -> parse 128 false (fun value -> TUInt128 value) "UInt128"
+    | "z" ->
+        if ascii then Ok (TInt (Z.of_string_base 10 digits), 1) else invalid
     | "uy" -> parse 8 false (fun value -> TUInt8 (Z.to_int value)) "UInt8"
     | "us" -> parse 16 false (fun value -> TUInt16 (Z.to_int value)) "UInt16"
     | "ul" -> parse 32 false (fun value -> TUInt32 (Z.to_int64 value)) "UInt32"
