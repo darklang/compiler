@@ -1,0 +1,14 @@
+// Since darklang/dark@74dca94 one paren lists every parameter, as a call
+// lists its arguments; one paren per parameter still parses.
+
+let declAdd(a: Int64, b: Int64): Int64 = a + b
+let declThree(a: Int64, b: Int64, c: Int64): Int64 = a + b + c
+let declUnit(): Int64 = 42L
+let declMixed (a: Int64) (b: Int64) : Int64 = a - b
+let declGeneric<'t>(value: 't, other: 't): List<'t> = [value, other]
+
+declAdd(20L, 22L) = 42L
+declThree(10L, 20L, 12L) = 42L
+declUnit() = 42L
+declMixed(50L, 8L) = 42L
+declGeneric(1L, 2L) = [1L, 2L]
