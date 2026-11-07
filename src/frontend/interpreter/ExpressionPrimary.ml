@@ -253,6 +253,30 @@ let parsePrimary grammar state index =
   | TFun ->
       let keyword = rng state index in
       let patterns = RevBuffer.create () and stop = ref (index + 1) in
+      (* Since darklang/dark@b2fb96b a lambda lists its parameters the way a
+         call lists arguments, `fun(acc, x) -> ...`, with the paren against
+         the keyword. A spaced `fun (a, b) ->` still takes one tuple. *)
+      if
+        tok state (index + 1) = TLParen
+        && (rng state (index + 1)).start = keyword.end_
+        && tok state (index + 2) <> TRParen
+      then begin
+        stop := index + 2;
+        let more = ref true in
+        while !more do
+          let pattern, after = BindingPatternParser.parseLetPattern state !stop in
+          RevBuffer.add patterns pattern;
+          if after = !stop then more := false
+          else if tok state after = TComma then stop := after + 1
+          else begin
+            stop := after;
+            more := false
+          end
+        done;
+        if tok state !stop = TRParen then incr stop
+        else errUnclosed state !stop ")" "(" (rng state (index + 1))
+      end
+      else
       while
         match tok state !stop with
         | TIdent _ | TUnderscore | TLParen -> true
