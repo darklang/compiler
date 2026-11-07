@@ -1,0 +1,8 @@
+// Since darklang/dark@b2fb96b a lambda lists its parameters in one paren
+// against `fun`; the spaced form still destructures one tuple.
+
+Stdlib.List.fold [1L, 2L, 3L] 0L (fun(acc, x) -> acc + x) = 6L
+Stdlib.List.map [1L, 2L] (fun(x) -> x * 10L) = [10L, 20L]
+Stdlib.List.map [(1L, 2L)] (fun (a, b) -> a + b) = [3L]
+Stdlib.List.fold([1L, 2L, 3L], 0L, fun(acc, x) -> acc + x) = 6L
+(fun() -> 42L) () = 42L
