@@ -9,116 +9,116 @@
     "backend": "cachegrind",
     "measurement_policy": "cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs"
   },
-  "contract_sha256": "2ead0323fc6859c952a3b8a83c56e0b0da61e1350b7ddd39ecc4a0b1da25e861",
-  "generated_at": "2026-10-07T11:50:03+00:00",
+  "contract_sha256": "5547f5e73180619654c2f62a0ee6db7b48b8236b19fb16cb30836e856584dc87",
+  "generated_at": "2026-11-08T02:21:55+00:00",
   "compiler": {
-    "commit": "a8f74665d1a6b33228c2b85ed3c6ff93ee4e71cf",
-    "subject": "Make native benchmark test prerequisites portable"
+    "commit": "7608be218b01c26e89f27e4decbc2af0cdd834f4",
+    "subject": "Re-record the benchmark parity hashes for seven changed Dark sources"
   },
   "benchmarks": [
     {
       "name": "ackermann",
-      "instructions": 184178128
+      "instructions": 184178257
     },
     {
       "name": "binary_trees",
-      "instructions": 12916641
+      "instructions": 12916856
     },
     {
       "name": "collatz",
-      "instructions": 185401083
+      "instructions": 185401384
     },
     {
       "name": "edigits",
-      "instructions": 123233687
+      "instructions": 124281120
     },
     {
       "name": "factorial",
-      "instructions": 63446
+      "instructions": 64236
     },
     {
       "name": "fannkuch",
-      "instructions": 435308298
+      "instructions": 435308341
     },
     {
       "name": "fasta",
-      "instructions": 23431795
+      "instructions": 23439305
     },
     {
       "name": "fft",
-      "instructions": 2465221
+      "instructions": 2475741
     },
     {
       "name": "fib",
-      "instructions": 9856188
+      "instructions": 9856403
     },
     {
       "name": "huffman",
-      "instructions": 687600258
+      "instructions": 240159462
     },
     {
       "name": "leibniz",
-      "instructions": 43009535
+      "instructions": 43010045
     },
     {
       "name": "mandelbrot",
-      "instructions": 21677641
+      "instructions": 21677813
     },
     {
       "name": "matmul",
-      "instructions": 71903921
+      "instructions": 75290059
     },
     {
       "name": "merkletrees",
-      "instructions": 3775096
+      "instructions": 3775444
     },
     {
       "name": "myers_diff",
-      "instructions": 284156308
+      "instructions": 5558396
     },
     {
       "name": "nbody",
-      "instructions": 11878516
+      "instructions": 11878934
     },
     {
       "name": "nqueen",
-      "instructions": 10714474
+      "instructions": 10714603
     },
     {
       "name": "nsieve",
-      "instructions": 504794934
+      "instructions": 511146323
     },
     {
       "name": "pisum",
-      "instructions": 1511980
+      "instructions": 1512661
     },
     {
       "name": "primes",
-      "instructions": 3692310
+      "instructions": 4507275
     },
     {
       "name": "quicksort",
-      "instructions": 431665621
+      "instructions": 431665965
     },
     {
       "name": "raytracer",
-      "instructions": 66754325
+      "instructions": 75098125
     },
     {
       "name": "regex_lite",
-      "instructions": 108258533
+      "instructions": 1344375
     },
     {
       "name": "spectral_norm",
-      "instructions": 687911699
+      "instructions": 687899886
     },
     {
       "name": "string_equality",
-      "instructions": 1496122
+      "instructions": 1497022
     },
     {
       "name": "sum_to_n",
-      "instructions": 61844
+      "instructions": 62145
     },
     {
       "name": "tak",
@@ -126,11 +126,11 @@
     },
     {
       "name": "tinytemplate",
-      "instructions": 461239820
+      "instructions": 108091349
     },
     {
       "name": "warden",
-      "instructions": 61010185
+      "instructions": 913594
     }
   ]
 }
