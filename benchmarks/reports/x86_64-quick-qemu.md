@@ -4,7 +4,7 @@ Architecture: `x86_64`. Profile: `quick`.
 
 Measurement policy: `qemu-tcg-plugin-guest-insns-v1:qemu-11.1.1:rustc-1.89.0`.
 
-Current workload contract: `a51a118103e413603481d1a2066a457e9038664d101d2bf6a68291180454f957`.
+Current workload contract: `fda3afc196358063621df43fbbb9b1372d69ea109a7c4eaeacc561f77258120c`.
 
 Instruction counts include runtime and startup work; they are not elapsed-time speed ratios.
 

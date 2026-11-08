@@ -4,7 +4,7 @@ Architecture: `x86_64`. Profile: `full`.
 
 Measurement policy: `cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs`.
 
-Current workload contract: `2a3f42ac1a2085fe75562c15a454d4ec18429c61d8f22ee22c9619d5d0ef029f`.
+Current workload contract: `5547f5e73180619654c2f62a0ee6db7b48b8236b19fb16cb30836e856584dc87`.
 
 Instruction counts include runtime and startup work; they are not elapsed-time speed ratios.
 
@@ -14,7 +14,7 @@ Snapshots are independent. Stale values are retained for provenance and excluded
 
 | Language             | Version / compiler commit                | Measured                  | Current rows | Audited current rows | Build flags  | Runtime flags |
 | -------------------- | ---------------------------------------- | ------------------------- | ------------ | -------------------- | ------------ | ------------- |
-| Darklang             | a8f74665d1a6b33228c2b85ed3c6ff93ee4e71cf | 2026-10-07T11:50:03+00:00 | 0/29         | 0/0                  | not recorded | not recorded  |
+| Darklang             | 7608be218b01c26e89f27e4decbc2af0cdd834f4 | 2026-11-08T02:21:55+00:00 | 29/29        | 29/29                | not recorded | not recorded  |
 | Rust                 | not recorded                             | not recorded              | 0/29         | 0/0                  | not recorded | not recorded  |
 | Haskell              | not recorded                             | not recorded              | 0/29         | 0/0                  | not recorded | not recorded  |
 | Python               | not recorded                             | not recorded              | 0/29         | 0/0                  | not recorded | not recorded  |
@@ -29,37 +29,37 @@ Output validation alone does not establish algorithm parity.
 
 ## Absolute instructions
 
-| Benchmark       |                              Darklang |         Rust |      Haskell |       Python |         Node |          Roc |      OCaml 5 |         Koka | Darklang interpreter |
-| --------------- | ------------------------------------: | -----------: | -----------: | -----------: | -----------: | -----------: | -----------: | -----------: | -------------------: |
-| ackermann       | 184,178,128 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| binary_trees    |  12,916,641 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| collatz         | 185,401,083 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| edigits         | 123,233,687 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| factorial       |      63,446 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| fannkuch        | 435,308,298 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| fasta           |  23,431,795 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| fft             |   2,465,221 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| fib             |   9,856,188 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| huffman         | 687,600,258 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| leibniz         |  43,009,535 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| mandelbrot      |  21,677,641 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| matmul          |  71,903,921 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| merkletrees     |   3,775,096 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| myers_diff      | 284,156,308 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| nbody           |  11,878,516 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| nqueen          |  10,714,474 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| nsieve          | 504,794,934 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| pisum           |   1,511,980 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| primes          |   3,692,310 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| quicksort       | 431,665,621 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| raytracer       |  66,754,325 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| regex_lite      | 108,258,533 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| spectral_norm   | 687,911,699 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| string_equality |   1,496,122 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| sum_to_n        |      61,844 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| tak             |  56,735,194 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| tinytemplate    | 461,239,820 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
-| warden          |  61,010,185 (stale workload contract) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| Benchmark       |    Darklang |         Rust |      Haskell |       Python |         Node |          Roc |      OCaml 5 |         Koka | Darklang interpreter |
+| --------------- | ----------: | -----------: | -----------: | -----------: | -----------: | -----------: | -----------: | -----------: | -------------------: |
+| ackermann       | 184,178,257 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| binary_trees    |  12,916,856 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| collatz         | 185,401,384 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| edigits         | 124,281,120 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| factorial       |      64,236 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| fannkuch        | 435,308,341 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| fasta           |  23,439,305 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| fft             |   2,475,741 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| fib             |   9,856,403 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| huffman         | 240,159,462 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| leibniz         |  43,010,045 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| mandelbrot      |  21,677,813 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| matmul          |  75,290,059 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| merkletrees     |   3,775,444 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| myers_diff      |   5,558,396 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| nbody           |  11,878,934 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| nqueen          |  10,714,603 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| nsieve          | 511,146,323 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| pisum           |   1,512,661 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| primes          |   4,507,275 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| quicksort       | 431,665,965 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| raytracer       |  75,098,125 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| regex_lite      |   1,344,375 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| spectral_norm   | 687,899,886 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| string_equality |   1,497,022 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| sum_to_n        |      62,145 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| tak             |  56,735,194 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| tinytemplate    | 108,091,349 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
+| warden          |     913,594 | not measured | not measured | not measured | not measured | not measured | not measured | not measured |         not measured |
 
 ## Instructions relative to Rust
 
@@ -108,7 +108,7 @@ Geometric means are informational unless every included row is audited.
 
 | Language             | Instructions / Rust | Total instructions | Current rows | Parity     |
 | -------------------- | ------------------: | -----------------: | -----------: | ---------- |
-| Darklang             |         unavailable |        unavailable |         0/21 | incomplete |
+| Darklang             |         unavailable |        unavailable |        21/21 | incomplete |
 | Rust                 |         unavailable |        unavailable |         0/21 | incomplete |
 | Haskell              |         unavailable |        unavailable |         0/21 | incomplete |
 | Python               |         unavailable |        unavailable |         0/21 | incomplete |
@@ -124,7 +124,7 @@ Geometric means are informational unless every included row is audited.
 
 | Language             | Instructions / Rust | Total instructions | Current rows | Parity     |
 | -------------------- | ------------------: | -----------------: | -----------: | ---------- |
-| Darklang             |         unavailable |        unavailable |         0/29 | incomplete |
+| Darklang             |         unavailable |        unavailable |        29/29 | incomplete |
 | Rust                 |         unavailable |        unavailable |         0/29 | incomplete |
 | Haskell              |         unavailable |        unavailable |         0/29 | incomplete |
 | Python               |         unavailable |        unavailable |         0/29 | incomplete |
