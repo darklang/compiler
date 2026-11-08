@@ -264,13 +264,21 @@ let locationName element =
 (* The interpreter's own `__` helpers (`Darklang.Stdlib.Url.__escapesOk`)
    arrive with the hosted code that calls them, but `__` names are refused
    in user code here, to keep it off the compiler's internal helpers. A
-   hosted name's `__` segments are rendered as `pkg'__…`, which no written
+   hosted name's `__` segments are rendered as `pkg'__…` (or `Pkg'__…` for a
+   type), which no written
    name can collide with, both where it is declared and where it is called. *)
 let publicName name =
   String.split_on_char '.' name
   |> List.map (fun segment ->
       if String.length segment >= 2 && String.sub segment 0 2 = "__" then
-        "pkg'" ^ segment
+        (* A type or module keeps its capital (`Pkg'__ChildBuffer`), so it
+           still reads as one. *)
+        let capital =
+          String.length segment > 2
+          && Char.uppercase_ascii segment.[2] = segment.[2]
+          && Char.lowercase_ascii segment.[2] <> segment.[2]
+        in
+        (if capital then "Pkg'" else "pkg'") ^ segment
       else segment)
   |> String.concat "."
 
