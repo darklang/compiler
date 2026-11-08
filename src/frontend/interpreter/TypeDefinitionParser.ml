@@ -51,7 +51,8 @@ and parseTypeDefinition state index =
     tok state index = TBar
     ||
     match (tok state index, tok state (index + 1)) with
-    | TIdent name, next when upperName name -> next = TOf || next = TBar
+    | TIdent name, next when upperName name ->
+        next = TOf || next = TBar || next = TLParen
     | _ -> false
   in
   match tok state index with
@@ -187,6 +188,28 @@ and parseEnumDef state index =
               RevBuffer.add fields field;
               stop := next
             done
+          end
+          (* `| Pair(Int64, Int64)` (darklang/dark@632e932): fields in parens,
+             as a constructor takes them. `| Pair of Int64 * Int64` still
+             parses. *)
+          else if tok state !stop = TLParen && tok state (!stop + 1) <> TRParen
+          then begin
+            let opening = rng state !stop in
+            keywordOf := Some opening;
+            incr stop;
+            let more = ref true in
+            while !more do
+              let field, next = parseEnumField state !stop in
+              RevBuffer.add fields field;
+              if next = !stop then more := false
+              else if tok state next = TComma then stop := next + 1
+              else begin
+                stop := next;
+                more := false
+              end
+            done;
+            if tok state !stop = TRParen then incr stop
+            else errUnclosed state !stop ")" "(" opening
           end;
           let ending =
             match RevBuffer.last fields with
