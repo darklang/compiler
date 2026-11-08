@@ -362,15 +362,24 @@ and parseLet grammar state index =
           stop := !stop + 2
         end
         else begin
-          let name =
-            match tok state (!stop + 1) with TIdent name -> name | _ -> "_"
+          (* One paren may list several parameters, `let f(a: T, b: U)`,
+             since darklang/dark@74dca94. *)
+          let rec parameters at =
+            let name =
+              match tok state at with TIdent name -> name | _ -> "_"
+            in
+            RevBuffer.add patterns (WT.LPVariable (rng state at, name));
+            let after =
+              if tok state (at + 1) = TColon then
+                snd (TypeParser.parseTypeRef state (at + 2))
+              else at + 1
+            in
+            if tok state after = TComma && tok state (after + 1) <> TRParen
+            then parameters (after + 1)
+            else if tok state after = TComma then after + 1
+            else after
           in
-          RevBuffer.add patterns (WT.LPVariable (rng state (!stop + 1), name));
-          let closing =
-            if tok state (!stop + 2) = TColon then
-              snd (TypeParser.parseTypeRef state (!stop + 3))
-            else !stop + 2
-          in
+          let closing = parameters (!stop + 1) in
           if tok state closing = TRParen then stop := closing + 1
           else begin
             errExpected state closing "')'";

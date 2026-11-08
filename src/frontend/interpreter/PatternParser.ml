@@ -270,7 +270,12 @@ and parsePatternBaseInner state index =
            rest pattern, which means what `x :: rest` meant. *)
         if tok state !current = TDotDotDot && RevBuffer.length elements > 0
         then begin
-          let pattern, stop = parsePatternBase state (!current + 1) in
+          (* A bare `...` ignores the rest: `[first, ...]`. *)
+          let pattern, stop =
+            if tok state (!current + 1) = TRBracket then
+              (WT.MPVariable (rng state !current, "_"), !current + 1)
+            else parsePatternBase state (!current + 1)
+          in
           rest := Some (rng state !current, pattern);
           current := stop;
           if tok state !current = TComma then incr current;
