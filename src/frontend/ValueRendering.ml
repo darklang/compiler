@@ -39,6 +39,33 @@ let resolveFunction symbols name =
 
 let call symbols name values = C.Call (resolveFunction symbols name, args values)
 
+(* `--syntax=current`: render as the current interpreter's `dark eval` prints.
+   An Option or Result case is bare (`Some(41)`); other types drop the owner
+   and type arguments (`Stdlib.Math.Overflow.Overflow`); integers other than
+   Int64 keep their suffix (`5u8`, `1z`); records keep declaration order; a
+   top-level String prints raw and a top-level Unit prints nothing. *)
+let evalDisplay = ref false
+
+let displayTypeText typ =
+  let text = CheckingDiagnostics.typeToString typ in
+  if not !evalDisplay then text
+  else
+    let base =
+      match String.index_opt text '<' with
+      | Some index -> String.sub text 0 index
+      | None -> text
+    in
+    let base =
+      if String.starts_with ~prefix:"Darklang." base then
+        String.sub base 9 (String.length base - 9)
+      else base
+    in
+    match base with
+    | "Stdlib.Option.Option" | "Stdlib.Result.Result" -> ""
+    | _ -> base
+
+let casePrefix typeText = if typeText = "" then "" else typeText ^ "."
+
 let concat symbols = function
   | [] -> C.StringLiteral ""
   | first :: rest ->
@@ -325,34 +352,30 @@ and ensureDictItemsRenderer env keyType valueType (state : renderState) =
               withValueRenderer.functions;
         } )
 
+and suffixed state name suffix value =
+  let text = call state.symbols name [ value ] in
+  if !evalDisplay then concat state.symbols [ text; C.StringLiteral suffix ]
+  else text
+
 and renderBody env typ value state =
   match typ with
   | TUnit -> (C.StringLiteral "()", state)
   | TBool ->
       (call state.symbols "Darklang.Stdlib.Bool.toString" [ value ], state)
-  | TInt8 ->
-      (call state.symbols "Darklang.Stdlib.Int8.toString" [ value ], state)
-  | TInt16 ->
-      (call state.symbols "Darklang.Stdlib.Int16.toString" [ value ], state)
-  | TInt32 ->
-      (call state.symbols "Darklang.Stdlib.Int32.toString" [ value ], state)
+  | TInt8 -> (suffixed state "Darklang.Stdlib.Int8.toString" "s8" value, state)
+  | TInt16 -> (suffixed state "Darklang.Stdlib.Int16.toString" "s16" value, state)
+  | TInt32 -> (suffixed state "Darklang.Stdlib.Int32.toString" "s32" value, state)
   | TInt64 ->
       (call state.symbols "Darklang.Stdlib.Int64.toString" [ value ], state)
-  | TInt -> (call state.symbols "Darklang.Stdlib.Int.toString" [ value ], state)
-  | TUInt8 ->
-      (call state.symbols "Darklang.Stdlib.UInt8.toString" [ value ], state)
-  | TUInt16 ->
-      (call state.symbols "Darklang.Stdlib.UInt16.toString" [ value ], state)
-  | TUInt32 ->
-      (call state.symbols "Darklang.Stdlib.UInt32.toString" [ value ], state)
-  | TUInt64 ->
-      (call state.symbols "Darklang.Stdlib.UInt64.toString" [ value ], state)
+  | TInt -> (suffixed state "Darklang.Stdlib.Int.toString" "z" value, state)
+  | TUInt8 -> (suffixed state "Darklang.Stdlib.UInt8.toString" "u8" value, state)
+  | TUInt16 -> (suffixed state "Darklang.Stdlib.UInt16.toString" "u16" value, state)
+  | TUInt32 -> (suffixed state "Darklang.Stdlib.UInt32.toString" "u32" value, state)
+  | TUInt64 -> (suffixed state "Darklang.Stdlib.UInt64.toString" "u64" value, state)
   (* Fixed-block 128-bit values cross the textual boundary through their
     limb-based decimal formatters. *)
-  | TInt128 ->
-      (call state.symbols "Darklang.Stdlib.Int128.toString" [ value ], state)
-  | TUInt128 ->
-      (call state.symbols "Darklang.Stdlib.UInt128.toString" [ value ], state)
+  | TInt128 -> (suffixed state "Darklang.Stdlib.Int128.toString" "s128" value, state)
+  | TUInt128 -> (suffixed state "Darklang.Stdlib.UInt128.toString" "u128" value, state)
   | TFloat64 ->
       (call state.symbols "Darklang.Stdlib.Float.toString" [ value ], state)
   | TString -> (escapedString state.symbols "\"" value, state)
@@ -455,8 +478,12 @@ and renderBody env typ value state =
             List.mapi
               (fun index (name, typ) -> (index, name, typ))
               recordInfo.Types.fields
-            |> List.stable_sort (fun (_, a, _) (_, b, _) ->
-                StringOrder.compare a b)
+            |> fun fields ->
+            if !evalDisplay then fields
+            else
+              List.stable_sort
+                (fun (_, a, _) (_, b, _) -> StringOrder.compare a b)
+                fields
           in
           let rec renderFields remaining current acc =
             match remaining with
@@ -485,7 +512,7 @@ and renderBody env typ value state =
                    ])
                  renderedFields)
           in
-          let typeText = CheckingDiagnostics.typeToString typ in
+          let typeText = displayTypeText typ in
           let short =
             concat next.symbols
               ((C.StringLiteral (typeText ^ " { ") :: parts ", ")
@@ -517,7 +544,7 @@ and renderBody env typ value state =
           Crash.crash ("Missing sum metadata for value renderer: " ^ typeName)
       | Some sumInfo ->
           let subst = typeSubstitution sumInfo.Types.typeParams typeArgs in
-          let typeText = CheckingDiagnostics.typeToString typ in
+          let typeText = displayTypeText typ in
           let rec buildCases remaining current acc =
             match remaining with
             | [] -> (List.rev acc, current)
@@ -527,7 +554,7 @@ and renderBody env typ value state =
                     let case =
                       makeCase
                         (constructorPattern typeName variant current.symbols [])
-                        (C.StringLiteral (typeText ^ "." ^ variant.Types.name))
+                        (C.StringLiteral (casePrefix typeText ^ variant.Types.name))
                     in
                     buildCases rest current (case :: acc)
                 | fieldTypes ->
@@ -567,7 +594,7 @@ and renderBody env typ value state =
                     let body =
                       concat next.symbols
                         (C.StringLiteral
-                           (typeText ^ "." ^ variant.Types.name ^ "(")
+                           (casePrefix typeText ^ variant.Types.name ^ "(")
                          :: separated
                         @ [ C.StringLiteral ")" ])
                     in
@@ -685,6 +712,10 @@ let rewriteProgram recordMetadata sumMetadata programType program =
   let rewriteExpression state expr =
     let rendered, next =
       match (programType, expr, tryNamedPartialName expr) with
+      | TString, _, _ when !evalDisplay -> (expr, state)
+      | TUnit, _, _ when !evalDisplay ->
+          let id, next = freshBinding "__rendered_unit" state in
+          (C.Let (C.LPVariable id, expr, C.StringLiteral ""), next)
       | TDateTime, _, _ ->
           ( C.BoundaryRender
               ( resolveFunction state.symbols "Darklang.Stdlib.DateTime.toString",
