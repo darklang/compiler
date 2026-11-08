@@ -212,6 +212,9 @@ and parseMatch grammar state index =
     end
   in
   let cases = RevBuffer.create () in
+  (* `as` and record arms read the scrutinee by this name; `'` keeps it apart
+     from anything written. *)
+  let scrutineeName = "match'scrutinee" and needsScrutinee = ref false in
   let armColumn =
     if tok state afterWith = TBar then (rng state afterWith).start.column else 0
   in
@@ -229,8 +232,57 @@ and parseMatch grammar state index =
            || (rng state !current).start.column = armColumn)
       do
         let barRange = rng state !current in
-        let pattern, next =
-          PatternParser.parseMatchPattern state (!current + 1)
+        (* `| { name, other = o } ->` (darklang/dark@0851642): a record
+           pattern that leaves fields out. Here each field binds a name or
+           `_`; the arm matches the whole value and its body reads the
+           fields. Refutable field patterns are refused with the reason. *)
+        let recordFields, pattern, next =
+          if tok state (!current + 1) = TLBrace then begin
+            let opening = rng state (!current + 1) in
+            let fields = RevBuffer.create () and stop = ref (!current + 2) in
+            let more = ref (tok state !stop <> TRBrace) in
+            while !more do
+              (match (tok state !stop, tok state (!stop + 1), tok state (!stop + 2)) with
+              | TIdent field, TEquals, TIdent name ->
+                  RevBuffer.add fields ((rng state !stop, field), Some (rng state (!stop + 2), name));
+                  stop := !stop + 3
+              | TIdent _, TEquals, TUnderscore -> stop := !stop + 3
+              | TIdent field, (TComma | TRBrace), _ ->
+                  RevBuffer.add fields ((rng state !stop, field), Some (rng state !stop, field));
+                  stop := !stop + 1
+              | _ ->
+                  err state DiagnosticCode.pattern !stop
+                    "can't compile: uses a record pattern field that is not a \
+                     name, which this compiler does not support";
+                  more := false);
+              if !more then
+                if tok state !stop = TComma then incr stop
+                else more := false;
+              if tok state !stop = TRBrace then more := false
+            done;
+            let closing =
+              if tok state !stop = TRBrace then !stop + 1
+              else begin
+                errUnclosed state !stop "}" "{" opening;
+                !stop
+              end
+            in
+            ( Some (RevBuffer.toList fields),
+              WT.MPVariable (span opening (rng state (closing - 1)), "_"),
+              closing )
+          end
+          else
+            let pattern, next =
+              PatternParser.parseMatchPattern state (!current + 1)
+            in
+            (None, pattern, next)
+        in
+        (* `| pattern as name ->` (darklang/dark@6a5beac): also bind the whole
+           value. Only at the top of an arm; nested `as` is not parsed. *)
+        let asName, next =
+          match (tok state next, tok state (next + 1)) with
+          | TIdent "as", TIdent name -> (Some (rng state (next + 1), name), next + 2)
+          | _ -> (None, next)
         in
         let condition, next =
           if tok state next = TWhen then
@@ -247,6 +299,30 @@ and parseMatch grammar state index =
           end
         in
         let rhs, stop = parseBlock grammar state next in
+        let bindings =
+          (match asName with Some (range, name) -> [ (range, name, None) ] | None -> [])
+          @ List.filter_map
+              (fun ((fieldRange, field), binding) ->
+                Option.map (fun (range, name) -> (range, name, Some (fieldRange, field))) binding)
+              (Option.value ~default:[] recordFields)
+        in
+        if bindings <> [] then needsScrutinee := true;
+        let bind (range, name, field) body =
+          let whole = WT.EVariable (range, scrutineeName) in
+          let value =
+            match field with
+            | None -> whole
+            | Some (fieldRange, field) ->
+                WT.ERecordFieldAccess (range, whole, (fieldRange, field), range)
+          in
+          let zero = zeroWidthAtEnd range in
+          WT.ELet (span range (WT.exprRange body), WT.LPVariable (range, name), value, body, zero, zero)
+        in
+        let rhs = List.fold_right bind bindings rhs in
+        (* A guard may read what the arm binds, so it gets the same lets. *)
+        let condition =
+          Option.map (fun (range, value) -> (range, List.fold_right bind bindings value)) condition
+        in
         RevBuffer.add cases
           {
             WT.barRange;
@@ -264,13 +340,26 @@ and parseMatch grammar state index =
     if RevBuffer.length cases > 0 then WT.exprRange (last cases).WT.rhs
     else keywordWith
   in
-  ( WT.EMatch
-      ( span keywordMatch endRange,
-        expression,
-        RevBuffer.toList cases,
-        keywordMatch,
-        keywordWith ),
-    !current )
+  let whole = span keywordMatch endRange in
+  if !needsScrutinee then
+    let range = WT.exprRange expression in
+    let zero = zeroWidthAtEnd range in
+    ( WT.ELet
+        ( whole,
+          WT.LPVariable (range, scrutineeName),
+          expression,
+          WT.EMatch
+            ( whole,
+              WT.EVariable (range, scrutineeName),
+              RevBuffer.toList cases,
+              keywordMatch,
+              keywordWith ),
+          zero,
+          zero ),
+      !current )
+  else
+    ( WT.EMatch (whole, expression, RevBuffer.toList cases, keywordMatch, keywordWith),
+      !current )
 
 (*
    `else`/`elif` binds to the `if` at `minCol` or to the left; a less-indented
