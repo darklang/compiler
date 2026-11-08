@@ -98,6 +98,11 @@ ENTITIES["builtin-renamed-hash"] = fn("Hosted.renamedBuiltins", [("x", INT64)], 
             {"EString": [3, [{"StringText": ["a"]}]]}))
 
 
+# `Builtin.<module><Fn>` is the module's fn: stringTrim, stringToUppercase.
+ENTITIES["module-builtins-hash"] = fn("Hosted.moduleBuiltins", [("x", INT64)], {"TString": []},
+    builtin("stringToUppercase", builtin("stringTrim", {"EString": [1, [{"StringText": ["  ab "]}]]})))
+
+
 ENTITIES["deep-hash"] = fn("Hosted.deepAdds", [("x", INT64)], INT64, nested_adds(180))
 
 
@@ -168,6 +173,7 @@ def main():
             assert run("Hosted.overflowName ()\n") == "overflow"
             assert run("Hosted.describeNumber 42L\n") == "42"
             assert run("Hosted.renamedBuiltins 1L\n") is True
+            assert run("Hosted.moduleBuiltins 1L\n") == "AB"
             assert run("Hosted.builtinMore 7L\n") == "1"
             assert run("Hosted.builtinOps 52L\n") is False
             assert str(run("Hosted.doubleBig 12345678901234567890\n")) == "24691357802469135780"

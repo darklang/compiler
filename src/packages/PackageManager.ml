@@ -507,9 +507,15 @@ let builtinOperator name =
   in
   let unary = [ ("Negate", "-"); ("BitwiseNot", "~") ] in
   (* Builtins whose pinned counterpart is a library fn of the same arity and
-     meaning. Hex/Base16 is left out: its letter case is not pinned down. *)
+     meaning. Both hex encoders write uppercase (.NET's ToHexString and the
+     compiler's "0123456789ABCDEF"); decoding is left out because its error
+     text differs. *)
   let renamed =
-    [ ("dictContainsKey", "Stdlib.Dict.member"); ("bytesConcat", "Stdlib.Blob.concat") ]
+    [
+      ("dictContainsKey", "Stdlib.Dict.member");
+      ("bytesConcat", "Stdlib.Blob.concat");
+      ("base16Encode", "Stdlib.Blob.toHex");
+    ]
     @ List.map
         (fun fn ->
           ( "bigInt" ^ String.capitalize_ascii fn,
@@ -521,6 +527,33 @@ let builtinOperator name =
           "toInt64"; "toUInt64"; "toInt128"; "toUInt128"; "toFloat";
           "fromFloat"; "sqrt"; "absoluteValue";
         ]
+  in
+  (* Otherwise `Builtin.<module><Fn>` is the module's `fn`, as the
+     interpreter's own wrappers spell it (`Builtin.stringTrim` is
+     `Stdlib.String.trim`); a module the compiler lacks is reported by name. *)
+  let modules =
+    [
+      ("string", "String"); ("char", "Char"); ("list", "List"); ("dict", "Dict");
+      ("bool", "Bool"); ("uuid", "Uuid"); ("dateTime", "DateTime");
+      ("bytes", "Blob");
+    ]
+  in
+  let byModule fn =
+    List.find_map
+      (fun (prefix, moduleName) ->
+        let length = String.length prefix in
+        if
+          String.starts_with ~prefix fn
+          && String.length fn > length
+          && Char.uppercase_ascii fn.[length] = fn.[length]
+        then
+          Some
+            (`Call
+               ("Stdlib." ^ moduleName ^ "."
+               ^ String.uncapitalize_ascii
+                   (String.sub fn length (String.length fn - length))))
+        else None)
+      modules
   in
   match String.split_on_char '.' name with
   | [ "Builtin"; fn ] when List.mem_assoc fn renamed ->
@@ -534,10 +567,18 @@ let builtinOperator name =
             | Some text -> Some (`Binary text)
             | None when op = "ToString" ->
                 Some (`Call ("Stdlib." ^ moduleName typ ^ ".toString"))
-            | None ->
-                Option.map (fun text -> `Unary text) (List.assoc_opt op unary)
+            | None -> (
+                match List.assoc_opt op unary with
+                | Some text -> Some (`Unary text)
+                | None when op <> "" ->
+                    Some
+                      (`Call
+                         ("Stdlib." ^ moduleName typ ^ "."
+                         ^ String.uncapitalize_ascii op))
+                | None -> None)
           else None)
         types
+      |> fun found -> if Option.is_some found then found else byModule fn
   | _ -> None
 
 let rec renderExpr parameters selfName element =
