@@ -261,7 +261,24 @@ let locationName element =
       String.concat "." ((owner :: modules) @ [ leaf ])
   | _ -> Error ("Invalid package location: " ^ Yojson.Raw.to_string element)
 
-let resolvedName element =
+(* The interpreter's own `__` helpers (`Darklang.Stdlib.Url.__escapesOk`)
+   arrive with the hosted code that calls them, but `__` names are refused
+   in user code here, to keep it off the compiler's internal helpers. A
+   hosted name's `__` segments are rendered as `pkg'__…`, which no written
+   name can collide with, both where it is declared and where it is called. *)
+let publicName name =
+  String.split_on_char '.' name
+  |> List.map (fun segment ->
+      if String.length segment >= 2 && String.sub segment 0 2 = "__" then
+        "pkg'" ^ segment
+      else segment)
+  |> String.concat "."
+
+let hasInternalSegment name = publicName name <> name
+
+let rec resolvedName element = Result.map publicName (resolvedNameAsWritten element)
+
+and resolvedNameAsWritten element =
   match (tryField "resolved" element, tryField "originalName" element) with
   | Some resolved, Some originalName -> (
       let* name, fields = enumCase resolved in
@@ -556,6 +573,10 @@ let builtinOperator name =
       modules
   in
   match String.split_on_char '.' name with
+  (* `**` has no 128-bit lowering here; the compiler's Power implementations
+     for Int128 and UInt128 do. *)
+  | [ "Builtin"; ("int128Power" | "uint128Power") ] ->
+      Some (`Call "Stdlib.Power.power")
   | [ "Builtin"; fn ] when List.mem_assoc fn renamed ->
       Some (`Call (List.assoc fn renamed))
   | [ "Builtin"; fn ] ->
@@ -624,7 +645,9 @@ let rec renderExpr parameters selfName element =
         match (name, fields) with
         | "StringText", [ text ] ->
             let+ text = stringValue text in
-            escapedStringContents text
+            (* Strings render interpolated (`$"..."`), where a literal brace
+               is written doubled. *)
+            escapedStringContents text |> replace "{" "{{" |> replace "}" "}}"
         | "StringInterpolation", [ expr ] ->
             let+ text = recurse expr in
             "{" ^ text ^ "}"
@@ -956,7 +979,8 @@ let renderEntity entity =
         match List.rev parts with
         | [] | [ _ ] -> Error ("Invalid package location " ^ entity.location)
         | leaf :: reversedModule -> (
-            let moduleName = String.concat "." (List.rev reversedModule) in
+            let leaf = publicName leaf in
+            let moduleName = publicName (String.concat "." (List.rev reversedModule)) in
             let prefix body =
               {
                 name = "package:" ^ entity.location ^ "@" ^ entity.hash;
@@ -1512,7 +1536,10 @@ let resolveNames config resolutionEnv knownTraits names =
                 let next =
                   List.filter_map
                     (fun (hash, name) ->
-                      if isKnownName name then None
+                      (* A hosted `__` helper is fetched even when the
+                         compiler has one of the same name: it is rendered
+                         under its `pkg'` name. *)
+                      if isKnownName name && not (hasInternalSegment name) then None
                       else Some (None, hash, Some name))
                     dependencies
                 in
