@@ -506,7 +506,25 @@ let builtinOperator name =
     | typ -> String.capitalize_ascii typ
   in
   let unary = [ ("Negate", "-"); ("BitwiseNot", "~") ] in
+  (* Builtins whose pinned counterpart is a library fn of the same arity and
+     meaning. Hex/Base16 is left out: its letter case is not pinned down. *)
+  let renamed =
+    [ ("dictContainsKey", "Stdlib.Dict.member"); ("bytesConcat", "Stdlib.Blob.concat") ]
+    @ List.map
+        (fun fn ->
+          ( "bigInt" ^ String.capitalize_ascii fn,
+            "Stdlib.Int." ^ fn ))
+        [
+          "fromInt8"; "fromUInt8"; "fromInt16"; "fromUInt16"; "fromInt32";
+          "fromUInt32"; "fromInt64"; "fromUInt64"; "fromInt128"; "fromUInt128";
+          "toInt8"; "toUInt8"; "toInt16"; "toUInt16"; "toInt32"; "toUInt32";
+          "toInt64"; "toUInt64"; "toInt128"; "toUInt128"; "toFloat";
+          "fromFloat"; "sqrt"; "absoluteValue";
+        ]
+  in
   match String.split_on_char '.' name with
+  | [ "Builtin"; fn ] when List.mem_assoc fn renamed ->
+      Some (`Call (List.assoc fn renamed))
   | [ "Builtin"; fn ] ->
       List.find_map
         (fun typ ->
@@ -638,9 +656,7 @@ let rec renderExpr parameters selfName element =
           | Some (`Unary op), [ value ] ->
               let+ value = recurse value in
               "(" ^ op ^ "(" ^ value ^ "))"
-          | Some (`Call fn), [ value ] ->
-              let+ value = recurse value in
-              "(" ^ fn ^ " (" ^ value ^ "))"
+          | Some (`Call fn), _ -> application fn typeArgs args
           | _ -> application name typeArgs args)
       | _ ->
           let* fn = recurse fn in

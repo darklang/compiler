@@ -92,6 +92,12 @@ ENTITIES["trait-call-hash"] = fn("Hosted.describeNumber", [("x", INT64)], {"TStr
     {"EApply": [2, TO_STRING, [], [ARG0]]})
 
 
+# Builtins that are a pinned library fn under another name.
+ENTITIES["builtin-renamed-hash"] = fn("Hosted.renamedBuiltins", [("x", INT64)], {"TBool": []},
+    builtin("dictContainsKey", {"EDict": [1, [[{"EString": [2, [{"StringText": ["a"]}]]}, ARG0]]]},
+            {"EString": [3, [{"StringText": ["a"]}]]}))
+
+
 ENTITIES["deep-hash"] = fn("Hosted.deepAdds", [("x", INT64)], INT64, nested_adds(180))
 
 
@@ -161,6 +167,7 @@ def main():
             assert run("Hosted.builtinOps 50L\n") is True
             assert run("Hosted.overflowName ()\n") == "overflow"
             assert run("Hosted.describeNumber 42L\n") == "42"
+            assert run("Hosted.renamedBuiltins 1L\n") is True
             assert run("Hosted.builtinMore 7L\n") == "1"
             assert run("Hosted.builtinOps 52L\n") is False
             assert str(run("Hosted.doubleBig 12345678901234567890\n")) == "24691357802469135780"
