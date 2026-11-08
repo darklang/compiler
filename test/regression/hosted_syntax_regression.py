@@ -83,6 +83,15 @@ ENTITIES["builtin-more-hash"] = fn("Hosted.builtinMore", [("x", INT64)], {"TStri
         builtin("int64Power", {"EInt64": [3, 2]}, ARG0), {"EInt64": [4, 100]}), {"EInt64": [5, 10]})))
 
 
+# A trait call saved by the interpreter resolves to the trait's location.
+TO_STRING = {"EFnName": [1, dict(originalName=["Darklang", "Stdlib", "ToString", "toString"],
+    resolved={"Ok": [dict(location={"Some": [dict(owner="Darklang", modules=["Stdlib"], name="ToString")]},
+        name={"TraitMethod": [dict(method_="toString", trait_={"Hash": ["to-string-hash"]},
+                                   implFn={"Unknown": []})]})]}), []]}
+ENTITIES["trait-call-hash"] = fn("Hosted.describeNumber", [("x", INT64)], {"TString": []},
+    {"EApply": [2, TO_STRING, [], [ARG0]]})
+
+
 ENTITIES["deep-hash"] = fn("Hosted.deepAdds", [("x", INT64)], INT64, nested_adds(180))
 
 
@@ -151,6 +160,7 @@ def main():
             assert run("Hosted.deepAdds 1L\n") == 181
             assert run("Hosted.builtinOps 50L\n") is True
             assert run("Hosted.overflowName ()\n") == "overflow"
+            assert run("Hosted.describeNumber 42L\n") == "42"
             assert run("Hosted.builtinMore 7L\n") == "1"
             assert run("Hosted.builtinOps 52L\n") is False
             assert str(run("Hosted.doubleBig 12345678901234567890\n")) == "24691357802469135780"

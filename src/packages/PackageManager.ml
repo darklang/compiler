@@ -267,11 +267,27 @@ let resolvedName element =
       let* name, fields = enumCase resolved in
       match (name, fields) with
       | "Ok", [ value ] -> (
+          (* A trait method call resolves to its trait's location; the call
+             names the method under it, `Darklang.Stdlib.ToString.toString`,
+             and the compiler dispatches it. *)
+          let traitMethod =
+            match Option.map enumCase (tryField "name" value) with
+            | Some (Ok ("TraitMethod", [ method_ ])) -> (
+                match Option.map stringValue (tryField "method_" method_) with
+                | Some (Ok name) -> Some name
+                | _ -> None)
+            | _ -> None
+          in
+          let withMethod name =
+            match traitMethod with
+            | Some method_ -> name ^ "." ^ method_
+            | None -> name
+          in
           match tryField "location" value with
           | Some location -> (
               let* name, fields = enumCase location in
               match (name, fields) with
-              | "Some", [ value ] -> locationName value
+              | "Some", [ value ] -> Result.map withMethod (locationName value)
               | "None", [] ->
                   let+ names =
                     ResultList.mapResults stringValue (arrayItems originalName)
@@ -1543,6 +1559,34 @@ let resolveNames config resolutionEnv knownTraits names =
       let needed =
         reach StringOrder.Set.empty
           (List.map (fun entity -> entity.hash) rootEntities)
+      in
+      (* A discovered implementation of a trait the compiler already has, for
+         a type it already has, duplicates the compiler's own: the
+         interpreter's `Int64.ToString` beside the embedded one makes every
+         ToString call on Int64 ambiguous. Those are left out. *)
+      let duplicatesEmbedded entity =
+        entity.kind = PackageImpl
+        && (not (StringOrder.Set.mem entity.hash needed))
+        &&
+        match tryField "entity" (parse entity.json) with
+        | None -> false
+        | Some value -> (
+            match (tryField "trait_" value, tryField "self" value) with
+            | Some trait_, Some self -> (
+                match (resolvedName trait_, renderType self) with
+                | Ok trait_, Ok self ->
+                    let base =
+                      match String.index_opt self '<' with
+                      | Some index -> String.sub self 0 index
+                      | None -> self
+                    in
+                    isKnownName trait_
+                    && (not (String.contains base '.') || isKnownName base)
+                | _ -> false)
+            | _ -> false)
+      in
+      let entities =
+        List.filter (fun entity -> not (duplicatesEmbedded entity)) entities
       in
       let* rendered =
         ResultList.mapResults
