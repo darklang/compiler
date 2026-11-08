@@ -1231,11 +1231,15 @@ let printUsage () =
    Compile mode (default)
 *)
 (* `--syntax=current` applies anywhere on the command line, to every
-   command: executable sources read literals as the current interpreter
-   does (see Parser.currentSyntax). *)
+   command: executable sources read literals, and results print, as the
+   current interpreter does (see Parser.currentSyntax and
+   ValueRendering.evalDisplay). *)
 let withoutSyntaxFlag argv =
   let current = Array.exists (fun arg -> arg = "--syntax=current") argv in
-  if current then Parser.currentSyntax := true;
+  if current then begin
+    Parser.currentSyntax := true;
+    ValueRendering.evalDisplay := true
+  end;
   Array.of_list
     (List.filter (fun arg -> arg <> "--syntax=current") (Array.to_list argv))
 
