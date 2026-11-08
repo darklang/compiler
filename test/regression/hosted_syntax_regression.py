@@ -77,7 +77,26 @@ ENTITIES["builtin-ops-hash"] = fn("Hosted.builtinOps", [("x", INT64)], {"TBool":
             builtin("int64Negate", {"EInt64": [4, -50]})))
 
 
+# (2 ** x) / 100 % 10, through the Power, Divide, Mod and ToString builtins.
+ENTITIES["builtin-more-hash"] = fn("Hosted.builtinMore", [("x", INT64)], {"TString": []},
+    builtin("int64ToString", builtin("int64Mod", builtin("int64Divide",
+        builtin("int64Power", {"EInt64": [3, 2]}, ARG0), {"EInt64": [4, 100]}), {"EInt64": [5, 10]})))
+
+
 ENTITIES["deep-hash"] = fn("Hosted.deepAdds", [("x", INT64)], INT64, nested_adds(180))
+
+
+# `type Overflow = | Overflow`: one case, named like its type, as in Stdlib.Math.
+OVERFLOW_TYPE = dict(hash={"Hash": ["overflow-type-hash"]}, description="", deprecated={"NotDeprecated": []},
+    declaration=dict(typeParams=[], definition={"Enum": [[dict(name="Overflow", fields=[], description="")]]}))
+OVERFLOW_NAME = dict(originalName=["Hosted", "Overflow"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["overflow-type-hash"]}]},
+    location={"Some": [dict(owner="Hosted", modules=[], name="Overflow")]})]})
+ENTITIES["overflow-fn-hash"] = fn("Hosted.overflowName", [("u", {"TUnit": []})], {"TString": []},
+    {"EMatch": [1, {"EEnum": [2, OVERFLOW_NAME, [], "Overflow", []]}, [
+        dict(pat={"MPEnum": [3, "Overflow", []]}, whenCondition={"None": []},
+             rhs={"EString": [4, [{"StringText": ["overflow"]}]]})]]})
+TYPES = {"overflow-type-hash": ("Hosted.Overflow", OVERFLOW_TYPE)}
 
 
 def main():
@@ -93,6 +112,10 @@ def main():
                 for hash_, (name, _) in ENTITIES.items():
                     if name == parts[2]:
                         payload = {"Hash": [hash_]}
+            elif len(parts) == 4 and parts[:3] == ["type", "get", "with-location"]:
+                if parts[3] in TYPES:
+                    name, body = TYPES[parts[3]]
+                    payload = dict(entity=body, location=location(name))
             elif len(parts) == 4 and parts[:3] == ["function", "get", "with-location"]:
                 if parts[3] in ENTITIES:
                     name, body = ENTITIES[parts[3]]
@@ -127,6 +150,8 @@ def main():
             assert run("Hosted.pipePlus 41L\n") == 42
             assert run("Hosted.deepAdds 1L\n") == 181
             assert run("Hosted.builtinOps 50L\n") is True
+            assert run("Hosted.overflowName ()\n") == "overflow"
+            assert run("Hosted.builtinMore 7L\n") == "1"
             assert run("Hosted.builtinOps 52L\n") is False
             assert str(run("Hosted.doubleBig 12345678901234567890\n")) == "24691357802469135780"
             assert run("Hosted.isHalf 0.5\n") is True
