@@ -1,0 +1,11 @@
+// More of the interpreter's current syntax: function types with one
+// argument paren, local functions with one parameter list, a bare `...`
+// rest, and tuple fields in parenthesised enum cases.
+
+let moreApply(f: (Int64, Int64) -> Int64, a: Int64, b: Int64): Int64 = f(a, b)
+type MorePair = | MoreTuple(String * Int64) | MoreNone
+
+moreApply(fun(a, b) -> a * b, 6L, 7L) = 42L
+let twice(x: Int64, y: Int64): Int64 = (x + y) * 2L in twice(10L, 11L) = 42L
+match [1L, 2L, 3L] with | [first, ...] -> first | [] -> 0L = 1L
+match MorePair.MoreTuple(("a", 42L)) with | MoreTuple((_, n)) -> n | MoreNone -> 0L = 42L

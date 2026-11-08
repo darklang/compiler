@@ -54,6 +54,18 @@ let rec parseTypeRef state index =
    `A -> B -> C` (right-nested): arguments = [(A,->),(B,->)], ret = C
 *)
 and parseFnType state index =
+  (* `(A, B) -> C` (darklang/dark@b2fb96b): a function type lists its
+     arguments in one paren, as a call does. `A -> B -> C` still parses. *)
+  match parenFnArguments state index with
+  | Some (arguments, arrow) ->
+      let result, after = parseFnType state (arrow + 1) in
+      let arrowRange = rng state arrow in
+      ( WT.TFn
+          ( span (rng state index) (WT.typeReferenceRange result),
+            List.map (fun argument -> (argument, arrowRange)) arguments,
+            result ),
+        after )
+  | None ->
   let first, next = parseTupleType state index in
   if tok state next <> TArrow || state.pendingGt > 0 then (first, next)
   else
@@ -71,6 +83,35 @@ and parseFnType state index =
           RevBuffer.toList args,
           !current ),
       !stop )
+
+(* The argument types of `(A, B) -> C`, and the index of its arrow, when
+   [index] opens such a list: a paren whose top level has a comma and is
+   followed by `->`. A parenthesised tuple `(A * B)` is not one. *)
+and parenFnArguments state index =
+  if tok state index <> TLParen then None
+  else
+    let rec closeOf at depth sawComma =
+      if at >= state.tokenCount then None
+      else
+        match tok state at with
+        | TLParen | TLBracket | TLt -> closeOf (at + 1) (depth + 1) sawComma
+        | (TRBracket | TGt) when depth > 1 -> closeOf (at + 1) (depth - 1) sawComma
+        | TRParen when depth = 1 -> Some (at, sawComma)
+        | TRParen -> closeOf (at + 1) (depth - 1) sawComma
+        | TComma when depth = 1 -> closeOf (at + 1) depth true
+        | TEOF -> None
+        | _ -> closeOf (at + 1) depth sawComma
+    in
+    match closeOf (index + 1) 1 false with
+    | Some (close, true) when tok state (close + 1) = TArrow ->
+        let arguments = RevBuffer.create () and stop = ref (index + 1) in
+        while !stop < close do
+          let argument, after = parseTypeRef state !stop in
+          RevBuffer.add arguments argument;
+          stop := if tok state after = TComma then after + 1 else max after (!stop + 1)
+        done;
+        Some (RevBuffer.toList arguments, close + 1)
+    | _ -> None
 
 (*
    `A * B * C` (bare tuple, e.g. inside `List<…>`); parenthesized tuples fill
