@@ -667,6 +667,12 @@ let rec renderExpr parameters selfName element =
   | "EFnName", [ _; name ] | "EFnName", [ _; name; _ ] | "EValue", [ _; name ]
     ->
       resolvedName name
+  (* Since darklang/dark@b928144 an uncalled fn may carry type arguments,
+     `Stdlib.List.map<Int64, Int64>`: the fn as a specialised value. *)
+  | "EFnName", [ _; name; _; typeArgs ] ->
+      let* name = resolvedName name in
+      let+ types = ResultList.mapResults renderType (arrayItems typeArgs) in
+      if types = [] then name else name ^ "<" ^ String.concat ", " types ^ ">"
   | "EList", [ _; values ] ->
       let+ values = renderMany (arrayItems values) in
       "[" ^ String.concat ", " values ^ "]"
@@ -710,7 +716,7 @@ let rec renderExpr parameters selfName element =
   | "EApply", [ _; fn; typeArgs; args ] -> (
       let* name, fields = enumCase fn in
       match (name, fields) with
-      | "EFnName", [ _; name ] | "EFnName", [ _; name; _ ] -> (
+      | "EFnName", [ _; name ] | "EFnName", [ _; name; _ ] | "EFnName", [ _; name; _; _ ] -> (
           let* name = resolvedName name in
           match (builtinOperator name, arrayItems args) with
           | Some (`Binary op), [ left; right ] ->

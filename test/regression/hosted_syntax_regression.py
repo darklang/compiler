@@ -114,6 +114,15 @@ ENTITIES["uses-helper-hash"] = fn("Hosted.usesHelper", [("x", INT64)], INT64,
     {"EApply": [2, {"EFnName": [1, HELPER_NAME, []]}, [], [ARG0]]})
 ENTITIES["braces-hash"] = fn("Hosted.braces", [("x", INT64)], {"TString": []},
     {"EString": [1, [{"StringText": ["a{b}c"]}]]})
+# An uncalled fn with type args is the fn as a value (darklang/dark@b928144):
+# EFnName's fourth field.
+MAP_VALUE = {"EFnName": [1, dict(originalName=["Stdlib", "List", "map"],
+    resolved={"Error": ["unresolved"]}), [], [INT64, INT64]]}
+ENTITIES["fn-value-hash"] = fn("Hosted.mapWithValue", [("x", INT64)], {"TList": [INT64]},
+    {"ELet": [2, {"LPVariable": [3, "m"]}, MAP_VALUE,
+        {"EApply": [4, {"EVariable": [5, "m"]}, [], [
+            {"EList": [6, [ARG0, {"EInt64": [7, 2]}]]},
+            {"ELambda": [8, [{"LPVariable": [9, "v"]}], infix("ArithmeticMultiply", {"EVariable": [10, "v"]}, {"EInt64": [11, 10]})]}]]}]})
 # `**` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("int128Power", ARG0, {"EInt128": [3, 3]}))
@@ -191,6 +200,7 @@ def main():
             assert run("Hosted.renamedBuiltins 1L\n") is True
             assert run("Hosted.moduleBuiltins 1L\n") == "AB"
             assert run("Hosted.usesHelper 41L\n") == 42
+            assert run("Hosted.mapWithValue 1L\n") == [10, 20]
             assert run("Hosted.braces 1L\n") == "a{b}c"
             assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"
