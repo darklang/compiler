@@ -459,6 +459,41 @@ let infixText element =
       | _ -> unsupportedFeature ("the infix operator " ^ name))
   | _ -> unsupportedFeature ("the infix " ^ name)
 
+(* The interpreter's per-type operator builtins (`Builtin.int64Subtract`,
+   `Builtin.floatLessThan`, ...) are what its infix operators dispatch to, so
+   a call to one means the operator. The compiler has no builtins by those
+   names; it has the operators. Division and modulo are left out: their
+   rounding and zero rules are spelled differently per type. *)
+let builtinOperator name =
+  let types =
+    [
+      "int8"; "uint8"; "int16"; "uint16"; "int32"; "uint32"; "int64"; "uint64";
+      "int128"; "uint128"; "bigInt"; "float";
+    ]
+  in
+  let binary =
+    [
+      ("Add", "+"); ("Subtract", "-"); ("Multiply", "*"); ("LessThan", "<");
+      ("LessThanOrEqualTo", "<="); ("GreaterThan", ">");
+      ("GreaterThanOrEqualTo", ">="); ("BitwiseAnd", "&"); ("BitwiseOr", "|");
+      ("BitwiseXor", "^"); ("ShiftLeft", "<<"); ("ShiftRight", ">>");
+    ]
+  in
+  let unary = [ ("Negate", "-"); ("BitwiseNot", "~") ] in
+  match String.split_on_char '.' name with
+  | [ "Builtin"; fn ] ->
+      List.find_map
+        (fun typ ->
+          if String.starts_with ~prefix:typ fn then
+            let op = String.sub fn (String.length typ) (String.length fn - String.length typ) in
+            match List.assoc_opt op binary with
+            | Some text -> Some (`Binary text)
+            | None ->
+                Option.map (fun text -> `Unary text) (List.assoc_opt op unary)
+          else None)
+        types
+  | _ -> None
+
 let rec renderExpr parameters selfName element =
   let recurse = renderExpr parameters selfName in
   let renderMany = ResultList.mapResults recurse in
@@ -565,9 +600,17 @@ let rec renderExpr parameters selfName element =
   | "EApply", [ _; fn; typeArgs; args ] -> (
       let* name, fields = enumCase fn in
       match (name, fields) with
-      | "EFnName", [ _; name ] | "EFnName", [ _; name; _ ] ->
+      | "EFnName", [ _; name ] | "EFnName", [ _; name; _ ] -> (
           let* name = resolvedName name in
-          application name typeArgs args
+          match (builtinOperator name, arrayItems args) with
+          | Some (`Binary op), [ left; right ] ->
+              let* left = recurse left in
+              let+ right = recurse right in
+              "(" ^ left ^ " " ^ op ^ " " ^ right ^ ")"
+          | Some (`Unary op), [ value ] ->
+              let+ value = recurse value in
+              "(" ^ op ^ "(" ^ value ^ "))"
+          | _ -> application name typeArgs args)
       | _ ->
           let* fn = recurse fn in
           application ("(" ^ fn ^ ")") typeArgs args)
