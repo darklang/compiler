@@ -141,6 +141,14 @@ ENTITIES["counts-hash"] = fn("Hosted.counts", [("x", INT64)], INT64,
     infix("ArithmeticPlus",
           {"EApply": [1, {"EFnName": [2, LENGTH, [], []]}, [], [{"EList": [3, [ARG0, ARG0]]}]]},
           {"EPipe": [4, {"EList": [5, [ARG0]]}, [{"EPipeFnCall": [6, LENGTH, [], [], []]}]]}))
+# The interpreter's String.slice takes Int64 indexes; the pinned library's take Ints.
+SLICE = dict(originalName=["Stdlib", "String", "slice"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["slice-hash"]}]},
+    location={"Some": [dict(owner="Darklang", modules=["Stdlib", "String"], name="slice")]})]})
+ENTITIES["slices-hash"] = fn("Hosted.slices", [("x", INT64)], {"TString": []},
+    {"EPipe": [1, {"EApply": [2, {"EFnName": [3, SLICE, [], []]}, [],
+        [{"EString": [4, [{"StringText": ["abcdef"]}]]}, {"EInt64": [5, 1]}, {"EInt64": [6, 5]}]]},
+        [{"EPipeFnCall": [7, SLICE, [], [{"EInt64": [8, 1]}, ARG0], []]}]]})
 # `**` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("int128Power", ARG0, {"EInt128": [3, 3]}))
@@ -221,6 +229,7 @@ def main():
             assert run("Hosted.mapWithValue 1L\n") == [10, 20]
             assert run("Hosted.counts 7L\n") == 3
             assert run("Hosted.boxed 42L\n") == 42
+            assert run("Hosted.slices 3L\n") == "cd"
             assert run("Hosted.braces 1L\n") == "a{b}c"
             assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"
