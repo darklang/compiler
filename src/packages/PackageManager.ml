@@ -617,15 +617,42 @@ let builtinOperator name =
 let int64Counts =
   [ "Darklang.Stdlib.List.length"; "Darklang.Stdlib.String.length"; "Darklang.Stdlib.Dict.size" ]
 
+(* Positions (counting the piped value as 0) where the current interpreter
+   takes an Int64 and the pinned library an Int: indexes and counts. *)
+let int64Positions =
+  [
+    ("Darklang.Stdlib.String.slice", [ 1; 2 ]);
+    ("Darklang.Stdlib.String.first", [ 1 ]);
+    ("Darklang.Stdlib.String.last", [ 1 ]);
+    ("Darklang.Stdlib.String.dropFirst", [ 1 ]);
+    ("Darklang.Stdlib.String.dropLast", [ 1 ]);
+    ("Darklang.Stdlib.String.repeat", [ 1 ]);
+    ("Darklang.Stdlib.String.charAt", [ 1 ]);
+    ("Darklang.Stdlib.List.getAt", [ 1 ]);
+    ("Darklang.Stdlib.List.take", [ 1 ]);
+    ("Darklang.Stdlib.List.drop", [ 1 ]);
+  ]
+
+let asInt expression = "(Stdlib.Int.fromInt64 (" ^ expression ^ "))"
+
 let asInt64 expression =
   "(match Stdlib.Int.toInt64 (" ^ expression ^ ") with | Some count -> count | None -> 0L)"
 
 let rec renderExpr parameters selfName element =
   let recurse = renderExpr parameters selfName in
   let renderMany = ResultList.mapResults recurse in
-  let application name typeArgs args =
+  let application ?(offset = 0) name typeArgs args =
     let* types = ResultList.mapResults renderType (arrayItems typeArgs) in
     let+ args = renderMany (arrayItems args) in
+    let positions =
+      Option.value ~default:[] (List.assoc_opt name int64Positions)
+    in
+    let args =
+      List.mapi
+        (fun index arg ->
+          if List.mem (index + offset) positions then asInt arg else arg)
+        args
+    in
     let applied =
       if types = [] then name else name ^ "<" ^ String.concat ", " types ^ ">"
     in
@@ -819,10 +846,12 @@ let rec renderExpr parameters selfName element =
       let* argument = recurse argument in
       let+ cases = ResultList.mapResults case (arrayItems cases) in
       "(match " ^ argument ^ " with " ^ String.concat " " cases ^ ")"
+  (* `;` after a parenthesised let does not parse here; a discarded binding
+     sequences the same way. *)
   | "EStatement", [ _; first; next ] ->
       let* first = recurse first in
       let+ next = recurse next in
-      "(" ^ first ^ "; " ^ next ^ ")"
+      "(let _ = " ^ first ^ " in " ^ next ^ ")"
   | "EPipe", [ _; initial; parts ] ->
       let part element =
         let* name, fields = enumCase element in
@@ -852,7 +881,7 @@ let rec renderExpr parameters selfName element =
               else part
             in
             if arrayItems args <> [] then
-              Result.map converted (application name typeArgs args)
+              Result.map converted (application ~offset:1 name typeArgs args)
             else
               let+ types =
                 ResultList.mapResults renderType (arrayItems typeArgs)
