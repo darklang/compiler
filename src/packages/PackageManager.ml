@@ -602,6 +602,16 @@ let builtinOperator name =
       |> fun found -> if Option.is_some found then found else byModule fn
   | _ -> None
 
+(* Counts the current interpreter returns as Int64 and the pinned library as
+   an Int (BigInt). A hosted call to one converts the result, so the code
+   around it gets the type it was written for; no count reaches beyond
+   Int64. The re-pin removes this. *)
+let int64Counts =
+  [ "Darklang.Stdlib.List.length"; "Darklang.Stdlib.String.length"; "Darklang.Stdlib.Dict.size" ]
+
+let asInt64 expression =
+  "(match Stdlib.Int.toInt64 (" ^ expression ^ ") with | Some count -> count | None -> 0L)"
+
 let rec renderExpr parameters selfName element =
   let recurse = renderExpr parameters selfName in
   let renderMany = ResultList.mapResults recurse in
@@ -727,6 +737,8 @@ let rec renderExpr parameters selfName element =
               let+ value = recurse value in
               "(" ^ op ^ "(" ^ value ^ "))"
           | Some (`Call fn), _ -> application fn typeArgs args
+          | _ when List.mem name int64Counts ->
+              Result.map asInt64 (application name typeArgs args)
           | _ -> application name typeArgs args)
       | _ ->
           let* fn = recurse fn in
@@ -826,13 +838,20 @@ let rec renderExpr parameters selfName element =
         | "EPipeFnCall", [ _; name; typeArgs; args ]
         | "EPipeFnCall", [ _; name; typeArgs; args; _ ] ->
             let* name = resolvedName name in
-            if arrayItems args <> [] then application name typeArgs args
+            let converted part =
+              if List.mem name int64Counts then
+                part ^ " |> (fun count' -> " ^ asInt64 "count'" ^ ")"
+              else part
+            in
+            if arrayItems args <> [] then
+              Result.map converted (application name typeArgs args)
             else
               let+ types =
                 ResultList.mapResults renderType (arrayItems typeArgs)
               in
-              name
-              ^ if types = [] then "" else "<" ^ String.concat ", " types ^ ">"
+              converted
+                (name
+                ^ if types = [] then "" else "<" ^ String.concat ", " types ^ ">")
         | "EPipeEnum", [ _; name; caseName; values ] ->
             let* name = resolvedName name in
             let* leaf = stringValue caseName in
