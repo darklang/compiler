@@ -103,6 +103,22 @@ ENTITIES["module-builtins-hash"] = fn("Hosted.moduleBuiltins", [("x", INT64)], {
     builtin("stringToUppercase", builtin("stringTrim", {"EString": [1, [{"StringText": ["  ab "]}]]})))
 
 
+# A hosted fn calling the interpreter's own `__` helper, which `__` names in
+# user code may not reach directly.
+HELPER_NAME = dict(originalName=["Hosted", "__helper"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["helper-hash"]}]},
+    location={"Some": [dict(owner="Hosted", modules=[], name="__helper")]})]})
+ENTITIES["helper-hash"] = fn("Hosted.__helper", [("x", INT64)], INT64,
+    infix("ArithmeticPlus", ARG0, {"EInt64": [3, 1]}))
+ENTITIES["uses-helper-hash"] = fn("Hosted.usesHelper", [("x", INT64)], INT64,
+    {"EApply": [2, {"EFnName": [1, HELPER_NAME, []]}, [], [ARG0]]})
+ENTITIES["braces-hash"] = fn("Hosted.braces", [("x", INT64)], {"TString": []},
+    {"EString": [1, [{"StringText": ["a{b}c"]}]]})
+# `**` on Int128 goes through the compiler's Power implementation.
+ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
+    builtin("int128Power", ARG0, {"EInt128": [3, 3]}))
+
+
 ENTITIES["deep-hash"] = fn("Hosted.deepAdds", [("x", INT64)], INT64, nested_adds(180))
 
 
@@ -174,6 +190,9 @@ def main():
             assert run("Hosted.describeNumber 42L\n") == "42"
             assert run("Hosted.renamedBuiltins 1L\n") is True
             assert run("Hosted.moduleBuiltins 1L\n") == "AB"
+            assert run("Hosted.usesHelper 41L\n") == 42
+            assert run("Hosted.braces 1L\n") == "a{b}c"
+            assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"
             assert run("Hosted.builtinOps 52L\n") is False
             assert str(run("Hosted.doubleBig 12345678901234567890\n")) == "24691357802469135780"
