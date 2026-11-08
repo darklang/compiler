@@ -28,6 +28,7 @@ def fn(name, parameters, result, body):
 INT64 = {"TInt64": []}
 ARG0 = {"EArg": [2, 0]}
 
+TYPES = {}
 ENTITIES = {
     # (2 ** x) + (5 ^ 1) + (1 << 3): power must not render as `^`, which is xor.
     "operators-hash": fn("Hosted.operators", [("x", INT64)], INT64,
@@ -108,6 +109,15 @@ ENTITIES["module-builtins-hash"] = fn("Hosted.moduleBuiltins", [("x", INT64)], {
 HELPER_NAME = dict(originalName=["Hosted", "__helper"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["helper-hash"]}]},
     location={"Some": [dict(owner="Hosted", modules=[], name="__helper")]})]})
+# An internal record type, `__Box`, built and read by a hosted fn.
+BOX_NAME = dict(originalName=["Hosted", "__Box"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["box-type-hash"]}]},
+    location={"Some": [dict(owner="Hosted", modules=[], name="__Box")]})]})
+TYPES["box-type-hash"] = ("Hosted.__Box", dict(hash={"Hash": ["box-type-hash"]}, description="",
+    deprecated={"NotDeprecated": []}, declaration=dict(typeParams=[], definition={"Record": [[
+        dict(name="value", typ=INT64, description="")]]})))
+ENTITIES["box-hash"] = fn("Hosted.boxed", [("x", INT64)], INT64,
+    {"ERecordFieldAccess": [1, {"ERecord": [2, BOX_NAME, [], [["value", ARG0]]]}, "value"]})
 ENTITIES["helper-hash"] = fn("Hosted.__helper", [("x", INT64)], INT64,
     infix("ArithmeticPlus", ARG0, {"EInt64": [3, 1]}))
 ENTITIES["uses-helper-hash"] = fn("Hosted.usesHelper", [("x", INT64)], INT64,
@@ -149,7 +159,7 @@ ENTITIES["overflow-fn-hash"] = fn("Hosted.overflowName", [("u", {"TUnit": []})],
     {"EMatch": [1, {"EEnum": [2, OVERFLOW_NAME, [], "Overflow", []]}, [
         dict(pat={"MPEnum": [3, "Overflow", []]}, whenCondition={"None": []},
              rhs={"EString": [4, [{"StringText": ["overflow"]}]]})]]})
-TYPES = {"overflow-type-hash": ("Hosted.Overflow", OVERFLOW_TYPE)}
+TYPES["overflow-type-hash"] = ("Hosted.Overflow", OVERFLOW_TYPE)
 
 
 def main():
@@ -210,6 +220,7 @@ def main():
             assert run("Hosted.usesHelper 41L\n") == 42
             assert run("Hosted.mapWithValue 1L\n") == [10, 20]
             assert run("Hosted.counts 7L\n") == 3
+            assert run("Hosted.boxed 42L\n") == 42
             assert run("Hosted.braces 1L\n") == "a{b}c"
             assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"
