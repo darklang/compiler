@@ -232,6 +232,21 @@ and parseMatch grammar state index =
            || (rng state !current).start.column = armColumn)
       do
         let barRange = rng state !current in
+        (* `as` inside another pattern (`| Some(x as y) ->`) is not lowered
+           yet; name it before the pattern parser trips over it. *)
+        (let rec scan at depth =
+           if at < state.tokenCount then
+             match tok state at with
+             | TArrow | TEOF when depth = 0 -> ()
+             | TLParen | TLBracket | TLBrace -> scan (at + 1) (depth + 1)
+             | TRParen | TRBracket | TRBrace -> scan (at + 1) (max 0 (depth - 1))
+             | TIdent "as" when depth > 0 ->
+                 err state DiagnosticCode.pattern at
+                   "can't compile: uses an `as` pattern inside another \
+                    pattern, which this compiler does not support"
+             | _ -> scan (at + 1) depth
+         in
+         scan (!current + 1) 0);
         (* `| { name, other = o } ->` (darklang/dark@0851642): a record
            pattern that leaves fields out. Here each field binds a name or
            `_`; the arm matches the whole value and its body reads the
