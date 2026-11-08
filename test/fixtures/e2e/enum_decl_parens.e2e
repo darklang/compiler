@@ -1,0 +1,7 @@
+// Enum cases are declared with parentheses, like constructors, since
+// darklang/dark@632e932; `of` still parses.
+
+type ShapeP = | Circle(Int64) | Rect(Int64, Int64) | Dot match ShapeP.Rect(6L, 7L) with | Circle r -> r | Rect(w, h) -> w * h | Dot -> 0L = 42L
+type ShapeP = | Circle(Int64) | Rect(Int64, Int64) | Dot match ShapeP.Circle(42L) with | Circle r -> r | Rect(w, h) -> w * h | Dot -> 0L = 42L
+type ShapeP = Circle(Int64) | Dot match ShapeP.Dot with | Circle r -> r | Dot -> 42L = 42L
+type ShapeO = | Circle of Int64 | Dot match ShapeO.Circle 42L with | Circle r -> r | Dot -> 0L = 42L
