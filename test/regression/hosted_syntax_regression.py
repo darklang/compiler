@@ -65,6 +65,18 @@ def nested_adds(count):
     return body
 
 
+def builtin(name, *args):
+    callee = {"EFnName": [1, dict(originalName=["Builtin", name], resolved={"Ok": [dict(
+        name={"Builtin": [dict(name=name, version=0)]}, location={"None": []})]}), []]}
+    return {"EApply": [2, callee, [], list(args)]}
+
+
+# The interpreter's stdlib calls its per-type operator builtins by name.
+ENTITIES["builtin-ops-hash"] = fn("Hosted.builtinOps", [("x", INT64)], {"TBool": []},
+    builtin("int64LessThan", builtin("int64Subtract", ARG0, {"EInt64": [3, 1]}),
+            builtin("int64Negate", {"EInt64": [4, -50]})))
+
+
 ENTITIES["deep-hash"] = fn("Hosted.deepAdds", [("x", INT64)], INT64, nested_adds(180))
 
 
@@ -114,6 +126,8 @@ def main():
             assert run("Hosted.operators 10L\n") == 1036
             assert run("Hosted.pipePlus 41L\n") == 42
             assert run("Hosted.deepAdds 1L\n") == 181
+            assert run("Hosted.builtinOps 50L\n") is True
+            assert run("Hosted.builtinOps 52L\n") is False
             assert str(run("Hosted.doubleBig 12345678901234567890\n")) == "24691357802469135780"
             assert run("Hosted.isHalf 0.5\n") is True
             assert run("Hosted.isHalf 0.25\n") is False
