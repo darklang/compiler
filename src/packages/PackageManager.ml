@@ -462,8 +462,8 @@ let infixText element =
 (* The interpreter's per-type operator builtins (`Builtin.int64Subtract`,
    `Builtin.floatLessThan`, ...) are what its infix operators dispatch to, so
    a call to one means the operator. The compiler has no builtins by those
-   names; it has the operators. Division and modulo are left out: their
-   rounding and zero rules are spelled differently per type. *)
+   names; it has the operators, which keep the pinned interpreter's meaning
+   of the same builtins. `<type>ToString` is the module's `toString`. *)
 let builtinOperator name =
   let types =
     [
@@ -477,7 +477,17 @@ let builtinOperator name =
       ("LessThanOrEqualTo", "<="); ("GreaterThan", ">");
       ("GreaterThanOrEqualTo", ">="); ("BitwiseAnd", "&"); ("BitwiseOr", "|");
       ("BitwiseXor", "^"); ("ShiftLeft", "<<"); ("ShiftRight", ">>");
+      ("Divide", "/"); ("Mod", "%"); ("Power", "**");
     ]
+  in
+  let moduleName = function
+    | "bigInt" -> "Int"
+    | "uint8" -> "UInt8"
+    | "uint16" -> "UInt16"
+    | "uint32" -> "UInt32"
+    | "uint64" -> "UInt64"
+    | "uint128" -> "UInt128"
+    | typ -> String.capitalize_ascii typ
   in
   let unary = [ ("Negate", "-"); ("BitwiseNot", "~") ] in
   match String.split_on_char '.' name with
@@ -488,6 +498,8 @@ let builtinOperator name =
             let op = String.sub fn (String.length typ) (String.length fn - String.length typ) in
             match List.assoc_opt op binary with
             | Some text -> Some (`Binary text)
+            | None when op = "ToString" ->
+                Some (`Call ("Stdlib." ^ moduleName typ ^ ".toString"))
             | None ->
                 Option.map (fun text -> `Unary text) (List.assoc_opt op unary)
           else None)
@@ -610,6 +622,9 @@ let rec renderExpr parameters selfName element =
           | Some (`Unary op), [ value ] ->
               let+ value = recurse value in
               "(" ^ op ^ "(" ^ value ^ "))"
+          | Some (`Call fn), [ value ] ->
+              let+ value = recurse value in
+              "(" ^ fn ^ " (" ^ value ^ "))"
           | _ -> application name typeArgs args)
       | _ ->
           let* fn = recurse fn in
@@ -1054,7 +1069,10 @@ let renderEntity entity =
                             let+ cases =
                               ResultList.mapResults case (arrayItems cases)
                             in
-                            prefix (head ^ String.concat " | " cases)
+                            (* The leading bar keeps `type Overflow = | Overflow`
+                               an enum; without it a case named like its type
+                               reads as an alias of itself. *)
+                            prefix (head ^ "| " ^ String.concat " | " cases)
                         | _ ->
                             unsupportedFeature ("the type definition " ^ name)
                         )
