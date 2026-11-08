@@ -11,3 +11,4 @@ match MPoint { x = 1L, y = 2L, z = 3L } with | { x, z } -> x + z = 4L
 match MPoint { x = 1L, y = 2L, z = 3L } with | { y = second } -> second = 2L
 match MPoint { x = 5L, y = 2L, z = 3L } with | { x } when x > 4L -> x | { y } -> y = 5L
 match MPoint { x = 1L, y = 2L, z = 3L } with | { x = 1L } -> 0L = compileerror="can't compile: uses a record pattern field that is not a name"
+match Stdlib.Option.Option.Some 1L with | Some(x as y) -> y | None -> 0L = compileerror="can't compile: uses an `as` pattern inside another pattern"
