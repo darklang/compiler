@@ -123,6 +123,14 @@ ENTITIES["fn-value-hash"] = fn("Hosted.mapWithValue", [("x", INT64)], {"TList": 
         {"EApply": [4, {"EVariable": [5, "m"]}, [], [
             {"EList": [6, [ARG0, {"EInt64": [7, 2]}]]},
             {"ELambda": [8, [{"LPVariable": [9, "v"]}], infix("ArithmeticMultiply", {"EVariable": [10, "v"]}, {"EInt64": [11, 10]})]}]]}]})
+# The interpreter's List.length is an Int64; the pinned library's is an Int.
+LENGTH = dict(originalName=["Stdlib", "List", "length"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["length-hash"]}]},
+    location={"Some": [dict(owner="Darklang", modules=["Stdlib", "List"], name="length")]})]})
+ENTITIES["counts-hash"] = fn("Hosted.counts", [("x", INT64)], INT64,
+    infix("ArithmeticPlus",
+          {"EApply": [1, {"EFnName": [2, LENGTH, [], []]}, [], [{"EList": [3, [ARG0, ARG0]]}]]},
+          {"EPipe": [4, {"EList": [5, [ARG0]]}, [{"EPipeFnCall": [6, LENGTH, [], [], []]}]]}))
 # `**` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("int128Power", ARG0, {"EInt128": [3, 3]}))
@@ -201,6 +209,7 @@ def main():
             assert run("Hosted.moduleBuiltins 1L\n") == "AB"
             assert run("Hosted.usesHelper 41L\n") == 42
             assert run("Hosted.mapWithValue 1L\n") == [10, 20]
+            assert run("Hosted.counts 7L\n") == 3
             assert run("Hosted.braces 1L\n") == "a{b}c"
             assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"
