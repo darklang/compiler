@@ -178,6 +178,9 @@ ENTITIES["conversions-hash"] = fn("Hosted.conversions", [("x", INT64)], INT64,
             [{"EPipeFnCall": [6, WITH_DEFAULT, [], [{"EInt64": [7, 0]}], []]}]]},
         {"EApply": [8, {"EFnName": [9, TO_SECONDS, [], []]}, [],
             [{"EPipe": [10, ARG0, [{"EPipeFnCall": [11, FROM_SECONDS, [], [], []]}]]}]]}))
+# Builtin.bytesLength answers an Int64; the compiler's Blob.length an Int.
+ENTITIES["bytes-length-hash"] = fn("Hosted.bytesLen", [("b", {"TBytes": []})], INT64,
+    builtin("bytesLength", ARG0))
 # `**` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("int128Power", ARG0, {"EInt128": [3, 3]}))
@@ -260,6 +263,7 @@ def main():
             assert run("Hosted.boxed 42L\n") == 42
             assert run("Hosted.slices 3L\n") == "cd"
             assert run("Hosted.conversions 100L\n") == 103
+            assert run('Hosted.bytesLen (Stdlib.Blob.fromString "abc")\n') == 3
             assert run("Hosted.braces 1L\n") == "a{b}c"
             assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"
