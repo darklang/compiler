@@ -52,6 +52,7 @@ packages/darklang/stdlib/decimal.dark
 packages/darklang/stdlib/cli/__posix.dark
 packages/darklang/stdlib/cli/__nativeRuntime.dark
 packages/darklang/stdlib/cli/posix.dark
+packages/darklang/stdlib/__printError.dark
 packages/darklang/stdlib/cli/posix/__error.dark
 packages/darklang/stdlib/cli/posix/openFlags.dark
 packages/darklang/stdlib/retry.dark

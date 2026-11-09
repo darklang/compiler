@@ -1,0 +1,2 @@
+// The interpreter's Stdlib.printError and printErrorLine write to stderr.
+Stdlib.printErrorLine "oops" = stdout="" stderr="oops\n"
