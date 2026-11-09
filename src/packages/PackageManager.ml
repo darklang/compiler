@@ -297,6 +297,19 @@ let publicName name =
 
 let hasInternalSegment name = publicName name <> name
 
+(* The interpreter's name for a hosted `pkg'__` name. *)
+let interpreterName name =
+  String.split_on_char '.' name
+  |> List.map (fun segment ->
+      match String.index_opt segment '\'' with
+      | Some index
+        when (String.sub segment 0 index = "pkg" || String.sub segment 0 index = "Pkg")
+             && String.length segment > index + 2
+             && String.sub segment (index + 1) 2 = "__" ->
+          String.sub segment (index + 1) (String.length segment - index - 1)
+      | _ -> segment)
+  |> String.concat "."
+
 let rec resolvedName element = Result.map publicName (resolvedNameAsWritten element)
 
 and resolvedNameAsWritten element =
@@ -645,47 +658,150 @@ let builtinOperator name =
       |> fun found -> if Option.is_some found then found else byModule fn
   | _ -> None
 
-(* Counts the current interpreter returns as Int64 and the pinned library as
-   an Int (BigInt). A hosted call to one converts the result, so the code
-   around it gets the type it was written for; no count reaches beyond
-   Int64. The re-pin removes this. *)
-let int64Counts =
-  [ "Darklang.Stdlib.List.length"; "Darklang.Stdlib.String.length"; "Darklang.Stdlib.Dict.size" ]
+(* Where the interpreter's stdlib and the compiler's disagree on a fn's
+   numeric types (an Int64 index where the compiler takes an Int, a UInt8 where
+   it answers an Int), a hosted call converts the arguments it passes and the
+   result it gets back, so the code around the call keeps the types it was
+   written for. Widen takes an interpreter value to an Int, Narrow an Int back
+   to the interpreter's type, through Options, Results, Lists and tuples. The
+   table is the difference between the two stdlibs' signatures; the re-pin
+   removes it. *)
+type conversion =
+  | Widen of string
+  | Narrow of string
+  | OptionOf of conversion
+  | ResultOf of conversion
+  | ListOf of conversion
+  | TupleOf of conversion option list
 
-(* Positions (counting the piped value as 0) where the current interpreter
-   takes an Int64 and the pinned library an Int: indexes and counts. *)
-let int64Positions =
+let stdlibConversions =
   [
-    ("Darklang.Stdlib.String.slice", [ 1; 2 ]);
-    ("Darklang.Stdlib.String.first", [ 1 ]);
-    ("Darklang.Stdlib.String.last", [ 1 ]);
-    ("Darklang.Stdlib.String.dropFirst", [ 1 ]);
-    ("Darklang.Stdlib.String.dropLast", [ 1 ]);
-    ("Darklang.Stdlib.String.repeat", [ 1 ]);
-    ("Darklang.Stdlib.String.charAt", [ 1 ]);
-    ("Darklang.Stdlib.List.getAt", [ 1 ]);
-    ("Darklang.Stdlib.List.take", [ 1 ]);
-    ("Darklang.Stdlib.List.drop", [ 1 ]);
+    ("Darklang.Stdlib.Char.fromCodepoint", [ (0, Widen "UInt32") ], None);
+    ("Darklang.Stdlib.Char.toAsciiCode", [  ], Some (OptionOf (Narrow "UInt8")));
+    ("Darklang.Stdlib.Char.toCodepoint", [  ], Some (OptionOf (Narrow "UInt32")));
+    ("Darklang.Stdlib.Cli.Dir.size", [  ], Some (ResultOf (Narrow "Int64")));
+    ("Darklang.Stdlib.Cli.File.getModifiedTime", [  ], Some (ResultOf (Narrow "Int64")));
+    ("Darklang.Stdlib.Cli.File.readFully", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Cli.File.readLastLines", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Cli.File.setPermissions", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Cli.File.size", [  ], Some (ResultOf (Narrow "Int64")));
+    ("Darklang.Stdlib.Cli.Posix.chmod", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Cli.Posix.fdRead", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Cli.Posix.fdSeekFromStart", [ (1, Widen "Int64") ], Some (ResultOf (Narrow "Int64")));
+    ("Darklang.Stdlib.Cli.Posix.fdWrite", [  ], Some (ResultOf (Narrow "Int64")));
+    ("Darklang.Stdlib.Cli.Posix.mkdir", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Cli.Posix.openFile", [ (1, Widen "Int64"); (2, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Cli.Process.runInteractive", [  ], Some (ResultOf (Narrow "Int64")));
+    ("Darklang.Stdlib.Cli.Process.runSilent", [  ], Some (ResultOf (Narrow "Int64")));
+    ("Darklang.Stdlib.Cli.Process.runWithTimeout", [ (0, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Cli.Process.spawnAndWait", [ (2, OptionOf (Widen "Int64")) ], Some (ResultOf (TupleOf [Some (Narrow "Int64"); None; None])));
+    ("Darklang.Stdlib.Cli.Tui.Text.clipMarked", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Cli.Tui.Text.clipToWidth", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Cli.Tui.Text.styledWidth", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.Cli.UI.Progress.bar", [ (0, Widen "Int64"); (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.DateTime.addMilliseconds", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.DateTime.addSeconds", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.DateTime.day", [  ], Some (Narrow "UInt8"));
+    ("Darklang.Stdlib.DateTime.fromMilliseconds", [ (0, Widen "Int64") ], None);
+    ("Darklang.Stdlib.DateTime.fromSeconds", [ (0, Widen "Int64") ], None);
+    ("Darklang.Stdlib.DateTime.hour", [  ], Some (Narrow "UInt8"));
+    ("Darklang.Stdlib.DateTime.millisecond", [  ], Some (Narrow "UInt16"));
+    ("Darklang.Stdlib.DateTime.minute", [  ], Some (Narrow "UInt8"));
+    ("Darklang.Stdlib.DateTime.second", [  ], Some (Narrow "UInt8"));
+    ("Darklang.Stdlib.DateTime.subtractMilliseconds", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.DateTime.subtractMs", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.DateTime.subtractSeconds", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.DateTime.toMilliseconds", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.DateTime.toSeconds", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.DateTime.year", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.Float.ceiling", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.Float.floor", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.Float.round", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.Float.roundDown", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.Float.roundTowardsZero", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.Float.roundUp", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.Float.truncate", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.List.chunkBySize", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.List.drop", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.List.findFirstIndex", [  ], Some (OptionOf (Narrow "Int64")));
+    ("Darklang.Stdlib.List.range", [ (0, Widen "Int64"); (1, Widen "Int64") ], Some (ListOf (Narrow "Int64")));
+    ("Darklang.Stdlib.List.setAt", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Pretty.hang", [ (0, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Pretty.nest", [ (0, Widen "Int64") ], None);
+    ("Darklang.Stdlib.Pretty.render", [ (0, Widen "Int64") ], None);
+    ("Darklang.Stdlib.String.charAt", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.String.codepointLength", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.String.displayWidth", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.String.dropFirst", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.String.dropLast", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.String.first", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.String.getByteAt", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.String.indexOf", [  ], Some (OptionOf (Narrow "Int64")));
+    ("Darklang.Stdlib.String.last", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.String.lastIndexOf", [  ], Some (OptionOf (Narrow "Int64")));
+    ("Darklang.Stdlib.String.length", [  ], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.String.random", [ (0, Widen "Int64") ], None);
+    ("Darklang.Stdlib.String.repeat", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.String.slice", [ (1, Widen "Int64"); (2, Widen "Int64") ], None);
+    ("Darklang.Stdlib.String.splitN", [ (2, Widen "Int64") ], None);
+    ("Darklang.Stdlib.String.toCodepoints", [  ], Some (ListOf (Narrow "UInt32")));
+    ("Darklang.Stdlib.List.length", [], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.Dict.size", [], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.List.getAt", [ (1, Widen "Int64") ], None);
+    ("Darklang.Stdlib.List.take", [ (1, Widen "Int64") ], None);
   ]
 
-let asInt expression = "(Stdlib.Int.fromInt64 (" ^ expression ^ "))"
+let rec convert conversion expression =
+  match conversion with
+  | Widen typ -> "(Stdlib.Int.from" ^ typ ^ " (" ^ expression ^ "))"
+  | Narrow typ ->
+      "(match Stdlib.Int.to" ^ typ ^ " (" ^ expression
+      ^ ") with | Some n' -> n' | None -> Builtin.crash \"Int is out of range for "
+      ^ typ ^ "\")"
+  | OptionOf inner ->
+      "(Stdlib.Option.map (" ^ expression ^ ") (fun v' -> "
+      ^ convert inner "v'" ^ "))"
+  | ResultOf inner ->
+      "(Stdlib.Result.map (" ^ expression ^ ") (fun v' -> "
+      ^ convert inner "v'" ^ "))"
+  | ListOf inner ->
+      "(Stdlib.List.map (" ^ expression ^ ") (fun v' -> "
+      ^ convert inner "v'" ^ "))"
+  | TupleOf parts ->
+      let names = List.mapi (fun index _ -> "t" ^ string_of_int index ^ "'") parts in
+      "(let (" ^ String.concat ", " names ^ ") = " ^ expression ^ " in ("
+      ^ String.concat ", "
+          (List.map2
+             (fun name part ->
+               match part with Some inner -> convert inner name | None -> name)
+             names parts)
+      ^ "))"
 
-let asInt64 expression =
-  "(match Stdlib.Int.toInt64 (" ^ expression ^ ") with | Some count -> count | None -> 0L)"
+let argumentConversions name =
+  match List.find_opt (fun (candidate, _, _) -> candidate = name) stdlibConversions with
+  | Some (_, arguments, _) -> arguments
+  | None -> []
+
+let resultConversion name =
+  match List.find_opt (fun (candidate, _, _) -> candidate = name) stdlibConversions with
+  | Some (_, _, result) -> result
+  | None -> None
 
 let rec renderExpr parameters selfName element =
   let recurse = renderExpr parameters selfName in
   let renderMany = ResultList.mapResults recurse in
-  let application ?(offset = 0) name typeArgs args =
-    let* types = ResultList.mapResults renderType (arrayItems typeArgs) in
-    let+ args = renderMany (arrayItems args) in
-    let positions =
-      Option.value ~default:[] (List.assoc_opt name int64Positions)
-    in
+  let rec application ?(offset = 0) name typeArgs args =
+    let* args = renderMany (arrayItems args) in
+    renderedApplication ~offset name typeArgs args
+  and renderedApplication ?(offset = 0) name typeArgs args =
+    let+ types = ResultList.mapResults renderType (arrayItems typeArgs) in
+    let conversions = argumentConversions name in
     let args =
       List.mapi
         (fun index arg ->
-          if List.mem (index + offset) positions then asInt arg else arg)
+          match List.assoc_opt (index + offset) conversions with
+          | Some conversion -> convert conversion arg
+          | None -> arg)
         args
     in
     let applied =
@@ -812,9 +928,11 @@ let rec renderExpr parameters selfName element =
               let+ value = recurse value in
               "(" ^ op ^ "(" ^ value ^ "))"
           | Some (`Call fn), _ -> application fn typeArgs args
-          | _ when List.mem name int64Counts ->
-              Result.map asInt64 (application name typeArgs args)
-          | _ -> application name typeArgs args)
+          | _ -> (
+              match resultConversion name with
+              | Some conversion ->
+                  Result.map (convert conversion) (application name typeArgs args)
+              | None -> application name typeArgs args))
       | _ ->
           let* fn = recurse fn in
           application ("(" ^ fn ^ ")") typeArgs args)
@@ -915,20 +1033,13 @@ let rec renderExpr parameters selfName element =
         | "EPipeFnCall", [ _; name; typeArgs; args ]
         | "EPipeFnCall", [ _; name; typeArgs; args; _ ] ->
             let* name = resolvedName name in
-            let converted part =
-              if List.mem name int64Counts then
-                part ^ " |> (fun count' -> " ^ asInt64 "count'" ^ ")"
-              else part
-            in
-            if arrayItems args <> [] then
-              Result.map converted (application ~offset:1 name typeArgs args)
+            if arrayItems args <> [] then application ~offset:1 name typeArgs args
             else
               let+ types =
                 ResultList.mapResults renderType (arrayItems typeArgs)
               in
-              converted
-                (name
-                ^ if types = [] then "" else "<" ^ String.concat ", " types ^ ">")
+              name
+              ^ if types = [] then "" else "<" ^ String.concat ", " types ^ ">"
         | "EPipeEnum", [ _; name; caseName; values ] ->
             let* name = resolvedName name in
             let* leaf = stringValue caseName in
@@ -938,9 +1049,41 @@ let rec renderExpr parameters selfName element =
             if values = [] then "" else " (" ^ String.concat ") (" values ^ ")"
         | _ -> unsupportedFeature ("the pipe part " ^ name)
       in
+      (* A call whose types differ between the two stdlibs takes the piped
+         value as argument 0, bound to `piped'`, and converts both ways. *)
+      let stage piped element =
+        let converted =
+          match enumCase element with
+          | Ok
+              ( ("EPipeFnCall" as _kind),
+                ( [ _; name; typeArgs; args ] | [ _; name; typeArgs; args; _ ] ) )
+            -> (
+              match resolvedName name with
+              | Ok name
+                when argumentConversions name <> []
+                     || Option.is_some (resultConversion name) ->
+                  Some (name, typeArgs, args)
+              | _ -> None)
+          | _ -> None
+        in
+        match converted with
+        | Some (name, typeArgs, args) ->
+            let* args = renderMany (arrayItems args) in
+            let+ call = renderedApplication name typeArgs ("piped'" :: args) in
+            let call =
+              match resultConversion name with
+              | Some conversion -> convert conversion call
+              | None -> call
+            in
+            "(let piped' = " ^ piped ^ " in " ^ call ^ ")"
+        | None ->
+            let+ part = part element in
+            "(" ^ piped ^ " |> " ^ part ^ ")"
+      in
       let* initial = recurse initial in
-      let+ parts = ResultList.mapResults part (arrayItems parts) in
-      "(" ^ String.concat " |> " (initial :: parts) ^ ")"
+      List.fold_left
+        (fun piped element -> Result.bind piped (fun piped -> stage piped element))
+        (Ok initial) (arrayItems parts)
   | _ -> unsupportedFeature ("the expression " ^ name)
 
 let parseLocatedEntity kind hash json =
@@ -1446,6 +1589,13 @@ let resolveNames config resolutionEnv knownTraits names =
             if String.starts_with ~prefix:"Stdlib." name then
               Some ("Darklang." ^ name)
             else None)
+          names
+      (* A `pkg'__` name (a --check of an interpreter helper) is fetched
+         under the interpreter's `__` name. *)
+      @ List.filter_map
+          (fun name ->
+            let original = interpreterName name in
+            if original <> name then Some original else None)
           names)
   in
   let client = PackageIO.create () in

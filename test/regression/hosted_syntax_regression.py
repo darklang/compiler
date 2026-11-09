@@ -160,6 +160,24 @@ ENTITIES["slices-hash"] = fn("Hosted.slices", [("x", INT64)], {"TString": []},
     {"EPipe": [1, {"EApply": [2, {"EFnName": [3, SLICE, [], []]}, [],
         [{"EString": [4, [{"StringText": ["abcdef"]}]]}, {"EInt64": [5, 1]}, {"EInt64": [6, 5]}]]},
         [{"EPipeFnCall": [7, SLICE, [], [{"EInt64": [8, 1]}, ARG0], []]}]]})
+# String.indexOf answers Option<Int64> here and Option<Int> in the compiler; a
+# piped DateTime.fromSeconds takes its Int64 as the piped value:
+# (indexOf "abcdef" "d" |> withDefault 0) + toSeconds (x |> fromSeconds).
+def stdlib(modules, name, hash_):
+    return dict(originalName=["Stdlib"] + modules + [name], resolved={"Ok": [dict(
+        name={"Package": [{"Hash": [hash_]}]},
+        location={"Some": [dict(owner="Darklang", modules=["Stdlib"] + modules, name=name)]})]})
+INDEX_OF = stdlib(["String"], "indexOf", "index-of-hash")
+WITH_DEFAULT = stdlib(["Option"], "withDefault", "with-default-hash")
+FROM_SECONDS = stdlib(["DateTime"], "fromSeconds", "from-seconds-hash")
+TO_SECONDS = stdlib(["DateTime"], "toSeconds", "to-seconds-hash")
+ENTITIES["conversions-hash"] = fn("Hosted.conversions", [("x", INT64)], INT64,
+    infix("ArithmeticPlus",
+        {"EPipe": [1, {"EApply": [2, {"EFnName": [3, INDEX_OF, [], []]}, [],
+            [{"EString": [4, [{"StringText": ["abcdef"]}]]}, {"EString": [5, [{"StringText": ["d"]}]]}]]},
+            [{"EPipeFnCall": [6, WITH_DEFAULT, [], [{"EInt64": [7, 0]}], []]}]]},
+        {"EApply": [8, {"EFnName": [9, TO_SECONDS, [], []]}, [],
+            [{"EPipe": [10, ARG0, [{"EPipeFnCall": [11, FROM_SECONDS, [], [], []]}]]}]]}))
 # `**` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("int128Power", ARG0, {"EInt128": [3, 3]}))
@@ -241,6 +259,7 @@ def main():
             assert run("Hosted.counts 7L\n") == 3
             assert run("Hosted.boxed 42L\n") == 42
             assert run("Hosted.slices 3L\n") == "cd"
+            assert run("Hosted.conversions 100L\n") == 103
             assert run("Hosted.braces 1L\n") == "a{b}c"
             assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"
@@ -276,13 +295,14 @@ def main():
             # --check answers per package item, without a caller or arguments.
             checked = subprocess.run([compiler, "--check", "--package-server",
                 f"http://127.0.0.1:{server.server_port}", "Hosted.pipePlus", "Hosted.price",
-                "Hosted.recordPattern"],
+                "Hosted.recordPattern", "Hosted.__helper"],
                 env=env, capture_output=True, text=True, timeout=300)
             assert checked.returncode == 1, checked.stdout + checked.stderr
             assert checked.stdout.splitlines() == [
                 "Hosted.pipePlus: compiles",
                 "Hosted.price: compiles",
                 "Hosted.recordPattern: can't compile: uses a record pattern, which this compiler does not support",
+                "Hosted.__helper: compiles",
             ], checked.stdout + checked.stderr
         server.shutdown()
     print("Hosted operators, pipes, BigInt, Bytes and float patterns render; unsupported features name themselves, and batch and --check reports give the reason")
