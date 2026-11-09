@@ -1903,6 +1903,25 @@ let resolveNames config resolutionEnv knownTraits names =
       let entities =
         List.filter (fun entity -> not (duplicatesEmbedded entity)) entities
       in
+      (* The method fns of an implementation left out above went with it:
+         a fn stays only when the roots or a kept trait or impl reach it. *)
+      let reachable =
+        reach StringOrder.Set.empty
+          (List.map (fun entity -> entity.hash) rootEntities
+          @ List.filter_map
+              (fun entity ->
+                if entity.kind = PackageImpl || entity.kind = PackageTrait then
+                  Some entity.hash
+                else None)
+              entities)
+      in
+      let entities =
+        List.filter
+          (fun entity ->
+            entity.kind <> PackageFunction
+            || StringOrder.Set.mem entity.hash reachable)
+          entities
+      in
       let* rendered =
         ResultList.mapResults
           (fun entity ->

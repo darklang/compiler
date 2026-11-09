@@ -68,6 +68,15 @@ let compileUserWithPlan ?writtenSources (plan : P.userCompilePlan) =
                         |> List.sort_uniq String.compare )
                     plan.P.baseContext.X.typeCheckEnv.Types.resolutionEnv parsed
                 in
+                (* -vv shows each rendered package unit, whose line and
+                   column a diagnostic names. *)
+                if plan.P.verbosity >= 2 then
+                  List.iter
+                    (fun (package : PackageManager.resolvedSource) ->
+                      prerr_endline
+                        ("--- package unit " ^ package.PackageManager.name ^ "\n"
+                       ^ package.PackageManager.source))
+                    packages;
                 let packages =
                   List.map
                     (fun (package : PackageManager.resolvedSource) ->
