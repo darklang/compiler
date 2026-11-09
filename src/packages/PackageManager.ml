@@ -139,20 +139,33 @@ let cacheWrite config key result =
       PackageIO.cacheWrite config.cachePath key status body;
       Ok ())
 
+(* Answers already read from the package server in this process, by URL. One
+   process treats the server as unchanging, so `--check` over many names reads
+   each module listing once rather than once per name; a module listing from an
+   interpreter-sized store takes seconds. Failures are not kept. *)
+let networkAnswers : (string, fetchResult) Hashtbl.t = Hashtbl.create 256
+
 let requestNetwork client config path =
   let uri =
     Uri.to_string
       (Uri.resolve "http" (Uri.of_string config.server) (Uri.of_string path))
   in
-  try
-    let status, body = PackageIO.get client uri in
-    if status >= 200 && status <= 299 then Ok (Found body)
-    else if status = 404 then Ok Missing
-    else
-      Error
-        ("Package server GET " ^ uri ^ " returned " ^ string_of_int status
-       ^ ": " ^ body)
-  with ex -> Error ("Package server GET " ^ uri ^ " failed: " ^ message ex)
+  match Hashtbl.find_opt networkAnswers uri with
+  | Some answer -> Ok answer
+  | None -> (
+      try
+        let status, body = PackageIO.get client uri in
+        let answer =
+          if status >= 200 && status <= 299 then Ok (Found body)
+          else if status = 404 then Ok Missing
+          else
+            Error
+              ("Package server GET " ^ uri ^ " returned "
+             ^ string_of_int status ^ ": " ^ body)
+        in
+        Result.iter (Hashtbl.replace networkAnswers uri) answer;
+        answer
+      with ex -> Error ("Package server GET " ^ uri ^ " failed: " ^ message ex))
 
 let cacheKey config path =
   let rec trim index =
