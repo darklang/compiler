@@ -104,7 +104,7 @@ let[@warning "-4"] collidingCaseNames types =
     byName S.empty
 
 let caseTag colliding owner caseName ordinal =
-  if S.mem caseName colliding then AST.constructorRuntimeIdentity owner caseName
+  if S.mem caseName colliding then AST.constructorRuntimeIdentity owner caseName ordinal
   else ordinal
 
 let qualifiedFnName (name : WT.qualifiedFnIdentifier) =

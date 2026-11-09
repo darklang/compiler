@@ -536,7 +536,12 @@ let resolvedConstructorReferenceWithTypeArgs canonical typeArgs =
    Runtime I/O and string intrinsics construct these two foundational
    stdlib types directly. Their ABI tags predate user-defined ADTs.
 *)
-let constructorRuntimeIdentity declaringType caseName =
+(* The tag of a case whose name another sum also uses. Option and Result keep
+   0 and 1. Otherwise the declaring type's name picks a base slot and the case
+   its ordinal after it, so two cases of one sum never share a tag; cases of
+   one name in different sums almost never do, and the checker refuses those
+   that would. 4094 slots past the reserved two fit a 12-bit immediate. *)
+let constructorRuntimeIdentity declaringType caseName ordinal =
   match (declaringType, caseName) with
   | "Darklang.Stdlib.Option.Option", "Some"
   | "Darklang.Stdlib.Result.Result", "Ok" ->
@@ -551,12 +556,14 @@ let constructorRuntimeIdentity declaringType caseName =
             Int32.mul
               (Int32.logxor hash (Int32.of_int (Char.code byte)))
               16777619l)
-          0x811c9dc5l
-          (declaringType ^ "." ^ caseName)
+          0x811c9dc5l declaringType
       in
       2
       + Int64.to_int
-          (Int64.rem (Int64.logand (Int64.of_int32 hash) 0xffffffffL) 4094L)
+          (Int64.rem
+             (Int64.add (Int64.logand (Int64.of_int32 hash) 0xffffffffL)
+                (Int64.of_int ordinal))
+             4094L)
 
 let lambdaParameter pattern =
   { pattern; sourceAnnotation = None; inferredType = None }

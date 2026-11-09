@@ -295,39 +295,41 @@ let testConstructorIdentityCollisionRejected () =
        [
          TypeDef
            (SumTypeDef
-              ( "CollisionType151Tc",
+              ( "CollisionType2Tc",
                 [],
                 [ { AST.name = "CollisionCaseTc"; fields = [] } ] ));
          TypeDef
            (SumTypeDef
-              ( "CollisionType155Tc",
+              ( "CollisionType33Tc",
                 [],
                 [ { AST.name = "CollisionCaseTc"; fields = [] } ] ));
          Expression ([], UnitLiteral);
        ])
-    "Constructor identity collision 1236: CollisionType151Tc.CollisionCaseTc, \
-     CollisionType155Tc.CollisionCaseTc"
+    "Constructor identity collision 3090: CollisionType2Tc.CollisionCaseTc, \
+     CollisionType33Tc.CollisionCaseTc"
 
-(* TBool and EUnit, each a case of two sums, hash to the same tag (3740) for
-   these owners; they never share a name or a sum, so both are accepted. *)
-let testDifferentCasesMayShareATag () =
-  let sum owner case =
-    TypeDef (SumTypeDef (owner, [], [ { AST.name = case; fields = [] } ]))
+(* TString and TUInt128 of WrittenTypes.TypeReference.Builtin, both names other
+   sums use too, hashed to one tag (1649) when the case name was hashed; a
+   case's ordinal now follows its sum's slot, so they differ. *)
+let testCasesOfOneSumGetDistinctTags () =
+  let sum owner cases =
+    TypeDef
+      (SumTypeDef
+         (owner, [], List.map (fun case -> { AST.name = case; fields = [] }) cases))
   in
   match
     checkProgram
       (Program
          [
-           sum "Darklang.LanguageTools.ProgramTypes.TypeReference" "TBool";
-           sum "OtherBoolTc" "TBool";
-           sum "Darklang.LanguageTools.WrittenTypes.Expr" "EUnit";
-           sum "OtherUnitTc" "EUnit";
+           sum "Darklang.LanguageTools.WrittenTypes.TypeReference.Builtin"
+             [ "TString"; "TUInt128" ];
+           sum "OtherBuiltinTc" [ "TString"; "TUInt128" ];
            Expression ([], UnitLiteral);
          ])
   with
   | Ok _ -> Ok ()
   | Error error ->
-      Error ("Expected distinct cases to share a tag, got: " ^ D.typeErrorToString error)
+      Error ("Expected distinct tags for one sum's cases, got: " ^ D.typeErrorToString error)
 
 let testRecursiveGroupsReceiveStableTypedIdentities () =
   let source =
@@ -538,7 +540,7 @@ let tests =
     ("Empty nominal declarations rejected", testEmptyNominalDeclarationsRejected);
     ( "Invalid declaration type references rejected",
       testInvalidDeclarationTypeReferencesRejected );
-    ("Different cases may share a hashed tag", testDifferentCasesMayShareATag);
+    ("Cases of one sum get distinct tags", testCasesOfOneSumGetDistinctTags);
     ( "Constructor identity collision rejected",
       testConstructorIdentityCollisionRejected );
     ( "Recursive groups receive stable typed identities",
