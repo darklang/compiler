@@ -9,6 +9,9 @@ module Darklang.Stdlib.List
 
 type ChunkBySizeError = | SizeMustBeGreaterThanZero
 
+// What main's List.zip and List.map2 answer when their lists differ in length.
+type LengthMismatch = { left: Int64, right: Int64 }
+
 type IndexError =
   /// The resolved index was outside the bounds of the list.
   | IndexOutOfBounds
@@ -456,6 +459,26 @@ let map2
     Option.Option.None
   else
     Option.Option.Some(map2shortest as_ bs fn)
+
+// Main's List.map2 and List.zip: Error with both lengths when they differ.
+let __lengthMismatch<'a, 'b> (listA: List<a>) (listB: List<b>) : Stdlib.Option.Option<Stdlib.List.LengthMismatch> =
+    let left = Stdlib.List.length listA in
+    let right = Stdlib.List.length listB in
+    if left == right then None
+    else
+        Some (Stdlib.List.LengthMismatch {
+            left = Builtin.unwrap (Stdlib.Int.toInt64 left),
+            right = Builtin.unwrap (Stdlib.Int.toInt64 right) })
+
+let map2Checked<'a, 'b, 'c> (listA: List<a>) (listB: List<b>) (fn: a -> b -> c) : Stdlib.Result.Result<List<c>, Stdlib.List.LengthMismatch> =
+    match Stdlib.List.__lengthMismatch listA listB with
+    | Some mismatch -> Error mismatch
+    | None -> Ok (Stdlib.List.map2shortest listA listB fn)
+
+let zipChecked<'a, 'b> (listA: List<a>) (listB: List<b>) : Stdlib.Result.Result<List<(a * b)>, Stdlib.List.LengthMismatch> =
+    match Stdlib.List.__lengthMismatch listA listB with
+    | Some mismatch -> Error mismatch
+    | None -> Ok (Stdlib.List.zipShortest listA listB)
 
 let zipShortest<'a, 'b> (listA: List<a>) (listB: List<b>) : List<(a * b)> =
     match (listA, listB) with
