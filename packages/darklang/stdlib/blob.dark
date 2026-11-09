@@ -165,12 +165,23 @@ let __fromHex (value: String) (index: Int64) (acc: List<Int64>) : Stdlib.Result.
         let high = Stdlib.Blob.__hexValue (Stdlib.String.__byteAtUnchecked value index) in
         let low = Stdlib.Blob.__hexValue (Stdlib.String.__byteAtUnchecked value (index + 1L)) in
         if high < 0L || low < 0L then
-            Error "Invalid hex string: The input is not a valid hex string as it contains a non-hex character."
+            Error "Invalid hex string: Format_BadHexChar"
         else Stdlib.Blob.__fromHex value (index + 2L) (Stdlib.List.push acc (high * 16L + low))
 
+// The length of value in UTF-16 code units, as .NET counts a string.
+let __utf16Length (value: String) (index: Int64) (count: Int64) : Int64 =
+    if index >= Stdlib.String.__byteLength value then count
+    else
+        let byte = Stdlib.String.__byteAtUnchecked value index in
+        let units = if byte >= 128L && byte < 192L then 0L else if byte >= 240L then 2L else 1L in
+        Stdlib.Blob.__utf16Length value (index + 1L) (count + units)
+
+// The interpreter's messages are .NET's Convert.FromHexString exceptions,
+// which it reports by resource key; the length is checked first, in UTF-16
+// code units.
 let fromHex (value: String) : Stdlib.Result.Result<Blob, String> =
-    if Stdlib.String.__byteLength value % 2L != 0L then
-        Error "Invalid hex string: The input is not a valid hex string as its length is not a multiple of 2."
+    if Stdlib.Blob.__utf16Length value 0L 0L % 2L != 0L then
+        Error "Invalid hex string: Format_BadHexLength"
     else Stdlib.Blob.__fromHex value 0L []
 
 let toBase64 (blob: Blob) : String =

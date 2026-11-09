@@ -592,8 +592,8 @@ let builtinOperator name =
   let unary = [ ("Negate", "-"); ("BitwiseNot", "~") ] in
   (* Builtins whose pinned counterpart is a library fn of the same arity and
      meaning. Both hex encoders write uppercase (.NET's ToHexString and the
-     compiler's "0123456789ABCDEF"); decoding is left out because its error
-     text differs. *)
+     compiler's "0123456789ABCDEF"), and both decoders report .NET's resource
+     keys. *)
   let renamed =
     [
       ("dictContainsKey", "Stdlib.Dict.member");
@@ -605,6 +605,7 @@ let builtinOperator name =
       ("listIndexedMap", "Stdlib.List.indexedMapInt64");
       ("bytesConcat", "Stdlib.Blob.concat");
       ("base16Encode", "Stdlib.Blob.toHex");
+      ("base16Decode", "Stdlib.Blob.fromHex");
     ]
     @ List.map
         (fun fn ->
