@@ -187,16 +187,26 @@ let check ~context ~sources contracts =
             Ok { context with environment = Some environment })
     in
     let check (path, original, replacement) =
-      let mismatch name =
+      let mismatch ?(detail = "") name =
         Error
           ("Replacement contract mismatch for "
-          ^ String.concat "." (path @ [ name ]))
+          ^ String.concat "." (path @ [ name ])
+          ^ detail)
+      in
+      let signature (_, types, _, _) =
+        String.concat " -> " (List.map CheckingDiagnostics.typeToString types)
       in
       match (original, replacement) with
       | W.DFunction original, W.DFunction replacement ->
           let* expected = functionContract types traits path original in
           let* actual = functionContract types traits path replacement in
-          if expected = actual then Ok () else mismatch original.W.name.W.name
+          if expected = actual then Ok ()
+          else
+            mismatch
+              ~detail:
+                (": upstream " ^ signature expected ^ ", replacement "
+               ^ signature actual)
+              original.W.name.W.name
       | W.DType original, W.DType replacement ->
           let* expected = typeContract types traits path original in
           let* actual = typeContract types traits path replacement in
@@ -227,5 +237,29 @@ let check ~context ~sources contracts =
           false
     in
     let values, declarations = List.partition isValue contracts in
-    ResultList.traverse check (declarations @ values)
-    |> Result.map (fun _ -> ())
+    (* Every mismatch is reported, so a pin move can be worked through at
+       once rather than one contract per run. *)
+    match
+      List.filter_map
+        (fun contract ->
+          match check contract with
+          | Ok () -> None
+          | Error message when String.starts_with ~prefix:"Replacement" message
+            ->
+              Some message
+          | Error message ->
+              let path, original, _ = contract in
+              let name =
+                match original with
+                | W.DFunction fn -> fn.W.name.W.name
+                | W.DType typ -> typ.W.name.W.name
+                | W.DValue value -> value.W.name.W.name
+                | W.DTrait _ | W.DImpl _ | W.DModule _ | W.DExpr _
+                | W.DAssertion _ | W.DTest _ ->
+                    ""
+              in
+              Some (String.concat "." (path @ [ name ]) ^ ": " ^ message))
+        (declarations @ values)
+    with
+    | [] -> Ok ()
+    | messages -> Error (String.concat "\n" messages)
