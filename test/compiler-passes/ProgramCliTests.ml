@@ -167,6 +167,15 @@ let testEmitResultModeIsExplicit () =
   | Error error ->
       Error ("Expected --emit-result parsing to succeed, got: " ^ error)
 
+let testExpressionAfterDoubleDash () =
+  match P.parseArgs [| "-e"; "--"; "-7.5dec % 2dec" |] with
+  | Ok options
+    when options.P.isExpression && options.P.argument = Some "-7.5dec % 2dec" ->
+      Ok ()
+  | Ok options -> Error ("Unexpected expression options: " ^ formatOptions options)
+  | Error error ->
+      Error ("Expected an expression after -- to parse, got: " ^ error)
+
 let testPackageServerIsExplicit () =
   match
     P.parseArgs [| "--package-server=http://127.0.0.1:9090"; "program.dark" |]
@@ -380,6 +389,7 @@ let tests =
     ("reject unknown compiler target", testUnknownTargetRejected);
     ("reject cross-target run mode", testCrossTargetRunRejected);
     ("parse explicit file-result mode", testEmitResultModeIsExplicit);
+    ("parse an expression after --", testExpressionAfterDoubleDash);
     ("parse explicit package server", testPackageServerIsExplicit);
     ("reject non-HTTP package server", testPackageServerRejectsNonHttpUrl);
     ("parse scoped IR dump options", testScopedIRDumpOptions);
