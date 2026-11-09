@@ -157,6 +157,7 @@ packages/darklang/stdlib/valueSearch.dark
 packages/darklang/stdlib/dateTime.dark
 packages/darklang/stdlib/duration.dark
 packages/darklang/stdlib/blob.dark
+packages/darklang/stdlib/utf8.dark
 packages/darklang/stdlib/stream.dark
 packages/darklang/stdlib/html.dark
 packages/darklang/stdlib/http.dark

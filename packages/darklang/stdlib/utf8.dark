@@ -1,0 +1,16 @@
+// Stdlib.Utf8.dark - the interpreter's Utf8 module over the String/Blob conversions.
+
+module Darklang.Stdlib.Utf8
+
+/// Encodes <param s> as UTF-8.
+let encode (s: String) : Blob = Stdlib.String.toBlob s
+
+/// Decodes <param bytes> as UTF-8, or an Error when they are not UTF-8. The
+/// interpreter's message also quotes .NET's description of the first bad byte.
+let decode (bytes: Blob) : Stdlib.Result.Result<String, String> =
+    match Stdlib.String.fromBlob bytes with
+    | Some s -> Ok s
+    | None -> Error "Invalid UTF-8"
+
+/// Decodes <param bytes> as UTF-8, replacing invalid sequences with U+FFFD.
+let decodeWithReplacement (bytes: Blob) : String = Stdlib.String.fromBlobWithReplacement bytes
