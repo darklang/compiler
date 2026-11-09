@@ -90,7 +90,7 @@ root = tuple(shared_word, shared_word)
 Single-case DateTime wrapper keeps its payload word
 ---INPUT---
 type DateEnvelope = DateEnvelope of DateTime
-DateEnvelope (Stdlib.DateTime.fromMilliseconds 0)
+DateEnvelope (Stdlib.DateTime.fromMilliseconds 0L)
 ---EXPECTED---
 root = word(0)
 

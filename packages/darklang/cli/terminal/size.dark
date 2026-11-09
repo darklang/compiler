@@ -2,5 +2,9 @@
 module Darklang.Cli.Terminal
 
 /// Samples terminal width and height in one native call.
-let getSize () : (Int * Int) =
+let __getSizeInt () : (Int * Int) =
   Builtin.cliTerminalSize ()
+
+let getSize () : (Int64 * Int64) =
+  let (width, height) = Darklang.Cli.Terminal.__getSizeInt () in
+  (Builtin.unwrap (Stdlib.Int.toInt64 width), Builtin.unwrap (Stdlib.Int.toInt64 height))

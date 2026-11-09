@@ -38,4 +38,4 @@ match (4611686018427387904, -1) with | (first, _) -> first = 4611686018427387904
 let captured = 4611686018427387904 in (fun offset -> captured + offset) (-1) = 4611686018427387903
 
 // Large binary shifts and decimal formatting scale with limb count.
-Stdlib.String.length (Stdlib.Int.toString (Stdlib.Int.shiftLeft 1 100000)) = 30103
+Stdlib.String.length (Stdlib.Int.toString (Stdlib.Int.shiftLeft 1 100000)) = 30103L

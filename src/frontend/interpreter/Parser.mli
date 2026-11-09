@@ -14,6 +14,10 @@ val parse : string -> ParserSupport.parseResult
    current interpreter does; the embedded library keeps the pinned rules. *)
 val currentSyntax : bool ref
 
+(* Read the sources parsed by [f] as interpreter sources at the pin: a bare
+   integer is an Int64. *)
+val withInterpreterSource : bool -> (unit -> 'a) -> 'a
+
 val parseFor :
   ?adaptStdlib:bool ->
   Validation.mode ->

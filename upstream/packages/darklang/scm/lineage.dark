@@ -14,50 +14,23 @@
 module Darklang.SCM.Lineage
 
 
-/// The hash currently bound at `location` for `kind` on the PARENT of the branch being authored on, if
-/// anything is. `parentOverlay` is that parent's chain overlay (empty when the parent is main).
+/// The hash currently bound at `location` for `kind` on the PARENT of the branch being authored on (on
+/// main, main itself), if anything is.
 ///
-/// A branch's binding replaced what its PARENT binds, which is the fact a later merge wants. For a
-/// first-level branch that is `locations`, main's name layer, read directly and deliberately: not the
-/// branch's own overlay, which would record the branch's previous version rather than main's. For a
-/// branch OFF a branch the parent's overlay comes first, or a name the parent rebound records main's
-/// hash and the detector reports a conflict on a name nobody moved.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Lineage.currentlyBound: Unknown function or value 'Stdlib.Sqlite.queryOneP'"
-let currentlyBound
-  (parentOverlay: List<Conflicts.Binding>)
-  (location: LanguageTools.ProgramTypes.PackageLocation)
-  (kind: LanguageTools.ProgramTypes.ItemKind)
+/// A branch's binding replaced what its PARENT binds, which is the fact a later merge wants: not the
+/// branch's own previous version.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Lineage.currentlyBound: Unknown function or value 'SCM.PackageOps.liveBindingFor'"
+let currentlyBound(
+  parent: Uuid,
+  location: LanguageTools.ProgramTypes.PackageLocation,
+  kind: LanguageTools.ProgramTypes.ItemKind)
   : Stdlib.Option.Option<LanguageTools.ProgramTypes.Hash> =
-  let modules = Stdlib.String.join location.modules "."
-
-  let onParent =
-    parentOverlay
-    |> Stdlib.List.findFirst (fun b ->
-      (b.owner == location.owner)
-      && (b.modules == modules)
-      && (b.name == location.name)
-      && (b.itemType == LanguageTools.ProgramTypes.ItemKind.toString kind))
-
-  match onParent with
-  | Some b -> Stdlib.Option.Option.Some(LanguageTools.ProgramTypes.Hash.Hash b.hash)
-  | None ->
-
-  // main-scoped: every chain ends at main, and this is main's half.
-  let found =
-    Stdlib.Sqlite.queryOneP
-      (localDb ())
-      "SELECT item_hash FROM locations
-       WHERE owner = @p0 AND modules = @p1 AND name = @p2
-         AND item_type = @p3 AND unlisted_at IS NULL
-       LIMIT 1"
-      [ location.owner, modules, location.name, LanguageTools.ProgramTypes.ItemKind.toString kind ]
-
-  match found with
-  | Some row ->
-    match Stdlib.Sqlite.textField row "item_hash" with
-    | Some h -> Stdlib.Option.Option.Some(LanguageTools.ProgramTypes.Hash.Hash h)
-    | None -> Stdlib.Option.Option.None
-  | None -> Stdlib.Option.Option.None
+  SCM.PackageOps.liveBindingFor(parent, location)
+  |> Stdlib.Option.andThen(fun b ->
+    if b.itemType == LanguageTools.ProgramTypes.ItemKind.toString(kind) then
+      Stdlib.Option.Option.Some(LanguageTools.ProgramTypes.Hash.Hash(b.hash))
+    else
+      Stdlib.Option.Option.None)
 
 
 /// Fill in `previous` on every SetName in `ops` that does not already carry one.
@@ -73,36 +46,32 @@ let currentlyBound
 /// Runs BEFORE hash stabilization, which is safe because the answer is keyed on the location and the
 /// item kind, and stabilization rewrites neither -- it only replaces provisional target hashes.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
-let recordPrevious
-  (branchId: Uuid)
-  (ops: List<LanguageTools.ProgramTypes.PackageOp>)
+let recordPrevious(
+  branchId: Uuid,
+  ops: List<LanguageTools.ProgramTypes.PackageOp>)
   : List<LanguageTools.ProgramTypes.PackageOp> =
-  // The parent's overlay, resolved ONCE for the batch: `chainBindings` decodes every op in the chain.
-  // Empty for main and for a first-level branch, whose parent's bindings are `locations`.
-  let parentOverlay =
-    if SCM.Branch.isMain branchId then
-      []
+  let parent =
+    if SCM.Branch.isMain(branchId) then
+      branchId
     else
-      match SCM.PackageOps.branchParentOf branchId with
-      | parent when SCM.Branch.isMain parent -> []
-      | parent -> SCM.PackageOps.chainBindings parent
+      SCM.PackageOps.branchParentOf(branchId)
 
   ops
-  |> Stdlib.List.map (fun op ->
+  |> Stdlib.List.map(fun op ->
     match op with
     | SetName(location, target, None) ->
       let previous =
-        currentlyBound
-          parentOverlay
-          location
-          (LanguageTools.ProgramTypes.Reference.kind target)
+        currentlyBound(
+          parent,
+          location,
+          LanguageTools.ProgramTypes.Reference.kind(target))
 
       LanguageTools.ProgramTypes.PackageOp.SetName(location, target, previous)
     // Same for an unbind: what it removes is what is live at the name on this branch, whatever kind.
     | Unbind(location, None) ->
       let previous =
-        SCM.PackageOps.liveBindingFor branchId location
-        |> Stdlib.Option.map (fun b -> LanguageTools.ProgramTypes.Hash.Hash b.hash)
+        SCM.PackageOps.liveBindingFor(branchId, location)
+        |> Stdlib.Option.map(fun b -> LanguageTools.ProgramTypes.Hash.Hash(b.hash))
 
       LanguageTools.ProgramTypes.PackageOp.Unbind(location, previous)
     | other -> other)

@@ -2,12 +2,12 @@
 // The supported syntax is literals, '.', ranges, alternation, and * + ?.
 
 let byteAt (value: String) (index: Int64) : Int64 =
-    match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with
+    match Stdlib.String.getByteAt value index with
     | Some byte -> Stdlib.Int64.fromUInt8 byte
     | None -> Builtin.crash "Regex byte index is out of range"
 
 let stringLengthFrom (value: String) (index: Int64) : Int64 =
-    match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with
+    match Stdlib.String.getByteAt value index with
     | Some _ -> stringLengthFrom value (index + 1L)
     | None -> index
 
@@ -125,5 +125,5 @@ else
     let pattern = "dark[a-z]*lang|compiler[0-9]+|ab[0-9]?" in
     let alternatives = parseAlternatives pattern 0L [] [] in
     let unit = "darklang darkxxlang compiler42 compiler ab ab7 nope DARKlang compilerx\n" in
-    let text = Stdlib.String.repeat unit (Stdlib.Int.fromInt64 blocks) in
+    let text = Stdlib.String.repeat unit blocks in
     Builtin.printLine (Stdlib.Int64.toString (run repetitions alternatives text 0L))

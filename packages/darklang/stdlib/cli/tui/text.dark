@@ -8,19 +8,23 @@ let inspect (text: String) : (Int * Bool) =
   Builtin.cliTerminalInspectRow text
 
 /// Clip a row to a column width without splitting a grapheme cluster.
-let clipToWidth (text: String) (maxWidth: Int) : String =
+let __clipToWidthInt (text: String) (maxWidth: Int) : String =
     if maxWidth <= 0 then ""
     else Stdlib.Cli.Tui.Text.__clipToWidth (Stdlib.String.toList text) maxWidth ""
 
 /// Terminal columns occupied by a row that may carry SGR styling.
-let styledWidth (text: String) : Int =
+let __styledWidthInt (text: String) : Int =
     Stdlib.Cli.Tui.Text.__styledWidth (Stdlib.String.toList text) 0
 
 /// Clip to `maxWidth`, marking a cut so a truncated row reads as truncated.
-let clipMarked (text: String) (maxWidth: Int) : String =
-    if Stdlib.Cli.Tui.Text.styledWidth text <= maxWidth then
+let __clipMarkedInt (text: String) (maxWidth: Int) : String =
+    if Stdlib.Cli.Tui.Text.__styledWidthInt text <= maxWidth then
         text
     else if maxWidth <= 1 then
-        Stdlib.Cli.Tui.Text.clipToWidth text maxWidth
+        Stdlib.Cli.Tui.Text.__clipToWidthInt text maxWidth
     else
-        Stdlib.Cli.Tui.Text.clipToWidth text (maxWidth - 1) + "…"
+        Stdlib.Cli.Tui.Text.__clipToWidthInt text (maxWidth - 1) + "…"
+
+let clipToWidth (text: String) (maxWidth: Int64) : String = Stdlib.Cli.Tui.Text.__clipToWidthInt text (Stdlib.Int.fromInt64 maxWidth)
+let styledWidth (text: String) : Int64 = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.Cli.Tui.Text.__styledWidthInt text))
+let clipMarked (text: String) (maxWidth: Int64) : String = Stdlib.Cli.Tui.Text.__clipMarkedInt text (Stdlib.Int.fromInt64 maxWidth)

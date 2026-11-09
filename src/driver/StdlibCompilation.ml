@@ -18,7 +18,10 @@ let loadStdlib includeTests =
     CompilerAnnotations.parseReasons EmbeddedStdlib.compilerReasons
   in
   let load (filename, text) =
-    SourceInventory.parse ~reasons (ContentEncoding.decodeContent None text)
+    SourceInventory.parse
+      ~interpreterSource:(String.starts_with ~prefix:"upstream/" filename)
+      ~reasons
+      (ContentEncoding.decodeContent None text)
     |> Result.map_error (fun error ->
         "Error parsing " ^ filename ^ ": " ^ error)
     |> Result.map (fun source -> (filename, source))

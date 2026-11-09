@@ -15,7 +15,7 @@ Darklang.SCM.PackageOps.currentBranch () = Darklang.SCM.Branch.mainBranchId
 (Stdlib.Uuid.toString Darklang.SCM.Branch.mainBranchId == Darklang.SCM.Branch.mainBranchName) = false
 
 // ...and it is a Uuid, which is a different TYPE from a name, not merely a differently-shaped string.
-Stdlib.String.length (Stdlib.Uuid.toString Darklang.SCM.Branch.mainBranchId) = 36
+Stdlib.String.length (Stdlib.Uuid.toString Darklang.SCM.Branch.mainBranchId) = 36L
 
 // Main is not a row in `branches`: it needs no registration, so `get` finds nothing for it.
 // @compiler blocked: compiler-gap

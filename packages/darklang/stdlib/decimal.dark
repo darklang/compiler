@@ -156,7 +156,7 @@ let toString (d: Decimal) : String =
     else
         let length = Stdlib.String.__byteLength digits in
         let padCount = if scale + 1L > length then scale + 1L - length else 0L in
-        let padded = Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 padCount) + digits in
+        let padded = Stdlib.String.__repeatInt "0" (Stdlib.Int.fromInt64 padCount) + digits in
         let total = Stdlib.String.__byteLength padded in
         sign + Stdlib.String.__byteTake padded (total - scale) + "." + Stdlib.String.__byteDrop padded (total - scale)
 

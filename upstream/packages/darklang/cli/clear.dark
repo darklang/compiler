@@ -2,19 +2,20 @@ module Darklang.Cli.Clear
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let execute (state: AppState) (args: List<String>) : AppState =
-  Builtin.stdoutClear ()
+let execute(state: AppState, args: List<String>): AppState =
+  // Erase the screen, then move the cursor to the top left
+  Stdlib.print("\u001b[2J\u001b[H")
   state
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let complete (_state: AppState) (_args: List<String>) : List<Completion.CompletionItem> =
+let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let help (_state: AppState) : String =
+let help(_state: AppState): String =
   [
     "Usage: clear"
     "Clear the terminal screen."
-  ] |> Stdlib.String.join "\n"
+  ] |> Stdlib.String.join("\n")

@@ -539,7 +539,7 @@ and renderBody env typ value state =
                       ( Lte,
                         call next.symbols "Darklang.Stdlib.String.length"
                           [ C.Local shortId ],
-                        C.BigIntLiteral (Z.of_int 80) ),
+                        C.Int64Literal 80L ),
                     C.Local shortId,
                     long ) ),
             next ))

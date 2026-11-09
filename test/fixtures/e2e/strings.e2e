@@ -74,11 +74,11 @@ let a = "hello" in let b = "world" in let c = "!" in a + " " + b + c = "hello wo
 
 // A nonconstant ASCII concat tree allocates only its final buffer. The unfused
 // left-associated form exhausts the fixed heap by copying every prefix.
-let concatFusionChunk (n: Int64) (value: String): String = if n == 0L then value else concatFusionChunk (n - 1L) (value + value); let chunk = concatFusionChunk 20L "x" in Stdlib.String.getByteAt (chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk) 34603007 = stdout="Darklang.Stdlib.Option.Option<UInt8>.Some(120)\n" stderr="" isolated=true
+let concatFusionChunk (n: Int64) (value: String): String = if n == 0L then value else concatFusionChunk (n - 1L) (value + value); let chunk = concatFusionChunk 20L "x" in Stdlib.String.getByteAt (chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk) 34603007L = stdout="Darklang.Stdlib.Option.Option<UInt8>.Some(120)\n" stderr="" isolated=true
 
 // Joining dynamic chunks must allocate the final string once. Repeatedly
 // concatenating the growing prefix exhausts the fixed heap for this workload.
-let chunk = joinFusionChunk 17L "x" in Stdlib.String.getByteAt (Stdlib.String.join (repeatChunk 100L chunk []) "") 13107199 = stdout="Darklang.Stdlib.Option.Option<UInt8>.Some(120)\n" stderr="" isolated=true
+let chunk = joinFusionChunk 17L "x" in Stdlib.String.getByteAt (Stdlib.String.join (repeatChunk 100L chunk []) "") 13107199L = stdout="Darklang.Stdlib.Option.Option<UInt8>.Some(120)\n" stderr="" isolated=true
 Stdlib.String.join (["e", "\u0301"]) "" = "é"
 
 // Character-list construction uses the same one-allocation builder path.
@@ -169,35 +169,35 @@ let x = "one" in let y = "two" in $"{x} and {y}" = "one and two"
 // =============================================================================
 
 // Get bytes from ASCII string "abc" = 97, 98, 99
-Stdlib.String.getByteAt "abc" 0 = Some 97uy
-Stdlib.String.getByteAt "abc" 1 = Some 98uy
-Stdlib.String.getByteAt "abc" 2 = Some 99uy
+Stdlib.String.getByteAt "abc" 0L = Some 97uy
+Stdlib.String.getByteAt "abc" 1L = Some 98uy
+Stdlib.String.getByteAt "abc" 2L = Some 99uy
 
 // Get bytes from uppercase "ABC" = 65, 66, 67
-Stdlib.String.getByteAt "ABC" 0 = Some 65uy
-Stdlib.String.getByteAt "ABC" 1 = Some 66uy
-Stdlib.String.getByteAt "ABC" 2 = Some 67uy
+Stdlib.String.getByteAt "ABC" 0L = Some 65uy
+Stdlib.String.getByteAt "ABC" 1L = Some 66uy
+Stdlib.String.getByteAt "ABC" 2L = Some 67uy
 
 // Get byte from single character
-Stdlib.String.getByteAt "x" 0 = Some 120uy
+Stdlib.String.getByteAt "x" 0L = Some 120uy
 
 // Get space character (ASCII 32)
-Stdlib.String.getByteAt " " 0 = Some 32uy
+Stdlib.String.getByteAt " " 0L = Some 32uy
 
 // Get digits
-Stdlib.String.getByteAt "0" 0 = Some 48uy
-Stdlib.String.getByteAt "9" 0 = Some 57uy
-Stdlib.String.getByteAt "abc" (-1) = None
-Stdlib.String.getByteAt "abc" 3 = None
+Stdlib.String.getByteAt "0" 0L = Some 48uy
+Stdlib.String.getByteAt "9" 0L = Some 57uy
+Stdlib.String.getByteAt "abc" (-1L) = None
+Stdlib.String.getByteAt "abc" 3L = None
 
 // Presence-only byte matches preserve negative, in-range, and end-boundary behavior.
-let hasByte (value: String) (index: Int64) : Bool = match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with | Some _ -> true | None -> false let result = Stdlib.Bool.not (hasByte "abc" (-1L)) && hasByte "abc" 0L && hasByte "abc" 2L && Stdlib.Bool.not (hasByte "abc" 3L) in result = stdout="true\n" stderr=""
+let hasByte (value: String) (index: Int64) : Bool = match Stdlib.String.getByteAt value index with | Some _ -> true | None -> false let result = Stdlib.Bool.not (hasByte "abc" (-1L)) && hasByte "abc" 0L && hasByte "abc" 2L && Stdlib.Bool.not (hasByte "abc" 3L) in result = stdout="true\n" stderr=""
 
 // Payload-consuming byte matches load the byte only for an in-range index.
-let byteOr (value: String) (index: Int64) (fallback: UInt8) : UInt8 = match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with | Some byte -> byte | None -> fallback let result = byteOr "abc" (-1L) 7uy == 7uy && byteOr "abc" 1L 7uy == 98uy && byteOr "abc" 3L 7uy == 7uy in result = stdout="true\n" stderr=""
+let byteOr (value: String) (index: Int64) (fallback: UInt8) : UInt8 = match Stdlib.String.getByteAt value index with | Some byte -> byte | None -> fallback let result = byteOr "abc" (-1L) 7uy == 7uy && byteOr "abc" 1L 7uy == 98uy && byteOr "abc" 3L 7uy == 7uy in result = stdout="true\n" stderr=""
 
 // The None arm comes first, so the SSA bounds predicate must reverse the branch.
-let byteOrNoneFirst (value: String) (index: Int64) : UInt8 = match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with | None -> 7uy | Some byte -> byte let result = byteOrNoneFirst "abc" (-1L) == 7uy && byteOrNoneFirst "abc" 1L == 98uy && byteOrNoneFirst "abc" 3L == 7uy in result = stdout="true\n" stderr=""
+let byteOrNoneFirst (value: String) (index: Int64) : UInt8 = match Stdlib.String.getByteAt value index with | None -> 7uy | Some byte -> byte let result = byteOrNoneFirst "abc" (-1L) == 7uy && byteOrNoneFirst "abc" 1L == 98uy && byteOrNoneFirst "abc" 3L == 7uy in result = stdout="true\n" stderr=""
 
 // =============================================================================
 // Stdlib.String.startsWith Tests
@@ -245,21 +245,21 @@ let boundaryCheckChunk (remaining: Int64) (value: String): String = if remaining
 // =============================================================================
 
 // Basic indexOf
-Stdlib.String.indexOf "hello world" "hello" = Some 0
-Stdlib.String.indexOf "hello world" "world" = Some 6
-Stdlib.String.indexOf "hello world" "o" = Some 4
-Stdlib.String.indexOf "hello world" "o w" = Some 4
+Stdlib.String.indexOf "hello world" "hello" = Some 0L
+Stdlib.String.indexOf "hello world" "world" = Some 6L
+Stdlib.String.indexOf "hello world" "o" = Some 4L
+Stdlib.String.indexOf "hello world" "o w" = Some 4L
 
 // Not found
 Stdlib.String.indexOf "hello world" "xyz" = None
 Stdlib.String.indexOf "abc" "d" = None
 
 // Empty string search
-Stdlib.String.indexOf "hello" "" = Some 0
-Stdlib.String.indexOf "" "" = Some 0
+Stdlib.String.indexOf "hello" "" = Some 0L
+Stdlib.String.indexOf "" "" = Some 0L
 
 // Index conversion must not allocate a prefix string and one list node per codepoint.
-let utf16IndexChunk (remaining: Int64) (value: String): String = if remaining == 0L then value else utf16IndexChunk (remaining - 1L) (value + value); let value = utf16IndexChunk 24L "x" + "y" in Stdlib.String.indexOf value "y" = stdout="Darklang.Stdlib.Option.Option<Int>.Some(16777216)\n" stderr="" isolated=true
+let utf16IndexChunk (remaining: Int64) (value: String): String = if remaining == 0L then value else utf16IndexChunk (remaining - 1L) (value + value); let value = utf16IndexChunk 24L "x" + "y" in Stdlib.String.indexOf value "y" = stdout="Darklang.Stdlib.Option.Option<Int64>.Some(16777216)\n" stderr="" isolated=true
 
 // =============================================================================
 // Stdlib.String.contains Tests
@@ -281,41 +281,41 @@ Stdlib.String.contains "" "a" = false
 // =============================================================================
 
 // Basic slice (start, end exclusive)
-Stdlib.String.slice "hello world" 0 5 = "hello"
-Stdlib.String.slice "hello world" 6 11 = "world"
-Stdlib.String.slice "hello world" 0 11 = "hello world"
+Stdlib.String.slice "hello world" 0L 5L = "hello"
+Stdlib.String.slice "hello world" 6L 11L = "world"
+Stdlib.String.slice "hello world" 0L 11L = "hello world"
 
 // Slice from middle
-Stdlib.String.slice "abcdef" 2 5 = "cde"
+Stdlib.String.slice "abcdef" 2L 5L = "cde"
 
 // Empty result
-Stdlib.String.slice "hello" 0 0 = ""
-Stdlib.String.slice "hello" 5 5 = ""
+Stdlib.String.slice "hello" 0L 0L = ""
+Stdlib.String.slice "hello" 5L 5L = ""
 
 // Clamping behavior
-Stdlib.String.slice "hello" 0 100 = "hello"
-Stdlib.String.slice "hello" 10 15 = ""
-Stdlib.String.slice "hello" 4 2 = ""
+Stdlib.String.slice "hello" 0L 100L = "hello"
+Stdlib.String.slice "hello" 10L 15L = ""
+Stdlib.String.slice "hello" 4L 2L = ""
 
 // =============================================================================
 // Stdlib.String.first and drop Tests
 // =============================================================================
 
 // take
-Stdlib.String.first "hello world" 5 = "hello"
-Stdlib.String.first "hello" 0 = ""
-Stdlib.String.first "hello" 100 = "hello"
-Stdlib.String.first "hello" (-1) = ""
+Stdlib.String.first "hello world" 5L = "hello"
+Stdlib.String.first "hello" 0L = ""
+Stdlib.String.first "hello" 100L = "hello"
+Stdlib.String.first "hello" (-1L) = ""
 
 // drop
-Stdlib.String.dropFirst "hello world" 6 = "world"
-Stdlib.String.dropFirst "hello" 0 = "hello"
-Stdlib.String.dropFirst "hello" 100 = ""
-Stdlib.String.dropFirst "hello" (-1) = "hello"
+Stdlib.String.dropFirst "hello world" 6L = "world"
+Stdlib.String.dropFirst "hello" 0L = "hello"
+Stdlib.String.dropFirst "hello" 100L = ""
+Stdlib.String.dropFirst "hello" (-1L) = "hello"
 
 // =============================================================================
 // Stdlib.String.slice Tests
 // =============================================================================
 
-Stdlib.String.slice "hello world" 0 5 = "hello"
-Stdlib.String.slice "hello world" 6 11 = "world"
+Stdlib.String.slice "hello world" 0L 5L = "hello"
+Stdlib.String.slice "hello world" 6L 11L = "world"

@@ -46,19 +46,19 @@ let isWhitespace (char: Char) : Bool =
     | Some codepoint -> Stdlib.String.__Unicode.isWhitespace codepoint
     | None -> false
 
-let toCodepoint (char: Char) : Stdlib.Option.Option<Int> =
+let __toCodepointInt (char: Char) : Stdlib.Option.Option<Int> =
     match Stdlib.String.__toCodepoints (Stdlib.Char.toString char) with
     | [codepoint] -> Some (Stdlib.Int.fromInt64 codepoint)
     | _ -> None
 
-let toAsciiCode (char: Char) : Stdlib.Option.Option<Int> =
+let __toAsciiCodeInt (char: Char) : Stdlib.Option.Option<Int> =
     match Stdlib.String.__toCodepoints (Stdlib.Char.toString char) with
     | [codepoint] ->
         if codepoint >= 0L && codepoint < 128L then Some (Stdlib.Int.fromInt64 codepoint) else None
     | _ -> None
 
 let isASCII (c: Char) : Bool =
-  let asciiCode = Stdlib.Char.toAsciiCode c
+  let asciiCode = Stdlib.Char.__toAsciiCodeInt c
 
   match asciiCode with
   | Some ascii -> (ascii >= 0) && (ascii <= 127)
@@ -93,12 +93,20 @@ let isLessThanOrEqualTo (left: Char) (right: Char) : Bool = Stdlib.Char.__compar
 let isGreaterThan (left: Char) (right: Char) : Bool = Stdlib.Char.__compare left right > 0L
 let isGreaterThanOrEqualTo (left: Char) (right: Char) : Bool = Stdlib.Char.__compare left right >= 0L
 
-let fromCodepoint (codepoint: Int) : Stdlib.Option.Option<Char> =
-    match Stdlib.Int.toInt64 codepoint with
-    | None -> None
-    | Some value ->
-        if Stdlib.String.__Unicode.isScalar value then Some (Stdlib.Char.__asChar (Stdlib.String.__fromCodepoints ([value])))
-        else None
+let fromCodepoint (codepoint: UInt32) : Stdlib.Option.Option<Char> =
+    let value = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.Int.fromUInt32 codepoint)) in
+    if Stdlib.String.__Unicode.isScalar value then Some (Stdlib.Char.__asChar (Stdlib.String.__fromCodepoints ([value])))
+    else None
+
+let toCodepoint (char: Char) : Stdlib.Option.Option<UInt32> =
+    match Stdlib.String.__toCodepoints (Stdlib.Char.toString char) with
+    | [codepoint] -> Stdlib.UInt32.fromInt64 codepoint
+    | _ -> None
+
+let toAsciiCode (char: Char) : Stdlib.Option.Option<UInt8> =
+    match Stdlib.String.__toCodepoints (Stdlib.Char.toString char) with
+    | [codepoint] -> if codepoint < 128L then Stdlib.UInt8.fromInt64 codepoint else None
+    | _ -> None
 
 impl Stdlib.ToString for Char =
   let toString = Stdlib.Char.toString

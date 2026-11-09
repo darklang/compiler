@@ -124,4 +124,4 @@ let stream (entry: Stdlib.__Http3Pool.Entry) (prepared: Stdlib.HttpClient.__Prep
     let initial = Stdlib.__Http3Client.Body { state = reply.state, events = reply.events, bytes = Stdlib.Blob.empty, position = 0L, finished = reply.finished } in
     let lease = Stdlib.__Http3Pool.BodyLease { entry = entry, cell = Stdlib.Stream.__cellNew initial, lifecycle = lifecycle, returnOwner = returnOwner } in
     let body = Stdlib.Stream.__new (fun _unit -> Stdlib.__Http3Pool.__bodyNext lease) (fun _unit -> Stdlib.__Http3Pool.__bodyClose lease) in
-    Ok (Stdlib.HttpClient.StreamResponse { statusCode = Stdlib.Int.fromInt64 reply.head.status, headers = reply.head.headers, body = body })
+    Ok (Stdlib.HttpClient.StreamResponse { statusCode = reply.head.status, headers = reply.head.headers, body = body })

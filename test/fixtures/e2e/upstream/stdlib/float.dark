@@ -1,43 +1,43 @@
 Stdlib.Float.add 1.2 1.3 = 2.5
 
-Stdlib.Float.ceiling 1.3 = 2
-Stdlib.Float.ceiling 1.0000001 = 2
-Stdlib.Float.ceiling -2147483647.8 = -2147483647
-Stdlib.Float.ceiling 2147483647.0 = 2147483647
-Stdlib.Float.ceiling 0000000.1 = 1
-Stdlib.Float.ceiling 0.0 = 0
-Stdlib.Float.ceiling 17.55042081 = 18
+Stdlib.Float.ceiling 1.3 = 2L
+Stdlib.Float.ceiling 1.0000001 = 2L
+Stdlib.Float.ceiling -2147483647.8 = -2147483647L
+Stdlib.Float.ceiling 2147483647.0 = 2147483647L
+Stdlib.Float.ceiling 0000000.1 = 1L
+Stdlib.Float.ceiling 0.0 = 0L
+Stdlib.Float.ceiling 17.55042081 = 18L
 
-Stdlib.Float.roundUp 1.3 = 2
-Stdlib.Float.roundUp 1.0000001 = 2
-Stdlib.Float.roundUp -2147483647.8 = -2147483647
-Stdlib.Float.roundUp 2147483647.0 = 2147483647
-Stdlib.Float.roundUp 0000000.1 = 1
-Stdlib.Float.roundUp 0.0 = 0
+Stdlib.Float.roundUp 1.3 = 2L
+Stdlib.Float.roundUp 1.0000001 = 2L
+Stdlib.Float.roundUp -2147483647.8 = -2147483647L
+Stdlib.Float.roundUp 2147483647.0 = 2147483647L
+Stdlib.Float.roundUp 0000000.1 = 1L
+Stdlib.Float.roundUp 0.0 = 0L
 
-Stdlib.Float.floor 1.8 = 1
-Stdlib.Float.floor -1.0000001 = -2
-Stdlib.Float.floor -2147483647.8 = -2147483648
-Stdlib.Float.floor 2147483647.0 = 2147483647
-Stdlib.Float.floor 0000000.1 = 0
-Stdlib.Float.floor 0.0 = 0
+Stdlib.Float.floor 1.8 = 1L
+Stdlib.Float.floor -1.0000001 = -2L
+Stdlib.Float.floor -2147483647.8 = -2147483648L
+Stdlib.Float.floor 2147483647.0 = 2147483647L
+Stdlib.Float.floor 0000000.1 = 0L
+Stdlib.Float.floor 0.0 = 0L
 
-Stdlib.Float.roundDown 1.8 = 1
-Stdlib.Float.roundDown -1.0000001 = -2
-Stdlib.Float.roundDown -2147483647.8 = -2147483648
-Stdlib.Float.roundDown 2147483647.0 = 2147483647
-Stdlib.Float.roundDown 0000000.1 = 0
-Stdlib.Float.roundDown 0.0 = 0
+Stdlib.Float.roundDown 1.8 = 1L
+Stdlib.Float.roundDown -1.0000001 = -2L
+Stdlib.Float.roundDown -2147483647.8 = -2147483648L
+Stdlib.Float.roundDown 2147483647.0 = 2147483647L
+Stdlib.Float.roundDown 0000000.1 = 0L
+Stdlib.Float.roundDown 0.0 = 0L
 
-Stdlib.Float.round -2147483647.8 = -2147483648
-Stdlib.Float.round 0000000.1 = 0
-Stdlib.Float.round 2147483647.000009 = 2147483647
+Stdlib.Float.round -2147483647.8 = -2147483648L
+Stdlib.Float.round 0000000.1 = 0L
+Stdlib.Float.round 2147483647.000009 = 2147483647L
 
-Stdlib.Float.truncate -2367.9267 = -2367
-Stdlib.Float.truncate 000000.9 = 0
-Stdlib.Float.truncate -000000.9 = 0
-Stdlib.Float.truncate 0.0 = 0
-Stdlib.Float.truncate 2147483647.000009 = 2147483647
+Stdlib.Float.truncate -2367.9267 = -2367L
+Stdlib.Float.truncate 000000.9 = 0L
+Stdlib.Float.truncate -000000.9 = 0L
+Stdlib.Float.truncate 0.0 = 0L
+Stdlib.Float.truncate 2147483647.000009 = 2147483647L
 
 // NaN / Infinity have no Int representation -> Dark error, not a host crash
 Stdlib.Float.ceiling Builtin.testNan =
@@ -201,11 +201,11 @@ Stdlib.Float.parse "1.8E+308" = Stdlib.Result.Result.Ok Builtin.testInfinity
 Stdlib.Float.power 4.0 -0.5 = 0.5
 Stdlib.Float.power 4.0 0.5 = 2.0
 
-Stdlib.Float.roundTowardsZero -2367.9267 = -2367
-Stdlib.Float.roundTowardsZero 000000.9 = 0
-Stdlib.Float.roundTowardsZero -000000.9 = 0
-Stdlib.Float.roundTowardsZero 0.0 = 0
-Stdlib.Float.roundTowardsZero 2147483647.000009 = 2147483647
+Stdlib.Float.roundTowardsZero -2367.9267 = -2367L
+Stdlib.Float.roundTowardsZero 000000.9 = 0L
+Stdlib.Float.roundTowardsZero -000000.9 = 0L
+Stdlib.Float.roundTowardsZero 0.0 = 0L
+Stdlib.Float.roundTowardsZero 2147483647.000009 = 2147483647L
 
 Stdlib.Float.sqrt 25.0 = 5.0
 Stdlib.Float.sqrt 0.0 = 0.0
@@ -251,11 +251,11 @@ Stdlib.Float.toInt -1.9 = -1
 Stdlib.Float.toInt -3.0 = -3
 Stdlib.Float.toInt 0.1 = 0
 Stdlib.Float.toInt 2147483648.7 = 2147483648
-Stdlib.Float.toInt 2.5 = Stdlib.Float.roundTowardsZero 2.5
-Stdlib.Float.toInt -2.5 = Stdlib.Float.roundTowardsZero -2.5
+Stdlib.Float.toInt 2.5 = Stdlib.Int.fromInt64 (Stdlib.Float.roundTowardsZero 2.5)
+Stdlib.Float.toInt -2.5 = Stdlib.Int.fromInt64 (Stdlib.Float.roundTowardsZero -2.5)
 // Truncation and floor differ for negative values.
 Stdlib.Float.toInt -1.5 = -1
-Stdlib.Float.floor -1.5 = -2
+Stdlib.Float.floor -1.5 = -2L
 // NaN and infinities cannot become Ints.
 Stdlib.Float.toInt Builtin.testNan =
   error="Encountered out-of-range value for type of Int"

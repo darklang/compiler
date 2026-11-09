@@ -110,7 +110,7 @@ let __decodedHeaders (state: Stdlib.__Http3Message.State) (fields: List<(String 
 let __buffer (state: Stdlib.__Http3Message.State) (input: List<Stdlib.__Http3Stream.Event>) : Stdlib.Result.Result<Stdlib.__Http3Message.State, Stdlib.__Http3Wire.Failure> =
   let deferred = state.deferred @ input in
   let size = Stdlib.List.fold deferred 0L (fun size event -> match event with | Chunk ((_kind, bytes)) -> size + Stdlib.Blob.__byteLength bytes | _ -> size) in
-  if Stdlib.List.length deferred > 1024 || size > 65536L then Error (Stdlib.__Http3Wire.connectionFailure 263L "HTTP/3 blocked message buffer exceeds limit")
+  if Stdlib.List.__lengthInt deferred > 1024 || size > 65536L then Error (Stdlib.__Http3Wire.connectionFailure 263L "HTTP/3 blocked message buffer exceeds limit")
   else Ok { state with deferred = deferred }
 
 let __events (table: Stdlib.__QpackDecoder.State) (id: Int64) (state: Stdlib.__Http3Message.State) (input: List<Stdlib.__Http3Stream.Event>)

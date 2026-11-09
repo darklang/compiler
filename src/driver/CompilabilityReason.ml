@@ -9,11 +9,8 @@ let upstreamRenames =
   [
     ("Stdlib.Dict.containsKey", "Stdlib.Dict.member");
     ("Stdlib.Dict.toEntries", "Stdlib.Dict.toList");
-    ("Stdlib.List.concat", "Stdlib.List.append");
-    ("Stdlib.List.prepend", "Stdlib.List.push");
     ("Stdlib.Base16.encode", "Stdlib.Blob.toHex");
     ("Stdlib.Base16.decode", "Stdlib.Blob.fromHex");
-    ("Stdlib.Utf8.encode", "Stdlib.String.toBlob");
     ("Stdlib.Crypto.digestText", "Stdlib.String.digest");
   ]
 

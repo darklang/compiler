@@ -1,63 +1,77 @@
 module Darklang.Cli.Installation.Uninstall
 
 
-let removeDarklangDirectory
-  (host: Stdlib.Cli.Host.Host)
+/// The `.darklang` folder to delete for <param home>, or why it is not safe to: deleting relative
+/// to wherever `dark` happens to run is never what was meant.
+let darklangDirToRemove(home: String): Stdlib.Result.Result<String, String> =
+  Config.darklangHomeIn(home)
+  |> Stdlib.Result.mapError(fun e -> $"refusing to uninstall: {e}")
+
+
+/// Uninstall for <param home>: the folder is worked out and checked before anything is touched,
+/// so a refused uninstall leaves the shell alias where it was instead of half uninstalling.
+/// Then the alias goes, then the folder.
+let uninstallFrom(
+  home: String,
+  deleteAlias: Unit -> Stdlib.Result.Result<Unit, String>,
+  removeDirectory: String -> Stdlib.Result.Result<Unit, String>)
   : Stdlib.Result.Result<Unit, String> =
-  let darklangDir = Config.getDarklangHomeDir host
-  Stdlib.Cli.Unix.removeDirectory darklangDir
+  (darklangDirToRemove(home))
+  |> Stdlib.Result.andThen(fun dir ->
+    (deleteAlias())
+    |> Stdlib.Result.andThen(fun _ -> removeDirectory(dir)))
 
 
-let runUninstall
-  (host: Stdlib.Cli.Host.Host)
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Installation.Uninstall.runUninstall: Unknown function or value 'Stdlib.Cli.Unix.getHomeDirectory'"
+let runUninstall(
+  host: Stdlib.Cli.Host.Host)
   : Stdlib.Result.Result<Unit, String> =
   let result =
-    (Stdlib.Cli.Unix.deleteAlias host.defaultShell "dark")
-    |> Stdlib.Result.andThen (fun _ -> removeDarklangDirectory host)
+    match Stdlib.Cli.Unix.getHomeDirectory() with
+    | Ok(home) ->
+      uninstallFrom(
+        home,
+        fun () -> Stdlib.Cli.Unix.deleteAlias(host.defaultShell, "dark"),
+        fun dir -> Stdlib.Cli.Unix.removeDirectory(dir))
+    | Error(e) -> Stdlib.Result.Result.Error($"couldn't find your home directory: {e}")
 
   match result with
-  | Ok _ -> Stdlib.Result.Result.Ok()
-  | Error err -> Stdlib.Result.Result.Error $"Error uninstalling dark: {err}"
+  | Ok(_) -> Stdlib.Result.Result.Ok()
+  | Error(err) -> Stdlib.Result.Result.Error($"Error uninstalling dark: {err}")
 
 // CLI interface functions
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let execute (state: AppState) (args: List<String>) : AppState =
-  let currentMode = Installation.System.getInstallationMode ()
-  let host = (Stdlib.Cli.Host.getRuntimeHost ()) |> Builtin.unwrap
+let execute(state: AppState, args: List<String>): AppState =
+  let host = (Stdlib.Cli.Host.getRuntimeHost()) |> Builtin.unwrap
 
   // Parse flags
-  let autoConfirm =
-    (Stdlib.List.contains args "--yes") || (Stdlib.List.contains args "-y")
+  let confirm =
+    Cli.Confirm.assumeIf(
+      (Stdlib.List.contains(args, "--yes")) || (Stdlib.List.contains(args, "-y")))
 
-  match currentMode with
-  | Installed ->
-    match Installation.System.uninstallWithConfirmation host autoConfirm with
-    | Ok message ->
-      Stdlib.printLine (View.formatSuccess message)
-      // Exit after successful uninstall since the executable is being removed
-      { state with isExiting = true }
-    | Error e ->
-      Stdlib.printErrorLine (View.formatError e)
-      Cli.exitWith state false
-  | Portable ->
-    Stdlib.printLine (View.formatError "Cannot uninstall - running in portable mode")
-    Stdlib.printLine "To remove this portable installation, simply delete the current directory"
-    state
+  match Installation.System.uninstallWithConfirmation(host, confirm) with
+  | Ok(message) ->
+    Stdlib.printLine(View.formatSuccess(message))
+    // Exit after successful uninstall since the executable is being removed
+    { state with isExiting = true }
+  | Error(e) ->
+    Stdlib.printErrorLine(View.formatError(e))
+    Cli.failed(state)
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let complete (_state: AppState) (_args: List<String>) : List<Completion.CompletionItem> =
+let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let help (_state: AppState) : String =
+let help(_state: AppState): String =
   [ "Usage: uninstall [--yes|-y]"
-    "Uninstall Darklang CLI from global installation."
+    "Uninstall Darklang CLI from your user account."
     ""
-    "Removes the CLI from ~/.darklang/ and cleans up shell configuration."
-    "Only available for global installations."
+    "Removes ~/.darklang/ (the CLI and everything you've made) and cleans up"
+    "shell configuration."
     ""
     "Flags:"
     "  --yes, -y  Skip confirmation prompt" ]
-  |> Stdlib.String.join "\n"
+  |> Stdlib.String.join("\n")

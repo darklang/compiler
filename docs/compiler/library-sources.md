@@ -19,9 +19,10 @@ the move preserves their source bytes and declaration order. Env, File, Process,
 Sys, and root Cli execution under `packages/darklang/stdlib/cli/` are byte-identical
 to the porting pin in `porting/sources.yaml`. Moving files does not advance the
 general historical source baseline or establish compatibility with that pin.
-Option, Result, Tuple2, Tuple3, Fun, Duration, and Retry are also byte-identical
-to the interpreter revision in `porting/sources.yaml`, including their public
-documentation. These packages use the compiler's existing native dependencies.
+Option, Result, Tuple2, Tuple3 and Fun are also byte-identical to the
+interpreter revision before the current pin, including their public
+documentation. Pretty, Duration and Retry are no longer copied: the imported
+originals at the pin are selected. These packages use the compiler's existing native dependencies.
 Individual portable functions and types in List, Dict, String, Char, numeric,
 HTTP, HTML, Diff, and JSON modules also track that pin; engine-specific adapters
 remain native. Sqlite contains only the shared cell type and pure accessors,
@@ -82,6 +83,7 @@ fragments use `__` even where the interpreter also has private helpers.
 | `packages/darklang/stdlib/int64.dark` | `Darklang.Stdlib.Int64`  | `packages/darklang/stdlib/int64.dark` |
 | `packages/darklang/stdlib/int/__integer.dark` | `Darklang.Stdlib.Int`  | Compiler arbitrary-precision integer representation; package defined in `packages/darklang/stdlib/int.dark` |
 | `packages/darklang/stdlib/int.dark` | `Darklang.Stdlib.Int`  | `packages/darklang/stdlib/int.dark` |
+| `packages/darklang/stdlib/bigInt.dark` | `Darklang.Stdlib.BigInt` | `packages/darklang/stdlib/bigInt.dark`: builtin-backed conversions forwarding to the compiler's arbitrary-precision Int |
 | `packages/darklang/stdlib/int128.dark` | `Darklang.Stdlib.Int128`  | `packages/darklang/stdlib/int128.dark` |
 | `packages/darklang/stdlib/uint8.dark` | `Darklang.Stdlib.UInt8`  | `packages/darklang/stdlib/uint8.dark` |
 | `packages/darklang/stdlib/uint16.dark` | `Darklang.Stdlib.UInt16`  | `packages/darklang/stdlib/uint16.dark` |
@@ -117,7 +119,6 @@ fragments use `__` even where the interpreter also has private helpers.
 | `packages/darklang/stdlib/cli/posix.dark` | `Darklang.Stdlib.Cli.Posix`  | `packages/darklang/stdlib/cli/posix.dark` |
 | `packages/darklang/stdlib/cli/posix/__error.dark` | `Darklang.Stdlib.Cli.Posix` | Private conversion from the existing native CLI error record |
 | `packages/darklang/stdlib/cli/posix/openFlags.dark` | `Darklang.Stdlib.Cli.Posix.OpenFlags` | `packages/darklang/stdlib/cli/posix.dark` |
-| `packages/darklang/stdlib/retry.dark` | `Darklang.Stdlib.Retry`  | `packages/darklang/stdlib/retry.dark` |
 | `packages/darklang/stdlib/cli/path.dark` | `Darklang.Stdlib.Cli.Path`  | `packages/darklang/stdlib/cli/path.dark` |
 | `packages/darklang/stdlib/cli/file.dark` | `Darklang.Stdlib.Cli.File`  | `packages/darklang/stdlib/cli/file.dark` (unchanged copy at the porting pin) |
 | `packages/darklang/stdlib/cli/dir.dark` | `Darklang.Stdlib.Cli.Dir` | `packages/darklang/stdlib/cli/dir.dark` |
@@ -218,7 +219,6 @@ fragments use `__` even where the interpreter also has private helpers.
 | `packages/darklang/scm/branch.dark` | `Darklang.SCM.Branch`  | `packages/darklang/scm/branch.dark` |
 | `packages/darklang/stdlib/valueSearch.dark` | `Darklang.Stdlib.ValueSearch`  | `packages/darklang/stdlib/valueSearch.dark` |
 | `packages/darklang/stdlib/dateTime.dark` | `Darklang.Stdlib.DateTime`  | `packages/darklang/stdlib/dateTime.dark` |
-| `packages/darklang/stdlib/duration.dark` | `Darklang.Stdlib.Duration`  | `packages/darklang/stdlib/duration.dark` |
 | `packages/darklang/stdlib/blob.dark` | `Darklang.Stdlib.Blob`  | `packages/darklang/stdlib/blob.dark` |
 | `packages/darklang/stdlib/stream.dark` | `Darklang.Stdlib.Stream`  | `packages/darklang/stdlib/stream.dark` |
 | `packages/darklang/stdlib/html.dark` | `Darklang.Stdlib.Html`  | `packages/darklang/stdlib/html.dark` |
@@ -284,7 +284,6 @@ fragments use `__` even where the interpreter also has private helpers.
 | `packages/darklang/stdlib/httpClientSession.dark` | `Darklang.Stdlib.HttpClientSession` | Compiler extension: HTTP transport and secure server support |
 | `packages/darklang/stdlib/__httpsService.dark` | `Darklang.Stdlib.__HttpsService` | Compiler support: HTTP/2, HTTP/3, QUIC, or TLS protocol implementation |
 | `packages/darklang/stdlib/__httpsDns.dark` | `Darklang.Stdlib.__HttpsDns` | Compiler support: HTTP/2, HTTP/3, QUIC, or TLS protocol implementation |
-| `packages/darklang/stdlib/pretty.dark` | `Darklang.Stdlib.Pretty`  | `packages/darklang/stdlib/pretty.dark` |
 | `packages/darklang/stdlib/char.dark` | `Darklang.Stdlib.Char`  | `packages/darklang/stdlib/char.dark` |
 | `packages/darklang/stdlib/regex.dark` | `Darklang.Stdlib.Regex`  | `packages/darklang/stdlib/regex.dark` |
 | `packages/darklang/stdlib/base64.dark` | `Darklang.Stdlib.Base64`  | `packages/darklang/stdlib/base64.dark` |

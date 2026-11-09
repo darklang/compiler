@@ -28,7 +28,7 @@ let __withChildArgv (args: List<String>) (vector: RawPtr) (offset: Int64) (fn: R
 
 let __childStartAt (program: String) (args: List<String>) (inheritTerminal: Bool) (slot: Int64) : Int64 =
     let allArgs = Stdlib.List.push args program in
-    let vector = __mapped_alloc (Builtin.__posixInt64 (Stdlib.List.length allArgs + 1) * 8L) in
+    let vector = __mapped_alloc (Builtin.__posixInt64 (Stdlib.List.__lengthInt allArgs + 1) * 8L) in
     let record = Builtin.__childAddress slot in
     let _ = __raw_write_word record 16L -1L in
     let _ = __raw_write_word record 24L -1L in

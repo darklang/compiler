@@ -17,7 +17,7 @@
               Stdlib.__Tls13Handshake.finish complete.next))
        | _ -> Error "Unexpected handshake count"
  | _ -> Error "Invalid fixture")
-  = Ok ((0, 2L, "02000003010203", "010203", Ok ()))
+  = Ok ((0L, 2L, "02000003010203", "010203", Ok ()))
 
 (let input = Stdlib.Blob.fromHex "0200000301020308000000"
  match input with
@@ -58,16 +58,16 @@
      | _ -> Error "Unexpected handshake count")
   = Ok ((8L, ""))
 
-(let encoded = Stdlib.String.repeat "14000000" 64
+(let encoded = Stdlib.String.repeat "14000000" 64L
  match Stdlib.Blob.fromHex encoded with
  | Error _ -> Error "Invalid fixture"
  | Ok bytes ->
    match Stdlib.__Tls13Handshake.feed Stdlib.__Tls13Handshake.empty bytes with
    | Error error -> Error error
    | Ok result -> Ok (Stdlib.List.length result.messages))
-  = Ok 64
+  = Ok 64L
 
-(let encoded = Stdlib.String.repeat "14000000" 65
+(let encoded = Stdlib.String.repeat "14000000" 65L
  match Stdlib.Blob.fromHex encoded with
  | Error _ -> Error "Invalid fixture"
  | Ok bytes ->

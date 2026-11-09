@@ -14,7 +14,7 @@ let confirm (question: String) : Bool =
 let select (question: String) (choices: List<String>) : String =
     let _ = Builtin.printLine question in
     let _ =
-        Stdlib.List.indexedMap choices (fun i choice ->
+        Stdlib.List.__indexedMapInt choices (fun i choice ->
             Builtin.printLine (
                 "  " +
                 Stdlib.Cli.UI.Colors.boldText (Stdlib.Int.toString (i + 1)) +
@@ -28,7 +28,7 @@ let select (question: String) (choices: List<String>) : String =
     else
         let n = Stdlib.Result.withDefault parsed (Stdlib.Int.fromInt64 0L) in
         let index = Stdlib.Int.subtract n (Stdlib.Int.fromInt64 1L) in
-        match Stdlib.List.getAt choices index with
+        match Stdlib.List.__getAtInt choices index with
         | Some choice -> choice
         | None ->
             let _ = Builtin.printLine (Stdlib.Cli.UI.Colors.redText "Invalid selection") in

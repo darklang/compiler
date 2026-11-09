@@ -1,6 +1,6 @@
 module Darklang.Cli.Docs.CLI
 
-let content () : String =
+let content(): String =
   """# CLI Commands
 
 `help` lists every command, grouped. This is the ones you reach for, with a
@@ -25,7 +25,6 @@ use; it was a fifth name for `item`.
 
 ## Global flags
   --branch <name>   run ONE command on a branch, without switching to it
-  --entry-point <fn> run a package function for this invocation only; accepts a name or #hash
   --json            on any command that answers a question
 
 Branch context DOES persist: `dark switch <name>` moves you and the next `dark`
@@ -45,8 +44,8 @@ Your edits are LIVE as soon as you write them. There is no build step.
 
 ## Running
   eval <expr>       evaluate an expression -- this is how you call a function,
-                    e.g. `eval MyMod.myFn 1 2`
-  run-script <f>    run a .dark script file (`run` is an alias)
+                    e.g. `eval 'MyMod.myFn(1, 2)'`
+  run-script <f>    run a .dark script file (`run` is an alias; `docs scripts`)
   traces            what ran, and what it returned
 
 ## Looking around
@@ -65,7 +64,7 @@ Your edits are LIVE as soon as you write them. There is no build step.
   show <id>         what a commit committed, or what one op does
   discard           drop the whole draft
   undo <name>       step ONE item back a version
-  conflicts         review what a merge, rebase or sync auto-resolved
+  conflicts         review what a merge or rebase auto-resolved
   constraints       standing checks over the store
   ack <id>...       leave a constraint finding for now (`ack --all`)
   ops               read this branch's op log
@@ -90,7 +89,6 @@ Your edits are LIVE as soon as you write them. There is no build step.
 
 ## The full-screen experience (`dark` with no args opens it)
   workbench         the framed, navigable workbench (alias: wb)
-  outliner          the interactive tree outliner
 
 ## Config, and the rest
   install / update / uninstall / version   the `dark` binary itself

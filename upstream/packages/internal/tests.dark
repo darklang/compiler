@@ -3,29 +3,29 @@ module Darklang.Internal.Test
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Internal.Test.WTTest: Unknown type 'LanguageTools.WrittenTypes.Expr'"
 type WTTest =
   { name: String
-    lineNumber: Int
+    lineNumber: Int64
     actual: LanguageTools.WrittenTypes.Expr
     expected: LanguageTools.WrittenTypes.Expr }
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Internal.Test.PTTest: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 type PTTest =
   { name: String
-    lineNumber: Int
+    lineNumber: Int64
     actual: LanguageTools.ProgramTypes.Expr
     expected: LanguageTools.ProgramTypes.Expr }
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.WrittenTypes.ParsedFile'"
-let parseTest
-  (pf: LanguageTools.WrittenTypes.ParsedFile)
+let parseTest(
+  pf: LanguageTools.WrittenTypes.ParsedFile)
   : Stdlib.Result.Result<WTTest, String> =
   let exprsToEval =
     match pf with
-    | SourceFile s -> s.exprsToEval
+    | SourceFile(s) -> s.exprsToEval
     | _ -> []
 
   match exprsToEval with
-  | [] -> Stdlib.Result.Result.Error "no exprs to eval"
-  | _ :: _ :: _ -> Stdlib.Result.Result.Error "expected exactly one expr to eval"
+  | [] -> Stdlib.Result.Result.Error("no exprs to eval")
+  | [_, _, ...] -> Stdlib.Result.Result.Error("expected exactly one expr to eval")
   | [ e ] ->
     match e with
     | EInfix(r, _, actual, expected) ->
@@ -36,21 +36,22 @@ let parseTest
           expected = expected })
       |> Stdlib.Result.Result.Ok
 
-    | _ -> Stdlib.Result.Result.Error "expected x = y format"
+    | _ -> Stdlib.Result.Result.Error("expected x = y format")
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PTTest'"
-let parseSingleTestFromFile
-  (filename: String)
-  (testSource: String)
+let parseSingleTestFromFile(
+  filename: String,
+  testSource: String)
   : Stdlib.Result.Result<PTTest, String> =
   match testSource |> LanguageTools.Parser.Parse.initialParse with
-  | Error e -> Stdlib.Result.Result.Error e
-  | Ok parsedFile ->
-    match Test.parseTest parsedFile with
-    | Error e -> Stdlib.Result.Result.Error e
-    | Ok wtTest ->
+  | Error(e) ->
+    Stdlib.Result.Result.Error(LanguageTools.Parser.Parse.ParseError.toString(e))
+  | Ok(parsedFile) ->
+    match Test.parseTest(parsedFile) with
+    | Error(e) -> Stdlib.Result.Result.Error(e)
+    | Ok(wtTest) ->
       let lineNumber = wtTest.lineNumber
-      let pm = LanguageTools.PackageManager.pm ()
+      let pm = LanguageTools.PackageManager.pm()
 
       let ctx =
         LanguageTools.NameResolver.NRContext
@@ -67,16 +68,16 @@ let parseSingleTestFromFile
             localBindings = [] }
 
       let (actual, _unres) =
-        LanguageTools.WrittenTypesToProgramTypes.Expr.toPT
-          ctx
-          context
-          wtTest.actual
+        LanguageTools.WrittenTypesToProgramTypes.Expr.toPT(
+          ctx,
+          context,
+          wtTest.actual)
 
       let (expected, _unres) =
-        LanguageTools.WrittenTypesToProgramTypes.Expr.toPT
-          ctx
-          context
-          wtTest.expected
+        LanguageTools.WrittenTypesToProgramTypes.Expr.toPT(
+          ctx,
+          context,
+          wtTest.expected)
 
       (PTTest
         { name = "test"

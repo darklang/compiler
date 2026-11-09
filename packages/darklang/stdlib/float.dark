@@ -27,7 +27,7 @@ let __sum (values: List<Float>) (total: Float) : Float =
 let __toBits (f: Float) : UInt64 = 0UL
 
 let toBits (value: Float) : UInt64 = Stdlib.Float.__toBits value
-let toInt (a: Float) : Int = Stdlib.Float.roundTowardsZero a
+let toInt (a: Float) : Int = Stdlib.Float.__roundTowardsZeroInt a
 
 let isNaN (value: Float) : Bool = value != value
 
@@ -51,36 +51,45 @@ let __smallUInt64ToInt64 (n: UInt64) : Int64 =
 
 // Float rounding returns the interpreter's arbitrary-precision Int, not the
 // compiler-extension Int64 results exposed from Stdlib.Math.
-let truncate (value: Float) : Int = Stdlib.Int.fromFloat value
-let roundTowardsZero (value: Float) : Int = Stdlib.Float.truncate value
+let __truncateInt (value: Float) : Int = Stdlib.Int.fromFloat value
+let __roundTowardsZeroInt (value: Float) : Int = Stdlib.Float.__truncateInt value
 
-let floor (value: Float) : Int =
-    let truncated = Stdlib.Float.truncate value in
+let __floorInt (value: Float) : Int =
+    let truncated = Stdlib.Float.__truncateInt value in
     if value < Stdlib.Int.toFloat truncated then
         Stdlib.Int.subtract truncated (Stdlib.Int.fromInt64 1L)
     else truncated
 
-let roundDown (value: Float) : Int = Stdlib.Float.floor value
+let __roundDownInt (value: Float) : Int = Stdlib.Float.__floorInt value
 
-let ceiling (value: Float) : Int =
-    let truncated = Stdlib.Float.truncate value in
+let __ceilingInt (value: Float) : Int =
+    let truncated = Stdlib.Float.__truncateInt value in
     if value > Stdlib.Int.toFloat truncated then
         Stdlib.Int.add truncated (Stdlib.Int.fromInt64 1L)
     else truncated
 
-let roundUp (value: Float) : Int = Stdlib.Float.ceiling value
+let __roundUpInt (value: Float) : Int = Stdlib.Float.__ceilingInt value
+
+// The public rounding functions answer an Int64, as in the interpreter.
+let truncate (value: Float) : Int64 = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.Float.__truncateInt value))
+let roundTowardsZero (value: Float) : Int64 = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.Float.__roundTowardsZeroInt value))
+let floor (value: Float) : Int64 = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.Float.__floorInt value))
+let roundDown (value: Float) : Int64 = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.Float.__roundDownInt value))
+let ceiling (value: Float) : Int64 = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.Float.__ceilingInt value))
+let roundUp (value: Float) : Int64 = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.Float.__roundUpInt value))
+let round (value: Float) : Int64 = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.Float.__roundInt value))
 
 let mod (value: Float) (modulus: Float) : Float =
-    value - Stdlib.Int.toFloat (Stdlib.Float.floor (value / modulus)) * modulus
+    value - Stdlib.Int.toFloat (Stdlib.Float.__floorInt (value / modulus)) * modulus
 
 let __isOdd (value: Int) : Bool =
     match Stdlib.Int.remainder value (Stdlib.Int.fromInt64 2L) with
     | Error message -> Builtin.crash message
     | Ok remainder -> Stdlib.Bool.not (remainder == Stdlib.Int.fromInt64 0L)
 
-let round (value: Float) : Int =
-    let lower = Stdlib.Float.floor value in
-    let upper = Stdlib.Float.ceiling value in
+let __roundInt (value: Float) : Int =
+    let lower = Stdlib.Float.__floorInt value in
+    let upper = Stdlib.Float.__ceilingInt value in
     let distance = value - Stdlib.Int.toFloat lower in
     if distance < 0.5 then lower
     else if distance > 0.5 then upper
@@ -153,7 +162,7 @@ let __scanMantissa (value: String) (index: Int64) (digits: String) (fractionalDi
         else Error Stdlib.Float.ParseError.BadFormat
 
 let __pow10 (exponent: Int64) : Int =
-    Stdlib.Int.__value ("1" + Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 exponent))
+    Stdlib.Int.__value ("1" + Stdlib.String.__repeatInt "0" (Stdlib.Int.fromInt64 exponent))
 
 let __powerOfTwo (exponent: Int64) : Int =
     Stdlib.Int.__value (Stdlib.Float.__multiplyTextByDigit "1" 2L exponent)
@@ -232,7 +241,7 @@ let __decimalToFloat (digits: String) (decimalExponent: Int64) (negative: Bool) 
                 let integer = Stdlib.Int.__value normalized in
                 let numerator =
                     if decimalExponent >= 0L then
-                        Stdlib.Int.__value (normalized + Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 decimalExponent))
+                        Stdlib.Int.__value (normalized + Stdlib.String.__repeatInt "0" (Stdlib.Int.fromInt64 decimalExponent))
                     else integer in
                 let denominator = if decimalExponent < 0L then Stdlib.Float.__pow10 (0L - decimalExponent) else Stdlib.Int.fromInt64 1L in
                 Stdlib.Float.__ratioToFloat numerator denominator in
@@ -273,8 +282,8 @@ let __renderDecimalCandidate (digits: String) (decimalExponent: Int64) (negative
     else
         let point = decimalExponent + 1L in
         let length = Stdlib.String.__byteLength digits in
-        if point <= 0L then sign + "0." + Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 (0L - point)) + digits
-        else if point >= length then sign + digits + Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 (point - length)) + ".0"
+        if point <= 0L then sign + "0." + Stdlib.String.__repeatInt "0" (Stdlib.Int.fromInt64 (0L - point)) + digits
+        else if point >= length then sign + digits + Stdlib.String.__repeatInt "0" (Stdlib.Int.fromInt64 (point - length)) + ".0"
         else sign + Stdlib.String.__byteTake digits point + "." + Stdlib.String.__byteDrop digits point
 
 let __hasNonzeroDigit (value: String) (index: Int64) : Bool =
@@ -285,7 +294,7 @@ let __hasNonzeroDigit (value: String) (index: Int64) : Bool =
 let __roundedSignificand (exactText: String) (precision: Int64) : String =
     let exactLength = Stdlib.String.__byteLength exactText in
     if exactLength <= precision then
-        exactText + Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 (precision - exactLength))
+        exactText + Stdlib.String.__repeatInt "0" (Stdlib.Int.fromInt64 (precision - exactLength))
     else
         let prefix = Stdlib.String.__byteTake exactText precision in
         let nextDigit = Stdlib.String.__byteAtUnchecked exactText precision - (48L) in
@@ -315,7 +324,7 @@ let __shortestCandidate (originalBits: UInt64) (exactText: String) (scale: Int64
             // A distance strictly inside half an ULP has the same bits;
             // a distance outside cannot. Ties still use the parser.
             let candidateText =
-                digits + Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 decimalExponent) in
+                digits + Stdlib.String.__repeatInt "0" (Stdlib.Int.fromInt64 decimalExponent) in
             let candidate = Stdlib.Int.__value candidateText in
             let exact = Stdlib.Int.__value exactText in
             let distance =

@@ -41,7 +41,7 @@ let main includePackages allBlocked root manifest output =
             (Filename.concat root file)
             In_channel.input_all
         in
-        let source = I.parse ~reasons text |> require in
+        let source = I.parse ~interpreterSource:(String.starts_with ~prefix:"upstream/" file) ~reasons text |> require in
         S.nodes file source
         |> List.filter (fun node ->
             match node.S.declaration with
@@ -89,7 +89,7 @@ let main includePackages allBlocked root manifest output =
             (Filename.concat root file)
             In_channel.input_all
         in
-        (file, I.parse ~reasons text |> require))
+        (file, I.parse ~interpreterSource:(String.starts_with ~prefix:"upstream/" file) ~reasons text |> require))
   in
   let selected =
     S.select ~context:SourceContracts.emptyContext ~roots ~supplements ~sources

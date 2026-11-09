@@ -2,13 +2,13 @@
 // by the prebuilt library. Exercise the observable result through E2E.
 
 module Darklang.LanguageTools.PackageManager =
-  let countMatchingPrefix (a: List<String>) (b: List<String>) : Int =
+  let countMatchingPrefix (a: List<String>) (b: List<String>) : Int64 =
     match (a, b) with
     | (aHead :: aTail, bHead :: bTail) ->
       if aHead == bHead then
-        1 + (countMatchingPrefix aTail bTail)
+        1L + (countMatchingPrefix aTail bTail)
       else
-        0
-    | _ -> 0
+        0L
+    | _ -> 0L
 
-Darklang.LanguageTools.PackageManager.countMatchingPrefix ["a", "b", "c"] ["a", "b", "x"] = 2
+Darklang.LanguageTools.PackageManager.countMatchingPrefix ["a", "b", "c"] ["a", "b", "x"] = 2L

@@ -99,7 +99,7 @@ let encode (state: Stdlib.__QpackEncoder.State) (stream: Int64) (fields: List<(S
   : Stdlib.Result.Result<Stdlib.__QpackEncoder.Encoded, String> =
   if stream < 0L || stream > 4611686018427387903L || stream % 4L != 0L || budget < 0L || budget > 65536L then Error "Invalid QPACK encoder budget or stream"
   else Stdlib.__Qpack.encode fields |> Stdlib.Result.map (fun fallback ->
-    if Stdlib.List.length state.sections >= 1024 || Stdlib.Blob.__byteLength state.instructions > budget then
+    if Stdlib.List.__lengthInt state.sections >= 1024 || Stdlib.Blob.__byteLength state.instructions > budget then
       Stdlib.__QpackEncoder.Encoded { state = state, bytes = fallback, instructions = Stdlib.Blob.empty }
     else
       let initial = Stdlib.__QpackEncoder.Selected { state = { state with instructions = Stdlib.Blob.empty }, fields = [], references = [], instructions = [state.instructions], budget = budget - Stdlib.Blob.__byteLength state.instructions } in
@@ -110,7 +110,7 @@ let encode (state: Stdlib.__QpackEncoder.State) (stream: Int64) (fields: List<(S
         | Literal bytes -> bytes
         | Reference index -> Stdlib.__Hpack.encodeInteger 6L 128L (required - index - 1L)) in
       let section = Stdlib.__QpackEncoder.Section { stream = stream, required = required, references = selected.references } in
-      let sections = if required == 0L then selected.state.sections else Stdlib.List.append selected.state.sections [section] in
+      let sections = if required == 0L then selected.state.sections else Stdlib.List.concat selected.state.sections [section] in
       Stdlib.__QpackEncoder.Encoded { state = { selected.state with sections = sections },
         bytes = Stdlib.Blob.concat (Stdlib.List.push blocks (Stdlib.Blob.concat [Stdlib.__Hpack.encodeInteger 8L 0L count, Stdlib.__Hpack.encodeInteger 7L 0L 0L])),
         instructions = Stdlib.Blob.concat (Stdlib.List.reverse selected.instructions) })

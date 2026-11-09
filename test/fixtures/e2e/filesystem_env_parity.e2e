@@ -6,9 +6,9 @@ Stdlib.Cli.FileSystem.pathExists "/definitely/missing/dark-file" = false
 
 Stdlib.Cli.FileSystem.isDirectory "." = true
 
-match Stdlib.Cli.FileSystem.readFile "README.md" with | Ok blob -> (match Stdlib.Blob.toString blob with | Ok text -> Stdlib.String.length text > 0 | Error _ -> false) | Error _ -> false = stdout="true\n" stderr="" isolated=true
+match Stdlib.Cli.FileSystem.readFile "README.md" with | Ok blob -> (match Stdlib.Blob.toString blob with | Ok text -> Stdlib.String.length text > 0L | Error _ -> false) | Error _ -> false = stdout="true\n" stderr="" isolated=true
 
-Stdlib.List.length (Stdlib.Cli.FileSystem.listDirectory ".") > 0 = true isolated=true
+Stdlib.List.length (Stdlib.Cli.FileSystem.listDirectory ".") > 0L = true isolated=true
 
 Stdlib.Cli.FileSystem.listDirectory "/definitely/missing/dark-directory" = []
 

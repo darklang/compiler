@@ -7,8 +7,8 @@ name𐐨 = 7L
 $"😀{Stdlib.Int64.toString 𐐨}क्ष" = "😀41क्ष"
 'क्ष' = 'क्ष'
 '\u0915\u094D\u0937' = 'क्ष'
-Stdlib.String.length "क्ष" = 1
-Stdlib.String.length "क्ष😀" = 2
+Stdlib.String.length "क्ष" = 1L
+Stdlib.String.length "क्ष😀" = 2L
 "e\u0301" = "é"
 '👩‍💻' = '👩‍💻'
 // Dictionary key mismatches still fail at compilation.

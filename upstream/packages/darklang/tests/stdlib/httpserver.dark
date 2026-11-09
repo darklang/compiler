@@ -2,48 +2,75 @@
 // backend/testfiles/http-server exercise serve end to end.
 module Darklang.Stdlib.HttpServer.Tests
 
-test getMethod =
-  Stdlib.Test.all
-    [ // The method rides in `x-http-method`, and the header name is matched
-      // case-insensitively, so a client that capitalises it differently still gets
-      // its method honoured.
-      Stdlib.HttpServer.getMethod
-        (Stdlib.Http.Request
-          { url = "/"
-            headers = [ ("x-http-method", "POST") ]
-            body = Stdlib.Blob.empty })
-      |> Stdlib.Test.equal "POST"
-      Stdlib.HttpServer.getMethod
-        (Stdlib.Http.Request
-          { url = "/"
-            headers = [ ("X-Http-Method", "DELETE") ]
-            body = Stdlib.Blob.empty })
-      |> Stdlib.Test.equal "DELETE"
-      // No header at all means GET, which is what a browser sends.
-      Stdlib.HttpServer.getMethod
-        (Stdlib.Http.Request { url = "/", headers = [], body = Stdlib.Blob.empty })
-      |> Stdlib.Test.equal "GET"
-      // An unrelated header is not the method.
-      Stdlib.HttpServer.getMethod
-        (Stdlib.Http.Request
-          { url = "/"
-            headers = [ ("Accept", "text/html") ]
-            body = Stdlib.Blob.empty })
-      |> Stdlib.Test.equal "GET" ]
+// Route a request to /notes through a GET and a POST handler, returning the
+// status and body text.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpServer.Tests.routeNotes: Unknown function or value 'Stdlib.Bytes.empty'"
+let routeNotes(method: String, headers: List<String * String>): (Int64 * String) =
+  let handlers =
+    [ Stdlib.HttpServer.get("/notes", fun req -> Stdlib.Http.responseWithText(200, "list"))
+      Stdlib.HttpServer.post("/notes", fun req -> Stdlib.Http.responseWithText(200, "created")) ]
+
+  let response =
+    Stdlib.HttpServer.routeRequest(
+      handlers,
+      Stdlib.Http.Request
+        { method = method, url = "/notes", headers = headers, body = Stdlib.Bytes.empty })
+
+  (response.statusCode, Stdlib.Utf8.decodeWithReplacement(response.body))
+
+// The request's `method` picks the handler, and a header that looks like a
+// method does not.
+// @compiler xfail compile: "Unknown function or value 'routeNotes'" class=missing-support reason=upstream-dependency
+test routeRequestByMethod =
+  Stdlib.Test.all(
+    [ routeNotes("GET", []) |> Stdlib.Test.equal((200, "list"))
+      routeNotes("POST", []) |> Stdlib.Test.equal((200, "created"))
+      routeNotes("GET", [ ("x-http-method", "POST") ]) |> Stdlib.Test.equal((200, "list"))
+      (Stdlib.Tuple2.first(routeNotes("DELETE", []))) |> Stdlib.Test.equal(404) ])
 
 // `get`/`post` build the Handler a record literal would, so a route table reads as
 // routes.
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
 test routes =
-  Stdlib.Test.all
-    [ (Stdlib.HttpServer.get "/ping" (fun req ->
+  Stdlib.Test.all(
+    [ (Stdlib.HttpServer.get("/ping", fun req ->
          Stdlib.Http.Response
-           { statusCode = 200, headers = [], body = Stdlib.Blob.empty })).route
-      |> Stdlib.Test.equal "/ping"
-      (Stdlib.HttpServer.get "/ping" (fun req ->
+           { statusCode = 200, headers = [], body = Stdlib.Bytes.empty })).route
+      |> Stdlib.Test.equal("/ping")
+      (Stdlib.HttpServer.get("/ping", fun req ->
          Stdlib.Http.Response
-           { statusCode = 200, headers = [], body = Stdlib.Blob.empty })).method
-      |> Stdlib.Test.equal "GET"
-      (Stdlib.HttpServer.post "/ops" (fun req ->
+           { statusCode = 200, headers = [], body = Stdlib.Bytes.empty })).method
+      |> Stdlib.Test.equal("GET")
+      (Stdlib.HttpServer.post("/ops", fun req ->
          Stdlib.Http.Response
-           { statusCode = 200, headers = [], body = Stdlib.Blob.empty })).method
-      |> Stdlib.Test.equal "POST" ]
+           { statusCode = 200, headers = [], body = Stdlib.Bytes.empty })).method
+      |> Stdlib.Test.equal("POST") ])
+
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
+test getPath =
+  [ ("/users/42?x=1", "/users/42")
+    ("http://localhost:9000/a/b?x=1", "/a/b")
+    ("http://localhost:9000", "/")
+    ("http://localhost:9000//a", "//a")
+    ("/", "/")
+    // Kept as written: not decoded, and characters a client may send raw survive.
+    ("/a%20b/c|d[e]", "/a%20b/c|d[e]")
+    ("users/42", "/users/42")
+    // The host is the client's; a bad one does not route to "/".
+    ("http://123:8000/x?y=1", "/x")
+    ("http://999.1.1.1:8000/x", "/x")
+    ("http://[nope]/a/b#f", "/a/b")
+    ("http://h?x=/y", "/")
+    // What the server hands over for an absolute-form target (`GET http://x/y`).
+    ("http://x/y?z=2", "/y")
+    // Asterisk form never reaches a handler (the listener answers 400), but
+    // does not crash here either.
+    ("*", "/*") ]
+  |> Stdlib.List.map(fun pair ->
+    let (url, expected) = pair
+
+    Stdlib.HttpServer.getPath(
+      Stdlib.Http.Request
+        { method = "GET", url = url, headers = [], body = Stdlib.Bytes.empty })
+    |> Stdlib.Test.equal(expected))
+  |> Stdlib.Test.all

@@ -42,7 +42,7 @@ let __parameters (source: Blob) : Stdlib.Result.Result<Blob, String> =
       Stdlib.__QuicWire.integer value |> Stdlib.Result.andThen (Stdlib.__QuicClient.__parameter id)
         |> Stdlib.Result.map (fun bytes -> Stdlib.List.push chunks bytes))) in
   match encoded, Stdlib.__QuicClient.__parameter 12L Stdlib.Blob.empty, Stdlib.__QuicClient.__parameter 15L source with
-  | Ok chunks, Ok migration, Ok source -> Ok (Stdlib.Blob.concat (Stdlib.List.append (Stdlib.List.reverse chunks) [migration, source]))
+  | Ok chunks, Ok migration, Ok source -> Ok (Stdlib.Blob.concat (Stdlib.List.concat (Stdlib.List.reverse chunks) [migration, source]))
   | _, _, _ -> Error "QUIC local transport parameter encoding failed"
 
 let __initial (state: Stdlib.__QuicClient.Flight) (packet: Stdlib.__QuicPacket.Protected) (now: Int64)
@@ -121,7 +121,7 @@ let __packets (state: Stdlib.__QuicClient.Flight) (bytes: Blob) (now: Int64)
           | Initial -> if state.handshake.recovery.largestSent >= 0L then Ok state else Stdlib.__QuicClient.__initial state packet now
           | Handshake -> Stdlib.__QuicClient.__handshake state packet now
           | OneRtt -> if Stdlib.List.fold state.pending 0L (fun size bytes -> size + Stdlib.Blob.__byteLength bytes) + Stdlib.Blob.__byteLength packet.bytes > 4096L then Ok state
-                      else Ok (Stdlib.__QuicClient.__flight state state.identity state.initial state.handshake state.tls (Stdlib.List.append state.pending [packet.bytes]))
+                      else Ok (Stdlib.__QuicClient.__flight state state.identity state.initial state.handshake state.tls (Stdlib.List.concat state.pending [packet.bytes]))
           | ZeroRtt -> Ok state in
         next |> Stdlib.Result.andThen (fun next -> Stdlib.__QuicClient.__packets next packet.remaining now)
     | Ok (Retry packet) -> Stdlib.__QuicClient.__retry state packet now
@@ -218,7 +218,7 @@ let connect (peer: Stdlib.__Datagram.Endpoint) (host: String) (roots: List<Blob>
   : Stdlib.Result.Result<Stdlib.__QuicClient.Ready, String> =
   if timeout < 1L || timeout > 60000L then Error "Invalid QUIC handshake timeout"
   else
-    let bound = if Stdlib.List.length peer.address == 16 then Stdlib.__Datagram.bind6 [0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L] 0L
+    let bound = if Stdlib.List.__lengthInt peer.address == 16 then Stdlib.__Datagram.bind6 [0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L] 0L
                 else Stdlib.__Datagram.bind4 [0L,0L,0L,0L] 0L in
     match bound with
     | Error _ -> Error "QUIC UDP socket creation failed"

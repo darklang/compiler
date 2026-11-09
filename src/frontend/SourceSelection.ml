@@ -315,11 +315,21 @@ let select ~context ~roots ~supplements ~sources =
         compilerOrder
       |> StringOrder.Map.of_list
     in
+    (* Imported declarations follow the compiler's, in import order, except
+       that their vals come first: a val is inferred where it stands, and an
+       imported fn may read a val from a file imported after its own
+       (prettyPrinter reads Stdlib.Pretty.hardLine). *)
     let rank node =
-      Option.value ~default:max_int
-        (StringOrder.Map.find_opt
-           (kind node.declaration ^ ":" ^ node.name)
-           order)
+      match
+        StringOrder.Map.find_opt (kind node.declaration ^ ":" ^ node.name) order
+      with
+      | Some index -> index
+      | None -> (
+          match node.declaration with
+          | W.DValue _ -> max_int - 1
+          | W.DFunction _ | W.DType _ | W.DTrait _ | W.DImpl _ | W.DModule _
+          | W.DExpr _ | W.DAssertion _ | W.DTest _ ->
+              max_int)
     in
     (* Values are inferred in source order. Preserve the order of explicitly
        supplied compiler implementation files when selecting replacements. *)

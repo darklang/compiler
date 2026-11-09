@@ -462,7 +462,7 @@ let __writerFieldName (writer: String) (name: String) : String =
 let __writerFinish (writer: String) : String = writer
 
 let __padNumber (value: String) (goalLength: Int64) : String =
-    match Stdlib.String.padStart value "0" (Stdlib.Int.fromInt64 goalLength) with
+    match Stdlib.String.__padStartInt value "0" (Stdlib.Int.fromInt64 goalLength) with
     | Ok padded -> padded
     | Error _ -> Builtin.crash "JSON numeric padding failed"
 
@@ -651,7 +651,7 @@ let __shiftIntegerDigits (digits: String) (shift: Int64) : Stdlib.Option.Option<
     if Stdlib.Json.__allZero digits 0L (Stdlib.String.__byteLength digits) then
         Stdlib.Option.Option.Some "0"
     else if shift >= 0L then
-        Stdlib.Option.Option.Some (digits + Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 shift))
+        Stdlib.Option.Option.Some (digits + Stdlib.String.__repeatInt "0" (Stdlib.Int.fromInt64 shift))
     else
         let remove = 0L - shift in
         let length = Stdlib.String.__byteLength digits in
@@ -779,7 +779,7 @@ let __viewFloat (source: String) (value: Stdlib.Json.__InternalValueView) : Stdl
 let __viewChar (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Char> =
     match Stdlib.Json.__stringValue source value with
     | Some text ->
-        if Stdlib.String.length text == 1 then
+        if Stdlib.String.__lengthInt text == 1 then
             Stdlib.Option.Option.Some (Stdlib.Char.__asChar text)
         else Stdlib.Option.Option.None
     | None -> Stdlib.Option.Option.None

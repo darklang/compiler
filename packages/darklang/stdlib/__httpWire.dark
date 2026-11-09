@@ -82,12 +82,12 @@ let __ipv6Valid (host: String) : Bool =
     match Stdlib.String.splitFirst host "::" with
     | None ->
         let groups = Stdlib.String.split host ":" in
-        Stdlib.List.length groups == 8 && Stdlib.__HttpWire.__ipv6GroupsValid groups
+        Stdlib.List.__lengthInt groups == 8 && Stdlib.__HttpWire.__ipv6GroupsValid groups
     | Some ((left, right)) ->
         if Stdlib.String.contains right "::" then false
         else
-            let leftCount = if left == "" then 0 else Stdlib.List.length (Stdlib.String.split left ":") in
-            let rightCount = if right == "" then 0 else Stdlib.List.length (Stdlib.String.split right ":") in
+            let leftCount = if left == "" then 0 else Stdlib.List.__lengthInt (Stdlib.String.split left ":") in
+            let rightCount = if right == "" then 0 else Stdlib.List.__lengthInt (Stdlib.String.split right ":") in
             leftCount + rightCount < 8 &&
             Stdlib.__HttpWire.__ipv6SideValid left && Stdlib.__HttpWire.__ipv6SideValid right
 

@@ -1,6 +1,6 @@
 // Assertions preserve the parsed layout and literal contents when compared or batched.
 let t (s: String) : Stdlib.Pretty.Doc = Stdlib.Pretty.text s
-let r (width: Int) (d: Stdlib.Pretty.Doc) : String = Stdlib.Pretty.render width d
+let r (width: Int) (d: Stdlib.Pretty.Doc) : String = Stdlib.Pretty.render (Builtin.unwrap (Stdlib.Int.toInt64 width)) d
 let g (d: Stdlib.Pretty.Doc) : Stdlib.Pretty.Doc = Stdlib.Pretty.group d
 
 r 80 (g (Stdlib.Pretty.concat

@@ -55,7 +55,6 @@ packages/darklang/stdlib/cli/posix.dark
 packages/darklang/stdlib/__printError.dark
 packages/darklang/stdlib/cli/posix/__error.dark
 packages/darklang/stdlib/cli/posix/openFlags.dark
-packages/darklang/stdlib/retry.dark
 packages/darklang/stdlib/cli/path.dark
 packages/darklang/stdlib/cli/file.dark
 packages/darklang/stdlib/cli/dir.dark
@@ -156,7 +155,6 @@ packages/darklang/languageTools/packageManager/pickContext.dark
 packages/darklang/scm/branch.dark
 packages/darklang/stdlib/valueSearch.dark
 packages/darklang/stdlib/dateTime.dark
-packages/darklang/stdlib/duration.dark
 packages/darklang/stdlib/blob.dark
 packages/darklang/stdlib/utf8.dark
 packages/darklang/stdlib/stream.dark
@@ -223,7 +221,6 @@ packages/darklang/stdlib/__httpSessionBatch.dark
 packages/darklang/stdlib/httpClientSession.dark
 packages/darklang/stdlib/__httpsService.dark
 packages/darklang/stdlib/__httpsDns.dark
-packages/darklang/stdlib/pretty.dark
 packages/darklang/stdlib/char.dark
 packages/darklang/stdlib/regex.dark
 packages/darklang/stdlib/base64.dark

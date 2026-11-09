@@ -17,7 +17,7 @@ Dict { "first": 1L, "second": "two" } = compileerror="Expected TInt64, got TStri
 // Construction, lookup, update, removal, and merge match the interpreter.
 Stdlib.Dict.isEmpty Stdlib.Dict.empty = true
 Stdlib.Dict.isEmpty (Stdlib.Dict.singleton "a" 1L) = false
-Stdlib.Dict.size (Dict { "a": 1L, "b": 2L }) = 2
+Stdlib.Dict.size (Dict { "a": 1L, "b": 2L }) = 2L
 Stdlib.Dict.get (Dict { "a": 1L }) "a" = Some 1L
 Stdlib.Dict.get (Dict { "a": 1L }) "missing" = None
 Stdlib.Dict.member (Dict { "a": 1L }) "a" = true
@@ -27,11 +27,11 @@ Stdlib.Dict.remove (Dict { "a": 1L }) "a" = Dict { }
 Stdlib.Dict.merge (Dict { "a": 1L, "shared": 2L }) (Dict { "shared": 3L, "z": 4L }) = Dict { "a": 1L, "shared": 3L, "z": 4L }
 Stdlib.Dict.setOverridingDuplicates (Dict { "a": 1L }) "a" 2L = Dict { "a": 2L }
 
-// Rejecting and overwriting paths are observably separate.
-Stdlib.Dict.set (Dict { "a": 1L }) "a" 2L = exit=1 stderr="Uncaught exception: Cannot add two dictionary entries with the same key \"a\"\n"
-let key = "d" + "ynamic" in Stdlib.Dict.set (Dict { "dynamic": 1L }) key 2L = exit=1 stderr="Uncaught exception: Cannot add two dictionary entries with the same key \"dynamic\"\n"
-Stdlib.Dict.fromList ([("a", 1L), ("b", 2L)]) = Some (Dict { "a": 1L, "b": 2L })
-Stdlib.Dict.fromList ([("a", 1L), ("a", 2L)]) = None
+// set replaces an existing key's value, as in main.
+Stdlib.Dict.set (Dict { "a": 1L }) "a" 2L = Dict { "a": 2L }
+let key = "d" + "ynamic" in Stdlib.Dict.set (Dict { "dynamic": 1L }) key 2L = Dict { "dynamic": 2L }
+Stdlib.Dict.fromList ([("a", 1L), ("b", 2L)]) = (Dict { "a": 1L, "b": 2L })
+Stdlib.Dict.fromList ([("a", 1L), ("a", 2L)]) = (Dict { "a": 2L })
 Stdlib.Dict.fromListOverwritingDuplicates ([("a", 1L), ("b", 2L), ("a", 3L)]) = Dict { "a": 3L, "b": 2L }
 
 // All traversal-based operations use String ordering and key-then-value callbacks.
@@ -47,6 +47,6 @@ Stdlib.Dict.iter (Dict { "b": 2L, "a": 1L }) (fun key value -> let ignored = Bui
 
 // Equality and rendering are content-based and independent of HAMT shape.
 Stdlib.Dict.setOverridingDuplicates (Stdlib.Dict.singleton "b" 2L) "a" 1L == Dict { "a": 1L, "b": 2L } = true
-Stdlib.Dict.fromList ([("b", 2L), ("a", 1L)]) == Some (Dict { "a": 1L, "b": 2L }) = true
+Stdlib.Dict.fromList ([("b", 2L), ("a", 1L)]) == (Dict { "a": 1L, "b": 2L }) = true
 Dict { "b": 2L, "a": 1L } != Dict { "a": 1L, "b": 2L } = false
 Dict { "nested": Dict { "b": 2L, "a": 1L }, "not an identifier": Dict { } } = stdout="Dict { nested = Dict { a = 1, b = 2 }, ``not an identifier`` = Dict { } }\n" stderr=""

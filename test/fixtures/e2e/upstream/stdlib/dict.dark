@@ -80,20 +80,20 @@ module FromListOverwritingDuplicates =
 #compileerror="Expected TList"
   Stdlib.Dict.fromListOverwritingDuplicates [ 1L ] = error="Darklang.Stdlib.Dict.fromListOverwritingDuplicates's 1st parameter `entries` expects List<(_ * _)>, but got List<Int64> ([1])"
 module FromList =
-  Stdlib.Dict.fromList [] = Stdlib.Option.Option.Some(Dict { })
+  Stdlib.Dict.fromList [] = (Dict { })
 
   Stdlib.Dict.fromList [ ("a", 1L), ("b", 2L), ("c", 3L) ] =
-    Stdlib.Option.Option.Some(Dict { "c": 3L, "b": 2L, "a": 1L })
+    (Dict { "c": 3L, "b": 2L, "a": 1L })
 
-  // CLEANUP this test feels surprising - should it error or something?
-  Stdlib.Dict.fromList [ ("duplicate_key", 1L), ("b", 2L), ("duplicate_key", 3L) ] = Stdlib.Option.Option.None
+  // The last of a repeated key wins.
+  Stdlib.Dict.fromList [ ("duplicate_key", 1L), ("b", 2L), ("duplicate_key", 3L) ] = (Dict { "duplicate_key": 3L, "b": 2L })
 
   Stdlib.Dict.fromList [ ("Content-Length", "0"), ("Server", "dark") ] =
-    Stdlib.Option.Option.Some(Dict { "Content-Length": "0", "Server": "dark" })
+    (Dict { "Content-Length": "0", "Server": "dark" })
 
   // @compiler blocked: compiler-gap
   Stdlib.Dict.fromList [ Builtin.testRuntimeError "err" ] = error="Uncaught exception: err"
-  Stdlib.Dict.fromList [ (1L, 1L) ] = Stdlib.Option.Option.Some(Dict { 1L: 1L })
+  Stdlib.Dict.fromList [ (1L, 1L) ] = (Dict { 1L: 1L })
 module Get =
   Stdlib.Dict.get (Dict { "key1": "val1" }) "key1" = Stdlib.Option.Option.Some "val1"
 
@@ -149,8 +149,8 @@ module Set =
   Stdlib.Dict.set (Dict { "key1": "val1" }) "key2" "val2" =
     (Dict { "key1": "val1", "key2": "val2" })
 
-  Stdlib.Dict.set (Dict { "key1": "val1before" }) "key1" "val1after" = error="Cannot add two dictionary entries with the same key \"key1\""
-  Stdlib.Dict.set (Dict { "key1": "val1", "key2": "val2" }) "key2" "newVal2" = error="Cannot add two dictionary entries with the same key \"key2\""
+  Stdlib.Dict.set (Dict { "key1": "val1before" }) "key1" "val1after" = (Dict { "key1": "val1after" })
+  Stdlib.Dict.set (Dict { "key1": "val1", "key2": "val2" }) "key2" "newVal2" = (Dict { "key1": "val1", "key2": "newVal2" })
 #compileerror="Expected TString, got TInt64"
   Dict { "key1": "val1", "key2": 2L } = error="Cannot add an Int64 (2) to a dict of String. Failed at key \"key2\"."
 #compileerror="Expected TString, got TInt64"
@@ -183,8 +183,8 @@ module Singleton =
 
 
 module Size =
-  Stdlib.Dict.size (Dict { "a": 3L, "b": 1L, "c": 1L }) = 3
-  Stdlib.Dict.size (Dict { }) = 0
+  Stdlib.Dict.size (Dict { "a": 3L, "b": 1L, "c": 1L }) = 3L
+  Stdlib.Dict.size (Dict { }) = 0L
 
 
 module ToList =
@@ -254,7 +254,7 @@ module NonStringKeys =
      Stdlib.Dict.get (Dict { nan: "nan" }) nan) = Stdlib.Option.Option.Some "nan"
 
     (let nan = Stdlib.Float.sqrt -1.0
-     Stdlib.Dict.size (Stdlib.Dict.setOverridingDuplicates (Dict { nan: "a" }) nan "b")) = 1
+     Stdlib.Dict.size (Stdlib.Dict.setOverridingDuplicates (Dict { nan: "a" }) nan "b")) = 1L
 
     (let inf = 1.0 / 0.0
      Stdlib.Dict.get (Dict { inf: "inf" }) inf) = Stdlib.Option.Option.Some "inf"
@@ -334,7 +334,7 @@ module NonStringKeys =
   module FromListInfersTypes =
 #compileerror="Expected TInt64, got TString"
     Stdlib.Dict.set
-      (Builtin.unwrap (Stdlib.Dict.fromList [ (1L, "a") ]))
+      (Stdlib.Dict.fromList [ (1L, "a") ])
       "b"
       "c" = error="Darklang.Stdlib.Dict.set's 2nd parameter `key` expects Int64, but got String (\"b\")"
 
@@ -345,15 +345,15 @@ module NonStringKeys =
       "c" = error="Darklang.Stdlib.Dict.set's 2nd parameter `key` expects Int64, but got String (\"b\")"
 
 #compileerror="Expected TString, got TInt64"
-    Stdlib.Dict.set (Builtin.unwrap (Stdlib.Dict.fromList [ (1L, "a") ])) 2L 3L = error="Darklang.Stdlib.Dict.set's 3rd parameter `val` expects String, but got Int64 (3)"
+    Stdlib.Dict.set (Stdlib.Dict.fromList [ (1L, "a") ]) 2L 3L = error="Darklang.Stdlib.Dict.set's 3rd parameter `val` expects String, but got Int64 (3)"
 
 #compileerror="Lambda requires an expected function type"
     Stdlib.Dict.fromList [ (1L, "a"), ((fun x -> x), "b") ] = error="Cannot use (lambda) as a dict key. Functions, streams, database references, blobs, and values containing them cannot be keys."
 
-    Stdlib.Dict.fromList [ (1L, "a"), (1L, "b") ] = Stdlib.Option.Option.None
+    Stdlib.Dict.fromList [ (1L, "a"), (1L, "b") ] = (Dict { 1L: "b" })
 
     Stdlib.Dict.fromList [ (2L, "b"), (1L, "a") ] =
-      Stdlib.Option.Option.Some(Dict { 1L: "a", 2L: "b" })
+      (Dict { 1L: "a", 2L: "b" })
 
   module IdentityMatchesEquality =
     (Point { x = 1L, y = 2L }) == (PointAlias { x = 1L, y = 2L }) = true

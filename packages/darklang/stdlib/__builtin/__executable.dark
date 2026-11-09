@@ -58,7 +58,7 @@ let __executableWalk (parts: List<String>) (remaining: List<String>) (links: Int
                 if links >= 40L || target == "" then None
                 else
                     let base = if Stdlib.String.startsWith target "/" then [] else parts in
-                    Builtin.__executableWalk base (Stdlib.List.append (Stdlib.String.split target "/") rest) (links + 1L)
+                    Builtin.__executableWalk base (Stdlib.List.concat (Stdlib.String.split target "/") rest) (links + 1L)
             | Error errno ->
                 if errno != 22L then None
                 else

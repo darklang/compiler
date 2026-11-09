@@ -1,6 +1,6 @@
 module Darklang.Cli.Docs.Stdlib
 
-let content () : String =
+let content(): String =
   """# Stdlib (Darklang.Stdlib)
 
 The standard library provides common data-structure operations,
@@ -12,13 +12,13 @@ string handling, JSON, HTTP, and other utilities — all written in Dark.
   view <fn>                        # see signature + source
 
 ## Key modules
-  Stdlib.List       Stdlib.String     Stdlib.Option
-  Stdlib.Result     Stdlib.Dict       Stdlib.Int
-  Stdlib.Json       Stdlib.Http       Stdlib.Uuid
+  Stdlib.List(Stdlib.String, Stdlib.Option)
+  Stdlib.Result(Stdlib.Dict, Stdlib.Int64)
+  Stdlib.Json(Stdlib.Http, Stdlib.Uuid)
 
 ## Shortcut
   `Stdlib.X` always resolves to `Darklang.Stdlib.X` from any module.
 
 ## Param order (collection usually first)
-  Stdlib.List.map list fn
-  Stdlib.String.join list separator"""
+  Stdlib.List.map(list, fn)
+  Stdlib.String.join(list, separator)"""

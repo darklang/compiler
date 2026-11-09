@@ -67,7 +67,8 @@ let rec collectHelperTypes symbols aliases expr =
         | ( Some
               ( "Darklang.Stdlib.List.reverse" | "Darklang.Stdlib.List.fold"
               | "Darklang.Stdlib.List.push" | "Darklang.Stdlib.List.map"
-              | "Darklang.Stdlib.List.append" | "Darklang.Stdlib.List.head"
+              | "Darklang.Stdlib.List.concat" | "Darklang.Stdlib.List.append"
+              | "Darklang.Stdlib.List.head"
               | "Darklang.Stdlib.List.getAt" | "Darklang.Stdlib.List.indexedMap"
               | "Darklang.Stdlib.Dict.__entries" ),
             _,

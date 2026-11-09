@@ -54,8 +54,8 @@ let isRoot () : Bool =
 
 let __text (buffer: Blob) (offset: Int) (length: Int) : String =
   Stdlib.Blob.toList buffer
-  |> Stdlib.List.drop offset
-  |> Stdlib.List.take length
+  |> Stdlib.List.__dropInt offset
+  |> Stdlib.List.__takeInt length
   |> Stdlib.List.takeWhile (fun byte -> byte != 0uy)
   |> Stdlib.String.fromBytesWithReplacement
 

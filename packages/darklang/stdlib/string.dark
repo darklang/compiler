@@ -162,10 +162,10 @@ let __codepointLength (value: String) : Int64 =
 
 let __codepointToInt (codepoint: Int64) : Int = Stdlib.Int.fromInt64 codepoint
 
-let toCodepoints (value: String) : List<Int> =
+let __toCodepointsInt (value: String) : List<Int> =
     Stdlib.List.map (Stdlib.String.__toCodepoints value) (fun codepoint -> Stdlib.String.__codepointToInt codepoint)
 
-let codepointLength (value: String) : Int =
+let __codepointLengthInt (value: String) : Int =
     Stdlib.Int.fromInt64 (Stdlib.String.__codepointLength value)
 
 let __getByteAtInt64 (value: String) (index: Int64) : Stdlib.Option.Option<UInt8> =
@@ -174,7 +174,7 @@ let __getByteAtInt64 (value: String) (index: Int64) : Stdlib.Option.Option<UInt8
     if index < 0L || index >= length then None
     else Stdlib.UInt8.fromInt64 (__raw_get_byte pointer (index + 16L))
 
-let getByteAt (value: String) (index: Int) : Stdlib.Option.Option<UInt8> =
+let __getByteAtInt (value: String) (index: Int) : Stdlib.Option.Option<UInt8> =
     match Stdlib.Int.toInt64 index with
     | None -> None
     | Some nativeIndex -> Stdlib.String.__getByteAtInt64 value nativeIndex
@@ -193,7 +193,7 @@ let __graphemeLength (value: String) : Int64 =
     if Stdlib.String.__isAscii value then Stdlib.String.__asciiGraphemeLengthAt value 0L 0L (-1L)
     else Stdlib.String.__Unicode.graphemeCountUtf8 value 0L [] 0L
 
-let length (value: String) : Int =
+let __lengthInt (value: String) : Int =
     Stdlib.Int.fromInt64 (Stdlib.String.__graphemeLength value)
 
 let __isWideCodepoint (codepoint: Int64) : Bool =
@@ -247,7 +247,7 @@ let __displayWidthGraphemes (graphemes: List<String>) (total: Int64) : Int64 =
         Stdlib.String.__displayWidthGraphemes rest (total + Stdlib.String.__clusterDisplayWidth cluster)
 
 /// How many cells `value` occupies in a fixed-width grid.
-let displayWidth (value: String) : Int =
+let __displayWidthInt (value: String) : Int =
     Stdlib.Int.fromInt64 (Stdlib.String.__displayWidthGraphemes (Stdlib.String.__toGraphemes value) 0L)
 
 let isEmpty (value: String) : Bool = Stdlib.String.__byteLength value == 0L
@@ -365,7 +365,7 @@ let join (strings: List<String>) (separator: String) : String =
         let _ = Stdlib.String.__copyJoinedStrings strings separator separatorLength pointer 16L true in
         Stdlib.String.__normalizeAfterConcat (__rawptr_to_string pointer)
 
-let repeat (value: String) (count: Int) : String =
+let __repeatInt (value: String) (count: Int) : String =
     let zero = Stdlib.Int.fromInt64 0L in
     if count <= zero then "" else Stdlib.String.__repeat value count ""
 
@@ -375,11 +375,11 @@ let __repeat (value: String) (remaining: Int) (acc: String) : String =
     else Stdlib.String.__repeat value (remaining - Stdlib.Int.fromInt64 1L) (acc + value)
 
 let __sliceGraphemes (graphemes: List<String>) (start_: Int) (end_: Int) : String =
-    Stdlib.String.join (Stdlib.List.take (Stdlib.List.drop graphemes start_) (end_ - start_)) ""
+    Stdlib.String.join (Stdlib.List.__takeInt (Stdlib.List.__dropInt graphemes start_) (end_ - start_)) ""
 
-let slice (value: String) (start_: Int) (end_: Int) : String =
+let __sliceInt (value: String) (start_: Int) (end_: Int) : String =
     let zero = Stdlib.Int.fromInt64 0L in
-    let count = Stdlib.String.length value in
+    let count = Stdlib.String.__lengthInt value in
     let normalizedStart = if start_ < zero then count + start_ else start_ in
     let normalizedEnd = if end_ < zero then count + end_ else end_ in
     let actualStart = if normalizedStart < zero then zero else if normalizedStart > count then count else normalizedStart in
@@ -387,39 +387,39 @@ let slice (value: String) (start_: Int) (end_: Int) : String =
     let actualEnd = if boundedEnd < actualStart then actualStart else boundedEnd in
     Stdlib.String.__sliceGraphemes (Stdlib.String.__toGraphemes value) actualStart actualEnd
 
-let first (string: String) (characterCount: Int) : String =
+let __firstInt (string: String) (characterCount: Int) : String =
   if characterCount < 0 then
     ""
-  else if characterCount > String.length string then
+  else if characterCount > String.__lengthInt string then
     string
   else
-    String.slice string 0 characterCount
+    String.__sliceInt string 0 characterCount
 
-let last (string: String) (characterCount: Int) : String =
+let __lastInt (string: String) (characterCount: Int) : String =
   if characterCount < 0 then
     ""
-  else if characterCount > String.length string then
+  else if characterCount > String.__lengthInt string then
     string
   else
-    String.slice
+    String.__sliceInt
       string
-      (String.length string - characterCount)
-      (String.length string)
+      (String.__lengthInt string - characterCount)
+      (String.__lengthInt string)
 
-let dropFirst (value: String) (count: Int) : String =
+let __dropFirstInt (value: String) (count: Int) : String =
     let zero = Stdlib.Int.fromInt64 0L in
-    if count < zero then value else Stdlib.String.slice value count (Stdlib.String.length value)
+    if count < zero then value else Stdlib.String.__sliceInt value count (Stdlib.String.__lengthInt value)
 
-let dropLast (string: String) (characterCount: Int) : String =
+let __dropLastInt (string: String) (characterCount: Int) : String =
   if characterCount < 0 then
     string
-  else if characterCount > String.length string then
+  else if characterCount > String.__lengthInt string then
     ""
   else
-    String.slice
+    String.__sliceInt
       string
       0
-      (String.length string - characterCount)
+      (String.__lengthInt string - characterCount)
 
 let head (str: String) : Option.Option<Char> =
   if str == "" then
@@ -427,8 +427,8 @@ let head (str: String) : Option.Option<Char> =
   else
     str |> String.toList |> List.head
 
-let charAt (str: String) (index: Int) : Option.Option<Char> =
-  str |> String.toList |> List.getAt index
+let __charAtInt (str: String) (index: Int) : Option.Option<Char> =
+  str |> String.toList |> List.__getAtInt index
 
 let map (s: String) (fn: Char -> Char) : String =
   s |> String.toList |> List.map fn |> String.fromList
@@ -496,12 +496,12 @@ let __utf16LengthToByte (value: String) (index: Int64) (end_: Int64) (total: Int
 let __utf16IndexAtByte (value: String) (byteIndex: Int64) : Int =
     Stdlib.Int.fromInt64 (Stdlib.String.__utf16LengthToByte value 0L byteIndex 0L)
 
-let indexOf (value: String) (search: String) : Stdlib.Option.Option<Int> =
+let __indexOfInt (value: String) (search: String) : Stdlib.Option.Option<Int> =
     match Stdlib.String.__byteIndexOf value search with
     | None -> None
     | Some index -> Some (Stdlib.String.__utf16IndexAtByte value index)
 
-let lastIndexOf (value: String) (search: String) : Stdlib.Option.Option<Int> =
+let __lastIndexOfInt (value: String) (search: String) : Stdlib.Option.Option<Int> =
     match Stdlib.String.__byteLastIndexOf value search with
     | None -> None
     | Some index -> Some (Stdlib.String.__utf16IndexAtByte value index)
@@ -527,7 +527,7 @@ let indexOfEgc (value: String) (search: String) : Stdlib.Option.Option<Int> =
         Stdlib.String.__egcIndex (Stdlib.String.__toGraphemes value) (Stdlib.String.__toGraphemes search) zero None None)
 
 let lastIndexOfEgc (value: String) (search: String) : Stdlib.Option.Option<Int> =
-    if Stdlib.String.isEmpty search then Some (Stdlib.String.length value)
+    if Stdlib.String.isEmpty search then Some (Stdlib.String.__lengthInt value)
     else Stdlib.Tuple2.second (
         Stdlib.String.__egcIndex (Stdlib.String.__toGraphemes value) (Stdlib.String.__toGraphemes search) (Stdlib.Int.fromInt64 0L) None None)
 
@@ -536,7 +536,7 @@ let __splitGraphemes (values: List<String>) (separator: List<String>) (current: 
     | [] -> Stdlib.List.reverse (Stdlib.List.push result (Stdlib.String.join (Stdlib.List.reverse current) ""))
     | head :: rest ->
         if Stdlib.String.__startsWithList values separator then
-            Stdlib.String.__splitGraphemes (Stdlib.List.drop values (Stdlib.List.length separator)) separator [] (Stdlib.List.push result (Stdlib.String.join (Stdlib.List.reverse current) ""))
+            Stdlib.String.__splitGraphemes (Stdlib.List.__dropInt values (Stdlib.List.__lengthInt separator)) separator [] (Stdlib.List.push result (Stdlib.String.join (Stdlib.List.reverse current) ""))
         else Stdlib.String.__splitGraphemes rest separator (Stdlib.List.push current head) result
 
 let split (value: String) (separator: String) : List<String> =
@@ -554,11 +554,11 @@ let splitFirst
     match String.indexOfEgc string separator with
     | None -> Option.Option.None
     | Some i ->
-      let before = String.first string i
-      let after = String.dropFirst string (i + String.length separator)
+      let before = String.__firstInt string i
+      let after = String.__dropFirstInt string (i + String.__lengthInt separator)
       Option.Option.Some((before, after))
 
-let splitN
+let __splitNInt
   (string: String)
   (separator: String)
   (n: Int)
@@ -570,9 +570,9 @@ let splitN
     match String.indexOfEgc string separator with
     | None -> [ string ]
     | Some i ->
-      let before = String.first string i
-      let rest = String.dropFirst string (i + String.length separator)
-      List.push (String.splitN rest separator (n - 1)) before
+      let before = String.__firstInt string i
+      let rest = String.__dropFirstInt string (i + String.__lengthInt separator)
+      List.push (String.__splitNInt rest separator (n - 1)) before
 
 let __replaceEmpty (graphemes: List<String>) (replacement: String) (acc: String) : String =
     match graphemes with
@@ -636,58 +636,48 @@ let trim (value: String) : String =
         else Stdlib.String.__byteSlice value start_ end_
     | _ -> Stdlib.String.__fromCodepoints (Stdlib.String.__trimEndCodepoints (Stdlib.String.__trimStartCodepoints (Stdlib.String.__toCodepoints value)))
 
-let padStart
+let __padStartInt
   (string: String)
   (padWith: String)
   (goalLength: Int)
   : Result.Result<String, String> =
-  if String.length padWith != 1 then
+  if String.__lengthInt padWith != 1 then
     Result.Result.Error
       $"Expected `padWith` to be 1 character long, but it was `\"{padWith}\"`"
-  else if String.length string >= goalLength then
+  else if String.__lengthInt string >= goalLength then
     Result.Result.Ok string
   else
-    let padCount = goalLength - String.length string
-    let pad = String.repeat padWith padCount
+    let padCount = goalLength - String.__lengthInt string
+    let pad = String.__repeatInt padWith padCount
     Result.Result.Ok(pad + string)
 
-let padEnd
+let __padEndInt
   (string: String)
   (padWith: String)
   (goalLength: Int)
   : Result.Result<String, String> =
-  if String.length padWith != 1 then
+  if String.__lengthInt padWith != 1 then
     Result.Result.Error
       $"Expected `padWith` to be 1 character long, but it was `\"{padWith}\"`"
-  else if String.length string >= goalLength then
+  else if String.__lengthInt string >= goalLength then
     Result.Result.Ok string
   else
-    let padCount = goalLength - String.length string
-    let pad = String.repeat padWith padCount
+    let padCount = goalLength - String.__lengthInt string
+    let pad = String.__repeatInt padWith padCount
     Result.Result.Ok(string + pad)
 
 // Pad to display cells without clipping text that already meets the target width.
-// The interpreter's padStart and padEnd: a Char of padding up to an Int64
-// length, the string unchanged when it is already that long.
-let padStartChar (s: String) (padWith: Char) (goalLength: Int64) : String =
-  let padCount = Stdlib.Int.fromInt64 goalLength - String.length s
-  if padCount <= 0 then s else (String.repeat (String.fromChar padWith) padCount) + s
-
-let padEndChar (s: String) (padWith: Char) (goalLength: Int64) : String =
-  let padCount = Stdlib.Int.fromInt64 goalLength - String.length s
-  if padCount <= 0 then s else s + (String.repeat (String.fromChar padWith) padCount)
-
 let padStartToWidth (s: String) (width: Int) : String =
-  let padding = width - (String.displayWidth s)
-  if padding <= 0 then s else (String.repeat " " padding) + s
+  let padding = width - (String.__displayWidthInt s)
+  if padding <= 0 then s else (String.__repeatInt " " padding) + s
 
 let padEndToWidth (s: String) (width: Int) : String =
-  let padding = width - (String.displayWidth s)
-  if padding <= 0 then s else s + (String.repeat " " padding)
+  let padding = width - (String.__displayWidthInt s)
+  if padding <= 0 then s else s + (String.__repeatInt " " padding)
 
 let ellipsis (s: String) (length: Int) : String =
-  if String.length s > length then
-    (String.slice s 0 length) + "..."
+  if String.__lengthInt s > length then
+    (String.__sliceInt s 0 length) + "..."
   else
     s
 
@@ -698,10 +688,10 @@ let articleFor (nextWord: String) : String =
   | None -> ""
   | Some c ->
     if
-      String.length nextWord > 1
+      String.__lengthInt nextWord > 1
       && (Bool.not (Char.isASCIILetter c))
     then
-      articleFor (String.dropFirst nextWord 1)
+      articleFor (String.__dropFirstInt nextWord 1)
     else if List.contains vowels c then
       "an"
     else
@@ -820,7 +810,7 @@ let digest (s: String) : String =
 
   sha384Hash |> Base64.urlEncode
 
-let random (length: Int) : Result.Result<String, String> =
+let __randomInt (length: Int) : Result.Result<String, String> =
   if length < 0 then
     Result.Result.Error
       $"Expected `length` to be positive, but it was `{length |> Stdlib.toString}`"
@@ -830,15 +820,72 @@ let random (length: Int) : Result.Result<String, String> =
 
     let randomChar =
       fun _ ->
-        (let index = Stdlib.Int.random 0 ((String.length characters) - 1)
-         String.slice characters index (index + 1))
+        (let index = Stdlib.Int.random 0 ((String.__lengthInt characters) - 1)
+         String.__sliceInt characters index (index + 1))
 
     let result =
-      (List.range 0 (length - 1))
+      (List.__rangeInt 0 (length - 1))
       |> List.map (fun _ -> randomChar ())
       |> String.join ""
 
     Result.Result.Ok result
+
+// The public String API: lengths, counts and indexes are Int64, as in the
+// interpreter. The compiler's own library code keeps the Int forms above.
+let length (value: String) : Int64 = Stdlib.String.__graphemeLength value
+
+let codepointLength (value: String) : Int64 = Stdlib.String.__codepointLength value
+
+let displayWidth (value: String) : Int64 =
+    Stdlib.String.__displayWidthGraphemes (Stdlib.String.__toGraphemes value) 0L
+
+let toCodepoints (value: String) : List<UInt32> =
+    Stdlib.List.map (Stdlib.String.__toCodepoints value) (fun codepoint -> Builtin.unwrap (Stdlib.UInt32.fromInt64 codepoint))
+
+let getByteAt (value: String) (index: Int64) : Stdlib.Option.Option<UInt8> =
+    Stdlib.String.__getByteAtInt64 value index
+
+let repeat (value: String) (count: Int64) : String =
+    Stdlib.String.__repeatInt value (Stdlib.Int.fromInt64 count)
+
+let slice (value: String) (from: Int64) (to_: Int64) : String =
+    Stdlib.String.__sliceInt value (Stdlib.Int.fromInt64 from) (Stdlib.Int.fromInt64 to_)
+
+let first (value: String) (characterCount: Int64) : String =
+    Stdlib.String.__firstInt value (Stdlib.Int.fromInt64 characterCount)
+
+let last (value: String) (characterCount: Int64) : String =
+    Stdlib.String.__lastInt value (Stdlib.Int.fromInt64 characterCount)
+
+let dropFirst (value: String) (characterCount: Int64) : String =
+    Stdlib.String.__dropFirstInt value (Stdlib.Int.fromInt64 characterCount)
+
+let dropLast (value: String) (characterCount: Int64) : String =
+    Stdlib.String.__dropLastInt value (Stdlib.Int.fromInt64 characterCount)
+
+let charAt (value: String) (index: Int64) : Stdlib.Option.Option<Char> =
+    if index < 0L then None else Stdlib.String.__charAtInt value (Stdlib.Int.fromInt64 index)
+
+let indexOf (value: String) (search: String) : Stdlib.Option.Option<Int64> =
+    Stdlib.Option.map (Stdlib.String.__indexOfInt value search) (fun index -> Builtin.unwrap (Stdlib.Int.toInt64 index))
+
+let lastIndexOf (value: String) (search: String) : Stdlib.Option.Option<Int64> =
+    Stdlib.Option.map (Stdlib.String.__lastIndexOfInt value search) (fun index -> Builtin.unwrap (Stdlib.Int.toInt64 index))
+
+let splitN (value: String) (separator: String) (n: Int64) : List<String> =
+    Stdlib.String.__splitNInt value separator (Stdlib.Int.fromInt64 n)
+
+// Pads with a Char up to an Int64 length; a string already that long is unchanged.
+let padStart (value: String) (padWith: Char) (goalLength: Int64) : String =
+    let padCount = goalLength - Stdlib.String.length value in
+    if padCount <= 0L then value else Stdlib.String.repeat (Stdlib.String.fromChar padWith) padCount + value
+
+let padEnd (value: String) (padWith: Char) (goalLength: Int64) : String =
+    let padCount = goalLength - Stdlib.String.length value in
+    if padCount <= 0L then value else value + Stdlib.String.repeat (Stdlib.String.fromChar padWith) padCount
+
+let random (length: Int64) : Result.Result<String, String> =
+    Stdlib.String.__randomInt (Stdlib.Int.fromInt64 length)
 
 impl Stdlib.ToString for String =
   let toString (value: String) : String = value
@@ -858,6 +905,6 @@ impl Stdlib.Compare for String =
 let slugify (s: String) : String =
   s
   |> Stdlib.String.toLowercase
-  |> (fun lowered -> Stdlib.Regex.replaceAll lowered "([^a-z0-9\\s_-]|\\x0b)+" "")
+  |> (fun lowered -> Stdlib.Regex.__replaceAllText lowered "([^a-z0-9\\s_-]|\\x0b)+" "")
   |> Stdlib.String.trim
-  |> (fun trimmed -> Stdlib.Regex.replaceAll trimmed "[-_\\s]+" "-")
+  |> (fun trimmed -> Stdlib.Regex.__replaceAllText trimmed "[-_\\s]+" "-")

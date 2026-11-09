@@ -6,17 +6,17 @@ type ParseError = | BadFormat
 
 /// Generate a new <type Uuid> v4 according to RFC 4122
 // @compiler replace: packages/darklang/stdlib/uuid.dark#Darklang.Stdlib.Uuid.generate reason=compiler-implementation
-let generate () : Uuid = Builtin.uuidGenerate ()
+let generate(): Uuid = Builtin.uuidGenerate()
 
 
 /// Parse a <type Uuid> of form {{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}}
 // @compiler replace: packages/darklang/stdlib/uuid.dark#Darklang.Stdlib.Uuid.parse reason=compiler-implementation
-let parse (uuid: String) : Stdlib.Result.Result<Uuid, Stdlib.Uuid.ParseError> =
-  Builtin.uuidParse uuid
+let parse(uuid: String): Stdlib.Result.Result<Uuid, Stdlib.Uuid.ParseError> =
+  Builtin.uuidParse(uuid)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uuid.dark; importing another declaration of Darklang.Stdlib.Uuid.impl ToString for Uuid requires an explicit replacement contract"
 impl ToString for Uuid =
   /// Stringify <param uuid> to the format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Uuid.impl ToString for Uuid: Already selected from packages/darklang/stdlib/uuid.dark; importing another declaration of Darklang.Stdlib.Uuid.impl ToString for Uuid requires an explicit replacement contract"
-  let toString (uuid: Uuid) : String = Builtin.uuidToString uuid
+  let toString(uuid: Uuid): String = Builtin.uuidToString(uuid)

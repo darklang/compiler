@@ -5,7 +5,7 @@ let buildTrmcList (remaining: Int64) : List<Int64> =
     if remaining <= 0L then []
     else Stdlib.List.push<Int64> (buildTrmcList (remaining - 1L)) remaining
 
-Stdlib.List.length (buildTrmcList 150000L) = 150000
+Stdlib.List.length (buildTrmcList 150000L) = 150000L
 
 type TrmcChain = TrmcEnd of Int64 | TrmcNext of TrmcChain
 

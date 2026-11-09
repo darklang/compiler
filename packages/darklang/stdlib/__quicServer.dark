@@ -23,7 +23,7 @@ let __parameters (source: Blob) (original: Blob) : Stdlib.Result.Result<Blob, St
     Stdlib.__QuicWire.integer value |> Stdlib.Result.andThen (Stdlib.__QuicClient.__parameter id) |> Stdlib.Result.map (fun bytes -> Stdlib.List.push chunks bytes)))
     |> Stdlib.Result.andThen (fun chunks ->
       match Stdlib.__QuicClient.__parameter 0L original, Stdlib.__QuicClient.__parameter 15L source, Stdlib.__QuicClient.__parameter 16L source, Stdlib.__QuicClient.__parameter 12L Stdlib.Blob.empty with
-      | Ok original, Ok source, Ok retry, Ok migration -> Ok (Stdlib.Blob.concat (Stdlib.List.append (Stdlib.List.reverse chunks) [original, source, retry, migration]))
+      | Ok original, Ok source, Ok retry, Ok migration -> Ok (Stdlib.Blob.concat (Stdlib.List.concat (Stdlib.List.reverse chunks) [original, source, retry, migration]))
       | _, _, _, _ -> Error "QUIC server transport parameter encoding failed")
 
 let __queueCrypto (space: Stdlib.__QuicSpace.State) (bytes: Blob) (base: Int64) (offset: Int64) : Stdlib.Result.Result<Stdlib.__QuicSpace.State, String> =
@@ -98,8 +98,8 @@ let packets (state: Stdlib.__QuicServer.Flight) (bytes: Blob) (now: Int64) : Std
         | Initial -> Stdlib.__QuicServer.__initial state packet now
         | Handshake -> Stdlib.__QuicServer.__handshake state packet now
         | ZeroRtt -> Ok state
-        | OneRtt -> if Stdlib.List.length state.pending >= 16 || Stdlib.List.fold state.pending 0L (fun size bytes -> size + Stdlib.Blob.__byteLength bytes) + Stdlib.Blob.__byteLength packet.bytes > 65536L then Ok state
-                    else Ok { state with pending = Stdlib.List.append state.pending [packet.bytes] } in
+        | OneRtt -> if Stdlib.List.__lengthInt state.pending >= 16 || Stdlib.List.fold state.pending 0L (fun size bytes -> size + Stdlib.Blob.__byteLength bytes) + Stdlib.Blob.__byteLength packet.bytes > 65536L then Ok state
+                    else Ok { state with pending = Stdlib.List.concat state.pending [packet.bytes] } in
       next |> Stdlib.Result.andThen (fun next -> Stdlib.__QuicServer.packets next packet.remaining now)
   | _ -> Ok state
 

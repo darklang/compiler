@@ -149,36 +149,36 @@ let d1 = setStr (emptyStr ()) "a" 1L in let d2 = setStr d1 "b" 2L in Stdlib.Dict
 // ========== Dict enumeration (Int64-keyed) ==========
 
 // keys tests
-Stdlib.List.length (Stdlib.Dict.__keys (emptyInt ())) = 0
-Stdlib.List.length (Stdlib.Dict.__keys (setInt (emptyInt ()) 1L 100L)) = 1
-let d = setInt (setInt (emptyInt ()) 1L 10L) 2L 20L in Stdlib.List.length (Stdlib.Dict.__keys d) = 2
+Stdlib.List.length (Stdlib.Dict.__keys (emptyInt ())) = 0L
+Stdlib.List.length (Stdlib.Dict.__keys (setInt (emptyInt ()) 1L 100L)) = 1L
+let d = setInt (setInt (emptyInt ()) 1L 10L) 2L 20L in Stdlib.List.length (Stdlib.Dict.__keys d) = 2L
 
 // values tests
-Stdlib.List.length (Stdlib.Dict.__values (emptyInt ())) = 0
-Stdlib.List.length (Stdlib.Dict.__values (setInt (emptyInt ()) 1L 100L)) = 1
-let d = setInt (setInt (emptyInt ()) 1L 10L) 2L 20L in Stdlib.List.length (Stdlib.Dict.__values d) = 2
+Stdlib.List.length (Stdlib.Dict.__values (emptyInt ())) = 0L
+Stdlib.List.length (Stdlib.Dict.__values (setInt (emptyInt ()) 1L 100L)) = 1L
+let d = setInt (setInt (emptyInt ()) 1L 10L) 2L 20L in Stdlib.List.length (Stdlib.Dict.__values d) = 2L
 
 // ========== Dict enumeration (String-keyed) ==========
 
 // keys tests
-Stdlib.List.length (Stdlib.Dict.__keys (emptyStr ())) = 0
-Stdlib.List.length (Stdlib.Dict.__keys (setStr (emptyStr ()) "a" 100L)) = 1
-let d = setStr (setStr (emptyStr ()) "a" 10L) "b" 20L in Stdlib.List.length (Stdlib.Dict.__keys d) = 2
+Stdlib.List.length (Stdlib.Dict.__keys (emptyStr ())) = 0L
+Stdlib.List.length (Stdlib.Dict.__keys (setStr (emptyStr ()) "a" 100L)) = 1L
+let d = setStr (setStr (emptyStr ()) "a" 10L) "b" 20L in Stdlib.List.length (Stdlib.Dict.__keys d) = 2L
 
 // values tests
-Stdlib.List.length (Stdlib.Dict.__values (emptyStr ())) = 0
-Stdlib.List.length (Stdlib.Dict.__values (setStr (emptyStr ()) "a" 100L)) = 1
+Stdlib.List.length (Stdlib.Dict.__values (emptyStr ())) = 0L
+Stdlib.List.length (Stdlib.Dict.__values (setStr (emptyStr ()) "a" 100L)) = 1L
 
 // ========== Stdlib.Dict.__entries tests ==========
 
 // entries on empty dict
-Stdlib.List.length (Stdlib.Dict.__entries (emptyInt ())) = 0
+Stdlib.List.length (Stdlib.Dict.__entries (emptyInt ())) = 0L
 
 // entries on single-entry dict
-Stdlib.List.length (Stdlib.Dict.__entries (setInt (emptyInt ()) 1L 100L)) = 1
+Stdlib.List.length (Stdlib.Dict.__entries (setInt (emptyInt ()) 1L 100L)) = 1L
 
 // entries on two-entry dict
-let d = setInt (setInt (emptyInt ()) 1L 10L) 2L 20L in Stdlib.List.length (Stdlib.Dict.__entries d) = 2
+let d = setInt (setInt (emptyInt ()) 1L 10L) 2L 20L in Stdlib.List.length (Stdlib.Dict.__entries d) = 2L
 
 // ========== Stdlib.Dict.__fold tests ==========
 
@@ -305,10 +305,10 @@ let setListDict (d: Dict<Int64, List<Int64>>) (k: Int64) (v: List<Int64>): Dict<
 let getListDict (d: Dict<Int64, List<Int64>>) (k: Int64): Option<List<Int64>> = Stdlib.Dict.__get d k
 
 // Set and get list value
-Stdlib.List.length (Stdlib.Option.withDefault (getListDict (setListDict (emptyListDict ()) 1L ([10L, 20L, 30L])) 1L) ([])) = 3
+Stdlib.List.length (Stdlib.Option.withDefault (getListDict (setListDict (emptyListDict ()) 1L ([10L, 20L, 30L])) 1L) ([])) = 3L
 
 // Multiple list entries
-let d = setListDict (emptyListDict ()) 1L ([1L, 2L]) in let d = setListDict d 2L ([3L, 4L, 5L]) in Stdlib.List.length (Stdlib.Option.withDefault (getListDict d 2L) ([])) = 3
+let d = setListDict (emptyListDict ()) 1L ([1L, 2L]) in let d = setListDict d 2L ([3L, 4L, 5L]) in Stdlib.List.length (Stdlib.Option.withDefault (getListDict d 2L) ([])) = 3L
 
 // Empty list as value
 Stdlib.Option.withDefault (getListDict (setListDict (emptyListDict ()) 42L ([])) 42L) ([-1L]) = []

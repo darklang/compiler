@@ -19,12 +19,12 @@ let __wordBytes (word: Int64) : Blob =
     Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight word 24L) 255L]
 
 let __at (words: List<Int64>) (index: Int64) : Int64 =
-  match Stdlib.List.getAt words (Stdlib.Int.fromInt64 index) with
+  match Stdlib.List.__getAtInt words (Stdlib.Int.fromInt64 index) with
   | Some word -> word
   | None -> Builtin.crash "Invalid ChaCha20 state"
 
 let __replace (words: List<Int64>) (index: Int64) (value: Int64) : List<Int64> =
-  Stdlib.List.indexedMap words
+  Stdlib.List.__indexedMapInt words
     (fun position word -> if position == Stdlib.Int.fromInt64 index then value else word)
 
 let __quarter (words: List<Int64>) (a: Int64) (b: Int64) (c: Int64) (d: Int64)
@@ -70,7 +70,7 @@ let __initial (key: Blob) (nonce: Blob) (counter: Int64) : List<Int64> =
    Stdlib.__Chacha20Poly1305.__word nonce 8L]
 
 let __blockWords (initial: List<Int64>) (mixed: List<Int64>) : List<Blob> =
-  Stdlib.List.map2shortest initial mixed
+  Stdlib.List.map2Shortest initial mixed
     (fun a b -> Stdlib.__Chacha20Poly1305.__wordBytes
                   (Stdlib.__Chacha20Poly1305.__mask32 (a + b)))
 

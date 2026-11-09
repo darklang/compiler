@@ -8,68 +8,68 @@ module Darklang.Cli.Packages.FindValues
 /// Splitting read the FIRST segment as the owner, so `find-values Stdlib.Option.Option` looked for an
 /// owner named Stdlib and answered "Type not found" about a type `view` prints happily.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.PackageLocation'"
-let resolveTypeHash
-  (branchId: Uuid)
-  (currentLocation: Packages.PackageLocation)
-  (typePath: String)
+let resolveTypeHash(
+  branchId: Uuid,
+  currentLocation: Packages.PackageLocation,
+  typePath: String)
   : Stdlib.Result.Result<LanguageTools.ProgramTypes.Hash, String> =
-  match Traversal.traverse branchId currentLocation typePath with
-  | Error e -> Stdlib.Result.Result.Error e
-  | Ok(Type loc) ->
-    match LanguageTools.PackageManager.Type.find branchId loc with
-    | Some typeHash -> Stdlib.Result.Result.Ok typeHash
-    | None -> Stdlib.Result.Result.Error $"Type not found: {typePath}"
-  | Ok _ ->
-    Stdlib.Result.Result.Error
-      $"{typePath} is not a type. find-values looks for values OF a type."
+  match Traversal.traverse(branchId, currentLocation, typePath) with
+  | Error(e) -> Stdlib.Result.Result.Error(e)
+  | Ok(Type(loc)) ->
+    match LanguageTools.PackageManager.Type.find(branchId, loc) with
+    | Some(typeHash) -> Stdlib.Result.Result.Ok(typeHash)
+    | None -> Stdlib.Result.Result.Error($"Type not found: {typePath}")
+  | Ok(_) ->
+    Stdlib.Result.Result.Error(
+      $"{typePath} is not a type. find-values looks for values OF a type.")
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let execute (state: Cli.AppState) (args: List<String>) : Cli.AppState =
+let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
   match args with
   | [] ->
-    Stdlib.printLine "Usage: find-values <type-path> [namespace]"
+    Stdlib.printLine("Usage: find-values <type-path> [namespace]")
     state
 
   | [ typePath ] ->
-    match resolveTypeHash state.currentBranchId state.packageData.currentLocation typePath with
-    | Error msg ->
-      Stdlib.printLine (Stdlib.Cli.UI.Colors.error msg)
-      Cli.exitWith state false
-    | Ok typeHash ->
-      let values = Stdlib.ValueSearch.findByType state.currentBranchId "" typeHash
+    match resolveTypeHash(state.currentBranchId, state.packageData.currentLocation, typePath) with
+    | Error(msg) ->
+      Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.error(msg))
+      Cli.failed(state)
+    | Ok(typeHash) ->
+      let values = LanguageTools.PackageManager.Value.findByType(state.currentBranchId, "", typeHash)
 
-      if Stdlib.List.isEmpty values then
-        Stdlib.printLine (Stdlib.Cli.UI.Colors.dimText $"No values of type {typePath}")
+      if Stdlib.List.isEmpty(values) then
+        Stdlib.printLine(Stdlib.Cli.UI.Colors.dimText($"No values of type {typePath}"))
       else
         values
-        |> Stdlib.List.iter (fun discovered -> Stdlib.printLine discovered.path)
+        |> Stdlib.List.iter(fun discovered -> Stdlib.printLine(discovered.path))
 
       state
 
   | [ typePath, namespace_ ] ->
-    match resolveTypeHash state.currentBranchId state.packageData.currentLocation typePath with
-    | Error msg ->
-      Stdlib.printLine (Stdlib.Cli.UI.Colors.error msg)
-      Cli.exitWith state false
-    | Ok typeHash ->
-      let values = Stdlib.ValueSearch.findByType state.currentBranchId namespace_ typeHash
+    match resolveTypeHash(state.currentBranchId, state.packageData.currentLocation, typePath) with
+    | Error(msg) ->
+      Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.error(msg))
+      Cli.failed(state)
+    | Ok(typeHash) ->
+      let values = LanguageTools.PackageManager.Value.findByType(state.currentBranchId, namespace_, typeHash)
 
-      if Stdlib.List.isEmpty values then
-        Stdlib.printLine (Stdlib.Cli.UI.Colors.dimText $"No values of type {typePath} in {namespace_}")
+      if Stdlib.List.isEmpty(values) then
+        Stdlib.printLine(Stdlib.Cli.UI.Colors.dimText($"No values of type {typePath} in {namespace_}"))
       else
         values
-        |> Stdlib.List.iter (fun discovered -> Stdlib.printLine discovered.path)
+        |> Stdlib.List.iter(fun discovered -> Stdlib.printLine(discovered.path))
 
       state
 
   | _ ->
-    Stdlib.printLine "Usage: find-values <type-path> [namespace]"
+    Stdlib.printLine("Usage: find-values <type-path> [namespace]")
     state
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let help (_state: Cli.AppState) : String =
+let help(_state: Cli.AppState): String =
   [ "Find all package values of a given type."
     ""
     "Usage: find-values <type-path> [namespace]"
@@ -77,13 +77,13 @@ let help (_state: Cli.AppState) : String =
     "Examples:"
     "  find-values Darklang.LanguageTools.WrittenTypesToProgramTypes.Context"
     "  find-values Darklang.Stdlib.Cli.UI.Layout.Region Darklang.Cli" ]
-  |> Stdlib.String.join "\n"
+  |> Stdlib.String.join("\n")
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let complete
-  (state: Cli.AppState)
-  (args: List<String>)
+let complete(
+  state: Cli.AppState,
+  args: List<String>)
   : List<Cli.Completion.CompletionItem> =
   // For now, just return empty - could add type path completion later
   []

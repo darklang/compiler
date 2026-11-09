@@ -2,28 +2,35 @@ module Darklang.Stdlib
 
 
 // @compiler replace: packages/darklang/stdlib/__print.dark#Darklang.Stdlib.print reason=compiler-implementation
-let print (str: String): Unit =
-  Builtin.print str
+let print(str: String): Unit =
+  Builtin.print(str)
 
 
 // @compiler replace: packages/darklang/stdlib/__print.dark#Darklang.Stdlib.printLine reason=compiler-implementation
-let printLine (str: String): Unit =
-  Builtin.printLine str
+let printLine(str: String): Unit =
+  Builtin.printLine(str)
 
 
 /// Print <param str> to stderr, followed by a newline: for everything that is not the answer to what
 /// was asked, so `dark cmd | next` carries only the answer.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.printErrorLine: Unknown function or value 'Builtin.printErrorLine'"
-let printErrorLine (str: String): Unit =
-  Builtin.printErrorLine str
+let printErrorLine(str: String): Unit =
+  Builtin.printErrorLine(str)
 
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.printError: Unknown function or value 'Builtin.printError'"
-let printError (str: String): Unit =
-  Builtin.printError str
+let printError(str: String): Unit =
+  Builtin.printError(str)
 
 
 // @compiler replace: packages/darklang/stdlib/__print.dark#Darklang.Stdlib.printLines reason=compiler-implementation
-let printLines (lines: List<String>): Unit =
+let printLines(lines: List<String>): Unit =
   lines
-  |> List.iter(fun l -> printLine l)
+  |> List.iter(fun l -> printLine(l))
+
+
+/// `DEBUG: <label>: <value>` to stderr, the value as `toRepr` writes it: for looking at a value
+/// while working on code, without it landing in the answer on stdout.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.debug: Unknown function or value 'toRepr'"
+let debug(label: String, value: 'a): Unit =
+  printErrorLine($"DEBUG: {label}: {toRepr(value)}")

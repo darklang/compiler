@@ -375,7 +375,7 @@ let __walkParent (fd: Int64) (parts: List<String>) (fn: Int64 -> String -> Stdli
         let _ = Stdlib.Cli.__Posix.__close fd in
         Error (Stdlib.Cli.Posix.Error { errno = 22, message = "path has no final component" })
     | name :: rest ->
-        if Stdlib.List.length rest == 0 then
+        if Stdlib.List.__lengthInt rest == 0 then
             let result = fn fd name in
             let _ = Stdlib.Cli.__Posix.__close fd in
             result

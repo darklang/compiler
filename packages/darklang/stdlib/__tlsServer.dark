@@ -106,7 +106,7 @@ let __loop (context: Stdlib.__TlsServer.Context) (listener: Stdlib.__Network.Tcp
     Stdlib.__TlsServer.__round context now owners [] |> Stdlib.Result.andThen (fun round ->
       if round.stopped then let _ = Stdlib.__TlsServer.__closeAll round.owners in Ok ()
       else
-        let accepting = Stdlib.List.length round.owners < 64 in
+        let accepting = Stdlib.List.__lengthInt round.owners < 64 in
         let listenerInterest = Stdlib.__Network.Interest { watch = listener.watch, readable = accepting, writable = false } in
         let interests = Stdlib.List.push (Stdlib.List.filterMap round.owners Stdlib.__TlsServer.__interest) listenerInterest in
         match Stdlib.__Network.waitSockets interests (if Stdlib.List.any round.owners Stdlib.__TlsServer.__immediate then 0L else 100L) with

@@ -1,6 +1,6 @@
 // quic_transport_boundaries.e2e - Close after key update, discard invalid AEAD, and abort after failed close send.
 let boundaryClose (mode: Int64) : Bool =
-  let secret = Stdlib.String.toBlob (Stdlib.String.repeat "s" 32) in
+  let secret = Stdlib.String.toBlob (Stdlib.String.repeat "s" 32L) in
   let keys = match Stdlib.__QuicCrypto.derive secret with | Ok keys -> keys | Error _ -> Builtin.crash "Test keys" in
   let payload = Stdlib.Blob.__fromInt64List [15L, 0L, 0L, 3L, 97L, 98L, 99L, 15L, 0L, 2L, 0L] in
   let generation = match Stdlib.__QuicKeys.__next (Stdlib.__QuicKeys.Generation { secret = secret, keys = keys, phase = false }) with | Ok generation -> generation | Error _ -> Builtin.crash "Test update" in
@@ -24,7 +24,7 @@ let boundaryClose (mode: Int64) : Bool =
   let sent = Stdlib.Stream.__cellGet<List<Blob>> packets in
   let closed = Stdlib.Option.isNone (Stdlib.Stream.next life) in
   let valid =
-    if mode == 1L then Stdlib.Result.isOk result && Stdlib.Bool.not closed && Stdlib.List.length sent == 1
+    if mode == 1L then Stdlib.Result.isOk result && Stdlib.Bool.not closed && Stdlib.List.length sent == 1L
     else match sent with
     | [first, last] ->
       let decoded = match Stdlib.__QuicCrypto.openPacket keys first 9L -1L, Stdlib.__QuicCrypto.openPacket (if mode == 0L then generation.keys else keys) last 9L 0L with

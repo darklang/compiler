@@ -25,7 +25,7 @@ let take (state: Stdlib.__Http1Pool.State) (origin: Stdlib.__HttpWire.Url) (now:
     else if Stdlib.__Http1Pool.sameOrigin entry.origin origin then
       if Stdlib.Option.isNone lease.transport && entry.transport.idle () then { lease with transport = Some entry.transport }
       else let _ = Stdlib.__HttpTransport.close entry.transport in lease
-    else { lease with state = { lease.state with entries = Stdlib.List.append lease.state.entries [entry] } })
+    else { lease with state = { lease.state with entries = Stdlib.List.concat lease.state.entries [entry] } })
 
 let __retain (entries: List<Stdlib.__Http1Pool.Entry>) (count: Int64) : List<Stdlib.__Http1Pool.Entry> =
   match entries with
@@ -92,7 +92,7 @@ let openStream (trusted: Bool) (roots: Stdlib.Option.Option<List<Blob>>) (altern
             | Ok state -> Ok (Stdlib.__Http1Pool.StreamOpened.Http2 (Stdlib.__Http2Pool.Entry { origin = prepared.url, transport = transport, state = state, idle = 0L })))
 
 let __response (parsed: Stdlib.__HttpWire.ParsedResponse) : Stdlib.HttpClient.Response =
-  Stdlib.HttpClient.Response { statusCode = Stdlib.Int.fromInt64 parsed.statusCode, headers = parsed.headers, body = parsed.body }
+  Stdlib.HttpClient.Response { statusCode = parsed.statusCode, headers = parsed.headers, body = parsed.body }
 
 let __read (transport: Stdlib.__HttpTransport.Transport) (method: String) (buffer: Blob) (informational: Int64)
   : Stdlib.Result.Result<Stdlib.__Http1Pool.Read, Stdlib.HttpClient.RequestError> =

@@ -81,7 +81,7 @@ let __normalizeXField (digits: String) (maxWidth: Int64) (outputWidth: Int64) : 
         if significantLength > maxWidth then None
         else if significantLength > outputWidth then
             Some (Stdlib.String.__byteSlice significant (significantLength - outputWidth) significantLength)
-        else Some (Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 (outputWidth - significantLength)) + significant)
+        else Some (Stdlib.String.__repeatInt "0" (Stdlib.Int.fromInt64 (outputWidth - significantLength)) + significant)
 
 let __xFields (s: String) (index: Int64) (fieldIndex: Int64) (acc: String) : Stdlib.Option.Option<String> =
     let length = Stdlib.String.__byteLength s in

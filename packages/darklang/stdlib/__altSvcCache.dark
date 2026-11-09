@@ -32,7 +32,7 @@ let __httpDate (text: String) : Stdlib.Result.Result<Int64, String> =
     | Some ((_, month)) ->
       let iso = Stdlib.String.__byteSlice text 12L 16L + "-" + month + "-" + Stdlib.String.__byteSlice text 5L 7L + "T" + Stdlib.String.__byteSlice text 17L 25L + "Z" in
       Stdlib.DateTime.parse iso |> Stdlib.Result.mapError (fun _error -> "Invalid response Date") |> Stdlib.Result.andThen (fun date ->
-        match Stdlib.Int.toInt64 (Stdlib.DateTime.toSeconds date) with | None -> Error "Invalid response Date" | Some seconds -> Ok seconds)
+        match Stdlib.Int.toInt64 (Stdlib.DateTime.__toSecondsInt date) with | None -> Error "Invalid response Date" | Some seconds -> Ok seconds)
 
 let __age (headers: List<(String * String)>) (utc: Int64) : Stdlib.Result.Result<Int64, String> =
   let ages = Stdlib.List.filterMap headers (fun pair -> let (name, value) = pair in if Stdlib.String.toLowercase name == "age" then Some value else None) in
