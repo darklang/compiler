@@ -27,7 +27,10 @@ String traversal (`length`, `slice`, `first`, `last`, `dropFirst`, `dropLast`,
 EGCs. Negative slice indexes are relative to the EGC count and are clamped.
 `indexOf` and `lastIndexOf` deliberately return UTF-16 code-unit indexes to
 match the interpreter; `indexOfEgc` and `lastIndexOfEgc` return EGC indexes and
-accept a match only when both ends lie on EGC boundaries. String comparison,
+accept a match only when both ends lie on EGC boundaries. Under
+`--syntax=current`, the interpreter's `indexOf`, `lastIndexOf` and `contains`,
+which now match whole EGCs, call `indexOfEgc`, `lastIndexOfEgc` and
+`containsEgc`. String comparison,
 containment, and replacement are ordinal.
 
 Padding has argument order `(value, padWith, goalLength)` and returns

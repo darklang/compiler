@@ -531,6 +531,9 @@ let lastIndexOfEgc (value: String) (search: String) : Stdlib.Option.Option<Int> 
     else Stdlib.Tuple2.second (
         Stdlib.String.__egcIndex (Stdlib.String.__toGraphemes value) (Stdlib.String.__toGraphemes search) (Stdlib.Int.fromInt64 0L) None None)
 
+let containsEgc (value: String) (search: String) : Bool =
+    Stdlib.Option.isSome (Stdlib.String.indexOfEgc value search)
+
 let __splitGraphemes (values: List<String>) (separator: List<String>) (current: List<String>) (result: List<String>) : List<String> =
     match values with
     | [] -> Stdlib.List.reverse (Stdlib.List.push result (Stdlib.String.join (Stdlib.List.reverse current) ""))
