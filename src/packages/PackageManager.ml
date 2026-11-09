@@ -310,7 +310,20 @@ let interpreterName name =
       | _ -> segment)
   |> String.concat "."
 
-let rec resolvedName element = Result.map publicName (resolvedNameAsWritten element)
+(* Stdlib fns the compiler has under the interpreter's name with an older
+   meaning: the interpreter's Dict.fromList keeps the last of a repeated key,
+   where the compiler's answers None. A hosted call reaches the compiler fn
+   with the interpreter's meaning. *)
+let hostedRenames =
+  [
+    ("Darklang.Stdlib.Dict.fromList", "Darklang.Stdlib.Dict.fromListOverwritingDuplicates");
+  ]
+
+let hostedName name =
+  Option.value (List.assoc_opt name hostedRenames) ~default:name
+
+let rec resolvedName element =
+  Result.map (fun name -> hostedName (publicName name)) (resolvedNameAsWritten element)
 
 and resolvedNameAsWritten element =
   match (tryField "resolved" element, tryField "originalName" element) with
@@ -564,6 +577,8 @@ let builtinOperator name =
   let renamed =
     [
       ("dictContainsKey", "Stdlib.Dict.member");
+      ("dictFromEntries", "Stdlib.Dict.fromListOverwritingDuplicates");
+      ("dictToEntries", "Stdlib.Dict.toList");
       ("bytesConcat", "Stdlib.Blob.concat");
       ("base16Encode", "Stdlib.Blob.toHex");
     ]
