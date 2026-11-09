@@ -58,6 +58,11 @@ def main():
         assert run('Stdlib.List.repeat(3, "a")', current) == '["a", "a", "a"]'
         assert run("Stdlib.String.padStart(\"7\", '0', 3)", current) == "007"
         assert run("Stdlib.String.padEnd(\"7\", '.', 3)", current) == "7.."
+        # Bytes print as dark eval prints unsaved Bytes: the size and the first 16 in hex.
+        assert run("Stdlib.Blob.fromList([171u8])", current) == "<Bytes: 1 byte ab>"
+        assert run("(Stdlib.Blob.fromList([]), 1)", current) == "(<Bytes: 0 bytes>, 1)"
+        assert run("Stdlib.Blob.fromList([0u8, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8, 9u8, 10u8, 11u8, 12u8, 13u8, 14u8, 15u8, 16u8])", current) == \
+            "<Bytes: 17 bytes 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f ...>"
         # Without the flag a bare integer is still an Int, printed as before.
         pinned = compile_("Stdlib.Int64.add(20, 22)")
         assert pinned.returncode != 0, pinned.stdout + pinned.stderr

@@ -316,3 +316,22 @@ let peek (blob: Blob) (count: Int64) : Stdlib.Option.Option<Blob> =
     let length = Stdlib.Blob.__byteLength blob in
     let n = if count < 0L then 0L else if count > length then length else count in
     Some (Stdlib.Blob.slice blob (Stdlib.Int.fromInt64 0L) (Stdlib.Int.fromInt64 n))
+
+let __previewPairs (blob: Blob) (index: Int64) (stop: Int64) : String =
+    if index >= stop then ""
+    else
+        let byte = Stdlib.Blob.__getByte blob index in
+        let pair = Stdlib.String.toLowercase (Stdlib.Blob.__byteToHex byte) in
+        let rest = Stdlib.Blob.__previewPairs blob (index + 1L) stop in
+        if rest == "" then pair else pair + " " + rest
+
+// How the current interpreter prints unsaved Bytes, for --syntax=current:
+// the length, then the first 16 bytes in lower-case hex pairs.
+let __evalDisplay (blob: Blob) : String =
+    let n = Stdlib.Blob.__byteLength blob in
+    let size = Stdlib.Int64.toString n + (if n == 1L then " byte" else " bytes") in
+    if n == 0L then "<Bytes: " + size + ">"
+    else
+        let shown = if n > 16L then 16L else n in
+        let more = if n > 16L then " ..." else "" in
+        "<Bytes: " + size + " " + Stdlib.Blob.__previewPairs blob 0L shown + more + ">"
