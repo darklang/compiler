@@ -63,7 +63,11 @@ let parseWrittenSourceProgram ?writtenSources _allowInternal requireEntry
         let* name = NameSyntax.sourceUnitName source.X.name in
         let validated =
           match written with
-          | None -> WrittenParsing.parse Validation.Script source.X.source
+          | None ->
+              WrittenParsing.parse
+                ~adaptStdlib:
+                  (source.X.purpose <> NameSyntax.SourceUnitPurpose.Package)
+                Validation.Script source.X.source
           | Some program ->
               Validation.validate Validation.Script program
               |> Result.map_error (fun issues ->

@@ -15,6 +15,7 @@ val parse : string -> ParserSupport.parseResult
 val currentSyntax : bool ref
 
 val parseFor :
+  ?adaptStdlib:bool ->
   Validation.mode ->
   string ->
   (Validation.validatedSourceFile, ParserSupport.diagnostic list) result

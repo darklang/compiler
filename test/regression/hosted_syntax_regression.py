@@ -354,6 +354,13 @@ def main():
                 "Hosted.recordPattern: can't compile: uses a record pattern, which this compiler does not support",
                 "Hosted.__helper: compiles",
             ], checked.stdout + checked.stderr
+            # Under --syntax=current a rendered package unit, which converts its own
+            # stdlib calls, is not converted a second time as the script is.
+            current = subprocess.run([compiler, "--syntax=current", "--package-server",
+                f"http://127.0.0.1:{server.server_port}", "--check", "Hosted.bytesLen",
+                "Hosted.conversions"], env=env, capture_output=True, text=True, timeout=300)
+            assert current.stdout.splitlines() == ["Hosted.bytesLen: compiles",
+                "Hosted.conversions: compiles"], current.stdout + current.stderr
         server.shutdown()
     print("Hosted operators, pipes, BigInt, Bytes and float patterns render; unsupported features name themselves, and batch and --check reports give the reason")
 
