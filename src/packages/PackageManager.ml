@@ -371,8 +371,8 @@ let rec renderType element =
   | "TBigInt", [] -> Ok "Int"
   | "TBytes", [] -> Ok "Blob"
   | "TFloat", [] -> Ok "Float"
-  | "TFloat32", [] -> unsupportedFeature "the Float32 type"
-  | "TDecimal", [] -> unsupportedFeature "the Decimal type"
+  | "TFloat32", [] -> Ok "Float32"
+  | "TDecimal", [] -> Ok "Decimal"
   | "TStream", _ -> unary "Stream"
   | "TList", _ -> unary "List"
   | "TDB", _ -> unary "DB"
@@ -573,7 +573,7 @@ let builtinOperator name =
     [
       ("string", "String"); ("char", "Char"); ("list", "List"); ("dict", "Dict");
       ("bool", "Bool"); ("uuid", "Uuid"); ("dateTime", "DateTime");
-      ("bytes", "Blob");
+      ("bytes", "Blob"); ("float32", "Float32"); ("decimal", "Decimal");
     ]
   in
   let byModule fn =
@@ -603,7 +603,14 @@ let builtinOperator name =
   | [ "Builtin"; fn ] ->
       List.find_map
         (fun typ ->
-          if String.starts_with ~prefix:typ fn then
+          (* `float` is not `float32`: the type name ends where a capital starts. *)
+          let length = String.length typ in
+          if
+            String.starts_with ~prefix:typ fn
+            && (String.length fn = length
+               || Char.uppercase_ascii fn.[length] = fn.[length]
+                  && Char.lowercase_ascii fn.[length] <> fn.[length])
+          then
             let op = String.sub fn (String.length typ) (String.length fn - String.length typ) in
             match List.assoc_opt op binary with
             | Some text -> Some (`Binary text)
@@ -689,8 +696,13 @@ let rec renderExpr parameters selfName element =
   | "EUInt128", [ _; value ] -> scalar "Z" value
   | "EInt", [ _; value ] | "EBigInt", [ _; value ] -> scalar "z" value
   | "EFloat", [ _; sign; whole; part ] -> floatText sign whole part
-  | "EFloat32", _ -> unsupportedFeature "a Float32 literal"
-  | "EDecimal", _ -> unsupportedFeature "a Decimal literal"
+  | "EFloat32", [ _; sign; whole; part ] ->
+      let+ text = floatText sign whole part in
+      "(" ^ text ^ "f32)"
+  (* The value is the JSON number as .NET wrote it, at its scale: 1.10. *)
+  | "EDecimal", [ _; value ] ->
+      let+ text = numberText value in
+      "(" ^ text ^ "dec)"
   | "EUnwrap", [ _; value ] ->
       let+ value = recurse value in
       "(" ^ value ^ ")?"

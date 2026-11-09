@@ -5,3 +5,9 @@
 // behavior for equality, containers, closures, and Result values.
 
 type Uuid = UUID of UInt128
+
+// Float32 is binary32, held as the binary64 of the same value; see Stdlib.Float32.
+type Float32 = FLOAT32 of Float
+
+// Decimal is .NET decimal: a 96-bit unscaled integer and a scale; see Stdlib.Decimal.
+type Decimal = DECIMAL of Int * Int64

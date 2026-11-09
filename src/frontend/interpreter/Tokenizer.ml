@@ -81,6 +81,8 @@ type token =
   | TUInt64 of int64
   | TUInt128 of Z.t
   | TFloat of float
+  | TFloat32 of string
+  | TDecimal of string
   | TStringLit of string
   | TCharLit of string
   | TInterpString

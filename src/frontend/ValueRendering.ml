@@ -116,6 +116,8 @@ let runtimeFunctionNames =
     "Darklang.Stdlib.UInt64.toString";
     "Darklang.Stdlib.UInt8.toString";
     "Darklang.Stdlib.Uuid.toString";
+    "Darklang.Stdlib.Float32.__display";
+    "Darklang.Stdlib.Decimal.__display";
   ]
 
 let applySubstitution subst typ =
@@ -538,6 +540,11 @@ and renderBody env typ value state =
             next ))
   | TSum ("Uuid", []) ->
       (call state.symbols "Darklang.Stdlib.Uuid.toString" [ value ], state)
+  (* `dark eval` shows these as they are written: 1.5f32 and 1.10dec. *)
+  | TSum ("Float32", []) ->
+      (call state.symbols "Darklang.Stdlib.Float32.__display" [ value ], state)
+  | TSum ("Decimal", []) ->
+      (call state.symbols "Darklang.Stdlib.Decimal.__display" [ value ], state)
   | TSum (typeName, typeArgs) -> (
       match M.find_opt typeName (Lazy.force env.sums) with
       | None ->
