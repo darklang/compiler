@@ -100,9 +100,19 @@ def main():
                     assert "Big.App.Math.nope" in result.stdout + result.stderr, result.stdout + result.stderr
                 unrelated = [r for r in requests if "Unrelated" in r]
                 assert unrelated == [], (text, len(unrelated), unrelated[:5])
+            # A --check over several names in one module reads each answer once.
+            requests.clear()
+            result = subprocess.run([compiler, "--package-server",
+                f"http://127.0.0.1:{server.server_port}", "--check", "Big.App.Math.inc",
+                "Big.App.Math.inc"],
+                env=env, capture_output=True, text=True, timeout=300)
+            assert result.stdout.count(": compiles") == 2, result.stdout + result.stderr
+            repeated = sorted({r for r in requests if requests.count(r) > 1})
+            assert repeated == [], repeated
         server.shutdown()
     print("Hosted names resolve from their own modules without reading unrelated ones, "
-          "and an unused implementation over an unsupported type does not block them")
+          "an unused implementation over an unsupported type does not block them, "
+          "and a --check batch reads each package answer once")
 
 
 if __name__ == "__main__":
