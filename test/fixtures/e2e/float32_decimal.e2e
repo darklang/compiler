@@ -32,3 +32,7 @@ Stdlib.Decimal.toParts 1.10dec = (110, 2L)
 1.10dec = stdout="1.10dec\n" stderr=""
 79228162514264337593543950335dec + 1dec = error="Decimal result is out of range (larger than 79228162514264337593543950335)"
 1dec / 0dec = error="Cannot divide by 0"
+
+// `f64` spells a Float with its width.
+1.5f64 = 1.5
+2f64 + 0.5 = 2.5

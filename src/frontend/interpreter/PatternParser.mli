@@ -7,3 +7,9 @@ val parsePatternOr :
 
 val parsePatternBase :
   ParserSupport.parserState -> int -> WrittenTypes.matchPattern * int
+
+(* Read any `as name` after a pattern, refusing it when compiled. *)
+val nestedAs :
+  ParserSupport.parserState ->
+  WrittenTypes.matchPattern * int ->
+  WrittenTypes.matchPattern * int

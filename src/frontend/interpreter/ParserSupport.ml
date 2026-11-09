@@ -437,7 +437,14 @@ let checkBareMinMagnitude state index =
    Both expressions and patterns use this path; formatting never determines
    literal acceptance or the decimal representation used during lowering. *)
 let floatParts state index value =
-  match FloatLiteral.parse (txt state index) value with
+  let text = txt state index in
+  (* `1.5f64` is a Float spelled with its width. *)
+  let text =
+    if String.ends_with ~suffix:"f64" text then
+      String.sub text 0 (String.length text - 3)
+    else text
+  in
+  match FloatLiteral.parse text value with
   | Ok parts -> parts
   | Error error ->
       let code, message = FloatLiteral.diagnostic error in
