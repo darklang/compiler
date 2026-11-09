@@ -536,12 +536,22 @@ let resolvedConstructorReferenceWithTypeArgs canonical typeArgs =
    Runtime I/O and string intrinsics construct these two foundational
    stdlib types directly. Their ABI tags predate user-defined ADTs.
 *)
+let fnv1a text =
+  Int64.logand
+    (Int64.of_int32
+       (String.fold_left
+          (fun hash byte ->
+            Int32.mul (Int32.logxor hash (Int32.of_int (Char.code byte))) 16777619l)
+          0x811c9dc5l text))
+    0xffffffffL
+
 (* The tag of a case whose name another sum also uses. Option and Result keep
-   0 and 1. Otherwise the declaring type's name picks a base slot and the case
-   its ordinal after it, so two cases of one sum never share a tag; cases of
-   one name in different sums almost never do, and the checker refuses those
-   that would. 4094 slots past the reserved two fit a 12-bit immediate. *)
-let constructorRuntimeIdentity declaringType caseName ordinal =
+   0 and 1. Otherwise the case's sum and name hash into 4094 slots past those
+   two, which fit a 12-bit immediate. When two such cases of one sum land in
+   one slot, every hashed case of that sum takes the slot its sum's name
+   picks plus its ordinal instead, which keeps them apart. [hashedSiblings]
+   is the names of the sum's hashed cases. *)
+let constructorRuntimeIdentity declaringType caseName ordinal hashedSiblings =
   match (declaringType, caseName) with
   | "Darklang.Stdlib.Option.Option", "Some"
   | "Darklang.Stdlib.Result.Result", "Ok" ->
@@ -550,20 +560,14 @@ let constructorRuntimeIdentity declaringType caseName ordinal =
   | "Darklang.Stdlib.Result.Result", "Error" ->
       1
   | _ ->
-      let hash =
-        String.fold_left
-          (fun hash byte ->
-            Int32.mul
-              (Int32.logxor hash (Int32.of_int (Char.code byte)))
-              16777619l)
-          0x811c9dc5l declaringType
+      let slot name = Int64.to_int (Int64.rem (fnv1a (declaringType ^ "." ^ name)) 4094L) in
+      let slots = List.map slot hashedSiblings in
+      let collides =
+        List.length (List.sort_uniq compare slots) < List.length slots
       in
-      2
-      + Int64.to_int
-          (Int64.rem
-             (Int64.add (Int64.logand (Int64.of_int32 hash) 0xffffffffL)
-                (Int64.of_int ordinal))
-             4094L)
+      if collides then
+        2 + Int64.to_int (Int64.rem (Int64.add (fnv1a declaringType) (Int64.of_int ordinal)) 4094L)
+      else 2 + slot caseName
 
 let lambdaParameter pattern =
   { pattern; sourceAnnotation = None; inferredType = None }

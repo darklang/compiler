@@ -103,8 +103,19 @@ let[@warning "-4"] collidingCaseNames types =
       if S.cardinal (S.of_list owners) > 1 then S.add name result else result)
     byName S.empty
 
-let caseTag colliding owner caseName ordinal =
-  if S.mem caseName colliding then AST.constructorRuntimeIdentity owner caseName ordinal
+let caseTag colliding (types : typeInventory) owner caseName ordinal =
+  if S.mem caseName colliding then
+    let siblings =
+      match M.find_opt owner types with
+      | Some { definition = WT.TDEnum cases; _ } ->
+          List.filter_map
+            (fun (_, (case : WT.enumCaseSyntax)) ->
+              let name = snd case.WT.name in
+              if S.mem name colliding then Some name else None)
+            cases
+      | Some { definition = WT.TDAlias _ | WT.TDRecord _; _ } | None -> [ caseName ]
+    in
+    AST.constructorRuntimeIdentity owner caseName ordinal siblings
   else ordinal
 
 let qualifiedFnName (name : WT.qualifiedFnIdentifier) =

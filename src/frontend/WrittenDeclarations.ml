@@ -69,7 +69,7 @@ let[@warning "-4"] validateTypes types =
                         List.fold_left
                           (fun result (index, name) ->
                             bind result (fun tags ->
-                                let tag = caseTag colliding owner name index in
+                                let tag = caseTag colliding types owner name index in
                                 let identity = owner ^ "." ^ name in
                                 (* A hashed tag tells apart the cases that
                                    share a name (A.Error, B.Error), and the
@@ -220,7 +220,15 @@ let checkTypeDeclaration allowInternal types colliding symbols path
               (fun symbols (index, (variant : AST.variant)) ->
                 snd
                   (C.internConstructor name variant.AST.name
-                     (caseTag colliding name variant.AST.name index)
+                     (if S.mem variant.AST.name colliding then
+                        AST.constructorRuntimeIdentity name variant.AST.name index
+                          (List.filter_map
+                             (fun (other : AST.variant) ->
+                               if S.mem other.AST.name colliding then
+                                 Some other.AST.name
+                               else None)
+                             variants)
+                      else index)
                      symbols))
               symbols
               (List.mapi (fun index value -> (index, value)) variants)
