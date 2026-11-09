@@ -78,6 +78,12 @@ ENTITIES["builtin-ops-hash"] = fn("Hosted.builtinOps", [("x", INT64)], {"TBool":
             builtin("int64Negate", {"EInt64": [4, -50]})))
 
 
+# -(x - 1) * 3 < x % 4, through the polymorphic operator builtins.
+ENTITIES["builtin-poly-hash"] = fn("Hosted.builtinPoly", [("x", INT64)], {"TBool": []},
+    builtin("lessThan", builtin("multiply", builtin("negate", builtin("subtract", ARG0, {"EInt64": [3, 1]})),
+                                {"EInt64": [4, 3]}), builtin("modulo", ARG0, {"EInt64": [5, 4]})))
+
+
 # (2 ** x) / 100 % 10, through the Power, Divide, Mod and ToString builtins.
 ENTITIES["builtin-more-hash"] = fn("Hosted.builtinMore", [("x", INT64)], {"TString": []},
     builtin("int64ToString", builtin("int64Mod", builtin("int64Divide",
@@ -234,6 +240,8 @@ def main():
             assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"
             assert run("Hosted.builtinOps 52L\n") is False
+            assert run("Hosted.builtinPoly 2L\n") is True
+            assert run("Hosted.builtinPoly 0L\n") is False
             assert str(run("Hosted.doubleBig 12345678901234567890\n")) == "24691357802469135780"
             assert run("Hosted.isHalf 0.5\n") is True
             assert run("Hosted.isHalf 0.25\n") is False

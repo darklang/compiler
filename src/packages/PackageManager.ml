@@ -593,7 +593,22 @@ let builtinOperator name =
         else None)
       modules
   in
+  (* The polymorphic operator builtins (`Builtin.add`), which the trait impls
+     over a type call for its own operator. *)
+  let polymorphicBinary =
+    [
+      ("add", "+"); ("subtract", "-"); ("multiply", "*"); ("divide", "/");
+      ("modulo", "%"); ("power", "**"); ("lessThan", "<");
+      ("lessThanOrEqualTo", "<="); ("greaterThan", ">");
+      ("greaterThanOrEqualTo", ">=");
+    ]
+  in
+  let polymorphicUnary = [ ("negate", "-"); ("bitwiseNot", "~") ] in
   match String.split_on_char '.' name with
+  | [ "Builtin"; fn ] when List.mem_assoc fn polymorphicBinary ->
+      Some (`Binary (List.assoc fn polymorphicBinary))
+  | [ "Builtin"; fn ] when List.mem_assoc fn polymorphicUnary ->
+      Some (`Unary (List.assoc fn polymorphicUnary))
   (* `**` has no 128-bit lowering here; the compiler's Power implementations
      for Int128 and UInt128 do. *)
   | [ "Builtin"; ("int128Power" | "uint128Power") ] ->
