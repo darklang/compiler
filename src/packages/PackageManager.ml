@@ -748,7 +748,7 @@ let rec renderExpr parameters selfName element =
             Ok (List.nth parameters index)
           else Error ("Invalid package argument index " ^ string_of_int index)
       | None -> Error "Invalid package argument index")
-  | "ESelf", [ _ ] -> Ok selfName
+  | "ESelf", [ _ ] -> Ok (publicName selfName)
   | "EFnName", [ _; name ] | "EFnName", [ _; name; _ ] | "EValue", [ _; name ]
     ->
       resolvedName name

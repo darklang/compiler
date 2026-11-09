@@ -124,8 +124,13 @@ TYPES["box-type-hash"] = ("Hosted.__Box", dict(hash={"Hash": ["box-type-hash"]},
         dict(name="value", typ=INT64, description="")]]})))
 ENTITIES["box-hash"] = fn("Hosted.boxed", [("x", INT64)], INT64,
     {"ERecordFieldAccess": [1, {"ERecord": [2, BOX_NAME, [], [["value", ARG0]]]}, "value"]})
+# Recursive through `self`, which names the helper the way its declaration does:
+# if x <= 0 then 1 else self(x - 1) + 1.
 ENTITIES["helper-hash"] = fn("Hosted.__helper", [("x", INT64)], INT64,
-    infix("ArithmeticPlus", ARG0, {"EInt64": [3, 1]}))
+    {"EIf": [6, infix("ComparisonLessThanOrEqual", ARG0, {"EInt64": [3, 0]}), {"EInt64": [4, 1]},
+             {"Some": [infix("ArithmeticPlus",
+                             {"EApply": [7, {"ESelf": [8]}, [], [infix("ArithmeticMinus", ARG0, {"EInt64": [9, 1]})]]},
+                             {"EInt64": [5, 1]})]}]})
 ENTITIES["uses-helper-hash"] = fn("Hosted.usesHelper", [("x", INT64)], INT64,
     {"EApply": [2, {"EFnName": [1, HELPER_NAME, []]}, [], [ARG0]]})
 ENTITIES["braces-hash"] = fn("Hosted.braces", [("x", INT64)], {"TString": []},
