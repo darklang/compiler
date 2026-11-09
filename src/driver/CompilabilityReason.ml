@@ -56,7 +56,9 @@ let genericValue = "Cannot infer specialization for function value '"
 
 (* A generic function referenced without a call has no type arguments to
    specialize with, so its probe says nothing about whether it compiles. *)
-let undetermined error = Option.is_some (after genericValue '\'' error)
+let undetermined error =
+  Option.is_some (after genericValue '\'' error)
+  || Option.is_some (after "remained polymorphic after monomorphization" '\n' error)
 
 let classify error =
   let error = String.trim error in
@@ -76,4 +78,7 @@ let classify error =
                     withoutOwner name
                     ^ " is generic; compiling it needs a call with concrete \
                        type arguments"
+                | None when undetermined error ->
+                    "it is generic; compiling it needs a call with concrete \
+                     type arguments"
                 | None -> "compiler error: " ^ firstLine error)))
