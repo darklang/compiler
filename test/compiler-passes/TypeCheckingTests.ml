@@ -295,22 +295,22 @@ let testConstructorIdentityCollisionRejected () =
        [
          TypeDef
            (SumTypeDef
-              ( "CollisionType2Tc",
+              ( "CollisionType151Tc",
                 [],
                 [ { AST.name = "CollisionCaseTc"; fields = [] } ] ));
          TypeDef
            (SumTypeDef
-              ( "CollisionType33Tc",
+              ( "CollisionType155Tc",
                 [],
                 [ { AST.name = "CollisionCaseTc"; fields = [] } ] ));
          Expression ([], UnitLiteral);
        ])
-    "Constructor identity collision 3090: CollisionType2Tc.CollisionCaseTc, \
-     CollisionType33Tc.CollisionCaseTc"
+    "Constructor identity collision 1236: CollisionType151Tc.CollisionCaseTc, \
+     CollisionType155Tc.CollisionCaseTc"
 
 (* TString and TUInt128 of WrittenTypes.TypeReference.Builtin, both names other
-   sums use too, hashed to one tag (1649) when the case name was hashed; a
-   case's ordinal now follows its sum's slot, so they differ. *)
+   sums use too, hash to one tag (1649); such a sum's cases take its slot
+   plus their ordinals instead, so they differ. *)
 let testCasesOfOneSumGetDistinctTags () =
   let sum owner cases =
     TypeDef

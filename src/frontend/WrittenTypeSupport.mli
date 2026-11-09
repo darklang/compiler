@@ -62,7 +62,8 @@ type globals = {
 
 val emptyGlobals : globals
 val collidingCaseNames : typeInventory -> StringOrder.Set.t
-val caseTag : StringOrder.Set.t -> string -> string -> int -> int
+val caseTag :
+  StringOrder.Set.t -> typeInventory -> string -> string -> int -> int
 val qualifiedFnName : WrittenTypes.qualifiedFnIdentifier -> string list
 val restrictedIdentifier : bool -> string list -> bool
 val resolveFunction : globals -> string list -> functionSignature option

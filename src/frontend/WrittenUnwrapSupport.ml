@@ -67,7 +67,7 @@ let check checkExpression globals locals state expected operand =
       in
       let constructor name ordinal state =
         State.internConstructor owner name
-          (caseTag globals.collidingCases owner name ordinal)
+          (caseTag globals.collidingCases globals.types owner name ordinal)
           state
       in
       let successId, state = constructor successName 0 state in
