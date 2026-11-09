@@ -1,0 +1,17 @@
+// Math.sin and Math.cos give what the interpreter gives: .NET calls glibc, whose FMA build
+// these follow, including where glibc is not correctly rounded (the cos of -2.29... below).
+// Each of the first five differed from it in the last place before.
+Stdlib.Math.sin (-2.6556129687476435) = -0.4670748382186341
+Stdlib.Math.sin (-3.9672511729194886) = 0.7349944658249706
+Stdlib.Math.sin 657.7107562431211 = -0.899179868109235
+Stdlib.Math.cos 0.65280130929973 = 0.7943853628942749
+Stdlib.Math.cos 154279.83584641106 = -0.8034203102711319
+Stdlib.Math.cos (-2.2900493520582756) = -0.6588229081783437
+Stdlib.Math.sin 1e22 = -0.8522008497671888
+Stdlib.Math.cos 1e300 = -0.5753861119575491
+Stdlib.Math.sin 0.1 = 0.09983341664682815
+Stdlib.Math.sin 1.0 = 0.8414709848078965
+Stdlib.Math.cos 1.0 = 0.5403023058681398
+Stdlib.Math.sin (-0.0) = -0.0
+Stdlib.Math.cos 0.0 = 1.0
+Stdlib.Float.isNaN (Stdlib.Math.sin (1.0 / 0.0)) = true
