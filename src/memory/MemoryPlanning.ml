@@ -23,8 +23,12 @@ type recordRegistry = (string * AST.semanticType) list M.t
 *)
 let canUseTransparentSumPayload = function
   | TNever | TVar _ | TInferenceVar _ -> false
+  (* A Float lives in a float register and a sum in an integer one; a sum
+     that was its Float payload lost the value wherever a copy crossed the
+     two (`let r = f x in (r, Wrapped r)` read 0.0). It stays boxed. *)
+  | TFloat64 -> false
   | TInt8 | TInt16 | TInt32 | TInt64 | TInt128 | TInt | TUInt8 | TUInt16
-  | TUInt32 | TUInt64 | TUInt128 | TBool | TFloat64 | TDateTime | TUnit
+  | TUInt32 | TUInt64 | TUInt128 | TBool | TDateTime | TUnit
   | TString | TChar | TBlob | TTuple _ | TRecord _ | TSum _ | TList _ | TDict _
   | TStream _ | TFunction _ | TInternalRawPtr ->
       true
