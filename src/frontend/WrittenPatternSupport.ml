@@ -359,6 +359,10 @@ let[@warning "-4"] rec checkMatchPattern globals symbols prebound expected
                   match NonEmptyList.tryFromList (List.rev reversed) with
                   | Some patterns -> Ok (C.POr patterns, commonBindings, symbols)
                   | None -> Error "Or-pattern requires an alternative")))
+  | WT.MPUnsupported (_, feature) ->
+      Error
+        ("can't compile: uses " ^ feature
+       ^ ", which this compiler does not support")
   | WT.MPError _ -> Error "Invalid recovery pattern in validated source"
 
 let[@warning "-4"] rec patternAlternatives = function

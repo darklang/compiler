@@ -95,7 +95,7 @@ let rec matchBindings = function
   | WT.MPUnit _ | WT.MPBool _ | WT.MPInt _ | WT.MPInt64 _ | WT.MPInt8 _
   | WT.MPUInt8 _ | WT.MPInt16 _ | WT.MPUInt16 _ | WT.MPInt32 _ | WT.MPUInt32 _
   | WT.MPUInt64 _ | WT.MPInt128 _ | WT.MPUInt128 _ | WT.MPFloat _ | WT.MPChar _
-  | WT.MPString _ | WT.MPError _ ->
+  | WT.MPString _ | WT.MPUnsupported _ | WT.MPError _ ->
       []
 
 module Names = Set.Make (String)
@@ -176,7 +176,7 @@ let rec structuralPatternIssues = function
   | WT.MPUnit _ | WT.MPVariable _ | WT.MPBool _ | WT.MPInt _ | WT.MPInt64 _
   | WT.MPInt8 _ | WT.MPUInt8 _ | WT.MPInt16 _ | WT.MPUInt16 _ | WT.MPInt32 _
   | WT.MPUInt32 _ | WT.MPUInt64 _ | WT.MPInt128 _ | WT.MPUInt128 _
-  | WT.MPFloat _ | WT.MPChar _ | WT.MPString _ ->
+  | WT.MPFloat _ | WT.MPChar _ | WT.MPString _ | WT.MPUnsupported _ ->
       []
 
 let patternIssues pattern =

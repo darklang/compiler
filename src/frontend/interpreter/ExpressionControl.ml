@@ -232,21 +232,6 @@ and parseMatch grammar state index =
            || (rng state !current).start.column = armColumn)
       do
         let barRange = rng state !current in
-        (* `as` inside another pattern (`| Some(x as y) ->`) is not lowered
-           yet; name it before the pattern parser trips over it. *)
-        (let rec scan at depth =
-           if at < state.tokenCount then
-             match tok state at with
-             | TArrow | TEOF when depth = 0 -> ()
-             | TLParen | TLBracket | TLBrace -> scan (at + 1) (depth + 1)
-             | TRParen | TRBracket | TRBrace -> scan (at + 1) (max 0 (depth - 1))
-             | TIdent "as" when depth > 0 ->
-                 err state DiagnosticCode.pattern at
-                   "can't compile: uses an `as` pattern inside another \
-                    pattern, which this compiler does not support"
-             | _ -> scan (at + 1) depth
-         in
-         scan (!current + 1) 0);
         (* `| { name, other = o } ->` (darklang/dark@0851642): a record
            pattern that leaves fields out. Here each field binds a name or
            `_`; the arm matches the whole value and its body reads the
@@ -256,25 +241,51 @@ and parseMatch grammar state index =
             let opening = rng state (!current + 1) in
             let fields = RevBuffer.create () and stop = ref (!current + 2) in
             let more = ref (tok state !stop <> TRBrace) in
+            let refutable = ref false in
             while !more do
               (match (tok state !stop, tok state (!stop + 1), tok state (!stop + 2)) with
-              | TIdent field, TEquals, TIdent name ->
+              | TIdent field, TEquals, TIdent name
+                when (match tok state (!stop + 3) with
+                      | TComma | TRBrace -> true
+                      | _ -> false)
+                     && not (Char.equal (Char.uppercase_ascii name.[0]) name.[0]) ->
                   RevBuffer.add fields ((rng state !stop, field), Some (rng state (!stop + 2), name));
                   stop := !stop + 3
-              | TIdent _, TEquals, TUnderscore -> stop := !stop + 3
+              | TIdent _, TEquals, TUnderscore
+                when (match tok state (!stop + 3) with
+                      | TComma | TRBrace -> true
+                      | _ -> false) ->
+                  stop := !stop + 3
               | TIdent field, (TComma | TRBrace), _ ->
                   RevBuffer.add fields ((rng state !stop, field), Some (rng state !stop, field));
                   stop := !stop + 1
               | _ ->
-                  err state DiagnosticCode.pattern !stop
-                    "can't compile: uses a record pattern field that is not a \
-                     name, which this compiler does not support";
+                  (* A refutable or nested field (`{ age = 30 }`) is read
+                     through the end of the arm's pattern, and compiling it
+                     is refused. *)
+                  let rec skip at depth =
+                    match tok state at with
+                    | TEOF -> at
+                    | (TArrow | TWhen) when depth = 0 -> at
+                    | TLParen | TLBracket | TLBrace -> skip (at + 1) (depth + 1)
+                    | TRParen | TRBracket | TRBrace -> skip (at + 1) (max 0 (depth - 1))
+                    | _ -> skip (at + 1) depth
+                  in
+                  stop := skip !stop 1;
+                  refutable := true;
                   more := false);
               if !more then
                 if tok state !stop = TComma then incr stop
                 else more := false;
               if tok state !stop = TRBrace then more := false
             done;
+            if !refutable then
+              ( None,
+                WT.MPUnsupported
+                  ( span opening (rng state (!stop - 1)),
+                    "a record pattern field that is not a name" ),
+                !stop )
+            else
             let closing =
               if tok state !stop = TRBrace then !stop + 1
               else begin
@@ -293,11 +304,20 @@ and parseMatch grammar state index =
             (None, pattern, next)
         in
         (* `| pattern as name ->` (darklang/dark@6a5beac): also bind the whole
-           value. Only at the top of an arm; nested `as` is not parsed. *)
-        let asName, next =
+           value. Only one `as` at the top of an arm is lowered; a chain
+           (`| n as m as k ->`) is read and refused like a nested one. *)
+        let asName, pattern, next =
           match (tok state next, tok state (next + 1)) with
-          | TIdent "as", TIdent name -> (Some (rng state (next + 1), name), next + 2)
-          | _ -> (None, next)
+          | TIdent "as", TIdent name -> (
+              let bound = (Some (rng state (next + 1), name), next + 2) in
+              match (tok state (next + 2), tok state (next + 3)) with
+              | TIdent "as", TIdent _ ->
+                  let chained, stop =
+                    PatternParser.nestedAs state (pattern, next)
+                  in
+                  (None, chained, stop)
+              | _ -> (fst bound, pattern, snd bound))
+          | _ -> (None, pattern, next)
         in
         let condition, next =
           if tok state next = TWhen then

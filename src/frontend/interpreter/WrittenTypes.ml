@@ -180,6 +180,10 @@ type matchPattern =
   | MPList of range * (matchPattern * range option) list * range * range
   | MPListCons of range * matchPattern * matchPattern * range
   | MPOr of range * matchPattern list
+  (* A pattern the interpreter accepts and this compiler cannot lower yet,
+     named by its feature, e.g. "an `as` pattern inside another pattern".
+     It parses, so its file can be read; compiling it is refused. *)
+  | MPUnsupported of range * string
   | MPError of range
 
 type stringSegment =
@@ -563,6 +567,7 @@ let mpRange (p : matchPattern) =
   | MPList (r, _, _, _)
   | MPListCons (r, _, _, _)
   | MPOr (r, _)
+  | MPUnsupported (r, _)
   | MPError r ->
       r
 
@@ -682,6 +687,10 @@ let primTypes =
     ("DateTime", fun range -> TDateTime range);
     ("Uuid", fun range -> TUuid range);
     ("Blob", fun range -> TBlob range);
+    (* The interpreter's names since darklang/dark@2d1526d and its Bytes
+       rename: the same arbitrary-precision integer and byte sequence. *)
+    ("BigInt", fun range -> TInt range);
+    ("Bytes", fun range -> TBlob range);
   ]
 
 let primTypeFromName name =
