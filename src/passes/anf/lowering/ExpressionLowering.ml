@@ -523,7 +523,14 @@ let lowerExpression (toANFCore : LoweringCallbacks.expressionLowerer)
         | AST.Add | AST.Sub | AST.Mul | AST.Div | AST.Mod | AST.Pow | AST.Shl
         | AST.Shr | AST.BitAnd | AST.BitOr | AST.BitXor | AST.Lt | AST.Gt
         | AST.Lte | AST.Gte | AST.And | AST.Or ->
-            let* typ = infer expr in
+            let* resultType = infer expr in
+            (* The operand type selects the implementation: a comparison's
+               own type is Bool. *)
+            let* typ =
+              match op with
+              | AST.Lt | AST.Gt | AST.Lte | AST.Gte -> infer left
+              | _ -> Ok resultType
+            in
             (* Generic operator requirements must also hold after specialization. *)
             let* () =
               if op = AST.Mod then WrittenCheckingState.validateOperator op typ
