@@ -2,7 +2,11 @@
 
 module Darklang.LanguageTools.PackageManager
 
-type PickContext = { currentModule: List<String> }
+// preferredLocation (darklang/dark main): the asked-for name wins outright
+// when it is one of the candidates.
+type PickContext =
+    { currentModule: List<String>,
+      preferredLocation: Stdlib.Option.Option<Darklang.LanguageTools.ProgramTypes.PackageLocation> }
 
 let countMatchingPrefix (a: List<String>) (b: List<String>) : Int =
     match (a, b) with
@@ -11,7 +15,17 @@ let countMatchingPrefix (a: List<String>) (b: List<String>) : Int =
         else 0
     | _ -> 0
 
+let __asked (preferred: Stdlib.Option.Option<Darklang.LanguageTools.ProgramTypes.PackageLocation>) (locations: List<Darklang.LanguageTools.ProgramTypes.PackageLocation>) : Stdlib.Option.Option<Darklang.LanguageTools.ProgramTypes.PackageLocation> =
+    match preferred with
+    | Some p ->
+        Stdlib.List.findFirst locations (fun l ->
+            l.owner == p.owner && l.modules == p.modules && l.name == p.name)
+    | None -> Stdlib.Option.Option.None
+
 let pickLocation (ctx: Darklang.LanguageTools.PackageManager.PickContext) (locations: List<Darklang.LanguageTools.ProgramTypes.PackageLocation>) : Stdlib.Option.Option<Darklang.LanguageTools.ProgramTypes.PackageLocation> =
+    match Darklang.LanguageTools.PackageManager.__asked ctx.preferredLocation locations with
+    | Some asked -> Stdlib.Option.Option.Some asked
+    | None ->
     match locations with
     | [] -> Stdlib.Option.Option.None
     | [single] -> Stdlib.Option.Option.Some single

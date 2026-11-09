@@ -2,4 +2,4 @@
 
 module Darklang.LanguageTools.PackageManager.PickContext
 
-val empty = Darklang.LanguageTools.PackageManager.PickContext { currentModule = [] }
+val empty = Darklang.LanguageTools.PackageManager.PickContext { currentModule = [], preferredLocation = Stdlib.Option.Option.None }
