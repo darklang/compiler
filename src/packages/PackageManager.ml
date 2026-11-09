@@ -1903,7 +1903,12 @@ let resolveNames config resolutionEnv knownTraits names =
          interpreter's `Int64.ToString` beside the embedded one makes every
          ToString call on Int64 ambiguous. Those are left out. *)
       let duplicatesEmbedded entity =
-        entity.kind = PackageImpl
+        (* A trait the compiler declares under the same name (the
+           interpreter's own Darklang.Stdlib.BitwiseXor, listed beside a
+           Darklang.Stdlib fn) is the compiler's: a second declaration
+           would clash, and calls name it either way. *)
+        (entity.kind = PackageTrait && isKnownName entity.location)
+        || entity.kind = PackageImpl
         && (not (StringOrder.Set.mem entity.hash needed))
         &&
         match tryField "entity" (parse entity.json) with
