@@ -48,6 +48,9 @@ def main():
         assert run("Stdlib.List.append([1, 2], 3)", current) == "[1, 2, 3]"
         assert run("Stdlib.List.prepend([1, 2], 3)", current) == "[3, 1, 2]"
         assert run("Stdlib.List.concat([1], [2, 3])", current) == "[1, 2, 3]"
+        assert run('Stdlib.List.zip([1, 2], ["a", "b"])', current) == 'Ok([(1, "a"), (2, "b")])'
+        assert run("Stdlib.List.zip([1, 2], [3])", current) == "Error(Stdlib.List.LengthMismatch { left: 2, right: 1 })"
+        assert run("Stdlib.List.map2Shortest([1, 2, 3], [10, 20], fun(a, b) -> a + b)", current) == "[11, 22]"
         assert run('Stdlib.List.repeat(3, "a")', current) == '["a", "a", "a"]'
         assert run("Stdlib.String.padStart(\"7\", '0', 3)", current) == "007"
         assert run("Stdlib.String.padEnd(\"7\", '.', 3)", current) == "7.."

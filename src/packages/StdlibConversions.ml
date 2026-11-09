@@ -11,6 +11,10 @@ let hostedRenames =
     ("Darklang.Stdlib.List.append", "Darklang.Stdlib.List.appendOne");
     (* The compiler's names for List.prepend and List.concat. *)
     ("Darklang.Stdlib.List.prepend", "Darklang.Stdlib.List.push");
+    (* zip and map2 answer a Result with both lengths; the compiler's an Option. *)
+    ("Darklang.Stdlib.List.zip", "Darklang.Stdlib.List.zipChecked");
+    ("Darklang.Stdlib.List.map2", "Darklang.Stdlib.List.map2Checked");
+    ("Darklang.Stdlib.List.map2Shortest", "Darklang.Stdlib.List.map2shortest");
     ("Darklang.Stdlib.List.concat", "Darklang.Stdlib.List.append");
     (* List.repeat answers the List; the compiler's a Result. *)
     ("Darklang.Stdlib.List.repeat", "Darklang.Stdlib.List.repeatUnsafe");
