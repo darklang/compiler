@@ -308,6 +308,27 @@ let testConstructorIdentityCollisionRejected () =
     "Constructor identity collision 1236: CollisionType151Tc.CollisionCaseTc, \
      CollisionType155Tc.CollisionCaseTc"
 
+(* TBool and EUnit, each a case of two sums, hash to the same tag (3740) for
+   these owners; they never share a name or a sum, so both are accepted. *)
+let testDifferentCasesMayShareATag () =
+  let sum owner case =
+    TypeDef (SumTypeDef (owner, [], [ { AST.name = case; fields = [] } ]))
+  in
+  match
+    checkProgram
+      (Program
+         [
+           sum "Darklang.LanguageTools.ProgramTypes.TypeReference" "TBool";
+           sum "OtherBoolTc" "TBool";
+           sum "Darklang.LanguageTools.WrittenTypes.Expr" "EUnit";
+           sum "OtherUnitTc" "EUnit";
+           Expression ([], UnitLiteral);
+         ])
+  with
+  | Ok _ -> Ok ()
+  | Error error ->
+      Error ("Expected distinct cases to share a tag, got: " ^ D.typeErrorToString error)
+
 let testRecursiveGroupsReceiveStableTypedIdentities () =
   let source =
     "let groupEven (n: Int64) : Int64 = if n == 0L then 1L else groupOdd (n - \
@@ -517,6 +538,7 @@ let tests =
     ("Empty nominal declarations rejected", testEmptyNominalDeclarationsRejected);
     ( "Invalid declaration type references rejected",
       testInvalidDeclarationTypeReferencesRejected );
+    ("Different cases may share a hashed tag", testDifferentCasesMayShareATag);
     ( "Constructor identity collision rejected",
       testConstructorIdentityCollisionRejected );
     ( "Recursive groups receive stable typed identities",
