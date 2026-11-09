@@ -58,6 +58,14 @@ def main():
         assert run('Stdlib.List.repeat(3, "a")', current) == '["a", "a", "a"]'
         assert run("Stdlib.String.padStart(\"7\", '0', 3)", current) == "007"
         assert run("Stdlib.String.padEnd(\"7\", '.', 3)", current) == "7.."
+        # indexOf, lastIndexOf and contains match whole Chars and count in Chars.
+        assert run('Stdlib.String.indexOf("🇵🇷🇺🇸", "🇷🇺")', current) == "None"
+        assert run('Stdlib.String.indexOf("a🧑🏼‍💻b", "b")', current) == "Some(2)"
+        assert run('Stdlib.String.lastIndexOf("🧑🏼‍💻🧑🏼‍💻", "🧑")', current) == "None"
+        assert run('Stdlib.String.lastIndexOf("🧑🏼‍💻🧑🏼‍💻", "🧑🏼‍💻")', current) == "Some(1)"
+        assert run('Stdlib.String.contains("👍🏽", "👍")', current) == "false"
+        assert run('Stdlib.String.contains("a\\r\\nb", "\\n")', current) == "false"
+        assert run('Stdlib.String.contains("hello", "ell")', current) == "true"
         # Bytes print as dark eval prints unsaved Bytes: the size and the first 16 in hex.
         assert run("Stdlib.Blob.fromList([171u8])", current) == "<Bytes: 1 byte ab>"
         assert run("(Stdlib.Blob.fromList([]), 1)", current) == "(<Bytes: 0 bytes>, 1)"
