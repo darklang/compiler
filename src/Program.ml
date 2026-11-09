@@ -1000,6 +1000,19 @@ let compileBatch (options : batchCliOptions) =
    check and lower it and everything it calls, without needing arguments. *)
 let checkProbe name = "let packageProbe = " ^ name ^ " in 0L\n"
 
+(* A generic fn referenced without a call has no type arguments, so its probe
+   says nothing. It is probed again specialized to each type argument being
+   Int64, then String, at each arity up to four: the arity is whichever does
+   not fail with a count mismatch. *)
+let genericProbeTypes = [ "Int64"; "String" ]
+let genericProbeArities = [ 1; 2; 3; 4 ]
+
+let typeArgumentText typ arity =
+  "<" ^ String.concat ", " (List.init arity (fun _ -> typ)) ^ ">"
+
+let typeArgumentCountMismatch error =
+  Text.contains error "type argument count mismatch"
+
 let checkReportJson name error =
   let fields =
     [
@@ -1046,17 +1059,43 @@ let checkItems (options : checkCliOptions) =
                       packageServer = options.checkPackageServer;
                     }
                   in
-                  let error =
-                    match
-                      compileWithStdlib stdlib (checkProbe name) output Quiet
-                        cli
-                    with
+                  let attempt probe =
+                    match compileWithStdlib stdlib probe output Quiet cli with
                     | Ok () -> ""
                     | Error error -> error
                   in
+                  let error = attempt (checkProbe name) in
+                  (* The first specialization that compiles, or else the first
+                     error that is not about the number of type arguments. *)
+                  let error, specialized =
+                    if not (CompilabilityReason.undetermined error) then
+                      (error, None)
+                    else
+                      let rec probe typeFailure = function
+                        | [] -> (Option.value typeFailure ~default:error, None)
+                        | (typ, arity) :: rest -> (
+                            let args = typeArgumentText typ arity in
+                            match attempt (checkProbe (name ^ args)) with
+                            | "" -> ("", Some args)
+                            | failure
+                              when typeArgumentCountMismatch failure
+                                   || Option.is_some typeFailure ->
+                                probe typeFailure rest
+                            | failure -> probe (Some failure) rest)
+                      in
+                      probe None
+                        (List.concat_map
+                           (fun typ ->
+                             List.map (fun arity -> (typ, arity)) genericProbeArities)
+                           genericProbeTypes)
+                  in
                   (if options.checkJson then
                      print_endline (checkReportJson name error)
-                   else if error = "" then print_endline (name ^ ": compiles")
+                   else if error = "" then
+                     print_endline
+                       (name ^ ": compiles"
+                       ^ Option.fold ~none:"" ~some:(fun args -> " at " ^ args)
+                           specialized)
                    else if CompilabilityReason.undetermined error then
                      print_endline
                        (name ^ ": can't tell: "
