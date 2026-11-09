@@ -471,3 +471,7 @@ let __sleepMilliseconds (milliseconds: Float) : Unit =
   let nanos = Stdlib.Float.toInt (milliseconds * 1000000.0)
   if Builtin.runtimeTargetOS () == "browser" then Builtin.runtimeDelayTicks (nanos / 100)
   else __sleepNanoseconds (nanos / 1000000000) (nanos % 1000000000) |> Builtin.unwrap
+
+// The interpreter's DateTime representation builtins, 100ns ticks since the Unix epoch.
+let toUnixTicks (date: DateTime) : Int64 = Stdlib.DateTime.__ticks date
+let fromUnixTicks (ticks: Int64) : DateTime = Stdlib.DateTime.__fromUnixTimeTicks ticks

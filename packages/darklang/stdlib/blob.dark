@@ -259,3 +259,49 @@ let toString (blob: Blob) : Stdlib.Result.Result<String, String> =
     let invalidIndex = Stdlib.Blob.__validateUtf8 blob 0L (Stdlib.Blob.__byteLength blob) in
     if invalidIndex < 0L then Ok (Stdlib.Blob.__copyToString blob)
     else Error (Stdlib.Blob.__invalidUtf8 (Stdlib.Blob.__getByte blob invalidIndex) invalidIndex)
+
+// The interpreter's Bytes builtins that the Blob module had no counterpart for,
+// with the interpreter's Int64 indexes and counts.
+
+/// Some byte at <param index>, or None when it is out of range.
+let getAt (blob: Blob) (index: Int64) : Stdlib.Option.Option<UInt8> =
+    if index < 0L || index >= Stdlib.Blob.__byteLength blob then None
+    else Some (Stdlib.Blob.__int64ToUInt8 (Stdlib.Blob.__getByte blob index))
+
+let __indexOfFrom (blob: Blob) (byte: Int64) (index: Int64) (length: Int64) : Stdlib.Option.Option<Int64> =
+    if index >= length then None
+    else if Stdlib.Blob.__getByte blob index == byte then Some index
+    else Stdlib.Blob.__indexOfFrom blob byte (index + 1L) length
+
+/// Some index of the first <param byte> at or after <param start>, or None
+/// when there is none or <param start> is out of range.
+let indexOf (blob: Blob) (byte: UInt8) (start: Int64) : Stdlib.Option.Option<Int64> =
+    let length = Stdlib.Blob.__byteLength blob in
+    if start < 0L || start >= length then None
+    else Stdlib.Blob.__indexOfFrom blob (Stdlib.Blob.__uint8ToInt64 byte) start length
+
+let __segmentAt (blob: Blob) (segment: Blob) (at: Int64) (offset: Int64) (count: Int64) : Bool =
+    if offset >= count then true
+    else if Stdlib.Blob.__getByte blob (at + offset) != Stdlib.Blob.__getByte segment offset then false
+    else Stdlib.Blob.__segmentAt blob segment at (offset + 1L) count
+
+let __indexOfSegmentFrom (blob: Blob) (segment: Blob) (at: Int64) (last: Int64) (count: Int64) : Stdlib.Option.Option<Int64> =
+    if at > last then None
+    else if Stdlib.Blob.__segmentAt blob segment at 0L count then Some at
+    else Stdlib.Blob.__indexOfSegmentFrom blob segment (at + 1L) last count
+
+/// Some index of the first <param segment> at or after <param start>, or None
+/// when there is none or <param start> is out of range. An empty segment is
+/// found at <param start>.
+let indexOfSegment (blob: Blob) (segment: Blob) (start: Int64) : Stdlib.Option.Option<Int64> =
+    let length = Stdlib.Blob.__byteLength blob in
+    let count = Stdlib.Blob.__byteLength segment in
+    if start < 0L || start > length then None
+    else Stdlib.Blob.__indexOfSegmentFrom blob segment start (length - count) count
+
+/// The first <param count> bytes. Every Blob here is in memory, so this is
+/// always Some.
+let peek (blob: Blob) (count: Int64) : Stdlib.Option.Option<Blob> =
+    let length = Stdlib.Blob.__byteLength blob in
+    let n = if count < 0L then 0L else if count > length then length else count in
+    Some (Stdlib.Blob.slice blob (Stdlib.Int.fromInt64 0L) (Stdlib.Int.fromInt64 n))

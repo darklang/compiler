@@ -745,6 +745,8 @@ let stdlibConversions =
     ("Darklang.Stdlib.String.slice", [ (1, Widen "Int64"); (2, Widen "Int64") ], None);
     ("Darklang.Stdlib.String.splitN", [ (2, Widen "Int64") ], None);
     ("Darklang.Stdlib.String.toCodepoints", [  ], Some (ListOf (Narrow "UInt32")));
+    ("Darklang.Stdlib.Blob.length", [], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.Blob.slice", [ (1, Widen "Int64"); (2, Widen "Int64") ], None);
     ("Darklang.Stdlib.List.length", [], Some (Narrow "Int64"));
     ("Darklang.Stdlib.Dict.size", [], Some (Narrow "Int64"));
     ("Darklang.Stdlib.List.getAt", [ (1, Widen "Int64") ], None);
@@ -777,13 +779,20 @@ let rec convert conversion expression =
              names parts)
       ^ "))"
 
+(* A builtin renders as the compiler's fn (`Stdlib.Blob.length`), a hosted
+   call as the interpreter's (`Darklang.Stdlib.String.length`). *)
+let conversionsOf name =
+  List.find_opt
+    (fun (candidate, _, _) -> candidate = name || candidate = "Darklang." ^ name)
+    stdlibConversions
+
 let argumentConversions name =
-  match List.find_opt (fun (candidate, _, _) -> candidate = name) stdlibConversions with
+  match conversionsOf name with
   | Some (_, arguments, _) -> arguments
   | None -> []
 
 let resultConversion name =
-  match List.find_opt (fun (candidate, _, _) -> candidate = name) stdlibConversions with
+  match conversionsOf name with
   | Some (_, _, result) -> result
   | None -> None
 
@@ -927,7 +936,11 @@ let rec renderExpr parameters selfName element =
           | Some (`Unary op), [ value ] ->
               let+ value = recurse value in
               "(" ^ op ^ "(" ^ value ^ "))"
-          | Some (`Call fn), _ -> application fn typeArgs args
+          | Some (`Call fn), _ -> (
+              match resultConversion fn with
+              | Some conversion ->
+                  Result.map (convert conversion) (application fn typeArgs args)
+              | None -> application fn typeArgs args)
           | _ -> (
               match resultConversion name with
               | Some conversion ->
