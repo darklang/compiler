@@ -178,6 +178,15 @@ ENTITIES["conversions-hash"] = fn("Hosted.conversions", [("x", INT64)], INT64,
             [{"EPipeFnCall": [6, WITH_DEFAULT, [], [{"EInt64": [7, 0]}], []]}]]},
         {"EApply": [8, {"EFnName": [9, TO_SECONDS, [], []]}, [],
             [{"EPipe": [10, ARG0, [{"EPipeFnCall": [11, FROM_SECONDS, [], [], []]}]]}]]}))
+# The interpreter's Dict.fromList keeps the last of a repeated key:
+# Dict.size (Dict.fromList [(1, x); (1, x)]) is 1.
+FROM_LIST = stdlib(["Dict"], "fromList", "from-list-hash")
+DICT_SIZE = stdlib(["Dict"], "size", "dict-size-hash")
+ENTITIES["dict-last-hash"] = fn("Hosted.dictLast", [("x", INT64)], INT64,
+    {"EApply": [1, {"EFnName": [2, DICT_SIZE, [], []]}, [], [
+        {"EApply": [3, {"EFnName": [4, FROM_LIST, [], []]}, [], [{"EList": [5, [
+            {"ETuple": [6, {"EInt64": [7, 1]}, ARG0, []]},
+            {"ETuple": [8, {"EInt64": [9, 1]}, ARG0, []]}]]}]]}]]})
 # Builtin.bytesLength answers an Int64; the compiler's Blob.length an Int.
 ENTITIES["bytes-length-hash"] = fn("Hosted.bytesLen", [("b", {"TBytes": []})], INT64,
     builtin("bytesLength", ARG0))
@@ -264,6 +273,7 @@ def main():
             assert run("Hosted.slices 3L\n") == "cd"
             assert run("Hosted.conversions 100L\n") == 103
             assert run('Hosted.bytesLen (Stdlib.Blob.fromString "abc")\n') == 3
+            assert run("Hosted.dictLast 5L\n") == 1
             assert run("Hosted.braces 1L\n") == "a{b}c"
             assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"
