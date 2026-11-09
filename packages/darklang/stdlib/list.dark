@@ -46,6 +46,10 @@ let singleton (value: 'a) : List<'a> =
 let push<'t> (list: List<t>) (value: t) : List<t> =
     Stdlib.List.__push<t> list value
 
+// The interpreter's List.append: one value added at the end.
+let appendOne<'t> (list: List<t>) (value: t) : List<t> =
+    Stdlib.List.append<t> list [value]
+
 // Internal: force concrete monomorphization of push for compiler-generated list literals
 let __pushInt64 (list: List<Int64>) (value: Int64) : List<Int64> =
     Stdlib.List.__push list value

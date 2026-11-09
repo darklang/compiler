@@ -667,6 +667,16 @@ let padEnd
     Result.Result.Ok(string + pad)
 
 // Pad to display cells without clipping text that already meets the target width.
+// The interpreter's padStart and padEnd: a Char of padding up to an Int64
+// length, the string unchanged when it is already that long.
+let padStartChar (s: String) (padWith: Char) (goalLength: Int64) : String =
+  let padCount = Stdlib.Int.fromInt64 goalLength - String.length s
+  if padCount <= 0 then s else (String.repeat (String.fromChar padWith) padCount) + s
+
+let padEndChar (s: String) (padWith: Char) (goalLength: Int64) : String =
+  let padCount = Stdlib.Int.fromInt64 goalLength - String.length s
+  if padCount <= 0 then s else s + (String.repeat (String.fromChar padWith) padCount)
+
 let padStartToWidth (s: String) (width: Int) : String =
   let padding = width - (String.displayWidth s)
   if padding <= 0 then s else (String.repeat " " padding) + s

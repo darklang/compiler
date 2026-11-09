@@ -43,6 +43,12 @@ def main():
         assert run('Stdlib.Dict.fromList([("a", Stdlib.Dict.fromList([(1, 2)]))])', current) == '{ "a": { 1: 2 } }'
         assert run('Stdlib.Uuid.parse("6fad2a6c-a7b6-4b9e-bf01-5cb6ac1ebe62")', current) == \
             "Ok(<Uuid: 6fad2a6c-a7b6-4b9e-bf01-5cb6ac1ebe62>)"
+        # Fns whose meaning changed on main: append adds one value, repeat answers
+        # the list, padStart and padEnd pad with a Char.
+        assert run("Stdlib.List.append([1, 2], 3)", current) == "[1, 2, 3]"
+        assert run('Stdlib.List.repeat(3, "a")', current) == '["a", "a", "a"]'
+        assert run("Stdlib.String.padStart(\"7\", '0', 3)", current) == "007"
+        assert run("Stdlib.String.padEnd(\"7\", '.', 3)", current) == "7.."
         # Without the flag a bare integer is still an Int, printed as before.
         pinned = compile_("Stdlib.Int64.add(20, 22)")
         assert pinned.returncode != 0, pinned.stdout + pinned.stderr

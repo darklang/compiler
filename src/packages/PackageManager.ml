@@ -599,6 +599,7 @@ let builtinOperator name =
       ("dictContainsKey", "Stdlib.Dict.member");
       ("dictFromEntries", "Stdlib.Dict.fromListOverwritingDuplicates");
       ("dictToEntries", "Stdlib.Dict.toList");
+      ("listAppend", "Stdlib.List.appendOne");
       ("bytesConcat", "Stdlib.Blob.concat");
       ("base16Encode", "Stdlib.Blob.toHex");
     ]
