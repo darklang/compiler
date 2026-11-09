@@ -182,6 +182,12 @@ and parseApp grammar state index =
     when tok state next = TLParen
          && (rng state next).start = (WT.exprRange callee).end_ ->
       stop := parseCtorParenFields grammar state next args
+  (* The same holds for a parenthesized function value, such as the operator
+     section in `(==)(a, b)` or `(fun(a, b) -> a + b)(1, 2)`. *)
+  | WT.ELambda _
+    when tok state next = TLParen
+         && (rng state (next - 1)).end_ = (rng state next).start ->
+      stop := parseCtorParenFields grammar state next args
   | _ -> ());
   let accepts =
     match callee with
