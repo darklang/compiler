@@ -1,0 +1,31 @@
+// An ordering comparison with NaN on either side is false, including when the
+// comparison's Bool is the function's result rather than a branch condition.
+
+let ltF (a: Float) (b: Float) : Bool = a < b
+let leF (a: Float) (b: Float) : Bool = a <= b
+let gtF (a: Float) (b: Float) : Bool = a > b
+let geF (a: Float) (b: Float) : Bool = a >= b
+
+ltF Builtin.testNan_v0 0.0 = false
+leF Builtin.testNan_v0 0.0 = false
+gtF Builtin.testNan_v0 0.0 = false
+geF Builtin.testNan_v0 0.0 = false
+ltF 9007199254740992.0 Builtin.testNan_v0 = false
+leF 9007199254740992.0 Builtin.testNan_v0 = false
+gtF 9007199254740992.0 Builtin.testNan_v0 = false
+geF 9007199254740992.0 Builtin.testNan_v0 = false
+ltF 1.0 2.0 = true
+leF 2.0 2.0 = true
+gtF 1.0 2.0 = false
+geF 2.0 2.0 = true
+ltF -0.0 0.0 = false
+leF -0.0 0.0 = true
+
+Stdlib.Float32.lessThan (0.0f32 / 0.0f32) 0.0f32 = false
+Stdlib.Float32.lessThanOrEqualTo (0.0f32 / 0.0f32) 0.0f32 = false
+Stdlib.Float32.lessThan 16777216.0f32 (0.0f32 / 0.0f32) = false
+Stdlib.Float32.lessThanOrEqualTo 16777216.0f32 (0.0f32 / 0.0f32) = false
+Stdlib.Float32.greaterThan (0.0f32 / 0.0f32) 0.0f32 = false
+Stdlib.Float32.greaterThanOrEqualTo 0.0f32 (0.0f32 / 0.0f32) = false
+Stdlib.Float32.lessThan 1.0f32 2.0f32 = true
+Stdlib.Float32.lessThanOrEqualTo 2.0f32 2.0f32 = true
