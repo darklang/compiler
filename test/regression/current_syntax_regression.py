@@ -46,6 +46,8 @@ def main():
         # Fns whose meaning changed on main: append adds one value, repeat answers
         # the list, padStart and padEnd pad with a Char.
         assert run("Stdlib.List.append([1, 2], 3)", current) == "[1, 2, 3]"
+        assert run("Stdlib.List.prepend([1, 2], 3)", current) == "[3, 1, 2]"
+        assert run("Stdlib.List.concat([1], [2, 3])", current) == "[1, 2, 3]"
         assert run('Stdlib.List.repeat(3, "a")', current) == '["a", "a", "a"]'
         assert run("Stdlib.String.padStart(\"7\", '0', 3)", current) == "007"
         assert run("Stdlib.String.padEnd(\"7\", '.', 3)", current) == "7.."
