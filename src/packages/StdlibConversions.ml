@@ -7,6 +7,14 @@
 let hostedRenames =
   [
     ("Darklang.Stdlib.Dict.fromList", "Darklang.Stdlib.Dict.fromListOverwritingDuplicates");
+    (* List.append adds one value at the end; the compiler's joins two lists. *)
+    ("Darklang.Stdlib.List.append", "Darklang.Stdlib.List.appendOne");
+    (* List.repeat answers the List; the compiler's a Result. *)
+    ("Darklang.Stdlib.List.repeat", "Darklang.Stdlib.List.repeatUnsafe");
+    (* padStart and padEnd pad with a Char to an Int64; the compiler's with a
+       String to an Int, answering a Result. *)
+    ("Darklang.Stdlib.String.padStart", "Darklang.Stdlib.String.padStartChar");
+    ("Darklang.Stdlib.String.padEnd", "Darklang.Stdlib.String.padEndChar");
   ]
 
 let hostedName name =
@@ -102,6 +110,8 @@ let stdlibConversions =
     ("Darklang.Stdlib.Blob.length", [], Some (Narrow "Int64"));
     ("Darklang.Stdlib.Blob.slice", [ (1, Widen "Int64"); (2, Widen "Int64") ], None);
     ("Darklang.Stdlib.List.length", [], Some (Narrow "Int64"));
+    ("Darklang.Stdlib.List.repeat", [ (0, Widen "Int64") ], None);
+    ("Darklang.Stdlib.List.repeatUnsafe", [ (0, Widen "Int64") ], None);
     ("Darklang.Stdlib.Dict.size", [], Some (Narrow "Int64"));
     ("Darklang.Stdlib.List.getAt", [ (1, Widen "Int64") ], None);
     ("Darklang.Stdlib.List.take", [ (1, Widen "Int64") ], None);
