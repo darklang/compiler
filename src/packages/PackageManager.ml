@@ -602,6 +602,7 @@ let builtinOperator name =
       ("listAppend", "Stdlib.List.appendOne");
       ("listPrepend", "Stdlib.List.push");
       ("listConcat", "Stdlib.List.append");
+      ("listIndexedMap", "Stdlib.List.indexedMapInt64");
       ("bytesConcat", "Stdlib.Blob.concat");
       ("base16Encode", "Stdlib.Blob.toHex");
     ]

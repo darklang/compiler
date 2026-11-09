@@ -15,6 +15,8 @@ let hostedRenames =
     ("Darklang.Stdlib.List.zip", "Darklang.Stdlib.List.zipChecked");
     ("Darklang.Stdlib.List.map2", "Darklang.Stdlib.List.map2Checked");
     ("Darklang.Stdlib.List.map2Shortest", "Darklang.Stdlib.List.map2shortest");
+    (* indexedMap passes an Int64 index; the compiler's an Int. *)
+    ("Darklang.Stdlib.List.indexedMap", "Darklang.Stdlib.List.indexedMapInt64");
     ("Darklang.Stdlib.List.concat", "Darklang.Stdlib.List.append");
     (* List.repeat answers the List; the compiler's a Result. *)
     ("Darklang.Stdlib.List.repeat", "Darklang.Stdlib.List.repeatUnsafe");

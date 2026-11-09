@@ -356,6 +356,10 @@ let repeat
 let indexedMap<'a, 'b> (list: List<a>) (fn: Int -> a -> b) : List<b> =
     Stdlib.List.__indexedMapHelper<a, b> list fn 0 (Stdlib.List.__empty<b> ())
 
+// The interpreter's List.indexedMap, whose index is an Int64.
+let indexedMapInt64<'a, 'b> (list: List<a>) (fn: Int64 -> a -> b) : List<b> =
+    Stdlib.List.indexedMap<a, b> list (fun index value -> fn (Builtin.unwrap (Stdlib.Int.toInt64 index)) value)
+
 let __indexedMapHelper<'a, 'b> (list: List<a>) (fn: Int -> a -> b) (index: Int) (acc: List<b>) : List<b> =
     if Stdlib.List.__isEmpty<a> list then Stdlib.List.__reverse<b> acc
     else
