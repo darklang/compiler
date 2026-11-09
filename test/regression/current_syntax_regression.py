@@ -64,11 +64,21 @@ def main():
                    "type Pair<'a, 'b> = { first: a, second: b }\n"
                    '(MyOpt.Nothing, MyOpt.Just(1), Pair { first = 1, second = "a" })')
         assert run(generic, current) == \
-            '(MyOpt<_>.Nothing, MyOpt<Int64>.Just(1), Pair<Int64, String> { first: 1, second: "a" })'
+            '(\n  MyOpt<_>.Nothing,\n  MyOpt<Int64>.Just(1),\n  Pair<Int64, String> { first: 1, second: "a" }\n)'
         assert run('Stdlib.DateTime.parse("2019-07-28T22:42:36Z")', current) == \
             "Ok(<DateTime: 2019-07-28T22:42:36Z>)"
         assert run('Stdlib.DateTime.parse("2019-07-28T22:42:36Z") |> Builtin.unwrap', current) == \
             "<DateTime: 2019-07-28T22:42:36Z>"
+        # A value that does not fit in 80 columns breaks as dark eval breaks it:
+        # each group that does not fit puts one item per line, indented by two.
+        long = '"' + "a" * 41 + '"', '"' + "b" * 65 + '"'
+        assert run("Stdlib.Option.Option.Some((%s, %s))" % long, current) == \
+            "Some(\n  (\n    %s,\n    %s\n  )\n)" % long
+        assert run("[[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12], [13, 14, 15], [16, 17, 18], [19, 20, 21]]",
+                   current) == ("[\n  [1, 2, 3],\n  [4, 5, 6],\n  [7, 8, 9],\n  [10, 11, 12],\n"
+                                "  [13, 14, 15],\n  [16, 17, 18],\n  [19, 20, 21]\n]")
+        assert run('Stdlib.Dict.fromList([("k", Stdlib.Dict.fromList([])), ("j", Stdlib.Dict.fromList([("x", %s)]))])'
+                   % long[1], current) == '{\n  "j": {\n    "x": %s\n  },\n  "k": {}\n}' % long[1]
         # Bytes print as dark eval prints unsaved Bytes: the size and the first 16 in hex.
         assert run("Stdlib.Blob.fromList([171u8])", current) == "<Bytes: 1 byte ab>"
         assert run("(Stdlib.Blob.fromList([]), 1)", current) == "(<Bytes: 0 bytes>, 1)"
