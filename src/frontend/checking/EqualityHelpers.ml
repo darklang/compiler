@@ -143,6 +143,9 @@ let rec buildEqHelperExpr ?(key = false) aliases registry lookup sums mode typ
             ( LPVariable leftName,
               left,
               Let (LPVariable rightName, right, chain comparisons) ))
+  (* 1.10dec == 1.1dec: Decimal equality compares the numbers, not the scales. *)
+  | ExpandCurrent, TSum ("Decimal", []) ->
+      call "Darklang.Stdlib.Decimal.__equals" [ left; right ]
   | ExpandCurrent, TSum (name, args) ->
       if not (ComparisonPlanning.sumTypeHasPayload lookup name) then
         BinOp (Eq, left, right)

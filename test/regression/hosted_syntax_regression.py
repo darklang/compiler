@@ -51,7 +51,7 @@ ENTITIES = {
     "record-hash": fn("Hosted.recordPattern", [("x", INT64)], INT64,
         {"EMatch": [1, ARG0, [dict(pat={"MPRecord": [2, [["a", {"MPVariable": [3, "a"]}]]]},
                                    whenCondition={"None": []}, rhs={"EInt64": [4, 1]})]]}),
-    "decimal-hash": fn("Hosted.price", [], {"TDecimal": []}, {"EDecimal": [1, "19.99"]}),
+    "decimal-hash": fn("Hosted.price", [("x", INT64)], {"TDecimal": []}, {"EDecimal": [1, 19.99]}),
 }
 
 
@@ -238,8 +238,7 @@ def main():
             assert run("Hosted.isHalf 0.5\n") is True
             assert run("Hosted.isHalf 0.25\n") is False
             assert str(run('Stdlib.Blob.length (Hosted.sameBytes (Stdlib.Blob.fromString "abc"))\n')) == "3"
-            for text, feature in (("Hosted.recordPattern 1L\n", "uses a record pattern"),
-                                  ("Hosted.price\n", "uses the Decimal type")):
+            for text, feature in (("Hosted.recordPattern 1L\n", "uses a record pattern"),):
                 refused = compile_(text)
                 output = refused.stdout + refused.stderr
                 assert refused.returncode != 0, output
@@ -263,12 +262,14 @@ def main():
                 " the compiler's pinned name is Stdlib.Dict.member"], reasons
             # --check answers per package item, without a caller or arguments.
             checked = subprocess.run([compiler, "--check", "--package-server",
-                f"http://127.0.0.1:{server.server_port}", "Hosted.pipePlus", "Hosted.price"],
+                f"http://127.0.0.1:{server.server_port}", "Hosted.pipePlus", "Hosted.price",
+                "Hosted.recordPattern"],
                 env=env, capture_output=True, text=True, timeout=300)
             assert checked.returncode == 1, checked.stdout + checked.stderr
             assert checked.stdout.splitlines() == [
                 "Hosted.pipePlus: compiles",
-                "Hosted.price: can't compile: uses the Decimal type, which this compiler does not support",
+                "Hosted.price: compiles",
+                "Hosted.recordPattern: can't compile: uses a record pattern, which this compiler does not support",
             ], checked.stdout + checked.stderr
         server.shutdown()
     print("Hosted operators, pipes, BigInt, Bytes and float patterns render; unsupported features name themselves, and batch and --check reports give the reason")

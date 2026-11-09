@@ -1,0 +1,197 @@
+// Stdlib.Decimal.dark - .NET's System.Decimal over the root DECIMAL(Int, Int64) sum.
+//
+// A Decimal is an unscaled integer of at most 96 bits and a scale of 0 to 28
+// places: DECIMAL(110, 2) is 1.10. The scale is part of the value and is
+// kept by printing, while == and ordering compare the numbers. Results follow
+// .NET: a sum keeps the larger scale and a product adds the scales; a result
+// with more than 28 places, or past 96 bits, is rounded half to even to the
+// most places that fit, and one that does not fit at scale 0 raises.
+
+module Darklang.Stdlib.Decimal
+
+/// Split <param d> into (unscaled, scale): 1.10dec is (110, 2).
+let toParts (d: Decimal) : (Int * Int64) =
+    match d with
+    | DECIMAL (unscaled, scale) -> (unscaled, scale)
+
+let __limit () : Int = Stdlib.Float.__powerOfTwo 96L
+
+let __fits (unscaled: Int) : Bool =
+    Stdlib.Int.lessThan (Stdlib.Int.absoluteValue unscaled) (Stdlib.Decimal.__limit ())
+
+/// The decimal unscaled / 10 ** scale, keeping <param scale>; None when the
+/// scale is outside 0 to 28 or the unscaled value needs more than 96 bits.
+let fromParts (unscaled: Int) (scale: Int64) : Stdlib.Option.Option<Decimal> =
+    if scale < 0L || scale > 28L || Stdlib.Bool.not (Stdlib.Decimal.__fits unscaled) then None
+    else Some (DECIMAL (unscaled, scale))
+
+let __outOfRange () : Decimal =
+    Builtin.crash "Decimal result is out of range (larger than 79228162514264337593543950335)"
+
+let __zero () : Int = Stdlib.Int.fromInt64 0L
+
+// numerator / denominator (denominator > 0), rounded half to even.
+let __divideRounded (numerator: Int) (denominator: Int) : Int =
+    let magnitude = Stdlib.Float.__roundedQuotient (Stdlib.Int.absoluteValue numerator) denominator in
+    if Stdlib.Int.lessThan numerator (Stdlib.Decimal.__zero ()) then Stdlib.Int.negate magnitude
+    else magnitude
+
+// The exact value unscaled / 10 ** scale, at the largest scale no greater
+// than <param scale> and 28 whose rounding fits in 96 bits.
+let __fitFrom (unscaled: Int) (scale: Int64) (target: Int64) : Decimal =
+    if target < 0L then Stdlib.Decimal.__outOfRange ()
+    else
+        let rounded =
+            if target >= scale then unscaled
+            else Stdlib.Decimal.__divideRounded unscaled (Stdlib.Float.__pow10 (scale - target)) in
+        if Stdlib.Decimal.__fits rounded then DECIMAL (rounded, target)
+        else Stdlib.Decimal.__fitFrom unscaled scale (target - 1L)
+
+let __fit (unscaled: Int) (scale: Int64) : Decimal =
+    Stdlib.Decimal.__fitFrom unscaled scale (if scale > 28L then 28L else scale)
+
+let __scaledTo (d: Decimal) (scale: Int64) : Int =
+    let (unscaled, own) = Stdlib.Decimal.toParts d in
+    Stdlib.Int.multiply unscaled (Stdlib.Float.__pow10 (scale - own))
+
+let __commonScale (a: Decimal) (b: Decimal) : Int64 =
+    let (_, sa) = Stdlib.Decimal.toParts a in
+    let (_, sb) = Stdlib.Decimal.toParts b in
+    if sa > sb then sa else sb
+
+let add (a: Decimal) (b: Decimal) : Decimal =
+    let scale = Stdlib.Decimal.__commonScale a b in
+    Stdlib.Decimal.__fit (Stdlib.Int.add (Stdlib.Decimal.__scaledTo a scale) (Stdlib.Decimal.__scaledTo b scale)) scale
+
+let subtract (a: Decimal) (b: Decimal) : Decimal =
+    let scale = Stdlib.Decimal.__commonScale a b in
+    Stdlib.Decimal.__fit (Stdlib.Int.subtract (Stdlib.Decimal.__scaledTo a scale) (Stdlib.Decimal.__scaledTo b scale)) scale
+
+let multiply (a: Decimal) (b: Decimal) : Decimal =
+    let (ua, sa) = Stdlib.Decimal.toParts a in
+    let (ub, sb) = Stdlib.Decimal.toParts b in
+    Stdlib.Decimal.__fit (Stdlib.Int.multiply ua ub) (sa + sb)
+
+// The quotient at the smallest scale from <param scale> that holds it exactly,
+// or else rounded at the largest scale (at most 28) that fits in 96 bits.
+let __divideFrom (ua: Int) (sa: Int64) (ub: Int) (sb: Int64) (scale: Int64) : Decimal =
+    // ua / 10**sa / (ub / 10**sb) * 10**scale = ua * 10**(scale - sa + sb) / ub
+    let shift = scale - sa + sb in
+    let numerator = if shift >= 0L then Stdlib.Int.multiply ua (Stdlib.Float.__pow10 shift) else ua in
+    let denominator = if shift >= 0L then ub else Stdlib.Int.multiply ub (Stdlib.Float.__pow10 (0L - shift)) in
+    let quotient = Stdlib.Int.divide numerator denominator in
+    let exact =
+        match Stdlib.Int.remainder numerator denominator with
+        | Ok remainder -> remainder == Stdlib.Decimal.__zero ()
+        | Error _ -> false in
+    if Stdlib.Bool.not (Stdlib.Decimal.__fits quotient) then
+        if scale == 0L then Stdlib.Decimal.__outOfRange ()
+        else Stdlib.Decimal.__roundedQuotientAt ua sa ub sb (scale - 1L)
+    else if exact then DECIMAL (quotient, scale)
+    else if scale == 28L then Stdlib.Decimal.__roundedQuotientAt ua sa ub sb 28L
+    else Stdlib.Decimal.__divideFrom ua sa ub sb (scale + 1L)
+
+let __roundedQuotientAt (ua: Int) (sa: Int64) (ub: Int) (sb: Int64) (scale: Int64) : Decimal =
+    let shift = scale - sa + sb in
+    let numerator = if shift >= 0L then Stdlib.Int.multiply ua (Stdlib.Float.__pow10 shift) else ua in
+    let denominator = if shift >= 0L then ub else Stdlib.Int.multiply ub (Stdlib.Float.__pow10 (0L - shift)) in
+    let negative = Stdlib.Int.lessThan denominator (Stdlib.Decimal.__zero ()) in
+    let rounded =
+        Stdlib.Decimal.__divideRounded
+            (if negative then Stdlib.Int.negate numerator else numerator)
+            (Stdlib.Int.absoluteValue denominator) in
+    if Stdlib.Decimal.__fits rounded then DECIMAL (rounded, scale)
+    else if scale == 0L then Stdlib.Decimal.__outOfRange ()
+    else Stdlib.Decimal.__roundedQuotientAt ua sa ub sb (scale - 1L)
+
+let divide (a: Decimal) (b: Decimal) : Decimal =
+    let (ua, sa) = Stdlib.Decimal.toParts a in
+    let (ub, sb) = Stdlib.Decimal.toParts b in
+    if ub == Stdlib.Decimal.__zero () then Builtin.crash "Cannot divide by 0"
+    else Stdlib.Decimal.__divideFrom ua sa ub sb (if sa > sb then sa - sb else 0L)
+
+// `a % b` wrapped so that 0 <= result < b, as the interpreter's Modulo for Decimal.
+let modulo (a: Decimal) (b: Decimal) : Decimal =
+    let (ub, _) = Stdlib.Decimal.toParts b in
+    if ub == Stdlib.Decimal.__zero () then Builtin.crash "Cannot evaluate modulus against 0"
+    else if Stdlib.Int.lessThan ub (Stdlib.Decimal.__zero ()) then
+        Builtin.crash "Cannot evaluate modulus against a negative number"
+    else
+        let scale = Stdlib.Decimal.__commonScale a b in
+        let x = Stdlib.Decimal.__scaledTo a scale in
+        let y = Stdlib.Decimal.__scaledTo b scale in
+        // .NET's remainder takes the dividend's sign; then wrap a negative one.
+        let truncated =
+            match Stdlib.Int.remainder (Stdlib.Int.absoluteValue x) y with
+            | Ok r -> r
+            | Error message -> Builtin.crash message in
+        let remainder = if Stdlib.Int.lessThan x (Stdlib.Decimal.__zero ()) then Stdlib.Int.negate truncated else truncated in
+        let wrapped = if Stdlib.Int.lessThan remainder (Stdlib.Decimal.__zero ()) then Stdlib.Int.add y remainder else remainder in
+        DECIMAL (wrapped, scale)
+
+let negate (a: Decimal) : Decimal =
+    let (u, s) = Stdlib.Decimal.toParts a in
+    DECIMAL (Stdlib.Int.negate u, s)
+
+let __compare (a: Decimal) (b: Decimal) : Int64 =
+    let scale = Stdlib.Decimal.__commonScale a b in
+    let x = Stdlib.Decimal.__scaledTo a scale in
+    let y = Stdlib.Decimal.__scaledTo b scale in
+    if Stdlib.Int.lessThan x y then -1L else if Stdlib.Int.greaterThan x y then 1L else 0L
+
+// == on Decimal compares the numbers: 1.10dec == 1.1dec.
+let __equals (a: Decimal) (b: Decimal) : Bool = Stdlib.Decimal.__compare a b == 0L
+
+let lessThan (a: Decimal) (b: Decimal) : Bool = Stdlib.Decimal.__compare a b < 0L
+let lessThanOrEqualTo (a: Decimal) (b: Decimal) : Bool = Stdlib.Decimal.__compare a b <= 0L
+let greaterThan (a: Decimal) (b: Decimal) : Bool = Stdlib.Decimal.__compare a b > 0L
+let greaterThanOrEqualTo (a: Decimal) (b: Decimal) : Bool = Stdlib.Decimal.__compare a b >= 0L
+
+/// <param d> at its scale, without exponent: 1.10dec is "1.10", -0.05dec is "-0.05".
+let toString (d: Decimal) : String =
+    let (unscaled, scale) = Stdlib.Decimal.toParts d in
+    let sign = if Stdlib.Int.lessThan unscaled (Stdlib.Decimal.__zero ()) then "-" else "" in
+    let digits = Stdlib.Int.toString (Stdlib.Int.absoluteValue unscaled) in
+    if scale == 0L then sign + digits
+    else
+        let length = Stdlib.String.__byteLength digits in
+        let padCount = if scale + 1L > length then scale + 1L - length else 0L in
+        let padded = Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 padCount) + digits in
+        let total = Stdlib.String.__byteLength padded in
+        sign + Stdlib.String.__byteTake padded (total - scale) + "." + Stdlib.String.__byteDrop padded (total - scale)
+
+// How `dark eval` shows a Decimal: `1.10dec`.
+let __display (d: Decimal) : String = Stdlib.Decimal.toString d + "dec"
+
+impl Stdlib.Add for Decimal =
+  let add = Stdlib.Decimal.add
+
+impl Stdlib.Subtract for Decimal =
+  let subtract = Stdlib.Decimal.subtract
+
+impl Stdlib.Multiply for Decimal =
+  let multiply = Stdlib.Decimal.multiply
+
+impl Stdlib.Divide for Decimal =
+  let divide = Stdlib.Decimal.divide
+
+impl Stdlib.Modulo for Decimal =
+  let modulo = Stdlib.Decimal.modulo
+
+impl Stdlib.Negate for Decimal =
+  let negate = Stdlib.Decimal.negate
+
+impl Stdlib.ToString for Decimal =
+  let toString = Stdlib.Decimal.toString
+
+impl Stdlib.Compare for Decimal =
+  let lessThan = Stdlib.Decimal.lessThan
+  let lessThanOrEqualTo = Stdlib.Decimal.lessThanOrEqualTo
+  let greaterThan = Stdlib.Decimal.greaterThan
+  let greaterThanOrEqualTo = Stdlib.Decimal.greaterThanOrEqualTo
+
+impl Stdlib.Zero for Decimal =
+  let zero () : Decimal = DECIMAL (Stdlib.Int.fromInt64 0L, 0L)
+
+impl Stdlib.One for Decimal =
+  let one () : Decimal = DECIMAL (Stdlib.Int.fromInt64 1L, 0L)

@@ -72,6 +72,8 @@ let rec wrapReturnWithPrint resolveFunction programType gen expr =
       | AST.TSum ("Uuid", []) ->
           (* UUID is an ordinary sum, but public output is its canonical text. *)
           format "Darklang.Stdlib.Uuid.toString"
+      | AST.TSum ("Float32", []) -> format "Darklang.Stdlib.Float32.__display"
+      | AST.TSum ("Decimal", []) -> format "Darklang.Stdlib.Decimal.__display"
       | _ ->
           (* Non-list types: simple print *)
           let id, gen = freshVar gen in
