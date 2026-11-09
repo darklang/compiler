@@ -1,0 +1,30 @@
+// A destructuring let over a match keeps the match's unreachable
+// non-exhaustive-fallback arm. That arm stops the program, so the
+// destructuring and the code after it must not be lowered on the arm's
+// placeholder result: doing so read a String field from a constant and
+// failed code generation.
+
+let matchErrorSplit(hostPort: String): Stdlib.Result.Result<(String * String), String> =
+  let (host, portText) =
+    (if Stdlib.String.startsWith(hostPort, "[") then
+       Stdlib.Result.Result.Error("bracket")
+     else
+       let (name, portText) =
+         match Stdlib.String.splitFirst(hostPort, ":") with
+         | Some((h, p)) -> (h, p)
+         | None -> (hostPort, "")
+       if Stdlib.String.contains(name, "@") then
+         Stdlib.Result.Result.Error(name)
+       else
+         Stdlib.Result.Result.Ok((Stdlib.String.toLowercase(name), portText)))?
+
+  if host == "" then
+    Stdlib.Result.Result.Error(hostPort)
+  else
+    Stdlib.Result.Result.Ok((host, portText))
+
+matchErrorSplit("Example.com:80") = Stdlib.Result.Result.Ok(("example.com", "80"))
+matchErrorSplit("example.com") = Stdlib.Result.Result.Ok(("example.com", ""))
+matchErrorSplit(":80") = Stdlib.Result.Result.Error(":80")
+matchErrorSplit("a@b:80") = Stdlib.Result.Result.Error("a@b")
+matchErrorSplit("[::1]") = Stdlib.Result.Result.Error("bracket")
