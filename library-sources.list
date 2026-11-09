@@ -9,6 +9,7 @@ packages/darklang/stdlib/int32.dark
 packages/darklang/stdlib/int64.dark
 packages/darklang/stdlib/int/__integer.dark
 packages/darklang/stdlib/int.dark
+packages/darklang/stdlib/bigInt.dark
 packages/darklang/stdlib/int128.dark
 packages/darklang/stdlib/uint8.dark
 packages/darklang/stdlib/uint16.dark

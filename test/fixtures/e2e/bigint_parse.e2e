@@ -1,0 +1,3 @@
+// The interpreter's BigInt.parse answers with BigInt's own ParseError.
+Stdlib.BigInt.parse "12" = Ok 12
+Stdlib.BigInt.parse "x" = Error Stdlib.BigInt.ParseError.BadFormat
