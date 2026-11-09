@@ -437,6 +437,12 @@ let parseArgs argv =
         if Option.is_some options.argument then
           Error ("Unexpected argument: " ^ argument)
         else resume rest { options with argument = Some argument }
+    (* `-e -- -7.5dec % 2dec`: after `--`, the one argument is the source or
+       expression even when it starts with a minus. *)
+    | [ "--"; argument ] ->
+        if Option.is_some options.argument then
+          Error ("Unexpected argument: " ^ argument)
+        else resume [] { options with argument = Some argument }
     | flag :: _ -> Error ("Unknown flag: " ^ flag)
   in
   flags (Array.to_list argv) defaultOptions Normal
