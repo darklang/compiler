@@ -36,6 +36,16 @@ IMPL = dict(hash={"Hash": ["impl-hash"]}, trait_=SHOW_REF, traitTypeArgs=[], sel
             typeParams=[], bounds=[], methods=[["show", DECIMAL_REF]])
 
 
+# twice calls Big.Lib.helper, which its module's listing leaves out, so the
+# helper is fetched by its hash alone.
+HELPER = dict(FN, hash={"Hash": ["helper-hash"]})
+HELPER_LOCATION = dict(owner="Big", modules=["Lib"], name="helper")
+TWICE = dict(FN, hash={"Hash": ["twice-hash"]}, body={"EApply": [1, {"EFnName": [2, dict(
+    originalName=["Big", "Lib", "helper"], resolved={"Ok": [dict(
+        name={"Package": [{"Hash": ["helper-hash"]}]}, location={"Some": [HELPER_LOCATION]})]}), []]},
+    [], [{"EArg": [3, 0]}]]})
+
+
 def inventory(module):
     # Like the interpreter's /:location browser: a module's direct items and children.
     parts = module.split(".")
@@ -60,6 +70,12 @@ def main():
             parts = url.path.strip("/").split("/")
             if url.path == "/search":
                 payload = inventory(urllib.parse.parse_qs(url.query)["modules"][0])
+            elif parts == ["function", "find", "Big.App.Math.twice"]:
+                payload = {"Hash": ["twice-hash"]}
+            elif parts[:3] == ["function", "get", "with-location"] and parts[3] == "twice-hash":
+                payload = dict(entity=TWICE, location=dict(LOCATION, name="twice"))
+            elif parts[:3] == ["function", "get", "with-location"] and parts[3] == "helper-hash":
+                payload = dict(entity=HELPER, location=HELPER_LOCATION)
             elif parts == ["function", "find", "Big.App.Math.inc"]:
                 payload = {"Hash": ["inc-hash"]}
             elif parts[:3] == ["function", "get", "with-location"] and parts[3] == "inc-hash":
@@ -109,6 +125,15 @@ def main():
             assert result.stdout.count(": compiles") == 2, result.stdout + result.stderr
             repeated = sorted({r for r in requests if requests.count(r) > 1})
             assert repeated == [], repeated
+            # A dependency found by hash alone is asked for as a function first, and
+            # the other kinds are not asked once it is found.
+            requests.clear()
+            result = subprocess.run([compiler, "--package-server",
+                f"http://127.0.0.1:{server.server_port}", "--check", "Big.App.Math.twice"],
+                env=env, capture_output=True, text=True, timeout=300)
+            assert result.stdout.strip() == "Big.App.Math.twice: compiles", result.stdout + result.stderr
+            by_hash = [r for r in requests if "helper-hash" in r]
+            assert by_hash == ["/function/get/with-location/helper-hash"], by_hash
         server.shutdown()
     print("Hosted names resolve from their own modules without reading unrelated ones, "
           "an unused implementation over an unsupported type does not block them, "

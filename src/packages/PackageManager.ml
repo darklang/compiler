@@ -1772,14 +1772,16 @@ let resolveNames config resolutionEnv knownTraits names =
                   match kind with
                   | Some kind -> fetchLocated kind hash
                   | None ->
-                      let attempts =
-                        List.map (fun kind -> fetchLocated kind hash) allKinds
-                      in
+                      (* Each kind is asked in turn until one has the hash;
+                         against the interpreter every miss costs a request. *)
                       Ok
                         (List.find_map
-                           (function
-                             | Ok (Some entity) -> Some entity | _ -> None)
-                           attempts))
+                           (fun kind ->
+                             match fetchLocated kind hash with
+                             | Ok (Some entity) -> Some entity
+                             | _ -> None)
+                           [ PackageFunction; PackageType; PackageValue;
+                             PackageImpl; PackageTrait ]))
             in
             match entity with
             | None -> Error ("Package dependency " ^ hash ^ " was not found")
