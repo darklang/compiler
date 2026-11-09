@@ -157,7 +157,7 @@ ENTITIES["fn-value-hash"] = fn("Hosted.mapWithValue", [("x", INT64)], {"TList": 
         {"EApply": [4, {"EVariable": [5, "m"]}, [], [
             {"EList": [6, [ARG0, {"EInt64": [7, 2]}]]},
             {"ELambda": [8, [{"LPVariable": [9, "v"]}], infix("ArithmeticMultiply", {"EVariable": [10, "v"]}, {"EInt64": [11, 10]})]}]]}]})
-# The interpreter's List.length is an Int64; the pinned library's is an Int.
+# A hosted List.length call answers an Int64, as the compiler's List.length does.
 LENGTH = dict(originalName=["Stdlib", "List", "length"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["length-hash"]}]},
     location={"Some": [dict(owner="Darklang", modules=["Stdlib", "List"], name="length")]})]})
@@ -165,7 +165,7 @@ ENTITIES["counts-hash"] = fn("Hosted.counts", [("x", INT64)], INT64,
     infix("ArithmeticPlus",
           {"EApply": [1, {"EFnName": [2, LENGTH, [], []]}, [], [{"EList": [3, [ARG0, ARG0]]}]]},
           {"EPipe": [4, {"EList": [5, [ARG0]]}, [{"EPipeFnCall": [6, LENGTH, [], [], []]}]]}))
-# The interpreter's String.slice takes Int64 indexes; the pinned library's take Ints.
+# A hosted String.slice call passes Int64 indexes, as the compiler's String.slice takes.
 SLICE = dict(originalName=["Stdlib", "String", "slice"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["slice-hash"]}]},
     location={"Some": [dict(owner="Darklang", modules=["Stdlib", "String"], name="slice")]})]})

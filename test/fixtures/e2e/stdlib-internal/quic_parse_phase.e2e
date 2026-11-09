@@ -1,6 +1,6 @@
 // quic_parse_phase.e2e - A malformed frame closes with authenticated updated keys and the post-tick nonce.
 let phaseClose () : Bool =
-  let secret = Stdlib.String.toBlob (Stdlib.String.repeat "s" 32) in
+  let secret = Stdlib.String.toBlob (Stdlib.String.repeat "s" 32L) in
   let keys = match Stdlib.__QuicCrypto.derive secret with | Ok keys -> keys | Error _ -> Builtin.crash "Test keys" in
   let payload = Stdlib.Blob.__fromInt64List [15L, 0L, 0L, 2L, 97L] in
   let generation = match Stdlib.__QuicKeys.__next (Stdlib.__QuicKeys.Generation { secret = secret, keys = keys, phase = false }) with | Ok generation -> generation | Error _ -> Builtin.crash "Test update" in

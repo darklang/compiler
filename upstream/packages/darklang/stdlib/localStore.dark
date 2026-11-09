@@ -1,51 +1,92 @@
 /// This instance's own local state: where its store is, and the key-value settings beside it.
 ///
 /// One module because these are the two primitives every layer needs and neither belongs to any of
-/// them. `scm/` runs SQL against the store; the CLI's `config`, `backups` and `scripts` do too; the
-/// relay and the package browser do. Without a shared home each of them carries its own
-/// `let localDb () : String = Builtin.localDbPath ()`, which is the one-wrapper rule defeated by
-/// copy-paste rather than a case where wrapping does not work.
+/// them.
 module Darklang.Stdlib.LocalStore
 
 
-/// The path of this instance's package store, for `Stdlib.Sqlite` calls against it.
+/// The path of this instance's package store, for showing and for finding what lives beside it.
+/// The store itself is read and changed only through the typed package and SCM functions.
 ///
-/// A PATH rather than a handle: every reader opens its own connection, and the store moves per
-/// instance (`DARK_CONFIG_RUNDIR`, a test's copy, a backup being restored), so nothing may cache it.
+/// The store moves per instance (its HOME, a test's copy), so nothing may cache this.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.path: Unknown function or value 'Builtin.localDbPath'"
-let path () : String = Builtin.localDbPath ()
+let path(): String = Builtin.localDbPath()
 
 
-/// Read a setting. `""` when the key has never been set, which every caller treats as the default
-/// rather than as an error: a fresh install has none of them.
+/// Read a setting. `None` when the key is not set, which every caller treats as the default
+/// rather than as an error: a fresh install has none of them. A key set to `""` is `Some("")`.
 ///
 /// Keys are namespaced by whoever owns them (`sync.*`, `current_branch`, `exec.*`), and the
 /// namespace is the contract. `Seed.export` strips this table wholesale, so nothing here travels.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.configGet: Unknown function or value 'Builtin.configGet'"
-let configGet (key: String) : String = Builtin.configGet key
+let configGet(key: String): Stdlib.Option.Option<String> = Builtin.configGet(key)
 
 
-/// Write a setting. Local to this instance, always: this is where "which relay" and "which branch"
-/// live, and neither is anybody else's business.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.configSet: Unknown function or value 'Builtin.configSet'"
-let configSet (key: String) (value: String) : Unit = Builtin.configSet key value
-
-
-/// Snapshot this instance's store to <param path>.
+/// Write a setting (`Some`), or unset it (`None`) so its reader falls back to the default. Local
+/// to this instance, always. `configSet` and `configUnset` are the names callers use.
 ///
-/// Not `Stdlib.Cli.File.copy`: the store path is guarded (a guest must not read or replace the
-/// host's store), so the file API refuses it, and a copy of `data.db` alone would miss whatever is
-/// still in the WAL. This goes through SQLite's online-backup API, which reads a consistent snapshot
-/// of an open store.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.backupTo: Unknown function or value 'Builtin.localDbBackupTo'"
-let backupTo (path: String) : Stdlib.Result.Result<Unit, String> =
-  Builtin.localDbBackupTo path
+/// The runtime owns the key list: it refuses a key nothing reads, a value its reader would not
+/// take, and the keys it writes itself (`current_branch` moves with `SCM.PackageOps.selectBranch`,
+/// `instance.id` is made once). The Error says why, ready to print. Keys under `test.` are free
+/// for tests.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.__configWrite: Unknown function or value 'Builtin.configSet'"
+let __configWrite(key: String, value: Stdlib.Option.Option<String>): Stdlib.Result.Result<Unit, String> =
+  Builtin.configSet(key, value)
 
 
-/// Replace this instance's store contents with the copy at <param path>.
+/// Write a setting. See `__configWrite` for what is refused.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.configSet: Unknown function or value '__configWrite'"
+let configSet(key: String, value: String): Stdlib.Result.Result<Unit, String> =
+  __configWrite(key, Stdlib.Option.Option.Some(value))
+
+
+/// Unset a setting, so its reader falls back to the default. Unsetting a key that is not set is
+/// fine; the keys only the runtime writes are refused.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.configUnset: Unknown function or value '__configWrite'"
+let configUnset(key: String): Stdlib.Result.Result<Unit, String> =
+  __configWrite(key, Stdlib.Option.Option.None)
+
+
+/// The keys `config get` reads: every setting a person sets, and `instance.id`.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.configKeys: Unknown function or value 'Builtin.configKeys'"
+let configKeys(): List<String> = Builtin.configKeys()
+
+
+/// One copy of the store: a backup in the folder beside it, or a snapshot written elsewhere.
+/// The path is for showing; an action names a backup by its name.
+type Backup = { name: String, path: String, bytes: Int64 }
+
+
+/// What `backups` does. Each answers with the backups it is about.
+type BackupAction =
+  /// Every backup, newest first. The upgrade path's are among them.
+  | List
+  /// Take one now (`data.db.manual-<time>`).
+  | Create
+  /// Put the named backup in place of the store. The store as it is now is copied aside first
+  /// (`data.db.pre-restore-<time>`), and that copy is the answer. Anything this process has already
+  /// read is still the old store, so the caller should say to restart.
+  | Restore(String)
+  /// Delete the named backup.
+  | Delete(String)
+  /// Write a copy of the store to a path outside the folder, such as a store to try a new
+  /// release against. A database already there has its contents replaced.
+  | SnapshotTo(String)
+
+
+/// Copies of this instance's store: list, take, restore and delete the backups beside it, or write
+/// a snapshot elsewhere.
 ///
-/// Contents, not the file, so connections already open keep working. Anything already read into
-/// memory is still the OLD store, though, so the caller should say to restart.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.restoreFrom: Unknown function or value 'Builtin.localDbRestoreFrom'"
-let restoreFrom (path: String) : Stdlib.Result.Result<Unit, String> =
-  Builtin.localDbRestoreFrom path
+/// The runtime owns the folder, the names and the copying, including the upgrade path's own
+/// backups, so this never builds a path. Every copy goes through SQLite's online-backup API rather
+/// than a file copy: the store path is guarded (a guest must not read or replace the host's store),
+/// and a copy of `data.db` alone would miss whatever is still in the WAL.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.backups: Unknown function or value 'Builtin.storeBackup'"
+let backups(action: BackupAction): Stdlib.Result.Result<List<Backup>, String> =
+  Builtin.storeBackup(action)
+
+
+/// Write a copy of this instance's store to <param path>, WAL included.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.snapshotTo: Unknown function or value 'backups'"
+let snapshotTo(path: String): Stdlib.Result.Result<Unit, String> =
+  backups(BackupAction.SnapshotTo(path)) |> Stdlib.Result.map(fun _ -> ())

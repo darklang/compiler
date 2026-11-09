@@ -330,12 +330,12 @@ let __anyMatch (names: List<String>) (host: String) : Bool =
 
 let __dateNumber (date: DateTime) : Int64 =
   Stdlib.__X509Identity.__timestamp
-    (Stdlib.DateTime.__intToInt64 (Stdlib.DateTime.year date))
-    (Stdlib.DateTime.__intToInt64 (Stdlib.DateTime.month date))
-    (Stdlib.DateTime.__intToInt64 (Stdlib.DateTime.day date))
-    (Stdlib.DateTime.__intToInt64 (Stdlib.DateTime.hour date))
-    (Stdlib.DateTime.__intToInt64 (Stdlib.DateTime.minute date))
-    (Stdlib.DateTime.__intToInt64 (Stdlib.DateTime.second date))
+    (Stdlib.DateTime.__intToInt64 (Stdlib.DateTime.__yearInt date))
+    (Stdlib.DateTime.__intToInt64 (Stdlib.DateTime.__monthInt date))
+    (Stdlib.DateTime.__intToInt64 (Stdlib.DateTime.__dayInt date))
+    (Stdlib.DateTime.__intToInt64 (Stdlib.DateTime.__hourInt date))
+    (Stdlib.DateTime.__intToInt64 (Stdlib.DateTime.__minuteInt date))
+    (Stdlib.DateTime.__intToInt64 (Stdlib.DateTime.__secondInt date))
 
 // This checks identity metadata only. Chain signatures and trust must be
 // verified before the result can authorize HTTPS application data.

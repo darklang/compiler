@@ -12,49 +12,49 @@ module Darklang.Stdlib
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Add requires an explicit replacement contract"
 trait Add<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Add: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Add requires an explicit replacement contract"
-  let add (a: 'a) (b: 'a) : 'a
+  let add(a: 'a, b: 'a): 'a
 
 
 /// `a - b`
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Subtract requires an explicit replacement contract"
 trait Subtract<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Subtract: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Subtract requires an explicit replacement contract"
-  let subtract (a: 'a) (b: 'a) : 'a
+  let subtract(a: 'a, b: 'a): 'a
 
 
 /// `a * b`
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Multiply requires an explicit replacement contract"
 trait Multiply<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Multiply: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Multiply requires an explicit replacement contract"
-  let multiply (a: 'a) (b: 'a) : 'a
+  let multiply(a: 'a, b: 'a): 'a
 
 
 /// `a / b`
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Divide requires an explicit replacement contract"
 trait Divide<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Divide: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Divide requires an explicit replacement contract"
-  let divide (a: 'a) (b: 'a) : 'a
+  let divide(a: 'a, b: 'a): 'a
 
 
 /// `a % b`, wrapped so that `0 <= result < b`
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Modulo requires an explicit replacement contract"
 trait Modulo<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Modulo: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Modulo requires an explicit replacement contract"
-  let modulo (a: 'a) (b: 'a) : 'a
+  let modulo(a: 'a, b: 'a): 'a
 
 
 /// `a ** b`
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Power requires an explicit replacement contract"
 trait Power<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Power: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Power requires an explicit replacement contract"
-  let power (``base``: 'a) (exponent: 'a) : 'a
+  let power(``base``: 'a, exponent: 'a): 'a
 
 
 /// `-a`
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Negate requires an explicit replacement contract"
 trait Negate<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Negate: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Negate requires an explicit replacement contract"
-  let negate (a: 'a) : 'a
+  let negate(a: 'a): 'a
 
 
 /// The identity for `+`, not only a number's: `Zero.zero<String> ()` is `""`. Dispatched from
@@ -62,80 +62,89 @@ trait Negate<'a> =
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Zero requires an explicit replacement contract"
 trait Zero<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Zero: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Zero requires an explicit replacement contract"
-  let zero () : 'a
+  let zero(): 'a
 
 
 /// The multiplicative identity, `One.one<Int64> ()`
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.One requires an explicit replacement contract"
 trait One<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.One: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.One requires an explicit replacement contract"
-  let one () : 'a
+  let one(): 'a
 
 
 /// `a & b`
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.BitwiseAnd requires an explicit replacement contract"
 trait BitwiseAnd<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.BitwiseAnd: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.BitwiseAnd requires an explicit replacement contract"
-  let bitwiseAnd (a: 'a) (b: 'a) : 'a
+  let bitwiseAnd(a: 'a, b: 'a): 'a
 
 
 /// `a | b`
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.BitwiseOr requires an explicit replacement contract"
 trait BitwiseOr<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.BitwiseOr: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.BitwiseOr requires an explicit replacement contract"
-  let bitwiseOr (a: 'a) (b: 'a) : 'a
+  let bitwiseOr(a: 'a, b: 'a): 'a
 
 
 /// `a ^ b`, exclusive or
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.BitwiseXor requires an explicit replacement contract"
 trait BitwiseXor<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.BitwiseXor: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.BitwiseXor requires an explicit replacement contract"
-  let bitwiseXor (a: 'a) (b: 'a) : 'a
+  let bitwiseXor(a: 'a, b: 'a): 'a
 
 
 /// `~a`, every bit flipped
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.BitwiseNot requires an explicit replacement contract"
 trait BitwiseNot<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.BitwiseNot: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.BitwiseNot requires an explicit replacement contract"
-  let bitwiseNot (a: 'a) : 'a
+  let bitwiseNot(a: 'a): 'a
 
 
 /// `a << b`. The shift count is the same type as the value.
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.ShiftLeft requires an explicit replacement contract"
 trait ShiftLeft<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.ShiftLeft: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.ShiftLeft requires an explicit replacement contract"
-  let shiftLeft (a: 'a) (b: 'a) : 'a
+  let shiftLeft(a: 'a, b: 'a): 'a
 
 
 /// `a >> b`
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.ShiftRight requires an explicit replacement contract"
 trait ShiftRight<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.ShiftRight: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.ShiftRight requires an explicit replacement contract"
-  let shiftRight (a: 'a) (b: 'a) : 'a
+  let shiftRight(a: 'a, b: 'a): 'a
+
+
+/// How two values compare: what a comparator, such as the one
+/// `List.sortWith` takes, returns.
+type Ordering =
+  | Less
+  | Equal
+  | Greater
 
 
 /// `<`, `<=`, `>`, `>=`
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Compare requires an explicit replacement contract"
 trait Compare<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Compare: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Compare requires an explicit replacement contract"
-  let lessThan (a: 'a) (b: 'a) : Bool
+  let lessThan(a: 'a, b: 'a): Bool
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Compare: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Compare requires an explicit replacement contract"
-  let lessThanOrEqualTo (a: 'a) (b: 'a) : Bool
+  let lessThanOrEqualTo(a: 'a, b: 'a): Bool
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Compare: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Compare requires an explicit replacement contract"
-  let greaterThan (a: 'a) (b: 'a) : Bool
+  let greaterThan(a: 'a, b: 'a): Bool
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Compare: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Compare requires an explicit replacement contract"
-  let greaterThanOrEqualTo (a: 'a) (b: 'a) : Bool
+  let greaterThanOrEqualTo(a: 'a, b: 'a): Bool
 
 
 /// A value rendered as text for a person: `p.toString`, or `ToString.toString p`.
-/// Every builtin type implements it, so `toString` works on any of them;
-/// `Stdlib.toRepr` stays the structural debug form.
+/// Many standard-library types implement it, and you can implement it for your own types.
+/// Use `Stdlib.toRepr` to see a value's structure when debugging.
+// TODO: Add ToString for Unit, List, Option and tuples.
 // CLEANUP if this splits, it splits into `ToString` for what a person reads and
 // `ToDebugString` for the derived one. Nothing more elaborate.
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.ToString requires an explicit replacement contract"
 trait ToString<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.ToString: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.ToString requires an explicit replacement contract"
-  let toString (v: 'a) : String
+  let toString(v: 'a): String
 
 
 // Written once over the traits above, for any type that implements them.
@@ -149,26 +158,26 @@ trait ToString<'a> =
 
 /// The larger of two values of any type with a `Compare` impl
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.max reason=compiler-implementation
-let max<'a: Compare> (a: 'a) (b: 'a) : 'a = if a > b then a else b
+let max<'a: Compare>(a: 'a, b: 'a): 'a = if a > b then a else b
 
 
 /// The smaller of two values of any type with a `Compare` impl
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.min reason=compiler-implementation
-let min<'a: Compare> (a: 'a) (b: 'a) : 'a = if a < b then a else b
+let min<'a: Compare>(a: 'a, b: 'a): 'a = if a < b then a else b
 
 
 /// The distance of <param value> from zero. A fixed-width minimum wraps back to itself, since it
-/// has no positive counterpart: `abs -128y` is `-128y`.
+/// has no positive counterpart: `abs -128s8` is `-128s8`.
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.abs reason=compiler-implementation
-let abs<'a: Compare + Negate + Zero> (value: 'a) : 'a =
-  if value < Zero.zero () then -value else value
+let abs<'a: Compare + Negate + Zero>(value: 'a): 'a =
+  if value < Zero.zero() then -value else value
 
 
 /// <param value> held between the two limits, whichever order they are given in. A NaN limit
 /// compares false against everything, so the value comes back unclamped;
 /// <fn Float.clampRefusingNaN> returns a Result instead when that is the wrong answer.
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.clamp reason=compiler-implementation
-let clamp<'a: Compare> (value: 'a) (limitA: 'a) (limitB: 'a) : 'a =
+let clamp<'a: Compare>(value: 'a, limitA: 'a, limitB: 'a): 'a =
   let low = if limitA < limitB then limitA else limitB
   let high = if limitA > limitB then limitA else limitB
   if value < low then low
@@ -176,19 +185,19 @@ let clamp<'a: Compare> (value: 'a) (limitA: 'a) (limitB: 'a) : 'a =
   else value
 
 
-/// <param xs> added up from <param seed>: `Stdlib.sum 0L [ 1L, 2L ]` is `3L`. The seed is what
+/// <param xs> added up from <param seed>: `Stdlib.sum 0 [ 1, 2 ]` is `3`. The seed is what
 /// `[]` sums to, which is why it is an argument and not `Zero.zero`.
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.sum reason=compiler-implementation
-let sum<'a: Add> (seed: 'a) (xs: List<'a>) : 'a =
-  Stdlib.List.fold xs seed (fun acc x -> acc + x)
+let sum<'a: Add>(seed: 'a, xs: List<'a>): 'a =
+  Stdlib.List.fold(xs, seed, fun(acc, x) -> acc + x)
 
 
 /// <param xs> multiplied together from <param seed>, for any type with a `Multiply`
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.product reason=compiler-implementation
-let product<'a: Multiply> (seed: 'a) (xs: List<'a>) : 'a =
-  Stdlib.List.fold xs seed (fun acc x -> acc * x)
+let product<'a: Multiply>(seed: 'a, xs: List<'a>): 'a =
+  Stdlib.List.fold(xs, seed, fun(acc, x) -> acc * x)
 
 
 /// <param v> as text, for any type with a `ToString`
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.toString reason=compiler-implementation
-let toString<'a: ToString> (v: 'a) : String = ToString.toString v
+let toString<'a: ToString>(v: 'a): String = ToString.toString(v)

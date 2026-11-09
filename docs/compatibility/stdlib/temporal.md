@@ -108,8 +108,8 @@ unit character exactly:
 | Clock and tick precision | `src/backend/arm64/instructions/ARM64EmitNativeEffects.ml`, `src/backend/x64/instructions/X64EmitNativeEffects.ml` | `Builtins.Time/Libs/DateTime.fs:14-45`, `DarkDateTime.fs` | Aligned to available host precision |
 | Public signatures and behavior | `packages/darklang/stdlib/dateTime.dark` | `packages/darklang/stdlib/dateTime.dark:4-136`, `Builtins.Pure/Libs/DateTime.fs:13-536` | Aligned |
 | Duration grammar and errors | `packages/darklang/stdlib/duration.dark`, `packages/darklang/stdlib/int.dark` | `packages/darklang/stdlib/duration.dark:6-28`, `Builtins.Pure/Libs/Int.fs:359-379` | Aligned for the documented grammar |
-| Same-source DateTime corpus | `test/fixtures/e2e/upstream/stdlib/date.dark`; no line allowlist | `backend/testfiles/execution/stdlib/date.dark` | Exact file, DateTime behavior cases |
-| Same-source Duration corpus | `test/fixtures/e2e/upstream/stdlib/duration.dark`; no line allowlist | `backend/testfiles/execution/stdlib/duration.dark` | Exact file, Duration behavior cases |
+| Same-source DateTime corpus | Imported `upstream/packages/darklang/tests/stdlib/dateTime.dark`, with its `@compiler` dispositions | `packages/darklang/tests/stdlib/dateTime.dark` | Exact file, DateTime behavior cases |
+| Same-source Duration corpus | Imported `upstream/packages/darklang/tests/stdlib/duration.dark` | `packages/darklang/tests/stdlib/duration.dark` | Exact file, Duration behavior cases |
 | Type, range, rounding and grammar probes | `test/fixtures/e2e/temporal-parity.e2e`, `stdlib-internal/datetime.e2e` | Focused expectations derived from the pinned builtins and NodaTime constants | Type, range, rounding and grammar cases |
 | Non-host x64 syscall lowering | `test/compiler-passes/X86_64CodeGenTests.ml` DateTimeNow test | N/A | 100ns conversion inspected directly |
 

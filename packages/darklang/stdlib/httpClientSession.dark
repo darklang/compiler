@@ -63,7 +63,7 @@ let __streamHttp1 (cell: RawPtr) (lifecycle: Stream<Unit>) (epoch: Int64) (trans
     let lease = Stdlib.HttpClientSession.__BodyLease { cell = cell, lifecycle = lifecycle, epoch = epoch, returned = Stdlib.Stream.__cellNew false, origin = prepared.url, transport = transport, reusable = Stdlib.__Http1Pool.reusable prepared.method received.wire Stdlib.Blob.empty } in
     let initial = Stdlib.HttpClient.__StreamBodyState { source = Stdlib.HttpClient.__StreamSource.Owned transport, onEnd = fun remaining -> Stdlib.HttpClientSession.__returnBody lease remaining, buffer = head.remaining, offset = 0L, phase = phase, total = 0L, chunks = 0L } in
     let body = Stdlib.Stream.__fromProducer initial (fun state -> Stdlib.HttpClientSession.__bodyStep lifecycle state) (fun state -> Stdlib.HttpClientSession.__bodyDispose lease state) in
-    Ok (Stdlib.HttpClient.StreamResponse { statusCode = Stdlib.Int.fromInt64 head.statusCode, headers = head.headers, body = body })
+    Ok (Stdlib.HttpClient.StreamResponse { statusCode = head.statusCode, headers = head.headers, body = body })
 
 let __lookup (cell: RawPtr) (url: String) (now: Int64) : List<Stdlib.__HttpsService.Service> =
   match Stdlib.__HttpWire.parseUrl url with
@@ -74,11 +74,11 @@ let __lookup (cell: RawPtr) (url: String) (now: Int64) : List<Stdlib.__HttpsServ
     let _ = Stdlib.Stream.__cellSet cell { state with cache = found.state } in
     found.services
 
-let __learn (cell: RawPtr) (url: String) (status: Int) (headers: List<(String * String)>) (started: Int64) : Unit =
-  match Stdlib.__HttpWire.parseUrl url, Stdlib.__Network.monotonicMillis (), Stdlib.Int.toInt64 (Stdlib.DateTime.toSeconds (Stdlib.DateTime.now ())) with
+let __learn (cell: RawPtr) (url: String) (status: Int64) (headers: List<(String * String)>) (started: Int64) : Unit =
+  match Stdlib.__HttpWire.parseUrl url, Stdlib.__Network.monotonicMillis (), Stdlib.Int.toInt64 (Stdlib.DateTime.__toSecondsInt (Stdlib.DateTime.now ())) with
   | Ok parsed, Ok now, Some utc ->
     let state = Stdlib.Stream.__cellGet<Stdlib.HttpClientSession.__State> cell in
-    Stdlib.Stream.__cellSet cell { state with cache = Stdlib.__AltSvcCache.learn state.cache parsed status headers started now utc }
+    Stdlib.Stream.__cellSet cell { state with cache = Stdlib.__AltSvcCache.learn state.cache parsed (Stdlib.Int.fromInt64 status) headers started now utc }
   | _, _, _ -> ()
 
 let __request (cell: RawPtr) (lifecycle: Stream<Unit>) (trusted: Bool) (roots: Stdlib.Option.Option<List<Blob>>)

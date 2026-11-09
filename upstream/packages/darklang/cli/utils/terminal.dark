@@ -2,18 +2,8 @@ module Darklang.Cli.Terminal
 
 /// Samples terminal width and height in one native call.
 // @compiler replace: packages/darklang/cli/terminal/size.dark#Darklang.Cli.Terminal.getSize reason=compiler-implementation
-let getSize () : (Int * Int) =
-  Builtin.cliTerminalSize ()
-
-
-/// Whether printed output should carry color.
-///
-/// `NO_COLOR` is the informal standard and people expect it to work; a redirected stdout is what makes
-/// `dark eval ... > file` produce text rather than escape sequences. Both are facts about the process,
-/// which is why the host answers rather than the printer.
-// @compiler replace: packages/darklang/cli/terminal/color.dark#Darklang.Cli.Terminal.colorEnabled reason=compiler-implementation
-let colorEnabled () : Bool =
-  Builtin.cliTerminalColorEnabled ()
+let getSize(): (Int64 * Int64) =
+  Builtin.cliTerminalSize()
 
 
 /// Display options sized to the terminal we are actually printing to.
@@ -21,9 +11,9 @@ let colorEnabled () : Bool =
 /// Lives here rather than next to `DisplayOptions` on purpose: reading the terminal is something the
 /// edge does, and a printer that could reach for this would stop being reproducible in a test or
 /// sizeable to a pane. `getSize` is the one place the builtin is reached.
-let displayOptions () : PrettyPrinter.DisplayOptions =
-  let (cols, _rows) = Terminal.getSize ()
-  PrettyPrinter.DisplayOptions.atWidth cols
+let displayOptions(): PrettyPrinter.DisplayOptions =
+  let (cols, _rows) = Terminal.getSize()
+  PrettyPrinter.DisplayOptions.atWidth(cols)
 
 
 /// The CLI's palette for printed values.
@@ -31,7 +21,7 @@ let displayOptions () : PrettyPrinter.DisplayOptions =
 /// Lives here rather than beside `DisplayOptions` because these are `Cli.Colors` constants, and
 /// `PrettyPrinter` has no business knowing about them. It knows a string is a string; this says what a
 /// string looks like.
-let palette () : PrettyPrinter.Palette =
+let palette(): PrettyPrinter.Palette =
   PrettyPrinter.Palette
     { string_ = Stdlib.Cli.UI.Colors.stringColor
       number = Stdlib.Cli.UI.Colors.numberColor
@@ -42,20 +32,15 @@ let palette () : PrettyPrinter.Palette =
 
 
 /// A value rendered for this terminal: laid out for `width`, painted with the CLI's palette.
-///
-/// The CLI host calls this rather than the printer directly, because the palette is a `Cli.Colors`
-/// thing and the printer must not know about it.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Terminal.renderValue: Unknown function or value 'PrettyPrinter.RuntimeTypes.dvalWith'"
-let renderValue
-  (branchId: Uuid)
-  (width: Int)
-  (color: Bool)
-  (currentModule: List<String>)
-  (dv: LanguageTools.RuntimeTypes.Dval)
+let renderValue(
+  branchId: Uuid,
+  width: Int64,
+  color: Bool,
+  currentModule: List<String>,
+  dv: LanguageTools.RuntimeTypes.Dval)
   : String =
-  // Whether to color is decided by the host, not here: it is a fact about stdout and the environment,
-  // and asking for it from Dark needs an `env-read` permission the instance may not grant.
-  let palette = if color then Terminal.palette () else PrettyPrinter.Palette.plain
+  let palette = if color then Terminal.palette() else PrettyPrinter.Palette.plain
 
   let opts =
     { PrettyPrinter.DisplayOptions.default with
@@ -63,4 +48,4 @@ let renderValue
         palette = palette
         currentModule = currentModule }
 
-  PrettyPrinter.RuntimeTypes.dvalWith branchId opts dv
+  PrettyPrinter.RuntimeTypes.dvalWith(branchId, opts, dv)

@@ -10,8 +10,6 @@ type conversion =
   | ListOf of conversion
   | TupleOf of conversion option list
 
-val hostedRenames : (string * string) list
-val hostedName : string -> string
 val stdlibConversions : (string * (int * conversion) list * conversion option) list
 val argumentConversions : string -> (int * conversion) list
 val resultConversion : string -> conversion option

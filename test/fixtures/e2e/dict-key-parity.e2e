@@ -11,6 +11,6 @@ let n = nanValue () in Stdlib.Dict.get (Dict { ParityKey { number = n, label = "
 let n = nanValue () in Stdlib.Dict.get (Dict { ParitySum (n, "key"): "sum" }) (ParitySum (n, "key")) = Some "sum"
 let n = nanValue () in Stdlib.Dict.get (Dict { Some n: "option" }) (Some n) = Some "option"
 let n = nanValue () in Stdlib.Dict.get (Dict { Dict { 1L: n }: "dict" }) (Dict { 1L: n }) = Some "dict"
-let n = nanValue () in Stdlib.Dict.size (Stdlib.Dict.setOverridingDuplicates (Dict { [n]: "before" }) [n] "after") = 1
+let n = nanValue () in Stdlib.Dict.size (Stdlib.Dict.setOverridingDuplicates (Dict { [n]: "before" }) [n] "after") = 1L
 let n = nanValue () in Stdlib.Dict.get (Stdlib.Dict.remove (Dict { [n]: "value" }) [n]) [n] = None
 Stdlib.Dict.get (Dict { [1.0]: "one" }) [2.0] = None

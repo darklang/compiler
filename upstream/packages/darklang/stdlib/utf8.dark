@@ -1,0 +1,20 @@
+module Darklang.Stdlib.Utf8
+
+
+/// Encodes <param s> as UTF-8.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Utf8.encode: Unknown function or value 'Builtin.utf8Encode'"
+let encode(s: String): Bytes = Builtin.utf8Encode(s)
+
+
+/// Decodes <param bytes> as UTF-8. Returns Error with a message if the
+/// bytes aren't valid UTF-8.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Utf8.decode: Unknown function or value 'Builtin.utf8Decode'"
+let decode(bytes: Bytes): Stdlib.Result.Result<String, String> =
+  Builtin.utf8Decode(bytes)
+
+
+/// Decodes <param bytes> as UTF-8, replacing invalid sequences with
+/// {{U+FFFD}}.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Utf8.decodeWithReplacement: Unknown function or value 'Builtin.utf8DecodeWithReplacement'"
+let decodeWithReplacement(bytes: Bytes): String =
+  Builtin.utf8DecodeWithReplacement(bytes)

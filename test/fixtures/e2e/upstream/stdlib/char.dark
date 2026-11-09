@@ -134,11 +134,11 @@ Stdlib.Char.isASCII ' ' = true
 Stdlib.Char.isASCII '\t' = true
 
 
-Stdlib.Char.toAsciiCode 'a' = Stdlib.Option.Option.Some 97
-Stdlib.Char.toAsciiCode 'A' = Stdlib.Option.Option.Some 65
+Stdlib.Char.toAsciiCode 'a' = Stdlib.Option.Option.Some 97u8
+Stdlib.Char.toAsciiCode 'A' = Stdlib.Option.Option.Some 65u8
 Stdlib.Char.toAsciiCode 'á' = Stdlib.Option.Option.None
 Stdlib.Char.toAsciiCode 'Á' = Stdlib.Option.Option.None
-Stdlib.Char.toAsciiCode '3' = Stdlib.Option.Option.Some 51
+Stdlib.Char.toAsciiCode '3' = Stdlib.Option.Option.Some 51u8
 Stdlib.Char.toAsciiCode (smiley ()) = Stdlib.Option.Option.None
 Stdlib.Char.toAsciiCode 'ż' = Stdlib.Option.Option.None
 Stdlib.Char.toAsciiCode 'Ż' = Stdlib.Option.Option.None
@@ -149,8 +149,8 @@ Stdlib.Char.toAsciiCode 'Ł' = Stdlib.Option.Option.None
 Stdlib.Char.toAsciiCode (hand ()) = Stdlib.Option.Option.None
 Stdlib.Char.toAsciiCode 'ჾ' = Stdlib.Option.Option.None
 Stdlib.Char.toAsciiCode 'Ჾ' = Stdlib.Option.Option.None
-Stdlib.Char.toAsciiCode ' ' = Stdlib.Option.Option.Some 32
-Stdlib.Char.toAsciiCode '\t' = Stdlib.Option.Option.Some 9
+Stdlib.Char.toAsciiCode ' ' = Stdlib.Option.Option.Some 32u8
+Stdlib.Char.toAsciiCode '\t' = Stdlib.Option.Option.Some 9u8
 
 
 Stdlib.Char.isLessThan 'a' 'b' = true
@@ -205,22 +205,22 @@ Stdlib.Char.toString 'ჾ' = "ჾ"
 
 
 // Valid codepoints
-Stdlib.Char.fromCodepoint 65 = Stdlib.Option.Option.Some 'A'
-Stdlib.Char.fromCodepoint 233 = Stdlib.Option.Option.Some 'é'
+Stdlib.Char.fromCodepoint 65u32 = Stdlib.Option.Option.Some 'A'
+Stdlib.Char.fromCodepoint 233u32 = Stdlib.Option.Option.Some 'é'
 // Non-BMP: pins the surrogate-pair path through ConvertFromUtf32. 0x1F602 = 😂
-Stdlib.Char.fromCodepoint 128514 = Stdlib.Option.Option.Some (smiley ())
+Stdlib.Char.fromCodepoint 128514u32 = Stdlib.Option.Option.Some (smiley ())
 
 // Invalid: surrogate range (D800..DFFF) — reserved for UTF-16 surrogate pairs
-Stdlib.Char.fromCodepoint 55296 = Stdlib.Option.Option.None
-Stdlib.Char.fromCodepoint 56319 = Stdlib.Option.Option.None
-Stdlib.Char.fromCodepoint 57343 = Stdlib.Option.Option.None
+Stdlib.Char.fromCodepoint 55296u32 = Stdlib.Option.Option.None
+Stdlib.Char.fromCodepoint 56319u32 = Stdlib.Option.Option.None
+Stdlib.Char.fromCodepoint 57343u32 = Stdlib.Option.Option.None
 
 // Invalid: above Unicode max (0x10FFFF)
-Stdlib.Char.fromCodepoint 1114112 = Stdlib.Option.Option.None
-Stdlib.Char.fromCodepoint 2147483647 = Stdlib.Option.Option.None
+Stdlib.Char.fromCodepoint 1114112u32 = Stdlib.Option.Option.None
+Stdlib.Char.fromCodepoint 2147483647u32 = Stdlib.Option.Option.None
 
-Stdlib.Char.fromCodepoint -1 = Stdlib.Option.Option.None
-Stdlib.Char.fromCodepoint -1000 = Stdlib.Option.Option.None
+Stdlib.Char.fromCodepoint 1114112u32 = Stdlib.Option.Option.None
+Stdlib.Char.fromCodepoint 4294967295u32 = Stdlib.Option.Option.None
 
 
 Stdlib.Char.isLetter 'a' = true
@@ -260,27 +260,27 @@ Stdlib.Char.isAlphanumeric (smiley ()) = false
 
 
 // Single-scalar Chars return their codepoint.
-Stdlib.Char.toCodepoint 'a' = Stdlib.Option.Option.Some 97
-Stdlib.Char.toCodepoint 'A' = Stdlib.Option.Option.Some 65
-Stdlib.Char.toCodepoint '3' = Stdlib.Option.Option.Some 51
-Stdlib.Char.toCodepoint 'é' = Stdlib.Option.Option.Some 233
-Stdlib.Char.toCodepoint 'ż' = Stdlib.Option.Option.Some 380
-Stdlib.Char.toCodepoint (smiley ()) = Stdlib.Option.Option.Some 128514
+Stdlib.Char.toCodepoint 'a' = Stdlib.Option.Option.Some 97u32
+Stdlib.Char.toCodepoint 'A' = Stdlib.Option.Option.Some 65u32
+Stdlib.Char.toCodepoint '3' = Stdlib.Option.Option.Some 51u32
+Stdlib.Char.toCodepoint 'é' = Stdlib.Option.Option.Some 233u32
+Stdlib.Char.toCodepoint 'ż' = Stdlib.Option.Option.Some 380u32
+Stdlib.Char.toCodepoint (smiley ()) = Stdlib.Option.Option.Some 128514u32
 
 // Multi-scalar Chars return None.
 Stdlib.Char.toCodepoint (hand ()) = Stdlib.Option.Option.None
 Stdlib.Char.toCodepoint (family ()) = Stdlib.Option.Option.None
 
 // Round-trip BMP and non-BMP scalars.
-Stdlib.Char.toCodepoint (Stdlib.Char.fromCodepoint 65 |> Builtin.unwrap) =
-  Stdlib.Option.Option.Some 65
-Stdlib.Char.toCodepoint (Stdlib.Char.fromCodepoint 128514 |> Builtin.unwrap) =
-  Stdlib.Option.Option.Some 128514
+Stdlib.Char.toCodepoint (Stdlib.Char.fromCodepoint 65u32 |> Builtin.unwrap) =
+  Stdlib.Option.Option.Some 65u32
+Stdlib.Char.toCodepoint (Stdlib.Char.fromCodepoint 128514u32 |> Builtin.unwrap) =
+  Stdlib.Option.Option.Some 128514u32
 
 // Upstream #5790: an ASCII prefix does not make a grapheme ASCII.
 Stdlib.Char.toAsciiCode 'é' = Stdlib.Option.Option.None
 Stdlib.Char.toAsciiCode 'ÿ' = Stdlib.Option.Option.None
-Stdlib.Char.toAsciiCode '~' = Stdlib.Option.Option.Some 126
-Stdlib.Char.toAsciiCode '\t' = Stdlib.Option.Option.Some 9
+Stdlib.Char.toAsciiCode '~' = Stdlib.Option.Option.Some 126u8
+Stdlib.Char.toAsciiCode '\t' = Stdlib.Option.Option.Some 9u8
 Stdlib.Char.toAsciiCode 'ä͖̭̈̇' = Stdlib.Option.Option.None
 Stdlib.Char.isASCII 'ä͖̭̈̇' = false

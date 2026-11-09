@@ -6,108 +6,107 @@ type ParseError = | BadFormat
 
 /// Round up to an integer value
 // @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.ceiling reason=compiler-implementation
-let ceiling (a: Float) : Int = Builtin.floatCeiling a
+let ceiling(a: Float): Int64 = Builtin.floatCeiling(a)
 
 
 /// Round up to an integer value
 // @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.roundUp reason=compiler-implementation
-let roundUp (a: Float) : Int = Builtin.floatRoundUp a
+let roundUp(a: Float): Int64 = ceiling(a)
 
 /// Round down to an integer value.
 /// Consider <fn Float.truncate> if your goal
-/// is to discard the fractional part of a number: {{Float.floor -1.9 == -2.0}}
-/// but {{Float.truncate -1.9 == -1.0}}
+/// is to discard the fractional part of a number: {{Float.floor(-1.9) == -2}}
+/// but {{Float.truncate(-1.9) == -1}}
 // @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.floor reason=compiler-implementation
-let floor (a: Float) : Int = Builtin.floatFloor a
+let floor(a: Float): Int64 = Builtin.floatFloor(a)
 
 
 /// Round down to an integer value.
 /// Consider <fn Float.truncate> if your goal is to discard the fractional part
-/// of a number: {{Float.floor -1.9 == -2.0}} but {{Float.truncate -1.9 ==
-/// -1.0}}
+/// of a number: {{Float.floor(-1.9) == -2}} but {{Float.truncate(-1.9) == -1}}
 // @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.roundDown reason=compiler-implementation
-let roundDown (a: Float) : Int = Builtin.floatRoundDown a
+let roundDown(a: Float): Int64 = floor(a)
 
 
 /// Round to the nearest integer value
 // @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.round reason=compiler-implementation
-let round (a: Float) : Int = Builtin.floatRound a
+let round(a: Float): Int64 = Builtin.floatRound(a)
 
 
 /// Returns the <type Float> value wrapped in a {{Result}} of the <type String>
 // @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.roundTowardsZero reason=compiler-implementation
-let roundTowardsZero (a: Float) : Int = Builtin.floatRoundTowardsZero a
+let roundTowardsZero(a: Float): Int64 = truncate(a)
 
 
 /// Discard the fractional portion of the float, rounding towards zero
 // @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.truncate reason=compiler-implementation
-let truncate (a: Float) : Int = Builtin.floatTruncate a
+let truncate(a: Float): Int64 = Builtin.floatTruncate(a)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Negate for Float requires an explicit replacement contract"
 impl Negate for Float =
   /// Returns the negation of <param a>, {{-a}}
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl Negate for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Negate for Float requires an explicit replacement contract"
-  let negate (a: Float) : Float = a * -1.0
+  let negate(a: Float): Float = a * -1.0
 
 
 /// Get the square root of a float
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Float.sqrt: Unknown function or value 'Builtin.floatSqrt'"
-let sqrt (a: Float) : Float = Builtin.floatSqrt a
+let sqrt(a: Float): Float = Builtin.floatSqrt(a)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Add for Float requires an explicit replacement contract"
 impl Add for Float =
   /// Add <type Float> <param a> to <type Float> <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl Add for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Add for Float requires an explicit replacement contract"
-  let add (a: Float) (b: Float) : Float = Builtin.floatAdd a b
+  let add(a: Float, b: Float): Float = Builtin.floatAdd(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Subtract for Float requires an explicit replacement contract"
 impl Subtract for Float =
   /// Subtract <type Float> <param b> from <type Float> <param a>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl Subtract for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Subtract for Float requires an explicit replacement contract"
-  let subtract (a: Float) (b: Float) : Float = Builtin.floatSubtract a b
+  let subtract(a: Float, b: Float): Float = Builtin.floatSubtract(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Multiply for Float requires an explicit replacement contract"
 impl Multiply for Float =
   /// Multiply <type Float> <param a> by <type Float> <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl Multiply for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Multiply for Float requires an explicit replacement contract"
-  let multiply (a: Float) (b: Float) : Float = Builtin.floatMultiply a b
+  let multiply(a: Float, b: Float): Float = Builtin.floatMultiply(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Power for Float requires an explicit replacement contract"
 impl Power for Float =
   /// Returns <param base> raised to the power of <param exponent>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl Power for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Power for Float requires an explicit replacement contract"
-  let power (``base``: Float) (exponent: Float) : Float =
-    Builtin.floatPower ``base`` exponent
+  let power(``base``: Float, exponent: Float): Float =
+    Builtin.floatPower(``base``, exponent)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Divide for Float requires an explicit replacement contract"
 impl Divide for Float =
   /// Divide <type Float> <param a> by <type Float> <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl Divide for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Divide for Float requires an explicit replacement contract"
-  let divide (a: Float) (b: Float) : Float = Builtin.floatDivide a b
+  let divide(a: Float, b: Float): Float = Builtin.floatDivide(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Compare for Float requires an explicit replacement contract"
 impl Compare for Float =
   /// Returns true if a is less than b
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl Compare for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Compare for Float requires an explicit replacement contract"
-  let lessThan (a: Float) (b: Float) : Bool = Builtin.floatLessThan a b
+  let lessThan(a: Float, b: Float): Bool = Builtin.floatLessThan(a, b)
   /// Returns true if a is less than or equal to b
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl Compare for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Compare for Float requires an explicit replacement contract"
-  let lessThanOrEqualTo (a: Float) (b: Float) : Bool =
-    Builtin.floatLessThanOrEqualTo a b
+  let lessThanOrEqualTo(a: Float, b: Float): Bool =
+    Builtin.floatLessThanOrEqualTo(a, b)
   /// Returns true if a is greater than b
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl Compare for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Compare for Float requires an explicit replacement contract"
-  let greaterThan (a: Float) (b: Float) : Bool = Builtin.floatGreaterThan a b
+  let greaterThan(a: Float, b: Float): Bool = Builtin.floatGreaterThan(a, b)
   /// Returns true if a is greater than or equal to b
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl Compare for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Compare for Float requires an explicit replacement contract"
-  let greaterThanOrEqualTo (a: Float) (b: Float) : Bool =
-    Builtin.floatGreaterThanOrEqualTo a b
+  let greaterThanOrEqualTo(a: Float, b: Float): Bool =
+    Builtin.floatGreaterThanOrEqualTo(a, b)
 
 
 /// If <param value> is within the range given by <param limitA> and <param
@@ -121,13 +120,13 @@ impl Compare for Float =
 /// NaN limit rather than answering. The generic cannot, since NaN is a Float's business and
 /// NaN compares false against everything, so there it comes back unclamped.
 // @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.clampRefusingNaN reason=compiler-implementation
-let clampRefusingNaN
-  (value: Float)
-  (limitA: Float)
-  (limitB: Float)
+let clampRefusingNaN(
+  value: Float,
+  limitA: Float,
+  limitB: Float)
   : Stdlib.Result.Result<Float, String> =
-  if Stdlib.Float.isNaN limitA || Stdlib.Float.isNaN limitB then
-    Stdlib.Result.Result.Error "clampRefusingNaN requires limits that are numbers"
+  if Stdlib.Float.isNaN(limitA) || Stdlib.Float.isNaN(limitB) then
+    Stdlib.Result.Result.Error("clampRefusingNaN requires limits that are numbers")
   else
     let (lower, upper) =
       if (limitA < limitB) then
@@ -136,55 +135,56 @@ let clampRefusingNaN
         (limitB, limitA)
 
     if (value < lower) then
-      Stdlib.Result.Result.Ok lower
+      Stdlib.Result.Result.Ok(lower)
     else if (value > upper) then
-      Stdlib.Result.Result.Ok upper
+      Stdlib.Result.Result.Ok(upper)
     else
-      Stdlib.Result.Result.Ok value
+      Stdlib.Result.Result.Ok(value)
 
 
 /// Returns the <type Float> value wrapped in a {{Result}} of the <type String>
 // @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.parse reason=compiler-implementation
-let parse (s: String) : Stdlib.Result.Result<Float, ParseError> =
-  Builtin.floatParse s
+let parse(s: String): Stdlib.Result.Result<Float, ParseError> =
+  Builtin.floatParse(s)
 
 
 /// Returns true if <param f> is NaN
 // @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.isNaN reason=compiler-implementation
-let isNaN (f: Float) : Bool = Builtin.floatIsNaN f
+let isNaN(f: Float): Bool =
+  // NaN is the only float that does not equal itself
+  f != f
 
 
 /// Returns {{true}} if <param f> is a finite number, and {{false}} for NaN
 /// and for positive or negative infinity
 // @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.isFinite reason=compiler-implementation
-let isFinite (f: Float) : Bool =
+let isFinite(f: Float): Bool =
   // NaN and ±infinity give NaN here, which equals nothing
   (f - f) == 0.0
 
 
-/// Convert <param a> to an <type Int> by discarding its fractional part.
+/// Convert <param a> to an <type Int64> by discarding its fractional part.
 /// Raises for NaN and infinities. Alias of <fn Float.roundTowardsZero>.
-// @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.toInt reason=compiler-implementation
-let toInt (a: Float) : Int = Stdlib.Float.roundTowardsZero a
+let toInt64(a: Float): Int64 = Stdlib.Float.roundTowardsZero(a)
 
 
 /// Return <param a>'s IEEE 754 binary64 bits as an unsigned 64-bit value.
 // @compiler replace: packages/darklang/stdlib/float.dark#Darklang.Stdlib.Float.toBits reason=compiler-implementation
-let toBits (a: Float) : UInt64 = Builtin.floatToBits a
+let toBits(a: Float): UInt64 = Builtin.floatToBits(a)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl ToString for Float requires an explicit replacement contract"
 impl ToString for Float =
   /// Stringify <param float> as the shortest decimal that parses back to the same value, e.g. `1.5`,
   /// `0.30000000000000004`, `1e+16`, `1e-5`.
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl ToString for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl ToString for Float requires an explicit replacement contract"
-  let toString (a: Float) : String = Builtin.floatToString a
+  let toString(a: Float): String = Builtin.floatToString(a)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Zero for Float requires an explicit replacement contract"
 impl Zero for Float =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl Zero for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl Zero for Float requires an explicit replacement contract"
-  let zero () : Float = 0.0
+  let zero(): Float = 0.0
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl One for Float requires an explicit replacement contract"
 impl One for Float =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float.impl One for Float: Already selected from packages/darklang/stdlib/float.dark; importing another declaration of Darklang.Stdlib.Float.impl One for Float requires an explicit replacement contract"
-  let one () : Float = 1.0
+  let one(): Float = 1.0

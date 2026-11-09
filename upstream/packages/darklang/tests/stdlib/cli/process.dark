@@ -2,115 +2,167 @@ module Darklang.Stdlib.Cli.Process.Tests
 
 // Process.shellQuote
 test shellQuote =
-  Stdlib.Test.all
-    [ Stdlib.Cli.Process.shellQuote "hello" |> Stdlib.Test.equal "'hello'"
-      Stdlib.Cli.Process.shellQuote "hello world"
-      |> Stdlib.Test.equal "'hello world'"
-      Stdlib.Cli.Process.shellQuote "" |> Stdlib.Test.equal "''"
-      Stdlib.Cli.Process.shellQuote "it's" |> Stdlib.Test.equal "'it'\\''s'"
-      Stdlib.Cli.Process.shellQuote "a'b'c" |> Stdlib.Test.equal "'a'\\''b'\\''c'"
-      Stdlib.Cli.Process.shellQuote "no-special" |> Stdlib.Test.equal "'no-special'"
-      Stdlib.Cli.Process.shellQuote "has spaces" |> Stdlib.Test.equal "'has spaces'"
-      Stdlib.Cli.Process.shellQuote "semi;colon" |> Stdlib.Test.equal "'semi;colon'"
-      Stdlib.Cli.Process.shellQuote "pipe|char" |> Stdlib.Test.equal "'pipe|char'"
-      Stdlib.Cli.Process.shellQuote "$(dangerous)"
-      |> Stdlib.Test.equal "'$(dangerous)'"
-      Stdlib.Cli.Process.shellQuote "`backtick`"
-      |> Stdlib.Test.equal "'`backtick`'" ]
+  Stdlib.Test.all(
+    [ Stdlib.Cli.Process.shellQuote("hello") |> Stdlib.Test.equal("'hello'")
+      Stdlib.Cli.Process.shellQuote("hello world")
+      |> Stdlib.Test.equal("'hello world'")
+      Stdlib.Cli.Process.shellQuote("") |> Stdlib.Test.equal("''")
+      Stdlib.Cli.Process.shellQuote("it's") |> Stdlib.Test.equal("'it'\\''s'")
+      Stdlib.Cli.Process.shellQuote("a'b'c") |> Stdlib.Test.equal("'a'\\''b'\\''c'")
+      Stdlib.Cli.Process.shellQuote("no-special") |> Stdlib.Test.equal("'no-special'")
+      Stdlib.Cli.Process.shellQuote("-rf") |> Stdlib.Test.equal("'-rf'")
+      Stdlib.Cli.Process.shellQuote("has spaces") |> Stdlib.Test.equal("'has spaces'")
+      Stdlib.Cli.Process.shellQuote("semi;colon") |> Stdlib.Test.equal("'semi;colon'")
+      Stdlib.Cli.Process.shellQuote("pipe|char") |> Stdlib.Test.equal("'pipe|char'")
+      Stdlib.Cli.Process.shellQuote("$(dangerous)")
+      |> Stdlib.Test.equal("'$(dangerous)'")
+      Stdlib.Cli.Process.shellQuote("`backtick`")
+      |> Stdlib.Test.equal("'`backtick`'") ])
 
 
+// A child on this process's own terminal still hands back its exit code.
+// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
+test inheritedChildExitCode =
+  Stdlib.Cli.Process.__childInteractive("/bin/sh", [ "-c", "exit 5" ])
+  |> Stdlib.Test.equal(Ok(5))
+
+
+// @compiler xfail compile: "Expected TInt64, got TInt" class=missing-support reason=compiler-gap
 test capturesOutputAndExit =
-  (match Stdlib.Cli.Process.run "/bin/sh"
-     [ "-c", "printf out; printf err >&2; exit 7" ] with
-   | Ok output -> (output.exitCode, output.stdout, output.stderr)
-   | Error _ -> (-1, "", ""))
-  |> Stdlib.Test.equal (7, "out", "err")
+  (match Stdlib.Cli.Process.run("/bin/sh",
+     [ "-c", "printf out; printf err >&2; exit 7" ]) with
+   | Ok(output) -> (output.exitCode, output.stdout, output.stderr)
+   | Error(_) -> (-1, "", ""))
+  |> Stdlib.Test.equal((7, "out", "err"))
 
+// \377 isn't valid UTF-8 on its own, so it only survives as bytes.
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.Process.runBytes'" class=missing-support reason=upstream-dependency
+test runBytesKeepsRawOutput =
+  (match Stdlib.Cli.Process.runBytes("/bin/sh",
+     [ "-c", "printf '\\377a'; printf '\\376' >&2; exit 3" ]) with
+   | Ok(output) ->
+     (output.exitCode, Stdlib.Base16.encode(output.stdout), Stdlib.Base16.encode(output.stderr))
+   | Error(_) -> (-1, "", ""))
+  |> Stdlib.Test.equal((3, "FF61", "FE"))
+
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.Process.runBytes'" class=missing-support reason=upstream-dependency
+test outputTextReplacesInvalidUtf8 =
+  (match Stdlib.Cli.Process.runBytes("/bin/sh", [ "-c", "printf '\\377a'" ]) with
+   | Ok(output) -> (Stdlib.Cli.Process.outputText(output)).stdout
+   | Error(_) -> "")
+  |> Stdlib.Test.equal("\uFFFDa")
+
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.executeBytes'" class=missing-support reason=upstream-dependency
+test executeBytesKeepsRawOutput =
+  let outcome = Stdlib.Cli.executeBytes("printf '\\377\\000'; printf '\\376' >&2")
+  (outcome.exitCode, Stdlib.Base16.encode(outcome.stdout), Stdlib.Base16.encode(outcome.stderr))
+  |> Stdlib.Test.equal((0, "FF00", "FE"))
+
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.executionText'" class=missing-support reason=upstream-dependency
+test executionTextMatchesExecute =
+  Stdlib.Cli.executionText(Stdlib.Cli.executeBytes("printf out; printf err >&2; exit 2"))
+  |> Stdlib.Test.equal(Stdlib.Cli.execute("printf out; printf err >&2; exit 2"))
+
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.Unix.executeInDirectoryWithBytes'" class=missing-support reason=upstream-dependency
+test executeInDirectoryWithBytes =
+  let outcome = Stdlib.Cli.Unix.executeInDirectoryWithBytes("/", "pwd")
+  (outcome.exitCode, Stdlib.Utf8.decodeWithReplacement(outcome.stdout))
+  |> Stdlib.Test.equal((0, "/\n"))
+
+
+// @compiler xfail compile: "Expected TInt64, got TInt" class=missing-support reason=compiler-gap
 test closesStdin =
-  (match Stdlib.Cli.Process.run "/bin/cat" [] with
-   | Ok output -> (output.exitCode, output.stdout)
-   | Error _ -> (-1, ""))
-  |> Stdlib.Test.equal (0, "")
+  (match Stdlib.Cli.Process.run("/bin/cat", []) with
+   | Ok(output) -> (output.exitCode, output.stdout)
+   | Error(_) -> (-1, ""))
+  |> Stdlib.Test.equal((0, ""))
 
+// @compiler xfail compile: "Expected TInt64, got TInt" class=missing-support reason=compiler-gap
 test missingExecutable =
-  (match Stdlib.Cli.Process.run "/definitely/not/a/dark/executable" [] with
-   | Error error -> error.errno
-   | Ok _ -> 0)
-  |> Stdlib.Test.equal 2
+  (match Stdlib.Cli.Process.run("/definitely/not/a/dark/executable", []) with
+   | Error(error) -> error.errno
+   | Ok(_) -> 0)
+  |> Stdlib.Test.equal(2)
 
+// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test rejectsInvalidTimeout =
-  Stdlib.Cli.Process.runWithTimeout 0 "/bin/true" []
-  |> Stdlib.Test.equal (Error "timeoutMs must be positive")
+  Stdlib.Cli.Process.runWithTimeout(0, "/bin/true", [])
+  |> Stdlib.Test.equal(Error("timeoutMs must be positive"))
 
+// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test timesOut =
-  Stdlib.Cli.Process.runWithTimeout 5 "/bin/sh" [ "-c", "sleep 1" ]
-  |> Stdlib.Test.equal (Error "Process timed out")
+  Stdlib.Cli.Process.runWithTimeout(5, "/bin/sh", [ "-c", "sleep 1" ])
+  |> Stdlib.Test.equal(Error("Process timed out"))
 
 
 test interactiveRoundTrip =
   let handle =
-    Stdlib.Cli.Process.spawn
-      "while read line; do printf 'reply:%s\\n' \"$line\"; done"
-  let first = Stdlib.Cli.Process.communicate handle "one"
-  let second = Stdlib.Cli.Process.communicate handle "two"
-  let final = Stdlib.Cli.Process.terminate handle
+    Stdlib.Cli.Process.spawn(
+      "while read line; do printf 'reply:%s\\n' \"$line\"; done")
+  let first = Stdlib.Cli.Process.communicate(handle, "one")
+  let second = Stdlib.Cli.Process.communicate(handle, "two")
+  let final = Stdlib.Cli.Process.terminate(handle)
   (first.stdout, second.stdout, final.stdout)
-  |> Stdlib.Test.equal (("reply:one\n", "reply:two\n", "reply:one\nreply:two\n"))
+  |> Stdlib.Test.equal(("reply:one\n", "reply:two\n", "reply:one\nreply:two\n"))
 
 
 test collectsChunkedOutput =
   let handle =
-    Stdlib.Cli.Process.spawn
-      "while read line; do printf 'reply:'; sleep 0.03; printf '%s\\n' \"$line\"; done"
-  let response = Stdlib.Cli.Process.communicate handle "chunked"
-  let _ = Stdlib.Cli.Process.terminate handle
+    Stdlib.Cli.Process.spawn(
+      "while read line; do printf 'reply:'; sleep 0.03; printf '%s\\n' \"$line\"; done")
+  let response = Stdlib.Cli.Process.communicate(handle, "chunked")
+  let _ = Stdlib.Cli.Process.terminate(handle)
   response.stdout
-  |> Stdlib.Test.equal ("reply:chunked\n")
+  |> Stdlib.Test.equal("reply:chunked\n")
 
 
 test emptyInputDoesNotBlock =
   let handle =
-    Stdlib.Cli.Process.spawn
-      "read line"
-  let result = Stdlib.Cli.Process.communicate handle ""
-  let _ = Stdlib.Cli.Process.terminate handle
+    Stdlib.Cli.Process.spawn(
+      "read line")
+  let result = Stdlib.Cli.Process.communicate(handle, "")
+  let _ = Stdlib.Cli.Process.terminate(handle)
   (result.stdout, result.stderr)
-  |> Stdlib.Test.equal (("", ""))
+  |> Stdlib.Test.equal(("", ""))
 
 
+// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test invalidChildPoll =
-  Builtin.runtimeChildPoll (-1)
-  |> Stdlib.Test.equal (Error 9)
+  Builtin.runtimeChildPoll(-1z)
+  |> Stdlib.Test.equal(Error(9))
 
 
+// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test invalidChildDescriptors =
-  Builtin.runtimeChildDescriptors (-1)
-  |> Stdlib.Test.equal (Error 9)
+  Builtin.runtimeChildDescriptors(-1z)
+  |> Stdlib.Test.equal(Error(9))
 
 
+// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test invalidChildClose =
-  Builtin.runtimeChildClose (-1)
-  |> Stdlib.Test.equal (Error 9)
+  Builtin.runtimeChildClose(-1z)
+  |> Stdlib.Test.equal(Error(9))
 
 
 test reportsOS =
-  Stdlib.Cli.OS.getOS ()
-  |> Stdlib.Test.equal (Ok Stdlib.Cli.OS.OS.Linux)
+  Stdlib.Cli.OS.getOS()
+  |> Stdlib.Test.equal(Ok(Stdlib.Cli.OS.OS.Linux))
 
 
 test reportsRuntimeHost =
-  (match Stdlib.Cli.Host.getRuntimeHost () with
-   | Ok host -> host.os == Stdlib.Cli.OS.OS.Linux
-   | Error _ -> false)
-  |> Stdlib.Test.equal (true)
+  (match Stdlib.Cli.Host.getRuntimeHost() with
+   | Ok(host) -> host.os == Stdlib.Cli.OS.OS.Linux
+   | Error(_) -> false)
+  |> Stdlib.Test.equal(true)
 
 
+// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test closedStdinReturnsFailure =
   let handle =
-    Stdlib.Cli.Process.spawn
-      "exec 0<&-; printf ready; sleep 1"
-  let _ = Stdlib.DateTime.__sleepMilliseconds 100.0
-  let response = Stdlib.Cli.Process.communicate handle "input"
-  let _ = Stdlib.Cli.Process.terminate handle
+    Stdlib.Cli.Process.spawn(
+      "exec 0<&-; printf ready; sleep 1")
+  let _ = Stdlib.DateTime.__sleepMilliseconds(100.0)
+  let response = Stdlib.Cli.Process.communicate(handle, "input")
+  let _ = Stdlib.Cli.Process.terminate(handle)
   response.exitCode
-  |> Stdlib.Test.equal (-1)
+  |> Stdlib.Test.equal(-1)

@@ -313,7 +313,7 @@ let interpreterName name =
   |> String.concat "."
 
 let rec resolvedName element =
-  Result.map (fun name -> hostedName (publicName name)) (resolvedNameAsWritten element)
+  Result.map publicName (resolvedNameAsWritten element)
 
 and resolvedNameAsWritten element =
   let writtenBuiltin =
@@ -609,12 +609,8 @@ let builtinOperator name =
   let renamed =
     [
       ("dictContainsKey", "Stdlib.Dict.member");
-      ("dictFromEntries", "Stdlib.Dict.fromListOverwritingDuplicates");
+      ("dictFromEntries", "Stdlib.Dict.fromList");
       ("dictToEntries", "Stdlib.Dict.toList");
-      ("listAppend", "Stdlib.List.appendOne");
-      ("listPrepend", "Stdlib.List.push");
-      ("listConcat", "Stdlib.List.append");
-      ("listIndexedMap", "Stdlib.List.indexedMapInt64");
       ("bytesConcat", "Stdlib.Blob.concat");
       ("base16Encode", "Stdlib.Blob.toHex");
       ("base16Decode", "Stdlib.Blob.fromHex");

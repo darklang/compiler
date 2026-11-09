@@ -25,9 +25,9 @@ let create () : Stdlib.Result.Result<Stdlib.__QuicSpace.State, String> =
 
 let queue (state: Stdlib.__QuicSpace.State) (payload: Blob) : Stdlib.Result.Result<Stdlib.__QuicSpace.State, String> =
   if Stdlib.Blob.__byteLength payload == 0L || Stdlib.Blob.__byteLength payload > 1000L then Error "Invalid QUIC reliable frame size"
-  else if Stdlib.List.length state.queued >= 2048 || state.nextToken == 4611686018427387903L then Error "QUIC send queue exhausted"
+  else if Stdlib.List.__lengthInt state.queued >= 2048 || state.nextToken == 4611686018427387903L then Error "QUIC send queue exhausted"
   else Ok (Stdlib.__QuicSpace.__state state state.received state.recovery state.crypto
-    (Stdlib.List.append state.queued [Stdlib.__QuicSpace.Transmission { token = state.nextToken, payload = payload, probe = false }])
+    (Stdlib.List.concat state.queued [Stdlib.__QuicSpace.Transmission { token = state.nextToken, payload = payload, probe = false }])
     (state.nextToken + 1L) state.ackPending)
 
 let __retransmit (packets: List<Stdlib.__QuicRecovery.Packet>) (items: List<Stdlib.__QuicSpace.Transmission>) (probe: Bool)
@@ -36,13 +36,13 @@ let __retransmit (packets: List<Stdlib.__QuicRecovery.Packet>) (items: List<Stdl
   | [] -> items
   | packet :: rest ->
     let next = if Stdlib.List.any items (fun item -> item.token == packet.token) then items
-               else Stdlib.List.append items [Stdlib.__QuicSpace.Transmission { token = packet.token, payload = packet.payload, probe = probe }] in
+               else Stdlib.List.concat items [Stdlib.__QuicSpace.Transmission { token = packet.token, payload = packet.payload, probe = probe }] in
     Stdlib.__QuicSpace.__retransmit rest next probe
 
 let __updated (state: Stdlib.__QuicSpace.State) (update: Stdlib.__QuicRecovery.Update) : Stdlib.Result.Result<Stdlib.__QuicSpace.State, String> =
   let queued = Stdlib.List.filter state.queued (fun item -> Stdlib.Bool.not (Stdlib.List.contains update.acknowledged item.token)) in
   let retransmit = Stdlib.__QuicSpace.__retransmit update.retransmit [] update.probe in
-  let queued = Stdlib.List.append retransmit (Stdlib.List.filter queued (fun item -> Stdlib.Bool.not (Stdlib.List.any retransmit (fun retry -> retry.token == item.token)))) in
+  let queued = Stdlib.List.concat retransmit (Stdlib.List.filter queued (fun item -> Stdlib.Bool.not (Stdlib.List.any retransmit (fun retry -> retry.token == item.token)))) in
   let queued = if update.probe then (match queued with | first :: rest -> Stdlib.List.push rest (Stdlib.__QuicSpace.Transmission { token = first.token, payload = first.payload, probe = true }) | [] -> []) else queued in
   let next = Stdlib.__QuicSpace.__state state state.received update.state state.crypto queued state.nextToken state.ackPending in
   if update.probe && Stdlib.List.isEmpty queued then
@@ -50,7 +50,7 @@ let __updated (state: Stdlib.__QuicSpace.State) (update: Stdlib.__QuicRecovery.U
       Stdlib.__QuicSpace.__state probe probe.received probe.recovery probe.crypto
         (Stdlib.List.map probe.queued (fun item -> Stdlib.__QuicSpace.Transmission { token = item.token, payload = item.payload, probe = true }))
         probe.nextToken probe.ackPending)
-  else if Stdlib.List.length queued > 2048 then Error "QUIC retransmission queue exhausted"
+  else if Stdlib.List.__lengthInt queued > 2048 then Error "QUIC retransmission queue exhausted"
   else Ok next
 
 let acknowledge (state: Stdlib.__QuicSpace.State) (ack: Stdlib.__QuicFrames.Ack) (now: Int64) (delay: Int64) (maxDelay: Int64)
@@ -138,5 +138,5 @@ let sent (state: Stdlib.__QuicSpace.State) (plan: Stdlib.__QuicSpace.Plan) (size
     number = state.recovery.largestSent + 1L, at = now, size = size, token = plan.token, payload = plan.reliable })
     plan.ackEliciting plan.probe |> Stdlib.Result.map (fun recovery ->
       Stdlib.__QuicSpace.__state state state.received recovery state.crypto
-        (if plan.queued then Stdlib.List.drop state.queued 1 else state.queued)
+        (if plan.queued then Stdlib.List.__dropInt state.queued 1 else state.queued)
         (if plan.ackEliciting && Stdlib.Bool.not plan.queued then state.nextToken + 1L else state.nextToken) false)

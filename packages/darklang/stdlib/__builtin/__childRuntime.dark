@@ -28,7 +28,7 @@ let __withChildArgv (args: List<String>) (vector: RawPtr) (offset: Int64) (fn: R
 
 let __childStartAt (program: String) (args: List<String>) (inheritTerminal: Bool) (slot: Int64) : Int64 =
     let allArgs = Stdlib.List.push args program in
-    let vector = __mapped_alloc (Builtin.__posixInt64 (Stdlib.List.length allArgs + 1) * 8L) in
+    let vector = __mapped_alloc (Builtin.__posixInt64 (Stdlib.List.__lengthInt allArgs + 1) * 8L) in
     let record = Builtin.__childAddress slot in
     let _ = __raw_write_word record 16L -1L in
     let _ = __raw_write_word record 24L -1L in
@@ -62,9 +62,9 @@ let __childCandidates (programs: List<String>) (args: List<String>) (inheritTerm
 let runtimeChildStart (program: String) (args: List<String>) (inheritTerminal: Bool) : Stdlib.Result.Result<Int, Int> =
     let slot = Builtin.__childFree 1L in
     if slot == 0L || __raw_get<Int64> (Builtin.__childState ()) 0L == 9223372036854775807L then Error 24
-    else if Stdlib.String.contains program "\0" || Stdlib.List.any args (fun arg -> Stdlib.String.contains arg "\0") then Error 22
+    else if Stdlib.String.__containsBytes program "\0" || Stdlib.List.any args (fun arg -> Stdlib.String.__containsBytes arg "\0") then Error 22
     else
-        let programs = if Stdlib.String.contains program "/" then [program]
+        let programs = if Stdlib.String.__containsBytes program "/" then [program]
                        else
                          let path = match Stdlib.Cli.Env.get "PATH" with | Some path -> path | None -> "/bin:/usr/bin" in
                          Stdlib.List.map (Stdlib.String.split path ":") (fun directory ->

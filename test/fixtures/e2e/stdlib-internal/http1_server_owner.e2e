@@ -14,7 +14,7 @@ let prepared (input: String) (response: Stdlib.Http.Response) (count: Int64) : (
     | AwaitRequest _ -> ("pending", "pending", next.requests)
     | _ -> ("unexpected", "unexpected", next.requests) in
   let _ = Stdlib.__Network.closeTcp connection in result
-let response () : Stdlib.Http.Response = Stdlib.Http.responseWithText "x" 200
+let response () : Stdlib.Http.Response = Stdlib.Http.responseWithText 200L "x"
 prepared "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n" (response ()) 0L = ("HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: 1\r\n\r\nx", "", 1L) // leak_check
 prepared "HEAD / HTTP/1.1\r\nHost: example.com\r\n\r\n" (response ()) 0L = ("HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: 1\r\n\r\n", "", 1L) // leak_check
 prepared "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: keep-alive, ClOsE\r\n\r\n" (response ()) 0L |> fun (_wire, after, count) -> (after, count) = ("closed", 1L) // leak_check

@@ -20,15 +20,15 @@ type ScmStatus =
     /// The three-way split. `changed` counts both halves, because both are in the draft and both get
     /// committed, but a bare total is nearly useless: "3 changed" after you edited one thing is either fine or
     /// a disaster, and the number can't say which.
-    changed: Int
-    authored: Int
-    followed: Int
+    changed: Int64
+    authored: Int64
+    followed: Int64
     /// References a pin is holding on an older version. On screen because it's the thing people forget they
     /// asked for.
     /// Conflicts plus standing findings: everything waiting on a person.
-    needsYou: Int
+    needsYou: Int64
     conflicts: List<SCM.Conflicts.Conflict>
-    commits: Int
+    commits: Int64
     lastCommit: String
     /// The draft's op count. Carried so `refreshScmStatus` has a cheap thing to compare against: it's one
     /// indexed count, and it moves whenever anything in here could have.
@@ -40,7 +40,7 @@ type ScmStatus =
     /// showing zeroes for everything.
     loaded: Bool }
 
-let emptyScmStatus () : ScmStatus =
+let emptyScmStatus(): ScmStatus =
   ScmStatus
     { branchName = SCM.Branch.mainBranchName
       wipNames = []
@@ -51,34 +51,34 @@ let emptyScmStatus () : ScmStatus =
       conflicts = []
       commits = 0
       lastCommit = ""
-      ops = 0L
+      ops = 0
       loaded = false }
 
 /// Read the whole SCM picture for <param branchId>.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.readScmStatus: Unknown function or value 'scmStatusFrom'"
-let readScmStatus (branchId: Uuid) : ScmStatus = scmStatusFrom branchId (SCM.Draft.read ())
+let readScmStatus(branchId: Uuid): ScmStatus = scmStatusFrom(branchId, SCM.Draft.read())
 
 /// `readScmStatus` over a draft already read.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.scmStatusFrom: Unknown function or value 'SCM.PackageOps.commitsOnBranch'"
-let scmStatusFrom (branchId: Uuid) (p: SCM.Draft.Picture) : ScmStatus =
+let scmStatusFrom(branchId: Uuid, p: SCM.Draft.Picture): ScmStatus =
   // This branch's commits, not the store's: the row says "N commits on this branch", and a store-wide
   // count is the same number everywhere and right only on main.
-  let recent = SCM.PackageOps.commitsOnBranch branchId 1000L
+  let recent = SCM.PackageOps.commitsOnBranch(branchId, 1000)
 
   ScmStatus
-    { branchName = SCM.PackageOps.branchName branchId
+    { branchName = SCM.PackageOps.branchName(branchId)
       wipNames =
         p.bindings
-        |> Stdlib.List.map (fun b -> SCM.Conflicts.fqn b.owner b.modules b.name)
-      changed = Stdlib.List.length p.bindings
-      authored = SCM.Draft.authoredCount p
-      followed = SCM.Draft.followedCount p
-      needsYou = SCM.Draft.needsYouCount p
+        |> Stdlib.List.map(fun b -> SCM.Conflicts.fqn(b.owner, b.modules, b.name))
+      changed = Stdlib.List.length(p.bindings)
+      authored = SCM.Draft.authoredCount(p)
+      followed = SCM.Draft.followedCount(p)
+      needsYou = SCM.Draft.needsYouCount(p)
       conflicts = p.conflicts
-      commits = Stdlib.List.length recent
+      commits = Stdlib.List.length(recent)
       lastCommit =
-        match Stdlib.List.head recent with
-        | Some c -> c.message
+        match Stdlib.List.head(recent) with
+        | Some(c) -> c.message
         | None -> ""
       ops = p.ops
       loaded = true }

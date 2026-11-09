@@ -11,31 +11,29 @@ type ParseError =
 impl Modulo for UInt32 =
   /// Returns the result of wrapping <param a> around so that {{0 <= res < b}}.
   /// The modulus <param b> must be greater than 0.
-  /// Use <fn UInt32.remainder> if you want the remainder after division, which has
-  /// a different behavior for negative numbers.
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl Modulo for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Modulo for UInt32 requires an explicit replacement contract"
-  let modulo (a: UInt32) (b: UInt32) : UInt32 = Builtin.uint32Mod a b
+  let modulo(a: UInt32, b: UInt32): UInt32 = Builtin.uint32Mod(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Add for UInt32 requires an explicit replacement contract"
 impl Add for UInt32 =
   /// Adds two 32-bit unsigned integers together (wraps on overflow)
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl Add for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Add for UInt32 requires an explicit replacement contract"
-  let add (a: UInt32) (b: UInt32) : UInt32 = Builtin.uint32Add a b
+  let add(a: UInt32, b: UInt32): UInt32 = Builtin.uint32Add(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Subtract for UInt32 requires an explicit replacement contract"
 impl Subtract for UInt32 =
   /// Subtracts two 32-bit unsigned  integers (wraps on overflow)
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl Subtract for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Subtract for UInt32 requires an explicit replacement contract"
-  let subtract (a: UInt32) (b: UInt32) : UInt32 = Builtin.uint32Subtract a b
+  let subtract(a: UInt32, b: UInt32): UInt32 = Builtin.uint32Subtract(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Multiply for UInt32 requires an explicit replacement contract"
 impl Multiply for UInt32 =
   /// Multiplies two 32-bit unsigned  integers (wraps on overflow)
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl Multiply for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Multiply for UInt32 requires an explicit replacement contract"
-  let multiply (a: UInt32) (b: UInt32) : UInt32 = Builtin.uint32Multiply a b
+  let multiply(a: UInt32, b: UInt32): UInt32 = Builtin.uint32Multiply(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Power for UInt32 requires an explicit replacement contract"
@@ -43,54 +41,56 @@ impl Power for UInt32 =
   /// Raise <param base> to the power of <param exponent>.
   /// Overflow wraps around.
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl Power for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Power for UInt32 requires an explicit replacement contract"
-  let power (``base``: UInt32) (exponent: UInt32) : UInt32 =
+  let power(``base``: UInt32, exponent: UInt32): UInt32 =
     // The signed types push this into the builtin; here the ladder stays, because an
     // unsigned exponent is never negative, so there is no error case to push.
-    if ``base`` == 0ul && exponent == 0ul then 1ul
-    else if ``base`` == 0ul then 0ul
-    else if ``base`` == 1ul then 1ul
-    else Builtin.uint32Power ``base`` exponent
+    if ``base`` == 0u32 && exponent == 0u32 then 1u32
+    else if ``base`` == 0u32 then 0u32
+    else if ``base`` == 1u32 then 1u32
+    else Builtin.uint32Power(``base``, exponent)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Divide for UInt32 requires an explicit replacement contract"
 impl Divide for UInt32 =
   /// Divides two 32-bit unsigned integers
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl Divide for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Divide for UInt32 requires an explicit replacement contract"
-  let divide (a: UInt32) (b: UInt32) : UInt32 = Builtin.uint32Divide a b
+  let divide(a: UInt32, b: UInt32): UInt32 = Builtin.uint32Divide(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Compare for UInt32 requires an explicit replacement contract"
 impl Compare for UInt32 =
   /// Returns {{true}} if <param a> is less than <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl Compare for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Compare for UInt32 requires an explicit replacement contract"
-  let lessThan (a: UInt32) (b: UInt32) : Bool = Builtin.uint32LessThan a b
+  let lessThan(a: UInt32, b: UInt32): Bool = Builtin.uint32LessThan(a, b)
   /// Returns {{true}} if <param a> is less than or equal to <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl Compare for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Compare for UInt32 requires an explicit replacement contract"
-  let lessThanOrEqualTo (a: UInt32) (b: UInt32) : Bool =
-    Builtin.uint32LessThanOrEqualTo a b
+  let lessThanOrEqualTo(a: UInt32, b: UInt32): Bool =
+    Builtin.uint32LessThanOrEqualTo(a, b)
   /// Returns {{true}} if <param a> is greater than <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl Compare for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Compare for UInt32 requires an explicit replacement contract"
-  let greaterThan (a: UInt32) (b: UInt32) : Bool = Builtin.uint32GreaterThan a b
+  let greaterThan(a: UInt32, b: UInt32): Bool = Builtin.uint32GreaterThan(a, b)
   /// Returns {{true}} if <param a> is greater than or equal to <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl Compare for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Compare for UInt32 requires an explicit replacement contract"
-  let greaterThanOrEqualTo (a: UInt32) (b: UInt32) : Bool =
-    Builtin.uint32GreaterThanOrEqualTo a b
+  let greaterThanOrEqualTo(a: UInt32, b: UInt32): Bool =
+    Builtin.uint32GreaterThanOrEqualTo(a, b)
 
 
 /// Returns a random 32-bit unsigned integer between <param start> and <param end> (inclusive)
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.random reason=compiler-implementation
-let random (start: UInt32) (``end``: UInt32) : UInt32 =
-  Builtin.uint32Random start ``end``
+let random(start: UInt32, ``end``: UInt32): UInt32 =
+  Stdlib.BigInt.random(Stdlib.BigInt.fromUInt32(start), Stdlib.BigInt.fromUInt32(``end``))
+  |> Stdlib.BigInt.toUInt32
+  |> Builtin.unwrap
 
 
 /// Get the square root of an <type UInt32>
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.sqrt reason=compiler-implementation
-let sqrt (a: UInt32) : Float = Builtin.uint32Sqrt a
+let sqrt(a: UInt32): Float = Stdlib.Float.sqrt(Stdlib.UInt32.toFloat(a))
 
 
 /// Converts an <type UInt32> to a <type Float>
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.toFloat reason=compiler-implementation
-let toFloat (a: UInt32) : Float = Builtin.uint32ToFloat a
+let toFloat(a: UInt32): Float = Builtin.uint32ToFloat(a)
 
 
 /// Parses a <type String> into a <type UInt32>, returning {{Ok}} with the
@@ -98,117 +98,202 @@ let toFloat (a: UInt32) : Float = Builtin.uint32ToFloat a
 /// if the string isn't a valid integer, {{OutOfRange}} if it's outside the
 /// <type UInt32> range).
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.parse reason=compiler-implementation
-let parse
-  (s: String)
+let parse(
+  s: String)
   : Stdlib.Result.Result<UInt32, Stdlib.UInt32.ParseError> =
-  Builtin.uint32Parse s
+  match Stdlib.BigInt.parse(s) with
+  | Ok(n) -> Stdlib.Option.toResult(Stdlib.BigInt.toUInt32(n), Stdlib.UInt32.ParseError.OutOfRange)
+  | Error(_) -> Error(Stdlib.UInt32.ParseError.BadFormat)
 
 
 /// Converts an <type Int8> to a <type UInt32>. Returns {{None}} if the value is less than 0.
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.fromInt8 reason=compiler-implementation
-let fromInt8 (i: Int8) : Stdlib.Option.Option<UInt32> =
-  Builtin.uint32FromInt8 i
+let fromInt8(i: Int8): Stdlib.Option.Option<UInt32> =
+  Stdlib.BigInt.toUInt32(Stdlib.BigInt.fromInt8(i))
 
 
 /// Converts an <type UInt8> to a <type UInt32>.
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.fromUInt8 reason=compiler-implementation
-let fromUInt8 (i: UInt8) : UInt32 = Builtin.uint32FromUInt8 i
+let fromUInt8(i: UInt8): UInt32 =
+  Stdlib.BigInt.toUInt32(Stdlib.BigInt.fromUInt8(i)) |> Builtin.unwrap
 
 
 /// Converts an <type Int16> to a <type UInt32>. Returns {{None}} if the value is less than 0.
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.fromInt16 reason=compiler-implementation
-let fromInt16 (i: Int16) : Stdlib.Option.Option<UInt32> =
-  Builtin.uint32FromInt16 i
+let fromInt16(i: Int16): Stdlib.Option.Option<UInt32> =
+  Stdlib.BigInt.toUInt32(Stdlib.BigInt.fromInt16(i))
 
 
 /// Converts an <type UInt16> to a <type UInt32>.
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.fromUInt16 reason=compiler-implementation
-let fromUInt16 (i: UInt16) : UInt32 = Builtin.uint32FromUInt16 i
+let fromUInt16(i: UInt16): UInt32 =
+  Stdlib.BigInt.toUInt32(Stdlib.BigInt.fromUInt16(i)) |> Builtin.unwrap
 
 
 /// Converts an <type Int32> to a <type UInt32>. Returns {{None}} if the value is less than 0.
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.fromInt32 reason=compiler-implementation
-let fromInt32 (i: Int32) : Stdlib.Option.Option<UInt32> =
-  Builtin.uint32FromInt32 i
+let fromInt32(i: Int32): Stdlib.Option.Option<UInt32> =
+  Stdlib.BigInt.toUInt32(Stdlib.BigInt.fromInt32(i))
 
 
 /// Converts an <type Int64> to a <type UInt32>. Returns {{None}} if the value is less than 0 or greater than 4294967295.
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.fromInt64 reason=compiler-implementation
-let fromInt64 (i: Int64) : Stdlib.Option.Option<UInt32> =
-  Builtin.uint32FromInt64 i
+let fromInt64(i: Int64): Stdlib.Option.Option<UInt32> =
+  Stdlib.BigInt.toUInt32(Stdlib.BigInt.fromInt64(i))
 
 
 /// Converts an <type UInt64> to a <type UInt32>. Returns {{None}} if the value is greater than 4294967295.
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.fromUInt64 reason=compiler-implementation
-let fromUInt64 (i: UInt64) : Stdlib.Option.Option<UInt32> =
-  Builtin.uint32FromUInt64 i
+let fromUInt64(i: UInt64): Stdlib.Option.Option<UInt32> =
+  Stdlib.BigInt.toUInt32(Stdlib.BigInt.fromUInt64(i))
 
 
 /// Converts an <type Int128> to a <type UInt32>. Returns {{None}} if the value is less than 0 or greater than 4294967295.
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.fromInt128 reason=compiler-implementation
-let fromInt128 (i: Int128) : Stdlib.Option.Option<UInt32> =
-  Builtin.uint32FromInt128 i
+let fromInt128(i: Int128): Stdlib.Option.Option<UInt32> =
+  Stdlib.BigInt.toUInt32(Stdlib.BigInt.fromInt128(i))
 
 
 /// Converts an <type UInt128> to a <type UInt32>. Returns {{None}} if the value is greater than 4294967295.
 // @compiler replace: packages/darklang/stdlib/uint32.dark#Darklang.Stdlib.UInt32.fromUInt128 reason=compiler-implementation
-let fromUInt128 (i: UInt128) : Stdlib.Option.Option<UInt32> =
-  Builtin.uint32FromUInt128 i
+let fromUInt128(i: UInt128): Stdlib.Option.Option<UInt32> =
+  Stdlib.BigInt.toUInt32(Stdlib.BigInt.fromUInt128(i))
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl BitwiseAnd for UInt32 requires an explicit replacement contract"
 impl BitwiseAnd for UInt32 =
   /// Bitwise AND on two <type UInt32> values
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl BitwiseAnd for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl BitwiseAnd for UInt32 requires an explicit replacement contract"
-  let bitwiseAnd (a: UInt32) (b: UInt32) : UInt32 = Builtin.uint32BitwiseAnd a b
+  let bitwiseAnd(a: UInt32, b: UInt32): UInt32 = Builtin.uint32BitwiseAnd(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl BitwiseOr for UInt32 requires an explicit replacement contract"
 impl BitwiseOr for UInt32 =
   /// Bitwise OR on two <type UInt32> values
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl BitwiseOr for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl BitwiseOr for UInt32 requires an explicit replacement contract"
-  let bitwiseOr (a: UInt32) (b: UInt32) : UInt32 = Builtin.uint32BitwiseOr a b
+  let bitwiseOr(a: UInt32, b: UInt32): UInt32 = Builtin.uint32BitwiseOr(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl BitwiseXor for UInt32 requires an explicit replacement contract"
 impl BitwiseXor for UInt32 =
   /// Bitwise XOR on two <type UInt32> values
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl BitwiseXor for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl BitwiseXor for UInt32 requires an explicit replacement contract"
-  let bitwiseXor (a: UInt32) (b: UInt32) : UInt32 = Builtin.uint32BitwiseXor a b
+  let bitwiseXor(a: UInt32, b: UInt32): UInt32 = Builtin.uint32BitwiseXor(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl BitwiseNot for UInt32 requires an explicit replacement contract"
 impl BitwiseNot for UInt32 =
   /// Bitwise NOT on a <type UInt32> value
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl BitwiseNot for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl BitwiseNot for UInt32 requires an explicit replacement contract"
-  let bitwiseNot (a: UInt32) : UInt32 = Builtin.uint32BitwiseNot a
+  let bitwiseNot(a: UInt32): UInt32 = Builtin.uint32BitwiseNot(a)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl ShiftLeft for UInt32 requires an explicit replacement contract"
 impl ShiftLeft for UInt32 =
   /// Bitwise left shift of a <type UInt32> value
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl ShiftLeft for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl ShiftLeft for UInt32 requires an explicit replacement contract"
-  let shiftLeft (a: UInt32) (b: UInt32) : UInt32 = Builtin.uint32ShiftLeft a b
+  let shiftLeft(a: UInt32, b: UInt32): UInt32 = Builtin.uint32ShiftLeft(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl ShiftRight for UInt32 requires an explicit replacement contract"
 impl ShiftRight for UInt32 =
   /// Bitwise right shift of a <type UInt32> value
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl ShiftRight for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl ShiftRight for UInt32 requires an explicit replacement contract"
-  let shiftRight (a: UInt32) (b: UInt32) : UInt32 = Builtin.uint32ShiftRight a b
+  let shiftRight(a: UInt32, b: UInt32): UInt32 = Builtin.uint32ShiftRight(a, b)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl ToString for UInt32 requires an explicit replacement contract"
 impl ToString for UInt32 =
   /// Stringify <param uint32>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl ToString for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl ToString for UInt32 requires an explicit replacement contract"
-  let toString (uint32: UInt32) : String = Builtin.uint32ToString uint32
+  let toString(uint32: UInt32): String = Builtin.uint32ToString(uint32)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Zero for UInt32 requires an explicit replacement contract"
 impl Zero for UInt32 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl Zero for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Zero for UInt32 requires an explicit replacement contract"
-  let zero () : UInt32 = 0ul
+  let zero(): UInt32 = 0u32
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl One for UInt32 requires an explicit replacement contract"
 impl One for UInt32 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl One for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl One for UInt32 requires an explicit replacement contract"
-  let one () : UInt32 = 1ul
+  let one(): UInt32 = 1u32
+
+
+// Checked arithmetic. The operators wrap on overflow; these return
+// {{Error Overflow}} instead, going below 0 included.
+
+/// Adds <param a> and <param b>, or {{Error Overflow}} where `+` would wrap
+let checkedAdd(
+  a: UInt32,
+  b: UInt32)
+  : Stdlib.Result.Result<UInt32, Stdlib.Math.Overflow> =
+  let sum = a + b
+  if sum < a then Error(Stdlib.Math.Overflow.Overflow) else Ok(sum)
+
+
+/// Subtracts <param b> from <param a>, or {{Error Overflow}} where `-` would wrap
+let checkedSubtract(
+  a: UInt32,
+  b: UInt32)
+  : Stdlib.Result.Result<UInt32, Stdlib.Math.Overflow> =
+  if b > a then Error(Stdlib.Math.Overflow.Overflow) else Ok(a - b)
+
+
+/// Multiplies <param a> by <param b>, or {{Error Overflow}} where `*` would wrap
+let checkedMultiply(
+  a: UInt32,
+  b: UInt32)
+  : Stdlib.Result.Result<UInt32, Stdlib.Math.Overflow> =
+  let product = Stdlib.BigInt.fromUInt32(a) * Stdlib.BigInt.fromUInt32(b)
+  match Stdlib.BigInt.toUInt32(product) with
+  | Some(fits) -> Ok(fits)
+  | None -> Error(Stdlib.Math.Overflow.Overflow)
+
+
+/// The negation of <param a>: {{Ok 0}} for 0, and {{Error Overflow}} for
+/// anything else, which has no unsigned negation
+let checkedNegate(a: UInt32): Stdlib.Result.Result<UInt32, Stdlib.Math.Overflow> =
+  if a == 0u32 then Ok(a) else Error(Stdlib.Math.Overflow.Overflow)
+
+
+/// The distance of <param a> from zero, which for an unsigned value is always
+/// <param a> itself. Here so every fixed-width type has the same checked set.
+let checkedAbsoluteValue(a: UInt32)
+  : Stdlib.Result.Result<UInt32, Stdlib.Math.Overflow> =
+  Ok(a)
+
+
+/// <param base> raised to the power of <param exponent>, or {{Error Overflow}}
+/// where `**` would wrap
+let checkedPower(
+  ``base``: UInt32,
+  exponent: UInt32)
+  : Stdlib.Result.Result<UInt32, Stdlib.Math.PowerError> =
+  if ``base`` == 0u32 || ``base`` == 1u32 then
+    // 0 and 1 never grow, so `**` is exact whatever the exponent
+    Ok(``base`` ** exponent)
+  else if exponent >= 32u32 then
+    // any other base is at least 2 from zero, and 2 ** 32 is past the UInt32 range
+    Error(Stdlib.Math.PowerError.Overflow)
+  else
+    let result = Stdlib.BigInt.fromUInt32(``base``) ** Stdlib.BigInt.fromUInt32(exponent)
+
+    match Stdlib.BigInt.toUInt32(result) with
+    | Some(fits) -> Ok(fits)
+    | None -> Error(Stdlib.Math.PowerError.Overflow)
+
+
+// Division. `/` raises on a zero divisor and `%` on a modulus that is not positive;
+// these return the reason instead.
+// TODO: make `/` and `%` themselves checked by default; see the TODO on the `divide`
+// builtin in NoModule.fs.
+
+/// Divides <param a> by <param b>, rounding towards zero, or
+/// {{Error DivisionByZero}} where `/` raises.
+let checkedDivide(a: UInt32, b: UInt32): Stdlib.Result.Result<UInt32, Stdlib.Math.DivisionError> =
+  if b == 0u32 then Error(Stdlib.Math.DivisionError.DivisionByZero) else Ok(a / b)
+
+
+/// <param a> wrapped around so that {{0 <= res < b}}, or {{Error ZeroModulus}}
+/// where `%` raises
+let checkedMod(a: UInt32, b: UInt32): Stdlib.Result.Result<UInt32, Stdlib.Math.ModulusError> =
+  if b == 0u32 then Error(Stdlib.Math.ModulusError.ZeroModulus) else Ok(a % b)

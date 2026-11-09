@@ -6,4 +6,4 @@ type PreambleIdentityRecord = { value: String }
 let preambleRecordList (): List<PreambleIdentityRecord> =
   Stdlib.List.singleton<PreambleIdentityRecord> (PreambleIdentityRecord { value = "managed" })
 
-Stdlib.List.length (preambleRecordList ()) = 1
+Stdlib.List.length (preambleRecordList ()) = 1L

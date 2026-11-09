@@ -17,7 +17,7 @@ Stdlib.Cli.Posix.getenv "DARK_POSIX_ENV" = Some "value\n " env="DARK_POSIX_ENV=v
 match Stdlib.Cli.Posix.flock (-1) true with | Error e -> e.errno | Ok _ -> 0 = 9
 match Stdlib.Cli.Posix.fdSeekFromStart (-1) 0 with | Error e -> e.errno | Ok _ -> 0 = 9
 match Stdlib.Cli.Posix.readlink "/definitely/missing/dark-posix-link" with | Error e -> e.errno | Ok _ -> 0 = 2
-match Stdlib.Cli.Posix.listDir "/" with | Ok entries -> Stdlib.List.length entries > 0 | Error _ -> false = true
+match Stdlib.Cli.Posix.listDir "/" with | Ok entries -> Stdlib.List.length entries > 0L | Error _ -> false = true
 
 // directories
 Stdlib.Cli.Dir.withTemp (fun dir -> let nested = dir + "/one/two" in let created = Stdlib.Cli.Dir.createRecursive nested in let listed = Stdlib.Cli.Dir.list (dir + "/one") in let exists = Stdlib.Cli.Posix.isDirectory nested in (created, listed, exists) == (Ok (), Ok ["two"], true)) = Ok true isolated=true
@@ -44,7 +44,7 @@ Stdlib.Cli.Dir.withTemp (fun dir -> let target = dir + "/target" in let link = d
 Stdlib.Cli.Dir.withTemp (fun dir -> let target = dir + "/target" in let link = dir + "/link" in let made = Stdlib.Cli.Dir.create target in let linked = Stdlib.Cli.File.createSymlink target link in let rejected = match Stdlib.Cli.File.writeText (link + "/bad") "x" with | Error _ -> true | Ok _ -> false in (made, linked, rejected, Stdlib.Cli.File.exists (target + "/bad")) == (Ok (), Ok (), true, false)) = Ok true isolated=true
 
 // recursive walk/glob/size
-Stdlib.Cli.Dir.withTemp (fun dir -> let nested = dir + "/a" in let made = Stdlib.Cli.Dir.create nested in let wrote = Stdlib.Cli.File.writeText (nested + "/x.dark") "abc" in let glob = Stdlib.Cli.File.glob dir "**/*.dark" in let size = Stdlib.Cli.Dir.size dir in let walk = match Stdlib.Cli.Dir.walk dir with | Ok paths -> Stdlib.List.length paths | Error _ -> 0 in (made, wrote, glob, size, walk) == (Ok (), Ok (), Ok [nested + "/x.dark"], Ok 3, 2)) = Ok true isolated=true
+Stdlib.Cli.Dir.withTemp (fun dir -> let nested = dir + "/a" in let made = Stdlib.Cli.Dir.create nested in let wrote = Stdlib.Cli.File.writeText (nested + "/x.dark") "abc" in let glob = Stdlib.Cli.File.glob dir "**/*.dark" in let size = Stdlib.Cli.Dir.size dir in let walk = match Stdlib.Cli.Dir.walk dir with | Ok paths -> Stdlib.List.length paths | Error _ -> 0L in (made, wrote, glob, size, walk) == (Ok (), Ok (), Ok [nested + "/x.dark"], Ok 3L, 2L)) = Ok true isolated=true
 
 // directory error
 Stdlib.Cli.Dir.withTemp (fun dir -> let made = Stdlib.Cli.Dir.create (dir + "/one") in let duplicate = match Stdlib.Cli.Dir.create (dir + "/one") with | Error e -> e.errno | Ok _ -> 0 in let wrote = Stdlib.Cli.File.writeText (dir + "/one/file") "x" in let nonempty = match Stdlib.Cli.Dir.delete (dir + "/one") with | Error _ -> true | Ok _ -> false in (made, duplicate, wrote, nonempty) == (Ok (), 17, Ok (), true)) = Ok true isolated=true

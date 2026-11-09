@@ -1,5 +1,5 @@
 # Reproducible discovery inputs; paths are supplied on the command line.
 schema: 1
 upstream_repository: darklang/dark
-upstream_revision: 06be3203f31820bcaa99db7bca6756cda3ae5c8d
+upstream_revision: da83cdda06a51f25be4f63ea059c6c30d4e8c960
 target: linux-x64

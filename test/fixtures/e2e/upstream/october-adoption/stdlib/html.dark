@@ -29,7 +29,7 @@ test comment =
 
 test commentNeverHoldsDoubleDash =
   Stdlib.Test.all (
-    [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 ]
+    [ 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L ]
     |> Stdlib.List.map (fun n ->
       let dashes = Stdlib.String.repeat "-" n
       let html = (Stdlib.Html.comment $"{dashes}>x") |> nodeToString
@@ -37,7 +37,7 @@ test commentNeverHoldsDoubleDash =
       // Strip `<!-- ` and ` -->` to get the text inside.
       let inner =
         html
-        |> Stdlib.String.dropFirst 5
-        |> Stdlib.String.dropLast 4
+        |> Stdlib.String.dropFirst 5L
+        |> Stdlib.String.dropLast 4L
 
       Stdlib.String.contains inner "--" |> Stdlib.Test.equal false))

@@ -3,71 +3,116 @@ module Darklang.Cli.Packages.Errors
 
 /// Whether an invalid name uses the internal `PACKAGE.` notation, allowing the
 /// CLI to show its source spelling.
-let isInternalPackageName (originalName: List<String>) : Bool =
+let isInternalPackageName(originalName: List<String>): Bool =
   match originalName with
-  | "PACKAGE" :: _ -> true
+  | ["PACKAGE", ...] -> true
   | _ -> false
 
 
-let sourceNameWithoutInternalPrefix (originalName: List<String>) : String =
+let sourceNameWithoutInternalPrefix(originalName: List<String>): String =
   let sourceParts =
     match originalName with
-    | "PACKAGE" :: "Darklang" :: "Stdlib" :: rest ->
-      Stdlib.List.push rest "Stdlib"
-    | "PACKAGE" :: rest -> rest
+    | ["PACKAGE", "Darklang", "Stdlib", ...rest] ->
+      Stdlib.List.prepend(rest, "Stdlib")
+    | ["PACKAGE", ...rest] -> rest
     | _ -> originalName
-  Stdlib.String.join sourceParts "."
+  Stdlib.String.join(sourceParts, ".")
 
 
-let splitLast
-  (parts: List<String>)
+let splitLast(
+  parts: List<String>)
   : Stdlib.Option.Option<(List<String> * String)> =
-  match Stdlib.List.reverse parts with
+  match Stdlib.List.reverse(parts) with
   | [] -> Stdlib.Option.Option.None
-  | name :: reversedModules ->
-    Stdlib.Option.Option.Some((Stdlib.List.reverse reversedModules, name))
+  | [name, ...reversedModules] ->
+    Stdlib.Option.Option.Some((Stdlib.List.reverse(reversedModules), name))
 
 
-/// Suggest the `Stdlib.`-qualified form of an unresolved multi-part name when
-/// an item exists at that standard-library location.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.stdlibSuggestion: Unknown function or value 'LanguageTools.PackageManager.findAny'"
-let stdlibSuggestion
-  (branchId: Uuid)
-  (originalName: List<String>)
-  : Stdlib.Option.Option<String> =
-  match originalName with
-  | "Stdlib" :: _
-  | "Darklang" :: _
-  | "PACKAGE" :: _ -> Stdlib.Option.Option.None
+/// One place a name could live in the standard library: how the user would write it, and where it is.
+/// <param writtenPrefix> is how they spelled the root, `Stdlib` or `Darklang.Stdlib`, and
+/// <param modules> are the modules below it.
+let stdlibCandidate(
+  writtenPrefix: List<String>,
+  modules: List<String>,
+  name: String)
+  : (String * LanguageTools.ProgramTypes.PackageLocation) =
+  let written =
+    Stdlib.List.flatten([ writtenPrefix, modules, [ name ] ])
+    |> Stdlib.String.join(".")
+  let location =
+    LanguageTools.ProgramTypes.PackageLocation
+      { owner = "Darklang"
+        modules = Stdlib.List.prepend(modules, "Stdlib")
+        name = name }
+  (written, location)
+
+
+/// The modules enclosing <param modules>, nearest first, down to the empty root:
+/// `[Int64, Bits]` gives `[Int64]` then `[]`.
+let enclosingModules(modules: List<String>): List<List<String>> =
+  match modules with
+  | [] -> []
   | _ ->
-    match splitLast originalName with
-    | Some((modules, name)) when Stdlib.Bool.not (Stdlib.List.isEmpty modules) ->
-      let location =
-        LanguageTools.ProgramTypes.PackageLocation
-          { owner = "Darklang"
-            modules = Stdlib.List.push modules "Stdlib"
-            name = name }
-      match LanguageTools.PackageManager.findAny branchId location with
-      | Some _ ->
-        Stdlib.Option.Option.Some
-          ("Stdlib." + (Stdlib.String.join originalName "."))
-      | None -> Stdlib.Option.Option.None
-    | _ -> Stdlib.Option.Option.None
+    let parent = Stdlib.List.dropLast(modules)
+    Stdlib.List.prepend(enclosingModules(parent), parent)
+
+
+/// Where an unresolved name might really be, in the order <fn stdlibSuggestion> tries them.
+///
+/// A name without a `Stdlib.` prefix gets one: `Bool.not` -> `Stdlib.Bool.not`. A name already under
+/// `Stdlib.` tries its final name in each enclosing module, nearest first, down to the `Stdlib` root:
+/// `Stdlib.Int64.toString` -> `Stdlib.toString`. An unprefixed name walks up only from one module,
+/// so `Int64.toString` also tries `Stdlib.toString`: a deeper one may be the user's own module that
+/// does not exist yet.
+let stdlibSuggestionCandidates(
+  originalName: List<String>)
+  : List<(String * LanguageTools.ProgramTypes.PackageLocation)> =
+  match splitLast(originalName) with
+  | None -> []
+  | Some((modules, name)) ->
+    let walkUp =
+      fun(writtenPrefix, inner) ->
+        enclosingModules(inner)
+        |> Stdlib.List.map(fun m -> stdlibCandidate(writtenPrefix, m, name))
+
+    match modules with
+    | [] -> []
+    | ["Stdlib", ...inner] -> walkUp([ "Stdlib" ], inner)
+    | ["Darklang", "Stdlib", ...inner] -> walkUp([ "Darklang", "Stdlib" ], inner)
+    | ["Darklang", ...] -> []
+    | ["PACKAGE", ...] -> []
+    | [ _ ] ->
+      Stdlib.List.prepend(
+        walkUp([ "Stdlib" ], modules),
+        stdlibCandidate([ "Stdlib" ], modules, name))
+    | _ -> [ stdlibCandidate([ "Stdlib" ], modules, name) ]
+
+
+/// Suggest the standard-library name an unresolved name probably meant, when an item exists there:
+/// the first of <fn stdlibSuggestionCandidates> that is on the branch.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.stdlibSuggestion: Unknown function or value 'LanguageTools.PackageManager.findAny'"
+let stdlibSuggestion(
+  branchId: Uuid,
+  originalName: List<String>)
+  : Stdlib.Option.Option<String> =
+  stdlibSuggestionCandidates(originalName)
+  |> Stdlib.List.findFirst(fun((_, location)) ->
+    Stdlib.Option.isSome(LanguageTools.PackageManager.findAny(branchId, location)))
+  |> Stdlib.Option.map(fun((written, _)) -> written)
 
 
 /// Prints the first parse diagnostic. Returns true when parsing failed.
-let reportParseErrors
-  (diagnostics: List<(LanguageTools.Parser.Range * String)>)
+let reportParseErrors(
+  diagnostics: List<(LanguageTools.Parser.Range * String)>)
   : Bool =
   match diagnostics with
   | [] -> false
-  | (range, message) :: _ ->
+  | [(range, message), ...] ->
     let lineNum = (range.start.row + 1) |> Stdlib.toString
     // 1-based column, matching renderDiagnostic and the line number above
     let colNum = (range.start.column + 1) |> Stdlib.toString
 
-    Stdlib.printLine
-      (Stdlib.Cli.UI.Colors.error $"Parse error at line {lineNum}, column {colNum}: {message}")
+    Cli.printErr($"Parse error at line {lineNum}, column {colNum}: {message}")
 
     true
 
@@ -76,15 +121,15 @@ let reportParseErrors
 ///
 /// The arguments are joined into one source, so a stray extra one parses as a second
 /// declaration or a bare expression. Taking the first declaration and ignoring the rest
-/// saved `dark val Me.A.x 42L zzznope` as `42L` and reported success.
+/// saved `dark val Me.A.x 42 zzznope` as `42` and reported success.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.WrittenTypes.SourceFile.SourceFile'"
-let reportTrailing (sourceFile: LanguageTools.WrittenTypes.SourceFile.SourceFile) : Bool =
-  let decls = Stdlib.List.length sourceFile.declarations
-  let extra = decls + (Stdlib.List.length sourceFile.exprsToEval) - 1
+let reportTrailing(sourceFile: LanguageTools.WrittenTypes.SourceFile.SourceFile): Bool =
+  let decls = Stdlib.List.length(sourceFile.declarations)
+  let extra = decls + (Stdlib.List.length(sourceFile.exprsToEval)) - 1
 
   if extra > 0 then
-    Cli.printErr "There is something after the definition; nothing was saved."
-    Cli.printHint "  Quote the whole definition as one argument, or pass `-` and pipe it in."
+    Cli.printErr("There is something after the definition; nothing was saved.")
+    Cli.printHint("  Quote the whole definition as one argument, or pass `-` and pipe it in.")
     true
   else
     false
@@ -92,17 +137,17 @@ let reportTrailing (sourceFile: LanguageTools.WrittenTypes.SourceFile.SourceFile
 
 /// The unresolved names in one line, `Nope.missing (line 1), Other.thing (line 3)`, for a surface with no
 /// room for <fn reportUnresolvedNames>'s list: the workbench's footer.
-let unresolvedNamesText
-  (unresolvedNames:
+let unresolvedNamesText(
+  unresolvedNames:
     List<LanguageTools.Parser.Range
       * List<String>
       * LanguageTools.ProgramTypes.NameResolutionError>)
   : String =
   unresolvedNames
-  |> Stdlib.List.map (fun (range, originalName, _err) ->
+  |> Stdlib.List.map(fun((range, originalName, _err)) ->
     let lineNum = (range.start.row + 1) |> Stdlib.toString
-    $"{Stdlib.String.join originalName "."} (line {lineNum})")
-  |> Stdlib.String.join ", "
+    $"{Stdlib.String.join(originalName, ".")} (line {lineNum})")
+  |> Stdlib.String.join(", ")
 
 
 /// Checks for invalid names (hard errors) and unresolved names (warnings).
@@ -110,72 +155,73 @@ let unresolvedNamesText
 /// Unresolved names are allowed in WIP — they'll be resolved by WipRefresh when
 /// the missing items are added, and rejected at commit time if still unresolved.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.reportUnresolvedNames: Unknown function or value 'stdlibSuggestion'"
-let reportUnresolvedNames
-  (branchId: Uuid)
-  (unresolvedNames:
+let reportUnresolvedNames(
+  branchId: Uuid,
+  unresolvedNames:
     List<LanguageTools.Parser.Range
       * List<String>
       * LanguageTools.ProgramTypes.NameResolutionError>)
   : Bool =
   let invalidNames =
     unresolvedNames
-    |> Stdlib.List.filter (fun (_, _, err) ->
+    |> Stdlib.List.filter(fun((_, _, err)) ->
       match err with
       | InvalidName -> true
       | NotFound -> false)
 
   let notFoundNames =
     unresolvedNames
-    |> Stdlib.List.filter (fun (_, _, err) ->
+    |> Stdlib.List.filter(fun((_, _, err)) ->
       match err with
       | NotFound -> true
       | InvalidName -> false)
 
-  // Print warnings for unresolved names (will be fixed by WipRefresh)
-  if (Stdlib.List.isEmpty notFoundNames) |> Stdlib.Bool.not then
-    Stdlib.printLine
-      (Stdlib.Cli.UI.Colors.warning
-        "Warning: Unresolved references (will resolve when dependencies are added)")
+  // Warnings for unresolved names (will be fixed by WipRefresh). On stderr: the save's answer is the
+  // "Created" line, and a warning is never part of it.
+  if (Stdlib.List.isEmpty(notFoundNames)) |> Stdlib.Bool.not then
+    Stdlib.printErrorLine(
+      (Stdlib.Cli.UI.Colors.warning(
+        "Warning: Unresolved references (will resolve when dependencies are added)")))
 
     notFoundNames
-    |> Stdlib.List.iter (fun (range, originalName, _err) ->
+    |> Stdlib.List.iter(fun((range, originalName, _err)) ->
       let lineNum = (range.start.row + 1) |> Stdlib.toString
       let colNum = range.start.column |> Stdlib.toString
-      let nameStr = Stdlib.String.join originalName "."
+      let nameStr = Stdlib.String.join(originalName, ".")
 
       let suggestion =
-        match stdlibSuggestion branchId originalName with
-        | Some name -> $" Did you mean `{name}`?"
+        match stdlibSuggestion(branchId, originalName) with
+        | Some(name) -> $" Did you mean `{name}`?"
         | None -> ""
 
       let message =
         $"  - Not found: {nameStr} (line {lineNum}, column {colNum}).{suggestion}"
-      Stdlib.printLine (Stdlib.Cli.UI.Colors.warning message))
+      Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.warning(message)))
 
-    Stdlib.printLine ""
+    Stdlib.printErrorLine("")
 
   // Print errors for invalid names (these block creation)
-  if (Stdlib.List.isEmpty invalidNames) |> Stdlib.Bool.not then
-    Stdlib.printLine (Stdlib.Cli.UI.Colors.error "Error: Invalid names")
+  if (Stdlib.List.isEmpty(invalidNames)) |> Stdlib.Bool.not then
+    Cli.printErr("Error: Invalid names")
 
     invalidNames
-    |> Stdlib.List.iter (fun (range, originalName, _err) ->
+    |> Stdlib.List.iter(fun((range, originalName, _err)) ->
       let lineNum = (range.start.row + 1) |> Stdlib.toString
       let colNum = range.start.column |> Stdlib.toString
-      let nameStr = Stdlib.String.join originalName "."
+      let nameStr = Stdlib.String.join(originalName, ".")
 
-      if isInternalPackageName originalName then
-        let suggested = sourceNameWithoutInternalPrefix originalName
+      if isInternalPackageName(originalName) then
+        let suggested = sourceNameWithoutInternalPrefix(originalName)
         let message =
           ($"  - Invalid name: {nameStr} (line {lineNum}, column {colNum}). "
            + $"`PACKAGE.` is internal notation; write `{suggested}`.")
-        Stdlib.printLine (Stdlib.Cli.UI.Colors.error message)
+        Cli.printErr(message)
       else
         let message =
           $"  - Invalid name: {nameStr} (line {lineNum}, column {colNum})"
-        Stdlib.printLine (Stdlib.Cli.UI.Colors.error message))
+        Cli.printErr(message))
 
-    Stdlib.printLine ""
+    Stdlib.printErrorLine("")
     true
   else
     false

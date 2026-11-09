@@ -20,7 +20,7 @@ let __writeMib (mib: List<Int>) (buffer: RawPtr) (offset: Int64) : Unit =
 
 let syscallSysctl (mib: List<Int>) (count: Int) : Stdlib.Result.Result<Blob, Int> =
     let count = Builtin.__posixInt32 count in
-    let length = Stdlib.Int.toInt64 (Stdlib.List.length mib) |> Builtin.unwrap in
+    let length = Stdlib.Int.toInt64 (Stdlib.List.__lengthInt mib) |> Builtin.unwrap in
     if count <= 0L || length == 0L then Error 22
     else
         let keys = __mapped_alloc (length * 4L + 4L) in

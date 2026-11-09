@@ -12,5 +12,5 @@ Stdlib.Int64.fromFloatRounded 2.5 = Stdlib.Option.Option.Some 2L
 Stdlib.UInt64.fromFloatRounded -1.0 = Stdlib.Option.Option.None
 Stdlib.String.slugify " Hello World! " = "hello-world"
 Stdlib.List.SortByComparatorHelpers.mergeSort ["b", "a", "c"] (fun a b -> if a < b then -1 else if a > b then 1 else 0) = Stdlib.Result.Result.Ok ["a", "b", "c"] // leak_check
-Stdlib.List.partition ["a", "bb", "c"] (fun value -> Stdlib.String.length value == 1) = (["a", "c"], ["bb"]) // leak_check
+Stdlib.List.partition ["a", "bb", "c"] (fun value -> Stdlib.String.length value == 1L) = (["a", "c"], ["bb"]) // leak_check
 Stdlib.List.unzip [("a", "one"), ("b", "two")] = (["a", "b"], ["one", "two"]) // leak_check

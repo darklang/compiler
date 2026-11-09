@@ -1,5 +1,5 @@
 // List patterns must retain dynamically allocated string keys through parent cleanup.
 
-Stdlib.List.groupByWithKey (["apple"]) (fun value -> Stdlib.String.first value 1) = [("a", ["apple"])]
-Stdlib.List.groupByWithKey (["apple", "ant"]) (fun value -> Stdlib.String.first value 1) = [("a", ["apple", "ant"])]
-Stdlib.List.groupByWithKey (["apple", "bee"]) (fun value -> Stdlib.String.first value 1) = [("a", ["apple"]), ("b", ["bee"])]
+Stdlib.List.groupByWithKey (["apple"]) (fun value -> Stdlib.String.first value 1L) = [("a", ["apple"])]
+Stdlib.List.groupByWithKey (["apple", "ant"]) (fun value -> Stdlib.String.first value 1L) = [("a", ["apple", "ant"])]
+Stdlib.List.groupByWithKey (["apple", "bee"]) (fun value -> Stdlib.String.first value 1L) = [("a", ["apple"]), ("b", ["bee"])]

@@ -611,7 +611,7 @@ and renderBody env typ value state =
                       ( Lte,
                         call next.symbols "Darklang.Stdlib.String.length"
                           [ C.Local shortId ],
-                        C.BigIntLiteral (Z.of_int 80) ),
+                        C.Int64Literal 80L ),
                     C.Local shortId,
                     long ) ),
             next ))
@@ -1050,7 +1050,7 @@ let ensureEvalRenderer env typ state =
   generated (evalRendererName typ) typ TString state (fun value state ->
       let doc, next = docCall env typ value state in
       ( call next.symbols "Darklang.Stdlib.Pretty.render"
-          [ C.BigIntLiteral (Z.of_int 80); doc ],
+          [ C.Int64Literal 80L; doc ],
         next ))
 
 let starts name prefix = Text.startsWith name prefix

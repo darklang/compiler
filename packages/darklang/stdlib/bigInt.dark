@@ -1,14 +1,37 @@
-// Stdlib.BigInt.dark - the interpreter's BigInt module where its types differ from Int's.
+// bigInt.dark - The interpreter's Stdlib.BigInt over the compiler's arbitrary-precision Int.
 //
-// The interpreter calls arbitrary-precision integers BigInt and gives the
-// module its own ParseError; the compiler's type is Int. Hosted BigInt code
-// reaches the Int builtins, and BigInt.parse answers with BigInt's error.
+// Main renamed Int to BigInt (darklang/dark@2d1526d); `BigInt` names the same
+// type as Int here. Its builtin-backed functions forward to Stdlib.Int.
 
 module Darklang.Stdlib.BigInt
 
-type ParseError = | BadFormat
+let toFloat (value: BigInt) : Float = Stdlib.Int.toFloat value
+let fromFloat (value: Float) : BigInt = Stdlib.Int.fromFloat value
+let random (start: BigInt) (end_: BigInt) : BigInt = Stdlib.Int.random start end_
 
-let parse (s: String) : Stdlib.Result.Result<Int, Stdlib.BigInt.ParseError> =
-    match Stdlib.Int.parse s with
-    | Ok value -> Ok value
+let parse (value: String) : Stdlib.Result.Result<BigInt, Stdlib.BigInt.ParseError> =
+    match Stdlib.Int.parse value with
+    | Ok parsed -> Ok parsed
     | Error _ -> Error Stdlib.BigInt.ParseError.BadFormat
+
+let fromInt8 (value: Int8) : BigInt = Stdlib.Int.fromInt8 value
+let fromUInt8 (value: UInt8) : BigInt = Stdlib.Int.fromUInt8 value
+let fromInt16 (value: Int16) : BigInt = Stdlib.Int.fromInt16 value
+let fromUInt16 (value: UInt16) : BigInt = Stdlib.Int.fromUInt16 value
+let fromInt32 (value: Int32) : BigInt = Stdlib.Int.fromInt32 value
+let fromUInt32 (value: UInt32) : BigInt = Stdlib.Int.fromUInt32 value
+let fromInt64 (value: Int64) : BigInt = Stdlib.Int.fromInt64 value
+let fromUInt64 (value: UInt64) : BigInt = Stdlib.Int.fromUInt64 value
+let fromInt128 (value: Int128) : BigInt = Stdlib.Int.fromInt128 value
+let fromUInt128 (value: UInt128) : BigInt = Stdlib.Int.fromUInt128 value
+
+let toInt8 (value: BigInt) : Stdlib.Option.Option<Int8> = Stdlib.Int.toInt8 value
+let toUInt8 (value: BigInt) : Stdlib.Option.Option<UInt8> = Stdlib.Int.toUInt8 value
+let toInt16 (value: BigInt) : Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16 value
+let toUInt16 (value: BigInt) : Stdlib.Option.Option<UInt16> = Stdlib.Int.toUInt16 value
+let toInt32 (value: BigInt) : Stdlib.Option.Option<Int32> = Stdlib.Int.toInt32 value
+let toUInt32 (value: BigInt) : Stdlib.Option.Option<UInt32> = Stdlib.Int.toUInt32 value
+let toInt64 (value: BigInt) : Stdlib.Option.Option<Int64> = Stdlib.Int.toInt64 value
+let toUInt64 (value: BigInt) : Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64 value
+let toInt128 (value: BigInt) : Stdlib.Option.Option<Int128> = Stdlib.Int.toInt128 value
+let toUInt128 (value: BigInt) : Stdlib.Option.Option<UInt128> = Stdlib.Int.toUInt128 value
