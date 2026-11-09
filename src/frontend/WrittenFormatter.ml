@@ -915,6 +915,8 @@ and matchPattern (value : WrittenTypes.matchPattern) =
   | WrittenTypes.MPOr (field0, field1) ->
       union "MPOr"
         [ (fun _ -> "") field0; list (fun item -> matchPattern item) field1 ]
+  | WrittenTypes.MPUnsupported (field0, field1) ->
+      union "MPUnsupported" [ (fun _ -> "") field0; quoted field1 ]
   | WrittenTypes.MPError field0 -> union "MPError" [ (fun _ -> "") field0 ]
 
 and infix (value : WrittenTypes.infix) =
