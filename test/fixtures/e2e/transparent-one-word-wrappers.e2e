@@ -35,3 +35,4 @@ match OuterEnvelope (InnerEnvelope 7L) with | OuterEnvelope (InnerEnvelope value
 match GenericListEnvelope [1L, 2L] with | GenericListEnvelope values -> Stdlib.List.length values = 2 // leak_check
 match GenericDictEnvelope (Stdlib.Dict.singleton "key" 7L) with | GenericDictEnvelope values -> Stdlib.Dict.get values "key" = Some 7L // leak_check
 let value = RecursiveDictEnvelope (Stdlib.Dict.singleton "leaf" (RecursiveDictEnvelope Stdlib.Dict.empty)) in match value with | RecursiveDictEnvelope values -> match Stdlib.Dict.get values "leaf" with | Some (RecursiveDictEnvelope child) -> Stdlib.Dict.isEmpty child | None -> false = true // leak_check
+let r = Stdlib.Float.sqrt 4.0 in (r, FloatEnvelope r) = stdout="(2.0, FloatEnvelope.FloatEnvelope(2.0))\n" stderr=""
