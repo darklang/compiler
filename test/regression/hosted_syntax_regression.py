@@ -196,6 +196,20 @@ TYPES["tagged-type-hash"] = ("Hosted.Tagged", dict(hash={"Hash": ["tagged-type-h
         dict(name="type", typ=INT64, description="")]]})))
 ENTITIES["tagged-hash"] = fn("Hosted.tagged", [("x", INT64)], INT64,
     {"ERecordFieldAccess": [1, {"ERecord": [2, TAGGED_NAME, [], [["type", ARG0]]]}, "type"]})
+# `as` inside other patterns, refutable and not, with and without a guard:
+# match (x, 1) with | (5 as five, n) -> five * 10 + n
+#                   | ((a as b), _) when b > 5 -> a + b | _ -> 0
+def case(pat, rhs, guard=None):
+    return dict(pat=pat, rhs=rhs, whenCondition={"Some": [guard]} if guard else {"None": []})
+VAR = lambda name: {"EVariable": [1, name]}
+ENTITIES["as-hash"] = fn("Hosted.asPatterns", [("x", INT64)], INT64,
+    {"EMatch": [1, {"ETuple": [2, ARG0, {"EInt64": [3, 1]}, []]}, [
+        case({"MPTuple": [4, {"MPAs": [5, {"MPInt64": [6, 5]}, "five"]}, {"MPVariable": [7, "n"]}, []]},
+             infix("ArithmeticPlus", infix("ArithmeticMultiply", VAR("five"), {"EInt64": [8, 10]}), VAR("n"))),
+        case({"MPTuple": [9, {"MPAs": [10, {"MPVariable": [11, "a"]}, "b"]}, {"MPVariable": [12, "_"]}, []]},
+             infix("ArithmeticPlus", VAR("a"), VAR("b")),
+             infix("ComparisonGreaterThan", VAR("b"), {"EInt64": [13, 5]})),
+        case({"MPVariable": [14, "_"]}, {"EInt64": [15, 0]})]]})
 # Builtin.bytesLength answers an Int64; the compiler's Blob.length an Int.
 ENTITIES["bytes-length-hash"] = fn("Hosted.bytesLen", [("b", {"TBytes": []})], INT64,
     builtin("bytesLength", ARG0))
@@ -284,6 +298,7 @@ def main():
             assert run('Hosted.bytesLen (Stdlib.Blob.fromString "abc")\n') == 3
             assert run("Hosted.dictLast 5L\n") == 1
             assert run("Hosted.tagged 7L\n") == 7
+            assert [run(f"Hosted.asPatterns {x}L\n") for x in (5, 7, 1)] == [51, 14, 0]
             assert run("Hosted.braces 1L\n") == "a{b}c"
             assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"

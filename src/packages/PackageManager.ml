@@ -496,6 +496,36 @@ let rec renderMatchPattern element =
       String.concat " | " values
   | _ -> unsupportedFeature ("the match pattern " ^ name)
 
+(* `P as n`, at any depth, matches as the variable `n`; P is matched against
+   `n` in the arm's guard and again around its body, where P's variables are
+   bound. [splitAs] replaces each `as` with its variable and lists (name, P),
+   outermost first. *)
+let rec splitAs element =
+  match element with
+  | `Assoc [ ("MPAs", `List [ id; inner; name ]) ] ->
+      let inner, nested = splitAs inner in
+      (`Assoc [ ("MPVariable", `List [ id; name ]) ], (name, inner) :: nested)
+  | `Assoc [ (tag, `List fields) ] ->
+      let fields, bindings = List.split (List.map splitAs fields) in
+      (`Assoc [ (tag, `List fields) ], List.concat bindings)
+  | `List items ->
+      let items, bindings = List.split (List.map splitAs items) in
+      (`List items, List.concat bindings)
+  | other -> (other, [])
+
+let rec irrefutablePattern element =
+  match enumCase element with
+  | Ok (("MPVariable" | "MPUnit"), _) -> true
+  | Ok ("MPTuple", [ _; first; second; rest ]) ->
+      List.for_all irrefutablePattern (first :: second :: arrayItems rest)
+  | _ -> false
+
+let rec containsOrWithAs element =
+  match element with
+  | `Assoc [ ("MPOr", `List fields) ] -> snd (splitAs (`List fields)) <> []
+  | `Assoc [ (_, `List fields) ] | `List fields -> List.exists containsOrWithAs fields
+  | _ -> false
+
 let infixText element =
   let* name, fields = enumCase element in
   match (name, fields) with
@@ -898,17 +928,49 @@ let rec renderExpr parameters selfName element =
             tryField "rhs" element )
         with
         | Some pattern, Some guard, Some body -> (
-            let* pattern = renderMatchPattern pattern in
+            let* () =
+              if containsOrWithAs pattern then
+                unsupportedFeature "an `as` pattern inside an or-pattern"
+              else Ok ()
+            in
+            let stripped, bindings = splitAs pattern in
+            let* pattern = renderMatchPattern stripped in
+            let* bindings =
+              ResultList.mapResults
+                (fun (name, inner) ->
+                  let* name = stringValue name in
+                  let+ text = renderMatchPattern inner in
+                  (name, text, irrefutablePattern inner))
+                bindings
+            in
+            (* Matches each `as` pattern around <inner>, innermost last. *)
+            let within inner fallback =
+              List.fold_right
+                (fun (name, text, irrefutable) inner ->
+                  "(match " ^ name ^ " with | " ^ text ^ " -> " ^ inner
+                  ^ (if irrefutable then "" else " | _ -> " ^ fallback)
+                  ^ ")")
+                bindings inner
+            in
+            let refutable =
+              List.exists (fun (_, _, irrefutable) -> not irrefutable) bindings
+            in
             let* name, fields = enumCase guard in
-            match (name, fields) with
-            | "None", [] ->
-                let+ body = recurse body in
-                "| " ^ pattern ^ " -> " ^ body
-            | "Some", [ condition ] ->
-                let* guard = recurse condition in
-                let+ body = recurse body in
-                "| " ^ pattern ^ " when " ^ guard ^ " -> " ^ body
-            | _ -> Error ("Invalid match guard " ^ name))
+            let* guard =
+              match (name, fields) with
+              | "None", [] -> Ok None
+              | "Some", [ condition ] -> Result.map Option.some (recurse condition)
+              | _ -> Error ("Invalid match guard " ^ name)
+            in
+            let+ body = recurse body in
+            let body =
+              within body "Builtin.crash \"an as-pattern arm was taken without its pattern\""
+            in
+            match guard with
+            | None when not refutable -> "| " ^ pattern ^ " -> " ^ body
+            | None -> "| " ^ pattern ^ " when " ^ within "true" "false" ^ " -> " ^ body
+            | Some guard ->
+                "| " ^ pattern ^ " when " ^ within guard "false" ^ " -> " ^ body)
         | _ -> Error "Invalid package match case"
       in
       let* argument = recurse argument in
