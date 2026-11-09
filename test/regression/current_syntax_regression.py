@@ -47,6 +47,8 @@ def main():
         # the list, padStart and padEnd pad with a Char.
         assert run("Stdlib.List.append([1, 2], 3)", current) == "[1, 2, 3]"
         assert run("Stdlib.List.prepend([1, 2], 3)", current) == "[3, 1, 2]"
+        assert run("Stdlib.List.indexedMap([5, 6], fun(i, x) -> i * x)", current) == "[0, 6]"
+        assert run('$"a{1 + 1}b{1.5}{\"c\"}"', current) == "a2b1.5c"
         assert run("Stdlib.List.concat([1], [2, 3])", current) == "[1, 2, 3]"
         assert run('Stdlib.List.zip([1, 2], ["a", "b"])', current) == 'Ok([(1, "a"), (2, "b")])'
         assert run("Stdlib.List.zip([1, 2], [3])", current) == "Error(Stdlib.List.LengthMismatch { left: 2, right: 1 })"
