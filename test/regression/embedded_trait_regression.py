@@ -25,13 +25,29 @@ TRAIT = dict(hash={"Hash": ["xor-hash"]}, typeParams=["a"], bounds=[], methods=[
          returnType={"TVariable": ["a"]})])
 
 
+# The interpreter's own BitwiseXor impl for Int64, which the compiler has too;
+# its method fn does not type here, and goes with the impl.
+METHOD = dict(hash={"Hash": ["xor-method-hash"]}, typeParams=[], bounds=[], returnType={"TInt64": []},
+              parameters=[dict(name="a", typ={"TInt64": []}), dict(name="b", typ={"TInt64": []})],
+              body={"EString": [1, [{"StringText": ["not an Int64"]}]]})
+METHOD_LOCATION = dict(owner="Darklang", modules=["Stdlib", "Int64", "BitwiseXor"], name="bitwiseXor")
+IMPL = dict(hash={"Hash": ["xor-impl-hash"]}, trait_=dict(originalName=["Stdlib", "BitwiseXor"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["xor-hash"]}]},
+    location={"Some": [dict(owner="Darklang", modules=["Stdlib"], name="BitwiseXor")]})]}),
+    traitTypeArgs=[], self={"TInt64": []}, typeParams=[], bounds=[],
+    methods=[["bitwiseXor", dict(originalName=["Stdlib", "Int64", "BitwiseXor", "bitwiseXor"], resolved={"Ok": [dict(
+        name={"Package": [{"Hash": ["xor-method-hash"]}]}, location={"Some": [METHOD_LOCATION]})]})]])
+
+
 def inventory(module):
     stdlib = module == "Darklang.Stdlib"
     return dict(submodules=[], types=[], values=[],
                 fns=[dict(entity=FN, location=LOCATION)] if stdlib else [],
                 traits=[dict(entity=TRAIT, location=dict(owner="Darklang", modules=["Stdlib"],
                                                          name="BitwiseXor"))] if stdlib else [],
-                impls=[], tests=[])
+                impls=[dict(entity=IMPL, location=dict(owner="Darklang", modules=["Stdlib"],
+                                                       name="Int64BitwiseXor"))] if stdlib else [],
+                tests=[])
 
 
 def main():
@@ -50,6 +66,8 @@ def main():
             elif parts[:3] == ["trait", "get", "with-location"] and parts[3] == "xor-hash":
                 payload = dict(entity=TRAIT, location=dict(owner="Darklang", modules=["Stdlib"],
                                                            name="BitwiseXor"))
+            elif parts[:3] == ["function", "get", "with-location"] and parts[3] == "xor-method-hash":
+                payload = dict(entity=METHOD, location=METHOD_LOCATION)
             elif len(parts) == 1 and parts[0].startswith("Darklang"):
                 payload = inventory(parts[0])
             else:
@@ -71,7 +89,8 @@ def main():
             assert result.stdout.strip() == "Darklang.Stdlib.incXor: compiles", \
                 result.stdout + result.stderr
         server.shutdown()
-    print("A hosted trait the compiler already declares is left to the compiler's declaration")
+    print("A hosted trait or impl the compiler already declares is left to the compiler, "
+          "and the impl's method fns go with it")
 
 
 if __name__ == "__main__":
