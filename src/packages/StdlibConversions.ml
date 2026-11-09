@@ -24,6 +24,11 @@ let hostedRenames =
        String to an Int, answering a Result. *)
     ("Darklang.Stdlib.String.padStart", "Darklang.Stdlib.String.padStartChar");
     ("Darklang.Stdlib.String.padEnd", "Darklang.Stdlib.String.padEndChar");
+    (* indexOf, lastIndexOf and contains match whole Chars and count in Chars;
+       the compiler's count UTF-16 units and match inside a Char. *)
+    ("Darklang.Stdlib.String.indexOf", "Darklang.Stdlib.String.indexOfEgc");
+    ("Darklang.Stdlib.String.lastIndexOf", "Darklang.Stdlib.String.lastIndexOfEgc");
+    ("Darklang.Stdlib.String.contains", "Darklang.Stdlib.String.containsEgc");
   ]
 
 let hostedName name =
@@ -110,6 +115,9 @@ let stdlibConversions =
     ("Darklang.Stdlib.String.indexOf", [  ], Some (OptionOf (Narrow "Int64")));
     ("Darklang.Stdlib.String.last", [ (1, Widen "Int64") ], None);
     ("Darklang.Stdlib.String.lastIndexOf", [  ], Some (OptionOf (Narrow "Int64")));
+    (* Hosted package calls are converted under their hosted name. *)
+    ("Darklang.Stdlib.String.indexOfEgc", [  ], Some (OptionOf (Narrow "Int64")));
+    ("Darklang.Stdlib.String.lastIndexOfEgc", [  ], Some (OptionOf (Narrow "Int64")));
     ("Darklang.Stdlib.String.length", [  ], Some (Narrow "Int64"));
     ("Darklang.Stdlib.String.random", [ (0, Widen "Int64") ], None);
     ("Darklang.Stdlib.String.repeat", [ (1, Widen "Int64") ], None);
