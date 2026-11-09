@@ -343,16 +343,12 @@ let lowerExpression (toANFCore : LoweringCallbacks.expressionLowerer)
             in
             let* body, gen = anf ~env body gen in
             let continuation = K.wrapBindings (List.rev projections) body in
-            let rec transform = function
-              | A.Return value -> A.Let (root, A.Atom value, continuation)
-              | A.Jump _ as value -> value
-              | A.Join (parameter, continuation, entry) ->
-                  A.Join (parameter, transform continuation, transform entry)
-              | A.Let (id, value, rest) -> A.Let (id, value, transform rest)
-              | A.If (condition, yes, no) ->
-                  A.If (condition, transform yes, transform no)
-            in
-            Ok (transform value, gen))
+            (* A failing match arm never returns, so the destructuring
+               continuation must not run on its placeholder result. *)
+            Ok
+              ( K.bindReturns value (fun value ->
+                    A.Let (root, A.Atom value, continuation)),
+                gen ))
   | C.UnaryOp (AST.Neg, inner) -> (
       let* typ = infer inner in
       match (typ, inner) with
