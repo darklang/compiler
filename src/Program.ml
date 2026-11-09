@@ -998,7 +998,10 @@ let compileBatch (options : batchCliOptions) =
 
 (* The probe references the item as a value, so the compiler must resolve,
    check and lower it and everything it calls, without needing arguments. *)
-let checkProbe name = "let packageProbe = " ^ name ^ " in 0L\n"
+(* An interpreter helper (`__name`) is declared under its hosted `pkg'__`
+   name, so the probe names it that way. *)
+let checkProbe name =
+  "let packageProbe = " ^ PackageManager.publicName name ^ " in 0L\n"
 
 (* A generic fn referenced without a call has no type arguments, so its probe
    says nothing. It is probed again specialized to each type argument being
