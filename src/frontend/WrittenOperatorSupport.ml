@@ -151,6 +151,16 @@ let[@warning "-4"] check checkExpression checkedLiteral globals locals symbols
                 then Some (traitName, methodName)
                 else None
           in
+          (* Main's `**` on Int128 and UInt128 is their Power implementation;
+             the pinned interpreter refused it, as the pinned syntax still does. *)
+          let dispatch =
+            match (dispatch, selection) with
+            | None, (AST.Pow, _, _)
+              when !Parser.currentSyntax
+                   && (leftType = AST.TInt128 || leftType = AST.TUInt128) ->
+                Some ("Darklang.Stdlib.Power", "power")
+            | _ -> dispatch
+          in
           match dispatch with
           | Some (traitName, methodName) ->
               let range =
