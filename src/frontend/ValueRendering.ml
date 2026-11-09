@@ -117,6 +117,7 @@ let runtimeFunctionNames =
     "Darklang.Stdlib.UInt8.toString";
     "Darklang.Stdlib.Uuid.toString";
     "Darklang.Stdlib.Float32.__display";
+    "Darklang.Stdlib.Blob.__evalDisplay";
     "Darklang.Stdlib.Decimal.__display";
   ]
 
@@ -632,6 +633,10 @@ and renderBody env typ value state =
           in
           (C.Match (value, args cases), next))
   | TFunction _ -> (C.StringLiteral "(lambda)", state)
+  | TBlob when !evalDisplay ->
+      (* As the current interpreter prints unsaved Bytes: the length and the
+     first 16 bytes in hex. *)
+      (call state.symbols "Darklang.Stdlib.Blob.__evalDisplay" [ value ], state)
   | TBlob ->
       (* The interpreter deliberately does not expose ephemeral Blob payloads
      or process-local identities through value rendering. *)
