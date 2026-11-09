@@ -71,17 +71,36 @@ let[@warning "-4"] validateTypes types =
                             bind result (fun tags ->
                                 let tag = caseTag colliding owner name index in
                                 let identity = owner ^ "." ^ name in
-                                let key = string_of_int tag in
+                                (* A hashed tag tells apart the cases that
+                                   share a name (A.Error, B.Error), and the
+                                   cases of one sum. Other cases never meet,
+                                   so they may share a tag: with thousands of
+                                   hashed cases in 4094 slots, some do. *)
+                                let keys =
+                                  [ "case " ^ name ^ "#" ^ string_of_int tag;
+                                    "type " ^ owner ^ "#" ^ string_of_int tag ]
+                                in
                                 if not (S.mem name colliding) then Ok tags
                                 else
-                                  match M.find_opt key tags with
-                                  | Some existing
-                                    when existing <> identity
-                                         && S.mem name colliding ->
+                                  match
+                                    List.find_map
+                                      (fun key ->
+                                        match M.find_opt key tags with
+                                        | Some existing when existing <> identity ->
+                                            Some existing
+                                        | _ -> None)
+                                      keys
+                                  with
+                                  | Some existing ->
                                       Error
-                                        ("Constructor identity collision " ^ key
-                                       ^ ": " ^ existing ^ ", " ^ identity)
-                                  | _ -> Ok (M.add key identity tags)))
+                                        ("Constructor identity collision "
+                                       ^ string_of_int tag ^ ": " ^ existing
+                                       ^ ", " ^ identity)
+                                  | None ->
+                                      Ok
+                                        (List.fold_left
+                                           (fun tags key -> M.add key identity tags)
+                                           tags keys)))
                           (Ok tags)
                           (List.mapi (fun index name -> (index, name)) names))
                 | _ -> Ok tags)))
