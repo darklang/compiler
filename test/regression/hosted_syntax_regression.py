@@ -220,6 +220,11 @@ TYPES["shared-type-hash"] = ("Hosted.First", dict(hash={"Hash": ["shared-type-ha
         dict(name="width", typ=INT64, description="")]]})))
 ENTITIES["second-name-hash"] = fn("Hosted.secondName", [("x", INT64)], INT64,
     {"ERecordFieldAccess": [1, {"ERecord": [2, SECOND_NAME, [], [["width", ARG0]]]}, "width"]})
+# A hosted record as a dictionary key: Dict.size (Dict.fromList [(Tagged { type = x }, true)]).
+ENTITIES["record-key-hash"] = fn("Hosted.recordKey", [("x", INT64)], INT64,
+    {"EApply": [1, {"EFnName": [2, DICT_SIZE, [], []]}, [], [
+        {"EApply": [3, {"EFnName": [4, FROM_LIST, [], []]}, [], [{"EList": [5, [
+            {"ETuple": [6, {"ERecord": [7, TAGGED_NAME, [], [["type", ARG0]]]}, {"EBool": [8, True]}, []]}]]}]]}]]})
 # Builtin.bytesLength answers an Int64; the compiler's Blob.length an Int.
 ENTITIES["bytes-length-hash"] = fn("Hosted.bytesLen", [("b", {"TBytes": []})], INT64,
     builtin("bytesLength", ARG0))
@@ -307,6 +312,7 @@ def main():
             assert run("Hosted.conversions 100L\n") == 103
             assert run('Hosted.bytesLen (Stdlib.Blob.fromString "abc")\n') == 3
             assert run("Hosted.dictLast 5L\n") == 1
+            assert run("Hosted.recordKey 5L\n") == 1
             assert run("Hosted.tagged 7L\n") == 7
             assert run("Hosted.secondName 4L\n") == 4
             assert [run(f"Hosted.asPatterns {x}L\n") for x in (5, 7, 1)] == [51, 14, 0]
@@ -358,9 +364,9 @@ def main():
             # stdlib calls, is not converted a second time as the script is.
             current = subprocess.run([compiler, "--syntax=current", "--package-server",
                 f"http://127.0.0.1:{server.server_port}", "--check", "Hosted.bytesLen",
-                "Hosted.conversions"], env=env, capture_output=True, text=True, timeout=300)
+                "Hosted.conversions", "Hosted.recordKey"], env=env, capture_output=True, text=True, timeout=300)
             assert current.stdout.splitlines() == ["Hosted.bytesLen: compiles",
-                "Hosted.conversions: compiles"], current.stdout + current.stderr
+                "Hosted.conversions: compiles", "Hosted.recordKey: compiles"], current.stdout + current.stderr
         server.shutdown()
     print("Hosted operators, pipes, BigInt, Bytes and float patterns render; unsupported features name themselves, and batch and --check reports give the reason")
 

@@ -1055,6 +1055,9 @@ let checkItems (options : checkCliOptions) =
                   let cli =
                     {
                       defaultOptions with
+                      (* As `dark compile -e` compiles it: the probe is an
+                         expression, and only what it reaches is lowered. *)
+                      isExpression = true;
                       argument = Some ("<check " ^ name ^ ">");
                       outputFile = Some output;
                       verbosity = Quiet;
