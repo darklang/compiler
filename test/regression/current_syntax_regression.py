@@ -33,6 +33,16 @@ def main():
         assert run("Stdlib.Result.Result.Ok((5u8, 3s16))", current) == "Ok((5u8, 3s16))"
         assert run('"a\\"b"', current) == 'a"b'
         assert run('["a\\"b"]', current) == '["a\\"b"]'
+        # Stdlib calls have the interpreter's types and meaning, and dicts and
+        # Uuids print as `dark eval` prints them.
+        assert run('Stdlib.String.slice("hello world", 2, 7)', current) == "llo w"
+        assert run('"hello" |> Stdlib.String.slice(1, 3)', current) == "el"
+        assert run("Stdlib.List.length([1, 2, 3])", current) == "3"
+        assert run('Stdlib.String.indexOf("hello", "l")', current) == "Some(2)"
+        assert run('Stdlib.Dict.fromList([("a", 1), ("a", 2)])', current) == '{ "a": 2 }'
+        assert run('Stdlib.Dict.fromList([("a", Stdlib.Dict.fromList([(1, 2)]))])', current) == '{ "a": { 1: 2 } }'
+        assert run('Stdlib.Uuid.parse("6fad2a6c-a7b6-4b9e-bf01-5cb6ac1ebe62")', current) == \
+            "Ok(<Uuid: 6fad2a6c-a7b6-4b9e-bf01-5cb6ac1ebe62>)"
         # Without the flag a bare integer is still an Int, printed as before.
         pinned = compile_("Stdlib.Int64.add(20, 22)")
         assert pinned.returncode != 0, pinned.stdout + pinned.stderr

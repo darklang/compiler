@@ -260,6 +260,12 @@ let parseForUnchecked mode source =
   let result = parseSyntaxWithRootScope scope source in
   match (result.diagnostics, result.parsed) with
   | [], Some (WT.SourceFile file) -> (
+      (* A script in the interpreter's syntax calls the interpreter's stdlib. *)
+      let file =
+        if !currentSyntax && mode <> Validation.Package then
+          WrittenStdlibAdaptation.sourceFile file
+        else file
+      in
       match Validation.validate mode file with
       | Ok value -> Ok value
       | Error issues ->
