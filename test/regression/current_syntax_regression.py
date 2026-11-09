@@ -66,6 +66,17 @@ def main():
         assert run('Stdlib.String.contains("👍🏽", "👍")', current) == "false"
         assert run('Stdlib.String.contains("a\\r\\nb", "\\n")', current) == "false"
         assert run('Stdlib.String.contains("hello", "ell")', current) == "true"
+        # A generic type shows the type arguments its value holds, `_` for a
+        # parameter none of its fields mention, and a DateTime prints in angle brackets.
+        generic = ("type MyOpt<'a> =\n  | Nothing\n  | Just(a)\n"
+                   "type Pair<'a, 'b> = { first: a, second: b }\n"
+                   '(MyOpt.Nothing, MyOpt.Just(1), Pair { first = 1, second = "a" })')
+        assert run(generic, current) == \
+            '(MyOpt<_>.Nothing, MyOpt<Int64>.Just(1), Pair<Int64, String> { first: 1, second: "a" })'
+        assert run('Stdlib.DateTime.parse("2019-07-28T22:42:36Z")', current) == \
+            "Ok(<DateTime: 2019-07-28T22:42:36Z>)"
+        assert run('Stdlib.DateTime.parse("2019-07-28T22:42:36Z") |> Builtin.unwrap', current) == \
+            "<DateTime: 2019-07-28T22:42:36Z>"
         # Bytes print as dark eval prints unsaved Bytes: the size and the first 16 in hex.
         assert run("Stdlib.Blob.fromList([171u8])", current) == "<Bytes: 1 byte ab>"
         assert run("(Stdlib.Blob.fromList([]), 1)", current) == "(<Bytes: 0 bytes>, 1)"

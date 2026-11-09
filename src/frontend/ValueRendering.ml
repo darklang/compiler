@@ -40,29 +40,84 @@ let resolveFunction symbols name =
 let call symbols name values = C.Call (resolveFunction symbols name, args values)
 
 (* `--syntax=current`: render as the current interpreter's `dark eval` prints.
-   An Option or Result case is bare (`Some(41)`); other types drop the owner
-   and type arguments (`Stdlib.Math.Overflow.Overflow`); integers other than
-   Int64 keep their suffix (`5u8`, `1z`); records keep declaration order; a
-   top-level String prints raw and a top-level Unit prints nothing. *)
+   An Option or Result case is bare (`Some(41)`); a Stdlib type drops the
+   `Darklang` owner (`Stdlib.Math.Overflow.Overflow`) and other package types
+   keep it; a generic type shows its arguments (`Scope<Int64>.Only(443)`);
+   integers other than Int64 keep their suffix (`5u8`, `1z`); DateTimes print
+   as `<DateTime: ...>`; records keep declaration order; a top-level String
+   prints raw and a top-level Unit prints nothing. *)
 let evalDisplay = ref false
+
+(* The interpreter's PrettyPrinter.shortenName from the root module: only the
+   `Darklang` owner in front of `Stdlib` comes off, and the parser's
+   scaffolding owners (`Tests`, `CliScript`) are not printed. *)
+let evalTypeName name =
+  match String.split_on_char '.' name with
+  | "Darklang" :: ("Stdlib" :: _ as rest) -> String.concat "." rest
+  | ("Tests" | "CliScript" | "") :: (_ :: _ as rest) -> String.concat "." rest
+  | _ -> name
+
+(* A type argument as the interpreter's valueType prints it: `_` where the
+   type is not known, `(A * B)` for a tuple, and custom types by full name. *)
+let rec evalTypeArgText typ =
+  match typ with
+  | TVar _ | TInferenceVar _ -> "_"
+  | TInt -> "BigInt"
+  | TBlob -> "Bytes"
+  | TTuple elems -> "(" ^ String.concat " * " (List.map evalTypeArgText elems) ^ ")"
+  | TList elem -> "List<" ^ evalTypeArgText elem ^ ">"
+  | TStream elem -> "Stream<" ^ evalTypeArgText elem ^ ">"
+  | TDict (key, value) ->
+      "Dict<" ^ evalTypeArgText key ^ ", " ^ evalTypeArgText value ^ ">"
+  | TFunction (params, result) ->
+      let grouped text =
+        if Text.contains text " -> " then "(" ^ text ^ ")" else text
+      in
+      let result = grouped (evalTypeArgText result) in
+      (match params with
+      | [ only ] -> grouped (evalTypeArgText only)
+      | params -> "(" ^ String.concat ", " (List.map evalTypeArgText params) ^ ")")
+      ^ " -> " ^ result
+  | TRecord (name, []) | TSum (name, []) -> name
+  | TRecord (name, args) | TSum (name, args) ->
+      name ^ "<" ^ String.concat ", " (List.map evalTypeArgText args) ^ ">"
+  | _ -> CheckingDiagnostics.typeToString typ
+
+let rec typeVariables = function
+  | TVar name | TInferenceVar (_, name) -> [ name ]
+  | TList elem | TStream elem -> typeVariables elem
+  | TDict (key, value) -> typeVariables key @ typeVariables value
+  | TFunction (params, result) ->
+      List.concat_map typeVariables params @ typeVariables result
+  | TTuple elems -> List.concat_map typeVariables elems
+  | TRecord (_, args) | TSum (_, args) -> List.concat_map typeVariables args
+  | _ -> []
+
+(* The interpreter knows a value's type arguments from what it holds, so a
+   parameter that none of the shown fields mention prints as `_`:
+   `MyOpt<_>.Nothing`, `MyOpt<Int64>.Just(1)`. *)
+let evalTypeArgs typeParams typeArgs fieldTypes =
+  if typeArgs = [] || List.length typeParams <> List.length typeArgs then ""
+  else
+    let used = List.concat_map typeVariables fieldTypes in
+    "<"
+    ^ String.concat ", "
+        (List.map2
+           (fun param arg ->
+             if List.mem param used then evalTypeArgText arg else "_")
+           typeParams typeArgs)
+    ^ ">"
 
 let displayTypeText typ =
   let text = CheckingDiagnostics.typeToString typ in
   if not !evalDisplay then text
   else
-    let base =
-      match String.index_opt text '<' with
-      | Some index -> String.sub text 0 index
-      | None -> text
-    in
-    let base =
-      if String.starts_with ~prefix:"Darklang." base then
-        String.sub base 9 (String.length base - 9)
-      else base
-    in
-    match base with
-    | "Stdlib.Option.Option" | "Stdlib.Result.Result" -> ""
-    | _ -> base
+    match typ with
+    | TRecord (name, _) | TSum (name, _) -> (
+        match name with
+        | "Darklang.Stdlib.Option.Option" | "Darklang.Stdlib.Result.Result" -> ""
+        | _ -> evalTypeName name)
+    | _ -> text
 
 let casePrefix typeText = if typeText = "" then "" else typeText ^ "."
 
@@ -387,7 +442,12 @@ and renderBody env typ value state =
   | TString -> (escapedString state.symbols "\"" value, state)
   | TChar -> (escapedString state.symbols "'" value, state)
   | TDateTime ->
-      (call state.symbols "Darklang.Stdlib.DateTime.toString" [ value ], state)
+      let text = call state.symbols "Darklang.Stdlib.DateTime.toString" [ value ] in
+      ( (if !evalDisplay then
+           concat state.symbols
+             [ C.StringLiteral "<DateTime: "; text; C.StringLiteral ">" ]
+         else text),
+        state )
   | TTuple elems ->
       let items =
         List.mapi (fun index typ -> (typ, C.TupleAccess (value, index))) elems
@@ -519,7 +579,13 @@ and renderBody env typ value state =
                    ])
                  renderedFields)
           in
-          let typeText = displayTypeText typ in
+          let typeText =
+            if !evalDisplay then
+              displayTypeText typ
+              ^ evalTypeArgs typeParams typeArgs
+                  (List.map snd recordInfo.Types.fields)
+            else displayTypeText typ
+          in
           let short =
             concat next.symbols
               ((C.StringLiteral (typeText ^ " { ") :: parts ", ")
@@ -562,6 +628,14 @@ and renderBody env typ value state =
       | Some sumInfo ->
           let subst = typeSubstitution sumInfo.Types.typeParams typeArgs in
           let typeText = displayTypeText typ in
+          let casePrefix (variant : Types.sumVariantInfo) =
+            if !evalDisplay && typeText <> "" then
+              casePrefix
+                (typeText
+                ^ evalTypeArgs sumInfo.Types.typeParams typeArgs
+                    variant.Types.fields)
+            else casePrefix typeText
+          in
           let rec buildCases remaining current acc =
             match remaining with
             | [] -> (List.rev acc, current)
@@ -571,7 +645,7 @@ and renderBody env typ value state =
                     let case =
                       makeCase
                         (constructorPattern typeName variant current.symbols [])
-                        (C.StringLiteral (casePrefix typeText ^ variant.Types.name))
+                        (C.StringLiteral (casePrefix variant ^ variant.Types.name))
                     in
                     buildCases rest current (case :: acc)
                 | fieldTypes ->
@@ -611,7 +685,7 @@ and renderBody env typ value state =
                     let body =
                       concat next.symbols
                         (C.StringLiteral
-                           (casePrefix typeText ^ variant.Types.name ^ "(")
+                           (casePrefix variant ^ variant.Types.name ^ "(")
                          :: separated
                         @ [ C.StringLiteral ")" ])
                     in
@@ -676,7 +750,7 @@ let rewriteProgram recordMetadata sumMetadata programType program =
   let existing = existingRenderers topLevels in
   let renderName, state =
     match programType with
-    | TDateTime -> (None, { functions = existing; symbols })
+    | TDateTime when not !evalDisplay -> (None, { functions = existing; symbols })
     | _ ->
         let name, state =
           ensureRenderer env programType { functions = existing; symbols }
@@ -737,7 +811,7 @@ let rewriteProgram recordMetadata sumMetadata programType program =
       | TUnit, _, _ when !evalDisplay ->
           let id, next = freshBinding "__rendered_unit" state in
           (C.Let (C.LPVariable id, expr, C.StringLiteral ""), next)
-      | TDateTime, _, _ ->
+      | TDateTime, _, _ when not !evalDisplay ->
           ( C.BoundaryRender
               ( resolveFunction state.symbols "Darklang.Stdlib.DateTime.toString",
                 expr ),
