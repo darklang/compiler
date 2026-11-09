@@ -73,6 +73,16 @@ let parseWrittenSourceProgram ?writtenSources _allowInternal requireEntry
                          issue.Validation.message)
                        (NonEmptyList.toList issues)))
         in
+        (* A hosted package unit is rendered, not written: its parse error
+           names the item, since its line and column point into no file. *)
+        let validated =
+          match source.X.purpose with
+          | NameSyntax.SourceUnitPurpose.Package ->
+              Result.map_error
+                (fun error -> NameSyntax.sourceUnitNameText name ^ ": " ^ error)
+                validated
+          | _ -> validated
+        in
         Result.map
           (fun parsed ->
             (NameSyntax.sourceUnitNameText name, source.X.purpose, parsed))

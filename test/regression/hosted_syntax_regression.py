@@ -187,6 +187,15 @@ ENTITIES["dict-last-hash"] = fn("Hosted.dictLast", [("x", INT64)], INT64,
         {"EApply": [3, {"EFnName": [4, FROM_LIST, [], []]}, [], [{"EList": [5, [
             {"ETuple": [6, {"EInt64": [7, 1]}, ARG0, []]},
             {"ETuple": [8, {"EInt64": [9, 1]}, ARG0, []]}]]}]]}]]})
+# A record field named by a keyword: (Tagged { type = x }).type.
+TAGGED_NAME = dict(originalName=["Hosted", "Tagged"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["tagged-type-hash"]}]},
+    location={"Some": [dict(owner="Hosted", modules=[], name="Tagged")]})]})
+TYPES["tagged-type-hash"] = ("Hosted.Tagged", dict(hash={"Hash": ["tagged-type-hash"]}, description="",
+    deprecated={"NotDeprecated": []}, declaration=dict(typeParams=[], definition={"Record": [[
+        dict(name="type", typ=INT64, description="")]]})))
+ENTITIES["tagged-hash"] = fn("Hosted.tagged", [("x", INT64)], INT64,
+    {"ERecordFieldAccess": [1, {"ERecord": [2, TAGGED_NAME, [], [["type", ARG0]]]}, "type"]})
 # Builtin.bytesLength answers an Int64; the compiler's Blob.length an Int.
 ENTITIES["bytes-length-hash"] = fn("Hosted.bytesLen", [("b", {"TBytes": []})], INT64,
     builtin("bytesLength", ARG0))
@@ -274,6 +283,7 @@ def main():
             assert run("Hosted.conversions 100L\n") == 103
             assert run('Hosted.bytesLen (Stdlib.Blob.fromString "abc")\n') == 3
             assert run("Hosted.dictLast 5L\n") == 1
+            assert run("Hosted.tagged 7L\n") == 7
             assert run("Hosted.braces 1L\n") == "a{b}c"
             assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"

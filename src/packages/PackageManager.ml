@@ -811,6 +811,10 @@ let resultConversion name =
   | Some (_, _, result) -> result
   | None -> None
 
+(* A record field named by a keyword (`type`) is written in backticks. *)
+let fieldName name =
+  NameSyntax.formatIdentifier (NameSyntax.identifierFromText name)
+
 let rec renderExpr parameters selfName element =
   let recurse = renderExpr parameters selfName in
   let renderMany = ResultList.mapResults recurse in
@@ -978,7 +982,7 @@ let rec renderExpr parameters selfName element =
         | [ name; value ] ->
             let* name = stringValue name in
             let+ value = recurse value in
-            name ^ " = " ^ value
+            fieldName name ^ " = " ^ value
         | _ -> Error "Invalid package record field"
       in
       let+ fields = ResultList.mapResults field (arrayItems values) in
@@ -989,14 +993,14 @@ let rec renderExpr parameters selfName element =
   | "ERecordFieldAccess", [ _; record; field ] ->
       let* record = recurse record in
       let+ field = stringValue field in
-      "(" ^ record ^ ")." ^ field
+      "(" ^ record ^ ")." ^ fieldName field
   | "ERecordUpdate", [ _; record; updates ] ->
       let update element =
         match arrayItems element with
         | [ name; value ] ->
             let* name = stringValue name in
             let+ value = recurse value in
-            name ^ " = " ^ value
+            fieldName name ^ " = " ^ value
         | _ -> Error "Invalid package record update"
       in
       let* record = recurse record in
@@ -1405,7 +1409,7 @@ let renderEntity entity =
                               | Some name, Some typ ->
                                   let* name = stringValue name in
                                   let+ typ = renderType typ in
-                                  name ^ ": " ^ typ
+                                  fieldName name ^ ": " ^ typ
                               | _ -> Error "Invalid package record field"
                             in
                             let+ fields =
