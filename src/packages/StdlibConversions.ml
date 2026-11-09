@@ -9,6 +9,9 @@ let hostedRenames =
     ("Darklang.Stdlib.Dict.fromList", "Darklang.Stdlib.Dict.fromListOverwritingDuplicates");
     (* List.append adds one value at the end; the compiler's joins two lists. *)
     ("Darklang.Stdlib.List.append", "Darklang.Stdlib.List.appendOne");
+    (* The compiler's names for List.prepend and List.concat. *)
+    ("Darklang.Stdlib.List.prepend", "Darklang.Stdlib.List.push");
+    ("Darklang.Stdlib.List.concat", "Darklang.Stdlib.List.append");
     (* List.repeat answers the List; the compiler's a Result. *)
     ("Darklang.Stdlib.List.repeat", "Darklang.Stdlib.List.repeatUnsafe");
     (* padStart and padEnd pad with a Char to an Int64; the compiler's with a

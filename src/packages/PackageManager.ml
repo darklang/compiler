@@ -600,6 +600,8 @@ let builtinOperator name =
       ("dictFromEntries", "Stdlib.Dict.fromListOverwritingDuplicates");
       ("dictToEntries", "Stdlib.Dict.toList");
       ("listAppend", "Stdlib.List.appendOne");
+      ("listPrepend", "Stdlib.List.push");
+      ("listConcat", "Stdlib.List.append");
       ("bytesConcat", "Stdlib.Blob.concat");
       ("base16Encode", "Stdlib.Blob.toHex");
     ]
