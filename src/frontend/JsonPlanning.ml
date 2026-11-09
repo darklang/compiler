@@ -775,6 +775,7 @@ and serializeBody (env : env) typ value writer (state : state) =
   | AST.TInt128 -> raw "Darklang.Stdlib.Int128.toString"
   | AST.TUInt128 -> raw "Darklang.Stdlib.UInt128.toString"
   | AST.TFloat64 -> raw "Darklang.Stdlib.Json.__serializeFloat"
+  | AST.TSum ("Float32", []) -> raw "Darklang.Stdlib.Json.__serializeFloat32"
   | AST.TString | AST.TChar -> Ok (writerString env writer value, state)
   | AST.TSum ("Uuid", []) ->
       Ok
@@ -1508,6 +1509,7 @@ and decodeBody (env : env) typ source view path (state : state) =
   | AST.TUInt64 -> optional "Darklang.Stdlib.Json.__viewUInt64"
   | AST.TUInt128 -> optional "Darklang.Stdlib.Json.__viewUInt128"
   | AST.TFloat64 -> optional "Darklang.Stdlib.Json.__viewFloat"
+  | AST.TSum ("Float32", []) -> optional "Darklang.Stdlib.Json.__viewFloat32"
   | AST.TSum ("Uuid", []) -> optional "Darklang.Stdlib.Json.__viewUuid"
   | AST.TDateTime -> optional "Darklang.Stdlib.Json.__viewDateTime"
   | AST.TList elemType ->
