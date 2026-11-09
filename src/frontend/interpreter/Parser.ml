@@ -247,7 +247,7 @@ let parseUnchecked source =
    embedded library) read literals as the current interpreter does. *)
 let currentSyntax = ref false
 
-let parseForUnchecked mode source =
+let parseForUnchecked ~adaptStdlib mode source =
   let previous = !Lexer.bareIntegerIsInt64 in
   Lexer.bareIntegerIsInt64 := !currentSyntax && mode <> Validation.Package;
   Fun.protect ~finally:(fun () -> Lexer.bareIntegerIsInt64 := previous)
@@ -260,9 +260,10 @@ let parseForUnchecked mode source =
   let result = parseSyntaxWithRootScope scope source in
   match (result.diagnostics, result.parsed) with
   | [], Some (WT.SourceFile file) -> (
-      (* A script in the interpreter's syntax calls the interpreter's stdlib. *)
+      (* A script in the interpreter's syntax calls the interpreter's stdlib.
+         Rendered package units already convert their own calls. *)
       let file =
-        if !currentSyntax && mode <> Validation.Package then
+        if adaptStdlib && !currentSyntax && mode <> Validation.Package then
           WrittenStdlibAdaptation.sourceFile file
         else file
       in
@@ -291,8 +292,8 @@ let parse source =
   with Stack_overflow ->
     { parsed = None; diagnostics = [ stackExhaustionDiagnostic () ] }
 
-let parseFor mode source =
-  try parseForUnchecked mode source
+let parseFor ?(adaptStdlib = false) mode source =
+  try parseForUnchecked ~adaptStdlib mode source
   with Stack_overflow -> Error [ stackExhaustionDiagnostic () ]
 
 (*
