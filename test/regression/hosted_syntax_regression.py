@@ -210,6 +210,16 @@ ENTITIES["as-hash"] = fn("Hosted.asPatterns", [("x", INT64)], INT64,
              infix("ArithmeticPlus", VAR("a"), VAR("b")),
              infix("ComparisonGreaterThan", VAR("b"), {"EInt64": [13, 5]})),
         case({"MPVariable": [14, "_"]}, {"EInt64": [15, 0]})]]})
+# Equal type declarations share a hash: the server answers the hash with
+# Hosted.First, while this fn names it Hosted.Second.
+SECOND_NAME = dict(originalName=["Hosted", "Second"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["shared-type-hash"]}]},
+    location={"Some": [dict(owner="Hosted", modules=[], name="Second")]})]})
+TYPES["shared-type-hash"] = ("Hosted.First", dict(hash={"Hash": ["shared-type-hash"]}, description="",
+    deprecated={"NotDeprecated": []}, declaration=dict(typeParams=[], definition={"Record": [[
+        dict(name="width", typ=INT64, description="")]]})))
+ENTITIES["second-name-hash"] = fn("Hosted.secondName", [("x", INT64)], INT64,
+    {"ERecordFieldAccess": [1, {"ERecord": [2, SECOND_NAME, [], [["width", ARG0]]]}, "width"]})
 # Builtin.bytesLength answers an Int64; the compiler's Blob.length an Int.
 ENTITIES["bytes-length-hash"] = fn("Hosted.bytesLen", [("b", {"TBytes": []})], INT64,
     builtin("bytesLength", ARG0))
@@ -298,6 +308,7 @@ def main():
             assert run('Hosted.bytesLen (Stdlib.Blob.fromString "abc")\n') == 3
             assert run("Hosted.dictLast 5L\n") == 1
             assert run("Hosted.tagged 7L\n") == 7
+            assert run("Hosted.secondName 4L\n") == 4
             assert [run(f"Hosted.asPatterns {x}L\n") for x in (5, 7, 1)] == [51, 14, 0]
             assert run("Hosted.braces 1L\n") == "a{b}c"
             assert str(run("Hosted.int128Power 2Q\n")) == "8"

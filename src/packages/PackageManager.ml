@@ -1934,7 +1934,61 @@ let resolveNames config resolutionEnv knownTraits names =
             | Error message -> Error message)
           entities
       in
-      Ok (List.filter_map Fun.id rendered))
+      (* Equal type declarations share a hash, so one hash can have several
+         names: ProgramTypes.TypeDeclaration.RecordField and
+         ProgramTypes.PackageFn.Parameter are one record. The entity arrives
+         under one of them; every other name the code uses is declared as an
+         alias of it. *)
+      let declared =
+        List.fold_left
+          (fun names entity -> StringOrder.Set.add entity.location names)
+          StringOrder.Set.empty entities
+      in
+      let aliases =
+        List.concat_map
+          (fun entity ->
+            match dependencyRefs entity.json with Ok refs -> refs | Error _ -> [])
+          entities
+        |> List.filter_map (fun (hash, name) ->
+            match StringOrder.Map.find_opt hash byHash with
+            | Some target
+              when target.kind = PackageType
+                   && (not (StringOrder.Set.mem name declared))
+                   && (not (isKnownName name))
+                   && List.length (String.split_on_char '.' name) > 1 ->
+                Some (name, target)
+            | _ -> None)
+        |> List.sort_uniq (fun (a, _) (b, _) -> String.compare a b)
+      in
+      let* aliasSources =
+        ResultList.mapResults
+          (fun (name, target) ->
+            let parts = String.split_on_char '.' name in
+            let leaf = publicName (List.hd (List.rev parts)) in
+            let moduleName =
+              publicName (String.concat "." (List.rev (List.tl (List.rev parts))))
+            in
+            let* types =
+              match
+                Option.bind (tryField "entity" (parse target.json)) (fun value ->
+                    tryField "declaration" value)
+              with
+              | Some declaration -> (
+                  match tryField "typeParams" declaration with
+                  | Some params -> renderTypeParameters params None
+                  | None -> Ok "")
+              | None -> Ok ""
+            in
+            Ok
+              {
+                name = "package:" ^ name ^ "@" ^ target.hash;
+                source =
+                  "module " ^ moduleName ^ "\ntype " ^ leaf ^ types ^ " = "
+                  ^ publicName target.location ^ types;
+              })
+          aliases
+      in
+      Ok (List.filter_map Fun.id rendered @ aliasSources))
 
 let resolveWritten ?(knownTraits = []) config resolutionEnv units =
   let* names = WrittenSource.qualifiedNames units in
