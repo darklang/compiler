@@ -747,6 +747,92 @@ test stdlibSuggestionFindsTheRealName =
       suggest("Bool.not") |> Stdlib.Test.equal(Stdlib.Option.Option.Some("Stdlib.Bool.not"))
       suggest("Stdlib.Nope.zzz") |> Stdlib.Test.equal(Stdlib.Option.Option.None) ])
 
+// @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Packages.Errors.closestNames'" class=missing-support reason=upstream-dependency
+test closestNamesAreSpelledNear =
+  let branch = Darklang.SCM.Branch.mainBranchId
+  let closest = fun name ->
+    Darklang.Cli.Packages.Errors.closestNames(branch, Stdlib.String.split(name, "."))
+
+  Stdlib.Test.all(
+    [ closest("Stdlib.List.lenght") |> Stdlib.Test.equal([ "Stdlib.List.length" ])
+      closest("Stdlib.String.touppercase")
+      |> Stdlib.Test.equal([ "Stdlib.String.toUppercase" ])
+      Stdlib.List.contains(closest("Stdlib.String.toUpper"), "Stdlib.String.toUppercase")
+      |> Stdlib.Test.equal(true)
+      closest("String.lenght") |> Stdlib.Test.equal([ "Stdlib.String.length" ])
+      closest("Darklang.Stdlib.List.revers")
+      |> Stdlib.Test.equal([ "Darklang.Stdlib.List.reverse" ])
+      closest("Stdlib.List.zzzzzzzz") |> Stdlib.Test.equal([])
+      closest("Stdlib.Nope.zzz") |> Stdlib.Test.equal([])
+      closest("lenght") |> Stdlib.Test.equal([]) ])
+
+
+// A function name for an operator points at the operator, when the type has it.
+// @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Packages.Errors.operatorSuggestion'" class=missing-support reason=upstream-dependency
+test operatorNamesSuggestTheOperator =
+  let branch = Darklang.SCM.Branch.mainBranchId
+  let suggest = fun name ->
+    Darklang.Cli.Packages.Errors.operatorSuggestion(branch, Stdlib.String.split(name, "."))
+
+  Stdlib.Test.all(
+    [ suggest("Stdlib.Int64.mod") |> Stdlib.Test.equal(Stdlib.Option.Option.Some("a % b"))
+      suggest("Int64.modulo") |> Stdlib.Test.equal(Stdlib.Option.Option.Some("a % b"))
+      suggest("Stdlib.Float.pow") |> Stdlib.Test.equal(Stdlib.Option.Option.Some("a ** b"))
+      suggest("Stdlib.String.mod") |> Stdlib.Test.equal(Stdlib.Option.Option.None)
+      suggest("Stdlib.Int64.zzz") |> Stdlib.Test.equal(Stdlib.Option.Option.None)
+      suggest("mod") |> Stdlib.Test.equal(Stdlib.Option.Option.None) ])
+
+
+// `Stdlib.Int64.mod` said only "not found", and searching for it never showed `%`.
+// @compiler xfail compile: "Operator is unavailable for this type" class=missing-support reason=compiler-gap
+test int64ModSuggestsPercent =
+  let evaluated = evalOutcome("Stdlib.Int64.mod(7, 3)")
+  let searched = runWithBothStreams([ "search", "Int64.mod", "--fn" ])
+
+  if
+    evaluated.exitCode != 0
+    && Stdlib.String.contains(evaluated.stderr, "Did you mean `a % b`?")
+    && Stdlib.String.contains(searched, "Int64.mod is the operator: a % b")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail($"Expected `a % b`; eval={evaluated.stderr}; search={searched}")
+
+
+test didYouMeanText =
+  let text = Darklang.Cli.Packages.Errors.didYouMeanText
+
+  Stdlib.Test.all(
+    [ text([]) |> Stdlib.Test.equal("")
+      text([ "A.a" ]) |> Stdlib.Test.equal("Did you mean `A.a`?")
+      text([ "A.a", "A.b", "A.c" ]) |> Stdlib.Test.equal("Did you mean `A.a`, `A.b` or `A.c`?") ])
+
+
+// A misspelt name gets the names spelled near it, on eval and on save.
+// @compiler xfail compile: "Operator is unavailable for this type" class=missing-support reason=compiler-gap
+test notFoundSuggestsNamesSpelledNear =
+  let evaluated = evalOutcome("Stdlib.List.lenght([1])")
+  let branchName = "cli-did-you-mean-test-" + Stdlib.toString(Stdlib.Int64.random(100000, 999999))
+  let _ = runWithCommand([ "branch", "create", branchName ])
+  let saved =
+    runWithBothStreams(
+      [ "--branch"
+        branchName
+        "fn"
+        "/Tests.CliDidYouMean.size"
+        "(xs: List<Int64>) : Int64 = Stdlib.List.lenght(xs)" ])
+  let _ = runWithCommand([ "branch", "archive", branchName, "-y" ])
+
+  if
+    evaluated.exitCode != 0
+    && Stdlib.String.contains(evaluated.stderr, "Did you mean `Stdlib.List.length`?")
+    && Stdlib.String.contains(saved, "Did you mean `Stdlib.List.length`?")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail($"Expected a near name; eval={evaluated.stderr}; save={saved}")
+
+
 // #6024: an impl's methods are called through its trait, never at the type's module, so
 // `view` and `search` say where: the `Stdlib.toString` shortcut beside `ToString`, and the
 // trait's own path for one without a shortcut.
@@ -759,7 +845,8 @@ test implListingsSayWhereTheMethodsAreCalled =
     Stdlib.String.contains(viewed, "Stdlib.toString")
     && Stdlib.String.contains(viewed, "Stdlib.Add.add")
     && Stdlib.Bool.not(Stdlib.String.contains(viewed, "Stdlib.Int64.toString"))
-    && Stdlib.String.contains(searched, "impl ToString for Int64; call Stdlib.toString")
+    && Stdlib.String.contains(searched, "Stdlib.toString(v)")
+    && Stdlib.String.contains(searched, "impl ToString for Int64")
   then
     Stdlib.Test.Result.Pass
   else

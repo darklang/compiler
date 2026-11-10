@@ -273,17 +273,18 @@ module ExecutionError =
     | Unhandled(Unhandled)
 
   /// `. Did you mean `X`?` for a name that did not resolve, when the standard library has it
-  /// somewhere else; the same hint `dark fn` gives (<fn Packages.Errors.stdlibSuggestion>).
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ExecutionError.nameSuggestion: Unknown function or value 'Packages.Errors.stdlibSuggestion'"
+  /// somewhere else or a name near it exists; the same hint `dark fn` gives
+  /// (<fn Packages.Errors.didYouMean>).
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ExecutionError.nameSuggestion: Unknown function or value 'Packages.Errors.didYouMean'"
   let nameSuggestion(
     branchId: Uuid,
     rte: LanguageTools.RuntimeTypes.RuntimeError.Error)
     : String =
     match rte with
     | ParseTimeNameResolution(originalName, NotFound) ->
-      match Packages.Errors.stdlibSuggestion(branchId, originalName) with
-      | Some(name) -> $". Did you mean `{name}`?"
-      | None -> ""
+      match Packages.Errors.didYouMeanText(Packages.Errors.didYouMean(branchId, originalName)) with
+      | "" -> ""
+      | text -> ". " + text
     | _ -> ""
 
   // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError'"
@@ -328,7 +329,10 @@ module ExecutionError =
       | Denied(_) -> frames != []
       | _ -> hasReadableFrames(frames)
     if show then
-      let rendered = PrettyPrinter.RuntimeTypes.callStack(branchId, frames)
+      let rendered =
+        match error with
+        | Denied(_) -> deniedCallStack(branchId, frames)
+        | _ -> PrettyPrinter.RuntimeTypes.callStack(branchId, frames)
       let gap =
         match error with
         | Denied(_) -> ""
@@ -336,6 +340,36 @@ module ExecutionError =
       Stdlib.printErrorLine($"Error when executing {what}. Call-stack:\n{rendered}{gap}")
     else
       ()
+
+  /// A denial's call stack down to the first bundled Darklang function it went through. The
+  /// calls inside that function are how it reaches the resource, and the denial already names
+  /// the resource, so they are counted rather than listed.
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ExecutionError.deniedCallStack: Unknown function or value 'PrettyPrinter.RuntimeTypes.executionPoint'"
+  let deniedCallStack(
+    branchId: Uuid,
+    frames: List<LanguageTools.RuntimeTypes.ExecutionPoint>)
+    : String =
+    let isBundled = fun frame ->
+      let shown = PrettyPrinter.RuntimeTypes.executionPoint(branchId, frame)
+      Stdlib.String.startsWith(shown, "Package Function Darklang.")
+      || Stdlib.String.startsWith(shown, "Lambda in Darklang.")
+      || Stdlib.String.startsWith(shown, "Builtin Function ")
+      || Stdlib.String.startsWith(shown, "Trait Method ")
+
+    let inside =
+      frames
+      |> Stdlib.List.reverse
+      |> Stdlib.List.takeWhile(isBundled)
+      |> Stdlib.List.length
+    let kept = Stdlib.List.length(frames) - inside + 1
+
+    if inside < 2 then
+      PrettyPrinter.RuntimeTypes.callStack(branchId, frames)
+    else
+      let hidden = inside - 1
+      let calls = if hidden == 1 then "call" else "calls"
+      PrettyPrinter.RuntimeTypes.callStack(branchId, Stdlib.List.take(frames, kept))
+      + $"\n  ({Stdlib.toString(hidden)} {calls} inside it)"
 
 
 module View =

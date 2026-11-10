@@ -27,7 +27,6 @@ let roundTrip(s: String): Stdlib.Result.Result<String, Stdlib.Url.ParseError> =
 
 
 // The example from darklang/dark#2792, every part at once.
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test parseEveryPart =
   Stdlib.Url.parse(
     "https://user:pw@Example.com:8080/foo/bar?arg1=some_val&arg2=other_val#somehash")
@@ -42,7 +41,6 @@ test parseEveryPart =
           query = Some("arg1=some_val&arg2=other_val")
           fragment = Some("somehash") }))
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test parseMinimal =
   Stdlib.Url.parse("http://example.com")
   |> Stdlib.Test.equal(
@@ -57,7 +55,6 @@ test parseMinimal =
           fragment = None }))
 
 // No `//`, so no authority: host is None, and the rest is path.
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test parseWithoutAuthority =
   Stdlib.Test.all(
     [ Stdlib.Url.parse("mailto:someone@example.com")
@@ -83,7 +80,6 @@ test parseWithoutAuthority =
       |> Stdlib.Result.map(fun u -> (u.scheme, u.host, u.path))
       |> Stdlib.Test.equal(Ok((Some("localhost"), None, "8080"))) ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test scheme =
   Stdlib.Test.all(
     [ Stdlib.Url.parse("HTTPS://x")
@@ -104,7 +100,6 @@ test scheme =
       Stdlib.Url.parse("htt_p://x")
       |> Stdlib.Test.equal(Error(Stdlib.Url.ParseError.InvalidScheme("htt_p"))) ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test userinfo =
   Stdlib.Test.all(
     [ Stdlib.Url.parse("ftp://anonymous@ftp.example.com/")
@@ -132,7 +127,6 @@ test userinfo =
       |> Stdlib.Test.equal(
         Error(Stdlib.Url.ParseError.InvalidCharacter("userinfo", " "))) ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test hostName =
   Stdlib.Test.all(
     [ hostOf("http://Example.COM/") |> Stdlib.Test.equal(Ok(Some("example.com")))
@@ -163,7 +157,6 @@ test hostName =
       |> Stdlib.Test.equal(
         Error(Stdlib.Url.ParseError.InvalidCharacter("host", ":"))) ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test hostEmpty =
   Stdlib.Test.all(
     [ hostOf("http:///path") |> Stdlib.Test.equal(Ok(Some("")))
@@ -174,7 +167,6 @@ test hostEmpty =
       hostOf("http://user@/")
       |> Stdlib.Test.equal(Error(Stdlib.Url.ParseError.InvalidHost(""))) ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test hostIPv4 =
   Stdlib.Test.all(
     [ hostOf("http://127.0.0.1/") |> Stdlib.Test.equal(Ok(Some("127.0.0.1")))
@@ -197,7 +189,6 @@ test hostIPv4 =
       // Letters in it make it a name, which may look like an address.
       hostOf("http://1.2.3.x/") |> Stdlib.Test.equal(Ok(Some("1.2.3.x"))) ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test hostIPv6 =
   Stdlib.Test.all(
     [ hostOf("http://[::1]/") |> Stdlib.Test.equal(Ok(Some("::1")))
@@ -255,7 +246,6 @@ test hostIPv6 =
       |> Stdlib.Test.equal(
         Error(Stdlib.Url.ParseError.InvalidCharacter("host", ":"))) ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test port =
   Stdlib.Test.all(
     [ portOf("http://x:8080/") |> Stdlib.Test.equal(Ok(Some(8080)))
@@ -280,7 +270,6 @@ test port =
       portOf("http://[::1]:x/")
       |> Stdlib.Test.equal(Error(Stdlib.Url.ParseError.InvalidPort("x"))) ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test pathPart =
   Stdlib.Test.all(
     [ pathOf("http://x") |> Stdlib.Test.equal(Ok(""))
@@ -312,7 +301,6 @@ test pathPart =
       |> Stdlib.Test.equal(
         Error(Stdlib.Url.ParseError.InvalidCharacter("path", "\\"))) ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test queryPart =
   Stdlib.Test.all(
     [ Stdlib.Url.parse("http://x/?a=1&b=2")
@@ -339,7 +327,6 @@ test queryPart =
       |> Stdlib.Test.equal(
         Error(Stdlib.Url.ParseError.InvalidCharacter("query", " "))) ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test fragmentPart =
   Stdlib.Test.all(
     [ Stdlib.Url.parse("http://x/#top")
@@ -359,7 +346,6 @@ test fragmentPart =
       |> Stdlib.Test.equal(
         Error(Stdlib.Url.ParseError.InvalidCharacter("fragment", "#"))) ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test percentEncodingInParse =
   Stdlib.Test.all(
     [ pathOf("http://x/%7euser") |> Stdlib.Test.equal(Ok("/%7euser"))
@@ -390,7 +376,6 @@ test percentEncodingInParse =
       |> Stdlib.Test.equal(
         Error(Stdlib.Url.ParseError.InvalidPercentEncoding("host"))) ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test invalidInputs =
   Stdlib.Test.all(
     [ Stdlib.Url.parse("") |> Stdlib.Test.equal(Error(Stdlib.Url.ParseError.MissingScheme))
@@ -433,7 +418,6 @@ test errorMessages =
         "The query has a '%' that is not followed by two hex digits") ])
 
 // toString(parse(s)) == s for anything already in normal form.
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test roundTripExact =
   [ "https://example.com"
     "https://example.com/"
@@ -462,7 +446,6 @@ test roundTripExact =
 
 // Parsing normalizes the scheme, the host and an empty port, and what comes back
 // parses to the same record: parse(toString(u)) == Ok u.
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test roundTripNormalizes =
   Stdlib.Test.all(
     [ roundTrip("HTTP://Example.COM/A?B#C")
@@ -577,7 +560,6 @@ test percentEncode =
 let refRoundTrip(s: String): Stdlib.Result.Result<String, Stdlib.Url.ParseError> =
   Stdlib.Url.parseReference(s) |> Stdlib.Result.map(fun u -> Stdlib.Url.toString(u))
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test parseReference =
   Stdlib.Test.all(
     [ Stdlib.Url.parseReference("../a/b?q#f")
@@ -617,7 +599,6 @@ test parseReference =
       |> Stdlib.List.map(fun s -> refRoundTrip(s) |> Stdlib.Test.equal(Ok(s)))
       |> Stdlib.Test.all ])
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test parseLenient =
   Stdlib.Test.all(
     [ Stdlib.Url.parseLenient("http://x/a b|[c]?k[]=1 2&v=100%#é")
@@ -653,7 +634,6 @@ test removeDotSegments =
       Stdlib.Url.removeDotSegments(input) |> Stdlib.Test.equal(expected)))
 
 // Every example in RFC 3986 section 5.4, normal and abnormal.
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test resolve =
   let base = Stdlib.Url.parse("http://a/b/c/d;p?q")
 
@@ -709,7 +689,7 @@ test resolve =
     |> Stdlib.Test.equal(Ok(expected)))
   |> Stdlib.Test.all
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
+// @compiler blocked: compiler-crash diagnostic="runtime exit code 139 (SIGSEGV)"
 test resolveAgainstEmptyPath =
   Stdlib.Test.all(
     [ (Stdlib.Url.parse("http://a"), "g", "http://a/g")
@@ -813,7 +793,6 @@ test withQueryParams =
 // RFC 3986 sections 4.2 and 5.3: with no host, a resolved path starting `//`
 // gets a `/.` in front, or it would read back as a host. Cases from WHATWG's
 // urltestdata.json, which serializes the same way.
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test resolveGuardsPath =
   [ ("non-spec:/p", "/..//path", "non-spec:/.//path")
     ("non-spec:/p", "..//path", "non-spec:/.//path")
@@ -869,7 +848,6 @@ test pathSegments =
 // elm/url has no test suite of its own; its cases live in the doc examples of
 // Url, Url.Builder, Url.Parser and Url.Parser.Query. Every one that applies is
 // here, with OUR expected value; a comment marks each deliberate difference.
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test elmUrlFromString =
   Stdlib.Test.all(
     [ // Elm gives path "/" here; we keep "" so toString gives the string back.
@@ -987,7 +965,6 @@ test elmUrlQuery =
 // A curated set from WHATWG's urltestdata.json (web-platform-tests): the cases
 // whose answer RFC 3986 agrees on. Browser-only rules (backslashes, special
 // schemes, IPv4 in hex or octal, IDNA) are left out.
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test whatwgFailures =
   [ "http://[1::2]:3:4"
     "http://[::127.0.0.1.]"
@@ -1027,7 +1004,6 @@ test whatwgFailures =
     Stdlib.Url.parse(s) |> Stdlib.Result.isError |> Stdlib.Test.equal(true))
   |> Stdlib.Test.all
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test whatwgRoundTrip =
   [ "telnet://user:pass@foobar.com:23/"
     "ut2004://10.10.10.10:7777/Index.ut2"
@@ -1058,7 +1034,6 @@ test whatwgRoundTrip =
 
 // WHATWG accepts these; RFC 3986 does not (a `%` must start an escape), and
 // neither do we. parseLenient takes them.
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test whatwgStricter =
   [ ("sc://%/", Stdlib.Url.ParseError.InvalidPercentEncoding("host"))
     ("wow:%NBD", Stdlib.Url.ParseError.InvalidPercentEncoding("path")) ]
@@ -1067,7 +1042,6 @@ test whatwgStricter =
     Stdlib.Url.parse(input) |> Stdlib.Test.equal(Error(expected)))
   |> Stdlib.Test.all
 
-// @compiler xfail compile: "x86-64 code generation error: CanonicalBufferEq requires StringSymbol or Reg operands" class=missing-support reason=compiler-gap
 test whatwgResolve =
   [ ("sc:/pa/pa", "i", "sc:/pa/i")
     ("sc://ho/pa", "i", "sc://ho/i")

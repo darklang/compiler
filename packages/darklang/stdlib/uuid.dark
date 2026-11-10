@@ -234,6 +234,34 @@ let toString (uuid: Uuid) : String =
         Stdlib.String.__byteSlice hex 12L 16L + "-" + Stdlib.String.__byteSlice hex 16L 20L + "-" +
         Stdlib.String.__byteSlice hex 20L 32L
 
+// The UUID whose upper and lower 64 bits are high and low.
+let __fromWords (high: Int64) (low: Int64) : Uuid =
+    // Format: 8-4-4-4-12 hex chars
+    // bytes 0-3 (bits 32-63 of high)
+    let text = Stdlib.Uuid.__byteToHex high 56L +
+    Stdlib.Uuid.__byteToHex high 48L +
+    Stdlib.Uuid.__byteToHex high 40L +
+    Stdlib.Uuid.__byteToHex high 32L + "-" +
+    // bytes 4-5 (bits 16-31 of high)
+    Stdlib.Uuid.__byteToHex high 24L +
+    Stdlib.Uuid.__byteToHex high 16L + "-" +
+    // bytes 6-7 (bits 0-15 of high) - contains version
+    Stdlib.Uuid.__byteToHex high 8L +
+    Stdlib.Uuid.__byteToHex high 0L + "-" +
+    // bytes 8-9 (bits 48-63 of low) - contains variant
+    Stdlib.Uuid.__byteToHex low 56L +
+    Stdlib.Uuid.__byteToHex low 48L + "-" +
+    // bytes 10-15 (bits 0-47 of low)
+    Stdlib.Uuid.__byteToHex low 40L +
+    Stdlib.Uuid.__byteToHex low 32L +
+    Stdlib.Uuid.__byteToHex low 24L +
+    Stdlib.Uuid.__byteToHex low 16L +
+    Stdlib.Uuid.__byteToHex low 8L +
+    Stdlib.Uuid.__byteToHex low 0L in
+    match Stdlib.Uuid.parse text with
+    | Ok uuid -> uuid
+    | Error _ -> Builtin.crash "Generated UUID was not canonical"
+
 // Generate UUID v4: xxxxxxxx-xxxx-4xxx-Nxxx-xxxxxxxxxxxx
 // where N is 8, 9, a, or b (variant bits)
 let generate () : Uuid =
@@ -248,30 +276,16 @@ let generate () : Uuid =
     // Mask 4611686018427387903 = 0x3FFFFFFFFFFFFFFF (clears top 2 bits)
     // Variant -9223372036854775808 = 0x8000000000000000 (sets top bit)
     let lowWithVariant = Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseAnd low 4611686018427387903L) (-9223372036854775808L) in
-    // Format: 8-4-4-4-12 hex chars
-    // bytes 0-3 (bits 32-63 of high)
-    let text = Stdlib.Uuid.__byteToHex highWithVersion 56L +
-    Stdlib.Uuid.__byteToHex highWithVersion 48L +
-    Stdlib.Uuid.__byteToHex highWithVersion 40L +
-    Stdlib.Uuid.__byteToHex highWithVersion 32L + "-" +
-    // bytes 4-5 (bits 16-31 of high)
-    Stdlib.Uuid.__byteToHex highWithVersion 24L +
-    Stdlib.Uuid.__byteToHex highWithVersion 16L + "-" +
-    // bytes 6-7 (bits 0-15 of high) - contains version
-    Stdlib.Uuid.__byteToHex highWithVersion 8L +
-    Stdlib.Uuid.__byteToHex highWithVersion 0L + "-" +
-    // bytes 8-9 (bits 48-63 of low) - contains variant
-    Stdlib.Uuid.__byteToHex lowWithVariant 56L +
-    Stdlib.Uuid.__byteToHex lowWithVariant 48L + "-" +
-    // bytes 10-15 (bits 0-47 of low)
-    Stdlib.Uuid.__byteToHex lowWithVariant 40L +
-    Stdlib.Uuid.__byteToHex lowWithVariant 32L +
-    Stdlib.Uuid.__byteToHex lowWithVariant 24L +
-    Stdlib.Uuid.__byteToHex lowWithVariant 16L +
-    Stdlib.Uuid.__byteToHex lowWithVariant 8L +
-    Stdlib.Uuid.__byteToHex lowWithVariant 0L in
-    match Stdlib.Uuid.parse text with
-    | Ok uuid -> uuid
-    | Error _ -> Builtin.crash "Generated UUID was not canonical"
+    Stdlib.Uuid.__fromWords highWithVersion lowWithVariant
+
+// Generate UUID v7 (RFC 9562): the Unix time in milliseconds in the top 48
+// bits, version 7, then random bits below the variant.
+let generateV7 () : Uuid =
+    let milliseconds = Stdlib.DateTime.__floorDiv (Stdlib.DateTime.__ticks (Stdlib.DateTime.now ())) (Stdlib.DateTime.__ticksPerMillisecond ()) in
+    // 28672 = 0x7000, version 7 above 12 random bits
+    let high = Stdlib.Int64.bitwiseXor (Stdlib.Int64.shiftLeft milliseconds 16L) (Stdlib.Int64.bitwiseXor 28672L (Stdlib.Int64.random 0L 4095L)) in
+    let low = Stdlib.Int64.random (-9223372036854775808L) 9223372036854775807L in
+    let lowWithVariant = Stdlib.Int64.bitwiseXor (Stdlib.Int64.bitwiseAnd low 4611686018427387903L) (-9223372036854775808L) in
+    Stdlib.Uuid.__fromWords high lowWithVariant
 
 // =============================================================================

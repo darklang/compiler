@@ -403,12 +403,6 @@ files:
     intToUInt64_v0: unassessed
     intToUInt8_v0: unassessed
   Builtins.Pure/Libs/Int128.fs:
-    int128Add_v0: unassessed
-    int128BitwiseAnd_v0: unassessed
-    int128BitwiseNot_v0: unassessed
-    int128BitwiseOr_v0: unassessed
-    int128BitwiseXor_v0: unassessed
-    int128Divide_v0: unassessed
     int128FromInt16_v0: unassessed
     int128FromInt32_v0: unassessed
     int128FromInt64_v0: unassessed
@@ -417,29 +411,12 @@ files:
     int128FromUInt32_v0: unassessed
     int128FromUInt64_v0: unassessed
     int128FromUInt8_v0: unassessed
-    int128GreaterThan_v0: unassessed
-    int128GreaterThanOrEqualTo_v0: unassessed
-    int128LessThan_v0: unassessed
-    int128LessThanOrEqualTo_v0: unassessed
-    int128Mod_v0: unassessed
-    int128Multiply_v0: unassessed
-    int128Negate_v0: unassessed
     int128Parse_v0: unassessed
-    int128Power_v0: unassessed
     int128Remainder_v0: unassessed
-    int128ShiftLeft_v0: unassessed
-    int128ShiftRight_v0: unassessed
     int128Sqrt_v0: unassessed
-    int128Subtract_v0: unassessed
     int128ToFloat_v0: unassessed
     int128ToString_v0: unassessed
   Builtins.Pure/Libs/Int16.fs:
-    int16Add_v0: unassessed
-    int16BitwiseAnd_v0: unassessed
-    int16BitwiseNot_v0: unassessed
-    int16BitwiseOr_v0: unassessed
-    int16BitwiseXor_v0: unassessed
-    int16Divide_v0: unassessed
     int16FromInt128_v0: unassessed
     int16FromInt32_v0: unassessed
     int16FromInt64_v0: unassessed
@@ -449,29 +426,12 @@ files:
     int16FromUInt32_v0: unassessed
     int16FromUInt64_v0: unassessed
     int16FromUInt8_v0: unassessed
-    int16GreaterThan_v0: unassessed
-    int16GreaterThanOrEqualTo_v0: unassessed
-    int16LessThan_v0: unassessed
-    int16LessThanOrEqualTo_v0: unassessed
-    int16Mod_v0: unassessed
-    int16Multiply_v0: unassessed
-    int16Negate_v0: unassessed
     int16Parse_v0: unassessed
-    int16Power_v0: unassessed
     int16Remainder_v0: unassessed
-    int16ShiftLeft_v0: unassessed
-    int16ShiftRight_v0: unassessed
     int16Sqrt_v0: unassessed
-    int16Subtract_v0: unassessed
     int16ToFloat_v0: unassessed
     int16ToString_v0: unassessed
   Builtins.Pure/Libs/Int32.fs:
-    int32Add_v0: unassessed
-    int32BitwiseAnd_v0: unassessed
-    int32BitwiseNot_v0: unassessed
-    int32BitwiseOr_v0: unassessed
-    int32BitwiseXor_v0: unassessed
-    int32Divide_v0: unassessed
     int32FromInt128_v0: unassessed
     int32FromInt16_v0: unassessed
     int32FromInt64_v0: unassessed
@@ -481,29 +441,12 @@ files:
     int32FromUInt32_v0: unassessed
     int32FromUInt64_v0: unassessed
     int32FromUInt8_v0: unassessed
-    int32GreaterThan_v0: unassessed
-    int32GreaterThanOrEqualTo_v0: unassessed
-    int32LessThan_v0: unassessed
-    int32LessThanOrEqualTo_v0: unassessed
-    int32Mod_v0: unassessed
-    int32Multiply_v0: unassessed
-    int32Negate_v0: unassessed
     int32Parse_v0: unassessed
-    int32Power_v0: unassessed
     int32Remainder_v0: unassessed
-    int32ShiftLeft_v0: unassessed
-    int32ShiftRight_v0: unassessed
     int32Sqrt_v0: unassessed
-    int32Subtract_v0: unassessed
     int32ToFloat_v0: unassessed
     int32ToString_v0: unassessed
   Builtins.Pure/Libs/Int64.fs:
-    int64Add_v0: unassessed
-    int64BitwiseAnd_v0: unassessed
-    int64BitwiseNot_v0: unassessed
-    int64BitwiseOr_v0: unassessed
-    int64BitwiseXor_v0: unassessed
-    int64Divide_v0: unassessed
     int64FromInt128_v0: unassessed
     int64FromInt16_v0: unassessed
     int64FromInt32_v0: unassessed
@@ -513,29 +456,12 @@ files:
     int64FromUInt32_v0: unassessed
     int64FromUInt64_v0: unassessed
     int64FromUInt8_v0: unassessed
-    int64GreaterThan_v0: unassessed
-    int64GreaterThanOrEqualTo_v0: unassessed
-    int64LessThan_v0: unassessed
-    int64LessThanOrEqualTo_v0: unassessed
-    int64Mod_v0: unassessed
-    int64Multiply_v0: unassessed
-    int64Negate_v0: unassessed
     int64Parse_v0: unassessed
-    int64Power_v0: unassessed
     int64Remainder_v0: unassessed
-    int64ShiftLeft_v0: unassessed
-    int64ShiftRight_v0: unassessed
     int64Sqrt_v0: unassessed
-    int64Subtract_v0: unassessed
     int64ToFloat_v0: unassessed
     int64ToString_v0: unassessed
   Builtins.Pure/Libs/Int8.fs:
-    int8Add_v0: unassessed
-    int8BitwiseAnd_v0: unassessed
-    int8BitwiseNot_v0: unassessed
-    int8BitwiseOr_v0: unassessed
-    int8BitwiseXor_v0: unassessed
-    int8Divide_v0: unassessed
     int8FromInt128_v0: unassessed
     int8FromInt16_v0: unassessed
     int8FromInt32_v0: unassessed
@@ -545,20 +471,9 @@ files:
     int8FromUInt32_v0: unassessed
     int8FromUInt64_v0: unassessed
     int8FromUInt8_v0: unassessed
-    int8GreaterThan_v0: unassessed
-    int8GreaterThanOrEqualTo_v0: unassessed
-    int8LessThan_v0: unassessed
-    int8LessThanOrEqualTo_v0: unassessed
-    int8Mod_v0: unassessed
-    int8Multiply_v0: unassessed
-    int8Negate_v0: unassessed
     int8Parse_v0: unassessed
-    int8Power_v0: unassessed
     int8Remainder_v0: unassessed
-    int8ShiftLeft_v0: unassessed
-    int8ShiftRight_v0: unassessed
     int8Sqrt_v0: unassessed
-    int8Subtract_v0: unassessed
     int8ToFloat_v0: unassessed
     int8ToString_v0: unassessed
   Builtins.Pure/Libs/Json.fs:
@@ -672,37 +587,15 @@ files:
     stringTrimEnd_v0: unassessed
     stringTrimStart_v0: unassessed
   Builtins.Pure/Libs/UInt128.fs:
-    uint128Add_v0: unassessed
-    uint128BitwiseAnd_v0: unassessed
-    uint128BitwiseNot_v0: unassessed
-    uint128BitwiseOr_v0: unassessed
-    uint128BitwiseXor_v0: unassessed
-    uint128Divide_v0: unassessed
     uint128FromUInt16_v0: unassessed
     uint128FromUInt32_v0: unassessed
     uint128FromUInt64_v0: unassessed
     uint128FromUInt8_v0: unassessed
-    uint128GreaterThan_v0: unassessed
-    uint128GreaterThanOrEqualTo_v0: unassessed
-    uint128LessThan_v0: unassessed
-    uint128LessThanOrEqualTo_v0: unassessed
-    uint128Mod_v0: unassessed
-    uint128Multiply_v0: unassessed
     uint128Parse_v0: unassessed
-    uint128Power_v0: unassessed
-    uint128ShiftLeft_v0: unassessed
-    uint128ShiftRight_v0: unassessed
     uint128Sqrt_v0: unassessed
-    uint128Subtract_v0: unassessed
     uint128ToFloat_v0: unassessed
     uint128ToString_v0: unassessed
   Builtins.Pure/Libs/UInt16.fs:
-    uint16Add_v0: unassessed
-    uint16BitwiseAnd_v0: unassessed
-    uint16BitwiseNot_v0: unassessed
-    uint16BitwiseOr_v0: unassessed
-    uint16BitwiseXor_v0: unassessed
-    uint16Divide_v0: unassessed
     uint16FromInt128_v0: unassessed
     uint16FromInt16_v0: unassessed
     uint16FromInt32_v0: unassessed
@@ -712,27 +605,11 @@ files:
     uint16FromUInt32_v0: unassessed
     uint16FromUInt64_v0: unassessed
     uint16FromUInt8_v0: unassessed
-    uint16GreaterThan_v0: unassessed
-    uint16GreaterThanOrEqualTo_v0: unassessed
-    uint16LessThan_v0: unassessed
-    uint16LessThanOrEqualTo_v0: unassessed
-    uint16Mod_v0: unassessed
-    uint16Multiply_v0: unassessed
     uint16Parse_v0: unassessed
-    uint16Power_v0: unassessed
-    uint16ShiftLeft_v0: unassessed
-    uint16ShiftRight_v0: unassessed
     uint16Sqrt_v0: unassessed
-    uint16Subtract_v0: unassessed
     uint16ToFloat_v0: unassessed
     uint16ToString_v0: unassessed
   Builtins.Pure/Libs/UInt32.fs:
-    uint32Add_v0: unassessed
-    uint32BitwiseAnd_v0: unassessed
-    uint32BitwiseNot_v0: unassessed
-    uint32BitwiseOr_v0: unassessed
-    uint32BitwiseXor_v0: unassessed
-    uint32Divide_v0: unassessed
     uint32FromInt128_v0: unassessed
     uint32FromInt16_v0: unassessed
     uint32FromInt32_v0: unassessed
@@ -742,27 +619,11 @@ files:
     uint32FromUInt16_v0: unassessed
     uint32FromUInt64_v0: unassessed
     uint32FromUInt8_v0: unassessed
-    uint32GreaterThan_v0: unassessed
-    uint32GreaterThanOrEqualTo_v0: unassessed
-    uint32LessThan_v0: unassessed
-    uint32LessThanOrEqualTo_v0: unassessed
-    uint32Mod_v0: unassessed
-    uint32Multiply_v0: unassessed
     uint32Parse_v0: unassessed
-    uint32Power_v0: unassessed
-    uint32ShiftLeft_v0: unassessed
-    uint32ShiftRight_v0: unassessed
     uint32Sqrt_v0: unassessed
-    uint32Subtract_v0: unassessed
     uint32ToFloat_v0: unassessed
     uint32ToString_v0: unassessed
   Builtins.Pure/Libs/UInt64.fs:
-    uint64Add_v0: unassessed
-    uint64BitwiseAnd_v0: unassessed
-    uint64BitwiseNot_v0: unassessed
-    uint64BitwiseOr_v0: unassessed
-    uint64BitwiseXor_v0: unassessed
-    uint64Divide_v0: unassessed
     uint64FromInt128_v0: unassessed
     uint64FromInt16_v0: unassessed
     uint64FromInt32_v0: unassessed
@@ -772,27 +633,11 @@ files:
     uint64FromUInt16_v0: unassessed
     uint64FromUInt32_v0: unassessed
     uint64FromUInt8_v0: unassessed
-    uint64GreaterThan_v0: unassessed
-    uint64GreaterThanOrEqualTo_v0: present
-    uint64LessThan_v0: unassessed
-    uint64LessThanOrEqualTo_v0: present
-    uint64Mod_v0: unassessed
-    uint64Multiply_v0: unassessed
     uint64Parse_v0: unassessed
-    uint64Power_v0: unassessed
-    uint64ShiftLeft_v0: unassessed
-    uint64ShiftRight_v0: unassessed
     uint64Sqrt_v0: unassessed
-    uint64Subtract_v0: unassessed
     uint64ToFloat_v0: unassessed
     uint64ToString_v0: unassessed
   Builtins.Pure/Libs/UInt8.fs:
-    uint8Add_v0: unassessed
-    uint8BitwiseAnd_v0: unassessed
-    uint8BitwiseNot_v0: unassessed
-    uint8BitwiseOr_v0: unassessed
-    uint8BitwiseXor_v0: unassessed
-    uint8Divide_v0: unassessed
     uint8FromInt128_v0: unassessed
     uint8FromInt16_v0: unassessed
     uint8FromInt32_v0: unassessed
@@ -802,18 +647,8 @@ files:
     uint8FromUInt16_v0: unassessed
     uint8FromUInt32_v0: unassessed
     uint8FromUInt64_v0: unassessed
-    uint8GreaterThan_v0: unassessed
-    uint8GreaterThanOrEqualTo_v0: unassessed
-    uint8LessThan_v0: unassessed
-    uint8LessThanOrEqualTo_v0: unassessed
-    uint8Mod_v0: unassessed
-    uint8Multiply_v0: unassessed
     uint8Parse_v0: unassessed
-    uint8Power_v0: unassessed
-    uint8ShiftLeft_v0: unassessed
-    uint8ShiftRight_v0: unassessed
     uint8Sqrt_v0: unassessed
-    uint8Subtract_v0: unassessed
     uint8ToFloat_v0: unassessed
     uint8ToString_v0: unassessed
   Builtins.Pure/Libs/Uuid.fs:

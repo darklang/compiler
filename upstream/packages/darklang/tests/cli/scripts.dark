@@ -76,6 +76,25 @@ module CallStack =
     |> Stdlib.Test.equal(
       "Call stack (last call at bottom):\n- Source\n- Builtin Function bigIntDivide (×2)\n- Source")
 
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Scripts.CallStack.denied: Unknown function or value 'Darklang.Cli.ExecutionError.deniedCallStack'"
+  let denied(
+    frames: List<Darklang.LanguageTools.RuntimeTypes.ExecutionPoint>)
+    : String =
+    Darklang.Cli.ExecutionError.deniedCallStack(Darklang.SCM.Branch.mainBranchId, frames)
+
+  // A denial lists the caller's frames and the first bundled function, and counts the rest.
+  // @compiler xfail compile: "Unknown function or value 'denied'" class=missing-support reason=upstream-dependency
+  test deniedStackStopsAtTheFirstBundledFunction =
+    denied([ source(), builtin(), builtin(), builtin() ])
+    |> Stdlib.Test.equal(
+      "Call stack (last call at bottom):\n- Source\n- Builtin Function bigIntDivide\n  (2 calls inside it)")
+
+  // @compiler xfail compile: "Unknown function or value 'denied'" class=missing-support reason=upstream-dependency
+  test deniedStackWithOneBundledFrameIsWhole =
+    denied([ source(), builtin() ])
+    |> Stdlib.Test.equal(
+      "Call stack (last call at bottom):\n- Source\n- Builtin Function bigIntDivide")
+
   // @compiler xfail compile: "Unknown function or value 'Darklang.PrettyPrinter.RuntimeTypes.executionPoint'" class=missing-support reason=upstream-dependency
   test lambdaLabel =
     Darklang.PrettyPrinter.RuntimeTypes.executionPoint(

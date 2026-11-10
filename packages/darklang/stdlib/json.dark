@@ -579,55 +579,6 @@ let __serializeFloat (value: Float) : String =
                     Stdlib.Json.__shortestFloat numerator denominator (Stdlib.Float.__toBits absolute) 1L in
             if Stdlib.UInt64.shiftRight bits 63UL == 1UL then "-" + rendered else rendered
 
-let __numberHasDecimalSyntax (text: String) : Bool =
-    Stdlib.AltJson.__findNumberMarker text 0L 46L 46L >= 0L
-    || Stdlib.AltJson.__findNumberMarker text 0L 101L 69L >= 0L
-
-let __floatIsInteger (value: Float) : Bool =
-    let bits = Stdlib.Float.__toBits (Stdlib.Float.absoluteValue value) in
-    let rawExponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
-    if rawExponent == 2047UL then false
-    else if rawExponent >= 1075UL then true
-    else if rawExponent < 1023UL then value == 0.0
-    else
-        let fractionalBits = 1075UL - rawExponent in
-        let fractionalMask = (Stdlib.UInt64.shiftLeft 1UL fractionalBits) - 1UL in
-        Stdlib.UInt64.bitwiseAnd bits fractionalMask == 0UL
-
-let __floatInteger (text: String) : Stdlib.Option.Option<Int> =
-    match Stdlib.AltJson.__numberToFloat text with
-    | None -> None
-    | Some value ->
-        if Stdlib.Json.__floatIsInteger value then Some (Stdlib.Int.fromFloat value) else None
-
-let __numberToInt128 (text: String) : Stdlib.Option.Option<Int128> =
-    let direct =
-        if Stdlib.Json.__numberHasDecimalSyntax text then None
-        else
-            match Stdlib.Int.parse text with
-            | Ok value -> Stdlib.Int.toInt128 value
-            | Error _ -> None in
-    match direct with
-    | Some value -> Some value
-    | None ->
-        match Stdlib.Json.__floatInteger text with
-        | Some value -> Stdlib.Int.toInt128 value
-        | None -> None
-
-let __numberToUInt128 (text: String) : Stdlib.Option.Option<UInt128> =
-    let direct =
-        if Stdlib.Json.__numberHasDecimalSyntax text then None
-        else
-            match Stdlib.Int.parse text with
-            | Ok value -> Stdlib.Int.toUInt128 value
-            | Error _ -> None in
-    match direct with
-    | Some value -> Some value
-    | None ->
-        match Stdlib.Json.__floatInteger text with
-        | Some value -> Stdlib.Int.toUInt128 value
-        | None -> None
-
 let __allZero (text: String) (index: Int64) (endIndex: Int64) : Bool =
     if index >= endIndex then true
     else if Stdlib.String.__byteAtUnchecked text index != 48L then false
@@ -738,8 +689,9 @@ let __viewInt64 (source: String) (value: Stdlib.Json.__InternalValueView) : Stdl
     | None -> Stdlib.Option.Option.None
 
 let __viewInt128 (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Int128> =
-    if Stdlib.Json.__isNumber source value then Stdlib.Json.__numberToInt128 (Stdlib.Json.__viewText source value)
-    else Stdlib.Option.Option.None
+    match Stdlib.Json.__viewInt source value with
+    | Some integer -> Stdlib.Int.toInt128 integer
+    | None -> Stdlib.Option.Option.None
 
 let __viewUInt8 (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<UInt8> =
     match Stdlib.Json.__viewInt source value with
@@ -762,8 +714,9 @@ let __viewUInt64 (source: String) (value: Stdlib.Json.__InternalValueView) : Std
     | None -> Stdlib.Option.Option.None
 
 let __viewUInt128 (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<UInt128> =
-    if Stdlib.Json.__isNumber source value then Stdlib.Json.__numberToUInt128 (Stdlib.Json.__viewText source value)
-    else Stdlib.Option.Option.None
+    match Stdlib.Json.__viewInt source value with
+    | Some integer -> Stdlib.Int.toUInt128 integer
+    | None -> Stdlib.Option.Option.None
 
 let __viewFloat (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Float> =
     if Stdlib.Json.__isNumber source value then Stdlib.AltJson.__numberToFloat (Stdlib.Json.__viewText source value)
