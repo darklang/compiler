@@ -571,18 +571,13 @@ let infixText element =
       | _ -> unsupportedFeature ("the infix operator " ^ name))
   | _ -> unsupportedFeature ("the infix " ^ name)
 
-(* The interpreter's per-type operator builtins (`Builtin.int64Subtract`,
-   `Builtin.floatLessThan`, ...) are what its infix operators dispatch to, so
-   a call to one means the operator. The compiler has no builtins by those
-   names; it has the operators, which keep the pinned interpreter's meaning
-   of the same builtins. `<type>ToString` is the module's `toString`. *)
+(* BigInt's and Float's own operator builtins (`Builtin.bigIntSubtract`,
+   `Builtin.floatLessThan`, ...) are what the interpreter's infix operators
+   dispatch to for those types, so a call to one means the operator. The
+   compiler has no builtins by those names; it has the operators, which keep
+   the pinned interpreter's meaning of the same builtins. *)
 let builtinOperator name =
-  let types =
-    [
-      "int8"; "uint8"; "int16"; "uint16"; "int32"; "uint32"; "int64"; "uint64";
-      "int128"; "uint128"; "bigInt"; "float";
-    ]
-  in
+  let types = [ "bigInt"; "float" ] in
   let binary =
     [
       ("Add", "+"); ("Subtract", "-"); ("Multiply", "*"); ("LessThan", "<");
@@ -594,11 +589,6 @@ let builtinOperator name =
   in
   let moduleName = function
     | "bigInt" -> "Int"
-    | "uint8" -> "UInt8"
-    | "uint16" -> "UInt16"
-    | "uint32" -> "UInt32"
-    | "uint64" -> "UInt64"
-    | "uint128" -> "UInt128"
     | typ -> String.capitalize_ascii typ
   in
   let unary = [ ("Negate", "-"); ("BitwiseNot", "~") ] in
@@ -635,6 +625,10 @@ let builtinOperator name =
       ("string", "String"); ("char", "Char"); ("list", "List"); ("dict", "Dict");
       ("bool", "Bool"); ("uuid", "Uuid"); ("dateTime", "DateTime");
       ("bytes", "Blob"); ("float32", "Float32"); ("decimal", "Decimal");
+      ("int8", "Int8"); ("uint8", "UInt8"); ("int16", "Int16");
+      ("uint16", "UInt16"); ("int32", "Int32"); ("uint32", "UInt32");
+      ("int64", "Int64"); ("uint64", "UInt64"); ("int128", "Int128");
+      ("uint128", "UInt128");
     ]
   in
   let byModule fn =
@@ -655,11 +649,13 @@ let builtinOperator name =
       modules
   in
   (* The polymorphic operator builtins (`Builtin.add`), which the trait impls
-     over a type call for its own operator. *)
+     over a type call for its own operator. `**` has no 128-bit lowering here,
+     so `power` calls the compiler's Power implementations, which cover every
+     integer width. *)
   let polymorphicBinary =
     [
       ("add", "+"); ("subtract", "-"); ("multiply", "*"); ("divide", "/");
-      ("modulo", "%"); ("power", "**"); ("lessThan", "<");
+      ("modulo", "%"); ("lessThan", "<");
       ("lessThanOrEqualTo", "<="); ("greaterThan", ">");
       ("greaterThanOrEqualTo", ">="); ("bitwiseAnd", "&"); ("bitwiseOr", "|");
       ("bitwiseXor", "^"); ("shiftLeft", "<<"); ("shiftRight", ">>");
@@ -671,10 +667,7 @@ let builtinOperator name =
       Some (`Binary (List.assoc fn polymorphicBinary))
   | [ "Builtin"; fn ] when List.mem_assoc fn polymorphicUnary ->
       Some (`Unary (List.assoc fn polymorphicUnary))
-  (* `**` has no 128-bit lowering here; the compiler's Power implementations
-     for Int128 and UInt128 do. *)
-  | [ "Builtin"; ("int128Power" | "uint128Power") ] ->
-      Some (`Call "Stdlib.Power.power")
+  | [ "Builtin"; "power" ] -> Some (`Call "Stdlib.Power.power")
   | [ "Builtin"; fn ] when List.mem_assoc fn renamed ->
       Some (`Call (List.assoc fn renamed))
   | [ "Builtin"; fn ] ->
@@ -691,8 +684,6 @@ let builtinOperator name =
             let op = String.sub fn (String.length typ) (String.length fn - String.length typ) in
             match List.assoc_opt op binary with
             | Some text -> Some (`Binary text)
-            | None when op = "ToString" ->
-                Some (`Call ("Stdlib." ^ moduleName typ ^ ".toString"))
             | None -> (
                 match List.assoc_opt op unary with
                 | Some text -> Some (`Unary text)

@@ -140,7 +140,7 @@ test scriptArgumentsAndExitCodes =
          0,
          "")
         ("option terminator", "if args == [] then 0 else 1", [ "--" ], [], 0, "")
-        ("int64 exit code", "3", [], [], 3, "Script exited with code 3")
+        ("int64 exit code", "3", [], [], 3, "")
         ("definitions only", "let main(inputs: List<String>): Int64 = 0", [], [], 1, "main(args)")
         ("main is not auto-called",
          "let main(inputs: List<String>): Int64 = 0\nmain",
@@ -170,6 +170,10 @@ test scriptArgumentsAndExitCodes =
                Instance.says(out, expectedOutput, label)) ]))
       |> Stdlib.Test.all
 
+    // The script's own exit code is not reported as a failure of the run.
+    let _ = Stdlib.Cli.File.writeText(path, "Stdlib.printErrorLine(\"usage: contract <n>\")\n2")
+    let (ownCode, own) = Instance.ran(i, [ "run", path ])
+
     let (typoCode, typo) = Instance.ran(i, [ "run", "--sandbxo", path ])
     let _ = Stdlib.Cli.File.writeText(path, "Stdlib.printLine(\"SHOULD_NOT_RUN\")\n9")
 
@@ -186,6 +190,9 @@ test scriptArgumentsAndExitCodes =
 
     Stdlib.Test.all(
       [ contract
+        Instance.exitedWith(ownCode, 2, "the script's exit code")
+        Instance.says(own, "usage: contract <n>", "the script's own message")
+        Instance.doesNotSay(own, "exited", "no line about the exit code")
         Instance.exitedWith(typoCode, 1, "unknown runner options fail")
         Instance.says(typo, "Unknown run-script option", "option guidance")
         help ]))
@@ -286,7 +293,7 @@ test aDeniedScriptStopsAndApprovalIsSaved =
 /// `run` and `eval` type-check the code first, and a definite error stops it before
 /// anything runs: the `printLine` ahead of the error must not print. A dropped value counts,
 /// whether it is on the top level, in a branch that would not be taken, in a lambda, or in a
-/// script's own function.
+/// script's own function, and an error in a function gives its line and the call it is in.
 // @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test runAndEvalRefuseADefiniteTypeErrorBeforeRunning =
   Instance.withInstance(fun i ->
@@ -302,7 +309,10 @@ test runAndEvalRefuseADefiniteTypeErrorBeforeRunning =
       ("a dropped value in the script's own function",
        "let helper(n: Int64): Unit =\n  n + 1\n  ()\n" + first + "0",
        "Function helper")
-      ("a wrong argument", first + "Stdlib.List.length(\"bad\")", "line 2, column 20") ]
+      ("a wrong argument", first + "Stdlib.List.length(\"bad\")", "line 2, column 20")
+      ("a wrong argument in the script's own function",
+       "let size(s: String): Int64 =\n  Stdlib.List.length(s)\n" + first + "0",
+       "line 2, column 22: [TypeMismatch] In `Stdlib.List.length`, argument 1") ]
     |> Stdlib.List.map(fun((label, source, where)) ->
       let path = script(i, "refused.dark", source)
 
@@ -318,6 +328,25 @@ test runAndEvalRefuseADefiniteTypeErrorBeforeRunning =
             Instance.doesNotSay(out, "SCRIPT_RAN", $"{cmd}, {label}: nothing ran") ]))
       |> Stdlib.Test.all)
     |> Stdlib.Test.all)
+
+
+/// A missing trait implementation names the trait, not its hash, and points at the type's own
+/// `toString` when its module has one.
+// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
+test runNamesTheTraitAMissingImplementationIsOf =
+  Instance.withInstance(fun i ->
+    let source =
+      "let show (e: Stdlib.HttpClient.RequestError): String =\n  Stdlib.toString(e)\n"
+      + "Stdlib.printLine(\"SCRIPT_RAN\")\n0"
+    let path = script(i, "missing-impl.dark", source)
+    let (code, out) = Instance.ran(i, [ "run", path ])
+
+    Stdlib.Test.all(
+      [ Instance.exitedWith(code, 1, "refused")
+        Instance.says(out, "has no implementation of Stdlib.ToString", "names the trait")
+        Instance.doesNotSay(out, "implementation of #", "no hash")
+        Instance.says(out, "Try `Stdlib.HttpClient.toString`", "points at the module's toString")
+        Instance.doesNotSay(out, "SCRIPT_RAN", "nothing ran") ]))
 
 
 /// What the check cannot prove wrong still runs: a value discarded with `let _ =`, and a

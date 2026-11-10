@@ -223,6 +223,19 @@ test operatorsDarkLacksSayWhatToWrite =
       says("match xs with | [h, ...[t]] -> h", "takes a name for the rest")
       says("match xs with | [...t] -> t", "write `t`") ])
 
+// The refused operator is the only mistake reported: the parse reads on past it.
+// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
+test operatorsDarkLacksDoNotCascade =
+  Stdlib.Test.all(
+    [ golden(
+        "match xs with\n| h :: t -> h\n| [] -> 0",
+        [ "'::' is not Dark; a list is `[head, ...tail]`" ])
+      golden(
+        "Stdlib.printLine(\"n = \" ++ s ++ \"!\")",
+        [ "'++' is not Dark; join Strings with `+`"
+          "'++' is not Dark; join Strings with `+`" ])
+      golden("[1] @ [2]", [ "'@' is not Dark; join lists with `[...a, ...b]`" ]) ])
+
 // @compiler xfail compile: "Unknown function or value 'rejects'" class=missing-support reason=upstream-dependency
 test sameLineItemsNeedSeparators =
   Stdlib.Test.all(

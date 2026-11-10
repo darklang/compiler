@@ -28,6 +28,7 @@ packages/darklang/cli/docs/scripts.dark
 packages/darklang/cli/docs/stdlib.dark
 packages/darklang/cli/docs/stdlibOverview.dark
 packages/darklang/cli/docs/syntax.dark
+packages/darklang/cli/docs/syntaxAtAGlance.dark
 packages/darklang/cli/docs/terminalUi.dark
 packages/darklang/cli/docs/traits.dark
 packages/darklang/cli/docs/types.dark
@@ -311,6 +312,7 @@ packages/darklang/tests/cli/builtinGroups.dark
 packages/darklang/tests/cli/commandCompletions.dark
 packages/darklang/tests/cli/commandGroups.dark
 packages/darklang/tests/cli/deprecationKinds.dark
+packages/darklang/tests/cli/docs.dark
 packages/darklang/tests/cli/evalAndRun.dark
 packages/darklang/tests/cli/file.dark
 packages/darklang/tests/cli/flags.dark
@@ -330,6 +332,7 @@ packages/darklang/tests/cli/releaseAssets.dark
 packages/darklang/tests/cli/scripts.dark
 packages/darklang/tests/cli/searchRanking.dark
 packages/darklang/tests/cli/searchShallow.dark
+packages/darklang/tests/cli/signaturesTraitCalls.dark
 packages/darklang/tests/cli/telemetry.dark
 packages/darklang/tests/cli/tests-picker.dark
 packages/darklang/tests/cli/tests-tui.dark
@@ -368,6 +371,7 @@ packages/darklang/tests/language/records.dark
 packages/darklang/tests/language/runtimeToProgramTypes.dark
 packages/darklang/tests/language/semantics.dark
 packages/darklang/tests/language/stringInterpolation.dark
+packages/darklang/tests/language/tailCalls.dark
 packages/darklang/tests/language/traits.dark
 packages/darklang/tests/language/tupleLiterals.dark
 packages/darklang/tests/language/unwrap.dark
