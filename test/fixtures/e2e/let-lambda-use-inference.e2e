@@ -1,0 +1,14 @@
+// A let-bound lambda whose body reads a field of its unannotated parameter
+// takes the parameter's type from how the scope uses it, as a package fn's
+// local `let sum(p: Point) = p.x + p.y` arrives without the annotation.
+type LetUsePoint = { x: Int64, y: Int64 }
+let letUseSum (points: List<LetUsePoint>) : List<Int64> =
+  let sum = fun p -> p.x + p.y in
+  Stdlib.List.map points (fun point -> sum point)
+let letUseFind (points: List<LetUsePoint>) (target: Int64) : Int64 =
+  let holds = fun p -> p.x == target in
+  match Stdlib.List.findFirstIndex points holds with
+  | Some i -> i
+  | None -> -1L
+letUseSum [LetUsePoint { x = 1L, y = 2L }, LetUsePoint { x = 3L, y = 4L }] = [3L, 7L]
+letUseFind [LetUsePoint { x = 1L, y = 2L }, LetUsePoint { x = 3L, y = 4L }] 3L = 1L

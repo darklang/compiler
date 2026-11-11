@@ -278,8 +278,53 @@ let check checkExpression (globals : globals) locals symbols expected
                    (M.add name (valueType, binding) locals)
                    afterValue expected body)))
   | _ ->
-      bind (check symbols valueExpected value)
-        (fun (valueType, checkedValue, afterValue) ->
+      (* A package fn's local `let shown(loc: PackageLocation) = loc.name`
+         arrives as a let-bound lambda without its annotations, and a body that
+         reads a field of `loc` cannot be checked without them. When the lambda
+         does not check on its own, take its parameter types from how the rest
+         of the scope calls it, and check it again against those. *)
+      let fromUses () =
+        match (pattern, value) with
+        | WT.LPVariable (_, name), WT.ELambda (_, parameters, _, _, _) ->
+            let provisional =
+              AST.TFunction
+                ( List.mapi
+                    (fun index _ ->
+                      let name = "t$let_lambda_use_" ^ string_of_int index in
+                      AST.TInferenceVar (name, name))
+                    parameters,
+                  AST.TInferenceVar
+                    ("t$let_lambda_use_return", "t$let_lambda_use_return") )
+            in
+            let provisional, provisionalSymbols =
+              WrittenCheckingState.freshenType globals.typeParams provisional
+                symbols
+            in
+            let binding, withBinding =
+              WrittenCheckingState.allocateBinding name provisionalSymbols
+            in
+            Result.to_option
+              (checkExpression globals
+                 (M.add name (provisional, binding) locals)
+                 withBinding expected body)
+            |> Option.map (fun (_, _, afterBody) ->
+                WrittenCheckingState.freshenType globals.typeParams
+                  (WrittenCheckingState.resolve afterBody provisional)
+                  symbols)
+        | _ -> None
+      in
+      let checkedValue =
+        match check symbols valueExpected value with
+        | Ok _ as checked -> checked
+        | Error _ as failed -> (
+            match fromUses () with
+            | Some (used, usedSymbols) -> (
+                match check usedSymbols (Some used) value with
+                | Ok _ as checked -> checked
+                | Error _ -> failed)
+            | None -> failed)
+      in
+      bind checkedValue (fun (valueType, checkedValue, afterValue) ->
           bind
             (WrittenPatternSupport.checkLetPattern pattern valueType afterValue)
             (fun (pattern, bindings, afterPattern) ->
