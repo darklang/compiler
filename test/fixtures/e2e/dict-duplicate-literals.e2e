@@ -10,7 +10,7 @@ let key = "d" + "ynamic" in Dict { key: 10L, "dynamic": 20L } = error="Cannot ad
 Dict { [1L, 2L]: "first", [1L, 2L]: "second" } = error="Cannot add two dictionary entries with the same key"
 Dict { DuplicateLiteralKey { number = 1L, label = "a" }: 10L, DuplicateLiteralKey { number = 1L, label = "a" }: 20L } = error="Cannot add two dictionary entries with the same key"
 Dict { 0.0: "first", -0.0: "second" } = error="Cannot add two dictionary entries with the same key"
-let n = Stdlib.Float.sqrt -1.0 in Dict { [n, 0.0]: 10L, [n, -0.0]: 20L } = error="Cannot add two dictionary entries with the same key"
+let n = Stdlib.Float.sqrt -1.0 in Dict { [n, 0.0]: 10L, [n, -0.0]: 20L } = error="Cannot use [NaN, 0.0] as a dict key."
 duplicateLiteral 1L 1L = error="Cannot add two dictionary entries with the same key"
 Stdlib.Dict.size (duplicateLiteral 1L 2L) = 2L
 Stdlib.Dict.size (Dict { [1L]: 10L, [2L]: 20L }) = 2L

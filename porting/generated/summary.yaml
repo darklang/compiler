@@ -36,8 +36,8 @@ dispositions:
     replace: 903
     run: 613
   tests:
-    blocked: 59
-    run: 1509
+    blocked: 54
+    run: 1514
     xfail: 1263
 reasons:
   packages:
@@ -71,7 +71,7 @@ reasons:
     aot-name-error: 11
     aot-type-error: 151
     compiler-crash: 2
-    compiler-gap: 212
+    compiler-gap: 207
     compiler-leak: 2
     diagnostic-difference: 2
     interpreter-fixture: 45

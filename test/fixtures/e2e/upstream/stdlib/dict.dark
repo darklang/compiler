@@ -251,21 +251,20 @@ module NonStringKeys =
      nan == nan) = false
 
     (let nan = Stdlib.Float.sqrt -1.0
-     Stdlib.Dict.get (Dict { nan: "nan" }) nan) = Stdlib.Option.Option.Some "nan"
+     Dict { nan: "nan" }) = error="Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
 
-    (let nan = Stdlib.Float.sqrt -1.0
-     Stdlib.Dict.size (Stdlib.Dict.setOverridingDuplicates (Dict { nan: "a" }) nan "b")) = 1L
+    Stdlib.Dict.set (Dict { 1.0: "one" }) (Stdlib.Float.sqrt -1.0) "nan" = error="Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
+
+    Stdlib.Dict.set (Dict { }) [ 1.0, Stdlib.Float.sqrt -1.0 ] "nan" = error="Cannot use [1.0, NaN] as a dict key. NaN is not equal to itself, so a key holding it could never be found."
+
+    Stdlib.Dict.get (Dict { 1.0: "one" }) (Stdlib.Float.sqrt -1.0) = error="Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
 
     (let inf = 1.0 / 0.0
      Stdlib.Dict.get (Dict { inf: "inf" }) inf) = Stdlib.Option.Option.Some "inf"
 
     (let inf = 1.0 / 0.0
      let ninf = -1.0 / 0.0
-     let nan = Stdlib.Float.sqrt -1.0
-     Stdlib.List.map
-       (Stdlib.Dict.keys (Dict { inf: 1L, ninf: 2L, 0.0: 3L, nan: 4L }))
-       (fun key -> if key != key then 0L else if key < 0.0 then 1L else if key == 0.0 then 2L else 3L)) =
-      [ 0L, 1L, 2L, 3L ]
+     Stdlib.Dict.keys (Dict { inf: 1L, ninf: 2L, 0.0: 3L })) = [ -1.0 / 0.0, 0.0, 1.0 / 0.0 ]
 
   module EveryKeyType =
     Stdlib.Dict.get (Dict { (): "unit" }) () = Stdlib.Option.Option.Some "unit"

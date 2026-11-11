@@ -12,7 +12,7 @@ A run disposition means selected, not a passing execution receipt. Replacement c
 | --- | --- |
 | packages | 2,196 blocked, 2 excluded, 35 replace, 1,798 run |
 | stdlib | 876 blocked, 3 excluded, 903 replace, 613 run |
-| tests | 59 blocked, 1,509 run, 1,263 xfail |
+| tests | 54 blocked, 1,514 run, 1,263 xfail |
 
 ## Expected test failures
 
@@ -211,7 +211,7 @@ Tags are defined in [the glossary](../../../porting/compiler-reasons.json).
 | tests | `aot-name-error` | 11 |
 | tests | `aot-type-error` | 151 |
 | tests | `compiler-crash` | 2 |
-| tests | `compiler-gap` | 212 |
+| tests | `compiler-gap` | 207 |
 | tests | `compiler-leak` | 2 |
 | tests | `diagnostic-difference` | 2 |
 | tests | `interpreter-fixture` | 45 |

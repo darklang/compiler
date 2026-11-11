@@ -466,13 +466,11 @@ test nonStringKeysFloatKeys =
 
 // NaN is not equal to itself, so a NaN key could never be found: it is refused,
 // alone or inside a key, wherever a key goes in.
-// @compiler blocked: compiler-gap diagnostic="Expected compilation error but compilation succeeded"
 test nanKeyInLiteralRaises =
   (let nan = Stdlib.Float.sqrt(-1.0)
    Dict { nan: "nan" })
   => raises "Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
 
-// @compiler blocked: compiler-gap diagnostic="Expected compilation error but compilation succeeded"
 test nanKeyInSetRaises =
   Stdlib.Dict.set(Dict { 1.0: "one" }, Stdlib.Float.sqrt(-1.0), "nan")
   => raises "Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
@@ -482,17 +480,14 @@ test nanKeyInFromEntriesRaises =
   Stdlib.Dict.fromEntries([ (1.0, "one"), (Stdlib.Float.sqrt(-1.0), "nan") ])
   => raises "Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
 
-// @compiler blocked: compiler-gap diagnostic="Expected compilation error but compilation succeeded"
 test nanInsideKeyRaises =
   Stdlib.Dict.set(Dict { }, [ 1.0, Stdlib.Float.sqrt(-1.0) ], "nan")
   => raises "Cannot use [1.0, NaN] as a dict key. NaN is not equal to itself, so a key holding it could never be found."
 
-// @compiler blocked: compiler-gap diagnostic="Expected compilation error but compilation succeeded"
 test float32NanKeyRaises =
   Stdlib.Dict.set(Dict { }, Stdlib.Float32.sqrt(-1.0f32), "nan")
   => raises "Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
 
-// @compiler blocked: compiler-gap diagnostic="Expected compilation error but compilation succeeded"
 test nanKeyLookupRaises =
   Stdlib.Dict.get(Dict { 1.0: "one" }, Stdlib.Float.sqrt(-1.0))
   => raises "Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
