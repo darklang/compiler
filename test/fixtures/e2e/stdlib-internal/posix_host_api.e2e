@@ -79,4 +79,4 @@ Stdlib.Cli.File.__globMatches "[]a]" "]" false = true
 Stdlib.Cli.File.__globMatches "[[:alpha:]]" "A" false = true
 Stdlib.Cli.File.__globMatches "[" "[" false = true
 Stdlib.Cli.Posix.OpenFlags.flag "unknown" = compileerror="Unknown function"
-Stdlib.Cli.Posix.fdClose 4294967299 = error="Uncaught exception: Encountered out-of-range value for type of Int"
+Stdlib.Cli.Posix.fdClose 4294967299 = error="Uncaught exception: Encountered an out-of-range integer value"

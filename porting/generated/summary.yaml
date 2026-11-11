@@ -36,8 +36,8 @@ dispositions:
     run: 649
   tests:
     blocked: 56
-    run: 1594
-    xfail: 1249
+    run: 1617
+    xfail: 1226
 reasons:
   packages:
     aot-type-error: 10
@@ -68,7 +68,7 @@ reasons:
     aot-name-error: 11
     aot-type-error: 151
     compiler-crash: 2
-    compiler-gap: 167
+    compiler-gap: 144
     compiler-leak: 2
     diagnostic-difference: 2
     interpreter-fixture: 47
@@ -119,9 +119,9 @@ expected_failures:
   missing-support:
     phases:
       compile: 961
-      runtime: 65
+      runtime: 42
     reasons:
-      compiler-gap: 162
+      compiler-gap: 139
       test-counter: 7
       upstream-dependency: 857
     sources:
@@ -167,7 +167,7 @@ expected_failures:
       upstream/packages/darklang/tests/language/lambdas.dark: 3
       upstream/packages/darklang/tests/language/letBindings.dark: 1
       upstream/packages/darklang/tests/language/matchExpressions.dark: 5
-      upstream/packages/darklang/tests/language/operators.dark: 3
+      upstream/packages/darklang/tests/language/operators.dark: 1
       upstream/packages/darklang/tests/language/records.dark: 7
       upstream/packages/darklang/tests/language/runtimeToProgramTypes.dark: 6
       upstream/packages/darklang/tests/language/tailCalls.dark: 2
@@ -224,16 +224,14 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/cli/widgets.dark: 6
       upstream/packages/darklang/tests/stdlib/codepoint.dark: 1
       upstream/packages/darklang/tests/stdlib/crypto.dark: 10
-      upstream/packages/darklang/tests/stdlib/dateTime.dark: 7
+      upstream/packages/darklang/tests/stdlib/dateTime.dark: 4
       upstream/packages/darklang/tests/stdlib/decimal.dark: 4
       upstream/packages/darklang/tests/stdlib/dict.dark: 32
       upstream/packages/darklang/tests/stdlib/exec.dark: 3
-      upstream/packages/darklang/tests/stdlib/float.dark: 11
-      upstream/packages/darklang/tests/stdlib/float32.dark: 5
+      upstream/packages/darklang/tests/stdlib/float32.dark: 3
       upstream/packages/darklang/tests/stdlib/http.dark: 5
       upstream/packages/darklang/tests/stdlib/httpclient.dark: 7
       upstream/packages/darklang/tests/stdlib/httpserver.dark: 3
-      upstream/packages/darklang/tests/stdlib/ints/bigInt.dark: 5
       upstream/packages/darklang/tests/stdlib/ints/int128.dark: 1
       upstream/packages/darklang/tests/stdlib/ints/int64.dark: 2
       upstream/packages/darklang/tests/stdlib/ints/uint128.dark: 1

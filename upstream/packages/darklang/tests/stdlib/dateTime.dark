@@ -402,19 +402,16 @@ test secondsRoundTrip =
       |> Stdlib.Test.equal("2019-07-28T22:42:36Z") ])
 
 // seconds whose ticks are past Int64 can't be represented; surface a Dark error
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test fromSecondsPastInt64Raises =
   (2 ** 62) |> Stdlib.DateTime.fromSeconds
   => raises "Encountered an out-of-range integer value"
 
 // Int64.MaxValue fits int64 but is past NodaTime's instant range; the host
 // exception is turned into a Dark error rather than escaping
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test fromSecondsPastInstantRangeRaises =
   9223372036854775807 |> Stdlib.DateTime.fromSeconds
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test addSecondsPastInstantRangeRaises =
   Stdlib.DateTime.addSeconds(Stdlib.DateTime.fromSeconds(0), 9223372036854775807)
   => raises "Encountered an out-of-range integer value"
