@@ -1,0 +1,6 @@
+// Strings order by code point, as the interpreter orders them: U+FF71 comes
+// before U+1F600, though UTF-16 puts the latter's surrogates first.
+"ｱ" < "😀" = true
+Stdlib.String.compare "😀" "ｱ" > 0L = true
+Stdlib.List.sort ["😀", "ｱ", "é", "a"] = ["a", "é", "ｱ", "😀"]
+Stdlib.Dict.keys (Stdlib.Dict.fromList [("😀", 1L), ("ｱ", 2L)]) = ["ｱ", "😀"]
