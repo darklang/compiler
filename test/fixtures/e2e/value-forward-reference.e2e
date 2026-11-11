@@ -1,0 +1,6 @@
+// A fn or value may name a value declared after it, as package items can,
+// since the interpreter's store has no order.
+let valueForwardUse (x: Int64) : Int64 = x + valueForwardLater
+val valueForwardLater = valueForwardBase + 1L
+val valueForwardBase = 4L
+valueForwardUse 1L = 6L
