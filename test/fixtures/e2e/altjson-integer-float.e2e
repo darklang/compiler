@@ -1,0 +1,10 @@
+// AltJson reads a number written without a fraction or exponent that fits an
+// Int64 as an Integer, and any other number as a Float, as main does.
+Stdlib.AltJson.parse "0" = Ok(Stdlib.AltJson.Json.Integer 0L)
+Stdlib.AltJson.parse "-1337" = Ok(Stdlib.AltJson.Json.Integer (-1337L))
+Stdlib.AltJson.parse "1.0" = Ok(Stdlib.AltJson.Json.Float 1.0)
+Stdlib.AltJson.parse "1e0" = Ok(Stdlib.AltJson.Json.Float 1.0)
+Stdlib.AltJson.parse "9007199254740993" = Ok(Stdlib.AltJson.Json.Integer 9007199254740993L)
+Stdlib.AltJson.parse "99999999999999999999" = Ok(Stdlib.AltJson.Json.Float 100000000000000000000.0)
+Stdlib.AltJson.format (Stdlib.AltJson.Json.Array [Stdlib.AltJson.Json.Integer 3L, Stdlib.AltJson.Json.Float 2.5]) = "[3,2.5]"
+Stdlib.AltJson.toInt64 (Stdlib.AltJson.Json.Float 1.0) = Stdlib.Option.Option.None
