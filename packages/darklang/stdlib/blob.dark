@@ -164,24 +164,38 @@ let __fromHex (value: String) (index: Int64) (acc: List<Int64>) : Stdlib.Result.
     else
         let high = Stdlib.Blob.__hexValue (Stdlib.String.__byteAtUnchecked value index) in
         let low = Stdlib.Blob.__hexValue (Stdlib.String.__byteAtUnchecked value (index + 1L)) in
-        if high < 0L || low < 0L then
-            Error "Invalid hex string: Format_BadHexChar"
-        else Stdlib.Blob.__fromHex value (index + 2L) (Stdlib.List.push acc (high * 16L + low))
+        Stdlib.Blob.__fromHex value (index + 2L) (Stdlib.List.push acc (high * 16L + low))
 
-// The length of value in UTF-16 code units, as .NET counts a string.
-let __utf16Length (value: String) (index: Int64) (count: Int64) : Int64 =
-    if index >= Stdlib.String.__byteLength value then count
-    else
-        let byte = Stdlib.String.__byteAtUnchecked value index in
-        let units = if byte >= 128L && byte < 192L then 0L else if byte >= 240L then 2L else 1L in
-        Stdlib.Blob.__utf16Length value (index + 1L) (count + units)
+// The byte index of the first character of value that is not a hex digit,
+// or -1. Every byte before it is ASCII, so it starts a character.
+let __firstNonHex (value: String) (index: Int64) : Int64 =
+    if index >= Stdlib.String.__byteLength value then -1L
+    else if Stdlib.Blob.__hexValue (Stdlib.String.__byteAtUnchecked value index) < 0L then index
+    else Stdlib.Blob.__firstNonHex value (index + 1L)
 
-// The interpreter's messages are .NET's Convert.FromHexString exceptions,
-// which it reports by resource key; the length is checked first, in UTF-16
-// code units.
+// The character starting at a byte index, by its UTF-8 lead byte.
+let __characterAt (value: String) (index: Int64) : String =
+    let lead = Stdlib.String.__byteAtUnchecked value index in
+    let size = if lead < 128L then 1L else if lead < 224L then 2L else if lead < 240L then 3L else 4L in
+    let blob = Stdlib.String.toBlob value in
+    match Stdlib.String.fromBlob (Stdlib.Blob.__fromBuffer (__blob_to_rawptr blob) (16L + index) size) with
+    | Some character -> character
+    | None -> ""
+
+// As the interpreter words it: the first character that is not a hex digit,
+// and otherwise an odd number of digits.
 let fromHex (value: String) : Stdlib.Result.Result<Blob, String> =
-    if Stdlib.Blob.__utf16Length value 0L 0L % 2L != 0L then
-        Error "Invalid hex string: Format_BadHexLength"
+    let bad = Stdlib.Blob.__firstNonHex value 0L in
+    if bad >= 0L then
+        Error
+            ("Invalid hex string: '"
+             + Stdlib.Blob.__characterAt value bad
+             + "' is not a hex digit (0-9, a-f, A-F)")
+    else if Stdlib.String.__byteLength value % 2L != 0L then
+        Error
+            ("Invalid hex string: it has "
+             + Stdlib.Int64.toString (Stdlib.String.__byteLength value)
+             + " digits, and each byte takes two")
     else Stdlib.Blob.__fromHex value 0L []
 
 let toBase64 (blob: Blob) : String =
