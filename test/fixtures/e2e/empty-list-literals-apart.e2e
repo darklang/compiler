@@ -1,0 +1,14 @@
+// Each `[]` has its own unknown element type: two of them in one tuple, or
+// as two arguments of a local fn's first call, can become different lists.
+let emptyAccumulators (words: List<String>) : (List<String> * List<Int64>) =
+  Stdlib.List.fold words ([], []) (fun (names, lengths) word ->
+    (Stdlib.List.prepend names word, Stdlib.List.prepend lengths (Stdlib.String.length word)))
+let emptyArgumentsWalk (text: String) : List<String> =
+  let walk = fun remaining current soFar ->
+    match remaining with
+    | [] -> soFar
+    | c :: rest -> walk rest (Stdlib.List.prepend current c) soFar
+  in
+  walk (Stdlib.String.toList text) [] []
+emptyAccumulators ["ab", "c"] = (["c", "ab"], [1L, 2L])
+emptyArgumentsWalk "ab" = []
