@@ -1,0 +1,4 @@
+// Crypto.digest runs the named hash, as the interpreter's does.
+Stdlib.Blob.toHex (Stdlib.Crypto.digest Stdlib.Crypto.DigestAlgorithm.Sha256 (Stdlib.Blob.fromString "abc")) = "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"
+Stdlib.Blob.toHex (Stdlib.Crypto.digest Stdlib.Crypto.DigestAlgorithm.Md5 (Stdlib.Blob.fromString "abc")) = "900150983CD24FB0D6963F7D28E17F72"
+Stdlib.Blob.toHex (Stdlib.Crypto.digest Stdlib.Crypto.DigestAlgorithm.Sha1 (Stdlib.Blob.fromString "abc")) = "A9993E364706816ABA3E25717850C26C9CD0D89D"

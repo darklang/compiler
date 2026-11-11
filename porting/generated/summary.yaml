@@ -31,8 +31,8 @@ dispositions:
     replace: 35
     run: 1823
   stdlib:
-    blocked: 828
-    replace: 906
+    blocked: 827
+    replace: 907
     run: 638
   tests:
     blocked: 56
@@ -52,14 +52,14 @@ reasons:
     upstream-dependency: 2214
   stdlib:
     compiler-contract: 129
-    compiler-implementation: 903
+    compiler-implementation: 904
     compiler-timeout: 1
     constructor-identity: 2
     container-adaptation: 490
     interpreter-intrinsic: 1
     test-counter: 2
     test-diagnostics: 2
-    upstream-dependency: 204
+    upstream-dependency: 203
   tests:
     aot-arity-error: 12
     aot-invalid-field: 16

@@ -10,7 +10,7 @@ type DigestAlgorithm =
 
 
 /// Computes the <param algorithm> digest of the given <param data>
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Crypto.digest: Unknown function or value 'Builtin.cryptoDigest'"
+// @compiler replace: packages/darklang/stdlib/crypto.dark#Darklang.Stdlib.Crypto.digest reason=compiler-implementation
 let digest(algorithm: DigestAlgorithm, data: Bytes): Bytes =
   Builtin.cryptoDigest(algorithm, data)
 
