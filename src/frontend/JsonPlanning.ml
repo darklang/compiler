@@ -347,7 +347,7 @@ let rec typeReference (env : env) typ =
   | AST.TUInt64 -> nullary "TUInt64"
   | AST.TInt128 -> nullary "TInt128"
   | AST.TUInt128 -> nullary "TUInt128"
-  | AST.TInt -> nullary "TInt"
+  | AST.TInt -> nullary "TBigInt"
   | AST.TFloat64 -> nullary "TFloat"
   | AST.TChar -> nullary "TChar"
   | AST.TString -> nullary "TString"
