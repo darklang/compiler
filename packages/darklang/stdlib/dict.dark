@@ -52,6 +52,13 @@ let set<'k, 'v> (dict: Dict<k, v>) (key: k) (value: v) : Dict<k, v> =
 let __renderGenericKey<'k> (key: k) : String =
     Builtin.crash "Dictionary key renderer was not specialized"
 
+// NaN is the only key value unequal to itself, and a key holding one could never be found.
+let __refuseNaNKey<'k> (key: k) : k =
+    if key == key then key
+    else
+        Builtin.crash
+            ("Cannot use " + Stdlib.Dict.__renderGenericKey key + " as a dict key. NaN is not equal to itself, so a key holding it could never be found.")
+
 // Dict literals are built entry by entry with this, so a key that two
 // entries compute equal is refused at run time.
 let __setRejectingDuplicate<'k, 'v> (dict: Dict<k, v>) (key: k) (value: v) : Dict<k, v> =
