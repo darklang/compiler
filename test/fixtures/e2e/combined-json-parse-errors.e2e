@@ -6,11 +6,11 @@ let err (v: Stdlib.Result.Result<'a, Stdlib.Json.ParseError.ParseError>) : Resul
 (Stdlib.Test.all
     [
       (Stdlib.Json.parse<Int64> " ") |> err
-      |> Stdlib.Test.equal (Result.Error "Not JSON")
+      |> Stdlib.Test.equal (Result.Error "Not JSON at line 1, column 2")
       (Stdlib.Json.parse<Int64> "4a") |> err
-      |> Stdlib.Test.equal (Result.Error "Not JSON")
+      |> Stdlib.Test.equal (Result.Error "Not JSON at line 1, column 2")
       (Stdlib.Json.parse<Int64> "- 42") |> err
-      |> Stdlib.Test.equal (Result.Error "Not JSON")
+      |> Stdlib.Test.equal (Result.Error "Not JSON at line 1, column 2")
       (Stdlib.Json.parse<Int64> "null") |> err
       |> Stdlib.Test.equal (Result.Error "Can't parse JSON `null` as type `Int64` at path: `root`")
       (Stdlib.Json.parse<Int64> "true") |> err
@@ -26,4 +26,4 @@ let err (v: Stdlib.Result.Result<'a, Stdlib.Json.ParseError.ParseError>) : Resul
       (Stdlib.Json.parse<Int64> "42.5") |> err
       |> Stdlib.Test.equal (Result.Error "Can't parse JSON `42.5` as type `Int64` at path: `root`")
       (Stdlib.Json.parse<Int64> "\"42\n\"") |> err
-      |> Stdlib.Test.equal (Result.Error "Not JSON") ]) = Stdlib.Test.Result.Pass
+      |> Stdlib.Test.equal (Result.Error "Not JSON at line 1, column 4") ]) = Stdlib.Test.Result.Pass
