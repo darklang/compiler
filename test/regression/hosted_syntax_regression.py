@@ -241,6 +241,12 @@ ENTITIES["record-key-hash"] = fn("Hosted.recordKey", [("x", INT64)], INT64,
 # Builtin.bytesLength answers an Int64; the compiler's Blob.length an Int.
 ENTITIES["bytes-length-hash"] = fn("Hosted.bytesLen", [("b", {"TBytes": []})], INT64,
     builtin("bytesLength", ARG0))
+# An uncalled builtin, as in `val empty = Builtin.bytesEmpty`, is the same
+# library item as a call: Builtin.bytesLength(Builtin.bytesEmpty).
+BYTES_EMPTY = {"EValue": [1, dict(originalName=["Builtin", "bytesEmpty"], resolved={"Ok": [dict(
+    name={"Builtin": [dict(name="bytesEmpty", version=0)]}, location={"None": []})]})]}
+ENTITIES["bytes-empty-hash"] = fn("Hosted.emptyBytesLen", [("x", INT64)], INT64,
+    builtin("bytesLength", BYTES_EMPTY))
 # `Builtin.power` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("power", ARG0, {"EInt128": [3, 3]}))
@@ -324,6 +330,7 @@ def main():
             assert run("Hosted.slices 3L\n") == "cd"
             assert run("Hosted.conversions 100L\n") == 103
             assert run('Hosted.bytesLen (Stdlib.Blob.fromString "abc")\n') == 3
+            assert run("Hosted.emptyBytesLen 1L\n") == 0
             assert run("Hosted.dictLast 5L\n") == 1
             assert run("Hosted.recordKey 5L\n") == 1
             assert run("Hosted.tagged 7L\n") == 7
