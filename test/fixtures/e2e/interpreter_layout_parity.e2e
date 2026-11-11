@@ -123,7 +123,7 @@ let nestedVariantArm (o: Option<Stdlib.AltJson.Json>) : Int64 =
   | Some(String _) -> 1L
   | None -> 2L
   | Some(_) -> 3L
-[nestedVariantArm (Some(Stdlib.AltJson.Json.String "x")), nestedVariantArm None, nestedVariantArm (Some(Stdlib.AltJson.Json.Number 1.0))] = [1L, 2L, 3L]
+[nestedVariantArm (Some(Stdlib.AltJson.Json.String "x")), nestedVariantArm None, nestedVariantArm (Some(Stdlib.AltJson.Json.Float 1.0))] = [1L, 2L, 3L]
 
 // Stdlib.Result.mapError takes the result first, as every other Result and
 // Option combinator does; it took the function first.
