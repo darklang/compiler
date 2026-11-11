@@ -73,6 +73,11 @@ def main():
                    '(MyOpt.Nothing, MyOpt.Just(1), Pair { first = 1, second = "a" })')
         assert run(generic, current) == \
             '(\n  MyOpt<_>.Nothing,\n  MyOpt<Int64>.Just(1),\n  Pair<Int64, String> { first: 1, second: "a" }\n)'
+        # Types with the same parameters and shape are one type to the interpreter, so
+        # their cases print without a type name.
+        same = ("type A = | Same\ntype B = | Same\ntype C = | Other(Int64)\n"
+                '(A.Same, B.Same, C.Other(1), Stdlib.Int64.parse("x"))')
+        assert run(same, current) == "(Same, Same, C.Other(1), Error(BadFormat))"
         assert run('Stdlib.DateTime.parse("2019-07-28T22:42:36Z")', current) == \
             "Ok(<DateTime: 2019-07-28T22:42:36Z>)"
         assert run('Stdlib.DateTime.parse("2019-07-28T22:42:36Z") |> Builtin.unwrap', current) == \
