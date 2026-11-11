@@ -1073,6 +1073,13 @@ let sha256hmac (key: Blob) (data: Blob) : Blob =
 let __sha384hmac (key: Blob) (data: Blob) : Blob =
     Stdlib.Crypto.__hmac key data 128L Stdlib.Crypto.sha384
 
+let digest (algorithm: Stdlib.Crypto.DigestAlgorithm) (data: Blob) : Blob =
+    match algorithm with
+    | Md5 -> Stdlib.Crypto.md5 data
+    | Sha1 -> Stdlib.Crypto.__sha1 data
+    | Sha256 -> Stdlib.Crypto.sha256 data
+    | Sha384 -> Stdlib.Crypto.sha384 data
+
 // HMAC-SHA1
 let sha1hmac (key: Blob) (data: Blob) : Blob =
     Stdlib.Crypto.__hmac key data 64L Stdlib.Crypto.__sha1
