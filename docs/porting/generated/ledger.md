@@ -35,9 +35,9 @@ Upstream bugs record interpreter behavior or test expectations that the compiler
 | `aot-rejection` | `aot-match-error` | 26 |
 | `aot-rejection` | `aot-name-error` | 11 |
 | `aot-rejection` | `aot-type-error` | 151 |
-| `missing-support` | `compiler-gap` | 199 |
+| `missing-support` | `compiler-gap` | 196 |
 | `missing-support` | `test-counter` | 7 |
-| `missing-support` | `upstream-dependency` | 857 |
+| `missing-support` | `upstream-dependency` | 860 |
 | `upstream-bug` | `upstream-bug` | 1 |
 
 ### Remaining support by source
@@ -213,14 +213,14 @@ Tags are defined in [the glossary](../../../porting/compiler-reasons.json).
 | tests | `aot-name-error` | 11 |
 | tests | `aot-type-error` | 151 |
 | tests | `compiler-crash` | 2 |
-| tests | `compiler-gap` | 204 |
+| tests | `compiler-gap` | 201 |
 | tests | `compiler-leak` | 2 |
 | tests | `compiler-timeout` | 1 |
 | tests | `diagnostic-difference` | 2 |
 | tests | `interpreter-fixture` | 47 |
 | tests | `test-counter` | 7 |
 | tests | `upstream-bug` | 1 |
-| tests | `upstream-dependency` | 857 |
+| tests | `upstream-dependency` | 860 |
 
 ## Separate capability assessments
 

@@ -64,6 +64,28 @@ let rec checkLetPattern pattern typ symbols =
       Ok (C.LPVariable id, M.singleton name (typ, id), symbols)
   | WT.LPTuple (_, first, _, second, rest, _, _) -> (
       let patterns = first :: second :: List.map snd rest in
+      (* A parameter of an unannotated lambda, the form a package fn's local
+         `let f(x: T) = ...` arrives in, has no type yet: the tuple pattern
+         gives it one, with an unknown per element. *)
+      let typ, symbols =
+        match WrittenCheckingState.resolve symbols typ with
+        | (AST.TVar _ | AST.TInferenceVar _) as unknown -> (
+            let elements, fresh =
+              WrittenCheckingState.freshenType S.empty
+                (AST.TTuple
+                   (List.mapi
+                      (fun index _ ->
+                        let name = "t$tuple_element_" ^ string_of_int index in
+                        AST.TInferenceVar (name, name))
+                      patterns))
+                symbols
+            in
+            match WrittenCheckingState.constrain unknown elements fresh with
+            | Ok constrained ->
+                (WrittenCheckingState.resolve constrained unknown, constrained)
+            | Error _ -> (unknown, symbols))
+        | resolved -> (resolved, symbols)
+      in
       match typ with
       | AST.TTuple types when List.length patterns = List.length types ->
           let result =

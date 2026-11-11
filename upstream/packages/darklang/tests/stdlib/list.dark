@@ -551,7 +551,7 @@ test sort =
       |> Stdlib.Test.equal([ 2, 3, 6, 8 ])
       Stdlib.List.sort([]) |> Stdlib.Test.equal([]) ])
 
-// @compiler xfail compile: "Tuple pattern does not match the value type" class=missing-support reason=compiler-gap
+// @compiler xfail compile: "Unknown function or value 'Stdlib.List.sortWith'" class=missing-support reason=upstream-dependency
 test sortWith =
   let ascending = fun(a, b) ->
     if a < b then Stdlib.Ordering.Less

@@ -105,7 +105,7 @@ test wordNamesModule =
 
 // On an equal match Stdlib comes first, then other packages, then Darklang's own
 // tools; within each, the most called first.
-// @compiler xfail compile: "Tuple pattern does not match the value type" class=missing-support reason=compiler-gap
+// @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Packages.Search.rankKey'" class=missing-support reason=upstream-dependency
 test tiersThenCallers =
   let uses =
     Stdlib.Dict.fromList(
@@ -136,7 +136,7 @@ test tiersThenCallers =
 
 // A word Stdlib spells another way is searched that way too, and ranks by the name it
 // stands for: `size of string` is `String.length`, `replace` is `String.replaceAll`.
-// @compiler xfail compile: "Tuple pattern does not match the value type" class=missing-support reason=compiler-gap
+// @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Packages.Search.rankKey'" class=missing-support reason=upstream-dependency
 test synonyms =
   let order = fun(query, uses, candidates) ->
     let targets =

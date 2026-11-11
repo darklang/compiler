@@ -1,0 +1,7 @@
+// An unannotated lambda parameter takes its type from a tuple pattern applied
+// to it, as in a package fn's local `let names(pairs: T) = ...`, which arrives
+// as a let-bound lambda without the annotation.
+let tupleParameterNames (groups: List<(List<(String * Int64)> * Int64)>) : List<String> =
+  let names = fun pairs -> Stdlib.List.map pairs (fun (name, _) -> name) in
+  Stdlib.List.flatten (Stdlib.List.map groups (fun (pairs, _) -> names pairs))
+tupleParameterNames [([("a", 1L), ("b", 2L)], 3L), ([("c", 4L)], 5L)] = ["a", "b", "c"]
