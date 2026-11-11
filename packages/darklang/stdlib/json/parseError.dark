@@ -25,7 +25,7 @@ module ParseError =
       JsonPath.JsonPath
     | RecordDuplicateField of fieldName: String * JsonPath.JsonPath
     | RecordMissingField of fieldName: String * JsonPath.JsonPath
-    | NotJson
+    | NotJson of line: Int64 * column: Int64
 
   let __copyString (value: String) : String =
       Stdlib.String.__byteSlice value 0L (Stdlib.String.__byteLength value)
@@ -112,4 +112,9 @@ module ParseError =
       + JsonPath.toString path
       + "`"
 
-    | NotJson -> "Not JSON"
+    // Not JSON at line 1, column 4
+    | NotJson(line, column) ->
+      "Not JSON at line "
+      + Stdlib.Int64.toString line
+      + ", column "
+      + Stdlib.Int64.toString column
