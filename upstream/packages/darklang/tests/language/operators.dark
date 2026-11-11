@@ -166,11 +166,9 @@ test shifts =
       1u8 << 8u8 |> Stdlib.Test.equal(1u8) ])
 
 // `BigInt` has no width to mask a count against, so an unusable one raises
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test negativeLeftShiftRaises =
   1z << -1z => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test negativeRightShiftRaises =
   1z >> -1z => raises "Encountered an out-of-range integer value"
 

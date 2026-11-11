@@ -75,11 +75,11 @@ Stdlib.Int.toUInt128 (2 ** 200) = Stdlib.Option.Option.None
 Stdlib.Int.fromFloat 3.9 = 3
 Stdlib.Int.fromFloat -3.9 = -3
 Stdlib.Int.fromFloat (0.0 / 0.0) =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 Stdlib.Int.fromFloat (1.0 / 0.0) =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 Stdlib.Int.fromFloat (-1.0 / 0.0) =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 
 
 // --- remainder: Result<Int>; sign follows the dividend; Error only if divisor is 0 ---
@@ -112,6 +112,6 @@ Stdlib.Int.shiftLeft 1 4 = 16
 Stdlib.Int.shiftLeft 1 64 = 18446744073709551616
 Stdlib.Int.shiftRight 256 4 = 16
 Stdlib.Int.shiftLeft 1 (2 ** 40) =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 Stdlib.Int.shiftRight 1 (2 ** 40) =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"

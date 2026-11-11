@@ -116,17 +116,14 @@ test fromFloatTruncatesTowardZero =
 
 // NaN and the infinities have no BigInt, so they are out of range.
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test fromFloatRejectsNaN =
   Stdlib.BigInt.fromFloat(0.0 / 0.0)
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test fromFloatRejectsInfinity =
   Stdlib.BigInt.fromFloat(1.0 / 0.0)
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test fromFloatRejectsNegativeInfinity =
   Stdlib.BigInt.fromFloat(-1.0 / 0.0)
   => raises "Encountered an out-of-range integer value"
@@ -174,12 +171,10 @@ test shifts =
       (1z << 64z) |> Stdlib.Test.equal(18446744073709551616z)
       (256z >> 4z) |> Stdlib.Test.equal(16z) ])
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test shiftLeftRejectsHugeCount =
   (1z << (2z ** 40z))
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test shiftRightRejectsHugeCount =
   (1z >> (2z ** 40z))
   => raises "Encountered an out-of-range integer value"

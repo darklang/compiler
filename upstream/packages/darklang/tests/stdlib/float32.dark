@@ -243,12 +243,10 @@ test nanAndInfinities =
       |> Stdlib.Test.equal(Ok(true))
       Stdlib.Float32.fromFloat(0.0 / 0.0) |> Stdlib.Float32.isNaN |> Stdlib.Test.equal(true) ])
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test truncateRejectsNan =
   Stdlib.Float32.truncate(nan())
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test roundRejectsInfinity =
   Stdlib.Float32.round(infinity())
   => raises "Encountered an out-of-range integer value"

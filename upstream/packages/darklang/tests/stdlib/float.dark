@@ -59,37 +59,30 @@ test truncate =
       Stdlib.Float.truncate(2147483647.000009) |> Stdlib.Test.equal(2147483647) ])
 
 // NaN / Infinity have no Int64 representation -> Dark error, not a host crash
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test ceilingRejectsNan =
   Stdlib.Float.ceiling(nan())
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test roundUpRejectsInfinity =
   Stdlib.Float.roundUp(infinity())
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test floorRejectsNegativeInfinity =
   Stdlib.Float.floor(negativeInfinity())
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test roundDownRejectsNan =
   Stdlib.Float.roundDown(nan())
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test roundRejectsInfinity =
   Stdlib.Float.round(infinity())
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test truncateRejectsNan =
   Stdlib.Float.truncate(nan())
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test roundTowardsZeroRejectsNegativeInfinity =
   Stdlib.Float.roundTowardsZero(negativeInfinity())
   => raises "Encountered an out-of-range integer value"
@@ -326,17 +319,14 @@ test toInt64 =
       |> Stdlib.Test.equal(Stdlib.Float.roundTowardsZero(-2.5)) ])
 
 // NaN and infinities cannot become Int64s.
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test toInt64RejectsNan =
   Stdlib.Float.toInt64(nan())
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test toInt64RejectsInfinity =
   Stdlib.Float.toInt64(infinity())
   => raises "Encountered an out-of-range integer value"
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test toInt64RejectsNegativeInfinity =
   Stdlib.Float.toInt64(negativeInfinity())
   => raises "Encountered an out-of-range integer value"
@@ -394,7 +384,6 @@ test roundAliasesMatch =
       Stdlib.Float.roundTowardsZero(-1.5) |> Stdlib.Test.equal(Stdlib.Float.truncate(-1.5))
       Stdlib.Float.roundTowardsZero(1.5) |> Stdlib.Test.equal(1) ])
 
-// @compiler xfail runtime: "Uncaught exception: Encountered out-of-range value for type of Int" class=missing-support reason=compiler-gap
 test roundTowardsZeroRejectsNan =
   Stdlib.Float.roundTowardsZero(nan())
   => raises "Encountered an out-of-range integer value"

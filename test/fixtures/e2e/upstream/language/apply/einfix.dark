@@ -96,8 +96,8 @@ Stdlib.Int64.add 5L 3L = 8L
 1uy << 8uy = 1uy
 
 // `Int` has no width to mask a count against, so an unusable one raises
-1 << -1 = error="Encountered out-of-range value for type of Int"
-1 >> -1 = error="Encountered out-of-range value for type of Int"
+1 << -1 = error="Encountered an out-of-range integer value"
+1 >> -1 = error="Encountered an out-of-range integer value"
 
 // unary `~` is two's complement on every integer type
 ~0L = -1L
