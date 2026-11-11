@@ -36,8 +36,8 @@ dispositions:
     run: 638
   tests:
     blocked: 56
-    run: 1561
-    xfail: 1282
+    run: 1569
+    xfail: 1274
 reasons:
   packages:
     aot-type-error: 10
@@ -68,7 +68,7 @@ reasons:
     aot-name-error: 11
     aot-type-error: 151
     compiler-crash: 2
-    compiler-gap: 197
+    compiler-gap: 189
     compiler-leak: 2
     diagnostic-difference: 2
     interpreter-fixture: 47
@@ -119,9 +119,9 @@ expected_failures:
   missing-support:
     phases:
       compile: 970
-      runtime: 89
+      runtime: 81
     reasons:
-      compiler-gap: 192
+      compiler-gap: 184
       test-counter: 7
       upstream-dependency: 860
     sources:
@@ -131,7 +131,6 @@ expected_failures:
       upstream/packages/darklang/tests/cli/commandGroups.dark: 3
       upstream/packages/darklang/tests/cli/docsForAI.dark: 5
       upstream/packages/darklang/tests/cli/evalAndRun.dark: 17
-      upstream/packages/darklang/tests/cli/file.dark: 1
       upstream/packages/darklang/tests/cli/flags.dark: 3
       upstream/packages/darklang/tests/cli/golden.dark: 2
       upstream/packages/darklang/tests/cli/instance-tests.dark: 5
@@ -161,7 +160,7 @@ expected_failures:
       upstream/packages/darklang/tests/language/basic.dark: 6
       upstream/packages/darklang/tests/language/big.dark: 1
       upstream/packages/darklang/tests/language/collections.dark: 1
-      upstream/packages/darklang/tests/language/equality.dark: 3
+      upstream/packages/darklang/tests/language/equality.dark: 2
       upstream/packages/darklang/tests/language/errorTypeNames.dark: 8
       upstream/packages/darklang/tests/language/eself.dark: 2
       upstream/packages/darklang/tests/language/fastOps.dark: 2
@@ -214,7 +213,7 @@ expected_failures:
       upstream/packages/darklang/tests/scm/removalConflicts.dark: 5
       upstream/packages/darklang/tests/stdlib/altJson.dark: 12
       upstream/packages/darklang/tests/stdlib/base16.dark: 5
-      upstream/packages/darklang/tests/stdlib/base64.dark: 6
+      upstream/packages/darklang/tests/stdlib/base64.dark: 2
       upstream/packages/darklang/tests/stdlib/bytes.dark: 32
       upstream/packages/darklang/tests/stdlib/char.dark: 2
       upstream/packages/darklang/tests/stdlib/cli/file.dark: 11
@@ -231,7 +230,7 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/exec.dark: 3
       upstream/packages/darklang/tests/stdlib/float.dark: 11
       upstream/packages/darklang/tests/stdlib/float32.dark: 5
-      upstream/packages/darklang/tests/stdlib/http.dark: 7
+      upstream/packages/darklang/tests/stdlib/http.dark: 5
       upstream/packages/darklang/tests/stdlib/httpclient.dark: 7
       upstream/packages/darklang/tests/stdlib/httpserver.dark: 3
       upstream/packages/darklang/tests/stdlib/ints/bigInt.dark: 5

@@ -3,7 +3,6 @@
 module Darklang.Stdlib.Base64.Tests
 
 // Base64.decode
-// @compiler xfail runtime: "assertion 1: expected Darklang.Stdlib.Result.Result<Blob, String>.Ok(<Blob: ephemeral>), got Darklang.Stdlib.Result.Result<Blob, String>.Ok(<Blob: ephemeral>)" class=missing-support reason=compiler-gap
 test decode =
   Stdlib.Test.all(
     [ Stdlib.Base64.decode("") |> Stdlib.Test.equal(Ok(Stdlib.Utf8.encode("")))
@@ -26,7 +25,6 @@ test decodeFailures =
 
 // empty case
 // Test cases from the spec with padding added
-// @compiler xfail runtime: "assertion 1: expected Darklang.Stdlib.Result.Result<Blob, String>.Ok(<Blob: ephemeral>), got Darklang.Stdlib.Result.Result<Blob, String>.Ok(<Blob: ephemeral>)" class=missing-support reason=compiler-gap
 test decodeSpecCases =
   Stdlib.Test.all(
     [ Stdlib.Base64.decode("Zg") |> Stdlib.Test.equal(Ok(Stdlib.Utf8.encode("f")))
@@ -48,7 +46,6 @@ test decodeSpecCases =
 
 // "Impossible cases" from apache
 // https://commons.apache.org/proper/commons-codec/xref-test/org/apache/commons/codec/binary/Base64Test.html
-// @compiler xfail runtime: "assertion 1: expected Darklang.Stdlib.Result.Result<Blob, String>.Ok(<Blob: ephemeral>), got Darklang.Stdlib.Result.Result<Blob, String>.Ok(<Blob: ephemeral>)" class=missing-support reason=compiler-gap
 test decodeImpossibleCases =
   Stdlib.Test.all(
     [ Stdlib.Base64.decode("ZE==") |> Stdlib.Test.equal(Ok(Stdlib.Utf8.encode("d")))
@@ -59,7 +56,6 @@ test decodeImpossibleCases =
       |> Stdlib.Test.equal(Ok(Stdlib.Utf8.encode("foob`"))) ])
 
 // longer tests
-// @compiler xfail runtime: "assertion 1: expected Darklang.Stdlib.Result.Result<Blob, String>.Ok(<Blob: ephemeral>), got Darklang.Stdlib.Result.Result<Blob, String>.Ok(<Blob: ephemeral>)" class=missing-support reason=compiler-gap
 test decodeLongInputs =
   Stdlib.Test.all(
     [ Stdlib.Base64.decode(

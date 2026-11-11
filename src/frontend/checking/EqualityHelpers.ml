@@ -86,6 +86,7 @@ let rec buildEqHelperExpr ?(key = false) aliases registry lookup sums mode typ
       AST.applyNamedWithTypes "__key_eq" [ TFloat64 ]
         (NonEmptyList.fromList [ left; right ])
   | _, TInt -> call "Darklang.Stdlib.Int.__equals" [ left; right ]
+  | _, TBlob -> call "Darklang.Stdlib.Blob.__equals" [ left; right ]
   | ExpandCurrent, TDict (keyType, value) ->
       AST.applyNamedWithTypes
         (if key then "Darklang.Stdlib.Dict.__keyEquals"

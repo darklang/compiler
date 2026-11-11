@@ -145,11 +145,11 @@ type ComparisonRecordB = { value: Int64 }
 true < false = compileerror="Operator is unavailable for this type"
 "a" >= "b" = false
 1L < 1.0 = compileerror="Expected TInt64, got TFloat64"
-Stdlib.Blob.fromList ([]) != Stdlib.Blob.fromList ([]) = true
+Stdlib.Blob.fromList ([]) == Stdlib.Blob.fromList ([]) = true
 let blob = Stdlib.Blob.fromList ([]) in blob == blob = true
-Stdlib.equals (Stdlib.Blob.fromList ([])) (Stdlib.Blob.fromList ([])) = false
+Stdlib.equals (Stdlib.Blob.fromList ([])) (Stdlib.Blob.fromList ([])) = true
 let publicBlob = Stdlib.Blob.fromList ([]) in Stdlib.equals publicBlob publicBlob = true
-Stdlib.notEquals (Stdlib.Blob.fromList ([])) (Stdlib.Blob.fromList ([])) = true
+Stdlib.notEquals (Stdlib.Blob.fromList ([])) (Stdlib.Blob.fromList ([])) = false
 
 // Public wrapper calls retain the compiler's intentional AOT mismatch timing
 // for incompatible operand types.

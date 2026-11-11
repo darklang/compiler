@@ -380,6 +380,11 @@ let lowerAtom (toANFCore : LoweringCallbacks.expressionLowerer)
                 (A.Call
                    ( functionId "Darklang.Stdlib.Int.__equals",
                      [ leftAtom; rightAtom ] ))
+          | Ok AST.TBlob ->
+              equalityResult leftBindings rightBindings gen
+                (A.Call
+                   ( functionId "Darklang.Stdlib.Blob.__equals",
+                     [ leftAtom; rightAtom ] ))
           | Ok typ when Option.is_some (P.canonicalBufferKindForType typ) ->
               let kind =
                 match P.canonicalBufferKindForType typ with

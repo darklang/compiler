@@ -47,7 +47,6 @@ module AreIdentical =
       |> Builtin.unwrap)
     |> Builtin.unwrap
 
-  // @compiler xfail runtime: "expected true, got false" class=missing-support reason=compiler-gap
   test sameContents =
     compareWith("same contents", "same contents") |> Stdlib.Test.equal(true)
 
