@@ -2217,6 +2217,9 @@ let rewriteProgramWithSession (session : planningSession option)
                 allocateBinding "__json_parse_result" symbols1
               in
               let viewId, symbols3 = allocateBinding "__json_view" symbols2 in
+              let errorId, symbols3 =
+                allocateBinding "__json_parse_error" symbols3
+              in
               let parsed =
                 call finalPlanningEnv "Darklang.Stdlib.Json.__parseRoot"
                   [ Local sourceId ]
@@ -2247,11 +2250,8 @@ let rewriteProgramWithSession (session : planningSession option)
                               makeCase
                                 (constructorPattern planningEnv
                                    "Darklang.Stdlib.Result.Result" "Error"
-                                   [ PWildcard ])
-                                (error finalPlanningEnv
-                                   (constructor finalPlanningEnv
-                                      "Darklang.Stdlib.Json.ParseError.ParseError"
-                                      "NotJson" None));
+                                   [ PVariable errorId ])
+                                (error finalPlanningEnv (Local errorId));
                             ] ) ) ),
                 symbols3 )
           | _ -> (expr, currentSymbols)
