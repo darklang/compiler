@@ -45,7 +45,7 @@ let segmentsToString (branchId: Uuid) (segments: ErrorSegments) : String =
         | IndefiniteArticle ->
             match Stdlib.List.head prevSegments with
             | None -> ""
-            | Some following -> Stdlib.String.articleFor following + " "
+            | Some following -> Stdlib.English.articleFor following + " "
         | FunctionName name -> Darklang.PrettyPrinter.RuntimeTypes.fnName branchId name
         | Description value -> value
         | ParamName value -> "`" + value + "`"
