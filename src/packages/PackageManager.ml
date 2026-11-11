@@ -586,6 +586,7 @@ let builtinOperator name =
       ("bytesConcat", "Stdlib.Blob.concat");
       ("base16Encode", "Stdlib.Blob.toHex");
       ("base16Decode", "Stdlib.Blob.fromHex");
+      ("cryptoDigest", "Stdlib.Crypto.digest");
       ("toRepr", "Stdlib.inspect");
     ]
     @ List.map
