@@ -109,15 +109,15 @@ module Int =
 
   module Errors =
     // genuinely fractional values are rejected, never rounded
-    (Stdlib.Json.parse<Int> "1.5") |> err = Result.Error "Can't parse JSON `1.5` as type `Int` at path: `root`"
-    (Stdlib.Json.parse<Int> "9007199254740993.5") |> err = Result.Error "Can't parse JSON `9007199254740993.5` as type `Int` at path: `root`"
-    (Stdlib.Json.parse<Int> "\"42\"") |> err = Result.Error "Can't parse JSON `\"42\"` as type `Int` at path: `root`"
-    (Stdlib.Json.parse<Int> "null") |> err = Result.Error "Can't parse JSON `null` as type `Int` at path: `root`"
+    (Stdlib.Json.parse<Int> "1.5") |> err = Result.Error "Can't parse JSON `1.5` as type `BigInt` at path: `root`"
+    (Stdlib.Json.parse<Int> "9007199254740993.5") |> err = Result.Error "Can't parse JSON `9007199254740993.5` as type `BigInt` at path: `root`"
+    (Stdlib.Json.parse<Int> "\"42\"") |> err = Result.Error "Can't parse JSON `\"42\"` as type `BigInt` at path: `root`"
+    (Stdlib.Json.parse<Int> "null") |> err = Result.Error "Can't parse JSON `null` as type `BigInt` at path: `root`"
 
     // extreme exponents are rejected cleanly, never crash or hang the parser
-    (Stdlib.Json.parse<Int> "1e2147483647") |> err = Result.Error "Can't parse JSON `1e2147483647` as type `Int` at path: `root`"
-    (Stdlib.Json.parse<Int> "1e-2147483647") |> err = Result.Error "Can't parse JSON `1e-2147483647` as type `Int` at path: `root`"
-    (Stdlib.Json.parse<Int> "1e-2147483648") |> err = Result.Error "Can't parse JSON `1e-2147483648` as type `Int` at path: `root`"
+    (Stdlib.Json.parse<Int> "1e2147483647") |> err = Result.Error "Can't parse JSON `1e2147483647` as type `BigInt` at path: `root`"
+    (Stdlib.Json.parse<Int> "1e-2147483647") |> err = Result.Error "Can't parse JSON `1e-2147483647` as type `BigInt` at path: `root`"
+    (Stdlib.Json.parse<Int> "1e-2147483648") |> err = Result.Error "Can't parse JSON `1e-2147483648` as type `BigInt` at path: `root`"
     // ...but zero with an extreme negative exponent is still exactly zero
     Stdlib.Json.parse<Int> "0e-2147483648" = Result.Ok 0
 

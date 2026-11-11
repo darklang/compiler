@@ -136,7 +136,6 @@ module BigInt =
           |> Stdlib.Test.equal(Result.Ok(9007199254740993z)) ])
 
   module Errors =
-    // @compiler xfail runtime: "assertion 1: expected Darklang.Stdlib.Result.Result<Int, String>.Error(\"Can't parse JSON `1.5` as type `BigInt` at path: `root`\"), got Darklang.Stdlib.Result.Result<Int, String>.Error(\"Can't parse JSON `1.5` as type `Int` at path: `root`\")" class=missing-support reason=compiler-gap
     test parseErrors =
       Stdlib.Test.all(
         [ // genuinely fractional values are rejected, never rounded
