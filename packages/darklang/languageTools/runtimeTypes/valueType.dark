@@ -15,7 +15,7 @@ type KnownType =
   | KTUInt64
   | KTInt128
   | KTUInt128
-  | KTInt
+  | KTBigInt
   | KTFloat
   | KTChar
   | KTString
