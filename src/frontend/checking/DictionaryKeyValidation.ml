@@ -49,6 +49,21 @@ let needsValidation aliases records sums typ =
   in
   inspect S.empty typ
 
+(* A Float anywhere in a key, Dict values included, could be a NaN. *)
+let mayHoldNaN aliases records sums typ =
+  let rec inspect seen typ =
+    let typ = Types.resolveType aliases typ in
+    if S.mem typ seen then false
+    else
+      match typ with
+      | TFloat64 -> true
+      | _ ->
+          List.exists
+            (inspect (S.add typ seen))
+            (children aliases records sums typ)
+  in
+  inspect S.empty typ
+
 let generate aliases records sums roots =
   let needed = needsValidation aliases records sums in
   let call typ value = applyNamed (name typ) (NonEmptyList.singleton value) in
