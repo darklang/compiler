@@ -5,7 +5,7 @@ Stdlib.DateTime.atStartOfDay (Stdlib.DateTime.today ()) = Stdlib.DateTime.today 
 Stdlib.DateTime.hour (Stdlib.DateTime.today ()) = 0u8
 Stdlib.DateTime.toMilliseconds (Stdlib.DateTime.fromMilliseconds (-377673580800000L)) = -377673580800000L
 Stdlib.DateTime.toMilliseconds (Stdlib.DateTime.fromMilliseconds 253402300799999L) = 253402300799999L
-Stdlib.DateTime.fromMilliseconds (-377673580800001L) = error="Encountered out-of-range value for type of Int"
-Stdlib.DateTime.fromMilliseconds 253402300800000L = error="Encountered out-of-range value for type of Int"
-Stdlib.DateTime.addMilliseconds (Stdlib.DateTime.fromMilliseconds 253402300799999L) 1L = error="Encountered out-of-range value for type of Int"
-Stdlib.DateTime.subtractMilliseconds (Stdlib.DateTime.fromMilliseconds (-377673580800000L)) 1L = error="Encountered out-of-range value for type of Int"
+Stdlib.DateTime.fromMilliseconds (-377673580800001L) = error="Encountered an out-of-range integer value"
+Stdlib.DateTime.fromMilliseconds 253402300800000L = error="Encountered an out-of-range integer value"
+Stdlib.DateTime.addMilliseconds (Stdlib.DateTime.fromMilliseconds 253402300799999L) 1L = error="Encountered an out-of-range integer value"
+Stdlib.DateTime.subtractMilliseconds (Stdlib.DateTime.fromMilliseconds (-377673580800000L)) 1L = error="Encountered an out-of-range integer value"
