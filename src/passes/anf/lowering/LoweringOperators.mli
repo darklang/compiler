@@ -1,6 +1,9 @@
 (* LoweringOperators.mli - Lower numeric operators and structural equality into ANF. *)
 val convertBinOp : AST.binOp -> ANF.binOp
 
+val shortCircuit :
+  AST.binOp -> CheckedAST.expr -> CheckedAST.expr -> CheckedAST.expr option
+
 val integerFunctionForBinOp :
   (string -> AST.functionId) ->
   AST.semanticType ->
