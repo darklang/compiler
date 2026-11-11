@@ -355,6 +355,11 @@ let lowerAtom (toANFCore : LoweringCallbacks.expressionLowerer)
                         [ A.Var raw ] ) );
                 ],
               gen ))
+  | C.BinOp (op, left, right) when Option.is_some (O.shortCircuit op left right)
+    -> (
+      match O.shortCircuit op left right with
+      | Some conditional -> atom conditional gen
+      | None -> Crash.crash "Short-circuit operator lost its conditional")
   | C.BinOp (op, left, right) -> (
       let* leftAtom, leftBindings, gen = atom left gen in
       let* rightAtom, rightBindings, gen = atom right gen in

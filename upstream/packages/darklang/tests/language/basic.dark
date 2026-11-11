@@ -44,7 +44,6 @@ test and =
 test andShortCircuits =
   (false && Stdlib.Test.raiseRuntimeError("msg")) |> Stdlib.Test.equal(false)
 
-// @compiler xfail runtime: "Cannot divide by 0" class=missing-support reason=compiler-gap
 test andSkipsDivideByZero =
   (false && ((1 / 0) == 1)) |> Stdlib.Test.equal(false)
 
@@ -96,7 +95,6 @@ test orRejectsNonBooleanLeft =
 test orShortCircuits =
   (true || Stdlib.Test.raiseRuntimeError("msg")) |> Stdlib.Test.equal(true)
 
-// @compiler xfail runtime: "Cannot divide by 0" class=missing-support reason=compiler-gap
 test orSkipsDivideByZero =
   (true || ((1 / 0) == 1)) |> Stdlib.Test.equal(true)
 
