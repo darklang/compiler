@@ -68,13 +68,13 @@ reasons:
     aot-name-error: 11
     aot-type-error: 151
     compiler-crash: 2
-    compiler-gap: 204
+    compiler-gap: 201
     compiler-leak: 2
     diagnostic-difference: 2
     interpreter-fixture: 47
     test-counter: 7
     upstream-bug: 1
-    upstream-dependency: 857
+    upstream-dependency: 860
 expected_failures:
   aot-rejection:
     phases:
@@ -121,9 +121,9 @@ expected_failures:
       compile: 971
       runtime: 92
     reasons:
-      compiler-gap: 199
+      compiler-gap: 196
       test-counter: 7
-      upstream-dependency: 857
+      upstream-dependency: 860
     sources:
       upstream/packages/darklang/tests/cli/bashrc.dark: 2
       upstream/packages/darklang/tests/cli/builtinGroups.dark: 4
