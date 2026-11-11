@@ -2,7 +2,7 @@
 
 module Darklang.Stdlib.Cli.UI.TextField
 
-type State = { text: String, cursor: Int }
+type State = { text: String, cursor: Int64 }
 type Msg = Submitted of String | Cancelled
 
-val empty = Stdlib.Cli.UI.TextField.State { text = "", cursor = 0 }
+val empty = Stdlib.Cli.UI.TextField.State { text = "", cursor = 0L }
