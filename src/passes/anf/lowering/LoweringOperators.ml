@@ -138,6 +138,8 @@ let rec generateStructuralEquality resolve left right typ gen registry variants
         A.Call (resolve "Darklang.Stdlib.UInt128.__equals", [ left; right ])
     | AST.TInt ->
         A.Call (resolve "Darklang.Stdlib.Int.__equals", [ left; right ])
+    | AST.TBlob ->
+        A.Call (resolve "Darklang.Stdlib.Blob.__equals", [ left; right ])
     | AST.TString -> A.CanonicalBufferEq (MemoryModel.Utf8String, left, right)
     | AST.TChar -> A.CanonicalBufferEq (MemoryModel.GraphemeCluster, left, right)
     | _ -> A.Prim (A.Eq, left, right)
