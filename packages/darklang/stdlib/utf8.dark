@@ -5,9 +5,8 @@ module Darklang.Stdlib.Utf8
 /// Encodes <param s> as UTF-8.
 let encode (s: String) : Blob = Stdlib.String.toBlob s
 
-/// Decodes <param bytes> as UTF-8, or an Error when they are not UTF-8, worded
-/// as the interpreter words it: .NET's message for the first invalid sequence
-/// (its resource key, the bytes and their index).
+/// Decodes <param bytes> as UTF-8, or an Error naming where the first invalid
+/// sequence starts and its bytes in hex: `Invalid UTF-8 at byte 1: E2 82`.
 let decode (bytes: Blob) : Stdlib.Result.Result<String, String> =
     match Stdlib.String.fromBlob bytes with
     | Some s -> Ok s
@@ -15,10 +14,10 @@ let decode (bytes: Blob) : Stdlib.Result.Result<String, String> =
         let index = Stdlib.Utf8.__firstInvalid bytes 0L (Stdlib.Blob.__byteLength bytes) in
         let length = Stdlib.Utf8.__validPrefix bytes index (Stdlib.Blob.__byteLength bytes) in
         Error
-            ("Invalid UTF-8: Argument_InvalidCodePageBytesIndex, "
-             + Stdlib.Utf8.__bracketedBytes bytes index (index + length)
-             + ", "
-             + Stdlib.Int64.toString index)
+            ("Invalid UTF-8 at byte "
+             + Stdlib.Int64.toString index
+             + ": "
+             + Stdlib.Utf8.__spacedBytes bytes index (index + length))
 
 let __hexDigit (value: Int64) : String =
     match value with
@@ -30,12 +29,13 @@ let __hexDigit (value: Int64) : String =
     | 15L -> "F"
     | _ -> Stdlib.Int64.toString value
 
-let __bracketedBytes (bytes: Blob) (index: Int64) (stop: Int64) : String =
+let __spacedBytes (bytes: Blob) (index: Int64) (stop: Int64) : String =
     if index >= stop then ""
     else
         let byte = Stdlib.Blob.__getByte bytes index in
-        "[" + Stdlib.Utf8.__hexDigit (byte / 16L) + Stdlib.Utf8.__hexDigit (byte % 16L) + "]"
-        + Stdlib.Utf8.__bracketedBytes bytes (index + 1L) stop
+        let separator = if index + 1L < stop then " " else "" in
+        Stdlib.Utf8.__hexDigit (byte / 16L) + Stdlib.Utf8.__hexDigit (byte % 16L) + separator
+        + Stdlib.Utf8.__spacedBytes bytes (index + 1L) stop
 
 // The bytes a lead byte needs after it (0 for ASCII, -1 for a byte that cannot
 // start a sequence), and the range its first continuation byte must fall in.

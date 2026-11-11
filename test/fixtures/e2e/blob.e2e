@@ -18,9 +18,9 @@ Stdlib.Blob.concat ([]) != Stdlib.Blob.empty = true
 
 Stdlib.Blob.fromString "rendered" = stdout="<Blob: ephemeral>" stderr=""
 
-Stdlib.Blob.fromHex "0" = Error "Invalid hex string: Format_BadHexLength"
+Stdlib.Blob.fromHex "0" = Error "Invalid hex string: it has 1 digits, and each byte takes two"
 
-Stdlib.Blob.fromHex "GG" = Error "Invalid hex string: Format_BadHexChar"
+Stdlib.Blob.fromHex "GG" = Error "Invalid hex string: 'G' is not a hex digit (0-9, a-f, A-F)"
 
 (match Stdlib.Base64.decode "Zg" with | Ok b -> Stdlib.Blob.toHex b | Error e -> e) = "66"
 
@@ -40,6 +40,6 @@ Stdlib.Blob.toString (Stdlib.Blob.fromList ([237uy, 160uy, 128uy])) = Error "Inv
 
 Stdlib.Blob.toString (Stdlib.Blob.fromList ([244uy, 144uy, 128uy, 128uy])) = Error "Invalid UTF-8: Unable to translate bytes [F4] at index 0 from specified code page to Unicode."
 // .NET checks the length in UTF-16 code units before the characters.
-Stdlib.Blob.fromHex "é" = Error "Invalid hex string: Format_BadHexLength"
-Stdlib.Blob.fromHex "aé" = Error "Invalid hex string: Format_BadHexChar"
-Stdlib.Blob.fromHex "a😀" = Error "Invalid hex string: Format_BadHexLength"
+Stdlib.Blob.fromHex "é" = Error "Invalid hex string: 'é' is not a hex digit (0-9, a-f, A-F)"
+Stdlib.Blob.fromHex "aé" = Error "Invalid hex string: 'é' is not a hex digit (0-9, a-f, A-F)"
+Stdlib.Blob.fromHex "a😀" = Error "Invalid hex string: '😀' is not a hex digit (0-9, a-f, A-F)"
