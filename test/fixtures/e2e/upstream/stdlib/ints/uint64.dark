@@ -105,11 +105,11 @@ Stdlib.UInt64.divide 1UL 0UL = error="Cannot divide by 0"
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.UInt64.random 0UL 1UL)
- |> Stdlib.List.unique) = [ 0UL, 1UL ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0UL, 1UL ]
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.UInt64.random 0UL 2UL)
- |> Stdlib.List.unique) = [ 0UL, 1UL, 2UL ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0UL, 1UL, 2UL ]
 
 Stdlib.UInt64.sum [ 1UL, 2UL ] = 3UL
 

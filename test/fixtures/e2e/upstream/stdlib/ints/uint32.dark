@@ -116,11 +116,11 @@ Stdlib.UInt32.mod 5ul 0ul = error="Cannot evaluate modulus against 0"
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.UInt32.random 0ul 1ul)
- |> Stdlib.List.unique) = [ 0ul, 1ul ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0ul, 1ul ]
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.UInt32.random 0ul 2ul)
- |> Stdlib.List.unique) = [ 0ul, 1ul, 2ul ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0ul, 1ul, 2ul ]
 
 Stdlib.UInt32.sum [ 1ul, 2ul ] = 3ul
 

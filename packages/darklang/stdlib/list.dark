@@ -179,7 +179,7 @@ let sortBy<'a, 'b> (list: List<a>) (fn: a -> b) : List<a> =
         Stdlib.List.sort<(b * a)> (Stdlib.List.__sortByPairs<a, b> list fn))
 
 let unique<'a> (list: List<a>) : List<a> =
-    Stdlib.List.sort (Stdlib.List.__uniqueUnsorted list [])
+    Stdlib.List.reverse (Stdlib.List.__uniqueUnsorted list [])
 
 let __uniqueUnsorted<'a> (remaining: List<a>) (uniqueValues: List<a>) : List<a> =
     match remaining with
@@ -189,7 +189,7 @@ let __uniqueUnsorted<'a> (remaining: List<a>) (uniqueValues: List<a>) : List<a> 
         Stdlib.List.__uniqueUnsorted<a> tail next
 
 let uniqueBy<'a, 'b> (list: List<a>) (fn: a -> b) : List<a> =
-    Stdlib.List.sort (Stdlib.List.__uniqueByHelper list fn [] [])
+    Stdlib.List.reverse (Stdlib.List.__uniqueByHelper list fn [] [])
 
 let __uniqueByHelper<'a, 'b> (remaining: List<a>) (fn: a -> b) (uniqueValues: List<a>) (seen: List<b>) : List<a> =
     match remaining with

@@ -226,11 +226,11 @@ Stdlib.Int64.divide (-9223372036854775808L) -1L = -9223372036854775808L
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.Int64.random 0L 1L)
- |> Stdlib.List.unique) = [ 0L, 1L ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0L, 1L ]
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.Int64.random 0L 2L)
- |> Stdlib.List.unique) = [ 0L, 1L, 2L ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0L, 1L, 2L ]
 
 Stdlib.Int64.sum [ 1L, 2L ] = 3L
 

@@ -305,7 +305,6 @@ module OrderPreservingDedup =
   // steps through, deduped with `Stdlib.List.unique`/`uniqueBy`. Sorting there would swap the
   // sequence for lexicographic hash order, which looks plausible and sends undo to the wrong version,
   // so pin that both keep first occurrences in place.
-  // @compiler xfail runtime: "assertion 1: expected [\"c\", \"a\", \"b\"], got [\"a\", \"b\", \"c\"]" class=missing-support reason=compiler-gap
   test uniqueKeepsOrder =
     Stdlib.Test.all(
       [ Stdlib.List.unique([ "c", "a", "b", "a" ]) |> Stdlib.Test.equal([ "c", "a", "b" ])
