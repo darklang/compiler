@@ -311,9 +311,9 @@ let rec checkExpression (globals : globals) locals symbols expected expression =
       WrittenCollectionSupport.tuple checkExpression checkedLiteral globals
         locals symbols expected
         (first :: second :: List.map snd rest)
-  | WT.EList (_, contents, _, _) ->
+  | WT.EList (range, contents, _, _) ->
       WrittenCollectionSupport.list checkExpression checkedLiteral globals
-        locals symbols expected contents
+        locals symbols expected range contents
   | WT.EDict (_, entries, _, _, _) ->
       WrittenCollectionSupport.dict checkExpression checkedLiteral globals
         locals symbols expected entries
