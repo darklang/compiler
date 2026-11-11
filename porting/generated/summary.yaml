@@ -31,13 +31,13 @@ dispositions:
     replace: 35
     run: 1823
   stdlib:
-    blocked: 827
-    replace: 907
-    run: 638
+    blocked: 815
+    replace: 908
+    run: 649
   tests:
     blocked: 56
-    run: 1571
-    xfail: 1272
+    run: 1577
+    xfail: 1266
 reasons:
   packages:
     aot-type-error: 10
@@ -51,15 +51,15 @@ reasons:
     test-diagnostics: 1
     upstream-dependency: 2214
   stdlib:
-    compiler-contract: 129
-    compiler-implementation: 904
+    compiler-contract: 128
+    compiler-implementation: 905
     compiler-timeout: 1
     constructor-identity: 2
     container-adaptation: 490
     interpreter-intrinsic: 1
     test-counter: 2
     test-diagnostics: 2
-    upstream-dependency: 203
+    upstream-dependency: 192
   tests:
     aot-arity-error: 12
     aot-invalid-field: 16
@@ -68,13 +68,13 @@ reasons:
     aot-name-error: 11
     aot-type-error: 151
     compiler-crash: 2
-    compiler-gap: 187
+    compiler-gap: 184
     compiler-leak: 2
     diagnostic-difference: 2
     interpreter-fixture: 47
     test-counter: 7
     upstream-bug: 1
-    upstream-dependency: 860
+    upstream-dependency: 857
 expected_failures:
   aot-rejection:
     phases:
@@ -118,12 +118,12 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/string.dark: 3
   missing-support:
     phases:
-      compile: 970
-      runtime: 79
+      compile: 961
+      runtime: 82
     reasons:
-      compiler-gap: 182
+      compiler-gap: 179
       test-counter: 7
-      upstream-dependency: 860
+      upstream-dependency: 857
     sources:
       upstream/packages/darklang/tests/cli/bashrc.dark: 2
       upstream/packages/darklang/tests/cli/builtinGroups.dark: 4
@@ -211,7 +211,7 @@ expected_failures:
       upstream/packages/darklang/tests/scm/propagation.dark: 16
       upstream/packages/darklang/tests/scm/referenceNames.dark: 2
       upstream/packages/darklang/tests/scm/removalConflicts.dark: 5
-      upstream/packages/darklang/tests/stdlib/altJson.dark: 12
+      upstream/packages/darklang/tests/stdlib/altJson.dark: 6
       upstream/packages/darklang/tests/stdlib/base16.dark: 5
       upstream/packages/darklang/tests/stdlib/base64.dark: 2
       upstream/packages/darklang/tests/stdlib/bytes.dark: 32

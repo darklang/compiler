@@ -6,7 +6,7 @@
 
 module Darklang.Stdlib.AltJson
 
-type Json = Null | Bool of Bool | Number of Float | String of String | Array of List<Stdlib.AltJson.Json> | Object of List<(String * Stdlib.AltJson.Json)>
+type Json = Null | Bool of Bool | Integer of Int64 | Float of Float | String of String | Array of List<Stdlib.AltJson.Json> | Object of List<(String * Stdlib.AltJson.Json)>
 
 
 type __InternalRawJson = RawNull of raw: String | RawBool of value: Bool * raw: String | RawNumber of lexeme: String * raw: String | RawString of value: String * raw: String | RawArray of values: List<Stdlib.AltJson.__InternalRawJson> * raw: String | RawObject of fields: List<(String * Stdlib.AltJson.__InternalRawJson)> * raw: String
@@ -402,14 +402,25 @@ let __projectRawFields (values: List<(String * Stdlib.AltJson.__InternalRawJson)
         | None -> Stdlib.Option.Option.None
         | Some value -> Stdlib.AltJson.__projectRawFields tail (Stdlib.List.push acc ((key, value)))
 
+// As the interpreter reads a number: an Integer when it is written without a
+// fraction or exponent and fits an Int64, and otherwise a Float.
+let __projectNumber (lexeme: String) : Stdlib.Option.Option<Stdlib.AltJson.Json> =
+    let integral =
+        Stdlib.AltJson.__findNumberMarker lexeme 0L 46L 46L < 0L
+        && Stdlib.AltJson.__findNumberMarker lexeme 0L 101L 69L < 0L
+    in
+    match (if integral then Stdlib.Int64.parse lexeme |> Stdlib.Result.toOption else Stdlib.Option.Option.None) with
+    | Some value -> Stdlib.Option.Option.Some (Stdlib.AltJson.Json.Integer value)
+    | None ->
+        match Stdlib.AltJson.__numberToFloat lexeme with
+        | None -> Stdlib.Option.Option.None
+        | Some value -> Stdlib.Option.Option.Some (Stdlib.AltJson.Json.Float value)
+
 let __projectRaw (value: Stdlib.AltJson.__InternalRawJson) : Stdlib.Option.Option<Stdlib.AltJson.Json> =
     match value with
     | RawNull _ -> Stdlib.Option.Option.Some Stdlib.AltJson.Json.Null
     | RawBool (value, _) -> Stdlib.Option.Option.Some (Stdlib.AltJson.Json.Bool value)
-    | RawNumber (lexeme, _) ->
-        (match Stdlib.AltJson.__numberToFloat lexeme with
-        | None -> Stdlib.Option.Option.None
-        | Some value -> Stdlib.Option.Option.Some (Stdlib.AltJson.Json.Number value))
+    | RawNumber (lexeme, _) -> Stdlib.AltJson.__projectNumber lexeme
     | RawString (value, _) -> Stdlib.Option.Option.Some (Stdlib.AltJson.Json.String value)
     | RawArray (values, _) ->
         (match Stdlib.AltJson.__projectRawList values [] with
@@ -518,7 +529,8 @@ let format (json: Stdlib.AltJson.Json) : String =
     match json with
     | Null -> "null"
     | Bool value -> if value then "true" else "false"
-    | Number value -> Stdlib.AltJson.__formatNumber value
+    | Integer value -> Stdlib.Int64.toString value
+    | Float value -> Stdlib.AltJson.__formatNumber value
     | String value -> Stdlib.AltJson.__quote value
     | Array values -> "[" + Stdlib.AltJson.__formatArray values true + "]"
     | Object values -> "{" + Stdlib.AltJson.__formatObject values true + "}"

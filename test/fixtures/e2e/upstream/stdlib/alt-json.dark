@@ -56,17 +56,17 @@ module Number =
   // - NaN
   // - huge numbers (esp at Float's limits)
   // - other notation
-  format (Json.Number 0.0) = "0" // TODO: any reason we need to make this `0.0`?
-  parse "0" = parsedOk (Json.Number 0.0)
+  format (Json.Integer 0L) = "0" // TODO: any reason we need to make this `0.0`?
+  parse "0" = parsedOk (Json.Integer 0L)
 
-  format (Json.Number 0.1) = "0.1"
-  parse "0.1" = parsedOk (Json.Number 0.1)
+  format (Json.Float 0.1) = "0.1"
+  parse "0.1" = parsedOk (Json.Float 0.1)
 
-  format (Json.Number -1.0) = "-1"
-  parse "-1" = parsedOk (Json.Number -1.0)
+  format (Json.Integer (-1L)) = "-1"
+  parse "-1" = parsedOk (Json.Integer (-1L))
 
-  format (Json.Number -1337.0) = "-1337"
-  parse "-1337" = parsedOk (Json.Number -1337.0)
+  format (Json.Integer (-1337L)) = "-1337"
+  parse "-1337" = parsedOk (Json.Integer (-1337L))
 
 
 
@@ -96,30 +96,30 @@ module Array =
   // first fibonnaci numbers
   format (
     Json.Array
-      [ Json.Number 0.0
-        Json.Number 1.0
-        Json.Number 1.0
-        Json.Number 2.0
-        Json.Number 3.0
-        Json.Number 5.0
-        Json.Number 8.0
-        Json.Number 13.0
-        Json.Number 21.0
-        Json.Number 34.0 ]
+      [ Json.Integer 0L
+        Json.Integer 1L
+        Json.Integer 1L
+        Json.Integer 2L
+        Json.Integer 3L
+        Json.Integer 5L
+        Json.Integer 8L
+        Json.Integer 13L
+        Json.Integer 21L
+        Json.Integer 34L ]
   ) = "[0,1,1,2,3,5,8,13,21,34]"
 
   parse "[0, 1, 1, 2, 3, 5, 8, 13, 21, 34]" = parsedOk (
     Json.Array
-      [ Json.Number 0.0
-        Json.Number 1.0
-        Json.Number 1.0
-        Json.Number 2.0
-        Json.Number 3.0
-        Json.Number 5.0
-        Json.Number 8.0
-        Json.Number 13.0
-        Json.Number 21.0
-        Json.Number 34.0 ]
+      [ Json.Integer 0L
+        Json.Integer 1L
+        Json.Integer 1L
+        Json.Integer 2L
+        Json.Integer 3L
+        Json.Integer 5L
+        Json.Integer 8L
+        Json.Integer 13L
+        Json.Integer 21L
+        Json.Integer 34L ]
   )
 
   // nested arrays
@@ -129,23 +129,23 @@ module Array =
         [4, 5, 6],
         [7, 8, 9] ]""" = parsedOk (
     Json.Array
-      [ Json.Array [ Json.Number 1.0, Json.Number 2.0, Json.Number 3.0 ]
-        Json.Array [ Json.Number 4.0, Json.Number 5.0, Json.Number 6.0 ]
-        Json.Array [ Json.Number 7.0, Json.Number 8.0, Json.Number 9.0 ] ]
+      [ Json.Array [ Json.Integer 1L, Json.Integer 2L, Json.Integer 3L ]
+        Json.Array [ Json.Integer 4L, Json.Integer 5L, Json.Integer 6L ]
+        Json.Array [ Json.Integer 7L, Json.Integer 8L, Json.Integer 9L ] ]
   )
 
   format (
     Json.Array
-      [ Json.Array [ Json.Number 1.0, Json.Number 2.0, Json.Number 3.0 ]
-        Json.Array [ Json.Number 4.0, Json.Number 5.0, Json.Number 6.0 ]
-        Json.Array [ Json.Number 7.0, Json.Number 8.0, Json.Number 9.0 ] ]
+      [ Json.Array [ Json.Integer 1L, Json.Integer 2L, Json.Integer 3L ]
+        Json.Array [ Json.Integer 4L, Json.Integer 5L, Json.Integer 6L ]
+        Json.Array [ Json.Integer 7L, Json.Integer 8L, Json.Integer 9L ] ]
   ) = "[[1,2,3],[4,5,6],[7,8,9]]"
 
 
   // mixed types
-  format (Json.Array [ Json.Null, Json.Number 1.2 ]) = "[null,1.2]"
+  format (Json.Array [ Json.Null, Json.Float 1.2 ]) = "[null,1.2]"
 
-  parse "[ null, 1.2 ]" = parsedOk (Json.Array [ Json.Null, Json.Number 1.2 ])
+  parse "[ null, 1.2 ]" = parsedOk (Json.Array [ Json.Null, Json.Float 1.2 ])
 
 
 
@@ -163,10 +163,10 @@ module Object =
 
   // dupe name
   parse """{ "n": null, "n": 1 }""" = parsedOk (
-    Json.Object [ ("n", Json.Null), ("n", Json.Number 1.0) ]
+    Json.Object [ ("n", Json.Null), ("n", Json.Integer 1L) ]
   )
 
-  format (Json.Object [ ("n", Json.Null), ("n", Json.Number 1.0) ]) = """{"n":null,"n":1}"""
+  format (Json.Object [ ("n", Json.Null), ("n", Json.Integer 1L) ]) = """{"n":null,"n":1}"""
 
 
   // blank name

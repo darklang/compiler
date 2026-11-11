@@ -1,7 +1,7 @@
 module Darklang.Stdlib.AltJson
 
 
-// @compiler blocked: compiler-contract diagnostic="Imported Json has distinct Integer and Float cases; the compiler substitute exposes Number of Float."
+// @compiler replace: packages/darklang/stdlib/altJson.dark#Darklang.Stdlib.AltJson.Json reason=compiler-implementation
 type Json =
   | Null
   | Bool(Bool)
@@ -359,7 +359,6 @@ module Parse =
 
 /// Reads an exact JSON integer. A Float value is never silently truncated or
 /// reinterpreted as an integer, even if its current value is whole.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.toInt64: Unknown constructor 'Darklang.Stdlib.AltJson.Json.Integer' in pattern"
 let toInt64(j: Json): Option.Option<Int64> =
   match j with
   | Integer(i) -> Option.Option.Some(i)
@@ -367,7 +366,6 @@ let toInt64(j: Json): Option.Option<Int64> =
 
 
 /// Read a JSON number as Float only when the conversion is exact.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.toFloat: Unknown constructor 'Darklang.Stdlib.AltJson.Json.Float' in pattern"
 let toFloat(j: Json): Option.Option<Float> =
   match j with
   | Float(n) -> Option.Option.Some(n)
@@ -434,7 +432,6 @@ module Helpers =
 
   /// Get an integer value from a JSON object's fields. {{None}} if the key is
   /// missing or its value isn't exactly an integer (see <fn toInt64>).
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Helpers.getInt64Option: Unknown function or value 'toInt64'"
   let getInt64Option(
     key: String,
     fields: List<(String * Json)>)
@@ -448,7 +445,6 @@ module Helpers =
 
   /// Read an optional integer while distinguishing an absent or null field
   /// from a present value that cannot be converted exactly.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Helpers.getInt64OptionResult: Unknown function or value 'toInt64'"
   let getInt64OptionResult(
     key: String,
     fields: List<(String * Json)>)
@@ -464,7 +460,6 @@ module Helpers =
 
   /// Get a required integer field. The error distinguishes a missing field
   /// from a field whose value cannot be converted exactly.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Helpers.getInt64Result: Unknown function or value 'toInt64'"
   let getInt64Result(
     key: String,
     fields: List<(String * Json)>)
@@ -480,7 +475,6 @@ module Helpers =
   /// Get an integer field that may be left out. {{Ok}} <param default_> if the
   /// key is missing or null, {{Error}} if it's present but isn't exactly an
   /// integer (see <fn toInt64>).
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Helpers.getInt64Or: Unknown function or value 'toInt64'"
   let getInt64Or(
     key: String,
     default_: Int64,
@@ -497,7 +491,6 @@ module Helpers =
 
   /// Get a Float field. An integer is converted only if Float can hold it
   /// exactly; use <fn getInt64Option> for integers.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Helpers.getFloat: Unknown function or value 'toFloat'"
   let getFloat(
     key: String,
     fields: List<(String * Json)>)
@@ -558,12 +551,10 @@ module Builder =
     List.append(fields, (key, Json.String(value)))
 
   /// Add a floating-point field
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Builder.addFloat: Unknown constructor 'Darklang.Stdlib.AltJson.Json.Float'"
   let addFloat(fields: Fields, key: String, value: Float): Fields =
     List.append(fields, (key, Json.Float(value)))
 
   /// Add an integer field without converting it to Float
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Builder.addInt64: Unknown constructor 'Darklang.Stdlib.AltJson.Json.Integer'"
   let addInt64(fields: Fields, key: String, value: Int64): Fields =
     List.append(fields, (key, Json.Integer(value)))
 
@@ -594,7 +585,6 @@ module Builder =
     | None -> fields
 
   /// Add an optional Float field (only adds if Some)
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Builder.addOptionalFloat: Unknown constructor 'Darklang.Stdlib.AltJson.Json.Float'"
   let addOptionalFloat(
     fields: Fields,
     key: String,
@@ -605,7 +595,6 @@ module Builder =
     | None -> fields
 
   /// Add an optional integer field (only adds if Some)
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Builder.addOptionalInt64: Unknown function or value 'addInt64'"
   let addOptionalInt64(
     fields: Fields,
     key: String,

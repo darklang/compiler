@@ -11,7 +11,7 @@ let guardedNestedLiteral (o: Option<Stdlib.AltJson.Json>) : Int64 =
   | Some(_) -> 3L
 guardedNestedLiteral (Some(Stdlib.AltJson.Json.String "2.0")) = 1L
 guardedNestedLiteral None = 2L
-guardedNestedLiteral (Some(Stdlib.AltJson.Json.Number 1.0)) = 3L
+guardedNestedLiteral (Some(Stdlib.AltJson.Json.Float 1.0)) = 3L
 guardedNestedLiteral (Some(Stdlib.AltJson.Json.String "3")) = 3L
 
 type GuardedErr = | Missing | Invalid of Stdlib.AltJson.Json
@@ -22,7 +22,7 @@ let guardedTuplePayload (fields: List<(String * Stdlib.AltJson.Json)>) : Result<
   | Some((_, invalid)) -> Error(GuardedErr.Invalid invalid)
 guardedTuplePayload [("jsonrpc", Stdlib.AltJson.Json.String "2.0")] = Ok ()
 guardedTuplePayload [] = Error(GuardedErr.Missing)
-guardedTuplePayload [("jsonrpc", Stdlib.AltJson.Json.Number 1.0)] = Error(GuardedErr.Invalid (Stdlib.AltJson.Json.Number 1.0))
+guardedTuplePayload [("jsonrpc", Stdlib.AltJson.Json.Float 1.0)] = Error(GuardedErr.Invalid (Stdlib.AltJson.Json.Float 1.0))
 
 let guardedDeep (o: Option<(Int64 * Option<String>)>) : Int64 =
   match o with
@@ -62,6 +62,6 @@ let listHeadsAtTop (xs: List<String>) : Int =
 let consHeadConstructor (xs: List<Stdlib.AltJson.Json>) : Int64 =
   match xs with
   | [String s] -> Stdlib.String.length s
-  | Number n :: _ -> 100L
+  | Float n :: _ -> 100L
   | _ -> 0L
-[consHeadConstructor [Stdlib.AltJson.Json.String "abc"], consHeadConstructor [Stdlib.AltJson.Json.Number 1.0, Stdlib.AltJson.Json.Null], consHeadConstructor [], consHeadConstructor [Stdlib.AltJson.Json.Null]] = [3L, 100L, 0L, 0L]
+[consHeadConstructor [Stdlib.AltJson.Json.String "abc"], consHeadConstructor [Stdlib.AltJson.Json.Float 1.0, Stdlib.AltJson.Json.Null], consHeadConstructor [], consHeadConstructor [Stdlib.AltJson.Json.Null]] = [3L, 100L, 0L, 0L]
