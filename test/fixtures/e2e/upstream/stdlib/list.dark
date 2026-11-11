@@ -317,12 +317,12 @@ Stdlib.List.takeWhile [] (fun item -> item < 3L) = []
 Stdlib.List.uniqueBy [ 1L, 2L, 3L, 4L ] (fun x -> Stdlib.Int64.divide x 2L) = [ 1L, 2L, 4L ]
 Stdlib.List.uniqueBy [ 1L, 2L, 3L, 4L ] (fun x -> x) = [ 1L, 2L, 3L, 4L ]
 Stdlib.List.uniqueBy [ 1L, 1L, 1L, 1L ] (fun x -> x) = [ 1L ]
-Stdlib.List.uniqueBy [ 7L, 42L, 7L, 2L, 10L ] (fun x -> x) = [ 2L, 7L, 10L, 42L ]
+Stdlib.List.uniqueBy [ 7L, 42L, 7L, 2L, 10L ] (fun x -> x) = [ 7L, 42L, 2L, 10L ]
 Stdlib.List.uniqueBy [] (fun x -> x) = []
 Stdlib.List.uniqueBy [ 6L, 2.0 ] (fun x -> x) = compileerror="Expected TInt64, got TFloat64"
 Stdlib.List.unique [ 1L, 2L, 3L, 4L ] = [ 1L, 2L, 3L, 4L ]
 Stdlib.List.unique [ 1L, 1L, 1L, 1L ] = [ 1L ]
-Stdlib.List.unique [ 7L, 42L, 7L, 2L, 10L ] = [ 2L, 7L, 10L, 42L ]
+Stdlib.List.unique [ 7L, 42L, 7L, 2L, 10L ] = [ 7L, 42L, 2L, 10L ]
 Stdlib.List.unique [] = []
 
 // `dedup` keeps the FIRST occurrence where it was. Compare the `unique` cases just above:

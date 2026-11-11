@@ -634,7 +634,6 @@ test takeWhile =
       Stdlib.List.takeWhile([], fun item -> item < 3)
       |> Stdlib.Test.equal([]) ])
 
-// @compiler xfail runtime: "assertion 4: expected [7, 42, 2, 10], got [2, 7, 10, 42]" class=missing-support reason=compiler-gap
 test uniqueBy =
   Stdlib.Test.all(
     [ // When `fn` collapses two values it is the FIRST that survives, where it was.
@@ -653,7 +652,6 @@ test uniqueBy =
       Stdlib.List.uniqueBy([ "bb", "a", "cc", "d" ], fun s -> Stdlib.String.length(s))
       |> Stdlib.Test.equal([ "bb", "a" ]) ])
 
-// @compiler xfail runtime: "assertion 1: expected [7, 42, 2, 10], got [2, 7, 10, 42]" class=missing-support reason=compiler-gap
 test unique =
   Stdlib.Test.all(
     [ // The FIRST occurrence is kept where it was; nothing is sorted.
@@ -929,7 +927,6 @@ test uniqueByRejectsFunctionKeys =
   => raises "Cannot use (lambda) as a dict key. Functions, streams, and values containing them cannot be keys."
 
 // `unique` compares a lambda by identity, the way `==` does.
-// @compiler xfail compile: "ANF conversion error: Sort ordering remained polymorphic after monomorphization" class=missing-support reason=compiler-gap
 test uniqueKeepsFunctions =
   Stdlib.List.length(Stdlib.List.unique([ (fun value -> value) ]))
   |> Stdlib.Test.equal(1)

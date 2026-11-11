@@ -117,11 +117,11 @@ Stdlib.UInt8.mod 5uy 0uy = error="Cannot evaluate modulus against 0"
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.UInt8.random 0uy 1uy)
- |> Stdlib.List.unique) = [ 0uy, 1uy ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0uy, 1uy ]
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.UInt8.random 0uy 2uy)
- |> Stdlib.List.unique) = [ 0uy, 1uy, 2uy ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0uy, 1uy, 2uy ]
 
 Stdlib.UInt8.sum [ 1uy, 2uy ] = 3uy
 
