@@ -75,30 +75,21 @@ let setOverridingDuplicates<'k, 'v> (dict: Dict<k, v>) (key: k) (value: v) : Dic
 let remove<'k, 'v> (dict: Dict<k, v>) (key: k) : Dict<k, v> =
     Stdlib.Dict.__remove<k, v> dict (__dict_check_key key)
 
-let __toUtf16Units (codepoints: List<Int64>) : List<Int64> =
-    match codepoints with
-    | [] -> []
-    | codepoint :: tail ->
-        let rest = Stdlib.Dict.__toUtf16Units tail in
-        if codepoint < 65536L then Stdlib.List.push rest codepoint
-        else
-            let supplementary = codepoint - 65536L in
-            let highSurrogate = 55296L + Stdlib.Int64.shiftRight supplementary 10L in
-            let lowSurrogate = 56320L + Stdlib.Int64.bitwiseAnd supplementary 1023L in
-            [highSurrogate, lowSurrogate] @ rest
-
-let __compareUtf16Units (left: List<Int64>) (right: List<Int64>) : Int32 =
-    match (left, right) with
-    | ([], []) -> 0l
-    | ([], _) -> -1l
-    | (_, []) -> 1l
-    | (leftUnit :: leftTail, rightUnit :: rightTail) ->
-        if leftUnit < rightUnit then -1l
-        else if leftUnit > rightUnit then 1l
-        else Stdlib.Dict.__compareUtf16Units leftTail rightTail
-
+// Code point order, which is UTF-8 byte order: how the interpreter orders
+// Strings, both for `<` and sorting and for a Dict's keys.
 let __compareString (left: String) (right: String) : Int32 =
-    Stdlib.Dict.__compareUtf16Units (Stdlib.Dict.__toUtf16Units (Stdlib.String.__toCodepoints left)) (Stdlib.Dict.__toUtf16Units (Stdlib.String.__toCodepoints right))
+    Stdlib.Dict.__compareStringFrom left right 0L
+
+let __compareStringFrom (left: String) (right: String) (index: Int64) : Int32 =
+    if index >= Stdlib.String.__byteLength left then
+        if index >= Stdlib.String.__byteLength right then 0l else -1l
+    else if index >= Stdlib.String.__byteLength right then 1l
+    else
+        let leftByte = Stdlib.String.__byteAtUnchecked left index in
+        let rightByte = Stdlib.String.__byteAtUnchecked right index in
+        if leftByte < rightByte then -1l
+        else if leftByte > rightByte then 1l
+        else Stdlib.Dict.__compareStringFrom left right (index + 1L)
 
 let __isIdentifierStart (byte: Int64) : Bool =
     (byte >= 65L && byte <= 90L) || (byte >= 97L && byte <= 122L) || byte == 95L

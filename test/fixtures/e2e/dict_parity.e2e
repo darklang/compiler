@@ -38,7 +38,7 @@ Stdlib.Dict.fromListOverwritingDuplicates ([("a", 1L), ("b", 2L), ("a", 3L)]) = 
 Stdlib.Dict.keys (Dict { "c": 3L, "a": 1L, "b": 2L }) = ["a", "b", "c"]
 Stdlib.Dict.values (Dict { "c": 3L, "a": 1L, "b": 2L }) = [1L, 2L, 3L]
 Stdlib.Dict.toList (Dict { "c": 3L, "a": 1L, "b": 2L }) = [("a", 1L), ("b", 2L), ("c", 3L)]
-Stdlib.Dict.keys (Dict { "𐀀": 1L, "": 2L }) = ["𐀀", ""]
+Stdlib.Dict.keys (Dict { "𐀀": 1L, "": 2L }) = ["", "𐀀"]
 Stdlib.Dict.map (Dict { "b": 2L, "a": 1L }) (fun key value -> key + Stdlib.Int64.toString value) = Dict { "a": "a1", "b": "b2" }
 Stdlib.Dict.filter (Dict { "b": 2L, "a": 1L }) (fun key value -> key == "b") = Dict { "b": 2L }
 Stdlib.Dict.filterMap (Dict { "b": 2L, "a": 1L }) (fun key value -> if key == "a" then Some (value + 10L) else None) = Dict { "a": 11L }
