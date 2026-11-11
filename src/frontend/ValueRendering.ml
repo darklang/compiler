@@ -13,6 +13,7 @@ module N = AST.NonEmptyList
 type renderEnv = {
   records : Types.recordTypeInfo M.t Lazy.t;
   sums : Types.sumTypeInfo M.t Lazy.t;
+  sharedShapes : StringOrder.Set.t Lazy.t;
 }
 
 type renderState = { functions : C.functionDef M.t; symbols : C.symbols }
@@ -118,6 +119,110 @@ let displayTypeText typ =
         | "Darklang.Stdlib.Option.Option" | "Darklang.Stdlib.Result.Result" -> ""
         | _ -> evalTypeName name)
     | _ -> text
+
+(* The interpreter's package types are content-addressed: declarations with
+   the same type parameters and shape are one type under several names, and
+   `dark eval` prints such an enum's case without a type name, since any one
+   name would be a guess (`Error(BadFormat)` for every integer ParseError).
+   Group the known declarations by shape, comparing referenced types by
+   group, refining until the grouping is stable, and return the names that
+   share a group. *)
+let sharedShapeNames records sums =
+  let rec shapeType groupOf = function
+    | TRecord (name, args) | TSum (name, args) ->
+        TSum (groupOf name, List.map (shapeType groupOf) args)
+    | TList elem -> TList (shapeType groupOf elem)
+    | TStream elem -> TStream (shapeType groupOf elem)
+    | TDict (key, value) ->
+        TDict (shapeType groupOf key, shapeType groupOf value)
+    | TFunction (params, result) ->
+        TFunction (List.map (shapeType groupOf) params, shapeType groupOf result)
+    | TTuple elems -> TTuple (List.map (shapeType groupOf) elems)
+    | typ -> typ
+  in
+  let text groupOf typ =
+    CheckingDiagnostics.typeToString (shapeType groupOf typ)
+  in
+  let sumShape (info : Types.sumTypeInfo) groupOf =
+    String.concat " " info.Types.typeParams
+    ^ " = "
+    ^ String.concat " | "
+        (List.map
+           (fun (variant : Types.sumVariantInfo) ->
+             variant.Types.name ^ "("
+             ^ String.concat ", " (List.map (text groupOf) variant.Types.fields)
+             ^ ")")
+           (List.stable_sort
+              (fun (a : Types.sumVariantInfo) b ->
+                Int.compare a.Types.tag b.Types.tag)
+              info.Types.variants))
+  in
+  let recordShape (info : Types.recordTypeInfo) groupOf =
+    String.concat " " info.Types.typeParams
+    ^ " = { "
+    ^ String.concat ", "
+        (List.map
+           (fun (field, typ) -> field ^ ": " ^ text groupOf typ)
+           info.Types.fields)
+    ^ " }"
+  in
+  let isCompilerOnly name =
+    List.exists
+      (fun part -> String.starts_with ~prefix:"__" part)
+      (String.split_on_char '.' name)
+  in
+  let declarations =
+    M.fold
+      (fun name info acc ->
+        if isCompilerOnly name then acc else (name, sumShape info) :: acc)
+      sums []
+    |> M.fold
+         (fun name info acc ->
+           if M.mem name sums || isCompilerOnly name then acc
+           else (name, recordShape info) :: acc)
+         records
+  in
+  let rec refine groups count =
+    let groupOf name =
+      match M.find_opt name groups with Some group -> group | None -> name
+    in
+    let _, idCount, next =
+      List.fold_left
+        (fun (ids, idCount, next) (name, shape) ->
+          let key = groupOf name ^ " " ^ shape groupOf in
+          match M.find_opt key ids with
+          | Some id -> (ids, idCount, M.add name id next)
+          | None ->
+              let id = "#" ^ string_of_int idCount in
+              (M.add key id ids, idCount + 1, M.add name id next))
+        (M.empty, 0, M.empty) declarations
+    in
+    if idCount = count then next else refine next idCount
+  in
+  let initial = M.map (fun _ -> "") (M.of_list declarations) in
+  let groups = refine initial 1 in
+  let sizes =
+    M.fold
+      (fun _ group sizes ->
+        M.add group (1 + Option.value ~default:0 (M.find_opt group sizes)) sizes)
+      groups M.empty
+  in
+  M.fold
+    (fun name group shared ->
+      if Option.value ~default:0 (M.find_opt group sizes) > 1 then
+        StringOrder.Set.add name shared
+      else shared)
+    groups StringOrder.Set.empty
+
+(* An enum's type name before its case, or nothing where `dark eval` prints the
+   case alone. *)
+let caseTypeText env typ =
+  match typ with
+  | TSum (name, _)
+    when !evalDisplay && StringOrder.Set.mem name (Lazy.force env.sharedShapes)
+    ->
+      ""
+  | _ -> displayTypeText typ
 
 let casePrefix typeText = if typeText = "" then "" else typeText ^ "."
 
@@ -636,7 +741,7 @@ and renderBody env typ value state =
           Crash.crash ("Missing sum metadata for value renderer: " ^ typeName)
       | Some sumInfo ->
           let subst = typeSubstitution sumInfo.Types.typeParams typeArgs in
-          let typeText = displayTypeText typ in
+          let typeText = caseTypeText env typ in
           let casePrefix (variant : Types.sumVariantInfo) =
             if !evalDisplay && typeText <> "" then
               casePrefix
@@ -978,7 +1083,7 @@ and docBody env typ value state =
       | None -> leaf ()
       | Some sumInfo ->
           let subst = typeSubstitution sumInfo.Types.typeParams typeArgs in
-          let typeText = displayTypeText typ in
+          let typeText = caseTypeText env typ in
           let prefix (variant : Types.sumVariantInfo) =
             if typeText = "" then ""
             else
@@ -1058,6 +1163,13 @@ let ensureEvalRenderer env typ state =
 
 let starts name prefix = Text.startsWith name prefix
 
+let renderEnv recordMetadata sumMetadata =
+  {
+    records = lazy recordMetadata;
+    sums = lazy sumMetadata;
+    sharedShapes = lazy (sharedShapeNames recordMetadata sumMetadata);
+  }
+
 let includeRuntimeFunctions symbols =
   List.fold_left
     (fun symbols name -> snd (C.internFunction name symbols))
@@ -1078,7 +1190,7 @@ let rewriteProgram recordMetadata sumMetadata programType program =
   let symbols = includeRuntimeFunctions symbols in
   (* Type checking already built and overlaid these immutable indexes. Keep
     them lazy so primitive renderers do not inspect declaration metadata. *)
-  let env = { records = lazy recordMetadata; sums = lazy sumMetadata } in
+  let env = renderEnv recordMetadata sumMetadata in
   let existing = existingRenderers topLevels in
   let renderName, state =
     match programType with
@@ -1245,7 +1357,7 @@ let interpolation env valueType value state =
 let rewriteDiagnosticRenderers recordMetadata sumMetadata program =
   let symbols, topLevels = C.viewProgram program in
   let symbols = includeRuntimeFunctions symbols in
-  let env = { records = lazy recordMetadata; sums = lazy sumMetadata } in
+  let env = renderEnv recordMetadata sumMetadata in
   let existing = existingRenderers topLevels in
   let initial = { functions = existing; symbols } in
   let reversed, final =
