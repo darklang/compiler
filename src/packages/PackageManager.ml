@@ -765,8 +765,11 @@ let rec renderExpr parameters selfName element =
       | None -> Error "Invalid package argument index")
   | "ESelf", [ _ ] -> Ok (publicName selfName)
   | "EFnName", [ _; name ] | "EFnName", [ _; name; _ ] | "EValue", [ _; name ]
-    ->
-      resolvedName name
+    -> (
+      (* An uncalled builtin, as `val empty = Builtin.bytesEmpty` holds one,
+         names the same library item a call to it would. *)
+      let+ name = resolvedName name in
+      match builtinOperator name with Some (`Call fn) -> fn | _ -> name)
   (* Since darklang/dark@b928144 an uncalled fn may carry type arguments,
      `Stdlib.List.map<Int64, Int64>`: the fn as a specialised value. *)
   | "EFnName", [ _; name; _; typeArgs ] ->
