@@ -29,15 +29,15 @@ let fromInt64(i: Int64): Stdlib.Option.Option<UInt32> =
 
 
 /// Return whether the scalar is a Unicode letter. Invalid scalars return false.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Codepoint.isLetter: Unknown function or value 'Builtin.codepointIsLetter'"
+// @compiler replace: packages/darklang/stdlib/codepoint.dark#Darklang.Stdlib.Codepoint.isLetter reason=compiler-implementation
 let isLetter(codepoint: UInt32): Bool = Builtin.codepointIsLetter(codepoint)
 
 
 /// Return whether the scalar is Unicode whitespace. Invalid scalars return false.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Codepoint.isWhitespace: Unknown function or value 'Builtin.codepointIsWhitespace'"
+// @compiler replace: packages/darklang/stdlib/codepoint.dark#Darklang.Stdlib.Codepoint.isWhitespace reason=compiler-implementation
 let isWhitespace(codepoint: UInt32): Bool = Builtin.codepointIsWhitespace(codepoint)
 
 
 /// Return whether the scalar is a Unicode letter or digit. Invalid scalars return false.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Codepoint.isAlphanumeric: Unknown function or value 'Builtin.codepointIsAlphanumeric'"
+// @compiler replace: packages/darklang/stdlib/codepoint.dark#Darklang.Stdlib.Codepoint.isAlphanumeric reason=compiler-implementation
 let isAlphanumeric(codepoint: UInt32): Bool = Builtin.codepointIsAlphanumeric(codepoint)
