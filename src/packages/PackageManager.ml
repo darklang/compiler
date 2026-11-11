@@ -608,6 +608,7 @@ let builtinOperator name =
     [
       ("string", "String"); ("char", "Char"); ("list", "List"); ("dict", "Dict");
       ("bool", "Bool"); ("uuid", "Uuid"); ("dateTime", "DateTime");
+      ("codepoint", "Codepoint");
       ("bytes", "Blob"); ("float32", "Float32"); ("decimal", "Decimal");
       ("int8", "Int8"); ("uint8", "UInt8"); ("int16", "Int16");
       ("uint16", "UInt16"); ("int32", "Int32"); ("uint32", "UInt32");

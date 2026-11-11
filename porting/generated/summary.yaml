@@ -31,13 +31,13 @@ dispositions:
     replace: 35
     run: 1823
   stdlib:
-    blocked: 815
-    replace: 908
+    blocked: 812
+    replace: 911
     run: 649
   tests:
     blocked: 56
-    run: 1618
-    xfail: 1225
+    run: 1619
+    xfail: 1224
 reasons:
   packages:
     aot-type-error: 10
@@ -52,14 +52,14 @@ reasons:
     upstream-dependency: 2214
   stdlib:
     compiler-contract: 128
-    compiler-implementation: 905
+    compiler-implementation: 908
     compiler-timeout: 1
     constructor-identity: 2
     container-adaptation: 490
     interpreter-intrinsic: 1
     test-counter: 2
     test-diagnostics: 2
-    upstream-dependency: 192
+    upstream-dependency: 189
   tests:
     aot-arity-error: 12
     aot-invalid-field: 16
@@ -74,7 +74,7 @@ reasons:
     interpreter-fixture: 47
     test-counter: 7
     upstream-bug: 1
-    upstream-dependency: 857
+    upstream-dependency: 856
 expected_failures:
   aot-rejection:
     phases:
@@ -118,12 +118,12 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/string.dark: 3
   missing-support:
     phases:
-      compile: 961
+      compile: 960
       runtime: 41
     reasons:
       compiler-gap: 138
       test-counter: 7
-      upstream-dependency: 857
+      upstream-dependency: 856
     sources:
       upstream/packages/darklang/tests/cli/bashrc.dark: 2
       upstream/packages/darklang/tests/cli/builtinGroups.dark: 4
@@ -222,7 +222,6 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/cli/sgr.dark: 3
       upstream/packages/darklang/tests/stdlib/cli/sys.dark: 2
       upstream/packages/darklang/tests/stdlib/cli/widgets.dark: 6
-      upstream/packages/darklang/tests/stdlib/codepoint.dark: 1
       upstream/packages/darklang/tests/stdlib/crypto.dark: 10
       upstream/packages/darklang/tests/stdlib/dateTime.dark: 4
       upstream/packages/darklang/tests/stdlib/decimal.dark: 4

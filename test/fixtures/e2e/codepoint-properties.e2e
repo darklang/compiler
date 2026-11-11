@@ -1,0 +1,8 @@
+// Codepoint.isLetter, isWhitespace and isAlphanumeric read the Unicode
+// tables, as main's builtins do.
+Stdlib.Codepoint.isLetter 233ul = true
+Stdlib.Codepoint.isLetter 49ul = false
+Stdlib.Codepoint.isWhitespace 12288ul = true
+Stdlib.Codepoint.isAlphanumeric 1633ul = true
+Stdlib.Codepoint.isAlphanumeric 95ul = false
+Stdlib.Codepoint.isLetter 55296ul = false

@@ -32,7 +32,6 @@ test fromInt64 =
       Stdlib.Codepoint.fromInt64(4294967296) |> Stdlib.Test.equal(None) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Codepoint.isLetter'" class=missing-support reason=upstream-dependency
 test properties =
   Stdlib.Test.all(
     [ Stdlib.Codepoint.isLetter(233u32) |> Stdlib.Test.equal(true)

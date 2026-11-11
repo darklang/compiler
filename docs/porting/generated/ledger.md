@@ -11,8 +11,8 @@ A run disposition means selected, not a passing execution receipt. Replacement c
 | Area | Source dispositions |
 | --- | --- |
 | packages | 2,278 blocked, 5 excluded, 35 replace, 1,823 run |
-| stdlib | 815 blocked, 908 replace, 649 run |
-| tests | 56 blocked, 1,618 run, 1,225 xfail |
+| stdlib | 812 blocked, 911 replace, 649 run |
+| tests | 56 blocked, 1,619 run, 1,224 xfail |
 
 ## Expected test failures
 
@@ -24,7 +24,7 @@ Upstream bugs record interpreter behavior or test expectations that the compiler
 | Class | Compile | Runtime | Total |
 | --- | ---: | ---: | ---: |
 | `aot-rejection` | 222 | 0 | 222 |
-| `missing-support` | 961 | 41 | 1,002 |
+| `missing-support` | 960 | 41 | 1,001 |
 | `upstream-bug` | 0 | 1 | 1 |
 
 | Class | Reason | Tests |
@@ -37,7 +37,7 @@ Upstream bugs record interpreter behavior or test expectations that the compiler
 | `aot-rejection` | `aot-type-error` | 151 |
 | `missing-support` | `compiler-gap` | 138 |
 | `missing-support` | `test-counter` | 7 |
-| `missing-support` | `upstream-dependency` | 857 |
+| `missing-support` | `upstream-dependency` | 856 |
 | `upstream-bug` | `upstream-bug` | 1 |
 
 ### Remaining support by source
@@ -143,7 +143,6 @@ Each row links to the authoritative per-test annotations. A named test remains o
 | [packages/darklang/tests/stdlib/cli/sgr.dark](../../../upstream/packages/darklang/tests/stdlib/cli/sgr.dark) | 3 |
 | [packages/darklang/tests/stdlib/cli/sys.dark](../../../upstream/packages/darklang/tests/stdlib/cli/sys.dark) | 2 |
 | [packages/darklang/tests/stdlib/cli/widgets.dark](../../../upstream/packages/darklang/tests/stdlib/cli/widgets.dark) | 6 |
-| [packages/darklang/tests/stdlib/codepoint.dark](../../../upstream/packages/darklang/tests/stdlib/codepoint.dark) | 1 |
 | [packages/darklang/tests/stdlib/crypto.dark](../../../upstream/packages/darklang/tests/stdlib/crypto.dark) | 10 |
 | [packages/darklang/tests/stdlib/dateTime.dark](../../../upstream/packages/darklang/tests/stdlib/dateTime.dark) | 4 |
 | [packages/darklang/tests/stdlib/decimal.dark](../../../upstream/packages/darklang/tests/stdlib/decimal.dark) | 4 |
@@ -195,14 +194,14 @@ Tags are defined in [the glossary](../../../porting/compiler-reasons.json).
 | packages | `test-diagnostics` | 1 |
 | packages | `upstream-dependency` | 2,214 |
 | stdlib | `compiler-contract` | 128 |
-| stdlib | `compiler-implementation` | 905 |
+| stdlib | `compiler-implementation` | 908 |
 | stdlib | `compiler-timeout` | 1 |
 | stdlib | `constructor-identity` | 2 |
 | stdlib | `container-adaptation` | 490 |
 | stdlib | `interpreter-intrinsic` | 1 |
 | stdlib | `test-counter` | 2 |
 | stdlib | `test-diagnostics` | 2 |
-| stdlib | `upstream-dependency` | 192 |
+| stdlib | `upstream-dependency` | 189 |
 | tests | `aot-arity-error` | 12 |
 | tests | `aot-invalid-field` | 16 |
 | tests | `aot-invalid-key` | 6 |
@@ -216,7 +215,7 @@ Tags are defined in [the glossary](../../../porting/compiler-reasons.json).
 | tests | `interpreter-fixture` | 47 |
 | tests | `test-counter` | 7 |
 | tests | `upstream-bug` | 1 |
-| tests | `upstream-dependency` | 857 |
+| tests | `upstream-dependency` | 856 |
 
 ## Separate capability assessments
 
