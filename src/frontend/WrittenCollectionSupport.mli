@@ -16,6 +16,7 @@ val list :
   WrittenTypeSupport.locals ->
   WrittenCheckingState.t ->
   AST.semanticType option ->
+  WrittenTypes.range ->
   (WrittenTypes.expr * WrittenTypes.range option) list ->
   (WrittenTypeSupport.checkedExpression, string) result
 

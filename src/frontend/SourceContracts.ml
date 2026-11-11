@@ -23,6 +23,57 @@ let normalize names typ =
     |> M.of_list)
     typ
 
+(* A value's type up to the names of its unknowns: each `[]` names its own,
+   so `[]` in the original and in the replacement are the same contract. *)
+let canonicalUnknowns typ =
+  let rec visit names = function
+    | AST.TVar name | AST.TInferenceVar (_, name) -> (
+        match List.assoc_opt name names with
+        | Some canonical -> (AST.TVar canonical, names)
+        | None ->
+            let canonical = "#unknown" ^ string_of_int (List.length names) in
+            (AST.TVar canonical, (name, canonical) :: names))
+    | AST.TList element ->
+        let element, names = visit names element in
+        (AST.TList element, names)
+    | AST.TStream element ->
+        let element, names = visit names element in
+        (AST.TStream element, names)
+    | AST.TDict (key, value) ->
+        let key, names = visit names key in
+        let value, names = visit names value in
+        (AST.TDict (key, value), names)
+    | AST.TTuple elements ->
+        let elements, names = many names elements in
+        (AST.TTuple elements, names)
+    | AST.TRecord (name, arguments) ->
+        let arguments, names = many names arguments in
+        (AST.TRecord (name, arguments), names)
+    | AST.TSum (name, arguments) ->
+        let arguments, names = many names arguments in
+        (AST.TSum (name, arguments), names)
+    | AST.TFunction (parameters, result) ->
+        let parameters, names = many names parameters in
+        let result, names = visit names result in
+        (AST.TFunction (parameters, result), names)
+    | ( AST.TInt8 | AST.TInt16 | AST.TInt32 | AST.TInt64 | AST.TInt128
+      | AST.TInt | AST.TUInt8 | AST.TUInt16 | AST.TUInt32 | AST.TUInt64
+      | AST.TUInt128 | AST.TBool | AST.TFloat64 | AST.TString | AST.TBlob
+      | AST.TChar | AST.TDateTime | AST.TUnit | AST.TNever | AST.TInternalRawPtr
+        ) as typ ->
+        (typ, names)
+  and many names types =
+    let reversed, names =
+      List.fold_left
+        (fun (reversed, names) typ ->
+          let typ, names = visit names typ in
+          (typ :: reversed, names))
+        ([], names) types
+    in
+    (List.rev reversed, names)
+  in
+  fst (visit [] typ)
+
 let parameterType = function
   | W.FPUnit _ -> W.TUnit W.synthRange
   | W.FPNormal (_, _, typ, _, _, _, _) -> typ
@@ -220,7 +271,8 @@ let check ~context ~sources contracts =
                 ^ original.W.name.W.name ^ ": " ^ message)
           in
           let* actual = initializerType context [] path replacement.W.body in
-          if expected = actual then Ok () else mismatch original.W.name.W.name
+          if canonicalUnknowns expected = canonicalUnknowns actual then Ok ()
+          else mismatch original.W.name.W.name
       | ( ( W.DFunction _ | W.DType _ | W.DValue _ | W.DTrait _ | W.DImpl _
           | W.DModule _ | W.DExpr _ | W.DAssertion _ | W.DTest _ ),
           ( W.DFunction _ | W.DType _ | W.DValue _ | W.DTrait _ | W.DImpl _

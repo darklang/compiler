@@ -36,8 +36,8 @@ dispositions:
     run: 649
   tests:
     blocked: 56
-    run: 1619
-    xfail: 1224
+    run: 1623
+    xfail: 1220
 reasons:
   packages:
     aot-type-error: 10
@@ -68,7 +68,7 @@ reasons:
     aot-name-error: 11
     aot-type-error: 151
     compiler-crash: 2
-    compiler-gap: 143
+    compiler-gap: 139
     compiler-leak: 2
     diagnostic-difference: 2
     interpreter-fixture: 47
@@ -118,10 +118,10 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/string.dark: 3
   missing-support:
     phases:
-      compile: 960
+      compile: 956
       runtime: 41
     reasons:
-      compiler-gap: 138
+      compiler-gap: 134
       test-counter: 7
       upstream-dependency: 856
     sources:
@@ -205,7 +205,6 @@ expected_failures:
       upstream/packages/darklang/tests/scm/cli/propagation.dark: 5
       upstream/packages/darklang/tests/scm/cli/rebase.dark: 6
       upstream/packages/darklang/tests/scm/conflicts.dark: 21
-      upstream/packages/darklang/tests/scm/constraintKinds.dark: 4
       upstream/packages/darklang/tests/scm/draft.dark: 6
       upstream/packages/darklang/tests/scm/lww.dark: 6
       upstream/packages/darklang/tests/scm/propagation.dark: 16

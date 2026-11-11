@@ -59,12 +59,10 @@ module Naming =
         |> Stdlib.Test.equal(Stdlib.Option.Option.None) ])
 
 module RivalPairs =
-  // @compiler xfail compile: "ANF conversion error: Expected TList (TTuple [TString; TString]), got TList (TTuple [TString; TTuple [TString; TVar \"t$empty\"]]) in function 'Darklang.SCM.Constraints.rivalPairs_str'" class=missing-support reason=compiler-gap
   test noCandidates =
     Darklang.SCM.Constraints.rivalPairs<String>([])
     |> Stdlib.Test.equal([])
 
-  // @compiler xfail compile: "ANF conversion error: Expected TList (TTuple [TString; TString]), got TList (TTuple [TString; TTuple [TString; TVar \"t$empty\"]]) in function 'Darklang.SCM.Constraints.rivalPairs_str'" class=missing-support reason=compiler-gap
   test distinctSelfTypesAreNotRivals =
     Darklang.SCM.Constraints.rivalPairs(
       [ ("Point", "a"), ("String", "b"), ("List<Int64>", "c") ])
@@ -72,7 +70,6 @@ module RivalPairs =
 
   // Interleaving two rival groups must not reorder findings or reverse a pair:
   // both affect which implementation is the usage and the finding ID we ack.
-  // @compiler xfail compile: "ANF conversion error: Expected TList (TTuple [TString; TString]), got TList (TTuple [TString; TTuple [TString; TVar \"t$empty\"]]) in function 'Darklang.SCM.Constraints.rivalPairs_str'" class=missing-support reason=compiler-gap
   test interleavedGroupsKeepEveryPairInOrder =
     Darklang.SCM.Constraints.rivalPairs(
       [ ("Point", "a")
@@ -82,7 +79,6 @@ module RivalPairs =
         ("Point", "e") ])
     |> Stdlib.Test.equal([ ("a", "c"), ("a", "e"), ("b", "d"), ("c", "e") ])
 
-  // @compiler xfail compile: "ANF conversion error: Expected TList (TTuple [TString; TString]), got TList (TTuple [TString; TTuple [TString; TVar \"t$empty\"]]) in function 'Darklang.SCM.Constraints.rivalPairs_str'" class=missing-support reason=compiler-gap
   test genericAndSpecificSelfTypesStaySeparate =
     Darklang.SCM.Constraints.rivalPairs(
       [ ("List<'a>", "generic"), ("List<Int64>", "specific") ])
