@@ -278,7 +278,7 @@ let __copyCharList (chars: List<Char>) (pointer: RawPtr) (offset: Int64) : Unit 
         Stdlib.String.__copyCharList rest pointer (offset + length)
 
 let fromList (lst: List<Char>) : String =
-  join (List.map lst (fun c -> Stdlib.toString c)) ""
+  join (List.map lst (fun c -> Stdlib.display c)) ""
 
 let __isAsciiAt (value: String) (index: Int64) (length: Int64) : Bool =
     if index >= length then true
@@ -329,7 +329,7 @@ let byteIndexOfFrom (value: String) (search: String) (offset: Int64) : Stdlib.Op
 let __appendNormalized (left: String) (right: String) : String =
     Stdlib.String.__normalizeAfterConcat (__string_concat_raw left right)
 
-let fromChar (c: Char) : String = Stdlib.toString c
+let fromChar (c: Char) : String = Stdlib.display c
 
 let append (left: String) (right: String) : String = Stdlib.String.__appendNormalized left right
 let prepend (s1: String) (s2: String) : String = s2 + s1
@@ -743,7 +743,7 @@ let toOrdinal (n: Int) : String =
       | 3 -> "rd"
       | _ -> "th"
 
-  (Stdlib.toString n) + suffix
+  (Stdlib.display n) + suffix
 
 let splitOnNewline (str: String) : List<String> =
   if str == "" then [] else String.split str "\n"
@@ -835,7 +835,7 @@ let digest (s: String) : String =
 let __randomInt (length: Int) : Result.Result<String, String> =
   if length < 0 then
     Result.Result.Error
-      $"Expected `length` to be positive, but it was `{length |> Stdlib.toString}`"
+      $"Expected `length` to be positive, but it was `{length |> Stdlib.display}`"
   else
     let characters =
       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -921,8 +921,8 @@ let padEnd (value: String) (padWith: Char) (goalLength: Int64) : String =
 let random (length: Int64) : Result.Result<String, String> =
     Stdlib.String.__randomInt (Stdlib.Int.fromInt64 length)
 
-impl Stdlib.ToString for String =
-  let toString (value: String) : String = value
+impl Stdlib.Display for String =
+  let display (value: String) : String = value
 
 impl Stdlib.Add for String =
   let add = Stdlib.String.append

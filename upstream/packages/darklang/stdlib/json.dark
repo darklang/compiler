@@ -6,7 +6,7 @@ let serialize<'a>(value: 'a): String =
   Builtin.jsonSerialize<'a>(value)
 
 /// Parses a JSON string as a Dark value, matching the type <typeParam a>.
-/// Show an error with `$"{e}"` or `Stdlib.toString(e)`.
+/// Show an error with `$"{e}"` or `Stdlib.display(e)`.
 // @compiler replace: packages/darklang/stdlib/json.dark#Darklang.Stdlib.Json.parse reason=compiler-implementation
 let parse<'a>(
   json: String)
@@ -28,7 +28,7 @@ module ParseError =
         match part with
         | Root -> "root"
         | Field(name) -> "." + name
-        | Index(index) -> "[" + Stdlib.toString(index) + "]"
+        | Index(index) -> "[" + Stdlib.display(index) + "]"
 
     // @compiler replace: packages/darklang/stdlib/json/parseError/jsonPath.dark#Darklang.Stdlib.Json.ParseError.JsonPath.JsonPath reason=compiler-implementation
     type JsonPath = List<Part.Part>
@@ -92,7 +92,7 @@ module ParseError =
     // Can't parse JSON because argument 4 (`Int64`) is missing at path: `root.Enh`
     | EnumMissingField(typ, index, path) ->
       "Can't parse JSON because argument "
-      + Stdlib.toString(index)
+      + Stdlib.display(index)
       + " (`"
       + PrettyPrinter.RuntimeTypes.typeReference(branchId, typ)
       + "`) is missing at path: `"
@@ -145,14 +145,15 @@ module ParseError =
     // Not JSON at line 1, column 4
     | NotJson(line, column) ->
       "Not JSON at line "
-      + Stdlib.toString(line)
+      + Stdlib.display(line)
       + ", column "
-      + Stdlib.toString(column)
+      + Stdlib.display(column)
 
 
-  // @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
-  impl ToString for ParseError =
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Json.ParseError.display: Unknown function or value 'Darklang.SCM.Branches.current'"
+  impl Display for ParseError =
     /// What went wrong, with types named as the current branch sees them:
     /// {{Can't parse JSON `"x"` as type `Int64` at path: `root.age`}}
-    let toString(e: ParseError): String =
+    // @compiler blocked: upstream-dependency diagnostic="Containing implementation Darklang.Stdlib.Json.ParseError.impl Display for ParseError: Darklang.Stdlib.Json.ParseError.display: Unknown function or value 'Darklang.SCM.Branches.current'"
+    let display(e: ParseError): String =
       Stdlib.Json.ParseError.toString(Darklang.SCM.Branches.current(), e)

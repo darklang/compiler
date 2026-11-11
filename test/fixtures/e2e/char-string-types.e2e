@@ -14,7 +14,7 @@ if true then "a" else 'a' = compileerror="Expected TString, got TChar"
 if true then 'a' else "a" = compileerror="Expected TChar, got TString"
 let identity<'a> (value: a) : a = value; identity<String> 'a' = compileerror="Expected TString, got TChar"
 let identity<'a> (value: a) : a = value; identity<Char> "a" = compileerror="Expected TChar, got TString"
-$"{'a'}" = compileerror="Expected String in string interpolation, got TChar"
+$"{'a'}" = "a"
 __char_to_string 'a' = compileerror="Internal identifier not allowed in user code"
 __string_to_char_unchecked "ab" = compileerror="Internal identifier not allowed in user code"
 

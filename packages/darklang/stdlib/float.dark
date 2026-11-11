@@ -531,8 +531,8 @@ impl Stdlib.Power for Float =
 impl Stdlib.Negate for Float =
   let negate = Stdlib.Float.negate
 
-impl Stdlib.ToString for Float =
-  let toString = Stdlib.Float.toString
+impl Stdlib.Display for Float =
+  let display = Stdlib.Float.toString
 
 impl Stdlib.Compare for Float =
   let lessThan = Stdlib.Float.lessThan

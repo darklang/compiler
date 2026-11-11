@@ -68,7 +68,7 @@ module ParseError =
     // Can't parse JSON because argument 4 (`Int`) is missing at path: `root.Enh`
     | EnumMissingField(typ, index, path) ->
       "Can't parse JSON because argument "
-      + Stdlib.toString index
+      + Stdlib.display index
       + " (`"
       + PrettyPrinter.RuntimeTypes.typeReference branchId typ
       + "`) is missing at path: `"

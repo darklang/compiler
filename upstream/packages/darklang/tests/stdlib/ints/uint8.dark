@@ -95,12 +95,12 @@ test lessThan =
 
 test toString =
   Stdlib.Test.all(
-    [ Stdlib.toString(120u8) |> Stdlib.Test.equal("120")
-      Stdlib.toString(1u8) |> Stdlib.Test.equal("1")
+    [ Stdlib.display(120u8) |> Stdlib.Test.equal("120")
+      Stdlib.display(1u8) |> Stdlib.Test.equal("1")
       // UInt8 lower limit
-      Stdlib.toString(0u8) |> Stdlib.Test.equal("0")
+      Stdlib.display(0u8) |> Stdlib.Test.equal("0")
       // UInt8 upper limit
-      Stdlib.toString(255u8) |> Stdlib.Test.equal("255") ])
+      Stdlib.display(255u8) |> Stdlib.Test.equal("255") ])
 
 test toFloat =
   Stdlib.Test.all(
@@ -285,6 +285,15 @@ test shiftRight =
       (1u8 >> 0u8) |> Stdlib.Test.equal(1u8)
       (128u8 >> 7u8) |> Stdlib.Test.equal(1u8)
       (40u8 >> 3u8) |> Stdlib.Test.equal(5u8) ])
+
+/// The shift count is taken modulo 8, as in Rust and C#: shifting by 9
+/// shifts by 1, and the largest count shifts by 7.
+test shiftCountWraps =
+  Stdlib.Test.all(
+    [ (1u8 << 8u8) |> Stdlib.Test.equal(1u8)
+      (1u8 << 9u8) |> Stdlib.Test.equal(2u8)
+      (64u8 >> 9u8) |> Stdlib.Test.equal(32u8)
+      (1u8 << 255u8) |> Stdlib.Test.equal(128u8) ])
 
 test checkedAdd =
   Stdlib.Test.all(

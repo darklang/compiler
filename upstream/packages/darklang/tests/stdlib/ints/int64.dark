@@ -376,24 +376,24 @@ test parseBadFormat =
 
 test toString =
   Stdlib.Test.all(
-    [ Stdlib.toString(0) |> Stdlib.Test.equal("0")
-      Stdlib.toString(1) |> Stdlib.Test.equal("1")
-      Stdlib.toString(-1) |> Stdlib.Test.equal("-1")
+    [ Stdlib.display(0) |> Stdlib.Test.equal("0")
+      Stdlib.display(1) |> Stdlib.Test.equal("1")
+      Stdlib.display(-1) |> Stdlib.Test.equal("-1")
       // int63 lower limit
-      Stdlib.toString(-4611686018427387904)
+      Stdlib.display(-4611686018427387904)
       |> Stdlib.Test.equal("-4611686018427387904")
       // past the int63 upper limit"
-      Stdlib.toString(-4611686018427387905)
+      Stdlib.display(-4611686018427387905)
       |> Stdlib.Test.equal("-4611686018427387905")
       // .NET lower limit
-      Stdlib.toString(-9223372036854775808)
+      Stdlib.display(-9223372036854775808)
       |> Stdlib.Test.equal("-9223372036854775808")
       // int63 upper limit
-      Stdlib.toString(4611686018427387903) |> Stdlib.Test.equal("4611686018427387903")
+      Stdlib.display(4611686018427387903) |> Stdlib.Test.equal("4611686018427387903")
       // past the int63 upper limit
-      Stdlib.toString(4611686018427387904) |> Stdlib.Test.equal("4611686018427387904")
+      Stdlib.display(4611686018427387904) |> Stdlib.Test.equal("4611686018427387904")
       // .NET upper limit
-      Stdlib.toString(9223372036854775807)
+      Stdlib.display(9223372036854775807)
       |> Stdlib.Test.equal("9223372036854775807") ])
 
 test fromInt8 =
@@ -518,6 +518,15 @@ test shiftRight =
       ((-1) >> 1) |> Stdlib.Test.equal(-1)
       (40 >> 3) |> Stdlib.Test.equal(5) ])
 
+/// The shift count is taken modulo 64, as in Rust and C#: shifting by 65
+/// shifts by 1, and a count of -1 shifts by 63.
+test shiftCountWraps =
+  Stdlib.Test.all(
+    [ (1 << 64) |> Stdlib.Test.equal(1)
+      (1 << 65) |> Stdlib.Test.equal(2)
+      (64 >> 65) |> Stdlib.Test.equal(32)
+      (1 << -1) |> Stdlib.Test.equal(-9223372036854775808) ])
+
 test checkedAdd =
   Stdlib.Test.all(
     [ Stdlib.Int64.checkedAdd(9223372036854775807, 1)
@@ -614,7 +623,15 @@ test divisionResults =
     [ Stdlib.Int64.checkedDivide(17, 3) |> Stdlib.Test.equal(Ok(5))
       Stdlib.Int64.checkedDivide(-8, 5) |> Stdlib.Test.equal(Ok(-1))
       Stdlib.Int64.checkedDivide(-9223372036854775808, -1)
+      |> Stdlib.Test.equal(Error(Stdlib.Math.DivisionError.Overflow))
+      Stdlib.Int64.checkedDivide(-9223372036854775808, 1)
       |> Stdlib.Test.equal(Ok(-9223372036854775808))
+      Stdlib.Int64.checkedDivide(-9223372036854775807, -1)
+      |> Stdlib.Test.equal(Ok(9223372036854775807))
+      Stdlib.Int64.checkedDivide(9223372036854775807, -1)
+      |> Stdlib.Test.equal(Ok(-9223372036854775807))
+      Stdlib.Int64.checkedDivide(-9223372036854775808, -2)
+      |> Stdlib.Test.equal(Ok(4611686018427387904))
       Stdlib.Int64.checkedDivide(5, 0)
       |> Stdlib.Test.equal(Error(Stdlib.Math.DivisionError.DivisionByZero))
       Stdlib.Int64.checkedMod(15, 6) |> Stdlib.Test.equal(Ok(3))
@@ -623,3 +640,9 @@ test divisionResults =
       |> Stdlib.Test.equal(Error(Stdlib.Math.ModulusError.ZeroModulus))
       Stdlib.Int64.checkedMod(5, -1)
       |> Stdlib.Test.equal(Error(Stdlib.Math.ModulusError.NegativeModulus)) ])
+
+test checkedSqrt =
+  Stdlib.Test.all(
+    [ Stdlib.Int64.checkedSqrt(4) |> Stdlib.Test.equal(Ok(2.0))
+      Stdlib.Int64.checkedSqrt(-4)
+      |> Stdlib.Test.equal(Error(Stdlib.Math.NonFinite.NotANumber)) ])

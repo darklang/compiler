@@ -7,6 +7,12 @@ type Option<'v> =
   | None
 
 
+impl Display for Option<'v> =
+  /// The same text as <fn Stdlib.inspect>: {{$"{Some(3)}"}} is {{"Some(3)"}}, and {{None}} is
+  /// {{"None"}}. To print the value or a fallback, use <fn Stdlib.Option.withDefault> first.
+  let display(o: Option<'v>): String = Stdlib.inspect(o)
+
+
 /// If <param option> is {{Some <var value>}}, returns {{fn <var value>}}. The
 /// lambda <fn fn> is applied to <var value> and the result is wrapped in
 /// {{Some}}. Otherwise, returns {{None}}

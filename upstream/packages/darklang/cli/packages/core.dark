@@ -382,7 +382,7 @@ let commitAuthored(
     // to break); `dark commit` is the gate. Said on the second line, with the issue itself.
     // Named, not hashed. A trait diagnostic carries the CONTENT HASH of the type and of the
     // trait, and turning one into a name needs a branch to look it up on.
-    // `Stdlib.Live.reportText` takes the report and nothing else, so it renders
+    // `LanguageTools.Live.reportText` takes the report and nothing else, so it renders
     // `type #bf494e2a has no implementation of #d4222cbd155f`, which is the least useful
     // thing to say at the moment a save is refused. `AtRestCheck.customTypeName` is the
     // lookup `dark commit` uses, and the branch is already in hand here.
@@ -406,7 +406,7 @@ let commitAuthored(
             "["
             + (LanguageTools.AtRestTypeChecker.issueCodeToString(issue.code))
             + "] "
-            + AtRestCheck.withToStringHint(
+            + AtRestCheck.withDisplayHint(
                 branchId,
                 issue,
                 PrettyPrinter.ProgramTypes.PackageLocation.packageLocation,
@@ -418,7 +418,7 @@ let commitAuthored(
             if Stdlib.List.isEmpty(rest) then
               ""
             else
-              " (and " + (Stdlib.toString(Stdlib.List.length(rest))) + " more)"
+              " (and " + (Stdlib.display(Stdlib.List.length(rest))) + " more)"
 
           Stdlib.Option.Option.Some(first + more)
       | _ -> Stdlib.Option.Option.None

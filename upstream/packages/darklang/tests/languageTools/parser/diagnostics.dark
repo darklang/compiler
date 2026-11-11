@@ -26,7 +26,7 @@ let golden(source: String, expected: List<String>): Stdlib.Test.Result =
   let actual = messages(source)
   Stdlib.Test.expect(
     actual == expected,
-    $"{shown(source)}: got {Stdlib.toRepr(actual)}")
+    $"{shown(source)}: got {Stdlib.inspect(actual)}")
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.rejectsIn: Unknown function or value 'messagesIn'"
 let rejectsIn(
@@ -45,7 +45,7 @@ let cleanIn(
   let actual = messagesIn(kind, source)
   Stdlib.Test.expect(
     Stdlib.List.isEmpty(actual),
-    $"{shown(source)}: {Stdlib.toRepr(actual)}")
+    $"{shown(source)}: {Stdlib.inspect(actual)}")
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.rejects: Unknown function or value 'rejectsIn'"
 let rejects(source: String): Stdlib.Test.Result =
@@ -69,7 +69,7 @@ let says(source: String, fragment: String): Stdlib.Test.Result =
   let actual = messages(source)
   Stdlib.Test.expect(
     Stdlib.List.any(actual, fun m -> Stdlib.String.contains(m, fragment)),
-    $"{shown(source)} should say {fragment}, got {Stdlib.toRepr(actual)}")
+    $"{shown(source)} should say {fragment}, got {Stdlib.inspect(actual)}")
 
 
 // @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
@@ -223,6 +223,28 @@ test operatorsDarkLacksSayWhatToWrite =
       says("match xs with | [h, ...[t]] -> h", "takes a name for the rest")
       says("match xs with | [...t] -> t", "write `t`") ])
 
+// `rec` is reported once, and the function after it parses as written.
+// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
+test letRecSaysRecursionNeedsNoKeyword =
+  Stdlib.Test.all(
+    [ golden(
+        "let rec go(n: Int64): Int64 = if n <= 0 then 0 else go(n - 1)\ngo(3)",
+        [ "Dark functions can call themselves; there's no `rec` keyword" ])
+      golden(
+        "let f(n: Int64): Int64 =\n  let rec go(k: Int64): Int64 = k\n  go(n)\nf(1)",
+        [ "Dark functions can call themselves; there's no `rec` keyword" ])
+      clean("let rec = 1\nrec") ])
+
+// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
+test builtinTypeNamesAreRefused =
+  Stdlib.Test.all(
+    [ golden(
+        "type Unit =\n  | Celsius\n  | Fahrenheit\n1",
+        [ "`Unit` is a built-in type, so it can't also name a type of your own" ])
+      says("type String = { s: Int64 }\n1", "is a built-in type")
+      says("module M =\n  type List = | A\n1", "is a built-in type")
+      clean("type TempUnit =\n  | Celsius\n  | Fahrenheit\n1") ])
+
 // The refused operator is the only mistake reported: the parse reads on past it.
 // @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
 test operatorsDarkLacksDoNotCascade =
@@ -332,7 +354,7 @@ test recoveryStopsAtEndOfFile =
         "reports the error")
       Stdlib.Test.expect(
         Stdlib.List.length(found) <= 3,
-        $"does not spam: {Stdlib.toRepr(found)}")
+        $"does not spam: {Stdlib.inspect(found)}")
       // a broken generic leaves nothing behind for the next parse
       rejects("type X = List<List<Int64")
       clean("type Y = List<Int64>") ])

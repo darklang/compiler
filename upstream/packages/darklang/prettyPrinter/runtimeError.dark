@@ -39,6 +39,8 @@ module RuntimeError =
     | ShortTypeName(FQTypeName)
     | TraitName(LanguageTools.RuntimeTypes.FQTraitName.FQTraitName)
     | ShortTraitName(LanguageTools.RuntimeTypes.FQTraitName.FQTraitName)
+    /// ". `Stdlib.inspect` shows any value" when the trait is `Stdlib.Display`, else nothing
+    | InspectHint(LanguageTools.RuntimeTypes.FQTraitName.FQTraitName)
     | TypeReference(TypeReference)
     | TypeOfValue(Dval) // CLEANUP should these all just be ValueTypes?
     | ValueType(ValueType)
@@ -95,10 +97,10 @@ module RuntimeError =
         let newSegment =
           match segment with
           | String(s) -> s
-          | Int64(i) -> Stdlib.toString(i)
+          | Int64(i) -> Stdlib.display(i)
           | Ordinal(i) -> Stdlib.English.toOrdinal(i)
           | Count(i, singular, plural) ->
-            let count = Stdlib.toString(i)
+            let count = Stdlib.display(i)
 
             if i == 1 then
               let segment = segmentsToString(branchId, [ singular ])
@@ -123,6 +125,11 @@ module RuntimeError =
           | ShortTypeName(t) -> shortTypeName(branchId, t)
           | TraitName(t) -> traitName(branchId, t)
           | ShortTraitName(t) -> shortTraitName(branchId, t)
+          | InspectHint(t) ->
+            if traitName(branchId, t) == "Darklang.Stdlib.Display" then
+              ". `Stdlib.inspect` shows any value"
+            else
+              ""
           | TypeReference(t) -> typeReference(branchId, t)
           | TypeOfValue(dv) -> Dval.valueTypeName(branchId, dv)
           | ValueType(vt) -> valueType(branchId, vt)
@@ -154,12 +161,12 @@ module RuntimeError =
     Stdlib.String.join(parts, "")
 
 
-  /// For a value type that has a `toString` in stdlib, return a hint
+  /// For a value type that has a Display impl in stdlib, return a hint
   /// suffix pointing the user at the right conversion function. Empty
   /// string otherwise (Unknown, Unit, String, collection/custom types).
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.toStringHint: Unknown constructor 'Darklang.LanguageTools.RuntimeTypes.KnownType.KTBigInt' in pattern"
-  let toStringHint(vt: LanguageTools.RuntimeTypes.ValueType): String =
-    // One hint for the types that have a ToString impl; `Stdlib.toString` is the fn to
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.displayHint: Unknown constructor 'Darklang.LanguageTools.RuntimeTypes.KnownType.KTBigInt' in pattern"
+  let displayHint(vt: LanguageTools.RuntimeTypes.ValueType): String =
+    // One hint for the types that have a Display impl; `Stdlib.display` is the fn to
     // reach for whichever it is. Collections and custom types have none, so no hint.
     match vt with
     | Known(KTInt8)
@@ -179,20 +186,20 @@ module RuntimeError =
     | Known(KTBool)
     | Known(KTChar)
     | Known(KTDateTime)
-    | Known(KTUuid) -> ". Try wrapping it with `Stdlib.toString`."
+    | Known(KTUuid) -> ". Try wrapping it with `Stdlib.display`."
     | _ -> ""
 
 
-  /// <fn toStringHint> for a value that went where a String was expected, and nothing otherwise.
+  /// <fn displayHint> for a value that went where a String was expected, and nothing otherwise.
   // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.stringExpectedHint: Unknown function or value 'toStringHint'"
   let stringExpectedHint(expected: ValueType, actual: ValueType): String =
     match expected with
-    | Known(KTString) -> toStringHint(actual)
+    | Known(KTString) -> displayHint(actual)
     | _ -> ""
 
 
   /// `"total: " + 5` is the usual way a newcomer meets this error, so when one side is a String
-  /// and the other has a ToString impl, say how to join them.
+  /// and the other has a Display impl, say how to join them.
   // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.joinWithStringHint: Unknown function or value 'toStringHint'"
   let joinWithStringHint(left: ValueType, right: ValueType): ErrorSegments =
     let other =
@@ -202,10 +209,10 @@ module RuntimeError =
       | (other, Known(KTString)) -> Stdlib.Option.Option.Some(other)
       | _ -> Stdlib.Option.Option.None
     match other with
-    | Some(vt) when toStringHint(vt) != "" ->
+    | Some(vt) when displayHint(vt) != "" ->
       [ ES.String(". To join them, make the ")
         ES.ValueType(vt)
-        ES.String(" a String with `Stdlib.toString`, or interpolate it: `$\"total: {n}\"`.") ]
+        ES.String(" a String with `Stdlib.display`, or interpolate it: `$\"total: {n}\"`.") ]
     | _ -> []
 
 
@@ -286,7 +293,7 @@ module RuntimeError =
         ES.ValueType(vt)
         ES.String(" (")
         ES.InlineValue(dv)
-        ES.String($") instead{toStringHint(vt)}") ]
+        ES.String($") instead{displayHint(vt)}") ]
 
     | List(TriedToAddMismatchedData(index, expectedType, actualType, actualValue)) ->
       [ ES.String("Cannot add ")
@@ -451,7 +458,8 @@ module RuntimeError =
 
       // -- Update --
       | UpdateNotRecord(actualType) ->
-        [ ES.String("Cannot apply a record-update to a ")
+        [ ES.String("Cannot apply a record-update to ")
+          ES.IndefiniteArticle
           ES.ValueType(actualType) ]
       | UpdateEmptyKey -> [ ES.String("Empty key in record update") ]
       | UpdateDuplicateField(fieldName) ->
@@ -505,8 +513,8 @@ module RuntimeError =
       match err with
       | ConstructionWrongNumberOfFields(typeName, caseName, expectedFieldCount, actualFieldCount) ->
         [ ES.String("Expected ")
-          ES.Int64(expectedFieldCount)
-          ES.String(" fields in ")
+          ES.Count(expectedFieldCount, ES.String("field"), ES.String("fields"))
+          ES.String(" in ")
           ES.TypeName(typeName)
           ES.String(".")
           ES.FieldName(caseName)
@@ -667,10 +675,8 @@ module RuntimeError =
       | UnsupportedType(typ) ->
         [ ES.String("Unsupported type in JSON: ")
           ES.TypeReference(typ)
-          ES.String(". Some types are not supported in Json serialization, and cannot be used as arguments to ")
-          ES.FunctionName(LanguageTools.RuntimeTypes.FQFnName.FQFnName.Builtin(LanguageTools.RuntimeTypes.FQFnName.Builtin { name = "jsonParse", version = 0s32 }))
-          ES.String(" or ")
-          ES.FunctionName(LanguageTools.RuntimeTypes.FQFnName.FQFnName.Builtin(LanguageTools.RuntimeTypes.FQFnName.Builtin { name = "jsonSerialize", version = 0s32 })) ]
+          // Named as the caller wrote them: the builtins behind them are internal.
+          ES.String(". Some types are not supported in Json serialization, and cannot be used as type arguments to Stdlib.Json.parse or Stdlib.Json.serialize") ]
       | CannotSerializeValue(dv) ->
         [ ES.String("Cannot serialize ")
           ES.FullValue(dv)
@@ -690,9 +696,10 @@ module RuntimeError =
           ES.ValueType(self)
           ES.String(" = ...`, or run `dark impls ")
           ES.ShortTraitName(trait_)
-          ES.String("` to see which types do") ]
+          ES.String("` to see which types do")
+          ES.InspectHint(trait_) ]
       | DispatchAmbiguous(trait_, self, candidates) ->
-        [ ES.String(Stdlib.toString(Stdlib.List.length(candidates)))
+        [ ES.String(Stdlib.display(Stdlib.List.length(candidates)))
           ES.String(" implementations of ")
           ES.TraitName(trait_)
           ES.String(" for ")
@@ -704,7 +711,7 @@ module RuntimeError =
         // No article in front of the type: an article here produces "on a Int64".
         [ ES.ValueType(self)
           ES.String($" has more than one `{method_}`: ")
-          ES.String(Stdlib.toString(Stdlib.List.length(traits)))
+          ES.String(Stdlib.display(Stdlib.List.length(traits)))
           ES.String($" traits declare it. Say which one you mean, as `SomeTrait.{method_}(value)`") ]
       | SelfTypeUnknown(trait_, method_) ->
         [ ES.ShortTraitName(trait_)

@@ -75,56 +75,129 @@ let sqrt(a: Float32): Float32 =
 // @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Add for Float32 =
   /// Add <type Float32> <param a> to <type Float32> <param b>
-  let add(a: Float32, b: Float32): Float32 =
-    let sum = (Stdlib.Float32.toFloat(a)) + (Stdlib.Float32.toFloat(b))
-    Stdlib.Float32.fromFloat(sum)
+  let add(a: Float32, b: Float32): Float32 = Builtin.add(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Subtract for Float32 =
   /// Subtract <type Float32> <param b> from <type Float32> <param a>
-  let subtract(a: Float32, b: Float32): Float32 =
-    let difference = (Stdlib.Float32.toFloat(a)) - (Stdlib.Float32.toFloat(b))
-    Stdlib.Float32.fromFloat(difference)
+  let subtract(a: Float32, b: Float32): Float32 = Builtin.subtract(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Multiply for Float32 =
   /// Multiply <type Float32> <param a> by <type Float32> <param b>
-  let multiply(a: Float32, b: Float32): Float32 =
-    let product = (Stdlib.Float32.toFloat(a)) * (Stdlib.Float32.toFloat(b))
-    Stdlib.Float32.fromFloat(product)
+  let multiply(a: Float32, b: Float32): Float32 = Builtin.multiply(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Power for Float32 =
   /// Returns <param base> raised to the power of <param exponent>
   let power(``base``: Float32, exponent: Float32): Float32 =
-    Stdlib.Float32.fromFloat((Stdlib.Float32.toFloat(``base``)) ** (Stdlib.Float32.toFloat(exponent)))
+    Builtin.power(``base``, exponent)
 
 
 // @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Divide for Float32 =
   /// Divide <type Float32> <param a> by <type Float32> <param b>
-  let divide(a: Float32, b: Float32): Float32 =
-    let quotient = (Stdlib.Float32.toFloat(a)) / (Stdlib.Float32.toFloat(b))
-    Stdlib.Float32.fromFloat(quotient)
+  let divide(a: Float32, b: Float32): Float32 = Builtin.divide(a, b)
+
+
+// Checked arithmetic. The operators follow IEEE 754 and give NaN or an infinity
+// where the answer is not a finite number; these return {{Error}} instead.
+
+/// {{Ok}} <param result> if it is finite, otherwise {{Error Overflow}}
+let __noOverflow(result: Float32): Stdlib.Result.Result<Float32, Stdlib.Math.Overflow> =
+  if isFinite(result) then Ok(result) else Error(Stdlib.Math.Overflow.Overflow)
+
+
+/// {{Ok}} <param result> if it is finite, otherwise {{Error NotANumber}} for NaN or
+/// {{Error}} <param ifInfinite> for an infinity
+let __finite(
+  result: Float32,
+  ifInfinite: Stdlib.Math.NonFinite)
+  : Stdlib.Result.Result<Float32, Stdlib.Math.NonFinite> =
+  if isFinite(result) then
+    Ok(result)
+  else if isNaN(result) then
+    Error(Stdlib.Math.NonFinite.NotANumber)
+  else
+    Error(ifInfinite)
+
+
+/// Adds <param a> to <param b>, or {{Error Overflow}} where the sum is not finite
+let checkedAdd(a: Float32, b: Float32): Stdlib.Result.Result<Float32, Stdlib.Math.Overflow> =
+  __noOverflow(a + b)
+
+
+/// Subtracts <param b> from <param a>, or {{Error Overflow}} where the difference is
+/// not finite
+let checkedSubtract(a: Float32, b: Float32): Stdlib.Result.Result<Float32, Stdlib.Math.Overflow> =
+  __noOverflow(a - b)
+
+
+/// Multiplies <param a> by <param b>, or {{Error Overflow}} where the product is not
+/// finite
+let checkedMultiply(a: Float32, b: Float32): Stdlib.Result.Result<Float32, Stdlib.Math.Overflow> =
+  __noOverflow(a * b)
+
+
+/// Divides <param a> by <param b>, or {{Error DivisionByZero}} where <param b> is zero
+/// and {{Error Overflow}} where the quotient is too large
+let checkedDivide(a: Float32, b: Float32): Stdlib.Result.Result<Float32, Stdlib.Math.NonFinite> =
+  if b == 0.0f32 then
+    Error(Stdlib.Math.NonFinite.DivisionByZero)
+  else
+    __finite(a / b, Stdlib.Math.NonFinite.Overflow)
+
+
+/// <param base> raised to the power of <param exponent>, or {{Error}} where the result
+/// is not finite: {{DivisionByZero}} for zero to a negative power, {{NotANumber}} for a
+/// negative base to a fractional power, and {{Overflow}} where it is too large
+let checkedPower(
+  ``base``: Float32,
+  exponent: Float32)
+  : Stdlib.Result.Result<Float32, Stdlib.Math.NonFinite> =
+  let ifInfinite =
+    if ``base`` == 0.0f32 then
+      Stdlib.Math.NonFinite.DivisionByZero
+    else
+      Stdlib.Math.NonFinite.Overflow
+
+  __finite(``base`` ** exponent, ifInfinite)
+
+
+/// The square root of <param a>, or {{Error NotANumber}} where <param a> is negative
+let checkedSqrt(a: Float32): Stdlib.Result.Result<Float32, Stdlib.Math.NonFinite> =
+  __finite(sqrt(a), Stdlib.Math.NonFinite.Overflow)
+
+
+/// <fn Float32.parse>, but {{Error BadFormat}} for text that is not a finite number, such
+/// as {{"NaN"}}, {{"Infinity"}} or a number too large for the type
+let checkedParse(s: String): Stdlib.Result.Result<Float32, ParseError> =
+  match parse(s) with
+  | Ok(f) when isFinite(f) -> Ok(f)
+  | _ -> Error(ParseError.BadFormat)
+
+
+/// <fn Float32.fromFloat>, or {{Error Overflow}} where <param a> is too large for a
+/// Float32
+let checkedFromFloat(a: Float): Stdlib.Result.Result<Float32, Stdlib.Math.Overflow> =
+  __noOverflow(fromFloat(a))
 
 
 // @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Compare for Float32 =
   /// Returns true if a is less than b
-  let lessThan(a: Float32, b: Float32): Bool =
-    (Stdlib.Float32.toFloat(a)) < (Stdlib.Float32.toFloat(b))
+  let lessThan(a: Float32, b: Float32): Bool = Builtin.lessThan(a, b)
   /// Returns true if a is less than or equal to b
   let lessThanOrEqualTo(a: Float32, b: Float32): Bool =
-    (Stdlib.Float32.toFloat(a)) <= (Stdlib.Float32.toFloat(b))
+    Builtin.lessThanOrEqualTo(a, b)
   /// Returns true if a is greater than b
-  let greaterThan(a: Float32, b: Float32): Bool =
-    (Stdlib.Float32.toFloat(a)) > (Stdlib.Float32.toFloat(b))
+  let greaterThan(a: Float32, b: Float32): Bool = Builtin.greaterThan(a, b)
   /// Returns true if a is greater than or equal to b
   let greaterThanOrEqualTo(a: Float32, b: Float32): Bool =
-    (Stdlib.Float32.toFloat(a)) >= (Stdlib.Float32.toFloat(b))
+    Builtin.greaterThanOrEqualTo(a, b)
 
 
 /// If <param value> is within the range given by <param limitA> and <param
@@ -195,11 +268,12 @@ let fromBits(bits: UInt32): Float32 = Builtin.float32FromBits(bits)
 
 
 // @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
-impl ToString for Float32 =
+impl Display for Float32 =
   /// Stringify <param a> as the shortest decimal that parses back to the same
   /// Float32, e.g. `0.1` for `0.1f32` (where the widened Float says
   /// `0.10000000149011612`), `1e+16`, `1e-5`.
-  let toString(a: Float32): String = Builtin.float32ToString(a)
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float32.impl Display for Float32: An implementation new at this pin; not yet checked against the compiler trait implementations"
+  let display(a: Float32): String = Builtin.float32ToString(a)
 
 
 // @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"

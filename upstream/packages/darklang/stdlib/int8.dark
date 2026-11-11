@@ -93,6 +93,11 @@ let random(start: Int8, ``end``: Int8): Int8 =
 let sqrt(a: Int8): Float = Stdlib.Float.sqrt(Stdlib.Int8.toFloat(a))
 
 
+/// The square root of <param a>, or {{Error NotANumber}} where <param a> is negative
+let checkedSqrt(a: Int8): Stdlib.Result.Result<Float, Stdlib.Math.NonFinite> =
+  Stdlib.Float.checkedSqrt(Stdlib.Int8.toFloat(a))
+
+
 /// Converts an <type Int8> to a <type Float>
 // @compiler replace: packages/darklang/stdlib/int8.dark#Darklang.Stdlib.Int8.toFloat reason=compiler-implementation
 let toFloat(a: Int8): Float = Builtin.int8ToFloat(a)
@@ -204,11 +209,11 @@ impl ShiftRight for Int8 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int8.impl ShiftRight for Int8: Already selected from packages/darklang/stdlib/int8.dark; importing another declaration of Darklang.Stdlib.Int8.impl ShiftRight for Int8 requires an explicit replacement contract"
   let shiftRight(a: Int8, b: Int8): Int8 = Builtin.shiftRight(a, b)
 
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int8.dark; importing another declaration of Darklang.Stdlib.Int8.impl ToString for Int8 requires an explicit replacement contract"
-impl ToString for Int8 =
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int8.dark; importing another declaration of Darklang.Stdlib.Int8.impl Display for Int8 requires an explicit replacement contract"
+impl Display for Int8 =
   /// Stringify <param int8>
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int8.impl ToString for Int8: Already selected from packages/darklang/stdlib/int8.dark; importing another declaration of Darklang.Stdlib.Int8.impl ToString for Int8 requires an explicit replacement contract"
-  let toString(int8: Int8): String = Builtin.int8ToString(int8)
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int8.impl Display for Int8: Already selected from packages/darklang/stdlib/int8.dark; importing another declaration of Darklang.Stdlib.Int8.impl Display for Int8 requires an explicit replacement contract"
+  let display(int8: Int8): String = Builtin.int8ToString(int8)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int8.dark; importing another declaration of Darklang.Stdlib.Int8.impl Zero for Int8 requires an explicit replacement contract"
 impl Zero for Int8 =
@@ -297,10 +302,15 @@ let checkedPower(
 // builtin in NoModule.fs.
 
 /// Divides <param a> by <param b>, rounding towards zero, or
-/// {{Error DivisionByZero}} where `/` raises.
-/// Dividing the minimum value by -1 wraps back to it, as `/` does.
+/// {{Error DivisionByZero}} where `/` raises, or {{Error Overflow}} for the
+/// minimum value divided by -1, where `/` wraps back to the minimum.
 let checkedDivide(a: Int8, b: Int8): Stdlib.Result.Result<Int8, Stdlib.Math.DivisionError> =
-  if b == 0s8 then Error(Stdlib.Math.DivisionError.DivisionByZero) else Ok(a / b)
+  if b == 0s8 then
+    Error(Stdlib.Math.DivisionError.DivisionByZero)
+  else if b == -1s8 && a == -128s8 then
+    Error(Stdlib.Math.DivisionError.Overflow)
+  else
+    Ok(a / b)
 
 
 /// What is left after dividing <param value> by <param divisor>, rounding towards

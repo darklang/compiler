@@ -15,10 +15,10 @@ type T =
 
 
 /// Keep nested instances beside the active store, inside the enclosing fixture.
-/// LocalStore.path is absolute; child process configuration requires that.
+/// LanguageTools.LocalStore.path is absolute; child process configuration requires that.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.root: Unknown function or value 'Stdlib.LocalStore.path'"
 let root(): String =
-  let store = Stdlib.LocalStore.path()
+  let store = LanguageTools.LocalStore.path()
   (Stdlib.Cli.Path.parent(store)) + "/test-instances"
 
 
@@ -33,7 +33,7 @@ let root(): String =
 /// caller has to remember.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.seedFrom: Unknown function or value 'Stdlib.LocalStore.path'"
 let seedFrom(): String =
-  Stdlib.LocalStore.path()
+  LanguageTools.LocalStore.path()
 
 
 /// The binary an instance drives.
@@ -49,7 +49,7 @@ let cliBinary(): String =
 /// A fresh instance. Fails with a message rather than half-existing.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.create: Unknown function or value 'root'"
 let create(): Stdlib.Result.Result<T, String> =
-  let suffix = Stdlib.toString(Stdlib.Int64.random(100000, 999999))
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let dir = $"{root()}/{suffix}/.darklang"
   let src = seedFrom()
 
@@ -118,7 +118,7 @@ let run(i: T, args: List<String>): Stdlib.Result.Result<Stdlib.Cli.Process.Outpu
   |> Stdlib.Result.mapError(fun e ->
     if e == "Process timed out" then
       let cmd = Stdlib.String.join(args, " ")
-      let seconds = Stdlib.toString(commandTimeoutMs / 1000)
+      let seconds = Stdlib.display(commandTimeoutMs / 1000)
       $"`{cmd}` gave no answer in {seconds}s"
     else
       e)
@@ -177,8 +177,8 @@ let expectExit(i: T, args: List<String>, expected: Int64): Stdlib.Test.Result =
     if out.exitCode == expected then
       Stdlib.Test.Result.Pass
     else
-      let got = Stdlib.toString(out.exitCode)
-      let want = Stdlib.toString(expected)
+      let got = Stdlib.display(out.exitCode)
+      let want = Stdlib.display(expected)
       Stdlib.Test.fail($"`{cmd}` exited {got}, expected {want}")
 
 
@@ -220,6 +220,6 @@ let exitedWith(code: Int64, expected: Int64, why: String): Stdlib.Test.Result =
   if code == expected then
     Stdlib.Test.Result.Pass
   else
-    let got = Stdlib.toString(code)
-    let want = Stdlib.toString(expected)
+    let got = Stdlib.display(code)
+    let want = Stdlib.display(expected)
     Stdlib.Test.fail($"{why}: exited {got}, expected {want}")

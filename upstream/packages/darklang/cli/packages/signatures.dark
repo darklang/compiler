@@ -166,7 +166,7 @@ let renderModule(
 
 
 /// One line per method of each impl, written the way a call is: `a % b  (Modulo)`,
-/// `Stdlib.toString(v)  (ToString)`. An impl's method fns live at the impl's path, which no call
+/// `Stdlib.display(v)  (Display)`. An impl's method fns live at the impl's path, which no call
 /// uses, so they are listed here instead of as a module of their own.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
 let implLines(
@@ -198,12 +198,14 @@ let implModuleKey(loc: LanguageTools.ProgramTypes.PackageLocation): String =
   moduleKey(loc) + "." + loc.name
 
 
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Signatures.ParsedArgs: Unknown type 'Cli.Packages.Query.TestModules'"
 type ParsedArgs =
   { root: List<String>
     includeTypes: Bool
     deprecated: Cli.Packages.Query.Deprecated
     internal: Cli.Packages.Query.Internal
-    filter: Stdlib.Option.Option<String>
+    testModules: Cli.Packages.Query.TestModules
+    filters: List<String>
     all: Bool
     parseErrors: List<FlagParser.ParseError> }
 
@@ -211,11 +213,12 @@ type ParsedArgs =
 val argSpec =
   FlagParser.Spec
     { flags =
-        [ ("--types", []), ("--include-deprecated", []), ("--include-internal", []), ("--all", []) ]
+        [ ("--types", []), ("--include-deprecated", []), ("--include-internal", []), ("--include-tests", []), ("--all", []) ]
       valueFlags = [ ("--module", []) ] }
 
 
-// The first positional is the filter; later ones are ignored.
+// Every positional is a filter of its own, listed in turn.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let parseArgs(args: List<String>): ParsedArgs =
   let p = FlagParser.parse(argSpec, args)
   let root =
@@ -229,7 +232,8 @@ let parseArgs(args: List<String>): ParsedArgs =
       deprecated =
         Cli.Packages.Query.Deprecated.showIf(FlagParser.hasFlag(p, "--include-deprecated"))
       internal = Cli.Packages.Query.Internal.showIf(FlagParser.hasFlag(p, "--include-internal"))
-      filter = Stdlib.List.head(p.positionals)
+      testModules = Cli.Packages.Query.TestModules.showIf(FlagParser.hasFlag(p, "--include-tests"))
+      filters = p.positionals
       all = FlagParser.hasFlag(p, "--all")
       parseErrors = p.errors }
 
@@ -241,6 +245,7 @@ let executeFiltered(
   includeTypes: Bool,
   deprecated: Cli.Packages.Query.Deprecated,
   internal: Cli.Packages.Query.Internal,
+  testModules: Cli.Packages.Query.TestModules,
   filterText: Stdlib.Option.Option<String>)
   : Cli.AppState =
   let rootName = Stdlib.String.join(rootPath, ".")
@@ -278,6 +283,17 @@ let executeFiltered(
           traits = unfiltered.traits |> Stdlib.List.filter(fun i -> hits(i.location))
           impls = unfiltered.impls |> Stdlib.List.filter(fun i -> hits(i.location))
           tests = unfiltered.tests |> Stdlib.List.filter(fun i -> hits(i.location)) }
+
+  // Test fixtures and helpers (`DateTime.Tests.d`) are not part of an API, so they are left out
+  // unless asked for, or unless the listing is itself rooted in a `Tests` module.
+  let (results, hiddenTestItems) =
+    match testModules with
+    | Show -> (results, 0)
+    | Hide ->
+      if Cli.Packages.Search.inTestModule(rootPath) then
+        (results, 0)
+      else
+        Cli.Packages.Search.withoutTestHelpers(results)
 
   // An impl's method fns are listed with the impl, as calls, not as a module at the impl's path.
   // An impl shows when its own path matches the filter or one of its methods does.
@@ -326,8 +342,10 @@ let executeFiltered(
     |> Stdlib.List.map(fun xs -> Stdlib.List.length(xs))
     |> Stdlib.List.fold(0, fun(a, b) -> a + b)
 
+  let matchedNothing = Stdlib.Option.isSome(filterText) && Stdlib.List.isEmpty(allKeys)
+
   // A module exists only through what it holds, so a root that holds nothing is a typo, and
-  // "0 fns across 0 modules" would read as an answer.
+  // "0 fns across 0 modules" would read as an answer. The same goes for a filter.
   if
     Stdlib.List.isEmpty(raw.submodules)
     && Stdlib.List.isEmpty(raw.types)
@@ -338,6 +356,12 @@ let executeFiltered(
     && Stdlib.List.isEmpty(raw.tests)
   then
     Cli.printErr($"no module named {rootName} on this branch")
+    Cli.failed(state)
+  else if matchedNothing then
+    let needle = Stdlib.Option.withDefault(filterText, "")
+    let typesHint =
+      if Stdlib.List.isEmpty(results.types) then "" else "; only types do, so add --types"
+    Cli.printErr($"no functions in {rootName} match `{needle}`{typesHint}")
     Cli.failed(state)
   else
     let title =
@@ -351,18 +375,20 @@ let executeFiltered(
     Stdlib.printLine("")
 
     let typesNote =
-      if includeTypes then $", {Stdlib.toString(totalTypes)} types"
+      if includeTypes then $", {Stdlib.display(totalTypes)} types"
       else ""
 
     let methodsNote =
-      if totalMethods > 0 then $", {Stdlib.toString(totalMethods)} operators and trait methods"
+      if totalMethods > 0 then $", {Stdlib.display(totalMethods)} operators and trait methods"
       else ""
 
-    let summary = $"{Stdlib.toString(totalFns)} fns{typesNote}{methodsNote} across {Stdlib.toString(Stdlib.List.length(allKeys))} modules"
+    let summary = $"{Stdlib.display(totalFns)} fns{typesNote}{methodsNote} across {Stdlib.display(Stdlib.List.length(allKeys))} modules"
     Stdlib.printLine(Stdlib.Cli.UI.Colors.hint(summary))
 
-    if Stdlib.Bool.not(includeTypes) then
-      Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint("Use --types to include type definitions. `view <name>` shows source/docs."))
+    if hiddenTestItems > 0 then
+      Stdlib.printErrorLine(
+        Stdlib.Cli.UI.Colors.hint(
+          $"{Stdlib.display(hiddenTestItems)} test helpers left out; --include-tests shows them."))
 
     state
 
@@ -380,7 +406,7 @@ let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
 
   let isUnscoped =
     isDefaultRoot
-    && (Stdlib.Option.isNone(parsed.filter))
+    && (Stdlib.List.isEmpty(parsed.filters))
     && (Stdlib.Bool.not(parsed.all))
 
   if Stdlib.Bool.not(Stdlib.List.isEmpty(parsed.parseErrors)) then
@@ -390,18 +416,34 @@ let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
   else if isUnscoped then
     Darklang.Cli.Docs.StdlibOverview.execute(state, args)
   else
-    executeFiltered(
-      state,
-      parsed.root,
-      parsed.includeTypes,
-      parsed.deprecated,
-      parsed.internal,
-      parsed.filter)
+    let listing(st: Cli.AppState, filter: Stdlib.Option.Option<String>): Cli.AppState =
+      executeFiltered(
+        st,
+        parsed.root,
+        parsed.includeTypes,
+        parsed.deprecated,
+        parsed.internal,
+        parsed.testModules,
+        filter)
+
+    let finalState =
+      match parsed.filters with
+      | [] -> listing(state, Stdlib.Option.Option.None)
+      | [ first, ...rest ] ->
+        rest
+        |> Stdlib.List.fold(listing(state, Stdlib.Option.Option.Some(first)), fun(acc, filter) ->
+          Stdlib.printLine("")
+          listing(acc, Stdlib.Option.Option.Some(filter)))
+
+    if (finalState.exitCode == 0) && (Stdlib.Bool.not(parsed.includeTypes)) then
+      Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint("Use --types to include type definitions. `view <name>` shows source/docs."))
+
+    finalState
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: Cli.AppState): String =
-  [ "Usage: docs signatures [filter|module] [--types] [--module <path>] [--all] [--include-deprecated] [--include-internal]"
+  [ "Usage: docs signatures [filter...] [--types] [--module <path>] [--all] [--include-deprecated] [--include-internal] [--include-tests]"
     ""
     "Token-tight dump of stdlib functions with full type signatures."
     "Designed for AI agents needing an API map for a specific module or task."
@@ -409,16 +451,19 @@ let help(_state: Cli.AppState): String =
     "Without args, prints the cheap module overview (same as `docs stdlib`)."
     ""
     "Options:"
-    "  filter                 Substring match on names/modules (fuzzy)"
+    "  filter                 Substring match on names/modules (fuzzy). Give several"
+    "                         to list each in turn, in one call"
     "  --types                Also emit type definitions (Option, Result, ...)"
     "  --module <path>        Scope to a specific module (e.g. Stdlib.Http)"
     "  --all                  Dump every stdlib fn at once (heavy)"
     "  --include-deprecated   Include deprecated items hidden by default"
     "  --include-internal     Include internal helpers (names starting with __)"
+    "  --include-tests        Include test helpers (what lives in Tests modules)"
     ""
     "Examples:"
     "  docs signatures                                # cheap overview"
     "  docs signatures uuid                           # filter to 'uuid'"
+    "  docs signatures Stdlib.String Stdlib.List      # two modules, one call"
     "  docs signatures --module Stdlib.Http  # one module"
     "  docs signatures --module Stdlib.Option --types"
     "  docs signatures --all                          # everything (heavy)"
@@ -436,7 +481,7 @@ let complete(
   match Stdlib.List.last(args) with
   | Some(last) ->
     if Stdlib.String.startsWith(last, "--") then
-      [ "--types", "--module", "--include-deprecated", "--include-internal" ]
+      [ "--types", "--module", "--include-deprecated", "--include-internal", "--include-tests" ]
       |> Stdlib.List.filter(fun f -> Stdlib.String.startsWith(f, last))
       |> Stdlib.List.map(Cli.Completion.simple)
     else []

@@ -184,7 +184,7 @@ module Update =
     test updateOfNonRecordRaises =
       (let r = 1
        { r with key = false })
-      => raises "Cannot apply a record-update to a Int64"
+      => raises "Cannot apply a record-update to an Int64"
 
     // @compiler xfail compile: "Unknown field 'p' on Darklang.Language.Tests.Records.Update.RecordForUpdateMultiple" class=aot-rejection reason=aot-invalid-field
     test unknownFieldRaises =

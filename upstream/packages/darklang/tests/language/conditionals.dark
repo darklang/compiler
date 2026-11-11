@@ -21,7 +21,7 @@ test elseErrorRaises =
 // @compiler xfail compile: "Expected TBool, got TUnit" class=aot-rejection reason=aot-type-error
 test unitConditionRaises =
   (if () then "" else "")
-  => raises "Encountered a condition that must be a Bool, but got an Unit (())"
+  => raises "Encountered a condition that must be a Bool, but got a Unit (())"
 
 // @compiler xfail compile: "Expected TBool, got TInt64" class=aot-rejection reason=aot-type-error
 test conditionErrorRaises =
@@ -44,7 +44,7 @@ test ifWithoutElse =
 // @compiler xfail compile: "Expected TBool, got TUnit" class=aot-rejection reason=aot-type-error
 test ifWithoutElseUnitConditionRaises =
   (if () then "msg")
-  => raises "Encountered a condition that must be a Bool, but got an Unit (())"
+  => raises "Encountered a condition that must be a Bool, but got a Unit (())"
 
 // @compiler xfail compile: "Expected TInt64, got TUnit" class=aot-rejection reason=aot-type-error
 test ifWithoutElseThenErrorRaises =

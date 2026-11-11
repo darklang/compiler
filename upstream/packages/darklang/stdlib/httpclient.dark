@@ -57,6 +57,10 @@ let toString(e: RequestError): String =
   | BadMethod -> "Bad Method"
 
 
+impl Display for RequestError =
+  let display = Stdlib.HttpClient.toString
+
+
 /// The response from a HTTP request
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.Response reason=compiler-implementation
 type Response =

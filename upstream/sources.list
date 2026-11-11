@@ -15,6 +15,7 @@ packages/darklang/cli/docs/enums.dark
 packages/darklang/cli/docs/errors.dark
 packages/darklang/cli/docs/escapes.dark
 packages/darklang/cli/docs/for-ai.dark
+packages/darklang/cli/docs/forAIParts.dark
 packages/darklang/cli/docs/functions.dark
 packages/darklang/cli/docs/http-server.dark
 packages/darklang/cli/docs/live.dark
@@ -152,7 +153,11 @@ packages/darklang/languageTools/atRestTypeChecker/run.dark
 packages/darklang/languageTools/atRestTypeChecker/solve.dark
 packages/darklang/languageTools/atRestTypeChecker/types.dark
 packages/darklang/languageTools/common.dark
+packages/darklang/languageTools/exec.dark
+packages/darklang/languageTools/execPolicy.dark
 packages/darklang/languageTools/interpreterStats.dark
+packages/darklang/languageTools/live.dark
+packages/darklang/languageTools/localStore.dark
 packages/darklang/languageTools/nameResolver.dark
 packages/darklang/languageTools/packageManager.dark
 packages/darklang/languageTools/parser/cliScript.dark
@@ -262,7 +267,6 @@ packages/darklang/stdlib/duration.dark
 packages/darklang/stdlib/english.dark
 packages/darklang/stdlib/env.dark
 packages/darklang/stdlib/exec.dark
-packages/darklang/stdlib/execPolicy.dark
 packages/darklang/stdlib/float.dark
 packages/darklang/stdlib/float32.dark
 packages/darklang/stdlib/fun.dark
@@ -278,8 +282,6 @@ packages/darklang/stdlib/int64.dark
 packages/darklang/stdlib/int8.dark
 packages/darklang/stdlib/json.dark
 packages/darklang/stdlib/list.dark
-packages/darklang/stdlib/live.dark
-packages/darklang/stdlib/localStore.dark
 packages/darklang/stdlib/math.dark
 packages/darklang/stdlib/net.dark
 packages/darklang/stdlib/noModule.dark
@@ -313,6 +315,7 @@ packages/darklang/tests/cli/commandCompletions.dark
 packages/darklang/tests/cli/commandGroups.dark
 packages/darklang/tests/cli/deprecationKinds.dark
 packages/darklang/tests/cli/docs.dark
+packages/darklang/tests/cli/docsForAI.dark
 packages/darklang/tests/cli/evalAndRun.dark
 packages/darklang/tests/cli/file.dark
 packages/darklang/tests/cli/flags.dark
@@ -330,8 +333,11 @@ packages/darklang/tests/cli/permissionsGrammar.dark
 packages/darklang/tests/cli/propagate.dark
 packages/darklang/tests/cli/releaseAssets.dark
 packages/darklang/tests/cli/scripts.dark
+packages/darklang/tests/cli/searchDefaults.dark
+packages/darklang/tests/cli/searchExactSeveral.dark
 packages/darklang/tests/cli/searchRanking.dark
 packages/darklang/tests/cli/searchShallow.dark
+packages/darklang/tests/cli/signaturesSeveral.dark
 packages/darklang/tests/cli/signaturesTraitCalls.dark
 packages/darklang/tests/cli/telemetry.dark
 packages/darklang/tests/cli/tests-picker.dark
@@ -342,6 +348,7 @@ packages/darklang/tests/cli/traceVerbs.dark
 packages/darklang/tests/cli/traces.dark
 packages/darklang/tests/cli/tracesRendering.dark
 packages/darklang/tests/cli/uninstall.dark
+packages/darklang/tests/cli/viewSeveral.dark
 packages/darklang/tests/cli/workbenchRepl.dark
 packages/darklang/tests/cli/zshrc.dark
 packages/darklang/tests/language/aliases.dark
@@ -378,6 +385,7 @@ packages/darklang/tests/language/unwrap.dark
 packages/darklang/tests/language/values.dark
 packages/darklang/tests/languageTools/atRestTypeChecker.dark
 packages/darklang/tests/languageTools/builtinIntrospection.dark
+packages/darklang/tests/languageTools/live.dark
 packages/darklang/tests/languageTools/opWalks.dark
 packages/darklang/tests/languageTools/parsedFileShape.dark
 packages/darklang/tests/languageTools/parser/diagnostics.dark
@@ -460,7 +468,6 @@ packages/darklang/tests/stdlib/ints/uint64.dark
 packages/darklang/tests/stdlib/ints/uint8.dark
 packages/darklang/tests/stdlib/json.dark
 packages/darklang/tests/stdlib/list.dark
-packages/darklang/tests/stdlib/live.dark
 packages/darklang/tests/stdlib/math.dark
 packages/darklang/tests/stdlib/net.dark
 packages/darklang/tests/stdlib/option.dark

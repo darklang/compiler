@@ -93,6 +93,11 @@ let random(start: Int64, ``end``: Int64): Int64 =
 let sqrt(a: Int64): Float = Stdlib.Float.sqrt(Stdlib.Int64.toFloat(a))
 
 
+/// The square root of <param a>, or {{Error NotANumber}} where <param a> is negative
+let checkedSqrt(a: Int64): Stdlib.Result.Result<Float, Stdlib.Math.NonFinite> =
+  Stdlib.Float.checkedSqrt(Stdlib.Int64.toFloat(a))
+
+
 /// Converts an <type Int64> to a <type Float>
 // @compiler replace: packages/darklang/stdlib/int64.dark#Darklang.Stdlib.Int64.toFloat reason=compiler-implementation
 let toFloat(a: Int64): Float = Builtin.int64ToFloat(a)
@@ -227,11 +232,11 @@ impl ShiftRight for Int64 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int64.impl ShiftRight for Int64: Already selected from packages/darklang/stdlib/int64.dark; importing another declaration of Darklang.Stdlib.Int64.impl ShiftRight for Int64 requires an explicit replacement contract"
   let shiftRight(a: Int64, b: Int64): Int64 = Builtin.shiftRight(a, b)
 
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int64.dark; importing another declaration of Darklang.Stdlib.Int64.impl ToString for Int64 requires an explicit replacement contract"
-impl ToString for Int64 =
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int64.dark; importing another declaration of Darklang.Stdlib.Int64.impl Display for Int64 requires an explicit replacement contract"
+impl Display for Int64 =
   /// Stringify <param int>
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int64.impl ToString for Int64: Already selected from packages/darklang/stdlib/int64.dark; importing another declaration of Darklang.Stdlib.Int64.impl ToString for Int64 requires an explicit replacement contract"
-  let toString(int: Int64): String = Builtin.int64ToString(int)
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int64.impl Display for Int64: Already selected from packages/darklang/stdlib/int64.dark; importing another declaration of Darklang.Stdlib.Int64.impl Display for Int64 requires an explicit replacement contract"
+  let display(int: Int64): String = Builtin.int64ToString(int)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int64.dark; importing another declaration of Darklang.Stdlib.Int64.impl Zero for Int64 requires an explicit replacement contract"
 impl Zero for Int64 =
@@ -324,10 +329,15 @@ let checkedPower(
 // builtin in NoModule.fs.
 
 /// Divides <param a> by <param b>, rounding towards zero, or
-/// {{Error DivisionByZero}} where `/` raises.
-/// Dividing the minimum value by -1 wraps back to it, as `/` does.
+/// {{Error DivisionByZero}} where `/` raises, or {{Error Overflow}} for the
+/// minimum value divided by -1, where `/` wraps back to the minimum.
 let checkedDivide(a: Int64, b: Int64): Stdlib.Result.Result<Int64, Stdlib.Math.DivisionError> =
-  if b == 0 then Error(Stdlib.Math.DivisionError.DivisionByZero) else Ok(a / b)
+  if b == 0 then
+    Error(Stdlib.Math.DivisionError.DivisionByZero)
+  else if b == -1 && a == -9223372036854775808 then
+    Error(Stdlib.Math.DivisionError.Overflow)
+  else
+    Ok(a / b)
 
 
 /// What is left after dividing <param value> by <param divisor>, rounding towards

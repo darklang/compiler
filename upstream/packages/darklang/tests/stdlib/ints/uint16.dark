@@ -95,12 +95,12 @@ test lessThan =
 
 test toString =
   Stdlib.Test.all(
-    [ Stdlib.toString(120u16) |> Stdlib.Test.equal("120")
-      Stdlib.toString(1u16) |> Stdlib.Test.equal("1")
+    [ Stdlib.display(120u16) |> Stdlib.Test.equal("120")
+      Stdlib.display(1u16) |> Stdlib.Test.equal("1")
       // UInt16 lower limit
-      Stdlib.toString(0u16) |> Stdlib.Test.equal("0")
+      Stdlib.display(0u16) |> Stdlib.Test.equal("0")
       // UInt16 upper limit
-      Stdlib.toString(65535u16) |> Stdlib.Test.equal("65535") ])
+      Stdlib.display(65535u16) |> Stdlib.Test.equal("65535") ])
 
 test toFloat =
   Stdlib.Test.all(
@@ -279,6 +279,15 @@ test shiftRight =
       (1u16 >> 0u16) |> Stdlib.Test.equal(1u16)
       (32768u16 >> 15u16) |> Stdlib.Test.equal(1u16)
       (40u16 >> 3u16) |> Stdlib.Test.equal(5u16) ])
+
+/// The shift count is taken modulo 16, as in Rust and C#: shifting by 17
+/// shifts by 1, and the largest count shifts by 15.
+test shiftCountWraps =
+  Stdlib.Test.all(
+    [ (1u16 << 16u16) |> Stdlib.Test.equal(1u16)
+      (1u16 << 17u16) |> Stdlib.Test.equal(2u16)
+      (64u16 >> 17u16) |> Stdlib.Test.equal(32u16)
+      (1u16 << 65535u16) |> Stdlib.Test.equal(32768u16) ])
 
 test checkedAdd =
   Stdlib.Test.all(

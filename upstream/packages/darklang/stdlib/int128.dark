@@ -85,6 +85,11 @@ impl Compare for Int128 =
 let sqrt(a: Int128): Float = Stdlib.Float.sqrt(Stdlib.Int128.toFloat(a))
 
 
+/// The square root of <param a>, or {{Error NotANumber}} where <param a> is negative
+let checkedSqrt(a: Int128): Stdlib.Result.Result<Float, Stdlib.Math.NonFinite> =
+  Stdlib.Float.checkedSqrt(Stdlib.Int128.toFloat(a))
+
+
 /// Converts an <type Int128> to a <type Float>
 // @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.toFloat reason=compiler-implementation
 let toFloat(a: Int128): Float = Builtin.int128ToFloat(a)
@@ -192,11 +197,11 @@ impl ShiftRight for Int128 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl ShiftRight for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl ShiftRight for Int128 requires an explicit replacement contract"
   let shiftRight(a: Int128, b: Int128): Int128 = Builtin.shiftRight(a, b)
 
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl ToString for Int128 requires an explicit replacement contract"
-impl ToString for Int128 =
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Display for Int128 requires an explicit replacement contract"
+impl Display for Int128 =
   /// Stringify <param int128>
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl ToString for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl ToString for Int128 requires an explicit replacement contract"
-  let toString(int128: Int128): String = Builtin.int128ToString(int128)
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Display for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Display for Int128 requires an explicit replacement contract"
+  let display(int128: Int128): String = Builtin.int128ToString(int128)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Zero for Int128 requires an explicit replacement contract"
 impl Zero for Int128 =
@@ -293,10 +298,15 @@ let checkedPower(
 // builtin in NoModule.fs.
 
 /// Divides <param a> by <param b>, rounding towards zero, or
-/// {{Error DivisionByZero}} where `/` raises.
-/// Dividing the minimum value by -1 wraps back to it, as `/` does.
+/// {{Error DivisionByZero}} where `/` raises, or {{Error Overflow}} for the
+/// minimum value divided by -1, where `/` wraps back to the minimum.
 let checkedDivide(a: Int128, b: Int128): Stdlib.Result.Result<Int128, Stdlib.Math.DivisionError> =
-  if b == 0s128 then Error(Stdlib.Math.DivisionError.DivisionByZero) else Ok(a / b)
+  if b == 0s128 then
+    Error(Stdlib.Math.DivisionError.DivisionByZero)
+  else if b == -1s128 && a == -170141183460469231731687303715884105728s128 then
+    Error(Stdlib.Math.DivisionError.Overflow)
+  else
+    Ok(a / b)
 
 
 /// What is left after dividing <param value> by <param divisor>, rounding towards

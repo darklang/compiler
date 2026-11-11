@@ -15,7 +15,7 @@
 ///
 /// Nothing here knows about threads, timers or a queue. `poll` is a question; who asks it, and when, is
 /// the host's business (`Stdlib.Host.await`).
-module Darklang.Stdlib.Live
+module Darklang.LanguageTools.Live
 
 
 /// The store's change counter as this process sees it. It moves whenever a commit lands through another
@@ -28,12 +28,13 @@ let version(): Int64 = Builtin.storeVersion()
 // --- what changed ---
 
 /// One thing a change touched: a name and what kind of item is bound there.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.Live.Change'"
 type Touched =
   { location: LanguageTools.ProgramTypes.PackageLocation
     kind: LanguageTools.ProgramTypes.ItemKind }
 
 /// What a poll found.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Live.Change: Unknown type 'SCM.PackageOps.OpSummary'"
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Live.Change: Unknown type 'SCM.PackageOps.OpSummary'"
 type Change =
   { /// The ops that landed since the last poll, oldest first, as the branch sees them.
     ops: List<SCM.PackageOps.OpSummary>
@@ -76,13 +77,13 @@ val showKey = "live.show"
 /// turn, and one started later opens on it when it is given no view of its own.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Live.show: Unknown function or value 'Stdlib.LocalStore.configSet'"
 let show(view: LanguageTools.ProgramTypes.PackageLocation): Unit =
-  let _ = Stdlib.LocalStore.configSet(showKey, entryName(view))
+  let _ = LanguageTools.LocalStore.configSet(showKey, entryName(view))
   ()
 
 /// The view `show` last named, if any.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Live.shown: Unknown function or value 'Stdlib.LocalStore.configGet'"
 let shown(): Stdlib.Option.Option<LanguageTools.ProgramTypes.PackageLocation> =
-  match Stdlib.LocalStore.configGet(showKey) with
+  match LanguageTools.LocalStore.configGet(showKey) with
   | Some(name) when name != "" -> locationOfName(name)
   | _ -> Stdlib.Option.Option.None
 
@@ -121,8 +122,9 @@ let watch(branchId: Uuid): Watch =
       version = counter
       since = since
       reported = reported
-      shown = Stdlib.LocalStore.configGet(showKey) }
+      shown = LanguageTools.LocalStore.configGet(showKey) }
 
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 let kindOf(target: LanguageTools.ProgramTypes.Reference): LanguageTools.ProgramTypes.ItemKind =
   match target with
   | PackageType(_) -> LanguageTools.ProgramTypes.ItemKind.Type
@@ -165,6 +167,7 @@ let unknownChange(): Change =
 /// Keyed on location AND kind, because one name can be bound as a fn and as a type and those are
 /// two things for a host to reload. Keyed on location alone the second one vanishes, and a touched
 /// name that vanishes is a host left running stale code with nothing on screen to say so.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.Live.Change'"
 let dedupeTouched(touched: List<Touched>): List<Touched> =
   touched |> Stdlib.List.uniqueBy(fun t -> (t.location, t.kind))
 
@@ -193,7 +196,7 @@ let poll(w: Watch): (Watch * Stdlib.Option.Option<Change>) =
       SCM.PackageOps.summariesByIds(Stdlib.List.take(newIds, describeAtMost))
 
     if Stdlib.List.isEmpty(landed) then
-      let shownNow = Stdlib.LocalStore.configGet(showKey)
+      let shownNow = LanguageTools.LocalStore.configGet(showKey)
       let next = { w with version = now, shown = shownNow }
 
       // The store moved and no op landed: a config or trace write. Only a `show` is anyone's
@@ -228,7 +231,7 @@ let poll(w: Watch): (Watch * Stdlib.Option.Option<Change>) =
             version = now
             since = since
             reported = reported
-            shown = Stdlib.LocalStore.configGet(showKey) }
+            shown = LanguageTools.LocalStore.configGet(showKey) }
 
       (next, Stdlib.Option.Option.Some(change))
 
@@ -307,7 +310,7 @@ let affects(change: Change, entry: LanguageTools.ProgramTypes.PackageLocation): 
 /// `hash` is `None` until the first `refresh` finds something usable. `report` is the at-rest report of
 /// the newest version when that version FAILED and the host is staying on `hash`; `None` when the host
 /// is on the newest. `problem` is for a name that stopped resolving at all.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Live.LastGood: Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Live.LastGood: Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 type LastGood =
   { entry: LanguageTools.ProgramTypes.PackageLocation
     hash: Stdlib.Option.Option<LanguageTools.ProgramTypes.Hash>
@@ -522,7 +525,7 @@ let reportText(report: LanguageTools.AtRestTypeChecker.Report): String =
     | [issue, ...] -> issueText(issue)
     | [] -> "it failed the type check"
 
-  let more = if count > 1 then $" (and {Stdlib.toString(count - 1)} more)" else ""
+  let more = if count > 1 then $" (and {Stdlib.display(count - 1)} more)" else ""
   first + more
 
 /// One line for a band or a log: why the host is not on the newest version, if it is not.
@@ -560,14 +563,14 @@ let transition(before: LastGood, after: LastGood): Stdlib.Option.Option<String> 
 /// location, poll, and hand back the last version that passes its checks. The state is a value the
 /// server carries between requests; nothing here is a thread or a timer.
 module Router =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Live.Router.State: Unknown type 'LastGood'"
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Live.Router.State: Unknown type 'LastGood'"
   type State =
     { watch: Watch
       lastGood: LastGood }
 
   // @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
   let start(branchId: Uuid, entry: LanguageTools.ProgramTypes.PackageLocation): State =
-    State { watch = watch(branchId), lastGood = refresh(branchId, Stdlib.Live.start(entry)) }
+    State { watch = watch(branchId), lastGood = refresh(branchId, LanguageTools.Live.start(entry)) }
 
   /// One request's worth of following: did the store move, does it reach the router, and if so
   /// which hash is the router now. A newly broken version is said once, on stdout, which is where a
@@ -646,7 +649,7 @@ let call2(lg: LastGood, first: 'a, second: 'b): Stdlib.Result.Result<'c, String>
 
 /// What an agent (or a test) sees of a view: the picture and what is wrong with the newest code,
 /// without a terminal in the way.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Live.Observation: Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Live.Observation: Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 type Observation =
   { /// The at-rest report of the newest version, when it failed its checks and an earlier
     /// version is what rendered. `None` when the newest is what you are looking at.
@@ -859,7 +862,7 @@ module Values =
       let fns = Stdlib.List.length(Darklang.Tracing.Store.fnsOf(newest.id))
       if (newest.durationMs > maxDurationMs) || (fns > maxFns) then
         let why =
-          $"too large to show live values: its last run took {Stdlib.toString(newest.durationMs)} ms through {Stdlib.toString(fns)} fns (dark traces inspect {Stdlib.String.slice(newest.id, 0, 8)})"
+          $"too large to show live values: its last run took {Stdlib.display(newest.durationMs)} ms through {Stdlib.display(fns)} fns (dark traces inspect {Stdlib.String.slice(newest.id, 0, 8)})"
         Stdlib.Option.Option.Some(
           Values
             { byExpr = Stdlib.Dict.empty
@@ -885,7 +888,7 @@ module Values =
         collected
         |> Stdlib.List.map(fun pair ->
           let (id, v) = pair
-          (Stdlib.toString(id), v))
+          (Stdlib.display(id), v))
         |> Stdlib.Dict.fromEntries
 
       Stdlib.Option.Option.Some(

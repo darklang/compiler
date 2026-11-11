@@ -40,7 +40,7 @@ let isDigit(c: Char): Bool =
 /// Return whether the first scalar in <param c> is a Unicode letter.
 // @compiler replace: packages/darklang/stdlib/char.dark#Darklang.Stdlib.Char.isLetter reason=compiler-implementation
 let isLetter(c: Char): Bool =
-  match Stdlib.String.toCodepoints(Stdlib.toString(c)) with
+  match Stdlib.String.toCodepoints(Stdlib.display(c)) with
   | [first, ...rest] -> Stdlib.Codepoint.isLetter(first)
   | _ -> false
 
@@ -48,7 +48,7 @@ let isLetter(c: Char): Bool =
 /// Return whether the first scalar in <param c> is Unicode whitespace.
 // @compiler replace: packages/darklang/stdlib/char.dark#Darklang.Stdlib.Char.isWhitespace reason=compiler-implementation
 let isWhitespace(c: Char): Bool =
-  match Stdlib.String.toCodepoints(Stdlib.toString(c)) with
+  match Stdlib.String.toCodepoints(Stdlib.display(c)) with
   | [first, ...rest] -> Stdlib.Codepoint.isWhitespace(first)
   | _ -> false
 
@@ -56,7 +56,7 @@ let isWhitespace(c: Char): Bool =
 /// Return whether the first scalar in <param c> is a Unicode letter or digit.
 // @compiler replace: packages/darklang/stdlib/char.dark#Darklang.Stdlib.Char.isAlphanumeric reason=compiler-implementation
 let isAlphanumeric(c: Char): Bool =
-  match Stdlib.String.toCodepoints(Stdlib.toString(c)) with
+  match Stdlib.String.toCodepoints(Stdlib.display(c)) with
   | [first, ...rest] -> Stdlib.Codepoint.isAlphanumeric(first)
   | _ -> false
 
@@ -124,11 +124,11 @@ impl Compare for Char =
   let greaterThanOrEqualTo = Stdlib.Char.isGreaterThanOrEqualTo
 
 
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/char.dark; importing another declaration of Darklang.Stdlib.Char.impl ToString for Char requires an explicit replacement contract"
-impl ToString for Char =
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/char.dark; importing another declaration of Darklang.Stdlib.Char.impl Display for Char requires an explicit replacement contract"
+impl Display for Char =
   /// Stringify <param c>
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Char.impl ToString for Char: Already selected from packages/darklang/stdlib/char.dark; importing another declaration of Darklang.Stdlib.Char.impl ToString for Char requires an explicit replacement contract"
-  let toString(c: Char): String = Builtin.charToString(c)
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Char.impl Display for Char: Already selected from packages/darklang/stdlib/char.dark; importing another declaration of Darklang.Stdlib.Char.impl Display for Char requires an explicit replacement contract"
+  let display(c: Char): String = Builtin.charToString(c)
 
 
 /// Return {{Some <var c>}} for the Unicode codepoint <param codepoint>,
@@ -145,6 +145,6 @@ let fromCodepoint(codepoint: UInt32): Stdlib.Option.Option<Char> =
 /// This is the inverse of <fn Char.fromCodepoint>.
 // @compiler replace: packages/darklang/stdlib/char.dark#Darklang.Stdlib.Char.toCodepoint reason=compiler-implementation
 let toCodepoint(c: Char): Stdlib.Option.Option<UInt32> =
-  match Stdlib.String.toCodepoints(Stdlib.toString(c)) with
+  match Stdlib.String.toCodepoints(Stdlib.display(c)) with
   | [codepoint] -> Stdlib.Option.Option.Some(codepoint)
   | _ -> Stdlib.Option.Option.None

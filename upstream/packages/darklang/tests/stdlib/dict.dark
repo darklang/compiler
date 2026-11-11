@@ -366,7 +366,7 @@ test literalRejectsValueOfAnotherType =
 // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
 test setRejectsWrongValueType =
   Stdlib.Dict.set(Dict { "key1": "val1" }, "key2", 2)
-  => raises "Darklang.Stdlib.Dict.set's 3rd parameter `value` expects String, but got Int64 (2). Try wrapping it with `Stdlib.toString`."
+  => raises "Darklang.Stdlib.Dict.set's 3rd parameter `value` expects String, but got Int64 (2). Try wrapping it with `Stdlib.display`."
 
 test singleton =
   Stdlib.Test.all(
@@ -392,6 +392,27 @@ test listAliases =
       |> Stdlib.Test.equal([ ("a", 1), ("b", 2) ])
       Stdlib.Dict.fromList([ ("a", 1), ("b", 2), ("a", 3) ])
       |> Stdlib.Test.equal(Dict { "a": 3, "b": 2 }) ])
+
+// Past 24 entries a dict is a tree; these are the order and duplicates it is built with.
+test fromListPastTwentyFourKeepsKeyOrder =
+  let reversed = Stdlib.List.reverse(Stdlib.List.range(1, 30))
+  let ints =
+    Stdlib.Dict.fromList(
+      Stdlib.List.append(Stdlib.List.map(reversed, fun i -> (i, i)), (5, 99)))
+  let strings =
+    Stdlib.Dict.fromList(
+      Stdlib.List.map(reversed, fun i -> ("k" + (Stdlib.display(i)), i)))
+  let tuples =
+    Stdlib.Dict.fromList(
+      Stdlib.List.map(reversed, fun i -> ((i % 3, Stdlib.display(i)), i)))
+  Stdlib.Test.all(
+    [ Stdlib.Dict.keys(ints) |> Stdlib.Test.equal(Stdlib.List.range(1, 30))
+      Stdlib.Dict.get(ints, 5) |> Stdlib.Test.equal(Some(99))
+      Stdlib.List.take(Stdlib.Dict.keys(strings), 4)
+      |> Stdlib.Test.equal([ "k1", "k10", "k11", "k12" ])
+      Stdlib.List.take(Stdlib.Dict.toList(tuples), 3)
+      |> Stdlib.Test.equal([ ((0, "12"), 12), ((0, "15"), 15), ((0, "18"), 18) ])
+      Stdlib.Dict.size(tuples) |> Stdlib.Test.equal(30) ])
 
 test values =
   Stdlib.Dict.values(Dict { "key1": "val1" }) |> Stdlib.Test.equal([ "val1" ])
@@ -438,6 +459,23 @@ test nonStringKeysEnum =
 test nonStringKeysOrdering =
   Stdlib.Dict.keys(Dict { 10: "a", 9: "b", 100: "c" })
   |> Stdlib.Test.equal([ 9, 10, 100 ])
+
+// Past 24 entries a dict is a tree; every traversal still goes in key order.
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Dict.fold'" class=missing-support reason=upstream-dependency
+test traversalsPastTwentyFourGoInKeyOrder =
+  let d =
+    Stdlib.List.fold(Stdlib.List.reverse(Stdlib.List.range(1, 40)), Dict { }, fun(acc, i) ->
+      Stdlib.Dict.set(acc, (i % 2 == 0, "k" + (Stdlib.display(i))), i))
+  let firstKeys = [ (false, "k1"), (false, "k11"), (false, "k13") ]
+  Stdlib.Test.all(
+    [ Stdlib.List.take(Stdlib.Dict.keys(d), 3) |> Stdlib.Test.equal(firstKeys)
+      Stdlib.List.take(Stdlib.Dict.values(d), 3) |> Stdlib.Test.equal([ 1, 11, 13 ])
+      Stdlib.List.last(Stdlib.Dict.toList(d))
+      |> Stdlib.Test.equal(Some(((true, "k8"), 8)))
+      Stdlib.Dict.fold(d, [], fun(acc, k, v) -> Stdlib.List.append(acc, v))
+      |> Stdlib.Test.equal(Stdlib.Dict.values(d))
+      Stdlib.Dict.values(Stdlib.Dict.mapValues(d, fun v -> v * 10))
+      |> Stdlib.Test.equal(Stdlib.List.map(Stdlib.Dict.values(d), fun v -> v * 10)) ])
 
 test nonStringKeysComputedKeys =
   Stdlib.Test.all(
@@ -582,7 +620,7 @@ test nonStringKeysFromEntriesInfersKeyType =
 // @compiler xfail compile: "Unknown function or value 'Stdlib.Dict.fromEntriesUnique'" class=missing-support reason=upstream-dependency
 test nonStringKeysFromEntriesUniqueInfersValueType =
   Stdlib.Dict.set(Builtin.unwrap(Stdlib.Dict.fromEntriesUnique([ (1, "a") ])), 2, 3)
-  => raises "Darklang.Stdlib.Dict.set's 3rd parameter `value` expects String, but got Int64 (3). Try wrapping it with `Stdlib.toString`."
+  => raises "Darklang.Stdlib.Dict.set's 3rd parameter `value` expects String, but got Int64 (3). Try wrapping it with `Stdlib.display`."
 
 // @compiler xfail compile: "Unknown function or value 'Stdlib.Dict.fromEntriesUnique'" class=missing-support reason=upstream-dependency
 test nonStringKeysFromEntriesUniqueRejectsLambdaKey =

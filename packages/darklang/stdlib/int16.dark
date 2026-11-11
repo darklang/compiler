@@ -169,8 +169,8 @@ impl Stdlib.ShiftLeft for Int16 =
 impl Stdlib.ShiftRight for Int16 =
   let shiftRight = Stdlib.Int16.shiftRight
 
-impl Stdlib.ToString for Int16 =
-  let toString = Stdlib.Int16.toString
+impl Stdlib.Display for Int16 =
+  let display = Stdlib.Int16.toString
 
 impl Stdlib.Compare for Int16 =
   let lessThan = Stdlib.Int16.lessThan

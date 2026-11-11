@@ -233,8 +233,8 @@ impl Stdlib.ShiftLeft for UInt128 =
 impl Stdlib.ShiftRight for UInt128 =
   let shiftRight = Stdlib.UInt128.shiftRight
 
-impl Stdlib.ToString for UInt128 =
-  let toString = Stdlib.UInt128.toString
+impl Stdlib.Display for UInt128 =
+  let display = Stdlib.UInt128.toString
 
 impl Stdlib.Compare for UInt128 =
   let lessThan = Stdlib.UInt128.lessThan

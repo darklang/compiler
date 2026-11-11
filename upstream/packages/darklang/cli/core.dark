@@ -14,7 +14,7 @@ type SubAppAction =
   /// Hand off to another command (e.g. a browser launching a foreground app), replacing this page.
   | LaunchCommand(String)
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.SubApp: Unknown type 'Stdlib.Live.Change'"
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.Live.Change'"
 type SubApp =
   { onKey: (Stdlib.Cli.Stdin.Key.Key, Stdlib.Cli.Stdin.Modifiers.Modifiers, Stdlib.Option.Option<String>) -> (SubAppAction * SubApp)
     onDisplay: Unit -> Unit
@@ -34,7 +34,7 @@ type SubApp =
     onResume: Unit -> SubApp
     /// The package store changed under the page (an edit from another process, a pull). The page
     /// re-reads what it shows, or ignores it, and presents.
-    onStoreChanged: Stdlib.Live.Change -> SubApp }
+    onStoreChanged: LanguageTools.Live.Change -> SubApp }
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Page: Unknown type 'Packages.NavInteractive.Session'"
 type Page =
@@ -369,7 +369,7 @@ module ExecutionError =
       let hidden = inside - 1
       let calls = if hidden == 1 then "call" else "calls"
       PrettyPrinter.RuntimeTypes.callStack(branchId, Stdlib.List.take(frames, kept))
-      + $"\n  ({Stdlib.toString(hidden)} {calls} inside it)"
+      + $"\n  ({Stdlib.display(hidden)} {calls} inside it)"
 
 
 module View =

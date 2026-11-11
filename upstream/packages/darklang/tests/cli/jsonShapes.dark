@@ -55,6 +55,10 @@ let hasKeys(json: Stdlib.AltJson.Json, expected: List<String>): Stdlib.Test.Resu
     |> Stdlib.Test.equal(Stdlib.List.sort(expected))
   | _ -> Stdlib.Test.fail($"expected an object, got {Stdlib.AltJson.format(json)}")
 
+/// The keys of `search --json`. The hint keys are there, empty, when something matched.
+val searchKeys = [ "query", "results", "alsoSearched", "wordCounts", "didYouMean" ]
+
+
 /// A list that answers `{}` or `null` when it is empty is the same break as a missing key.
 let isArray(json: Stdlib.AltJson.Json): Stdlib.Test.Result =
   match json with
@@ -167,7 +171,26 @@ test emptyAnswersKeepTheirShape =
         check(
           i,
           [ "search", "zzz-nothing-matches-this", "--json" ],
-          [ fun(j) -> hasKeys(j, [ "query", "results" ]) ])
+          [ fun(j) -> hasKeys(j, searchKeys)
+            fun(j) -> fieldIsArray(j, "results")
+            fun(j) -> fieldIsArray(j, "alsoSearched")
+            fun(j) -> fieldIsArray(j, "wordCounts")
+            fun(j) -> fieldIsArray(j, "didYouMean") ])
+        // The hints the human view prints when nothing matched, as data.
+        check(
+          i,
+          [ "search", "lentgh", "--json" ],
+          [ fun(j) -> rowsHaveKeys(field(j, "didYouMean"), [ "names", "word" ])
+            fun(j) -> isTrue(Stdlib.Bool.not(Stdlib.List.isEmpty(rows(field(j, "didYouMean")))), "suggests a name") ])
+        check(
+          i,
+          [ "search", "length", "zzzq", "--json" ],
+          [ fun(j) -> rowsHaveKeys(field(j, "wordCounts"), [ "count", "word" ])
+            fun(j) -> isTrue(Stdlib.List.length(rows(field(j, "wordCounts"))) == 2, "counts each word") ])
+        check(
+          i,
+          [ "search", "size", "of", "string", "--json" ],
+          [ fun(j) -> field(j, "alsoSearched") |> Stdlib.Test.equal(Stdlib.AltJson.Json.Array([ Stdlib.AltJson.Json.String("length string") ])) ])
         check(i, [ "traces", "list", "--json" ], [ isArray ])
         // A command with no JSON form has to SAY so, rather than print prose for a caller
         // to parse as a payload. `ops` takes no flags at all.
@@ -220,7 +243,7 @@ test aDraftThroughCommitKeepsItsShape =
             fun(j) -> fieldIsArray(j, "dependencies")
             fun(j) -> isTrue(Stdlib.Bool.not(Stdlib.List.isEmpty(rows(field(j, "dependents")))), "lists the caller") ])
         check(i, [ "commits", "--json" ], [ isArray, fun(j) -> rowsHaveKeys(j, [ "hash", "message", "ops" ]) ])
-        check(i, [ "search", "Tests.JsonDeps", "--json" ], [ fun(j) -> hasKeys(j, [ "query", "results" ]) ]) ]))
+        check(i, [ "search", "Tests.JsonDeps", "--json" ], [ fun(j) -> hasKeys(j, searchKeys) ]) ]))
 
 
 /// `branches` is a listing of rows; `diff` against a branch that has done nothing is still
@@ -325,8 +348,8 @@ test typecheckNamesOnlyWhatIsInScope =
       rows(field(j, "items")) |> Stdlib.List.map(fun(r) -> string(r, "name"))
     // Setup runs before the text is read, so it is bound first rather than listed below.
     let setup =
-      [ step(i, [ "fn", "Tests.TcElsewhere.show", "(n: Int64): String = Stdlib.toString(n)" ])
-        step(i, [ "fn", "Tests.TcScope.render", "(n: Int64): String = Stdlib.toString(n)" ]) ]
+      [ step(i, [ "fn", "Tests.TcElsewhere.show", "(n: Int64): String = Stdlib.display(n)" ])
+        step(i, [ "fn", "Tests.TcScope.render", "(n: Int64): String = Stdlib.display(n)" ]) ]
     let text =
       match Instance.run(i, [ "typecheck", "Tests.TcScope", "--all" ]) with
       | Ok(out) -> out.stdout
@@ -360,7 +383,7 @@ test typecheckNamesOnlyWhatIsInScope =
 test typecheckLoadsWhatAModuleBodyCalls =
   Instance.withInstance(fun i ->
     Stdlib.Test.all(
-      [ step(i, [ "fn", "Tests.TcBodyDep.render", "(n: Int64): String = Stdlib.toString(n)" ])
+      [ step(i, [ "fn", "Tests.TcBodyDep.render", "(n: Int64): String = Stdlib.display(n)" ])
         check(
           i,
           [ "typecheck", "Tests.TcBodyDep", "--json" ],
@@ -374,7 +397,7 @@ test typecheckLoadsWhatAModuleBodyCalls =
           i,
           [ "fn"
             "Tests.TcBodyDepLib.describe"
-            "(p: Tests.TcBodyDepLib.Point): String = Stdlib.toString(p.x)" ])
+            "(p: Tests.TcBodyDepLib.Point): String = Stdlib.display(p.x)" ])
         step(
           i,
           [ "fn"

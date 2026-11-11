@@ -201,11 +201,11 @@ impl ShiftRight for UInt16 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt16.impl ShiftRight for UInt16: Already selected from packages/darklang/stdlib/uint16.dark; importing another declaration of Darklang.Stdlib.UInt16.impl ShiftRight for UInt16 requires an explicit replacement contract"
   let shiftRight(a: UInt16, b: UInt16): UInt16 = Builtin.shiftRight(a, b)
 
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint16.dark; importing another declaration of Darklang.Stdlib.UInt16.impl ToString for UInt16 requires an explicit replacement contract"
-impl ToString for UInt16 =
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint16.dark; importing another declaration of Darklang.Stdlib.UInt16.impl Display for UInt16 requires an explicit replacement contract"
+impl Display for UInt16 =
   /// Stringify <param uint16>
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt16.impl ToString for UInt16: Already selected from packages/darklang/stdlib/uint16.dark; importing another declaration of Darklang.Stdlib.UInt16.impl ToString for UInt16 requires an explicit replacement contract"
-  let toString(uint16: UInt16): String = Builtin.uint16ToString(uint16)
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt16.impl Display for UInt16: Already selected from packages/darklang/stdlib/uint16.dark; importing another declaration of Darklang.Stdlib.UInt16.impl Display for UInt16 requires an explicit replacement contract"
+  let display(uint16: UInt16): String = Builtin.uint16ToString(uint16)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint16.dark; importing another declaration of Darklang.Stdlib.UInt16.impl Zero for UInt16 requires an explicit replacement contract"
 impl Zero for UInt16 =

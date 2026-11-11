@@ -97,15 +97,13 @@ test questionMarkWildcard =
       |> Stdlib.Test.equal(false) ])
 
 /// One `__globMatches` case, labelled so a failure names its pattern and text.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.File.Tests.globCase: Unknown function or value 'Stdlib.toRepr'"
 let globCase(pattern: String, text: String, pathname: Bool, expected: Bool): Stdlib.Test.Result =
   let actual = Stdlib.Cli.File.__globMatches(pattern, text, pathname)
   Stdlib.Test.expect(
     actual == expected,
-    $"__globMatches({Stdlib.toRepr(pattern)}, {Stdlib.toRepr(text)}, pathname={Stdlib.toString(pathname)}): expected {Stdlib.toString(expected)}")
+    $"__globMatches({Stdlib.inspect(pattern)}, {Stdlib.inspect(text)}, pathname={Stdlib.display(pathname)}): expected {Stdlib.display(expected)}")
 
 // __globMatches: POSIX glob semantics, independent of libc availability.
-// @compiler xfail compile: "Unknown function or value 'globCase'" class=missing-support reason=upstream-dependency
 test globSemantics =
   Stdlib.Test.all(
     [ globCase("", "", false, true)
@@ -144,7 +142,6 @@ test globSemantics =
       globCase("?", "\0a", false, false) ])
 
 // __globMatches: like libc's default C locale, matching consumes UTF-8 bytes, not graphemes.
-// @compiler xfail compile: "Unknown function or value 'globCase'" class=missing-support reason=upstream-dependency
 test globMatchesUtf8Bytes =
   Stdlib.Test.all(
     [ globCase("é", "é", false, true)
@@ -153,7 +150,6 @@ test globMatchesUtf8Bytes =
       globCase("***a***b***", "aaabbb", false, true) ])
 
 // __globMatches: outcomes checked against host libc's fnmatch in its default C locale.
-// @compiler xfail compile: "Unknown function or value 'globCase'" class=missing-support reason=upstream-dependency
 test globLibcCorpus =
   Stdlib.Test.all(
     [ globCase("**/x", "a", true, false)

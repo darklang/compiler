@@ -199,11 +199,11 @@ impl ShiftRight for UInt8 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt8.impl ShiftRight for UInt8: Already selected from packages/darklang/stdlib/uint8.dark; importing another declaration of Darklang.Stdlib.UInt8.impl ShiftRight for UInt8 requires an explicit replacement contract"
   let shiftRight(a: UInt8, b: UInt8): UInt8 = Builtin.shiftRight(a, b)
 
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint8.dark; importing another declaration of Darklang.Stdlib.UInt8.impl ToString for UInt8 requires an explicit replacement contract"
-impl ToString for UInt8 =
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint8.dark; importing another declaration of Darklang.Stdlib.UInt8.impl Display for UInt8 requires an explicit replacement contract"
+impl Display for UInt8 =
   /// Stringify <param Uint8>
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt8.impl ToString for UInt8: Already selected from packages/darklang/stdlib/uint8.dark; importing another declaration of Darklang.Stdlib.UInt8.impl ToString for UInt8 requires an explicit replacement contract"
-  let toString(uint8: UInt8): String = Builtin.uint8ToString(uint8)
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt8.impl Display for UInt8: Already selected from packages/darklang/stdlib/uint8.dark; importing another declaration of Darklang.Stdlib.UInt8.impl Display for UInt8 requires an explicit replacement contract"
+  let display(uint8: UInt8): String = Builtin.uint8ToString(uint8)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint8.dark; importing another declaration of Darklang.Stdlib.UInt8.impl Zero for UInt8 requires an explicit replacement contract"
 impl Zero for UInt8 =

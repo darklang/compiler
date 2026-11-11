@@ -270,8 +270,8 @@ test exprsDictLiteral =
       roundTrip("dict keyed by tuple", "Dict { (1, \"a\"): true }", "Dict { (1, \"a\"): true }")
       roundTrip(
         "dict with a computed key",
-        "Dict { Stdlib.toString(1): 1 }",
-        "Dict { Stdlib.toString(1): 1 }") ])
+        "Dict { Stdlib.display(1): 1 }",
+        "Dict { Stdlib.display(1): 1 }") ])
 
 // @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsTupleLiterals =
@@ -608,11 +608,11 @@ test exprsPipeExpression =
 // @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsThePrefixOperators =
   Stdlib.Test.all(
-    [ // The prefix operators desugar to their builtin, exactly as unary `-` does,
-      // so the NORMAL FORM prints the builtin call rather than the operator.
+    [ // The prefix operators desugar to the call they are, so the NORMAL FORM prints
+      // that call rather than the operator.
       roundTrip("prefix bang", "!true", "Builtin.boolNot(true)")
-      roundTrip("prefix tilde", "~1", "Builtin.bitwiseNot(1)")
-      roundTrip("unary minus on a non-literal", "-x", "Builtin.negate(x)")
+      roundTrip("prefix tilde", "~1", "Stdlib.BitwiseNot.bitwiseNot(1)")
+      roundTrip("unary minus on a non-literal", "-x", "Stdlib.Negate.negate(x)")
       roundTrip("prefix bang takes a whole application", "!f(x)", "Builtin.boolNot(f(x))")
       // `|` is the match-arm separator inside a match, so a bitwise-or in an arm
       // body has to come back parenthesised or it re-parses as the next arm.
@@ -645,7 +645,7 @@ test exprsThePrefixOperators =
         "1 |> (fun x -> x + 1) |> (fun v -> v + 2)",
         "1 |> (fun x -> x + 1) |> (fun v -> v + 2)")
       roundTrip("pipe, into fn call", "1 |> (fun v -> v + 2)", "1 |> (fun v -> v + 2)")
-      roundTrip("pipe, into fn call 2", "1 |> Stdlib.toString", "1 |> Stdlib.toString")
+      roundTrip("pipe, into fn call 2", "1 |> Stdlib.display", "1 |> Stdlib.display")
       roundTrip(
         "pipe, into fn call 3",
         "\"true\" |> Builtin.jsonParse<Bool>",

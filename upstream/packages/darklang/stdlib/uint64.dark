@@ -225,11 +225,11 @@ impl ShiftRight for UInt64 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl ShiftRight for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl ShiftRight for UInt64 requires an explicit replacement contract"
   let shiftRight(a: UInt64, b: UInt64): UInt64 = Builtin.shiftRight(a, b)
 
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl ToString for UInt64 requires an explicit replacement contract"
-impl ToString for UInt64 =
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Display for UInt64 requires an explicit replacement contract"
+impl Display for UInt64 =
   /// Stringify <param int>
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl ToString for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl ToString for UInt64 requires an explicit replacement contract"
-  let toString(uint64: UInt64): String = Builtin.uint64ToString(uint64)
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Display for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Display for UInt64 requires an explicit replacement contract"
+  let display(uint64: UInt64): String = Builtin.uint64ToString(uint64)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Zero for UInt64 requires an explicit replacement contract"
 impl Zero for UInt64 =

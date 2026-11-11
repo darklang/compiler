@@ -1,5 +1,15 @@
 module Darklang.Stdlib.Option.Tests
 
+test display =
+  Stdlib.Test.all(
+    [ Stdlib.display(Some(3)) |> Stdlib.Test.equal("Some(3)")
+      Stdlib.display<Option<Int64>>(None) |> Stdlib.Test.equal("None")
+      Some("Bob") |> (fun maybeName -> $"name: {maybeName}")
+      |> Stdlib.Test.equal("name: Some(\"Bob\")")
+      (Some(3)).display |> Stdlib.Test.equal("Some(3)")
+      Stdlib.display(Some(Some(true))) |> Stdlib.Test.equal("Some(Some(true))")
+      Stdlib.display(Some([ 1 ])) |> Stdlib.Test.equal(Stdlib.inspect(Some([ 1 ]))) ])
+
 test andThen =
   Stdlib.Test.all(
     [ Stdlib.Option.andThen(Some(5), fun x -> Some(1 + x))

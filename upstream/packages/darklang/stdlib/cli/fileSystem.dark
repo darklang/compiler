@@ -25,6 +25,10 @@ module FileError =
     | Other(msg) -> msg
 
 
+impl Display for FileError =
+  let display = Stdlib.Cli.FileSystem.FileError.toString
+
+
 /// The process's current working directory.
 // @compiler replace: packages/darklang/stdlib/cli/fileSystem.dark#Darklang.Stdlib.Cli.FileSystem.currentDirectory reason=compiler-implementation
 let currentDirectory(): String =

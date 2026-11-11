@@ -28,7 +28,8 @@ type Parsed =
     unresolved: List<(List<String> * LanguageTools.ProgramTypes.NameResolutionError)> }
 
 
-let exprName(i: Int64): String = $"roundTripExpr{Stdlib.toString(i)}"
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
+let exprName(i: Int64): String = $"roundTripExpr{Stdlib.display(i)}"
 
 /// Each top-level expression as the body of a value, so it is hashed, and its references to the
 /// file's own declarations remapped, along with those declarations.
@@ -180,7 +181,7 @@ let stabilize(
 /// owner `Tests`, so a case can refer to `Tests.Person` or, from a declaration, `Person`.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.branchWith: Unknown function or value 'SCM.PackageOps.ensureBranch'"
 let branchWith(prelude: String): Uuid =
-  let name = "round-trip-" + Stdlib.toString(Stdlib.Uuid.generate())
+  let name = "round-trip-" + Stdlib.display(Stdlib.Uuid.generate())
   let (branchId, _) = SCM.PackageOps.ensureBranch(name, SCM.Branch.mainBranchId)
 
   if prelude != "" then
@@ -327,9 +328,9 @@ let roundTripAs(
 
         let widthProblems =
           match parseOnAs(kind, parseBranch, widthPrint) with
-          | Error(e) -> [ $"width {Stdlib.toString(width)}: re-parse failed: {e}\n{widthPrint}" ]
+          | Error(e) -> [ $"width {Stdlib.display(width)}: re-parse failed: {e}\n{widthPrint}" ]
           | Ok(atWidth) ->
-            sameProgram($"printed at width {Stdlib.toString(width)}\n{widthPrint}\n", atWidth, first)
+            sameProgram($"printed at width {Stdlib.display(width)}\n{widthPrint}\n", atWidth, first)
 
         let problems =
           Stdlib.List.flatten(
@@ -375,11 +376,11 @@ let decoded(e: LanguageTools.ProgramTypes.Expr): String =
       match s with
       | StringText(t) -> t
       | StringInterpolation(inner) ->
-        // Lowering wraps the literal in a ToString call. Inspect the literal
+        // Lowering wraps the literal in a Display call. Inspect the literal
         // itself here: this helper checks escape decoding, not execution.
         match inner with
         | EApply(_, EFnName(_, name, _, _), [], [ literal ]) when
-            name.originalName == [ "Darklang", "Stdlib", "ToString", "toString" ] ->
+            name.originalName == [ "Darklang", "Stdlib", "Display", "display" ] ->
           decoded(literal)
         | _ -> decoded(inner))
     |> Stdlib.String.join("")
@@ -496,7 +497,7 @@ let runsDeclaredFn(
 
     match fnNames with
     | [ fnName ] ->
-      match Stdlib.Live.applicableByName(branchId, fnName) with
+      match LanguageTools.Live.applicableByName(branchId, fnName) with
       | Ok(f) -> callWith(f, arg) |> Stdlib.Test.equal(expected)
       | Error(e) -> Stdlib.Test.fail($"{name}: {e}")
     | _ -> Stdlib.Test.fail($"{name}: expected exactly one declared fn")

@@ -439,7 +439,7 @@ let __pathGetCwd () : Result.Result<String, Posix.Error> =
 /// Error messages ported from the compiler's Cli.__Posix implementation.
 /// Kernel errno is platform-specific; permission and host diagnostics stay intact.
 
-// Keep errno rendering shared while the engines have different ToString APIs.
+// Keep errno rendering shared while the engines have different Display APIs.
 let __decimal (value: Int) : String =
     if value < 0 then Stdlib.String.append "-" (__decimal (0 - value))
     else

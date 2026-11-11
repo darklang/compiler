@@ -26,11 +26,11 @@ test clamp =
 
 test toString =
   Stdlib.Test.all
-    [ Stdlib.toString 0Q |> Stdlib.Test.equal "0"
-      Stdlib.toString 1Q |> Stdlib.Test.equal "1"
-      Stdlib.toString -1Q |> Stdlib.Test.equal "-1"
-      Stdlib.toString -170141183460469231731687303715884105728Q
+    [ Stdlib.display 0Q |> Stdlib.Test.equal "0"
+      Stdlib.display 1Q |> Stdlib.Test.equal "1"
+      Stdlib.display -1Q |> Stdlib.Test.equal "-1"
+      Stdlib.display -170141183460469231731687303715884105728Q
       |> Stdlib.Test.equal "-170141183460469231731687303715884105728"
-      Stdlib.toString 170141183460469231731687303715884105727Q
+      Stdlib.display 170141183460469231731687303715884105727Q
       |> Stdlib.Test.equal "170141183460469231731687303715884105727" ]
 

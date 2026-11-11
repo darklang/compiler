@@ -128,12 +128,12 @@ files:
     getAllBuiltinFns_v0: missing
     getAllBuiltinValues_v0: missing
     getBuiltinFn_v0: missing
-    getBuiltinValue_v0: missing
   Builtins.Language/Libs/Parser.fs:
     parserParseDiagnostics_v0: missing
     parserParsePackageToWrittenTypes_v0: missing
     parserParseToWrittenTypes_v0: missing
   Builtins.Language/Libs/Reflection.fs:
+    inspectImpl_v0: missing
     reflect_v0: missing
     toRepr_v0: missing
   Builtins.Matter/Libs/PM/AtRestCheckGuard.fs:
@@ -170,6 +170,7 @@ files:
     applicableByName_v0: missing
     applicableTryApply_v0: missing
     pmBitwiseNotImplCandidates_v0: missing
+    pmCallerCounts_v0: missing
     pmDocsAt_v0: missing
     pmEvaluateValue_v0: missing
     pmFindFn_v0: missing
@@ -337,24 +338,15 @@ files:
     dictToList_v0: unassessed
     dictValues_v0: unassessed
   Builtins.Pure/Libs/Float.fs:
-    floatAdd_v0: unassessed
     floatCeiling_v0: unassessed
-    floatDivide_v0: unassessed
     floatFloor_v0: unassessed
-    floatGreaterThan_v0: unassessed
-    floatGreaterThanOrEqualTo_v0: unassessed
     floatIsNaN_v0: unassessed
-    floatLessThan_v0: unassessed
-    floatLessThanOrEqualTo_v0: unassessed
-    floatMultiply_v0: unassessed
     floatParse_v0: unassessed
-    floatPower_v0: unassessed
     floatRound_v0: unassessed
     floatRoundDown_v0: unassessed
     floatRoundTowardsZero_v0: unassessed
     floatRoundUp_v0: unassessed
     floatSqrt_v0: missing
-    floatSubtract_v0: unassessed
     floatToBits_v0: unassessed
     floatToString_v0: unassessed
     floatTruncate_v0: unassessed

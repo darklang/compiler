@@ -192,9 +192,9 @@ test parseBadFormat =
 
 test toString =
   Stdlib.Test.all(
-    [ Stdlib.toString(0u64) |> Stdlib.Test.equal("0")
-      Stdlib.toString(1u64) |> Stdlib.Test.equal("1")
-      Stdlib.toString(18446744073709551615u64)
+    [ Stdlib.display(0u64) |> Stdlib.Test.equal("0")
+      Stdlib.display(1u64) |> Stdlib.Test.equal("1")
+      Stdlib.display(18446744073709551615u64)
       |> Stdlib.Test.equal("18446744073709551615") ])
 
 test fromInt8 =
@@ -308,6 +308,15 @@ test shiftRight =
       (1u64 >> 0u64) |> Stdlib.Test.equal(1u64)
       (9223372036854775808u64 >> 63u64) |> Stdlib.Test.equal(1u64)
       (40u64 >> 3u64) |> Stdlib.Test.equal(5u64) ])
+
+/// The shift count is taken modulo 64, as in Rust and C#: shifting by 65
+/// shifts by 1, and the largest count shifts by 63.
+test shiftCountWraps =
+  Stdlib.Test.all(
+    [ (1u64 << 64u64) |> Stdlib.Test.equal(1u64)
+      (1u64 << 65u64) |> Stdlib.Test.equal(2u64)
+      (64u64 >> 65u64) |> Stdlib.Test.equal(32u64)
+      (1u64 << 18446744073709551615u64) |> Stdlib.Test.equal(9223372036854775808u64) ])
 
 test checkedAdd =
   Stdlib.Test.all(

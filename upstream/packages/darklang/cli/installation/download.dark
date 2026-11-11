@@ -106,7 +106,7 @@ let smokeTest(binaryPath: String): Stdlib.Result.Result<Unit, String> =
     let rundir = $"{tmp}/.darklang"
 
     // A snapshot rather than a file copy, so what is still in the WAL comes too.
-    match Stdlib.LocalStore.snapshotTo($"{rundir}/data.db") with
+    match LanguageTools.LocalStore.snapshotTo($"{rundir}/data.db") with
     | Error(e) ->
       let _cleaned = Stdlib.Cli.execute($"rm -rf '{tmp}'")
       Stdlib.Result.Result.Error($"Couldn't copy your store to test the new binary against: {e}")
@@ -131,7 +131,7 @@ let smokeTest(binaryPath: String): Stdlib.Result.Result<Unit, String> =
         Stdlib.Result.Result.Ok()
       else
         Stdlib.Result.Result.Error(
-          $"The downloaded release failed a test run against a copy of your store ({Stdlib.String.trim(errorLine)}, exit {Stdlib.toString(result.exitCode)}). Nothing was changed. Please report this at https://github.com/darklang/dark/issues")
+          $"The downloaded release failed a test run against a copy of your store ({Stdlib.String.trim(errorLine)}, exit {Stdlib.display(result.exitCode)}). Nothing was changed. Please report this at https://github.com/darklang/dark/issues")
 
 
 /// Download <param download>, check it, and put the binary it holds at <param target>.

@@ -1,5 +1,21 @@
 module Darklang.Stdlib.Result.Tests
 
+// @compiler xfail runtime: "assertion 4: expected \"got Error(bad)\", got \"got Error(\\\"bad\\\")\"" class=missing-support reason=compiler-gap
+test display =
+  Stdlib.Test.all(
+    [ Stdlib.display<Result<Int64, String>>(Ok(3)) |> Stdlib.Test.equal("Ok(3)")
+      Stdlib.display<Result<Int64, String>>(Error("no"))
+      |> Stdlib.Test.equal("Error(no)")
+      Stdlib.display<Result<Option<Int64>, String>>(Ok(Some(1)))
+      |> Stdlib.Test.equal("Ok(Some(1))")
+      Error("bad") |> (fun r -> $"got {r}")
+      |> Stdlib.Test.equal("got Error(bad)")
+      // A value with no Display of its own shows as inspect does.
+      Stdlib.display<Result<List<Int64>, String>>(Ok([ 1, 2 ]))
+      |> Stdlib.Test.equal("Ok([1, 2])")
+      Stdlib.inspect<Result<Int64, String>>(Error("nope"))
+      |> Stdlib.Test.equal("Error(\"nope\")") ])
+
 test andThen =
   Stdlib.Test.all(
     [ Stdlib.Result.andThen(Error("test"), fun _ -> Error("test"))

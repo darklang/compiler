@@ -201,11 +201,11 @@ impl ShiftRight for UInt32 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl ShiftRight for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl ShiftRight for UInt32 requires an explicit replacement contract"
   let shiftRight(a: UInt32, b: UInt32): UInt32 = Builtin.shiftRight(a, b)
 
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl ToString for UInt32 requires an explicit replacement contract"
-impl ToString for UInt32 =
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Display for UInt32 requires an explicit replacement contract"
+impl Display for UInt32 =
   /// Stringify <param uint32>
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl ToString for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl ToString for UInt32 requires an explicit replacement contract"
-  let toString(uint32: UInt32): String = Builtin.uint32ToString(uint32)
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt32.impl Display for UInt32: Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Display for UInt32 requires an explicit replacement contract"
+  let display(uint32: UInt32): String = Builtin.uint32ToString(uint32)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint32.dark; importing another declaration of Darklang.Stdlib.UInt32.impl Zero for UInt32 requires an explicit replacement contract"
 impl Zero for UInt32 =

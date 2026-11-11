@@ -6,8 +6,8 @@
 
 module Darklang.Stdlib.DateTime
 
-impl Stdlib.ToString for DateTime =
-  let toString = Stdlib.DateTime.toString
+impl Stdlib.Display for DateTime =
+  let display = Stdlib.DateTime.toString
 
 impl Stdlib.Compare for DateTime =
   let lessThan = Stdlib.DateTime.lessThan

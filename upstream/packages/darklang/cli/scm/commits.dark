@@ -9,7 +9,7 @@ module Darklang.Cli.Commits
 /// One display row: [short hash; ops committed; message].
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Commits.commitRow: Unknown function or value 'SCM.PackageOps.opCountIn'"
 let commitRow(c: SCM.Commits.Commit): List<String> =
-  let ops = Stdlib.toString(SCM.PackageOps.opCountIn(c.hash))
+  let ops = Stdlib.display(SCM.PackageOps.opCountIn(c.hash))
   [ SCM.Conflicts.shortHash(c.hash), ops, c.message ]
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
@@ -49,7 +49,7 @@ let executeList(state: AppState, limit: Int64, showAll: Bool): AppState =
       if shown >= total then
         counted
       else
-        $"{counted} - showing the {Stdlib.toString(shown)} most recent"
+        $"{counted} - showing the {Stdlib.display(shown)} most recent"
 
     Cli.printOk(header)
 
@@ -59,7 +59,7 @@ let executeList(state: AppState, limit: Int64, showAll: Bool): AppState =
 
     if hidden > 0 then
       Cli.printHint(
-        $"  {Stdlib.toString(hidden)} housekeeping commit(s) (branch archives) hidden -- `dark commits --all` shows them")
+        $"  {Stdlib.display(hidden)} housekeeping commit(s) (branch archives) hidden -- `dark commits --all` shows them")
 
     state
 
@@ -100,7 +100,7 @@ let executeDetailed(state: AppState, limit: Int64, showAll: Bool): AppState =
 
       if n > 50 then
         Cli.printHint(
-          $"    ... {Stdlib.toString(n - 50)} more -- `dark ops` walks the log in full."))
+          $"    ... {Stdlib.display(n - 50)} more -- `dark ops` walks the log in full."))
 
     state
 
@@ -211,7 +211,7 @@ let showCommit(state: AppState, c: SCM.Commits.Commit): Unit =
   if n > 50 then
     Stdlib.printErrorLine("")
     Cli.printHint(
-      $"  showing the first 50 of {Stdlib.toString(n)} -- `dark ops` walks the log in full.")
+      $"  showing the first 50 of {Stdlib.display(n)} -- `dark ops` walks the log in full.")
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let helpShow(_state: AppState): String =

@@ -10,6 +10,7 @@ module Rank =
 
   /// not depend on what the store happens to hold.
 
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.SearchRanking.Rank.order: Unknown function or value 'Darklang.Cli.Packages.Search.sortKey'"
   let order(query: String, candidates: List<(String * String)>): List<String> =
     candidates
     |> Stdlib.List.sortBy(fun pair ->
@@ -34,6 +35,7 @@ module Rank =
       ("Cli.Backups.Store", "fromFile") ]
 
 // Plain words find the camelCase name they spell.
+// @compiler xfail compile: "Unknown function or value 'Rank.order'" class=missing-support reason=upstream-dependency
 test plainWordsFindCamelCase =
   Stdlib.Test.all(
     [ Rank.order("read file", Rank.fileFns())
@@ -44,6 +46,7 @@ test plainWordsFindCamelCase =
 
 // A section's best rank decides where it prints: a function spelled by the words beats a type that
 // only starts with them.
+// @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Packages.Search.nameRank'" class=missing-support reason=upstream-dependency
 test bestRankDecidesSection =
   Stdlib.Test.all(
     [ Darklang.Cli.Packages.Search.nameRank("read file", "readFile")
@@ -52,6 +55,7 @@ test bestRankDecidesSection =
       |> Stdlib.Test.equal(2) ])
 
 // Verb then noun, where the name is the verb: `parse json` names `parse` outright.
+// @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Packages.Search.nameRank'" class=missing-support reason=upstream-dependency
 test verbThenNoun =
   Stdlib.Test.all(
     [ Darklang.Cli.Packages.Search.nameRank("parse json", "parse")
@@ -60,6 +64,7 @@ test verbThenNoun =
       |> Stdlib.Test.equal(3) ])
 
 // Already right, and unchanged: the item token still decides a one-word or dotted query.
+// @compiler xfail compile: "Unknown function or value 'Rank.order'" class=missing-support reason=upstream-dependency
 test itemTokenDecides =
   Stdlib.Test.all(
     [ Rank.order("List.map", [ ("Stdlib.List", "map2"), ("Stdlib.List", "map"), ("Stdlib.List", "filterMap") ])
@@ -71,6 +76,7 @@ test itemTokenDecides =
         [ "readFile", "readFileAsString", "overwriteFile", "fromFile" ]) ])
 
 // A one-word query joins to itself, so nameRank is matchRank there.
+// @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Packages.Search.nameRank'" class=missing-support reason=upstream-dependency
 test oneWordQuery =
   Stdlib.Test.all(
     [ Darklang.Cli.Packages.Search.nameRank("map", "map")
@@ -80,6 +86,7 @@ test oneWordQuery =
 
 // Any word can be the name, and a word naming the module picks among equal names:
 // `parse int` is `Int64.parse`, not whichever `parse` sorts first.
+// @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Packages.Search.sortKey'" class=missing-support reason=upstream-dependency
 test wordNamesModule =
   Stdlib.Test.all(
     [ [ ("Stdlib.AltJson", "parse"), ("Stdlib.Url", "parse"), ("Stdlib.Int64", "parse") ]
@@ -96,14 +103,20 @@ test wordNamesModule =
       |> Stdlib.Test.equal(0) ])
 
 
-// On an equal match the common Stdlib modules come first, then the rest of
-// Stdlib, then other packages, then Darklang's own tools.
+// On an equal match Stdlib comes first, then other packages, then Darklang's own
+// tools; within each, the most called first.
 // @compiler xfail compile: "Tuple pattern does not match the value type" class=missing-support reason=compiler-gap
-test commonModulesFirst =
+test tiersThenCallers =
+  let uses =
+    Stdlib.Dict.fromList(
+      [ ("Darklang.Stdlib.String.split", 114)
+        ("Darklang.Stdlib.Regex.split", 1)
+        ("Darklang.Cli.Repl.split", 500) ])
   let order = fun(query, candidates) ->
+    let ranker = Darklang.Cli.Packages.Search.rankerWith(query, [], uses)
     candidates
     |> Stdlib.List.sortBy(fun((owner, m, n)) ->
-      Darklang.Cli.Packages.Search.sortKey(query, owner, Stdlib.String.split(m, "."), n))
+      Darklang.Cli.Packages.Search.rankKey(ranker, owner, Stdlib.String.split(m, "."), n))
     |> Stdlib.List.map(fun((owner, m, _)) -> owner + "." + m)
   Stdlib.Test.all(
     [ order(
@@ -119,6 +132,47 @@ test commonModulesFirst =
           "Darklang.Stdlib.Url"
           "Me.Text"
           "Darklang.Cli.Repl" ]) ])
+
+
+// A word Stdlib spells another way is searched that way too, and ranks by the name it
+// stands for: `size of string` is `String.length`, `replace` is `String.replaceAll`.
+// @compiler xfail compile: "Tuple pattern does not match the value type" class=missing-support reason=compiler-gap
+test synonyms =
+  let order = fun(query, uses, candidates) ->
+    let targets =
+      Darklang.Cli.Packages.Search.synonymQueries(query)
+      |> Stdlib.List.map(fun((_, target)) -> target)
+    let ranker = Darklang.Cli.Packages.Search.rankerWith(query, targets, Stdlib.Dict.fromList(uses))
+    candidates
+    |> Stdlib.List.sortBy(fun((m, n)) ->
+      Darklang.Cli.Packages.Search.rankKey(ranker, "Darklang", Stdlib.String.split(m, "."), n))
+    |> Stdlib.List.map(fun((m, n)) -> m + "." + n)
+  Stdlib.Test.all(
+    [ Darklang.Cli.Packages.Search.synonymQueries("size of string")
+      |> Stdlib.Test.equal([ ("length string", "length") ])
+      Darklang.Cli.Packages.Search.synonymQueries("concat strings")
+      |> Stdlib.Test.equal([ ("join strings", "join"), ("append strings", "append") ])
+      Darklang.Cli.Packages.Search.synonymQueries("random number")
+      |> Stdlib.Test.equal([ ("Int64.random", "Int64.random") ])
+      Darklang.Cli.Packages.Search.synonymQueries("String.size")
+      |> Stdlib.Test.equal([])
+      Darklang.Cli.Packages.Search.synonymQueries("split")
+      |> Stdlib.Test.equal([])
+      order(
+        "size of string",
+        [],
+        [ ("Stdlib.Crypto", "digestText"), ("Stdlib.List", "length"), ("Stdlib.String", "length") ])
+      |> Stdlib.Test.equal([ "Stdlib.String.length", "Stdlib.List.length", "Stdlib.Crypto.digestText" ])
+      order(
+        "replace",
+        [ ("Darklang.Stdlib.String.replaceAll", 30), ("Darklang.Stdlib.Regex.replace", 1) ],
+        [ ("Stdlib.Regex", "replace"), ("Stdlib.String", "replaceAll") ])
+      |> Stdlib.Test.equal([ "Stdlib.String.replaceAll", "Stdlib.Regex.replace" ])
+      order(
+        "random number",
+        [ ("Darklang.Stdlib.BigInt.random", 8), ("Darklang.Stdlib.Int64.random", 4) ],
+        [ ("Stdlib.BigInt", "random"), ("Stdlib.Int64", "random") ])
+      |> Stdlib.Test.equal([ "Stdlib.Int64.random", "Stdlib.BigInt.random" ]) ])
 
 
 // What lives in a `Tests` module is left out unless the search is about tests.
