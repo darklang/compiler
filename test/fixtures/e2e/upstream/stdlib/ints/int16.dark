@@ -131,11 +131,11 @@ Stdlib.Int16.toFloat -10s = -10.0
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.Int16.random 0s 1s)
- |> Stdlib.List.unique) = [ 0s, 1s ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0s, 1s ]
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.Int16.random 0s 2s)
- |> Stdlib.List.unique) = [ 0s, 1s, 2s ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0s, 1s, 2s ]
 
 
 Stdlib.Int16.parse "0" = Stdlib.Result.Result.Ok 0s

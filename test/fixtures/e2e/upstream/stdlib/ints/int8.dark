@@ -149,12 +149,12 @@ Stdlib.Int8.mod 5y -5y = error="Cannot evaluate modulus against a negative numbe
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.Int8.random 0y 1y)
- |> Stdlib.List.unique) = [ 0y, 1y ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0y, 1y ]
 
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.Int8.random 0y 2y)
- |> Stdlib.List.unique) = [ 0y, 1y, 2y ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0y, 1y, 2y ]
 
 
 // ok

@@ -150,12 +150,12 @@ Stdlib.Int32.divide (-2147483648l) -1l = -2147483648l
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.Int32.random 0l 1l)
- |> Stdlib.List.unique) = [ 0l, 1l ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0l, 1l ]
 
 
 ((Stdlib.List.range 1L 100L)
  |> Stdlib.List.map (fun x -> Stdlib.Int32.random 0l 2l)
- |> Stdlib.List.unique) = [ 0l, 1l, 2l ]
+ |> Stdlib.List.unique |> Stdlib.List.sort) = [ 0l, 1l, 2l ]
 
 
 Stdlib.Int32.sum [ 1l, 2l ] = 3l
