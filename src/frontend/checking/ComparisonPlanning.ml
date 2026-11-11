@@ -227,10 +227,11 @@ let buildEqExprForType aliases lookup typ left right =
   | TInt -> call "Darklang.Stdlib.Int.__equals"
   | TInt128 -> call "Darklang.Stdlib.Int128.__equals"
   | TUInt128 -> call "Darklang.Stdlib.UInt128.__equals"
+  | TBlob -> call "Darklang.Stdlib.Blob.__equals"
   | TList inner -> dispatch (TList (Types.resolveType aliases inner))
   | TInt8 | TInt16 | TInt32 | TInt64 | TUInt8 | TUInt16 | TUInt32 | TUInt64
-  | TBool | TFloat64 | TBlob | TChar | TDateTime | TUnit | TNever
-  | TInternalRawPtr | TTuple _ | TRecord _ | TSum _ | TStream _ | TDict _ ->
+  | TBool | TFloat64 | TChar | TDateTime | TUnit | TNever | TInternalRawPtr
+  | TTuple _ | TRecord _ | TSum _ | TStream _ | TDict _ ->
       if needsEqHelperForResolvedType lookup resolved then dispatch resolved
       else BinOp (Eq, left, right)
 

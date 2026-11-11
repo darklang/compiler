@@ -91,7 +91,6 @@ test lists =
       ([ 1u8, 2u8, 3u8 ] == [ 1u8, 2u8, 3u8 ]) |> Stdlib.Test.equal(true)
       ([ 1u8, 2u8, 3u8 ] != [ 3u8, 2u8, 1u8 ]) |> Stdlib.Test.equal(true) ])
 
-// @compiler xfail runtime: "assertion 1: expected true, got false" class=missing-support reason=compiler-gap
 test bytesDatesAndUuids =
   Stdlib.Test.all(
     [ ((Stdlib.Utf8.encode("🧑🏽‍🦰🧑🏼‍💻🧑🏻‍🍼"))

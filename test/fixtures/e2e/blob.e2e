@@ -4,7 +4,10 @@ Stdlib.Blob.length Stdlib.Blob.empty = 0
 Stdlib.Blob.toHex (Stdlib.Blob.fromList ([0uy, 15uy, 255uy])) = "000FFF"
 Stdlib.Blob.length (Stdlib.Blob.slice (Stdlib.Blob.fromString "abcdef") (-2) 99) = 6
 Stdlib.Blob.length (Stdlib.Blob.slice (Stdlib.Blob.fromString "abcdef") 99 3) = 0
-Stdlib.Blob.fromString "same" != Stdlib.Blob.fromString "same" = true
+Stdlib.Blob.fromString "same" == Stdlib.Blob.fromString "same" = true
+Stdlib.Blob.fromString "same" != Stdlib.Blob.fromString "sane" = true
+[Stdlib.Blob.fromString "hi"] == [Stdlib.Blob.fromList [104uy, 105uy]] = true
+(Stdlib.Blob.fromString "", 1L) == (Stdlib.Blob.empty, 1L) = true
 
 let b = Stdlib.Blob.fromString "same" in b == b = true
 
@@ -12,9 +15,9 @@ Stdlib.Blob.empty == Stdlib.Blob.empty = true
 
 let b = Stdlib.Blob.fromString "nested" in ([b], b) == ([b], b) = true
 
-([Stdlib.Blob.fromString "nested"], Stdlib.Blob.empty) != ([Stdlib.Blob.fromString "nested"], Stdlib.Blob.empty) = true
+([Stdlib.Blob.fromString "nested"], Stdlib.Blob.empty) == ([Stdlib.Blob.fromString "nested"], Stdlib.Blob.empty) = true
 
-Stdlib.Blob.concat ([]) != Stdlib.Blob.empty = true
+Stdlib.Blob.concat ([]) == Stdlib.Blob.empty = true
 
 Stdlib.Blob.fromString "rendered" = stdout="<Blob: ephemeral>" stderr=""
 

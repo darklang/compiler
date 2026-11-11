@@ -71,7 +71,6 @@ let request(
     { method = "GET", url = url, headers = headers, body = Stdlib.Bytes.empty }
 
 // Compare response builders with their expected fields.
-// @compiler xfail runtime: "assertion 1: expected Darklang.Stdlib.Http.Response {" class=missing-support reason=compiler-gap
 test responseBuilders =
   Stdlib.Test.all(
     [ Stdlib.Http.badRequest("Your request resulted in an error")
@@ -102,7 +101,6 @@ test responseBuilders =
       |> Stdlib.Test.equal(
         expected(200, [ ("Content-Type", "application/json") ], "test")) ])
 
-// @compiler xfail runtime: "assertion 1: expected Darklang.Stdlib.Http.Response {" class=missing-support reason=compiler-gap
 test redirectTo =
   Stdlib.Test.all(
     [ Stdlib.Http.redirectTo("")

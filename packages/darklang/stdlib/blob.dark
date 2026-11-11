@@ -149,6 +149,16 @@ let slice (blob: Blob) (start: Int) (length: Int) : Blob =
     Stdlib.Blob.__fromBuffer (__blob_to_rawptr blob)
         (16L + Stdlib.Blob.__intToInt64 safeStart) (Stdlib.Blob.__intToInt64 safeLength)
 
+// Blobs are equal when they hold the same bytes, as the interpreter's are.
+let __equals (left: Blob) (right: Blob) : Bool =
+    let length = Stdlib.Blob.__byteLength left in
+    length == Stdlib.Blob.__byteLength right && Stdlib.Blob.__equalsFrom left right 0L length
+
+let __equalsFrom (left: Blob) (right: Blob) (index: Int64) (length: Int64) : Bool =
+    if index >= length then true
+    else if Stdlib.Blob.__getByte left index != Stdlib.Blob.__getByte right index then false
+    else Stdlib.Blob.__equalsFrom left right (index + 1L) length
+
 let toHex (blob: Blob) : String =
     Stdlib.Blob.__hexEncode blob 0L (Stdlib.Blob.__byteLength blob) ""
 
