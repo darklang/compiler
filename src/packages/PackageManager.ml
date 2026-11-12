@@ -1856,6 +1856,15 @@ let resolveNames config resolutionEnv knownTraits names =
          a type it already has, duplicates the compiler's own: the
          interpreter's `Int64.Display` beside the embedded one makes every
          Display call on Int64 ambiguous. Those are left out. *)
+      (* Checking `Decimal.Add.add` makes the impl around it a root too; it
+         still duplicates the compiler's, and its methods compile as fns. *)
+      let referenced =
+        reach StringOrder.Set.empty
+          (List.filter_map
+             (fun entity ->
+               if entity.kind = PackageImpl then None else Some entity.hash)
+             rootEntities)
+      in
       let duplicatesEmbedded entity =
         (* A trait the compiler declares under the same name (the
            interpreter's own Darklang.Stdlib.BitwiseXor, listed beside a
@@ -1863,7 +1872,7 @@ let resolveNames config resolutionEnv knownTraits names =
            would clash, and calls name it either way. *)
         (entity.kind = PackageTrait && isKnownName entity.location)
         || entity.kind = PackageImpl
-        && (not (StringOrder.Set.mem entity.hash needed))
+        && (not (StringOrder.Set.mem entity.hash referenced))
         &&
         match tryField "entity" (parse entity.json) with
         | None -> false
