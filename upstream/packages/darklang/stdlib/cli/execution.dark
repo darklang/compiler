@@ -2,7 +2,7 @@ module Darklang.Stdlib.Cli
 
 
 /// The result of running a command in the CLI, typically with `Cli.execute`
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch"
+// @compiler replace: packages/darklang/stdlib/cli/execution.dark#Darklang.Stdlib.Cli.ExecutionOutcome reason=compiler-implementation
 type ExecutionOutcome =
   { exitCode: Int64
     stdout: String

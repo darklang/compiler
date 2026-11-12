@@ -31,13 +31,13 @@ dispositions:
     replace: 35
     run: 1823
   stdlib:
-    blocked: 812
-    replace: 911
+    blocked: 806
+    replace: 917
     run: 649
   tests:
     blocked: 56
-    run: 1623
-    xfail: 1220
+    run: 1628
+    xfail: 1215
 reasons:
   packages:
     aot-type-error: 10
@@ -51,8 +51,8 @@ reasons:
     test-diagnostics: 1
     upstream-dependency: 2214
   stdlib:
-    compiler-contract: 128
-    compiler-implementation: 908
+    compiler-contract: 122
+    compiler-implementation: 914
     compiler-timeout: 1
     constructor-identity: 2
     container-adaptation: 490
@@ -68,7 +68,7 @@ reasons:
     aot-name-error: 11
     aot-type-error: 151
     compiler-crash: 2
-    compiler-gap: 139
+    compiler-gap: 134
     compiler-leak: 2
     diagnostic-difference: 2
     interpreter-fixture: 47
@@ -118,10 +118,10 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/string.dark: 3
   missing-support:
     phases:
-      compile: 956
-      runtime: 41
+      compile: 948
+      runtime: 44
     reasons:
-      compiler-gap: 134
+      compiler-gap: 129
       test-counter: 7
       upstream-dependency: 856
     sources:
@@ -217,7 +217,7 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/char.dark: 2
       upstream/packages/darklang/tests/stdlib/cli/file.dark: 11
       upstream/packages/darklang/tests/stdlib/cli/posix.dark: 12
-      upstream/packages/darklang/tests/stdlib/cli/process.dark: 15
+      upstream/packages/darklang/tests/stdlib/cli/process.dark: 10
       upstream/packages/darklang/tests/stdlib/cli/sgr.dark: 3
       upstream/packages/darklang/tests/stdlib/cli/sys.dark: 2
       upstream/packages/darklang/tests/stdlib/cli/widgets.dark: 6
