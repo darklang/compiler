@@ -92,7 +92,9 @@ let __sysctlText(mib: List<Int64>): Result.Result<String, Int64> =
 // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int64 -> Int64, replacement Int -> Int"
 let __countBits(value: Int64): Int64 =
   if value == 0 then 0
-  else value % 2 + __countBits(value / 2)
+  else
+    (Stdlib.Int64.checkedMod(value, 2) |> Stdlib.Result.withDefault(0))
+    + __countBits(Stdlib.Int64.checkedDivide(value, 2) |> Stdlib.Result.withDefault(0))
 
 // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int64 -> Darklang.Stdlib.Result.Result<Blob, Int64>, replacement Int -> Darklang.Stdlib.Result.Result<Blob, Int>"
 let __affinityWith(count: Int64): Result.Result<Bytes, Int64> =

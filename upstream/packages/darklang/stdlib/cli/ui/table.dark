@@ -6,7 +6,6 @@ module Darklang.Stdlib.Cli.UI.Table
 /// rows: list of rows, each row is a list of cell strings
 // @compiler replace: packages/darklang/stdlib/cli/ui/table.dark#Darklang.Stdlib.Cli.UI.Table.print reason=compiler-implementation
 let print(columns: List<String>, rows: List<List<String>>): Unit =
-  // Calculate column widths (max of header and all cell values)
   let colWidths =
     columns
     |> Stdlib.List.indexedMap(fun(i, header) ->
@@ -21,7 +20,6 @@ let print(columns: List<String>, rows: List<List<String>>): Unit =
 
       Stdlib.max(headerLen, maxCellLen))
 
-  // Print header row
   let headerLine =
     columns
     |> Stdlib.List.indexedMap(fun(i, header) ->
@@ -35,15 +33,13 @@ let print(columns: List<String>, rows: List<List<String>>): Unit =
 
   Stdlib.printLine(Stdlib.Cli.UI.Colors.boldText(headerLine))
 
-  // Print separator
   let sepLine =
     colWidths
-    |> Stdlib.List.map(fun w -> Stdlib.String.repeat("-", w))
+    |> Stdlib.List.map(fun w -> (Stdlib.String.checkedRepeat("-", w) |> Stdlib.Result.withDefault("")))
     |> Stdlib.String.join("  ")
 
   Stdlib.printLine(sepLine)
 
-  // Print data rows
   let _ =
     rows
     |> Stdlib.List.map(fun row ->

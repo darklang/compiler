@@ -159,7 +159,7 @@ type ValueType =
 
 // @compiler blocked: compiler-contract diagnostic="Already selected from packages/darklang/languageTools/runtimeTypes/dval.dark; importing another declaration of Darklang.LanguageTools.RuntimeTypes.LetPattern requires an explicit replacement contract"
 type LetPattern =
-  | LPVariable(reg: Register)
+  | LPVariable(reg: Register, name: String)
   | LPWildcard
   | LPUnit
   | LPTuple(

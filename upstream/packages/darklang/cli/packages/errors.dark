@@ -164,7 +164,7 @@ let nameDistance(name: String, candidate: String): Stdlib.Option.Option<Int64> =
   let b = Stdlib.String.toLowercase(candidate)
   let d = Cli.Config.editDistance(a, b)
   let shorter = Cli.Config.smaller(Stdlib.String.length(a), Stdlib.String.length(b))
-  let allowed = Cli.Config.smaller(3, Stdlib.max(1, Stdlib.String.length(a) / 3))
+  let allowed = Cli.Config.smaller(3, Stdlib.max(1, Stdlib.Int64.checkedDivide(Stdlib.String.length(a), 3) |> Stdlib.Result.withDefault(0)))
 
   if d <= allowed then
     Stdlib.Option.Option.Some(d)
@@ -172,6 +172,17 @@ let nameDistance(name: String, candidate: String): Stdlib.Option.Option<Int64> =
     Stdlib.Option.Option.Some(d)
   else
     Stdlib.Option.Option.None
+
+
+/// <fn nameDistance>, or 0 when <param candidate> is what Stdlib calls the word written: `size`
+/// is `length` (<fn Search.wordSynonyms>).
+let nearness(name: String, candidate: String): Stdlib.Option.Option<Int64> =
+  let synonyms = Search.wordSynonyms(name) |> Stdlib.List.map(Stdlib.String.toLowercase)
+
+  if Stdlib.List.contains(synonyms, Stdlib.String.toLowercase(candidate)) then
+    Stdlib.Option.Option.Some(0)
+  else
+    nameDistance(name, candidate)
 
 
 /// The (distance, name) pairs of <param sorted> no more than one edit further than the first: a
@@ -183,7 +194,8 @@ let nearestOnly(sorted: List<(Int64 * String)>): List<(Int64 * String)> =
 
 
 /// Up to three existing names in the module <param originalName> names that are spelled close to
-/// it, nearest first: `Stdlib.List.lenght` gives `Stdlib.List.length`.
+/// it or are Stdlib's word for it, nearest first: `Stdlib.List.lenght` and `Stdlib.List.size` give
+/// `Stdlib.List.length`.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.closestNames: Unknown function or value 'Query.allDirectDescendantNames'"
 let closestNames(branchId: Uuid, originalName: List<String>): List<String> =
   match splitLast(originalName) with
@@ -196,7 +208,7 @@ let closestNames(branchId: Uuid, originalName: List<String>): List<String> =
 
       Stdlib.List.flatten([ fns, values, types ])
       |> Stdlib.List.filterMap(fun candidate ->
-        nameDistance(name, candidate)
+        nearness(name, candidate)
         |> Stdlib.Option.map(fun d ->
           (d, Stdlib.String.join(Stdlib.List.flatten([ written, [ candidate ] ]), ".")))))
     |> Stdlib.List.flatten

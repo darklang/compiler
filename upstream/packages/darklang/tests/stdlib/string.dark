@@ -221,7 +221,11 @@ test endsWith =
       Stdlib.String.endsWith("👱👱🏻👱🏼👱🏽👱🏾👱🏿", "﷽") |> Stdlib.Test.equal(false)
       Stdlib.String.endsWith("🧟‍♀️🧟‍♂️", "🧟‍♀️") |> Stdlib.Test.equal(false)
       Stdlib.String.endsWith("👨‍❤️‍💋‍👨👩‍👩‍👧‍👦🏳️‍⚧️‍️🇵🇷", "🏳️‍⚧️‍️🇵🇷")
-      |> Stdlib.Test.equal(true) ])
+      |> Stdlib.Test.equal(true)
+      Stdlib.String.endsWith("a🇺🇸", "🇸") |> Stdlib.Test.equal(false)
+      Stdlib.String.endsWith("👍🏽", "🏽") |> Stdlib.Test.equal(false)
+      Stdlib.String.endsWith("ab👍🏽", "b👍🏽") |> Stdlib.Test.equal(true)
+      Stdlib.String.endsWith("ab", "xab") |> Stdlib.Test.equal(false) ])
 
 
 test randomPairIsDifferent =
@@ -1173,7 +1177,17 @@ test checkedRepeat =
       Stdlib.String.checkedRepeat("ab", -1)
       |> Stdlib.Test.equal(Error(Stdlib.String.RepeatError.NegativeCount))
       Stdlib.String.checkedRepeat("ab", -3000000000)
-      |> Stdlib.Test.equal(Error(Stdlib.String.RepeatError.NegativeCount)) ])
+      |> Stdlib.Test.equal(Error(Stdlib.String.RepeatError.NegativeCount))
+      Stdlib.String.checkedRepeat("ab", 3000000000)
+      |> Stdlib.Test.equal(Error(Stdlib.String.RepeatError.TooLong)) ])
+
+test padding =
+  Stdlib.Test.all(
+    [ Stdlib.String.padStart("7", '0', 3) |> Stdlib.Test.equal("007")
+      Stdlib.String.padEnd("ab", '.', 4) |> Stdlib.Test.equal("ab..")
+      Stdlib.String.padStart("abc", '0', 2) |> Stdlib.Test.equal("abc")
+      Stdlib.String.padStart("7", '0', 3000000000) |> Stdlib.Test.equal("7")
+      Stdlib.String.padEnd("7", '0', 3000000000) |> Stdlib.Test.equal("7") ])
 
 test toCodepoints =
   Stdlib.Test.all(

@@ -198,7 +198,8 @@ let getPathParam(req: Http.Request, routePattern: String, paramName: String): Op
 module Config =
   // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch"
   type Config =
-    { port: Stdlib.Net.Port
+    { address: String
+      port: Stdlib.Net.Port
       /// Maximum request body size in bytes (over-limit → 413).
       maxBodyBytes: Int64
       /// Auto-add `Server: darklang` + HSTS unless the handler set them.
@@ -216,7 +217,8 @@ module Config =
   // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Darklang.Stdlib.Net.Port -> Darklang.Stdlib.HttpServer.Config.Config, replacement Int -> Darklang.Stdlib.HttpServer.Config.Config"
   let defaults(port: Stdlib.Net.Port): Config =
     Config
-      { port = port
+      { address = "127.0.0.1"
+        port = port
         maxBodyBytes = defaultMaxBodyBytes
         injectStandardHeaders = true
         canonicalizeFromForwardedProto = true
@@ -231,14 +233,18 @@ let serve(
   handler: Http.Request -> Http.Response,
   onListening: Unit -> Unit)
   : Stdlib.Result.Result<Unit, String> =
-  Builtin.httpServerServe(
-    Stdlib.Net.Port.toInt64(config.port),
-    handler,
-    config.maxBodyBytes,
-    config.injectStandardHeaders,
-    config.canonicalizeFromForwardedProto,
-    config.logRequests,
-    onListening)
+  if config.maxBodyBytes < 0 then
+    Stdlib.Result.Result.Error("maxBodyBytes must not be negative")
+  else
+    Builtin.httpServerServe(
+      config.address,
+      Stdlib.Net.Port.toInt64(config.port),
+      handler,
+      config.maxBodyBytes,
+      config.injectStandardHeaders,
+      config.canonicalizeFromForwardedProto,
+      config.logRequests,
+      onListening)
 
 
 /// Whether an open page reloads itself when what served it is saved.
@@ -269,14 +275,18 @@ let serveLive(
     | OnSave -> true
     | Off -> false
 
-  Builtin.httpServerServeLive(
-    Stdlib.Net.Port.toInt64(config.port),
-    init,
-    step,
-    first,
-    dev,
-    config.maxBodyBytes,
-    config.injectStandardHeaders,
-    config.canonicalizeFromForwardedProto,
-    config.logRequests,
-    onListening)
+  if config.maxBodyBytes < 0 then
+    Stdlib.Result.Result.Error("maxBodyBytes must not be negative")
+  else
+    Builtin.httpServerServeLive(
+      config.address,
+      Stdlib.Net.Port.toInt64(config.port),
+      init,
+      step,
+      first,
+      dev,
+      config.maxBodyBytes,
+      config.injectStandardHeaders,
+      config.canonicalizeFromForwardedProto,
+      config.logRequests,
+      onListening)

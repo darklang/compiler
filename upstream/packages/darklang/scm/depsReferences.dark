@@ -3,8 +3,11 @@ module Darklang.SCM.Deps
 /// Read selected callers, or all visible callers when sources is empty.
 /// Read the graph in one batch, keeping each caller's reference names separate.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.namedReferencesFor: Unknown function or value 'Builtin.pmNamedReferences'"
-let namedReferencesFor(branchId: Uuid, sources: List<PackageOps.ReferenceSource>): List<NamedReference> =
-  Builtin.pmNamedReferences(branchId, sources) |> Builtin.unwrap
+let namedReferencesFor(
+  branchId: Uuid,
+  sources: List<PackageOps.ReferenceSource>)
+  : Stdlib.Result.Result<List<NamedReference>, String> =
+  Builtin.pmNamedReferences(branchId, sources)
 
 /// Only stale references cross into Dark during a review, with the current target.
 type StaleReference =
@@ -14,5 +17,8 @@ type DependencyReview =
   (List<StaleReference> * List<(LanguageTools.ProgramTypes.PackageLocation * LanguageTools.ProgramTypes.PackageLocation)>)
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.review: Unknown function or value 'Builtin.pmDependencyReview'"
-let review(branchId: Uuid, changed: List<PackageOps.ReferenceSource>): DependencyReview =
-  Builtin.pmDependencyReview(branchId, changed) |> Builtin.unwrap
+let review(
+  branchId: Uuid,
+  changed: List<PackageOps.ReferenceSource>)
+  : Stdlib.Result.Result<DependencyReview, String> =
+  Builtin.pmDependencyReview(branchId, changed)

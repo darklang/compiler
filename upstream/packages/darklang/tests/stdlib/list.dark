@@ -144,7 +144,9 @@ test drop =
       Stdlib.List.drop([ 5 ], 4)
       |> Stdlib.Test.equal([])
       Stdlib.List.drop([], 4)
-      |> Stdlib.Test.equal([]) ])
+      |> Stdlib.Test.equal([])
+      Stdlib.List.drop(Stdlib.List.range(0, 99), 60)
+      |> Stdlib.Test.equal(Stdlib.List.range(60, 99)) ])
 
 test dropWhile =
   Stdlib.Test.all(
@@ -281,6 +283,32 @@ test fold =
         Stdlib.List.append(accum, curr + 1))
       |> Stdlib.Test.equal([ 2, 3, 4, 5, 6 ]) ])
 
+let __mixBy(xs: List<Int64>, acc: Int64): Int64 =
+  match xs with
+  | [] -> acc
+  | [x, ...rest] -> __mixBy(rest, acc * 31 + x)
+
+let __indexedBy(xs: List<Int64>, i: Int64): List<(Int64 * Int64)> =
+  match xs with
+  | [] -> []
+  | [x, ...rest] -> Stdlib.List.prepend(__indexedBy(rest, i + 1), (i, x))
+
+test twoArgumentCallbacksSeeEveryElementInOrder =
+  Stdlib.Test.all(
+    Stdlib.List.map([ 0, 1, 2, 5, 33, 100 ], fun n ->
+      let xs = Stdlib.List.range(1, n)
+      Stdlib.Test.all(
+        [ Stdlib.List.fold(xs, 0, fun(acc, x) -> acc * 31 + x)
+          |> Stdlib.Test.equal(__mixBy(xs, 0))
+          Stdlib.List.fold(xs, (0, []), fun((count, seen), x) ->
+            (count + 1, Stdlib.List.prepend(seen, x)))
+          |> Stdlib.Test.equal((n, Stdlib.List.reverse(xs)))
+          Stdlib.List.fold(Stdlib.List.map(xs, fun x -> (x, 0 - x)), 0, fun(acc, (a, b)) ->
+            acc * 31 + a + b + a)
+          |> Stdlib.Test.equal(__mixBy(xs, 0))
+          Stdlib.List.indexedMap(xs, fun(i, x) -> (i, x))
+          |> Stdlib.Test.equal(__indexedBy(xs, 0)) ])))
+
 test getAt =
   Stdlib.Test.all(
     [ Stdlib.List.getAt([ "a", "b", "c", "d" ], -1)
@@ -325,7 +353,11 @@ test setAt =
       Stdlib.List.setAt([ 1, 2 ], 9223372036854775807, 9)
       |> Stdlib.Test.equal(Error(Stdlib.List.IndexError.IndexOutOfBounds))
       Stdlib.List.setAt([ 1, 2 ], -9223372036854775807, 9)
-      |> Stdlib.Test.equal(Error(Stdlib.List.IndexError.IndexOutOfBounds)) ])
+      |> Stdlib.Test.equal(Error(Stdlib.List.IndexError.IndexOutOfBounds))
+      Stdlib.List.setAt(Stdlib.List.range(0, 99), 70, -1)
+      |> Stdlib.Test.equal(
+        Ok(Stdlib.List.flatten([ Stdlib.List.range(0, 69), [ -1 ], Stdlib.List.range(71, 99) ]))
+      ) ])
 
 test head =
   Stdlib.Test.all(
@@ -464,6 +496,15 @@ test range =
       |> Stdlib.Test.equal([ -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5 ])
       Stdlib.List.range(5, 0) |> Stdlib.Test.equal([]) ])
 
+test checkedRange =
+  Stdlib.Test.all(
+    [ Stdlib.List.checkedRange(-1, 1) |> Stdlib.Test.equal(Ok([ -1, 0, 1 ]))
+      Stdlib.List.checkedRange(5, 0) |> Stdlib.Test.equal(Ok([]))
+      Stdlib.List.checkedRange(0, 3000000000)
+      |> Stdlib.Test.equal(Error(Stdlib.List.RangeError.TooLong))
+      Stdlib.List.checkedRange(-9223372036854775808, 9223372036854775807)
+      |> Stdlib.Test.equal(Error(Stdlib.List.RangeError.TooLong)) ])
+
 test repeat =
   Stdlib.Test.all(
     [ Stdlib.List.repeat(0, 1) |> Stdlib.Test.equal([])
@@ -486,7 +527,9 @@ test checkedRepeat =
       Stdlib.List.checkedRepeat(-1, "a")
       |> Stdlib.Test.equal(Error(Stdlib.List.RepeatError.NegativeCount))
       Stdlib.List.checkedRepeat(-4, "a")
-      |> Stdlib.Test.equal(Error(Stdlib.List.RepeatError.NegativeCount)) ])
+      |> Stdlib.Test.equal(Error(Stdlib.List.RepeatError.NegativeCount))
+      Stdlib.List.checkedRepeat(3000000000, "a")
+      |> Stdlib.Test.equal(Error(Stdlib.List.RepeatError.TooLong)) ])
 
 test reverse =
   Stdlib.Test.all(

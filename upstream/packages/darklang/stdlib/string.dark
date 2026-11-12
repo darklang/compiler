@@ -338,7 +338,8 @@ let dropFirst(string: String, characterCount: Int64): String =
 /// If <param string> is shorter than <param goalLength> characters, returns a
 /// copy of <param string> starting with enough copies of <param padWith> for the
 /// result to have <param goalLength>.
-/// If <param string> is <param goalLength> characters or longer, returns an unchanged copy of <param string>.
+/// If <param string> is <param goalLength> characters or longer, or <param goalLength> is past
+/// 2147483647, returns an unchanged copy of <param string>.
 ///
 /// Counts characters, not display cells. To line up columns of text, use `Stdlib.Text.padStartToWidth`.
 // @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.padStart reason=compiler-implementation
@@ -348,13 +349,14 @@ let padStart(string: String, padWith: Char, goalLength: Int64): String =
   if padCount <= 0 then
     string
   else
-    (String.repeat(String.fromChar(padWith), padCount)) + string
+    (String.checkedRepeat(String.fromChar(padWith), padCount) |> Result.withDefault("")) + string
 
 
 /// If <param string> is shorter than <param goalLength> characters, returns a
 /// copy of <param string> ending with enough copies of <param padWith> for the
 /// result to have <param goalLength>.
-/// If <param string> is <param goalLength> characters or longer, returns an unchanged copy of <param string>.
+/// If <param string> is <param goalLength> characters or longer, or <param goalLength> is past
+/// 2147483647, returns an unchanged copy of <param string>.
 ///
 /// Counts characters, not display cells. To line up columns of text, use `Stdlib.Text.padEndToWidth`.
 // @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.padEnd reason=compiler-implementation
@@ -364,7 +366,7 @@ let padEnd(string: String, padWith: Char, goalLength: Int64): String =
   if padCount <= 0 then
     string
   else
-    string + (String.repeat(String.fromChar(padWith), padCount))
+    string + (String.checkedRepeat(String.fromChar(padWith), padCount) |> Result.withDefault(""))
 
 
 // TODO: re-write in dark
@@ -408,8 +410,7 @@ let startsWith(subject: String, prefix: String): Bool =
 /// Checks if <param subject> ends with <param suffix>
 // @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.endsWith reason=compiler-implementation
 let endsWith(subject: String, suffix: String): Bool =
-  let len = String.length(subject)
-  String.slice(subject, len - String.length(suffix), len) == suffix
+  Builtin.stringEndsWith(subject, suffix)
 
 
 /// Removes <param prefix> from the start of <param subject>.
@@ -463,7 +464,6 @@ let lastIndexOf(
     Option.Option.Some(lastIndex)
 
 
-// TODO: `repeat` may become the checked version; see #6056.
 /// Returns <param string> repeated <param count> times, or {{""}} if <param count>
 /// is 0 or less. Use <fn String.checkedRepeat> to get an error for a negative count.
 // @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.repeat reason=compiler-implementation
@@ -471,15 +471,19 @@ let repeat(string: String, count: Int64): String =
   if count <= 0 then "" else Builtin.stringRepeat(string, count)
 
 
-/// What <fn String.checkedRepeat> returns for a count below 0
-type RepeatError = | NegativeCount
+/// What <fn String.checkedRepeat> returns for a count below 0, or past 2147483647
+type RepeatError =
+  | NegativeCount
+  | TooLong
 
 /// Returns {{Ok}} <param string> repeated <param count> times, or
-/// {{Error NegativeCount}} if <param count> is below 0. A count of 0 gives
-/// {{Ok ""}}.
+/// {{Error NegativeCount}} if <param count> is below 0, or {{Error TooLong}} if it
+/// is past 2147483647, where <fn String.repeat> raises. A count of 0 gives {{Ok ""}}.
 let checkedRepeat(string: String, count: Int64): Result.Result<String, RepeatError> =
   if count < 0 then
     Result.Result.Error(RepeatError.NegativeCount)
+  else if count > 2147483647 then
+    Result.Result.Error(RepeatError.TooLong)
   else
     Result.Result.Ok(repeat(string, count))
 

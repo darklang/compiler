@@ -415,11 +415,11 @@ test unwrapSpelling =
       says("fun x -> Some(x) ?", "directly after its operand")
       says("fun x ->\n  let n = x ?\n  n", "directly after its operand") ])
 
-// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
+// @compiler xfail compile: "Unknown function or value 'rejectsPackage'" class=missing-support reason=upstream-dependency
 test effectRows =
   Stdlib.Test.all(
-    [ clean("module M =\n  let f(x: Int64):{Http, Clock} Int64 = x")
-      clean("module M =\n  let f(x: Int64):{} Int64 = x") ])
+    [ rejectsPackage("module M =\n  let f(x: Int64):{Http, Clock} Int64 = x")
+      rejectsPackage("module M =\n  let f(x: Int64):{} Int64 = x") ])
 
 // @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
 test traitDeclarations =
@@ -467,14 +467,24 @@ test packageRootLetValue =
   |> Stdlib.Test.equal(
     [ "Module value declarations must use 'val'; 'let' is reserved for functions and local bindings" ])
 
-// A keyword where a name goes says how to escape it.
-// @compiler xfail compile: "Unknown function or value 'says'" class=missing-support reason=upstream-dependency
+// A keyword where a name goes says how to escape it, and is then read as that name,
+// so the rest parses and it is the only error.
+// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
 test keywordAsName =
   let escape = fun word -> $"`{word}` is a keyword, so to use it as a name write ``{word}``"
+  let only = fun(source, what, word) ->
+    golden(source, [ "expected " + what + ", found '" + word + "'; " + escape(word) ])
   Stdlib.Test.all(
-    [ says("let match = \"x\"\nx", "expected a pattern, found 'match'; " + escape("match"))
-      says("fun type -> \"x\"", escape("type"))
-      says("type R = { type: String }", escape("type"))
+    [ only("let match = \"x\"\nx", "a pattern", "match")
+      only("let type = \"x\"\nx", "a pattern", "type")
+      only("Stdlib.List.map([\"x\"], fun type -> \"y\")", "a pattern", "type")
+      only("match \"x\" with\n| type -> 1", "a pattern", "type")
+      only("type R = { type: String, title: String }", "a record field 'name : Type'", "type")
+      only(
+        "type R = { ``type``: String }\nR { type = \"post\" }",
+        "a record field 'name = value'",
+        "type")
+      only("{ r with type = \"post\" }", "a record-update field 'name = value'", "type")
       says("let f(in: String): String = in", escape("in"))
       golden(
         "r.type",

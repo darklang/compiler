@@ -113,15 +113,23 @@ let landDocEdits(
     | _ -> Stdlib.Option.Option.None)
   |> Stdlib.List.length
 
+/// Who is saving a module.
+type Caller =
+  /// `dark module`.
+  | Command
+  /// `defineBundled`, for the dev build.
+  | DevBuild
+
 /// Save the declarations in <param source> under <param modulePath>, saying what happened, as
-/// `module` does. <param bundled> is `defineBundled`'s.
+/// `module` does.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let define(
   state: Cli.AppState,
   modulePath: String,
   source: String,
-  bundled: Bool)
+  caller: Caller)
   : Cli.AppState =
+  let bundled = caller == Caller.DevBuild
   // Package input is declaration scope at its root. In particular, `val x`
   // declares a package value while `let x` is diagnosed directly instead of
   // being consumed as a script binding and failing later at EOF.
@@ -195,7 +203,10 @@ let define(
             Cli.printErr($"Failed to define module: {message}")
             { state with exitCode = 1 }
           | Ok(report) ->
-            let followed = Propagate.repointSaved(branchId, updates, Stdlib.Bool.not(bundled))
+            let followed = Propagate.repointSaved(
+              branchId,
+              updates,
+              (if bundled then Propagate.FollowerCheck.Skip else Propagate.FollowerCheck.Check))
             Propagate.printFollowed(followed)
 
             // A reload never leaves an edit's dependents behind, so the build fails over to one
@@ -279,7 +290,7 @@ let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
   let input =
     match args with
     | [ modulePath, "-" ] ->
-      Stdlib.Result.Result.Ok((modulePath, Stdlib.Cli.Stdin.readAll()))
+      Stdlib.Cli.Stdin.readAll() |> Stdlib.Result.map(fun source -> (modulePath, source))
     | [ modulePath, sourcePath ] ->
       match Stdlib.Cli.File.readText(sourcePath) with
       | Ok(source) -> Stdlib.Result.Result.Ok((modulePath, source))
@@ -294,7 +305,7 @@ let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
   | Error(message) ->
     Cli.printErr(message)
     { state with exitCode = 1 }
-  | Ok((modulePath, source)) -> define(state, modulePath, source, false)
+  | Ok((modulePath, source)) -> define(state, modulePath, source, Caller.Command)
 
 
 /// `module` for `LocalExec apply-package-edits`, which lands the dev build's edits to `packages/` on
@@ -307,7 +318,7 @@ let defineBundled(modulePath: String, source: String): Int64 =
     { Cli.initState() with
         nonInteractive = true
         currentBranchId = SCM.Branch.mainBranchId }
-  (define(state, modulePath, source, true)).exitCode
+  (define(state, modulePath, source, Caller.DevBuild)).exitCode
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"

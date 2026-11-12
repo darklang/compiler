@@ -166,11 +166,13 @@ test shifts =
       1u8 << 8u8 |> Stdlib.Test.equal(1u8) ])
 
 // `BigInt` has no width to mask a count against, so an unusable one raises
+// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test negativeLeftShiftRaises =
-  1z << -1z => raises "Encountered an out-of-range integer value"
+  1z << -1z => raises "Shift count out of range (0 to 2147483647): -1z"
 
+// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test negativeRightShiftRaises =
-  1z >> -1z => raises "Encountered an out-of-range integer value"
+  1z >> -1z => raises "Shift count out of range (0 to 2147483647): -1z"
 
 // unary `~` is two's complement on every integer type
 test bitwiseNot =

@@ -402,19 +402,32 @@ test secondsRoundTrip =
       |> Stdlib.Test.equal("2019-07-28T22:42:36Z") ])
 
 // seconds whose ticks are past Int64 can't be represented; surface a Dark error
+// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test fromSecondsPastInt64Raises =
   (2 ** 62) |> Stdlib.DateTime.fromSeconds
-  => raises "Encountered an out-of-range integer value"
+  => raises "Seconds out of DateTime range (-9998-01-01 to 9999-12-31): 4611686018427387904"
 
 // Int64.MaxValue fits int64 but is past NodaTime's instant range; the host
 // exception is turned into a Dark error rather than escaping
+// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test fromSecondsPastInstantRangeRaises =
   9223372036854775807 |> Stdlib.DateTime.fromSeconds
-  => raises "Encountered an out-of-range integer value"
+  => raises "Seconds out of DateTime range (-9998-01-01 to 9999-12-31): 9223372036854775807"
 
+// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test addSecondsPastInstantRangeRaises =
   Stdlib.DateTime.addSeconds(Stdlib.DateTime.fromSeconds(0), 9223372036854775807)
-  => raises "Encountered an out-of-range integer value"
+  => raises "Seconds out of DateTime range (-9998-01-01 to 9999-12-31): 9223372036854775807"
+
+// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
+test fromMillisecondsPastInstantRangeRaises =
+  Stdlib.DateTime.fromMilliseconds(-9223372036854775807)
+  => raises "Milliseconds out of DateTime range (-9998-01-01 to 9999-12-31): -9223372036854775807"
+
+// @compiler xfail compile: "Unknown function or value 'Stdlib.DateTime.__fromTicks'" class=missing-support reason=upstream-dependency
+test fromTicksPastInstantRangeRaises =
+  Stdlib.DateTime.__fromTicks(9223372036854775807)
+  => raises "Ticks out of DateTime range (-9998-01-01 to 9999-12-31): 9223372036854775807"
 
 test todayIsCurrentUtcMidnight =
   let before = Stdlib.DateTime.atStartOfDay(Stdlib.DateTime.now())
@@ -529,13 +542,26 @@ test subtractMilliseconds =
       (sms("2020-11-26T04:37:46Z", -500)) |> Stdlib.display
       |> Stdlib.Test.equal("2020-11-26T04:37:46.500Z") ])
 
+// @compiler xfail compile: "Unknown function or value 'Stdlib.DateTime.__fromTicks'" class=missing-support reason=upstream-dependency
 test subtractMs =
   Stdlib.Test.all(
     [ sMs("2020-11-26T04:37:46Z", "2020-11-26T04:37:46Z") |> Stdlib.Test.equal(0)
       sMs("2020-11-26T04:37:46Z", "2020-11-26T04:37:45Z") |> Stdlib.Test.equal(1000)
       sMs("2020-11-26T04:37:46Z", "2020-11-26T04:37:56Z") |> Stdlib.Test.equal(-10000)
       sMs("2021-01-01T00:00:00Z", "2020-01-01T00:00:00Z")
-      |> Stdlib.Test.equal(31622400000) ])
+      |> Stdlib.Test.equal(31622400000)
+      Stdlib.DateTime.subtractMs(
+        Stdlib.DateTime.__fromTicks(25000),
+        Stdlib.DateTime.__fromTicks(0))
+      |> Stdlib.Test.equal(2)
+      Stdlib.DateTime.subtractMs(
+        Stdlib.DateTime.__fromTicks(35000),
+        Stdlib.DateTime.__fromTicks(0))
+      |> Stdlib.Test.equal(4)
+      Stdlib.DateTime.subtractMs(
+        Stdlib.DateTime.__fromTicks(-25000),
+        Stdlib.DateTime.__fromTicks(0))
+      |> Stdlib.Test.equal(-2) ])
 
 let f(date: DateTime): String =
   Stdlib.DateTime.format(date, "%Y-%m-%d %H:%M:%S.%f") |> Builtin.unwrap
@@ -563,6 +589,7 @@ test formatPadsEveryField =
       f(d("9999-12-31T23:59:59.999Z")) |> Stdlib.Test.equal("9999-12-31 23:59:59.999")
       f(civil(0, 1, 1)) |> Stdlib.Test.equal("0000-01-01 00:00:00.000")
       f(civil(-1, 6, 15)) |> Stdlib.Test.equal("-0001-06-15 00:00:00.000")
+      Stdlib.display(civil(-1, 6, 15)) |> Stdlib.Test.equal("-0001-06-15T00:00:00Z")
       // the fraction is truncated to milliseconds, never rounded up into the next second
       f(Stdlib.DateTime.__fromTicks(9999999))
       |> Stdlib.Test.equal("1970-01-01 00:00:00.999") ])
@@ -617,3 +644,12 @@ test clockSyscalls =
       |> Stdlib.Test.equal(Ok(true))
       // EINTR (-4) on the first call resumes with the remaining time
       Stdlib.DateTime.__sleepWith(interruptedOnce, 1, 0) |> Stdlib.Test.equal(Ok()) ])
+
+test weekdayAndMonthDisplay =
+  Stdlib.Test.all(
+    [ Stdlib.display(Stdlib.DateTime.Weekday.Monday) |> Stdlib.Test.equal("Monday")
+      Stdlib.display(Stdlib.DateTime.Weekday.Sunday) |> Stdlib.Test.equal("Sunday")
+      Stdlib.display(Stdlib.DateTime.Month.January) |> Stdlib.Test.equal("January")
+      Stdlib.display(Stdlib.DateTime.Month.September) |> Stdlib.Test.equal("September")
+      $"{Stdlib.DateTime.Weekday.Friday}, {Stdlib.DateTime.Month.March}"
+      |> Stdlib.Test.equal("Friday, March") ])

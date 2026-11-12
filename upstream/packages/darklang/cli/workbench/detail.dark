@@ -29,7 +29,7 @@ let renderTreeList(state: State, region: Stdlib.Cli.UI.Layout.Region): List<Stdl
     let anyDesc = state.items |> Stdlib.List.any(fun it -> it.desc != "")
     let nameCap =
       if state.activeView == vHome then
-        Stdlib.max(16, (region.cols * 2) / 3)
+        Stdlib.max(16, Stdlib.Int64.checkedDivide(region.cols * 2, 3) |> Stdlib.Result.withDefault(0))
       else 36
     let nameCol =
       if Stdlib.Bool.not(anyDesc) then 0
@@ -65,7 +65,7 @@ let renderTreeList(state: State, region: Stdlib.Cli.UI.Layout.Region): List<Stdl
           + (if isDeprecated then Stdlib.Cli.UI.Colors.colorize(Stdlib.Cli.UI.Colors.yellow, " ⚠") else "")
         let gap =
           if item.desc == "" then ""
-          else Stdlib.String.repeat(" ", Stdlib.max(2, nameCol + 2 - (Stdlib.String.displayWidth(display))))
+          else (Stdlib.String.checkedRepeat(" ", Stdlib.max(2, nameCol + 2 - (Stdlib.String.displayWidth(display)))) |> Stdlib.Result.withDefault(""))
         // A description that arrives coloured (a change kind, a diff stat) keeps its colours; a
         // plain one is dim.
         let descStyled =
@@ -78,7 +78,7 @@ let renderTreeList(state: State, region: Stdlib.Cli.UI.Layout.Region): List<Stdl
           // the cursor (see `selectableRow`).
           if item.name == "" then "" else "  " + (Stdlib.Cli.UI.Colors.dimText(item.name))
         else if i == state.selected then
-          selectionBar(display, rest, focused)
+          selectionBar(display, rest, Stdlib.Cli.UI.Focus.fromBool(focused))
         else
           // A module holding uncommitted work is grayed rather than bold: not yet part of what
           // everyone else sees, and the leaf dots inside say exactly what.
@@ -119,15 +119,9 @@ let factRow(label: String, value: String): String =
 
 /// A dim note under a fact row, aligned with its value.
 let factNote(note: String): String =
-  "  " + (Stdlib.String.repeat(" ", 11)) + (Stdlib.Cli.UI.Colors.dimText(note))
+  "             " + (Stdlib.Cli.UI.Colors.dimText(note))
 
-/// The essentials of a fn's authority, for a detail pane: what it needs, the
-/// ceiling its author set (and whether the body exceeds it), and whether this
-/// account has approved it. `permissions show` prints the whole layered
-/// report; the version is already on the meta strip, the instance policy is
-/// the same for every fn on the machine, and the closing lines about run
-/// policy and call-time resource checks describe the runtime rather than
-/// this fn, so none of that earns a line here.
+/// The function's effects and approval status, without instance-wide rules.
 /// The line the access block opens with; `inspectPageLines` splits on it.
 val accessHeading = sectionHeading("access")
 
@@ -138,34 +132,14 @@ let accessSummaryLines(state: State, hash: String): List<String> =
     Stdlib.List.flatten(
       [ [ factRow("requires", effectsText(Permissions.Command.describeRequirements((facts.effects, facts.complete)))) ]
         (if facts.complete then [] else [ factNote("incomplete · some calls not followed") ]) ])
-  let ceiling =
-    match facts.ceiling with
-    | None -> []
-    | Some(names) ->
-      let exceeding =
-        facts.effects |> Stdlib.List.filter(fun e -> Stdlib.Bool.not(Stdlib.List.contains(names, e)))
-      let warning =
-        if facts.complete && (Stdlib.Bool.not(Stdlib.List.isEmpty(exceeding))) then
-          [ factNote(
-              ("⚠ narrower than the body needs: "
-               + (Stdlib.String.join(exceeding |> Stdlib.List.map(LanguageTools.Permissions.effectName), ", "))
-               + " denied at runtime")) ]
-        else []
-      Stdlib.List.prepend(
-        warning,
-        factRow("ceiling", LanguageTools.Permissions.ceilingRow(Stdlib.Option.Option.Some(names))))
   let approval =
     if facts.bundled then
       [ factRow("approval", (Stdlib.Cli.UI.Colors.colorize(Stdlib.Cli.UI.Colors.green, "none needed")) + (Stdlib.Cli.UI.Colors.dimText(" · bundled Darklang code"))) ]
     else if Stdlib.Bool.not(Stdlib.List.isEmpty(facts.approvedAs)) then
       [ factRow("approval", Stdlib.Cli.UI.Colors.colorize(Stdlib.Cli.UI.Colors.green, "approved as " + (Stdlib.String.join(facts.approvedAs, ", ")))) ]
     else
-      match facts.packagePolicy with
-      | Some(_) -> [ factRow("approval", Stdlib.Cli.UI.Colors.colorize(Stdlib.Cli.UI.Colors.green, "approved")) ]
-      | None ->
-        [ factRow("approval", Stdlib.Cli.UI.Colors.colorize(Stdlib.Cli.UI.Colors.yellow, "not approved"))
-          factNote("blocked as a dependency · runs as an entry point") ]
-  Stdlib.List.flatten([ [ accessHeading ], requires, ceiling, approval ])
+      [ factRow("approval", Stdlib.Cli.UI.Colors.dimText("uses instance defaults")) ]
+  Stdlib.List.flatten([ [ accessHeading ], requires, approval ])
 
 /// The selected module's immediate children for the Inspect pane. This is a
 /// preview of the next Tree level, not a recursive package listing.

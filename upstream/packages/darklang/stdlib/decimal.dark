@@ -107,7 +107,7 @@ impl Display for Decimal =
     else
       // at least one digit before the point: 0.05 is "005" before the split
       let padCount = scale + 1 - Stdlib.String.length(digits)
-      let padding = Stdlib.String.repeat("0", padCount)
+      let padding = (Stdlib.String.checkedRepeat("0", padCount) |> Stdlib.Result.withDefault(""))
       let padded = padding + digits
       let whole = Stdlib.String.dropLast(padded, scale)
       let fraction = Stdlib.String.last(padded, scale)
@@ -130,8 +130,9 @@ let normalize(d: Decimal): Decimal =
   | None -> d
 
 let __stripZeros(unscaled: BigInt, scale: Int64): (BigInt * Int64) =
-  if scale > 0 && unscaled % 10z == 0z then
-    __stripZeros(unscaled / 10z, scale - 1)
+  let tenth = Stdlib.BigInt.checkedDivide(unscaled, 10z) |> Stdlib.Result.withDefault(0z)
+  if scale > 0 && tenth * 10z == unscaled then
+    __stripZeros(tenth, scale - 1)
   else
     (unscaled, scale)
 

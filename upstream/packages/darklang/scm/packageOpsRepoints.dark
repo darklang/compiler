@@ -31,11 +31,11 @@ let repointsFromReview(pairs: List<(LanguageTools.ProgramTypes.PackageLocation *
 
 /// Shared native review for constraints and caller updates.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.dependencyReview: Unknown function or value 'Deps.review'"
-let dependencyReview(changed: List<Conflicts.Binding>): Deps.DependencyReview =
+let dependencyReview(changed: List<Conflicts.Binding>): Stdlib.Result.Result<Deps.DependencyReview, String> =
   Deps.review(currentBranch(), changed |> Stdlib.List.map(sourceOfBinding))
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftRepoints: Unknown function or value 'dependencyReview'"
-let draftRepoints(changed: List<Conflicts.Binding>): List<Repoint> =
-  if Stdlib.List.isEmpty(changed) then [] else
-    let (_, repoints) = dependencyReview(changed)
-    repointsFromReview(repoints)
+let draftRepoints(changed: List<Conflicts.Binding>): Stdlib.Result.Result<List<Repoint>, String> =
+  if Stdlib.List.isEmpty(changed) then Stdlib.Result.Result.Ok([]) else
+    dependencyReview(changed)
+    |> Stdlib.Result.map(fun((_, repoints)) -> repointsFromReview(repoints))

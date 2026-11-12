@@ -78,7 +78,7 @@ let formatLocation(location: PackageLocation): String =
 /// argument has to go first. A lone argument naming a file that exists reads the
 /// file, the way `module` does; a definition is never one token, so the two cannot
 /// be confused.
-let definitionFromArgs(args: List<String>): String =
+let definitionFromArgs(args: List<String>): Stdlib.Result.Result<String, String> =
   let withoutSeparator =
     match args with
     | ["=", ...rest] -> rest
@@ -91,15 +91,15 @@ let definitionFromArgs(args: List<String>): String =
   // name may fail closed (the link check treats what it cannot inspect as a link).
   | [ path ] when (if Stdlib.String.contains(path, " ") then false else Stdlib.Cli.File.exists(path)) ->
     match Stdlib.Cli.File.readText(path) with
-    | Ok(source) -> source
-    | Error(_) -> path
+    | Ok(source) -> Stdlib.Result.Result.Ok(source)
+    | Error(_) -> Stdlib.Result.Result.Ok(path)
   | parts ->
     let joined = Stdlib.String.join(parts, " ") |> Stdlib.String.trim
 
     if Stdlib.String.startsWith(joined, "=") then
-      Stdlib.String.dropFirst(joined, 1) |> Stdlib.String.trim
+      Stdlib.Result.Result.Ok(Stdlib.String.dropFirst(joined, 1) |> Stdlib.String.trim)
     else
-      joined
+      Stdlib.Result.Result.Ok(joined)
 
 
 
@@ -115,7 +115,9 @@ let docsOfFn(
   let params =
     fn.parameters
     |> Stdlib.List.indexedMap(fun(i, p) ->
-      (LanguageTools.ProgramTypes.DocPart.Parameter(i), p.description))
+      [ (LanguageTools.ProgramTypes.DocPart.Parameter(i), p.description)
+        (LanguageTools.ProgramTypes.DocPart.ParameterName(i), p.name) ])
+    |> Stdlib.List.flatten
 
   Stdlib.List.prepend(
     params,
@@ -238,9 +240,9 @@ let docAt(
 
 /// Author an `UpdateDoc` for every doc that changed, and say whether there was one.
 ///
-/// Called once the save has landed on <param hash>: if that is a hash the location already had,
-/// nothing about the VERSION moved, so the ops just authored folded to nothing and a changed doc
-/// comment is the only thing left that could have been meant.
+/// Called once the save has landed on <param hash>. When that hash was already stored, under this
+/// name or another, the ops just authored folded to nothing, so the docs and parameter names written
+/// here are what this name says rather than what the stored declaration does.
 ///
 /// One op per changed PART, each naming the text it replaces. Naming it is what lets the far side
 /// tell an edit made on top of its own words from one made without ever seeing them.
@@ -312,6 +314,8 @@ type Committed =
     followed: Propagate.Followed
     /// The save's own type error, named, if it has one.
     ownIssue: Stdlib.Option.Option<String>
+    /// Another name that already held the version this name now holds.
+    sameAs: Stdlib.Option.Option<LanguageTools.ProgramTypes.PackageLocation>
     report: LanguageTools.AtRestTypeChecker.Report }
 
 
@@ -351,9 +355,16 @@ let commitAuthored(
     let movedVersion =
       Stdlib.Bool.not(Stdlib.List.contains(previousHashes, boundHash))
 
-    let docOnly =
-      (isUpdate && (Stdlib.Bool.not(movedVersion)))
-      && (updateDocsThatChanged(branchId, location, kind, boundHash, ops))
+    let docsChanged = updateDocsThatChanged(branchId, location, kind, boundHash, ops)
+    let docOnly = isUpdate && (Stdlib.Bool.not(movedVersion)) && docsChanged
+
+    let sameAs =
+      if isUpdate && (Stdlib.Bool.not(movedVersion)) then
+        Stdlib.Option.Option.None
+      else
+        LanguageTools.PackageManager.itemLocations(branchId, kind, boundHash)
+        |> Stdlib.List.filter(fun other -> other != location)
+        |> Stdlib.List.head
 
     // A body the name held BEFORE, not the one it holds now: the save put the name back on an
     // earlier version (as a decision, since the SetName already exists). A change, and one a live
@@ -376,7 +387,7 @@ let commitAuthored(
     // deciding whether to commit. Nothing is committed; `dark commit` is still the blessing. A
     // revert repoints too: the dependents follow the name to the version it holds now. Done
     // BEFORE anything prints: whether a dependent broke decides the first line's glyph.
-    let followed = Propagate.repointSaved(branchId, updates, true)
+    let followed = Propagate.repointSaved(branchId, updates, Propagate.FollowerCheck.Check)
 
     // The save's own type check: an error in what was just written. Saved anyway (WIP is yours
     // to break); `dark commit` is the gate. Said on the second line, with the issue itself.
@@ -431,6 +442,7 @@ let commitAuthored(
           boundHash = boundHash
           followed = followed
           ownIssue = ownIssue
+          sameAs = sameAs
           report = report })
   | Error(msg) -> Stdlib.Result.Result.Error(msg)
 
@@ -494,7 +506,12 @@ let saveAuthored(
         Stdlib.printLine($"{glyph} Put {kindWord} {fullPath} back to an earlier version")
       else if landed then
         let action = if isUpdate then "Updated" else "Created"
-        Stdlib.printLine($"{glyph} {action} {kindWord} {fullPath}")
+        let alsoNamed =
+          match committed.sameAs with
+          | Some(other) ->
+            $" (also named {PrettyPrinter.ProgramTypes.PackageLocation.packageLocation(other)})"
+          | None -> ""
+        Stdlib.printLine($"{glyph} {action} {kindWord} {fullPath}{alsoNamed}")
       else
         Stdlib.printLine(
           Stdlib.Cli.UI.Colors.hint($"= {kindWord} {fullPath} is unchanged; nothing was saved"))
