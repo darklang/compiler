@@ -61,7 +61,7 @@ let terminate(handle: ProcessHandle): Stdlib.Cli.ExecutionOutcome =
 // ─── Posix-based process execution (no bash, no shell) ───
 
 /// Result of running a process
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch"
+// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.Output reason=compiler-implementation
 type Output =
   { exitCode: Int64
     stdout: String
@@ -109,7 +109,7 @@ let spawnAndWaitBytes(
 
 
 /// Same as `spawnAndWaitBytes`, with stdout and stderr decoded as UTF-8.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream String -> List<String> -> Darklang.Stdlib.Option.Option<Int64> -> Darklang.Stdlib.Result.Result<(Int64, String, String), Darklang.Stdlib.Cli.Posix.Error>, replacement String -> List<String> -> Darklang.Stdlib.Option.Option<Int> -> Darklang.Stdlib.Result.Result<(Int, String, String), Darklang.Stdlib.Cli.Posix.Error>"
+// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.spawnAndWait reason=compiler-implementation
 let spawnAndWait(
   program: String,
   args: List<String>,
@@ -144,7 +144,7 @@ let run(program: String, args: List<String>): Result.Result<Output, Posix.Error>
 /// anything that DRAWS needs: an editor with a redirected stdout paints into a pipe
 /// and reads keys from nowhere. Use `run` when you want the output, this when you
 /// want the program to be usable.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream String -> List<String> -> Darklang.Stdlib.Result.Result<Int64, Darklang.Stdlib.Cli.Posix.Error>, replacement String -> List<String> -> Darklang.Stdlib.Result.Result<Int, Darklang.Stdlib.Cli.Posix.Error>"
+// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.runInteractive reason=compiler-implementation
 let runInteractive(
   program: String,
   args: List<String>)
@@ -203,7 +203,7 @@ let runIn(
 
 
 /// Run a program silently, discarding output. Returns exit code only.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream String -> List<String> -> Darklang.Stdlib.Result.Result<Int64, Darklang.Stdlib.Cli.Posix.Error>, replacement String -> List<String> -> Darklang.Stdlib.Result.Result<Int, Darklang.Stdlib.Cli.Posix.Error>"
+// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.runSilent reason=compiler-implementation
 let runSilent(
   program: String,
   args: List<String>)
@@ -252,7 +252,7 @@ let runWithEnv(
 /// Run a program with a timeout in milliseconds.
 /// Returns Error if the command times out.
 /// Returns String errors because it mixes spawn failures with validation/timeout errors.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int64 -> String -> List<String> -> Darklang.Stdlib.Result.Result<Darklang.Stdlib.Cli.Process.Output, String>, replacement Int -> String -> List<String> -> Darklang.Stdlib.Result.Result<Darklang.Stdlib.Cli.Process.Output, String>"
+// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.runWithTimeout reason=compiler-implementation
 let runWithTimeout(
   timeoutMs: Int64,
   program: String,

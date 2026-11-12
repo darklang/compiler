@@ -20,9 +20,9 @@ match Stdlib.Cli.Process.run "/definitely/missing/cli-parity" [] with | Error er
 
 // Argv execution is a process primitive, not shell evaluation. A broken
 // configured shell must not affect an absolute executable.
-match Stdlib.Cli.Process.run "/usr/bin/printf" (["%s", "native argv"]) with | Ok output -> (output.exitCode, output.stdout, output.stderr) | Error error -> (-1, "", error.message) = (0, "native argv", "") env="SHELL=/definitely/missing"
+match Stdlib.Cli.Process.run "/usr/bin/printf" (["%s", "native argv"]) with | Ok output -> (output.exitCode, output.stdout, output.stderr) | Error error -> (-1L, "", error.message) = (0L, "native argv", "") env="SHELL=/definitely/missing"
 
-let outcome = Stdlib.Cli.execute "printf 'stdout'; printf 'stderr' >&2; exit 7" in (outcome.exitCode, outcome.stdout, outcome.stderr) = (7, "stdout", "stderr")
+let outcome = Stdlib.Cli.execute "printf 'stdout'; printf 'stderr' >&2; exit 7" in (outcome.exitCode, outcome.stdout, outcome.stderr) = (7L, "stdout", "stderr")
 
 let outcome = Stdlib.Cli.execute "printf 'x\\n\\n'" in outcome.stdout = "x\n\n"
 
@@ -58,11 +58,11 @@ match Stdlib.Cli.Process.pipe "/usr/bin/printf" (["abc"]) "/usr/bin/tr" (["a-z",
 // implementation times out first and prints "sequential" instead.
 let marker = $"/tmp/dark-native-pipe-{Stdlib.Int.toString (Stdlib.Cli.Sys.currentPid ())}" in let quoted = Stdlib.Cli.Process.shellQuote marker in let _ = Stdlib.Cli.Process.run "/bin/rm" (["-f", marker]) in match Stdlib.Cli.Process.pipe "/bin/sh" (["-c", $"marker={quoted}; count=0; while [ ! -e \"$marker\" ] && [ $count -lt 100 ]; do /bin/sleep 0.01; count=$((count + 1)); done; if [ -e \"$marker\" ]; then printf concurrent; else printf sequential; fi"]) "/bin/sh" (["-c", $"/usr/bin/touch {quoted}; /bin/cat; /bin/rm -f {quoted}"]) with | Ok output -> output.stdout | Error error -> error.message = "concurrent" env="SHELL=/definitely/missing" env="PATH="
 
-match Stdlib.Cli.Process.runWithTimeout 0 "true" [] with | Error error -> error | Ok _ -> "unexpected" = "timeoutMs must be positive"
+match Stdlib.Cli.Process.runWithTimeout 0L "true" [] with | Error error -> error | Ok _ -> "unexpected" = "timeoutMs must be positive"
 
-match Stdlib.Cli.Process.runWithTimeout 5 "/bin/sh" (["-c", "sleep 1"]) with | Error error -> error | Ok _ -> "unexpected" = "Process timed out"
+match Stdlib.Cli.Process.runWithTimeout 5L "/bin/sh" (["-c", "sleep 1"]) with | Error error -> error | Ok _ -> "unexpected" = "Process timed out"
 
-let handle = Stdlib.Cli.Process.spawn "read line; printf 'reply:%s\\n' \"$line\"" in let result = Stdlib.Cli.Process.communicate handle "hello" in (result.exitCode, result.stdout, result.stderr) = (0, "reply:hello\n", "")
+let handle = Stdlib.Cli.Process.spawn "read line; printf 'reply:%s\\n' \"$line\"" in let result = Stdlib.Cli.Process.communicate handle "hello" in (result.exitCode, result.stdout, result.stderr) = (0L, "reply:hello\n", "")
 
 // communicate waits in bounded polling intervals for an input-driven child,
 // and terminate returns all output accumulated over the handle's lifetime.

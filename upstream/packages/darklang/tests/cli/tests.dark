@@ -690,7 +690,7 @@ let evalOutcome(expr: String): Stdlib.Cli.ExecutionOutcome =
 
 // #6024: agents guess `Stdlib.Int64.toString`; the function is `Stdlib.display`, and the error
 // should say so. A name with nothing near it gets no guess.
-// @compiler xfail compile: "Operator is unavailable for this type" class=missing-support reason=compiler-gap
+// @compiler xfail runtime: "Expected a suggestion for the moved name only; moved=/bin/sh: 1: ./scripts/run-cli: not found" class=missing-support reason=compiler-gap
 test notFoundSuggestsTheEnclosingStdlibName =
   let moved = evalOutcome("Stdlib.Int64.toString(5)")
   let unprefixed = evalOutcome("Int64.toString(5)")
@@ -792,7 +792,7 @@ test operatorNamesSuggestTheOperator =
 
 
 // `Stdlib.Int64.mod` said only "not found", and searching for it never showed `%`.
-// @compiler xfail compile: "Operator is unavailable for this type" class=missing-support reason=compiler-gap
+// @compiler xfail runtime: "Expected `a % b`; eval=/bin/sh: 1: ./scripts/run-cli: not found" class=missing-support reason=compiler-gap
 test int64ModSuggestsPercent =
   let evaluated = evalOutcome("Stdlib.Int64.mod(7, 3)")
   let searched = runWithBothStreams([ "search", "Int64.mod", "--fn" ])
@@ -817,7 +817,7 @@ test didYouMeanText =
 
 
 // A misspelt name gets the names spelled near it, on eval and on save.
-// @compiler xfail compile: "Operator is unavailable for this type" class=missing-support reason=compiler-gap
+// @compiler xfail runtime: "Expected a near name; eval=/bin/sh: 1: ./scripts/run-cli: not found" class=missing-support reason=compiler-gap
 test notFoundSuggestsNamesSpelledNear =
   let evaluated = evalOutcome("Stdlib.List.lenght([1])")
   let branchName = "cli-did-you-mean-test-" + Stdlib.display(Stdlib.Int64.random(100000, 999999))
