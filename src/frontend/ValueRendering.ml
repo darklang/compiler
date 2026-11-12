@@ -288,6 +288,7 @@ let runtimeFunctionNames =
     "Darklang.Stdlib.Pretty.text";
     "Darklang.Stdlib.Pretty.__valueBraced";
     "Darklang.Stdlib.Pretty.__valueBracketed";
+    "Darklang.Stdlib.__Console.forFd";
   ]
 
 let applySubstitution subst typ =
@@ -1250,10 +1251,15 @@ let rewriteProgram recordMetadata sumMetadata programType program =
         | _ -> None)
     | _ -> None
   in
+  (* dark eval's console strips SGR sequences from output to a pipe or a file. *)
+  let forStdout state rendered =
+    call state.symbols "Darklang.Stdlib.__Console.forFd"
+      [ C.Int64Literal 1L; rendered ]
+  in
   let rewriteExpression state expr =
     let rendered, next =
       match (programType, expr, tryNamedPartialName expr) with
-      | TString, _, _ when !evalDisplay -> (expr, state)
+      | TString, _, _ when !evalDisplay -> (forStdout state expr, state)
       | TUnit, _, _ when !evalDisplay ->
           let id, next = freshBinding "__rendered_unit" state in
           (C.Let (C.LPVariable id, expr, C.StringLiteral ""), next)
@@ -1289,7 +1295,8 @@ let rewriteProgram recordMetadata sumMetadata programType program =
             | Some name -> resolveFunction state.symbols name
             | None -> Crash.crash "Missing boundary value renderer"
           in
-          (C.BoundaryRender (renderer, expr), state)
+          let rendered = C.BoundaryRender (renderer, expr) in
+          ((if !evalDisplay then forStdout state rendered else rendered), state)
     in
     (C.Expression rendered, next)
   in
