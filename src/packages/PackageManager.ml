@@ -814,16 +814,26 @@ let rec renderExpr parameters selfName element =
       let* value = recurse value in
       let+ body = recurse body in
       "(let " ^ pattern ^ " = " ^ value ^ " in " ^ body ^ ")"
-  | "EIf", [ _; condition; yes; no ] -> (
-      let* condition = recurse condition in
-      let* yes = recurse yes in
-      let* name, fields = enumCase no in
-      match (name, fields) with
-      | "Some", [ value ] ->
-          let+ no = recurse value in
-          "(if " ^ condition ^ " then " ^ yes ^ " else " ^ no ^ ")"
-      | "None", [] -> Ok ("(if " ^ condition ^ " then " ^ yes ^ ")")
-      | _ -> Error ("Invalid optional else case " ^ name))
+  | "EIf", _ ->
+      (* An else-if chain is written as one, not as nested parentheses, so
+         a long chain (Posix.__fromErrno's) stays within the parser's
+         nesting limit. *)
+      let rec chain element =
+        match enumCase element with
+        | Ok ("EIf", [ _; condition; yes; no ]) -> (
+            let* condition = recurse condition in
+            let* yes = recurse yes in
+            let* name, fields = enumCase no in
+            match (name, fields) with
+            | "Some", [ value ] ->
+                let+ no = chain value in
+                "if " ^ condition ^ " then " ^ yes ^ " else " ^ no
+            | "None", [] -> Ok ("if " ^ condition ^ " then " ^ yes)
+            | _ -> Error ("Invalid optional else case " ^ name))
+        | _ -> recurse element
+      in
+      let+ text = chain element in
+      "(" ^ text ^ ")"
   (* The trailing field is the saved trait-implementation choice. Operators on
      the compiler's own types resolve natively, so the choice is not needed. *)
   | "EInfix", [ _; infix; left; right ] | "EInfix", [ _; infix; left; right; _ ]

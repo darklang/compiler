@@ -259,6 +259,19 @@ ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})
 ENTITIES["deep-hash"] = fn("Hosted.deepAdds", [("x", INT64)], INT64, nested_adds(180))
 
 
+def else_if_chain(count):
+    # if x == 0 then 0 else if x == 1 then 10 ... else -1, as Posix.__fromErrno
+    # writes its 130 errnos: deeper than the parser's limit as nested parentheses.
+    body = {"EInt64": [1, -1]}
+    for index in reversed(range(count)):
+        body = {"EIf": [2, infix("ComparisonEquals", ARG0, {"EInt64": [3, index]}),
+                        {"EInt64": [4, index * 10]}, {"Some": [body]}]}
+    return body
+
+
+ENTITIES["else-if-hash"] = fn("Hosted.elseIfChain", [("x", INT64)], INT64, else_if_chain(150))
+
+
 # `type Overflow = | Overflow`: one case, named like its type, as in Stdlib.Math.
 OVERFLOW_TYPE = dict(hash={"Hash": ["overflow-type-hash"]}, description="", deprecated={"NotDeprecated": []},
     declaration=dict(typeParams=[], definition={"Enum": [[dict(name="Overflow", fields=[], description="")]]}))
@@ -322,6 +335,7 @@ def main():
             assert run("Hosted.operators 10L\n") == 1036
             assert run("Hosted.pipePlus 41L\n") == 42
             assert run("Hosted.deepAdds 1L\n") == 181
+            assert [run(f"Hosted.elseIfChain {x}L\n") for x in (0, 149, 150)] == [0, 1490, -1]
             assert run("Hosted.builtinOps 50\n") is True
             assert run("Hosted.overflowName ()\n") == "overflow"
             assert run("Hosted.describeNumber 42L\n") == "42"
