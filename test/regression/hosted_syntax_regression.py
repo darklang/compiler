@@ -267,6 +267,8 @@ ENTITIES["calls-shared-hash"] = fn("Hosted.callsShared", [("x", INT64)], INT64,
     {"EApply": [2, {"EFnName": [1, dict(originalName=["Hosted", "B", "second"], resolved={"Ok": [dict(
         name={"Package": [{"Hash": ["shared-fn-hash"]}]},
         location={"Some": [dict(owner="Hosted", modules=["B"], name="second")]})]}), []]}, [], [ARG0]]})
+# The server finds Hosted.B.second by name, and answers with the fn at Hosted.A.first.
+FIND_ALSO = {"Hosted.B.second": "shared-fn-hash"}
 # `Builtin.power` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("power", ARG0, {"EInt128": [3, 3]}))
@@ -314,6 +316,8 @@ def main():
                 for hash_, (name, _) in ENTITIES.items():
                     if name == parts[2]:
                         payload = {"Hash": [hash_]}
+                if parts[2] in FIND_ALSO:
+                    payload = {"Hash": [FIND_ALSO[parts[2]]]}
             elif len(parts) == 4 and parts[:3] == ["type", "get", "with-location"]:
                 if parts[3] in TYPES:
                     name, body = TYPES[parts[3]]
@@ -372,6 +376,7 @@ def main():
                 "type", "trait", "impl", "of", "match", "with", "fun", "when", "true", "false", "_"]
             assert run("Hosted.firstOk 7L\n") == 7
             assert run("Hosted.callsShared 7L\n") == 7
+            assert run("Hosted.B.second 7L\n") == 7
             current = compile_with(["--syntax=current"], "Hosted.int16Zero(1)\n")
             assert current.returncode == 0, current.stdout + current.stderr
             assert subprocess.check_output([str(program)], text=True, timeout=10) == "-7s16\n"
