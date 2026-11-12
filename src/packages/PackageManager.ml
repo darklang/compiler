@@ -463,7 +463,7 @@ let rec renderMatchPattern element =
       string_of_bool value
   | "MPInt8", [ _; value ] -> scalar "y" value
   | "MPUInt8", [ _; value ] -> scalar "uy" value
-  | "MPInt16", [ _; value ] -> scalar "s" value
+  | "MPInt16", [ _; value ] -> scalar "s16" value
   | "MPUInt16", [ _; value ] -> scalar "us" value
   | "MPInt32", [ _; value ] -> scalar "l" value
   | "MPUInt32", [ _; value ] -> scalar "ul" value
@@ -730,7 +730,7 @@ let rec renderExpr parameters selfName element =
       string_of_bool value
   | "EInt8", [ _; value ] -> scalar "y" value
   | "EUInt8", [ _; value ] -> scalar "uy" value
-  | "EInt16", [ _; value ] -> scalar "s" value
+  | "EInt16", [ _; value ] -> scalar "s16" value
   | "EUInt16", [ _; value ] -> scalar "us" value
   | "EInt32", [ _; value ] -> scalar "l" value
   | "EUInt32", [ _; value ] -> scalar "ul" value
