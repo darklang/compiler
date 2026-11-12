@@ -275,6 +275,12 @@ CLIP = {"EFnName": [1, dict(originalName=["Stdlib", "Cli", "Tui", "Text", "clipT
     location={"Some": [dict(owner="Darklang", modules=["Stdlib", "Cli", "Tui", "Text"], name="clipToWidth")]})]}), []]}
 ENTITIES["clip-caller-hash"] = fn("Hosted.clipped", [("x", INT64)], {"TString": []},
     {"EApply": [2, CLIP, [], [{"EString": [3, [{"StringText": ["abcdef"]}]]}, ARG0]]})
+# The compiler's syscallClose answers an Int errno; the interpreter's, an Int64.
+ENTITIES["close-bad-hash"] = fn("Hosted.closeBad", [("x", INT64)], INT64,
+    {"EMatch": [1, builtin("syscallClose", {"EBigInt": [2, -1]}), [
+        dict(pat={"MPEnum": [3, "Error", [{"MPVariable": [4, "e"]}]]}, whenCondition={"None": []},
+             rhs={"EVariable": [5, "e"]}),
+        dict(pat={"MPVariable": [6, "_other"]}, whenCondition={"None": []}, rhs={"EInt64": [7, 0]})]]})
 # `Builtin.power` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("power", ARG0, {"EInt128": [3, 3]}))
@@ -383,6 +389,7 @@ def main():
             assert run("Hosted.firstOk 7L\n") == 7
             assert run("Hosted.callsShared 7L\n") == 7
             assert run("Hosted.clipped 3L\n") == "abc"
+            assert run("Hosted.closeBad 1L\n") == 9
             assert run("Hosted.B.second 7L\n") == 7
             current = compile_with(["--syntax=current"], "Hosted.int16Zero(1)\n")
             assert current.returncode == 0, current.stdout + current.stderr

@@ -7,6 +7,8 @@ type conversion =
   | Narrow of string
   | OptionOf of conversion
   | ResultOf of conversion
+  | ErrorOf of conversion
+  | Both of conversion * conversion
   | ListOf of conversion
   | TupleOf of conversion option list
 
