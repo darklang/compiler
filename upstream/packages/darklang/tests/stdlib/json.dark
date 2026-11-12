@@ -1253,19 +1253,18 @@ module BadTypes =
     (Stdlib.Json.serialize<Int64 -> Int64>(fun i -> 5))
     => raises "Cannot serialize (lambda) into JSON"
 
-  // @compiler xfail compile: "Type arguments require a named function" class=missing-support reason=upstream-dependency
+  // @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Display'" class=missing-support reason=upstream-dependency
   test checkedRejects =
     Stdlib.Json.checkedSerialize<Int64 -> Int64>(fun i -> 5)
     |> Stdlib.Result.mapError(fun e -> Stdlib.display(e))
     |> Stdlib.Test.equal(Result.Error("Cannot serialize a function into JSON"))
 
-  // @compiler xfail compile: "Type arguments require a named function" class=missing-support reason=upstream-dependency
+  // @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Display'" class=missing-support reason=upstream-dependency
   test checkedRejectsIntKeys =
     Stdlib.Json.checkedSerialize<Dict<Int64, String>>(Dict { 1: "a" })
     |> Stdlib.Result.mapError(fun e -> Stdlib.display(e))
     |> Stdlib.Test.equal(Result.Error("Cannot serialize a dict into JSON: JSON object keys must be Strings, but this dict's keys are Int64"))
 
-  // @compiler xfail compile: "Type arguments require a named function" class=missing-support reason=upstream-dependency
   test checkedSerializes =
     Stdlib.Json.checkedSerialize<List<Int64>>([ 1, 2 ])
     |> Stdlib.Test.equal(Result.Ok("[1,2]"))

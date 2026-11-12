@@ -44,3 +44,4 @@ Stdlib.Json.parse<Int64> "not-json" = Error (Stdlib.Json.ParseError.ParseError.N
 Stdlib.Json.serialize<Int64 -> Int64> (fun value -> value) = error="Unsupported type in JSON"
 Stdlib.Json.serialize (Stdlib.Stream.fromList []) = error="Unsupported type in JSON"
 Stdlib.Json.parse<Stream<Int64>> "[]" = error="Unsupported type in JSON"
+Stdlib.Json.checkedSerialize<List<Int64>> [1L, 2L] = Ok "[1,2]"

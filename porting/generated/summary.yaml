@@ -31,13 +31,13 @@ dispositions:
     replace: 35
     run: 1836
   stdlib:
-    blocked: 802
-    replace: 925
+    blocked: 801
+    replace: 926
     run: 676
   tests:
     blocked: 56
-    run: 1614
-    xfail: 1256
+    run: 1615
+    xfail: 1255
 reasons:
   packages:
     aot-type-error: 10
@@ -52,14 +52,14 @@ reasons:
     upstream-dependency: 2243
   stdlib:
     compiler-contract: 115
-    compiler-implementation: 922
+    compiler-implementation: 923
     compiler-timeout: 1
     constructor-identity: 2
     container-adaptation: 490
     interpreter-intrinsic: 1
     test-counter: 2
     test-diagnostics: 2
-    upstream-dependency: 192
+    upstream-dependency: 191
   tests:
     aot-arity-error: 12
     aot-invalid-field: 16
@@ -75,7 +75,7 @@ reasons:
     interpreter-fixture: 47
     test-counter: 7
     upstream-bug: 1
-    upstream-dependency: 869
+    upstream-dependency: 868
 expected_failures:
   aot-rejection:
     phases:
@@ -119,13 +119,13 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/string.dark: 3
   missing-support:
     phases:
-      compile: 961
+      compile: 960
       runtime: 72
     reasons:
       compiler-contract: 2
       compiler-gap: 155
       test-counter: 7
-      upstream-dependency: 869
+      upstream-dependency: 868
     sources:
       upstream/packages/darklang/tests/cli/bashrc.dark: 2
       upstream/packages/darklang/tests/cli/builtinGroups.dark: 4
@@ -238,7 +238,7 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/ints/int64.dark: 2
       upstream/packages/darklang/tests/stdlib/ints/uint128.dark: 1
       upstream/packages/darklang/tests/stdlib/ints/uint8.dark: 1
-      upstream/packages/darklang/tests/stdlib/json.dark: 20
+      upstream/packages/darklang/tests/stdlib/json.dark: 19
       upstream/packages/darklang/tests/stdlib/list.dark: 20
       upstream/packages/darklang/tests/stdlib/net.dark: 2
       upstream/packages/darklang/tests/stdlib/regex.dark: 15

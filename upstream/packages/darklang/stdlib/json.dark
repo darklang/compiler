@@ -7,7 +7,7 @@ let serialize<'a>(value: 'a): String =
 
 /// Serializes a Dark value to a JSON string, or {{Error}} where <fn serialize> raises: a value
 /// with no JSON form, such as a function, bytes, or a dict whose keys are not Strings.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Json.checkedSerialize: Type arguments require a named function"
+// @compiler replace: packages/darklang/stdlib/json.dark#Darklang.Stdlib.Json.checkedSerialize reason=compiler-implementation
 let checkedSerialize<'a>(
   value: 'a)
   : Stdlib.Result.Result<String, SerializeError.SerializeError> =
