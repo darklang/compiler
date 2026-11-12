@@ -8,11 +8,11 @@ match Stdlib.Cli.OS.getOS () with | Ok Linux -> true | Ok MacOS -> true | _ -> f
 
 Stdlib.Cli.Sys.cpuCount () > 0 = true
 Stdlib.Cli.Sys.cpuCount () > 1 = true // test hosts expose more than one CPU; the intrinsic must not return its old constant
-Stdlib.Cli.Sys.currentPid () > 0 = true
+Stdlib.Cli.Sys.currentPid () > 0L = true
 
 // POSIX failures must preserve the kernel errno instead of inferring it from
 // localized command-line utility output.
-match Stdlib.Cli.Posix.kill (Stdlib.Cli.Sys.currentPid ()) 99999 with | Error error -> (error.errno, error.message) | Ok (()) -> (0L, "unexpected") = (22L, "Invalid argument")
+match Stdlib.Cli.Posix.kill (Stdlib.Int.fromInt64 (Stdlib.Cli.Sys.currentPid ())) 99999 with | Error error -> (error.errno, error.message) | Ok (()) -> (0L, "unexpected") = (22L, "Invalid argument")
 
 match Stdlib.Cli.Process.exec "printf" (["%s", "direct execution"]) with | Ok output -> output | Error message -> message = "direct execution"
 
@@ -56,7 +56,7 @@ match Stdlib.Cli.Process.pipe "/usr/bin/printf" (["abc"]) "/usr/bin/tr" (["a-z",
 
 // The consumer creates a marker while the producer is alive. A sequential
 // implementation times out first and prints "sequential" instead.
-let marker = $"/tmp/dark-native-pipe-{Stdlib.Int.toString (Stdlib.Cli.Sys.currentPid ())}" in let quoted = Stdlib.Cli.Process.shellQuote marker in let _ = Stdlib.Cli.Process.run "/bin/rm" (["-f", marker]) in match Stdlib.Cli.Process.pipe "/bin/sh" (["-c", $"marker={quoted}; count=0; while [ ! -e \"$marker\" ] && [ $count -lt 100 ]; do /bin/sleep 0.01; count=$((count + 1)); done; if [ -e \"$marker\" ]; then printf concurrent; else printf sequential; fi"]) "/bin/sh" (["-c", $"/usr/bin/touch {quoted}; /bin/cat; /bin/rm -f {quoted}"]) with | Ok output -> output.stdout | Error error -> error.message = "concurrent" env="SHELL=/definitely/missing" env="PATH="
+let marker = $"/tmp/dark-native-pipe-{Stdlib.Int64.toString (Stdlib.Cli.Sys.currentPid ())}" in let quoted = Stdlib.Cli.Process.shellQuote marker in let _ = Stdlib.Cli.Process.run "/bin/rm" (["-f", marker]) in match Stdlib.Cli.Process.pipe "/bin/sh" (["-c", $"marker={quoted}; count=0; while [ ! -e \"$marker\" ] && [ $count -lt 100 ]; do /bin/sleep 0.01; count=$((count + 1)); done; if [ -e \"$marker\" ]; then printf concurrent; else printf sequential; fi"]) "/bin/sh" (["-c", $"/usr/bin/touch {quoted}; /bin/cat; /bin/rm -f {quoted}"]) with | Ok output -> output.stdout | Error error -> error.message = "concurrent" env="SHELL=/definitely/missing" env="PATH="
 
 match Stdlib.Cli.Process.runWithTimeout 0L "true" [] with | Error error -> error | Ok _ -> "unexpected" = "timeoutMs must be positive"
 
