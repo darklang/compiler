@@ -269,6 +269,12 @@ ENTITIES["calls-shared-hash"] = fn("Hosted.callsShared", [("x", INT64)], INT64,
         location={"Some": [dict(owner="Hosted", modules=["B"], name="second")]})]}), []]}, [], [ARG0]]})
 # The server finds Hosted.B.second by name, and answers with the fn at Hosted.A.first.
 FIND_ALSO = {"Hosted.B.second": "shared-fn-hash"}
+# The compiler's Tui.Text.clipToWidth takes an Int64 width, as the interpreter's does.
+CLIP = {"EFnName": [1, dict(originalName=["Stdlib", "Cli", "Tui", "Text", "clipToWidth"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["clip-hash"]}]},
+    location={"Some": [dict(owner="Darklang", modules=["Stdlib", "Cli", "Tui", "Text"], name="clipToWidth")]})]}), []]}
+ENTITIES["clip-caller-hash"] = fn("Hosted.clipped", [("x", INT64)], {"TString": []},
+    {"EApply": [2, CLIP, [], [{"EString": [3, [{"StringText": ["abcdef"]}]]}, ARG0]]})
 # `Builtin.power` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("power", ARG0, {"EInt128": [3, 3]}))
@@ -376,6 +382,7 @@ def main():
                 "type", "trait", "impl", "of", "match", "with", "fun", "when", "true", "false", "_"]
             assert run("Hosted.firstOk 7L\n") == 7
             assert run("Hosted.callsShared 7L\n") == 7
+            assert run("Hosted.clipped 3L\n") == "abc"
             assert run("Hosted.B.second 7L\n") == 7
             current = compile_with(["--syntax=current"], "Hosted.int16Zero(1)\n")
             assert current.returncode == 0, current.stdout + current.stderr
