@@ -812,6 +812,10 @@ let __viewFloat32 (source: String) (value: Stdlib.Json.__InternalValueView) : St
     | Some wide -> Stdlib.Option.Option.Some (Stdlib.Float32.fromFloat wide)
     | None -> Stdlib.Option.Option.None
 
+let __viewDecimal (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Decimal> =
+    if Stdlib.Json.__isNumber source value then Stdlib.AltJson.__numberToDecimal (Stdlib.Json.__viewText source value)
+    else Stdlib.Option.Option.None
+
 let __viewChar (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Char> =
     match Stdlib.Json.__stringValue source value with
     | Some text ->

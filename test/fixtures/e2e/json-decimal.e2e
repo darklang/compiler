@@ -1,0 +1,8 @@
+// Decimal reads and writes as a JSON number at its scale, as the interpreter's
+// Json does.
+Stdlib.Json.serialize<Decimal> 19.90dec = "19.90"
+Stdlib.Json.serialize<List<Decimal>> [-0.05dec, 3dec] = "[-0.05,3]"
+Stdlib.Json.parse<Decimal> "19.90" = Stdlib.Result.Result.Ok 19.90dec
+Stdlib.Json.parse<Decimal> "-1.5e2" |> Stdlib.Result.map Stdlib.Decimal.toString = Stdlib.Result.Result.Ok "-150"
+Stdlib.Json.parse<Decimal> "25e-3" |> Stdlib.Result.map Stdlib.Decimal.toString = Stdlib.Result.Result.Ok "0.025"
+Stdlib.Json.parse<Decimal> "\"1.5\"" |> Stdlib.Result.isError = true
