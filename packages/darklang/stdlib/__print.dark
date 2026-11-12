@@ -3,11 +3,11 @@
 module Darklang.Stdlib
 
 let print (str: String) : Unit =
-    let _ = Builtin.print str in
+    let _ = Builtin.print (Stdlib.__Console.forFd 1L str) in
     ()
 
 let printLine (str: String) : Unit =
-    let _ = Builtin.printLine str in
+    let _ = Builtin.printLine (Stdlib.__Console.forFd 1L str) in
     ()
 
 let printLines (lines: List<String>) : Unit =
