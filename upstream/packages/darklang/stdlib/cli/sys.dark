@@ -53,7 +53,6 @@ let currentPid(): Int64 =
 
 
 /// isatty for 0 (stdin), 1 (stdout) or 2 (stderr).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Sys.isTerminal: Unknown function or value 'Builtin.cliTerminalIsatty'"
 let isTerminal(fd: Int64): Bool =
   Builtin.cliTerminalIsatty(fd)
 

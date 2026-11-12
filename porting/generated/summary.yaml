@@ -31,13 +31,13 @@ dispositions:
     replace: 35
     run: 1836
   stdlib:
-    blocked: 801
+    blocked: 800
     replace: 926
-    run: 676
+    run: 677
   tests:
     blocked: 56
-    run: 1615
-    xfail: 1255
+    run: 1616
+    xfail: 1254
 reasons:
   packages:
     aot-type-error: 10
@@ -59,7 +59,7 @@ reasons:
     interpreter-intrinsic: 1
     test-counter: 2
     test-diagnostics: 2
-    upstream-dependency: 191
+    upstream-dependency: 190
   tests:
     aot-arity-error: 12
     aot-invalid-field: 16
@@ -75,7 +75,7 @@ reasons:
     interpreter-fixture: 47
     test-counter: 7
     upstream-bug: 1
-    upstream-dependency: 868
+    upstream-dependency: 867
 expected_failures:
   aot-rejection:
     phases:
@@ -119,13 +119,13 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/string.dark: 3
   missing-support:
     phases:
-      compile: 960
+      compile: 959
       runtime: 72
     reasons:
       compiler-contract: 2
       compiler-gap: 155
       test-counter: 7
-      upstream-dependency: 868
+      upstream-dependency: 867
     sources:
       upstream/packages/darklang/tests/cli/bashrc.dark: 2
       upstream/packages/darklang/tests/cli/builtinGroups.dark: 4
@@ -137,7 +137,7 @@ expected_failures:
       upstream/packages/darklang/tests/cli/golden.dark: 2
       upstream/packages/darklang/tests/cli/instance-tests.dark: 5
       upstream/packages/darklang/tests/cli/interactiveTests.dark: 4
-      upstream/packages/darklang/tests/cli/isolation.dark: 13
+      upstream/packages/darklang/tests/cli/isolation.dark: 12
       upstream/packages/darklang/tests/cli/jsonShapes.dark: 9
       upstream/packages/darklang/tests/cli/permissionsGrammar.dark: 19
       upstream/packages/darklang/tests/cli/propagate.dark: 1

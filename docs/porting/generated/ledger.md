@@ -11,8 +11,8 @@ A run disposition means selected, not a passing execution receipt. Replacement c
 | Area | Source dispositions |
 | --- | --- |
 | packages | 2,309 blocked, 5 excluded, 35 replace, 1,836 run |
-| stdlib | 801 blocked, 926 replace, 676 run |
-| tests | 56 blocked, 1,615 run, 1,255 xfail |
+| stdlib | 800 blocked, 926 replace, 677 run |
+| tests | 56 blocked, 1,616 run, 1,254 xfail |
 
 ## Expected test failures
 
@@ -24,7 +24,7 @@ Upstream bugs record interpreter behavior or test expectations that the compiler
 | Class | Compile | Runtime | Total |
 | --- | ---: | ---: | ---: |
 | `aot-rejection` | 222 | 0 | 222 |
-| `missing-support` | 960 | 72 | 1,032 |
+| `missing-support` | 959 | 72 | 1,031 |
 | `upstream-bug` | 0 | 1 | 1 |
 
 | Class | Reason | Tests |
@@ -38,7 +38,7 @@ Upstream bugs record interpreter behavior or test expectations that the compiler
 | `missing-support` | `compiler-contract` | 2 |
 | `missing-support` | `compiler-gap` | 155 |
 | `missing-support` | `test-counter` | 7 |
-| `missing-support` | `upstream-dependency` | 868 |
+| `missing-support` | `upstream-dependency` | 867 |
 | `upstream-bug` | `upstream-bug` | 1 |
 
 ### Remaining support by source
@@ -57,7 +57,7 @@ Each row links to the authoritative per-test annotations. A named test remains o
 | [packages/darklang/tests/cli/golden.dark](../../../upstream/packages/darklang/tests/cli/golden.dark) | 2 |
 | [packages/darklang/tests/cli/instance-tests.dark](../../../upstream/packages/darklang/tests/cli/instance-tests.dark) | 5 |
 | [packages/darklang/tests/cli/interactiveTests.dark](../../../upstream/packages/darklang/tests/cli/interactiveTests.dark) | 4 |
-| [packages/darklang/tests/cli/isolation.dark](../../../upstream/packages/darklang/tests/cli/isolation.dark) | 13 |
+| [packages/darklang/tests/cli/isolation.dark](../../../upstream/packages/darklang/tests/cli/isolation.dark) | 12 |
 | [packages/darklang/tests/cli/jsonShapes.dark](../../../upstream/packages/darklang/tests/cli/jsonShapes.dark) | 9 |
 | [packages/darklang/tests/cli/permissionsGrammar.dark](../../../upstream/packages/darklang/tests/cli/permissionsGrammar.dark) | 19 |
 | [packages/darklang/tests/cli/propagate.dark](../../../upstream/packages/darklang/tests/cli/propagate.dark) | 1 |
@@ -203,7 +203,7 @@ Tags are defined in [the glossary](../../../porting/compiler-reasons.json).
 | stdlib | `interpreter-intrinsic` | 1 |
 | stdlib | `test-counter` | 2 |
 | stdlib | `test-diagnostics` | 2 |
-| stdlib | `upstream-dependency` | 191 |
+| stdlib | `upstream-dependency` | 190 |
 | tests | `aot-arity-error` | 12 |
 | tests | `aot-invalid-field` | 16 |
 | tests | `aot-invalid-key` | 6 |
@@ -218,7 +218,7 @@ Tags are defined in [the glossary](../../../porting/compiler-reasons.json).
 | tests | `interpreter-fixture` | 47 |
 | tests | `test-counter` | 7 |
 | tests | `upstream-bug` | 1 |
-| tests | `upstream-dependency` | 868 |
+| tests | `upstream-dependency` | 867 |
 
 ## Separate capability assessments
 

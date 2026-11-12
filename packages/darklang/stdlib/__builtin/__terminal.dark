@@ -16,6 +16,9 @@ let cliTerminalSessionInfo () : (Bool * Bool * String) =
     let name = Stdlib.Option.withDefault (Stdlib.Cli.__getenv "TERM") "" in
     (input, output, name)
 
+let cliTerminalIsatty (fd: Int64) : Bool =
+    (fd == 0L || fd == 1L || fd == 2L) && Builtin.__isTerminal fd
+
 let cliTerminalColorEnabled () : Bool =
     let noColor = Stdlib.Option.withDefault (Stdlib.Cli.__getenv "NO_COLOR") "" in
     noColor == "" && Builtin.__isTerminal 1L
