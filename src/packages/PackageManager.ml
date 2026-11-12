@@ -1703,7 +1703,7 @@ let resolveNames config resolutionEnv knownTraits names =
                   | Missing -> Ok []
                   | Found json ->
                       let+ hash = parseHashJson json in
-                      [ (kind, hash) ])
+                      [ (kind, hash, name) ])
                 allKinds)
             (List.filter
                (fun name -> not (isKnownName name))
@@ -1788,7 +1788,8 @@ let resolveNames config resolutionEnv knownTraits names =
           (nearbyModules isKnownName names)
           StringOrder.Set.empty StringOrder.Map.empty
       in
-      let* roots = findRoots () in
+      let* namedRoots = findRoots () in
+      let roots = List.map (fun (kind, hash, _) -> (kind, hash)) namedRoots in
       let inventoryRoots =
         StringOrder.Map.bindings inventory
         |> List.filter_map (fun (hash, entity) ->
@@ -1944,7 +1945,7 @@ let resolveNames config resolutionEnv knownTraits names =
          ProgramTypes.PackageFn.Parameter are one record. The entity arrives
          under one of them; every other name the code uses is declared as an
          alias of it. Equal fns share a hash too, and one is written again
-         under each other name. *)
+         under each other name, a root's name included. *)
       let declared =
         List.fold_left
           (fun names entity -> StringOrder.Set.add entity.location names)
@@ -1955,6 +1956,7 @@ let resolveNames config resolutionEnv knownTraits names =
           (fun entity ->
             match dependencyRefs entity.json with Ok refs -> refs | Error _ -> [])
           entities
+        @ List.map (fun (_, hash, name) -> (hash, name)) namedRoots
         |> List.filter_map (fun (hash, name) ->
             match StringOrder.Map.find_opt hash byHash with
             | Some target
