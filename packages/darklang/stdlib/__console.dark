@@ -1,0 +1,64 @@
+// __console.dark - What the interpreter's console does to escape sequences in text bound for stdout or stderr.
+
+module Darklang.Stdlib.__Console
+
+// The parameters of an SGR sequence at the start of piece, the text after ESC [, and what follows it.
+let __sgr (piece: String) : Stdlib.Option.Option<(String * String)> =
+    match Stdlib.String.indexOf piece "m" with
+    | None -> Stdlib.Option.Option.None
+    | Some index ->
+        let parameters = Stdlib.String.first piece index in
+        if Stdlib.List.all (Stdlib.String.toList parameters) (fun c -> Stdlib.Char.isDigit c || c == ';') then
+            Stdlib.Option.Option.Some ((parameters, Stdlib.String.dropFirst piece (index + 1L)))
+        else Stdlib.Option.Option.None
+
+let __rewrite (text: String) (keep: String -> String) : String =
+    match Stdlib.String.split text "\u001b[" with
+    | [] -> text
+    | first :: pieces ->
+        let rewritten = Stdlib.List.map pieces (fun piece ->
+            match Stdlib.__Console.__sgr piece with
+            | Some ((parameters, rest)) -> keep parameters + rest
+            | None -> "\u001b[" + piece) in
+        Stdlib.String.join ([first] @ rewritten) ""
+
+let withoutSgr (text: String) : String =
+    Stdlib.__Console.__rewrite text (fun _ -> "")
+
+let __keepStyle (parameters: List<String>) : List<String> =
+    match parameters with
+    | [] -> []
+    | p :: rest ->
+        let extended = p == "38" || p == "48" in
+        if extended && Stdlib.List.head rest == Stdlib.Option.Option.Some "5" && Stdlib.List.length rest >= 2L then
+            Stdlib.__Console.__keepStyle (Stdlib.List.drop rest 2L)
+        else if extended && Stdlib.List.head rest == Stdlib.Option.Option.Some "2" && Stdlib.List.length rest >= 4L then
+            Stdlib.__Console.__keepStyle (Stdlib.List.drop rest 4L)
+        else
+            let colour =
+                match Stdlib.Int64.parse p with
+                | Ok n -> (n >= 30L && n <= 49L) || (n >= 90L && n <= 107L)
+                | Error _ -> false in
+            if colour then Stdlib.__Console.__keepStyle rest
+            else [p] @ Stdlib.__Console.__keepStyle rest
+
+// NO_COLOR asks for no colour, not no style: bold and the like stay.
+let withoutColour (text: String) : String =
+    Stdlib.__Console.__rewrite text (fun parameters ->
+        let all = if parameters == "" then ["0"] else Stdlib.String.split parameters ";" in
+        match Stdlib.__Console.__keepStyle all with
+        | [] -> ""
+        | kept -> "\u001b[" + Stdlib.String.join kept ";" + "m")
+
+let __env (name: String) : String =
+    Stdlib.Option.withDefault (Stdlib.Cli.__getenv name) ""
+
+// A pipe, a file or TERM=dumb gets no SGR sequences; CLICOLOR_FORCE keeps them anyway.
+let forFd (fd: Int64) (text: String) : String =
+    if Stdlib.Bool.not (Stdlib.String.contains text "\u001b[") then text
+    else
+        let force = Stdlib.__Console.__env "CLICOLOR_FORCE" in
+        if force != "" && force != "0" then text
+        else if Stdlib.Bool.not (Builtin.__isTerminal fd) || Stdlib.__Console.__env "TERM" == "dumb" then Stdlib.__Console.withoutSgr text
+        else if Stdlib.__Console.__env "NO_COLOR" != "" then Stdlib.__Console.withoutColour text
+        else text
