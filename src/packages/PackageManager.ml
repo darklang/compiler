@@ -726,6 +726,34 @@ let rec renderExpr parameters selfName element =
     in
     applied ^ " (" ^ String.concat ") (" args ^ ")"
   in
+  let uncalled name =
+    (* An uncalled builtin, as `val empty = Builtin.bytesEmpty` holds one,
+       names the same library item a call to it would. *)
+    let* name = resolvedName name in
+    match (name, builtinOperator name) with
+    | "Builtin.parserKeywords", _ ->
+        Ok
+          ("["
+          ^ String.concat ", " (List.map (fun word -> "\"" ^ word ^ "\"") parserKeywords)
+          ^ "]")
+    | _, Some (`Call fn) -> Ok fn
+    (* One whose arguments convert, passed as a value
+       (`__sleepWith(Builtin.syscallNanosleep, ...)`), is wrapped in a
+       lambda that converts them as a call would. *)
+    | _ when argumentConversions name <> [] ->
+        let arity =
+          1 + List.fold_left (fun top (index, _) -> max top index) 0 (argumentConversions name)
+        in
+        let names = List.init arity (fun index -> "a" ^ string_of_int index ^ "'") in
+        let+ call = renderedApplication name (`List []) names in
+        let call =
+          match resultConversion name with
+          | Some conversion -> convert conversion call
+          | None -> call
+        in
+        "(fun " ^ String.concat " " names ^ " -> " ^ call ^ ")"
+    | _ -> Ok name
+  in
   let* name, fields = enumCase element in
   match (name, fields) with
   | "EUnit", [ _ ] -> Ok "()"
@@ -783,19 +811,12 @@ let rec renderExpr parameters selfName element =
       | None -> Error "Invalid package argument index")
   | "ESelf", [ _ ] -> Ok (publicName selfName)
   | "EFnName", [ _; name ] | "EFnName", [ _; name; _ ] | "EValue", [ _; name ]
-    -> (
-      (* An uncalled builtin, as `val empty = Builtin.bytesEmpty` holds one,
-         names the same library item a call to it would. *)
-      let+ name = resolvedName name in
-      match (name, builtinOperator name) with
-      | "Builtin.parserKeywords", _ ->
-          "["
-          ^ String.concat ", " (List.map (fun word -> "\"" ^ word ^ "\"") parserKeywords)
-          ^ "]"
-      | _, Some (`Call fn) -> fn
-      | _ -> name)
+    ->
+      uncalled name
   (* Since darklang/dark@b928144 an uncalled fn may carry type arguments,
      `Stdlib.List.map<Int64, Int64>`: the fn as a specialised value. *)
+  | "EFnName", [ _; name; _; typeArgs ] when arrayItems typeArgs = [] ->
+      uncalled name
   | "EFnName", [ _; name; _; typeArgs ] ->
       let* name = resolvedName name in
       let+ types = ResultList.mapResults renderType (arrayItems typeArgs) in
