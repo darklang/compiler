@@ -75,7 +75,6 @@ test closesStdin =
    | Error(_) -> (-1, ""))
   |> Stdlib.Test.equal((0, ""))
 
-// @compiler xfail compile: "Expected TInt64, got TInt" class=missing-support reason=compiler-gap
 test missingExecutable =
   (match Stdlib.Cli.Process.run("/definitely/not/a/dark/executable", []) with
    | Error(error) -> error.errno

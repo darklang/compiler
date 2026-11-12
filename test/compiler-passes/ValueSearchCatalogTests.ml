@@ -29,7 +29,7 @@ let errorValue errno message =
     ( AST.unresolvedRecordReference "Darklang.Stdlib.Cli.Posix.Error" [],
       [
         ( AST.unresolvedRecordFieldReference "errno",
-          AST.BigIntLiteral (Z.of_int errno) );
+          AST.Int64Literal (Int64.of_int errno) );
         (AST.unresolvedRecordFieldReference "message", AST.StringLiteral message);
       ] )
 
@@ -154,10 +154,10 @@ let paritySource =
         let allMatches =
             match all with
             | [first, second, multiple, alternate] ->
-                first.path == "Owner.Nested.first" && first.value.errno == 1 && first.value.message == "first" &&
-                second.path == "Owner.Nested.Deep.second" && second.value.errno == 2 && second.value.message == "second" &&
-                multiple.path == "Owner.Nested.short" && multiple.value.errno == 3 && multiple.value.message == "multiple" &&
-                alternate.path == "Owner.selected" && alternate.value.errno == 4 && alternate.value.message == "alternate"
+                first.path == "Owner.Nested.first" && first.value.errno == 1L && first.value.message == "first" &&
+                second.path == "Owner.Nested.Deep.second" && second.value.errno == 2L && second.value.message == "second" &&
+                multiple.path == "Owner.Nested.short" && multiple.value.errno == 3L && multiple.value.message == "multiple" &&
+                alternate.path == "Owner.selected" && alternate.value.errno == 4L && alternate.value.message == "alternate"
             | _ -> false in
         let nestedMatches =
             match nested with
@@ -168,15 +168,15 @@ let paritySource =
             | _ -> false in
         let deepMatches =
             match deep with
-            | [value] -> value.path == "Owner.Nested.Deep.second" && value.value.errno == 2
+            | [value] -> value.path == "Owner.Nested.Deep.second" && value.value.errno == 2L
             | _ -> false in
         let otherMatches =
             match other with
-            | [value] -> value.path == "Owner.other" && value.value.errno == 20
+            | [value] -> value.path == "Owner.other" && value.value.errno == 20L
             | _ -> false in
         let branchMatches =
             match branch with
-            | [value] -> value.path == "Other.Nested.branchValue" && value.value.errno == 8
+            | [value] -> value.path == "Other.Nested.branchValue" && value.value.errno == 8L
             | _ -> false in
         Builtin.printLine (Stdlib.Bool.toString (allMatches && nestedMatches && deepMatches && otherMatches && branchMatches))
         |}

@@ -4,7 +4,7 @@ module Builtin
 let syscallStatAt (path: String) : Stdlib.Result.Result<Blob, Int> =
     Stdlib.Cli.__Posix.__withStat path
         (fun ptr -> Stdlib.Cli.__Posix.__bufferBytes ptr 0L 256L [])
-    |> Stdlib.Result.mapError (fun error -> error.errno)
+    |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)
 
 let syscallGetdents (fd: Int) (count: Int) : Stdlib.Result.Result<Blob, Int> =
     let fd = Builtin.__posixInt32 fd in

@@ -13,7 +13,7 @@ let syscallInotifyAddWatch (fd: Int) (path: String) (mask: Int) : Stdlib.Result.
             let rc = Stdlib.Cli.__Posix.__withCString held (fun ptr -> Stdlib.Cli.__Posix.__inotifyAddWatch fd ptr mask) in
             if rc < 0L then Error (Stdlib.Cli.__Posix.__error (0L - rc))
             else Ok (Stdlib.Int.fromInt64 rc))
-        |> Stdlib.Result.mapError (fun error -> error.errno)
+        |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)
 
 let __writePollDescriptors (ptr: RawPtr) (offset: Int64) (fds: List<(Int * Int)>) : Unit =
     match fds with
