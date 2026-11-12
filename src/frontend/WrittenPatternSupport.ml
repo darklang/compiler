@@ -478,21 +478,26 @@ let[@warning "-4"] matchIsExhaustive globals symbols scrutineeType scrutinee
              [ [] ] types)
     | _ -> [ C.PWildcard ]
   in
+  let uncons = function
+    | C.PList (head :: rest) -> Some (head, C.PList rest)
+    | C.PListCons ([ head ], tail) -> Some (head, tail)
+    | C.PListCons (head :: heads, tail) -> Some (head, C.PListCons (heads, tail))
+    | _ -> None
+  in
   let rec coversWitness pattern witness =
     if patternCoversAny pattern then true
     else
       match (pattern, witness) with
       | C.PBool left, C.PBool right -> left = right
       | C.PUnit, C.PUnit -> true
-      | C.PList [], C.PList [] -> true
-      | C.PList left, C.PList right when List.length left = List.length right ->
-          List.for_all2 coversWitness left right
-      | C.PListCons ([ head ], tail), C.PList [ single ] ->
-          coversWitness head single && coversWitness tail (C.PList [])
-      | C.PListCons (leftHeads, leftTail), C.PListCons (rightHeads, rightTail)
-        when List.length leftHeads = List.length rightHeads ->
-          List.for_all2 coversWitness leftHeads rightHeads
-          && coversWitness leftTail rightTail
+      | ( (C.PList _ | C.PListCons _), (C.PList _ | C.PListCons _) ) -> (
+          (* One head at a time, so `x :: y :: rest` (one cons of two heads)
+             is compared with the witness `x :: (y :: _)`. *)
+          match (uncons pattern, uncons witness) with
+          | None, None -> true
+          | Some (left, leftRest), Some (right, rightRest) ->
+              coversWitness left right && coversWitness leftRest rightRest
+          | _ -> false)
       | ( C.PConstructor (leftId, leftFields),
           C.PConstructor (rightId, rightFields) )
         when leftId = rightId
