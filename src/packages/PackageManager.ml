@@ -1943,7 +1943,8 @@ let resolveNames config resolutionEnv knownTraits names =
          names: ProgramTypes.TypeDeclaration.RecordField and
          ProgramTypes.PackageFn.Parameter are one record. The entity arrives
          under one of them; every other name the code uses is declared as an
-         alias of it. *)
+         alias of it. Equal fns share a hash too, and one is written again
+         under each other name. *)
       let declared =
         List.fold_left
           (fun names entity -> StringOrder.Set.add entity.location names)
@@ -1957,7 +1958,7 @@ let resolveNames config resolutionEnv knownTraits names =
         |> List.filter_map (fun (hash, name) ->
             match StringOrder.Map.find_opt hash byHash with
             | Some target
-              when target.kind = PackageType
+              when (target.kind = PackageType || target.kind = PackageFunction)
                    && (not (StringOrder.Set.mem name declared))
                    && (not (isKnownName name))
                    && List.length (String.split_on_char '.' name) > 1 ->
@@ -1968,6 +1969,9 @@ let resolveNames config resolutionEnv knownTraits names =
       let* aliasSources =
         ResultList.mapResults
           (fun (name, target) ->
+            if target.kind = PackageFunction then
+              renderEntity { target with location = name }
+            else
             let parts = String.split_on_char '.' name in
             let leaf = publicName (List.hd (List.rev parts)) in
             let moduleName =

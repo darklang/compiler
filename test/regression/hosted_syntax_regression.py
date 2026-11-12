@@ -260,6 +260,13 @@ ENTITIES["int16-hash"] = fn("Hosted.int16Zero", [("x", INT64)], {"TInt16": []},
     {"EMatch": [1, {"EInt16": [2, 0]}, [
         dict(pat={"MPInt16": [3, 0]}, whenCondition={"None": []}, rhs={"EInt16": [4, -7]}),
         dict(pat={"MPVariable": [5, "_other"]}, whenCondition={"None": []}, rhs={"EInt16": [6, 1]})]]})
+# Equal fns share a hash: the entity arrives as Hosted.A.first, and a caller
+# names it Hosted.B.second.
+ENTITIES["shared-fn-hash"] = fn("Hosted.A.first", [("x", INT64)], INT64, ARG0)
+ENTITIES["calls-shared-hash"] = fn("Hosted.callsShared", [("x", INT64)], INT64,
+    {"EApply": [2, {"EFnName": [1, dict(originalName=["Hosted", "B", "second"], resolved={"Ok": [dict(
+        name={"Package": [{"Hash": ["shared-fn-hash"]}]},
+        location={"Some": [dict(owner="Hosted", modules=["B"], name="second")]})]}), []]}, [], [ARG0]]})
 # `Builtin.power` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("power", ARG0, {"EInt128": [3, 3]}))
@@ -364,6 +371,7 @@ def main():
             assert run("Hosted.keywords 1L\n") == ["let", "val", "in", "if", "elif", "then", "else",
                 "type", "trait", "impl", "of", "match", "with", "fun", "when", "true", "false", "_"]
             assert run("Hosted.firstOk 7L\n") == 7
+            assert run("Hosted.callsShared 7L\n") == 7
             current = compile_with(["--syntax=current"], "Hosted.int16Zero(1)\n")
             assert current.returncode == 0, current.stdout + current.stderr
             assert subprocess.check_output([str(program)], text=True, timeout=10) == "-7s16\n"
