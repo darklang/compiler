@@ -143,8 +143,38 @@ let record check literal globals locals symbols expected
                         (AST.TRecord (canonical, args))
                         (C.RecordLiteral (reference, complete)))))))
 
+(* The one non-generic record type with a field of this name, if there is
+   exactly one: the type of a value read as `x.field` before anything else
+   says what `x` is, as a hosted local fn's unannotated parameter. *)
+let recordWithField globals fieldName =
+  let candidates =
+    M.fold
+      (fun canonical (entry : typeEntry) found ->
+        if entry.kind <> RecordKind || entry.params <> [] then found
+        else
+          match recordFields globals.allowInternal globals.types entry [] with
+          | Ok fields when List.exists (fun (name, _) -> name = fieldName) fields
+            ->
+              canonical :: found
+          | _ -> found)
+      globals.types []
+  in
+  match candidates with [ canonical ] -> Some canonical | _ -> None
+
 let access check literal globals locals symbols expected record fieldName =
   bind (check globals locals symbols None record) (fun (typ, record, symbols) ->
+      let typ = WrittenCheckingState.resolve symbols typ in
+      bind
+        (match typ with
+        | AST.TInferenceVar _ -> (
+            match recordWithField globals fieldName with
+            | Some canonical ->
+                let known = AST.TRecord (canonical, []) in
+                map (fun symbols -> (known, symbols))
+                  (WrittenCheckingState.constrain typ known symbols)
+            | None -> Ok (typ, symbols))
+        | _ -> Ok (typ, symbols))
+      @@ fun (typ, symbols) ->
       match typ with
       | AST.TTuple fields -> (
           match int_of_string_opt fieldName with
