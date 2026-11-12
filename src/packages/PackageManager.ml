@@ -683,6 +683,10 @@ let rec convert conversion expression =
   | ResultOf inner ->
       "(Stdlib.Result.map (" ^ expression ^ ") (fun v' -> "
       ^ convert inner "v'" ^ "))"
+  | ErrorOf inner ->
+      "(Stdlib.Result.mapError (" ^ expression ^ ") (fun v' -> "
+      ^ convert inner "v'" ^ "))"
+  | Both (first, second) -> convert second (convert first expression)
   | ListOf inner ->
       "(Stdlib.List.map (" ^ expression ^ ") (fun v' -> "
       ^ convert inner "v'" ^ "))"
