@@ -19,7 +19,6 @@ type conversion =
 
 let stdlibConversions =
   [
-    ("Darklang.Stdlib.Cli.Dir.size", [  ], Some (ResultOf (Narrow "Int64")));
     ("Darklang.Stdlib.Cli.File.getModifiedTime", [  ], Some (ResultOf (Narrow "Int64")));
     ("Darklang.Stdlib.Cli.File.readFully", [ (1, Widen "Int64") ], None);
     ("Darklang.Stdlib.Cli.File.readLastLines", [ (1, Widen "Int64") ], None);
@@ -31,10 +30,6 @@ let stdlibConversions =
     ("Darklang.Stdlib.Cli.Posix.fdWrite", [  ], Some (ResultOf (Narrow "Int64")));
     ("Darklang.Stdlib.Cli.Posix.mkdir", [ (1, Widen "Int64") ], None);
     ("Darklang.Stdlib.Cli.Posix.openFile", [ (1, Widen "Int64"); (2, Widen "Int64") ], None);
-    ("Darklang.Stdlib.Cli.Tui.Text.clipMarked", [ (1, Widen "Int64") ], None);
-    ("Darklang.Stdlib.Cli.Tui.Text.clipToWidth", [ (1, Widen "Int64") ], None);
-    ("Darklang.Stdlib.Cli.Tui.Text.styledWidth", [  ], Some (Narrow "Int64"));
-    ("Darklang.Stdlib.Cli.UI.Progress.bar", [ (0, Widen "Int64"); (1, Widen "Int64") ], None);
     ("Darklang.Stdlib.Blob.length", [], Some (Narrow "Int64"));
     ("Darklang.Stdlib.Blob.slice", [ (1, Widen "Int64"); (2, Widen "Int64") ], None);
   ]
