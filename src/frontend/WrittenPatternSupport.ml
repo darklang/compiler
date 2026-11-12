@@ -484,10 +484,19 @@ let[@warning "-4"] matchIsExhaustive globals symbols scrutineeType scrutinee
     | C.PListCons (head :: heads, tail) -> Some (head, C.PListCons (heads, tail))
     | _ -> None
   in
+  let rec irrefutable = function
+    | C.PWildcard | C.PVariable _ | C.PUnit -> true
+    | C.PTuple patterns -> List.for_all irrefutable patterns
+    | _ -> false
+  in
   let rec coversWitness pattern witness =
     if patternCoversAny pattern then true
     else
       match (pattern, witness) with
+      (* A wildcard witness stands for a value of a type not known yet, such
+         as the `'a` of an Option<'a> still being inferred: a tuple of
+         variables covers it. *)
+      | _, C.PWildcard -> irrefutable pattern
       | C.PBool left, C.PBool right -> left = right
       | C.PUnit, C.PUnit -> true
       | ( (C.PList _ | C.PListCons _), (C.PList _ | C.PListCons _) ) -> (
