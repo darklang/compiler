@@ -848,3 +848,9 @@ let serialize<'a> (value: a) : String =
 
 let parse<'a> (json: String) : Stdlib.Result.Result<a, Stdlib.Json.ParseError.ParseError> =
     Builtin.crash "Json.parse was not specialized"
+
+let checkedSerialize<'a> (value: a) : Stdlib.Result.Result<String, Stdlib.Json.SerializeError.SerializeError> =
+    Builtin.crash "Json.checkedSerialize was not specialized"
+
+let __serialized (json: String) : Stdlib.Result.Result<String, Stdlib.Json.SerializeError.SerializeError> =
+    Ok json

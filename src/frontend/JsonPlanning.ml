@@ -1930,9 +1930,44 @@ let rec mapExpr rewrite symbols expr =
   in
   rewrite symbols mapped
 
+(* checkedSerialize<T> v is Ok (serialize<T> v): a type with no JSON form is
+   refused when serialize<T> is planned, so nothing is left to check at run time. *)
+let checkedSerializeAsSerialize program =
+  let symbols, topLevels = viewProgram program in
+  match
+    ( tryFindFunctionId "Darklang.Stdlib.Json.checkedSerialize" symbols,
+      tryFindFunctionId "Darklang.Stdlib.Json.serialize" symbols )
+  with
+  | Some checkedId, Some serializeId ->
+      let rewrite current expr =
+        match expr with
+        | TypeApp (id, typeArgs, values) when id = checkedId ->
+            let okId, current =
+              internFunction "Darklang.Stdlib.Json.__serialized" current
+            in
+            ( Call (okId, N.singleton (TypeApp (serializeId, typeArgs, values))),
+              current )
+        | _ -> (expr, current)
+      in
+      let topLevels, symbols =
+        mapFold
+          (fun current topLevel ->
+            match topLevel with
+            | FunctionDef fn ->
+                let body, next = mapExpr rewrite current fn.body in
+                (FunctionDef { fn with body }, next)
+            | Expression expr ->
+                let expr, next = mapExpr rewrite current expr in
+                (Expression expr, next)
+            | other -> (other, current))
+          symbols topLevels
+      in
+      programFromCheckedParts (symbols, topLevels)
+  | _ -> program
+
 let rewriteProgramWithSession (session : planningSession option)
     (env : Types.typeCheckEnv) program =
-  let symbols, topLevels = viewProgram program in
+  let symbols, topLevels = viewProgram (checkedSerializeAsSerialize program) in
   let serializeId =
     tryFindFunctionId "Darklang.Stdlib.Json.serialize" symbols
   in
