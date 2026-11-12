@@ -324,7 +324,7 @@ impl Display for Signal =
     | SIGTERM -> "SIGTERM"
 
 /// Send <param signal> to the process <param pid>
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Darklang.Stdlib.Cli.Posix.Pid -> Darklang.Stdlib.Cli.Posix.Signal -> Darklang.Stdlib.Result.Result<Unit, Darklang.Stdlib.Cli.Posix.Error>, replacement Int -> Int -> Darklang.Stdlib.Result.Result<Unit, Darklang.Stdlib.Cli.Posix.Error>"
+// @compiler replace: packages/darklang/stdlib/cli/posix.dark#Darklang.Stdlib.Cli.Posix.kill reason=compiler-implementation
 let kill(pid: Pid, signal: Signal): Result.Result<Unit, Error> =
   Builtin.syscallKill(Stdlib.Cli.Posix.Pid.toInt64(pid), Stdlib.Cli.Posix.Signal.toInt64(signal))
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
@@ -384,7 +384,7 @@ let isDirectory(path: String): Bool =
 
 /// Check if a process is running via kill(pid, 0).
 /// Signal 0 checks process existence without sending a signal.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Darklang.Stdlib.Cli.Posix.Pid -> Bool, replacement Int -> Bool"
+// @compiler replace: packages/darklang/stdlib/cli/posix.dark#Darklang.Stdlib.Cli.Posix.isProcessRunning reason=compiler-implementation
 let isProcessRunning(pid: Pid): Bool =
   // EPERM means the process exists but we lack permission to signal it
   match Builtin.syscallKill(Stdlib.Cli.Posix.Pid.toInt64(pid), 0) with

@@ -174,13 +174,9 @@ let uname () : Result.Result<(String * String * String), Error> =
 
 
 /// Send a signal to a process
-let kill (pid: Int) (signal: Int) : Result.Result<Unit, Error> =
-  Builtin.syscallKill pid signal
+let kill (pid: Pid) (signal: Signal) : Result.Result<Unit, Error> =
+  Builtin.syscallKill (Stdlib.Int.fromInt64 (Pid.toInt64 pid)) (Stdlib.Int.fromInt64 (Signal.toInt64 signal))
   |> Stdlib.Result.mapError Stdlib.Cli.Posix.__fromErrno
-
-val sigterm = 15
-val sigkill = 9
-val sigint = 2
 
 /// Common errno values (Linux/macOS)
 /// Stat file-type mask and constants
@@ -200,13 +196,11 @@ let isDirectory (path: String) : Bool =
 
 /// Check if a process is running via kill(pid, 0).
 /// Signal 0 checks process existence without sending a signal.
-let isProcessRunning (pid: Int) : Bool =
-  match kill pid 0 with
+let isProcessRunning (pid: Pid) : Bool =
+  // EPERM means the process exists but we lack permission to signal it
+  match Builtin.syscallKill (Stdlib.Int.fromInt64 (Pid.toInt64 pid)) 0 with
   | Ok _ -> true
-  | Error e ->
-    // EPERM means the process exists but we lack permission to signal it
-    if e.errno == Errno.eperm then true
-    else false
+  | Error errno -> Stdlib.Int.toInt64 errno == Some Errno.eperm
 
 
 /// Create a directory and all missing parents (like mkdir -p).

@@ -172,13 +172,13 @@ let exec(program: String, args: List<String>): Result.Result<String, String> =
 
 
 /// Kill a process by PID.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Darklang.Stdlib.Cli.Posix.Pid -> Darklang.Stdlib.Result.Result<Unit, Darklang.Stdlib.Cli.Posix.Error>, replacement Int -> Darklang.Stdlib.Result.Result<Unit, Darklang.Stdlib.Cli.Posix.Error>"
+// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.kill reason=compiler-implementation
 let kill(pid: Posix.Pid): Result.Result<Unit, Posix.Error> =
   Posix.kill(pid, Posix.Signal.SIGTERM)
 
 
 /// Force-kill a process by PID.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Darklang.Stdlib.Cli.Posix.Pid -> Darklang.Stdlib.Result.Result<Unit, Darklang.Stdlib.Cli.Posix.Error>, replacement Int -> Darklang.Stdlib.Result.Result<Unit, Darklang.Stdlib.Cli.Posix.Error>"
+// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.forceKill reason=compiler-implementation
 let forceKill(pid: Posix.Pid): Result.Result<Unit, Posix.Error> =
   Posix.kill(pid, Posix.Signal.SIGKILL)
 
@@ -301,13 +301,13 @@ let shellPipeline(commands: List<String>): Result.Result<Output, Posix.Error> =
 
 
 /// Check if a process is running.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Darklang.Stdlib.Cli.Posix.Pid -> Bool, replacement Int -> Bool"
+// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.isRunning reason=compiler-implementation
 let isRunning(pid: Posix.Pid): Bool =
   Posix.isProcessRunning(pid)
 
 
 /// Wait for a process to finish by polling.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Darklang.Stdlib.Cli.Posix.Pid -> Unit, replacement Int -> Unit"
+// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.waitFor reason=compiler-implementation
 let waitFor(pid: Posix.Pid): Unit =
   if Posix.isProcessRunning(pid) then
     let _ = Posix.sleep(100.0)
