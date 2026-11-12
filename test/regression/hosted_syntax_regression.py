@@ -251,6 +251,10 @@ ENTITIES["bytes-empty-hash"] = fn("Hosted.emptyBytesLen", [("x", INT64)], INT64,
 KEYWORDS = {"EValue": [1, dict(originalName=["Builtin", "parserKeywords"], resolved={"Ok": [dict(
     name={"Builtin": [dict(name="parserKeywords", version=0)]}, location={"None": []})]})]}
 ENTITIES["keywords-hash"] = fn("Hosted.keywords", [("x", INT64)], {"TList": [{"TString": []}]}, KEYWORDS)
+# A capitalized type parameter, as in `impl Display for Result<'Ok, 'Err>`.
+ENTITIES["capital-param-hash"] = ("Hosted.firstOk", dict(typeParams=["Ok"], bounds=[],
+    returnType={"TVariable": ["Ok"]}, body=ARG0,
+    parameters=[dict(name="value", typ={"TVariable": ["Ok"]})]))
 # `Builtin.power` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("power", ARG0, {"EInt128": [3, 3]}))
@@ -351,6 +355,7 @@ def main():
             assert run("Hosted.emptyBytesLen 1L\n") == 0
             assert run("Hosted.keywords 1L\n") == ["let", "val", "in", "if", "elif", "then", "else",
                 "type", "trait", "impl", "of", "match", "with", "fun", "when", "true", "false", "_"]
+            assert run("Hosted.firstOk 7L\n") == 7
             assert run("Hosted.dictLast 5L\n") == 1
             assert run("Hosted.recordKey 5L\n") == 1
             assert run("Hosted.tagged 7L\n") == 7

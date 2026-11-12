@@ -388,7 +388,11 @@ let rec renderType element =
     | _ -> Error ("Invalid " ^ name ^ " type")
   in
   match (name, fields) with
-  | "TVariable", [ value ] -> stringValue value
+  (* Written with its quote, so a capitalized parameter (`'Ok` in
+     `impl Display for Result<'Ok, 'Err>`) is not read as a type name. *)
+  | "TVariable", [ value ] ->
+      let+ name = stringValue value in
+      if String.starts_with ~prefix:"'" name then name else "'" ^ name
   | ( ( "TUnit" | "TBool" | "TInt8" | "TUInt8" | "TInt16" | "TUInt16" | "TInt32"
       | "TUInt32" | "TInt64" | "TUInt64" | "TInt128" | "TUInt128" | "TInt"
       | "TChar" | "TString" | "TDateTime" | "TUuid" | "TBlob" ),
