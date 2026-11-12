@@ -21,7 +21,7 @@ Stdlib.Cli.Posix.sigint = 2
 Stdlib.Cli.Posix.Modes.defaultDir = 493
 Stdlib.Cli.Posix.Modes.defaultFile = 420
 Stdlib.HttpClient.ContentType.json = ("content-type", "application/json")
-Stdlib.HttpServer.Config.defaultMaxBodyBytes = 31457280
+Stdlib.HttpServer.Config.defaultMaxBodyBytes = 31457280L
 Stdlib.Pretty.empty = Stdlib.Pretty.Doc.Empty
 Stdlib.Cli.UI.TextField.empty = Stdlib.Cli.UI.TextField.State { text = "", cursor = 0L }
 Stdlib.Cli.Tui.TerminalSession.Ansi.restoreInline = "\u001b[?2026l\u001b[0m\u001b[r\u001b[?25h"

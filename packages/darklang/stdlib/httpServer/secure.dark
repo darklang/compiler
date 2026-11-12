@@ -88,17 +88,18 @@ let __bind (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (ide
 /// Identity is imported with TlsServerIdentity.create. Bind both transports
 /// before announcing, respect application Alt-Svc, and return on SIGINT/SIGTERM.
 let serveOn (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (identity: Stdlib.TlsServerIdentity.Identity) (handler: Stdlib.Http.Request -> Stdlib.Http.Response) (onListening: Unit -> Unit) : Stdlib.Result.Result<Unit, String> =
-  match Stdlib.Int.toInt64 config.port, Stdlib.Int.toInt64 config.maxBodyBytes with
-  | Some port, Some limit ->
-    if port <= 0L || port > 65535L || limit < 0L || limit > 104857600L then Error "Invalid secure HTTP server configuration"
-    else match Stdlib.__Network.shutdownSignals () with
-    | Error _ -> Error "Secure HTTP shutdown setup failed"
-    | Ok signals ->
-      let result = Stdlib.HttpServer.Secure.__bind address config identity handler onListening signals port limit in
-      let _ = Stdlib.__Network.closeShutdownSignals signals in
-      result
-  | _, _ -> Error "Invalid secure HTTP server configuration"
+  let port = Stdlib.Net.Port.toInt64 config.port in
+  let limit = config.maxBodyBytes in
+  if port <= 0L || port > 65535L || limit < 0L || limit > 104857600L then Error "Invalid secure HTTP server configuration"
+  else match Stdlib.__Network.shutdownSignals () with
+  | Error _ -> Error "Secure HTTP shutdown setup failed"
+  | Ok signals ->
+    let result = Stdlib.HttpServer.Secure.__bind address config identity handler onListening signals port limit in
+    let _ = Stdlib.__Network.closeShutdownSignals signals in
+    result
 
-/// Serve on the default IPv4 wildcard address. Use serveOn for IPv6 or an explicit interface.
+/// Serve on config.address. Use serveOn for IPv6.
 let serve (config: Stdlib.HttpServer.Config.Config) (identity: Stdlib.TlsServerIdentity.Identity) (handler: Stdlib.Http.Request -> Stdlib.Http.Response) (onListening: Unit -> Unit) : Stdlib.Result.Result<Unit, String> =
-  Stdlib.HttpServer.Secure.serveOn [0L, 0L, 0L, 0L] config identity handler onListening
+  match Stdlib.HttpServer.__bindAddress config.address with
+  | Error message -> Error message
+  | Ok address -> Stdlib.HttpServer.Secure.serveOn address config identity handler onListening

@@ -207,7 +207,7 @@ let __request (config: Stdlib.HttpServer.Config.Config) (parsed: Stdlib.__HttpWi
     let headers = Stdlib.List.concat [("x-http-method", parsed.method)] parsed.headers in
     let temporary = Stdlib.Http.Request { method = parsed.method, url = "", headers = headers, body = parsed.body } in
     let authority = Stdlib.Http.Request.header temporary "host"
-        |> Stdlib.Option.withDefault ("localhost:" + Stdlib.Int.toString config.port) in
+        |> Stdlib.Option.withDefault ("localhost:" + Stdlib.Int64.toString (Stdlib.Net.Port.toInt64 config.port)) in
     match Stdlib.__HttpWire.parseUrl ("http://" + authority + "/") with
     | Error message -> Error message
     | Ok url ->
@@ -452,33 +452,45 @@ let __handleConnection (config: Stdlib.HttpServer.Config.Config) (handler: Stdli
     | Error _ -> Error "HTTP server clock failed"
     | Ok now -> Stdlib.HttpServer.__dispatchPrelude config handler signals connection limit (now + 10000L) Stdlib.Blob.empty
 
+/// The address to bind, as main reads config.address: localhost or a plain IPv4 address.
+let __bindAddress (address: String) : Stdlib.Result.Result<List<Int64>, String> =
+    let address = if address == "localhost" then "127.0.0.1" else address in
+    let parts = Stdlib.String.split address "." in
+    let octets = Stdlib.List.filterMap parts (fun part ->
+        match Stdlib.Int64.parse part with
+        | Ok n -> if n >= 0L && n <= 255L && Stdlib.Int64.toString n == part then Stdlib.Option.Option.Some n else Stdlib.Option.Option.None
+        | Error _ -> Stdlib.Option.Option.None) in
+    if Stdlib.List.length parts == 4L && Stdlib.List.length octets == 4L then Ok octets
+    else Error ("Invalid bind address: " + address + "; use an IPv4 address or localhost")
+
 /// Bind before announcing, serve bounded persistent HTTP/1.1 connections or one HTTP/2 exchange,
 /// and return normally after SIGINT or SIGTERM. Routing remains ordinary Dark.
 let serveOn (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (handler: Stdlib.Http.Request -> Stdlib.Http.Response)
     (onListening: Unit -> Unit) : Stdlib.Result.Result<Unit, String> =
-    match Stdlib.Int.toInt64 config.port, Stdlib.Int.toInt64 config.maxBodyBytes with
-    | Some port, Some limit ->
-        if port <= 0L || port > 65535L || limit < 0L || limit > 104857600L then Error "Invalid HTTP server configuration"
-        else
-            match Stdlib.__Network.monotonicMillis () with
-            | Error code -> Error ("Monotonic clock unavailable: " + Stdlib.Int64.toString code)
-            | Ok _ ->
-                match Stdlib.__Network.shutdownSignals () with
-                | Error code -> Error ("Shutdown setup failed: " + Stdlib.Int64.toString code)
-                | Ok signals ->
-                    let result =
-                        match (if Stdlib.List.__lengthInt address == 16 then Stdlib.__Network.listenTcp6 address port else Stdlib.__Network.listenTcp4 address port) with
-                        | Error code -> Error ("Cannot bind HTTP server: " + Stdlib.Int64.toString code)
-                        | Ok listener ->
-                            let _ = onListening () in
-                            let result = Stdlib.__Http1Server.serve config handler signals listener limit in
-                            let _ = Stdlib.__Network.closeListener listener in
-                            result in
-                    let _ = Stdlib.__Network.closeShutdownSignals signals in
-                    result
-    | _, _ -> Error "Invalid HTTP server configuration"
+    let port = Stdlib.Net.Port.toInt64 config.port in
+    let limit = config.maxBodyBytes in
+    if port <= 0L || port > 65535L || limit < 0L || limit > 104857600L then Error "Invalid HTTP server configuration"
+    else
+        match Stdlib.__Network.monotonicMillis () with
+        | Error code -> Error ("Monotonic clock unavailable: " + Stdlib.Int64.toString code)
+        | Ok _ ->
+            match Stdlib.__Network.shutdownSignals () with
+            | Error code -> Error ("Shutdown setup failed: " + Stdlib.Int64.toString code)
+            | Ok signals ->
+                let result =
+                    match (if Stdlib.List.__lengthInt address == 16 then Stdlib.__Network.listenTcp6 address port else Stdlib.__Network.listenTcp4 address port) with
+                    | Error code -> Error ("Cannot bind HTTP server: " + Stdlib.Int64.toString code)
+                    | Ok listener ->
+                        let _ = onListening () in
+                        let result = Stdlib.__Http1Server.serve config handler signals listener limit in
+                        let _ = Stdlib.__Network.closeListener listener in
+                        result in
+                let _ = Stdlib.__Network.closeShutdownSignals signals in
+                result
 
-/// Serve on the default IPv4 wildcard address. Use serveOn for IPv6 or an explicit interface.
+/// Serve on config.address. Use serveOn for IPv6.
 let serve (config: Stdlib.HttpServer.Config.Config) (handler: Stdlib.Http.Request -> Stdlib.Http.Response)
     (onListening: Unit -> Unit) : Stdlib.Result.Result<Unit, String> =
-    Stdlib.HttpServer.serveOn [0L, 0L, 0L, 0L] config handler onListening
+    match Stdlib.HttpServer.__bindAddress config.address with
+    | Error message -> Error message
+    | Ok address -> Stdlib.HttpServer.serveOn address config handler onListening
