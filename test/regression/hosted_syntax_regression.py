@@ -281,6 +281,14 @@ ENTITIES["close-bad-hash"] = fn("Hosted.closeBad", [("x", INT64)], INT64,
         dict(pat={"MPEnum": [3, "Error", [{"MPVariable": [4, "e"]}]]}, whenCondition={"None": []},
              rhs={"EVariable": [5, "e"]}),
         dict(pat={"MPVariable": [6, "_other"]}, whenCondition={"None": []}, rhs={"EInt64": [7, 0]})]]})
+# A builtin whose arguments convert, passed as a value: it converts as a call would.
+NANOSLEEP = {"EFnName": [1, dict(originalName=["Builtin", "syscallNanosleep"], resolved={"Ok": [dict(
+    name={"Builtin": [dict(name="syscallNanosleep", version=0)]}, location={"None": []})]}), [], []]}
+ENTITIES["sleep-value-hash"] = fn("Hosted.sleepZero", [("x", INT64)], INT64,
+    {"EApply": [2, {"ELambda": [3, [{"LPVariable": [4, "f"]}],
+        {"ELet": [5, {"LPTuple": [6, {"LPVariable": [7, "rc"]}, {"LPWildcard": [8]}, []]},
+            {"EApply": [9, {"EVariable": [10, "f"]}, [], [{"EInt64": [11, 0]}, {"EInt64": [12, 0]}]]},
+            {"EVariable": [13, "rc"]}]}]}, [], [NANOSLEEP]]})
 # `Builtin.power` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("power", ARG0, {"EInt128": [3, 3]}))
@@ -390,6 +398,7 @@ def main():
             assert run("Hosted.callsShared 7L\n") == 7
             assert run("Hosted.clipped 3L\n") == "abc"
             assert run("Hosted.closeBad 1L\n") == 9
+            assert run("Hosted.sleepZero 1L\n") == 0
             assert run("Hosted.B.second 7L\n") == 7
             current = compile_with(["--syntax=current"], "Hosted.int16Zero(1)\n")
             assert current.returncode == 0, current.stdout + current.stderr
