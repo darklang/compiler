@@ -167,7 +167,6 @@ test conversions =
 test sumOfPrices =
   Stdlib.sum(0dec, [ 19.99dec, 5.01dec, 0.10dec ]) |> Stdlib.Test.equal(25.10dec)
 
-// @compiler xfail runtime: "assertion 1: expected \"19.90\", got \"{\\\"DECIMAL\\\":[1990,2]}\"" class=missing-support reason=compiler-gap
 test json =
   Stdlib.Test.all(
     [ Stdlib.Json.serialize<Decimal>(19.90dec) |> Stdlib.Test.equal("19.90")

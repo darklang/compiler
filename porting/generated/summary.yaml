@@ -36,8 +36,8 @@ dispositions:
     run: 649
   tests:
     blocked: 56
-    run: 1628
-    xfail: 1215
+    run: 1629
+    xfail: 1214
 reasons:
   packages:
     aot-type-error: 10
@@ -68,7 +68,7 @@ reasons:
     aot-name-error: 11
     aot-type-error: 151
     compiler-crash: 2
-    compiler-gap: 134
+    compiler-gap: 133
     compiler-leak: 2
     diagnostic-difference: 2
     interpreter-fixture: 47
@@ -119,9 +119,9 @@ expected_failures:
   missing-support:
     phases:
       compile: 948
-      runtime: 44
+      runtime: 43
     reasons:
-      compiler-gap: 129
+      compiler-gap: 128
       test-counter: 7
       upstream-dependency: 856
     sources:
@@ -223,7 +223,7 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/cli/widgets.dark: 6
       upstream/packages/darklang/tests/stdlib/crypto.dark: 10
       upstream/packages/darklang/tests/stdlib/dateTime.dark: 4
-      upstream/packages/darklang/tests/stdlib/decimal.dark: 4
+      upstream/packages/darklang/tests/stdlib/decimal.dark: 3
       upstream/packages/darklang/tests/stdlib/dict.dark: 32
       upstream/packages/darklang/tests/stdlib/exec.dark: 3
       upstream/packages/darklang/tests/stdlib/float32.dark: 3

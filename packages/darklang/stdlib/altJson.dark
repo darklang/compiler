@@ -384,6 +384,42 @@ let __numberToFloat (text: String) : Stdlib.Option.Option<Float> =
         else
             Stdlib.AltJson.__applyNumberSign text (Stdlib.AltJson.__ratioToFloat significand power)
 
+/// A JSON number as the Decimal that holds it exactly, at the scale it is
+/// written with, as the interpreter reads one: `19.90` is 19.90dec and `1e2`
+/// is 100dec. None when no Decimal holds it.
+let __numberToDecimal (text: String) : Stdlib.Option.Option<Decimal> =
+    let length = Stdlib.String.__byteLength text in
+    let negative = Stdlib.String.__byteAtUnchecked text 0L == 45L in
+    let start = if negative then 1L else 0L in
+    let exponentMarker = Stdlib.AltJson.__findNumberMarker text start 101L 69L in
+    let mantissaEnd = if exponentMarker < 0L then length else exponentMarker in
+    let dot = Stdlib.AltJson.__findNumberMarker text start 46L 46L in
+    let integerEnd = if dot < 0L || dot > mantissaEnd then mantissaEnd else dot in
+    let fractionStart = if dot < 0L || dot > mantissaEnd then mantissaEnd else dot + 1L in
+    let fractionDigits = mantissaEnd - fractionStart in
+    let digits =
+        Stdlib.String.__byteSlice text start integerEnd +
+        Stdlib.String.__byteSlice text fractionStart mantissaEnd in
+    let exponentStart0 = if exponentMarker < 0L then length else exponentMarker + 1L in
+    let exponentNegative = exponentStart0 < length && Stdlib.String.__byteAtUnchecked text exponentStart0 == 45L in
+    let exponentStart =
+        if exponentStart0 < length &&
+           (Stdlib.String.__byteAtUnchecked text exponentStart0 == 43L ||
+            Stdlib.String.__byteAtUnchecked text exponentStart0 == 45L) then exponentStart0 + 1L
+        else exponentStart0 in
+    let exponentMagnitude = Stdlib.AltJson.__parseSmallExponent text exponentStart length 0L in
+    let explicitExponent = if exponentNegative then 0L - exponentMagnitude else exponentMagnitude in
+    let scale = fractionDigits - explicitExponent in
+    if exponentMagnitude > 1000L || scale > 28L then Stdlib.Option.Option.None
+    else
+        let magnitude = Stdlib.Int.__value digits in
+        let signed = if negative then Stdlib.Int.negate magnitude else magnitude in
+        if scale < 0L then
+            Stdlib.Decimal.fromParts
+                (Stdlib.Int.multiply signed (Stdlib.Int.power 10 (Stdlib.Int.fromInt64 (0L - scale))))
+                0L
+        else Stdlib.Decimal.fromParts signed scale
+
 let __projectRawList (values: List<Stdlib.AltJson.__InternalRawJson>) (acc: List<Stdlib.AltJson.Json>) : Stdlib.Option.Option<List<Stdlib.AltJson.Json>> =
     match values with
     | [] -> Stdlib.Option.Option.Some (Stdlib.List.reverse acc)
