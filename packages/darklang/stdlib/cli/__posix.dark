@@ -332,7 +332,7 @@ let __error (errno: Int64) : Stdlib.Cli.Posix.Error =
         else if errno == 132L then "Operation not possible due to RF-kill"
         else if errno == 133L then "Memory page has hardware error"
         else "Unknown error " + Stdlib.Int64.toString errno in
-    Stdlib.Cli.Posix.Error { errno = Stdlib.Int.fromInt64 errno, message = message }
+    Stdlib.Cli.Posix.Error { errno = errno, message = message }
 
 let __unitResult (rc: Int64) : Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
     if rc < 0L then Error (Stdlib.Cli.__Posix.__error (0L - rc)) else Ok ()
@@ -373,7 +373,7 @@ let __walkParent (fd: Int64) (parts: List<String>) (fn: Int64 -> String -> Stdli
     match parts with
     | [] ->
         let _ = Stdlib.Cli.__Posix.__close fd in
-        Error (Stdlib.Cli.Posix.Error { errno = 22, message = "path has no final component" })
+        Error (Stdlib.Cli.Posix.Error { errno = 22L, message = "path has no final component" })
     | name :: rest ->
         if Stdlib.List.__lengthInt rest == 0 then
             let result = fn fd name in

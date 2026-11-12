@@ -5,7 +5,7 @@ module Darklang.Stdlib.Cli.Posix
 
 /// Structured error from posix operations, carrying the errno code.
 type Error =
-  { errno: Int
+  { errno: Int64
     message: String }
 
 /// Result of a stat() call.
@@ -699,7 +699,7 @@ let __fromErrno (errno: Int) : Stdlib.Cli.Posix.Error =
         else if errno == 132 then "Operation not possible due to RF-kill"
         else if errno == 133 then "Memory page has hardware error"
         else Stdlib.String.append "Unknown error " (__decimal errno)
-    Stdlib.Cli.Posix.Error { errno = errno
+    Stdlib.Cli.Posix.Error { errno = Stdlib.Int.__toInt64Unchecked errno
                             message = message }
 
 
@@ -715,12 +715,12 @@ let __writeAll
   else
     match write bytes with
     | Error error ->
-      if error.errno == 4 then __writeAll write bytes written
+      if error.errno == 4L then __writeAll write bytes written
       else Stdlib.Result.Result.Error error
     | Ok count ->
       if count <= 0 || count > length then
         Stdlib.Result.Result.Error (Stdlib.Cli.Posix.Error {
-          errno = 5, message = "write made invalid progress" })
+          errno = 5L, message = "write made invalid progress" })
       else if count == length then Stdlib.Result.Result.Ok (written + count)
       else
         let rest = Stdlib.Blob.slice bytes count (length - count)
@@ -770,7 +770,7 @@ let __tempRetry
   : Result.Result<'a, Stdlib.Cli.Posix.Error> =
   match create remaining with
   | Error error ->
-    if error.errno == 17 && remaining > 0 then __tempRetry create (remaining - 1)
+    if error.errno == 17L && remaining > 0 then __tempRetry create (remaining - 1)
     else Stdlib.Result.Result.Error error
   | Ok value -> Stdlib.Result.Result.Ok value
 
