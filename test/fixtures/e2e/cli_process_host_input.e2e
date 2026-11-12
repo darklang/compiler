@@ -12,7 +12,9 @@ Stdlib.Cli.Sys.currentPid () > 0L = true
 
 // POSIX failures must preserve the kernel errno instead of inferring it from
 // localized command-line utility output.
-match Stdlib.Cli.Posix.kill (Stdlib.Int.fromInt64 (Stdlib.Cli.Sys.currentPid ())) 99999 with | Error error -> (error.errno, error.message) | Ok (()) -> (0L, "unexpected") = (22L, "Invalid argument")
+match Stdlib.Cli.Posix.kill (Stdlib.Cli.Posix.Pid { __pid = 2147483647L }) Stdlib.Cli.Posix.Signal.SIGTERM with | Error error -> (error.errno, error.message) | Ok (()) -> (0L, "unexpected") = (3L, "No such process")
+Stdlib.Cli.Process.isRunning (Stdlib.Cli.Posix.Pid { __pid = Stdlib.Cli.Sys.currentPid () }) = true
+Stdlib.Cli.Process.isRunning (Stdlib.Cli.Posix.Pid { __pid = 2147483647L }) = false
 
 match Stdlib.Cli.Process.exec "printf" (["%s", "direct execution"]) with | Ok output -> output | Error message -> message = "direct execution"
 
