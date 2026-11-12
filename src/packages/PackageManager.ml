@@ -658,6 +658,14 @@ let builtinOperator name =
   | [ "Builtin"; fn ] -> byModule fn
   | _ -> None
 
+(* The interpreter's reserved words, as its lexer lists them, which it serves
+   as `Builtin.parserKeywords`. *)
+let parserKeywords =
+  [
+    "let"; "val"; "in"; "if"; "elif"; "then"; "else"; "type"; "trait"; "impl";
+    "of"; "match"; "with"; "fun"; "when"; "true"; "false"; "_";
+  ]
+
 let rec convert conversion expression =
   match conversion with
   | Widen typ -> "(Stdlib.Int.from" ^ typ ^ " (" ^ expression ^ "))"
@@ -771,7 +779,13 @@ let rec renderExpr parameters selfName element =
       (* An uncalled builtin, as `val empty = Builtin.bytesEmpty` holds one,
          names the same library item a call to it would. *)
       let+ name = resolvedName name in
-      match builtinOperator name with Some (`Call fn) -> fn | _ -> name)
+      match (name, builtinOperator name) with
+      | "Builtin.parserKeywords", _ ->
+          "["
+          ^ String.concat ", " (List.map (fun word -> "\"" ^ word ^ "\"") parserKeywords)
+          ^ "]"
+      | _, Some (`Call fn) -> fn
+      | _ -> name)
   (* Since darklang/dark@b928144 an uncalled fn may carry type arguments,
      `Stdlib.List.map<Int64, Int64>`: the fn as a specialised value. *)
   | "EFnName", [ _; name; _; typeArgs ] ->
