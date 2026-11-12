@@ -10,9 +10,9 @@ let spawn (command: String) : ProcessHandle =
 
 let __executionOutcome (result: Result.Result<(Int * Blob * Blob), Int>) : Stdlib.Cli.ExecutionOutcome =
   match result with
-  | Error e -> Stdlib.Cli.ExecutionOutcome { exitCode = -1, stdout = "", stderr = (Stdlib.Cli.Posix.__fromErrno e).message }
+  | Error e -> Stdlib.Cli.ExecutionOutcome { exitCode = -1L, stdout = "", stderr = (Stdlib.Cli.Posix.__fromErrno e).message }
   | Ok ((code, output, error)) ->
-    Stdlib.Cli.ExecutionOutcome { exitCode = code,
+    Stdlib.Cli.ExecutionOutcome { exitCode = Stdlib.Int.__toInt64Unchecked code,
       stdout = Stdlib.String.fromBlobWithReplacement output,
       stderr = Stdlib.String.fromBlobWithReplacement error }
 
@@ -30,7 +30,7 @@ let terminate (handle: ProcessHandle) : Stdlib.Cli.ExecutionOutcome =
 
 /// Result of running a process
 type Output =
-  { exitCode: Int
+  { exitCode: Int64
     stdout: String
     stderr: String }
 
@@ -48,16 +48,16 @@ let shellQuote (s: String) : String =
 let spawnAndWait
   (program: String)
   (args: List<String>)
-  (timeoutMs: Stdlib.Option.Option<Int>)
-  : Result.Result<(Int * String * String), Posix.Error> =
-  Stdlib.Cli.Process.__childRun program args timeoutMs
+  (timeoutMs: Stdlib.Option.Option<Int64>)
+  : Result.Result<(Int64 * String * String), Posix.Error> =
+  Stdlib.Cli.Process.__childRun program args (Stdlib.Option.map timeoutMs Stdlib.Int.fromInt64)
   |> Stdlib.Result.mapError (fun errno ->
     if errno == (if Stdlib.Cli.Posix.__abiMac () then 60 else 110) then
       Posix.Error { errno = errno, message = "Process timed out" }
     else Stdlib.Cli.Posix.__fromErrno errno)
   |> Stdlib.Result.map (fun result ->
     let (code, output, error) = result
-    (code, Stdlib.String.fromBlobWithReplacement output, Stdlib.String.fromBlobWithReplacement error))
+    (Stdlib.Int.__toInt64Unchecked code, Stdlib.String.fromBlobWithReplacement output, Stdlib.String.fromBlobWithReplacement error))
 
 
 /// Run a program with arguments and capture its output.
@@ -80,8 +80,10 @@ let run (program: String) (args: List<String>) : Result.Result<Output, Posix.Err
 let runInteractive
   (program: String)
   (args: List<String>)
-  : Result.Result<Int, Posix.Error> =
-  Stdlib.Cli.Process.__childInteractive program args |> Stdlib.Result.mapError Stdlib.Cli.Posix.__fromErrno
+  : Result.Result<Int64, Posix.Error> =
+  Stdlib.Cli.Process.__childInteractive program args
+  |> Stdlib.Result.map Stdlib.Int.__toInt64Unchecked
+  |> Stdlib.Result.mapError Stdlib.Cli.Posix.__fromErrno
 
 
 /// Run a program and return stdout as text, or stderr as error.
@@ -90,14 +92,14 @@ let exec (program: String) (args: List<String>) : Result.Result<String, String> 
   (run program args)
   |> Stdlib.Result.mapError (fun e -> e.message)
   |> Stdlib.Result.andThen (fun output ->
-    if output.exitCode == 0 then
+    if output.exitCode == 0L then
       Stdlib.Result.Result.Ok(Stdlib.String.trimEnd output.stdout)
     else
       let err = Stdlib.String.trimEnd output.stderr
 
       if err == "" then
         Stdlib.Result.Result.Error
-          $"Command failed with exit code {Stdlib.Cli.Posix.__decimal output.exitCode}"
+          $"Command failed with exit code {Stdlib.Cli.Posix.__decimal (Stdlib.Int.fromInt64 output.exitCode)}"
       else
         Stdlib.Result.Result.Error err)
 
@@ -134,7 +136,7 @@ let runIn
 let runSilent
   (program: String)
   (args: List<String>)
-  : Result.Result<Int, Posix.Error> =
+  : Result.Result<Int64, Posix.Error> =
   (run program args)
   |> Stdlib.Result.map (fun output -> output.exitCode)
 
@@ -179,11 +181,11 @@ let runWithEnv
 /// Returns Error if the command times out.
 /// Returns String errors because it mixes spawn failures with validation/timeout errors.
 let runWithTimeout
-  (timeoutMs: Int)
+  (timeoutMs: Int64)
   (program: String)
   (args: List<String>)
   : Result.Result<Output, String> =
-  if timeoutMs <= 0 then
+  if timeoutMs <= 0L then
     Stdlib.Result.Result.Error "timeoutMs must be positive"
   else
 

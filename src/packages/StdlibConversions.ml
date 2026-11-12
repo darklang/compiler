@@ -31,10 +31,6 @@ let stdlibConversions =
     ("Darklang.Stdlib.Cli.Posix.fdWrite", [  ], Some (ResultOf (Narrow "Int64")));
     ("Darklang.Stdlib.Cli.Posix.mkdir", [ (1, Widen "Int64") ], None);
     ("Darklang.Stdlib.Cli.Posix.openFile", [ (1, Widen "Int64"); (2, Widen "Int64") ], None);
-    ("Darklang.Stdlib.Cli.Process.runInteractive", [  ], Some (ResultOf (Narrow "Int64")));
-    ("Darklang.Stdlib.Cli.Process.runSilent", [  ], Some (ResultOf (Narrow "Int64")));
-    ("Darklang.Stdlib.Cli.Process.runWithTimeout", [ (0, Widen "Int64") ], None);
-    ("Darklang.Stdlib.Cli.Process.spawnAndWait", [ (2, OptionOf (Widen "Int64")) ], Some (ResultOf (TupleOf [Some (Narrow "Int64"); None; None])));
     ("Darklang.Stdlib.Cli.Tui.Text.clipMarked", [ (1, Widen "Int64") ], None);
     ("Darklang.Stdlib.Cli.Tui.Text.clipToWidth", [ (1, Widen "Int64") ], None);
     ("Darklang.Stdlib.Cli.Tui.Text.styledWidth", [  ], Some (Narrow "Int64"));
