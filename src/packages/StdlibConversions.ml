@@ -48,6 +48,8 @@ let stdlibConversions =
     ("Builtin.runtimeChildBufferGet", [ (1, Widen "Int64") ], Some (ErrorOf (Narrow "Int64")));
     ("Builtin.runtimeChildBufferSet", [ (1, Widen "Int64") ], Some (ErrorOf (Narrow "Int64")));
     ("Builtin.runtimeMonotonicCounter", [  ], Some (TupleOf [ Some (Narrow "Int64"); Some (Narrow "Int64") ]));
+    ("Builtin.runtimeDelayTicks", [ (0, Widen "Int64") ], None);
+    ("Builtin.syscallNanosleep", [ (0, Widen "Int64"); (1, Widen "Int64") ], Some (TupleOf [ Some (Narrow "Int64"); None ]));
     ("Builtin.syscallClockGettime", [ (0, Widen "Int64") ], Some (ErrorOf (Narrow "Int64")));
     ("Builtin.syscallMachAbsoluteTime", [  ], Some (ErrorOf (Narrow "Int64")));
     ("Builtin.syscallMachTimebaseInfo", [  ], Some (ErrorOf (Narrow "Int64")));
