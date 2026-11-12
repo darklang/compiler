@@ -255,6 +255,11 @@ ENTITIES["keywords-hash"] = fn("Hosted.keywords", [("x", INT64)], {"TList": [{"T
 ENTITIES["capital-param-hash"] = ("Hosted.firstOk", dict(typeParams=["Ok"], bounds=[],
     returnType={"TVariable": ["Ok"]}, body=ARG0,
     parameters=[dict(name="value", typ={"TVariable": ["Ok"]})]))
+# Int16 literals stay Int16 where a bare integer is an Int64.
+ENTITIES["int16-hash"] = fn("Hosted.int16Zero", [("x", INT64)], {"TInt16": []},
+    {"EMatch": [1, {"EInt16": [2, 0]}, [
+        dict(pat={"MPInt16": [3, 0]}, whenCondition={"None": []}, rhs={"EInt16": [4, -7]}),
+        dict(pat={"MPVariable": [5, "_other"]}, whenCondition={"None": []}, rhs={"EInt16": [6, 1]})]]})
 # `Builtin.power` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("power", ARG0, {"EInt128": [3, 3]}))
@@ -325,11 +330,14 @@ def main():
             source = directory / "input.dark"
             program = directory / "program"
 
-            def compile_(text):
+            def compile_with(flags, text):
                 source.write_text(text)
-                return subprocess.run([compiler, "-q", "--emit-result", "--package-server",
+                return subprocess.run([compiler, "-q", "--emit-result", *flags, "--package-server",
                     f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                     env=env, capture_output=True, text=True, timeout=300)
+
+            def compile_(text):
+                return compile_with([], text)
 
             def run(text):
                 result = compile_(text)
@@ -356,6 +364,9 @@ def main():
             assert run("Hosted.keywords 1L\n") == ["let", "val", "in", "if", "elif", "then", "else",
                 "type", "trait", "impl", "of", "match", "with", "fun", "when", "true", "false", "_"]
             assert run("Hosted.firstOk 7L\n") == 7
+            current = compile_with(["--syntax=current"], "Hosted.int16Zero(1)\n")
+            assert current.returncode == 0, current.stdout + current.stderr
+            assert subprocess.check_output([str(program)], text=True, timeout=10) == "-7s16\n"
             assert run("Hosted.dictLast 5L\n") == 1
             assert run("Hosted.recordKey 5L\n") == 1
             assert run("Hosted.tagged 7L\n") == 7
