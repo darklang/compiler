@@ -975,7 +975,13 @@ let lowerMatch (toANFCore : LoweringCallbacks.expressionLowerer)
         | C.PWildcard ->
             let* body, gen = anf body gen env in
             Ok (K.wrapBindings bindings body, gen)
-        | _ -> Error "Tail pattern in list cons must be variable or wildcard")
+        | tailPat ->
+            (* `a :: b :: rest` and `a :: [b]`: the tail is a list pattern
+               of its own, already tested. *)
+            let* body, gen =
+              extractAndCompileBody tailPat body remaining typ env gen
+            in
+            Ok (K.wrapBindings bindings body, gen))
     | C.PUnit | C.PWildcard | C.PInt64 _ | C.PBigInt _ | C.PInt128Literal _
     | C.PInt8Literal _ | C.PInt16Literal _ | C.PInt32Literal _
     | C.PUInt8Literal _ | C.PUInt16Literal _ | C.PUInt32Literal _
@@ -1527,7 +1533,8 @@ let lowerMatch (toANFCore : LoweringCallbacks.expressionLowerer)
             | C.PVariable name ->
                 Ok (R.BindingMap.add name (typedHead, elem) env, [], gen, None)
             | C.PWildcard -> Ok (env, [], gen, None)
-            | C.PTuple _ | C.PConstructor _ | C.PList _ | C.PListCons _ ->
+            | C.PTuple _ | C.PConstructor _ | C.PList _ | C.PListCons _
+            | C.PString _ | C.PChar _ | C.PBool _ ->
                 let impossible = patternStaticallyCannotMatchType pat elem in
                 let* comparison =
                   if impossible then Ok (Some (makeFalsePatternCondition gen))

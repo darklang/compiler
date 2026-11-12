@@ -1,0 +1,23 @@
+// A cons of several heads, or of a head onto an exact list, matches inside a
+// constructor, as hosted `Ok([a, b, ...rest])` and `Ok(a :: [b])` do, and a
+// literal head after the first matches, as `[key, ":", ...rest]` does.
+let sumTwo (r: Stdlib.Result.Result<List<Int64>, String>) : Int64 =
+  match r with
+  | Ok(a :: b :: rest) -> a + b + Stdlib.List.length rest
+  | _ -> 0L
+let exactTwo (r: Stdlib.Result.Result<List<Int64>, String>) : Int64 =
+  match r with
+  | Ok(a :: [b]) -> a * b
+  | Ok(_) -> 1L
+  | _ -> 0L
+let afterColon (tokens: List<String>) : String =
+  match tokens with
+  | key :: ":" :: rest -> key + Stdlib.String.join rest ""
+  | _ -> "none"
+sumTwo (Stdlib.Result.Result.Ok [1L, 2L, 3L, 4L]) = 5L
+sumTwo (Stdlib.Result.Result.Ok [1L]) = 0L
+exactTwo (Stdlib.Result.Result.Ok [5L, 6L]) = 30L
+exactTwo (Stdlib.Result.Result.Ok [5L, 6L, 7L]) = 1L
+exactTwo (Stdlib.Result.Result.Ok [5L]) = 1L
+afterColon ["a", ":", "b"] = "ab"
+afterColon ["a", "b"] = "none"
