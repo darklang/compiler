@@ -186,6 +186,42 @@ let check checkExpression (globals : globals) locals symbols expected
     | WT.EError _ ->
         false
   in
+  (* A package fn's local `let shown(loc: PackageLocation) = loc.name`
+     arrives as a let-bound lambda without its annotations, and a body that
+     reads a field of `loc` cannot be checked without them. When the lambda
+     does not check on its own, take its parameter types from how the rest
+     of the scope calls it, and check it again against those. A recursive
+     one gets the same second chance. *)
+  let fromUses () =
+    match (pattern, value) with
+    | WT.LPVariable (_, name), WT.ELambda (_, parameters, _, _, _) ->
+        let provisional =
+          AST.TFunction
+            ( List.mapi
+                (fun index _ ->
+                  let name = "t$let_lambda_use_" ^ string_of_int index in
+                  AST.TInferenceVar (name, name))
+                parameters,
+              AST.TInferenceVar
+                ("t$let_lambda_use_return", "t$let_lambda_use_return") )
+        in
+        let provisional, provisionalSymbols =
+          WrittenCheckingState.freshenType globals.typeParams provisional
+            symbols
+        in
+        let binding, withBinding =
+          WrittenCheckingState.allocateBinding name provisionalSymbols
+        in
+        Result.to_option
+          (checkExpression globals
+             (M.add name (provisional, binding) locals)
+             withBinding expected body)
+        |> Option.map (fun (_, _, afterBody) ->
+            WrittenCheckingState.freshenType globals.typeParams
+              (WrittenCheckingState.resolve afterBody provisional)
+              symbols)
+    | _ -> None
+  in
   match (pattern, value) with
   | ( WT.LPVariable (_, name),
       WT.ELambda (_, parameters, lambdaBody, keywordFun, _) )
@@ -199,7 +235,7 @@ let check checkExpression (globals : globals) locals symbols expected
       WT.ELambda (_, parameters, lambdaBody, keywordFun, _) )
     when (not (M.mem name locals))
          && (not (List.exists (letBinds name) parameters))
-         && referencesSelf name lambdaBody ->
+         && referencesSelf name lambdaBody -> (
       let provisional =
         match valueExpected with
         | Some typ -> typ
@@ -221,98 +257,72 @@ let check checkExpression (globals : globals) locals symbols expected
             let result = "t$recursive_return_" ^ prefix in
             AST.TFunction (types, AST.TInferenceVar (result, result))
       in
-      let provisional, symbols =
-        WrittenCheckingState.freshenType globals.typeParams provisional symbols
-      in
-      let binding, withBinding =
-        WrittenCheckingState.allocateBinding name symbols
-      in
-      bind
-        (checkExpression globals
-           (M.add name (provisional, binding) locals)
-           withBinding (Some provisional) value)
-        (fun (valueType, _, _) ->
-          (* Recursive calls initially use inference variables. Recheck with
+      let recursive (provisional, symbols) =
+        let binding, withBinding =
+          WrittenCheckingState.allocateBinding name symbols
+        in
+        bind
+          (checkExpression globals
+             (M.add name (provisional, binding) locals)
+             withBinding (Some provisional) value)
+          (fun (valueType, _, _) ->
+            (* Recursive calls initially use inference variables. Recheck with
              the inferred signature so nested generic calls retain concrete
              type arguments before specialization. *)
-          bind
-            (checkExpression globals
-               (M.add name (valueType, binding) locals)
-               withBinding (Some valueType) value)
-            (fun (valueType, checkedValue, afterValue) ->
-              map
-                (fun (bodyType, checkedBody, finalSymbols) ->
-                  let ordinal =
-                    WrittenCheckingState.nextBindingOrdinal symbols
-                  in
-                  let member = AST.recursiveMemberId ordinal in
-                  let kind =
-                    if keywordFun.start = keywordFun.end_ then
-                      AST.NamedLocalFunctionMember
-                    else AST.DirectLambdaValueMember
-                  in
-                  let parsed : AST.parsedRecursiveMember =
-                    {
-                      binding;
-                      boundary = AST.scopeBoundaryId ordinal;
-                      member;
-                      sourceName = name;
-                      kind;
-                    }
-                  in
-                  let resolved : AST.resolvedRecursiveMember =
-                    {
-                      parsed;
-                      group = AST.singletonRecursiveGroupId member;
-                      groupIndex = 0;
-                      availability = AST.SelfRecursiveMember;
-                    }
-                  in
-                  let typed : C.recursiveMember =
-                    { resolved; monomorphicType = C.checkedType valueType }
-                  in
-                  ( bodyType,
-                    C.RecursiveLet (typed, checkedValue, checkedBody),
-                    finalSymbols ))
-                (checkExpression globals
-                   (M.add name (valueType, binding) locals)
-                   afterValue expected body)))
-  | _ ->
-      (* A package fn's local `let shown(loc: PackageLocation) = loc.name`
-         arrives as a let-bound lambda without its annotations, and a body that
-         reads a field of `loc` cannot be checked without them. When the lambda
-         does not check on its own, take its parameter types from how the rest
-         of the scope calls it, and check it again against those. *)
-      let fromUses () =
-        match (pattern, value) with
-        | WT.LPVariable (_, name), WT.ELambda (_, parameters, _, _, _) ->
-            let provisional =
-              AST.TFunction
-                ( List.mapi
-                    (fun index _ ->
-                      let name = "t$let_lambda_use_" ^ string_of_int index in
-                      AST.TInferenceVar (name, name))
-                    parameters,
-                  AST.TInferenceVar
-                    ("t$let_lambda_use_return", "t$let_lambda_use_return") )
-            in
-            let provisional, provisionalSymbols =
-              WrittenCheckingState.freshenType globals.typeParams provisional
-                symbols
-            in
-            let binding, withBinding =
-              WrittenCheckingState.allocateBinding name provisionalSymbols
-            in
-            Result.to_option
+            bind
               (checkExpression globals
-                 (M.add name (provisional, binding) locals)
-                 withBinding expected body)
-            |> Option.map (fun (_, _, afterBody) ->
-                WrittenCheckingState.freshenType globals.typeParams
-                  (WrittenCheckingState.resolve afterBody provisional)
-                  symbols)
-        | _ -> None
+                 (M.add name (valueType, binding) locals)
+                 withBinding (Some valueType) value)
+              (fun (valueType, checkedValue, afterValue) ->
+                map
+                  (fun (bodyType, checkedBody, finalSymbols) ->
+                    let ordinal =
+                      WrittenCheckingState.nextBindingOrdinal symbols
+                    in
+                    let member = AST.recursiveMemberId ordinal in
+                    let kind =
+                      if keywordFun.start = keywordFun.end_ then
+                        AST.NamedLocalFunctionMember
+                      else AST.DirectLambdaValueMember
+                    in
+                    let parsed : AST.parsedRecursiveMember =
+                      {
+                        binding;
+                        boundary = AST.scopeBoundaryId ordinal;
+                        member;
+                        sourceName = name;
+                        kind;
+                      }
+                    in
+                    let resolved : AST.resolvedRecursiveMember =
+                      {
+                        parsed;
+                        group = AST.singletonRecursiveGroupId member;
+                        groupIndex = 0;
+                        availability = AST.SelfRecursiveMember;
+                      }
+                    in
+                    let typed : C.recursiveMember =
+                      { resolved; monomorphicType = C.checkedType valueType }
+                    in
+                    ( bodyType,
+                      C.RecursiveLet (typed, checkedValue, checkedBody),
+                      finalSymbols ))
+                  (checkExpression globals
+                     (M.add name (valueType, binding) locals)
+                     afterValue expected body)))
       in
+      match
+        recursive
+          (WrittenCheckingState.freshenType globals.typeParams provisional
+             symbols)
+      with
+      | Ok _ as checked -> checked
+      | Error _ as failed -> (
+          match Option.map recursive (fromUses ()) with
+          | Some (Ok _ as checked) -> checked
+          | _ -> failed))
+  | _ ->
       let checkedValue =
         match check symbols valueExpected value with
         | Ok _ as checked -> checked
