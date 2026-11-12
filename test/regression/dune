@@ -125,6 +125,10 @@
  (action (run python3 %{dep:stdin_input_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
+ (deps hosted_impl_check_regression.py)
+ (action (run python3 %{dep:hosted_impl_check_regression.py} %{exe:../../bin/dark.exe})))
+(rule
+ (alias runtest)
  (deps check_generic_regression.py)
  (action (run python3 %{dep:check_generic_regression.py} %{exe:../../bin/dark.exe})))
 (rule
