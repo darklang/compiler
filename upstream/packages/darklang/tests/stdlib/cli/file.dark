@@ -154,7 +154,6 @@ test copyFallbackAndFinish =
       |> Stdlib.Test.equal(Error(posixError(28, "full"))) ])
 
 // Copying a directory fails with EISDIR and leaves no destination behind
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test copyDirectoryRefused =
   Stdlib.Cli.Dir.withTemp(fun dir ->
     let destination = Stdlib.String.append(dir, "/not-a-file")

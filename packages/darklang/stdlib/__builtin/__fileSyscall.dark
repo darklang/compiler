@@ -43,7 +43,7 @@ let syscallFclonefileAt (source: Int) (destination: String) (flags: Int) : Stdli
     let flags = Stdlib.Int64.bitwiseOr (Builtin.__posixInt32 flags) 1L in
     Stdlib.Cli.__Posix.__withEntry destination (fun parent name ->
         Stdlib.Cli.__Posix.__unitResult (Stdlib.Cli.__Posix.__fclonefileat source parent name flags))
-    |> Stdlib.Result.mapError (fun error -> error.errno)
+    |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)
 
 let syscallFchmod (fd: Int) (mode: Int) : Stdlib.Result.Result<Unit, Int> =
     Builtin.__syscallUnitResult

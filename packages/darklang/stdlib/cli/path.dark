@@ -94,7 +94,7 @@ let normalize (path: String) : String =
 // implemented by the native POSIX layer added with the remaining CLI effects.
 let resolve (path: String) : Stdlib.Result.Result<String, Stdlib.Cli.Posix.Error> =
     if Stdlib.Cli.Path.isAbsolute path then Ok (Stdlib.Cli.Path.normalize path)
-    else Error (Stdlib.Cli.Posix.Error { errno = -1, message = "getcwd is unavailable" })
+    else Error (Stdlib.Cli.Posix.Error { errno = -1L, message = "getcwd is unavailable" })
 
 let resolveToAbsolute (path: String) : Stdlib.Result.Result<String, Stdlib.Cli.Posix.Error> =
     Stdlib.Cli.Path.resolve path

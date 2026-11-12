@@ -53,7 +53,7 @@ let spawnAndWait
   Stdlib.Cli.Process.__childRun program args (Stdlib.Option.map timeoutMs Stdlib.Int.fromInt64)
   |> Stdlib.Result.mapError (fun errno ->
     if errno == (if Stdlib.Cli.Posix.__abiMac () then 60 else 110) then
-      Posix.Error { errno = errno, message = "Process timed out" }
+      Posix.Error { errno = Stdlib.Int.__toInt64Unchecked errno, message = "Process timed out" }
     else Stdlib.Cli.Posix.__fromErrno errno)
   |> Stdlib.Result.map (fun result ->
     let (code, output, error) = result
