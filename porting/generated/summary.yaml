@@ -31,8 +31,8 @@ dispositions:
     replace: 35
     run: 1836
   stdlib:
-    blocked: 811
-    replace: 916
+    blocked: 808
+    replace: 919
     run: 676
   tests:
     blocked: 56
@@ -51,8 +51,8 @@ reasons:
     test-diagnostics: 1
     upstream-dependency: 2243
   stdlib:
-    compiler-contract: 124
-    compiler-implementation: 913
+    compiler-contract: 121
+    compiler-implementation: 916
     compiler-timeout: 1
     constructor-identity: 2
     container-adaptation: 490

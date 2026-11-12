@@ -17,7 +17,7 @@ let fixture () : Stdlib.__Http3Server.State =
   | Error _ -> Builtin.crash "Test HTTP/3 initialization failed"
   | Ok wire -> Stdlib.__Http3Server.initial wire 0L
 let context () : Stdlib.__Http3Server.Context =
-  Stdlib.__Http3Server.Context { config = { Stdlib.HttpServer.Config.defaults 443 with injectStandardHeaders = false, logRequests = false }, handler = fun request -> Stdlib.Http.responseWithText 200L (Stdlib.Blob.toString request.body |> Stdlib.Result.withDefault "invalid"), limit = 4L }
+  Stdlib.__Http3Server.Context { config = { Stdlib.HttpServer.Config.defaults Stdlib.Net.Port.https with injectStandardHeaders = false, logRequests = false }, handler = fun request -> Stdlib.Http.responseWithText 200L (Stdlib.Blob.toString request.body |> Stdlib.Result.withDefault "invalid"), limit = 4L }
 let request (state: Stdlib.__Http3Server.State) (id: Int64) (body: String) (length: Int64) (finished: Bool) : Stdlib.Result.Result<Stdlib.__Http3Server.State, String> =
   Stdlib.__Qpack.encode [(":method", "POST"), (":scheme", "https"), (":authority", "localhost"), (":path", "/echo"), ("content-length", Stdlib.Int64.toString length)] |> Stdlib.Result.andThen (Stdlib.__Http3Wire.serialize 1L) |> Stdlib.Result.andThen (fun headers ->
     Stdlib.__Http3Wire.serialize 0L (Stdlib.String.toBlob body) |> Stdlib.Result.andThen (fun data ->

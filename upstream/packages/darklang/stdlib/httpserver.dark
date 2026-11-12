@@ -196,7 +196,7 @@ let getPathParam(req: Http.Request, routePattern: String, paramName: String): Op
 /// Configuration for `serve`. Build defaults with `Config.defaults port`, then override any field with
 /// record-update, e.g. `{ HttpServer.Config.defaults(Net.Port.httpAlt) with logRequests = false }`.
 module Config =
-  // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch"
+  // @compiler replace: packages/darklang/stdlib/httpServer/config.dark#Darklang.Stdlib.HttpServer.Config.Config reason=compiler-implementation
   type Config =
     { address: String
       port: Stdlib.Net.Port
@@ -210,11 +210,11 @@ module Config =
       logRequests: Bool }
 
   /// Default max request body size: 30 MB.
-  // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch for Darklang.Stdlib.HttpServer.Config.defaultMaxBodyBytes"
+  // @compiler replace: packages/darklang/stdlib/httpServer/config.dark#Darklang.Stdlib.HttpServer.Config.defaultMaxBodyBytes reason=compiler-implementation
   val defaultMaxBodyBytes = 31457280
 
   /// Sensible serve defaults for `port`: 30 MB max body, standard headers, proto canonicalization, logging.
-  // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Darklang.Stdlib.Net.Port -> Darklang.Stdlib.HttpServer.Config.Config, replacement Int -> Darklang.Stdlib.HttpServer.Config.Config"
+  // @compiler replace: packages/darklang/stdlib/httpServer/config.dark#Darklang.Stdlib.HttpServer.Config.defaults reason=compiler-implementation
   let defaults(port: Stdlib.Net.Port): Config =
     Config
       { address = "127.0.0.1"
