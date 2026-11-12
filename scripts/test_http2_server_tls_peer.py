@@ -27,13 +27,13 @@ let handler (request: Stdlib.Http.Request) : Stdlib.Http.Response =
   if Stdlib.Bool.not (Stdlib.String.startsWith request.url "https://localhost") then Stdlib.Http.responseWithText "wrong scheme" 500
   else Stdlib.Http.Response { statusCode = 200, headers = [("set-cookie", "a=1"), ("set-cookie", "b=2")], body = if Stdlib.String.endsWith request.url "/big" then Stdlib.String.toBlob (Stdlib.String.join (Stdlib.List.repeatUnsafe 70 (Stdlib.String.repeat "b" 1000)) "") else request.body }
 let run () : Unit =
-  let port = Stdlib.Cli.__Args.get 0 |> Stdlib.Result.withDefault "0" |> Stdlib.Int.parse |> Stdlib.Result.withDefault 0 in
+  let port = Stdlib.Cli.__Args.get 0 |> Stdlib.Result.withDefault "0" |> Stdlib.Int64.parse |> Stdlib.Result.withDefault 0L in
   let imported = Stdlib.Blob.fromHex "@CERT@" |> Stdlib.Result.andThen (fun certificate ->
     Stdlib.Blob.fromHex "@KEY@" |> Stdlib.Result.andThen (fun key -> Stdlib.TlsServerIdentity.create certificate key)) in
   match imported with
   | Error message -> Stdlib.printLine message
   | Ok identity ->
-    let config = Stdlib.HttpServer.Config.Config { port = port, maxBodyBytes = 80000, injectStandardHeaders = false, canonicalizeFromForwardedProto = false, logRequests = false } in
+    let config = Stdlib.HttpServer.Config.Config { address = "127.0.0.1", port = Stdlib.Net.Port { __port = port }, maxBodyBytes = 80000L, injectStandardHeaders = false, canonicalizeFromForwardedProto = false, logRequests = false } in
     match Stdlib.HttpServer.Tls.serve config identity handler (fun _unit -> Stdlib.printLine "LISTENING") with
     | Error message -> Stdlib.printLine message
     | Ok () -> Stdlib.printLine "STOPPED"

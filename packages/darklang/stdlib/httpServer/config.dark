@@ -5,9 +5,10 @@ module Darklang.Stdlib.HttpServer
 module Config =
 
   type Config =
-    { port: Int
+    { address: String
+      port: Stdlib.Net.Port
       /// Maximum request body size in bytes (over-limit → 413).
-      maxBodyBytes: Int
+      maxBodyBytes: Int64
       /// Auto-add `Server: darklang` + HSTS unless the handler set them.
       injectStandardHeaders: Bool
       /// Rewrite request.url to https:// when X-Forwarded-Proto: https is present.
@@ -15,11 +16,12 @@ module Config =
       /// Emit a per-request stdout line + telemetry event.
       logRequests: Bool }
 
-  val defaultMaxBodyBytes = 31457280
+  val defaultMaxBodyBytes = 31457280L
 
-  let defaults (port: Int) : Config =
+  let defaults (port: Stdlib.Net.Port) : Config =
     Config
-      { port = port
+      { address = "127.0.0.1"
+        port = port
         maxBodyBytes = defaultMaxBodyBytes
         injectStandardHeaders = true
         canonicalizeFromForwardedProto = true

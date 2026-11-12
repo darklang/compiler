@@ -274,26 +274,27 @@ let __loop (context: Stdlib.HttpServer.Quic.Context) (handler: Stdlib.Http.Reque
 /// connection proves its source address with Retry before a certificate flight.
 /// The shared UDP listener returns normally on SIGINT or SIGTERM.
 let serveOn (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (identity: Stdlib.TlsServerIdentity.Identity) (handler: Stdlib.Http.Request -> Stdlib.Http.Response) (onListening: Unit -> Unit) : Stdlib.Result.Result<Unit, String> =
-  match Stdlib.Int.toInt64 config.port, Stdlib.Int.toInt64 config.maxBodyBytes with
-  | Some port, Some limit ->
-    if port <= 0L || port > 65535L || limit < 0L || limit > 104857600L then Error "Invalid HTTP/3 server configuration"
-    else match Stdlib.__Network.shutdownSignals () with
-    | Error _ -> Error "HTTP/3 shutdown setup failed"
-    | Ok signals ->
-      let result = match Stdlib.Crypto.__secureRandomBytes 32L with
-        | Error _ -> Error "HTTP/3 Retry key generation failed"
-        | Ok secret -> match (if Stdlib.List.__lengthInt address == 16 then Stdlib.__Datagram.bind6 address port else Stdlib.__Datagram.bind4 address port) with
-          | Error _ -> Error "Cannot bind HTTP/3 server"
-          | Ok socket ->
-            onListening ()
-            let context = Stdlib.HttpServer.Quic.Context { config = config, identity = identity, signals = signals, socket = socket, secret = secret, limit = limit } in
-            let result = Stdlib.HttpServer.Quic.__loop context handler (Stdlib.HttpServer.Quic.__initial ()) in
-            Stdlib.__Datagram.close socket
-            result in
-      Stdlib.__Network.closeShutdownSignals signals
-      result
-  | _, _ -> Error "Invalid HTTP/3 server configuration"
+  let port = Stdlib.Net.Port.toInt64 config.port in
+  let limit = config.maxBodyBytes in
+  if port <= 0L || port > 65535L || limit < 0L || limit > 104857600L then Error "Invalid HTTP/3 server configuration"
+  else match Stdlib.__Network.shutdownSignals () with
+  | Error _ -> Error "HTTP/3 shutdown setup failed"
+  | Ok signals ->
+    let result = match Stdlib.Crypto.__secureRandomBytes 32L with
+      | Error _ -> Error "HTTP/3 Retry key generation failed"
+      | Ok secret -> match (if Stdlib.List.__lengthInt address == 16 then Stdlib.__Datagram.bind6 address port else Stdlib.__Datagram.bind4 address port) with
+        | Error _ -> Error "Cannot bind HTTP/3 server"
+        | Ok socket ->
+          onListening ()
+          let context = Stdlib.HttpServer.Quic.Context { config = config, identity = identity, signals = signals, socket = socket, secret = secret, limit = limit } in
+          let result = Stdlib.HttpServer.Quic.__loop context handler (Stdlib.HttpServer.Quic.__initial ()) in
+          Stdlib.__Datagram.close socket
+          result in
+    Stdlib.__Network.closeShutdownSignals signals
+    result
 
-/// Serve on the default IPv4 wildcard address. Use serveOn for IPv6 or an explicit interface.
+/// Serve on config.address. Use serveOn for IPv6.
 let serve (config: Stdlib.HttpServer.Config.Config) (identity: Stdlib.TlsServerIdentity.Identity) (handler: Stdlib.Http.Request -> Stdlib.Http.Response) (onListening: Unit -> Unit) : Stdlib.Result.Result<Unit, String> =
-  Stdlib.HttpServer.Quic.serveOn [0L, 0L, 0L, 0L] config identity handler onListening
+  match Stdlib.HttpServer.__bindAddress config.address with
+  | Error message -> Error message
+  | Ok address -> Stdlib.HttpServer.Quic.serveOn address config identity handler onListening

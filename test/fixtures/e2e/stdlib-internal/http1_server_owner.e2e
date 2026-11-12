@@ -2,7 +2,7 @@
 let prepared (input: String) (response: Stdlib.Http.Response) (count: Int64) : (String * String * Int64) =
   let life = Stdlib.Stream.__new (fun _unit -> Some ()) (fun _unit -> ()) in
   let connection = Stdlib.__Network.TcpConnection { lifecycle = life, watch = None, read = fun _length -> Builtin.crash "Prepare attempted read", write = fun _bytes -> Builtin.crash "Prepare attempted write" } in
-  let config = { Stdlib.HttpServer.Config.defaults 80 with injectStandardHeaders = false, logRequests = false } in
+  let config = { Stdlib.HttpServer.Config.defaults Stdlib.Net.Port.http with injectStandardHeaders = false, logRequests = false } in
   let context = Stdlib.__Http1Server.Context { config = config, handler = fun _request -> response, signals = Stdlib.__Network.ShutdownSignals { lifecycle = life }, limit = 16L } in
   let buffer = Stdlib.__Http1Server.RequestBuffer { bytes = Stdlib.String.toBlob input, continued = false } in
   let owner = Stdlib.__Http1Server.Owner { connection = connection, transport = Stdlib.__HttpTransport.plain connection, phase = Stdlib.__Http1Server.Phase.Request buffer, started = 0L, deadline = 10000L, requests = count } in

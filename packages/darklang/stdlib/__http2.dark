@@ -486,35 +486,33 @@ let __sendResponse (transport: Stdlib.__HttpTransport.Transport) (state: Stdlib.
 let serve (transport: Stdlib.__HttpTransport.Transport) (pending: Blob)
   (config: Stdlib.HttpServer.Config.Config) (handler: Stdlib.Http.Request -> Stdlib.Http.Response)
   : Stdlib.Result.Result<Unit, String> =
-  match Stdlib.Int.toInt64 config.maxBodyBytes with
-  | None -> Error "Invalid HTTP body limit"
-  | Some limit ->
-    match Stdlib.__Http2.openServer transport pending with
+  let limit = config.maxBodyBytes in
+  match Stdlib.__Http2.openServer transport pending with
+  | Error message -> Error message
+  | Ok state ->
+    match Stdlib.__Http2.receiveHead transport state with
     | Error message -> Error message
-    | Ok state ->
-      match Stdlib.__Http2.receiveHead transport state with
-      | Error message -> Error message
-      | Ok head ->
-        match Stdlib.__Http2Fields.request head.fields with
-        | Error _ -> Stdlib.__Http2.__sendResponse transport head.state config "GET" (Stdlib.Http.badRequest "Invalid HTTP request")
-        | Ok request ->
-          match Stdlib.__Http2Fields.length request.headers with
-          | Error _ -> Stdlib.__Http2.__sendResponse transport head.state config request.method (Stdlib.Http.badRequest "Invalid Content-Length")
-          | Ok expected ->
-            let oversized = match expected with | None -> false | Some size -> size > limit in
-            if oversized then Stdlib.__Http2.__sendResponse transport head.state config request.method (Stdlib.Http.__responseWithTextInt "413 Payload Too Large" 413)
-            else
-              match Stdlib.__Http2.__bufferBody transport head.state head.ended limit 0L [] with
-              | Error message ->
-                if message == "HTTP server shutting down" then Error message
-                else
-                  let response = if message == "HTTP body too large" then Stdlib.Http.__responseWithTextInt "413 Payload Too Large" 413
-                                 else Stdlib.Http.badRequest "Invalid HTTP request body" in
-                  Stdlib.__Http2.__sendResponse transport head.state config request.method response
-              | Ok body ->
-                let mismatch = match expected with | None -> false | Some size -> size != Stdlib.Blob.__byteLength body.bytes in
-                let response =
-                  if mismatch then Stdlib.Http.badRequest "Content-Length mismatch"
-                  else handler (Stdlib.Http.Request { method = request.method, url = request.url,
-                    headers = Stdlib.List.push request.headers ("x-http-method", request.method), body = body.bytes }) in
-                Stdlib.__Http2.__sendResponse transport body.state config request.method response
+    | Ok head ->
+      match Stdlib.__Http2Fields.request head.fields with
+      | Error _ -> Stdlib.__Http2.__sendResponse transport head.state config "GET" (Stdlib.Http.badRequest "Invalid HTTP request")
+      | Ok request ->
+        match Stdlib.__Http2Fields.length request.headers with
+        | Error _ -> Stdlib.__Http2.__sendResponse transport head.state config request.method (Stdlib.Http.badRequest "Invalid Content-Length")
+        | Ok expected ->
+          let oversized = match expected with | None -> false | Some size -> size > limit in
+          if oversized then Stdlib.__Http2.__sendResponse transport head.state config request.method (Stdlib.Http.__responseWithTextInt "413 Payload Too Large" 413)
+          else
+            match Stdlib.__Http2.__bufferBody transport head.state head.ended limit 0L [] with
+            | Error message ->
+              if message == "HTTP server shutting down" then Error message
+              else
+                let response = if message == "HTTP body too large" then Stdlib.Http.__responseWithTextInt "413 Payload Too Large" 413
+                               else Stdlib.Http.badRequest "Invalid HTTP request body" in
+                Stdlib.__Http2.__sendResponse transport head.state config request.method response
+            | Ok body ->
+              let mismatch = match expected with | None -> false | Some size -> size != Stdlib.Blob.__byteLength body.bytes in
+              let response =
+                if mismatch then Stdlib.Http.badRequest "Content-Length mismatch"
+                else handler (Stdlib.Http.Request { method = request.method, url = request.url,
+                  headers = Stdlib.List.push request.headers ("x-http-method", request.method), body = body.bytes }) in
+              Stdlib.__Http2.__sendResponse transport body.state config request.method response
