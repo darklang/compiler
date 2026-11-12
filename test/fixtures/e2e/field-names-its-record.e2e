@@ -1,0 +1,4 @@
+// A local fn without annotations reads a field of its parameter before any
+// call says what the parameter is: the one record type with that field is
+// its type, as for a hosted Cli.Tracing.formatFnCalls.
+type FieldNamesItsRecord = { onlyHereCount: Int64 } (let g = (fun s -> s.onlyHereCount) in Stdlib.List.map [FieldNamesItsRecord { onlyHereCount = 7L }] (fun s -> (let w = g s in Stdlib.Display.display w))) = ["7"]
