@@ -4,7 +4,7 @@ let next (v: Stdlib.Option.Option<Int64>) : Stdlib.Option.Option<Int64> =
 next (Some 4L) = Some 5L
 next None = None
 let stringify (v: Stdlib.Result.Result<Int64, String>) : Stdlib.Result.Result<String, String> =
-  Ok (Stdlib.toString v?)
+  Ok (Stdlib.display v?)
 stringify (Ok 4L) = Ok "4"
 stringify (Error "stop") = Error "stop"
 Stdlib.List.map [Some 1L, None, Some 3L] (fun v -> Some (v? + 1L)) = [Some 2L, None, Some 4L]
@@ -64,8 +64,8 @@ stmt None = None
 stmt (Some ()) = Some 1L
 let generic<'a, 'b, 'e> (v: Stdlib.Result.Result<'a, 'e>) (f: 'a -> 'b) : Stdlib.Result.Result<'b, 'e> =
   Ok (f v?)
-generic (Ok 4L) (fun n -> Stdlib.toString n) = Ok "4"
-generic (Error "stop") (fun n -> Stdlib.toString (n + 1L)) = Error "stop"
+generic (Ok 4L) (fun n -> Stdlib.display n) = Ok "4"
+generic (Error "stop") (fun n -> Stdlib.display (n + 1L)) = Error "stop"
 (fun x -> Some (x? + 1L)) None = None
 (fun x -> let n = x? in Some (n + 1L)) (Some 3L) = Some 4L
 (fun x -> if true then Some x? else None) (Some 3L) = Some 3L
@@ -74,7 +74,7 @@ Stdlib.List.filterMap [Some 1L, None, Some 3L] (fun v -> Some (v? * 10L)) = [10L
 Stdlib.List.fold [Some 1L, None, Some 2L] (Some 0L) (fun acc v -> Some (acc? + v?)) = None
 type Alias<'a> = Stdlib.Result.Result<'a, String>
 let alias (v: Alias<Int64>) : Alias<String> =
-  Ok (Stdlib.toString v?)
+  Ok (Stdlib.display v?)
 alias (Ok 4L) = Ok "4"
 alias (Error "stop") = Error "stop"
 type Container = { item: Stdlib.Option.Option<Int64> }

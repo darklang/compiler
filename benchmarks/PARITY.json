@@ -27,7 +27,7 @@
     },
     "edigits": {
       "status": "comparable",
-      "dark_sha256": "e4459abb274fbae80a59e220b822bcb999065f92b140fcfb6deaac75b4af2a1a",
+      "dark_sha256": "bfa6ba46ff8ce4f7b373f01aa46e6b10bf79b6fdb36bc5f038554c64c549000b",
       "rust_sha256": "e02b38ee93dcaddca45ce3e1dde2e8eafed5c6e1adaa4dddf4c95f752945925e",
       "quick": {
         "status": "comparable"
@@ -43,7 +43,7 @@
     },
     "fannkuch": {
       "status": "comparable",
-      "dark_sha256": "c3466cd51030177eeb15672a07faeef30d56d2ba0d95ebbcd190f41e5714eb37",
+      "dark_sha256": "ba1ac5d9a9f1ab2f936381573b01521041911477fa62f1e840ae089403c4b7a1",
       "rust_sha256": "0daca8dcb4fce6b905442af1246a545d06a44d62a68aba3c9832dc4f778ae719",
       "quick": {
         "status": "comparable"
@@ -51,7 +51,7 @@
     },
     "fasta": {
       "status": "comparable",
-      "dark_sha256": "ab11db20927d3c3a9dcbd76ac52282104b8fcbd2d9ba9e2e4e3b957ed9722f6b",
+      "dark_sha256": "f6210fd4e17e22af88220ff29b1a2512214a8e79f3428b41ec1470b6407c97b0",
       "rust_sha256": "56e6ac8b3e14aee41e79ab03b775fa8a3fc7efdbe3b846d8d49a02b4cb33d8a1",
       "quick": {
         "status": "comparable"
@@ -59,7 +59,7 @@
     },
     "fft": {
       "status": "comparable",
-      "dark_sha256": "c5266b3082ce07ecfaf9f5fbfca9b26cbe4a6d7b3b599d263e50a44ed3b31a6a",
+      "dark_sha256": "ec3c8f739d0e120bfe5d912aa806fe497bb1400c7fddb065fb5cdc9262daf0fc",
       "rust_sha256": "441cf2180cb7a4aaf3431fb065468b8240586e0928022c153020c400ac27c737",
       "quick": {
         "status": "comparable"
@@ -75,7 +75,7 @@
     },
     "huffman": {
       "status": "comparable",
-      "dark_sha256": "6bf0214dcab1e6b0aa32cd5fdf07f0c828d250e220f2e1213ac08f2b821d979b",
+      "dark_sha256": "b75c57849b988fff8512249ca8d076a9fd3ed12fe888076b389e690fa7164179",
       "rust_sha256": "835d1d3aacd307c5db4f2a5f9df603dbc64a247a9188ac63b37ffd910e749579",
       "quick": {
         "status": "comparable"
@@ -115,7 +115,7 @@
     },
     "myers_diff": {
       "status": "comparable",
-      "dark_sha256": "6ef6e4ee3605c48c0facb5e3b7add3d6c4a39b59c278d74d9ff9ad5d0765e419",
+      "dark_sha256": "c6d6528517ce641478136667b6d99698e447eb2b7f823f3d5c3fb7e1d749dfcd",
       "rust_sha256": "ff84da7f1f6c0ef68513522bd306a6368ace18732a036de14bc33108d0651ec9",
       "quick": {
         "status": "comparable"
@@ -163,7 +163,7 @@
     },
     "quicksort": {
       "status": "comparable",
-      "dark_sha256": "b19b2b7ea22bb10e9d59aa903b12788268800c550de06ff41bf6dfd8a703b121",
+      "dark_sha256": "73e3572550904702de8271fcdcac2df60757455b156bef675e19fabf57744d3d",
       "rust_sha256": "148f63961f9a8568d9f66ae2f49e3a4d097398b547cf316e3fcf20bce2af5452",
       "quick": {
         "status": "comparable"
@@ -179,7 +179,7 @@
     },
     "regex_lite": {
       "status": "comparable",
-      "dark_sha256": "4e2f0ef3c94455b5e76a373f4dab859e226c9b052fb16c2ffc1bc331874c55e9",
+      "dark_sha256": "0b9ad6ec1ad8b1cc0df6f882ba35885cf388e014bd1be5c8165210942daa8c0d",
       "rust_sha256": "2e7bcf4ae3faa7702eb023d1c66c6cde07112c9d5cb038d14c270721b5aa4561",
       "quick": {
         "status": "comparable"
@@ -187,7 +187,7 @@
     },
     "spectral_norm": {
       "status": "comparable",
-      "dark_sha256": "6e9099c10045f46e7a9e58317480b8075bb4a7468971a927155bb028be7ba90d",
+      "dark_sha256": "be7a867e51a2c75db12d5eef9b13649983b2aafe94f1a3ad63a9ccecdf1b1f7f",
       "rust_sha256": "f5ab4979dc98a314d736d87ae69d7d8cf564525466612c656ae2ec6acbf4c080",
       "quick": {
         "status": "comparable"
@@ -219,7 +219,7 @@
     },
     "tinytemplate": {
       "status": "comparable",
-      "dark_sha256": "ae9b3a4c89f8d38fe4323b9769924ee92997e6002f1e4ce54dc061636d23266b",
+      "dark_sha256": "0ecc552834354a533e53e379857e213967e1350052ccaa8ce711e16b8fce0f75",
       "rust_sha256": "8d48482f6e4d62cc12b31f79e9d713be8d94f1d392b7088c20eeb95261c474c1",
       "rust_tree_sha256": "227382068ebda723333d617219a416f34759e29d47d5ce12f43fcd093e088c71",
       "quick": {
@@ -228,7 +228,7 @@
     },
     "warden": {
       "status": "comparable",
-      "dark_sha256": "9d79fe97f46720fdf1f0f25ffb2e330a5c492d55a7aa120390302e328139a69b",
+      "dark_sha256": "230b5784534b870bbabc67952f578f84db780f2fe14fbc24a8f56b22bec25c4d",
       "rust_sha256": "17ad09bfe10fdca67ff198740da76504f219d8c9b39bc0e0fc9fec8cad20f0fe",
       "quick": {
         "status": "comparable"

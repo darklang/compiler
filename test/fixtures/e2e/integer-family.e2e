@@ -4,7 +4,7 @@
 
 // Managed decimal buffers survive aggregates, branches, sums, and closures.
 let value = Stdlib.Int.power 2 100 in let (first, _) = (value, value + 1) in first = 1267650600228229401496703205376
-let values = [170141183460469231731687303715884105727Q, -1Q] in Stdlib.List.length values = 2
+let values = [170141183460469231731687303715884105727Q, -1Q] in Stdlib.List.length values = 2L
 let value = 340282366920938463463374607431768211455Z in let selected = if true then Some value else None in selected = Some 340282366920938463463374607431768211455Z
 let captured = Stdlib.Int.power 2 100 in (fun offset -> captured + offset) 1 = 1267650600228229401496703205377
 type IntegerOwnerBox = { arbitrary: Int, signed128: Int128, unsigned128: UInt128 } let box = IntegerOwnerBox { arbitrary = Stdlib.Int.power 2 100, signed128 = -170141183460469231731687303715884105728Q, unsigned128 = 340282366920938463463374607431768211455Z } in box.signed128 = -170141183460469231731687303715884105728Q

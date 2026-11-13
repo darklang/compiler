@@ -230,9 +230,9 @@ module BothWritersAgreeOnOps =
       if stored != 3 then
         $"stored {Stdlib.Int.toString stored}, not 3"
       else if (Stdlib.List.length n) != 3 then
-        $"native served {Stdlib.Int.toString (Stdlib.List.length n)} of ours"
+        $"native served {Stdlib.Int64.toString (Stdlib.List.length n)} of ours"
       else if (Stdlib.List.length d) != 3 then
-        $"dark served {Stdlib.Int.toString (Stdlib.List.length d)} of ours"
+        $"dark served {Stdlib.Int64.toString (Stdlib.List.length d)} of ours"
       else if n != d then
         let show (t: (String * String * String * String * String)) : String =
           let (i, b, ts, a, cm) = t

@@ -26,11 +26,11 @@ test sum =
 
 test toString =
   Stdlib.Test.all
-    [ Stdlib.toString 0l |> Stdlib.Test.equal "0"
-      Stdlib.toString 1l |> Stdlib.Test.equal "1"
-      Stdlib.toString -1l |> Stdlib.Test.equal "-1"
+    [ Stdlib.display 0l |> Stdlib.Test.equal "0"
+      Stdlib.display 1l |> Stdlib.Test.equal "1"
+      Stdlib.display -1l |> Stdlib.Test.equal "-1"
       // Int32 lower limit
-      Stdlib.toString -2147483648l |> Stdlib.Test.equal "-2147483648"
+      Stdlib.display -2147483648l |> Stdlib.Test.equal "-2147483648"
       // Int32 upper limit
-      Stdlib.toString 2147483647l |> Stdlib.Test.equal "2147483647" ]
+      Stdlib.display 2147483647l |> Stdlib.Test.equal "2147483647" ]
 

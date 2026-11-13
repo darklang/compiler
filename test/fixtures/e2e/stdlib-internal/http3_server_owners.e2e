@@ -6,7 +6,7 @@ let resetFrame (state: Stdlib.__QuicFlow.State) (frame: Stdlib.__QuicApplication
 let fixture () : Stdlib.__Http3Server.State =
   let life = Stdlib.Stream.__new (fun _unit -> Some ()) (fun _unit -> ()) in
   let socket = Stdlib.__Datagram.Socket { lifecycle = life, watch = None, send = fun _peer _bytes _timeout -> Ok (), receive = fun _timeout -> Builtin.crash "Scheduler attempted socket receive" } in
-  let secret = Stdlib.String.toBlob (Stdlib.String.repeat "s" 32) in
+  let secret = Stdlib.String.toBlob (Stdlib.String.repeat "s" 32L) in
   let keys = match Stdlib.__QuicCrypto.derive secret with | Ok keys -> keys | Error _ -> Builtin.crash "Invalid test keys" in
   let parameters = Stdlib.__QuicParameters.Parameters { originalDestination = None, initialSource = Stdlib.String.toBlob "clientID", retrySource = None, resetToken = None,
     idleTimeout = 0L, maxUdpPayload = 1200L, maxData = 262144L, maxStreamDataBidiLocal = 65536L, maxStreamDataBidiRemote = 65536L, maxStreamDataUni = 65536L,
@@ -17,7 +17,7 @@ let fixture () : Stdlib.__Http3Server.State =
   | Error _ -> Builtin.crash "Test HTTP/3 initialization failed"
   | Ok wire -> Stdlib.__Http3Server.initial wire 0L
 let context () : Stdlib.__Http3Server.Context =
-  Stdlib.__Http3Server.Context { config = { Stdlib.HttpServer.Config.defaults 443 with injectStandardHeaders = false, logRequests = false }, handler = fun request -> Stdlib.Http.responseWithText (Stdlib.Blob.toString request.body |> Stdlib.Result.withDefault "invalid") 200, limit = 4L }
+  Stdlib.__Http3Server.Context { config = { Stdlib.HttpServer.Config.defaults 443 with injectStandardHeaders = false, logRequests = false }, handler = fun request -> Stdlib.Http.responseWithText 200L (Stdlib.Blob.toString request.body |> Stdlib.Result.withDefault "invalid"), limit = 4L }
 let request (state: Stdlib.__Http3Server.State) (id: Int64) (body: String) (length: Int64) (finished: Bool) : Stdlib.Result.Result<Stdlib.__Http3Server.State, String> =
   Stdlib.__Qpack.encode [(":method", "POST"), (":scheme", "https"), (":authority", "localhost"), (":path", "/echo"), ("content-length", Stdlib.Int64.toString length)] |> Stdlib.Result.andThen (Stdlib.__Http3Wire.serialize 1L) |> Stdlib.Result.andThen (fun headers ->
     Stdlib.__Http3Wire.serialize 0L (Stdlib.String.toBlob body) |> Stdlib.Result.andThen (fun data ->
@@ -118,11 +118,11 @@ let timeout () : Stdlib.Result.Result<(String * Int64), String> =
   result
 timeout () = Ok (("408", 40001L)) // leak_check
 
-let response (method: String) (status: Int) : Stdlib.Result.Result<(Int64 * List<String> * String), String> =
+let response (method: String) (status: Int64) : Stdlib.Result.Result<(Int64 * List<String> * String), String> =
   let initial = fixture () in
   let result = request initial 0L "" 0L true |> Stdlib.Result.andThen (fun state -> Stdlib.__Http3Server.admit state 1L) |> Stdlib.Result.andThen (fun state ->
     match state.streams with
-    | [active] -> Stdlib.__Http3Server.respond (context ()) state active method (Stdlib.Http.responseWithText "abc" status) 2L |> Stdlib.Result.map (fun state ->
+    | [active] -> Stdlib.__Http3Server.respond (context ()) state active method (Stdlib.Http.responseWithText status "abc") 2L |> Stdlib.Result.map (fun state ->
       match state.streams with
       | [active] -> match active.message with
         | RequestInput _ -> (-1L, [], "input")
@@ -134,10 +134,10 @@ let response (method: String) (status: Int) : Stdlib.Result.Result<(Int64 * List
     | _ -> Error "Missing test stream") in
   Stdlib.__Http3.close initial.wire
   result
-response "HEAD" 200 = Ok ((0L, ["3"], "200")) // leak_check
-response "GET" 204 = Ok ((0L, [], "204")) // leak_check
-response "GET" 304 = Ok ((0L, ["3"], "304")) // leak_check
-response "GET" 101 = Ok ((21L, ["21"], "500")) // leak_check
+response "HEAD" 200L = Ok ((0L, ["3"], "200")) // leak_check
+response "GET" 204L = Ok ((0L, [], "204")) // leak_check
+response "GET" 304L = Ok ((0L, ["3"], "304")) // leak_check
+response "GET" 101L = Ok ((21L, ["21"], "500")) // leak_check
 
 let draining (credit: Int64) : Stdlib.Result.Result<(Bool * Int64), String> =
   let initial = fixture () in
@@ -171,7 +171,7 @@ let queuedQpackCancellation (credit: Int64) (cancelledByPeer: Bool) : Stdlib.Res
   let result = request initial 0L "" 0L true |> Stdlib.Result.andThen (fun state -> Stdlib.__Http3Server.admit state 1L) |> Stdlib.Result.andThen (fun state ->
     match state.streams with
     | [active] ->
-      let response = Stdlib.Http.Response { statusCode = 200, headers = [("x", "y")], body = Stdlib.Blob.empty } in
+      let response = Stdlib.Http.Response { statusCode = 200L, headers = [("x", "y")], body = Stdlib.Blob.empty } in
       Stdlib.__Http3Server.respond (context ()) state active "GET" response 1L |> Stdlib.Result.andThen (fun state ->
         Stdlib.__QpackEncoder.create 64L 1L |> Stdlib.Result.andThen (fun outgoing ->
           let channels = Stdlib.List.map state.wire.connection.flow.channels (fun channel ->

@@ -18,12 +18,12 @@ test clamp =
 /// Wraps on overflow.
 test toString =
   Stdlib.Test.all
-    [ Stdlib.toString 120us |> Stdlib.Test.equal "120"
-      Stdlib.toString 1us |> Stdlib.Test.equal "1"
+    [ Stdlib.display 120us |> Stdlib.Test.equal "120"
+      Stdlib.display 1us |> Stdlib.Test.equal "1"
       // UInt16 lower limit
-      Stdlib.toString 0us |> Stdlib.Test.equal "0"
+      Stdlib.display 0us |> Stdlib.Test.equal "0"
       // UInt16 upper limit
-      Stdlib.toString 65535us |> Stdlib.Test.equal "65535" ]
+      Stdlib.display 65535us |> Stdlib.Test.equal "65535" ]
 
 test sum =
   Stdlib.Test.all

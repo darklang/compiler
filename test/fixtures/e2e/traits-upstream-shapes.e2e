@@ -7,10 +7,10 @@ module UpstreamTraitShapes =
 
   impl Show for Point =
     let show (p: Point) : String =
-      $"({Stdlib.toString p.x}, {Stdlib.toString p.y})"
+      $"({Stdlib.display p.x}, {Stdlib.display p.y})"
 
   impl Show for Int =
-    let show (n: Int) : String = Stdlib.toString n
+    let show (n: Int) : String = Stdlib.display n
 
   impl Show for Bool =
     let show (b: Bool) : String = if b then "yes" else "no"
@@ -28,4 +28,4 @@ UpstreamTraitShapes.Show.show [[true], []] = "[[yes], []]"
 ([1, 2] |> Stdlib.List.map UpstreamTraitShapes.Show.show) = ["1", "2"]
 (UpstreamTraitShapes.Point { x = 1, y = 2 }).show = "(1, 2)"
 UpstreamTraitShapes.Show.show 3.5 = compileerror="No implementation of trait"
-Stdlib.Int64.ToString.toString 42L = "42"
+Stdlib.Int64.Display.display 42L = "42"

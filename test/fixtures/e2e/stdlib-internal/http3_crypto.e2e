@@ -15,6 +15,6 @@ let cid = Stdlib.Blob.fromHex "8394C8F03E515708" |> Stdlib.Result.withDefault St
 let cid = Stdlib.Blob.fromHex "8394C8F03E515708" |> Stdlib.Result.withDefault Stdlib.Blob.empty in let retry = Stdlib.Blob.fromHex "FF000000010008F067A5502A4262B5746F6B656E04A265BA2EFF4D829058FB3F0F2496BA" |> Stdlib.Result.withDefault Stdlib.Blob.empty in Stdlib.__QuicCrypto.verifyRetry cid retry = Ok true
 let cid = Stdlib.Blob.fromHex "8394C8F03E515708" |> Stdlib.Result.withDefault Stdlib.Blob.empty in let retry = Stdlib.Blob.fromHex "FF000000010008F067A5502A4262B5746F6B656E04A265BA2EFF4D829058FB3F0F2496BB" |> Stdlib.Result.withDefault Stdlib.Blob.empty in Stdlib.__QuicCrypto.verifyRetry cid retry = Ok false
 let cid = Stdlib.Blob.fromHex "8394C8F03E515709" |> Stdlib.Result.withDefault Stdlib.Blob.empty in let retry = Stdlib.Blob.fromHex "FF000000010008F067A5502A4262B5746F6B656E04A265BA2EFF4D829058FB3F0F2496BA" |> Stdlib.Result.withDefault Stdlib.Blob.empty in Stdlib.__QuicCrypto.verifyRetry cid retry = Ok false
-Stdlib.__QuicCrypto.initial (Stdlib.String.toBlob (Stdlib.String.repeat "x" 21)) = Error "QUIC connection ID exceeds 20 bytes"
+Stdlib.__QuicCrypto.initial (Stdlib.String.toBlob (Stdlib.String.repeat "x" 21L)) = Error "QUIC connection ID exceeds 20 bytes"
 Stdlib.__QuicCrypto.nonce Stdlib.Blob.empty 0L = Error "QUIC IV must have 12 bytes"
 let iv = Stdlib.Blob.fromHex "000000000000000000000000" |> Stdlib.Result.withDefault Stdlib.Blob.empty in Stdlib.__QuicCrypto.nonce iv 4611686018427387904L = Error "Invalid QUIC packet number"

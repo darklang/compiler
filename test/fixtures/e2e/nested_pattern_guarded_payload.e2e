@@ -46,22 +46,22 @@ let listHeadsInTuple (xs: List<String>) (n: String) : Int64 =
   | ("Stdlib" :: _, _) -> 1L
   | ([], "Result") -> 2L
   | (["a", "b"], _) -> 4L
-  | (_ :: "z" :: rest, _) when Stdlib.List.length rest > 0 -> 5L
+  | (_ :: "z" :: rest, _) when Stdlib.List.length rest > 0L -> 5L
   | _ -> 3L
 [listHeadsInTuple ["Stdlib", "a"] "x", listHeadsInTuple ["hello"] "x", listHeadsInTuple [] "Result", listHeadsInTuple [] "x", listHeadsInTuple ["a", "b"] "x", listHeadsInTuple ["a", "b", "c"] "x", listHeadsInTuple ["q", "z", "w"] "x", listHeadsInTuple ["q", "z"] "x"] = [1L, 3L, 2L, 3L, 4L, 3L, 5L, 3L]
 
 let listHeadsAtTop (xs: List<String>) : Int =
   match xs with
-  | "Stdlib" :: rest -> Stdlib.List.length rest
+  | "Stdlib" :: rest -> Stdlib.Int.fromInt64 (Stdlib.List.length rest)
   | ["PACKAGE", x] -> 20
   | [] -> 2
   | _ -> 3
 [listHeadsAtTop ["Stdlib", "a", "b"], listHeadsAtTop ["hello"], listHeadsAtTop [], listHeadsAtTop ["PACKAGE", "q"], listHeadsAtTop ["PACKAGE"]] = [2, 3, 2, 20, 3]
 
 // `Ctor x :: rest` is `(Ctor x) :: rest`.
-let consHeadConstructor (xs: List<Stdlib.AltJson.Json>) : Int =
+let consHeadConstructor (xs: List<Stdlib.AltJson.Json>) : Int64 =
   match xs with
   | [String s] -> Stdlib.String.length s
-  | Number n :: _ -> 100
-  | _ -> 0
-[consHeadConstructor [Stdlib.AltJson.Json.String "abc"], consHeadConstructor [Stdlib.AltJson.Json.Number 1.0, Stdlib.AltJson.Json.Null], consHeadConstructor [], consHeadConstructor [Stdlib.AltJson.Json.Null]] = [3, 100, 0, 0]
+  | Number n :: _ -> 100L
+  | _ -> 0L
+[consHeadConstructor [Stdlib.AltJson.Json.String "abc"], consHeadConstructor [Stdlib.AltJson.Json.Number 1.0, Stdlib.AltJson.Json.Null], consHeadConstructor [], consHeadConstructor [Stdlib.AltJson.Json.Null]] = [3L, 100L, 0L, 0L]

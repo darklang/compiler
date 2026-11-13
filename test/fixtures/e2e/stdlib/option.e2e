@@ -55,7 +55,7 @@ Stdlib.Option.or None None = None
 // Stdlib.Option.toList - Convert to a list
 // ===================================================================
 
-Stdlib.List.length (Stdlib.Option.toList (Some 42L)) = 1
+Stdlib.List.length (Stdlib.Option.toList (Some 42L)) = 1L
 Stdlib.List.isEmpty (Stdlib.Option.toList None) = true
 
 // ===================================================================
@@ -116,7 +116,7 @@ let x = None in Stdlib.Option.withDefault x ((1L, 2L)) = (1L, 2L)
 let x = None in Stdlib.Option.withDefault x ((1L, 2L, 3L)) = (1L, 2L, 3L)
 
 // List
-let x = None in Stdlib.List.length (Stdlib.Option.withDefault x ([1L, 2L, 3L])) = 3
+let x = None in Stdlib.List.length (Stdlib.Option.withDefault x ([1L, 2L, 3L])) = 3L
 
 // Nested Option (Option<Option<Int64>>)
 let x = None in Stdlib.Option.isSome (Stdlib.Option.withDefault x (Some 42L)) = true
@@ -125,7 +125,7 @@ let x = None in Stdlib.Option.isSome (Stdlib.Option.withDefault x (Some 42L)) = 
 let x = None in Stdlib.Result.isOk (Stdlib.Option.withDefault x (Ok 42L)) = true
 
 // Large combines follow the interpreter's stack-safe fold implementation.
-let options = Stdlib.List.repeatUnsafe 100000 (Some 1L) in match Stdlib.Option.combine options with | Some values -> Stdlib.List.length values | None -> 0 = 100000 isolated=true
+let options = Stdlib.List.repeatUnsafe 100000 (Some 1L) in match Stdlib.Option.combine options with | Some values -> Stdlib.List.length values | None -> 0L = 100000L isolated=true
 
 // Large value extraction follows the interpreter's filterMap implementation.
-let options = Stdlib.List.repeatUnsafe 100000 (Some 1L) in Stdlib.List.length (Stdlib.Option.values options) = 100000 isolated=true
+let options = Stdlib.List.repeatUnsafe 100000 (Some 1L) in Stdlib.List.length (Stdlib.Option.values options) = 100000L isolated=true

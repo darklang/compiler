@@ -228,7 +228,7 @@ let inner = NestedReuseInner { items = [1L, 2L, 3L] } in let original = NestedRe
 // Regular recursive records can reuse their unique outer block while an alias
 // keeps the displaced recursive child list alive.
 type RecursiveReuseNode = { value: Int64, children: List<RecursiveReuseNode> }
-let leaf = RecursiveReuseNode { value = 1L, children = [] } in let children = [leaf] in let original = RecursiveReuseNode { value = 2L, children = children } in let counted = { original with value = 3L } in let updated = { counted with children = [], value = 4L } in Stdlib.List.length children == 1 && Stdlib.List.length updated.children == 0 && updated.value == 4L = true
+let leaf = RecursiveReuseNode { value = 1L, children = [] } in let children = [leaf] in let original = RecursiveReuseNode { value = 2L, children = children } in let counted = { original with value = 3L } in let updated = { counted with children = [], value = 4L } in Stdlib.List.length children == 1L && Stdlib.List.length updated.children == 0L && updated.value == 4L = true
 
 type LongRenderedRecord = { alpha: String, beta: String }
 LongRenderedRecord { alpha = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz", beta = "abcdefghijklmnopqrstuvwxyz" } = stdout="LongRenderedRecord {\n  alpha: \"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz\",\n  beta: \"abcdefghijklmnopqrstuvwxyz\"\n}\n" stderr=""

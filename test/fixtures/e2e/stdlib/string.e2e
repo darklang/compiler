@@ -63,14 +63,14 @@ Stdlib.String.newline = "\n"
 // Stdlib.String.length - Extended grapheme cluster count
 // ===================================================================
 
-Stdlib.String.length "hello" = 5
-Stdlib.String.length "" = 0
-Stdlib.String.length "a" = 1
-Stdlib.String.length "hello world" = 11
+Stdlib.String.length "hello" = 5L
+Stdlib.String.length "" = 0L
+Stdlib.String.length "a" = 1L
+Stdlib.String.length "hello world" = 11L
 
 // Unicode EGC lengths
-Stdlib.String.length "żółw" = 4
-Stdlib.String.length "😄" = 1
+Stdlib.String.length "żółw" = 4L
+Stdlib.String.length "😄" = 1L
 
 // ===================================================================
 // Stdlib.String.isEmpty - Check if string is empty
@@ -192,53 +192,53 @@ Stdlib.String.endsWith "👨‍❤️‍💋‍👨👩‍👩‍👧‍👦🏳
 // Stdlib.String.indexOf - Find UTF-16 code-unit index of substring
 // ===================================================================
 
-Stdlib.String.indexOf "hello" "l" = Some 2
-Stdlib.String.indexOf "hello" "ll" = Some 2
-Stdlib.String.indexOf "hello" "o" = Some 4
+Stdlib.String.indexOf "hello" "l" = Some 2L
+Stdlib.String.indexOf "hello" "ll" = Some 2L
+Stdlib.String.indexOf "hello" "o" = Some 4L
 Stdlib.String.indexOf "hello" "x" = None
-Stdlib.String.indexOf "hello" "" = Some 0
-Stdlib.String.indexOf "" "" = Some 0
-Stdlib.String.indexOf "abcabc" "bc" = Some 1
+Stdlib.String.indexOf "hello" "" = Some 0L
+Stdlib.String.indexOf "" "" = Some 0L
+Stdlib.String.indexOf "abcabc" "bc" = Some 1L
 Stdlib.String.indexOf "" "a" = None
 
 // ===================================================================
 // Stdlib.String.slice - Extract EGC range (end exclusive)
 // ===================================================================
 
-Stdlib.String.slice "hello" 0 2 = "he"
-Stdlib.String.slice "hello" 0 5 = "hello"
-Stdlib.String.slice "hello" 1 4 = "ell"
-Stdlib.String.slice "hello" 2 10 = "llo"
-Stdlib.String.slice "hello" 0 0 = ""
-Stdlib.String.slice "hello" 5 5 = ""
+Stdlib.String.slice "hello" 0L 2L = "he"
+Stdlib.String.slice "hello" 0L 5L = "hello"
+Stdlib.String.slice "hello" 1L 4L = "ell"
+Stdlib.String.slice "hello" 2L 10L = "llo"
+Stdlib.String.slice "hello" 0L 0L = ""
+Stdlib.String.slice "hello" 5L 5L = ""
 
 // ===================================================================
 // Stdlib.String.slice - Extract substring by start and end index
 // ===================================================================
 
-Stdlib.String.slice "hello" 0 2 = "he"
-Stdlib.String.slice "hello" 1 4 = "ell"
-Stdlib.String.slice "hello" 0 5 = "hello"
+Stdlib.String.slice "hello" 0L 2L = "he"
+Stdlib.String.slice "hello" 1L 4L = "ell"
+Stdlib.String.slice "hello" 0L 5L = "hello"
 
 // ===================================================================
 // Stdlib.String.first - Take first n bytes
 // ===================================================================
 
-Stdlib.String.first "hello" 3 = "hel"
-Stdlib.String.first "hello" 0 = ""
-Stdlib.String.first "hello" 5 = "hello"
-Stdlib.String.first "hello" 10 = "hello"
-Stdlib.String.first "" 5 = ""
+Stdlib.String.first "hello" 3L = "hel"
+Stdlib.String.first "hello" 0L = ""
+Stdlib.String.first "hello" 5L = "hello"
+Stdlib.String.first "hello" 10L = "hello"
+Stdlib.String.first "" 5L = ""
 
 // ===================================================================
 // Stdlib.String.dropFirst - Drop first n bytes
 // ===================================================================
 
-Stdlib.String.dropFirst "hello" 2 = "llo"
-Stdlib.String.dropFirst "hello" 0 = "hello"
-Stdlib.String.dropFirst "hello" 5 = ""
-Stdlib.String.dropFirst "hello" 10 = ""
-Stdlib.String.dropFirst "" 5 = ""
+Stdlib.String.dropFirst "hello" 2L = "llo"
+Stdlib.String.dropFirst "hello" 0L = "hello"
+Stdlib.String.dropFirst "hello" 5L = ""
+Stdlib.String.dropFirst "hello" 10L = ""
+Stdlib.String.dropFirst "" 5L = ""
 
 // ===================================================================
 // Stdlib.String.trim - Remove leading and trailing whitespace
@@ -331,11 +331,11 @@ Stdlib.String.reverse "Z̤͔ͧ̑̓ä͖̭̈̇lͮ̒ͫǧ̗͚̚o̙̔ͮ̇͐̇" = "o̙
 // Stdlib.String.repeat - Repeat string n times
 // ===================================================================
 
-Stdlib.String.repeat "ab" 3 = "ababab"
-Stdlib.String.repeat "x" 5 = "xxxxx"
-Stdlib.String.repeat "hello" 0 = ""
-Stdlib.String.repeat "hello" 1 = "hello"
-Stdlib.String.repeat "" 5 = ""
+Stdlib.String.repeat "ab" 3L = "ababab"
+Stdlib.String.repeat "x" 5L = "xxxxx"
+Stdlib.String.repeat "hello" 0L = ""
+Stdlib.String.repeat "hello" 1L = "hello"
+Stdlib.String.repeat "" 5L = ""
 
 // ===================================================================
 // Stdlib.String.replaceAll - Replace occurrences of substring
@@ -429,33 +429,33 @@ Stdlib.equals "Hello" "hello" = false
 // Stdlib.String.codepointLength - Count Unicode codepoints
 // ===================================================================
 
-Stdlib.String.codepointLength "hello" = 5
-Stdlib.String.codepointLength "" = 0
-Stdlib.String.codepointLength "żółw" = 4
-Stdlib.String.codepointLength "😄" = 1
+Stdlib.String.codepointLength "hello" = 5L
+Stdlib.String.codepointLength "" = 0L
+Stdlib.String.codepointLength "żółw" = 4L
+Stdlib.String.codepointLength "😄" = 1L
 
 // ===================================================================
 // Stdlib.String.length - Count grapheme clusters
 // ===================================================================
 
-Stdlib.String.length "hello" = 5
-Stdlib.String.length "" = 0
-Stdlib.String.length "😄" = 1
-Stdlib.String.length "abcdef" = 6
-Stdlib.String.length "🧑🏽‍🦰🧑🏼‍💻🧑🏻‍🍼✋✋🏻✋🏿" = 6
-Stdlib.String.length "Z̤͔ͧ̑̓ä͖̭̈̇lͮ̒ͫǧ̗͚̚o̙̔ͮ̇͐̇" = 5
-Stdlib.String.length "﷽﷽﷽﷽﷽" = 5
-Stdlib.String.length "👱👱🏻👱🏼👱🏽👱🏾👱🏿" = 6
-Stdlib.String.length "🧟‍♀️🧟‍♂️" = 2
-Stdlib.String.length "👨‍❤️‍💋‍👨👩‍👩‍👧‍👦🏳️‍⚧️‍️🇵🇷" = 4
+Stdlib.String.length "hello" = 5L
+Stdlib.String.length "" = 0L
+Stdlib.String.length "😄" = 1L
+Stdlib.String.length "abcdef" = 6L
+Stdlib.String.length "🧑🏽‍🦰🧑🏼‍💻🧑🏻‍🍼✋✋🏻✋🏿" = 6L
+Stdlib.String.length "Z̤͔ͧ̑̓ä͖̭̈̇lͮ̒ͫǧ̗͚̚o̙̔ͮ̇͐̇" = 5L
+Stdlib.String.length "﷽﷽﷽﷽﷽" = 5L
+Stdlib.String.length "👱👱🏻👱🏼👱🏽👱🏾👱🏿" = 6L
+Stdlib.String.length "🧟‍♀️🧟‍♂️" = 2L
+Stdlib.String.length "👨‍❤️‍💋‍👨👩‍👩‍👧‍👦🏳️‍⚧️‍️🇵🇷" = 4L
 
 // ===================================================================
 // Stdlib.String.toCodepoints - Convert to list of codepoints
 // ===================================================================
 
-Stdlib.String.toCodepoints "abc" = [97, 98, 99]
+Stdlib.String.toCodepoints "abc" = [97u32, 98u32, 99u32]
 Stdlib.String.toCodepoints "" = []
-Stdlib.String.toCodepoints "Hi" = [72, 105]
+Stdlib.String.toCodepoints "Hi" = [72u32, 105u32]
 
 // ===================================================================
 // Stdlib.String.fromList - Create string from characters
@@ -478,37 +478,37 @@ Stdlib.String.toList "" = []
 // Stdlib.String.first - Get first n EGCs
 // ===================================================================
 
-Stdlib.String.first "hello" 3 = "hel"
-Stdlib.String.first "hello" 0 = ""
-Stdlib.String.first "hello" 10 = "hello"
+Stdlib.String.first "hello" 3L = "hel"
+Stdlib.String.first "hello" 0L = ""
+Stdlib.String.first "hello" 10L = "hello"
 
 // ===================================================================
 // Stdlib.String.last - Get last n EGCs
 // ===================================================================
 
-Stdlib.String.last "hello" 3 = "llo"
-Stdlib.String.last "hello" 0 = ""
-Stdlib.String.last "hello" 10 = "hello"
-Stdlib.String.last "hello" 5 = "hello"
-Stdlib.String.last "abcdef" 2 = "ef"
+Stdlib.String.last "hello" 3L = "llo"
+Stdlib.String.last "hello" 0L = ""
+Stdlib.String.last "hello" 10L = "hello"
+Stdlib.String.last "hello" 5L = "hello"
+Stdlib.String.last "abcdef" 2L = "ef"
 
 // ===================================================================
 // Stdlib.String.dropFirst - Drop first n EGCs
 // ===================================================================
 
-Stdlib.String.dropFirst "hello" 2 = "llo"
-Stdlib.String.dropFirst "hello" 0 = "hello"
-Stdlib.String.dropFirst "hello" 10 = ""
+Stdlib.String.dropFirst "hello" 2L = "llo"
+Stdlib.String.dropFirst "hello" 0L = "hello"
+Stdlib.String.dropFirst "hello" 10L = ""
 
 // ===================================================================
 // Stdlib.String.dropLast - Drop last n EGCs
 // ===================================================================
 
-Stdlib.String.dropLast "hello" 2 = "hel"
-Stdlib.String.dropLast "hello" 0 = "hello"
-Stdlib.String.dropLast "hello" 10 = ""
-Stdlib.String.dropLast "hello" 5 = ""
-Stdlib.String.dropLast "abcdef" 3 = "abc"
+Stdlib.String.dropLast "hello" 2L = "hel"
+Stdlib.String.dropLast "hello" 0L = "hello"
+Stdlib.String.dropLast "hello" 10L = ""
+Stdlib.String.dropLast "hello" 5L = ""
+Stdlib.String.dropLast "abcdef" 3L = "abc"
 
 // ===================================================================
 // Stdlib.String.head - Get first character as Option
@@ -521,18 +521,18 @@ Stdlib.Option.isNone (Stdlib.String.head "") = true
 // Stdlib.String.padStart - Pad on the left
 // ===================================================================
 
-Stdlib.String.padStart "hi" " " 5 = Ok "   hi"
-Stdlib.String.padStart "hello" " " 5 = Ok "hello"
-Stdlib.String.padStart "hello" " " 3 = Ok "hello"
-Stdlib.String.padStart "5" "0" 3 = Ok "005"
-Stdlib.String.padStart "42" "0" 5 = Ok "00042"
+Stdlib.String.padStart "hi" ' ' 5L = "   hi"
+Stdlib.String.padStart "hello" ' ' 5L = "hello"
+Stdlib.String.padStart "hello" ' ' 3L = "hello"
+Stdlib.String.padStart "5" '0' 3L = "005"
+Stdlib.String.padStart "42" '0' 5L = "00042"
 
 // ===================================================================
 // Stdlib.String.padEnd - Pad on the right
 // ===================================================================
 
-Stdlib.String.padEnd "hi" " " 5 = Ok "hi   "
-Stdlib.String.padEnd "hello" " " 5 = Ok "hello"
-Stdlib.String.padEnd "hello" " " 3 = Ok "hello"
-Stdlib.String.padEnd "5" "0" 3 = Ok "500"
-Stdlib.String.padEnd "42" "0" 5 = Ok "42000"
+Stdlib.String.padEnd "hi" ' ' 5L = "hi   "
+Stdlib.String.padEnd "hello" ' ' 5L = "hello"
+Stdlib.String.padEnd "hello" ' ' 3L = "hello"
+Stdlib.String.padEnd "5" '0' 3L = "500"
+Stdlib.String.padEnd "42" '0' 5L = "42000"

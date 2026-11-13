@@ -4,7 +4,7 @@ let sharedRepeatedPipeline (count: Int) : Int64 = let xs = Stdlib.List.repeatUns
 let repeatedRuntimePipelines (n: Int64) (acc: Int64) : Int64 = if n == 0L then acc else repeatedRuntimePipelines (n - 1L) (acc + runtimeRepeatedPipeline (Stdlib.Int.fromInt64 (n % 65L)) 2L)
 let printedCount () : Int = let _ = Builtin.printLine "count" in 3
 let printedValue () : Int64 = let _ = Builtin.printLine "value" in 7L
-let capturedRepeatControl (xs: List<Int64>) : Int64 = let ys = Stdlib.List.map xs (fun x -> x + Stdlib.Option.withDefault (Stdlib.List.getAt xs 0) 0L) in Stdlib.List.fold ys 0L (fun acc x -> acc + x)
+let capturedRepeatControl (xs: List<Int64>) : Int64 = let ys = Stdlib.List.map xs (fun x -> x + Stdlib.Option.withDefault (Stdlib.List.getAt xs 0L) 0L) in Stdlib.List.fold ys 0L (fun acc x -> acc + x)
 
 runtimeRepeatedPipeline 0 2L = stdout="9\n" stderr=""
 runtimeRepeatedPipeline 1 2L = 12L

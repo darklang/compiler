@@ -29,7 +29,7 @@ module BigTestCase =
    |> (+) "\nhex64Encode: "
    |> (+) hexEncode
    |> (+) "\nstring length: "
-   |> (+) (Stdlib.Int.toString sl)
+   |> (+) (Stdlib.Int64.toString sl)
    |> (+) "\nbytes length: "
    |> (+) (Stdlib.Int.toString bl)
    |> (+) "\nbool: "
