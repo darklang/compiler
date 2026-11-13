@@ -16,7 +16,7 @@ let __find (extensions: List<Stdlib.__Tls13ServerHello.Extension>) (kind: Int64)
 let __extensions (data: Blob) (position: Int64) (seen: List<Int64>) (acc: List<Stdlib.__Tls13ServerHello.Extension>) : Stdlib.Result.Result<List<Stdlib.__Tls13ServerHello.Extension>, String> =
   let length = Stdlib.Blob.__byteLength data in
   if position == length then Ok (Stdlib.List.reverse acc)
-  else if position + 4L > length || Stdlib.List.length seen >= 64 then Error "Invalid TLS client extensions"
+  else if position + 4L > length || Stdlib.List.__lengthInt seen >= 64 then Error "Invalid TLS client extensions"
   else
     let kind = Stdlib.__Tls13.__read16 data position in
     let size = Stdlib.__Tls13.__read16 data (position + 2L) in
@@ -62,7 +62,7 @@ let __alpn (extensions: List<Stdlib.__Tls13ServerHello.Extension>) : Stdlib.Resu
 let __shares (data: Blob) (position: Int64) (groups: List<Int64>) (seen: List<Int64>) (selected: Stdlib.Option.Option<Blob>) : Stdlib.Result.Result<Stdlib.Option.Option<Blob>, String> =
   let length = Stdlib.Blob.__byteLength data in
   if position == length then Ok selected
-  else if position + 4L > length || Stdlib.List.length seen >= 64 then Error "Invalid TLS client key shares"
+  else if position + 4L > length || Stdlib.List.__lengthInt seen >= 64 then Error "Invalid TLS client key shares"
   else
     let group = Stdlib.__Tls13.__read16 data position in
     let size = Stdlib.__Tls13.__read16 data (position + 2L) in
@@ -152,7 +152,7 @@ let __containsProtocol (protocols: List<Blob>) (protocol: Blob) : Bool =
 
 let selectProtocol (hello: Stdlib.__Tls13ServerHello.Hello) (preferred: List<String>) : Stdlib.Result.Result<String, String> =
   match preferred with
-  | [] -> if Stdlib.List.length hello.protocols == 0 then Ok "" else Error "No common TLS ALPN protocol"
+  | [] -> if Stdlib.List.__lengthInt hello.protocols == 0 then Ok "" else Error "No common TLS ALPN protocol"
   | protocol :: rest ->
     if Stdlib.__Tls13ServerHello.__containsProtocol hello.protocols (Stdlib.String.toBlob protocol) then Ok protocol
     else Stdlib.__Tls13ServerHello.selectProtocol hello rest

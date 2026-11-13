@@ -171,6 +171,6 @@ impl Stdlib.One for UInt64 =
 
 let fromFloatRounded (a: Float) : Stdlib.Option.Option<UInt64> =
   if Float.isFinite a then
-    a |> Float.round |> Stdlib.Int.toUInt64
+    a |> Float.__roundInt |> Stdlib.Int.toUInt64
   else
     Stdlib.Option.Option.None

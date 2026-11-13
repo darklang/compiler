@@ -24,7 +24,7 @@ let __socket (peer: Stdlib.__Datagram.Endpoint) : (Stdlib.__Datagram.Socket * Ra
       | Some () ->
         let pending = Stdlib.Stream.__cellGet<List<Blob>> outbox in
         if target != peer then Error 22L
-        else if Stdlib.List.length pending >= 8 || Stdlib.Blob.__byteLength bytes > 4096L then Error 90L
+        else if Stdlib.List.__lengthInt pending >= 8 || Stdlib.Blob.__byteLength bytes > 4096L then Error 90L
         else let _ = Stdlib.Stream.__cellSet outbox (pending @ [bytes]) in Ok (),
     receive = fun _timeout -> Error 11L } in
   (socket, outbox)
@@ -163,7 +163,7 @@ let __route (context: Stdlib.HttpServer.Quic.Context) (state: Stdlib.HttpServer.
     else if Stdlib.Blob.__byteLength packet.token == 0L then
       let _ = Stdlib.HttpServer.Quic.__retry context.socket context.secret datagram.peer packet now in
       state
-    else if Stdlib.List.length state.recent >= 256 || Stdlib.List.length state.owners >= 64 then state
+    else if Stdlib.List.__lengthInt state.recent >= 256 || Stdlib.List.__lengthInt state.owners >= 64 then state
     else match Stdlib.__QuicServerRetry.validate context.secret datagram.peer packet now with
     | Error _ -> state
     | Ok _ ->
@@ -282,7 +282,7 @@ let serveOn (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (id
     | Ok signals ->
       let result = match Stdlib.Crypto.__secureRandomBytes 32L with
         | Error _ -> Error "HTTP/3 Retry key generation failed"
-        | Ok secret -> match (if Stdlib.List.length address == 16 then Stdlib.__Datagram.bind6 address port else Stdlib.__Datagram.bind4 address port) with
+        | Ok secret -> match (if Stdlib.List.__lengthInt address == 16 then Stdlib.__Datagram.bind6 address port else Stdlib.__Datagram.bind4 address port) with
           | Error _ -> Error "Cannot bind HTTP/3 server"
           | Ok socket ->
             onListening ()

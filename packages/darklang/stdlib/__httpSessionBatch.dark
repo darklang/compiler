@@ -52,7 +52,7 @@ let __h2 (cell: RawPtr) (entry: Stdlib.__Http2Pool.Entry) (pending: List<Stdlib.
       Stdlib.Stream.__cellSet cell { state with http2 = Stdlib.__Http2Pool.put state.http2 { entry with state = batch.state } now }
     | _ -> Stdlib.__HttpTransport.close entry.transport in
     Stdlib.List.map batch.responses (fun outcome ->
-      match Stdlib.List.getAt pending (Stdlib.Int.fromInt64 outcome.index) with
+      match Stdlib.List.__getAtInt pending (Stdlib.Int.fromInt64 outcome.index) with
       | None -> Builtin.crash "HTTP/2 batch returned an invalid request index"
       | Some pending -> Stdlib.__HttpSessionBatch.__learn cell pending (Stdlib.Result.mapError outcome.response (fun _message -> Stdlib.HttpClient.RequestError.NetworkError)) started)
 
@@ -63,7 +63,7 @@ let __h3 (cell: RawPtr) (entry: Stdlib.__Http3Pool.Entry) (pending: List<Stdlib.
   match requests |> Stdlib.Result.andThen (Stdlib.__Http3Connection.requestMany entry.state) with
   | Error message ->
     let _ = Stdlib.__Http3.close entry.state.wire in
-    Stdlib.__HttpSessionBatch.__failure pending (if Stdlib.String.contains message "timed out" then Stdlib.HttpClient.RequestError.Timeout else Stdlib.HttpClient.RequestError.NetworkError)
+    Stdlib.__HttpSessionBatch.__failure pending (if Stdlib.String.__containsBytes message "timed out" then Stdlib.HttpClient.RequestError.Timeout else Stdlib.HttpClient.RequestError.NetworkError)
   | Ok batch ->
     let _ = match Stdlib.__Network.monotonicMillis () with
     | Ok now when Stdlib.__Http3Pool.reusable batch.state ->
@@ -71,7 +71,7 @@ let __h3 (cell: RawPtr) (entry: Stdlib.__Http3Pool.Entry) (pending: List<Stdlib.
       Stdlib.Stream.__cellSet cell { state with http3 = Stdlib.__Http3Pool.put state.http3 { entry with state = batch.state } now }
     | _ -> Stdlib.__Http3.close batch.state.wire in
     Stdlib.List.map batch.responses (fun outcome ->
-      match Stdlib.List.getAt pending (Stdlib.Int.fromInt64 outcome.index) with
+      match Stdlib.List.__getAtInt pending (Stdlib.Int.fromInt64 outcome.index) with
       | None -> Builtin.crash "HTTP/3 batch returned an invalid request index"
       | Some pending -> Stdlib.__HttpSessionBatch.__learn cell pending (Stdlib.Result.mapError outcome.response (fun _message -> Stdlib.HttpClient.RequestError.NetworkError)) started)
 
@@ -159,9 +159,9 @@ let requestMany (cell: RawPtr) (life: Stream<Unit>) (trusted: Bool) (roots: Stdl
   | None -> Error Stdlib.HttpClient.RequestError.NetworkError
   | Some _ ->
     let size = Stdlib.List.fold requests 0L (fun total request -> total + Stdlib.Blob.__byteLength request.body) in
-    if Stdlib.List.length requests > 32 || size > 104857600L then Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.InvalidRequest)
+    if Stdlib.List.__lengthInt requests > 32 || size > 104857600L then Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.InvalidRequest)
     else
-      let indexed = Stdlib.List.indexedMap requests (fun index request -> (Stdlib.Int64.__fromIntUnchecked index, request)) in
+      let indexed = Stdlib.List.__indexedMapInt requests (fun index request -> (Stdlib.Int64.__fromIntUnchecked index, request)) in
       Stdlib.List.fold indexed (Ok []) (fun result pair -> result |> Stdlib.Result.andThen (fun pending ->
         let (index, request) = pair in
         Stdlib.HttpClient.__prepare request.method request.url request.headers request.body false |> Stdlib.Result.map (fun prepared ->

@@ -15,10 +15,10 @@ let __validBytes (bytes: List<Int64>) : Bool =
         byte >= 0L && byte <= 255L && Stdlib.__HttpConnect.__validBytes rest
 
 let __valid4 (bytes: List<Int64>) : Bool =
-    Stdlib.List.length bytes == 4 && Stdlib.__HttpConnect.__validBytes bytes
+    Stdlib.List.__lengthInt bytes == 4 && Stdlib.__HttpConnect.__validBytes bytes
 
 let __valid6 (bytes: List<Int64>) : Bool =
-    Stdlib.List.length bytes == 16 && Stdlib.__HttpConnect.__validBytes bytes
+    Stdlib.List.__lengthInt bytes == 16 && Stdlib.__HttpConnect.__validBytes bytes
 
 let __private4 (bytes: List<Int64>) : Bool =
     match bytes with

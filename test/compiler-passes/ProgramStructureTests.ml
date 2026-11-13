@@ -123,14 +123,14 @@ let testLibraryRedeclaresStdlibCarriedFunction stdlib () =
              "module Darklang.LanguageTools.PackageManager";
              "";
              "let countMatchingPrefix (a: List<String>) (b: List<String>) : \
-              Int =";
+              Int64 =";
              "  match (a, b) with";
              "  | (aHead :: aTail, bHead :: bTail) ->";
              "    if aHead == bHead then";
-             "      1 + (countMatchingPrefix aTail bTail)";
+             "      1L + (countMatchingPrefix aTail bTail)";
              "    else";
-             "      0";
-             "  | _ -> 0";
+             "      0L";
+             "  | _ -> 0L";
            ]);
       source "entry.dark" P.Executable
         "Darklang.LanguageTools.PackageManager.countMatchingPrefix [\"a\", \

@@ -20,7 +20,7 @@ type grammar = {
    The bitwise levels follow Python's order rather than C's: they bind TIGHTER
    than the comparisons, so `a & b == c` is `(a & b) == c` and not C's
    `a & (b == c)`. Every pre-existing operator keeps its relative position.
-   `@` desugars to `Stdlib.List.append` (there is no WT infix for it); `**` is
+   `@` desugars to `Stdlib.List.concat` (there is no WT infix for it); `**` is
    exponentiation and nests right: `2 ** 3 ** 2 = 2 ** (3 ** 2)`.
 *)
 let infixBindingPower = function
@@ -90,7 +90,7 @@ and parseInfixRhs grammar state minimum first next =
                        ({ WT.range = opRange; name = "Stdlib" }, opRange);
                        ({ WT.range = opRange; name = "List" }, opRange);
                      ];
-                   fn = { WT.range = opRange; name = "append" };
+                   fn = { WT.range = opRange; name = "concat" };
                  }
                in
                WT.EApply

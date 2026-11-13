@@ -69,7 +69,7 @@ let __head (transport: Stdlib.__HttpTransport.Transport) (work: Stdlib.__Http2Co
   | [outcome] ->
     match outcome.response with
     | Error message -> Error message
-    | Ok response -> Ok (Stdlib.__Http2Pool.StreamReady { work = work, head = Stdlib.__Http2Fields.ResponseHead { status = Stdlib.Int64.__fromIntUnchecked response.statusCode, headers = response.headers } })
+    | Ok response -> Ok (Stdlib.__Http2Pool.StreamReady { work = work, head = Stdlib.__Http2Fields.ResponseHead { status = response.statusCode, headers = response.headers } })
   | [] ->
     match Stdlib.List.findFirst work.active (fun stream -> Stdlib.Option.isSome stream.head) with
     | Some stream ->
@@ -135,4 +135,4 @@ let stream (entry: Stdlib.__Http2Pool.Entry) (prepared: Stdlib.HttpClient.__Prep
     let initial = Stdlib.__Http2Pool.Body { work = ready.work, bytes = Stdlib.Blob.empty, position = 0L, finished = false } in
     let lease = Stdlib.__Http2Pool.BodyLease { entry = entry, cell = Stdlib.Stream.__cellNew initial, lifecycle = lifecycle, returnOwner = returnOwner } in
     let body = Stdlib.Stream.__new (fun _unit -> Stdlib.__Http2Pool.__bodyNext lease) (fun _unit -> Stdlib.__Http2Pool.__bodyClose lease) in
-    Ok (Stdlib.HttpClient.StreamResponse { statusCode = Stdlib.Int.fromInt64 ready.head.status, headers = ready.head.headers, body = body })
+    Ok (Stdlib.HttpClient.StreamResponse { statusCode = ready.head.status, headers = ready.head.headers, body = body })

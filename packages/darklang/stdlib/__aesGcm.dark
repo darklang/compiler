@@ -5,7 +5,7 @@ module Darklang.Stdlib.__AesGcm
 type Bits128 = { hi: Int64, lo: Int64 }
 
 let __at (bytes: List<Int64>) (index: Int64) : Int64 =
-  match Stdlib.List.getAt bytes (Stdlib.Int.fromInt64 index) with
+  match Stdlib.List.__getAtInt bytes (Stdlib.Int.fromInt64 index) with
   | Some value -> value
   | None -> Builtin.crash "Invalid AES block shape"
 
@@ -71,9 +71,9 @@ let __expandKey (expanded: List<Int64>) (word: Int64) (keyWords: Int64)
       else if keyWords == 8L && word % 8L == 4L then
         Stdlib.List.map previous Stdlib.__AesGcm.__sbox
       else previous in
-    let next = Stdlib.List.map2shortest (Stdlib.__AesGcm.__keyWord expanded (word - keyWords)) temp
+    let next = Stdlib.List.map2Shortest (Stdlib.__AesGcm.__keyWord expanded (word - keyWords)) temp
                  Stdlib.__AesGcm.__xor in
-    Stdlib.__AesGcm.__expandKey (Stdlib.List.append expanded next) (word + 1L)
+    Stdlib.__AesGcm.__expandKey (Stdlib.List.concat expanded next) (word + 1L)
       keyWords
       (if word % keyWords == 0L then Stdlib.__AesGcm.__xtime roundConstant else roundConstant)
 
@@ -122,7 +122,7 @@ let __aesRound (state: List<Int64>) (key: List<Int64>) (round: Int64)
 
 let __encryptBlock (expandedKey: List<Int64>) (block: Blob) : Blob =
   let state = Stdlib.__AesGcm.__addRoundKey (Stdlib.Blob.__toInt64List block) expandedKey 0L 0L [] in
-  let rounds = if Stdlib.List.length expandedKey == 240 then 14L else 10L in
+  let rounds = if Stdlib.List.__lengthInt expandedKey == 240 then 14L else 10L in
   Stdlib.Blob.__fromInt64List (Stdlib.__AesGcm.__aesRound state expandedKey 1L rounds)
 
 let __bits (blob: Blob) : Stdlib.__AesGcm.Bits128 =
@@ -132,7 +132,7 @@ let __bits (blob: Blob) : Stdlib.__AesGcm.Bits128 =
 
 let __bitsBlob (bits: Stdlib.__AesGcm.Bits128) : Blob =
   Stdlib.Blob.__fromInt64List
-    (Stdlib.List.append (Stdlib.Crypto.__int64ToBE bits.hi)
+    (Stdlib.List.concat (Stdlib.Crypto.__int64ToBE bits.hi)
       (Stdlib.Crypto.__int64ToBE bits.lo))
 
 let __xorBits (a: Stdlib.__AesGcm.Bits128) (b: Stdlib.__AesGcm.Bits128)
@@ -189,7 +189,7 @@ let __ghash (hashKey: Stdlib.__AesGcm.Bits128) (aad: Blob) (ciphertext: Blob)
   let first = Stdlib.__AesGcm.__ghashData hashKey aad 0L (Stdlib.__AesGcm.__zeroBits ()) in
   let second = Stdlib.__AesGcm.__ghashData hashKey ciphertext 0L first in
   let lengths = (Stdlib.Blob.__fromInt64List
-    (Stdlib.List.append (Stdlib.Crypto.__int64ToBE (Stdlib.Blob.__byteLength aad * 8L))
+    (Stdlib.List.concat (Stdlib.Crypto.__int64ToBE (Stdlib.Blob.__byteLength aad * 8L))
       (Stdlib.Crypto.__int64ToBE (Stdlib.Blob.__byteLength ciphertext * 8L)))) in
   Stdlib.__AesGcm.__ghashBlock hashKey second lengths
 

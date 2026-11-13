@@ -82,7 +82,7 @@ let __validBytes (bytes: List<Int64>) : Bool =
         byte >= 0L && byte <= 255L && Stdlib.__Network.__validBytes rest
 
 let __validAddress (ipv6: Bool) (bytes: List<Int64>) : Bool =
-    Stdlib.List.length bytes == (if ipv6 then 16 else 4) &&
+    Stdlib.List.__lengthInt bytes == (if ipv6 then 16 else 4) &&
     Stdlib.__Network.__validBytes bytes
 
 let __writeAddress (ptr: RawPtr) (bytes: List<Int64>) (offset: Int64) : Unit =
@@ -444,7 +444,7 @@ let __pollResults (buffer: RawPtr) (count: Int64) (index: Int64)
 // Closed owners wake immediately; empty sets still support timer deadlines.
 let waitSockets (entries: List<Stdlib.__Network.Interest>) (milliseconds: Int64)
     : Stdlib.Result.Result<List<Stdlib.__Network.Ready>, Int64> =
-    let count = Stdlib.List.length entries in
+    let count = Stdlib.List.__lengthInt entries in
     if milliseconds < 0L || milliseconds > 60000L || count > 1024 ||
         Stdlib.List.any entries (fun entry -> entry.watch.descriptor < 0L || entry.watch.descriptor > 2147483647L) then Error 22L
     else

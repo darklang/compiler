@@ -2,7 +2,7 @@
 module Darklang.Stdlib.__QuicServerRetry
 
 let __endpoint (peer: Stdlib.__Datagram.Endpoint) : Stdlib.Result.Result<Blob, String> =
-  let length = Stdlib.List.length peer.address in
+  let length = Stdlib.List.__lengthInt peer.address in
   if (length != 4 && length != 16) || peer.port < 1L || peer.port > 65535L || Stdlib.Bool.not (Stdlib.__Network.__validAddress (length == 16) peer.address) then Error "Invalid QUIC Retry peer"
   else Ok (Stdlib.Blob.concat [Stdlib.Blob.__fromInt64List [if length == 4 then 4L else 16L], Stdlib.Blob.__fromInt64List peer.address, Stdlib.__Tls13.__u16 peer.port])
 

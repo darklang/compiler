@@ -147,7 +147,7 @@ let __receive (socket: Stdlib.__Datagram.Socket) (peer: Stdlib.__Datagram.Endpoi
 let __lookup (socket: Stdlib.__Datagram.Socket) (peer: Stdlib.__Datagram.Endpoint) (name: String)
   (port: Int64) (deadline: Int64) (visited: List<String>) (ttl: Int64)
   : Stdlib.Result.Result<Stdlib.__HttpsDns.Answer, String> =
-  if Stdlib.List.length visited >= 8 || Stdlib.List.contains visited name then Error "HTTPS DNS alias chain too long"
+  if Stdlib.List.__lengthInt visited >= 8 || Stdlib.List.contains visited name then Error "HTTPS DNS alias chain too long"
   else
     match Stdlib.Crypto.__secureRandomBytes 2L, Stdlib.__Network.monotonicMillis () with
     | Ok random, Ok now ->
@@ -168,12 +168,12 @@ let __lookup (socket: Stdlib.__Datagram.Socket) (peer: Stdlib.__Datagram.Endpoin
 let lookup (peer: Stdlib.__Datagram.Endpoint) (host: String) (port: Int64) (timeout: Int64)
   : Stdlib.Result.Result<Stdlib.__HttpsDns.Answer, String> =
   if timeout < 1L || timeout > 10000L || peer.port < 1L || peer.port > 65535L ||
-    Stdlib.Bool.not (Stdlib.__Network.__validAddress (Stdlib.List.length peer.address == 16) peer.address) then Error "Invalid HTTPS DNS lookup"
+    Stdlib.Bool.not (Stdlib.__Network.__validAddress (Stdlib.List.__lengthInt peer.address == 16) peer.address) then Error "Invalid HTTPS DNS lookup"
   else Stdlib.__HttpsDns.originName host port |> Stdlib.Result.andThen (fun name ->
     match Stdlib.__Network.monotonicMillis () with
     | Error _ -> Error "HTTPS DNS clock failed"
     | Ok now ->
-      let bound = if Stdlib.List.length peer.address == 16 then Stdlib.__Datagram.bind6 [0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L] 0L else Stdlib.__Datagram.bind4 [0L,0L,0L,0L] 0L in
+      let bound = if Stdlib.List.__lengthInt peer.address == 16 then Stdlib.__Datagram.bind6 [0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L] 0L else Stdlib.__Datagram.bind4 [0L,0L,0L,0L] 0L in
       match bound with
       | Error _ -> Error "HTTPS DNS socket creation failed"
       | Ok socket ->
