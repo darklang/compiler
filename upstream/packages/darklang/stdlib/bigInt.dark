@@ -1,0 +1,295 @@
+module Darklang.Stdlib.BigInt
+
+// `BigInt` is the arbitrary-precision integer, written with a `z` suffix: `1z` (`z`
+// for ℤ, the integers). A bare `1` is an Int64. The operators (`+`, `-`, `<`,
+// ...) work on it; this module provides the same operations as named functions,
+// plus parse/stringify and conversions to/from the fixed-width integer types.
+
+type ParseError = | BadFormat
+
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl Modulo for Int requires an explicit replacement contract"
+impl Modulo for BigInt =
+  /// Returns the result of wrapping <param a> around so that {{0 <= res < b}}.
+  /// The modulus <param b> must be greater than 0.
+  /// Use <fn BigInt.checkedRemainder> if you want the remainder after division, which has
+  /// a different behavior for negative numbers.
+  let modulo(a: BigInt, b: BigInt): BigInt = Builtin.modulo(a, b)
+
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl Add for Int requires an explicit replacement contract"
+impl Add for BigInt =
+  /// Adds two integers together
+  let add(a: BigInt, b: BigInt): BigInt = Builtin.add(a, b)
+
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl Subtract for Int requires an explicit replacement contract"
+impl Subtract for BigInt =
+  /// Subtracts two integers
+  let subtract(a: BigInt, b: BigInt): BigInt = Builtin.subtract(a, b)
+
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl Multiply for Int requires an explicit replacement contract"
+impl Multiply for BigInt =
+  /// Multiplies two integers
+  let multiply(a: BigInt, b: BigInt): BigInt = Builtin.multiply(a, b)
+
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl Divide for Int requires an explicit replacement contract"
+impl Divide for BigInt =
+  /// Divides two integers, rounding towards zero
+  let divide(a: BigInt, b: BigInt): BigInt = Builtin.divide(a, b)
+
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl Power for Int requires an explicit replacement contract"
+impl Power for BigInt =
+  /// Raise <param base> to the power of <param exponent>.
+  /// Raises an error if <param exponent> is negative.
+  let power(``base``: BigInt, exponent: BigInt): BigInt =
+    Builtin.power(``base``, exponent)
+
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl Negate for Int requires an explicit replacement contract"
+impl Negate for BigInt =
+  /// Returns the negation of <param a>, {{-a}}
+  let negate(a: BigInt): BigInt = Builtin.negate(a)
+
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl Compare for Int requires an explicit replacement contract"
+impl Compare for BigInt =
+  /// Returns {{true}} if <param a> is less than <param b>
+  let lessThan(a: BigInt, b: BigInt): Bool = Builtin.lessThan(a, b)
+  /// Returns {{true}} if <param a> is less than or equal to <param b>
+  let lessThanOrEqualTo(a: BigInt, b: BigInt): Bool = Builtin.lessThanOrEqualTo(a, b)
+  /// Returns {{true}} if <param a> is greater than <param b>
+  let greaterThan(a: BigInt, b: BigInt): Bool = Builtin.greaterThan(a, b)
+  /// Returns {{true}} if <param a> is greater than or equal to <param b>
+  let greaterThanOrEqualTo(a: BigInt, b: BigInt): Bool =
+    Builtin.greaterThanOrEqualTo(a, b)
+
+
+/// Get the square root of a <type BigInt>
+let sqrt(a: BigInt): Float = Stdlib.Float.sqrt(Stdlib.BigInt.toFloat(a))
+
+
+/// The square root of <param a>, or {{Error NotANumber}} where <param a> is negative and
+/// {{Error Overflow}} where it is too large for a Float
+let checkedSqrt(a: BigInt): Stdlib.Result.Result<Float, Stdlib.Math.NonFinite> =
+  Stdlib.Float.checkedSqrt(Stdlib.BigInt.toFloat(a))
+
+
+/// Converts a <type BigInt> to a <type Float>
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.toFloat reason=compiler-implementation
+let toFloat(a: BigInt): Float = Builtin.bigIntToFloat(a)
+
+
+/// Converts <param a> to a <type Float>, or {{Error Overflow}} where it is too large for one
+let checkedToFloat(a: BigInt): Stdlib.Result.Result<Float, Stdlib.Math.Overflow> =
+  Stdlib.Float.__noOverflow(toFloat(a))
+
+
+/// Converts a <type Float> to a <type BigInt>, truncating toward zero.
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.fromFloat reason=compiler-implementation
+let fromFloat(a: Float): BigInt = Builtin.bigIntFromFloat(a)
+
+
+/// Returns the <type BigInt> value of a <type String>. Because <type BigInt> is
+/// arbitrary-precision, the only failure is a badly-formatted string.
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.parse reason=compiler-implementation
+let parse(s: String): Stdlib.Result.Result<BigInt, ParseError> =
+  Builtin.bigIntParse(s)
+
+
+// Conversions from the fixed-width integer types into `BigInt` (always succeed).
+
+/// Converts an <type Int8> to an arbitrary-precision <type BigInt>
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.fromInt8 reason=compiler-implementation
+let fromInt8(a: Int8): BigInt = Builtin.bigIntFromInt8(a)
+
+/// Converts a <type UInt8> to an arbitrary-precision <type BigInt>
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.fromUInt8 reason=compiler-implementation
+let fromUInt8(a: UInt8): BigInt = Builtin.bigIntFromUInt8(a)
+
+/// Converts an <type Int16> to an arbitrary-precision <type BigInt>
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.fromInt16 reason=compiler-implementation
+let fromInt16(a: Int16): BigInt = Builtin.bigIntFromInt16(a)
+
+/// Converts a <type UInt16> to an arbitrary-precision <type BigInt>
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.fromUInt16 reason=compiler-implementation
+let fromUInt16(a: UInt16): BigInt = Builtin.bigIntFromUInt16(a)
+
+/// Converts an <type Int32> to an arbitrary-precision <type BigInt>
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.fromInt32 reason=compiler-implementation
+let fromInt32(a: Int32): BigInt = Builtin.bigIntFromInt32(a)
+
+/// Converts a <type UInt32> to an arbitrary-precision <type BigInt>
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.fromUInt32 reason=compiler-implementation
+let fromUInt32(a: UInt32): BigInt = Builtin.bigIntFromUInt32(a)
+
+/// Converts an <type Int64> to an arbitrary-precision <type BigInt>
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.fromInt64 reason=compiler-implementation
+let fromInt64(a: Int64): BigInt = Builtin.bigIntFromInt64(a)
+
+/// Converts a <type UInt64> to an arbitrary-precision <type BigInt>
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.fromUInt64 reason=compiler-implementation
+let fromUInt64(a: UInt64): BigInt = Builtin.bigIntFromUInt64(a)
+
+/// Converts an <type Int128> to an arbitrary-precision <type BigInt>
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.fromInt128 reason=compiler-implementation
+let fromInt128(a: Int128): BigInt = Builtin.bigIntFromInt128(a)
+
+/// Converts a <type UInt128> to an arbitrary-precision <type BigInt>
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.fromUInt128 reason=compiler-implementation
+let fromUInt128(a: UInt128): BigInt = Builtin.bigIntFromUInt128(a)
+
+
+// Conversions from `BigInt` into the fixed-width integer types, returning {{None}}
+// if the value doesn't fit the target range.
+
+/// Converts a <type BigInt> to an <type Int8>, returning {{None}} if it doesn't fit
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.toInt8 reason=compiler-implementation
+let toInt8(a: BigInt): Stdlib.Option.Option<Int8> = Builtin.bigIntToInt8(a)
+
+/// Converts a <type BigInt> to a <type UInt8>, returning {{None}} if it doesn't fit
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.toUInt8 reason=compiler-implementation
+let toUInt8(a: BigInt): Stdlib.Option.Option<UInt8> = Builtin.bigIntToUInt8(a)
+
+/// Converts a <type BigInt> to an <type Int16>, returning {{None}} if it doesn't fit
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.toInt16 reason=compiler-implementation
+let toInt16(a: BigInt): Stdlib.Option.Option<Int16> = Builtin.bigIntToInt16(a)
+
+/// Converts a <type BigInt> to a <type UInt16>, returning {{None}} if it doesn't fit
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.toUInt16 reason=compiler-implementation
+let toUInt16(a: BigInt): Stdlib.Option.Option<UInt16> = Builtin.bigIntToUInt16(a)
+
+/// Converts a <type BigInt> to an <type Int32>, returning {{None}} if it doesn't fit
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.toInt32 reason=compiler-implementation
+let toInt32(a: BigInt): Stdlib.Option.Option<Int32> = Builtin.bigIntToInt32(a)
+
+/// Converts a <type BigInt> to a <type UInt32>, returning {{None}} if it doesn't fit
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.toUInt32 reason=compiler-implementation
+let toUInt32(a: BigInt): Stdlib.Option.Option<UInt32> = Builtin.bigIntToUInt32(a)
+
+/// Converts a <type BigInt> to an <type Int64>, returning {{None}} if it doesn't
+/// fit the 64-bit range
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.toInt64 reason=compiler-implementation
+let toInt64(a: BigInt): Stdlib.Option.Option<Int64> = Builtin.bigIntToInt64(a)
+
+/// Converts a <type BigInt> to a <type UInt64>, returning {{None}} if it doesn't fit
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.toUInt64 reason=compiler-implementation
+let toUInt64(a: BigInt): Stdlib.Option.Option<UInt64> = Builtin.bigIntToUInt64(a)
+
+/// Converts a <type BigInt> to an <type Int128>, returning {{None}} if it doesn't fit
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.toInt128 reason=compiler-implementation
+let toInt128(a: BigInt): Stdlib.Option.Option<Int128> = Builtin.bigIntToInt128(a)
+
+/// Converts a <type BigInt> to a <type UInt128>, returning {{None}} if it doesn't fit
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.toUInt128 reason=compiler-implementation
+let toUInt128(a: BigInt): Stdlib.Option.Option<UInt128> = Builtin.bigIntToUInt128(a)
+
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl BitwiseAnd for Int requires an explicit replacement contract"
+impl BitwiseAnd for BigInt =
+  let bitwiseAnd(a: BigInt, b: BigInt): BigInt = Builtin.bitwiseAnd(a, b)
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl BitwiseOr for Int requires an explicit replacement contract"
+impl BitwiseOr for BigInt =
+  let bitwiseOr(a: BigInt, b: BigInt): BigInt = Builtin.bitwiseOr(a, b)
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl BitwiseXor for Int requires an explicit replacement contract"
+impl BitwiseXor for BigInt =
+  let bitwiseXor(a: BigInt, b: BigInt): BigInt = Builtin.bitwiseXor(a, b)
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl BitwiseNot for Int requires an explicit replacement contract"
+impl BitwiseNot for BigInt =
+  let bitwiseNot(a: BigInt): BigInt = Builtin.bitwiseNot(a)
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl ShiftLeft for Int requires an explicit replacement contract"
+impl ShiftLeft for BigInt =
+  let shiftLeft(a: BigInt, b: BigInt): BigInt = Builtin.shiftLeft(a, b)
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl ShiftRight for Int requires an explicit replacement contract"
+impl ShiftRight for BigInt =
+  let shiftRight(a: BigInt, b: BigInt): BigInt = Builtin.shiftRight(a, b)
+
+
+/// Returns a random integer between <param start> and <param end> (inclusive)
+// @compiler replace: packages/darklang/stdlib/bigInt.dark#Darklang.Stdlib.BigInt.random reason=compiler-implementation
+let random(start: BigInt, ``end``: BigInt): BigInt =
+  Builtin.bigIntRandom(start, ``end``)
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl Display for Int requires an explicit replacement contract"
+impl Display for BigInt =
+  /// Stringify <param int>
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.BigInt.impl Display for BigInt: Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl Display for Int requires an explicit replacement contract"
+  let display(int: BigInt): String = Builtin.bigIntToString(int)
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl Zero for Int requires an explicit replacement contract"
+impl Zero for BigInt =
+  let zero(): BigInt = 0z
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int.dark; importing another declaration of Darklang.Stdlib.Int.impl One for Int requires an explicit replacement contract"
+impl One for BigInt =
+  let one(): BigInt = 1z
+
+
+/// The most bits <fn BigInt.checkedPower> computes a result into: 1 MB
+val maxPowerBits = 8388608z
+
+
+/// <param base> raised to the power of <param exponent>, or {{Error NegativeExponent}}
+/// where `**` raises. {{Error ResultTooLarge}} if the result could take more than
+/// 1 MB, which is <param exponent> times the bits in <param base>; this is checked
+/// before computing anything. {{0}}, {{1}} and {{-1}} take any exponent.
+let checkedPower(
+  ``base``: BigInt,
+  exponent: BigInt)
+  : Stdlib.Result.Result<BigInt, Stdlib.Math.PowerError> =
+  if exponent < 0z then
+    Error(Stdlib.Math.PowerError.NegativeExponent)
+  else if exponent == 0z || ``base`` == 0z || ``base`` == 1z || ``base`` == -1z then
+    Ok(``base`` ** exponent)
+  else
+    let magnitude = if ``base`` < 0z then -``base`` else ``base``
+    // bits(magnitude) * exponent <= maxPowerBits exactly when magnitude has no bit at
+    // or past maxPowerBits / exponent: one shift, without counting the bits
+    if (magnitude >> (Stdlib.BigInt.maxPowerBits / exponent)) == 0z then
+      Ok(``base`` ** exponent)
+    else
+      Error(Stdlib.Math.PowerError.ResultTooLarge)
+
+
+// Division. `/` raises on a zero divisor and `%` on a modulus that is not positive;
+// these return the reason instead.
+// TODO: make `/` and `%` themselves checked by default; see the TODO on the `divide`
+// builtin in NoModule.fs.
+
+/// Divides <param a> by <param b>, rounding towards zero, or
+/// {{Error DivisionByZero}} where `/` raises.
+let checkedDivide(a: BigInt, b: BigInt): Stdlib.Result.Result<BigInt, Stdlib.Math.DivisionError> =
+  if b == 0z then Error(Stdlib.Math.DivisionError.DivisionByZero) else Ok(a / b)
+
+
+/// What is left after dividing <param value> by <param divisor>, rounding towards
+/// zero: negative only if <param value> is, whatever the sign of <param divisor>.
+/// {{Error DivisionByZero}} if <param divisor> is {{0}}.
+/// Use <fn BigInt.checkedMod> to wrap around into {{0 <= res < b}} instead.
+let checkedRemainder(
+  value: BigInt,
+  divisor: BigInt)
+  : Stdlib.Result.Result<BigInt, Stdlib.Math.DivisionError> =
+  if divisor == 0z then
+    Error(Stdlib.Math.DivisionError.DivisionByZero)
+  else
+    Ok(value - (value / divisor) * divisor)
+
+
+/// <param a> wrapped around so that {{0 <= res < b}}, or where `%` raises,
+/// {{Error ZeroModulus}} or {{Error NegativeModulus}}
+let checkedMod(a: BigInt, b: BigInt): Stdlib.Result.Result<BigInt, Stdlib.Math.ModulusError> =
+  if b == 0z then
+    Error(Stdlib.Math.ModulusError.ZeroModulus)
+  else if b < 0z then
+    Error(Stdlib.Math.ModulusError.NegativeModulus)
+  else
+    Ok(a % b)

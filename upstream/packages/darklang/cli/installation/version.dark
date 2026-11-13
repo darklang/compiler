@@ -2,16 +2,16 @@ module Darklang.Cli.Installation.Version
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let execute (state: AppState) (args: List<String>) : AppState =
+let execute(state: AppState, args: List<String>): AppState =
   // Named, not ignored: a mistyped `--locl` would otherwise fall through to the update
   // check, which is the one thing the caller was trying to skip.
-  let unknown = args |> Stdlib.List.filter (fun a -> a != "--local")
+  let unknown = args |> Stdlib.List.filter(fun a -> a != "--local")
 
   match unknown with
-  | bad :: _ ->
-    Stdlib.printLine (Stdlib.Cli.UI.Colors.error $"version: unknown option `{bad}`")
-    Stdlib.printLine (help state)
-    Cli.exitWith state false
+  | [bad, ...] ->
+    Cli.printErr($"version: unknown option `{bad}`")
+    Stdlib.printErrorLine(help(state))
+    Cli.failed(state)
   | [] ->
 
   // Checks GitHub for a newer release, which dominates the command. Deliberate: knowing you're out of
@@ -22,24 +22,24 @@ let execute (state: AppState) (args: List<String>) : AppState =
   // a round trip and then prints "unable to check for updates". Measured at ~11s against a firewall that
   // drops rather than refuses, which is the shape of a CI runner.
   let line =
-    if Stdlib.List.contains args "--local" then
-      $"Darklang CLI {Helpers.cliVersion ()}"
+    if Stdlib.List.contains(args, "--local") then
+      $"Darklang CLI {Helpers.cliVersion()}"
     else
-      Helpers.versionInfoWithUpdateCheck ()
+      Helpers.versionInfoWithUpdateCheck()
 
-  Stdlib.printLine line
+  Stdlib.printLine(line)
   // No store-format line: an op log needs no format coordinate. Ops are content-addressed and a binary
   // tops its own store up, so there is nothing for a version number to gate.
   state
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let complete (_state: AppState) (_args: List<String>) : List<Completion.CompletionItem> =
+let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let help (_state: AppState) : String =
+let help(_state: AppState): String =
   [
     "Usage: version [--local]"
     "Display the CLI version."
@@ -48,4 +48,4 @@ let help (_state: AppState) : String =
     ""
     "  --local    Skip the check for a newer release, which needs the network."
     "             Answers immediately, and says nothing about updates."
-  ] |> Stdlib.String.join "\n"
+  ] |> Stdlib.String.join("\n")

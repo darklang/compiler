@@ -1,164 +1,146 @@
 module Darklang.Cli.Packages.Rename
 
-// `dark rename <old> <new>` -- give an item a different name, without touching its content.
-//
-// A name is a binding, so a rename is two ops: the old name ends (`Unbind`), and the same content
-// gets bound at the new one (`SetName`). Nothing is re-authored and no hash changes, which is why
-// callers are unaffected: they reference content, not names.
-//
-// Two ops rather than one: identical content is one item, so no heuristic over a single `SetName`
-// can tell "rename this name" from "bind this content somewhere else too". Saying both halves out
-// loud says exactly what happened, and both travel.
+// A rename changes bindings and the current branch's reference names atomically.
+// Reference names are metadata; content hashes remain unchanged.
 
-/// The ops a rename authors: end the old name, bind the content at the new one.
-///
-/// `previous = Some hash` on the `Unbind` records what the name held, for the same reason
-/// `SetName` carries one: a merge wants to know what was replaced. The `SetName`'s predecessor is
-/// None because the new name was not in use -- "no predecessor known" is the honest answer, and
-/// the divergence detector only concludes anything when both sides claim one.
+/// Prepare one atomic rename, including its current callers' reference names.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
-let ops
-  (oldLocation: LanguageTools.ProgramTypes.PackageLocation)
-  (newLocation: LanguageTools.ProgramTypes.PackageLocation)
-  (reference: LanguageTools.ProgramTypes.Reference)
+let ops(
+  branchId: Uuid,
+  oldLocation: LanguageTools.ProgramTypes.PackageLocation,
+  newLocation: LanguageTools.ProgramTypes.PackageLocation,
+  reference: LanguageTools.ProgramTypes.Reference)
   : List<LanguageTools.ProgramTypes.PackageOp> =
-  [ LanguageTools.ProgramTypes.PackageOp.Unbind(
-      oldLocation,
-      Stdlib.Option.Option.Some(LanguageTools.ProgramTypes.Reference.hash reference)
-    )
-    LanguageTools.ProgramTypes.PackageOp.SetName(
-      newLocation,
-      reference,
-      Stdlib.Option.Option.None
-    ) ]
+  SCM.PackageOps.prepareRename(branchId, oldLocation, newLocation, reference)
 
 
 /// What lives at <param location> right now, as the reference a rename rebinds. `None` when the
 /// name holds nothing here -- a typo, or a name that only exists on another branch.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Rename.referenceAt: Unknown function or value 'Packages.Query.searchExactMatch'"
-let referenceAt
-  (branchId: Uuid)
-  (location: LanguageTools.ProgramTypes.PackageLocation)
+let referenceAt(
+  branchId: Uuid,
+  location: LanguageTools.ProgramTypes.PackageLocation)
   : Stdlib.Option.Option<LanguageTools.ProgramTypes.Reference> =
-  let modulePath = Stdlib.List.append [ location.owner ] location.modules
-  let results = Packages.Query.searchExactMatch branchId modulePath location.name
+  let modulePath = Stdlib.List.prepend(location.modules, location.owner)
+  let results = Packages.Query.searchExactMatch(branchId, modulePath, location.name)
 
   match results.fns with
-  | i :: _ ->
+  | [i, ...] ->
     Stdlib.Option.Option.Some(
-      LanguageTools.ProgramTypes.Reference.PackageFn i.entity.hash
+      LanguageTools.ProgramTypes.Reference.PackageFn(i.entity.hash)
     )
   | [] ->
     match results.types with
-    | i :: _ ->
+    | [i, ...] ->
       Stdlib.Option.Option.Some(
-        LanguageTools.ProgramTypes.Reference.PackageType i.entity.hash
+        LanguageTools.ProgramTypes.Reference.PackageType(i.entity.hash)
       )
     | [] ->
       match results.values with
-      | i :: _ ->
+      | [i, ...] ->
         Stdlib.Option.Option.Some(
-          LanguageTools.ProgramTypes.Reference.PackageValue i.entity.hash
+          LanguageTools.ProgramTypes.Reference.PackageValue(i.entity.hash)
         )
       | [] ->
         match results.traits with
-        | i :: _ ->
+        | [i, ...] ->
           Stdlib.Option.Option.Some(
-            LanguageTools.ProgramTypes.Reference.PackageTrait i.entity.hash
+            LanguageTools.ProgramTypes.Reference.PackageTrait(i.entity.hash)
           )
         | [] ->
           match results.impls with
-          | i :: _ ->
+          | [i, ...] ->
             Stdlib.Option.Option.Some(
-              LanguageTools.ProgramTypes.Reference.PackageTraitImpl i.entity.hash
+              LanguageTools.ProgramTypes.Reference.PackageTraitImpl(i.entity.hash)
             )
           | [] ->
             match results.tests with
-            | i :: _ ->
+            | [i, ...] ->
               Stdlib.Option.Option.Some(
-                LanguageTools.ProgramTypes.Reference.PackageTest i.entity.hash
+                LanguageTools.ProgramTypes.Reference.PackageTest(i.entity.hash)
               )
             | [] -> Stdlib.Option.Option.None
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let execute (state: Cli.AppState) (args: List<String>) : Cli.AppState =
+let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
   match args with
   | [ oldName, newName ] ->
     let here = state.packageData.currentLocation
 
     match
-      (Packages.Location.parseRelativeTo here oldName,
-       Packages.Location.parseRelativeTo here newName)
+      (Packages.Location.parseRelativeTo(here, oldName),
+       Packages.Location.parseRelativeTo(here, newName))
     with
-    | (Error e, _) ->
-      Cli.printErr $"the name to rename: {e}"
+    | (Error(e), _) ->
+      Cli.printErr($"the name to rename: {e}")
       { state with exitCode = 1 }
-    | (_, Error e) ->
-      Cli.printErr $"the new name: {e}"
+    | (_, Error(e)) ->
+      Cli.printErr($"the new name: {e}")
       { state with exitCode = 1 }
-    | (Ok oldLoc, Ok newLoc) ->
-      let dotted (l: LanguageTools.ProgramTypes.PackageLocation) : String =
-        PrettyPrinter.ProgramTypes.PackageLocation.packageLocation l
+    | (Ok(oldLoc), Ok(newLoc)) ->
+      let dotted(l: LanguageTools.ProgramTypes.PackageLocation): String =
+        PrettyPrinter.ProgramTypes.PackageLocation.packageLocation(l)
 
-      if (dotted oldLoc) == (dotted newLoc) then
-        Cli.printOk $"{dotted oldLoc} already has that name -- nothing to do."
+      if (dotted(oldLoc)) == (dotted(newLoc)) then
+        Cli.printOk($"{dotted(oldLoc)} already has that name -- nothing to do.")
         state
       else
-        match referenceAt state.currentBranchId oldLoc with
+        match referenceAt(state.currentBranchId, oldLoc) with
         | None ->
-          Cli.printErr $"nothing here is named {dotted oldLoc}."
-          Cli.printHint "  `dark ls` lists what is; `dark search <text>` looks wider."
+          Cli.printErr($"nothing here is named {dotted(oldLoc)}.")
+          Cli.printHint("  `dark ls` lists what is; `dark search <text>` looks wider.")
           { state with exitCode = 1 }
-        | Some reference ->
+        | Some(reference) ->
           // Refused rather than silently rebound: one name holds one item, so binding over a live
           // name would take the other item off the shelf as a side effect of renaming this one.
-          match referenceAt state.currentBranchId newLoc with
-          | Some _ ->
-            Cli.printErr $"{dotted newLoc} already names something."
-            Cli.printHint "  pick another name, or retire that one first (`dark delete`)."
+          match referenceAt(state.currentBranchId, newLoc) with
+          | Some(_) ->
+            Cli.printErr($"{dotted(newLoc)} already names something.")
+            Cli.printHint("  pick another name, or retire that one first (`dark delete`).")
             { state with exitCode = 1 }
           | None ->
-            match SCM.PackageOps.add state.currentBranchId (ops oldLoc newLoc reference) with
-            | Ok _ ->
-              Cli.printOk $"renamed {dotted oldLoc} -> {dotted newLoc}."
+            let changes = ops(state.currentBranchId, oldLoc, newLoc, reference)
+            match SCM.PackageOps.add(state.currentBranchId, changes) with
+            | Ok(_) ->
+              Cli.printOk($"renamed {dotted(oldLoc)} -> {dotted(newLoc)}.")
 
-              Cli.printHint
-                "  callers are unaffected: they reference content, not names. `dark status` shows it as a change."
+              Cli.printHint(
+                "  callers now use the new name; content hashes are unchanged. `dark status` shows the change.")
 
               state
-            | Error e ->
-              Cli.printErr $"couldn't rename: {e}"
+            | Error(e) ->
+              Cli.printErr($"couldn't rename: {e}")
               { state with exitCode = 1 }
 
   | _ ->
-    Cli.printErr "usage: dark rename <name> <new-name>"
-    Cli.printHint "  both names are relative to where you are (`dark nav` moves)."
+    Cli.printErr("usage: dark rename <name> <new-name>")
+    Cli.printHint("  both names are relative to where you are (`dark nav` moves).")
     { state with exitCode = 1 }
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let help (_state: Cli.AppState) : String =
+let help(_state: Cli.AppState): String =
   [ ""
     "  dark rename <name> <new-name>"
     ""
-    "  The content does not change and neither does its hash, so everything that"
-    "  calls it goes on working: a reference points at content, not at a name."
+    "  The item and its callers keep their content hashes. References on this"
+    "  branch use the new name, and subsequent edits keep reaching those callers."
     ""
-    "  Two ops are authored -- the old name ends, the new one binds the same"
-    "  content -- so `dark status` shows both, and both travel when you sync."
+    "  The old binding ends, the new binding starts, and reference names update"
+    "  together. `dark status` shows the change."
     ""
     "  Refused when the new name already holds something: one name holds one"
     "  item, so that would take the other one off the shelf." ]
-  |> Stdlib.String.join "\n"
+  |> Stdlib.String.join("\n")
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let complete
-  (state: Cli.AppState)
-  (args: List<String>)
+let complete(
+  state: Cli.AppState,
+  args: List<String>)
   : List<Completion.CompletionItem> =
   match args with
-  | [] -> Packages.Nav.complete state args
-  | [ _ ] -> Packages.Nav.complete state args
+  | [] -> Packages.Nav.complete(state, args)
+  | [ _ ] -> Packages.Nav.complete(state, args)
   | _ -> []

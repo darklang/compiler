@@ -7,87 +7,214 @@ module Darklang.Cli.Packages.Impls
 // lists is what a call can reach. Two implementations for one type are both bound and only
 // the newer one runs, so the older is marked rather than silently listed alongside it.
 
-let describeSelf (branchId: Uuid) (self: LanguageTools.RuntimeTypes.TypeReference) : String =
-  PrettyPrinter.RuntimeTypes.typeReference branchId self
+let describeSelf(branchId: Uuid, self: LanguageTools.RuntimeTypes.TypeReference): String =
+  PrettyPrinter.RuntimeTypes.typeReference(branchId, self)
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.PackageLocation'"
-let traitHashAt
-  (branchId: Uuid)
-  (currentLocation: Packages.PackageLocation)
-  (traitPath: String)
+let traitHashAt(
+  branchId: Uuid,
+  currentLocation: Packages.PackageLocation,
+  traitPath: String)
   : Stdlib.Result.Result<LanguageTools.ProgramTypes.Hash, String> =
-  match Traversal.traverse branchId currentLocation traitPath with
-  | Error e -> Stdlib.Result.Result.Error e
-  | Ok(Trait loc) ->
-    match LanguageTools.PackageManager.Trait.find branchId loc with
-    | Some h -> Stdlib.Result.Result.Ok h
-    | None -> Stdlib.Result.Result.Error $"Trait not found: {traitPath}"
-  | Ok _ -> Stdlib.Result.Result.Error $"{traitPath} is not a trait."
+  match Traversal.traverse(branchId, currentLocation, traitPath) with
+  | Error(e) -> Stdlib.Result.Result.Error(e)
+  | Ok(Trait(loc)) ->
+    match LanguageTools.PackageManager.Trait.find(branchId, loc) with
+    | Some(h) -> Stdlib.Result.Result.Ok(h)
+    | None -> Stdlib.Result.Result.Error($"Trait not found: {traitPath}")
+  | Ok(_) -> Stdlib.Result.Result.Error($"{traitPath} is not a trait.")
 
 /// The trait as written, then under `Stdlib.` (the operator traits are what
 /// most people ask about, and `impls Add` should just work).
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let resolveTrait
-  (state: Cli.AppState)
-  (traitPath: String)
+let resolveTrait(
+  state: Cli.AppState,
+  traitPath: String)
   : Stdlib.Result.Result<LanguageTools.ProgramTypes.Hash, String> =
   // An operator is the trait it lowers to, as in `dark search %`: `impls +` is `impls Add`.
   // `==` and the Bool operators alias to fn names rather than traits, so they keep the symbol.
   let traitPath =
-    match Packages.Search.operatorAlias traitPath with
-    | Some name when (Stdlib.String.first name 1) != (Stdlib.String.toLowercase (Stdlib.String.first name 1)) ->
+    match Packages.Search.operatorAlias(traitPath) with
+    | Some(name) when (Stdlib.String.first(name, 1)) != (Stdlib.String.toLowercase(Stdlib.String.first(name, 1))) ->
       name
     | _ -> traitPath
 
-  match traitHashAt state.currentBranchId state.packageData.currentLocation traitPath with
-  | Ok h -> Stdlib.Result.Result.Ok h
-  | Error msg ->
-    if Stdlib.String.startsWith traitPath "Stdlib." || Stdlib.String.startsWith traitPath "Darklang." then
-      Stdlib.Result.Result.Error msg
+  match traitHashAt(state.currentBranchId, state.packageData.currentLocation, traitPath) with
+  | Ok(h) -> Stdlib.Result.Result.Ok(h)
+  | Error(msg) ->
+    if Stdlib.String.startsWith(traitPath, "Stdlib.") || Stdlib.String.startsWith(traitPath, "Darklang.") then
+      Stdlib.Result.Result.Error(msg)
     else
-      match traitHashAt state.currentBranchId state.packageData.currentLocation $"Stdlib.{traitPath}" with
-      | Ok h -> Stdlib.Result.Result.Ok h
-      | Error _ -> Stdlib.Result.Result.Error msg
+      match traitHashAt(state.currentBranchId, state.packageData.currentLocation, $"Stdlib.{traitPath}") with
+      | Ok(h) -> Stdlib.Result.Result.Ok(h)
+      | Error(_) -> Stdlib.Result.Result.Error(msg)
+
+/// Where code calls an implementation's methods: through its trait, never at the impl's
+/// own path. A fn beside the trait named for the method is the shorter call, so
+/// `impl Display for Int64` gives `[Stdlib.display]`, which is what someone looking for
+/// `Stdlib.Int64.toString` wanted; otherwise it is the trait's own, `Stdlib.Add.add`.
+/// Empty when the trait is unresolved.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
+let methodCalls(
+  branchId: Uuid,
+  i: LanguageTools.ProgramTypes.TraitImpl.TraitImpl)
+  : List<String> =
+  match traitLocation(i) with
+  | Some(loc) ->
+    i.methods |> Stdlib.List.map(fun((method, _)) -> methodCallName(branchId, loc, method))
+  | None -> []
+
+
+/// Where the trait of <param i> lives, when it resolved.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
+let traitLocation(
+  i: LanguageTools.ProgramTypes.TraitImpl.TraitImpl)
+  : Stdlib.Option.Option<LanguageTools.ProgramTypes.PackageLocation> =
+  match i.trait_.resolved with
+  | Ok(r) -> r.location
+  | Error(_) -> Stdlib.Option.Option.None
+
+
+/// The name a call to <param method> of the trait at <param loc> uses: the fn beside the trait
+/// named for the method when there is one (`Stdlib.display`), else the trait's own
+/// (`Stdlib.Add.add`). Written as a person writes it: `Stdlib`, not `Darklang.Stdlib`.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Impls.methodCallName: Unknown function or value 'LanguageTools.PackageManager.Function.find'"
+let methodCallName(
+  branchId: Uuid,
+  loc: LanguageTools.ProgramTypes.PackageLocation,
+  method: String)
+  : String =
+  let written =
+    match (loc.owner, loc.modules) with
+    | ("Darklang", ["Stdlib", ...rest]) -> Stdlib.List.prepend(rest, "Stdlib")
+    | _ -> Stdlib.List.prepend(loc.modules, loc.owner)
+
+  let beside =
+    LanguageTools.ProgramTypes.PackageLocation
+      { owner = loc.owner
+        modules = loc.modules
+        name = method }
+
+  match LanguageTools.PackageManager.Function.find(branchId, beside) with
+  | Some(_) -> Stdlib.String.join(Stdlib.List.append(written, method), ".")
+  | None -> Stdlib.String.join(Stdlib.List.flatten([ written, [ loc.name, method ] ]), ".")
+
+
+/// The operator a standard-library trait method is written with: `modulo` is `a % b`. None for
+/// any other method, and for a trait outside `Darklang.Stdlib`, whose `add` is an ordinary call.
+let operatorSyntax(
+  loc: LanguageTools.ProgramTypes.PackageLocation,
+  method: String)
+  : Stdlib.Option.Option<String> =
+  if loc.owner == "Darklang" && loc.modules == [ "Stdlib" ] then
+    match method with
+    | "add" -> Stdlib.Option.Option.Some("a + b")
+    | "subtract" -> Stdlib.Option.Option.Some("a - b")
+    | "multiply" -> Stdlib.Option.Option.Some("a * b")
+    | "divide" -> Stdlib.Option.Option.Some("a / b")
+    | "modulo" -> Stdlib.Option.Option.Some("a % b")
+    | "power" -> Stdlib.Option.Option.Some("a ** b")
+    | "negate" -> Stdlib.Option.Option.Some("-a")
+    | "bitwiseAnd" -> Stdlib.Option.Option.Some("a & b")
+    | "bitwiseOr" -> Stdlib.Option.Option.Some("a | b")
+    | "bitwiseXor" -> Stdlib.Option.Option.Some("a ^ b")
+    | "bitwiseNot" -> Stdlib.Option.Option.Some("~a")
+    | "shiftLeft" -> Stdlib.Option.Option.Some("a << b")
+    | "shiftRight" -> Stdlib.Option.Option.Some("a >> b")
+    | "lessThan" -> Stdlib.Option.Option.Some("a < b")
+    | "lessThanOrEqualTo" -> Stdlib.Option.Option.Some("a <= b")
+    | "greaterThan" -> Stdlib.Option.Option.Some("a > b")
+    | "greaterThanOrEqualTo" -> Stdlib.Option.Option.Some("a >= b")
+    | _ -> Stdlib.Option.Option.None
+  else
+    Stdlib.Option.Option.None
+
+
+/// Each method of <param i> as a person would type the call: `a % b`, `Stdlib.display(v)`, or
+/// `Stdlib.Zero.zero<Int64>()` for a method that takes nothing and so reads its type from a type
+/// argument. Arguments use the trait method's own parameter names. Empty when the trait is
+/// unresolved.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
+let callExamples(
+  branchId: Uuid,
+  ctx: PrettyPrinter.ProgramTypes.Context,
+  i: LanguageTools.ProgramTypes.TraitImpl.TraitImpl)
+  : List<String> =
+  match traitLocation(i) with
+  | None -> []
+  | Some(loc) ->
+    let declared =
+      match i.trait_.resolved with
+      | Ok(r) ->
+        match r.name with
+        | Package(hash) ->
+          LanguageTools.PackageManager.Trait.get(hash)
+          |> Stdlib.Option.map(fun t -> t.methods)
+          |> Stdlib.Option.withDefault([])
+      | Error(_) -> []
+
+    i.methods
+    |> Stdlib.List.map(fun((method, _)) ->
+      match operatorSyntax(loc, method) with
+      | Some(op) -> op
+      | None ->
+        let name = methodCallName(branchId, loc, method)
+        let parameters =
+          declared
+          |> Stdlib.List.findFirst(fun m -> m.name == method)
+          |> Stdlib.Option.map(fun m ->
+            m.parameters
+            |> Stdlib.List.filter(fun p ->
+              match p.typ with
+              | TUnit -> false
+              | _ -> true)
+            |> Stdlib.List.map(fun p -> p.name))
+          |> Stdlib.Option.withDefault([])
+
+        match parameters with
+        | [] -> $"{name}<{PrettyPrinter.ProgramTypes.typeReference(ctx, i.self)}>()"
+        | names -> $"{name}({Stdlib.String.join(names, ", ")})")
+
 
 /// The name of the implementation, or its short hash when nothing binds it.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Impls.sourceNameOf: Unknown function or value 'LanguageTools.PackageManager.TraitImpl.locations'"
-let sourceNameOf
-  (branchId: Uuid)
-  (source: LanguageTools.ProgramTypes.Hash)
+let sourceNameOf(
+  branchId: Uuid,
+  source: LanguageTools.ProgramTypes.Hash)
   : String =
-  match LanguageTools.PackageManager.TraitImpl.locations branchId source with
-  | loc :: _ -> PrettyPrinter.ProgramTypes.PackageLocation.packageLocation loc
-  | [] -> LanguageTools.ProgramTypes.hashToShort source
+  match LanguageTools.PackageManager.TraitImpl.locations(branchId, source) with
+  | [loc, ...] -> PrettyPrinter.ProgramTypes.PackageLocation.packageLocation(loc)
+  | [] -> LanguageTools.ProgramTypes.hashToShort(source)
 
 
 /// Which of `active`, `shadowed` and `unordered` this implementation is, against the others for
 /// the same type. `shadowed` means a newer implementation for that type runs instead;
 /// `unordered` means neither came from an op, so nothing says which is newer and a call errors.
 // @compiler blocked: compiler-gap diagnostic="Darklang.Cli.Packages.Impls.statusOf: Expected TSum (\"Darklang.LanguageTools.ProgramTypes.Hash\", []), got TSum (\"Darklang.LanguageTools.RuntimeTypes.Hash\", [])"
-let statusOf
-  (branchId: Uuid)
-  (candidates: List<LanguageTools.RuntimeTypes.ImplCandidate>)
-  (c: LanguageTools.RuntimeTypes.ImplCandidate)
+let statusOf(
+  branchId: Uuid,
+  candidates: List<LanguageTools.RuntimeTypes.ImplCandidate>,
+  c: LanguageTools.RuntimeTypes.ImplCandidate)
   : String =
-  let selfStr = describeSelf branchId c.self
-  let cHash = LanguageTools.ProgramTypes.hashToString c.source
+  let selfStr = describeSelf(branchId, c.self)
+  let cHash = LanguageTools.ProgramTypes.hashToString(c.source)
 
   let rivals =
     candidates
-    |> Stdlib.List.filter (fun d ->
-      (LanguageTools.ProgramTypes.hashToString d.source != cHash)
-      && (describeSelf branchId d.self == selfStr))
+    |> Stdlib.List.filter(fun d ->
+      (LanguageTools.ProgramTypes.hashToString(d.source) != cHash)
+      && (describeSelf(branchId, d.self) == selfStr))
 
-  if rivals |> Stdlib.List.any (fun d -> d.stamp == "" && c.stamp == "") then
+  if rivals |> Stdlib.List.any(fun d -> d.stamp == "" && c.stamp == "") then
     "unordered"
   else if
     rivals
-    |> Stdlib.List.any (fun d ->
-      SCM.Conflicts.beats
-        d.stamp
-        (LanguageTools.ProgramTypes.hashToString d.source)
-        c.stamp
-        cHash)
+    |> Stdlib.List.any(fun d ->
+      SCM.Conflicts.beats(
+        d.stamp,
+        LanguageTools.ProgramTypes.hashToString(d.source),
+        c.stamp,
+        cHash))
   then
     "shadowed"
   else
@@ -96,117 +223,115 @@ let statusOf
 
 /// `--json`: the same listing, for something parsing it rather than reading it. One object,
 /// `implementations` in the order the human listing prints them, each with the status a call
-/// would see. An error is `{"error": "..."}` and exits the same way.
+/// would see. An error leaves stdout empty, says why on stderr, and exits 1, as every --json does.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Impls.printJson: Unknown function or value 'sourceNameOf'"
-let printJson
-  (branchId: Uuid)
-  (traitName: String)
-  (candidates: List<LanguageTools.RuntimeTypes.ImplCandidate>)
+let printJson(
+  branchId: Uuid,
+  traitName: String,
+  candidates: List<LanguageTools.RuntimeTypes.ImplCandidate>)
   : Unit =
   let methods =
     match candidates with
-    | c :: _ -> c.methods |> Stdlib.Dict.keys |> Stdlib.List.sort
+    | [c, ...] -> c.methods |> Stdlib.Dict.keys |> Stdlib.List.sort
     | [] -> []
 
   let methodsJson =
-    methods |> Stdlib.List.map (fun m -> Cli.jsonStr m) |> Stdlib.String.join ","
+    methods |> Stdlib.List.map(fun m -> Cli.jsonStr(m)) |> Stdlib.String.join(",")
 
   let implsJson =
     candidates
-    |> Stdlib.List.sortBy (fun c -> describeSelf branchId c.self)
-    |> Stdlib.List.map (fun c ->
-      let self = Cli.jsonStr (describeSelf branchId c.self)
-      let name = Cli.jsonStr (sourceNameOf branchId c.source)
-      let hash = Cli.jsonStr (LanguageTools.ProgramTypes.hashToString c.source)
-      let status = Cli.jsonStr (statusOf branchId candidates c)
+    |> Stdlib.List.sortBy(fun c -> describeSelf(branchId, c.self))
+    |> Stdlib.List.map(fun c ->
+      let self = Cli.jsonStr(describeSelf(branchId, c.self))
+      let name = Cli.jsonStr(sourceNameOf(branchId, c.source))
+      let hash = Cli.jsonStr(LanguageTools.ProgramTypes.hashToString(c.source))
+      let status = Cli.jsonStr(statusOf(branchId, candidates, c))
       $"{{\"self\":{self},\"name\":{name},\"hash\":{hash},\"status\":{status}}}")
-    |> Stdlib.String.join ","
+    |> Stdlib.String.join(",")
 
-  Stdlib.printLine
-    $"{{\"trait\":{Cli.jsonStr traitName},\"methods\":[{methodsJson}],\"implementations\":[{implsJson}]}}"
+  Stdlib.printLine(
+    $"{{\"trait\":{Cli.jsonStr(traitName)},\"methods\":[{methodsJson}],\"implementations\":[{implsJson}]}}")
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let execute (state: Cli.AppState) (args: List<String>) : Cli.AppState =
-  let json = Stdlib.List.contains args "--json"
+let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
+  let json = Stdlib.List.contains(args, "--json")
 
   let positional =
-    args |> Stdlib.List.filter (fun a -> Stdlib.String.startsWith a "-" |> Stdlib.Bool.not)
+    args |> Stdlib.List.filter(fun a -> Stdlib.String.startsWith(a, "-") |> Stdlib.Bool.not)
 
   match positional with
   | [ traitPath ] ->
-    match resolveTrait state traitPath with
-    | Error msg ->
+    match resolveTrait(state, traitPath) with
+    | Error(msg) ->
+      Cli.printErr(msg)
       if json then
-        Stdlib.printLine $"{{\"error\":{Cli.jsonStr msg}}}"
+        ()
       else
-        Stdlib.printLine (Stdlib.Cli.UI.Colors.error msg)
-        Stdlib.printLine
-          (Stdlib.Cli.UI.Colors.dimText
-            $"  `dark search {traitPath} --trait` looks for a trait by name")
+        Stdlib.printErrorLine(
+          (Stdlib.Cli.UI.Colors.dimText(
+            $"  `dark search {traitPath} --trait` looks for a trait by name")))
       { state with exitCode = 1 }
-    | Ok traitHash ->
-      let candidates = LanguageTools.PackageManager.Trait.impls state.currentBranchId traitHash
+    | Ok(traitHash) ->
+      let candidates = LanguageTools.PackageManager.Trait.impls(state.currentBranchId, traitHash)
       if json then
         let traitName =
-          match LanguageTools.PackageManager.Trait.locations state.currentBranchId traitHash with
-          | loc :: _ -> PrettyPrinter.ProgramTypes.PackageLocation.packageLocation loc
+          match LanguageTools.PackageManager.Trait.locations(state.currentBranchId, traitHash) with
+          | [loc, ...] -> PrettyPrinter.ProgramTypes.PackageLocation.packageLocation(loc)
           | [] -> traitPath
 
-        printJson state.currentBranchId traitName candidates
-      else if Stdlib.List.isEmpty candidates then
-        Stdlib.printLine
-          (Stdlib.Cli.UI.Colors.dimText
-            $"No implementations of {traitPath} on this branch. `dark search {traitPath} --impl` looks on others.")
+        printJson(state.currentBranchId, traitName, candidates)
+      else if Stdlib.List.isEmpty(candidates) then
+        Stdlib.printLine(
+          (Stdlib.Cli.UI.Colors.dimText(
+            $"No implementations of {traitPath} on this branch. `dark search {traitPath} --impl` looks on others.")))
       else
         // Sorted, because the store returns candidates in whatever order its index does.
         let methodNames =
           match candidates with
-          | c :: _ -> c.methods |> Stdlib.Dict.keys |> Stdlib.List.sort |> Stdlib.String.join ", "
+          | [c, ...] -> c.methods |> Stdlib.Dict.keys |> Stdlib.List.sort |> Stdlib.String.join(", ")
           | [] -> ""
 
-        Stdlib.printLine $"{traitPath}  ({methodNames})"
+        Stdlib.printLine($"{traitPath}  ({methodNames})")
 
         // 12 is a floor, so a page of short type names still has a column.
         let selfWidth =
           candidates
-          |> Stdlib.List.map (fun c ->
-            Stdlib.String.displayWidth (describeSelf state.currentBranchId c.self))
-          |> Stdlib.List.fold 12 (fun acc w -> if w > acc then w else acc)
+          |> Stdlib.List.map(fun c ->
+            Stdlib.String.displayWidth(describeSelf(state.currentBranchId, c.self)))
+          |> Stdlib.List.fold(12, fun(acc, w) -> if w > acc then w else acc)
 
         candidates
-        |> Stdlib.List.sortBy (fun c -> describeSelf state.currentBranchId c.self)
-        |> Stdlib.List.iter (fun c ->
-          let selfStr = describeSelf state.currentBranchId c.self
-          let sourceName = sourceNameOf state.currentBranchId c.source
+        |> Stdlib.List.sortBy(fun c -> describeSelf(state.currentBranchId, c.self))
+        |> Stdlib.List.iter(fun c ->
+          let selfStr = describeSelf(state.currentBranchId, c.self)
+          let sourceName = sourceNameOf(state.currentBranchId, c.source)
 
           // Mark what a call will not reach.
           let note =
-            match statusOf state.currentBranchId candidates c with
+            match statusOf(state.currentBranchId, candidates, c) with
             | "unordered" ->
-              Stdlib.Cli.UI.Colors.dimText
-                "  nothing orders these two, so a call errors; deprecate one"
+              Stdlib.Cli.UI.Colors.dimText(
+                "  nothing orders these two, so a call errors; deprecate one")
             | "shadowed" ->
-              Stdlib.Cli.UI.Colors.dimText "  not used; a newer implementation for this type runs"
+              Stdlib.Cli.UI.Colors.dimText("  not used; a newer implementation for this type runs")
             | _ -> ""
 
-          Stdlib.printLine
-            $"  {Stdlib.String.padEndToWidth selfStr selfWidth} {Stdlib.Cli.UI.Colors.dimText sourceName}{note}")
+          Stdlib.printLine(
+            $"  {Stdlib.Text.padEndToWidth(selfStr, selfWidth)} {Stdlib.Cli.UI.Colors.dimText(sourceName)}{note}"))
       state
   | _ ->
+    Cli.printErr("Usage: impls <trait> [--json]          e.g. `dark impls Display`")
     if json then
-      Stdlib.printLine
-        $"{{\"error\":{Cli.jsonStr "impls takes one trait name"}}}"
+      ()
     else
-      Stdlib.printLine "Usage: impls <trait> [--json]          e.g. `dark impls ToString`"
-      Stdlib.printLine
-        (Stdlib.Cli.UI.Colors.hint
-          "  `dark ls Stdlib` has a Traits section; `dark search <name> --trait` finds one anywhere")
+      Cli.printHint(
+        "  `dark ls Stdlib` has a Traits section; `dark search <name> --trait` finds one anywhere")
     { state with exitCode = 1 }
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let help (_state: Cli.AppState) : String =
+let help(_state: Cli.AppState): String =
   [ "List the implementations of a trait that are bound on the current branch."
     ""
     "Usage: impls <trait-path> [--json]"
@@ -224,28 +349,28 @@ let help (_state: Cli.AppState) : String =
     "Related:"
     "  search <name> --trait   find a trait anywhere"
     "  constraints             two implementations of one trait for one type, as a finding" ]
-  |> Stdlib.String.join "\n"
+  |> Stdlib.String.join("\n")
 
 
 /// The traits in the current module, then the stdlib's, which is where a bare name resolves.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let complete
-  (state: Cli.AppState)
-  (args: List<String>)
+let complete(
+  state: Cli.AppState,
+  args: List<String>)
   : List<Cli.Completion.CompletionItem> =
   match args with
   | []
   | [ _ ] ->
     let (_, _, _, _, here, _, _) =
-      Query.allDirectDescendantNames
-        state.currentBranchId
-        (Traversal.getCurrentModulePath state.packageData.currentLocation)
+      Query.allDirectDescendantNames(
+        state.currentBranchId,
+        Traversal.getCurrentModulePath(state.packageData.currentLocation))
 
     let (_, _, _, _, stdlib, _, _) =
-      Query.allDirectDescendantNames state.currentBranchId [ "Darklang", "Stdlib" ]
+      Query.allDirectDescendantNames(state.currentBranchId, [ "Darklang", "Stdlib" ])
 
-    Stdlib.List.flatten [ here, stdlib ]
+    Stdlib.List.flatten([ here, stdlib ])
     |> Stdlib.List.unique
     |> Stdlib.List.sort
-    |> Stdlib.List.map Cli.Completion.simple
+    |> Stdlib.List.map(Cli.Completion.simple)
   | _ -> []

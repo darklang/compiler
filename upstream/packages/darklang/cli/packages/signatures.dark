@@ -17,16 +17,16 @@ module Darklang.Cli.Packages.Signatures
 // `Option.Option` regardless of which submodule the listing was scoped to. `shortenName` makes that
 // unnecessary: it drops the longest common prefix with the current module and knows Option and Result
 // resolve bare, so the same listing shortens correctly without anyone naming a namespace.
-let rootContext (branchId: Uuid) (modulePath: List<String>) : PrettyPrinter.ProgramTypes.Context =
-  PrettyPrinter.ProgramTypes.Context.forModule branchId modulePath
+let rootContext(branchId: Uuid, modulePath: List<String>): PrettyPrinter.ProgramTypes.Context =
+  PrettyPrinter.ProgramTypes.Context.forModule(branchId, modulePath)
 
 
 // Renders the signature body only (no name) — e.g.
-// `(list: List<'a>) (fn: 'a -> 'b) -> List<'b>`. Callers prepend the name.
+// `(list: List<'a>, fn: 'a -> 'b): List<'b>`. Callers prepend the name.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
-let formatFn
-  (ctx: PrettyPrinter.ProgramTypes.Context)
-  (fn: LanguageTools.ProgramTypes.PackageFn.PackageFn)
+let formatFn(
+  ctx: PrettyPrinter.ProgramTypes.Context,
+  fn: LanguageTools.ProgramTypes.PackageFn.PackageFn)
   : String =
   // Single Unit param is the Dark convention for a nullary fn; collapse to ().
   let isUnitOnly =
@@ -38,121 +38,174 @@ let formatFn
     | _ -> false
 
   let paramStrs =
-    if isUnitOnly then ["()"]
+    if isUnitOnly then []
     else
-      match fn.parameters with
-      | [] -> ["()"]
-      | _ ->
-        fn.parameters
-        |> Stdlib.List.map (fun p ->
-          let typStr = PrettyPrinter.ProgramTypes.typeReference ctx p.typ
-          $"({p.name}: {typStr})")
+      fn.parameters
+      |> Stdlib.List.map(fun p ->
+        let typStr = PrettyPrinter.ProgramTypes.typeReference(ctx, p.typ)
+        $"{p.name}: {typStr}")
 
-  let ret = PrettyPrinter.ProgramTypes.typeReference ctx fn.returnType
-  let paramsJoined = Stdlib.String.join paramStrs " "
-  $"{paramsJoined} -> {ret}"
+  let ret = PrettyPrinter.ProgramTypes.typeReference(ctx, fn.returnType)
+  let paramsJoined = Stdlib.String.join(paramStrs, ", ")
+  $"({paramsJoined}): {ret}"
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageType.PackageType'"
-let formatType
-  (ctx: PrettyPrinter.ProgramTypes.Context)
-  (name: String)
-  (typ: LanguageTools.ProgramTypes.PackageType.PackageType)
+let formatType(
+  ctx: PrettyPrinter.ProgramTypes.Context,
+  name: String,
+  typ: LanguageTools.ProgramTypes.PackageType.PackageType)
   : String =
   let typeParams =
     match typ.declaration.typeParams with
     | [] -> ""
     | tps ->
-      let parts = tps |> Stdlib.List.map (fun t -> $"'{t}") |> Stdlib.String.join ", "
+      let parts = tps |> Stdlib.List.map(fun t -> $"'{t}") |> Stdlib.String.join(", ")
       $"<{parts}>"
 
   let body =
     match typ.declaration.definition with
-    | Alias tref ->
-      PrettyPrinter.ProgramTypes.typeReference ctx tref
+    | Alias(tref) ->
+      PrettyPrinter.ProgramTypes.typeReference(ctx, tref)
 
-    | Record fields ->
+    | Record(fields) ->
       let parts =
         fields
-        |> Stdlib.List.map (fun f ->
-          $"{f.name}: {PrettyPrinter.ProgramTypes.typeReference ctx f.typ}")
-        |> Stdlib.String.join ", "
+        |> Stdlib.List.map(fun f ->
+          $"{f.name}: {PrettyPrinter.ProgramTypes.typeReference(ctx, f.typ)}")
+        |> Stdlib.String.join(", ")
       $"{{ {parts} }}"
 
-    | Enum cases ->
+    | Enum(cases) ->
       cases
-      |> Stdlib.List.map (fun c ->
+      |> Stdlib.List.map(fun c ->
         match c.fields with
         | [] -> c.name
         | fs ->
           let fieldStrs =
             fs
-            |> Stdlib.List.map (fun f ->
-              let t = PrettyPrinter.ProgramTypes.typeReference ctx f.typ
+            |> Stdlib.List.map(fun f ->
+              let t =
+                match f.typ with
+                | TTuple(first, second, theRest) ->
+                  (Stdlib.List.concat([ first, second ], theRest))
+                  |> Stdlib.List.map(fun item ->
+                    PrettyPrinter.ProgramTypes.typeReferenceFlatAtPrecedence(ctx, true, item))
+                  |> Stdlib.String.join(" * ")
+                | typ -> PrettyPrinter.ProgramTypes.typeReference(ctx, typ)
               match f.label with
-              | Some lbl -> $"{lbl}: {t}"
+              | Some(lbl) -> $"{lbl}: {t}"
               | None -> t)
-            |> Stdlib.String.join " * "
-          $"{c.name} of {fieldStrs}")
-      |> Stdlib.String.join " | "
+            |> Stdlib.String.join(", ")
+          $"{c.name}({fieldStrs})")
+      |> Stdlib.String.join(" | ")
 
   $"type {name}{typeParams} = {body}"
 
 
-let moduleKey (loc: LanguageTools.ProgramTypes.PackageLocation) : String =
-  (Stdlib.List.append [loc.owner] loc.modules) |> Stdlib.String.join "."
+let moduleKey(loc: LanguageTools.ProgramTypes.PackageLocation): String =
+  (Stdlib.List.prepend(loc.modules, loc.owner)) |> Stdlib.String.join(".")
 
 
-let groupByModule
-  (items: List<LanguageTools.ProgramTypes.LocatedItem<'a>>)
+let groupByModule(
+  items: List<LanguageTools.ProgramTypes.LocatedItem<'a>>)
   : Dict<String, List<LanguageTools.ProgramTypes.LocatedItem<'a>>> =
   items
-  |> Stdlib.List.fold Stdlib.Dict.empty (fun acc item ->
-    let key = moduleKey item.location
+  |> Stdlib.List.fold(Stdlib.Dict.empty, fun(acc, item) ->
+    let key = moduleKey(item.location)
     let existing =
-      match Stdlib.Dict.get acc key with
-      | Some xs -> xs
+      match Stdlib.Dict.get(acc, key) with
+      | Some(xs) -> xs
       | None -> []
-    Stdlib.Dict.setOverridingDuplicates acc key (Stdlib.List.append existing [item]))
+    Stdlib.Dict.set(acc, key, Stdlib.List.append(existing, item)))
 
 
-let trimRoot (root: String) (key: String) : String =
+let trimRoot(root: String, key: String): String =
   let prefix = root + "."
   if key == root then "(root)"
-  else if Stdlib.String.startsWith key prefix then
-    Stdlib.String.dropFirst key (Stdlib.String.length prefix)
+  else if Stdlib.String.startsWith(key, prefix) then
+    Stdlib.String.dropFirst(key, Stdlib.String.length(prefix))
   else key
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageType.PackageType'"
-let renderModule
-  (ctx: PrettyPrinter.ProgramTypes.Context)
-  (rootName: String)
-  (modKey: String)
-  (types: List<LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageType.PackageType>>)
-  (fns: List<LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageFn.PackageFn>>)
+let renderModule(
+  ctx: PrettyPrinter.ProgramTypes.Context,
+  rootName: String,
+  modKey: String,
+  types: List<LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageType.PackageType>>,
+  fns: List<LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageFn.PackageFn>>,
+  impls: List<LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.TraitImpl.TraitImpl>>)
   : String =
-  let header = $"## {trimRoot rootName modKey}"
+  let header = $"## {trimRoot(rootName, modKey)}"
 
   let typeLines =
     types
-    |> Stdlib.List.sortBy (fun i -> i.location.name)
-    |> Stdlib.List.map (fun i -> formatType ctx i.location.name i.entity)
+    |> Stdlib.List.sortBy(fun i -> i.location.name)
+    |> Stdlib.List.map(fun i -> formatType(ctx, i.location.name, i.entity))
 
   let fnLines =
     fns
-    |> Stdlib.List.sortBy (fun i -> i.location.name)
-    |> Stdlib.List.map (fun i -> $"{i.location.name} {formatFn ctx i.entity}")
+    |> Stdlib.List.sortBy(fun i -> i.location.name)
+    |> Stdlib.List.map(fun i -> $"{i.location.name}{formatFn(ctx, i.entity)}")
 
-  let body = (Stdlib.List.append typeLines fnLines) |> Stdlib.String.join "\n"
-  $"{header}\n{body}"
+  let body = (Stdlib.List.concat(typeLines, fnLines)) |> Stdlib.String.join("\n")
+
+  let listing =
+    match (typeLines, fnLines) with
+    | ([], []) -> []
+    | _ -> [ $"{header}\n{body}" ]
+
+  let traitSection =
+    match implLines(ctx, impls) with
+    | [] -> []
+    | lines ->
+      [ $"## {trimRoot(rootName, modKey)}: operators and traits\n{Stdlib.String.join(lines, "\n")}" ]
+
+  Stdlib.String.join(Stdlib.List.concat(listing, traitSection), "\n\n")
 
 
+/// One line per method of each impl, written the way a call is: `a % b  (Modulo)`,
+/// `Stdlib.display(v)  (Display)`. An impl's method fns live at the impl's path, which no call
+/// uses, so they are listed here instead of as a module of their own.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
+let implLines(
+  ctx: PrettyPrinter.ProgramTypes.Context,
+  impls: List<LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.TraitImpl.TraitImpl>>)
+  : List<String> =
+  let rows =
+    impls
+    |> Stdlib.List.sortBy(fun i -> i.location.name)
+    |> Stdlib.List.map(fun i ->
+      let traitName =
+        PrettyPrinter.ProgramTypes.NameResolution.traitName(ctx, i.entity.trait_)
+      Packages.Impls.callExamples(ctx.branchId, ctx, i.entity)
+      |> Stdlib.List.map(fun call -> (call, traitName)))
+    |> Stdlib.List.flatten
+
+  let width =
+    rows
+    |> Stdlib.List.map(fun((call, _)) -> Stdlib.String.displayWidth(call))
+    |> Stdlib.List.fold(0, fun(acc, w) -> if w > acc then w else acc)
+
+  rows
+  |> Stdlib.List.map(fun((call, traitName)) ->
+    $"{Stdlib.Text.padEndToWidth(call, width)}  ({traitName})")
+
+
+/// The module path an impl's own method fns sit under: `Darklang.Stdlib.Int64.Modulo`.
+let implModuleKey(loc: LanguageTools.ProgramTypes.PackageLocation): String =
+  moduleKey(loc) + "." + loc.name
+
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Signatures.ParsedArgs: Unknown type 'Cli.Packages.Query.TestModules'"
 type ParsedArgs =
   { root: List<String>
     includeTypes: Bool
-    includeDeprecated: Bool
-    filter: Stdlib.Option.Option<String>
+    deprecated: Cli.Packages.Query.Deprecated
+    internal: Cli.Packages.Query.Internal
+    testModules: Cli.Packages.Query.TestModules
+    filters: List<String>
     all: Bool
     parseErrors: List<FlagParser.ParseError> }
 
@@ -160,36 +213,42 @@ type ParsedArgs =
 val argSpec =
   FlagParser.Spec
     { flags =
-        [ ("--types", []), ("--include-deprecated", []), ("--all", []) ]
+        [ ("--types", []), ("--include-deprecated", []), ("--include-internal", []), ("--include-tests", []), ("--all", []) ]
       valueFlags = [ ("--module", []) ] }
 
 
-// The first positional is the filter; later ones are ignored.
-let parseArgs (args: List<String>) : ParsedArgs =
-  let p = FlagParser.parse argSpec args
+// Every positional is a filter of its own, listed in turn.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
+let parseArgs(args: List<String>): ParsedArgs =
+  let p = FlagParser.parse(argSpec, args)
   let root =
-    match FlagParser.getOption p "--module" with
-    | Some path -> Stdlib.String.split path "."
+    match FlagParser.getOption(p, "--module") with
+    | Some(path) -> Stdlib.String.split(path, ".")
     | None -> [ "Darklang", "Stdlib" ]
 
   ParsedArgs
     { root = root
-      includeTypes = FlagParser.hasFlag p "--types"
-      includeDeprecated = FlagParser.hasFlag p "--include-deprecated"
-      filter = Stdlib.List.head p.positionals
-      all = FlagParser.hasFlag p "--all"
+      includeTypes = FlagParser.hasFlag(p, "--types")
+      deprecated =
+        Cli.Packages.Query.Deprecated.showIf(FlagParser.hasFlag(p, "--include-deprecated"))
+      internal = Cli.Packages.Query.Internal.showIf(FlagParser.hasFlag(p, "--include-internal"))
+      testModules = Cli.Packages.Query.TestModules.showIf(FlagParser.hasFlag(p, "--include-tests"))
+      filters = p.positionals
+      all = FlagParser.hasFlag(p, "--all")
       parseErrors = p.errors }
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let executeFiltered
-  (state: Cli.AppState)
-  (rootPath: List<String>)
-  (includeTypes: Bool)
-  (includeDeprecated: Bool)
-  (filterText: Stdlib.Option.Option<String>)
+let executeFiltered(
+  state: Cli.AppState,
+  rootPath: List<String>,
+  includeTypes: Bool,
+  deprecated: Cli.Packages.Query.Deprecated,
+  internal: Cli.Packages.Query.Internal,
+  testModules: Cli.Packages.Query.TestModules,
+  filterText: Stdlib.Option.Option<String>)
   : Cli.AppState =
-  let rootName = Stdlib.String.join rootPath "."
+  let rootName = Stdlib.String.join(rootPath, ".")
   let branchId = state.currentBranchId
 
   // Always pull the full subtree, then apply our own substring filter against
@@ -203,83 +262,194 @@ let executeFiltered
         entityTypes = []
         exactMatch = false }
 
-  let raw = LanguageTools.PackageManager.Search.search branchId query
-  let depSets = Cli.Packages.Query.loadDeprecationSets branchId
-  let unfiltered = Cli.Packages.Query.filterDeprecated raw depSets includeDeprecated
+  let raw = LanguageTools.PackageManager.Search.search(branchId, query)
+  let depSets = Cli.Packages.Query.loadDeprecationSets(branchId)
+  let unfiltered = Cli.Packages.Query.filterHidden(raw, depSets, deprecated, internal)
 
   let results =
     match filterText with
     | None -> unfiltered
-    | Some needle ->
-      let lower = Stdlib.String.toLowercase needle
+    | Some(needle) ->
+      // A filter ending in a module name, such as `Stdlib.Http`, means that module and not
+      // every module whose name starts the same way (`HttpClient`, `HttpServer`).
+      let endsInModule =
+        Stdlib.String.contains(needle, ".")
+        && (needle
+            |> Stdlib.String.split(".")
+            |> Stdlib.List.last
+            |> Stdlib.Option.andThen(fun last -> Stdlib.String.head(last))
+            |> Stdlib.Option.map(fun c -> Stdlib.Char.isUppercase(c))
+            |> Stdlib.Option.withDefault(false))
+      let lower =
+        (Stdlib.String.toLowercase(needle)) + (if endsInModule then "." else "")
       let hits =
         fun loc ->
-          let pathStr = (Stdlib.String.toLowercase (moduleKey loc)) + "." + (Stdlib.String.toLowercase loc.name)
-          Stdlib.String.contains pathStr lower
+          let pathStr = (Stdlib.String.toLowercase(moduleKey(loc))) + "." + (Stdlib.String.toLowercase(loc.name))
+          Stdlib.String.contains(pathStr, lower)
       LanguageTools.ProgramTypes.Search.SearchResults
         { submodules = unfiltered.submodules
-          types = unfiltered.types |> Stdlib.List.filter (fun i -> hits i.location)
-          values = unfiltered.values |> Stdlib.List.filter (fun i -> hits i.location)
-          fns = unfiltered.fns |> Stdlib.List.filter (fun i -> hits i.location)
-          traits = unfiltered.traits |> Stdlib.List.filter (fun i -> hits i.location)
-          impls = unfiltered.impls |> Stdlib.List.filter (fun i -> hits i.location)
-          tests = unfiltered.tests |> Stdlib.List.filter (fun i -> hits i.location) }
+          types = unfiltered.types |> Stdlib.List.filter(fun i -> hits(i.location))
+          values = unfiltered.values |> Stdlib.List.filter(fun i -> hits(i.location))
+          fns = unfiltered.fns |> Stdlib.List.filter(fun i -> hits(i.location))
+          traits = unfiltered.traits |> Stdlib.List.filter(fun i -> hits(i.location))
+          impls = unfiltered.impls |> Stdlib.List.filter(fun i -> hits(i.location))
+          tests = unfiltered.tests |> Stdlib.List.filter(fun i -> hits(i.location)) }
 
-  let fnsBy = groupByModule results.fns
+  // Test fixtures and helpers (`DateTime.Tests.d`) are not part of an API, so they are left out
+  // unless asked for, or unless the listing is itself rooted in a `Tests` module.
+  let (results, hiddenTestItems) =
+    match testModules with
+    | Show -> (results, 0)
+    | Hide ->
+      if Cli.Packages.Search.inTestModule(rootPath) then
+        (results, 0)
+      else
+        Cli.Packages.Search.withoutTestHelpers(results)
+
+  // An impl's method fns are listed with the impl, as calls, not as a module at the impl's path.
+  // An impl shows when its own path matches the filter or one of its methods does.
+  let implKeys = unfiltered.impls |> Stdlib.List.map(fun i -> implModuleKey(i.location))
+  let (implFns, plainFns) =
+    results.fns
+    |> Stdlib.List.partition(fun f -> Stdlib.List.contains(implKeys, moduleKey(f.location)))
+  let implFnKeys = implFns |> Stdlib.List.map(fun f -> moduleKey(f.location))
+  let matchedImplKeys = results.impls |> Stdlib.List.map(fun i -> implModuleKey(i.location))
+  let shownImpls =
+    unfiltered.impls
+    |> Stdlib.List.filter(fun i ->
+      Stdlib.List.contains(matchedImplKeys, implModuleKey(i.location))
+      || Stdlib.List.contains(implFnKeys, implModuleKey(i.location)))
+
+  let fnsBy = groupByModule(plainFns)
+  let implsBy = groupByModule(shownImpls)
   let typesBy =
-    if includeTypes then groupByModule results.types
+    if includeTypes then groupByModule(results.types)
     else Stdlib.Dict.empty
 
   let allKeys =
-    (Stdlib.List.append (Stdlib.Dict.keys fnsBy) (Stdlib.Dict.keys typesBy))
+    (Stdlib.List.flatten(
+      [ Stdlib.Dict.keys(fnsBy), Stdlib.Dict.keys(typesBy), Stdlib.Dict.keys(implsBy) ]))
     |> Stdlib.List.unique
     |> Stdlib.List.sort
 
-  let ctx = rootContext branchId rootPath
+  let ctx = rootContext(branchId, rootPath)
 
   let sections =
     allKeys
-    |> Stdlib.List.map (fun key ->
-      let ts = match Stdlib.Dict.get typesBy key with | Some v -> v | None -> []
-      let fs = match Stdlib.Dict.get fnsBy key with | Some v -> v | None -> []
-      renderModule ctx rootName key ts fs)
+    |> Stdlib.List.map(fun key ->
+      let ts = match Stdlib.Dict.get(typesBy, key) with | Some(v) -> v | None -> []
+      let fs = match Stdlib.Dict.get(fnsBy, key) with | Some(v) -> v | None -> []
+      let is = match Stdlib.Dict.get(implsBy, key) with | Some(v) -> v | None -> []
+      renderModule(ctx, rootName, key, ts, fs, is))
 
-  let totalFns =
-    (Stdlib.Dict.values fnsBy)
-    |> Stdlib.List.map (fun xs -> Stdlib.List.length xs)
-    |> Stdlib.List.fold 0 (fun a b -> a + b)
+  let totalFns = Stdlib.List.length(plainFns)
+  let totalMethods =
+    shownImpls
+    |> Stdlib.List.map(fun i -> Stdlib.List.length(i.entity.methods))
+    |> Stdlib.List.fold(0, fun(a, b) -> a + b)
 
   let totalTypes =
-    (Stdlib.Dict.values typesBy)
-    |> Stdlib.List.map (fun xs -> Stdlib.List.length xs)
-    |> Stdlib.List.fold 0 (fun a b -> a + b)
+    (Stdlib.Dict.values(typesBy))
+    |> Stdlib.List.map(fun xs -> Stdlib.List.length(xs))
+    |> Stdlib.List.fold(0, fun(a, b) -> a + b)
 
-  let title =
-    match filterText with
-    | None -> $"# {rootName}"
-    | Some t -> $"# {rootName}  (filter: {t})"
+  let matchedNothing = Stdlib.Option.isSome(filterText) && Stdlib.List.isEmpty(allKeys)
 
-  Stdlib.printLine title
-  Stdlib.printLine ""
-  Stdlib.printLine (Stdlib.String.join sections "\n\n")
-  Stdlib.printLine ""
+  // A module exists only through what it holds, so a root that holds nothing is a typo, and
+  // "0 fns across 0 modules" would read as an answer. The same goes for a filter.
+  if
+    Stdlib.List.isEmpty(raw.submodules)
+    && Stdlib.List.isEmpty(raw.types)
+    && Stdlib.List.isEmpty(raw.values)
+    && Stdlib.List.isEmpty(raw.fns)
+    && Stdlib.List.isEmpty(raw.traits)
+    && Stdlib.List.isEmpty(raw.impls)
+    && Stdlib.List.isEmpty(raw.tests)
+  then
+    Cli.printErr($"no module named {rootName} on this branch")
+    Cli.failed(state)
+  else if matchedNothing then
+    let needle = Stdlib.Option.withDefault(filterText, "")
+    let typesHint =
+      if Stdlib.List.isEmpty(results.types) then "" else "; only types do, so add --types"
+    Cli.printErr($"no functions in {rootName} match `{needle}`{typesHint}")
+    match namedLike(rootName, unfiltered.fns, needle) with
+    | [] -> ()
+    | names ->
+      let shown = Stdlib.String.join(names, ", ")
+      Stdlib.printErrorLine(
+        Stdlib.Cli.UI.Colors.hint($"Did you mean {shown}?"))
+    Cli.failed(state)
+  else
+    let title =
+      match filterText with
+      | None -> $"# {rootName}"
+      | Some(t) -> $"# {rootName}  (filter: {t})"
 
-  let typesNote =
-    if includeTypes then $", {Stdlib.toString totalTypes} types"
-    else ""
+    Stdlib.printLine(title)
+    Stdlib.printLine("")
+    Stdlib.printLine(Stdlib.String.join(sections, "\n\n"))
+    Stdlib.printLine("")
 
-  let summary = $"{Stdlib.toString totalFns} fns{typesNote} across {Stdlib.toString (Stdlib.List.length allKeys)} modules"
-  Stdlib.printLine (Stdlib.Cli.UI.Colors.hint summary)
+    let typesNote =
+      if includeTypes then $", {Stdlib.display(totalTypes)} types"
+      else ""
 
-  if Stdlib.Bool.not includeTypes then
-    Stdlib.printLine (Stdlib.Cli.UI.Colors.hint "Use --types to include type definitions. `view <name>` shows source/docs.")
+    let methodsNote =
+      if totalMethods > 0 then $", {Stdlib.display(totalMethods)} operators and trait methods"
+      else ""
 
-  state
+    let summary = $"{Stdlib.display(totalFns)} fns{typesNote}{methodsNote} across {Stdlib.display(Stdlib.List.length(allKeys))} modules"
+    Stdlib.printLine(Stdlib.Cli.UI.Colors.hint(summary))
+
+    if hiddenTestItems > 0 then
+      Stdlib.printErrorLine(
+        Stdlib.Cli.UI.Colors.hint(
+          $"{Stdlib.display(hiddenTestItems)} test helpers left out; --include-tests shows them."))
+
+    state
+
+
+/// `Stdlib.Random` holds nothing, but `Int64.random` and `String.random` exist, and
+/// `Stdlib.Cli.Environment` is `Cli.Env`: the modules and functions a dotted filter's last
+/// part names.
+// @compiler blocked: upstream-dependency diagnostic="namedLike: Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
+let namedLike(
+  rootName: String,
+  fns: List<LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageFn.PackageFn>>,
+  filter: String)
+  : List<String> =
+  match Stdlib.String.split(filter, ".") |> Stdlib.List.last with
+  | Some(last) ->
+    if Stdlib.String.contains(filter, ".") && Stdlib.String.length(last) > 2 then
+      let word = Stdlib.String.toLowercase(last)
+      let shown = fns |> Stdlib.List.filter(fun f -> Stdlib.Bool.not(Cli.Packages.Search.inTestModule(f.location.modules)))
+      let modules =
+        shown
+        |> Stdlib.List.filter(fun f ->
+          match Stdlib.List.last(f.location.modules) with
+          | Some(m) ->
+            let lower = Stdlib.String.toLowercase(m)
+            Stdlib.String.length(lower) > 2
+            && (Stdlib.String.startsWith(word, lower) || Stdlib.String.startsWith(lower, word))
+          | None -> false)
+        |> Stdlib.List.map(fun f -> trimRoot(rootName, moduleKey(f.location)))
+        |> Stdlib.List.unique
+        |> Stdlib.List.sort
+      let named =
+        shown
+        |> Stdlib.List.filter(fun f -> Stdlib.String.contains(Stdlib.String.toLowercase(f.location.name), word))
+        |> Stdlib.List.map(fun f -> trimRoot(rootName, moduleKey(f.location)) + "." + f.location.name)
+        |> Stdlib.List.sort
+      Stdlib.List.concat(modules, named) |> Stdlib.List.take(8)
+    else
+      []
+  | None -> []
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let execute (state: Cli.AppState) (args: List<String>) : Cli.AppState =
-  let parsed = parseArgs args
+let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
+  let parsed = parseArgs(args)
 
   // No scope, no filter, no --all: redirect to the cheap overview rather
   // than dumping every stdlib signature by default.
@@ -290,27 +460,44 @@ let execute (state: Cli.AppState) (args: List<String>) : Cli.AppState =
 
   let isUnscoped =
     isDefaultRoot
-    && (Stdlib.Option.isNone parsed.filter)
-    && (Stdlib.Bool.not parsed.all)
+    && (Stdlib.List.isEmpty(parsed.filters))
+    && (Stdlib.Bool.not(parsed.all))
 
-  if Stdlib.Bool.not (Stdlib.List.isEmpty parsed.parseErrors) then
-    Stdlib.printLine (Stdlib.Cli.UI.Colors.error (FlagParser.parseErrorsMessage parsed.parseErrors))
-    Stdlib.printLine (help state)
-    state
+  if Stdlib.Bool.not(Stdlib.List.isEmpty(parsed.parseErrors)) then
+    Cli.printErr(FlagParser.parseErrorsMessage(parsed.parseErrors))
+    Stdlib.printErrorLine(help(state))
+    Cli.failed(state)
   else if isUnscoped then
-    Darklang.Cli.Docs.StdlibOverview.execute state args
+    Darklang.Cli.Docs.StdlibOverview.execute(state, args)
   else
-    executeFiltered
-      state
-      parsed.root
-      parsed.includeTypes
-      parsed.includeDeprecated
-      parsed.filter
+    let listing(st: Cli.AppState, filter: Stdlib.Option.Option<String>): Cli.AppState =
+      executeFiltered(
+        st,
+        parsed.root,
+        parsed.includeTypes,
+        parsed.deprecated,
+        parsed.internal,
+        parsed.testModules,
+        filter)
+
+    let finalState =
+      match parsed.filters with
+      | [] -> listing(state, Stdlib.Option.Option.None)
+      | [ first, ...rest ] ->
+        rest
+        |> Stdlib.List.fold(listing(state, Stdlib.Option.Option.Some(first)), fun(acc, filter) ->
+          Stdlib.printLine("")
+          listing(acc, Stdlib.Option.Option.Some(filter)))
+
+    if (finalState.exitCode == 0) && (Stdlib.Bool.not(parsed.includeTypes)) then
+      Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint("Use --types to include type definitions. `view <name>` shows source/docs."))
+
+    finalState
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let help (_state: Cli.AppState) : String =
-  [ "Usage: docs signatures [filter|module] [--types] [--module <path>] [--all] [--include-deprecated]"
+let help(_state: Cli.AppState): String =
+  [ "Usage: docs signatures [filter...] [--types] [--module <path>] [--all] [--include-deprecated] [--include-internal] [--include-tests]"
     ""
     "Token-tight dump of stdlib functions with full type signatures."
     "Designed for AI agents needing an API map for a specific module or task."
@@ -318,34 +505,38 @@ let help (_state: Cli.AppState) : String =
     "Without args, prints the cheap module overview (same as `docs stdlib`)."
     ""
     "Options:"
-    "  filter                 Substring match on names/modules (fuzzy)"
+    "  filter                 Substring match on names/modules (fuzzy). Give several"
+    "                         to list each in turn, in one call"
     "  --types                Also emit type definitions (Option, Result, ...)"
     "  --module <path>        Scope to a specific module (e.g. Stdlib.Http)"
     "  --all                  Dump every stdlib fn at once (heavy)"
     "  --include-deprecated   Include deprecated items hidden by default"
+    "  --include-internal     Include internal helpers (names starting with __)"
+    "  --include-tests        Include test helpers (what lives in Tests modules)"
     ""
     "Examples:"
     "  docs signatures                                # cheap overview"
     "  docs signatures uuid                           # filter to 'uuid'"
+    "  docs signatures Stdlib.String Stdlib.List      # two modules, one call"
     "  docs signatures --module Stdlib.Http  # one module"
     "  docs signatures --module Stdlib.Option --types"
     "  docs signatures --all                          # everything (heavy)"
     ""
     "Output: per-module sections, one signature per line."
     "Use `view <name>` to see source code and docs for a single item." ]
-  |> Stdlib.String.join "\n"
+  |> Stdlib.String.join("\n")
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let complete
-  (_state: Cli.AppState)
-  (args: List<String>)
+let complete(
+  _state: Cli.AppState,
+  args: List<String>)
   : List<Cli.Completion.CompletionItem> =
-  match Stdlib.List.last args with
-  | Some last ->
-    if Stdlib.String.startsWith last "--" then
-      [ "--types", "--module", "--include-deprecated" ]
-      |> Stdlib.List.filter (fun f -> Stdlib.String.startsWith f last)
-      |> Stdlib.List.map Cli.Completion.simple
+  match Stdlib.List.last(args) with
+  | Some(last) ->
+    if Stdlib.String.startsWith(last, "--") then
+      [ "--types", "--module", "--include-deprecated", "--include-internal", "--include-tests" ]
+      |> Stdlib.List.filter(fun f -> Stdlib.String.startsWith(f, last))
+      |> Stdlib.List.map(Cli.Completion.simple)
     else []
   | None -> []

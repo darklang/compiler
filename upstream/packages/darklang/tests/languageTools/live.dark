@@ -1,0 +1,201 @@
+module Darklang.LanguageTools.Tests.Live
+
+// `Live.dedupeTouched` and `Live.dependents`: the two places a live host decides
+// WHAT to reload.
+//
+// What already covers them, so this file does not claim to be first: the F# test
+// `poll reports an edit and affects reaches its dependents`
+// (tests/CliWorkspace/live) authors a leaf, a caller and a bystander, polls a real
+// watch, and checks that `affects` reaches the caller and not the bystander,
+// including the transitive walk on its own. The happy path is not the gap.
+//
+// The gap is that a single authored edit touches ONE name, so the dedup in that test
+// never meets a duplicate and never meets the case it exists for. That test would
+// pass with the dedup keyed on location alone, and it would pass with no dedup at
+// all. These are the cases it cannot fail on.
+//
+// Both dedups key on a record (`t.location`) or a tuple containing one
+// (`(t.location, t.kind)`), and `Stdlib.List.uniqueBy` decides equality by Dict key
+// rather than by `==`. Two ways that goes wrong and neither raises: a key the Dict
+// cannot take, and a key too coarse for what it separates. The second is the
+// dangerous one, because a touched name collapsed away is a host that quietly does
+// not reload.
+
+// @compiler xfail compile: "Unknown function or value 'LanguageTools.Live.dedupeTouched'" class=missing-support reason=upstream-dependency
+test dedupeTouched =
+  Stdlib.Test.all(
+    [ // Same location, same kind, twice: one thing to reload.
+      (Stdlib.List.length(
+        (LanguageTools.Live.dedupeTouched(
+          [ LanguageTools.Live.Touched
+              { location =
+                  Darklang.LanguageTools.ProgramTypes.PackageLocation
+                    { owner = "Demo", modules = [ "M" ], name = "a" }
+                kind = Darklang.LanguageTools.ProgramTypes.ItemKind.Fn }
+            LanguageTools.Live.Touched
+              { location =
+                  Darklang.LanguageTools.ProgramTypes.PackageLocation
+                    { owner = "Demo", modules = [ "M" ], name = "a" }
+                kind = Darklang.LanguageTools.ProgramTypes.ItemKind.Fn } ]))))
+      |> Stdlib.Test.equal(1)
+
+      // THE case a coarser key would silently eat: one name bound as a fn and as a
+      // type. Two things to reload, and a dedup on location alone reports one.
+      (Stdlib.List.length(
+        (LanguageTools.Live.dedupeTouched(
+          [ LanguageTools.Live.Touched
+              { location =
+                  Darklang.LanguageTools.ProgramTypes.PackageLocation
+                    { owner = "Demo", modules = [ "M" ], name = "a" }
+                kind = Darklang.LanguageTools.ProgramTypes.ItemKind.Fn }
+            LanguageTools.Live.Touched
+              { location =
+                  Darklang.LanguageTools.ProgramTypes.PackageLocation
+                    { owner = "Demo", modules = [ "M" ], name = "a" }
+                kind = Darklang.LanguageTools.ProgramTypes.ItemKind.Type } ]))))
+      |> Stdlib.Test.equal(2)
+
+      // Different names under the same module are different, so the key reads the
+      // whole location and not just its head.
+      (Stdlib.List.length(
+        (LanguageTools.Live.dedupeTouched(
+          [ LanguageTools.Live.Touched
+              { location =
+                  Darklang.LanguageTools.ProgramTypes.PackageLocation
+                    { owner = "Demo", modules = [ "M" ], name = "a" }
+                kind = Darklang.LanguageTools.ProgramTypes.ItemKind.Fn }
+            LanguageTools.Live.Touched
+              { location =
+                  Darklang.LanguageTools.ProgramTypes.PackageLocation
+                    { owner = "Demo", modules = [ "M" ], name = "b" }
+                kind = Darklang.LanguageTools.ProgramTypes.ItemKind.Fn } ]))))
+      |> Stdlib.Test.equal(2)
+
+      // Nothing touched is nothing to reload, rather than a raise on an empty Dict.
+      LanguageTools.Live.dedupeTouched([]) |> Stdlib.Test.equal([]) ])
+
+// @compiler xfail compile: "Unknown function or value 'LanguageTools.Live.dependents'" class=missing-support reason=upstream-dependency
+test dependents =
+  Stdlib.Test.all(
+    [ // An unknown location: not a raise, not empty, but the seed itself, because
+      // the walk starts with its own frontier in `seen`. Nothing else pins what
+      // this answers for a name that resolves to nothing.
+      (Stdlib.List.length(
+        (LanguageTools.Live.dependents(
+          [ LanguageTools.Live.Touched
+              { location =
+                  Darklang.LanguageTools.ProgramTypes.PackageLocation
+                    { owner = "Nobody", modules = [ "Nothing" ], name = "here" }
+                kind = Darklang.LanguageTools.ProgramTypes.ItemKind.Fn } ]))))
+      |> Stdlib.Test.equal(1)
+
+      // At real scale, where the dependency graph actually has diamonds in it. The
+      // count is not asserted, since it moves with every call site anyone adds;
+      // more than the seed alone is the property, and it is the precondition for
+      // the assertion below meaning anything.
+      (Stdlib.List.length(
+        (LanguageTools.Live.dependents(
+          [ LanguageTools.Live.Touched
+              { location =
+                  Darklang.LanguageTools.ProgramTypes.PackageLocation
+                    { owner = "Darklang"
+                      modules = [ "Stdlib", "List" ]
+                      name = "map" }
+                kind = Darklang.LanguageTools.ProgramTypes.ItemKind.Fn } ]))) > 1)
+      |> Stdlib.Test.equal(true)
+      // Each location ONCE. This is the `uniqueBy` inside the walk, and the one
+      // thing here the F# test above does not assert: without it a diamond reports
+      // the same caller once per path to it, and a host reloads it that many times.
+      (let reached =
+         LanguageTools.Live.dependents(
+           [ LanguageTools.Live.Touched
+               { location =
+                   Darklang.LanguageTools.ProgramTypes.PackageLocation
+                     { owner = "Darklang"
+                       modules = [ "Stdlib", "List" ]
+                       name = "map" }
+                 kind = Darklang.LanguageTools.ProgramTypes.ItemKind.Fn } ])
+       (Stdlib.List.length(reached))
+       == (Stdlib.List.length(Stdlib.List.unique(reached))))
+      |> Stdlib.Test.equal(true) ])
+
+
+// `Live.applicableByName` resolves a name by evaluating it. Only a dotted name of plain
+// identifiers is evaluated, and only a fn comes back.
+module ApplicableByName =
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Live.Tests.ApplicableByName.resolve: Unknown function or value 'Stdlib.Live.applicableByName'"
+  let resolve(name: String): Stdlib.Result.Result<String -> Int64, String> =
+    LanguageTools.Live.applicableByName(Darklang.SCM.Branch.mainBranchId, name)
+
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Live.Tests.ApplicableByName.errorOf: Unknown function or value 'resolve'"
+  let errorOf(name: String): String =
+    match resolve(name) with
+    | Ok(_) -> "resolved"
+    | Error(e) -> e
+
+  // @compiler xfail compile: "Unknown function or value 'resolve'" class=missing-support reason=upstream-dependency
+  test resolvesAFn =
+    match resolve("Darklang.Stdlib.String.length") with
+    | Ok(f) -> f("four") |> Stdlib.Test.equal(4)
+    | Error(e) -> Stdlib.Test.fail(e)
+
+  // @compiler xfail compile: "Unknown function or value 'errorOf'" class=missing-support reason=upstream-dependency
+  test missingFn =
+    errorOf("Darklang.Stdlib.String.noSuchFn")
+    |> Stdlib.Test.equal("No function named Darklang.Stdlib.String.noSuchFn")
+
+  // A value evaluates fine, but it is not a fn.
+  // @compiler xfail compile: "Unknown function or value 'errorOf'" class=missing-support reason=upstream-dependency
+  test valueIsNotAFn =
+    errorOf("Darklang.Stdlib.Math.pi")
+    |> Stdlib.Test.equal("No function named Darklang.Stdlib.Math.pi")
+
+  // Anything but a dotted name is refused before eval sees it.
+  // @compiler xfail compile: "Unknown function or value 'errorOf'" class=missing-support reason=upstream-dependency
+  test codeIsNotEvaluated =
+    Stdlib.Test.all(
+      [ errorOf("Darklang.Stdlib.String.length(\"four\")")
+        |> Stdlib.Test.equal(
+          "Not a package function name: Darklang.Stdlib.String.length(\"four\")")
+        errorOf("length")
+        |> Stdlib.Test.equal("Not a package function name: length")
+        errorOf("")
+        |> Stdlib.Test.equal("Not a package function name: ") ])
+
+
+module IssueText =
+  /// Check real source and render its diagnostics as a live host does.
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Tests.Live.IssueText.messages: Unknown function or value 'LanguageTools.Parser.Parse.packageSourceToOps'"
+  let messages(source: String): List<String> =
+    match
+      LanguageTools.Parser.Parse.packageSourceToOps(
+        Darklang.SCM.Branch.mainBranchId, "Tests", [ "LiveDiagnostics" ], source)
+    with
+    | Error(error) -> [ "Parse failed: " + error ]
+    | Ok(ops) ->
+      (LanguageTools.AtRestTypeChecker.checkPackageOps(ops)).diagnostics
+      |> Stdlib.List.map(LanguageTools.Live.issueText)
+
+  // @compiler xfail compile: "Unknown function or value 'messages'" class=missing-support reason=upstream-dependency
+  test pairCallbackRetainsHint =
+    messages(
+      "let f(): Unit =\n"
+      + "  Stdlib.List.iter([(\"a\", 1)], fun (k, v) -> Stdlib.printLine(k))")
+    |> Stdlib.Test.equal(
+      [ "expected ((String * Int64)) -> Unit, got (String, _) -> Unit"
+        + " (a pair is one argument; write `fun ((a, b)) -> ...`)"
+        + " (`Stdlib.List.iter`, argument 2)" ])
+
+  // @compiler xfail compile: "Unknown function or value 'messages'" class=missing-support reason=upstream-dependency
+  test ordinaryMismatchKeepsLayout =
+    messages("let f(): String = 1")
+    |> Stdlib.Test.equal([ "expected String, got Int64 (return value)" ])
+
+  // @compiler xfail compile: "Unknown function or value 'messages'" class=missing-support reason=upstream-dependency
+  test otherCallbackArityKeepsLayout =
+    messages(
+      "let f(): Unit =\n"
+      + "  Stdlib.List.iter([\"a\"], fun (k, v) -> Stdlib.printLine(k))")
+    |> Stdlib.Test.equal(
+      [ "expected (String) -> Unit, got (String, _) -> Unit"
+        + " (`Stdlib.List.iter`, argument 2)" ])

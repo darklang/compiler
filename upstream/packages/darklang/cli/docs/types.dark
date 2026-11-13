@@ -1,22 +1,25 @@
 module Darklang.Cli.Docs.Types
 
-let content () : String =
+let content(): String =
   """# Types
 
 ## Primitives
-  Int    5, -42
-  Float    3.14, -0.5
+  Int64    5, -42       a bare integer; the other widths are 5s8 ... 5u128
+  BigInt   5z           arbitrary precision (z for ℤ): no size limit
+  Float    3.14, -0.5   a bare fraction or exponent
+  Float32  1.5f32, 1e3f32   single precision
+  Decimal  19.99dec, -0.05dec   exact base-10: 0.1dec + 0.2dec is 0.3dec. For money.
   String   "hello"
   Bool     true, false
   Char     'a'
 
 ## Option
-  Type: Stdlib.Option.Option<Int>
-  Construct: Some 5, None
+  Type: Stdlib.Option.Option<Int64>
+  Construct: Some(5), None
 
 ## Result
-  Type: Stdlib.Result.Result<Int, String>
-  Construct: Ok value, Error msg
+  Type: Stdlib.Result.Result<Int64, String>
+  Construct: Ok(value), Error(msg)
 
 ## Collections
   List<T>     [1, 2]
@@ -24,20 +27,20 @@ let content () : String =
   (a, b)      tuple
 
 ## Records
-  type Person = { name: String, age: Int }
+  type Person = { name: String, age: Int64 }
   Person { name = "Jo", age = 30 }
 
 ## Enums
-  type Status = | Active | Inactive of String
+  type Status = | Active | Inactive(String)
   Status.Active
-  Status.Inactive "reason"
+  Status.Inactive("reason")
 
 ## Generics
   type Box<'a> = { value: 'a }
-  let first<'a: Stdlib.Compare> (a: 'a) (b: 'a) : 'a = if a < b then a else b
+  let first<'a: Stdlib.Compare>(a: 'a, b: 'a): 'a = if a < b then a else b
   // a bound (`'a: Compare`) says what the type must implement; `docs traits`
 
 ## Traits
-  impl ToString for Person =
-    let toString (p: Person) : String = p.name
-  // `jo.toString`, or `ToString.toString jo`; your own with `trait`; `docs traits`"""
+  impl Display for Person =
+    let display(p: Person): String = p.name
+  // `jo.display`, or `Display.display(jo)`; your own with `trait`; `docs traits`"""
