@@ -21,6 +21,8 @@ type typeEntry = {
   path : string list;
   definition : WrittenTypes.typeDefinition;
   bounds : WrittenTypes.typeParamBound list;
+  (* The type this one is an alias of because their contents are the same. *)
+  sameAs : string option;
 }
 
 type typeInventory = typeEntry StringOrder.Map.t

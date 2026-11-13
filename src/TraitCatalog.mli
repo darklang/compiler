@@ -23,6 +23,8 @@ type t = {
   implementations : implementation StringOrder.Map.t;
   functionBounds : (string list * obligation list) StringOrder.Map.t;
   typeBounds : (string list * obligation list) StringOrder.Map.t;
+  (* A type declared with the same content as another, to that other. *)
+  sameTypes : string StringOrder.Map.t;
 }
 
 val empty : t
