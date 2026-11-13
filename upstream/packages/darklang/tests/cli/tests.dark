@@ -14,9 +14,9 @@ module Darklang.Cli.Tests.TestSuite
 /// so the suite validates the thing we're about to ship rather than a Debug
 /// build. That matters most under NativeAOT, where a trimming failure is
 /// invisible at build time and only shows up in the one command that hits it.
-let cliUnderTest () : String =
-  match Stdlib.Env.get "DARK_CLI_UNDER_TEST" with
-  | Some path -> path
+let cliUnderTest(): String =
+  match Stdlib.Env.get("DARK_CLI_UNDER_TEST") with
+  | Some(path) -> path
   | None -> "./scripts/run-cli"
 
 
@@ -24,102 +24,115 @@ let cliUnderTest () : String =
 /// halted harmful call), so dropping stdout on a nonzero exit hid the very text these tests assert
 /// on. Stderr is only surfaced when stdout said nothing: appending it broke exact-match assertions
 /// on any stray diagnostic line.
-let callOutput (result: Stdlib.Cli.ExecutionOutcome) : String =
-  let out = Stdlib.String.trim result.stdout
+let callOutput(result: Stdlib.Cli.ExecutionOutcome): String =
+  let out = Stdlib.String.trim(result.stdout)
 
   if out != "" then out
   else
-    let err = Stdlib.String.trim result.stderr
+    let err = Stdlib.String.trim(result.stderr)
     if err == "" then "" else $"ERROR: {err}"
 
 
 // Quote the CLI path and every argument with Stdlib.Cli.Process.shellQuote.
-let runWithCommand (args: List<String>): String =
+let runWithCommand(args: List<String>): String =
   let argsString =
     args
-    |> Stdlib.List.map Stdlib.Cli.Process.shellQuote
-    |> Stdlib.String.join " "
+    |> Stdlib.List.map(Stdlib.Cli.Process.shellQuote)
+    |> Stdlib.String.join(" ")
   let command =
-    (Stdlib.Cli.Process.shellQuote (cliUnderTest ())) + " " + argsString
-  let result = Stdlib.Cli.Unix.executeInDirectoryWithOutput "." command
+    (Stdlib.Cli.Process.shellQuote(cliUnderTest())) + " " + argsString
+  let result = Stdlib.Cli.Unix.executeInDirectoryWithOutput(".", command)
 
-  callOutput result
+  callOutput(result)
+
+
+// Both streams, for a command whose answer and diagnostics are asserted together: a save prints what
+// it saved on stdout and why it is only a draft on stderr.
+let runWithBothStreams(args: List<String>): String =
+  let argsString =
+    args
+    |> Stdlib.List.map(Stdlib.Cli.Process.shellQuote)
+    |> Stdlib.String.join(" ")
+  let command =
+    (Stdlib.Cli.Process.shellQuote(cliUnderTest())) + " " + argsString
+  let result = Stdlib.Cli.Unix.executeInDirectoryWithOutput(".", command)
+  Stdlib.String.trim(result.stdout + "\n" + result.stderr)
 
 
 // Pass input on stdin for commands such as conflicts walk.
 // Use a quoted argument to printf %s so input cannot change the shell command.
-let runWithStdinAndCommand (input: String) (args: List<String>): String =
+let runWithStdinAndCommand(input: String, args: List<String>): String =
   let argsString =
     args
-    |> Stdlib.List.map Stdlib.Cli.Process.shellQuote
-    |> Stdlib.String.join " "
-  let input = Stdlib.Cli.Process.shellQuote input
-  let cli = Stdlib.Cli.Process.shellQuote (cliUnderTest ())
+    |> Stdlib.List.map(Stdlib.Cli.Process.shellQuote)
+    |> Stdlib.String.join(" ")
+  let input = Stdlib.Cli.Process.shellQuote(input)
+  let cli = Stdlib.Cli.Process.shellQuote(cliUnderTest())
   let command = $"printf '%s' {input} | {cli} {argsString}"
-  let result = Stdlib.Cli.Unix.executeInDirectoryWithOutput "." command
-  callOutput result
+  let result = Stdlib.Cli.Unix.executeInDirectoryWithOutput(".", command)
+  callOutput(result)
 
 
 /// Run a command and compare its whole output exactly.
-let expectExact (args: List<String>) (expected: String): Stdlib.Test.Result =
-  let output = runWithCommand args
+let expectExact(args: List<String>, expected: String): Stdlib.Test.Result =
+  let output = runWithCommand(args)
   if output == expected then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail $"Expected '{expected}', got '{output}'"
+    Stdlib.Test.fail($"Expected '{expected}', got '{output}'")
 
 
 // Drive conflicts walk between a throwaway parent and child.
 // Commit both sides before merging and pass -y to avoid an interactive prompt.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test conflictWalkthrough =
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let parent = "cli-walk-parent-" + suffix
   let child = "cli-walk-child-" + suffix
   let fnName = "Tests.CliWalk.f" + suffix
 
-  let _ = runWithCommand [ "branch", "create", parent ]
+  let _ = runWithCommand([ "branch", "create", parent ])
   // A shared base for the name: both sides have to move it from something.
-  let _ = runWithCommand [ "--branch", parent, "fn", "/" + fnName, "() : Int64 = 1L" ]
-  let _ = runWithCommand [ "--branch", parent, "commit", "shared base", "-y" ]
-  let _ = runWithCommand [ "--branch", parent, "branch", "create", child ]
-  let _ = runWithCommand [ "--branch", child, "fn", "/" + fnName, "() : Int64 = 222L" ]
-  let _ = runWithCommand [ "--branch", child, "commit", "child change", "-y" ]
-  let _ = runWithCommand [ "--branch", parent, "fn", "/" + fnName, "() : Int64 = 111L" ]
-  let _ = runWithCommand [ "--branch", parent, "commit", "parent change", "-y" ]
+  let _ = runWithCommand([ "--branch", parent, "fn", "/" + fnName, "() : Int64 = 1" ])
+  let _ = runWithCommand([ "--branch", parent, "commit", "shared base", "-y" ])
+  let _ = runWithCommand([ "--branch", parent, "branch", "create", child ])
+  let _ = runWithCommand([ "--branch", child, "fn", "/" + fnName, "() : Int64 = 222" ])
+  let _ = runWithCommand([ "--branch", child, "commit", "child change", "-y" ])
+  let _ = runWithCommand([ "--branch", parent, "fn", "/" + fnName, "() : Int64 = 111" ])
+  let _ = runWithCommand([ "--branch", parent, "commit", "parent change", "-y" ])
 
-  let merged = runWithCommand [ "--branch", child, "merge", child, "-y" ]
-  let beforeJson = runWithCommand [ "--branch", parent, "conflicts", "--json" ]
+  let merged = runWithCommand([ "--branch", child, "merge", child, "-y" ])
+  let beforeJson = runWithCommand([ "--branch", parent, "conflicts", "--json" ])
   // `b` takes the other side, which is the answer that has to WRITE something.
-  let walked = runWithStdinAndCommand "b\n" [ "--branch", parent, "conflicts", "walk" ]
-  let afterJson = runWithCommand [ "--branch", parent, "conflicts", "--json" ]
-  let onMain = runWithCommand [ "--branch", "main", "eval", fnName + " ()" ]
+  let walked = runWithStdinAndCommand("b\n", [ "--branch", parent, "conflicts", "walk" ])
+  let afterJson = runWithCommand([ "--branch", parent, "conflicts", "--json" ])
+  let onMain = runWithCommand([ "--branch", "main", "eval", fnName + " ()" ])
 
   // Archive before asserting, not after: every arm below returns, so a trailing cleanup only runs
   // on the passing path, and these branches are otherwise permanent.
-  let _ = runWithCommand [ "branch", "archive", child, "-y" ]
-  let _ = runWithCommand [ "branch", "archive", parent, "-y" ]
+  let _ = runWithCommand([ "branch", "archive", child, "-y" ])
+  let _ = runWithCommand([ "branch", "archive", parent, "-y" ])
 
-  if Stdlib.Bool.not (Stdlib.String.contains merged "conflict") then
-    Stdlib.Test.fail $"Expected the merge to record a conflict; got: {merged}"
-  else if Stdlib.Bool.not (Stdlib.String.contains beforeJson "\"pending\":1") then
-    Stdlib.Test.fail $"Expected one pending conflict before the walk; got: {beforeJson}"
-  else if Stdlib.String.contains walked "ERROR:" then
-    Stdlib.Test.fail $"`conflicts walk` failed: {walked}"
-  else if Stdlib.Bool.not (Stdlib.String.contains walked "took theirs") then
-    Stdlib.Test.fail $"Expected the walk to take the other side on `b`; got: {walked}"
-  else if Stdlib.Bool.not (Stdlib.String.contains afterJson "\"pending\":0") then
-    Stdlib.Test.fail $"Expected nothing pending after the walk; got: {afterJson}"
-  else if Stdlib.Bool.not (Stdlib.String.contains onMain "not found") then
-    Stdlib.Test.fail
-      $"A conflict resolved between two branches reached MAIN. Got: {onMain}"
+  if Stdlib.Bool.not(Stdlib.String.contains(merged, "conflict")) then
+    Stdlib.Test.fail($"Expected the merge to record a conflict; got: {merged}")
+  else if Stdlib.Bool.not(Stdlib.String.contains(beforeJson, "\"pending\":1")) then
+    Stdlib.Test.fail($"Expected one pending conflict before the walk; got: {beforeJson}")
+  else if Stdlib.String.contains(walked, "ERROR:") then
+    Stdlib.Test.fail($"`conflicts walk` failed: {walked}")
+  else if Stdlib.Bool.not(Stdlib.String.contains(walked, "took theirs")) then
+    Stdlib.Test.fail($"Expected the walk to take the other side on `b`; got: {walked}")
+  else if Stdlib.Bool.not(Stdlib.String.contains(afterJson, "\"pending\":0")) then
+    Stdlib.Test.fail($"Expected nothing pending after the walk; got: {afterJson}")
+  else if Stdlib.Bool.not(Stdlib.String.contains(onMain, "not found")) then
+    Stdlib.Test.fail(
+      $"A conflict resolved between two branches reached MAIN. Got: {onMain}")
   else
     Stdlib.Test.Result.Pass
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test helpCommand =
-  let output = runWithCommand ["help"]
+  let output = runWithCommand(["help"])
 
   // Assert on the groups and a command from a few of them.
   //
@@ -127,59 +140,59 @@ test helpCommand =
   // the workbench's description, so it would have stayed green with the `nav` command deleted; "help",
   // "version" and "status" all appear in other commands' descriptions too. The row shape
   // (`  name (aliases) - `) is what `formatCommandGroup` emits and is unique per command.
-  if Stdlib.String.contains output "Packages:" &&
-      Stdlib.String.contains output "  nav (cd) -" &&
-      Stdlib.String.contains output "  ls (dir) -" &&
-      Stdlib.String.contains output "  version (--version, -v) -" &&
-      Stdlib.String.contains output "  status (wip, changes) -" then
+  if Stdlib.String.contains(output, "Packages:") &&
+      Stdlib.String.contains(output, "  nav (cd) -") &&
+      Stdlib.String.contains(output, "  ls (dir) -") &&
+      Stdlib.String.contains(output, "  version (--version, -v) -") &&
+      Stdlib.String.contains(output, "  status (wip, changes) -") then
       Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail "Expected help grouped by category, with the nav/ls/version/status rows rendered"
+    Stdlib.Test.fail("Expected help grouped by category, with the nav/ls/version/status rows rendered")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test versionCommand =
-  let output = runWithCommand ["version"]
-  if Stdlib.String.contains output "Darklang CLI" &&
-      Stdlib.String.contains output "alpha-" then
+  let output = runWithCommand(["version"])
+  if Stdlib.String.contains(output, "Darklang CLI") &&
+      Stdlib.String.contains(output, "alpha-") then
       Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail "Expected version string with 'Darklang CLI alpha-'"
+    Stdlib.Test.fail("Expected version string with 'Darklang CLI alpha-'")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test statusCommand =
   // Two things, because `status` is the one signal you get while editing: WHERE you are, and WHAT you have.
   // The branch line matters most when several branches are in play, which is the normal case now.
-  let output = runWithCommand ["status"]
-  if Stdlib.String.contains output "On branch" &&
-      (Stdlib.String.contains output "clean:" ||
-       Stdlib.String.contains output "draft:") then
+  let output = runWithCommand(["status"])
+  if Stdlib.String.contains(output, "On branch") &&
+      (Stdlib.String.contains(output, "clean:") ||
+       Stdlib.String.contains(output, "draft:")) then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail
-      $"Expected `status` to name the branch and summarise the draft; got: {output}"
+    Stdlib.Test.fail(
+      $"Expected `status` to name the branch and summarise the draft; got: {output}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test evalBoolAnd =
   // `run` is for script files now; calling a package function is `eval`'s job, without the `@`.
-  expectExact ["eval", "Stdlib.Bool.and true false"] "false"
+  expectExact(["eval", "Stdlib.Bool.and(true, false)"], "false")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test evalInt64Add =
-  expectExact ["eval", "(5L + 3L)"] "8"
+  expectExact(["eval", "(5 + 3)"], "8")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test evalStringLength =
-  expectExact ["eval", "Stdlib.String.length \"hello\""] "5"
+  expectExact(["eval", "Stdlib.String.length(\"hello\")"], "5")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test evalListLength =
-  expectExact ["eval", "[1, 2, 3] |> Stdlib.List.length"] "3"
+  expectExact(["eval", "[1, 2, 3] |> Stdlib.List.length"], "3")
 
 
 /// Create, update, and what happens to a module that does not type-check.
@@ -190,95 +203,95 @@ test evalListLength =
 /// message says it is WIP, and the definitions that were already there are untouched.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test moduleCommand =
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let branchName = "cli-module-test-" + suffix
   let moduleName = "Tests.CliModule"
   let initialSource =
-    [ "type Counter = { value: Int }"
+    [ "type Counter = { value: Int64 }"
       ""
       "val initial = Counter { value = 0 }"
       ""
-      "let double (n: Int) : Int = n * 2"
+      "let double(n: Int64): Int64 = n * 2"
       ""
-      "let quadruple (n: Int) : Int = double (double n)"
-    ] |> Stdlib.String.join "\n"
+      "let quadruple(n: Int64): Int64 = double(double(n))"
+    ] |> Stdlib.String.join("\n")
   let updatedSource =
-    [ "type Counter = { value: Int }"
+    [ "type Counter = { value: Int64 }"
       ""
       "val initial = Counter { value = 1 }"
       ""
-      "let double (n: Int) : Int = n * 3"
+      "let double(n: Int64): Int64 = n * 3"
       ""
-      "let quadruple (n: Int) : Int = double (double n)"
-    ] |> Stdlib.String.join "\n"
+      "let quadruple(n: Int64): Int64 = double(double(n))"
+    ] |> Stdlib.String.join("\n")
   let invalidSource =
-    [ "type Wrapped = Wrap of (Int * String)"
+    [ "type Wrapped = Wrap(Int64 * String)"
       ""
-      "let shouldNotExist (value: Wrapped) : Wrapped ="
+      "let shouldNotExist(value: Wrapped): Wrapped ="
       "  match value with"
       "  | Wrap((number, text)) -> Wrapped.Wrap(number, text)"
-    ] |> Stdlib.String.join "\n"
-  let initialPath = Stdlib.Cli.File.createTemp () |> Builtin.unwrap
-  let updatedPath = Stdlib.Cli.File.createTemp () |> Builtin.unwrap
-  let invalidPath = Stdlib.Cli.File.createTemp () |> Builtin.unwrap
+    ] |> Stdlib.String.join("\n")
+  let initialPath = Stdlib.Cli.File.createTemp() |> Builtin.unwrap
+  let updatedPath = Stdlib.Cli.File.createTemp() |> Builtin.unwrap
+  let invalidPath = Stdlib.Cli.File.createTemp() |> Builtin.unwrap
   let _ =
-    (Stdlib.Cli.File.writeAtomic initialPath initialSource) |> Builtin.unwrap
+    (Stdlib.Cli.File.writeAtomic(initialPath, initialSource)) |> Builtin.unwrap
   let _ =
-    (Stdlib.Cli.File.writeAtomic updatedPath updatedSource) |> Builtin.unwrap
+    (Stdlib.Cli.File.writeAtomic(updatedPath, updatedSource)) |> Builtin.unwrap
   let _ =
-    (Stdlib.Cli.File.writeAtomic invalidPath invalidSource) |> Builtin.unwrap
-  let _ = runWithCommand ["branch", "create", branchName]
+    (Stdlib.Cli.File.writeAtomic(invalidPath, invalidSource)) |> Builtin.unwrap
+  let _ = runWithCommand(["branch", "create", branchName])
   let moduleOutput =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "module"
         "/" + moduleName
-        initialPath ]
+        initialPath ])
   let initialEval =
-    runWithCommand
-      [ "--branch", branchName, "eval", moduleName + ".quadruple 3" ]
+    runWithCommand(
+      [ "--branch", branchName, "eval", moduleName + ".quadruple(3)" ])
   let updateOutput =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "module"
         "/" + moduleName
-        updatedPath ]
+        updatedPath ])
   let updatedEval =
-    runWithCommand
-      [ "--branch", branchName, "eval", moduleName + ".quadruple 3" ]
+    runWithCommand(
+      [ "--branch", branchName, "eval", moduleName + ".quadruple(3)" ])
   let invalidOutput =
-    runWithCommand
+    runWithBothStreams(
       [ "--branch"
         branchName
         "module"
         "/" + moduleName
-        invalidPath ]
+        invalidPath ])
   let searchOutput =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "search"
         moduleName + ".shouldNotExist"
         "--exact"
-        "--fn" ]
+        "--fn" ])
   let afterInvalidEval =
-    runWithCommand
-      [ "--branch", branchName, "eval", moduleName + ".quadruple 3" ]
-  let _ = runWithCommand ["branch", "archive", branchName, "-y"]
-  let _ = Stdlib.Cli.File.delete initialPath
-  let _ = Stdlib.Cli.File.delete updatedPath
-  let _ = Stdlib.Cli.File.delete invalidPath
+    runWithCommand(
+      [ "--branch", branchName, "eval", moduleName + ".quadruple(3)" ])
+  let _ = runWithCommand(["branch", "archive", branchName, "-y"])
+  let _ = Stdlib.Cli.File.delete(initialPath)
+  let _ = Stdlib.Cli.File.delete(updatedPath)
+  let _ = Stdlib.Cli.File.delete(invalidPath)
 
   if
-    Stdlib.String.contains moduleOutput "Defined 4 declarations"
+    Stdlib.String.contains(moduleOutput, "Defined 4 declarations")
     && initialEval == "12"
-    && Stdlib.String.contains updateOutput "Defined 4 declarations"
+    && Stdlib.String.contains(updateOutput, "Defined 4 declarations")
     && updatedEval == "27"
-    && Stdlib.String.contains invalidOutput "expects 1 field"
-    && Stdlib.String.contains invalidOutput "Saved as a draft"
-    && Stdlib.String.contains searchOutput "shouldNotExist"
+    && Stdlib.String.contains(invalidOutput, "expects 1 field")
+    && Stdlib.String.contains(invalidOutput, "Saved as a draft")
+    && Stdlib.String.contains(searchOutput, "shouldNotExist")
     && afterInvalidEval == "27"
   then
     Stdlib.Test.Result.Pass
@@ -291,355 +304,605 @@ test moduleCommand =
         $"invalid: {invalidOutput}"
         $"invalid item search: {searchOutput}"
         $"eval after invalid: {afterInvalidEval}"
-      ] |> Stdlib.String.join "; "
-    Stdlib.Test.fail
-      $"Expected atomic create, update, and rejection; got {details}"
+      ] |> Stdlib.String.join("; ")
+    Stdlib.Test.fail(
+      $"Expected atomic create, update, and rejection; got {details}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test moduleRejectsDuplicateNames =
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let branchName = "cli-module-duplicate-test-" + suffix
   let moduleName = "Tests.CliModuleDuplicate"
   let source =
-    [ "let duplicate (n: Int) : Int = n"
+    [ "let duplicate(n: Int64): Int64 = n"
       ""
-      "let duplicate (n: Int) : Int = n + 1"
-    ] |> Stdlib.String.join "\n"
-  let sourcePath = Stdlib.Cli.File.createTemp () |> Builtin.unwrap
-  let _ = Stdlib.Cli.File.writeAtomic sourcePath source |> Builtin.unwrap
-  let _ = runWithCommand ["branch", "create", branchName]
+      "let duplicate(n: Int64): Int64 = n + 1"
+    ] |> Stdlib.String.join("\n")
+  let sourcePath = Stdlib.Cli.File.createTemp() |> Builtin.unwrap
+  let _ = Stdlib.Cli.File.writeAtomic(sourcePath, source) |> Builtin.unwrap
+  let _ = runWithCommand(["branch", "create", branchName])
   let moduleOutput =
-    runWithCommand
-      [ "--branch", branchName, "module", "/" + moduleName, sourcePath ]
+    runWithCommand(
+      [ "--branch", branchName, "module", "/" + moduleName, sourcePath ])
   let searchOutput =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "search"
         moduleName + ".duplicate"
         "--exact"
-        "--fn" ]
-  let _ = runWithCommand ["branch", "archive", branchName, "-y"]
-  let _ = Stdlib.Cli.File.delete sourcePath
+        "--fn" ])
+  let _ = runWithCommand(["branch", "archive", branchName, "-y"])
+  let _ = Stdlib.Cli.File.delete(sourcePath)
 
   if
-    Stdlib.String.contains moduleOutput "duplicate declaration names"
-    && Stdlib.String.contains moduleOutput "duplicate"
-    && Stdlib.String.contains searchOutput "No results found"
+    Stdlib.String.contains(moduleOutput, "duplicate declaration names")
+    && Stdlib.String.contains(moduleOutput, "duplicate")
+    && Stdlib.String.contains(searchOutput, "No results found")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail
+    Stdlib.Test.fail(
       ($"Expected duplicate declarations to be rejected without mutation; "
-       + $"module={moduleOutput}; search={searchOutput}")
+       + $"module={moduleOutput}; search={searchOutput}"))
+
+
+// A module save that fails the type check says which function each error is in.
+// @compiler xfail runtime: "Expected each failing function named above its error; got /bin/sh: 1: ./scripts/run-cli: not found" class=missing-support reason=compiler-gap
+test moduleSaveNamesTheFunctionsWithTypeErrors =
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
+  let branchName = "cli-module-type-errors-test-" + suffix
+  let moduleName = "Tests.CliModuleTypeErrors"
+  let source =
+    [ "let addsText(n: Int64): Int64 = n + \"x\""
+      ""
+      "let multipliesText(n: Int64): Int64 = n * \"y\""
+      ""
+      "let fine(n: Int64): Int64 = n"
+    ] |> Stdlib.String.join("\n")
+  let sourcePath = Stdlib.Cli.File.createTemp() |> Builtin.unwrap
+  let _ = Stdlib.Cli.File.writeAtomic(sourcePath, source) |> Builtin.unwrap
+  let _ = runWithCommand(["branch", "create", branchName])
+  let output =
+    runWithBothStreams(
+      [ "--branch", branchName, "module", "/" + moduleName, sourcePath ])
+  let _ = runWithCommand(["branch", "archive", branchName, "-y"])
+  let _ = Stdlib.Cli.File.delete(sourcePath)
+
+  let namedAboveItsError(fnName: String): Bool =
+    Stdlib.String.contains(
+      output,
+      $"  {moduleName}.{fnName}:\n    - [TypeMismatch]")
+
+  if
+    namedAboveItsError("addsText")
+    && namedAboveItsError("multipliesText")
+    && Stdlib.Bool.not(Stdlib.String.contains(output, $"{moduleName}.fine:"))
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail($"Expected each failing function named above its error; got {output}")
+
+
+// Two functions with identical bodies share a hash, and the trait-calls line still names each.
+// @compiler xfail runtime: "Expected the trait-calls line to name each function once; got /bin/sh: 1: ./scripts/run-cli: not found" class=missing-support reason=compiler-gap
+test moduleSaveNamesEachIdenticalFunctionWithUnresolvedTraitCalls =
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
+  let branchName = "cli-module-trait-calls-test-" + suffix
+  let moduleName = "Tests.CliModuleTraitCalls"
+  let source =
+    [ "let addsText(n: Int64): Int64 = n + \"x\""
+      ""
+      "let addsTextToo(n: Int64): Int64 = n + \"x\""
+    ] |> Stdlib.String.join("\n")
+  let sourcePath = Stdlib.Cli.File.createTemp() |> Builtin.unwrap
+  let _ = Stdlib.Cli.File.writeAtomic(sourcePath, source) |> Builtin.unwrap
+  let _ = runWithCommand(["branch", "create", branchName])
+  let output =
+    runWithBothStreams(
+      [ "--branch", branchName, "module", "/" + moduleName, sourcePath ])
+  let _ = runWithCommand(["branch", "archive", branchName, "-y"])
+  let _ = Stdlib.Cli.File.delete(sourcePath)
+
+  if
+    Stdlib.String.contains(
+      output,
+      $"in 2 item(s), will run whichever implementation is newest when they run: {moduleName}.addsText (1), {moduleName}.addsTextToo (1)")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail($"Expected the trait-calls line to name each function once; got {output}")
 
 
 // Merge a child into a throwaway parent so the test leaves no function on main.
 // Commit the changes before merging and pass -y to avoid an interactive prompt.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test mergeRoundTrip =
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let parent = "cli-merge-parent-" + suffix
   let child = "cli-merge-child-" + suffix
   let fnName = "Tests.CliMerge.landed" + suffix
 
-  let _ = runWithCommand [ "branch", "create", parent ]
-  let _ = runWithCommand [ "--branch", parent, "branch", "create", child ]
+  let _ = runWithCommand([ "branch", "create", parent ])
+  let _ = runWithCommand([ "--branch", parent, "branch", "create", child ])
   let _ =
-    runWithCommand
-      [ "--branch", child, "fn", "/" + fnName, "() : Int64 = 7L" ]
-  let _ = runWithCommand [ "--branch", child, "commit", "merge fixture", "-y" ]
+    runWithCommand(
+      [ "--branch", child, "fn", "/" + fnName, "() : Int64 = 7" ])
+  let _ = runWithCommand([ "--branch", child, "commit", "merge fixture", "-y" ])
 
   // --dry-run records nothing, so it has to answer the same question the merge does without doing it.
-  let dryRun = runWithCommand [ "--branch", child, "merge", child, "--dry-run" ]
-  let merged = runWithCommand [ "--branch", child, "merge", child, "-y" ]
-  let onParent = runWithCommand [ "--branch", parent, "eval", fnName + " ()" ]
-  let onMain = runWithCommand [ "--branch", "main", "eval", fnName + " ()" ]
+  let dryRun = runWithCommand([ "--branch", child, "merge", child, "--dry-run" ])
+  let merged = runWithCommand([ "--branch", child, "merge", child, "-y" ])
+  let onParent = runWithCommand([ "--branch", parent, "eval", fnName + " ()" ])
+  let onMain = runWithCommand([ "--branch", "main", "eval", fnName + " ()" ])
 
   // Archived before the assertions, because each arm returns and a trailing cleanup would only run
   // on the passing path.
-  let _ = runWithCommand [ "branch", "archive", child, "-y" ]
-  let _ = runWithCommand [ "branch", "archive", parent, "-y" ]
+  let _ = runWithCommand([ "branch", "archive", child, "-y" ])
+  let _ = runWithCommand([ "branch", "archive", parent, "-y" ])
 
-  if Stdlib.String.contains dryRun "ERROR:" then
-    Stdlib.Test.fail $"`merge --dry-run` failed: {dryRun}"
-  else if Stdlib.Bool.not (Stdlib.String.contains dryRun parent) then
-    Stdlib.Test.fail $"Expected `merge --dry-run` to name the parent it would merge into; got: {dryRun}"
-  else if Stdlib.Bool.not (Stdlib.String.contains dryRun fnName) then
-    Stdlib.Test.fail $"Expected `merge --dry-run` to list the name that would land; got: {dryRun}"
-  else if Stdlib.Bool.not (Stdlib.String.contains merged "Merged") then
-    Stdlib.Test.fail $"Expected `merge` to report what it merged; got: {merged}"
+  if Stdlib.String.contains(dryRun, "ERROR:") then
+    Stdlib.Test.fail($"`merge --dry-run` failed: {dryRun}")
+  else if Stdlib.Bool.not(Stdlib.String.contains(dryRun, parent)) then
+    Stdlib.Test.fail($"Expected `merge --dry-run` to name the parent it would merge into; got: {dryRun}")
+  else if Stdlib.Bool.not(Stdlib.String.contains(dryRun, fnName)) then
+    Stdlib.Test.fail($"Expected `merge --dry-run` to list the name that would land; got: {dryRun}")
+  else if Stdlib.Bool.not(Stdlib.String.contains(merged, "Merged")) then
+    Stdlib.Test.fail($"Expected `merge` to report what it merged; got: {merged}")
   else if onParent != "7" then
-    Stdlib.Test.fail $"Expected the merged fn to resolve on the parent as 7; got: {onParent}"
+    Stdlib.Test.fail($"Expected the merged fn to resolve on the parent as 7; got: {onParent}")
   else if onMain == "7" then
-    Stdlib.Test.fail
-      $"A merge into \"{parent}\" reached MAIN -- the branch overlay leaked. Got: {onMain}"
+    Stdlib.Test.fail(
+      $"A merge into \"{parent}\" reached MAIN -- the branch overlay leaked. Got: {onMain}")
   else
     Stdlib.Test.Result.Pass
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test fnAcceptsCompleteDeclaration =
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let branchName = "cli-authoring-test-" + suffix
   let moduleName = "Tests.CliAuthoring"
   let fnSource =
     [ "/// Greets someone by name."
-      "let main (name: String) : String ="
+      "let main(name: String): String ="
       "  \"Hello, \" + name"
-    ] |> Stdlib.String.join "\n"
+    ] |> Stdlib.String.join("\n")
   let mismatchedSource =
-    "let other (name: String) : String = name"
+    "let other(name: String): String = name"
   let multipleSource =
-    [ "let extra (n: Int) : Int = n"
-      "let ignored (n: Int) : Int = n" ]
-    |> Stdlib.String.join "\n"
-  let _ = runWithCommand [ "branch", "create", branchName ]
+    [ "let extra(n: Int64): Int64 = n"
+      "let ignored(n: Int64): Int64 = n" ]
+    |> Stdlib.String.join("\n")
+  let _ = runWithCommand([ "branch", "create", branchName ])
   let fnOutput =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "fn"
         "/" + moduleName + ".main"
-        fnSource ]
+        fnSource ])
   let evalOutput =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "eval"
-        moduleName + ".main \"Dark\"" ]
+        moduleName + ".main(\"Dark\")" ])
   let fragmentOutput =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "fn"
         "/" + moduleName + ".double"
-        "(n: Int) : Int = n * 2" ]
+        "(n: Int64) : Int64 = n * 2" ])
   let fragmentEval =
-    runWithCommand
-      [ "--branch", branchName, "eval", moduleName + ".double 4" ]
+    runWithCommand(
+      [ "--branch", branchName, "eval", moduleName + ".double(4)" ])
   let mismatchOutput =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "fn"
         "/" + moduleName + ".main"
-        mismatchedSource ]
+        mismatchedSource ])
   let multipleOutput =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "fn"
         "/" + moduleName + ".extra"
-        multipleSource ]
-  let _ = runWithCommand [ "branch", "archive", branchName, "-y" ]
+        multipleSource ])
+  let _ = runWithCommand([ "branch", "archive", branchName, "-y" ])
 
   if
-    Stdlib.String.contains fnOutput "Created function"
+    Stdlib.String.contains(fnOutput, "Created function")
     && evalOutput == "Hello, Dark"
-    && Stdlib.String.contains fragmentOutput "Created function"
+    && Stdlib.String.contains(fragmentOutput, "Created function")
     && fragmentEval == "8"
-    && Stdlib.String.contains mismatchOutput "does not match target"
-    && Stdlib.String.contains multipleOutput "something after the definition"
-    && Stdlib.String.contains multipleOutput "nothing was saved"
-    && Stdlib.Bool.not (Stdlib.String.contains multipleOutput "Created function")
+    && Stdlib.String.contains(mismatchOutput, "does not match target")
+    && Stdlib.String.contains(multipleOutput, "something after the definition")
+    && Stdlib.String.contains(multipleOutput, "nothing was saved")
+    && Stdlib.Bool.not(Stdlib.String.contains(multipleOutput, "Created function"))
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail
+    Stdlib.Test.fail(
       ($"Expected complete and fragment fn input with target-name validation; "
        + $"fn={fnOutput}; eval={evalOutput}; fragment={fragmentOutput}; "
        + $"fragment eval={fragmentEval}; mismatch={mismatchOutput}; "
-       + $"multiple={multipleOutput}")
+       + $"multiple={multipleOutput}"))
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test listFunctions =
-  let output = runWithCommand ["ls", "Stdlib.List"]
-  if Stdlib.String.contains output "Functions" &&
-      Stdlib.String.contains output "head" then
+  let output = runWithCommand(["ls", "Stdlib.List"])
+  if Stdlib.String.contains(output, "Functions") &&
+      Stdlib.String.contains(output, "head") then
       Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail "Expected directory listing with functions"
+    Stdlib.Test.fail("Expected directory listing with functions")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test viewFunction =
-  let output = runWithCommand ["view", "Stdlib.List.head"]
-  if Stdlib.String.contains output "head"
-    && Stdlib.String.contains output "Option"
-    && Stdlib.String.contains output "->"
+  let output = runWithCommand(["view", "Stdlib.List.head"])
+  if Stdlib.String.contains(output, "head")
+    && Stdlib.String.contains(output, "Option")
+    && Stdlib.String.contains(output, "->")
   then
       Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail "Expected function signature for List.head"
+    Stdlib.Test.fail("Expected function signature for List.head")
 
 
 // Exercise the harmful gate through a real CLI process: the gate lives in the CLI host.
 // Each command names main explicitly because deprecation folding only runs on main.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test harmfulGate =
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let fnName = $"Tests.HarmGate.g{suffix}"
-  let onMain (args: List<String>) : String =
-    runWithCommand (Stdlib.List.append [ "--branch", "main" ] args)
+  let onMain(args: List<String>): String =
+    runWithCommand(Stdlib.List.concat([ "--branch", "main" ], args))
 
-  let _ = onMain [ "fn", fnName, "(x: Int64) : Int64 = (x + 31L)" ]
+  let _ = onMain([ "fn", fnName, "(x: Int64) : Int64 = (x + 31)" ])
 
   let _ =
-    onMain
-      [ "deprecate", "fn", fnName, "--kind", "harmful", "-m", "test", "--yes" ]
+    onMain(
+      [ "deprecate", "fn", fnName, "--kind", "harmful", "-m", "test", "--yes" ])
 
-  let halted = onMain [ "eval", $"{fnName} 0L" ]
-  let allowed = onMain [ "eval", $"{fnName} 0L", "--allow-harmful" ]
+  let halted = onMain([ "eval", $"{fnName}(0)" ])
+  let allowed = onMain([ "eval", $"{fnName}(0)", "--allow-harmful" ])
 
-  if Stdlib.Bool.not (Stdlib.String.contains halted "Harmful") then
-    Stdlib.Test.fail
-      $"a fn marked harmful should refuse to run without the flag, got: {halted}"
-  else if Stdlib.Bool.not (Stdlib.String.contains allowed "31") then
+  if Stdlib.Bool.not(Stdlib.String.contains(halted, "Harmful")) then
+    Stdlib.Test.fail(
+      $"a fn marked harmful should refuse to run without the flag, got: {halted}")
+  else if Stdlib.Bool.not(Stdlib.String.contains(allowed, "31")) then
     // The halt message names `--allow-harmful`, so the flag has to do what the message promises.
-    Stdlib.Test.fail $"--allow-harmful should run it anyway, got: {allowed}"
+    Stdlib.Test.fail($"--allow-harmful should run it anyway, got: {allowed}")
   else
     Stdlib.Test.Result.Pass
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test searchMatchesModuleAndCamelCaseName =
-  let output = runWithCommand ["search", "string toList", "--fn"]
-  if Stdlib.String.contains output "Darklang.Stdlib.String.toList" then
+  let output = runWithCommand(["search", "string toList", "--fn"])
+  if Stdlib.String.contains(output, "Darklang.Stdlib.String.toList") then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail
-      $"Expected `string toList` to find Stdlib.String.toList, got: {output}"
+    Stdlib.Test.fail(
+      $"Expected `string toList` to find Stdlib.String.toList, got: {output}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test searchMatchesModuleAndOperationName =
-  let output = runWithCommand ["search", "json parse", "--fn"]
-  if Stdlib.String.contains output "Darklang.Stdlib.Json.parse" then
+  let output = runWithCommand(["search", "json parse", "--fn"])
+  if Stdlib.String.contains(output, "Darklang.Stdlib.Json.parse") then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail
-      $"Expected `json parse` to find Stdlib.Json.parse, got: {output}"
+    Stdlib.Test.fail(
+      $"Expected `json parse` to find Stdlib.Json.parse, got: {output}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test searchFindsNestedHelpersFromParentModule =
-  let output = runWithCommand ["search", "AltJson.get", "--fn"]
+  let output = runWithCommand(["search", "AltJson.get", "--fn"])
 
-  if Stdlib.String.contains output "Darklang.Stdlib.AltJson.Helpers.getIntResult" then
+  if Stdlib.String.contains(output, "Darklang.Stdlib.AltJson.Helpers.getInt64Result") then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail
-      $"Expected `AltJson.get` to find nested AltJson helpers, got: {output}"
+    Stdlib.Test.fail(
+      $"Expected `AltJson.get` to find nested AltJson helpers, got: {output}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test batchSearchKeepsQueriesIndependent =
   let output =
-    runWithCommand
+    runWithCommand(
       [ "search"
         "--batch"
         "string toList"
         "json parse"
         "list map"
-        "--fn" ]
+        "--fn" ])
 
   if
-    Stdlib.String.contains output "Search results for: string toList"
-    && Stdlib.String.contains output "Darklang.Stdlib.String.toList"
-    && Stdlib.String.contains output "Search results for: json parse"
-    && Stdlib.String.contains output "Darklang.Stdlib.Json.parse"
-    && Stdlib.String.contains output "Search results for: list map"
-    && Stdlib.String.contains output "Darklang.Stdlib.List.map"
+    Stdlib.String.contains(output, "Search results for: string toList")
+    && Stdlib.String.contains(output, "Darklang.Stdlib.String.toList")
+    && Stdlib.String.contains(output, "Search results for: json parse")
+    && Stdlib.String.contains(output, "Darklang.Stdlib.Json.parse")
+    && Stdlib.String.contains(output, "Search results for: list map")
+    && Stdlib.String.contains(output, "Darklang.Stdlib.List.map")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail
-      $"Expected three independent batch search results, got: {output}"
+    Stdlib.Test.fail(
+      $"Expected three independent batch search results, got: {output}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test unresolvedNameGuidance =
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let branchName = "cli-name-guidance-test-" + suffix
   let moduleName = "Tests.CliNameGuidance"
-  let _ = runWithCommand ["branch", "create", branchName]
+  let _ = runWithCommand(["branch", "create", branchName])
+  // Both streams: the suggestion is a warning, so it is on stderr beside the "Created" line.
   let stdlibOutput =
-    runWithCommand
+    runWithBothStreams(
       [ "--branch"
         branchName
         "fn"
         "/" + moduleName + ".negate"
-        "(value: Bool) : Bool = Bool.not value" ]
+        "(value: Bool) : Bool = Bool.not(value)" ])
   let internalSource =
-    ("(values: List<Int>) : List<Int> = "
-     + "PACKAGE.Darklang.Stdlib.List.map values (fun value -> value)")
+    ("(values: List<Int64>) : List<Int64> = "
+     + "PACKAGE.Darklang.Stdlib.List.map(values, fun value -> value)")
   let packageOutput =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "fn"
         "/" + moduleName + ".map"
-        internalSource ]
+        internalSource ])
   // `-y`: the branch holds unmerged names, so a bare archive is refused and every later test would run
   // on this branch. Archiving the branch you stand on moves the process (and the config) back to main.
-  let _ = runWithCommand ["branch", "archive", branchName, "-y"]
+  let _ = runWithCommand(["branch", "archive", branchName, "-y"])
 
   if
-    Stdlib.String.contains stdlibOutput "Did you mean `Stdlib.Bool.not`?"
-    && Stdlib.String.contains packageOutput "`PACKAGE.` is internal notation"
-    && Stdlib.String.contains packageOutput "write `Stdlib.List.map`"
-    && Stdlib.Bool.not (Stdlib.String.contains packageOutput "Created function")
+    Stdlib.String.contains(stdlibOutput, "Did you mean `Stdlib.Bool.not`?")
+    && Stdlib.String.contains(packageOutput, "`PACKAGE.` is internal notation")
+    && Stdlib.String.contains(packageOutput, "write `Stdlib.List.map`")
+    && Stdlib.Bool.not(Stdlib.String.contains(packageOutput, "Created function"))
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail
+    Stdlib.Test.fail(
       ($"Expected source-name guidance; stdlib={stdlibOutput}; "
-       + $"PACKAGE={packageOutput}")
+       + $"PACKAGE={packageOutput}"))
+
+
+/// Eval with stdout and stderr apart, for an error whose text and exit code are both asserted.
+let evalOutcome(expr: String): Stdlib.Cli.ExecutionOutcome =
+  let cli = Stdlib.Cli.Process.shellQuote(cliUnderTest())
+  let quoted = Stdlib.Cli.Process.shellQuote(expr)
+  Stdlib.Cli.Unix.executeInDirectoryWithOutput(".", $"{cli} eval {quoted}")
+
+
+// #6024: agents guess `Stdlib.Int64.toString`; the function is `Stdlib.display`, and the error
+// should say so. A name with nothing near it gets no guess.
+// @compiler xfail runtime: "Expected a suggestion for the moved name only; moved=/bin/sh: 1: ./scripts/run-cli: not found" class=missing-support reason=compiler-gap
+test notFoundSuggestsTheEnclosingStdlibName =
+  let moved = evalOutcome("Stdlib.Int64.toString(5)")
+  let unprefixed = evalOutcome("Int64.toString(5)")
+  let nowhere = evalOutcome("Stdlib.Nope.zzz(5)")
+
+  if
+    moved.exitCode != 0
+    && Stdlib.String.contains(moved.stderr, "Did you mean `Stdlib.display`?")
+    && Stdlib.String.contains(unprefixed.stderr, "Did you mean `Stdlib.display`?")
+    && nowhere.exitCode != 0
+    && Stdlib.String.contains(nowhere.stderr, "Stdlib.Nope.zzz not found")
+    && Stdlib.Bool.not(Stdlib.String.contains(nowhere.stderr, "Did you mean"))
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail(
+      ($"Expected a suggestion for the moved name only; moved={moved.stderr}; "
+       + $"unprefixed={unprefixed.stderr}; nowhere={nowhere.stderr}"))
+
+
+/// The written names <fn Darklang.Cli.Packages.Errors.stdlibSuggestion> would try, in order.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.TestSuite.suggestionCandidates: Unknown function or value 'Darklang.Cli.Packages.Errors.stdlibSuggestionCandidates'"
+let suggestionCandidates(name: String): List<String> =
+  Darklang.Cli.Packages.Errors.stdlibSuggestionCandidates(Stdlib.String.split(name, "."))
+  |> Stdlib.List.map(fun((written, _)) -> written)
+
+
+// @compiler xfail compile: "Unknown function or value 'suggestionCandidates'" class=missing-support reason=upstream-dependency
+test stdlibSuggestionCandidatesWalkUpWithinStdlib =
+  Stdlib.Test.all(
+    [ suggestionCandidates("Bool.not") |> Stdlib.Test.equal([ "Stdlib.Bool.not", "Stdlib.not" ])
+      suggestionCandidates("Int64.toString")
+      |> Stdlib.Test.equal([ "Stdlib.Int64.toString", "Stdlib.toString", "Stdlib.display" ])
+      suggestionCandidates("Me.Utils.render") |> Stdlib.Test.equal([ "Stdlib.Me.Utils.render" ])
+      suggestionCandidates("Stdlib.Int64.toString")
+      |> Stdlib.Test.equal([ "Stdlib.toString", "Stdlib.display" ])
+      suggestionCandidates("Stdlib.toRepr") |> Stdlib.Test.equal([ "Stdlib.inspect" ])
+      suggestionCandidates("Stdlib.A.B.name")
+      |> Stdlib.Test.equal([ "Stdlib.A.name", "Stdlib.name" ])
+      suggestionCandidates("Darklang.Stdlib.Int64.toString")
+      |> Stdlib.Test.equal([ "Darklang.Stdlib.toString", "Darklang.Stdlib.display" ])
+      suggestionCandidates("Stdlib.display") |> Stdlib.Test.equal([])
+      suggestionCandidates("Darklang.Cli.foo") |> Stdlib.Test.equal([])
+      suggestionCandidates("toString") |> Stdlib.Test.equal([]) ])
+
+
+// @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Packages.Errors.stdlibSuggestion'" class=missing-support reason=upstream-dependency
+test stdlibSuggestionFindsTheRealName =
+  let branch = Darklang.SCM.Branch.mainBranchId
+  let suggest = fun name ->
+    Darklang.Cli.Packages.Errors.stdlibSuggestion(branch, Stdlib.String.split(name, "."))
+
+  Stdlib.Test.all(
+    [ suggest("Stdlib.Int64.toString")
+      |> Stdlib.Test.equal(Stdlib.Option.Option.Some("Stdlib.display"))
+      suggest("Stdlib.List.Nope.length")
+      |> Stdlib.Test.equal(Stdlib.Option.Option.Some("Stdlib.List.length"))
+      suggest("Bool.not") |> Stdlib.Test.equal(Stdlib.Option.Option.Some("Stdlib.Bool.not"))
+      suggest("Stdlib.String.fromBytes")
+      |> Stdlib.Test.equal(Stdlib.Option.Option.Some("Stdlib.Utf8.decode"))
+      suggest("Bytes.toString") |> Stdlib.Test.equal(Stdlib.Option.Option.Some("Stdlib.Utf8.decode"))
+      suggest("String.toBytes") |> Stdlib.Test.equal(Stdlib.Option.Option.Some("Stdlib.Utf8.encode"))
+      suggest("Stdlib.Nope.zzz") |> Stdlib.Test.equal(Stdlib.Option.Option.None) ])
+
+// @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Packages.Errors.closestNames'" class=missing-support reason=upstream-dependency
+test closestNamesAreSpelledNear =
+  let branch = Darklang.SCM.Branch.mainBranchId
+  let closest = fun name ->
+    Darklang.Cli.Packages.Errors.closestNames(branch, Stdlib.String.split(name, "."))
+
+  Stdlib.Test.all(
+    [ closest("Stdlib.List.lenght") |> Stdlib.Test.equal([ "Stdlib.List.length" ])
+      closest("Stdlib.String.touppercase")
+      |> Stdlib.Test.equal([ "Stdlib.String.toUppercase" ])
+      Stdlib.List.contains(closest("Stdlib.String.toUpper"), "Stdlib.String.toUppercase")
+      |> Stdlib.Test.equal(true)
+      closest("String.lenght") |> Stdlib.Test.equal([ "Stdlib.String.length" ])
+      closest("Darklang.Stdlib.List.revers")
+      |> Stdlib.Test.equal([ "Darklang.Stdlib.List.reverse" ])
+      closest("Stdlib.List.zzzzzzzz") |> Stdlib.Test.equal([])
+      closest("Stdlib.Nope.zzz") |> Stdlib.Test.equal([])
+      closest("lenght") |> Stdlib.Test.equal([])
+      closest("Stdlib.List.member") |> Stdlib.Test.equal([ "Stdlib.List.contains" ])
+      closest("Stdlib.String.size") |> Stdlib.Test.equal([ "Stdlib.String.length" ]) ])
+
+
+// A function name for an operator points at the operator, when the type has it.
+// @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Packages.Errors.operatorSuggestion'" class=missing-support reason=upstream-dependency
+test operatorNamesSuggestTheOperator =
+  let branch = Darklang.SCM.Branch.mainBranchId
+  let suggest = fun name ->
+    Darklang.Cli.Packages.Errors.operatorSuggestion(branch, Stdlib.String.split(name, "."))
+
+  Stdlib.Test.all(
+    [ suggest("Stdlib.Int64.mod") |> Stdlib.Test.equal(Stdlib.Option.Option.Some("a % b"))
+      suggest("Int64.modulo") |> Stdlib.Test.equal(Stdlib.Option.Option.Some("a % b"))
+      suggest("Stdlib.Float.pow") |> Stdlib.Test.equal(Stdlib.Option.Option.Some("a ** b"))
+      suggest("Stdlib.String.mod") |> Stdlib.Test.equal(Stdlib.Option.Option.None)
+      suggest("Stdlib.Int64.zzz") |> Stdlib.Test.equal(Stdlib.Option.Option.None)
+      suggest("mod") |> Stdlib.Test.equal(Stdlib.Option.Option.None) ])
+
+
+// `Stdlib.Int64.mod` said only "not found", and searching for it never showed `%`.
+// @compiler xfail runtime: "Expected `a % b`; eval=/bin/sh: 1: ./scripts/run-cli: not found" class=missing-support reason=compiler-gap
+test int64ModSuggestsPercent =
+  let evaluated = evalOutcome("Stdlib.Int64.mod(7, 3)")
+  let searched = runWithBothStreams([ "search", "Int64.mod", "--fn" ])
+
+  if
+    evaluated.exitCode != 0
+    && Stdlib.String.contains(evaluated.stderr, "Did you mean `a % b`?")
+    && Stdlib.String.contains(searched, "Int64.mod is the operator: a % b")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail($"Expected `a % b`; eval={evaluated.stderr}; search={searched}")
+
+
+test didYouMeanText =
+  let text = Darklang.Cli.Packages.Errors.didYouMeanText
+
+  Stdlib.Test.all(
+    [ text([]) |> Stdlib.Test.equal("")
+      text([ "A.a" ]) |> Stdlib.Test.equal("Did you mean `A.a`?")
+      text([ "A.a", "A.b", "A.c" ]) |> Stdlib.Test.equal("Did you mean `A.a`, `A.b` or `A.c`?") ])
+
+
+// A misspelt name gets the names spelled near it, on eval and on save.
+// @compiler xfail runtime: "Expected a near name; eval=/bin/sh: 1: ./scripts/run-cli: not found" class=missing-support reason=compiler-gap
+test notFoundSuggestsNamesSpelledNear =
+  let evaluated = evalOutcome("Stdlib.List.lenght([1])")
+  let branchName = "cli-did-you-mean-test-" + Stdlib.display(Stdlib.Int64.random(100000, 999999))
+  let _ = runWithCommand([ "branch", "create", branchName ])
+  let saved =
+    runWithBothStreams(
+      [ "--branch"
+        branchName
+        "fn"
+        "/Tests.CliDidYouMean.size"
+        "(xs: List<Int64>) : Int64 = Stdlib.List.lenght(xs)" ])
+  let _ = runWithCommand([ "branch", "archive", branchName, "-y" ])
+
+  if
+    evaluated.exitCode != 0
+    && Stdlib.String.contains(evaluated.stderr, "Did you mean `Stdlib.List.length`?")
+    && Stdlib.String.contains(saved, "Did you mean `Stdlib.List.length`?")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail($"Expected a near name; eval={evaluated.stderr}; save={saved}")
+
+
+// #6024: an impl's methods are called through its trait, never at the type's module, so
+// `view` and `search` say where: the `Stdlib.display` shortcut beside `Display`, and the
+// trait's own path for one without a shortcut.
+// @compiler xfail runtime: "Expected call paths; view=ERROR: /bin/sh: 1: ./scripts/run-cli: not found; search=ERROR: /bin/sh: 1: ./scripts/run-cli: not found" class=missing-support reason=compiler-gap
+test implListingsSayWhereTheMethodsAreCalled =
+  let viewed = runWithCommand([ "view", "Stdlib.Int64" ])
+  let searched = runWithCommand([ "search", "Int64.display", "--impl" ])
+
+  if
+    Stdlib.String.contains(viewed, "Stdlib.display")
+    && Stdlib.String.contains(viewed, "Stdlib.Add.add")
+    && Stdlib.Bool.not(Stdlib.String.contains(viewed, "Stdlib.Int64.toString"))
+    && Stdlib.String.contains(searched, "Stdlib.display(v)")
+    && Stdlib.String.contains(searched, "impl Display for Int64")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail($"Expected call paths; view={viewed}; search={searched}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test listTypes =
-  let output = runWithCommand ["ls", "Stdlib.Option"]
-  if Stdlib.String.contains output "Types" &&
-      Stdlib.String.contains output "Option" then
+  let output = runWithCommand(["ls", "Stdlib.Option"])
+  if Stdlib.String.contains(output, "Types") &&
+      Stdlib.String.contains(output, "Option") then
       Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail "Expected directory listing with types"
+    Stdlib.Test.fail("Expected directory listing with types")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test helpForRun =
-  let output = runWithCommand ["help", "run"]
+  let output = runWithCommand(["help", "run"])
   // `contains output "run"` is satisfied by the unknown-command fallback ("No help available for command:
   // run"), so it can't tell "help worked" from "help failed". The usage line is topic-unique, and it also
   // proves the `run` alias resolved to `run-script`, which is the rename this branch made.
-  if Stdlib.String.contains output "Usage: run-script" then
+  if Stdlib.String.contains(output, "Usage: run-script") then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail "Expected `help run` to resolve the alias and print run-script's usage"
+    Stdlib.Test.fail("Expected `help run` to resolve the alias and print run-script's usage")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test helpForLs =
-  let output = runWithCommand ["help", "ls"]
+  let output = runWithCommand(["help", "ls"])
   // Same reasoning as `help run`: assert something only the real topic prints.
-  if Stdlib.String.contains output "Usage: ls" then
+  if Stdlib.String.contains(output, "Usage: ls") then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail "Expected `help ls` to print ls's usage"
+    Stdlib.Test.fail("Expected `help ls` to print ls's usage")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test evalSimpleExpression =
-  expectExact ["eval", "2L + 3L"] "5"
+  expectExact(["eval", "2 + 3"], "5")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test evalStringExpression =
-  expectExact ["eval", "\"hello\" + \"world\""] "helloworld"
+  expectExact(["eval", "\"hello\" + \"world\""], "helloworld")
 
 
 // ---------------------------------------------------------------- compiler views
@@ -649,35 +912,36 @@ test evalStringExpression =
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test viewAst =
-  let output = runWithCommand ["view", "Stdlib.List.last", "--ast"]
+  let output = runWithCommand(["view", "Stdlib.List.dropLast", "--ast"])
 
-  // A signature line, then the body tree with its node kinds. `Match`/`Arg` are what `last` is made of.
+  // A signature line, then the body tree with its node kinds. `Match`/`Arg` are what `dropLast` is made
+  // of.
   // Label and detail are coloured separately, so a row's text isn't contiguous in the output. Match on
   // the pieces rather than on a whole rendered line.
-  if Stdlib.String.contains output "last<'a> (list: List<'a>) ->"
-    && Stdlib.String.contains output "Match"
-    && Stdlib.String.contains output "on Arg #0, 2 cases"
-    && Stdlib.String.contains output "head :: tail"
+  if Stdlib.String.contains(output, "dropLast<'a> (list: List<'a>) ->")
+    && Stdlib.String.contains(output, "Match")
+    && Stdlib.String.contains(output, "on Arg #0, 2 cases")
+    && Stdlib.String.contains(output, "[head, ...tail]")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail $"Expected an AST tree with signature rows and node kinds, got: {output}"
+    Stdlib.Test.fail($"Expected an AST tree with signature rows and node kinds, got: {output}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test viewInstructions =
-  let output = runWithCommand ["view", "Stdlib.List.push", "--instructions"]
+  let output = runWithCommand(["view", "Stdlib.List.prepend", "--instructions"])
 
-  // `push` is a thin wrapper over a builtin, so it must load the builtin and apply it.
-  if Stdlib.String.contains output "instructions"
-    && Stdlib.String.contains output "registers"
-    && Stdlib.String.contains output "LoadVal"
-    && Stdlib.String.contains output "Apply"
-    && Stdlib.String.contains output "listPush"
+  // `prepend` is a thin wrapper over a builtin, so it must load the builtin and apply it.
+  if Stdlib.String.contains(output, "instructions")
+    && Stdlib.String.contains(output, "registers")
+    && Stdlib.String.contains(output, "LoadVal")
+    && Stdlib.String.contains(output, "Apply")
+    && Stdlib.String.contains(output, "listPrepend")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail $"Expected an instruction listing for List.push, got: {output}"
+    Stdlib.Test.fail($"Expected an instruction listing for List.prepend, got: {output}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
@@ -688,62 +952,62 @@ test viewInstructionsShowsLambdas =
   // The subject is authored here rather than borrowed from the stdlib. Whether a given stdlib function
   // compiles to a lambda is an implementation detail: it can become a direct builtin call, and then a
   // test pointing at it still runs, still fails, and covers nothing.
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let name = "Tests.CliLambda.keepBig" + suffix
 
   let _ =
-    runWithCommand
+    runWithCommand(
       [ "fn"
         "/" + name
-        "(xs: List<Int64>) : List<Int64> = Stdlib.List.filter xs (fun x -> if x > 2L then true else false)" ]
+        "(xs: List<Int64>) : List<Int64> = Stdlib.List.filter(xs, fun x -> if x > 2 then true else false)" ])
 
-  let output = runWithCommand ["view", name, "--instructions"]
-  let _ = runWithCommand [ "delete", "fn", name, "--yes" ]
+  let output = runWithCommand(["view", name, "--instructions"])
+  let _ = runWithCommand([ "delete", "fn", name, "--yes" ])
 
-  if Stdlib.String.contains output "CreateLambda"
-    && Stdlib.String.contains output "lambda#"
-    && Stdlib.String.contains output "JumpByIfFalse"
+  if Stdlib.String.contains(output, "CreateLambda")
+    && Stdlib.String.contains(output, "lambda#")
+    && Stdlib.String.contains(output, "JumpByIfFalse")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail $"Expected the lambda's own listing under {name}'s, got: {output}"
+    Stdlib.Test.fail($"Expected the lambda's own listing under {name}'s, got: {output}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test viewCompilerViewsRejectNonFunctions =
   // Both views are function-only, and saying which kind of thing you pointed at beats "not found".
-  let typeOutput = runWithCommand ["view", "Stdlib.Option.Option", "--ast"]
-  let moduleOutput = runWithCommand ["view", "Stdlib.List", "--instructions"]
+  let typeOutput = runWithCommand(["view", "Stdlib.Option.Option", "--ast"])
+  let moduleOutput = runWithCommand(["view", "Stdlib.List", "--instructions"])
 
-  if Stdlib.String.contains typeOutput "type"
-    && Stdlib.String.contains moduleOutput "module"
+  if Stdlib.String.contains(typeOutput, "type")
+    && Stdlib.String.contains(moduleOutput, "module")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail
-      $"Expected kind-specific refusals, got type: {typeOutput}, module: {moduleOutput}"
+    Stdlib.Test.fail(
+      $"Expected kind-specific refusals, got type: {typeOutput}, module: {moduleOutput}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test viewFlagBeforePath =
   // Flags are position-independent; this is the ordering people actually type.
-  let output = runWithCommand ["view", "--ast", "Stdlib.List.push"]
+  let output = runWithCommand(["view", "--ast", "Stdlib.List.prepend"])
 
-  if Stdlib.String.contains output "push" && Stdlib.String.contains output "->" then
+  if Stdlib.String.contains(output, "prepend") && Stdlib.String.contains(output, "->") then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail $"Expected --ast to work before the path, got: {output}"
+    Stdlib.Test.fail($"Expected --ast to work before the path, got: {output}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test viewUnknownFlag =
-  let output = runWithCommand ["view", "Stdlib.List.push", "--nope"]
+  let output = runWithCommand(["view", "Stdlib.List.prepend", "--nope"])
 
-  if Stdlib.String.contains output "does not take `--nope`"
-    && Stdlib.String.contains output "dark view --help" then
+  if Stdlib.String.contains(output, "does not take `--nope`")
+    && Stdlib.String.contains(output, "dark view --help") then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail $"Expected a refusal naming the flag and pointing to help, got: {output}"
+    Stdlib.Test.fail($"Expected a refusal naming the flag and pointing to help, got: {output}")
 
 
 // ---------------------------------------------------------------- native list rewrites
@@ -753,35 +1017,35 @@ test viewUnknownFlag =
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test nativeListEdgeCases =
   let cases =
-    [ ("Stdlib.List.getAt [1,2,3] 0", "1")
-      ("Stdlib.List.getAt [1,2,3] 2", "3")
-      ("Stdlib.List.getAt [1,2,3] 3", "None")
-      ("Stdlib.List.getAt [1,2,3] (-1)", "None")
-      ("Stdlib.List.getAt [] 0", "None")
-      ("Stdlib.List.reverse [1,2,3]", "[3, 2, 1]")
-      ("Stdlib.List.reverse []", "[]")
-      ("Stdlib.List.push [2,3] 1", "[1, 2, 3]")
-      ("Stdlib.List.push [] 1", "[1]")
-      ("Stdlib.List.pushBack [1,2] 3", "[1, 2, 3]")
-      ("Stdlib.List.pushBack [] 1", "[1]")
-      ("Stdlib.List.flatten [[1,2],[3]]", "[1, 2, 3]")
-      ("Stdlib.List.flatten []", "[]")
-      ("Stdlib.List.flatten [[],[1],[]]", "[1]") ]
+    [ ("Stdlib.List.getAt([1,2,3], 0)", "1")
+      ("Stdlib.List.getAt([1,2,3], 2)", "3")
+      ("Stdlib.List.getAt([1,2,3], 3)", "None")
+      ("Stdlib.List.getAt([1,2,3], -1)", "None")
+      ("Stdlib.List.getAt([], 0)", "None")
+      ("Stdlib.List.reverse([1,2,3])", "[3, 2, 1]")
+      ("Stdlib.List.reverse([])", "[]")
+      ("Stdlib.List.prepend([2,3], 1)", "[1, 2, 3]")
+      ("Stdlib.List.prepend([], 1)", "[1]")
+      ("Stdlib.List.append([1,2], 3)", "[1, 2, 3]")
+      ("Stdlib.List.append([], 1)", "[1]")
+      ("Stdlib.List.flatten([[1,2],[3]])", "[1, 2, 3]")
+      ("Stdlib.List.flatten([])", "[]")
+      ("Stdlib.List.flatten([[],[1],[]])", "[1]") ]
 
   let failures =
     cases
-    |> Stdlib.List.filterMap (fun pair ->
+    |> Stdlib.List.filterMap(fun pair ->
       let (expr, expected) = pair
-      let output = runWithCommand ["eval", expr]
+      let output = runWithCommand(["eval", expr])
 
-      if Stdlib.String.contains output expected then
+      if Stdlib.String.contains(output, expected) then
         Stdlib.Option.Option.None
       else
-        Stdlib.Option.Option.Some $"`{expr}` expected `{expected}`, got `{output}`")
+        Stdlib.Option.Option.Some($"`{expr}` expected `{expected}`, got `{output}`"))
 
   match failures with
   | [] -> Stdlib.Test.Result.Pass
-  | _ -> Stdlib.Test.fail (Stdlib.String.join failures "; ")
+  | _ -> Stdlib.Test.fail(Stdlib.String.join(failures, "; "))
 
 
 /// A `None` from `getAt` must still compare and match as a plain `None`. The native version threads the
@@ -797,31 +1061,31 @@ test nativeListEdgeCases =
 /// each resolve differently, so all three are here.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test explicitTypeArgs =
-  let scalar = runWithCommand ["eval", "Stdlib.Json.parse<Int64> \"3\""]
-  let container = runWithCommand ["eval", "Stdlib.Json.parse<List<Int64>> \"[1,2]\""]
-  let custom = runWithCommand ["eval", "Stdlib.Json.parse<Stdlib.Uuid.ParseError> \"{}\""]
+  let scalar = runWithCommand(["eval", "Stdlib.Json.parse<Int64>(\"3\")"])
+  let container = runWithCommand(["eval", "Stdlib.Json.parse<List<Int64>>(\"[1,2]\")"])
+  let custom = runWithCommand(["eval", "Stdlib.Json.parse<Stdlib.Uuid.ParseError>(\"{}\")"])
 
   if
-    Stdlib.String.contains scalar "Ok" && Stdlib.String.contains scalar "3"
-      && Stdlib.String.contains container "Ok"
-      && Stdlib.String.contains container "[1, 2]"
-      && Stdlib.String.contains custom "ParseError"
+    Stdlib.String.contains(scalar, "Ok") && Stdlib.String.contains(scalar, "3")
+      && Stdlib.String.contains(container, "Ok")
+      && Stdlib.String.contains(container, "[1, 2]")
+      && Stdlib.String.contains(custom, "ParseError")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail
-      $"Expected explicit type args to resolve; got scalar: {scalar}, container: {container}, custom: {custom}"
+    Stdlib.Test.fail(
+      $"Expected explicit type args to resolve; got scalar: {scalar}, container: {container}, custom: {custom}")
 
 
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test getAtNoneIsStillNone =
-  let eq = runWithCommand ["eval", "(Stdlib.List.getAt [1,2,3] 99) == Stdlib.Option.Option.None"]
-  let dflt = runWithCommand ["eval", "Stdlib.Option.withDefault (Stdlib.List.getAt [1,2,3] 99) 0"]
+  let eq = runWithCommand(["eval", "(Stdlib.List.getAt([1,2,3], 99)) == Stdlib.Option.Option.None"])
+  let dflt = runWithCommand(["eval", "Stdlib.Option.withDefault(Stdlib.List.getAt([1,2,3], 99), 0)"])
 
-  if Stdlib.String.contains eq "true" && Stdlib.String.contains dflt "0" then
+  if Stdlib.String.contains(eq, "true") && Stdlib.String.contains(dflt, "0") then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail $"Expected out-of-bounds None to behave as None, got eq: {eq}, default: {dflt}"
+    Stdlib.Test.fail($"Expected out-of-bounds None to behave as None, got eq: {eq}, default: {dflt}")
 
 
 /// `view --raw` prints the declaration and nothing else.
@@ -832,17 +1096,17 @@ test getAtNoneIsStillNone =
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test viewRawIsUndecorated =
   let esc = "\u001b"
-  let raw = runWithCommand [ "view", "Stdlib.List.head", "--raw" ]
-  let decorated = runWithCommand [ "view", "Stdlib.List.head" ]
+  let raw = runWithCommand([ "view", "Stdlib.List.head", "--raw" ])
+  let decorated = runWithCommand([ "view", "Stdlib.List.head" ])
 
   if
-    Stdlib.String.contains raw "let head"
-      && Stdlib.Bool.not (Stdlib.String.contains raw esc)
-      && Stdlib.String.contains decorated esc
+    Stdlib.String.contains(raw, "let head")
+      && Stdlib.Bool.not(Stdlib.String.contains(raw, esc))
+      && Stdlib.String.contains(decorated, esc)
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail $"Expected an undecorated declaration, got: {raw}"
+    Stdlib.Test.fail($"Expected an undecorated declaration, got: {raw}")
 
 
 /// Reading an item and writing it straight back changes nothing.
@@ -852,53 +1116,53 @@ test viewRawIsUndecorated =
 /// and the op log grows every time someone looks at it.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test editRoundTripsThroughRaw =
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let branchName = "cli-edit-test-" + suffix
   let name = "Tests.CliEdit.tripled"
-  let sourcePath = Stdlib.Cli.File.createTemp () |> Builtin.unwrap
-  let changedPath = Stdlib.Cli.File.createTemp () |> Builtin.unwrap
+  let sourcePath = Stdlib.Cli.File.createTemp() |> Builtin.unwrap
+  let changedPath = Stdlib.Cli.File.createTemp() |> Builtin.unwrap
 
-  let _ = runWithCommand [ "branch", "create", branchName ]
+  let _ = runWithCommand([ "branch", "create", branchName ])
 
   let _ =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "fn"
         "/" + name
-        "let tripled (n: Int64) : Int64 = (n * 3L)" ]
+        "let tripled(n: Int64): Int64 = (n * 3)" ])
 
-  let before = runWithCommand [ "--branch", branchName, "view", name, "--raw" ]
+  let before = runWithCommand([ "--branch", branchName, "view", name, "--raw" ])
   // The hash, not the op count: an apply that changes nothing still records that the
   // name was set, so the log grows either way. What must not change is the item.
-  let hashBefore = runWithCommand [ "--branch", branchName, "hash", name ]
-  let _ = (Stdlib.Cli.File.writeAtomic sourcePath before) |> Builtin.unwrap
-  let _ = runWithCommand [ "--branch", branchName, "edit", name, sourcePath ]
-  let after = runWithCommand [ "--branch", branchName, "view", name, "--raw" ]
-  let hashAfter = runWithCommand [ "--branch", branchName, "hash", name ]
+  let hashBefore = runWithCommand([ "--branch", branchName, "hash", name ])
+  let _ = (Stdlib.Cli.File.writeAtomic(sourcePath, before)) |> Builtin.unwrap
+  let _ = runWithCommand([ "--branch", branchName, "edit", name, sourcePath ])
+  let after = runWithCommand([ "--branch", branchName, "view", name, "--raw" ])
+  let hashAfter = runWithCommand([ "--branch", branchName, "hash", name ])
 
   // And a real change still lands, so the assertion above is not passing because
   // `edit` quietly does nothing.
   let _ =
-    (Stdlib.Cli.File.writeAtomic
-      changedPath
-      "let tripled (n: Int64) : Int64 = (n * 30L)")
+    (Stdlib.Cli.File.writeAtomic(
+      changedPath,
+      "let tripled(n: Int64): Int64 = (n * 30)"))
     |> Builtin.unwrap
 
-  let _ = runWithCommand [ "--branch", branchName, "edit", name, changedPath ]
-  let evaluated = runWithCommand [ "--branch", branchName, "eval", name + " 2L" ]
+  let _ = runWithCommand([ "--branch", branchName, "edit", name, changedPath ])
+  let evaluated = runWithCommand([ "--branch", branchName, "eval", name + "(2)" ])
 
-  let _ = runWithCommand [ "branch", "archive", branchName, "-y" ]
+  let _ = runWithCommand([ "branch", "archive", branchName, "-y" ])
   if
     before == after && hashBefore == hashAfter
-      && Stdlib.String.contains evaluated "60"
+      && Stdlib.String.contains(evaluated, "60")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail(
+    Stdlib.Test.fail((
       $"Expected a no-op round trip then a landed change; before: {before}, "
       + $"after: {after}, eval: {evaluated}"
-    )
+    ))
 
 
 /// A definition is headed with the name you asked for.
@@ -910,47 +1174,47 @@ test editRoundTripsThroughRaw =
 /// that wrong name to whatever writes it back.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test viewHeadsWithTheNameYouAskedFor =
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let branchName = "cli-sharedbody-test-" + suffix
   let alpha = "Tests.CliShared.alpha"
   let beta = "Tests.CliShared.beta"
 
-  let _ = runWithCommand [ "branch", "create", branchName ]
+  let _ = runWithCommand([ "branch", "create", branchName ])
 
   // The same body on purpose: that is what makes them one item.
   let _ =
-    runWithCommand
-      [ "--branch", branchName, "fn", "/" + alpha, "let alpha () : Int64 = 7L" ]
+    runWithCommand(
+      [ "--branch", branchName, "fn", "/" + alpha, "let alpha(): Int64 = 7" ])
 
   let _ =
-    runWithCommand
-      [ "--branch", branchName, "fn", "/" + beta, "let beta () : Int64 = 7L" ]
+    runWithCommand(
+      [ "--branch", branchName, "fn", "/" + beta, "let beta(): Int64 = 7" ])
 
-  let rawAlpha = runWithCommand [ "--branch", branchName, "view", alpha, "--raw" ]
-  let rawBeta = runWithCommand [ "--branch", branchName, "view", beta, "--raw" ]
+  let rawAlpha = runWithCommand([ "--branch", branchName, "view", alpha, "--raw" ])
+  let rawBeta = runWithCommand([ "--branch", branchName, "view", beta, "--raw" ])
 
   // The decorated view resolves the name the same way, so it needs the same answer.
   // Only `--raw` gets written back, but a wrong name on screen is wrong either way.
-  let shownAlpha = runWithCommand [ "--branch", branchName, "view", alpha ]
-  let shownBeta = runWithCommand [ "--branch", branchName, "view", beta ]
+  let shownAlpha = runWithCommand([ "--branch", branchName, "view", alpha ])
+  let shownBeta = runWithCommand([ "--branch", branchName, "view", beta ])
 
-  let _ = runWithCommand [ "branch", "archive", branchName, "-y" ]
+  let _ = runWithCommand([ "branch", "archive", branchName, "-y" ])
   if
-    Stdlib.String.contains rawAlpha "let alpha"
-      && Stdlib.Bool.not (Stdlib.String.contains rawAlpha "let beta")
-      && Stdlib.String.contains rawBeta "let beta"
-      && Stdlib.Bool.not (Stdlib.String.contains rawBeta "let alpha")
-      && Stdlib.String.contains shownAlpha "alpha"
-      && Stdlib.Bool.not (Stdlib.String.contains shownAlpha "let beta")
-      && Stdlib.String.contains shownBeta "beta"
-      && Stdlib.Bool.not (Stdlib.String.contains shownBeta "let alpha")
+    Stdlib.String.contains(rawAlpha, "let alpha")
+      && Stdlib.Bool.not(Stdlib.String.contains(rawAlpha, "let beta"))
+      && Stdlib.String.contains(rawBeta, "let beta")
+      && Stdlib.Bool.not(Stdlib.String.contains(rawBeta, "let alpha"))
+      && Stdlib.String.contains(shownAlpha, "alpha")
+      && Stdlib.Bool.not(Stdlib.String.contains(shownAlpha, "let beta"))
+      && Stdlib.String.contains(shownBeta, "beta")
+      && Stdlib.Bool.not(Stdlib.String.contains(shownBeta, "let alpha"))
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail(
+    Stdlib.Test.fail((
       $"Expected each name to head its own declaration; alpha: {rawAlpha}, "
       + $"beta: {rawBeta}, shown: {shownAlpha} / {shownBeta}"
-    )
+    ))
 
 
 /// Every kind `--raw` prints round-trips, not just functions.
@@ -961,64 +1225,64 @@ test viewHeadsWithTheNameYouAskedFor =
 /// something you did not write.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test editRoundTripsTypesAndValues =
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let branchName = "cli-edit-kinds-" + suffix
   let typeName = "Tests.CliEditKinds.Pair"
   let valueName = "Tests.CliEditKinds.answer"
-  let typePath = Stdlib.Cli.File.createTemp () |> Builtin.unwrap
-  let valuePath = Stdlib.Cli.File.createTemp () |> Builtin.unwrap
+  let typePath = Stdlib.Cli.File.createTemp() |> Builtin.unwrap
+  let valuePath = Stdlib.Cli.File.createTemp() |> Builtin.unwrap
 
-  let _ = runWithCommand [ "branch", "create", branchName ]
+  let _ = runWithCommand([ "branch", "create", branchName ])
 
   let _ =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "type"
         "/" + typeName
-        "{ a: Int64, b: String }" ]
+        "{ a: Int64, b: String }" ])
 
   let _ =
-    runWithCommand [ "--branch", branchName, "val", "/" + valueName, "42L" ]
+    runWithCommand([ "--branch", branchName, "val", "/" + valueName, "42" ])
 
   let typeBefore =
-    runWithCommand [ "--branch", branchName, "view", typeName, "--raw" ]
+    runWithCommand([ "--branch", branchName, "view", typeName, "--raw" ])
 
-  let typeHashBefore = runWithCommand [ "--branch", branchName, "hash", typeName ]
+  let typeHashBefore = runWithCommand([ "--branch", branchName, "hash", typeName ])
 
   let valueBefore =
-    runWithCommand [ "--branch", branchName, "view", valueName, "--raw" ]
+    runWithCommand([ "--branch", branchName, "view", valueName, "--raw" ])
 
-  let valueHashBefore = runWithCommand [ "--branch", branchName, "hash", valueName ]
+  let valueHashBefore = runWithCommand([ "--branch", branchName, "hash", valueName ])
 
-  let _ = (Stdlib.Cli.File.writeAtomic typePath typeBefore) |> Builtin.unwrap
-  let _ = (Stdlib.Cli.File.writeAtomic valuePath valueBefore) |> Builtin.unwrap
-  let _ = runWithCommand [ "--branch", branchName, "edit", typeName, typePath ]
-  let _ = runWithCommand [ "--branch", branchName, "edit", valueName, valuePath ]
+  let _ = (Stdlib.Cli.File.writeAtomic(typePath, typeBefore)) |> Builtin.unwrap
+  let _ = (Stdlib.Cli.File.writeAtomic(valuePath, valueBefore)) |> Builtin.unwrap
+  let _ = runWithCommand([ "--branch", branchName, "edit", typeName, typePath ])
+  let _ = runWithCommand([ "--branch", branchName, "edit", valueName, valuePath ])
 
   let typeAfter =
-    runWithCommand [ "--branch", branchName, "view", typeName, "--raw" ]
+    runWithCommand([ "--branch", branchName, "view", typeName, "--raw" ])
 
-  let typeHashAfter = runWithCommand [ "--branch", branchName, "hash", typeName ]
+  let typeHashAfter = runWithCommand([ "--branch", branchName, "hash", typeName ])
 
   let valueAfter =
-    runWithCommand [ "--branch", branchName, "view", valueName, "--raw" ]
+    runWithCommand([ "--branch", branchName, "view", valueName, "--raw" ])
 
-  let valueHashAfter = runWithCommand [ "--branch", branchName, "hash", valueName ]
+  let valueHashAfter = runWithCommand([ "--branch", branchName, "hash", valueName ])
 
-  let _ = runWithCommand [ "branch", "archive", branchName, "-y" ]
+  let _ = runWithCommand([ "branch", "archive", branchName, "-y" ])
   if
     typeBefore == typeAfter && typeHashBefore == typeHashAfter
       && valueBefore == valueAfter && valueHashBefore == valueHashAfter
-      && Stdlib.String.contains typeBefore "type Pair"
-      && Stdlib.String.contains valueBefore "val answer"
+      && Stdlib.String.contains(typeBefore, "type Pair")
+      && Stdlib.String.contains(valueBefore, "val answer")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail(
+    Stdlib.Test.fail((
       $"Expected types and values to round-trip; type: {typeBefore} -> {typeAfter}, "
       + $"value: {valueBefore} -> {valueAfter}"
-    )
+    ))
 
 
 /// A file `edit` cannot use leaves the item exactly as it was.
@@ -1028,46 +1292,46 @@ test editRoundTripsTypesAndValues =
 /// would make an editor round trip something you cannot trust.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test editLeavesTheItemAloneOnABadFile =
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
   let branchName = "cli-edit-bad-" + suffix
   let name = "Tests.CliEditBad.kept"
-  let badPath = Stdlib.Cli.File.createTemp () |> Builtin.unwrap
+  let badPath = Stdlib.Cli.File.createTemp() |> Builtin.unwrap
 
-  let _ = runWithCommand [ "branch", "create", branchName ]
+  let _ = runWithCommand([ "branch", "create", branchName ])
 
   let _ =
-    runWithCommand
+    runWithCommand(
       [ "--branch"
         branchName
         "fn"
         "/" + name
-        "let kept (n: Int64) : Int64 = n" ]
+        "let kept(n: Int64): Int64 = n" ])
 
-  let hashBefore = runWithCommand [ "--branch", branchName, "hash", name ]
-  let _ = (Stdlib.Cli.File.writeAtomic badPath "this is not dark") |> Builtin.unwrap
-  let refused = runWithCommand [ "--branch", branchName, "edit", name, badPath ]
-  let hashAfterBad = runWithCommand [ "--branch", branchName, "hash", name ]
+  let hashBefore = runWithCommand([ "--branch", branchName, "hash", name ])
+  let _ = (Stdlib.Cli.File.writeAtomic(badPath, "this is not dark")) |> Builtin.unwrap
+  let refused = runWithCommand([ "--branch", branchName, "edit", name, badPath ])
+  let hashAfterBad = runWithCommand([ "--branch", branchName, "hash", name ])
 
   // A path that is not there at all takes the same route, and must also change
   // nothing.
   let missing =
-    runWithCommand
-      [ "--branch", branchName, "edit", name, "/tmp/cli-edit-no-such-file.dark" ]
+    runWithCommand(
+      [ "--branch", branchName, "edit", name, "/tmp/cli-edit-no-such-file.dark" ])
 
-  let hashAfterMissing = runWithCommand [ "--branch", branchName, "hash", name ]
+  let hashAfterMissing = runWithCommand([ "--branch", branchName, "hash", name ])
 
-  let _ = runWithCommand [ "branch", "archive", branchName, "-y" ]
+  let _ = runWithCommand([ "branch", "archive", branchName, "-y" ])
   if
     hashBefore == hashAfterBad && hashBefore == hashAfterMissing
-      && Stdlib.String.contains refused "Parse error"
-      && Stdlib.String.contains missing "Could not read"
+      && Stdlib.String.contains(refused, "Parse error")
+      && Stdlib.String.contains(missing, "Could not read")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail(
+    Stdlib.Test.fail((
       $"Expected a rejected file to change nothing; hashes {hashBefore} / "
       + $"{hashAfterBad} / {hashAfterMissing}, said: {refused} | {missing}"
-    )
+    ))
 
 
 /// `edit` and `view --raw` both take exactly one declaration, and say so.
@@ -1077,94 +1341,92 @@ test editLeavesTheItemAloneOnABadFile =
 /// rather than leaving you to guess.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test editRefusesWhatItCannotEdit =
-  let bare = runWithCommand [ "edit" ]
-  let tooMany = runWithCommand [ "edit", "a", "b", "c" ]
-  let aModule = runWithCommand [ "edit", "Stdlib.List" ]
-  let unknown = runWithCommand [ "edit", "Zz.NoSuch.thing" ]
-  let rawModule = runWithCommand [ "view", "Stdlib.List", "--raw" ]
+  let bare = runWithCommand([ "edit" ])
+  let tooMany = runWithCommand([ "edit", "a", "b", "c" ])
+  let aModule = runWithCommand([ "edit", "Stdlib.List" ])
+  let unknown = runWithCommand([ "edit", "Zz.NoSuch.thing" ])
+  let rawModule = runWithCommand([ "view", "Stdlib.List", "--raw" ])
 
   // These tests shell out, so stdin is a pipe, which is exactly the case `edit` with
   // no file has to refuse. An editor started here paints into that pipe.
-  let noTerminal = runWithCommand [ "edit", "Stdlib.List.head" ]
+  let noTerminal = runWithCommand([ "edit", "Stdlib.List.head" ])
 
   if
-    Stdlib.String.contains noTerminal "Cannot open an editor"
-      && Stdlib.String.contains noTerminal "not a terminal"
-      && Stdlib.String.contains noTerminal "--raw"
-      && Stdlib.String.contains bare "needs an argument"
-      && Stdlib.String.contains bare "dark edit --help"
-      && Stdlib.String.contains tooMany "does not take `c`"
-      && Stdlib.String.contains tooMany "dark edit --help"
-      && Stdlib.String.contains aModule "is a module"
-      && Stdlib.String.contains aModule "dark module"
-      && Stdlib.String.contains unknown "Cannot edit Zz.NoSuch.thing"
-      && Stdlib.String.contains rawModule "ONE declaration"
+    Stdlib.String.contains(noTerminal, "Cannot open an editor")
+      && Stdlib.String.contains(noTerminal, "not a terminal")
+      && Stdlib.String.contains(noTerminal, "--raw")
+      && Stdlib.String.contains(bare, "needs an argument")
+      && Stdlib.String.contains(bare, "dark edit --help")
+      && Stdlib.String.contains(tooMany, "does not take `c`")
+      && Stdlib.String.contains(tooMany, "dark edit --help")
+      && Stdlib.String.contains(aModule, "is a module")
+      && Stdlib.String.contains(aModule, "dark module")
+      && Stdlib.String.contains(unknown, "Cannot edit Zz.NoSuch.thing")
+      && Stdlib.String.contains(rawModule, "ONE declaration")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail(
+    Stdlib.Test.fail((
       $"Expected each refusal to name what to do instead; bare: {bare}, "
       + $"module: {aModule}, unknown: {unknown}, raw module: {rawModule}, "
       + $"no terminal: {noTerminal}"
-    )
+    ))
 
 
 /// Every way of passing a definition authors the same item. The `=` is a separator:
 /// unquoted the shell splits it off, quoted it arrives attached, and both come off.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test authoringAcceptsAQuotedSeparator =
-  let branch = "cli-quoted-eq-" + (Stdlib.toString (Stdlib.Int.random 1 999999))
-  let run (args: List<String>) : String =
-    runWithCommand (Stdlib.List.append [ "--branch", branch ] args)
+  let branch = "cli-quoted-eq-" + (Stdlib.display(Stdlib.Int64.random(1, 999999)))
+  let run(args: List<String>): String =
+    runWithCommand(Stdlib.List.concat([ "--branch", branch ], args))
 
-  let body = "(x: Int64) : Int64 = (x * 2L)"
-  let _ = runWithCommand [ "branch", "create", branch ]
-  let _ = run [ "fn", "/Tests.QuotedEq.quoted", "= " + body ]
-  let _ = run [ "fn", "/Tests.QuotedEq.split", "=", body ]
-  let typed = run [ "type", "/Tests.QuotedEq.T", "= { x: Int64 }" ]
-  let valued = run [ "val", "/Tests.QuotedEq.v", "= 42L" ]
+  let body = "(x: Int64) : Int64 = (x * 2)"
+  let _ = runWithCommand([ "branch", "create", branch ])
+  let _ = run([ "fn", "/Tests.QuotedEq.quoted", "= " + body ])
+  let _ = run([ "fn", "/Tests.QuotedEq.split", "=", body ])
+  let typed = run([ "type", "/Tests.QuotedEq.T", "= { x: Int64 }" ])
+  let valued = run([ "val", "/Tests.QuotedEq.v", "= 42" ])
 
   // The hash is the assertion: the same item, not merely both accepted. Evaluating it
   // shows the `=` inside the body survived.
-  let quotedHash = run [ "hash", "Tests.QuotedEq.quoted" ]
-  let splitHash = run [ "hash", "Tests.QuotedEq.split" ]
-  let evaluated = run [ "eval", "Tests.QuotedEq.quoted 21L" ]
+  let quotedHash = run([ "hash", "Tests.QuotedEq.quoted" ])
+  let splitHash = run([ "hash", "Tests.QuotedEq.split" ])
+  let evaluated = run([ "eval", "Tests.QuotedEq.quoted(21)" ])
 
-  let _ = runWithCommand [ "branch", "archive", branch, "-y" ]
+  let _ = runWithCommand([ "branch", "archive", branch, "-y" ])
   if
     quotedHash == splitHash
-      && Stdlib.String.contains evaluated "42"
-      && Stdlib.String.contains typed "Created type"
-      && Stdlib.String.contains valued "Created value"
+      && Stdlib.String.contains(evaluated, "42")
+      && Stdlib.String.contains(typed, "Created type")
+      && Stdlib.String.contains(valued, "Created value")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail(
-      $"hashes {quotedHash} / {splitHash}, eval {evaluated}, {typed}, {valued}"
-    )
+    Stdlib.Test.fail($"hashes {quotedHash} / {splitHash}, eval {evaluated}, {typed}, {valued}")
 
 
 /// A lowercase module segment is refused. It would be read as the item's NAME, so
 /// `Tests.lower.f` authors `Tests.lower` and nothing can refer to it afterwards.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test authoringRefusesALowercaseModule =
-  let branch = "cli-lowercase-" + (Stdlib.toString (Stdlib.Int.random 1 999999))
-  let run (args: List<String>) : String =
-    runWithCommand (Stdlib.List.append [ "--branch", branch ] args)
+  let branch = "cli-lowercase-" + (Stdlib.display(Stdlib.Int64.random(1, 999999)))
+  let run(args: List<String>): String =
+    runWithCommand(Stdlib.List.concat([ "--branch", branch ], args))
 
-  let _ = runWithCommand [ "branch", "create", branch ]
-  let refused = run [ "fn", "/Tests.lower.f", "() : Int64 = 1L" ]
-  let listed = run [ "ls", "Tests.lower" ]
+  let _ = runWithCommand([ "branch", "create", branch ])
+  let refused = run([ "fn", "/Tests.lower.f", "() : Int64 = 1" ])
+  let listed = run([ "ls", "Tests.lower" ])
 
-  let _ = runWithCommand [ "branch", "archive", branch, "-y" ]
+  let _ = runWithCommand([ "branch", "archive", branch, "-y" ])
   if
-    Stdlib.String.contains refused "must start with a capital"
-      && Stdlib.Bool.not (Stdlib.String.contains refused "Created")
-      && Stdlib.String.contains listed "Not found"
+    Stdlib.String.contains(refused, "must start with a capital")
+      && Stdlib.Bool.not(Stdlib.String.contains(refused, "Created"))
+      && Stdlib.String.contains(listed, "Not found")
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail $"refusal: {refused}, and listing said: {listed}"
+    Stdlib.Test.fail($"refusal: {refused}, and listing said: {listed}")
 
 
 /// "Not found" names the path, once. Naming it at the traversal covers every caller,
@@ -1175,70 +1437,66 @@ test notFoundNamesThePath =
   // and a wholly unknown path would only ever report its first.
   let missing = "Darklang.Stdlib.NoSuchModule.thing"
   let expected = "Not found: Darklang.Stdlib.NoSuchModule"
-  let viewed = runWithCommand [ "view", missing ]
-  let listed = runWithCommand [ "ls", missing ]
-  let navigated = runWithCommand [ "nav", missing ]
+  let viewed = runWithCommand([ "view", missing ])
+  let listed = runWithCommand([ "ls", missing ])
+  let navigated = runWithCommand([ "nav", missing ])
 
-  let names (s: String) : Bool = Stdlib.String.contains s expected
-  let twice = (Stdlib.List.length (Stdlib.String.split viewed "NoSuchModule")) > 2
+  let names(s: String): Bool = Stdlib.String.contains(s, expected)
+  let twice = (Stdlib.List.length(Stdlib.String.split(viewed, "NoSuchModule"))) > 2
 
-  if names viewed && names listed && names navigated && Stdlib.Bool.not twice then
+  if names(viewed) && names(listed) && names(navigated) && Stdlib.Bool.not(twice) then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail $"view: {viewed}, ls: {listed}, nav: {navigated}"
+    Stdlib.Test.fail($"view: {viewed}, ls: {listed}, nav: {navigated}")
 
 
 /// `tree` refuses what it cannot show. Both arms used to answer instead: an unknown flag
 /// was dropped with the real ones, and an unresolvable path fell back to where you stood.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test treeRefusesWhatItCannotShow =
-  let badFlag = runWithCommand [ "tree", "--zzbogus" ]
-  let badPath = runWithCommand [ "tree", "Zz.NoSuchThing" ]
-  let twoPaths = runWithCommand [ "tree", "Darklang.Stdlib", "Darklang.Cli" ]
-  let withDepth = runWithCommand [ "tree", "Darklang.Stdlib.Option", "--depth=1" ]
+  let badFlag = runWithCommand([ "tree", "--zzbogus" ])
+  let badPath = runWithCommand([ "tree", "Zz.NoSuchThing" ])
+  let twoPaths = runWithCommand([ "tree", "Darklang.Stdlib", "Darklang.Cli" ])
+  let withDepth = runWithCommand([ "tree", "Darklang.Stdlib.Option", "--depth=1" ])
 
   // The header the render prints. Seeing it in a refusal means it showed a tree anyway.
-  let shown (s: String) : Bool = Stdlib.String.contains s "Package tree from"
+  let shown(s: String): Bool = Stdlib.String.contains(s, "Package tree from")
 
   if
-    Stdlib.String.contains badFlag "does not take `--zzbogus`"
-      && Stdlib.Bool.not (shown badFlag)
-      && Stdlib.String.contains badPath "Not found"
-      && Stdlib.Bool.not (shown badPath)
-      && Stdlib.String.contains twoPaths "does not take `Darklang.Cli`"
-      && shown withDepth
+    Stdlib.String.contains(badFlag, "does not take `--zzbogus`")
+      && Stdlib.Bool.not(shown(badFlag))
+      && Stdlib.String.contains(badPath, "Not found")
+      && Stdlib.Bool.not(shown(badPath))
+      && Stdlib.String.contains(twoPaths, "does not take `Darklang.Cli`")
+      && shown(withDepth)
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail(
-      $"flag: {badFlag}, path: {badPath}, two: {twoPaths}, depth shown: {Stdlib.toString (shown withDepth)}"
-    )
+    Stdlib.Test.fail($"flag: {badFlag}, path: {badPath}, two: {twoPaths}, depth shown: {Stdlib.display(shown(withDepth))}")
 
 /// `discard` throws the whole draft away, so an unanswerable prompt is not a yes: it
 /// refuses, and the work is still there. `-y` is how a script says yes.
 // @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test discardNeedsAnExplicitYes =
-  let branch = "cli-discard-" + (Stdlib.toString (Stdlib.Int.random 1 999999))
-  let run (args: List<String>) : String =
-    runWithCommand (Stdlib.List.append [ "--branch", branch ] args)
+  let branch = "cli-discard-" + (Stdlib.display(Stdlib.Int64.random(1, 999999)))
+  let run(args: List<String>): String =
+    runWithCommand(Stdlib.List.concat([ "--branch", branch ], args))
 
-  let _ = runWithCommand [ "branch", "create", branch ]
-  let _ = run [ "fn", "/Tests.Discard.a", "() : Int64 = 1L" ]
+  let _ = runWithCommand([ "branch", "create", branch ])
+  let _ = run([ "fn", "/Tests.Discard.a", "() : Int64 = 1" ])
 
-  let refused = run [ "discard" ]
-  let survived = run [ "status" ]
-  let discarded = run [ "discard", "-y" ]
-  let after = run [ "status" ]
+  let refused = run([ "discard" ])
+  let survived = run([ "status" ])
+  let discarded = run([ "discard", "-y" ])
+  let after = run([ "status" ])
 
-  let _ = runWithCommand [ "branch", "archive", branch, "-y" ]
+  let _ = runWithCommand([ "branch", "archive", branch, "-y" ])
   if
-    Stdlib.String.contains refused "kept."
-      && Stdlib.String.contains survived "1 item"
-      && Stdlib.String.contains discarded "discarded"
-      && Stdlib.Bool.not (Stdlib.String.contains after "1 item")
+    Stdlib.String.contains(refused, "kept.")
+      && Stdlib.String.contains(survived, "1 item")
+      && Stdlib.String.contains(discarded, "discarded")
+      && Stdlib.Bool.not(Stdlib.String.contains(after, "1 item"))
   then
     Stdlib.Test.Result.Pass
   else
-    Stdlib.Test.fail(
-      $"refused: {refused}, survived: {survived}, discarded: {discarded}, after: {after}"
-    )
+    Stdlib.Test.fail($"refused: {refused}, survived: {survived}, discarded: {discarded}, after: {after}")

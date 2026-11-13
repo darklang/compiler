@@ -1,6 +1,6 @@
 // quic_transport_close.e2e - Authenticated stream violations close from the post-send packet state.
 let transportClose (mode: Int64) : Bool =
-  let secret = Stdlib.String.toBlob (Stdlib.String.repeat "s" 32) in
+  let secret = Stdlib.String.toBlob (Stdlib.String.repeat "s" 32L) in
   let keys = match Stdlib.__QuicCrypto.derive secret with | Ok keys -> keys | Error _ -> Builtin.crash "Test keys" in
   let encode = fun id offset bytes fin -> match Stdlib.__QuicApplication.stream id offset (Stdlib.String.toBlob bytes) fin with | Ok frame -> frame | Error _ -> Builtin.crash "Test frame" in
   let payload =
@@ -29,7 +29,7 @@ let transportClose (mode: Int64) : Bool =
   let sent = Stdlib.Stream.__cellGet<List<Blob>> packets in
   let closed = Stdlib.Option.isNone (Stdlib.Stream.next life) in
   let valid =
-    if mode == 5L then Stdlib.Result.isOk result && Stdlib.Bool.not closed && Stdlib.List.length sent == 1
+    if mode == 5L then Stdlib.Result.isOk result && Stdlib.Bool.not closed && Stdlib.List.length sent == 1L
     else match sent with
     | [first, last] ->
       let decoded = match Stdlib.__QuicCrypto.openPacket keys first 9L -1L, Stdlib.__QuicCrypto.openPacket keys last 9L 0L with

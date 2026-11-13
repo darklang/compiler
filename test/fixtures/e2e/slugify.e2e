@@ -9,4 +9,4 @@ Builtin.stringSlugify "\u200bA\u200bB\u200b" = "ab"
 Builtin.stringSlugify "z\u0307\u0324" = ""
 Builtin.stringSlugify "l\u030a" = "l"
 let value = "Hello" + "_WORLD!" in (Builtin.stringSlugify value, value) = ("hello-world", "Hello_WORLD!")
-Builtin.stringSlugify (Stdlib.String.repeat "ABC_!" 100) = Stdlib.String.repeat "abc-" 100
+Builtin.stringSlugify (Stdlib.String.repeat "ABC_!" 100L) = Stdlib.String.repeat "abc-" 100L

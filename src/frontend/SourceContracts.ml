@@ -23,6 +23,57 @@ let normalize names typ =
     |> M.of_list)
     typ
 
+(* A value's type up to the names of its unknowns: each `[]` names its own,
+   so `[]` in the original and in the replacement are the same contract. *)
+let canonicalUnknowns typ =
+  let rec visit names = function
+    | AST.TVar name | AST.TInferenceVar (_, name) -> (
+        match List.assoc_opt name names with
+        | Some canonical -> (AST.TVar canonical, names)
+        | None ->
+            let canonical = "#unknown" ^ string_of_int (List.length names) in
+            (AST.TVar canonical, (name, canonical) :: names))
+    | AST.TList element ->
+        let element, names = visit names element in
+        (AST.TList element, names)
+    | AST.TStream element ->
+        let element, names = visit names element in
+        (AST.TStream element, names)
+    | AST.TDict (key, value) ->
+        let key, names = visit names key in
+        let value, names = visit names value in
+        (AST.TDict (key, value), names)
+    | AST.TTuple elements ->
+        let elements, names = many names elements in
+        (AST.TTuple elements, names)
+    | AST.TRecord (name, arguments) ->
+        let arguments, names = many names arguments in
+        (AST.TRecord (name, arguments), names)
+    | AST.TSum (name, arguments) ->
+        let arguments, names = many names arguments in
+        (AST.TSum (name, arguments), names)
+    | AST.TFunction (parameters, result) ->
+        let parameters, names = many names parameters in
+        let result, names = visit names result in
+        (AST.TFunction (parameters, result), names)
+    | ( AST.TInt8 | AST.TInt16 | AST.TInt32 | AST.TInt64 | AST.TInt128
+      | AST.TInt | AST.TUInt8 | AST.TUInt16 | AST.TUInt32 | AST.TUInt64
+      | AST.TUInt128 | AST.TBool | AST.TFloat64 | AST.TString | AST.TBlob
+      | AST.TChar | AST.TDateTime | AST.TUnit | AST.TNever | AST.TInternalRawPtr
+        ) as typ ->
+        (typ, names)
+  and many names types =
+    let reversed, names =
+      List.fold_left
+        (fun (reversed, names) typ ->
+          let typ, names = visit names typ in
+          (typ :: reversed, names))
+        ([], names) types
+    in
+    (List.rev reversed, names)
+  in
+  fst (visit [] typ)
+
 let parameterType = function
   | W.FPUnit _ -> W.TUnit W.synthRange
   | W.FPNormal (_, _, typ, _, _, _, _) -> typ
@@ -187,16 +238,26 @@ let check ~context ~sources contracts =
             Ok { context with environment = Some environment })
     in
     let check (path, original, replacement) =
-      let mismatch name =
+      let mismatch ?(detail = "") name =
         Error
           ("Replacement contract mismatch for "
-          ^ String.concat "." (path @ [ name ]))
+          ^ String.concat "." (path @ [ name ])
+          ^ detail)
+      in
+      let signature (_, types, _, _) =
+        String.concat " -> " (List.map CheckingDiagnostics.typeToString types)
       in
       match (original, replacement) with
       | W.DFunction original, W.DFunction replacement ->
           let* expected = functionContract types traits path original in
           let* actual = functionContract types traits path replacement in
-          if expected = actual then Ok () else mismatch original.W.name.W.name
+          if expected = actual then Ok ()
+          else
+            mismatch
+              ~detail:
+                (": upstream " ^ signature expected ^ ", replacement "
+               ^ signature actual)
+              original.W.name.W.name
       | W.DType original, W.DType replacement ->
           let* expected = typeContract types traits path original in
           let* actual = typeContract types traits path replacement in
@@ -210,7 +271,8 @@ let check ~context ~sources contracts =
                 ^ original.W.name.W.name ^ ": " ^ message)
           in
           let* actual = initializerType context [] path replacement.W.body in
-          if expected = actual then Ok () else mismatch original.W.name.W.name
+          if canonicalUnknowns expected = canonicalUnknowns actual then Ok ()
+          else mismatch original.W.name.W.name
       | ( ( W.DFunction _ | W.DType _ | W.DValue _ | W.DTrait _ | W.DImpl _
           | W.DModule _ | W.DExpr _ | W.DAssertion _ | W.DTest _ ),
           ( W.DFunction _ | W.DType _ | W.DValue _ | W.DTrait _ | W.DImpl _
@@ -227,5 +289,29 @@ let check ~context ~sources contracts =
           false
     in
     let values, declarations = List.partition isValue contracts in
-    ResultList.traverse check (declarations @ values)
-    |> Result.map (fun _ -> ())
+    (* Every mismatch is reported, so a pin move can be worked through at
+       once rather than one contract per run. *)
+    match
+      List.filter_map
+        (fun contract ->
+          match check contract with
+          | Ok () -> None
+          | Error message when String.starts_with ~prefix:"Replacement" message
+            ->
+              Some message
+          | Error message ->
+              let path, original, _ = contract in
+              let name =
+                match original with
+                | W.DFunction fn -> fn.W.name.W.name
+                | W.DType typ -> typ.W.name.W.name
+                | W.DValue value -> value.W.name.W.name
+                | W.DTrait _ | W.DImpl _ | W.DModule _ | W.DExpr _
+                | W.DAssertion _ | W.DTest _ ->
+                    ""
+              in
+              Some (String.concat "." (path @ [ name ]) ^ ": " ^ message))
+        (declarations @ values)
+    with
+    | [] -> Ok ()
+    | messages -> Error (String.concat "\n" messages)

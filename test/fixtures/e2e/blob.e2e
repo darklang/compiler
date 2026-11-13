@@ -4,7 +4,10 @@ Stdlib.Blob.length Stdlib.Blob.empty = 0
 Stdlib.Blob.toHex (Stdlib.Blob.fromList ([0uy, 15uy, 255uy])) = "000FFF"
 Stdlib.Blob.length (Stdlib.Blob.slice (Stdlib.Blob.fromString "abcdef") (-2) 99) = 6
 Stdlib.Blob.length (Stdlib.Blob.slice (Stdlib.Blob.fromString "abcdef") 99 3) = 0
-Stdlib.Blob.fromString "same" != Stdlib.Blob.fromString "same" = true
+Stdlib.Blob.fromString "same" == Stdlib.Blob.fromString "same" = true
+Stdlib.Blob.fromString "same" != Stdlib.Blob.fromString "sane" = true
+[Stdlib.Blob.fromString "hi"] == [Stdlib.Blob.fromList [104uy, 105uy]] = true
+(Stdlib.Blob.fromString "", 1L) == (Stdlib.Blob.empty, 1L) = true
 
 let b = Stdlib.Blob.fromString "same" in b == b = true
 
@@ -12,15 +15,15 @@ Stdlib.Blob.empty == Stdlib.Blob.empty = true
 
 let b = Stdlib.Blob.fromString "nested" in ([b], b) == ([b], b) = true
 
-([Stdlib.Blob.fromString "nested"], Stdlib.Blob.empty) != ([Stdlib.Blob.fromString "nested"], Stdlib.Blob.empty) = true
+([Stdlib.Blob.fromString "nested"], Stdlib.Blob.empty) == ([Stdlib.Blob.fromString "nested"], Stdlib.Blob.empty) = true
 
-Stdlib.Blob.concat ([]) != Stdlib.Blob.empty = true
+Stdlib.Blob.concat ([]) == Stdlib.Blob.empty = true
 
 Stdlib.Blob.fromString "rendered" = stdout="<Blob: ephemeral>" stderr=""
 
-Stdlib.Blob.fromHex "0" = Error "Invalid hex string: The input is not a valid hex string as its length is not a multiple of 2."
+Stdlib.Blob.fromHex "0" = Error "Invalid hex string: it has 1 digits, and each byte takes two"
 
-Stdlib.Blob.fromHex "GG" = Error "Invalid hex string: The input is not a valid hex string as it contains a non-hex character."
+Stdlib.Blob.fromHex "GG" = Error "Invalid hex string: 'G' is not a hex digit (0-9, a-f, A-F)"
 
 (match Stdlib.Base64.decode "Zg" with | Ok b -> Stdlib.Blob.toHex b | Error e -> e) = "66"
 
@@ -39,3 +42,7 @@ Stdlib.Blob.toString (Stdlib.Blob.fromList ([226uy])) = Error "Invalid UTF-8: Un
 Stdlib.Blob.toString (Stdlib.Blob.fromList ([237uy, 160uy, 128uy])) = Error "Invalid UTF-8: Unable to translate bytes [ED] at index 0 from specified code page to Unicode."
 
 Stdlib.Blob.toString (Stdlib.Blob.fromList ([244uy, 144uy, 128uy, 128uy])) = Error "Invalid UTF-8: Unable to translate bytes [F4] at index 0 from specified code page to Unicode."
+// .NET checks the length in UTF-16 code units before the characters.
+Stdlib.Blob.fromHex "é" = Error "Invalid hex string: 'é' is not a hex digit (0-9, a-f, A-F)"
+Stdlib.Blob.fromHex "aé" = Error "Invalid hex string: 'é' is not a hex digit (0-9, a-f, A-F)"
+Stdlib.Blob.fromHex "a😀" = Error "Invalid hex string: '😀' is not a hex digit (0-9, a-f, A-F)"

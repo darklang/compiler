@@ -16,6 +16,9 @@ let cliTerminalSessionInfo () : (Bool * Bool * String) =
     let name = Stdlib.Option.withDefault (Stdlib.Cli.__getenv "TERM") "" in
     (input, output, name)
 
+let cliTerminalIsatty (fd: Int64) : Bool =
+    (fd == 0L || fd == 1L || fd == 2L) && Builtin.__isTerminal fd
+
 let cliTerminalColorEnabled () : Bool =
     let noColor = Stdlib.Option.withDefault (Stdlib.Cli.__getenv "NO_COLOR") "" in
     noColor == "" && Builtin.__isTerminal 1L
@@ -27,7 +30,7 @@ let stdinIsInteractive () : Bool =
 let cliTerminalInspectRow (text: String) : (Int * Bool) =
     // This measures plain text: escape payloads are not stripped. Control
     // detection also recognizes the single CRLF grapheme cluster.
-    let width = Stdlib.String.displayWidth text in
+    let width = Stdlib.String.__displayWidthInt text in
     let controls = Stdlib.List.any (Stdlib.String.toList text) Stdlib.Cli.Tui.Text.__isControl in
     (width, controls)
 

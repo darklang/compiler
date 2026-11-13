@@ -20,9 +20,12 @@ Actual function keys remain an AOT error: function-bearing containers must
 be provably free of functions, including through reusable preamble helpers.
 Explicit `RuntimeTypes.Dval` trees
 are ordinary sums and records and can be structural keys; see
-`dval_dict_lookup.e2e`. Key comparison recursively treats NaNs as the same key
-and equates positive and negative zero. Dictionary values retain ordinary
-equality, so dictionaries with NaN values compare unequal.
+`dval_dict_lookup.e2e`. A key holding a NaN anywhere, Dict values included,
+is refused at run time wherever a key goes in, as in the interpreter: NaN is
+not equal to itself, so such a key could never be found. Key comparison
+equates positive and negative zero, and the later of two equal keys is the
+one kept. Dictionary values retain ordinary equality, so dictionaries with
+NaN values compare unequal.
 Literals reject duplicate keys under that same canonical key equality. Known
 duplicate String literals fail during checking; computed and structural
 duplicates raise the ordinary duplicate-key error after all entry expressions
@@ -55,6 +58,4 @@ except for individually catalogued diagnostic, unavailable-builtin, invalid-key,
 and numeric-edge cases. Its enabled cases cover primitive widths, tuple, list,
 option, record, enum, nested Dict, and recursively nested keys. The formerly
 disabled `language/collections/edict.dark` smoke file is also enabled in full.
-The NaN-ordering assertion has a local oracle adaptation recorded in the
-[import annotations](../../porting/upstream-import.md). Syntax
-roundtrips cover two-argument Dict types and expression-key literals.
+Syntax roundtrips cover two-argument Dict types and expression-key literals.

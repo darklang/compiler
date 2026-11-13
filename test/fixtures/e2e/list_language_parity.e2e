@@ -2,8 +2,9 @@
 
 // Literal separators and trailing layout normalize to ordinary list literals.
 [1L, 2L, 3L] = [1L, 2L, 3L]
-[1L, ...[2L]] = compileerror="PARSE-UNEXPECTED"
-match [1L] with | [head, ...tail] -> head | _ -> 0L = compileerror="PARSE-UNEXPECTED"
+// Spreads and rest patterns, since darklang/dark@0781818.
+[1L, ...[2L]] = [1L, 2L]
+match [1L] with | [head, ...tail] -> head | _ -> 0L = 1L
 
 // Append is right-associative and retains homogeneous list typing.
 [1L] @ [2L] @ [3L] = [1L, 2L, 3L]
@@ -24,6 +25,6 @@ let appendFailure (message: String) : Int64 = Builtin.crash message; [appendFail
 let partitionTrace (value: Int64) : Bool = let _ = Builtin.print (Stdlib.Int64.toString value) in value % 2L == 1L let _ = Stdlib.List.partition ([1L, 2L, 3L]) partitionTrace in 0L = stdout="3210\n" stderr="" exact_bytes=true
 
 // Exact zip rejects unequal lengths while zipShortest truncates.
-Stdlib.List.zip ([1L, 2L]) (["a", "b"]) = Some ([(1L, "a"), (2L, "b")])
-Stdlib.List.zip ([1L]) (["a", "b"]) = None
+Stdlib.List.zip ([1L, 2L]) (["a", "b"]) = Stdlib.Result.Result.Ok ([(1L, "a"), (2L, "b")])
+Stdlib.List.zip ([1L]) (["a", "b"]) = Stdlib.Result.Result.Error (Stdlib.List.LengthMismatch { left = 1L, right = 2L })
 Stdlib.List.zipShortest ([1L]) (["a", "b"]) = [(1L, "a")]

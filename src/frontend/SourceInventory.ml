@@ -114,8 +114,8 @@ let entries tokens (tree : W.sourceFile) =
   declarations [] tree.W.declarations
   @ List.map (expression []) tree.W.exprsToEval
 
-let parse ~reasons source =
-  let parsed = Parser.parse source in
+let parse ?(interpreterSource = false) ~reasons source =
+  let parsed = Parser.withInterpreterSource interpreterSource (fun () -> Parser.parse source) in
   match (parsed.ParserSupport.diagnostics, parsed.ParserSupport.parsed) with
   | [], Some (W.SourceFile tree) ->
       let* tokens, _ = Lexer.tokenize source in

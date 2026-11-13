@@ -66,7 +66,7 @@ let listRecursive (path: String) : Result.Result<List<String>, Posix.Error> =
             if Posix.isDirectory fullPath then
               match listRecursive fullPath with
               | Ok subEntries ->
-                Stdlib.Result.Result.Ok(Stdlib.List.append subEntries collected)
+                Stdlib.Result.Result.Ok(Stdlib.List.concat (Stdlib.List.reverse subEntries) collected)
               | Error e -> Stdlib.Result.Result.Error e
             else
               Stdlib.Result.Result.Ok(Stdlib.List.push collected fullPath)
@@ -115,7 +115,8 @@ let deleteRecursive (path: String) : Result.Result<Unit, Posix.Error> =
   | Error e -> Stdlib.Result.Result.Error e
 
 
-/// Walk a directory tree, returning all entries (files and directories) as full paths.
+/// Walk a directory tree, returning all entries (files and directories) as full paths, each
+/// directory before its contents, in listing order.
 /// Does not follow symlinks — symlinks are included as entries but not recursed into.
 let walk (path: String) : Result.Result<List<String>, Posix.Error> =
   match Posix.listDir path with
@@ -136,8 +137,8 @@ let walk (path: String) : Result.Result<List<String>, Posix.Error> =
               match walk fullPath with
               | Ok subEntries ->
                 Stdlib.Result.Result.Ok(
-                  Stdlib.List.append
-                    subEntries
+                  Stdlib.List.concat
+                    (Stdlib.List.reverse subEntries)
                     (Stdlib.List.push collected fullPath))
               | Error e -> Stdlib.Result.Result.Error e
             else
@@ -149,7 +150,7 @@ let walk (path: String) : Result.Result<List<String>, Posix.Error> =
 
 
 /// Get the total size of a directory and its contents in bytes.
-let size (path: String) : Result.Result<Int, Posix.Error> =
+let __sizeInt (path: String) : Result.Result<Int, Posix.Error> =
   match listRecursive path with
   | Ok files ->
     files
@@ -174,3 +175,6 @@ let withTemp (fn: String -> 'a) : Result.Result<'a, Posix.Error> =
     | Error e -> Log.warn $"withTemp: failed to clean up {tmpDir}: {e.message}"
 
     result)
+
+let size (path: String) : Result.Result<Int64, Posix.Error> =
+  Stdlib.Result.map (Stdlib.Cli.Dir.__sizeInt path) (fun bytes -> Builtin.unwrap (Stdlib.Int.toInt64 bytes))

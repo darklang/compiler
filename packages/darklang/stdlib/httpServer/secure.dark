@@ -3,7 +3,7 @@ module Darklang.Stdlib.HttpServer.Secure
 
 let __advertise (port: Int64) (handler: Stdlib.Http.Request -> Stdlib.Http.Response) (request: Stdlib.Http.Request) : Stdlib.Http.Response =
   let response = handler request in
-  if response.statusCode == 421 || Stdlib.List.any response.headers (fun header -> let (name, _value) = header in Stdlib.String.toLowercase name == "alt-svc") then response
+  if response.statusCode == 421L || Stdlib.List.any response.headers (fun header -> let (name, _value) = header in Stdlib.String.toLowercase name == "alt-svc") then response
   else { response with headers = Stdlib.List.push response.headers ("alt-svc", "h3=\":" + Stdlib.Int64.toString port + "\"; ma=3600") }
 
 let __loop (context: Stdlib.HttpServer.Quic.Context) (tls: Stdlib.__TlsServer.Context) (listener: Stdlib.__Network.TcpListener)
@@ -38,7 +38,7 @@ let __loop (context: Stdlib.HttpServer.Quic.Context) (tls: Stdlib.__TlsServer.Co
         else match context.socket.watch with
         | None -> abort "Secure HTTP listener has no native readiness watch"
         | Some udp ->
-          let accepting = Stdlib.List.length round.owners < 64 in
+          let accepting = Stdlib.List.__lengthInt round.owners < 64 in
           let writable = Stdlib.List.any step.state.owners (fun owner -> Stdlib.Stream.__cellGet<List<Blob>> owner.outbox != []) in
           let listeners = [Stdlib.__Network.Interest { watch = listener.watch, readable = accepting, writable = false }, Stdlib.__Network.Interest { watch = udp, readable = true, writable = writable }] in
           let interests = listeners @ Stdlib.List.filterMap round.owners Stdlib.__TlsServer.__interest in
@@ -67,10 +67,10 @@ let __bind (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (ide
   match Stdlib.Crypto.__secureRandomBytes 32L with
   | Error _ -> Error "Secure HTTP Retry key generation failed"
   | Ok secret ->
-    match (if Stdlib.List.length address == 16 then Stdlib.__Network.listenTcp6 address port else Stdlib.__Network.listenTcp4 address port) with
+    match (if Stdlib.List.__lengthInt address == 16 then Stdlib.__Network.listenTcp6 address port else Stdlib.__Network.listenTcp4 address port) with
     | Error _ -> Error "Cannot bind secure HTTP TCP server"
     | Ok listener ->
-      let result = match (if Stdlib.List.length address == 16 then Stdlib.__Datagram.bind6 address port else Stdlib.__Datagram.bind4 address port) with
+      let result = match (if Stdlib.List.__lengthInt address == 16 then Stdlib.__Datagram.bind6 address port else Stdlib.__Datagram.bind4 address port) with
         | Error _ -> Error "Cannot bind secure HTTP UDP server"
         | Ok socket ->
           let context = Stdlib.HttpServer.Quic.Context { config = config, identity = identity, signals = signals, socket = socket, secret = secret, limit = limit } in
@@ -88,17 +88,18 @@ let __bind (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (ide
 /// Identity is imported with TlsServerIdentity.create. Bind both transports
 /// before announcing, respect application Alt-Svc, and return on SIGINT/SIGTERM.
 let serveOn (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (identity: Stdlib.TlsServerIdentity.Identity) (handler: Stdlib.Http.Request -> Stdlib.Http.Response) (onListening: Unit -> Unit) : Stdlib.Result.Result<Unit, String> =
-  match Stdlib.Int.toInt64 config.port, Stdlib.Int.toInt64 config.maxBodyBytes with
-  | Some port, Some limit ->
-    if port <= 0L || port > 65535L || limit < 0L || limit > 104857600L then Error "Invalid secure HTTP server configuration"
-    else match Stdlib.__Network.shutdownSignals () with
-    | Error _ -> Error "Secure HTTP shutdown setup failed"
-    | Ok signals ->
-      let result = Stdlib.HttpServer.Secure.__bind address config identity handler onListening signals port limit in
-      let _ = Stdlib.__Network.closeShutdownSignals signals in
-      result
-  | _, _ -> Error "Invalid secure HTTP server configuration"
+  let port = Stdlib.Net.Port.toInt64 config.port in
+  let limit = config.maxBodyBytes in
+  if port <= 0L || port > 65535L || limit < 0L || limit > 104857600L then Error "Invalid secure HTTP server configuration"
+  else match Stdlib.__Network.shutdownSignals () with
+  | Error _ -> Error "Secure HTTP shutdown setup failed"
+  | Ok signals ->
+    let result = Stdlib.HttpServer.Secure.__bind address config identity handler onListening signals port limit in
+    let _ = Stdlib.__Network.closeShutdownSignals signals in
+    result
 
-/// Serve on the default IPv4 wildcard address. Use serveOn for IPv6 or an explicit interface.
+/// Serve on config.address. Use serveOn for IPv6.
 let serve (config: Stdlib.HttpServer.Config.Config) (identity: Stdlib.TlsServerIdentity.Identity) (handler: Stdlib.Http.Request -> Stdlib.Http.Response) (onListening: Unit -> Unit) : Stdlib.Result.Result<Unit, String> =
-  Stdlib.HttpServer.Secure.serveOn [0L, 0L, 0L, 0L] config identity handler onListening
+  match Stdlib.HttpServer.__bindAddress config.address with
+  | Error message -> Error message
+  | Ok address -> Stdlib.HttpServer.Secure.serveOn address config identity handler onListening

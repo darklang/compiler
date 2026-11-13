@@ -67,7 +67,7 @@ let check reasons directory path =
       In_channel.input_all
   in
   let items, diagnostics =
-    match SourceInventory.parse ~reasons source with
+    match SourceInventory.parse ~interpreterSource:true ~reasons source with
     | Ok result -> (List.map entry result.SourceInventory.entries, [])
     | Error message -> ([], [ `String message ])
   in

@@ -1,6 +1,6 @@
 // Function arrows belong outside all closed generic arguments.
 type NestedListFunction = List<List<Int>> -> Int
-let nestedListLength (values: List<List<Int>>) : Int = Stdlib.List.length values
+let nestedListLength (values: List<List<Int>>) : Int = Stdlib.Int.fromInt64 (Stdlib.List.length values)
 let callNestedListFunction (f: NestedListFunction) : Int = f [[1], [2]]
 callNestedListFunction nestedListLength = 2
 

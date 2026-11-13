@@ -122,6 +122,15 @@ let formatCommand = function
       V.format (V.Union ("SingleCommand", [ optionsValue value ]))
   | P.BatchCommand value ->
       V.format (V.Union ("BatchCommand", [ batchValue value ]))
+  | P.CheckCommand value ->
+      V.format
+        (V.Union
+           ( "CheckCommand",
+             [
+               boolean value.P.checkJson;
+               optional (fun value -> V.Scalar value) value.P.checkPackageServer;
+               V.Sequence (List.map (fun name -> V.Scalar name) value.P.checkNames);
+             ] ))
 
 let testExplicitLinuxX86_64Target () =
   match P.parseArgs [| "--target=linux-x86_64"; "program.dark" |] with
@@ -157,6 +166,15 @@ let testEmitResultModeIsExplicit () =
         "Expected --emit-result to select observable file-result compilation"
   | Error error ->
       Error ("Expected --emit-result parsing to succeed, got: " ^ error)
+
+let testExpressionAfterDoubleDash () =
+  match P.parseArgs [| "-e"; "--"; "-7.5dec % 2dec" |] with
+  | Ok options
+    when options.P.isExpression && options.P.argument = Some "-7.5dec % 2dec" ->
+      Ok ()
+  | Ok options -> Error ("Unexpected expression options: " ^ formatOptions options)
+  | Error error ->
+      Error ("Expected an expression after -- to parse, got: " ^ error)
 
 let testPackageServerIsExplicit () =
   match
@@ -303,12 +321,75 @@ let testBatchCompileAllowsCompilerOwnedSources () =
   | Error error ->
       Error ("Expected --allow-internal to parse in batch mode, got: " ^ error)
 
+(* A batch report names what a failed item uses that the compiler lacks. *)
+let testBatchReasonNamesUnsupportedFeature () =
+  let expect error reason =
+    let actual = CompilabilityReason.classify error in
+    if actual = reason then Ok ()
+    else Error ("Expected reason '" ^ reason ^ "', got '" ^ actual ^ "'")
+  in
+  let ( let* ) = Result.bind in
+  let* () =
+    expect
+      "Package Hosted.f could not be loaded: can't compile: uses a record \
+       pattern, which this compiler does not support\nmore"
+      "uses a record pattern, which this compiler does not support"
+  in
+  let* () =
+    expect "<entry>: Unknown function or value 'Darklang.Stdlib.Dict.containsKey'"
+      "uses function or value Stdlib.Dict.containsKey, which the compiler does \
+       not define; the compiler's pinned name is Stdlib.Dict.member"
+  in
+  let* () =
+    expect "x.dark: Unknown type 'Stdlib.Decimal.Decimal'"
+      "uses type Stdlib.Decimal.Decimal, which the compiler does not define"
+  in
+  let* () =
+    expect
+      "Compilation failed: ANF conversion error: Cannot infer specialization \
+       for function value 'Darklang.Stdlib.List.map'"
+      "Stdlib.List.map is generic; compiling it needs a call with concrete \
+       type arguments"
+  in
+  let* () =
+    expect "Type mismatch: expected Int64\nat line 2"
+      "compiler error: Type mismatch: expected Int64"
+  in
+  expect "" ""
+
+let testCheckParsesNamesInOrder () =
+  match
+    P.parseCommand
+      [|
+        "--check"; "Hosted.first"; "--json";
+        "--package-server=http://127.0.0.1:9090"; "Hosted.second";
+      |]
+  with
+  | Ok (P.CheckCommand options)
+    when options.P.checkJson
+         && options.P.checkNames = [ "Hosted.first"; "Hosted.second" ]
+         && options.P.checkPackageServer = Some "http://127.0.0.1:9090/" ->
+      Ok ()
+  | Ok command -> Error ("Expected check command, got: " ^ formatCommand command)
+  | Error error -> Error ("Expected check command to parse, got: " ^ error)
+
+let testCheckRequiresAName () =
+  match P.parseCommand [| "--check"; "--json" |] with
+  | Error error when Text.contains error "at least one" -> Ok ()
+  | Error error -> Error ("Expected missing-name guidance, got: " ^ error)
+  | Ok command -> Error ("Expected a nameless check to be rejected, got: " ^ formatCommand command)
+
 let tests =
   [
+    ("parse check names in order", testCheckParsesNamesInOrder);
+    ("reject check without a name", testCheckRequiresAName);
+    ( "name what a failed batch item uses",
+      testBatchReasonNamesUnsupportedFeature );
     ("parse explicit Linux x86_64 target", testExplicitLinuxX86_64Target);
     ("reject unknown compiler target", testUnknownTargetRejected);
     ("reject cross-target run mode", testCrossTargetRunRejected);
     ("parse explicit file-result mode", testEmitResultModeIsExplicit);
+    ("parse an expression after --", testExpressionAfterDoubleDash);
     ("parse explicit package server", testPackageServerIsExplicit);
     ("reject non-HTTP package server", testPackageServerRejectsNonHttpUrl);
     ("parse scoped IR dump options", testScopedIRDumpOptions);

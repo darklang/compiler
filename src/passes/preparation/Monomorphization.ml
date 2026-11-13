@@ -183,7 +183,7 @@ let collectTypeApps symbols expr =
         if entries = [] then specs
         else
           SS.add
-            ( "Darklang.Stdlib.Dict.set",
+            ( "Darklang.Stdlib.Dict.__setRejectingDuplicate",
               C.semanticTypeArgs [ keyType; valueType ] )
             specs
     | C.RecordLiteral (_, fields) ->
@@ -694,7 +694,7 @@ let replaceTypeAppsCore symbols registry expr =
               List.fold_left
                 (fun dict (keyExpr, valueExpr) ->
                   C.TypeApp
-                    ( resolved "Darklang.Stdlib.Dict.set",
+                    ( resolved "Darklang.Stdlib.Dict.__setRejectingDuplicate",
                       [ key; value ],
                       NonEmptyList.fromList [ dict; keyExpr; valueExpr ] ))
                 (C.DictLiteral (key, value, []))

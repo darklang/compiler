@@ -25,7 +25,9 @@ let check native root =
     ResultList.traverse
       (fun file ->
         let* source =
-          SourceInventory.parse ~reasons (read (Filename.concat root file))
+          SourceInventory.parse
+            ~interpreterSource:(String.starts_with ~prefix:"upstream/" file)
+            ~reasons (read (Filename.concat root file))
         in
         Ok (file, source))
       (roots @ supplements)

@@ -20,7 +20,7 @@ let currentDirectory () : String =
 
 /// Expand HOME only when requested; environment access remains policy checked.
 let __expandPath (path: String) : String =
-  if Stdlib.String.contains path "$HOME" || Stdlib.String.contains path "${HOME}" then
+  if Stdlib.String.__containsBytes path "$HOME" || Stdlib.String.__containsBytes path "${HOME}" then
     let home = Stdlib.Option.withDefault (Stdlib.Env.get "HOME") ""
     path
     |> (fun p -> Stdlib.String.replaceAll p "${HOME}" home)
@@ -29,8 +29,8 @@ let __expandPath (path: String) : String =
 
 
 let __fromPosixError (error: Posix.Error) : FileError =
-  if error.errno == 2 || error.errno == 20 then FileError.NotFound
-  else if error.errno == 13 || error.errno == 1 || error.errno == 21 then FileError.OsAccessDenied
+  if error.errno == 2L || error.errno == 20L then FileError.NotFound
+  else if error.errno == 13L || error.errno == 1L || error.errno == 21L then FileError.OsAccessDenied
   else FileError.Other error.message
 
 
@@ -77,7 +77,7 @@ let getDirectoryContents (path: String) : List<String> =
       // Normalize path by removing leading "./" if present
       let normalizedPath =
         if Stdlib.String.startsWith path "./" then
-          Stdlib.String.dropFirst path 2
+          Stdlib.String.__dropFirstInt path 2
         else
           path
       $"{currentDir}/{normalizedPath}"
@@ -101,7 +101,7 @@ let isDirectoryAtPath (dirPath: String) (fileName: String) : Bool =
     if Stdlib.String.startsWith dirPath "/" then
       dirPath
     else if Stdlib.String.startsWith dirPath "./" then
-      let withoutDot = Stdlib.String.dropFirst dirPath 2
+      let withoutDot = Stdlib.String.__dropFirstInt dirPath 2
       $"{currentDir}/{withoutDot}"
     else
       $"{currentDir}/{dirPath}"

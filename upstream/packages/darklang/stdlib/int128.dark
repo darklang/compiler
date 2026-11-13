@@ -11,52 +11,38 @@ type ParseError =
 impl Modulo for Int128 =
   /// Returns the result of wrapping <param a> around so that {{0 <= res < b}}.
   /// The modulus <param b> must be greater than 0.
-  /// Use <fn Int128.remainder> if you want the remainder after division, which has
+  /// Use <fn Int128.checkedRemainder> if you want the remainder after division, which has
   /// a different behavior for negative numbers.
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Modulo for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Modulo for Int128 requires an explicit replacement contract"
-  let modulo (a: Int128) (b: Int128) : Int128 = Builtin.int128Mod a b
-
-
-/// Returns the integer remainder left over after dividing <param value> by
-/// <param divisor>, as a <type Result>.
-/// For example, {{Int128.remainder 15 6 == Ok 3}}. The remainder will be
-/// negative only if {{<var value> < 0}}.
-/// The sign of <param divisor> doesn't influence the outcome.
-/// Returns an {{Error}} if <param divisor> is {{0}}.
-// @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.remainder reason=compiler-implementation
-let remainder
-  (value: Int128)
-  (divisor: Int128)
-  : Stdlib.Result.Result<Int128, String> =
-  Builtin.int128Remainder value divisor
+  let modulo(a: Int128, b: Int128): Int128 = Builtin.modulo(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Add for Int128 requires an explicit replacement contract"
 impl Add for Int128 =
   /// Adds two 128-bit signed integers together (wraps on overflow)
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Add for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Add for Int128 requires an explicit replacement contract"
-  let add (a: Int128) (b: Int128) : Int128 = Builtin.int128Add a b
+  let add(a: Int128, b: Int128): Int128 = Builtin.add(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Subtract for Int128 requires an explicit replacement contract"
 impl Subtract for Int128 =
   /// Subtracts two 128-bit signed integers (wraps on overflow)
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Subtract for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Subtract for Int128 requires an explicit replacement contract"
-  let subtract (a: Int128) (b: Int128) : Int128 = Builtin.int128Subtract a b
+  let subtract(a: Int128, b: Int128): Int128 = Builtin.subtract(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Multiply for Int128 requires an explicit replacement contract"
 impl Multiply for Int128 =
   /// Multiplies two 128-bit signed integers (wraps on overflow)
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Multiply for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Multiply for Int128 requires an explicit replacement contract"
-  let multiply (a: Int128) (b: Int128) : Int128 = Builtin.int128Multiply a b
+  let multiply(a: Int128, b: Int128): Int128 = Builtin.multiply(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Divide for Int128 requires an explicit replacement contract"
 impl Divide for Int128 =
   /// Divides two 128-bit signed integers
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Divide for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Divide for Int128 requires an explicit replacement contract"
-  let divide (a: Int128) (b: Int128) : Int128 = Builtin.int128Divide a b
+  let divide(a: Int128, b: Int128): Int128 = Builtin.divide(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Power for Int128 requires an explicit replacement contract"
@@ -65,43 +51,48 @@ impl Power for Int128 =
   /// Overflow wraps around.
   /// Raises an error if <param exponent> is negative.
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Power for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Power for Int128 requires an explicit replacement contract"
-  let power (``base``: Int128) (exponent: Int128) : Int128 =
-    Builtin.int128Power ``base`` exponent
+  let power(``base``: Int128, exponent: Int128): Int128 =
+    Builtin.power(``base``, exponent)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Negate for Int128 requires an explicit replacement contract"
 impl Negate for Int128 =
   /// Returns the negation of <param a>, {{-a}}. Negating the minimum value wraps back to itself.
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Negate for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Negate for Int128 requires an explicit replacement contract"
-  let negate (a: Int128) : Int128 = Builtin.int128Negate a
+  let negate(a: Int128): Int128 = Builtin.negate(a)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Compare for Int128 requires an explicit replacement contract"
 impl Compare for Int128 =
   /// Returns {{true}} if <param a> is less than <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Compare for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Compare for Int128 requires an explicit replacement contract"
-  let lessThan (a: Int128) (b: Int128) : Bool = Builtin.int128LessThan a b
+  let lessThan(a: Int128, b: Int128): Bool = Builtin.lessThan(a, b)
   /// Returns {{true}} if <param a> is less than or equal to <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Compare for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Compare for Int128 requires an explicit replacement contract"
-  let lessThanOrEqualTo (a: Int128) (b: Int128) : Bool =
-    Builtin.int128LessThanOrEqualTo a b
+  let lessThanOrEqualTo(a: Int128, b: Int128): Bool =
+    Builtin.lessThanOrEqualTo(a, b)
   /// Returns {{true}} if <param a> is greater than <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Compare for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Compare for Int128 requires an explicit replacement contract"
-  let greaterThan (a: Int128) (b: Int128) : Bool = Builtin.int128GreaterThan a b
+  let greaterThan(a: Int128, b: Int128): Bool = Builtin.greaterThan(a, b)
   /// Returns {{true}} if <param a> is greater than or equal to <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Compare for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Compare for Int128 requires an explicit replacement contract"
-  let greaterThanOrEqualTo (a: Int128) (b: Int128) : Bool =
-    Builtin.int128GreaterThanOrEqualTo a b
+  let greaterThanOrEqualTo(a: Int128, b: Int128): Bool =
+    Builtin.greaterThanOrEqualTo(a, b)
 
 
 /// Get the square root of an <type Int128>
 // @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.sqrt reason=compiler-implementation
-let sqrt (a: Int128) : Float = Builtin.int128Sqrt a
+let sqrt(a: Int128): Float = Stdlib.Float.sqrt(Stdlib.Int128.toFloat(a))
+
+
+/// The square root of <param a>, or {{Error NotANumber}} where <param a> is negative
+let checkedSqrt(a: Int128): Stdlib.Result.Result<Float, Stdlib.Math.NonFinite> =
+  Stdlib.Float.checkedSqrt(Stdlib.Int128.toFloat(a))
 
 
 /// Converts an <type Int128> to a <type Float>
 // @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.toFloat reason=compiler-implementation
-let toFloat (a: Int128) : Float = Builtin.int128ToFloat a
+let toFloat(a: Int128): Float = Builtin.int128ToFloat(a)
 
 
 /// Parses a <type String> into an <type Int128>, returning {{Ok}} with the
@@ -109,105 +100,235 @@ let toFloat (a: Int128) : Float = Builtin.int128ToFloat a
 /// if the string isn't a valid integer, {{OutOfRange}} if it's outside the
 /// <type Int128> range).
 // @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.parse reason=compiler-implementation
-let parse
-  (s: String)
+let parse(
+  s: String)
   : Stdlib.Result.Result<Int128, Stdlib.Int128.ParseError> =
-  Builtin.int128Parse s
+  match Stdlib.BigInt.parse(s) with
+  | Ok(n) -> Stdlib.Option.toResult(Stdlib.BigInt.toInt128(n), Stdlib.Int128.ParseError.OutOfRange)
+  | Error(_) -> Error(Stdlib.Int128.ParseError.BadFormat)
 
 
 /// Converts an <type Int8> to an <type Int128>.
 // @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.fromInt8 reason=compiler-implementation
-let fromInt8 (i: Int8) : Int128 = Builtin.int128FromInt8 i
+let fromInt8(i: Int8): Int128 =
+  Stdlib.BigInt.toInt128(Stdlib.BigInt.fromInt8(i)) |> Builtin.unwrap
 
 
 /// Converts a <type UInt8> to an <type Int128>.
 // @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.fromUInt8 reason=compiler-implementation
-let fromUInt8 (i: UInt8) : Int128 = Builtin.int128FromUInt8 i
+let fromUInt8(i: UInt8): Int128 =
+  Stdlib.BigInt.toInt128(Stdlib.BigInt.fromUInt8(i)) |> Builtin.unwrap
 
 
 /// Converts an <type Int16> to an <type Int128>.
 // @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.fromInt16 reason=compiler-implementation
-let fromInt16 (i: Int16) : Int128 = Builtin.int128FromInt16 i
+let fromInt16(i: Int16): Int128 =
+  Stdlib.BigInt.toInt128(Stdlib.BigInt.fromInt16(i)) |> Builtin.unwrap
 
 
 /// Converts a <type UInt16> to an <type Int128>.
 // @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.fromUInt16 reason=compiler-implementation
-let fromUInt16 (i: UInt16) : Int128 = Builtin.int128FromUInt16 i
+let fromUInt16(i: UInt16): Int128 =
+  Stdlib.BigInt.toInt128(Stdlib.BigInt.fromUInt16(i)) |> Builtin.unwrap
 
 
 /// Converts an <type Int32> to an <type Int128>.
 // @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.fromInt32 reason=compiler-implementation
-let fromInt32 (i: Int32) : Int128 = Builtin.int128FromInt32 i
+let fromInt32(i: Int32): Int128 =
+  Stdlib.BigInt.toInt128(Stdlib.BigInt.fromInt32(i)) |> Builtin.unwrap
 
 
 /// Converts a <type UInt32> to an <type Int128>.
 // @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.fromUInt32 reason=compiler-implementation
-let fromUInt32 (i: UInt32) : Int128 = Builtin.int128FromUInt32 i
+let fromUInt32(i: UInt32): Int128 =
+  Stdlib.BigInt.toInt128(Stdlib.BigInt.fromUInt32(i)) |> Builtin.unwrap
 
 
 /// Converts an <type Int64> to an <type Int128>.
 // @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.fromInt64 reason=compiler-implementation
-let fromInt64 (i: Int64) : Int128 = Builtin.int128FromInt64 i
+let fromInt64(i: Int64): Int128 =
+  Stdlib.BigInt.toInt128(Stdlib.BigInt.fromInt64(i)) |> Builtin.unwrap
 
 
 /// Converts a <type UInt64> to an <type Int128>.
 // @compiler replace: packages/darklang/stdlib/int128.dark#Darklang.Stdlib.Int128.fromUInt64 reason=compiler-implementation
-let fromUInt64 (i: UInt64) : Int128 = Builtin.int128FromUInt64 i
+let fromUInt64(i: UInt64): Int128 =
+  Stdlib.BigInt.toInt128(Stdlib.BigInt.fromUInt64(i)) |> Builtin.unwrap
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl BitwiseAnd for Int128 requires an explicit replacement contract"
 impl BitwiseAnd for Int128 =
   /// Bitwise AND on two <type Int128> values
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl BitwiseAnd for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl BitwiseAnd for Int128 requires an explicit replacement contract"
-  let bitwiseAnd (a: Int128) (b: Int128) : Int128 = Builtin.int128BitwiseAnd a b
+  let bitwiseAnd(a: Int128, b: Int128): Int128 = Builtin.bitwiseAnd(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl BitwiseOr for Int128 requires an explicit replacement contract"
 impl BitwiseOr for Int128 =
   /// Bitwise OR on two <type Int128> values
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl BitwiseOr for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl BitwiseOr for Int128 requires an explicit replacement contract"
-  let bitwiseOr (a: Int128) (b: Int128) : Int128 = Builtin.int128BitwiseOr a b
+  let bitwiseOr(a: Int128, b: Int128): Int128 = Builtin.bitwiseOr(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl BitwiseXor for Int128 requires an explicit replacement contract"
 impl BitwiseXor for Int128 =
   /// Bitwise XOR on two <type Int128> values
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl BitwiseXor for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl BitwiseXor for Int128 requires an explicit replacement contract"
-  let bitwiseXor (a: Int128) (b: Int128) : Int128 = Builtin.int128BitwiseXor a b
+  let bitwiseXor(a: Int128, b: Int128): Int128 = Builtin.bitwiseXor(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl BitwiseNot for Int128 requires an explicit replacement contract"
 impl BitwiseNot for Int128 =
   /// Bitwise NOT on an <type Int128> value
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl BitwiseNot for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl BitwiseNot for Int128 requires an explicit replacement contract"
-  let bitwiseNot (a: Int128) : Int128 = Builtin.int128BitwiseNot a
+  let bitwiseNot(a: Int128): Int128 = Builtin.bitwiseNot(a)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl ShiftLeft for Int128 requires an explicit replacement contract"
 impl ShiftLeft for Int128 =
   /// Bitwise left shift of an <type Int128> value
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl ShiftLeft for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl ShiftLeft for Int128 requires an explicit replacement contract"
-  let shiftLeft (a: Int128) (b: Int128) : Int128 = Builtin.int128ShiftLeft a b
+  let shiftLeft(a: Int128, b: Int128): Int128 = Builtin.shiftLeft(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl ShiftRight for Int128 requires an explicit replacement contract"
 impl ShiftRight for Int128 =
   /// Bitwise right shift of an <type Int128> value
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl ShiftRight for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl ShiftRight for Int128 requires an explicit replacement contract"
-  let shiftRight (a: Int128) (b: Int128) : Int128 = Builtin.int128ShiftRight a b
+  let shiftRight(a: Int128, b: Int128): Int128 = Builtin.shiftRight(a, b)
 
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl ToString for Int128 requires an explicit replacement contract"
-impl ToString for Int128 =
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Display for Int128 requires an explicit replacement contract"
+impl Display for Int128 =
   /// Stringify <param int128>
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl ToString for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl ToString for Int128 requires an explicit replacement contract"
-  let toString (int128: Int128) : String = Builtin.int128ToString int128
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Display for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Display for Int128 requires an explicit replacement contract"
+  let display(int128: Int128): String = Builtin.int128ToString(int128)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Zero for Int128 requires an explicit replacement contract"
 impl Zero for Int128 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl Zero for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl Zero for Int128 requires an explicit replacement contract"
-  let zero () : Int128 = 0Q
+  let zero(): Int128 = 0s128
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl One for Int128 requires an explicit replacement contract"
 impl One for Int128 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Int128.impl One for Int128: Already selected from packages/darklang/stdlib/int128.dark; importing another declaration of Darklang.Stdlib.Int128.impl One for Int128 requires an explicit replacement contract"
-  let one () : Int128 = 1Q
+  let one(): Int128 = 1s128
+
+
+// Checked arithmetic. The operators wrap on overflow; these return
+// {{Error Overflow}} instead, going below 0 included.
+
+/// Adds <param a> and <param b>, or {{Error Overflow}} where `+` would wrap
+let checkedAdd(
+  a: Int128,
+  b: Int128)
+  : Stdlib.Result.Result<Int128, Stdlib.Math.Overflow> =
+  let sum = a + b
+  let wrapped = if b < 0s128 then sum > a else sum < a
+  if wrapped then Error(Stdlib.Math.Overflow.Overflow) else Ok(sum)
+
+
+/// Subtracts <param b> from <param a>, or {{Error Overflow}} where `-` would wrap
+let checkedSubtract(
+  a: Int128,
+  b: Int128)
+  : Stdlib.Result.Result<Int128, Stdlib.Math.Overflow> =
+  let difference = a - b
+  let wrapped = if b < 0s128 then difference < a else difference > a
+  if wrapped then Error(Stdlib.Math.Overflow.Overflow) else Ok(difference)
+
+
+/// Multiplies <param a> by <param b>, or {{Error Overflow}} where `*` would wrap
+let checkedMultiply(
+  a: Int128,
+  b: Int128)
+  : Stdlib.Result.Result<Int128, Stdlib.Math.Overflow> =
+  let product = Stdlib.BigInt.fromInt128(a) * Stdlib.BigInt.fromInt128(b)
+  match Stdlib.BigInt.toInt128(product) with
+  | Some(fits) -> Ok(fits)
+  | None -> Error(Stdlib.Math.Overflow.Overflow)
+
+
+/// The negation of <param a>, or {{Error Overflow}} for the minimum value,
+/// which `-` wraps back to itself
+let checkedNegate(a: Int128): Stdlib.Result.Result<Int128, Stdlib.Math.Overflow> =
+  if a == -170141183460469231731687303715884105728s128 then
+    Error(Stdlib.Math.Overflow.Overflow)
+  else
+    Ok(-a)
+
+
+/// The distance of <param a> from zero, or {{Error Overflow}} for the minimum
+/// value, which <fn Stdlib.abs> wraps back to itself
+let checkedAbsoluteValue(a: Int128)
+  : Stdlib.Result.Result<Int128, Stdlib.Math.Overflow> =
+  if a == -170141183460469231731687303715884105728s128 then
+    Error(Stdlib.Math.Overflow.Overflow)
+  else if a < 0s128 then
+    Ok(-a)
+  else
+    Ok(a)
+
+
+/// <param base> raised to the power of <param exponent>, or where `**` raises or wraps,
+/// {{Error NegativeExponent}} or {{Error Overflow}}
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Int128.checkedPower: Cannot perform numeric operation on Int128 and Int128"
+let checkedPower(
+  ``base``: Int128,
+  exponent: Int128)
+  : Stdlib.Result.Result<Int128, Stdlib.Math.PowerError> =
+  if exponent < 0s128 then
+    Error(Stdlib.Math.PowerError.NegativeExponent)
+  else if ``base`` == 0s128 || ``base`` == 1s128 || ``base`` == -1s128 then
+    // 0, 1 and -1 never grow, so `**` is exact whatever the exponent
+    Ok(``base`` ** exponent)
+  else if exponent >= 128s128 then
+    // any other base is at least 2 from zero, and 2 ** 128 is past the Int128 range
+    Error(Stdlib.Math.PowerError.Overflow)
+  else
+    let result = Stdlib.BigInt.fromInt128(``base``) ** Stdlib.BigInt.fromInt128(exponent)
+
+    match Stdlib.BigInt.toInt128(result) with
+    | Some(fits) -> Ok(fits)
+    | None -> Error(Stdlib.Math.PowerError.Overflow)
+
+
+// Division. `/` raises on a zero divisor and `%` on a modulus that is not positive;
+// these return the reason instead.
+// TODO: make `/` and `%` themselves checked by default; see the TODO on the `divide`
+// builtin in NoModule.fs.
+
+/// Divides <param a> by <param b>, rounding towards zero, or
+/// {{Error DivisionByZero}} where `/` raises, or {{Error Overflow}} for the
+/// minimum value divided by -1, where `/` wraps back to the minimum.
+let checkedDivide(a: Int128, b: Int128): Stdlib.Result.Result<Int128, Stdlib.Math.DivisionError> =
+  if b == 0s128 then
+    Error(Stdlib.Math.DivisionError.DivisionByZero)
+  else if b == -1s128 && a == -170141183460469231731687303715884105728s128 then
+    Error(Stdlib.Math.DivisionError.Overflow)
+  else
+    Ok(a / b)
+
+
+/// What is left after dividing <param value> by <param divisor>, rounding towards
+/// zero: negative only if <param value> is, whatever the sign of <param divisor>.
+/// {{Error DivisionByZero}} if <param divisor> is {{0}}.
+/// Use <fn Int128.checkedMod> to wrap around into {{0 <= res < b}} instead.
+let checkedRemainder(
+  value: Int128,
+  divisor: Int128)
+  : Stdlib.Result.Result<Int128, Stdlib.Math.DivisionError> =
+  if divisor == 0s128 then
+    Error(Stdlib.Math.DivisionError.DivisionByZero)
+  else
+    Ok(value - (value / divisor) * divisor)
+
+
+/// <param a> wrapped around so that {{0 <= res < b}}, or where `%` raises,
+/// {{Error ZeroModulus}} or {{Error NegativeModulus}}
+let checkedMod(a: Int128, b: Int128): Stdlib.Result.Result<Int128, Stdlib.Math.ModulusError> =
+  if b == 0s128 then
+    Error(Stdlib.Math.ModulusError.ZeroModulus)
+  else if b < 0s128 then
+    Error(Stdlib.Math.ModulusError.NegativeModulus)
+  else
+    Ok(a % b)

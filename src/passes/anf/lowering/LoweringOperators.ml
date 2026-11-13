@@ -7,6 +7,42 @@ module R = TypeRegistries
 module T = TypeSubstitution
 module M = StringOrder.Map
 
+(* Whether evaluating an expression can neither fail nor have an effect, so
+   computing it before its `&&` or `||` decides it is needed is unobservable. *)
+let rec evaluatesSafely (expr : CheckedAST.expr) =
+  match expr with
+  | CheckedAST.UnitLiteral | CheckedAST.Int64Literal _
+  | CheckedAST.Int128Literal _ | CheckedAST.Int8Literal _
+  | CheckedAST.Int16Literal _ | CheckedAST.Int32Literal _
+  | CheckedAST.UInt8Literal _ | CheckedAST.UInt16Literal _
+  | CheckedAST.UInt32Literal _ | CheckedAST.UInt64Literal _
+  | CheckedAST.UInt128Literal _ | CheckedAST.BigIntLiteral _
+  | CheckedAST.BoolLiteral _ | CheckedAST.StringLiteral _
+  | CheckedAST.CharLiteral _ | CheckedAST.FloatLiteral _ | CheckedAST.Local _
+  | CheckedAST.FuncRef _ ->
+      true
+  | CheckedAST.TupleAccess (inner, _)
+  | CheckedAST.RecordAccess (inner, _)
+  | CheckedAST.UnaryOp (AST.Not, inner) ->
+      evaluatesSafely inner
+  | CheckedAST.BinOp
+      ( ( AST.Eq | AST.Neq | AST.Lt | AST.Gt | AST.Lte | AST.Gte | AST.And
+        | AST.Or ),
+        left,
+        right ) ->
+      evaluatesSafely left && evaluatesSafely right
+  | _ -> false
+
+(* `a && b` evaluates `b` only when `a` is true, and `a || b` only when `a`
+   is false: `false && 1 / 0 == 1` is false, not a division error. *)
+let shortCircuit op left right =
+  match op with
+  | AST.And when not (evaluatesSafely right) ->
+      Some (CheckedAST.If (left, right, CheckedAST.BoolLiteral false))
+  | AST.Or when not (evaluatesSafely right) ->
+      Some (CheckedAST.If (left, CheckedAST.BoolLiteral true, right))
+  | _ -> None
+
 (*
    Never reached - StringConcat handled as CExpr
 *)
@@ -138,6 +174,8 @@ let rec generateStructuralEquality resolve left right typ gen registry variants
         A.Call (resolve "Darklang.Stdlib.UInt128.__equals", [ left; right ])
     | AST.TInt ->
         A.Call (resolve "Darklang.Stdlib.Int.__equals", [ left; right ])
+    | AST.TBlob ->
+        A.Call (resolve "Darklang.Stdlib.Blob.__equals", [ left; right ])
     | AST.TString -> A.CanonicalBufferEq (MemoryModel.Utf8String, left, right)
     | AST.TChar -> A.CanonicalBufferEq (MemoryModel.GraphemeCluster, left, right)
     | _ -> A.Prim (A.Eq, left, right)
@@ -198,6 +236,9 @@ let rec generateStructuralEquality resolve left right typ gen registry variants
           in
           compareElements (List.map snd fields) (fun atom index ->
               A.RecordGet (descriptor, atom, index)))
+  (* 1.10dec == 1.1dec: Decimal equality compares the numbers, not the scales. *)
+  | AST.TSum ("Decimal", []) ->
+      single (A.Call (resolve "Darklang.Stdlib.Decimal.__equals", [ left; right ]))
   | AST.TSum (name, args) -> (
       let payload =
         Option.value (M.find_opt name cases) ~default:M.empty

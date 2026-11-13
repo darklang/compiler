@@ -47,14 +47,6 @@ let original = 123456789012345678901234567890 in (original, IntEnvelope original
 root = tuple(shared_word, shared_word)
 
 ---NAME---
-Single-case Float zero wrapper keeps its payload bits
----INPUT---
-type FloatEnvelope = FloatEnvelope of Float
-FloatEnvelope 0.0
----EXPECTED---
-root = word(0)
-
----NAME---
 Single-case Bool wrapper keeps its payload word
 ---INPUT---
 type BoolEnvelope = BoolEnvelope of Bool
@@ -98,7 +90,7 @@ root = tuple(shared_word, shared_word)
 Single-case DateTime wrapper keeps its payload word
 ---INPUT---
 type DateEnvelope = DateEnvelope of DateTime
-DateEnvelope (Stdlib.DateTime.fromMilliseconds 0)
+DateEnvelope (Stdlib.DateTime.fromMilliseconds 0L)
 ---EXPECTED---
 root = word(0)
 

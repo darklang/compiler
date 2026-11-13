@@ -98,6 +98,13 @@ val outOfFuel : parserState -> int -> bool
 val tooDeep : parserState -> int -> bool
 val checkBareMinMagnitude : parserState -> int -> unit
 val floatParts : parserState -> int -> float -> string * string
+val exactFloatParts : float -> string * string
+
+val float32Literal :
+  parserState -> int -> bool -> Tokenizer.tokenRange -> string -> WrittenTypes.expr
+
+val decimalLiteral :
+  parserState -> int -> bool -> Tokenizer.tokenRange -> string -> WrittenTypes.expr
 val stripDelims : string -> string -> string -> string
 val validateLiterals : parserState -> unit
 

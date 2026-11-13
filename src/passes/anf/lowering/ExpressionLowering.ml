@@ -343,16 +343,12 @@ let lowerExpression (toANFCore : LoweringCallbacks.expressionLowerer)
             in
             let* body, gen = anf ~env body gen in
             let continuation = K.wrapBindings (List.rev projections) body in
-            let rec transform = function
-              | A.Return value -> A.Let (root, A.Atom value, continuation)
-              | A.Jump _ as value -> value
-              | A.Join (parameter, continuation, entry) ->
-                  A.Join (parameter, transform continuation, transform entry)
-              | A.Let (id, value, rest) -> A.Let (id, value, transform rest)
-              | A.If (condition, yes, no) ->
-                  A.If (condition, transform yes, transform no)
-            in
-            Ok (transform value, gen))
+            (* A failing match arm never returns, so the destructuring
+               continuation must not run on its placeholder result. *)
+            Ok
+              ( K.bindReturns value (fun value ->
+                    A.Let (root, A.Atom value, continuation)),
+                gen ))
   | C.UnaryOp (AST.Neg, inner) -> (
       let* typ = infer inner in
       match (typ, inner) with
@@ -451,6 +447,11 @@ let lowerExpression (toANFCore : LoweringCallbacks.expressionLowerer)
                     A.Return (A.Var id) ) )
           in
           Ok (sequence setups body, gen))
+  | C.BinOp (op, left, right) when Option.is_some (O.shortCircuit op left right)
+    -> (
+      match O.shortCircuit op left right with
+      | Some conditional -> anf conditional gen
+      | None -> Crash.crash "Short-circuit operator lost its conditional")
   | C.BinOp (op, left, right) ->
       let* leftSetup, leftAtom, gen = bound left gen in
       let* rightSetup, rightAtom, gen = bound right gen in
@@ -491,6 +492,13 @@ let lowerExpression (toANFCore : LoweringCallbacks.expressionLowerer)
                         ( functionId "Darklang.Stdlib.Int.__equals",
                           [ leftAtom; rightAtom ] ))
                      gen)
+            | Ok AST.TBlob ->
+                Ok
+                  (equality
+                     (A.Call
+                        ( functionId "Darklang.Stdlib.Blob.__equals",
+                          [ leftAtom; rightAtom ] ))
+                     gen)
             | Ok typ when Option.is_some (P.canonicalBufferKindForType typ) ->
                 let kind =
                   match P.canonicalBufferKindForType typ with
@@ -527,7 +535,14 @@ let lowerExpression (toANFCore : LoweringCallbacks.expressionLowerer)
         | AST.Add | AST.Sub | AST.Mul | AST.Div | AST.Mod | AST.Pow | AST.Shl
         | AST.Shr | AST.BitAnd | AST.BitOr | AST.BitXor | AST.Lt | AST.Gt
         | AST.Lte | AST.Gte | AST.And | AST.Or ->
-            let* typ = infer expr in
+            let* resultType = infer expr in
+            (* The operand type selects the implementation: a comparison's
+               own type is Bool. *)
+            let* typ =
+              match op with
+              | AST.Lt | AST.Gt | AST.Lte | AST.Gte -> infer left
+              | _ -> Ok resultType
+            in
             (* Generic operator requirements must also hold after specialization. *)
             let* () =
               if op = AST.Mod then WrittenCheckingState.validateOperator op typ

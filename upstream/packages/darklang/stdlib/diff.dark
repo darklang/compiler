@@ -2,32 +2,31 @@ module Darklang.Stdlib.Diff
 
 // @compiler replace: packages/darklang/stdlib/diff.dark#Darklang.Stdlib.Diff.DiffLine reason=compiler-implementation
 type DiffLine =
-  | Same of String
-  | Added of String
-  | Removed of String
+  | Same(String)
+  | Added(String)
+  | Removed(String)
 
 /// The rows of the LCS length table, last row first, each row last column first.
 ///
 /// Row j, column i is the LCS length of the first i old lines and the first j new lines.
-/// Rows are stored back to front because the walk in `trace` starts at the far corner.
-// @compiler replace: packages/darklang/stdlib/diff.dark#Darklang.Stdlib.Diff.buildTable reason=compiler-implementation
-let buildTable (oldLines: List<String>) (newLines: List<String>) : List<List<Int>> =
+/// Rows are stored back to front because the walk in `__trace` starts at the far corner.
+let __buildTable(oldLines: List<String>, newLines: List<String>): List<List<Int64>> =
   let zeroRow =
-    Stdlib.List.map
-      (Stdlib.List.range 0 (Stdlib.List.length oldLines))
-      (fun _i -> 0)
+    Stdlib.List.map(
+      (Stdlib.List.checkedRange(0, Stdlib.List.length(oldLines)) |> Stdlib.Result.withDefault([])),
+      fun _i -> 0)
 
   let (_, rows) =
-    Stdlib.List.fold newLines (zeroRow, [ zeroRow ]) (fun (prevRow, rows) newLine ->
+    Stdlib.List.fold(newLines, (zeroRow, [ zeroRow ]), fun((prevRow, rows), newLine) ->
       // Walks the previous row alongside the old lines: its head is the cell diagonally
       // up-left of the one being filled, and the cell after that is the one above.
       let (_, _, row) =
-        Stdlib.List.fold oldLines (prevRow, 0, [ 0 ]) (fun (prev, left, row) oldLine ->
+        Stdlib.List.fold(oldLines, (prevRow, 0, [ 0 ]), fun((prev, left, row), oldLine) ->
           match prev with
-          | diag :: rest ->
+          | [diag, ...rest] ->
             let above =
               match rest with
-              | above :: _ -> above
+              | [above, ...] -> above
               | [] -> 0
 
             let cell =
@@ -35,10 +34,10 @@ let buildTable (oldLines: List<String>) (newLines: List<String>) : List<List<Int
               else if above >= left then above
               else left
 
-            (rest, cell, Stdlib.List.push row cell)
+            (rest, cell, Stdlib.List.prepend(row, cell))
           | [] -> (prev, left, row))
 
-      (Stdlib.List.reverse row, Stdlib.List.push rows row))
+      (Stdlib.List.reverse(row), Stdlib.List.prepend(rows, row)))
 
   rows
 
@@ -47,85 +46,84 @@ let buildTable (oldLines: List<String>) (newLines: List<String>) : List<List<Int
 /// At (i, j): `oldRev` and `newRev` start at old line i and new line j (1-based, counting
 /// back), `row` is row j from column i, `prevRow` row j-1 from column i, and `rest` the rows
 /// before that in full. Prefers Added over Removed on a tie.
-// @compiler blocked: compiler-contract diagnostic="Already selected from packages/darklang/stdlib/diff.dark; importing another declaration of Darklang.Stdlib.Diff.trace requires an explicit replacement contract"
-let trace
-  (width: Int)
-  (oldRev: List<String>)
-  (newRev: List<String>)
-  (i: Int)
-  (row: List<Int>)
-  (prevRow: List<Int>)
-  (rest: List<List<Int>>)
-  (acc: List<DiffLine>)
+let __trace(
+  width: Int64,
+  oldRev: List<String>,
+  newRev: List<String>,
+  i: Int64,
+  row: List<Int64>,
+  prevRow: List<Int64>,
+  rest: List<List<Int64>>,
+  acc: List<DiffLine>)
   : List<DiffLine> =
   // Row j-2 from column c, for when the walk moves up a row and lands on column c.
-  let rowAbove (c: Int) : List<Int> =
+  let rowAbove(c: Int64): List<Int64> =
     match rest with
-    | r :: _ -> Stdlib.List.drop r (width - c)
+    | [r, ...] -> Stdlib.List.drop(r, width - c)
     | [] -> []
 
   match (oldRev, newRev) with
   | ([], []) -> acc
   | ([], _) ->
-    Stdlib.List.fold newRev acc (fun acc n -> Stdlib.List.push acc (DiffLine.Added n))
+    Stdlib.List.fold(newRev, acc, fun(acc, n) -> Stdlib.List.prepend(acc, DiffLine.Added(n)))
   | (_, []) ->
-    Stdlib.List.fold oldRev acc (fun acc o -> Stdlib.List.push acc (DiffLine.Removed o))
-  | (o :: oldRest, n :: newRest) ->
-    let restRest = Stdlib.List.drop rest 1
+    Stdlib.List.fold(oldRev, acc, fun(acc, o) -> Stdlib.List.prepend(acc, DiffLine.Removed(o)))
+  | ([o, ...oldRest], [n, ...newRest]) ->
+    let restRest = Stdlib.List.drop(rest, 1)
 
     if o == n then
-      trace
-        width
-        oldRest
-        newRest
-        (i - 1)
-        (Stdlib.List.drop prevRow 1)
-        (rowAbove (i - 1))
-        restRest
-        (Stdlib.List.push acc (DiffLine.Same o))
+      __trace(
+        width,
+        oldRest,
+        newRest,
+        i - 1,
+        Stdlib.List.drop(prevRow, 1),
+        rowAbove(i - 1),
+        restRest,
+        Stdlib.List.prepend(acc, DiffLine.Same(o)))
     else
-      let up = Stdlib.Option.withDefault (Stdlib.List.head prevRow) 0
-      let left = Stdlib.Option.withDefault (Stdlib.List.getAt row 1) 0
+      let up = Stdlib.Option.withDefault(Stdlib.List.head(prevRow), 0)
+      let left = Stdlib.Option.withDefault(Stdlib.List.getAt(row, 1), 0)
 
       if up >= left then
-        trace
-          width
-          oldRev
-          newRest
-          i
-          prevRow
-          (rowAbove i)
-          restRest
-          (Stdlib.List.push acc (DiffLine.Added n))
+        __trace(
+          width,
+          oldRev,
+          newRest,
+          i,
+          prevRow,
+          rowAbove(i),
+          restRest,
+          Stdlib.List.prepend(acc, DiffLine.Added(n)))
       else
-        trace
-          width
-          oldRest
-          newRev
-          (i - 1)
-          (Stdlib.List.drop row 1)
-          (Stdlib.List.drop prevRow 1)
-          rest
-          (Stdlib.List.push acc (DiffLine.Removed o))
+        __trace(
+          width,
+          oldRest,
+          newRev,
+          i - 1,
+          Stdlib.List.drop(row, 1),
+          Stdlib.List.drop(prevRow, 1),
+          rest,
+          Stdlib.List.prepend(acc, DiffLine.Removed(o)))
 
 /// Compute a line-based diff between two strings.
 // @compiler replace: packages/darklang/stdlib/diff.dark#Darklang.Stdlib.Diff.lines reason=compiler-implementation
-let lines (oldText: String) (newText: String) : List<DiffLine> =
-  let oldLines = Stdlib.String.split oldText "\n"
-  let newLines = Stdlib.String.split newText "\n"
-  let width = Stdlib.List.length oldLines
+let lines(oldText: String, newText: String): List<DiffLine> =
+  let oldLines = Stdlib.String.split(oldText, "\n")
+  let newLines = Stdlib.String.split(newText, "\n")
+  let width = Stdlib.List.length(oldLines)
 
-  match buildTable oldLines newLines with
-  | row :: rest ->
-    let prevRow = Stdlib.Option.withDefault (Stdlib.List.head rest) []
+  match __buildTable(oldLines, newLines) with
+  | [row, ...rest] ->
+    let prevRow = Stdlib.Option.withDefault(Stdlib.List.head(rest), [])
 
-    trace
-      width
-      (Stdlib.List.reverse oldLines)
-      (Stdlib.List.reverse newLines)
-      width
-      row
-      prevRow
-      (Stdlib.List.drop rest 1)
-      []
+    __trace(
+      width,
+      Stdlib.List.reverse(oldLines),
+      Stdlib.List.reverse(newLines),
+      width,
+      row,
+      prevRow,
+      Stdlib.List.drop(rest, 1),
+      [])
   | [] -> []

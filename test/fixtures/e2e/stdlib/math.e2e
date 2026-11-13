@@ -6,7 +6,7 @@
 // ===================================================================
 
 // Pi should be approximately 3.14159..., with an integer part of 3
-Stdlib.Float.truncate Stdlib.Math.pi = 3
+Stdlib.Float.truncate Stdlib.Math.pi = 3L
 
 // ===================================================================
 // Stdlib.Math.tau - Circle constant equal to exactly twice pi
@@ -19,61 +19,61 @@ Stdlib.Math.tau = 2.0 * Stdlib.Math.pi
 // ===================================================================
 
 // e should be approximately 2.71828...
-Stdlib.Float.truncate Stdlib.Math.e = 2
+Stdlib.Float.truncate Stdlib.Math.e = 2L
 
 // ===================================================================
 // Stdlib.Float.absoluteValue - Absolute value of float
 // ===================================================================
 
-Stdlib.Float.truncate (Stdlib.Float.absoluteValue 5.0) = 5
-Stdlib.Float.truncate (Stdlib.Float.absoluteValue (-5.0)) = 5
+Stdlib.Float.truncate (Stdlib.Float.absoluteValue 5.0) = 5L
+Stdlib.Float.truncate (Stdlib.Float.absoluteValue (-5.0)) = 5L
 
 // ===================================================================
 // Stdlib.Float.sqrt - Square root
 // ===================================================================
 
-Stdlib.Float.truncate (Stdlib.Float.sqrt 4.0) = 2
-Stdlib.Float.truncate (Stdlib.Float.sqrt 9.0) = 3
-Stdlib.Float.truncate (Stdlib.Float.sqrt 16.0) = 4
+Stdlib.Float.truncate (Stdlib.Float.sqrt 4.0) = 2L
+Stdlib.Float.truncate (Stdlib.Float.sqrt 9.0) = 3L
+Stdlib.Float.truncate (Stdlib.Float.sqrt 16.0) = 4L
 
 // ===================================================================
 // Stdlib.Float.truncate - Truncate toward zero
 // ===================================================================
 
-Stdlib.Float.truncate 3.7 = 3
-Stdlib.Float.truncate (-3.7) = -3
-Stdlib.Float.truncate 0.0 = 0
+Stdlib.Float.truncate 3.7 = 3L
+Stdlib.Float.truncate (-3.7) = -3L
+Stdlib.Float.truncate 0.0 = 0L
 
 // ===================================================================
 // Stdlib.Float.floor - Floor function
 // ===================================================================
 
-Stdlib.Float.floor 3.7 = 3
-Stdlib.Float.floor 3.0 = 3
-Stdlib.Float.floor (-3.7) = -4
-Stdlib.Float.floor (-3.0) = -3
+Stdlib.Float.floor 3.7 = 3L
+Stdlib.Float.floor 3.0 = 3L
+Stdlib.Float.floor (-3.7) = -4L
+Stdlib.Float.floor (-3.0) = -3L
 
 // ===================================================================
 // Stdlib.Float.ceiling - Ceiling function
 // ===================================================================
 
-Stdlib.Float.ceiling 3.7 = 4
-Stdlib.Float.ceiling 3.0 = 3
-Stdlib.Float.ceiling (-3.7) = -3
-Stdlib.Float.ceiling (-3.0) = -3
+Stdlib.Float.ceiling 3.7 = 4L
+Stdlib.Float.ceiling 3.0 = 3L
+Stdlib.Float.ceiling (-3.7) = -3L
+Stdlib.Float.ceiling (-3.0) = -3L
 
 // ===================================================================
 // Stdlib.Float.round - Round to nearest, ties to even
 // ===================================================================
 
-Stdlib.Float.round 2.5 = 2
-Stdlib.Float.round 3.5 = 4
-Stdlib.Float.round 3.4 = 3
-Stdlib.Float.round 3.0 = 3
-Stdlib.Float.round (-2.5) = -2
-Stdlib.Float.round (-3.5) = -4
-Stdlib.Float.round (-3.4) = -3
-Stdlib.Float.round (-3.0) = -3
+Stdlib.Float.round 2.5 = 2L
+Stdlib.Float.round 3.5 = 4L
+Stdlib.Float.round 3.4 = 3L
+Stdlib.Float.round 3.0 = 3L
+Stdlib.Float.round (-2.5) = -2L
+Stdlib.Float.round (-3.5) = -4L
+Stdlib.Float.round (-3.4) = -3L
+Stdlib.Float.round (-3.0) = -3L
 
 // Interpreter transcendental surface and domain behavior
 Stdlib.Math.sin (Stdlib.Math.pi / 2.0) = 1.0

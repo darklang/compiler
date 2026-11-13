@@ -25,6 +25,6 @@ let reverseEight
         + Stdlib.List.length f
         + Stdlib.List.length g
         + Stdlib.List.length h in
-    if discardedLengths >= 0 then a else []
+    if discardedLengths >= 0L then a else []
 
 reverseEight [1L, 2L] [2L] [3L] [4L] [5L] [6L] [7L] [8L] = [2L, 1L]

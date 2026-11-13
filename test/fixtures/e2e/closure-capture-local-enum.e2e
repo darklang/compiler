@@ -1,0 +1,13 @@
+// A lambda captures a binding from a constructor pattern of a type whose
+// case names other types share, as hosted `MPTuple(id, ...)` arms do.
+type Shape =
+  | Some of Int64
+  | Ok of Int64 * List<Int64>
+let shifted (shape: Shape) : List<Int64> =
+  match shape with
+  | Some(id) -> Stdlib.List.map [1L, 2L] (fun x -> x + id)
+  | Ok(id, xs) ->
+    let k = id * 2L in
+    Stdlib.List.map xs (fun x -> x + k)
+shifted (Shape.Some 10L) = [11L, 12L]
+shifted (Shape.Ok (5L, [1L])) = [11L]

@@ -56,8 +56,8 @@ let handler (req: Stdlib.Http.Request) : Stdlib.Http.Response =
 match Stdlib.Cli.__Args.int64 0 with
 | Error _ -> Stdlib.printLine "Invalid port"
 | Ok port ->
-  let config = Stdlib.HttpServer.Config.Config { port = Stdlib.Int.fromInt64 port,
-    maxBodyBytes = 80000, injectStandardHeaders = true,
+  let config = Stdlib.HttpServer.Config.Config { address = "127.0.0.1", port = Stdlib.Net.Port { __port = port },
+    maxBodyBytes = 80000L, injectStandardHeaders = true,
     canonicalizeFromForwardedProto = true, logRequests = false } in
   match Stdlib.HttpServer.serve config handler (fun _ -> Stdlib.printLine "LISTENING") with
   | Error message -> Stdlib.printLine message

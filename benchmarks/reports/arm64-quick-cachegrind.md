@@ -4,7 +4,7 @@ Architecture: `arm64`. Profile: `quick`.
 
 Measurement policy: `cachegrind-ir-v1:cache-sim=no,branch-sim=no,extract=summary-I-refs`.
 
-Current workload contract: `a51a118103e413603481d1a2066a457e9038664d101d2bf6a68291180454f957`.
+Current workload contract: `fda3afc196358063621df43fbbb9b1372d69ea109a7c4eaeacc561f77258120c`.
 
 Instruction counts include runtime and startup work; they are not elapsed-time speed ratios.
 

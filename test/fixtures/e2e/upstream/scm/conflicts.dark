@@ -304,15 +304,10 @@ module Fqn =
 
 
 module OrderPreservingDedup =
-  // `Stdlib.List.unique` and `uniqueBy` both SORT (their own docs say the order is not maintained), so
-  // neither can dedup a sequence whose order is the point. `PackageOps.branchHashHistoryFor` returns a
-  // name's versions oldest-first and is what `dark undo` steps through; sorting it there swaps the
-  // sequence for lexicographic hash order, which looks plausible and sends undo to the wrong version.
-  //
-  // Pinning the stdlib behaviour, so the day either of these starts preserving order the call sites that
-  // worked around it get revisited rather than silently double-correcting.
-  (Stdlib.List.unique [ "c", "a", "b" ]) = [ "a", "b", "c" ]
-  (Stdlib.List.uniqueBy [ "c", "a", "b" ] (fun x -> x)) = [ "a", "b", "c" ]
+  // `Stdlib.List.unique` and `uniqueBy` keep first occurrences in place, so `dark undo` can dedup a
+  // name's versions oldest-first without reordering them.
+  (Stdlib.List.unique [ "c", "a", "b", "a" ]) = [ "c", "a", "b" ]
+  (Stdlib.List.uniqueBy [ "c", "a", "b", "a" ] (fun x -> x)) = [ "c", "a", "b" ]
 
   // The order-preserving shape, which is what an authoring sequence needs.
   (Stdlib.List.fold

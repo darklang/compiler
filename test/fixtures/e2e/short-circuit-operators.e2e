@@ -1,0 +1,4 @@
+// `&&` and `||` evaluate their right side only when the left does not decide
+// the result, so a guard keeps a division by zero from running.
+Stdlib.List.map [0L, 1L] (fun x -> x != 0L && (1L / x) == 1L) = [false, true]
+Stdlib.List.map [0L, 1L] (fun x -> x == 0L || (1L / x) == 1L) = [true, true]

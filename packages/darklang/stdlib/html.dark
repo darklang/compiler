@@ -67,7 +67,7 @@ let nodeToString (node: Stdlib.Html.Node) : String =
             startTag + childHtml + "</" + tag.name + ">"
 
 let __commentText (value: String) : String =
-    if Stdlib.String.contains value "--" then
+    if Stdlib.String.__containsBytes value "--" then
         Stdlib.Html.__commentText (Stdlib.String.replaceAll value "--" "- -")
     else value
 

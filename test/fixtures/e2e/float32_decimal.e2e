@@ -1,0 +1,38 @@
+// Float32 and Decimal (darklang/dark@1d3a109): literals, arithmetic and printing as the
+// interpreter has them. Float32 is binary32, each result rounded to nearest, ties to even;
+// Decimal is .NET's decimal, 96 bits at a scale of 0 to 28.
+
+Stdlib.Float32.toString (0.1f32 + 0.2f32) = "0.3"
+Stdlib.Float32.toString (1.0f32 / 3.0f32) = "0.33333334"
+Stdlib.Float32.toString 1e30f32 = "1e+30"
+Stdlib.Float32.toString 100000000.0f32 = "100000000.0"
+Stdlib.Float32.toString (Stdlib.Float32.fromFloat 3.14159) = "3.14159"
+Stdlib.Float32.toString (Stdlib.Float32.fromInt64 16777217L) = "16777216.0"
+Stdlib.Float32.toString (Stdlib.Float32.fromFloat 1e-45) = "1e-45"
+Stdlib.Float32.toString (-2.5f32) = "-2.5"
+Stdlib.Float32.toBits 0.1f32 = 1036831949ul
+Stdlib.Float32.toBits (Stdlib.Float32.fromBits 1065353216ul) = 1065353216ul
+Stdlib.Float32.toFloat 0.1f32 = 0.10000000149011612
+0.0f32 == -0.0f32 = true
+1.5f32 < 2.5f32 = true
+1.5f32 = stdout="1.5f32\n" stderr=""
+Stdlib.Decimal.toString (1dec / 3dec) = "0.3333333333333333333333333333"
+Stdlib.Decimal.toString (2dec / 3dec) = "0.6666666666666666666666666667"
+Stdlib.Decimal.toString (1dec / 8dec) = "0.125"
+Stdlib.Decimal.toString (1.000dec / 4dec) = "0.250"
+Stdlib.Decimal.toString (10dec % 3.5dec) = "3.0"
+Stdlib.Decimal.toString (-7.5dec % 2dec) = "0.5"
+Stdlib.Decimal.toString (0.5dec * 0.5dec) = "0.25"
+Stdlib.Decimal.toString (1.10dec - 3dec) = "-1.90"
+Stdlib.Decimal.toString (-0.05dec) = "-0.05"
+Stdlib.Decimal.toParts 1.10dec = (110, 2L)
+1.10dec == 1.1dec = true
+[1.10dec] == [1.1dec] = true
+1.5dec < 2dec = true
+1.10dec = stdout="1.10dec\n" stderr=""
+79228162514264337593543950335dec + 1dec = error="Decimal result is out of range (larger than 79228162514264337593543950335)"
+1dec / 0dec = error="Cannot divide by 0"
+
+// `f64` spells a Float with its width.
+1.5f64 = 1.5
+2f64 + 0.5 = 2.5

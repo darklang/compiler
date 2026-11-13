@@ -7,21 +7,21 @@
 // application that could have taken more arguments.
 let layoutLetBody (xs: List<Int64>): Int =
   let doubled = Stdlib.List.map xs (fun x -> x * 2L)
-  Stdlib.List.length doubled
+  Stdlib.Int.fromInt64 (Stdlib.List.length doubled)
 layoutLetBody [1L, 2L, 3L] = 3
 
-let layoutLetChain (xs: List<Int64>): Int =
-  let a = Stdlib.List.append xs xs
-  let b = Stdlib.List.append a a
+let layoutLetChain (xs: List<Int64>): Int64 =
+  let a = Stdlib.List.concat xs xs
+  let b = Stdlib.List.concat a a
   Stdlib.List.length b
-layoutLetChain [1L] = 4
+layoutLetChain [1L] = 4L
 
-let layoutLetValueBelow (xs: List<Int64>): Int =
+let layoutLetValueBelow (xs: List<Int64>): Int64 =
   let a =
-    Stdlib.List.append xs xs
+    Stdlib.List.concat xs xs
   let (b, c) = (a, a)
   Stdlib.List.length b
-layoutLetValueBelow [1L, 2L] = 4
+layoutLetValueBelow [1L, 2L] = 4L
 
 let layoutOperatorInline (a: Int64) (b: Int64): Int64 =
   let total = a + b
@@ -45,7 +45,7 @@ let layoutStatements (label: String): String =
   "done"
 layoutStatements "A" = stdout="A\na\n\"done\"\n"
 
-let layoutStatementsThenLet (label: String): Int =
+let layoutStatementsThenLet (label: String): Int64 =
   Stdlib.printLine label
   let n = Stdlib.String.length label
   Stdlib.printLine "second"
@@ -110,7 +110,7 @@ $"{{ a {"b"} }}" = "{ a b }"
 
 // A constructor with adjacent parenthesized fields is one argument.
 Stdlib.Option.map Some(1L) (fun x -> x + 1L) = Some 2L
-Stdlib.List.length [Some(1L), None] = 2
+Stdlib.List.length [Some(1L), None] = 2L
 
 // A constructor with adjacent empty parentheses carries a unit payload.
 Ok() == Ok () = true
@@ -123,7 +123,7 @@ let nestedVariantArm (o: Option<Stdlib.AltJson.Json>) : Int64 =
   | Some(String _) -> 1L
   | None -> 2L
   | Some(_) -> 3L
-[nestedVariantArm (Some(Stdlib.AltJson.Json.String "x")), nestedVariantArm None, nestedVariantArm (Some(Stdlib.AltJson.Json.Number 1.0))] = [1L, 2L, 3L]
+[nestedVariantArm (Some(Stdlib.AltJson.Json.String "x")), nestedVariantArm None, nestedVariantArm (Some(Stdlib.AltJson.Json.Float 1.0))] = [1L, 2L, 3L]
 
 // Stdlib.Result.mapError takes the result first, as every other Result and
 // Option combinator does; it took the function first.
@@ -147,7 +147,7 @@ let armBodyWithLaterMatch (json: Stdlib.AltJson.Json): Int64 =
 [armBodyWithLaterMatch (Stdlib.AltJson.Json.Object [("name", Stdlib.AltJson.Json.String "x")]), armBodyWithLaterMatch (Stdlib.AltJson.Json.Object []), armBodyWithLaterMatch Stdlib.AltJson.Json.Null] = [10L, 20L, 3L]
 
 // `f x - 1` is subtraction; `f -1` still passes a negative literal.
-let spacedMinus (parts: List<String>) : Int =
-  Stdlib.List.length parts - 1
-[spacedMinus ["a", "b"], spacedMinus []] = [1, -1]
+let spacedMinus (parts: List<String>) : Int64 =
+  Stdlib.List.length parts - 1L
+[spacedMinus ["a", "b"], spacedMinus []] = [1L, -1L]
 Stdlib.Int64.add 1L -1L = 0L

@@ -106,6 +106,20 @@ array of `{ "kind", "name", "source", "output" }` objects. Add
 write one JSON result per line. The process prepares the standard library once
 for the complete batch.
 
+To ask whether particular package functions or values compile, and why not,
+name them after `--check`. One prepared standard library serves every name:
+
+```bash
+./dark --check --package-server http://127.0.0.1:9090 Hosted.price Stdlib.Int64.add
+# Hosted.price: can't compile: uses the Decimal type, which this compiler does not support
+# Stdlib.Int64.add: compiles
+./dark --check --json Stdlib.List.map   # one JSON object per name: name, status, reason, error
+```
+
+A generic function referenced this way has no type arguments to specialize
+with, so `--check` reports it as `can't tell` (`"status": "undetermined"`)
+rather than as a failure. Batch reports carry the same one-line `reason`.
+
 To audit hosted packages against the compiler, run the catalog-driven helper:
 
 ```bash

@@ -7,10 +7,10 @@
 let freshEmpty<'a> (): List<'a> = []
 
 let freshConcatAll<'a> (xss: List<List<'a>>): List<'a> =
-  Stdlib.List.fold xss (freshEmpty ()) (fun acc xs -> Stdlib.List.append acc xs)
+  Stdlib.List.fold xss (freshEmpty ()) (fun acc xs -> Stdlib.List.concat acc xs)
 
 let freshRunConcat (): Int =
-  Stdlib.List.length (freshConcatAll [[1L, 2L], [3L]])
+  Stdlib.Int.fromInt64 (Stdlib.List.length (freshConcatAll [[1L, 2L], [3L]]))
 freshRunConcat () = 3
 
 let freshPairUp<'a, 'b> (xs: List<'a>) (ys: List<'b>): List<('a * 'b)> =
@@ -32,12 +32,12 @@ let freshTakeWithin<'a> (items: List<'a>) (limit: Int) (cost: 'a -> Int): (List<
     Stdlib.List.fold items ([], 0) (fun acc item ->
       let (taken, spent) = acc
       let next = spent + (cost item)
-      if next <= limit then (Stdlib.List.append taken [item], next) else (taken, spent))
+      if next <= limit then (Stdlib.List.concat taken [item], next) else (taken, spent))
   (shown, spent)
 
 let freshRunTakeWithin (): Int =
   let (shown, spent) = freshTakeWithin [1L, 2L, 3L] 3 (fun x -> 1)
-  Stdlib.List.length shown + spent
+  Stdlib.Int.fromInt64 (Stdlib.List.length shown) + spent
 freshRunTakeWithin () = 6
 
 // An untyped lambda passed before the argument that fixes its parameter: the

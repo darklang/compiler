@@ -4,18 +4,18 @@ module Darklang.Stdlib.Test.Process
 
 type Options =
   { branch: Option<Uuid>
-    timeoutMs: Int
-    columns: Int
-    rows: Int }
+    timeoutMs: Int64
+    columns: Int64
+    rows: Int64 }
 
 type Output<'a> =
   { result: Stdlib.Result.Result<'a, String>
     stdout: String
     stderr: String
-    exitCode: Int
+    exitCode: Int64
     cleanupErrors: List<String> }
 
-let defaults () : Options =
+let defaults(): Options =
   Options
     { branch = None, timeoutMs = 120000, columns = 80, rows = 24 }
 
@@ -24,24 +24,24 @@ let defaults () : Options =
 /// captured separately from the typed result. Requires Native and a running test.
 /// The timeout covers worker execution and output collection, after the store copy.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Test.Process.run: Unknown function or value 'Builtin.testRunIsolated'"
-let run<'a, 'b>
-  (options: Options)
-  (callback: 'a -> 'b)
-  (argument: 'a)
+let run<'a, 'b>(
+  options: Options,
+  callback: 'a -> 'b,
+  argument: 'a)
   : Stdlib.Result.Result<Output<'b>, String> =
-  Builtin.testRunIsolated
-    options.branch options.timeoutMs options.columns options.rows
-    callback argument LanguageTools.PackageManager.Test.Worker.main
-  |> Stdlib.Result.andThen (fun (result, stdout, stderr, exitCode, cleanupErrors) ->
+  Builtin.testRunIsolated(
+    options.branch, options.timeoutMs, options.columns, options.rows,
+    callback, argument, LanguageTools.PackageManager.Test.Worker.main)
+  |> Stdlib.Result.andThen(fun((result, stdout, stderr, exitCode, cleanupErrors)) ->
     match result with
     | None ->
-      Stdlib.String.join
-        (Stdlib.List.append
-          [ $"Isolated test exited {Stdlib.toString exitCode} without a result:"
+      Stdlib.String.join(
+        (Stdlib.List.concat(
+          [ $"Isolated test exited {Stdlib.display(exitCode)} without a result:"
             stdout
-            stderr ]
-          cleanupErrors)
-        "\n"
+            stderr ],
+          cleanupErrors)),
+        "\n")
       |> Error
-    | Some result ->
-      Ok (Output { result = result, stdout = stdout, stderr = stderr, exitCode = exitCode, cleanupErrors = cleanupErrors }))
+    | Some(result) ->
+      Ok(Output { result = result, stdout = stdout, stderr = stderr, exitCode = exitCode, cleanupErrors = cleanupErrors }))

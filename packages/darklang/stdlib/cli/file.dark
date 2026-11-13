@@ -65,7 +65,7 @@ let readText (path: String) : Result.Result<String, Posix.Error> =
       | Ok s -> Stdlib.Result.Result.Ok s
       | Error msg ->
         Stdlib.Result.Result.Error
-          (Posix.Error { errno = -1, message = $"File contents not valid UTF-8: {msg}" })
+          (Posix.Error { errno = -1L, message = $"File contents not valid UTF-8: {msg}" })
     | Error e -> Stdlib.Result.Result.Error e
   | Error e -> Stdlib.Result.Result.Error e
 
@@ -112,7 +112,7 @@ let readFully
         // EOF: the file is shorter than the caller believed (it was truncated under us, say).
         Stdlib.Result.Result.Ok(Stdlib.Blob.concat acc)
       else
-        readFully fd (count - received) (Stdlib.List.append acc [ chunk ]))
+        readFully fd (count - received) (Stdlib.List.concat acc [ chunk ]))
 
 
 let readTailChunks
@@ -179,17 +179,17 @@ let readLastLines
           | Error message ->
             Stdlib.Result.Result.Error
               (Posix.Error {
-                errno = -1
+                errno = -1L
                 message = $"File contents not valid UTF-8: {message}"
               })
           | Ok text ->
             let lines = Stdlib.String.splitOnNewline text
-            let total = Stdlib.List.length lines
+            let total = Stdlib.List.__lengthInt lines
             if total <= count then
               Stdlib.Result.Result.Ok lines
             else
               Stdlib.Result.Result.Ok
-                (Stdlib.List.drop lines (total - count))))
+                (Stdlib.List.__dropInt lines (total - count))))
 
 
 /// Write bytes, completing short writes and preserving the first I/O error.
@@ -395,7 +395,7 @@ let glob (basePath: String) (pattern: String) : Result.Result<List<String>, Posi
   |> Stdlib.Result.map (fun allPaths ->
     allPaths
     |> Stdlib.List.filter (fun fullPath ->
-      let rel = Stdlib.String.dropFirst fullPath ((Stdlib.String.length cleanBase) + 1)
+      let rel = Stdlib.String.__dropFirstInt fullPath ((Stdlib.String.__lengthInt cleanBase) + 1)
       let pathSegs = Stdlib.String.split rel "/"
       globMatchSegments patternSegs pathSegs))
 
@@ -598,7 +598,7 @@ let __watchEvents (bytes: List<UInt8>) (remaining: Int) (changed: Bool) (rearm: 
         else
           let nextChanged = changed || (__watchHas mask 2) || (__watchHas mask 4) || (__watchHas mask 8) || (__watchHas mask 1024) || (__watchHas mask 2048) || (__watchHas mask 16384)
           let nextRearm = rearm || (__watchHas mask 1024) || (__watchHas mask 2048) || (__watchHas mask 32768)
-          __watchEvents (Stdlib.List.drop bytes length) (remaining - length) nextChanged nextRearm))
+          __watchEvents (Stdlib.List.__dropInt bytes length) (remaining - length) nextChanged nextRearm))
 
 let __watchDrain (fd: Int) : Result.Result<(Bool * Bool), Int> =
   match Builtin.syscallRead fd 65536 with
@@ -653,11 +653,11 @@ let __watchVnodeEvents (bytes: List<UInt8>) (remaining: Int) (changed: Bool) (re
       Stdlib.Cli.Posix.__kernelField bytes 12 4 |> Stdlib.Result.andThen (fun mask ->
         if __watchHas flags 16384 then
           Stdlib.Cli.Posix.__kernelSignedField bytes 16 8 |> Stdlib.Result.andThen (fun errno ->
-            if errno == 0 then __watchVnodeEvents (Stdlib.List.drop bytes 32) (remaining - 32) changed rearm
+            if errno == 0 then __watchVnodeEvents (Stdlib.List.__dropInt bytes 32) (remaining - 32) changed rearm
             else Error errno)
         else
           let nextRearm = rearm || (__watchHas mask 1) || (__watchHas mask 32) || (__watchHas mask 64)
-          __watchVnodeEvents (Stdlib.List.drop bytes 32) (remaining - 32) (changed || mask != 0) nextRearm))
+          __watchVnodeEvents (Stdlib.List.__dropInt bytes 32) (remaining - 32) (changed || mask != 0) nextRearm))
 
 let __watchVnodeLoop (queue: Int) (intervalMs: Int) (shouldStop: Unit -> Bool) (fn: Unit -> Unit)
   : Result.Result<Bool, Int> =
@@ -798,7 +798,7 @@ let __globBracket
     match bytes with
     | first :: _ -> first == 33uy || first == 94uy
     | [] -> false
-  let items = if inverted then Stdlib.List.drop bytes 1 else bytes
+  let items = if inverted then Stdlib.List.__dropInt bytes 1 else bytes
   match __globClassItems items c true false true with
   | None -> None
   | Some ((after, matched, valid)) ->

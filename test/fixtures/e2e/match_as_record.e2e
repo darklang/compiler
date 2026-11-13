@@ -1,0 +1,24 @@
+// `| pattern as name` (darklang/dark@6a5beac) and record patterns that leave
+// fields out, with `{ name }` shorthand (darklang/dark@0851642).
+
+type MPoint = { x: Int64, y: Int64, z: Int64 }
+type MShape = | MCircle(Int64) | MDot
+
+match Stdlib.Option.Option.Some 41L with | Some(n) as whole -> (n, whole) | None -> (0L, Stdlib.Option.Option.None) = (41L, Stdlib.Option.Option.Some 41L)
+match [1L, 2L] with | [first, ...] as all -> (first, all) | [] -> (0L, []) = (1L, [1L, 2L])
+match MShape.MCircle(3L) with | MCircle(r) as s when r > 2L -> s | _ -> MShape.MDot = MShape.MCircle(3L)
+match MPoint { x = 1L, y = 2L, z = 3L } with | { x, z } -> x + z = 4L
+match MPoint { x = 1L, y = 2L, z = 3L } with | { y = second } -> second = 2L
+match MPoint { x = 5L, y = 2L, z = 3L } with | { x } when x > 4L -> x | { y } -> y = 5L
+match MPoint { x = 1L, y = 2L, z = 3L } with | { x = 1L } -> 0L = compileerror="can't compile: uses a record pattern field that is not a name"
+match Stdlib.Option.Option.Some 1L with | Some(x as y) -> y | None -> 0L = compileerror="can't compile: uses an `as` pattern inside another pattern"
+// Patterns the interpreter accepts and this compiler cannot lower yet are read,
+// so the file around them parses, and refused when compiled, by name.
+match (Stdlib.Option.Option.Some 5L, 6L) with | ((Some(x) as o), n) -> x + n | _ -> 0L = compileerror="can't compile: uses an `as` pattern inside another pattern"
+match [7L, 8L] with | [a as b, c] -> a + b + c | _ -> 0L = compileerror="can't compile: uses an `as` pattern inside another pattern"
+match 3L with | n as m as k when n + m == 6L -> k | _ -> 0L = compileerror="can't compile: uses an `as` pattern inside another pattern"
+match Stdlib.Option.Option.Some 1L with | Stdlib.Option.Option.Some(x) -> x | _ -> 0L = compileerror="can't compile: uses a qualified enum case pattern"
+match Stdlib.Option.Option.Some (MPoint { x = 1L, y = 2L, z = 3L }) with | Some({ x }) -> x | _ -> 0L = compileerror="can't compile: uses a record pattern inside another pattern"
+match MPoint { x = 1L, y = 2L, z = 3L } with | { x = n, y = 2L } -> n | _ -> 0L = compileerror="can't compile: uses a record pattern field that is not a name"
+match 1.5f32 with | 1.5f32 -> 1L | _ -> 0L = compileerror="can't compile: uses a Float32 literal pattern"
+match [2L] with | [1L | 2L] -> 1L | _ -> 0L = compileerror="can't compile: uses an or-pattern inside a list pattern"

@@ -1,7 +1,6 @@
 /// A yes/no question, drawn over whatever is already on screen.
 ///
-/// For the actions that don't have an undo. Deleting a document used to happen the instant you pressed `d`,
-/// with no confirmation and no way back.
+/// For the actions that don't have an undo, like deleting a document.
 module Darklang.Stdlib.Cli.UI.Confirm
 
 type State =
@@ -14,14 +13,14 @@ type Msg =
   | Confirmed
   | Declined
 
-let ask (question: String) : State =
+let ask(question: String): State =
   State { question = question, detail = "", danger = false }
 
-let askDangerous (question: String) (detail: String) : State =
+let askDangerous(question: String, detail: String): State =
   State { question = question, detail = detail, danger = true }
 
 
-let onKey (state: State) (kp: Widget.KeyPress) : Widget.Outcome<State, Msg> =
+let onKey(state: State, kp: Widget.KeyPress): Widget.Outcome<State, Msg> =
   match kp.key with
   | Enter ->
     // Enter agrees with a plain question and declines a dangerous one: the safe answer is the easy one.
@@ -31,20 +30,20 @@ let onKey (state: State) (kp: Widget.KeyPress) : Widget.Outcome<State, Msg> =
       Widget.Outcome.Emitted(state, Msg.Confirmed)
   | Escape -> Widget.Outcome.Emitted(state, Msg.Declined)
   | _ ->
-    if Widget.isChar kp "y" then
+    if Widget.isChar(kp, "y") then
       Widget.Outcome.Emitted(state, Msg.Confirmed)
-    else if Widget.isChar kp "n" then
+    else if Widget.isChar(kp, "n") then
       Widget.Outcome.Emitted(state, Msg.Declined)
     else
       // Anything else is swallowed rather than passed on: a modal question that let other keys through
       // would act on the thing you were being asked about.
-      Widget.Outcome.Handled state
+      Widget.Outcome.Handled(state)
 
 
 /// Centre a box `rows` x `cols` inside `region`.
-let centred (region: Layout.Region) (rows: Int) (cols: Int) : Layout.Region =
-  let w = Stdlib.min region.cols cols
-  let h = Stdlib.min region.rows rows
+let centred(region: Layout.Region, rows: Int64, cols: Int64): Layout.Region =
+  let w = Stdlib.min(region.cols, cols)
+  let h = Stdlib.min(region.rows, rows)
 
   Layout.Region
     { top = region.top + ((region.rows - h) / 2)
@@ -53,29 +52,29 @@ let centred (region: Layout.Region) (rows: Int) (cols: Int) : Layout.Region =
       cols = w }
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.Confirm.view: Unknown function or value 'Box.panel'"
-let view (state: State) (region: Layout.Region) : List<Layout.Span> =
+let view(state: State, region: Layout.Region): List<Layout.Span> =
   let hasDetail = state.detail != ""
   let width =
-    Stdlib.max
-      32
-      (4 + (Stdlib.max
-              (Stdlib.String.displayWidth state.question)
-              (Stdlib.String.displayWidth state.detail)))
+    Stdlib.max(
+      32,
+      (4 + (Stdlib.max(
+              Stdlib.String.displayWidth(state.question),
+              Stdlib.String.displayWidth(state.detail)))))
 
-  let box = centred region (if hasDetail then 7 else 6) width
+  let box = centred(region, (if hasDetail then 7 else 6), width)
   let title = if state.danger then "confirm" else "question"
 
-  Box.panel box title true (fun inner ->
+  Box.panel(box, title, Stdlib.Cli.UI.Focus.Focused, fun inner ->
     let detail =
-      if hasDetail then Layout.at inner 2 1 (Colors.dimText state.detail) else []
+      if hasDetail then Layout.at(inner, 2, 1, Colors.dimText(state.detail)) else []
 
-    Stdlib.List.flatten
-      [ Layout.clearRegion inner
-        Layout.at inner 0 1 state.question
+    Stdlib.List.flatten(
+      [ Layout.clearRegion(inner)
+        Layout.at(inner, 0, 1, state.question)
         detail
-        Layout.at
-          inner
-          (inner.rows - 1)
-          1
-          (Colors.dimText "y: yes    n / Esc: no") ])
+        Layout.at(
+          inner,
+          inner.rows - 1,
+          1,
+          Colors.dimText("y: yes    n / Esc: no")) ]))
 

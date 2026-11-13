@@ -51,7 +51,8 @@ and parseTypeDefinition state index =
     tok state index = TBar
     ||
     match (tok state index, tok state (index + 1)) with
-    | TIdent name, next when upperName name -> next = TOf || next = TBar
+    | TIdent name, next when upperName name ->
+        next = TOf || next = TBar || next = TLParen
     | _ -> false
   in
   match tok state index with
@@ -121,6 +122,25 @@ and parseRecordDef state index =
    the field type is parsed at ATOM level — a bare `*` is the separator, not a
    tuple. A tuple field must be parenthesized (`(A * B)`), which parseAtomType handles.
 *)
+(* A field inside `Case(...)` is a whole type, so `Case(String * Int64)` is
+   one tuple field, as in the interpreter. *)
+and parseEnumParenField state index =
+  match (tok state index, tok state (index + 1)) with
+  | TIdent label, TColon ->
+      let nameRange = rng state index and colon = rng state (index + 1) in
+      let typ, next = TypeParser.parseTypeRef state (index + 2) in
+      ( {
+          WT.range = span nameRange (WT.typeReferenceRange typ);
+          typ;
+          label = Some (nameRange, label);
+          symbolColon = Some colon;
+        },
+        next )
+  | _ ->
+      let typ, next = TypeParser.parseTypeRef state index in
+      ( { WT.range = WT.typeReferenceRange typ; typ; label = None; symbolColon = None },
+        next )
+
 and parseEnumField state index =
   match (tok state index, tok state (index + 1)) with
   | TIdent label, TColon ->
@@ -187,6 +207,28 @@ and parseEnumDef state index =
               RevBuffer.add fields field;
               stop := next
             done
+          end
+          (* `| Pair(Int64, Int64)` (darklang/dark@632e932): fields in parens,
+             as a constructor takes them. `| Pair of Int64 * Int64` still
+             parses. *)
+          else if tok state !stop = TLParen && tok state (!stop + 1) <> TRParen
+          then begin
+            let opening = rng state !stop in
+            keywordOf := Some opening;
+            incr stop;
+            let more = ref true in
+            while !more do
+              let field, next = parseEnumParenField state !stop in
+              RevBuffer.add fields field;
+              if next = !stop then more := false
+              else if tok state next = TComma then stop := next + 1
+              else begin
+                stop := next;
+                more := false
+              end
+            done;
+            if tok state !stop = TRParen then incr stop
+            else errUnclosed state !stop ")" "(" opening
           end;
           let ending =
             match RevBuffer.last fields with

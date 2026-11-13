@@ -55,7 +55,7 @@ let insert (state: Stdlib.__QuicReassembly.State) (offset: Int64) (bytes: Blob)
       match Stdlib.__QuicReassembly.__merge incoming state.segments with
       | Error message -> Error message
       | Ok segments ->
-        if Stdlib.List.length segments > 256 then Error "Too many QUIC CRYPTO fragments"
+        if Stdlib.List.__lengthInt segments > 256 then Error "Too many QUIC CRYPTO fragments"
         else Ok (Stdlib.__QuicReassembly.State { maximum = state.maximum, consumed = state.consumed, segments = segments })
 
 let available (state: Stdlib.__QuicReassembly.State) : Blob =

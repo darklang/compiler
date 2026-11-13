@@ -314,7 +314,7 @@ val resolvedConstructorReference : string -> constructorReference
 val resolvedConstructorReferenceWithTypeArgs :
   string -> semanticType list -> constructorReference
 
-val constructorRuntimeIdentity : string -> string -> int
+val constructorRuntimeIdentity : string -> string -> int -> string list -> int
 val lambdaParameter : letPattern -> 't lambdaParameterNode
 val typedLambdaVariable : string -> 't -> 't lambdaParameterNode
 val inferredLambdaVariable : string -> 't -> 't lambdaParameterNode

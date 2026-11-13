@@ -3,7 +3,8 @@
 module Darklang.Stdlib.Http
 
 type Request =
-  { url: String
+  { method: String
+    url: String
     headers: List<String * String>
     body: Blob }
 
@@ -15,17 +16,17 @@ let urlDecode (value: String) : String =
     | first :: rest ->
         let decodedBytes =
             Stdlib.List.fold rest (Stdlib.String.toBytes first) (fun acc piece ->
-                let hex = Stdlib.String.slice piece 0 2 in
+                let hex = Stdlib.String.__sliceInt piece 0 2 in
                 let parsed =
-                    if Stdlib.String.length hex == 2 then Stdlib.Blob.fromHex hex
+                    if Stdlib.String.__lengthInt hex == 2 then Stdlib.Blob.fromHex hex
                     else Error "not an escape" in
                 match parsed with
                 | Ok blob ->
-                    Stdlib.List.append
-                        (Stdlib.List.append acc (Stdlib.Blob.toList blob))
-                        (Stdlib.String.toBytes (Stdlib.String.dropFirst piece 2))
+                    Stdlib.List.concat
+                        (Stdlib.List.concat acc (Stdlib.Blob.toList blob))
+                        (Stdlib.String.toBytes (Stdlib.String.__dropFirstInt piece 2))
                 | Error _ ->
-                    Stdlib.List.append acc (Stdlib.String.toBytes ("%" + piece))) in
+                    Stdlib.List.concat acc (Stdlib.String.toBytes ("%" + piece))) in
         Stdlib.String.fromBytesWithReplacement decodedBytes
 
 let __parseQueryParam (param: String) : Stdlib.Option.Option<(String * String)> =
@@ -83,49 +84,65 @@ let parseHeaders (value: String) : Dict<String, String> =
     Stdlib.Http.__headerLinesToDict lines Stdlib.Dict.empty
 
 type Response =
-  { statusCode: Int
+  { statusCode: Int64
     headers: List<String * String>
     body: Blob }
 
-let response (body: Blob) (statusCode: Int) : Stdlib.Http.Response =
+// The compiler's own servers answer through these, body first and an Int status.
+let __responseInt (body: Blob) (statusCode: Int) : Stdlib.Http.Response =
+    Stdlib.Http.Response { statusCode = Builtin.unwrap (Stdlib.Int.toInt64 statusCode), headers = [], body = body }
+
+let __responseWithHeadersInt (body: Blob) (headers: List<(String * String)>) (statusCode: Int) : Stdlib.Http.Response =
+    Stdlib.Http.Response { statusCode = Builtin.unwrap (Stdlib.Int.toInt64 statusCode), headers = headers, body = body }
+
+let __responseWithHtmlInt (body: String) (statusCode: Int) : Stdlib.Http.Response =
+    Stdlib.Http.__responseWithHeadersInt (Stdlib.String.toBlob body) ([("Content-Type", "text/html; charset=utf-8")]) statusCode
+
+let __responseWithTextInt (text: String) (statusCode: Int) : Stdlib.Http.Response =
+    Stdlib.Http.__responseWithHeadersInt (Stdlib.String.toBlob text) ([("Content-Type", "text/plain; charset=utf-8")]) statusCode
+
+let __responseWithJsonInt (json: String) (statusCode: Int) : Stdlib.Http.Response =
+    Stdlib.Http.__responseWithHeadersInt (Stdlib.String.toBlob json) ([("Content-Type", "application/json")]) statusCode
+
+let response (statusCode: Int64) (body: Blob) : Stdlib.Http.Response =
     Stdlib.Http.Response { statusCode = statusCode, headers = [], body = body }
 
-let responseWithHeaders (body: Blob) (headers: List<(String * String)>) (statusCode: Int) : Stdlib.Http.Response =
+let responseWithHeaders (statusCode: Int64) (headers: List<(String * String)>) (body: Blob) : Stdlib.Http.Response =
     Stdlib.Http.Response { statusCode = statusCode, headers = headers, body = body }
 
 let success (body: Blob) : Stdlib.Http.Response =
-    Stdlib.Http.response body 200
+    Stdlib.Http.__responseInt body 200
 
-let responseWithHtml (body: String) (statusCode: Int) : Stdlib.Http.Response =
-    Stdlib.Http.responseWithHeaders (Stdlib.String.toBlob body) ([("Content-Type", "text/html; charset=utf-8")]) statusCode
+let responseWithHtml (statusCode: Int64) (body: String) : Stdlib.Http.Response =
+    Stdlib.Http.responseWithHeaders statusCode ([("Content-Type", "text/html; charset=utf-8")]) (Stdlib.String.toBlob body)
 
-let responseWithText (text: String) (statusCode: Int) : Stdlib.Http.Response =
-    Stdlib.Http.responseWithHeaders (Stdlib.String.toBlob text) ([("Content-Type", "text/plain; charset=utf-8")]) statusCode
+let responseWithText (statusCode: Int64) (text: String) : Stdlib.Http.Response =
+    Stdlib.Http.responseWithHeaders statusCode ([("Content-Type", "text/plain; charset=utf-8")]) (Stdlib.String.toBlob text)
 
-let responseWithJson (json: String) (statusCode: Int) : Stdlib.Http.Response =
-    Stdlib.Http.responseWithHeaders (Stdlib.String.toBlob json) ([("Content-Type", "application/json")]) statusCode
+let responseWithJson (statusCode: Int64) (json: String) : Stdlib.Http.Response =
+    Stdlib.Http.responseWithHeaders statusCode ([("Content-Type", "application/json")]) (Stdlib.String.toBlob json)
 
 let redirectTo (url: String) : Stdlib.Http.Response =
-    Stdlib.Http.responseWithHeaders Stdlib.Blob.empty ([("Location", url)]) 302
+    Stdlib.Http.__responseWithHeadersInt Stdlib.Blob.empty ([("Location", url)]) 302
 
 let badRequest (error: String) : Stdlib.Http.Response =
-    Stdlib.Http.response (Stdlib.String.toBlob error) 400
+    Stdlib.Http.__responseInt (Stdlib.String.toBlob error) 400
 
 let notFound () : Stdlib.Http.Response =
-    Stdlib.Http.response Stdlib.Blob.empty 404
+    Stdlib.Http.__responseInt Stdlib.Blob.empty 404
 
 let unauthorized () : Stdlib.Http.Response =
-    Stdlib.Http.response Stdlib.Blob.empty 401
+    Stdlib.Http.__responseInt Stdlib.Blob.empty 401
 
 let forbidden () : Stdlib.Http.Response =
-    Stdlib.Http.response Stdlib.Blob.empty 403
+    Stdlib.Http.__responseInt Stdlib.Blob.empty 403
 
 let serverError (error: String) : Stdlib.Http.Response =
-    Stdlib.Http.response (Stdlib.String.toBlob error) 500
+    Stdlib.Http.__responseInt (Stdlib.String.toBlob error) 500
 
 type Cookie =
   { expires: DateTime
-    maxAge: Int
+    maxAge: Int64
     domain: String
     path: String
     secure: Bool

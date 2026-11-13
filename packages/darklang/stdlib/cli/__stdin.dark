@@ -130,7 +130,7 @@ let __readAll () : String = Stdlib.Cli.__Stdin.__stdinCollect (Stdlib.Cli.__Stdi
 
 let __readExactly (length: Int) : String =
     let count = Builtin.__posixInt32 length in
-    if count < 0L then Builtin.crash "Encountered out-of-range value for type of Int"
+    if count < 0L then Builtin.crash "Encountered an out-of-range integer value"
     else Stdlib.Cli.__Stdin.__stdinCollect (Stdlib.Cli.__Stdin.__stdinStart ()) (__mapped_alloc 4096L) 4096L 0L count 2L
 
 let __stdinReady (state: RawPtr) (milliseconds: Int64) : Bool =
@@ -215,9 +215,9 @@ let __stdinPlain (scalar: Int64) : (Int64 * Int64 * Int64) =
 let __stdinKey (code: Int64) : Stdlib.Cli.Stdin.Key.Key =
     if code >= 65L && code <= 90L then Stdlib.Cli.__Stdin.__stdinKey (code + 32L)
     else if code >= 97L && code <= 122L then
-        Stdlib.Option.withDefault (Stdlib.List.getAt [Stdlib.Cli.Stdin.Key.Key.A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z] (Stdlib.Int.fromInt64 (code - 97L))) Stdlib.Cli.Stdin.Key.Key.None
+        Stdlib.Option.withDefault (Stdlib.List.__getAtInt [Stdlib.Cli.Stdin.Key.Key.A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z] (Stdlib.Int.fromInt64 (code - 97L))) Stdlib.Cli.Stdin.Key.Key.None
     else if code >= 48L && code <= 57L then
-        Stdlib.Option.withDefault (Stdlib.List.getAt [Stdlib.Cli.Stdin.Key.Key.D0, D1, D2, D3, D4, D5, D6, D7, D8, D9] (Stdlib.Int.fromInt64 (code - 48L))) Stdlib.Cli.Stdin.Key.Key.None
+        Stdlib.Option.withDefault (Stdlib.List.__getAtInt [Stdlib.Cli.Stdin.Key.Key.D0, D1, D2, D3, D4, D5, D6, D7, D8, D9] (Stdlib.Int.fromInt64 (code - 48L))) Stdlib.Cli.Stdin.Key.Key.None
     else
         match code with
         | 8L -> Stdlib.Cli.Stdin.Key.Key.Backspace
@@ -380,12 +380,12 @@ let __secretLoop (chunks: List<String>) : String =
         Stdlib.String.join (Stdlib.List.reverse chunks) ""
     | Backspace ->
         let acc = Stdlib.String.join (Stdlib.List.reverse chunks) "" in
-        let shortened = Stdlib.String.dropLast acc 1 in
+        let shortened = Stdlib.String.__dropLastInt acc 1 in
         Stdlib.Cli.__Stdin.__secretLoop (if shortened == "" then [] else [shortened])
     | _ ->
         if k.keyChar == "" then Stdlib.Cli.__Stdin.__secretLoop chunks
         else
-            let text = if k.repeat > 1 then Stdlib.String.repeat k.keyChar k.repeat else k.keyChar in
+            let text = if k.repeat > 1 then Stdlib.String.__repeatInt k.keyChar k.repeat else k.keyChar in
             match Stdlib.String.split text "\n" with
             | [whole] -> Stdlib.Cli.__Stdin.__secretLoop (Stdlib.List.push chunks whole)
             | beforeNewline :: _ ->

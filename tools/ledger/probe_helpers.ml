@@ -41,7 +41,7 @@ let main includePackages allBlocked root manifest output =
             (Filename.concat root file)
             In_channel.input_all
         in
-        let source = I.parse ~reasons text |> require in
+        let source = I.parse ~interpreterSource:(String.starts_with ~prefix:"upstream/" file) ~reasons text |> require in
         S.nodes file source
         |> List.filter (fun node ->
             match node.S.declaration with
@@ -89,7 +89,7 @@ let main includePackages allBlocked root manifest output =
             (Filename.concat root file)
             In_channel.input_all
         in
-        (file, I.parse ~reasons text |> require))
+        (file, I.parse ~interpreterSource:(String.starts_with ~prefix:"upstream/" file) ~reasons text |> require))
   in
   let selected =
     S.select ~context:SourceContracts.emptyContext ~roots ~supplements ~sources
@@ -335,7 +335,7 @@ let main includePackages allBlocked root manifest output =
     in
     let blocked = typeRejections @ blocked in
     let initialRejections = List.length rejected in
-    let rec validate accepted rejected =
+    let checkWith accepted =
       let combinedSources =
         List.map
           (fun (file, (source : I.source)) ->
@@ -383,14 +383,32 @@ let main includePackages allBlocked root manifest output =
             (file, { source with I.entries }))
           sources
       in
-      let result =
-        Result.bind
-          (S.select ~context:SourceContracts.emptyContext ~roots ~supplements
-             ~sources:combinedSources) (fun selected ->
-            WrittenChecking.checkSourceUnitsWithBase None true false
-              (List.map snd selected.S.units))
+      Result.bind
+        (S.select ~context:SourceContracts.emptyContext ~roots ~supplements
+           ~sources:combinedSources) (fun selected ->
+          WrittenChecking.checkSourceUnitsWithBase None true false
+            (List.map snd selected.S.units))
+    in
+    (* A failure reported in a declaration that is not a candidate, such as
+       a compiler helper whose callee an accepted candidate now shadows, is
+       attributed by bisection: the candidate whose addition makes the
+       combined check fail is rejected. *)
+    let bisect accepted =
+      let rec search known count =
+        (* Invariant: the first [known] candidates check; all of them fail. *)
+        if count - known <= 1 then List.nth_opt accepted known
+        else
+          let middle = (known + count) / 2 in
+          match checkWith (List.take middle accepted) with
+          | Ok _ -> search middle count
+          | Error _ -> search known middle
       in
-      match result with
+      match checkWith [] with
+      | Error _ -> None
+      | Ok _ -> search 0 (List.length accepted)
+    in
+    let rec validate accepted rejected =
+      match checkWith accepted with
       | Ok _ -> (accepted, rejected @ blocked)
       | Error diagnostic -> (
           let responsible = responsible accepted diagnostic in
@@ -401,11 +419,19 @@ let main includePackages allBlocked root manifest output =
               validate
                 (List.filter (fun other -> not (sameNode node other)) accepted)
                 ((node, diagnostic) :: rejected)
-          | None ->
+          | None -> (
               if List.length rejected > initialRejections then combined rejected
               else
-                failwith
-                  ("Cannot attribute combined source failure: " ^ diagnostic))
+                match bisect accepted with
+                | Some node ->
+                    Printf.eprintf "Bisected rejection: %s: %s\n%!" node.S.name
+                      (String.sub diagnostic 0 (min 300 (String.length diagnostic)));
+                    validate
+                      (List.filter (fun other -> not (sameNode node other)) accepted)
+                      ((node, diagnostic) :: rejected)
+                | None ->
+                    failwith
+                      ("Cannot attribute combined source failure: " ^ diagnostic)))
     in
     validate accepted rejected
   in

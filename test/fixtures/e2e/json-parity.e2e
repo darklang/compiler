@@ -40,7 +40,8 @@ jsonParityError<JsonParityChoice> (Stdlib.Json.parse<JsonParityChoice> "{\"JsonP
 jsonParityError<JsonParityChoice> (Stdlib.Json.parse<JsonParityChoice> "{\"Wrong\":[]}") = "Can't parse JSON as `Wrong` is not a known case of type `JsonParityChoice` at path: `root`"
 jsonParityError<JsonParityChoice> (Stdlib.Json.parse<JsonParityChoice> "{\"JsonParityNo\":[],\"JsonParityYes\":[]}") = "Can't parse JSON with multiple fields (`JsonParityNo`, `JsonParityYes`) as type `JsonParityChoice` at path: `root`"
 jsonParityError<List<JsonParityPerson>> (Stdlib.Json.parse<List<JsonParityPerson>> "[{\"Name\":\"Ada\",\"Age\":\"old\"}]") = "Can't parse JSON `\"old\"` as type `Int64` at path: `root[0].Age`"
-Stdlib.Json.parse<Int64> "not-json" = Error Stdlib.Json.ParseError.ParseError.NotJson
+Stdlib.Json.parse<Int64> "not-json" = Error (Stdlib.Json.ParseError.ParseError.NotJson (1L, 2L))
 Stdlib.Json.serialize<Int64 -> Int64> (fun value -> value) = error="Unsupported type in JSON"
 Stdlib.Json.serialize (Stdlib.Stream.fromList []) = error="Unsupported type in JSON"
 Stdlib.Json.parse<Stream<Int64>> "[]" = error="Unsupported type in JSON"
+Stdlib.Json.checkedSerialize<List<Int64>> [1L, 2L] = Ok "[1,2]"

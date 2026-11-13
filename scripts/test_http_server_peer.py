@@ -37,8 +37,9 @@ let handler (req: Stdlib.Http.Request) : Stdlib.Http.Response =
 match Stdlib.Cli.__Args.int64 0, Stdlib.Cli.__Args.get 1 with
 | Ok port, Ok mode ->
     let config = Stdlib.HttpServer.Config.Config {
-        port = Stdlib.Int.fromInt64 port,
-        maxBodyBytes = 16,
+        address = "127.0.0.1",
+        port = Stdlib.Net.Port { __port = port },
+        maxBodyBytes = 16L,
         injectStandardHeaders = mode != "plain",
         canonicalizeFromForwardedProto = mode != "plain",
         logRequests = mode == "logging"

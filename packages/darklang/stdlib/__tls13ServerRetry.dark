@@ -35,7 +35,7 @@ let __padding (hello: Stdlib.__Tls13ServerHello.Hello) : Bool =
 
 let __identities (data: Blob) (position: Int64) (end_: Int64) (items: List<Blob>) : Stdlib.Result.Result<List<Blob>, String> =
   if position == end_ then Ok (Stdlib.List.reverse items)
-  else if position + 2L > end_ || Stdlib.List.length items >= 64 then Error "Invalid TLS PSK identities"
+  else if position + 2L > end_ || Stdlib.List.__lengthInt items >= 64 then Error "Invalid TLS PSK identities"
   else
     let size = Stdlib.__Tls13.__read16 data position in
     if size == 0L || position + 2L + size + 4L > end_ then Error "Invalid TLS PSK identity"

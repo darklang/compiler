@@ -1,0 +1,15 @@
+// `$"{value}"` shows a value through its type's Display impl, and any other value as Stdlib.inspect shows it.
+type InterpolationPoint = { x: Int64 }
+type InterpolationShown = { y: Int64 }
+impl Stdlib.Display for InterpolationShown =
+  let display (s: InterpolationShown) : String = "shown " + Stdlib.Int64.toString s.y
+let interpolationGeneric<'a> (value: 'a) : String = $"<{value}>"
+$"{1L}|{1.5}|{true}|{'c'}|{"s"}" = "1|1.5|true|c|s"
+$"{InterpolationShown { y = 2L }}" = "shown 2"
+$"{InterpolationPoint { x = 1L }}" = Stdlib.inspect (InterpolationPoint { x = 1L })
+$"{[1L, 2L]}" = Stdlib.inspect [1L, 2L]
+interpolationGeneric 5L = "<5>"
+interpolationGeneric (InterpolationShown { y = 3L }) = "<shown 3>"
+Stdlib.display 5L = "5"
+Stdlib.display "a" = "a"
+Stdlib.inspect "a" = "\"a\""

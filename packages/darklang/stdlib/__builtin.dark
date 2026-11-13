@@ -31,14 +31,6 @@ let stringSlugify (value: String) : String =
     let trimmed = Stdlib.String.__trimEndCodepoints (Stdlib.String.__trimStartCodepoints filtered) in
     Builtin.__slugifySeparators trimmed false []
 
-// Current interpreter integer probes call these primitive comparison names.
-// The compiler keeps their typed behavior while implementing them portably.
-let uint64GreaterThanOrEqualTo (a: UInt64) (b: UInt64) : Bool =
-    Stdlib.UInt64.greaterThanOrEqualTo a b
-
-let uint64LessThanOrEqualTo (a: UInt64) (b: UInt64) : Bool =
-    Stdlib.UInt64.lessThanOrEqualTo a b
-
 let runtimeEnvironmentGet (name: String) : Stdlib.Option.Option<String> =
     Stdlib.Cli.__getenv name
 

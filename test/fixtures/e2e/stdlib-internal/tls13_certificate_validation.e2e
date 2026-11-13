@@ -71,11 +71,11 @@
 
 (let handshake = Stdlib.Blob.fromHex "0B0000140000001000000330010000000000033001000000" in
  match handshake with
- | Error _ -> 0
+ | Error _ -> 0L
  | Ok bytes -> match Stdlib.__Tls13Certificate.parseCertificate bytes with
-               | Error _ -> 0
+               | Error _ -> 0L
                | Ok certificate -> Stdlib.List.length certificate.entries)
-  = 2
+  = 2L
 
 (let handshake = Stdlib.Blob.fromHex "0B00000C010000080000033001000000" in
  match handshake with

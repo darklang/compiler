@@ -8,35 +8,37 @@ match Stdlib.Cli.OS.getOS () with | Ok Linux -> true | Ok MacOS -> true | _ -> f
 
 Stdlib.Cli.Sys.cpuCount () > 0 = true
 Stdlib.Cli.Sys.cpuCount () > 1 = true // test hosts expose more than one CPU; the intrinsic must not return its old constant
-Stdlib.Cli.Sys.currentPid () > 0 = true
+Stdlib.Cli.Sys.currentPid () > 0L = true
 
 // POSIX failures must preserve the kernel errno instead of inferring it from
 // localized command-line utility output.
-match Stdlib.Cli.Posix.kill (Stdlib.Cli.Sys.currentPid ()) 99999 with | Error error -> (error.errno, error.message) | Ok (()) -> (0, "unexpected") = (22, "Invalid argument")
+match Stdlib.Cli.Posix.kill (Stdlib.Cli.Posix.Pid { __pid = 2147483647L }) Stdlib.Cli.Posix.Signal.SIGTERM with | Error error -> (error.errno, error.message) | Ok (()) -> (0L, "unexpected") = (3L, "No such process")
+Stdlib.Cli.Process.isRunning (Stdlib.Cli.Posix.Pid { __pid = Stdlib.Cli.Sys.currentPid () }) = true
+Stdlib.Cli.Process.isRunning (Stdlib.Cli.Posix.Pid { __pid = 2147483647L }) = false
 
 match Stdlib.Cli.Process.exec "printf" (["%s", "direct execution"]) with | Ok output -> output | Error message -> message = "direct execution"
 
-match Stdlib.Cli.Process.run "/definitely/missing/cli-parity" [] with | Error error -> (error.errno, error.message) | Ok _ -> (0, "unexpected") = (2, "No such file or directory")
+match Stdlib.Cli.Process.run "/definitely/missing/cli-parity" [] with | Error error -> (error.errno, error.message) | Ok _ -> (0L, "unexpected") = (2L, "No such file or directory")
 
 // Argv execution is a process primitive, not shell evaluation. A broken
 // configured shell must not affect an absolute executable.
-match Stdlib.Cli.Process.run "/usr/bin/printf" (["%s", "native argv"]) with | Ok output -> (output.exitCode, output.stdout, output.stderr) | Error error -> (-1, "", error.message) = (0, "native argv", "") env="SHELL=/definitely/missing"
+match Stdlib.Cli.Process.run "/usr/bin/printf" (["%s", "native argv"]) with | Ok output -> (output.exitCode, output.stdout, output.stderr) | Error error -> (-1L, "", error.message) = (0L, "native argv", "") env="SHELL=/definitely/missing"
 
-let outcome = Stdlib.Cli.execute "printf 'stdout'; printf 'stderr' >&2; exit 7" in (outcome.exitCode, outcome.stdout, outcome.stderr) = (7, "stdout", "stderr")
+let outcome = Stdlib.Cli.execute "printf 'stdout'; printf 'stderr' >&2; exit 7" in (outcome.exitCode, outcome.stdout, outcome.stderr) = (7L, "stdout", "stderr")
 
 let outcome = Stdlib.Cli.execute "printf 'x\\n\\n'" in outcome.stdout = "x\n\n"
 
-let outcome = Stdlib.Cli.execute "head -c 100000 /dev/zero; head -c 100000 /dev/zero >&2" in (Stdlib.String.length outcome.stdout, Stdlib.String.length outcome.stderr) = (100000, 100000)
+let outcome = Stdlib.Cli.execute "head -c 100000 /dev/zero; head -c 100000 /dev/zero >&2" in (Stdlib.String.length outcome.stdout, Stdlib.String.length outcome.stderr) = (100000L, 100000L)
 
 let key = Stdlib.Cli.Stdin.KeyRead.KeyRead { key = Stdlib.Cli.Stdin.Key.Key.A, modifiers = Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = true, ctrl = true, shift = true }, keyChar = "A", repeat = 2 } in Stdlib.Cli.Stdin.KeyRead.toString key = stdout="\"ALT+CTRL+SHIFT+A\"\n" stderr=""
 
 let key = Stdlib.Cli.Stdin.readKey () in (Stdlib.Cli.Stdin.Key.toString key.key, key.keyChar, key.repeat) = ("Escape", "", 1)
 
-match Stdlib.Cli.Env.get "PATH" with | Some path -> Stdlib.String.length path > 0 | None -> false = true
+match Stdlib.Cli.Env.get "PATH" with | Some path -> Stdlib.String.length path > 0L | None -> false = true
 
 Stdlib.Cli.Env.get "DARK_NATIVE_ENV_PROBE" = Some "value  \n" env="DARK_NATIVE_ENV_PROBE=value  \n"
 
-match Stdlib.Cli.Sys.hostname () with | Ok hostname -> Stdlib.String.length hostname > 0 | Error _ -> false = true env="PATH="
+match Stdlib.Cli.Sys.hostname () with | Ok hostname -> Stdlib.String.length hostname > 0L | Error _ -> false = true env="PATH="
 
 match Stdlib.Cli.Sys.currentUser () with | Some user -> user | None -> "missing" = "native user  " env="LOGNAME=native user  " env="USER=native user  " env="PATH="
 
@@ -56,13 +58,13 @@ match Stdlib.Cli.Process.pipe "/usr/bin/printf" (["abc"]) "/usr/bin/tr" (["a-z",
 
 // The consumer creates a marker while the producer is alive. A sequential
 // implementation times out first and prints "sequential" instead.
-let marker = $"/tmp/dark-native-pipe-{Stdlib.Int.toString (Stdlib.Cli.Sys.currentPid ())}" in let quoted = Stdlib.Cli.Process.shellQuote marker in let _ = Stdlib.Cli.Process.run "/bin/rm" (["-f", marker]) in match Stdlib.Cli.Process.pipe "/bin/sh" (["-c", $"marker={quoted}; count=0; while [ ! -e \"$marker\" ] && [ $count -lt 100 ]; do /bin/sleep 0.01; count=$((count + 1)); done; if [ -e \"$marker\" ]; then printf concurrent; else printf sequential; fi"]) "/bin/sh" (["-c", $"/usr/bin/touch {quoted}; /bin/cat; /bin/rm -f {quoted}"]) with | Ok output -> output.stdout | Error error -> error.message = "concurrent" env="SHELL=/definitely/missing" env="PATH="
+let marker = $"/tmp/dark-native-pipe-{Stdlib.Int64.toString (Stdlib.Cli.Sys.currentPid ())}" in let quoted = Stdlib.Cli.Process.shellQuote marker in let _ = Stdlib.Cli.Process.run "/bin/rm" (["-f", marker]) in match Stdlib.Cli.Process.pipe "/bin/sh" (["-c", $"marker={quoted}; count=0; while [ ! -e \"$marker\" ] && [ $count -lt 100 ]; do /bin/sleep 0.01; count=$((count + 1)); done; if [ -e \"$marker\" ]; then printf concurrent; else printf sequential; fi"]) "/bin/sh" (["-c", $"/usr/bin/touch {quoted}; /bin/cat; /bin/rm -f {quoted}"]) with | Ok output -> output.stdout | Error error -> error.message = "concurrent" env="SHELL=/definitely/missing" env="PATH="
 
-match Stdlib.Cli.Process.runWithTimeout 0 "true" [] with | Error error -> error | Ok _ -> "unexpected" = "timeoutMs must be positive"
+match Stdlib.Cli.Process.runWithTimeout 0L "true" [] with | Error error -> error | Ok _ -> "unexpected" = "timeoutMs must be positive"
 
-match Stdlib.Cli.Process.runWithTimeout 5 "/bin/sh" (["-c", "sleep 1"]) with | Error error -> error | Ok _ -> "unexpected" = "Process timed out"
+match Stdlib.Cli.Process.runWithTimeout 5L "/bin/sh" (["-c", "sleep 1"]) with | Error error -> error | Ok _ -> "unexpected" = "Process timed out"
 
-let handle = Stdlib.Cli.Process.spawn "read line; printf 'reply:%s\\n' \"$line\"" in let result = Stdlib.Cli.Process.communicate handle "hello" in (result.exitCode, result.stdout, result.stderr) = (0, "reply:hello\n", "")
+let handle = Stdlib.Cli.Process.spawn "read line; printf 'reply:%s\\n' \"$line\"" in let result = Stdlib.Cli.Process.communicate handle "hello" in (result.exitCode, result.stdout, result.stderr) = (0L, "reply:hello\n", "")
 
 // communicate waits in bounded polling intervals for an input-driven child,
 // and terminate returns all output accumulated over the handle's lifetime.
@@ -77,6 +79,6 @@ let handle = Stdlib.Cli.Process.spawn "printf started; sleep 10" in let _ = Stdl
 
 match Stdlib.Cli.Host.getRuntimeHost () with | Ok _ -> true | Error _ -> false = true
 
-match (Stdlib.Cli.Sys.hostname (), Stdlib.Cli.Sys.os (), Stdlib.Cli.Sys.arch ()) with | (Ok hostname, Ok os, Ok arch) -> Stdlib.String.length hostname > 0 && Stdlib.String.length os > 0 && Stdlib.String.length arch > 0 | _ -> false = true
+match (Stdlib.Cli.Sys.hostname (), Stdlib.Cli.Sys.os (), Stdlib.Cli.Sys.arch ()) with | (Ok hostname, Ok os, Ok arch) -> Stdlib.String.length hostname > 0L && Stdlib.String.length os > 0L && Stdlib.String.length arch > 0L | _ -> false = true
 
-match Stdlib.Cli.Sys.currentUser () with | Some user -> Stdlib.String.length user > 0 | None -> false = true
+match Stdlib.Cli.Sys.currentUser () with | Some user -> Stdlib.String.length user > 0L | None -> false = true

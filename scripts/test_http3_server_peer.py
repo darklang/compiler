@@ -28,12 +28,12 @@ let handler (request: Stdlib.Http.Request) : Stdlib.Http.Response =
   else if Stdlib.HttpServer.getMethod request == "HEAD" then Stdlib.Http.responseWithText "representation" 200
   else Stdlib.Http.Response { statusCode = 200, headers = [("set-cookie", "a=1"), ("set-cookie", "b=2")], body = request.body }
 let run () : Unit =
-  let port = Stdlib.Cli.__Args.get 0 |> Stdlib.Result.withDefault "0" |> Stdlib.Int.parse |> Stdlib.Result.withDefault 0 in
+  let port = Stdlib.Cli.__Args.get 0 |> Stdlib.Result.withDefault "0" |> Stdlib.Int64.parse |> Stdlib.Result.withDefault 0L in
   let identity = Stdlib.Blob.fromHex "@CERT@" |> Stdlib.Result.andThen (fun certificate -> Stdlib.Blob.fromHex "@KEY@" |> Stdlib.Result.andThen (fun key -> Stdlib.TlsServerIdentity.create certificate key)) in
   match identity with
   | Error message -> Stdlib.printLine message
   | Ok identity ->
-    let config = Stdlib.HttpServer.Config.Config { port = port, maxBodyBytes = 80000, injectStandardHeaders = false, canonicalizeFromForwardedProto = false, logRequests = false } in
+    let config = Stdlib.HttpServer.Config.Config { address = "127.0.0.1", port = Stdlib.Net.Port { __port = port }, maxBodyBytes = 80000L, injectStandardHeaders = false, canonicalizeFromForwardedProto = false, logRequests = false } in
     match Stdlib.HttpServer.Quic.serve config identity handler (fun _unit -> Stdlib.printLine "LISTENING") with
     | Error message -> Stdlib.printLine message
     | Ok () -> Stdlib.printLine "STOPPED"

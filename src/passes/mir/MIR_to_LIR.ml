@@ -529,9 +529,12 @@ let selectBinOp dest op left right typ state =
             | M.Div -> [ L.FDiv (lirFDest, leftReg, rightReg) ]
             | M.Eq -> [ L.FCmp (leftReg, rightReg); L.Cset (lirDest, L.EQ) ]
             | M.Neq -> [ L.FCmp (leftReg, rightReg); L.Cset (lirDest, L.NE) ]
-            | M.Lt -> [ L.FCmp (leftReg, rightReg); L.Cset (lirDest, L.LT) ]
+            (* An unordered (NaN) comparison makes both targets' "less"
+               conditions true but their "greater" conditions false, so
+               less-than compares the swapped operands. *)
+            | M.Lt -> [ L.FCmp (rightReg, leftReg); L.Cset (lirDest, L.GT) ]
             | M.Gt -> [ L.FCmp (leftReg, rightReg); L.Cset (lirDest, L.GT) ]
-            | M.Lte -> [ L.FCmp (leftReg, rightReg); L.Cset (lirDest, L.LE) ]
+            | M.Lte -> [ L.FCmp (rightReg, leftReg); L.Cset (lirDest, L.GE) ]
             | M.Gte -> [ L.FCmp (leftReg, rightReg); L.Cset (lirDest, L.GE) ]
             | M.Mod | M.And | M.Or | M.Shl | M.Shr | M.BitAnd | M.BitOr
             | M.BitXor ->

@@ -5,173 +5,242 @@ type PathSegment =
   | Root           // Go to root (/)
   | Here           // Stay here (.)
   | Up             // Go up one level (..)
-  | Into of String // Go into a named entity/module
+  | Into(String) // Go into a named entity/module
 
-let parsePath (pathStr: String) : List<PathSegment> =
+let parsePath(pathStr: String): List<PathSegment> =
   if pathStr == "/" then
     [PathSegment.Root]
   else
     // Check if path ends with a dot - this means user wants to complete within that location
     let endsWithDot =
-      (Stdlib.String.endsWith pathStr ".") && Stdlib.Bool.not (Stdlib.String.endsWith pathStr "..")
+      (Stdlib.String.endsWith(pathStr, ".")) && Stdlib.Bool.not(Stdlib.String.endsWith(pathStr, ".."))
 
     // Split on / first, then handle each part separately
     let parts =
       pathStr
-      |> Stdlib.String.split "/"
-      |> Stdlib.List.map (fun part ->
+      |> Stdlib.String.split("/")
+      |> Stdlib.List.map(fun part ->
         // Don't split ".." on dots - it's a special case
         if part == ".." then
           [part]
         else
-          Stdlib.String.split part "."
-      )
+          Stdlib.String.split(part, "."))
       |> Stdlib.List.flatten
-      |> Stdlib.List.filter (fun p -> Stdlib.Bool.not (Stdlib.String.isEmpty p))
+      |> Stdlib.List.filter(fun p -> Stdlib.Bool.not(Stdlib.String.isEmpty(p)))
 
     // If path ended with dot, add empty string to indicate completion at that level
-    let finalParts = if endsWithDot then Stdlib.List.append parts [""] else parts
+    let finalParts = if endsWithDot then Stdlib.List.append(parts, "") else parts
 
     let segments =
       finalParts
-      |> Stdlib.List.map (fun part ->
+      |> Stdlib.List.map(fun part ->
         match part with
         | "." -> PathSegment.Here
         | ".." -> PathSegment.Up
-        | name -> PathSegment.Into name
-      )
+        | name -> PathSegment.Into(name))
 
-    if Stdlib.String.startsWith pathStr "/" then
+    if Stdlib.String.startsWith(pathStr, "/") then
       // Absolute path from root
-      Stdlib.List.append [PathSegment.Root] segments
+      Stdlib.List.prepend(segments, PathSegment.Root)
     else
       segments
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
-let getCurrentModulePath (location: PackageLocation) : List<String> =
+let getCurrentModulePath(location: PackageLocation): List<String> =
   match location with
-  | Module path -> path
-  | Type t -> Stdlib.List.append [t.owner] t.modules
-  | Value v -> Stdlib.List.append [v.owner] v.modules
-  | Function f -> Stdlib.List.append [f.owner] f.modules
-  | Trait t -> Stdlib.List.append [t.owner] t.modules
+  | Module(path) -> path
+  | Type(t) -> Stdlib.List.prepend(t.modules, t.owner)
+  | Value(v) -> Stdlib.List.prepend(v.modules, v.owner)
+  | Function(f) -> Stdlib.List.prepend(f.modules, f.owner)
+  | Trait(t) -> Stdlib.List.prepend(t.modules, t.owner)
   // An implementation's methods are ordinary fns in a module named for the implementation, so
   // the module you are "in" when you are at one INCLUDES its name. Without this, descending a
   // path past an implementation silently dropped that segment and `view Stdlib.Int64.Add.add`
   // reported "Not found: (+)", a name nobody typed.
-  | Impl i ->
-    Stdlib.List.append (Stdlib.List.append [i.owner] i.modules) [i.name]
-  | Test test -> Stdlib.List.append [test.owner] test.modules
+  | Impl(i) ->
+    Stdlib.List.append(Stdlib.List.prepend(i.modules, i.owner), i.name)
+  | Test(test) -> Stdlib.List.prepend(test.modules, test.owner)
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
-let applySegment
-  (branchId: Uuid)
-  (location: PackageLocation)
-  (segment: PathSegment)
+let applySegment(
+  branchId: Uuid,
+  location: PackageLocation,
+  segment: PathSegment)
   : Stdlib.Result.Result<PackageLocation, String> =
   match segment with
   | Root ->
-    Stdlib.Result.Result.Ok (PackageLocation.Module [])
+    Stdlib.Result.Result.Ok(PackageLocation.Module([]))
 
   | Here ->
-    Stdlib.Result.Result.Ok location
+    Stdlib.Result.Result.Ok(location)
 
   | Up ->
     match location with
-    | Module [] ->
-      Stdlib.Result.Result.Error "Already at root - cannot go to parent"
-    | Module modules ->
-      let newModules = Stdlib.List.dropLast modules
-      Stdlib.Result.Result.Ok (PackageLocation.Module newModules)
+    | Module([]) ->
+      Stdlib.Result.Result.Error("Already at root - cannot go to parent")
+    | Module(modules) ->
+      let newModules = Stdlib.List.dropLast(modules)
+      Stdlib.Result.Result.Ok(PackageLocation.Module(newModules))
     // An item's parent is the module it lives in.
-    | item -> Stdlib.Result.Result.Ok (PackageLocation.Module (modulePathOf item))
+    | item -> Stdlib.Result.Result.Ok(PackageLocation.Module(modulePathOf(item)))
 
-  | Into name ->
-    let currentPath = getCurrentModulePath location
-    resolveEntity branchId currentPath name
+  | Into(name) ->
+    let currentPath = getCurrentModulePath(location)
+    resolveEntity(branchId, currentPath, name)
 
 
 // Resolve a name to an actual entity (module, type, fn, or value)
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
-let resolveEntity
-  (branchId: Uuid)
-  (basePath: List<String>)
-  (name: String)
+let resolveEntity(
+  branchId: Uuid,
+  basePath: List<String>,
+  name: String)
   : Stdlib.Result.Result<PackageLocation, String> =
-  // First see if it's a module
-  let modulePath = Stdlib.List.append basePath [name]
-  let moduleResults = Query.allDirectDescendants branchId modulePath
+  let (resolved, _implsInside) =
+    resolveEntityKnowing(branchId, basePath, name, Stdlib.Option.Option.None)
 
-  let isAModule = Query.hasContent moduleResults
+  resolved
+
+
+/// `resolveEntity`, given the names of the implementations stored directly in `basePath` when the
+/// caller already has them, and returning the same for `basePath.name`, which it lists anyway to
+/// find out whether that is a module. `applyPath` hands one segment's answer to the next, so a path
+/// costs one names-only listing per segment and no search of its own for implementations.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
+let resolveEntityKnowing(
+  branchId: Uuid,
+  basePath: List<String>,
+  name: String,
+  implsInBase: Stdlib.Option.Option<List<String>>)
+  : (Stdlib.Result.Result<PackageLocation, String> * List<String>) =
+  // First see if it's a module. Names and hashes only: whether anything is under `basePath.name`
+  // is the whole question, and materializing every definition there as a Dark value to ask it was
+  // most of what `ls` and `view` spent.
+  let modulePath = Stdlib.List.append(basePath, name)
+  let (subs, types, values, fns, traits, impls, tests) =
+    Query.allDirectDescendantNamesAndHashes(branchId, modulePath)
+
+  let isAModule =
+    Stdlib.Bool.not(
+      Stdlib.List.isEmpty(subs)
+      && Stdlib.List.isEmpty(types)
+      && Stdlib.List.isEmpty(values)
+      && Stdlib.List.isEmpty(fns)
+      && Stdlib.List.isEmpty(traits)
+      && Stdlib.List.isEmpty(impls)
+      && Stdlib.List.isEmpty(tests))
+
+  let implsInside = impls |> Stdlib.List.map(fun((implName, _hash)) -> implName)
 
   // An implementation wins over the module of the same name, because that module IS the
   // implementation: its methods are ordinary fns beneath the impl's member path. Letting the
   // module win would make `view Acme.Point.Show` print the implementation and then list its
   // own method fns underneath, the same thing twice.
+  //
+  // When the previous segment listed `basePath`, its implementation names say whether there is
+  // one here, and the search below only runs to fetch its location.
+  let worthSearching =
+    match implsInBase with
+    | Some(names) -> Stdlib.List.contains(names, name)
+    | None -> true
+
   let implHere =
-    match (Query.searchExactMatch branchId basePath name).impls with
-    | item :: _ -> Stdlib.Option.Option.Some item.location
-    | [] -> Stdlib.Option.Option.None
+    if worthSearching then
+      match (Query.searchExactImpl(branchId, basePath, name)).impls with
+      | [item, ...] -> Stdlib.Option.Option.Some(item.location)
+      | [] -> Stdlib.Option.Option.None
+    else
+      Stdlib.Option.Option.None
 
-  match implHere with
-  | Some loc -> Stdlib.Result.Result.Ok(PackageLocation.Impl loc)
-  | None ->
+  let resolved =
+    match implHere with
+    | Some(loc) -> Stdlib.Result.Result.Ok(PackageLocation.Impl(loc))
+    | None ->
 
-  if isAModule then
-    Stdlib.Result.Result.Ok (PackageLocation.Module modulePath)
-  // Not a module -- check if it's a type/value/fn
-  else
-    let entityResults = Query.searchExactMatch branchId basePath name
+    if isAModule then
+      Stdlib.Result.Result.Ok(PackageLocation.Module(modulePath))
+    // Not a module -- check if it's a type/value/fn
+    else
+      let entityResults = Query.searchExactMatch(branchId, basePath, name)
 
-    // Access lists directly to avoid type parameter loss
-    match entityResults.types with
-    | item :: _ -> Stdlib.Result.Result.Ok (PackageLocation.Type item.location)
-    | [] ->
-      match entityResults.fns with
-      | item :: _ -> Stdlib.Result.Result.Ok (PackageLocation.Function item.location)
+      // Access lists directly to avoid type parameter loss
+      match entityResults.types with
+      | [item, ...] -> Stdlib.Result.Result.Ok(PackageLocation.Type(item.location))
       | [] ->
-        match entityResults.values with
-        | item :: _ -> Stdlib.Result.Result.Ok (PackageLocation.Value item.location)
+        match entityResults.fns with
+        | [item, ...] -> Stdlib.Result.Result.Ok(PackageLocation.Function(item.location))
         | [] ->
-          match entityResults.traits with
-          | item :: _ -> Stdlib.Result.Result.Ok (PackageLocation.Trait item.location)
+          match entityResults.values with
+          | [item, ...] -> Stdlib.Result.Result.Ok(PackageLocation.Value(item.location))
           | [] ->
-            match entityResults.impls with
-            | item :: _ -> Stdlib.Result.Result.Ok (PackageLocation.Impl item.location)
+            match entityResults.traits with
+            | [item, ...] -> Stdlib.Result.Result.Ok(PackageLocation.Trait(item.location))
             | [] ->
-              match entityResults.tests with
-              | item :: _ -> Stdlib.Result.Result.Ok (PackageLocation.Test item.location)
+              match entityResults.impls with
+              | [item, ...] -> Stdlib.Result.Result.Ok(PackageLocation.Impl(item.location))
               | [] ->
-                // The path, not just "Not found": that same sentence otherwise covers a
-                // typo, an unauthored name, and a path resolved from somewhere unexpected.
-                let looked =
-                  Stdlib.String.join (Stdlib.List.append basePath [ name ]) "."
+                match entityResults.tests with
+                | [item, ...] -> Stdlib.Result.Result.Ok(PackageLocation.Test(item.location))
+                | [] ->
+                  // The path, not just "Not found": that same sentence otherwise covers a
+                  // typo, an unauthored name, and a path resolved from somewhere unexpected.
+                  let looked =
+                    Stdlib.String.join(Stdlib.List.append(basePath, name), ".")
 
-                Stdlib.Result.Result.Error $"Not found: {looked}"
+                  Stdlib.Result.Result.Error($"Not found: {looked}")
+
+  (resolved, implsInside)
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
-let applyPath
-  (branchId: Uuid)
-  (start: PackageLocation)
-  (segments: List<PathSegment>)
+let applyPath(
+  branchId: Uuid,
+  start: PackageLocation,
+  segments: List<PathSegment>)
   : Stdlib.Result.Result<PackageLocation, String> =
-  segments
-  |> Stdlib.List.fold (Stdlib.Result.Result.Ok start) (fun accResult segment ->
-    match accResult with
-    | Error e -> Stdlib.Result.Result.Error e
-    | Ok loc -> applySegment branchId loc segment
-  )
+  // Beside the location so far: the module the last segment listed and the implementation names
+  // stored directly in it, which answer the next segment's "is this an implementation?".
+  let (result, _listed) =
+    segments
+    |> Stdlib.List.fold(
+      (Stdlib.Result.Result.Ok(start), Stdlib.Option.Option.None),
+      fun(acc, segment) ->
+        let (accResult, listed) = acc
+
+        match accResult with
+        | Error(e) -> (Stdlib.Result.Result.Error(e), Stdlib.Option.Option.None)
+        | Ok(loc) ->
+          match segment with
+          | Into(name) ->
+            let basePath = getCurrentModulePath(loc)
+
+            let implsInBase =
+              match listed with
+              | Some((path, names)) ->
+                if path == basePath then
+                  Stdlib.Option.Option.Some(names)
+                else
+                  Stdlib.Option.Option.None
+              | None -> Stdlib.Option.Option.None
+
+            let (resolved, implsInside) =
+              resolveEntityKnowing(branchId, basePath, name, implsInBase)
+
+            (resolved,
+             Stdlib.Option.Option.Some((Stdlib.List.append(basePath, name), implsInside)))
+          | _ -> (applySegment(branchId, loc, segment), Stdlib.Option.Option.None))
+
+  result
 
 
 // Search for modules globally where a segment starts with the prefix
 // Returns only the path up to the matching segment, not descendants
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Traversal.searchModulesByPrefix: Unknown function or value 'LanguageTools.PackageManager.Search.search'"
-let searchModulesByPrefix
-  (branchId: Uuid)
-  (prefixText: String)
+let searchModulesByPrefix(
+  branchId: Uuid,
+  prefixText: String)
   : List<String> =
   // Search from root with AllDescendants - database returns all matching paths
   let query =
@@ -182,145 +251,149 @@ let searchModulesByPrefix
         entityTypes = []
         exactMatch = false }
 
-  let results = LanguageTools.PackageManager.Search.search branchId query
+  let results = LanguageTools.PackageManager.Search.search(branchId, query)
 
   // For each result, find the first segment starting with prefix and truncate there
   results.submodules
-  |> Stdlib.List.filterMap (fun modulePath ->
+  |> Stdlib.List.filterMap(fun modulePath ->
     // Find index of first segment starting with prefix
-    let indexed = Stdlib.List.indexedMap modulePath (fun idx seg -> (idx, seg))
-    let found = Stdlib.List.findFirst indexed (fun pair ->
+    let indexed = Stdlib.List.indexedMap(modulePath, fun(idx, seg) -> (idx, seg))
+    let found = Stdlib.List.findFirst(indexed, fun pair ->
       let (_, seg) = pair
-      Stdlib.String.startsWith seg prefixText)
+      Stdlib.String.startsWith(seg, prefixText))
 
     match found with
-    | Some pair ->
+    | Some(pair) ->
       let (idx, _) = pair
       // Return path up to and including the matching segment
-      Stdlib.Option.Option.Some (Stdlib.List.take modulePath (idx + 1))
+      Stdlib.Option.Option.Some(Stdlib.List.take(modulePath, idx + 1))
     | None -> Stdlib.Option.Option.None)
   |> Stdlib.List.unique
-  |> Stdlib.List.map (fun path -> Stdlib.String.join path ".")
+  |> Stdlib.List.sort
+  |> Stdlib.List.map(fun path -> Stdlib.String.join(path, "."))
 
 // Get all available items at a location for completion
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
-let getAvailableItems
-  (branchId: Uuid)
-  (location: PackageLocation)
-  (prefixText: String)
+let getAvailableItems(
+  branchId: Uuid,
+  location: PackageLocation,
+  prefixText: String)
   : List<Cli.Completion.CompletionItem> =
-  let currentPath = getCurrentModulePath location
+  let currentPath = getCurrentModulePath(location)
   // Names only: completion shows a name and an icon, and materializing each item's full definition to
   // read `.location.name` was the single worst hitch while typing (115 ms at the store root).
   let (submoduleNames, typeNames, valueNames, fnNames, traitNames, implNames, testNames) =
-    Query.allDirectDescendantNames branchId currentPath
+    Query.allDirectDescendantNames(branchId, currentPath)
 
   let moduleItems =
     submoduleNames
-    |> Stdlib.List.map (fun name -> Cli.Completion.withIcon EntityType.Module name)
+    |> Stdlib.List.map(fun name -> Cli.Completion.withIcon(EntityType.Module, name))
 
   let typeItems =
     typeNames
-    |> Stdlib.List.map (fun name -> Cli.Completion.withIcon EntityType.Type name)
+    |> Stdlib.List.map(fun name -> Cli.Completion.withIcon(EntityType.Type, name))
 
   let fnItems =
     fnNames
-    |> Stdlib.List.map (fun name -> Cli.Completion.withIcon EntityType.Function name)
+    |> Stdlib.List.map(fun name -> Cli.Completion.withIcon(EntityType.Function, name))
 
   let valueItems =
     valueNames
-    |> Stdlib.List.map (fun name -> Cli.Completion.withIcon EntityType.Value name)
+    |> Stdlib.List.map(fun name -> Cli.Completion.withIcon(EntityType.Value, name))
 
   let traitItems =
     traitNames
-    |> Stdlib.List.map (fun name -> Cli.Completion.withIcon EntityType.Trait name)
+    |> Stdlib.List.map(fun name -> Cli.Completion.withIcon(EntityType.Trait, name))
 
   let implItems =
     implNames
-    |> Stdlib.List.map (fun name -> Cli.Completion.withIcon EntityType.Impl name)
+    |> Stdlib.List.map(fun name -> Cli.Completion.withIcon(EntityType.Impl, name))
 
   let testItems =
     testNames
-    |> Stdlib.List.map (fun name -> Cli.Completion.withIcon EntityType.Test name)
+    |> Stdlib.List.map(fun name -> Cli.Completion.withIcon(EntityType.Test, name))
 
   let flatItems =
-    Stdlib.List.flatten
-      [moduleItems, typeItems, fnItems, valueItems, traitItems, implItems, testItems]
-  let allItems = flatItems |> Stdlib.List.sortBy (fun item -> item.value)
+    Stdlib.List.flatten(
+      [moduleItems, typeItems, fnItems, valueItems, traitItems, implItems, testItems])
+  // Internal `__` helpers are offered only once the prefix asks for them.
+  let flatItems =
+    if Stdlib.String.startsWith(prefixText, "__") then flatItems
+    else flatItems |> Stdlib.List.filter(fun item -> Stdlib.Bool.not(Query.isInternalName(item.value)))
+  let allItems = flatItems |> Stdlib.List.sortBy(fun item -> item.value)
 
   // Primary results: filter by prefix if we have search text
   let primaryResults =
-    if Stdlib.String.isEmpty prefixText then
+    if Stdlib.String.isEmpty(prefixText) then
       allItems
     else
-      allItems |> Stdlib.List.filter (fun item -> Stdlib.String.startsWith item.value prefixText)
+      allItems |> Stdlib.List.filter(fun item -> Stdlib.String.startsWith(item.value, prefixText))
 
   // At root level: prioritize owners, then add fallback
   match location with
-  | Module [] when Stdlib.Bool.not (Stdlib.String.isEmpty prefixText) ->
+  | Module([]) when Stdlib.Bool.not(Stdlib.String.isEmpty(prefixText)) ->
     let ownerMatches =
       primaryResults
-      |> Stdlib.List.filter (fun item -> Stdlib.Bool.not (Stdlib.String.contains item.value "."))
+      |> Stdlib.List.filter(fun item -> Stdlib.Bool.not(Stdlib.String.contains(item.value, ".")))
 
-    if Stdlib.Bool.not (Stdlib.List.isEmpty ownerMatches) then
+    if Stdlib.Bool.not(Stdlib.List.isEmpty(ownerMatches)) then
       ownerMatches
     else
       let fallbackResults =
-        (searchModulesByPrefix branchId prefixText)
-        |> Stdlib.List.map (fun name -> Cli.Completion.withIcon EntityType.Module name)
+        (searchModulesByPrefix(branchId, prefixText))
+        |> Stdlib.List.map(fun name -> Cli.Completion.withIcon(EntityType.Module, name))
 
-      let combined = Stdlib.List.append primaryResults fallbackResults
-      combined |> Stdlib.List.sortBy (fun item -> item.value)
+      let combined = Stdlib.List.concat(primaryResults, fallbackResults)
+      combined |> Stdlib.List.sortBy(fun item -> item.value)
   | _ ->
     primaryResults
 
 // Simple completion: traverse exact path, then fuzzy search the last part
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
-let completePartialPath
-  (branchId: Uuid)
-  (start: PackageLocation)
-  (partialPath: String)
+let completePartialPath(
+  branchId: Uuid,
+  start: PackageLocation,
+  partialPath: String)
   : List<Cli.Completion.CompletionItem> =
-  let segments = parsePath partialPath
+  let segments = parsePath(partialPath)
 
-  match Stdlib.List.reverse segments with
+  match Stdlib.List.reverse(segments) with
   | [] ->
     // Empty path - get completions from current location
-    getAvailableItems branchId start ""
+    getAvailableItems(branchId, start, "")
 
-  | (Into fuzzyPart) :: exactSegmentsReversed ->
+  | [Into(fuzzyPart), ...exactSegmentsReversed] ->
     // Navigate to exact path, then fuzzy search
-    let exactSegments = Stdlib.List.reverse exactSegmentsReversed
-    match applyPath branchId start exactSegments with
-    | Error _ -> []
-    | Ok contextLocation ->
-      let completionItems = getAvailableItems branchId contextLocation fuzzyPart
+    let exactSegments = Stdlib.List.reverse(exactSegmentsReversed)
+    match applyPath(branchId, start, exactSegments) with
+    | Error(_) -> []
+    | Ok(contextLocation) ->
+      let completionItems = getAvailableItems(branchId, contextLocation, fuzzyPart)
 
       // Build prefix for the completions, preserving the separator style
       let prefix =
-        if Stdlib.List.isEmpty exactSegments then
+        if Stdlib.List.isEmpty(exactSegments) then
           ""
         else
           // Check if original path uses / separator
-          let usesSlash = Stdlib.String.contains partialPath "/"
+          let usesSlash = Stdlib.String.contains(partialPath, "/")
           let separator = if usesSlash then "/" else "."
 
           let pathStr =
             exactSegments
-            |> Stdlib.List.map (fun segment ->
+            |> Stdlib.List.map(fun segment ->
               match segment with
               | Root -> ""
               | Here -> "."
               | Up -> ".."
-              | Into name -> name
-            )
-            |> Stdlib.List.filter (fun s -> Stdlib.Bool.not (Stdlib.String.isEmpty s))
-            |> Stdlib.String.join separator
+              | Into(name) -> name)
+            |> Stdlib.List.filter(fun s -> Stdlib.Bool.not(Stdlib.String.isEmpty(s)))
+            |> Stdlib.String.join(separator)
           pathStr + separator
 
       // Add prefix to both display and value
       completionItems
-      |> Stdlib.List.map (fun item ->
+      |> Stdlib.List.map(fun item ->
         Cli.Completion.CompletionItem
           { display = item.display
             value = prefix + item.value })
@@ -332,10 +405,10 @@ let completePartialPath
 
 // Main traverse function
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
-let traverse
-  (branchId: Uuid)
-  (start: PackageLocation)
-  (path: String)
+let traverse(
+  branchId: Uuid,
+  start: PackageLocation,
+  path: String)
   : Stdlib.Result.Result<PackageLocation, String> =
-  let segments = parsePath path
-  applyPath branchId start segments
+  let segments = parsePath(path)
+  applyPath(branchId, start, segments)

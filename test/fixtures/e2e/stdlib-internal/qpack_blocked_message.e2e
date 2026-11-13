@@ -3,7 +3,7 @@ let finish (state: Stdlib.__Http3Message.State) : Stdlib.Result.Result<Unit, Str
 let bytes (hex: String) : Blob = Stdlib.Blob.fromHex hex |> Stdlib.Result.withDefault Stdlib.Blob.empty
 let emptyTable () : Stdlib.__QpackDecoder.State = match Stdlib.__QpackDecoder.create 64L with | Ok state -> state | Error message -> Builtin.crash message
 let blocked () : Stdlib.Result.Result<Stdlib.__Http3Message.Received, String> = Stdlib.__Http3Message.feedWithTable (emptyTable ()) 0L (Stdlib.__Http3Message.create (Response false)) (bytes "01040200D9800003616263") |> Stdlib.Result.mapError (fun failure -> failure.message)
-blocked () |> Stdlib.Result.map (fun received -> Stdlib.List.length received.events) = Ok 0
+blocked () |> Stdlib.Result.map (fun received -> Stdlib.List.length received.events) = Ok 0L
 blocked () |> Stdlib.Result.map (fun received -> Stdlib.Option.isSome received.state.waiting) = Ok true
 blocked () |> Stdlib.Result.andThen (fun received -> finish received.state) = Error "HTTP/3 headers are blocked"
 let resumed () : Stdlib.Result.Result<Stdlib.__Http3Message.Received, String> =

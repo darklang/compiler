@@ -15,7 +15,7 @@ module SortByComparatorHelpers =
       Result.Result.Ok result
     else
       Result.Result.Error
-        $"Expected comparator function to return -1, 0, or 1, but it returned {Stdlib.toString result}"
+        $"Expected comparator function to return -1, 0, or 1, but it returned {Stdlib.display result}"
 
   let merge
     (left: List<'a>)

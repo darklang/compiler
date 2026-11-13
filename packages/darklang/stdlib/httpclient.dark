@@ -7,6 +7,8 @@ type BadHeader =
   // Occurs whrn a header key is empty. eg. [ ("", "") ]
   | EmptyKey
   | InvalidContentType
+  | InvalidName
+  | InvalidValue
 
 type BadUrlDetails =
   /// Occurs when the URI scheme is not allowed. eg. "ftp://darklang.com"
@@ -25,12 +27,13 @@ type RequestError =
   | BadHeader of BadHeader
   /// Occurs when there's an issue connecting to the endpoint or an I/O error. eg. network error, DNS failure, certifivate validation error, etc.
   | NetworkError
+  | TlsError of String
   /// Occurs when the request method is not invalid.
   | BadMethod
 
 /// The response from a HTTP request
 type Response =
-  { statusCode: Int
+  { statusCode: Int64
     headers: List<(String * String)>
     body: Blob }
 
@@ -40,7 +43,7 @@ type Response =
 /// The underlying HTTP response is released when the stream is
 /// drained to completion or `Stdlib.Stream.close`d.
 type StreamResponse =
-  { statusCode: Int
+  { statusCode: Int64
     headers: List<(String * String)>
     body: Stream<UInt8> }
 
@@ -55,7 +58,7 @@ let basicAuth
   (username: String)
   (password: String)
   : Stdlib.Result.Result<(String * String), String> =
-  if Stdlib.String.contains username "-" then
+  if Stdlib.String.__containsBytes username "-" then
     Stdlib.Result.Result.Error "Username cannot contain a hyphen"
   else
     let encoded = Stdlib.String.base64Encode $"{username}:{password}"
@@ -128,7 +131,7 @@ let __connectHost (host: String) (port: Int64) (trusted: Bool)
   if Stdlib.Bool.not trusted &&
      (host == "localhost" || host == "metadata" ||
       host == "metadata.google.internal" ||
-      (Stdlib.Bool.not (Stdlib.String.contains host ".") &&
+      (Stdlib.Bool.not (Stdlib.String.__containsBytes host ".") &&
        Stdlib.Option.isNone (Stdlib.__DnsWire.ipv6 host))) then
     Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.InvalidHost)
   else
@@ -198,7 +201,7 @@ let __readResponse (connection: Stdlib.__Network.TcpConnection) (method: String)
           Stdlib.HttpClient.__readResponse connection method parsed.remaining (informational + 1L)
         else
           Ok (Stdlib.HttpClient.Response {
-            statusCode = Stdlib.Int.fromInt64 parsed.statusCode,
+            statusCode = parsed.statusCode,
             headers = parsed.headers,
             body = parsed.body })
     | Error error ->
@@ -213,7 +216,7 @@ let __readResponse (connection: Stdlib.__Network.TcpConnection) (method: String)
                   | Ok parsed ->
                       if parsed.statusCode < 200L then Error Stdlib.HttpClient.RequestError.NetworkError
                       else Ok (Stdlib.HttpClient.Response {
-                        statusCode = Stdlib.Int.fromInt64 parsed.statusCode,
+                        statusCode = parsed.statusCode,
                         headers = parsed.headers,
                         body = parsed.body })
                   | Error _ -> Error Stdlib.HttpClient.RequestError.NetworkError
@@ -232,7 +235,7 @@ let __parseSecureResponse (method: String) (buffer: Blob) (informational: Int64)
       else if parsed.statusCode < 200L then
         Stdlib.HttpClient.__parseSecureResponse method parsed.remaining (informational + 1L)
       else Ok (Stdlib.HttpClient.Response {
-        statusCode = Stdlib.Int.fromInt64 parsed.statusCode,
+        statusCode = parsed.statusCode,
         headers = parsed.headers, body = parsed.body })
 
 let __secureRequest (connection: Stdlib.__Network.TcpConnection) (url: Stdlib.__HttpWire.Url)
@@ -272,8 +275,8 @@ let __prepare (method: String) (urlText: String) (headers: List<(String * String
       match Stdlib.__HttpWire.parseUrl urlText with
       | Error message ->
           if message == "Unsupported URL scheme" ||
-             Stdlib.Bool.not (Stdlib.String.contains urlText "://") && urlText != "" &&
-             Stdlib.Bool.not (Stdlib.String.contains urlText " ") then
+             Stdlib.Bool.not (Stdlib.String.__containsBytes urlText "://") && urlText != "" &&
+             Stdlib.Bool.not (Stdlib.String.__containsBytes urlText " ") then
             Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.UnsupportedProtocol)
           else Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.InvalidUri)
       | Ok url ->
@@ -622,8 +625,8 @@ let __streamWithAlternatives (trusted: Bool) (roots: Stdlib.Option.Option<List<B
     match Stdlib.__HttpWire.parseUrl urlText with
     | Error message ->
       if message == "Unsupported URL scheme" ||
-         Stdlib.Bool.not (Stdlib.String.contains urlText "://") && urlText != "" &&
-         Stdlib.Bool.not (Stdlib.String.contains urlText " ") then
+         Stdlib.Bool.not (Stdlib.String.__containsBytes urlText "://") && urlText != "" &&
+         Stdlib.Bool.not (Stdlib.String.__containsBytes urlText " ") then
         Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.UnsupportedProtocol)
       else Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.InvalidUri)
     | Ok url ->
@@ -672,7 +675,7 @@ let __streamWithAlternatives (trusted: Bool) (roots: Stdlib.Option.Option<List<B
                              Stdlib.HttpClient.__streamStep
                              Stdlib.HttpClient.__streamDispose in
               Ok (Stdlib.HttpClient.StreamResponse {
-                statusCode = Stdlib.Int.fromInt64 head.statusCode,
+                statusCode = head.statusCode,
                 headers = head.headers, body = stream })
 
 let __stream (trusted: Bool) (roots: Stdlib.Option.Option<List<Blob>>) (method: String) (url: String)
@@ -705,5 +708,8 @@ let toString (e: RequestError) : String =
     match details with
     | EmptyKey -> "Empty key"
     | InvalidContentType -> "Invalid content-type header"
+    | InvalidName -> "Invalid header name"
+    | InvalidValue -> "Header value contains CR, LF or NUL"
   | NetworkError -> "Network Error"
+  | TlsError message -> message
   | BadMethod -> "Bad Method"

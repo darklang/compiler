@@ -212,6 +212,9 @@ and parseMatch grammar state index =
     end
   in
   let cases = RevBuffer.create () in
+  (* `as` and record arms read the scrutinee by this name; `'` keeps it apart
+     from anything written. *)
+  let scrutineeName = "match'scrutinee" and needsScrutinee = ref false in
   let armColumn =
     if tok state afterWith = TBar then (rng state afterWith).start.column else 0
   in
@@ -229,8 +232,92 @@ and parseMatch grammar state index =
            || (rng state !current).start.column = armColumn)
       do
         let barRange = rng state !current in
-        let pattern, next =
-          PatternParser.parseMatchPattern state (!current + 1)
+        (* `| { name, other = o } ->` (darklang/dark@0851642): a record
+           pattern that leaves fields out. Here each field binds a name or
+           `_`; the arm matches the whole value and its body reads the
+           fields. Refutable field patterns are refused with the reason. *)
+        let recordFields, pattern, next =
+          if tok state (!current + 1) = TLBrace then begin
+            let opening = rng state (!current + 1) in
+            let fields = RevBuffer.create () and stop = ref (!current + 2) in
+            let more = ref (tok state !stop <> TRBrace) in
+            let refutable = ref false in
+            while !more do
+              (match (tok state !stop, tok state (!stop + 1), tok state (!stop + 2)) with
+              | TIdent field, TEquals, TIdent name
+                when (match tok state (!stop + 3) with
+                      | TComma | TRBrace -> true
+                      | _ -> false)
+                     && not (Char.equal (Char.uppercase_ascii name.[0]) name.[0]) ->
+                  RevBuffer.add fields ((rng state !stop, field), Some (rng state (!stop + 2), name));
+                  stop := !stop + 3
+              | TIdent _, TEquals, TUnderscore
+                when (match tok state (!stop + 3) with
+                      | TComma | TRBrace -> true
+                      | _ -> false) ->
+                  stop := !stop + 3
+              | TIdent field, (TComma | TRBrace), _ ->
+                  RevBuffer.add fields ((rng state !stop, field), Some (rng state !stop, field));
+                  stop := !stop + 1
+              | _ ->
+                  (* A refutable or nested field (`{ age = 30 }`) is read
+                     through the end of the arm's pattern, and compiling it
+                     is refused. *)
+                  let rec skip at depth =
+                    match tok state at with
+                    | TEOF -> at
+                    | (TArrow | TWhen) when depth = 0 -> at
+                    | TLParen | TLBracket | TLBrace -> skip (at + 1) (depth + 1)
+                    | TRParen | TRBracket | TRBrace -> skip (at + 1) (max 0 (depth - 1))
+                    | _ -> skip (at + 1) depth
+                  in
+                  stop := skip !stop 1;
+                  refutable := true;
+                  more := false);
+              if !more then
+                if tok state !stop = TComma then incr stop
+                else more := false;
+              if tok state !stop = TRBrace then more := false
+            done;
+            if !refutable then
+              ( None,
+                WT.MPUnsupported
+                  ( span opening (rng state (!stop - 1)),
+                    "a record pattern field that is not a name" ),
+                !stop )
+            else
+            let closing =
+              if tok state !stop = TRBrace then !stop + 1
+              else begin
+                errUnclosed state !stop "}" "{" opening;
+                !stop
+              end
+            in
+            ( Some (RevBuffer.toList fields),
+              WT.MPVariable (span opening (rng state (closing - 1)), "_"),
+              closing )
+          end
+          else
+            let pattern, next =
+              PatternParser.parseMatchPattern state (!current + 1)
+            in
+            (None, pattern, next)
+        in
+        (* `| pattern as name ->` (darklang/dark@6a5beac): also bind the whole
+           value. Only one `as` at the top of an arm is lowered; a chain
+           (`| n as m as k ->`) is read and refused like a nested one. *)
+        let asName, pattern, next =
+          match (tok state next, tok state (next + 1)) with
+          | TIdent "as", TIdent name -> (
+              let bound = (Some (rng state (next + 1), name), next + 2) in
+              match (tok state (next + 2), tok state (next + 3)) with
+              | TIdent "as", TIdent _ ->
+                  let chained, stop =
+                    PatternParser.nestedAs state (pattern, next)
+                  in
+                  (None, chained, stop)
+              | _ -> (fst bound, pattern, snd bound))
+          | _ -> (None, pattern, next)
         in
         let condition, next =
           if tok state next = TWhen then
@@ -247,6 +334,30 @@ and parseMatch grammar state index =
           end
         in
         let rhs, stop = parseBlock grammar state next in
+        let bindings =
+          (match asName with Some (range, name) -> [ (range, name, None) ] | None -> [])
+          @ List.filter_map
+              (fun ((fieldRange, field), binding) ->
+                Option.map (fun (range, name) -> (range, name, Some (fieldRange, field))) binding)
+              (Option.value ~default:[] recordFields)
+        in
+        if bindings <> [] then needsScrutinee := true;
+        let bind (range, name, field) body =
+          let whole = WT.EVariable (range, scrutineeName) in
+          let value =
+            match field with
+            | None -> whole
+            | Some (fieldRange, field) ->
+                WT.ERecordFieldAccess (range, whole, (fieldRange, field), range)
+          in
+          let zero = zeroWidthAtEnd range in
+          WT.ELet (span range (WT.exprRange body), WT.LPVariable (range, name), value, body, zero, zero)
+        in
+        let rhs = List.fold_right bind bindings rhs in
+        (* A guard may read what the arm binds, so it gets the same lets. *)
+        let condition =
+          Option.map (fun (range, value) -> (range, List.fold_right bind bindings value)) condition
+        in
         RevBuffer.add cases
           {
             WT.barRange;
@@ -264,13 +375,26 @@ and parseMatch grammar state index =
     if RevBuffer.length cases > 0 then WT.exprRange (last cases).WT.rhs
     else keywordWith
   in
-  ( WT.EMatch
-      ( span keywordMatch endRange,
-        expression,
-        RevBuffer.toList cases,
-        keywordMatch,
-        keywordWith ),
-    !current )
+  let whole = span keywordMatch endRange in
+  if !needsScrutinee then
+    let range = WT.exprRange expression in
+    let zero = zeroWidthAtEnd range in
+    ( WT.ELet
+        ( whole,
+          WT.LPVariable (range, scrutineeName),
+          expression,
+          WT.EMatch
+            ( whole,
+              WT.EVariable (range, scrutineeName),
+              RevBuffer.toList cases,
+              keywordMatch,
+              keywordWith ),
+          zero,
+          zero ),
+      !current )
+  else
+    ( WT.EMatch (whole, expression, RevBuffer.toList cases, keywordMatch, keywordWith),
+      !current )
 
 (*
    `else`/`elif` binds to the `if` at `minCol` or to the left; a less-indented
@@ -362,15 +486,24 @@ and parseLet grammar state index =
           stop := !stop + 2
         end
         else begin
-          let name =
-            match tok state (!stop + 1) with TIdent name -> name | _ -> "_"
+          (* One paren may list several parameters, `let f(a: T, b: U)`,
+             since darklang/dark@74dca94. *)
+          let rec parameters at =
+            let name =
+              match tok state at with TIdent name -> name | _ -> "_"
+            in
+            RevBuffer.add patterns (WT.LPVariable (rng state at, name));
+            let after =
+              if tok state (at + 1) = TColon then
+                snd (TypeParser.parseTypeRef state (at + 2))
+              else at + 1
+            in
+            if tok state after = TComma && tok state (after + 1) <> TRParen
+            then parameters (after + 1)
+            else if tok state after = TComma then after + 1
+            else after
           in
-          RevBuffer.add patterns (WT.LPVariable (rng state (!stop + 1), name));
-          let closing =
-            if tok state (!stop + 2) = TColon then
-              snd (TypeParser.parseTypeRef state (!stop + 3))
-            else !stop + 2
-          in
+          let closing = parameters (!stop + 1) in
           if tok state closing = TRParen then stop := closing + 1
           else begin
             errExpected state closing "')'";

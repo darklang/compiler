@@ -154,8 +154,8 @@ impl Stdlib.ShiftLeft for UInt64 =
 impl Stdlib.ShiftRight for UInt64 =
   let shiftRight = Stdlib.UInt64.shiftRight
 
-impl Stdlib.ToString for UInt64 =
-  let toString = Stdlib.UInt64.toString
+impl Stdlib.Display for UInt64 =
+  let display = Stdlib.UInt64.toString
 
 impl Stdlib.Compare for UInt64 =
   let lessThan = Stdlib.UInt64.lessThan
@@ -171,6 +171,6 @@ impl Stdlib.One for UInt64 =
 
 let fromFloatRounded (a: Float) : Stdlib.Option.Option<UInt64> =
   if Float.isFinite a then
-    a |> Float.round |> Stdlib.Int.toUInt64
+    a |> Float.__roundInt |> Stdlib.Int.toUInt64
   else
     Stdlib.Option.Option.None

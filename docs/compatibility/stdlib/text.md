@@ -25,10 +25,11 @@ U+FFFD and then normalize.
 String traversal (`length`, `slice`, `first`, `last`, `dropFirst`, `dropLast`,
 `head`, `charAt`, `map`, `toList`, `reverse`, `padStart`, `padEnd`, and EGC search) counts
 EGCs. Negative slice indexes are relative to the EGC count and are clamped.
-`indexOf` and `lastIndexOf` deliberately return UTF-16 code-unit indexes to
-match the interpreter; `indexOfEgc` and `lastIndexOfEgc` return EGC indexes and
-accept a match only when both ends lie on EGC boundaries. String comparison,
-containment, and replacement are ordinal.
+`indexOf`, `lastIndexOf` and `contains` match whole EGCs, as the interpreter
+does: a match counts only when both of its ends lie on EGC boundaries, and the
+indexes count EGCs, so `"👍"` is not found in `"👍🏽"`. `indexOfEgc` and
+`lastIndexOfEgc` answer the same indexes as Ints. String comparison and
+replacement are ordinal.
 
 Padding has argument order `(value, padWith, goalLength)` and returns
 `Result<String, String>`. A pad value other than one EGC returns exactly

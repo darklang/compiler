@@ -541,7 +541,6 @@ let liftLambdasInProgram baseRegistry baseVariants baseFunctions program =
       aliases
   in
   let variants =
-    let collisions = AST.collidingConstructorCaseNames definitions in
     definitions
     |> List.filter_map (function
       | AST.SumTypeDef (name, parameters, variants) ->
@@ -550,11 +549,16 @@ let liftLambdasInProgram baseRegistry baseVariants baseFunctions program =
     |> List.fold_left
          (fun lookup (owner, parameters, variants) ->
            List.fold_left
-             (fun lookup (index, (variant : AST.variant)) ->
+             (fun lookup (variant : AST.variant) ->
+               (* The checker's tag, which accounts for case names shared
+                  with every type in the program, not only this unit's. *)
                let tag =
-                 if Names.mem variant.AST.name collisions then
-                   AST.constructorRuntimeIdentity owner variant.AST.name
-                 else index
+                 match C.tryFindConstructorId owner variant.AST.name symbols with
+                 | Some id -> AST.constructorRuntimeTag id
+                 | None ->
+                     Crash.crash
+                       ("Missing constructor identity for '" ^ owner ^ "."
+                      ^ variant.AST.name ^ "'")
                in
                let info = (owner, parameters, tag, variant.AST.fields) in
                let lookup =
@@ -562,8 +566,7 @@ let liftLambdasInProgram baseRegistry baseVariants baseFunctions program =
                  else M.add variant.AST.name info lookup
                in
                M.add (owner ^ "." ^ variant.AST.name) info lookup)
-             lookup
-             (List.mapi (fun index value -> (index, value)) variants))
+             lookup variants)
          M.empty
   in
   let mergedRegistry = merge baseRegistry registry in

@@ -1,0 +1,8 @@
+// console_sgr.e2e - Output to a pipe loses its SGR sequences, as the interpreter's console does.
+
+Stdlib.__Console.withoutSgr "\u001b[1;31mred\u001b[0m plain \u001b[?25h" = "red plain \u001b[?25h"
+Stdlib.__Console.withoutSgr "a\u001b[\u001b[32mb\u001b[m" = "a\u001b[b"
+Stdlib.__Console.withoutColour "\u001b[1;31mx\u001b[0m" = "\u001b[1mx\u001b[0m"
+Stdlib.__Console.withoutColour "\u001b[38;5;208;4mx\u001b[48;2;1;2;3my\u001b[m" = "\u001b[4mxy\u001b[0m"
+Stdlib.printLine "\u001b[31mred\u001b[0m" = stdout="red\n" stderr=""
+Stdlib.printError "\u001b[31mred\u001b[0m" = stdout="" stderr="red"

@@ -1475,18 +1475,21 @@ let runTestsWithProgressReporter completedTestReporter args =
          first assertion runs, and keeps unrelated codegen caches alive. *)
       List.iter
         (fun tests ->
-          let library =
-            if
-              Array.exists
-                (fun test ->
-                  Text.contains test.E.sourceFile "upstream/packages/"
-                  || Text.contains test.E.sourceFile
-                       "upstream/backend/testfiles/execution/")
-                tests
-            then Lazy.force importedStdlib
-            else baseStdlib
+          let imported =
+            Array.exists
+              (fun test ->
+                Text.contains test.E.sourceFile "upstream/packages/"
+                || Text.contains test.E.sourceFile
+                     "upstream/backend/testfiles/execution/")
+              tests
           in
-          runE2EFile library suiteName progressLabel tests)
+          let library =
+            if imported then Lazy.force importedStdlib else baseStdlib
+          in
+          (* Imported tests are interpreter sources: a bare integer is an
+             Int64. *)
+          Parser.withInterpreterSource imported (fun () ->
+              runE2EFile library suiteName progressLabel tests))
         (R.sourceFileGroups testsArray)
     in
 

@@ -82,12 +82,12 @@ let __ipv6Valid (host: String) : Bool =
     match Stdlib.String.splitFirst host "::" with
     | None ->
         let groups = Stdlib.String.split host ":" in
-        Stdlib.List.length groups == 8 && Stdlib.__HttpWire.__ipv6GroupsValid groups
+        Stdlib.List.__lengthInt groups == 8 && Stdlib.__HttpWire.__ipv6GroupsValid groups
     | Some ((left, right)) ->
-        if Stdlib.String.contains right "::" then false
+        if Stdlib.String.__containsBytes right "::" then false
         else
-            let leftCount = if left == "" then 0 else Stdlib.List.length (Stdlib.String.split left ":") in
-            let rightCount = if right == "" then 0 else Stdlib.List.length (Stdlib.String.split right ":") in
+            let leftCount = if left == "" then 0 else Stdlib.List.__lengthInt (Stdlib.String.split left ":") in
+            let rightCount = if right == "" then 0 else Stdlib.List.__lengthInt (Stdlib.String.split right ":") in
             leftCount + rightCount < 8 &&
             Stdlib.__HttpWire.__ipv6SideValid left && Stdlib.__HttpWire.__ipv6SideValid right
 
@@ -109,7 +109,7 @@ let __parsePort (value: String) (defaultPort: Int64) : Stdlib.Result.Result<Int6
 
 let __parseAuthority (authority: String) (defaultPort: Int64) : Stdlib.Result.Result<(String * Int64), String> =
     let length = Stdlib.String.__byteLength authority in
-    if length == 0L || Stdlib.String.contains authority "@" then Error "Invalid URL authority"
+    if length == 0L || Stdlib.String.__containsBytes authority "@" then Error "Invalid URL authority"
     else if Stdlib.String.__byteAtUnchecked authority 0L == 91L then
         match Stdlib.String.splitFirst authority "]" with
         | None -> Error "Invalid URL authority"
@@ -457,7 +457,7 @@ let __requestLine (line: String) : Stdlib.Result.Result<(String * String * Strin
             Error (Stdlib.__HttpWire.ParseError.Invalid "Invalid HTTP method")
         else if target == "" ||
             (Stdlib.Bool.not (Stdlib.String.startsWith target "/") && target != "*") ||
-            Stdlib.String.contains target "#" then
+            Stdlib.String.__containsBytes target "#" then
             Error (Stdlib.__HttpWire.ParseError.Invalid "Invalid request target")
         else if version != "HTTP/1.1" && version != "HTTP/1.0" then
             Error (Stdlib.__HttpWire.ParseError.Invalid "Unsupported HTTP version")

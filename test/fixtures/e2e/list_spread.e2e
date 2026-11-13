@@ -1,0 +1,10 @@
+// Lists are written with `[x, ...rest]` and `[...a, ...b]` since
+// darklang/dark@0781818; `::` and `@` still parse.
+
+[0L, ...[1L, 2L]] = [0L, 1L, 2L]
+let a = [1L, 2L] in let b = [3L] in [...a, ...b] = [1L, 2L, 3L]
+let a = [2L] in [1L, ...a, 3L, 4L] = [1L, 2L, 3L, 4L]
+match [1L, 2L, 3L] with | [first, ...rest] -> (first, rest) | [] -> (0L, []) = (1L, [2L, 3L])
+match [1L, 2L, 3L] with | [a, b, ...rest] -> (a + b, rest) | _ -> (0L, []) = (3L, [3L])
+match [1L] with | [x, ...rest] -> rest | [] -> [9L] = []
+match [1L, 2L] with | x :: rest -> x | [] -> 0L = 1L

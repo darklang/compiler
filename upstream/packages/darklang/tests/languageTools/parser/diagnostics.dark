@@ -1,0 +1,511 @@
+module Darklang.LanguageTools.Parser.Tests.Diagnostics
+
+// The parser's diagnostics as Dark sees them: (range, message) pairs from
+// `Builtin.parse`. Tests that check a diagnostic's code, hint, related span or
+// severity stay in backend/tests/Tests/LibParser.Tests.fs, because only the
+// message crosses into Dark.
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.messagesIn: Unknown function or value 'Darklang.LanguageTools.Parser.Parse.parse'"
+let messagesIn(
+  kind: Darklang.LanguageTools.Parser.FileKind,
+  source: String)
+  : List<String> =
+  Darklang.LanguageTools.Parser.Parse.parse(kind, source)
+  |> Stdlib.Tuple2.second
+  |> Stdlib.List.map(fun((_, message)) -> message)
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.messages: Unknown function or value 'messagesIn'"
+let messages(source: String): List<String> =
+  messagesIn(Darklang.LanguageTools.Parser.FileKind.Script, source)
+
+let shown(source: String): String = Stdlib.String.replaceAll(source, "\n", "\\n")
+
+/// Exactly these messages, in order, so a new cascade or a reworded message fails.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.golden: Unknown function or value 'messages'"
+let golden(source: String, expected: List<String>): Stdlib.Test.Result =
+  let actual = messages(source)
+  Stdlib.Test.expect(
+    actual == expected,
+    $"{shown(source)}: got {Stdlib.inspect(actual)}")
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.rejectsIn: Unknown function or value 'messagesIn'"
+let rejectsIn(
+  kind: Darklang.LanguageTools.Parser.FileKind,
+  source: String)
+  : Stdlib.Test.Result =
+  Stdlib.Test.expect(
+    Stdlib.Bool.not(Stdlib.List.isEmpty(messagesIn(kind, source))),
+    $"{shown(source)}: expected a diagnostic, got none")
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.cleanIn: Unknown function or value 'messagesIn'"
+let cleanIn(
+  kind: Darklang.LanguageTools.Parser.FileKind,
+  source: String)
+  : Stdlib.Test.Result =
+  let actual = messagesIn(kind, source)
+  Stdlib.Test.expect(
+    Stdlib.List.isEmpty(actual),
+    $"{shown(source)}: {Stdlib.inspect(actual)}")
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.rejects: Unknown function or value 'rejectsIn'"
+let rejects(source: String): Stdlib.Test.Result =
+  rejectsIn(Darklang.LanguageTools.Parser.FileKind.Script, source)
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.clean: Unknown function or value 'cleanIn'"
+let clean(source: String): Stdlib.Test.Result =
+  cleanIn(Darklang.LanguageTools.Parser.FileKind.Script, source)
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.rejectsPackage: Unknown function or value 'rejectsIn'"
+let rejectsPackage(source: String): Stdlib.Test.Result =
+  rejectsIn(Darklang.LanguageTools.Parser.FileKind.Package, source)
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.cleanPackage: Unknown function or value 'cleanIn'"
+let cleanPackage(source: String): Stdlib.Test.Result =
+  cleanIn(Darklang.LanguageTools.Parser.FileKind.Package, source)
+
+/// Some message contains <param fragment>.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.says: Unknown function or value 'messages'"
+let says(source: String, fragment: String): Stdlib.Test.Result =
+  let actual = messages(source)
+  Stdlib.Test.expect(
+    Stdlib.List.any(actual, fun m -> Stdlib.String.contains(m, fragment)),
+    $"{shown(source)} should say {fragment}, got {Stdlib.inspect(actual)}")
+
+
+// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
+test goldenMessages =
+  Stdlib.Test.all(
+    [ golden(
+        "(1 + 2",
+        [ "expected ')' to close the '(' at line 1:1, found end of file" ])
+      golden("(1 + )", [ "expected an expression, found ')'" ])
+      golden(
+        "Point { x = 1",
+        [ "expected '}' to close the '{' at line 1:7, found end of file" ])
+      golden("if true then 1 else", [ "expected an expression, found end of file" ])
+      // the missing `:` is reported once, then `Int64` is read as the type
+      golden("let f (x Int64) : Int64 = x", [ "expected ':', found 'Int64'" ])
+      golden(
+        "128s8",
+        [ "integer literal 128s8 is out of range (this magnitude is only valid negated: -128s8)" ])
+      // the unfinished arm is missing both its arrow and its body
+      golden(
+        "match x with | Ok(v) -> v | Error",
+        [ "expected '->' in match case, found end of file"
+          "expected an expression, found end of file" ])
+      golden(
+        "let x = [1, 2",
+        [ "expected ']' to close the '[' at line 1:9, found end of file"
+          "expected an expression, found end of file" ])
+      golden("[1; 2]", [ "expected ',' between list elements, found ';'" ])
+      // record patterns ignore the fields they leave out, so `...` is not needed
+      golden(
+        "match x with | { name, ... } -> name",
+        [ "a record pattern needs no '...': the fields it leaves out are ignored" ])
+      golden("match x with | {} -> 1", [ "a record pattern names at least one field" ])
+      golden(
+        "match x with | { a = 1, a = 2 } -> 1",
+        [ "the field 'a' appears twice in this record pattern" ])
+      golden(
+        "match x with | { ID } -> 1",
+        [ "a field with no '= pattern' binds a variable named after it, and 'ID' cannot name a variable" ])
+      golden(
+        "match x with | { a = 1 b = 2 } -> 1",
+        [ "expected a comma or newline between record-pattern fields, found 'b'" ])
+      // `as` is looser than `,` and `|`, so naming one part needs parentheses
+      golden(
+        "match x with | (a as y, b) -> y",
+        [ "'as' names the whole pattern before it, so a ',' cannot follow it here" ])
+      golden(
+        "match x with | Ok(v) as r | Error(v) as r -> r",
+        [ "'as' names the whole or-pattern before it, so a '|' cannot follow it" ])
+      golden(
+        "match x with | a as -> a",
+        [ "expected a lowercase name after 'as', found '->'" ])
+      golden(
+        "match x with | (a, b as t) -> t",
+        [ "'as' after a tuple's last element is ambiguous" ])
+      // one diagnostic per invalid tuple index
+      golden("t.1s8", [ "expected a tuple element number after '.', found '1s8'" ])
+      golden(
+        "t.1e0 + 1",
+        [ "expected a tuple element number after '.', found '1e0'" ])
+      golden(
+        "t.1.2e3",
+        [ "expected a tuple element number after '.', found '1.2e3'" ])
+      // the lexer's error, without a parser error on top
+      golden("t.1.2s8", [ "invalid number literal: 1.2s8" ])
+      golden("200L", [ "invalid number literal: 200L; an Int64 is written `200`" ])
+      golden("t.300s8", [ "out of range for Int8: 300s8" ])
+      golden(
+        "[1; 2; 3]",
+        [ "expected ',' between list elements, found ';'"
+          "expected ',' between list elements, found ';'" ])
+      golden(
+        "match x with | [a; b] -> a",
+        [ "expected ',' between list-pattern elements, found ';'" ])
+      golden(
+        "Point { x = 1; y = 2 }",
+        [ "expected ',' between record fields, found ';'" ])
+      golden(
+        "Dict { 1: 2; 3: 4 }",
+        [ "expected ',' between dict entries, found ';'" ])
+      golden(
+        "{ p with x = 1; y = 2 }",
+        [ "expected ',' between record-update fields, found ';'" ])
+      golden(
+        "type P = { x: Int64; y: Int64 }",
+        [ "expected ',' between record-type fields, found ';'" ])
+      // only a newline separates statements: in a body, in parens, at top level
+      golden(
+        "let f(): Unit =\n  print(1); print(2)",
+        [ "expected a new line between statements, found ';'" ])
+      golden(
+        "(print(1); print(2))",
+        [ "expected a new line between statements, found ';'" ])
+      golden(
+        "print(1); print(2)",
+        [ "expected a new line between statements, found ';'" ])
+      golden("let x : String = 1 in x", [ "Value annotations are not supported" ])
+      golden("val x : String = 1", [ "Value annotations are not supported" ]) ])
+
+// A malformed lexeme gets a diagnostic, never a silent success and never a throw.
+// @compiler xfail compile: "Unknown function or value 'rejects'" class=missing-support reason=upstream-dependency
+test lexicalFailures =
+  Stdlib.Test.all(
+    [ rejects("let x = §")
+      rejects("\"abc")
+      rejects("'a")
+      rejects("'\\na'")
+      rejects("$\"{1")
+      rejects("$\"{1 +++ 2}\"")
+      rejects("match x with")
+      rejects("fun -> 1")
+      rejects("module X =\nlet y = 1")
+      rejects("{ a = 1 }")
+      rejects("match x with\n  | Some(x) -> x\n    | None -> 0")
+      rejects("1e")
+      rejects("1.5e+")
+      rejects("1e401")
+      rejects("99999999999999999999")
+      rejects("9000s8")
+      rejects("(* never closed")
+      rejects("$\"{1\n2}\"")
+      rejects("$\"{}\"")
+      rejects("$\"{val x = 1}\"")
+      rejects("$\"hello } world\"")
+      // a `}` inside a comment or a raw string does not close the interpolation
+      clean("$\"{(* } *) 1}\"")
+      clean("$\"{\"\"\" } \"\"\"}\"")
+      clean("$\"a{ 1 }b\"") ])
+
+// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
+test charLiteralsHoldOneCharacter =
+  Stdlib.Test.all(
+    [ clean("'q́'")
+      clean("'👩‍👩‍👧'")
+      clean("'🇵🇱'")
+      clean("'\\u0061\\u0301'")
+      says("'\\u0061\\u0062'", "exactly one grapheme") ])
+
+// @compiler xfail compile: "Unknown function or value 'says'" class=missing-support reason=upstream-dependency
+test operatorsDarkLacksSayWhatToWrite =
+  Stdlib.Test.all(
+    [ says("match xs with | h :: t -> h", "a list is `[head, ...tail]`")
+      says("1 :: []", "a list is `[head, ...tail]`")
+      says("[1] @ [2]", "join lists with `[...a, ...b]`")
+      says("(@)", "join lists with `[...a, ...b]`")
+      says("\"a\" ++ \"b\"", "join Strings with `+`")
+      says("...", "only goes inside a list")
+      says("match xs with | ... -> xs", "only goes last inside a list pattern")
+      // a rest element goes last, and binds a name or _
+      says("match xs with | [...t, h] -> h", "must be the last element")
+      says("match xs with | [h, ...[t]] -> h", "takes a name for the rest")
+      says("match xs with | [...t] -> t", "write `t`") ])
+
+// `rec` is reported once, and the function after it parses as written.
+// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
+test letRecSaysRecursionNeedsNoKeyword =
+  Stdlib.Test.all(
+    [ golden(
+        "let rec go(n: Int64): Int64 = if n <= 0 then 0 else go(n - 1)\ngo(3)",
+        [ "Dark functions can call themselves; there's no `rec` keyword" ])
+      golden(
+        "let f(n: Int64): Int64 =\n  let rec go(k: Int64): Int64 = k\n  go(n)\nf(1)",
+        [ "Dark functions can call themselves; there's no `rec` keyword" ])
+      clean("let rec = 1\nrec") ])
+
+// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
+test builtinTypeNamesAreRefused =
+  Stdlib.Test.all(
+    [ golden(
+        "type Unit =\n  | Celsius\n  | Fahrenheit\n1",
+        [ "`Unit` is a built-in type, so it can't also name a type of your own" ])
+      says("type String = { s: Int64 }\n1", "is a built-in type")
+      says("module M =\n  type List = | A\n1", "is a built-in type")
+      clean("type TempUnit =\n  | Celsius\n  | Fahrenheit\n1") ])
+
+// The refused operator is the only mistake reported: the parse reads on past it.
+// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
+test operatorsDarkLacksDoNotCascade =
+  Stdlib.Test.all(
+    [ golden(
+        "match xs with\n| h :: t -> h\n| [] -> 0",
+        [ "'::' is not Dark; a list is `[head, ...tail]`" ])
+      golden(
+        "Stdlib.printLine(\"n = \" ++ s ++ \"!\")",
+        [ "'++' is not Dark; join Strings with `+`"
+          "'++' is not Dark; join Strings with `+`" ])
+      golden("[1] @ [2]", [ "'@' is not Dark; join lists with `[...a, ...b]`" ]) ])
+
+// @compiler xfail compile: "Unknown function or value 'rejects'" class=missing-support reason=upstream-dependency
+test sameLineItemsNeedSeparators =
+  Stdlib.Test.all(
+    [ rejects("[1 2]")
+      rejects("match xs with | [a b] -> a")
+      rejects("Pair(1 2)")
+      rejects("match pair with | Pair(a b) -> a")
+      rejects("Person { a = 1 b = 2 }")
+      rejects("Dict { \"a\": 1 \"b\": 2 }")
+      rejects("{ value with a = 1 b = 2 }")
+      rejects("type R = { a: Int64 b: String }")
+      clean("[1, 2]")
+      clean("match xs with | [a, b] -> a")
+      clean("Pair(1, 2)")
+      clean("match pair with | Pair(a, b) -> a")
+      clean("Person { a = 1, b = 2 }")
+      clean("Dict { \"a\": 1, \"b\": 2 }")
+      clean("{ value with a = 1, b = 2 }")
+      clean("type R = { a: Int64, b: String }")
+      clean("Person { a = 1, b = 2, }")
+      clean("let f(): Unit =\n  print(1)\n  print(2)") ])
+
+// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
+test identifiersAndModifiers =
+  Stdlib.Test.all(
+    [ clean("def")
+      // rec, private and internal are identifiers, not let modifiers
+      rejects("module M =\n  let rec f (x: Int64) : Int64 = x")
+      rejects("module M =\n  let private f (x: Int64) : Int64 = x")
+      rejects("module M =\n  let internal f (x: Int64) : Int64 = x")
+      rejects("if true then let private f (x: Int64) : Int64 = x in f(1) else 0")
+      clean("let rec = 1 in rec")
+      clean("let private = 1 in private")
+      clean("let internal = 1 in internal")
+      // a package fn's parameter cannot be blank; a lambda's can
+      says(
+        "let f(___: Int64, x: Int64): Int64 = x",
+        "Blank parameter '___' is not allowed")
+      clean("let f(): Unit = ()")
+      clean("fun ___ -> 1")
+      // `val` declares a value, so it takes no parameters
+      says(
+        "val f (x: Int64) : Int64 = x",
+        "'val' declares a value and cannot have function parameters")
+      // private names keep their role
+      clean("let __make () : __Buffer = __Buffer { size = 0 }")
+      clean("let __make () : M.__Buffer = M.__Buffer { size = 0 }")
+      clean(
+        "let __make () : M.__Internal.__Buffer = M.__Internal.__Buffer { size = 0 }")
+      clean("__make(buffer.size)") ])
+
+// @compiler xfail compile: "Unknown function or value 'rejects'" class=missing-support reason=upstream-dependency
+test emptyAndMalformedForms =
+  Stdlib.Test.all(
+    [ // recovery still reports what it recovered from
+      rejects("[1 + , 2 * ]")
+      rejects(
+        "module Test\n"
+        + "let broken1 (x: Int64) : Int64 =\n  x + \n\n"
+        + "let broken2 () : Int64 =\n  [1, 2\n\n"
+        + "let fine (y: Int64) : Int64 =\n  y * 2\n")
+      rejects("{ x with }")
+      clean("{ r with f = 1 }")
+      rejects("type X = {}")
+      rejects("type X = |")
+      clean("type X = { a: Int64 }")
+      clean("type X = A | B")
+      // a number glued to identifier chars is a typo, not two tokens
+      rejects("123abc")
+      rejects("12l3")
+      rejects("1.5xyz")
+      rejects("80I")
+      clean("123")
+      clean("1.5")
+      clean("1e300")
+      clean("[1, 2]")
+      // `128s8` is not -128: the magnitude only fits negated
+      rejects("128s8")
+      rejects("32768s16")
+      rejects("2147483648s32")
+      rejects("9223372036854775808")
+      rejects("170141183460469231731687303715884105728s128")
+      clean("-128s8")
+      clean("-9223372036854775808")
+      clean("match x with | -128s8 -> 1 | _ -> 2")
+      clean("match x with | Ok(5s8) -> 1 | Ok(-4s8) -> 2 | _ -> 3") ])
+
+// @compiler xfail compile: "Unknown function or value 'messages'" class=missing-support reason=upstream-dependency
+test recoveryStopsAtEndOfFile =
+  let found = messages("let x =")
+  Stdlib.Test.all(
+    [ Stdlib.Test.expect(
+        Stdlib.Bool.not(Stdlib.List.isEmpty(found)),
+        "reports the error")
+      Stdlib.Test.expect(
+        Stdlib.List.length(found) <= 3,
+        $"does not spam: {Stdlib.inspect(found)}")
+      // a broken generic leaves nothing behind for the next parse
+      rejects("type X = List<List<Int64")
+      clean("type Y = List<Int64>") ])
+
+// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
+test genericSyntaxIsExplicit =
+  Stdlib.Test.all(
+    [ clean("type Pair<'a, 'b> = 'a * 'b")
+      clean("type X = List<List<Int64>> -> String")
+      clean("type X = List<Int64 -> List<String>> -> Bool")
+      rejects("type Box <'a> = 'a")
+      rejects("type Box<a> = a")
+      rejects("type Pair<'a 'b> = 'a")
+      rejects("type Box<> = Int64")
+      rejects("type Box<'a,> = 'a")
+      rejects("type Box = List < Int64 >")
+      rejects("type Box = Dict < String >")
+      rejects("type Box = Stdlib.Option.Option < Int64 >") ])
+
+// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
+test callSyntax =
+  Stdlib.Test.all(
+    [ clean("f (1, 2)")
+      clean("f(1)(2)")
+      clean("f(x).field")
+      clean("a.add(b)")
+      clean("Stdlib.Json.parse<Int64>(s)")
+      rejects("x |> (+) 1")
+      // a constructor's fields go in parentheses
+      clean("Ok(5)")
+      clean("Ok (5)")
+      clean("None")
+      clean("match x with | Ok(v) -> v | Pair(a, b) -> a | None -> 0")
+      // a declaration lists its parameters once
+      clean("let f(): Int64 = 1")
+      clean("let f(\n  a: Int64,\n  b: Int64\n): Int64 = a")
+      clean(
+        "let outer(n: Int64): Int64 =\n"
+        + "  let double(x: Int64, y: Int64): Int64 = x + y\n"
+        + "  double(n, n)")
+      // an argument list in a type needs an arrow after it
+      rejects("let f(g: (Int64, Int64)): Int64 = 1") ])
+
+// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
+test unwrapSpelling =
+  Stdlib.Test.all(
+    [ clean("fun x -> f(x)?")
+      clean("fun x -> x?.field??")
+      clean("fun v -> Ok (f(v?))?")
+      clean("fun v -> Ok(f(v?))?")
+      // a lambda in a package value is a boundary
+      clean("val f = fun x -> Some(x?)")
+      rejects("fun x -> x ?")
+      rejects("fun x -> ?x")
+      rejects("fun x -> ?")
+      says("fun x -> x ?", "directly after its operand")
+      says("fun x -> Some(x ?)", "directly after its operand")
+      says("fun x -> Some(x) ?", "directly after its operand")
+      says("fun x ->\n  let n = x ?\n  n", "directly after its operand") ])
+
+// @compiler xfail compile: "Unknown function or value 'rejectsPackage'" class=missing-support reason=upstream-dependency
+test effectRows =
+  Stdlib.Test.all(
+    [ rejectsPackage("module M =\n  let f(x: Int64):{Http, Clock} Int64 = x")
+      rejectsPackage("module M =\n  let f(x: Int64):{} Int64 = x") ])
+
+// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
+test traitDeclarations =
+  Stdlib.Test.all(
+    [ // a method may declare its own type params
+      clean("trait Fun<'f> =\n  let map<'b>(v: 'f): 'b")
+      // an alias member names a fn, so a lambda is not one
+      rejects("impl Show for Point =\n  let show = fun p -> \"p\"")
+      rejects("impl Show for Point =\n  val x = 1\nlet after (x: Int64) : Int64 = x") ])
+
+// Named tests are package declarations. These use the Package kind, since a
+// Script adds its own diagnostic for any test and would hide a missing one.
+// @compiler xfail compile: "Unknown function or value 'cleanPackage'" class=missing-support reason=upstream-dependency
+test namedTests =
+  Stdlib.Test.all(
+    [ cleanPackage("module M =\n  test doubles = Stdlib.Test.equal(8, 8)")
+      cleanPackage(
+        "module M =\n  test divisionByZero =\n    1 / 0\n"
+        + "    => raises \"Cannot divide by 0\"")
+      cleanPackage(
+        "module M =\n"
+        + "  test callsRaises = 1 |> raises(\"message\") |> Stdlib.Test.equal(1)")
+      clean("let test = 1 in test")
+      // tests use existing policies instead of declaring effect ceilings
+      rejectsPackage("module M =\n  test key :{Random} = Stdlib.Test.pass ()")
+      rejectsPackage("module M =\n  test key :{} = Stdlib.Test.pass ()")
+      rejectsPackage("module M =\n  test key :{NoSuchEffect} = Stdlib.Test.pass ()")
+      // the old header form is gone
+      rejectsPackage(
+        "module M =\n"
+        + "  test divisionByZero raises \"Cannot divide by 0\" = 1 / 0")
+      // a script refuses a named test
+      cleanPackage("test passes = true")
+      messages("test passes = true")
+      |> Stdlib.Test.equal(
+        [ "Named package tests are only allowed in package files" ]) ])
+
+// At a package root, a `let` value gets one focused diagnostic rather than an
+// end-of-file cascade.
+// @compiler xfail compile: "Unknown function or value 'messagesIn'" class=missing-support reason=upstream-dependency
+test packageRootLetValue =
+  messagesIn(
+    Darklang.LanguageTools.Parser.FileKind.Package,
+    "let chars = \"abc\"\n\nlet length(s: String): Int64 = Stdlib.String.length(s)")
+  |> Stdlib.Test.equal(
+    [ "Module value declarations must use 'val'; 'let' is reserved for functions and local bindings" ])
+
+// A keyword where a name goes says how to escape it, and is then read as that name,
+// so the rest parses and it is the only error.
+// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
+test keywordAsName =
+  let escape = fun word -> $"`{word}` is a keyword, so to use it as a name write ``{word}``"
+  let only = fun(source, what, word) ->
+    golden(source, [ "expected " + what + ", found '" + word + "'; " + escape(word) ])
+  Stdlib.Test.all(
+    [ only("let match = \"x\"\nx", "a pattern", "match")
+      only("let type = \"x\"\nx", "a pattern", "type")
+      only("Stdlib.List.map([\"x\"], fun type -> \"y\")", "a pattern", "type")
+      only("match \"x\" with\n| type -> 1", "a pattern", "type")
+      only("type R = { type: String, title: String }", "a record field 'name : Type'", "type")
+      only(
+        "type R = { ``type``: String }\nR { type = \"post\" }",
+        "a record field 'name = value'",
+        "type")
+      only("{ r with type = \"post\" }", "a record-update field 'name = value'", "type")
+      says("let f(in: String): String = in", escape("in"))
+      golden(
+        "r.type",
+        [ "expected a field name after '.', found 'type'; `type` is a keyword, so to use it as a name write r.``type``" ])
+      golden(
+        "M.match(\"x\")",
+        [ "expected a name after '.', found 'match'; `match` is a keyword, so to use it as a name write M.``match``" ])
+      says("type E =\n  | when", "an enum case name starts with an uppercase letter, found 'when'")
+      golden("type E = | foo", [ "an enum case name starts with an uppercase letter, found 'foo'" ])
+      golden("type E = |", [ "an enum type needs at least one case" ])
+      golden(
+        "let a = ``in``.type\na",
+        [ "expected a field name after '.', found 'type'; `type` is a keyword, so to use it as a name write ``in``.``type``" ])
+      // a dot left at the end of a line is a name still being typed, not a keyword field
+      golden("let a = r.\nlet b = \"x\"\nb", [ "expected an expression, found '.'" ])
+      golden("let a = Stdlib.String.\nlet b = \"x\"\nb", [ "expected an expression, found '.'" ])
+      // a keyword starting the next line is the next statement, after a missing name
+      Stdlib.Test.expect(
+        messages("let\nlet x = \"x\"\nx")
+        |> Stdlib.List.any(fun m -> Stdlib.String.contains(m, "is a keyword"))
+        |> Stdlib.Bool.not,
+        "a missing name before the next line's `let` gets no keyword hint")
+      clean("let ``match`` = \"x\"\n``match``")
+      clean("r.``type``") ])

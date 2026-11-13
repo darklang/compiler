@@ -67,16 +67,16 @@ Stdlib.Float.toString 0.0 = "0.0"
 Stdlib.Float.toString (-0.0) = "-0.0"
 
 // Interpreter parity: arbitrary-precision directed and nearest rounding
-Stdlib.Float.ceiling 1.25 = 2
-Stdlib.Float.roundUp (-1.25) = -1
-Stdlib.Float.floor (-1.25) = -2
-Stdlib.Float.roundDown 1.25 = 1
-Stdlib.Float.round 2.5 = 2
-Stdlib.Float.round 3.5 = 4
-Stdlib.Float.roundTowardsZero (-1.75) = -1
-Stdlib.Float.truncate (-1.75) = -1
-Stdlib.Float.ceiling 100000000000000000000.0 = 100000000000000000000
-Stdlib.Float.ceiling (1.0 / 0.0) = error="Encountered out-of-range value for type of Int"
+Stdlib.Float.ceiling 1.25 = 2L
+Stdlib.Float.roundUp (-1.25) = -1L
+Stdlib.Float.floor (-1.25) = -2L
+Stdlib.Float.roundDown 1.25 = 1L
+Stdlib.Float.round 2.5 = 2L
+Stdlib.Float.round 3.5 = 4L
+Stdlib.Float.roundTowardsZero (-1.75) = -1L
+Stdlib.Float.truncate (-1.75) = -1L
+Stdlib.Float.toInt 100000000000000000000.0 = 100000000000000000000
+Stdlib.Float.ceiling (1.0 / 0.0) = error="Encountered an out-of-range integer value"
 
 // IEEE classification and clamp deliberately reject only NaN limits
 Stdlib.Float.isNaN Builtin.testNan = true

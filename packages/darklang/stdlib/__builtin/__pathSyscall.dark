@@ -23,7 +23,7 @@ let syscallUtimensAt (path: String) (a: Int) (an: Int) (m: Int) (mn: Int) : Stdl
                 let rc = Stdlib.Cli.__Posix.__withCString "" (fun ptr -> Stdlib.Cli.__Posix.__utimesAt heldFd ptr times 4096L) in
                 if rc == -22L then Stdlib.Cli.__Posix.__withCString held (fun ptr -> Stdlib.Cli.__Posix.__unitResult (Stdlib.Cli.__Posix.__utimesAt (Stdlib.Cli.__Posix.__cwdFd ()) ptr times 0L))
                 else Stdlib.Cli.__Posix.__unitResult rc))
-        |> Stdlib.Result.mapError (fun error -> error.errno)
+        |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)
 
 let syscallSetattrlistTimes (path: String) (a: Int) (an: Int) (m: Int) (mn: Int) : Stdlib.Result.Result<Unit, Int> =
     if Stdlib.Cli.__Posix.__mac () == false then Error 38
@@ -38,7 +38,7 @@ let syscallSetattrlistTimes (path: String) (a: Int) (an: Int) (m: Int) (mn: Int)
                 let result = Stdlib.Cli.__Posix.__unitResult (Stdlib.Cli.__Posix.__setAttributesAt fd name attrs times 32L 1L) in
                 let _ = __mapped_free attrs in
                 result))
-        |> Stdlib.Result.mapError (fun error -> error.errno)
+        |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)
 
 let syscallGetcwd (count: Int) : Stdlib.Result.Result<Blob, Int> =
     let count = Builtin.__posixInt32 count in
@@ -72,32 +72,32 @@ let syscallReadlinkAt (path: String) (count: Int) : Stdlib.Result.Result<Blob, I
                 else Ok (Stdlib.Cli.__Posix.__bufferBytes buffer 0L rc []) in
             let _ = __mapped_free buffer in
             result)
-        |> Stdlib.Result.mapError (fun error -> error.errno)
+        |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)
 
 let syscallUnlinkAt (path: String) (flags: Int) : Stdlib.Result.Result<Unit, Int> =
     Builtin.__checkedUnlinkAt path flags
-    |> Stdlib.Result.mapError (fun error -> error.errno)
+    |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)
 
 let syscallOpen (path: String) (flags: Int) (mode: Int) : Stdlib.Result.Result<Int, Int> =
     Builtin.__checkedOpen path flags mode
-    |> Stdlib.Result.mapError (fun error -> error.errno)
+    |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)
 
 let syscallMkdir (path: String) (mode: Int) : Stdlib.Result.Result<Unit, Int> =
     Builtin.__checkedMkdir path mode
-    |> Stdlib.Result.mapError (fun error -> error.errno)
+    |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)
 
 let syscallChdir (path: String) : Stdlib.Result.Result<Unit, Int> =
     Builtin.__checkedChdir path
-    |> Stdlib.Result.mapError (fun error -> error.errno)
+    |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)
 
 let syscallRename (oldpath: String) (newpath: String) : Stdlib.Result.Result<Unit, Int> =
     Builtin.__checkedRename oldpath newpath
-    |> Stdlib.Result.mapError (fun error -> error.errno)
+    |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)
 
 let syscallChmod (path: String) (mode: Int) : Stdlib.Result.Result<Unit, Int> =
     Builtin.__checkedChmod path mode
-    |> Stdlib.Result.mapError (fun error -> error.errno)
+    |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)
 
 let syscallSymlink (target: String) (linkpath: String) : Stdlib.Result.Result<Unit, Int> =
     Builtin.__checkedSymlink target linkpath
-    |> Stdlib.Result.mapError (fun error -> error.errno)
+    |> Stdlib.Result.mapError (fun error -> Stdlib.Int.fromInt64 error.errno)

@@ -1,0 +1,9 @@
+// Utf8.decode words a failure as the interpreter does: where the first invalid sequence starts,
+// and its bytes, the Unicode maximal subpart, in hex.
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [195u8]) = Stdlib.Result.Result.Error "Invalid UTF-8 at byte 0: C3"
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [104u8, 105u8, 255u8, 254u8]) = Stdlib.Result.Result.Error "Invalid UTF-8 at byte 2: FF"
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [65u8, 226u8, 130u8, 65u8]) = Stdlib.Result.Result.Error "Invalid UTF-8 at byte 1: E2 82"
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [237u8, 160u8, 128u8]) = Stdlib.Result.Result.Error "Invalid UTF-8 at byte 0: ED"
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [240u8, 159u8, 152u8]) = Stdlib.Result.Result.Error "Invalid UTF-8 at byte 0: F0 9F 98"
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [244u8, 144u8, 128u8, 128u8]) = Stdlib.Result.Result.Error "Invalid UTF-8 at byte 0: F4"
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [104u8, 105u8]) = Stdlib.Result.Result.Ok "hi"

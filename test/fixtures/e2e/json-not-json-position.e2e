@@ -1,0 +1,11 @@
+// Json.parse names where the text stopped being JSON, as main does: the
+// line and the column, counted in characters from 1.
+Stdlib.Json.parse<Bool> "tru" = Error(Stdlib.Json.ParseError.ParseError.NotJson (1L, 4L))
+Stdlib.Json.parse<Bool> "tRUE" = Error(Stdlib.Json.ParseError.ParseError.NotJson (1L, 2L))
+Stdlib.Json.parse<Int64> "" = Error(Stdlib.Json.ParseError.ParseError.NotJson (1L, 1L))
+Stdlib.Json.parse<Int64> " " = Error(Stdlib.Json.ParseError.ParseError.NotJson (1L, 2L))
+Stdlib.Json.parse<Int64> "4a" = Error(Stdlib.Json.ParseError.ParseError.NotJson (1L, 2L))
+Stdlib.Json.parse<Int64> "- 42" = Error(Stdlib.Json.ParseError.ParseError.NotJson (1L, 2L))
+Stdlib.Json.parse<Float> "-000000.9" = Error(Stdlib.Json.ParseError.ParseError.NotJson (1L, 3L))
+Stdlib.Json.parse<List<Int64>> "[1,2,3,]" = Error(Stdlib.Json.ParseError.ParseError.NotJson (1L, 8L))
+Stdlib.Json.parse<List<String>> "[\"é\",\n x]" = Error(Stdlib.Json.ParseError.ParseError.NotJson (2L, 2L))

@@ -51,7 +51,7 @@ let __entries (sender: Stdlib.__QuicParameters.Sender) (data: Blob) (position: I
   (seen: List<Int64>) (entries: List<Stdlib.__QuicParameters.Entry>)
   : Stdlib.Result.Result<List<Stdlib.__QuicParameters.Entry>, String> =
   if position == Stdlib.Blob.__byteLength data then Ok entries
-  else if Stdlib.List.length seen >= 128 then Error "Too many QUIC transport parameters"
+  else if Stdlib.List.__lengthInt seen >= 128 then Error "Too many QUIC transport parameters"
   else
     match Stdlib.__QuicWire.parseInteger data position with
     | Error _ -> Error "Truncated QUIC transport parameter"

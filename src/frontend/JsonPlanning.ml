@@ -347,7 +347,7 @@ let rec typeReference (env : env) typ =
   | AST.TUInt64 -> nullary "TUInt64"
   | AST.TInt128 -> nullary "TInt128"
   | AST.TUInt128 -> nullary "TUInt128"
-  | AST.TInt -> nullary "TInt"
+  | AST.TInt -> nullary "TBigInt"
   | AST.TFloat64 -> nullary "TFloat"
   | AST.TChar -> nullary "TChar"
   | AST.TString -> nullary "TString"
@@ -775,6 +775,8 @@ and serializeBody (env : env) typ value writer (state : state) =
   | AST.TInt128 -> raw "Darklang.Stdlib.Int128.toString"
   | AST.TUInt128 -> raw "Darklang.Stdlib.UInt128.toString"
   | AST.TFloat64 -> raw "Darklang.Stdlib.Json.__serializeFloat"
+  | AST.TSum ("Float32", []) -> raw "Darklang.Stdlib.Json.__serializeFloat32"
+  | AST.TSum ("Decimal", []) -> raw "Darklang.Stdlib.Decimal.toString"
   | AST.TString | AST.TChar -> Ok (writerString env writer value, state)
   | AST.TSum ("Uuid", []) ->
       Ok
@@ -1508,6 +1510,8 @@ and decodeBody (env : env) typ source view path (state : state) =
   | AST.TUInt64 -> optional "Darklang.Stdlib.Json.__viewUInt64"
   | AST.TUInt128 -> optional "Darklang.Stdlib.Json.__viewUInt128"
   | AST.TFloat64 -> optional "Darklang.Stdlib.Json.__viewFloat"
+  | AST.TSum ("Float32", []) -> optional "Darklang.Stdlib.Json.__viewFloat32"
+  | AST.TSum ("Decimal", []) -> optional "Darklang.Stdlib.Json.__viewDecimal"
   | AST.TSum ("Uuid", []) -> optional "Darklang.Stdlib.Json.__viewUuid"
   | AST.TDateTime -> optional "Darklang.Stdlib.Json.__viewDateTime"
   | AST.TList elemType ->
@@ -1926,9 +1930,44 @@ let rec mapExpr rewrite symbols expr =
   in
   rewrite symbols mapped
 
+(* checkedSerialize<T> v is Ok (serialize<T> v): a type with no JSON form is
+   refused when serialize<T> is planned, so nothing is left to check at run time. *)
+let checkedSerializeAsSerialize program =
+  let symbols, topLevels = viewProgram program in
+  match
+    ( tryFindFunctionId "Darklang.Stdlib.Json.checkedSerialize" symbols,
+      tryFindFunctionId "Darklang.Stdlib.Json.serialize" symbols )
+  with
+  | Some checkedId, Some serializeId ->
+      let rewrite current expr =
+        match expr with
+        | TypeApp (id, typeArgs, values) when id = checkedId ->
+            let okId, current =
+              internFunction "Darklang.Stdlib.Json.__serialized" current
+            in
+            ( Call (okId, N.singleton (TypeApp (serializeId, typeArgs, values))),
+              current )
+        | _ -> (expr, current)
+      in
+      let topLevels, symbols =
+        mapFold
+          (fun current topLevel ->
+            match topLevel with
+            | FunctionDef fn ->
+                let body, next = mapExpr rewrite current fn.body in
+                (FunctionDef { fn with body }, next)
+            | Expression expr ->
+                let expr, next = mapExpr rewrite current expr in
+                (Expression expr, next)
+            | other -> (other, current))
+          symbols topLevels
+      in
+      programFromCheckedParts (symbols, topLevels)
+  | _ -> program
+
 let rewriteProgramWithSession (session : planningSession option)
     (env : Types.typeCheckEnv) program =
-  let symbols, topLevels = viewProgram program in
+  let symbols, topLevels = viewProgram (checkedSerializeAsSerialize program) in
   let serializeId =
     tryFindFunctionId "Darklang.Stdlib.Json.serialize" symbols
   in
@@ -2215,6 +2254,9 @@ let rewriteProgramWithSession (session : planningSession option)
                 allocateBinding "__json_parse_result" symbols1
               in
               let viewId, symbols3 = allocateBinding "__json_view" symbols2 in
+              let errorId, symbols3 =
+                allocateBinding "__json_parse_error" symbols3
+              in
               let parsed =
                 call finalPlanningEnv "Darklang.Stdlib.Json.__parseRoot"
                   [ Local sourceId ]
@@ -2245,11 +2287,8 @@ let rewriteProgramWithSession (session : planningSession option)
                               makeCase
                                 (constructorPattern planningEnv
                                    "Darklang.Stdlib.Result.Result" "Error"
-                                   [ PWildcard ])
-                                (error finalPlanningEnv
-                                   (constructor finalPlanningEnv
-                                      "Darklang.Stdlib.Json.ParseError.ParseError"
-                                      "NotJson" None));
+                                   [ PVariable errorId ])
+                                (error finalPlanningEnv (Local errorId));
                             ] ) ) ),
                 symbols3 )
           | _ -> (expr, currentSymbols)

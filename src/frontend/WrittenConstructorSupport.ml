@@ -260,7 +260,7 @@ let check checkExpression literal globals locals symbols expected
                           let constructorId, symbols =
                             WrittenCheckingState.internConstructor canonical
                               caseName
-                              (caseTag globals.collidingCases canonical caseName
+                              (caseTag globals.collidingCases globals.types canonical caseName
                                  ordinal)
                               symbols
                           in

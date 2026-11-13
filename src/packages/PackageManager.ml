@@ -22,6 +22,8 @@ type locatedEntity = {
 
 type fetchResult = Found of string | Missing
 
+open StdlibConversions
+
 let ( let* ) = Result.bind
 let ( let+ ) result f = Result.map f result
 
@@ -35,8 +37,14 @@ let message = function
   | Unix.Unix_error (error, _, _) -> Unix.error_message error
   | ex -> Printexc.to_string ex
 
-(* Package expression trees have a finite nesting bound. Raw JSON keeps
-   numeric literal spellings, including integers wider than OCaml's int. *)
+(* Package expression trees have a finite nesting bound. The interpreter's
+   parser caps expressions at depth 200 and each expression level costs
+   several JSON levels ({"EApply":[..., [ ...), and a module inventory wraps
+   bodies in a few more, so the bound must sit well above 4 * 200. Raw JSON
+   keeps numeric literal spellings, including integers wider than OCaml's
+   int. *)
+let maxJsonDepth = 8192
+
 let parse source =
   let depth = ref 0 and quoted = ref false and escaped = ref false in
   String.iter
@@ -50,8 +58,11 @@ let parse source =
         | '"' -> quoted := true
         | '[' | '{' ->
             incr depth;
-            if !depth > 512 then
-              raise (Yojson.Json_error "Package JSON exceeds nesting depth 512")
+            if !depth > maxJsonDepth then
+              raise
+                (Yojson.Json_error
+                   ("Package JSON exceeds nesting depth "
+                   ^ string_of_int maxJsonDepth))
         | ']' | '}' -> decr depth
         | _ -> ())
     source;
@@ -130,20 +141,33 @@ let cacheWrite config key result =
       PackageIO.cacheWrite config.cachePath key status body;
       Ok ())
 
+(* Answers already read from the package server in this process, by URL. One
+   process treats the server as unchanging, so `--check` over many names reads
+   each module listing once rather than once per name; a module listing from an
+   interpreter-sized store takes seconds. Failures are not kept. *)
+let networkAnswers : (string, fetchResult) Hashtbl.t = Hashtbl.create 256
+
 let requestNetwork client config path =
   let uri =
     Uri.to_string
       (Uri.resolve "http" (Uri.of_string config.server) (Uri.of_string path))
   in
-  try
-    let status, body = PackageIO.get client uri in
-    if status >= 200 && status <= 299 then Ok (Found body)
-    else if status = 404 then Ok Missing
-    else
-      Error
-        ("Package server GET " ^ uri ^ " returned " ^ string_of_int status
-       ^ ": " ^ body)
-  with ex -> Error ("Package server GET " ^ uri ^ " failed: " ^ message ex)
+  match Hashtbl.find_opt networkAnswers uri with
+  | Some answer -> Ok answer
+  | None -> (
+      try
+        let status, body = PackageIO.get client uri in
+        let answer =
+          if status >= 200 && status <= 299 then Ok (Found body)
+          else if status = 404 then Ok Missing
+          else
+            Error
+              ("Package server GET " ^ uri ^ " returned "
+             ^ string_of_int status ^ ": " ^ body)
+        in
+        Result.iter (Hashtbl.replace networkAnswers uri) answer;
+        answer
+      with ex -> Error ("Package server GET " ^ uri ^ " failed: " ^ message ex))
 
 let cacheKey config path =
   let rec trim index =
@@ -198,6 +222,12 @@ let numberText = function
   | `Intlit text | `Floatlit text -> Ok text
   | element -> Error ("Expected a number, got " ^ Yojson.Raw.to_string element)
 
+(* A hosted item that uses a language feature this compiler has no lowering for
+   is refused with a reason naming that feature, so a package audit can report
+   "can't compile: uses X" instead of a decoding failure. *)
+let unsupportedFeature feature =
+  Error ("can't compile: uses " ^ feature ^ ", which this compiler does not support")
+
 let argumentIndex = function
   | `Intlit text -> Option.map Int32.to_int (Int32.of_string_opt text)
   | _ -> None
@@ -246,17 +276,84 @@ let locationName element =
       String.concat "." ((owner :: modules) @ [ leaf ])
   | _ -> Error ("Invalid package location: " ^ Yojson.Raw.to_string element)
 
-let resolvedName element =
-  match (tryField "resolved" element, tryField "originalName" element) with
-  | Some resolved, Some originalName -> (
+(* The interpreter's own `__` helpers (`Darklang.Stdlib.Url.__escapesOk`)
+   arrive with the hosted code that calls them, but `__` names are refused
+   in user code here, to keep it off the compiler's internal helpers. A
+   hosted name's `__` segments are rendered as `pkg'__…` (or `Pkg'__…` for a
+   type), which no written
+   name can collide with, both where it is declared and where it is called. *)
+let publicName name =
+  String.split_on_char '.' name
+  |> List.map (fun segment ->
+      if String.length segment >= 2 && String.sub segment 0 2 = "__" then
+        (* A type or module keeps its capital (`Pkg'__ChildBuffer`), so it
+           still reads as one. *)
+        let capital =
+          String.length segment > 2
+          && Char.uppercase_ascii segment.[2] = segment.[2]
+          && Char.lowercase_ascii segment.[2] <> segment.[2]
+        in
+        (if capital then "Pkg'" else "pkg'") ^ segment
+      else segment)
+  |> String.concat "."
+
+let hasInternalSegment name = publicName name <> name
+
+(* The interpreter's name for a hosted `pkg'__` name. *)
+let interpreterName name =
+  String.split_on_char '.' name
+  |> List.map (fun segment ->
+      match String.index_opt segment '\'' with
+      | Some index
+        when (String.sub segment 0 index = "pkg" || String.sub segment 0 index = "Pkg")
+             && String.length segment > index + 2
+             && String.sub segment (index + 1) 2 = "__" ->
+          String.sub segment (index + 1) (String.length segment - index - 1)
+      | _ -> segment)
+  |> String.concat "."
+
+let rec resolvedName element =
+  Result.map publicName (resolvedNameAsWritten element)
+
+and resolvedNameAsWritten element =
+  let writtenBuiltin =
+    match Option.map arrayItems (tryField "originalName" element) with
+    | Some [ owner; name ] -> (
+        match (stringValue owner, stringValue name) with
+        | Ok "Builtin", Ok name -> Some ("Builtin." ^ name)
+        | _ -> None)
+    | _ -> None
+  in
+  match (writtenBuiltin, tryField "resolved" element, tryField "originalName" element) with
+  (* A call written `Builtin.negate` is the builtin, however it was saved: the
+     interpreter can save it resolved to the trait method of the same name,
+     with the calling impl fn itself as the chosen implementation. *)
+  | Some builtin, _, _ -> Ok builtin
+  | None, Some resolved, Some originalName -> (
       let* name, fields = enumCase resolved in
       match (name, fields) with
       | "Ok", [ value ] -> (
+          (* A trait method call resolves to its trait's location; the call
+             names the method under it, `Darklang.Stdlib.Display.display`,
+             and the compiler dispatches it. *)
+          let traitMethod =
+            match Option.map enumCase (tryField "name" value) with
+            | Some (Ok ("TraitMethod", [ method_ ])) -> (
+                match Option.map stringValue (tryField "method_" method_) with
+                | Some (Ok name) -> Some name
+                | _ -> None)
+            | _ -> None
+          in
+          let withMethod name =
+            match traitMethod with
+            | Some method_ -> name ^ "." ^ method_
+            | None -> name
+          in
           match tryField "location" value with
           | Some location -> (
               let* name, fields = enumCase location in
               match (name, fields) with
-              | "Some", [ value ] -> locationName value
+              | "Some", [ value ] -> Result.map withMethod (locationName value)
               | "None", [] ->
                   let+ names =
                     ResultList.mapResults stringValue (arrayItems originalName)
@@ -291,13 +388,23 @@ let rec renderType element =
     | _ -> Error ("Invalid " ^ name ^ " type")
   in
   match (name, fields) with
-  | "TVariable", [ value ] -> stringValue value
+  (* Written with its quote, so a capitalized parameter (`'Ok` in
+     `impl Display for Result<'Ok, 'Err>`) is not read as a type name. *)
+  | "TVariable", [ value ] ->
+      let+ name = stringValue value in
+      if String.starts_with ~prefix:"'" name then name else "'" ^ name
   | ( ( "TUnit" | "TBool" | "TInt8" | "TUInt8" | "TInt16" | "TUInt16" | "TInt32"
       | "TUInt32" | "TInt64" | "TUInt64" | "TInt128" | "TUInt128" | "TInt"
       | "TChar" | "TString" | "TDateTime" | "TUuid" | "TBlob" ),
       [] ) ->
       Ok (String.sub name 1 (String.length name - 1))
+  (* The interpreter renamed Int to BigInt and Blob to Bytes after the pinned
+     revision; the compiler's written syntax keeps the pinned spellings. *)
+  | "TBigInt", [] -> Ok "Int"
+  | "TBytes", [] -> Ok "Blob"
   | "TFloat", [] -> Ok "Float"
+  | "TFloat32", [] -> Ok "Float32"
+  | "TDecimal", [] -> Ok "Decimal"
   | "TStream", _ -> unary "Stream"
   | "TList", _ -> unary "List"
   | "TDB", _ -> unary "DB"
@@ -320,7 +427,7 @@ let rec renderType element =
       let* name = resolvedName name in
       let+ args = ResultList.mapResults renderType (arrayItems typeArgs) in
       name ^ if args = [] then "" else "<" ^ String.concat ", " args ^ ">"
-  | _ -> Error ("Unsupported package type " ^ name)
+  | _ -> unsupportedFeature ("the package type " ^ name)
 
 let rec renderLetPattern element =
   let* name, fields = enumCase element in
@@ -334,11 +441,17 @@ let rec renderLetPattern element =
           (first :: second :: arrayItems rest)
       in
       "(" ^ String.concat ", " values ^ ")"
-  | _ -> Error ("Unsupported package let pattern " ^ name)
+  | _ -> unsupportedFeature ("the let pattern " ^ name)
 
 let scalar suffix value =
   let+ number = numberText value in
   number ^ suffix
+
+let floatText sign whole part =
+  let* sign, _ = enumCase sign in
+  let* whole = stringValue whole in
+  let+ part = stringValue part in
+  (if sign = "Negative" then "-" else "") ^ whole ^ "." ^ part
 
 let rec renderMatchPattern element =
   let* name, fields = enumCase element in
@@ -350,7 +463,7 @@ let rec renderMatchPattern element =
       string_of_bool value
   | "MPInt8", [ _; value ] -> scalar "y" value
   | "MPUInt8", [ _; value ] -> scalar "uy" value
-  | "MPInt16", [ _; value ] -> scalar "s" value
+  | "MPInt16", [ _; value ] -> scalar "s16" value
   | "MPUInt16", [ _; value ] -> scalar "us" value
   | "MPInt32", [ _; value ] -> scalar "l" value
   | "MPUInt32", [ _; value ] -> scalar "ul" value
@@ -358,7 +471,13 @@ let rec renderMatchPattern element =
   | "MPUInt64", [ _; value ] -> scalar "UL" value
   | "MPInt128", [ _; value ] -> scalar "Q" value
   | "MPUInt128", [ _; value ] -> scalar "Z" value
-  | "MPInt", [ _; value ] -> numberText value
+  (* `z` keeps a BigInt a BigInt under either reading of a bare integer. *)
+  | "MPInt", [ _; value ] | "MPBigInt", [ _; value ] -> scalar "z" value
+  | "MPFloat", [ _; sign; whole; part ] -> floatText sign whole part
+  | "MPFloat32", _ -> unsupportedFeature "a Float32 pattern"
+  | "MPDecimal", _ -> unsupportedFeature "a Decimal pattern"
+  | "MPAs", _ -> unsupportedFeature "an `as` pattern"
+  | "MPRecord", _ -> unsupportedFeature "a record pattern"
   | "MPString", [ _; value ] ->
       let+ text = stringValue value in
       quoted text
@@ -391,7 +510,37 @@ let rec renderMatchPattern element =
         ResultList.mapResults renderMatchPattern (arrayItems values)
       in
       String.concat " | " values
-  | _ -> Error ("Unsupported package match pattern " ^ name)
+  | _ -> unsupportedFeature ("the match pattern " ^ name)
+
+(* `P as n`, at any depth, matches as the variable `n`; P is matched against
+   `n` in the arm's guard and again around its body, where P's variables are
+   bound. [splitAs] replaces each `as` with its variable and lists (name, P),
+   outermost first. *)
+let rec splitAs element =
+  match element with
+  | `Assoc [ ("MPAs", `List [ id; inner; name ]) ] ->
+      let inner, nested = splitAs inner in
+      (`Assoc [ ("MPVariable", `List [ id; name ]) ], (name, inner) :: nested)
+  | `Assoc [ (tag, `List fields) ] ->
+      let fields, bindings = List.split (List.map splitAs fields) in
+      (`Assoc [ (tag, `List fields) ], List.concat bindings)
+  | `List items ->
+      let items, bindings = List.split (List.map splitAs items) in
+      (`List items, List.concat bindings)
+  | other -> (other, [])
+
+let rec irrefutablePattern element =
+  match enumCase element with
+  | Ok (("MPVariable" | "MPUnit"), _) -> true
+  | Ok ("MPTuple", [ _; first; second; rest ]) ->
+      List.for_all irrefutablePattern (first :: second :: arrayItems rest)
+  | _ -> false
+
+let rec containsOrWithAs element =
+  match element with
+  | `Assoc [ ("MPOr", `List fields) ] -> snd (splitAs (`List fields)) <> []
+  | `Assoc [ (_, `List fields) ] | `List fields -> List.exists containsOrWithAs fields
+  | _ -> false
 
 let infixText element =
   let* name, fields = enumCase element in
@@ -401,7 +550,7 @@ let infixText element =
       match (name, fields) with
       | "BinOpAnd", [] -> Ok "&&"
       | "BinOpOr", [] -> Ok "||"
-      | _ -> Error ("Unsupported binary operation " ^ name))
+      | _ -> unsupportedFeature ("the binary operation " ^ name))
   | "InfixFnCall", [ operation ] -> (
       let* name, _ = enumCase operation in
       match name with
@@ -410,7 +559,12 @@ let infixText element =
       | "ArithmeticMultiply" -> Ok "*"
       | "ArithmeticDivide" -> Ok "/"
       | "ArithmeticModulo" -> Ok "%"
-      | "ArithmeticPower" -> Ok "^"
+      | "ArithmeticPower" -> Ok "**"
+      | "BitwiseAnd" -> Ok "&"
+      | "BitwiseOr" -> Ok "|"
+      | "BitwiseXor" -> Ok "^"
+      | "ShiftLeft" -> Ok "<<"
+      | "ShiftRight" -> Ok ">>"
       | "ComparisonGreaterThan" -> Ok ">"
       | "ComparisonGreaterThanOrEqual" -> Ok ">="
       | "ComparisonLessThan" -> Ok "<"
@@ -418,19 +572,187 @@ let infixText element =
       | "ComparisonEquals" -> Ok "=="
       | "ComparisonNotEquals" -> Ok "!="
       | "StringConcat" -> Ok "+"
-      | _ -> Error ("Unsupported infix function " ^ name))
-  | _ -> Error ("Unsupported infix " ^ name)
+      | _ -> unsupportedFeature ("the infix operator " ^ name))
+  | _ -> unsupportedFeature ("the infix " ^ name)
+
+(* How a hosted call to `Builtin.<name>` is compiled: as an operator, or as a
+   call to the library fn of the same meaning. *)
+let builtinOperator name =
+  (* Builtins whose pinned counterpart is a library fn of the same arity and
+     meaning. Both hex encoders write uppercase (.NET's ToHexString and the
+     compiler's "0123456789ABCDEF"), and both decoders report .NET's resource
+     keys. *)
+  let renamed =
+    [
+      ("dictContainsKey", "Stdlib.Dict.member");
+      ("dictFromEntries", "Stdlib.Dict.fromList");
+      ("dictToEntries", "Stdlib.Dict.toList");
+      ("bytesConcat", "Stdlib.Blob.concat");
+      ("base16Encode", "Stdlib.Blob.toHex");
+      ("base16Decode", "Stdlib.Blob.fromHex");
+      ("cryptoDigest", "Stdlib.Crypto.digest");
+      ("toRepr", "Stdlib.inspect");
+    ]
+    @ List.map
+        (fun fn ->
+          ( "bigInt" ^ String.capitalize_ascii fn,
+            "Stdlib.Int." ^ fn ))
+        [
+          "fromInt8"; "fromUInt8"; "fromInt16"; "fromUInt16"; "fromInt32";
+          "fromUInt32"; "fromInt64"; "fromUInt64"; "fromInt128"; "fromUInt128";
+          "toInt8"; "toUInt8"; "toInt16"; "toUInt16"; "toInt32"; "toUInt32";
+          "toInt64"; "toUInt64"; "toInt128"; "toUInt128"; "toFloat";
+          "fromFloat"; "sqrt"; "absoluteValue";
+        ]
+  in
+  (* Otherwise `Builtin.<module><Fn>` is the module's `fn`, as the
+     interpreter's own wrappers spell it (`Builtin.stringTrim` is
+     `Stdlib.String.trim`); a module the compiler lacks is reported by name. *)
+  let modules =
+    [
+      ("string", "String"); ("char", "Char"); ("list", "List"); ("dict", "Dict");
+      ("bool", "Bool"); ("uuid", "Uuid"); ("dateTime", "DateTime");
+      ("codepoint", "Codepoint");
+      ("bytes", "Blob"); ("float32", "Float32"); ("decimal", "Decimal");
+      ("int8", "Int8"); ("uint8", "UInt8"); ("int16", "Int16");
+      ("uint16", "UInt16"); ("int32", "Int32"); ("uint32", "UInt32");
+      ("int64", "Int64"); ("uint64", "UInt64"); ("int128", "Int128");
+      ("uint128", "UInt128"); ("float", "Float"); ("bigInt", "Int");
+    ]
+  in
+  let byModule fn =
+    List.find_map
+      (fun (prefix, moduleName) ->
+        let length = String.length prefix in
+        if
+          String.starts_with ~prefix fn
+          && String.length fn > length
+          && Char.uppercase_ascii fn.[length] = fn.[length]
+        then
+          Some
+            (`Call
+               ("Stdlib." ^ moduleName ^ "."
+               ^ String.uncapitalize_ascii
+                   (String.sub fn length (String.length fn - length))))
+        else None)
+      modules
+  in
+  (* The polymorphic operator builtins (`Builtin.add`), which the trait impls
+     over a type call for its own operator. `**` has no 128-bit lowering here,
+     so `power` calls the compiler's Power implementations, which cover every
+     integer width. *)
+  let polymorphicBinary =
+    [
+      ("add", "+"); ("subtract", "-"); ("multiply", "*"); ("divide", "/");
+      ("modulo", "%"); ("lessThan", "<");
+      ("lessThanOrEqualTo", "<="); ("greaterThan", ">");
+      ("greaterThanOrEqualTo", ">="); ("bitwiseAnd", "&"); ("bitwiseOr", "|");
+      ("bitwiseXor", "^"); ("shiftLeft", "<<"); ("shiftRight", ">>");
+    ]
+  in
+  let polymorphicUnary = [ ("negate", "-"); ("bitwiseNot", "~") ] in
+  match String.split_on_char '.' name with
+  | [ "Builtin"; fn ] when List.mem_assoc fn polymorphicBinary ->
+      Some (`Binary (List.assoc fn polymorphicBinary))
+  | [ "Builtin"; fn ] when List.mem_assoc fn polymorphicUnary ->
+      Some (`Unary (List.assoc fn polymorphicUnary))
+  | [ "Builtin"; "power" ] -> Some (`Call "Stdlib.Power.power")
+  | [ "Builtin"; fn ] when List.mem_assoc fn renamed ->
+      Some (`Call (List.assoc fn renamed))
+  | [ "Builtin"; fn ] -> byModule fn
+  | _ -> None
+
+(* The interpreter's reserved words, as its lexer lists them, which it serves
+   as `Builtin.parserKeywords`. *)
+let parserKeywords =
+  [
+    "let"; "val"; "in"; "if"; "elif"; "then"; "else"; "type"; "trait"; "impl";
+    "of"; "match"; "with"; "fun"; "when"; "true"; "false"; "_";
+  ]
+
+let rec convert conversion expression =
+  match conversion with
+  | Widen typ -> "(Stdlib.Int.from" ^ typ ^ " (" ^ expression ^ "))"
+  | Narrow typ ->
+      "(match Stdlib.Int.to" ^ typ ^ " (" ^ expression
+      ^ ") with | Some n' -> n' | None -> Builtin.crash \"Int is out of range for "
+      ^ typ ^ "\")"
+  | OptionOf inner ->
+      "(Stdlib.Option.map (" ^ expression ^ ") (fun v' -> "
+      ^ convert inner "v'" ^ "))"
+  | ResultOf inner ->
+      "(Stdlib.Result.map (" ^ expression ^ ") (fun v' -> "
+      ^ convert inner "v'" ^ "))"
+  | ErrorOf inner ->
+      "(Stdlib.Result.mapError (" ^ expression ^ ") (fun v' -> "
+      ^ convert inner "v'" ^ "))"
+  | Both (first, second) -> convert second (convert first expression)
+  | ListOf inner ->
+      "(Stdlib.List.map (" ^ expression ^ ") (fun v' -> "
+      ^ convert inner "v'" ^ "))"
+  | TupleOf parts ->
+      let names = List.mapi (fun index _ -> "t" ^ string_of_int index ^ "'") parts in
+      "(let (" ^ String.concat ", " names ^ ") = " ^ expression ^ " in ("
+      ^ String.concat ", "
+          (List.map2
+             (fun name part ->
+               match part with Some inner -> convert inner name | None -> name)
+             names parts)
+      ^ "))"
+
+(* A record field named by a keyword (`type`) is written in backticks. *)
+let fieldName name =
+  NameSyntax.formatIdentifier (NameSyntax.identifierFromText name)
 
 let rec renderExpr parameters selfName element =
   let recurse = renderExpr parameters selfName in
   let renderMany = ResultList.mapResults recurse in
-  let application name typeArgs args =
-    let* types = ResultList.mapResults renderType (arrayItems typeArgs) in
-    let+ args = renderMany (arrayItems args) in
+  let rec application ?(offset = 0) name typeArgs args =
+    let* args = renderMany (arrayItems args) in
+    renderedApplication ~offset name typeArgs args
+  and renderedApplication ?(offset = 0) name typeArgs args =
+    let+ types = ResultList.mapResults renderType (arrayItems typeArgs) in
+    let conversions = argumentConversions name in
+    let args =
+      List.mapi
+        (fun index arg ->
+          match List.assoc_opt (index + offset) conversions with
+          | Some conversion -> convert conversion arg
+          | None -> arg)
+        args
+    in
     let applied =
       if types = [] then name else name ^ "<" ^ String.concat ", " types ^ ">"
     in
     applied ^ " (" ^ String.concat ") (" args ^ ")"
+  in
+  let uncalled name =
+    (* An uncalled builtin, as `val empty = Builtin.bytesEmpty` holds one,
+       names the same library item a call to it would. *)
+    let* name = resolvedName name in
+    match (name, builtinOperator name) with
+    | "Builtin.parserKeywords", _ ->
+        Ok
+          ("["
+          ^ String.concat ", " (List.map (fun word -> "\"" ^ word ^ "\"") parserKeywords)
+          ^ "]")
+    | _, Some (`Call fn) -> Ok fn
+    (* One whose arguments convert, passed as a value
+       (`__sleepWith(Builtin.syscallNanosleep, ...)`), is wrapped in a
+       lambda that converts them as a call would. *)
+    | _ when argumentConversions name <> [] ->
+        let arity =
+          1 + List.fold_left (fun top (index, _) -> max top index) 0 (argumentConversions name)
+        in
+        let names = List.init arity (fun index -> "a" ^ string_of_int index ^ "'") in
+        let+ call = renderedApplication name (`List []) names in
+        let call =
+          match resultConversion name with
+          | Some conversion -> convert conversion call
+          | None -> call
+        in
+        "(fun " ^ String.concat " " names ^ " -> " ^ call ^ ")"
+    | _ -> Ok name
   in
   let* name, fields = enumCase element in
   match (name, fields) with
@@ -440,7 +762,7 @@ let rec renderExpr parameters selfName element =
       string_of_bool value
   | "EInt8", [ _; value ] -> scalar "y" value
   | "EUInt8", [ _; value ] -> scalar "uy" value
-  | "EInt16", [ _; value ] -> scalar "s" value
+  | "EInt16", [ _; value ] -> scalar "s16" value
   | "EUInt16", [ _; value ] -> scalar "us" value
   | "EInt32", [ _; value ] -> scalar "l" value
   | "EUInt32", [ _; value ] -> scalar "ul" value
@@ -448,12 +770,18 @@ let rec renderExpr parameters selfName element =
   | "EUInt64", [ _; value ] -> scalar "UL" value
   | "EInt128", [ _; value ] -> scalar "Q" value
   | "EUInt128", [ _; value ] -> scalar "Z" value
-  | "EInt", [ _; value ] -> numberText value
-  | "EFloat", [ _; sign; whole; part ] ->
-      let* sign, _ = enumCase sign in
-      let* whole = stringValue whole in
-      let+ part = stringValue part in
-      (if sign = "Negative" then "-" else "") ^ whole ^ "." ^ part
+  | "EInt", [ _; value ] | "EBigInt", [ _; value ] -> scalar "z" value
+  | "EFloat", [ _; sign; whole; part ] -> floatText sign whole part
+  | "EFloat32", [ _; sign; whole; part ] ->
+      let+ text = floatText sign whole part in
+      "(" ^ text ^ "f32)"
+  (* The value is the JSON number as .NET wrote it, at its scale: 1.10. *)
+  | "EDecimal", [ _; value ] ->
+      let+ text = numberText value in
+      "(" ^ text ^ "dec)"
+  | "EUnwrap", [ _; value ] ->
+      let+ value = recurse value in
+      "(" ^ value ^ ")?"
   | "EChar", [ _; value ] ->
       let+ text = stringValue value in
       "'" ^ replace "'" "\\'" text ^ "'"
@@ -463,11 +791,13 @@ let rec renderExpr parameters selfName element =
         match (name, fields) with
         | "StringText", [ text ] ->
             let+ text = stringValue text in
-            escapedStringContents text
+            (* Strings render interpolated (`$"..."`), where a literal brace
+               is written doubled. *)
+            escapedStringContents text |> replace "{" "{{" |> replace "}" "}}"
         | "StringInterpolation", [ expr ] ->
             let+ text = recurse expr in
             "{" ^ text ^ "}"
-        | _ -> Error ("Unsupported string segment " ^ name)
+        | _ -> unsupportedFeature ("the string segment " ^ name)
       in
       let+ segments = ResultList.mapResults segment (arrayItems segments) in
       "$\"" ^ String.concat "" segments ^ "\""
@@ -479,10 +809,18 @@ let rec renderExpr parameters selfName element =
             Ok (List.nth parameters index)
           else Error ("Invalid package argument index " ^ string_of_int index)
       | None -> Error "Invalid package argument index")
-  | "ESelf", [ _ ] -> Ok selfName
+  | "ESelf", [ _ ] -> Ok (publicName selfName)
   | "EFnName", [ _; name ] | "EFnName", [ _; name; _ ] | "EValue", [ _; name ]
     ->
-      resolvedName name
+      uncalled name
+  (* Since darklang/dark@b928144 an uncalled fn may carry type arguments,
+     `Stdlib.List.map<Int64, Int64>`: the fn as a specialised value. *)
+  | "EFnName", [ _; name; _; typeArgs ] when arrayItems typeArgs = [] ->
+      uncalled name
+  | "EFnName", [ _; name; _; typeArgs ] ->
+      let* name = resolvedName name in
+      let+ types = ResultList.mapResults renderType (arrayItems typeArgs) in
+      if types = [] then name else name ^ "<" ^ String.concat ", " types ^ ">"
   | "EList", [ _; values ] ->
       let+ values = renderMany (arrayItems values) in
       "[" ^ String.concat ", " values ^ "]"
@@ -505,17 +843,30 @@ let rec renderExpr parameters selfName element =
       let* value = recurse value in
       let+ body = recurse body in
       "(let " ^ pattern ^ " = " ^ value ^ " in " ^ body ^ ")"
-  | "EIf", [ _; condition; yes; no ] -> (
-      let* condition = recurse condition in
-      let* yes = recurse yes in
-      let* name, fields = enumCase no in
-      match (name, fields) with
-      | "Some", [ value ] ->
-          let+ no = recurse value in
-          "(if " ^ condition ^ " then " ^ yes ^ " else " ^ no ^ ")"
-      | "None", [] -> Ok ("(if " ^ condition ^ " then " ^ yes ^ ")")
-      | _ -> Error ("Invalid optional else case " ^ name))
-  | "EInfix", [ _; infix; left; right ] ->
+  | "EIf", _ ->
+      (* An else-if chain is written as one, not as nested parentheses, so
+         a long chain (Posix.__fromErrno's) stays within the parser's
+         nesting limit. *)
+      let rec chain element =
+        match enumCase element with
+        | Ok ("EIf", [ _; condition; yes; no ]) -> (
+            let* condition = recurse condition in
+            let* yes = recurse yes in
+            let* name, fields = enumCase no in
+            match (name, fields) with
+            | "Some", [ value ] ->
+                let+ no = chain value in
+                "if " ^ condition ^ " then " ^ yes ^ " else " ^ no
+            | "None", [] -> Ok ("if " ^ condition ^ " then " ^ yes)
+            | _ -> Error ("Invalid optional else case " ^ name))
+        | _ -> recurse element
+      in
+      let+ text = chain element in
+      "(" ^ text ^ ")"
+  (* The trailing field is the saved trait-implementation choice. Operators on
+     the compiler's own types resolve natively, so the choice is not needed. *)
+  | "EInfix", [ _; infix; left; right ] | "EInfix", [ _; infix; left; right; _ ]
+    ->
       let* op = infixText infix in
       let* left = recurse left in
       let+ right = recurse right in
@@ -523,9 +874,26 @@ let rec renderExpr parameters selfName element =
   | "EApply", [ _; fn; typeArgs; args ] -> (
       let* name, fields = enumCase fn in
       match (name, fields) with
-      | "EFnName", [ _; name ] | "EFnName", [ _; name; _ ] ->
+      | "EFnName", [ _; name ] | "EFnName", [ _; name; _ ] | "EFnName", [ _; name; _; _ ] -> (
           let* name = resolvedName name in
-          application name typeArgs args
+          match (builtinOperator name, arrayItems args) with
+          | Some (`Binary op), [ left; right ] ->
+              let* left = recurse left in
+              let+ right = recurse right in
+              "(" ^ left ^ " " ^ op ^ " " ^ right ^ ")"
+          | Some (`Unary op), [ value ] ->
+              let+ value = recurse value in
+              "(" ^ op ^ "(" ^ value ^ "))"
+          | Some (`Call fn), _ -> (
+              match resultConversion fn with
+              | Some conversion ->
+                  Result.map (convert conversion) (application fn typeArgs args)
+              | None -> application fn typeArgs args)
+          | _ -> (
+              match resultConversion name with
+              | Some conversion ->
+                  Result.map (convert conversion) (application name typeArgs args)
+              | None -> application name typeArgs args))
       | _ ->
           let* fn = recurse fn in
           application ("(" ^ fn ^ ")") typeArgs args)
@@ -543,7 +911,7 @@ let rec renderExpr parameters selfName element =
         | [ name; value ] ->
             let* name = stringValue name in
             let+ value = recurse value in
-            name ^ " = " ^ value
+            fieldName name ^ " = " ^ value
         | _ -> Error "Invalid package record field"
       in
       let+ fields = ResultList.mapResults field (arrayItems values) in
@@ -554,14 +922,14 @@ let rec renderExpr parameters selfName element =
   | "ERecordFieldAccess", [ _; record; field ] ->
       let* record = recurse record in
       let+ field = stringValue field in
-      "(" ^ record ^ ")." ^ field
+      "(" ^ record ^ ")." ^ fieldName field
   | "ERecordUpdate", [ _; record; updates ] ->
       let update element =
         match arrayItems element with
         | [ name; value ] ->
             let* name = stringValue name in
             let+ value = recurse value in
-            name ^ " = " ^ value
+            fieldName name ^ " = " ^ value
         | _ -> Error "Invalid package record update"
       in
       let* record = recurse record in
@@ -581,26 +949,60 @@ let rec renderExpr parameters selfName element =
             tryField "rhs" element )
         with
         | Some pattern, Some guard, Some body -> (
-            let* pattern = renderMatchPattern pattern in
+            let* () =
+              if containsOrWithAs pattern then
+                unsupportedFeature "an `as` pattern inside an or-pattern"
+              else Ok ()
+            in
+            let stripped, bindings = splitAs pattern in
+            let* pattern = renderMatchPattern stripped in
+            let* bindings =
+              ResultList.mapResults
+                (fun (name, inner) ->
+                  let* name = stringValue name in
+                  let+ text = renderMatchPattern inner in
+                  (name, text, irrefutablePattern inner))
+                bindings
+            in
+            (* Matches each `as` pattern around <inner>, innermost last. *)
+            let within inner fallback =
+              List.fold_right
+                (fun (name, text, irrefutable) inner ->
+                  "(match " ^ name ^ " with | " ^ text ^ " -> " ^ inner
+                  ^ (if irrefutable then "" else " | _ -> " ^ fallback)
+                  ^ ")")
+                bindings inner
+            in
+            let refutable =
+              List.exists (fun (_, _, irrefutable) -> not irrefutable) bindings
+            in
             let* name, fields = enumCase guard in
-            match (name, fields) with
-            | "None", [] ->
-                let+ body = recurse body in
-                "| " ^ pattern ^ " -> " ^ body
-            | "Some", [ condition ] ->
-                let* guard = recurse condition in
-                let+ body = recurse body in
-                "| " ^ pattern ^ " when " ^ guard ^ " -> " ^ body
-            | _ -> Error ("Invalid match guard " ^ name))
+            let* guard =
+              match (name, fields) with
+              | "None", [] -> Ok None
+              | "Some", [ condition ] -> Result.map Option.some (recurse condition)
+              | _ -> Error ("Invalid match guard " ^ name)
+            in
+            let+ body = recurse body in
+            let body =
+              within body "Builtin.crash \"an as-pattern arm was taken without its pattern\""
+            in
+            match guard with
+            | None when not refutable -> "| " ^ pattern ^ " -> " ^ body
+            | None -> "| " ^ pattern ^ " when " ^ within "true" "false" ^ " -> " ^ body
+            | Some guard ->
+                "| " ^ pattern ^ " when " ^ within guard "false" ^ " -> " ^ body)
         | _ -> Error "Invalid package match case"
       in
       let* argument = recurse argument in
       let+ cases = ResultList.mapResults case (arrayItems cases) in
       "(match " ^ argument ^ " with " ^ String.concat " " cases ^ ")"
+  (* `;` after a parenthesised let does not parse here; a discarded binding
+     sequences the same way. *)
   | "EStatement", [ _; first; next ] ->
       let* first = recurse first in
       let+ next = recurse next in
-      "(" ^ first ^ "; " ^ next ^ ")"
+      "(let _ = " ^ first ^ " in " ^ next ^ ")"
   | "EPipe", [ _; initial; parts ] ->
       let part element =
         let* name, fields = enumCase element in
@@ -616,14 +1018,15 @@ let rec renderExpr parameters selfName element =
             in
             let+ body = recurse body in
             "fun " ^ String.concat " " patterns ^ " -> " ^ body
-        | "EPipeInfix", [ _; infix; argument ] ->
+        | "EPipeInfix", [ _; infix; argument ]
+        | "EPipeInfix", [ _; infix; argument; _ ] ->
             let* op = infixText infix in
             let+ argument = recurse argument in
             "(" ^ op ^ ") (" ^ argument ^ ")"
         | "EPipeFnCall", [ _; name; typeArgs; args ]
         | "EPipeFnCall", [ _; name; typeArgs; args; _ ] ->
             let* name = resolvedName name in
-            if arrayItems args <> [] then application name typeArgs args
+            if arrayItems args <> [] then application ~offset:1 name typeArgs args
             else
               let+ types =
                 ResultList.mapResults renderType (arrayItems typeArgs)
@@ -637,12 +1040,44 @@ let rec renderExpr parameters selfName element =
             name ^ "." ^ leaf
             ^
             if values = [] then "" else " (" ^ String.concat ") (" values ^ ")"
-        | _ -> Error ("Unsupported package pipe part " ^ name)
+        | _ -> unsupportedFeature ("the pipe part " ^ name)
+      in
+      (* A call whose types differ between the two stdlibs takes the piped
+         value as argument 0, bound to `piped'`, and converts both ways. *)
+      let stage piped element =
+        let converted =
+          match enumCase element with
+          | Ok
+              ( ("EPipeFnCall" as _kind),
+                ( [ _; name; typeArgs; args ] | [ _; name; typeArgs; args; _ ] ) )
+            -> (
+              match resolvedName name with
+              | Ok name
+                when argumentConversions name <> []
+                     || Option.is_some (resultConversion name) ->
+                  Some (name, typeArgs, args)
+              | _ -> None)
+          | _ -> None
+        in
+        match converted with
+        | Some (name, typeArgs, args) ->
+            let* args = renderMany (arrayItems args) in
+            let+ call = renderedApplication name typeArgs ("piped'" :: args) in
+            let call =
+              match resultConversion name with
+              | Some conversion -> convert conversion call
+              | None -> call
+            in
+            "(let piped' = " ^ piped ^ " in " ^ call ^ ")"
+        | None ->
+            let+ part = part element in
+            "(" ^ piped ^ " |> " ^ part ^ ")"
       in
       let* initial = recurse initial in
-      let+ parts = ResultList.mapResults part (arrayItems parts) in
-      "(" ^ String.concat " |> " (initial :: parts) ^ ")"
-  | _ -> Error ("Unsupported package expression " ^ name)
+      List.fold_left
+        (fun piped element -> Result.bind piped (fun piped -> stage piped element))
+        (Ok initial) (arrayItems parts)
+  | _ -> unsupportedFeature ("the expression " ^ name)
 
 let parseLocatedEntity kind hash json =
   try
@@ -782,7 +1217,8 @@ let renderEntity entity =
         match List.rev parts with
         | [] | [ _ ] -> Error ("Invalid package location " ^ entity.location)
         | leaf :: reversedModule -> (
-            let moduleName = String.concat "." (List.rev reversedModule) in
+            let leaf = publicName leaf in
+            let moduleName = publicName (String.concat "." (List.rev reversedModule)) in
             let prefix body =
               {
                 name = "package:" ^ entity.location ^ "@" ^ entity.hash;
@@ -934,7 +1370,7 @@ let renderEntity entity =
                               | Some name, Some typ ->
                                   let* name = stringValue name in
                                   let+ typ = renderType typ in
-                                  name ^ ": " ^ typ
+                                  fieldName name ^ ": " ^ typ
                               | _ -> Error "Invalid package record field"
                             in
                             let+ fields =
@@ -968,9 +1404,12 @@ let renderEntity entity =
                             let+ cases =
                               ResultList.mapResults case (arrayItems cases)
                             in
-                            prefix (head ^ String.concat " | " cases)
+                            (* The leading bar keeps `type Overflow = | Overflow`
+                               an enum; without it a case named like its type
+                               reads as an alias of itself. *)
+                            prefix (head ^ "| " ^ String.concat " | " cases)
                         | _ ->
-                            Error ("Unsupported package type definition " ^ name)
+                            unsupportedFeature ("the type definition " ^ name)
                         )
                     | _ ->
                         Error
@@ -989,6 +1428,32 @@ let candidatePrefixes isKnownName names =
         (fun index ->
           String.concat "."
             (List.filteri (fun i _ -> i < List.length parts - index) parts)))
+  |> distinct
+
+(* Browsing descends this many module levels below a module it was asked
+   about: enough for WrittenTypes.implMemberPath, which places an
+   implementation at <module>[.<Type>].<Trait>, without walking a whole
+   package tree for every name. *)
+let browseDepth = 2
+
+(* Where a written name's declaration can live: the name itself (a leaf, or
+   a module) and its parent (the module of a function, or the type or trait
+   of a case or method). Browsing a leaf, or a listing with nothing in it,
+   continues at its parent, which is how a method's trait module is reached.
+   Owners and other distant prefixes are never browsed for their own sake:
+   their subtrees hold the whole package tree. *)
+let nearbyModules isKnownName names =
+  names
+  |> List.filter (fun name -> not (isKnownName name))
+  |> List.concat_map (fun name ->
+      let parts = String.split_on_char '.' name in
+      let count = List.length parts in
+      List.filter_map
+        (fun drop ->
+          if count - drop < 1 then None
+          else Some (String.concat "." (List.take (count - drop) parts), 0))
+        [ 0; 1 ])
+  |> List.filter (fun (name, _) -> not (isKnownName name))
   |> distinct
 
 let escapeDataString text =
@@ -1018,7 +1483,20 @@ let parseModuleInventory moduleName json =
                 ResultList.mapResults stringValue (arrayItems parts)
               in
               let name = String.concat "." parts in
-              if String.starts_with ~prefix:(moduleName ^ ".") name then Ok name
+              (* The interpreter resolves `Stdlib.X` inside its own owner, so
+                 the children of a module asked for without the owner come
+                 back owner-qualified: `Darklang.Stdlib.X.Tests`. *)
+              let ownerQualified =
+                match parts with
+                | _owner :: rest ->
+                    String.starts_with ~prefix:(moduleName ^ ".")
+                      (String.concat "." rest)
+                | [] -> false
+              in
+              if
+                String.starts_with ~prefix:(moduleName ^ ".") name
+                || ownerQualified
+              then Ok name
               else Error ("Invalid package child module '" ^ name ^ "'"))
             (arrayItems modules)
         in
@@ -1087,11 +1565,32 @@ let parseBrowserTraitLeaf location json =
         [ entity ]
   with ex -> Error ("Invalid package browser trait item: " ^ message ex)
 
+(* The module that holds an item: its location without the leaf. *)
 let packageModule location =
   let parts = String.split_on_char '.' location in
-  String.concat "." (List.take (min 2 (max 1 (List.length parts - 1))) parts)
+  String.concat "." (List.take (max 1 (List.length parts - 1)) parts)
 
 let resolveNames config resolutionEnv knownTraits names =
+  (* NameResolution reads `Stdlib.X` as `Darklang.Stdlib.X`, as the
+     interpreter does; look the owner-qualified name up too, so a Stdlib item
+     the compiler does not embed is fetched under its package location. *)
+  let names =
+    distinct
+      (names
+      @ List.filter_map
+          (fun name ->
+            if String.starts_with ~prefix:"Stdlib." name then
+              Some ("Darklang." ^ name)
+            else None)
+          names
+      (* A `pkg'__` name (a --check of an interpreter helper) is fetched
+         under the interpreter's `__` name. *)
+      @ List.filter_map
+          (fun name ->
+            let original = interpreterName name in
+            if original <> name then Some original else None)
+          names)
+  in
   let client = PackageIO.create () in
   Fun.protect
     ~finally:(fun () -> PackageIO.dispose client)
@@ -1120,6 +1619,10 @@ let resolveNames config resolutionEnv knownTraits names =
       in
       let shadowedModules = ref StringOrder.Set.empty in
       let rec browse modules visited inventory =
+        let below depth names =
+          if depth >= browseDepth then []
+          else List.map (fun name -> (name, depth + 1)) names
+        in
         match modules with
         | [] ->
             (* WrittenTypes.implMemberPath fixes impl locations as
@@ -1146,10 +1649,11 @@ let resolveNames config resolutionEnv knownTraits names =
                   not (StringOrder.Set.mem name visited))
             in
             if probes = [] then Ok (visited, inventory)
-            else browse probes visited inventory
-        | name :: rest when StringOrder.Set.mem name visited ->
+            else
+              browse (List.map (fun name -> (name, 0)) probes) visited inventory
+        | (name, _) :: rest when StringOrder.Set.mem name visited ->
             browse rest visited inventory
-        | name :: rest -> (
+        | (name, depth) :: rest -> (
             let visited = StringOrder.Set.add name visited in
             match findByName client config ("/" ^ escapeDataString name) with
             | Error _ | Ok Missing -> browse rest visited inventory
@@ -1157,7 +1661,15 @@ let resolveNames config resolutionEnv knownTraits names =
                 let* parsed = parseModuleInventory name json in
                 let* entities, children =
                   match parsed with
-                  | Some inventory -> Ok inventory
+                  | Some ([], []) ->
+                      (* An empty listing names no module: what the name means
+                         lives in its parent, as for a leaf. *)
+                      let parent =
+                        String.split_on_char '.' name
+                        |> List.rev |> List.tl |> List.rev |> String.concat "."
+                      in
+                      Ok ([], if parent = "" then [] else [ (parent, depth) ])
+                  | Some (entities, children) -> Ok (entities, below depth children)
                   | None ->
                       let* entities = parseBrowserTraitLeaf name json in
                       if entities = [] then
@@ -1180,9 +1692,11 @@ let resolveNames config resolutionEnv knownTraits names =
                         String.split_on_char '.' name
                         |> List.rev |> List.tl |> List.rev |> String.concat "."
                       in
+                      (* A leaf's siblings sit at the leaf's own depth. *)
                       Ok
                         ( entities,
-                          children @ if parent = "" then [] else [ parent ] )
+                          below depth children
+                          @ if parent = "" then [] else [ (parent, depth) ] )
                 in
                 let* inventory =
                   List.fold_left
@@ -1214,7 +1728,7 @@ let resolveNames config resolutionEnv knownTraits names =
                   | Missing -> Ok []
                   | Found json ->
                       let+ hash = parseHashJson json in
-                      [ (kind, hash) ])
+                      [ (kind, hash, name) ])
                 allKinds)
             (List.filter
                (fun name -> not (isKnownName name))
@@ -1241,7 +1755,7 @@ let resolveNames config resolutionEnv knownTraits names =
             let* browsed, inventory =
               match name with
               | Some name when not (StringOrder.Map.mem hash inventory) ->
-                  browse [ packageModule name ] browsed inventory
+                  browse [ (packageModule name, 0) ] browsed inventory
               | _ -> Ok (browsed, inventory)
             in
             let* entity =
@@ -1251,14 +1765,16 @@ let resolveNames config resolutionEnv knownTraits names =
                   match kind with
                   | Some kind -> fetchLocated kind hash
                   | None ->
-                      let attempts =
-                        List.map (fun kind -> fetchLocated kind hash) allKinds
-                      in
+                      (* Each kind is asked in turn until one has the hash;
+                         against the interpreter every miss costs a request. *)
                       Ok
                         (List.find_map
-                           (function
-                             | Ok (Some entity) -> Some entity | _ -> None)
-                           attempts))
+                           (fun kind ->
+                             match fetchLocated kind hash with
+                             | Ok (Some entity) -> Some entity
+                             | _ -> None)
+                           [ PackageFunction; PackageType; PackageValue;
+                             PackageImpl; PackageTrait ]))
             in
             match entity with
             | None -> Error ("Package dependency " ^ hash ^ " was not found")
@@ -1267,7 +1783,10 @@ let resolveNames config resolutionEnv knownTraits names =
                 let next =
                   List.filter_map
                     (fun (hash, name) ->
-                      if isKnownName name then None
+                      (* A hosted `__` helper is fetched even when the
+                         compiler has one of the same name: it is rendered
+                         under its `pkg'` name. *)
+                      if isKnownName name && not (hasInternalSegment name) then None
                       else Some (None, hash, Some name))
                     dependencies
                 in
@@ -1291,10 +1810,11 @@ let resolveNames config resolutionEnv knownTraits names =
       in
       let* browsed, inventory =
         browse
-          (List.map packageModule candidates |> distinct)
+          (nearbyModules isKnownName names)
           StringOrder.Set.empty StringOrder.Map.empty
       in
-      let* roots = findRoots () in
+      let* namedRoots = findRoots () in
+      let roots = List.map (fun (kind, hash, _) -> (kind, hash)) namedRoots in
       let inventoryRoots =
         StringOrder.Map.bindings inventory
         |> List.filter_map (fun (hash, entity) ->
@@ -1319,7 +1839,9 @@ let resolveNames config resolutionEnv knownTraits names =
         List.map (fun entity -> packageModule entity.location) rootEntities
         |> distinct
       in
-      let* browsed, inventory = browse modules browsed inventory in
+      let* browsed, inventory =
+        browse (List.map (fun name -> (name, 0)) modules) browsed inventory
+      in
       let inventory =
         List.fold_left
           (fun inventory entity ->
@@ -1342,7 +1864,167 @@ let resolveNames config resolutionEnv knownTraits names =
           @ discovered)
           StringOrder.Set.empty browsed inventory []
       in
-      ResultList.mapResults renderEntity entities)
+      (* Trait implementations are loaded by discovery, beside whatever the
+         roots need; one of them over a type this compiler lacks (an impl for
+         Decimal, say) must not fail a program that never uses it. What the
+         roots reach by reference still fails with its reason. *)
+      let byHash =
+        List.fold_left
+          (fun map entity -> StringOrder.Map.add entity.hash entity map)
+          StringOrder.Map.empty entities
+      in
+      let rec reach seen = function
+        | [] -> seen
+        | hash :: rest when StringOrder.Set.mem hash seen -> reach seen rest
+        | hash :: rest -> (
+            let seen = StringOrder.Set.add hash seen in
+            match StringOrder.Map.find_opt hash byHash with
+            | None -> reach seen rest
+            | Some entity ->
+                let next =
+                  match dependencyRefs entity.json with
+                  | Ok refs -> List.map fst refs
+                  | Error _ -> []
+                in
+                reach seen (next @ rest))
+      in
+      let needed =
+        reach StringOrder.Set.empty
+          (List.map (fun entity -> entity.hash) rootEntities)
+      in
+      (* A discovered implementation of a trait the compiler already has, for
+         a type it already has, duplicates the compiler's own: the
+         interpreter's `Int64.Display` beside the embedded one makes every
+         Display call on Int64 ambiguous. Those are left out. *)
+      (* Checking `Decimal.Add.add` makes the impl around it a root too; it
+         still duplicates the compiler's, and its methods compile as fns. *)
+      let referenced =
+        reach StringOrder.Set.empty
+          (List.filter_map
+             (fun entity ->
+               if entity.kind = PackageImpl then None else Some entity.hash)
+             rootEntities)
+      in
+      let duplicatesEmbedded entity =
+        (* A trait the compiler declares under the same name (the
+           interpreter's own Darklang.Stdlib.BitwiseXor, listed beside a
+           Darklang.Stdlib fn) is the compiler's: a second declaration
+           would clash, and calls name it either way. *)
+        (entity.kind = PackageTrait && isKnownName entity.location)
+        || entity.kind = PackageImpl
+        && (not (StringOrder.Set.mem entity.hash referenced))
+        &&
+        match tryField "entity" (parse entity.json) with
+        | None -> false
+        | Some value -> (
+            match (tryField "trait_" value, tryField "self" value) with
+            | Some trait_, Some self -> (
+                match (resolvedName trait_, renderType self) with
+                | Ok trait_, Ok self ->
+                    let base =
+                      match String.index_opt self '<' with
+                      | Some index -> String.sub self 0 index
+                      | None -> self
+                    in
+                    isKnownName trait_
+                    && (not (String.contains base '.') || isKnownName base)
+                | _ -> false)
+            | _ -> false)
+      in
+      let entities =
+        List.filter (fun entity -> not (duplicatesEmbedded entity)) entities
+      in
+      (* The method fns of an implementation left out above went with it:
+         a fn stays only when the roots or a kept trait or impl reach it. *)
+      let reachable =
+        reach StringOrder.Set.empty
+          (List.map (fun entity -> entity.hash) rootEntities
+          @ List.filter_map
+              (fun entity ->
+                if entity.kind = PackageImpl || entity.kind = PackageTrait then
+                  Some entity.hash
+                else None)
+              entities)
+      in
+      let entities =
+        List.filter
+          (fun entity ->
+            entity.kind <> PackageFunction
+            || StringOrder.Set.mem entity.hash reachable)
+          entities
+      in
+      let* rendered =
+        ResultList.mapResults
+          (fun entity ->
+            match renderEntity entity with
+            | Ok source -> Ok (Some source)
+            | Error message
+              when (not (StringOrder.Set.mem entity.hash needed))
+                   && Text.contains message "can't compile: " ->
+                Ok None
+            | Error message -> Error message)
+          entities
+      in
+      (* Equal type declarations share a hash, so one hash can have several
+         names: ProgramTypes.TypeDeclaration.RecordField and
+         ProgramTypes.PackageFn.Parameter are one record. The entity arrives
+         under one of them; every other name the code uses is declared as an
+         alias of it. Equal fns share a hash too, and one is written again
+         under each other name, a root's name included. *)
+      let declared =
+        List.fold_left
+          (fun names entity -> StringOrder.Set.add entity.location names)
+          StringOrder.Set.empty entities
+      in
+      let aliases =
+        List.concat_map
+          (fun entity ->
+            match dependencyRefs entity.json with Ok refs -> refs | Error _ -> [])
+          entities
+        @ List.map (fun (_, hash, name) -> (hash, name)) namedRoots
+        |> List.filter_map (fun (hash, name) ->
+            match StringOrder.Map.find_opt hash byHash with
+            | Some target
+              when (target.kind = PackageType || target.kind = PackageFunction)
+                   && (not (StringOrder.Set.mem name declared))
+                   && (not (isKnownName name))
+                   && List.length (String.split_on_char '.' name) > 1 ->
+                Some (name, target)
+            | _ -> None)
+        |> List.sort_uniq (fun (a, _) (b, _) -> String.compare a b)
+      in
+      let* aliasSources =
+        ResultList.mapResults
+          (fun (name, target) ->
+            if target.kind = PackageFunction then
+              renderEntity { target with location = name }
+            else
+            let parts = String.split_on_char '.' name in
+            let leaf = publicName (List.hd (List.rev parts)) in
+            let moduleName =
+              publicName (String.concat "." (List.rev (List.tl (List.rev parts))))
+            in
+            let* types =
+              match
+                Option.bind (tryField "entity" (parse target.json)) (fun value ->
+                    tryField "declaration" value)
+              with
+              | Some declaration -> (
+                  match tryField "typeParams" declaration with
+                  | Some params -> renderTypeParameters params None
+                  | None -> Ok "")
+              | None -> Ok ""
+            in
+            Ok
+              {
+                name = "package:" ^ name ^ "@" ^ target.hash;
+                source =
+                  "module " ^ moduleName ^ "\ntype " ^ leaf ^ types ^ " = "
+                  ^ publicName target.location ^ types;
+              })
+          aliases
+      in
+      Ok (List.filter_map Fun.id rendered @ aliasSources))
 
 let resolveWritten ?(knownTraits = []) config resolutionEnv units =
   let* names = WrittenSource.qualifiedNames units in

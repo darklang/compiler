@@ -26,23 +26,23 @@ test sum =
 
 test toString =
   Stdlib.Test.all
-    [ Stdlib.toString 0L |> Stdlib.Test.equal "0"
-      Stdlib.toString 1L |> Stdlib.Test.equal "1"
-      Stdlib.toString -1L |> Stdlib.Test.equal "-1"
+    [ Stdlib.display 0L |> Stdlib.Test.equal "0"
+      Stdlib.display 1L |> Stdlib.Test.equal "1"
+      Stdlib.display -1L |> Stdlib.Test.equal "-1"
       // int63 lower limit
-      Stdlib.toString -4611686018427387904L
+      Stdlib.display -4611686018427387904L
       |> Stdlib.Test.equal "-4611686018427387904"
       // past the int63 upper limit"
-      Stdlib.toString -4611686018427387905L
+      Stdlib.display -4611686018427387905L
       |> Stdlib.Test.equal "-4611686018427387905"
       // .NET lower limit
-      Stdlib.toString -9223372036854775808L
+      Stdlib.display -9223372036854775808L
       |> Stdlib.Test.equal "-9223372036854775808"
       // int63 upper limit
-      Stdlib.toString 4611686018427387903L |> Stdlib.Test.equal "4611686018427387903"
+      Stdlib.display 4611686018427387903L |> Stdlib.Test.equal "4611686018427387903"
       // past the int63 upper limit
-      Stdlib.toString 4611686018427387904L |> Stdlib.Test.equal "4611686018427387904"
+      Stdlib.display 4611686018427387904L |> Stdlib.Test.equal "4611686018427387904"
       // .NET upper limit
-      Stdlib.toString 9223372036854775807L
+      Stdlib.display 9223372036854775807L
       |> Stdlib.Test.equal "9223372036854775807" ]
 

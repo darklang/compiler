@@ -68,6 +68,15 @@ let compileUserWithPlan ?writtenSources (plan : P.userCompilePlan) =
                         |> List.sort_uniq String.compare )
                     plan.P.baseContext.X.typeCheckEnv.Types.resolutionEnv parsed
                 in
+                (* -vv shows each rendered package unit, whose line and
+                   column a diagnostic names. *)
+                if plan.P.verbosity >= 2 then
+                  List.iter
+                    (fun (package : PackageManager.resolvedSource) ->
+                      prerr_endline
+                        ("--- package unit " ^ package.PackageManager.name ^ "\n"
+                       ^ package.PackageManager.source))
+                    packages;
                 let packages =
                   List.map
                     (fun (package : PackageManager.resolvedSource) ->
@@ -593,6 +602,18 @@ let compileUserWithPlan ?writtenSources (plan : P.userCompilePlan) =
           record "Function Tree Shaking" (elapsed () -. before);
           funcs
       in
+      (* Emit functions in name order. The allocated lists follow identity
+         allocation, which numbers names in catalog order and specializations
+         in the order passes create them, so a library function added or
+         removed anywhere would move unrelated helpers in the executable. A
+         name, including its specialization suffix, does not depend on what
+         else the library holds. *)
+      let byName =
+        List.stable_sort (fun (left : LIR.functionDef) (right : LIR.functionDef) ->
+            StringOrder.compare left.LIR.name right.LIR.name)
+      in
+      let stdlib = byName stdlib in
+      let finalUser = byName finalUser in
       let prebuilt =
         List.map (fun (func : LIR.functionDef) -> func.LIR.name) stdlib
         |> S.of_list

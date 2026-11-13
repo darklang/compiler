@@ -20,7 +20,7 @@ type grammar = {
    The bitwise levels follow Python's order rather than C's: they bind TIGHTER
    than the comparisons, so `a & b == c` is `(a & b) == c` and not C's
    `a & (b == c)`. Every pre-existing operator keeps its relative position.
-   `@` desugars to `Stdlib.List.append` (there is no WT infix for it); `**` is
+   `@` desugars to `Stdlib.List.concat` (there is no WT infix for it); `**` is
    exponentiation and nests right: `2 ** 3 ** 2 = 2 ** (3 ** 2)`.
 *)
 let infixBindingPower = function
@@ -90,7 +90,7 @@ and parseInfixRhs grammar state minimum first next =
                        ({ WT.range = opRange; name = "Stdlib" }, opRange);
                        ({ WT.range = opRange; name = "List" }, opRange);
                      ];
-                   fn = { WT.range = opRange; name = "append" };
+                   fn = { WT.range = opRange; name = "concat" };
                  }
                in
                WT.EApply
@@ -169,11 +169,38 @@ and parsePrefixBuiltin grammar state index builtinName =
 and parseApp grammar state index =
   let callee, next = parseAtom grammar state index in
   let args = RevBuffer.create () and stop = ref next in
-  (match callee with
-  | WT.EEnum (_, _, _, [], _)
-    when tok state next = TLParen && offsideContinues state index next ->
-      stop := parseCtorParenFields grammar state next args
-  | _ -> ());
+  let parenList =
+    match callee with
+    | WT.EEnum (_, _, _, [], _)
+      when tok state next = TLParen && offsideContinues state index next ->
+        stop := parseCtorParenFields grammar state next args;
+        true
+    (* The interpreter's call syntax since darklang/dark@74dca94: a paren list
+       written against the callee, `f(a, b)`, passes each element as its own
+       argument, and `f()` passes unit. A spaced `f (a, b)` still passes one
+       tuple, and juxtaposed arguments still apply, so sources in the earlier
+       syntax keep their meaning. *)
+    | WT.EVariable _ | WT.EFnName _
+      when tok state next = TLParen
+           && (rng state next).start = (WT.exprRange callee).end_ ->
+        stop := parseCtorParenFields grammar state next args;
+        true
+    (* The same holds for a parenthesized function value, such as the operator
+       section in `(==)(a, b)` or `(fun(a, b) -> a + b)(1, 2)`. *)
+    | WT.ELambda _
+      when tok state next = TLParen
+           && (rng state (next - 1)).end_ = (rng state next).start ->
+        stop := parseCtorParenFields grammar state next args;
+        true
+    | _ -> false
+  in
+  (* `f(x)?` and `f(x).field` unwrap or select from the call's result, as in
+     the interpreter. *)
+  let postfixFollows =
+    parenList
+    && (match tok state !stop with TQuestion | TDot -> true | _ -> false)
+    && (rng state (!stop - 1)).end_ = (rng state !stop).start
+  in
   let accepts =
     match callee with
     | WT.EVariable _ | WT.EFnName _ | WT.EApply _ | WT.EUnwrap _
@@ -182,7 +209,7 @@ and parseApp grammar state index =
         true
     | _ -> false
   in
-  if accepts then
+  if accepts && not postfixFollows then
     while
       (canStartAtom (tok state !stop) || isNegLitArg state !stop)
       && offsideContinues state index !stop
@@ -191,6 +218,7 @@ and parseApp grammar state index =
       RevBuffer.add args value;
       stop := after
     done;
+  let applied, stop =
   if RevBuffer.length args = 0 then (callee, !stop)
   else
     let ending =
@@ -217,6 +245,8 @@ and parseApp grammar state index =
         ( WT.EApply
             (span (WT.exprRange lhs) ending, lhs, [], RevBuffer.toList args),
           !stop )
+  in
+  if postfixFollows then parsePostfix state applied stop else (applied, stop)
 
 and parseAtom grammar state index =
   let value, next = grammar.parsePrimary state index in
@@ -250,7 +280,7 @@ and parsePostfix state value index =
         (WT.ERecordFieldAccess
            (span (WT.exprRange value) field, value, (field, name), dot))
         (index + 2)
-  | TDot, TInt _ when digits (txt state (index + 1)) ->
+  | TDot, (TInt _ | TInt64 _) when digits (txt state (index + 1)) ->
       parsePostfix state
         (access (rng state index)
            (rng state (index + 1))

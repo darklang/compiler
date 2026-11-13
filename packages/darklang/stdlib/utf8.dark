@@ -1,0 +1,85 @@
+// Stdlib.Utf8.dark - the interpreter's Utf8 module over the String/Blob conversions.
+
+module Darklang.Stdlib.Utf8
+
+/// Encodes <param s> as UTF-8.
+let encode (s: String) : Blob = Stdlib.String.toBlob s
+
+/// Decodes <param bytes> as UTF-8, or an Error naming where the first invalid
+/// sequence starts and its bytes in hex: `Invalid UTF-8 at byte 1: E2 82`.
+let decode (bytes: Blob) : Stdlib.Result.Result<String, String> =
+    match Stdlib.String.fromBlob bytes with
+    | Some s -> Ok s
+    | None ->
+        let index = Stdlib.Utf8.__firstInvalid bytes 0L (Stdlib.Blob.__byteLength bytes) in
+        let length = Stdlib.Utf8.__validPrefix bytes index (Stdlib.Blob.__byteLength bytes) in
+        Error
+            ("Invalid UTF-8 at byte "
+             + Stdlib.Int64.toString index
+             + ": "
+             + Stdlib.Utf8.__spacedBytes bytes index (index + length))
+
+let __hexDigit (value: Int64) : String =
+    match value with
+    | 10L -> "A"
+    | 11L -> "B"
+    | 12L -> "C"
+    | 13L -> "D"
+    | 14L -> "E"
+    | 15L -> "F"
+    | _ -> Stdlib.Int64.toString value
+
+let __spacedBytes (bytes: Blob) (index: Int64) (stop: Int64) : String =
+    if index >= stop then ""
+    else
+        let byte = Stdlib.Blob.__getByte bytes index in
+        let separator = if index + 1L < stop then " " else "" in
+        Stdlib.Utf8.__hexDigit (byte / 16L) + Stdlib.Utf8.__hexDigit (byte % 16L) + separator
+        + Stdlib.Utf8.__spacedBytes bytes (index + 1L) stop
+
+// The bytes a lead byte needs after it (0 for ASCII, -1 for a byte that cannot
+// start a sequence), and the range its first continuation byte must fall in.
+let __continuations (lead: Int64) : Int64 =
+    if lead < 128L then 0L
+    else if lead < 194L then -1L
+    else if lead < 224L then 1L
+    else if lead < 240L then 2L
+    else if lead < 245L then 3L
+    else -1L
+
+let __firstLow (lead: Int64) : Int64 =
+    if lead == 224L then 160L else if lead == 240L then 144L else 128L
+
+let __firstHigh (lead: Int64) : Int64 =
+    if lead == 237L then 159L else if lead == 244L then 143L else 191L
+
+// How many bytes from index form the longest start of a well-formed sequence
+// (the maximal subpart), and whether that is the whole sequence.
+let __validPrefix (bytes: Blob) (index: Int64) (size: Int64) : Int64 =
+    let lead = Stdlib.Blob.__getByte bytes index in
+    let needed = Stdlib.Utf8.__continuations lead in
+    if needed <= 0L then 1L
+    else Stdlib.Utf8.__countContinuations bytes lead (index + 1L) size needed 1L
+
+let __countContinuations (bytes: Blob) (lead: Int64) (index: Int64) (size: Int64) (needed: Int64) (taken: Int64) : Int64 =
+    if taken > needed || index >= size then taken
+    else
+        let byte = Stdlib.Blob.__getByte bytes index in
+        let low = if taken == 1L then Stdlib.Utf8.__firstLow lead else 128L in
+        let high = if taken == 1L then Stdlib.Utf8.__firstHigh lead else 191L in
+        if byte < low || byte > high then taken
+        else Stdlib.Utf8.__countContinuations bytes lead (index + 1L) size needed (taken + 1L)
+
+// The index of the first byte that does not start a well-formed sequence.
+let __firstInvalid (bytes: Blob) (index: Int64) (size: Int64) : Int64 =
+    if index >= size then size
+    else
+        let lead = Stdlib.Blob.__getByte bytes index in
+        let needed = Stdlib.Utf8.__continuations lead in
+        if needed < 0L then index
+        else
+            let length = Stdlib.Utf8.__validPrefix bytes index size in
+            if length == needed + 1L then Stdlib.Utf8.__firstInvalid bytes (index + length) size else index
+
+/// Decodes <param bytes> as UTF-8, replacing invalid sequences with U+FFFD.
+let decodeWithReplacement (bytes: Blob) : String = Stdlib.String.fromBlobWithReplacement bytes

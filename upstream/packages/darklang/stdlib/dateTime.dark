@@ -1,76 +1,379 @@
+/// Work with dates and times in UTC. Values can be as little as 100 nanoseconds
+/// (one tick) apart. Two values are equal only when they match exactly, down to
+/// the tick, even if they look the same when printed.
+/// For example, `Stdlib.DateTime.__fromTicks(0) == Stdlib.DateTime.__fromTicks(0)`
+/// is `true`, but `Stdlib.DateTime.__fromTicks(0) == Stdlib.DateTime.__fromTicks(1)`
+/// is `false`: a difference of just 100 nanoseconds makes them unequal.
 module Darklang.Stdlib.DateTime
+
+
+/// A day of the week. <fn Weekday.toNumber> numbers them as ISO 8601 does, from Monday = {{1}} to Sunday = {{7}}.
+type Weekday =
+  | Monday
+  | Tuesday
+  | Wednesday
+  | Thursday
+  | Friday
+  | Saturday
+  | Sunday
+
+
+module Weekday =
+  /// The ISO 8601 number of <param day>, from Monday = {{1}} to Sunday = {{7}}
+  let toNumber(day: Weekday): UInt8 =
+    match day with
+    | Monday -> 1u8
+    | Tuesday -> 2u8
+    | Wednesday -> 3u8
+    | Thursday -> 4u8
+    | Friday -> 5u8
+    | Saturday -> 6u8
+    | Sunday -> 7u8
+
+  /// The weekday numbered <param n> by ISO 8601 (Monday = {{1}} to Sunday = {{7}}), or {{None}} for any other number
+  let fromNumber(n: UInt8): Stdlib.Option.Option<Weekday> =
+    match n with
+    | 1u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Weekday.Monday)
+    | 2u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Weekday.Tuesday)
+    | 3u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Weekday.Wednesday)
+    | 4u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Weekday.Thursday)
+    | 5u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Weekday.Friday)
+    | 6u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Weekday.Saturday)
+    | 7u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Weekday.Sunday)
+    | _ -> Stdlib.Option.Option.None
+
+
+impl Display for Weekday =
+  /// The day's name, {{Monday}}
+  let display(day: Weekday): String =
+    match day with
+    | Monday -> "Monday"
+    | Tuesday -> "Tuesday"
+    | Wednesday -> "Wednesday"
+    | Thursday -> "Thursday"
+    | Friday -> "Friday"
+    | Saturday -> "Saturday"
+    | Sunday -> "Sunday"
+
+
+/// A month of the year. <fn Month.toNumber> numbers them from January = {{1}} to December = {{12}}.
+type Month =
+  | January
+  | February
+  | March
+  | April
+  | May
+  | June
+  | July
+  | August
+  | September
+  | October
+  | November
+  | December
+
+
+module Month =
+  /// The number of <param month>, from January = {{1}} to December = {{12}}
+  let toNumber(month: Month): UInt8 =
+    match month with
+    | January -> 1u8
+    | February -> 2u8
+    | March -> 3u8
+    | April -> 4u8
+    | May -> 5u8
+    | June -> 6u8
+    | July -> 7u8
+    | August -> 8u8
+    | September -> 9u8
+    | October -> 10u8
+    | November -> 11u8
+    | December -> 12u8
+
+  /// The month numbered <param n> (January = {{1}} to December = {{12}}), or {{None}} for any other number
+  let fromNumber(n: UInt8): Stdlib.Option.Option<Month> =
+    match n with
+    | 1u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Month.January)
+    | 2u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Month.February)
+    | 3u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Month.March)
+    | 4u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Month.April)
+    | 5u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Month.May)
+    | 6u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Month.June)
+    | 7u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Month.July)
+    | 8u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Month.August)
+    | 9u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Month.September)
+    | 10u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Month.October)
+    | 11u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Month.November)
+    | 12u8 -> Stdlib.Option.Option.Some(Stdlib.DateTime.Month.December)
+    | _ -> Stdlib.Option.Option.None
+
+
+impl Display for Month =
+  /// The month's name, {{January}}
+  let display(month: Month): String =
+    match month with
+    | January -> "January"
+    | February -> "February"
+    | March -> "March"
+    | April -> "April"
+    | May -> "May"
+    | June -> "June"
+    | July -> "July"
+    | August -> "August"
+    | September -> "September"
+    | October -> "October"
+    | November -> "November"
+    | December -> "December"
+
+
+// A DateTime is a count of 100ns ticks since the Unix epoch, read and built by the two
+// builtins below. Apart from `toString`, which stays native because telemetry calls it on every
+// keystroke, everything else is arithmetic on that count, over the proleptic Gregorian calendar.
+// Follows Paul's compiler stdlib (`dateTime.dark`).
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.DateTime.__ticks: Unknown function or value 'Builtin.dateTimeToUnixTicks'"
+let __ticks(date: DateTime): Int64 = Builtin.dateTimeToUnixTicks(date)
+
+/// Raises "out of DateTime range" outside -9998-01-01 to 9999-12-31.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.DateTime.__fromTicks: Expected TInt, got TInt64"
+let __fromTicks(ticks: Int64): DateTime = __fromOffset(0, ticks, 1)
+
+let __ticksPerMillisecond(): Int64 = 10000
+let __ticksPerSecond(): Int64 = 10000000
+let __ticksPerMinute(): Int64 = 600000000
+let __ticksPerHour(): Int64 = 36000000000
+let __ticksPerDay(): Int64 = 864000000000
+
+/// The DateTime <param count> units of <param unit> ticks each after <param ticks>. Raises with
+/// <param count> outside -9998-01-01 to 9999-12-31.
+// @compiler blocked: compiler-contract diagnostic="Darklang.Stdlib.DateTime.__fromOffset: Function 'dateTimeFromUnixTicks' expects 1 arguments"
+let __fromOffset(ticks: Int64, count: Int64, unit: Int64): DateTime =
+  Builtin.dateTimeFromUnixTicks(ticks, count, unit)
+
+/// `/` and `%` by a positive divisor, which every caller here passes.
+let __div(value: Int64, divisor: Int64): Int64 =
+  Stdlib.Int64.checkedDivide(value, divisor) |> Stdlib.Result.withDefault(0)
+
+let __mod(value: Int64, divisor: Int64): Int64 =
+  Stdlib.Int64.checkedMod(value, divisor) |> Stdlib.Result.withDefault(0)
+
+/// `/` on Int64s rounds toward zero; dates before 1970 need it to round down.
+let __floorDiv(value: Int64, divisor: Int64): Int64 =
+  __div(value - __mod(value, divisor), divisor)
+
+let __daysSinceEpoch(date: DateTime): Int64 =
+  __floorDiv(__ticks(date), __ticksPerDay())
+
+let __ticksWithinDay(date: DateTime): Int64 = __mod(__ticks(date), __ticksPerDay())
+
+/// A calendar or clock field, which the caller has already bounded.
+let __field8(n: Int64): UInt8 = Stdlib.UInt8.fromInt64(n) |> Builtin.unwrap
+
+/// Days since 1970-01-01 of a civil date.
+let __daysFromCivil(year: Int64, month: Int64, day: Int64): Int64 =
+  let y = if month <= 2 then year - 1 else year
+  let era = __floorDiv(y, 400)
+  let yearOfEra = y - era * 400
+  let m = if month > 2 then month - 3 else month + 9
+  let dayOfYear = __div(153 * m + 2, 5) + day - 1
+  let dayOfEra = yearOfEra * 365 + __div(yearOfEra, 4) - __div(yearOfEra, 100) + dayOfYear
+  era * 146097 + dayOfEra - 719468
+
+/// (year, month, day) of a count of days since 1970-01-01.
+let __civilFromDays(days: Int64): (Int64 * Int64 * Int64) =
+  let shifted = days + 719468
+  let era = __floorDiv(shifted, 146097)
+  let dayOfEra = shifted - era * 146097
+  let yearOfEra =
+    __div(
+      dayOfEra - __div(dayOfEra, 1460) + __div(dayOfEra, 36524) - __div(dayOfEra, 146096),
+      365)
+  let dayOfYear = dayOfEra - (365 * yearOfEra + __div(yearOfEra, 4) - __div(yearOfEra, 100))
+  let mp = __div(5 * dayOfYear + 2, 153)
+  let day = dayOfYear - __div(153 * mp + 2, 5) + 1
+  let month = if mp < 10 then mp + 3 else mp - 9
+  let year = if month <= 2 then yearOfEra + era * 400 + 1 else yearOfEra + era * 400
+  (year, month, day)
+
+/// <param endDate> minus <param startDate> in whole units of <param ticksPerUnit> ticks,
+/// rounded half to even.
+let __roundedDifference(endDate: DateTime, startDate: DateTime, ticksPerUnit: Int64): Int64 =
+  let ticks = __ticks(endDate) - __ticks(startDate)
+  let whole = __floorDiv(ticks, ticksPerUnit)
+  let twiceRest = (ticks - whole * ticksPerUnit) * 2
+  if twiceRest > ticksPerUnit || (twiceRest == ticksPerUnit && __mod(whole, 2) == 1) then
+    whole + 1
+  else
+    whole
+
+let __digit(c: Char): Stdlib.Option.Option<Int64> =
+  match c with
+  | '0' -> Stdlib.Option.Option.Some(0)
+  | '1' -> Stdlib.Option.Option.Some(1)
+  | '2' -> Stdlib.Option.Option.Some(2)
+  | '3' -> Stdlib.Option.Option.Some(3)
+  | '4' -> Stdlib.Option.Option.Some(4)
+  | '5' -> Stdlib.Option.Option.Some(5)
+  | '6' -> Stdlib.Option.Option.Some(6)
+  | '7' -> Stdlib.Option.Option.Some(7)
+  | '8' -> Stdlib.Option.Option.Some(8)
+  | '9' -> Stdlib.Option.Option.Some(9)
+  | _ -> Stdlib.Option.Option.None
+
+let __number(digits: List<Char>): Stdlib.Option.Option<Int64> =
+  Stdlib.List.fold(digits, Stdlib.Option.Option.Some(0), fun(acc, c) ->
+    match (acc, __digit(c)) with
+    | (Some(n), Some(d)) -> Stdlib.Option.Option.Some(n * 10 + d)
+    | _ -> Stdlib.Option.Option.None)
+
+let __isLeapYear(year: Int64): Bool =
+  (__mod(year, 4) == 0 && __mod(year, 100) != 0) || __mod(year, 400) == 0
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branch.mainBranchName: Darklang.Stdlib.DateTime.__parseParts: Expected TSum (\"Darklang.Stdlib.DateTime.Month\", []), got TInt64"
+let __daysInMonth(year: Int64, month: Month): Int64 =
+  match month with
+  | February -> if __isLeapYear(year) then 29 else 28
+  | April -> 30
+  | June -> 30
+  | September -> 30
+  | November -> 30
+  | _ -> 31
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.DateTime.__fromParts: Unknown function or value '__fromTicks'"
+let __fromParts(
+  year: List<Char>,
+  month: List<Char>,
+  day: List<Char>,
+  hour: List<Char>,
+  minute: List<Char>,
+  second: List<Char>,
+  millisecond: List<Char>)
+  : Stdlib.Result.Result<DateTime, String> =
+  match
+    (__number(year),
+     __number(month),
+     __number(day),
+     __number(hour),
+     __number(minute),
+     __number(second),
+     __number(millisecond))
+  with
+  | (Some(y), Some(mo), Some(d), Some(h), Some(mi), Some(s), Some(ms)) ->
+    let valid =
+      match Stdlib.UInt8.fromInt64(mo) |> Stdlib.Option.andThen(Month.fromNumber) with
+      | Some(month) ->
+        y >= 1
+        && d >= 1
+        && d <= __daysInMonth(y, month)
+        && h <= 23
+        && mi <= 59
+        && s <= 59
+      | None -> false
+    if valid then
+      let ticks =
+        __daysFromCivil(y, mo, d) * __ticksPerDay()
+        + h * __ticksPerHour()
+        + mi * __ticksPerMinute()
+        + s * __ticksPerSecond()
+        + ms * __ticksPerMillisecond()
+      Stdlib.Result.Result.Ok(__fromTicks(ticks))
+    else
+      Stdlib.Result.Result.Error("Invalid date format")
+  | _ -> Stdlib.Result.Result.Error("Invalid date format")
 
 
 /// Parses a string representing a date and time in the ISO 8601 format exactly {{" + ISO8601Format+ "}}
 /// (for example: 2019-09-07T22:44:25Z) and returns the {{Date}} wrapped in a {{Result}}.
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.parse reason=compiler-implementation
-let parse (s: String) : Stdlib.Result.Result<DateTime, String> =
-  Builtin.dateTimeParse s
+let parse(s: String): Stdlib.Result.Result<DateTime, String> =
+  match Stdlib.String.toList(s) with
+  | [ y1, y2, y3, y4, '-', mo1, mo2, '-', d1, d2, 'T', h1, h2, ':', mi1, mi2, ':', s1, s2, 'Z' ] ->
+    __fromParts([ y1, y2, y3, y4 ], [ mo1, mo2 ], [ d1, d2 ], [ h1, h2 ], [ mi1, mi2 ], [ s1, s2 ], [])
+  | [ y1, y2, y3, y4, '-', mo1, mo2, '-', d1, d2, 'T', h1, h2, ':', mi1, mi2, ':', s1, s2, '.', f1, f2, f3, 'Z' ] ->
+    __fromParts(
+      [ y1, y2, y3, y4 ],
+      [ mo1, mo2 ],
+      [ d1, d2 ],
+      [ h1, h2 ],
+      [ mi1, mi2 ],
+      [ s1, s2 ],
+      [ f1, f2, f3 ])
+  | _ -> Stdlib.Result.Result.Error("Invalid date format")
 
 
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/dateTime.dark; importing another declaration of Darklang.Stdlib.DateTime.impl ToString for DateTime requires an explicit replacement contract"
-impl ToString for DateTime =
+/// The date as {{YYYYMMDD}}. A year before 1 gets a leading {{-}}, as {{format}} writes it.
+let __basicDate(date: DateTime): String =
+  let (year, month, day) = __civilFromDays(__daysSinceEpoch(date))
+  let yearText = if year < 0 then "-" + zeroPadded(0 - year, 4) else zeroPadded(year, 4)
+  yearText + zeroPadded(month, 2) + zeroPadded(day, 2)
+
+/// The time of day as {{hhmmss}}.
+let __basicTime(date: DateTime): String =
+  let ticks = __ticksWithinDay(date)
+  zeroPadded(__div(ticks, __ticksPerHour()), 2)
+  + zeroPadded(__mod(__div(ticks, __ticksPerMinute()), 60), 2)
+  + zeroPadded(__mod(__div(ticks, __ticksPerSecond()), 60), 2)
+
+
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/dateTime.dark; importing another declaration of Darklang.Stdlib.DateTime.impl Display for DateTime requires an explicit replacement contract"
+impl Display for DateTime =
   /// Stringify <param date> to the ISO 8601 format {{YYYY-MM-DD'T'hh:mm:ss'Z'}}
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.DateTime.impl ToString for DateTime: Already selected from packages/darklang/stdlib/dateTime.dark; importing another declaration of Darklang.Stdlib.DateTime.impl ToString for DateTime requires an explicit replacement contract"
-  let toString (date: DateTime) : String = Builtin.dateTimeToString date
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.DateTime.impl Display for DateTime: Already selected from packages/darklang/stdlib/dateTime.dark; importing another declaration of Darklang.Stdlib.DateTime.impl Display for DateTime requires an explicit replacement contract"
+  let display(date: DateTime): String = Builtin.dateTimeToString(date)
 
 
 /// Stringify <param date> to the ISO 8601 basic format {{YYYYMMDD'T'hhmmss'Z'}}
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.toStringISO8601BasicDateTime reason=compiler-implementation
-let toStringISO8601BasicDateTime (date: DateTime) : String =
-  Builtin.dateTimeToStringISO8601BasicDateTime date
+let toStringISO8601BasicDateTime(date: DateTime): String =
+  __basicDate(date) + "T" + __basicTime(date) + "Z"
 
 
 /// Stringify <param date> to the ISO 8601 basic format YYYYMMDD
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.toStringISO8601BasicDate reason=compiler-implementation
-let toStringISO8601BasicDate (date: DateTime) : String =
-  Builtin.dateTimeToStringISO8601BasicDate date
+let toStringISO8601BasicDate(date: DateTime): String = __basicDate(date)
 
 
 /// Returns the current time
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.now reason=compiler-implementation
-let now () : DateTime = Stdlib.DateTime.__now ()
+let now(): DateTime = Stdlib.DateTime.__now()
 
 
 /// Returns the <type DateTime> with the time set to midnight
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.today reason=compiler-implementation
-let today () : DateTime = Stdlib.DateTime.__today ()
+let today(): DateTime = Stdlib.DateTime.__today()
 
 
 /// Returns a <type DateTime> <param seconds> seconds after <param d>
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.addSeconds reason=compiler-implementation
-let addSeconds (d: DateTime) (seconds: Int) : DateTime =
-  Builtin.dateTimeAddSeconds d seconds
+let addSeconds(d: DateTime, seconds: Int64): DateTime =
+  __fromOffset(__ticks(d), seconds, __ticksPerSecond())
 
 
 /// Returns a <type DateTime> <param seconds> seconds before <param d>
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.subtractSeconds reason=compiler-implementation
-let subtractSeconds (d: DateTime) (seconds: Int) : DateTime =
-  Builtin.dateTimeSubtractSeconds d seconds
+let subtractSeconds(d: DateTime, seconds: Int64): DateTime =
+  __fromOffset(__ticks(d), -seconds, __ticksPerSecond())
 
 
 /// Returns whether {{<param d1> > <param d2>}}
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.greaterThan reason=compiler-implementation
-let greaterThan (d1: DateTime) (d2: DateTime) : Bool =
-  Builtin.dateTimeGreaterThan d1 d2
+let greaterThan(d1: DateTime, d2: DateTime): Bool = __ticks(d1) > __ticks(d2)
 
 
 /// Returns whether {{<param d1> < <param d2>}}
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.lessThan reason=compiler-implementation
-let lessThan (d1: DateTime) (d2: DateTime) : Bool =
-  Builtin.dateTimeLessThan d1 d2
+let lessThan(d1: DateTime, d2: DateTime): Bool = __ticks(d1) < __ticks(d2)
 
 
 /// Returns whether {{<param d1> >= <param d2>}}
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.greaterThanOrEqualTo reason=compiler-implementation
-let greaterThanOrEqualTo (d1: DateTime) (d2: DateTime) : Bool =
-  Builtin.dateTimeGreaterThanOrEqualTo d1 d2
+let greaterThanOrEqualTo(d1: DateTime, d2: DateTime): Bool =
+  __ticks(d1) >= __ticks(d2)
 
 
 /// Returns whether {{<param d1> <= <param d2>}}
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.lessThanOrEqualTo reason=compiler-implementation
-let lessThanOrEqualTo (d1: DateTime) (d2: DateTime) : Bool =
-  Builtin.dateTimeLessThanOrEqualTo d1 d2
+let lessThanOrEqualTo(d1: DateTime, d2: DateTime): Bool =
+  __ticks(d1) <= __ticks(d2)
 
 /// `d1 < d2` on DateTimes, by the four comparisons above.
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/dateTime.dark; importing another declaration of Darklang.Stdlib.DateTime.impl Compare for DateTime requires an explicit replacement contract"
@@ -85,187 +388,251 @@ impl Compare for DateTime =
   let greaterThanOrEqualTo = Stdlib.DateTime.greaterThanOrEqualTo
 
 
-/// Converts <param date> to an <type Int> representing seconds since the Unix epoch
+/// Converts <param date> to an <type Int64> representing seconds since the Unix epoch
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.toSeconds reason=compiler-implementation
-let toSeconds (date: DateTime) : Int = Builtin.dateTimeToSeconds date
+let toSeconds(date: DateTime): Int64 = __floorDiv(__ticks(date), __ticksPerSecond())
 
 
-/// Converts an <type Int> representing seconds since the Unix epoch into a <type DateTime>
+/// Converts an <type Int64> representing seconds since the Unix epoch into a <type DateTime>
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.fromSeconds reason=compiler-implementation
-let fromSeconds (seconds: Int) : DateTime =
-  Builtin.dateTimeFromSeconds seconds
+let fromSeconds(seconds: Int64): DateTime =
+  __fromOffset(0, seconds, __ticksPerSecond())
 
 
-/// Returns the year portion of <param date> as an <type Int>
+/// Returns the year portion of <param date> as an <type Int64>
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.year reason=compiler-implementation
-let year (date: DateTime) : Int = Builtin.dateTimeYear date
+let year(date: DateTime): Int64 = (__civilFromDays(__daysSinceEpoch(date))).1
 
 
-/// Returns the month portion of <param date> as an <type Int> between {{1}} and {{12}}
+/// Returns the month of <param date>
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.month reason=compiler-implementation
-let month (date: DateTime) : Int = Builtin.dateTimeMonth date
+let month(date: DateTime): Month =
+  __field8((__civilFromDays(__daysSinceEpoch(date))).2)
+  |> Month.fromNumber
+  |> Builtin.unwrap
 
 
-/// Returns the day portion of <param date> as an <type Int>
+/// Returns the day portion of <param date> as a <type UInt8> between {{1}} and {{31}}
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.day reason=compiler-implementation
-let day (date: DateTime) : Int = Builtin.dateTimeDay date
+let day(date: DateTime): UInt8 =
+  __field8((__civilFromDays(__daysSinceEpoch(date))).3)
 
 
-/// Returns the weekday of <param date> as an <type Int>. Monday = {{1}}, Tuesday = {{2}}, ... Sunday = {{7}} (in accordance with ISO 8601
+/// Returns the weekday of <param date>
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.weekday reason=compiler-implementation
-let weekday (date: DateTime) : Int = Builtin.dateTimeWeekday date
+let weekday(date: DateTime): Weekday =
+  __field8((__daysSinceEpoch(date) + 3) % 7 + 1)
+  |> Weekday.fromNumber
+  |> Builtin.unwrap
 
 
-/// Returns the hour portion of <param date> as an <type Int>
+/// Returns the hour portion of <param date> as a <type UInt8> between {{0}} and {{23}}
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.hour reason=compiler-implementation
-let hour (date: DateTime) : Int = Builtin.dateTimeHour date
+let hour(date: DateTime): UInt8 =
+  __field8(__ticksWithinDay(date) / __ticksPerHour())
 
 
-/// Returns the minute portion of <param date> as an <type Int>
+/// Returns the minute portion of <param date> as a <type UInt8> between {{0}} and {{59}}
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.minute reason=compiler-implementation
-let minute (date: DateTime) : Int = Builtin.dateTimeMinute date
+let minute(date: DateTime): UInt8 =
+  __field8((__ticksWithinDay(date) / __ticksPerMinute()) % 60)
 
 
-/// Returns the second portion of <param date> as an <type Int>
+/// Returns the second portion of <param date> as a <type UInt8> between {{0}} and {{59}}
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.second reason=compiler-implementation
-let second (date: DateTime) : Int = Builtin.dateTimeSecond date
+let second(date: DateTime): UInt8 =
+  __field8((__ticksWithinDay(date) / __ticksPerSecond()) % 60)
 
 
 /// Returns <type date> with the time set to midnight
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.atStartOfDay reason=compiler-implementation
-let atStartOfDay (date: DateTime) : DateTime =
-  Builtin.dateTimeAtStartOfDay date
+let atStartOfDay(date: DateTime): DateTime =
+  __fromTicks(__daysSinceEpoch(date) * __ticksPerDay())
 
 
-/// Returns the difference of the two dates, in seconds
+/// Returns <param d1> minus <param d2> as a duration, rounded to whole seconds.
+/// Half-second ties round to the nearest even second.
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.subtract reason=compiler-implementation
-let subtract (d1: DateTime) (d2: DateTime) : Int =
-  Builtin.dateTimeSubtract d1 d2
+let subtract(d1: DateTime, d2: DateTime): Stdlib.Duration.Duration =
+  __roundedDifference(d1, d2, __ticksPerSecond())
+  |> Stdlib.Duration.fromSeconds()
 
 
-/// Converts <param date> to an <type Int> representing milliseconds since the Unix epoch
+/// Converts <param date> to an <type Int64> representing milliseconds since the Unix epoch
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.toMilliseconds reason=compiler-implementation
-let toMilliseconds (date: DateTime) : Int =
-  Builtin.dateTimeToMilliseconds date
+let toMilliseconds(date: DateTime): Int64 =
+  __floorDiv(__ticks(date), __ticksPerMillisecond())
 
 
-/// Converts an <type Int> representing milliseconds since the Unix epoch into a <type DateTime>
+/// Converts an <type Int64> representing milliseconds since the Unix epoch into a <type DateTime>
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.fromMilliseconds reason=compiler-implementation
-let fromMilliseconds (milliseconds: Int) : DateTime =
-  Builtin.dateTimeFromMilliseconds milliseconds
+let fromMilliseconds(milliseconds: Int64): DateTime =
+  __fromOffset(0, milliseconds, __ticksPerMillisecond())
 
 
 /// Returns a <type DateTime> <param milliseconds> milliseconds after <param d>
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.addMilliseconds reason=compiler-implementation
-let addMilliseconds (d: DateTime) (milliseconds: Int) : DateTime =
-  Builtin.dateTimeAddMilliseconds d milliseconds
+let addMilliseconds(d: DateTime, milliseconds: Int64): DateTime =
+  __fromOffset(__ticks(d), milliseconds, __ticksPerMillisecond())
 
 
 /// Returns a <type DateTime> <param milliseconds> milliseconds before <param d>
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.subtractMilliseconds reason=compiler-implementation
-let subtractMilliseconds (d: DateTime) (milliseconds: Int) : DateTime =
-  Builtin.dateTimeSubtractMilliseconds d milliseconds
+let subtractMilliseconds(d: DateTime, milliseconds: Int64): DateTime =
+  __fromOffset(__ticks(d), -milliseconds, __ticksPerMillisecond())
 
 
-/// Returns the millisecond portion of <param date> as an <type Int> between {{0}} and {{999}}
+/// Returns the millisecond portion of <param date> as a <type UInt16> between {{0}} and {{999}}
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.millisecond reason=compiler-implementation
-let millisecond (date: DateTime) : Int =
-  Builtin.dateTimeMillisecond date
+let millisecond(date: DateTime): UInt16 =
+  Stdlib.UInt16.fromInt64((__ticksWithinDay(date) / __ticksPerMillisecond()) % 1000)
+  |> Builtin.unwrap
 
 
 /// Returns the difference of the two dates, in milliseconds
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.subtractMs reason=compiler-implementation
-let subtractMs (d1: DateTime) (d2: DateTime) : Int =
-  Builtin.dateTimeSubtractMs d1 d2
+let subtractMs(d1: DateTime, d2: DateTime): Int64 =
+  __roundedDifference(d1, d2, __ticksPerMillisecond())
+
+
+/// Writes <param n> with leading zeros up to <param width> digits
+let zeroPadded(n: Int64, width: Int64): String =
+  Stdlib.String.padStart(Stdlib.display(n), '0', width)
+
+/// The text for one {{format}} directive (the character after {{%}}), or {{None}} if it is not a directive
+let __formatDirective(date: DateTime, directive: Char): Stdlib.Option.Option<String> =
+  match directive with
+  | 'Y' ->
+    let y = year(date)
+    Stdlib.Option.Option.Some(if y < 0 then "-" + zeroPadded(0 - y, 4) else zeroPadded(y, 4))
+  | 'm' -> Stdlib.Option.Option.Some(zeroPadded(Stdlib.Int64.fromUInt8(Month.toNumber(month(date))), 2))
+  | 'd' -> Stdlib.Option.Option.Some(zeroPadded(Stdlib.Int64.fromUInt8(day(date)), 2))
+  | 'H' -> Stdlib.Option.Option.Some(zeroPadded(Stdlib.Int64.fromUInt8(hour(date)), 2))
+  | 'M' -> Stdlib.Option.Option.Some(zeroPadded(Stdlib.Int64.fromUInt8(minute(date)), 2))
+  | 'S' -> Stdlib.Option.Option.Some(zeroPadded(Stdlib.Int64.fromUInt8(second(date)), 2))
+  | 'f' -> Stdlib.Option.Option.Some(zeroPadded(Stdlib.Int64.fromUInt16(millisecond(date)), 3))
+  | '%' -> Stdlib.Option.Option.Some("%")
+  | _ -> Stdlib.Option.Option.None
+
+/// Writes <param chars> of a {{format}} pattern after <param written> (kept in reverse order)
+let __formatChars(date: DateTime, chars: List<Char>, written: List<String>)
+  : Stdlib.Result.Result<String, String> =
+  match chars with
+  | [] -> Stdlib.Result.Result.Ok(Stdlib.String.join(Stdlib.List.reverse(written), ""))
+  | [ '%' ] ->
+    Stdlib.Result.Result.Error("The pattern ends in a lone %; write %% for a literal %")
+  | [ '%', directive, ...rest ] ->
+    match __formatDirective(date, directive) with
+    | Some(text) -> __formatChars(date, rest, Stdlib.List.prepend(written, text))
+    | None ->
+      Stdlib.Result.Result.Error(
+        "Unknown directive %"
+        + Stdlib.String.fromChar(directive)
+        + "; the directives are %Y %m %d %H %M %S %f %%")
+  | [ c, ...rest ] ->
+    __formatChars(date, rest, Stdlib.List.prepend(written, Stdlib.String.fromChar(c)))
+
+
+/// Writes <param date> (always UTC) using <param pattern>, where each directive is
+/// replaced by a zero-padded field and every other character is copied as is:
+/// {{%Y}} year, four digits ({{0001}}; negative years get a leading {{-}}),
+/// {{%m}} month {{01}}-{{12}}, {{%d}} day {{01}}-{{31}},
+/// {{%H}} hour {{00}}-{{23}}, {{%M}} minute {{00}}-{{59}}, {{%S}} second {{00}}-{{59}},
+/// {{%f}} milliseconds {{000}}-{{999}} (truncated, not rounded), {{%%}} a literal {{%}}.
+/// Any other {{%}} sequence, or a lone {{%}} at the end, is an {{Error}}.
+/// For example, {{format(d, "%Y-%m-%d %H:%M:%S.%f")}} gives {{Ok("2019-07-28 22:42:36.500")}}.
+let format(date: DateTime, pattern: String): Stdlib.Result.Result<String, String> =
+  __formatChars(date, Stdlib.String.toList(pattern), [])
 
 
 // Shared clock implementation.
 /// Clock record decoding, scaling and interrupted-sleep retries in shared Dark.
 
-// @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.__timespec reason=compiler-implementation
-let __timespec (bytes: Blob) : Result.Result<(Int * Int), Int> =
-  let width = if Stdlib.Cli.Posix.__abiArm32 () then 4 else 8
-  let record = Stdlib.Blob.toList bytes
-  Stdlib.Cli.Posix.__kernelSignedField record 0 width
-  |> Stdlib.Result.andThen (fun seconds ->
-    Stdlib.Cli.Posix.__kernelSignedField record width width
-    |> Stdlib.Result.map (fun nanos -> (seconds, nanos)))
+// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Blob -> Darklang.Stdlib.Result.Result<(Int64, Int64), Int64>, replacement Blob -> Darklang.Stdlib.Result.Result<(Int, Int), Int>"
+let __timespec(bytes: Bytes): Result.Result<(Int64 * Int64), Int64> =
+  let width = if Stdlib.Cli.Posix.__abiArm32() then 4 else 8
+  Stdlib.Cli.Posix.__kernelSignedField(bytes, 0, width)
+  |> Stdlib.Result.andThen(fun seconds ->
+    Stdlib.Cli.Posix.__kernelSignedField(bytes, width, width)
+    |> Stdlib.Result.map(fun nanos -> (seconds, nanos)))
 
-// @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.__realtimeNanoseconds reason=compiler-implementation
-let __realtimeNanoseconds () : Result.Result<(Int * Int), Int> =
-  if Builtin.runtimeTargetOS () == "browser" then
-    let ticks = Builtin.runtimeRealtimeTicks ()
-    Ok ((ticks / 10000000, (ticks % 10000000) * 100))
-  else if Stdlib.Cli.Posix.__abiMac () then
-    Builtin.syscallGettimeofday ()
-    |> Stdlib.Result.andThen (fun bytes ->
-      let record = Stdlib.Blob.toList bytes
-      Stdlib.Cli.Posix.__kernelSignedField record 0 8
-      |> Stdlib.Result.andThen (fun seconds ->
-        Stdlib.Cli.Posix.__kernelSignedField record 8 4
-        |> Stdlib.Result.map (fun micros -> (seconds, micros * 1000))))
-  else Builtin.syscallClockGettime 0 |> Stdlib.Result.andThen __timespec
+// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Unit -> Darklang.Stdlib.Result.Result<(Int64, Int64), Int64>, replacement Unit -> Darklang.Stdlib.Result.Result<(Int, Int), Int>"
+let __realtimeNanoseconds(): Result.Result<(Int64 * Int64), Int64> =
+  if Builtin.runtimeTargetOS() == "browser" then
+    let ticks = Builtin.runtimeRealtimeTicks()
+    Ok((ticks / 10000000, (ticks % 10000000) * 100))
+  else if Stdlib.Cli.Posix.__abiMac() then
+    Builtin.syscallGettimeofday()
+    |> Stdlib.Result.andThen(fun bytes ->
+      Stdlib.Cli.Posix.__kernelSignedField(bytes, 0, 8)
+      |> Stdlib.Result.andThen(fun seconds ->
+        Stdlib.Cli.Posix.__kernelSignedField(bytes, 8, 4)
+        |> Stdlib.Result.map(fun micros -> (seconds, micros * 1000))))
+  else Builtin.syscallClockGettime(0) |> Stdlib.Result.andThen(__timespec)
 
-// @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.__monotonicNanoseconds reason=compiler-implementation
-let __monotonicNanoseconds () : Result.Result<(Int * Int), Int> =
-  if Builtin.runtimeTargetOS () == "browser" then
-    let (ticks, frequency) = Builtin.runtimeMonotonicCounter ()
-    if frequency <= 0 then Error 5
-    else Ok ((ticks / frequency, ((ticks % frequency) * 1000000000) / frequency))
-  else if Stdlib.Cli.Posix.__abiMac () then
-    Builtin.syscallMachAbsoluteTime ()
-    |> Stdlib.Result.andThen (fun bytes ->
-      Stdlib.Cli.Posix.__kernelField (Stdlib.Blob.toList bytes) 0 8
-      |> Stdlib.Result.andThen (fun ticks ->
-        Builtin.syscallMachTimebaseInfo ()
-        |> Stdlib.Result.andThen (fun base ->
-          let record = Stdlib.Blob.toList base
-          Stdlib.Cli.Posix.__kernelField record 0 4
-          |> Stdlib.Result.andThen (fun numerator ->
-            Stdlib.Cli.Posix.__kernelField record 4 4
-            |> Stdlib.Result.andThen (fun denominator ->
-              if denominator == 0 then Error 5
+// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Unit -> Darklang.Stdlib.Result.Result<(Int64, Int64), Int64>, replacement Unit -> Darklang.Stdlib.Result.Result<(Int, Int), Int>"
+let __monotonicNanoseconds(): Result.Result<(Int64 * Int64), Int64> =
+  if Builtin.runtimeTargetOS() == "browser" then
+    let (ticks, frequency) = Builtin.runtimeMonotonicCounter()
+    if frequency <= 0 then Error(5)
+    else Ok((ticks / frequency, ((ticks % frequency) * 1000000000) / frequency))
+  else if Stdlib.Cli.Posix.__abiMac() then
+    Builtin.syscallMachAbsoluteTime()
+    |> Stdlib.Result.andThen(fun bytes ->
+      Stdlib.Cli.Posix.__kernelField(bytes, 0, 8)
+      |> Stdlib.Result.andThen(fun ticks ->
+        Builtin.syscallMachTimebaseInfo()
+        |> Stdlib.Result.andThen(fun base ->
+          Stdlib.Cli.Posix.__kernelField(base, 0, 4)
+          |> Stdlib.Result.andThen(fun numerator ->
+            Stdlib.Cli.Posix.__kernelField(base, 4, 4)
+            |> Stdlib.Result.andThen(fun denominator ->
+              if denominator == 0 then Error(5)
               else
                 let nanos = (ticks / denominator) * numerator + ((ticks % denominator) * numerator) / denominator
-                Ok ((nanos / 1000000000, nanos % 1000000000)))))))
-  else Builtin.syscallClockGettime 1 |> Stdlib.Result.andThen __timespec
+                Ok((nanos / 1000000000, nanos % 1000000000)))))))
+  else Builtin.syscallClockGettime(1) |> Stdlib.Result.andThen(__timespec)
 
-// @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.__monotonicMilliseconds reason=compiler-implementation
-let __monotonicMilliseconds () : Int =
-  match __monotonicNanoseconds () with
-  | Ok ((seconds, nanos)) -> seconds * 1000 + nanos / 1000000
-  | Error e -> Builtin.unwrap (Error e)
+/// When the clock syscall fails, the runtime's own clock answers.
+// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Unit -> Int64, replacement Unit -> Int"
+let __monotonicMilliseconds(): Int64 =
+  match __monotonicNanoseconds() with
+  | Ok((seconds, nanos)) -> seconds * 1000 + __div(nanos, 1000000)
+  | Error(_) ->
+    let (ticks, frequency) = Builtin.runtimeMonotonicCounter()
+    __div(ticks, frequency) * 1000 + __div(__mod(ticks, frequency) * 1000, frequency)
 
+/// When the clock syscall fails, the runtime's own clock answers.
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.__now reason=compiler-implementation
-let __now () : DateTime =
-  match __realtimeNanoseconds () with
-  | Ok ((seconds, nanos)) -> Builtin.dateTimeFromUnixTicks (seconds * 10000000 + nanos / 100)
-  | Error e -> Builtin.unwrap (Error e)
+let __now(): DateTime =
+  match __realtimeNanoseconds() with
+  | Ok((seconds, nanos)) -> __fromTicks(seconds * 10000000 + __div(nanos, 100))
+  | Error(_) -> __fromTicks(Builtin.runtimeRealtimeTicks())
 
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.__today reason=compiler-implementation
-let __today () : DateTime =
-  let seconds = Stdlib.DateTime.toSeconds (__now ())
+let __today(): DateTime =
+  let seconds = Stdlib.DateTime.toSeconds(__now())
   let remainder = seconds % 86400
   let start = if remainder < 0 then seconds - remainder - 86400 else seconds - remainder
-  Stdlib.DateTime.fromSeconds start
+  Stdlib.DateTime.fromSeconds(start)
 
-// @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.__sleepWith reason=compiler-implementation
-let __sleepWith (sleep: Int -> Int -> (Int * Blob)) (seconds: Int) (nanos: Int)
-  : Result.Result<Unit, Int> =
-  let (rc, remaining) = sleep seconds nanos
-  if rc == 0 then Ok ()
+// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream (Int64, Int64) -> (Int64, Blob) -> Int64 -> Int64 -> Darklang.Stdlib.Result.Result<Unit, Int64>, replacement (Int, Int) -> (Int, Blob) -> Int -> Int -> Darklang.Stdlib.Result.Result<Unit, Int>"
+let __sleepWith(sleep: (Int64, Int64) -> (Int64 * Bytes), seconds: Int64, nanos: Int64)
+  : Result.Result<Unit, Int64> =
+  let (rc, remaining) = sleep(seconds, nanos)
+  if rc == 0 then Ok()
   else if rc == -4 then
-    __timespec remaining |> Stdlib.Result.andThen (fun pair ->
+    __timespec(remaining) |> Stdlib.Result.andThen(fun pair ->
       let (seconds, nanos) = pair
-      __sleepWith sleep seconds nanos)
-  else Error (0 - rc)
+      __sleepWith(sleep, seconds, nanos))
+  else Error(0 - rc)
 
-// @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.__sleepNanoseconds reason=compiler-implementation
-let __sleepNanoseconds (seconds: Int) (nanos: Int) : Result.Result<Unit, Int> =
-  __sleepWith Builtin.syscallNanosleep seconds nanos
+// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int64 -> Int64 -> Darklang.Stdlib.Result.Result<Unit, Int64>, replacement Int -> Int -> Darklang.Stdlib.Result.Result<Unit, Int>"
+let __sleepNanoseconds(seconds: Int64, nanos: Int64): Result.Result<Unit, Int64> =
+  __sleepWith(Builtin.syscallNanosleep, seconds, nanos)
 
 // @compiler replace: packages/darklang/stdlib/dateTime.dark#Darklang.Stdlib.DateTime.__sleepMilliseconds reason=compiler-implementation
-let __sleepMilliseconds (milliseconds: Float) : Unit =
-  let nanos = Stdlib.Float.toInt (milliseconds * 1000000.0)
-  if Builtin.runtimeTargetOS () == "browser" then Builtin.runtimeDelayTicks (nanos / 100)
-  else __sleepNanoseconds (nanos / 1000000000) (nanos % 1000000000) |> Builtin.unwrap
+let __sleepMilliseconds(milliseconds: Float): Unit =
+  let nanos = Stdlib.Float.toInt64(milliseconds * 1000000.0)
+  if Builtin.runtimeTargetOS() == "browser" then Builtin.runtimeDelayTicks(nanos / 100)
+  else __sleepNanoseconds(nanos / 1000000000, nanos % 1000000000) |> Builtin.unwrap

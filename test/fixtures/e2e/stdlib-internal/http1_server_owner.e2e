@@ -2,7 +2,7 @@
 let prepared (input: String) (response: Stdlib.Http.Response) (count: Int64) : (String * String * Int64) =
   let life = Stdlib.Stream.__new (fun _unit -> Some ()) (fun _unit -> ()) in
   let connection = Stdlib.__Network.TcpConnection { lifecycle = life, watch = None, read = fun _length -> Builtin.crash "Prepare attempted read", write = fun _bytes -> Builtin.crash "Prepare attempted write" } in
-  let config = { Stdlib.HttpServer.Config.defaults 80 with injectStandardHeaders = false, logRequests = false } in
+  let config = { Stdlib.HttpServer.Config.defaults Stdlib.Net.Port.http with injectStandardHeaders = false, logRequests = false } in
   let context = Stdlib.__Http1Server.Context { config = config, handler = fun _request -> response, signals = Stdlib.__Network.ShutdownSignals { lifecycle = life }, limit = 16L } in
   let buffer = Stdlib.__Http1Server.RequestBuffer { bytes = Stdlib.String.toBlob input, continued = false } in
   let owner = Stdlib.__Http1Server.Owner { connection = connection, transport = Stdlib.__HttpTransport.plain connection, phase = Stdlib.__Http1Server.Phase.Request buffer, started = 0L, deadline = 10000L, requests = count } in
@@ -14,7 +14,7 @@ let prepared (input: String) (response: Stdlib.Http.Response) (count: Int64) : (
     | AwaitRequest _ -> ("pending", "pending", next.requests)
     | _ -> ("unexpected", "unexpected", next.requests) in
   let _ = Stdlib.__Network.closeTcp connection in result
-let response () : Stdlib.Http.Response = Stdlib.Http.responseWithText "x" 200
+let response () : Stdlib.Http.Response = Stdlib.Http.responseWithText 200L "x"
 prepared "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n" (response ()) 0L = ("HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: 1\r\n\r\nx", "", 1L) // leak_check
 prepared "HEAD / HTTP/1.1\r\nHost: example.com\r\n\r\n" (response ()) 0L = ("HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: 1\r\n\r\n", "", 1L) // leak_check
 prepared "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: keep-alive, ClOsE\r\n\r\n" (response ()) 0L |> fun (_wire, after, count) -> (after, count) = ("closed", 1L) // leak_check

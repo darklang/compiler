@@ -23,11 +23,11 @@ test clamp =
 
 test toString =
   Stdlib.Test.all
-    [ Stdlib.toString 0y |> Stdlib.Test.equal "0"
-      Stdlib.toString 1y |> Stdlib.Test.equal "1"
-      Stdlib.toString -1y |> Stdlib.Test.equal "-1"
+    [ Stdlib.display 0y |> Stdlib.Test.equal "0"
+      Stdlib.display 1y |> Stdlib.Test.equal "1"
+      Stdlib.display -1y |> Stdlib.Test.equal "-1"
       // Int8 lower limit
-      Stdlib.toString -128y |> Stdlib.Test.equal "-128"
+      Stdlib.display -128y |> Stdlib.Test.equal "-128"
       // Int8 upper limit
-      Stdlib.toString 127y |> Stdlib.Test.equal "127" ]
+      Stdlib.display 127y |> Stdlib.Test.equal "127" ]
 

@@ -107,12 +107,20 @@ let parsePrimary grammar state index =
       | TFloat value ->
           let whole, fraction = floatParts state (index + 1) value in
           (WT.EFloat (range, true, whole, fraction), index + 2)
+      | TFloat32 text ->
+          (float32Literal state (index + 1) true range text, index + 2)
+      | TDecimal text ->
+          (decimalLiteral state (index + 1) true range text, index + 2)
       | _ ->
           parsePrefix grammar state index
             ProgramTypesShim.InfixFnName.negateBuiltinName)
   | TFloat value ->
       let whole, fraction = floatParts state index value in
       (WT.EFloat (rng state index, value < 0., whole, fraction), index + 1)
+  | TFloat32 text ->
+      (float32Literal state index false (rng state index) text, index + 1)
+  | TDecimal text ->
+      (decimalLiteral state index false (rng state index) text, index + 1)
   | TTrue -> (WT.EBool (rng state index, true), index + 1)
   | TFalse -> (WT.EBool (rng state index, false), index + 1)
   | TStringLit value ->
@@ -253,6 +261,30 @@ let parsePrimary grammar state index =
   | TFun ->
       let keyword = rng state index in
       let patterns = RevBuffer.create () and stop = ref (index + 1) in
+      (* Since darklang/dark@b2fb96b a lambda lists its parameters the way a
+         call lists arguments, `fun(acc, x) -> ...`, with the paren against
+         the keyword. A spaced `fun (a, b) ->` still takes one tuple. *)
+      if
+        tok state (index + 1) = TLParen
+        && (rng state (index + 1)).start = keyword.end_
+        && tok state (index + 2) <> TRParen
+      then begin
+        stop := index + 2;
+        let more = ref true in
+        while !more do
+          let pattern, after = BindingPatternParser.parseLetPattern state !stop in
+          RevBuffer.add patterns pattern;
+          if after = !stop then more := false
+          else if tok state after = TComma then stop := after + 1
+          else begin
+            stop := after;
+            more := false
+          end
+        done;
+        if tok state !stop = TRParen then incr stop
+        else errUnclosed state !stop ")" "(" (rng state (index + 1))
+      end
+      else
       while
         match tok state !stop with
         | TIdent _ | TUnderscore | TLParen -> true

@@ -31,8 +31,8 @@ let receive (state: Stdlib.__QuicAck.State) (number: Int64) : Stdlib.Result.Resu
     let ranges = Stdlib.__QuicAck.__insert state.ranges number
       |> Stdlib.List.filter (fun range -> range.largest >= floor)
       |> Stdlib.List.map (fun range -> Stdlib.__QuicFrames.Range { smallest = if range.smallest < floor then floor else range.smallest, largest = range.largest })
-      |> Stdlib.List.take 128 in
-    let floor = if Stdlib.List.length ranges == 128 then (match Stdlib.List.reverse ranges with | last :: _ -> if last.smallest > floor then last.smallest else floor | [] -> floor) else floor in
+      |> Stdlib.List.__takeInt 128 in
+    let floor = if Stdlib.List.__lengthInt ranges == 128 then (match Stdlib.List.reverse ranges with | last :: _ -> if last.smallest > floor then last.smallest else floor | [] -> floor) else floor in
     Ok (Stdlib.__QuicAck.Received { fresh = true, state = Stdlib.__QuicAck.State { largest = largest, floor = floor, ranges = ranges } })
 
 let __encode (ranges: List<Stdlib.__QuicFrames.Range>) (previous: Int64) (chunks: List<Blob>)
@@ -45,7 +45,7 @@ let __encode (ranges: List<Stdlib.__QuicFrames.Range>) (previous: Int64) (chunks
     | _, _ -> Error "Invalid QUIC ACK state"
 
 let encode (state: Stdlib.__QuicAck.State) : Stdlib.Result.Result<Blob, String> =
-  match Stdlib.List.take state.ranges 8 with
+  match Stdlib.List.__takeInt state.ranges 8 with
   | [] -> Error "No QUIC packets to acknowledge"
   | first :: rest ->
     match Stdlib.__QuicWire.integer first.largest, Stdlib.__QuicWire.integer (Stdlib.List.fold rest 0L (fun count _range -> count + 1L)), Stdlib.__QuicWire.integer (first.largest - first.smallest) with

@@ -37,7 +37,7 @@ let sent (state: Stdlib.__QuicRecovery.State) (packet: Stdlib.__QuicRecovery.Pac
   else if packet.at < state.clock || packet.at > 4611686018427387903L || packet.size < 1L || packet.size > state.mtu ||
           packet.token < 0L || packet.token > 4611686018427387903L || Stdlib.Blob.__byteLength packet.payload > 4096L then
     Error "Invalid QUIC sent packet"
-  else if ackEliciting && Stdlib.List.length state.packets >= 2048 then Error "Too many QUIC outstanding packets"
+  else if ackEliciting && Stdlib.List.__lengthInt state.packets >= 2048 then Error "Too many QUIC outstanding packets"
   else if ackEliciting && Stdlib.Bool.not probe && packet.size > state.congestion.window - state.congestion.inFlight then
     Error "QUIC congestion window is full"
   else Ok (Stdlib.__QuicRecovery.State {
@@ -46,7 +46,7 @@ let sent (state: Stdlib.__QuicRecovery.State) (packet: Stdlib.__QuicRecovery.Pac
       inFlight = state.congestion.inFlight + (if ackEliciting then packet.size else 0L) },
     largestSent = packet.number, largestAcked = state.largestAcked, clock = packet.at, ptoCount = state.ptoCount,
     lastSent = if ackEliciting then packet.at else state.lastSent,
-    packets = if ackEliciting then Stdlib.List.append state.packets [packet] else state.packets })
+    packets = if ackEliciting then Stdlib.List.concat state.packets [packet] else state.packets })
 
 let __contains (ranges: List<Stdlib.__QuicFrames.Range>) (number: Int64) : Bool =
   Stdlib.List.any ranges (fun range -> number >= range.smallest && number <= range.largest)
@@ -97,9 +97,9 @@ let __afterLoss (state: Stdlib.__QuicRecovery.State) (now: Int64) (lost: List<St
   let bytes = state.congestion.inFlight - Stdlib.__QuicRecovery.__bytes lost in
   let first = Stdlib.List.fold lost now (fun earlier packet -> Stdlib.__QuicRecovery.__min earlier packet.at) in
   let last = Stdlib.List.fold lost 0L (fun later packet -> Stdlib.__QuicRecovery.__max later packet.at) in
-  let persistent = state.rtt.smoothed > 0L && Stdlib.List.length lost >= 2 &&
+  let persistent = state.rtt.smoothed > 0L && Stdlib.List.__lengthInt lost >= 2 &&
     last - first >= 3L * Stdlib.__QuicRecovery.__basePto state maxAckDelay &&
-    Stdlib.Bool.not (Stdlib.List.any (Stdlib.List.append remaining acked) (fun packet -> packet.at >= first && packet.at <= last)) in
+    Stdlib.Bool.not (Stdlib.List.any (Stdlib.List.concat remaining acked) (fun packet -> packet.at >= first && packet.at <= last)) in
   if persistent then Stdlib.__QuicRecovery.Congestion {
     window = 2L * state.mtu, threshold = Stdlib.__QuicRecovery.__max (2L * state.mtu) (state.congestion.window / 2L),
     inFlight = bytes, recoveryStart = now }
@@ -112,7 +112,7 @@ let __afterLoss (state: Stdlib.__QuicRecovery.State) (now: Int64) (lost: List<St
 let acknowledge (state: Stdlib.__QuicRecovery.State) (ack: Stdlib.__QuicFrames.Ack) (now: Int64) (delayMillis: Int64) (maxAckDelay: Int64)
   : Stdlib.Result.Result<Stdlib.__QuicRecovery.Update, String> =
   if now < state.clock || now > 4611686018427387903L || delayMillis < 0L || maxAckDelay < 0L || maxAckDelay >= 16384L then Error "Invalid QUIC ACK timing"
-  else if Stdlib.List.length ack.ranges > 256 || Stdlib.List.isEmpty ack.ranges ||
+  else if Stdlib.List.__lengthInt ack.ranges > 256 || Stdlib.List.isEmpty ack.ranges ||
           Stdlib.Bool.not (Stdlib.__QuicRecovery.__validRanges ack.ranges -1L state.largestSent) then Error "QUIC ACK acknowledges unsent or invalid packets"
   else
     match ack.ranges with
@@ -182,7 +182,7 @@ let timeout (state: Stdlib.__QuicRecovery.State) (now: Int64) (maxAckDelay: Int6
     let kept = Stdlib.List.filter state.packets (fun packet -> Stdlib.Bool.not (Stdlib.__QuicRecovery.__isLost state.largestAcked now (Stdlib.__QuicRecovery.__lossDelay state) packet)) in
     let expired = match Stdlib.__QuicRecovery.__deadline state maxAckDelay with | None -> false | Some at -> now >= at in
     let probe = Stdlib.List.isEmpty lost && expired in
-    let retransmit = if probe then Stdlib.List.take (Stdlib.List.filter kept (fun packet -> Stdlib.Blob.__byteLength packet.payload > 0L)) 2
+    let retransmit = if probe then Stdlib.List.__takeInt (Stdlib.List.filter kept (fun packet -> Stdlib.Blob.__byteLength packet.payload > 0L)) 2
                      else Stdlib.List.filter lost (fun packet -> Stdlib.Blob.__byteLength packet.payload > 0L) in
     Ok (Stdlib.__QuicRecovery.Update { probe = probe, retransmit = retransmit, acknowledged = [],
       state = Stdlib.__QuicRecovery.State { mtu = state.mtu, rtt = state.rtt,

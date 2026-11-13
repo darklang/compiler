@@ -4,46 +4,46 @@
 module Darklang.Cli.Tests.Golden
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Golden.compare: Unknown function or value 'Stdlib.Test.Process.run'"
-let compare (render: Unit -> Unit) (expectedRows: List<String>) : Stdlib.Test.Result =
+let compare(render: Unit -> Unit, expectedRows: List<String>): Stdlib.Test.Result =
   // Key handlers read the worker's fixed 80x24 terminal size; viewAtSize
   // renders the original explicit sizes. Stdout contains frames only.
-  let output = Stdlib.Test.Process.run (Stdlib.Test.Process.defaults ()) render ()
+  let output = Stdlib.Test.Process.run(Stdlib.Test.Process.defaults(), render, ())
   match output with
-  | Error message -> Stdlib.Test.fail message
-  | Ok output ->
-    let actualRows = Stdlib.String.split output.stdout "\n"
-    Stdlib.Test.all
-      [ Stdlib.Test.expect
-          (output.exitCode == 0)
-          $"Fixture failed: {output.stderr} {output.stdout}"
-        Stdlib.List.length actualRows
-        |> Stdlib.Test.equal (Stdlib.List.length expectedRows)
+  | Error(message) -> Stdlib.Test.fail(message)
+  | Ok(output) ->
+    let actualRows = Stdlib.String.split(output.stdout, "\n")
+    Stdlib.Test.all(
+      [ Stdlib.Test.expect(
+          output.exitCode == 0,
+          $"Fixture failed: {output.stderr} {output.stdout}")
+        Stdlib.List.length(actualRows)
+        |> Stdlib.Test.equal(Stdlib.List.length(expectedRows))
         expectedRows
-        |> Stdlib.List.indexedMap (fun index expectedRow ->
-          Stdlib.List.getAt actualRows index |> Stdlib.Test.equal (Some expectedRow))
-        |> Stdlib.Test.all ]
+        |> Stdlib.List.indexedMap(fun(index, expectedRow) ->
+          Stdlib.List.getAt(actualRows, index) |> Stdlib.Test.equal(Some(expectedRow)))
+        |> Stdlib.Test.all ])
 
 // fixedHome supplies stable Home rows, independent of branches and commit ages.
 // The child runs with COLUMNS=80, LINES=24 and detached stdin.
 // Expected rows come from goldenview.expected.
 // @compiler blocked: compiler-gap diagnostic="Darklang.Cli.Tests.Golden.goldenviewRender: Field access requires a record value"
-let goldenviewRender () : Unit =
+let goldenviewRender(): Unit =
   // Fixed view inputs: these screenshots test layout and key handling, not the
   // developer's branches or how long ago the store was reloaded.
-  let homeItems () : List<Darklang.Cli.Workbench.BodyItem> =
-    let row (name: String) (kind: String) (desc: String) : Darklang.Cli.Workbench.BodyItem =
+  let homeItems(): List<Darklang.Cli.Workbench.BodyItem> =
+    let row(name: String, kind: String, desc: String): Darklang.Cli.Workbench.BodyItem =
       Darklang.Cli.Workbench.BodyItem { name = name, kind = kind, isModule = false, desc = desc }
-    [ Darklang.Cli.Workbench.homeHeader "this branch"
-      row "● main" "home-here" "nothing uncommitted · last commit 1m ago"
-      Darklang.Cli.Workbench.homeHeader ""
-      Darklang.Cli.Workbench.homeHeader "recent commits"
-      row "package reload (baseline)" "home-commit" "system · 1m ago"
-      Darklang.Cli.Workbench.homeHeader ""
-      Darklang.Cli.Workbench.homeHeader "branches"
-      row "● main" "home-branch" "current · 1m ago" ]
+    [ Darklang.Cli.Workbench.homeHeader("this branch")
+      row("● main", "home-here", "nothing uncommitted · last commit 1m ago")
+      Darklang.Cli.Workbench.homeHeader("")
+      Darklang.Cli.Workbench.homeHeader("recent commits")
+      row("package reload (baseline)", "home-commit", "system · 1m ago")
+      Darklang.Cli.Workbench.homeHeader("")
+      Darklang.Cli.Workbench.homeHeader("branches")
+      row("● main", "home-branch", "current · 1m ago") ]
 
-  let fixedHome (s: Darklang.Cli.Workbench.State) : Darklang.Cli.Workbench.State =
-    if s.activeView == Darklang.Cli.Workbench.vHome then { s with items = homeItems () }
+  let fixedHome(s: Darklang.Cli.Workbench.State): Darklang.Cli.Workbench.State =
+    if s.activeView == Darklang.Cli.Workbench.vHome then { s with items = homeItems() }
     else s
 
   // Every row of a workbench view at three sizes, for diffing a render change against.
@@ -58,37 +58,37 @@ let goldenviewRender () : Unit =
   // Three sizes because the interesting bugs are in clipping and in rows that run out of room.
 
   let loadedBase =
-    Darklang.Cli.Workbench.initialState
-      Darklang.SCM.Branch.mainBranchId
-      Stdlib.Option.Option.None
-      "perf-instance"
-      false
+    Darklang.Cli.Workbench.initialState(
+      Darklang.SCM.Branch.mainBranchId,
+      Stdlib.Option.Option.None,
+      "perf-instance",
+      Darklang.Cli.Workbench.Updates.Manual)
 
-  let base = fixedHome loadedBase
+  let base = fixedHome(loadedBase)
 
   let sizes =
     [ Stdlib.Cli.Tui.Size { width = 120, height = 40 }
       Stdlib.Cli.Tui.Size { width = 80, height = 24 }
       Stdlib.Cli.Tui.Size { width = 40, height = 10 } ]
 
-  let dump (size: Stdlib.Cli.Tui.Size) : Unit =
-    let v = Darklang.Cli.Workbench.viewAtSize base size
+  let dump(size: Stdlib.Cli.Tui.Size): Unit =
+    let v = Darklang.Cli.Workbench.viewAtSize(base, size)
     let _ =
       v.rows
-      |> Stdlib.List.indexedMap (fun i r ->
-        Stdlib.printLine
-          ((Stdlib.toString size.width)
+      |> Stdlib.List.indexedMap(fun(i, r) ->
+        Stdlib.printLine(
+          ((Stdlib.display(size.width))
            + "x"
-           + (Stdlib.toString size.height)
+           + (Stdlib.display(size.height))
            + " "
-           + (Stdlib.toString i)
+           + (Stdlib.display(i))
            + "|"
-           + r))
+           + r)))
     ()
 
-  let _rendered = sizes |> Stdlib.List.map (fun s -> dump s)
+  let _rendered = sizes |> Stdlib.List.map(fun s -> dump(s))
 
-  Stdlib.printLine "-- end of golden view --"
+  Stdlib.printLine("-- end of golden view --")
 
 val goldenviewExpected =
   [ "120x40 0|  \u001b[1m\u001b[38;5;141mmain\u001b[0m\u001b[2m    perf-instance\u001b[0m\u001b[0m"
@@ -130,7 +130,7 @@ val goldenviewExpected =
     "120x40 36|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "120x40 37|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "120x40 38|\u001b[90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\u001b[0m\u001b[0m"
-    "120x40 39|  \u001b[37m↑↓\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mopen\u001b[0m\u001b[2m · \u001b[0m\u001b[37ms\u001b[0m \u001b[2mswitch branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mb\u001b[0m \u001b[2mnew branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mc\u001b[0m \u001b[2mcommit\u001b[0m\u001b[2m · \u001b[0m\u001b[37mm\u001b[0m \u001b[2mmerge\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37mp\u001b[0m \u001b[2mprompt\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
+    "120x40 39|  \u001b[37m↑↓\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mopen\u001b[0m\u001b[2m · \u001b[0m\u001b[37ms\u001b[0m \u001b[2mswitch branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mb\u001b[0m \u001b[2mnew branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mc\u001b[0m \u001b[2mcommit\u001b[0m\u001b[2m · \u001b[0m\u001b[37mm\u001b[0m \u001b[2mmerge\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
     "80x24 0|  \u001b[1m\u001b[38;5;141mmain\u001b[0m\u001b[2m    perf-instance\u001b[0m\u001b[0m"
     "80x24 1|\u001b[90m╭\u001b[0m\u001b[90m──────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b[90m╮\u001b[0m\u001b[0m"
     "80x24 2|\u001b[90m│\u001b[0m   \u001b[2mthis branch\u001b[0m                                                                \u001b[90m│\u001b[0m\u001b[0m"
@@ -170,29 +170,29 @@ val goldenviewExpected =
 
 // @compiler xfail compile: "Unknown function or value 'compare'" class=missing-support reason=upstream-dependency
 test goldenview =
-  compare goldenviewRender goldenviewExpected
+  compare(goldenviewRender, goldenviewExpected)
 
 // fixedHome supplies stable Home rows after each key press, independent of branches
 // and commit ages. The child runs with COLUMNS=80, LINES=24 and detached stdin.
 // Expected rows come from goldenkeys.expected.
 // @compiler blocked: compiler-gap diagnostic="Darklang.Cli.Tests.Golden.goldenkeysRender: Field access requires a record value"
-let goldenkeysRender () : Unit =
+let goldenkeysRender(): Unit =
   // Fixed view inputs: these screenshots test layout and key handling, not the
   // developer's branches or how long ago the store was reloaded.
-  let homeItems () : List<Darklang.Cli.Workbench.BodyItem> =
-    let row (name: String) (kind: String) (desc: String) : Darklang.Cli.Workbench.BodyItem =
+  let homeItems(): List<Darklang.Cli.Workbench.BodyItem> =
+    let row(name: String, kind: String, desc: String): Darklang.Cli.Workbench.BodyItem =
       Darklang.Cli.Workbench.BodyItem { name = name, kind = kind, isModule = false, desc = desc }
-    [ Darklang.Cli.Workbench.homeHeader "this branch"
-      row "● main" "home-here" "nothing uncommitted · last commit 1m ago"
-      Darklang.Cli.Workbench.homeHeader ""
-      Darklang.Cli.Workbench.homeHeader "recent commits"
-      row "package reload (baseline)" "home-commit" "system · 1m ago"
-      Darklang.Cli.Workbench.homeHeader ""
-      Darklang.Cli.Workbench.homeHeader "branches"
-      row "● main" "home-branch" "current · 1m ago" ]
+    [ Darklang.Cli.Workbench.homeHeader("this branch")
+      row("● main", "home-here", "nothing uncommitted · last commit 1m ago")
+      Darklang.Cli.Workbench.homeHeader("")
+      Darklang.Cli.Workbench.homeHeader("recent commits")
+      row("package reload (baseline)", "home-commit", "system · 1m ago")
+      Darklang.Cli.Workbench.homeHeader("")
+      Darklang.Cli.Workbench.homeHeader("branches")
+      row("● main", "home-branch", "current · 1m ago") ]
 
-  let fixedHome (s: Darklang.Cli.Workbench.State) : Darklang.Cli.Workbench.State =
-    if s.activeView == Darklang.Cli.Workbench.vHome then { s with items = homeItems () }
+  let fixedHome(s: Darklang.Cli.Workbench.State): Darklang.Cli.Workbench.State =
+    if s.activeView == Darklang.Cli.Workbench.vHome then { s with items = homeItems() }
     else s
 
   // A workbench view after each key of a navigation sequence, for diffing a change against.
@@ -206,60 +206,59 @@ let goldenkeysRender () : Unit =
   // them deliberately, never to make the test pass.
 
   let loadedBase =
-    Darklang.Cli.Workbench.initialState
-      Darklang.SCM.Branch.mainBranchId
-      Stdlib.Option.Option.None
-      "perf-instance"
-      false
+    Darklang.Cli.Workbench.initialState(
+      Darklang.SCM.Branch.mainBranchId,
+      Stdlib.Option.Option.None,
+      "perf-instance",
+      Darklang.Cli.Workbench.Updates.Manual)
 
-  let base = fixedHome loadedBase
+  let base = fixedHome(loadedBase)
 
   let size = Stdlib.Cli.Tui.Size { width = 120, height = 40 }
   let mods = Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = false, ctrl = false, shift = false }
 
   // Rendered as one line per row, prefixed by the step, so a diff names the key that broke it.
-  let render (label: String) (s: Darklang.Cli.Workbench.State) : Unit =
-    let v = Darklang.Cli.Workbench.viewAtSize s size
+  let render(label: String, s: Darklang.Cli.Workbench.State): Unit =
+    let v = Darklang.Cli.Workbench.viewAtSize(s, size)
 
     v.rows
-    |> Stdlib.List.indexedMap (fun i row ->
-      Stdlib.printLine (label + " " + (Stdlib.toString i) + "|" + row))
+    |> Stdlib.List.indexedMap(fun(i, row) ->
+      Stdlib.printLine(label + " " + (Stdlib.display(i)) + "|" + row))
     |> Stdlib.List.length
-    |> Stdlib.toString
+    |> Stdlib.display
     |> (fun _ -> ())
 
   // Applies one key and renders the result, carrying the state forward. `Exit` and `Launch` end the
   // walk on the state they carry, so the sequence stays honest about where it actually got to.
-  let press
-    (s: Darklang.Cli.Workbench.State)
-    (label: String)
-    (k: Stdlib.Cli.Stdin.Key.Key)
+  let press(
+    s: Darklang.Cli.Workbench.State,
+    label: String,
+    k: Stdlib.Cli.Stdin.Key.Key)
     : Darklang.Cli.Workbench.State =
     let next =
-      match Darklang.Cli.Workbench.handleKey s k mods Stdlib.Option.Option.None with
-      | Continue s2 -> s2
-      | Exit s2 -> s2
+      match Darklang.Cli.Workbench.handleKey(s, k, mods, Stdlib.Option.Option.None) with
+      | Continue(s2) -> s2
+      | Exit(s2) -> s2
       | Launch(s2, _cmd) -> s2
-      | ToPrompt s2 -> s2
 
-    let next = fixedHome next
-    let _ = render label next
+    let next = fixedHome(next)
+    let _ = render(label, next)
     next
 
-  let _ = render "start" base
+  let _ = render("start", base)
 
-  let s1 = press base "tab" Stdlib.Cli.Stdin.Key.Key.Tab
-  let s2 = press s1 "down1" Stdlib.Cli.Stdin.Key.Key.DownArrow
-  let s3 = press s2 "down2" Stdlib.Cli.Stdin.Key.Key.DownArrow
-  let s4 = press s3 "right" Stdlib.Cli.Stdin.Key.Key.RightArrow
-  let s5 = press s4 "up" Stdlib.Cli.Stdin.Key.Key.UpArrow
-  let s6 = press s5 "left" Stdlib.Cli.Stdin.Key.Key.LeftArrow
-  let s7 = press s6 "enter" Stdlib.Cli.Stdin.Key.Key.Enter
-  let s8 = press s7 "esc" Stdlib.Cli.Stdin.Key.Key.Escape
-  let s9 = press s8 "tab2" Stdlib.Cli.Stdin.Key.Key.Tab
-  let _s10 = press s9 "end" Stdlib.Cli.Stdin.Key.Key.End
+  let s1 = press(base, "tab", Stdlib.Cli.Stdin.Key.Key.Tab)
+  let s2 = press(s1, "down1", Stdlib.Cli.Stdin.Key.Key.DownArrow)
+  let s3 = press(s2, "down2", Stdlib.Cli.Stdin.Key.Key.DownArrow)
+  let s4 = press(s3, "right", Stdlib.Cli.Stdin.Key.Key.RightArrow)
+  let s5 = press(s4, "up", Stdlib.Cli.Stdin.Key.Key.UpArrow)
+  let s6 = press(s5, "left", Stdlib.Cli.Stdin.Key.Key.LeftArrow)
+  let s7 = press(s6, "enter", Stdlib.Cli.Stdin.Key.Key.Enter)
+  let s8 = press(s7, "esc", Stdlib.Cli.Stdin.Key.Key.Escape)
+  let s9 = press(s8, "tab2", Stdlib.Cli.Stdin.Key.Key.Tab)
+  let _s10 = press(s9, "end", Stdlib.Cli.Stdin.Key.Key.End)
 
-  Stdlib.printLine "-- golden keys done --"
+  Stdlib.printLine("-- golden keys done --")
 
 val goldenkeysExpected =
   [ "start 0|  \u001b[1m\u001b[38;5;141mmain\u001b[0m\u001b[2m    perf-instance\u001b[0m\u001b[0m"
@@ -301,7 +300,7 @@ val goldenkeysExpected =
     "start 36|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "start 37|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "start 38|\u001b[90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\u001b[0m\u001b[0m"
-    "start 39|  \u001b[37m↑↓\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mopen\u001b[0m\u001b[2m · \u001b[0m\u001b[37ms\u001b[0m \u001b[2mswitch branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mb\u001b[0m \u001b[2mnew branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mc\u001b[0m \u001b[2mcommit\u001b[0m\u001b[2m · \u001b[0m\u001b[37mm\u001b[0m \u001b[2mmerge\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37mp\u001b[0m \u001b[2mprompt\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
+    "start 39|  \u001b[37m↑↓\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mopen\u001b[0m\u001b[2m · \u001b[0m\u001b[37ms\u001b[0m \u001b[2mswitch branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mb\u001b[0m \u001b[2mnew branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mc\u001b[0m \u001b[2mcommit\u001b[0m\u001b[2m · \u001b[0m\u001b[37mm\u001b[0m \u001b[2mmerge\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
     "tab 0|  \u001b[1m\u001b[38;5;141mmain\u001b[0m\u001b[2m    perf-instance\u001b[0m\u001b[0m"
     "tab 1| \u001b[7m 1 Home \u001b[0m   \u001b[2m2 \u001b[0mCode    \u001b[2m3 \u001b[0mChanges    \u001b[2m4 \u001b[0mREPL    \u001b[2m5 \u001b[0mTraces    \u001b[2m6 \u001b[0mDocs \u001b[0m"
     "tab 2|\u001b[90m╭\u001b[0m\u001b[90m──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b[90m╮\u001b[0m\u001b[0m"
@@ -341,7 +340,7 @@ val goldenkeysExpected =
     "tab 36|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "tab 37|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "tab 38|\u001b[90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\u001b[0m\u001b[0m"
-    "tab 39|  \u001b[37m←→\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mgo\u001b[0m\u001b[2m · \u001b[0m\u001b[37m↓\u001b[0m \u001b[2mto view\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37mp\u001b[0m \u001b[2mprompt\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
+    "tab 39|  \u001b[37m←→\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mgo\u001b[0m\u001b[2m · \u001b[0m\u001b[37m↓\u001b[0m \u001b[2mto view\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
     "down1 0|  \u001b[1m\u001b[38;5;141mmain\u001b[0m\u001b[2m    perf-instance\u001b[0m\u001b[0m"
     "down1 1| \u001b[48;5;61m\u001b[37m\u001b[1m 1 Home \u001b[0m  \u001b[7m 2 Code \u001b[0m   \u001b[2m3 \u001b[0mChanges    \u001b[2m4 \u001b[0mREPL    \u001b[2m5 \u001b[0mTraces    \u001b[2m6 \u001b[0mDocs \u001b[0m"
     "down1 2|\u001b[90m╭\u001b[0m\u001b[90m──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b[90m╮\u001b[0m\u001b[0m"
@@ -381,7 +380,7 @@ val goldenkeysExpected =
     "down1 36|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "down1 37|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "down1 38|\u001b[90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\u001b[0m\u001b[0m"
-    "down1 39|  \u001b[37m←→\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mgo\u001b[0m\u001b[2m · \u001b[0m\u001b[37m↓\u001b[0m \u001b[2mto view\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37mp\u001b[0m \u001b[2mprompt\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
+    "down1 39|  \u001b[37m←→\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mgo\u001b[0m\u001b[2m · \u001b[0m\u001b[37m↓\u001b[0m \u001b[2mto view\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
     "down2 0|  \u001b[1m\u001b[38;5;141mmain\u001b[0m\u001b[2m    perf-instance\u001b[0m\u001b[0m"
     "down2 1| \u001b[48;5;61m\u001b[37m\u001b[1m 1 Home \u001b[0m   \u001b[2m2 \u001b[0mCode   \u001b[7m 3 Changes \u001b[0m   \u001b[2m4 \u001b[0mREPL    \u001b[2m5 \u001b[0mTraces    \u001b[2m6 \u001b[0mDocs \u001b[0m"
     "down2 2|\u001b[90m╭\u001b[0m\u001b[90m──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b[90m╮\u001b[0m\u001b[0m"
@@ -421,7 +420,7 @@ val goldenkeysExpected =
     "down2 36|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "down2 37|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "down2 38|\u001b[90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\u001b[0m\u001b[0m"
-    "down2 39|  \u001b[37m←→\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mgo\u001b[0m\u001b[2m · \u001b[0m\u001b[37m↓\u001b[0m \u001b[2mto view\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37mp\u001b[0m \u001b[2mprompt\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
+    "down2 39|  \u001b[37m←→\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mgo\u001b[0m\u001b[2m · \u001b[0m\u001b[37m↓\u001b[0m \u001b[2mto view\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
     "right 0|  \u001b[1m\u001b[38;5;141mmain\u001b[0m\u001b[2m    perf-instance\u001b[0m\u001b[0m"
     "right 1| \u001b[48;5;61m\u001b[37m\u001b[1m 1 Home \u001b[0m   \u001b[2m2 \u001b[0m\u001b[2mCode\u001b[0m    \u001b[2m3 \u001b[0m\u001b[2mChanges\u001b[0m    \u001b[2m4 \u001b[0m\u001b[2mREPL\u001b[0m    \u001b[2m5 \u001b[0m\u001b[2mTraces\u001b[0m    \u001b[2m6 \u001b[0m\u001b[2mDocs\u001b[0m \u001b[0m"
     "right 2|\u001b[90m╭\u001b[0m\u001b[90m──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b[90m╮\u001b[0m\u001b[0m"
@@ -461,7 +460,7 @@ val goldenkeysExpected =
     "right 36|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "right 37|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "right 38|\u001b[90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\u001b[0m\u001b[0m"
-    "right 39|  \u001b[37m↑↓\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mopen\u001b[0m\u001b[2m · \u001b[0m\u001b[37ms\u001b[0m \u001b[2mswitch branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mb\u001b[0m \u001b[2mnew branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mc\u001b[0m \u001b[2mcommit\u001b[0m\u001b[2m · \u001b[0m\u001b[37mm\u001b[0m \u001b[2mmerge\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37mp\u001b[0m \u001b[2mprompt\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
+    "right 39|  \u001b[37m↑↓\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mopen\u001b[0m\u001b[2m · \u001b[0m\u001b[37ms\u001b[0m \u001b[2mswitch branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mb\u001b[0m \u001b[2mnew branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mc\u001b[0m \u001b[2mcommit\u001b[0m\u001b[2m · \u001b[0m\u001b[37mm\u001b[0m \u001b[2mmerge\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
     "up 0|  \u001b[1m\u001b[38;5;141mmain\u001b[0m\u001b[2m    perf-instance\u001b[0m\u001b[0m"
     "up 1| \u001b[48;5;61m\u001b[37m\u001b[1m 1 Home \u001b[0m   \u001b[2m2 \u001b[0m\u001b[2mCode\u001b[0m    \u001b[2m3 \u001b[0m\u001b[2mChanges\u001b[0m    \u001b[2m4 \u001b[0m\u001b[2mREPL\u001b[0m    \u001b[2m5 \u001b[0m\u001b[2mTraces\u001b[0m    \u001b[2m6 \u001b[0m\u001b[2mDocs\u001b[0m \u001b[0m"
     "up 2|\u001b[90m╭\u001b[0m\u001b[90m──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b[90m╮\u001b[0m\u001b[0m"
@@ -501,7 +500,7 @@ val goldenkeysExpected =
     "up 36|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "up 37|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "up 38|\u001b[90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\u001b[0m\u001b[0m"
-    "up 39|  \u001b[37m↑↓\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mopen\u001b[0m\u001b[2m · \u001b[0m\u001b[37ms\u001b[0m \u001b[2mswitch branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mb\u001b[0m \u001b[2mnew branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mc\u001b[0m \u001b[2mcommit\u001b[0m\u001b[2m · \u001b[0m\u001b[37mm\u001b[0m \u001b[2mmerge\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37mp\u001b[0m \u001b[2mprompt\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
+    "up 39|  \u001b[37m↑↓\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mopen\u001b[0m\u001b[2m · \u001b[0m\u001b[37ms\u001b[0m \u001b[2mswitch branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mb\u001b[0m \u001b[2mnew branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mc\u001b[0m \u001b[2mcommit\u001b[0m\u001b[2m · \u001b[0m\u001b[37mm\u001b[0m \u001b[2mmerge\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
     "left 0|  \u001b[1m\u001b[38;5;141mmain\u001b[0m\u001b[2m    perf-instance\u001b[0m\u001b[0m"
     "left 1| \u001b[48;5;61m\u001b[37m\u001b[1m 1 Home \u001b[0m   \u001b[2m2 \u001b[0m\u001b[2mCode\u001b[0m    \u001b[2m3 \u001b[0m\u001b[2mChanges\u001b[0m    \u001b[2m4 \u001b[0m\u001b[2mREPL\u001b[0m    \u001b[2m5 \u001b[0m\u001b[2mTraces\u001b[0m    \u001b[2m6 \u001b[0m\u001b[2mDocs\u001b[0m \u001b[0m"
     "left 2|\u001b[90m╭\u001b[0m\u001b[90m──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b[90m╮\u001b[0m\u001b[0m"
@@ -541,7 +540,7 @@ val goldenkeysExpected =
     "left 36|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "left 37|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "left 38|\u001b[90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\u001b[0m\u001b[0m"
-    "left 39|  \u001b[37m↑↓\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mopen\u001b[0m\u001b[2m · \u001b[0m\u001b[37ms\u001b[0m \u001b[2mswitch branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mb\u001b[0m \u001b[2mnew branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mc\u001b[0m \u001b[2mcommit\u001b[0m\u001b[2m · \u001b[0m\u001b[37mm\u001b[0m \u001b[2mmerge\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37mp\u001b[0m \u001b[2mprompt\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
+    "left 39|  \u001b[37m↑↓\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mopen\u001b[0m\u001b[2m · \u001b[0m\u001b[37ms\u001b[0m \u001b[2mswitch branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mb\u001b[0m \u001b[2mnew branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mc\u001b[0m \u001b[2mcommit\u001b[0m\u001b[2m · \u001b[0m\u001b[37mm\u001b[0m \u001b[2mmerge\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
     "enter 0|  \u001b[1m\u001b[38;5;141mmain\u001b[0m\u001b[2m    perf-instance\u001b[0m\u001b[0m"
     "enter 1|  \u001b[2m1 \u001b[0m\u001b[2mHome\u001b[0m    \u001b[2m2 \u001b[0m\u001b[2mCode\u001b[0m   \u001b[48;5;61m\u001b[37m\u001b[1m 3 Changes \u001b[0m   \u001b[2m4 \u001b[0m\u001b[2mREPL\u001b[0m    \u001b[2m5 \u001b[0m\u001b[2mTraces\u001b[0m    \u001b[2m6 \u001b[0m\u001b[2mDocs\u001b[0m \u001b[0m"
     "enter 2|\u001b[90m╭\u001b[0m\u001b[90m─ \u001b[0m\u001b[2mmain\u001b[0m\u001b[90m ───────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b[90m╮\u001b[0m\u001b[0m"
@@ -621,7 +620,7 @@ val goldenkeysExpected =
     "esc 36|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "esc 37|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "esc 38|\u001b[90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\u001b[0m\u001b[0m"
-    "esc 39|  \u001b[37m↑↓\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mopen\u001b[0m\u001b[2m · \u001b[0m\u001b[37ms\u001b[0m \u001b[2mswitch branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mb\u001b[0m \u001b[2mnew branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mc\u001b[0m \u001b[2mcommit\u001b[0m\u001b[2m · \u001b[0m\u001b[37mm\u001b[0m \u001b[2mmerge\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37mp\u001b[0m \u001b[2mprompt\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
+    "esc 39|  \u001b[37m↑↓\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mopen\u001b[0m\u001b[2m · \u001b[0m\u001b[37ms\u001b[0m \u001b[2mswitch branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mb\u001b[0m \u001b[2mnew branch\u001b[0m\u001b[2m · \u001b[0m\u001b[37mc\u001b[0m \u001b[2mcommit\u001b[0m\u001b[2m · \u001b[0m\u001b[37mm\u001b[0m \u001b[2mmerge\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
     "tab2 0|  \u001b[1m\u001b[38;5;141mmain\u001b[0m\u001b[2m    perf-instance\u001b[0m\u001b[0m"
     "tab2 1| \u001b[7m 1 Home \u001b[0m   \u001b[2m2 \u001b[0mCode    \u001b[2m3 \u001b[0mChanges    \u001b[2m4 \u001b[0mREPL    \u001b[2m5 \u001b[0mTraces    \u001b[2m6 \u001b[0mDocs \u001b[0m"
     "tab2 2|\u001b[90m╭\u001b[0m\u001b[90m──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b[90m╮\u001b[0m\u001b[0m"
@@ -661,7 +660,7 @@ val goldenkeysExpected =
     "tab2 36|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "tab2 37|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "tab2 38|\u001b[90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\u001b[0m\u001b[0m"
-    "tab2 39|  \u001b[37m←→\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mgo\u001b[0m\u001b[2m · \u001b[0m\u001b[37m↓\u001b[0m \u001b[2mto view\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37mp\u001b[0m \u001b[2mprompt\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
+    "tab2 39|  \u001b[37m←→\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mgo\u001b[0m\u001b[2m · \u001b[0m\u001b[37m↓\u001b[0m \u001b[2mto view\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
     "end 0|  \u001b[1m\u001b[38;5;141mmain\u001b[0m\u001b[2m    perf-instance\u001b[0m\u001b[0m"
     "end 1| \u001b[7m 1 Home \u001b[0m   \u001b[2m2 \u001b[0mCode    \u001b[2m3 \u001b[0mChanges    \u001b[2m4 \u001b[0mREPL    \u001b[2m5 \u001b[0mTraces    \u001b[2m6 \u001b[0mDocs \u001b[0m"
     "end 2|\u001b[90m╭\u001b[0m\u001b[90m──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b[90m╮\u001b[0m\u001b[0m"
@@ -701,10 +700,10 @@ val goldenkeysExpected =
     "end 36|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "end 37|\u001b[90m│\u001b[0m                                                                                                                      \u001b[90m│\u001b[0m\u001b[0m"
     "end 38|\u001b[90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\u001b[0m\u001b[0m"
-    "end 39|  \u001b[37m←→\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mgo\u001b[0m\u001b[2m · \u001b[0m\u001b[37m↓\u001b[0m \u001b[2mto view\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37mp\u001b[0m \u001b[2mprompt\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
+    "end 39|  \u001b[37m←→\u001b[0m \u001b[2mmove\u001b[0m\u001b[2m · \u001b[0m\u001b[37m⏎\u001b[0m \u001b[2mgo\u001b[0m\u001b[2m · \u001b[0m\u001b[37m↓\u001b[0m \u001b[2mto view\u001b[0m\u001b[2m · \u001b[0m\u001b[37m/\u001b[0m \u001b[2msearch\u001b[0m\u001b[2m · \u001b[0m\u001b[37m:\u001b[0m \u001b[2mcmd\u001b[0m\u001b[2m · \u001b[0m\u001b[37m`\u001b[0m \u001b[2mviews\u001b[0m\u001b[2m · \u001b[0m\u001b[37m?\u001b[0m \u001b[2mhelp\u001b[0m\u001b[2m · \u001b[0m\u001b[37mq\u001b[0m \u001b[2mquit\u001b[0m\u001b[0m"
     "-- golden keys done --"
     "" ]
 
 // @compiler xfail compile: "Unknown function or value 'compare'" class=missing-support reason=upstream-dependency
 test goldenkeys =
-  compare goldenkeysRender goldenkeysExpected
+  compare(goldenkeysRender, goldenkeysExpected)

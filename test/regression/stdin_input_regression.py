@@ -29,7 +29,7 @@ let _ = Stdlib.Cli.Posix.fdWrite 2 (Stdlib.String.toBlob report) in
             'secret': '''let value = Stdlib.Cli.Stdin.readSecret () in
 let _ = Stdlib.Cli.Posix.fdWrite 2 (Stdlib.String.toBlob value) in
 0L''',
-            'all': '''let value = Stdlib.Cli.Stdin.readAll () in
+            'all': '''let value = Stdlib.Cli.Stdin.readAll () |> Stdlib.Result.withDefault "" in
 let _ = Builtin.print value in
 0L''',
             'split': '''let a = Builtin.stdinReadExactly 1 in
