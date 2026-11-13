@@ -244,6 +244,11 @@ let slotInitRootRetainTarget recordRegistry sumShapeRegistry valueType =
         match valueType with
         | AST.TTuple _ | AST.TRecord _ | AST.TInt128 | AST.TUInt128 ->
             Some (LIR.SlotInitGenericRootRetain payloadSize)
+        (* Option<record> and the like are their payload's pointer, or 0. *)
+        | AST.TSum _
+          when MemoryPlanning.isNullablePointerSumType sumShapeRegistry
+                 valueType ->
+            Some (LIR.SlotInitGenericRootRetain payloadSize)
         | _ -> None)
     | MemoryModel.StreamRoot -> Some (LIR.SlotInitGenericRootRetain 24)
     | MemoryModel.BoxedSum (payloadSize, _, _) -> (
