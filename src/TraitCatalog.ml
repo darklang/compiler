@@ -25,6 +25,7 @@ type t = {
   implementations : implementation M.t;
   functionBounds : (string list * obligation list) M.t;
   typeBounds : (string list * obligation list) M.t;
+  sameTypes : string M.t;
 }
 
 let empty =
@@ -33,6 +34,7 @@ let empty =
     implementations = M.empty;
     functionBounds = M.empty;
     typeBounds = M.empty;
+    sameTypes = M.empty;
   }
 
 let mergeMap source target =
@@ -51,4 +53,5 @@ let merge source target =
     implementations = mergeMap source.implementations target.implementations;
     functionBounds = mergeMap source.functionBounds target.functionBounds;
     typeBounds = mergeMap source.typeBounds target.typeBounds;
+    sameTypes = mergeMap source.sameTypes target.sameTypes;
   }

@@ -200,12 +200,22 @@ let decodeDictName typ = namedPlan "__dark_json_decode_dict_" typ
 let makeCase pattern body =
   { patterns = N.singleton pattern; guard = None; body }
 
+(* A type merged into another of the same content is an alias of it. *)
+let rec owned (env : env) name =
+  match M.find_opt name env.aliases with
+  | Some (_, (AST.TRecord (target, _) | AST.TSum (target, _))) when target <> name ->
+      owned env target
+  | _ -> name
+[@@warning "-4"]
+
 let typeId (env : env) name =
+  let name = owned env name in
   match tryFindTypeId name env.symbols with
   | Some id -> id
   | None -> Crash.crash ("Generated JSON type was not interned: " ^ name)
 
 let constructor (env : env) owner caseName payload =
+  let owner = owned env owner in
   match tryFindConstructorId owner caseName env.symbols with
   | Some id ->
       Constructor
@@ -216,6 +226,7 @@ let constructor (env : env) owner caseName payload =
         ("JSON constructor was not interned: " ^ owner ^ "." ^ caseName)
 
 let constructorPattern (env : env) owner caseName fields =
+  let owner = owned env owner in
   match tryFindConstructorId owner caseName env.symbols with
   | Some id -> PConstructor (id, fields)
   | None ->
@@ -223,6 +234,7 @@ let constructorPattern (env : env) owner caseName fields =
         ("JSON constructor pattern was not interned: " ^ owner ^ "." ^ caseName)
 
 let fieldId (env : env) owner fieldName =
+  let owner = owned env owner in
   match tryFindFieldId owner fieldName env.symbols with
   | Some id -> id
   | None ->
@@ -233,7 +245,7 @@ let fieldId (env : env) owner fieldName =
 let recordLiteral (env : env) typeName typeArgs fields =
   let owner = typeId env typeName in
   let fieldCount =
-    match M.find_opt typeName env.records with
+    match M.find_opt (owned env typeName) env.records with
     | Some info -> List.length info.Types.fields
     | None ->
         Crash.crash ("Generated JSON record type '" ^ typeName ^ "' is absent")
@@ -310,7 +322,8 @@ let rec typeReference (env : env) typ =
         (Some (StringLiteral ""))
     in
     let fqNameType =
-      AST.TSum ("Darklang.LanguageTools.RuntimeTypes.FQTypeName.FQTypeName", [])
+      AST.TSum
+        (owned env "Darklang.LanguageTools.RuntimeTypes.FQTypeName.FQTypeName", [])
     in
     let fqName =
       constructor env

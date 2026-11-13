@@ -192,7 +192,7 @@ module Update =
        { myRec with z = 3, x = 42, y = 11, p = 10 })
       => raises "No field named `p`"
 
-    // @compiler xfail compile: "Unknown field 'other' on Darklang.Language.Tests.Records.Update.RecordForUpdate" class=aot-rejection reason=aot-invalid-field
+    // @compiler xfail compile: "Unknown field 'other' on Darklang.Language.Tests.Equality.ERec" class=aot-rejection reason=aot-invalid-field
     test otherFieldRaises =
       (let myRec = RecordForUpdate { x = 4, y = 1 }
        { myRec with other = 2 })
@@ -205,7 +205,7 @@ module Update =
       => raises "Duplicate field `x`"
 
     // As in construction, the first bad field as written is the one named.
-    // @compiler xfail compile: "Unknown field 'zzz' on Darklang.Language.Tests.Records.Update.RecordForUpdate" class=missing-support reason=compiler-gap
+    // @compiler xfail compile: "Unknown field 'zzz' on Darklang.Language.Tests.Equality.ERec" class=missing-support reason=compiler-gap
     test unknownBeforeADuplicateRaises =
       (let myRec = RecordForUpdate { x = 4, y = 1 }
        { myRec with x = 2, zzz = 1, x = 3 })
@@ -225,11 +225,11 @@ module FieldAccess =
     (let x = MyRecord { col1 = 1 } in x.col1) |> Stdlib.Test.equal(1)
 
   module Errors =
-    // @compiler xfail compile: "Unknown field '' on Darklang.Language.Tests.Records.FieldAccess.MyRecord" class=aot-rejection reason=aot-invalid-field
+    // @compiler xfail compile: "Unknown field '' on Darklang.Language.Tests.Records.Cols1" class=aot-rejection reason=aot-invalid-field
     test emptyFieldNameRaises =
       (let x = MyRecord { col1 = 1 } in x.___) => raises "Field name is empty"
 
-    // @compiler xfail compile: "Unknown field 'fieldName' on Darklang.Language.Tests.Records.FieldAccess.MyRecord" class=aot-rejection reason=aot-invalid-field
+    // @compiler xfail compile: "Unknown field 'fieldName' on Darklang.Language.Tests.Records.Cols1" class=aot-rejection reason=aot-invalid-field
     test missingFieldRaises =
       (let x = MyRecord { col1 = 1 } in x.fieldName)
       => raises "Tried to access field `fieldName`, but it doesn't exist"

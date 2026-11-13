@@ -134,6 +134,7 @@ let[@warning "-4"] predeclareTypes items =
                           path;
                           definition = declaration.WT.definition;
                           bounds = declaration.WT.bounds;
+                          sameAs = None;
                         }
                         types)
              | _ -> Ok types))
@@ -568,6 +569,18 @@ let checkItems (checkExpression : expressionChecker) baseEnvironment
         match baseEnvironment with
         | Some (Environment (globals, symbols)) -> (globals, symbols)
         | None -> (emptyGlobals, C.emptySymbols ())
+      in
+      let[@warning "-4"] baseImplemented =
+        List.fold_left
+          (fun found (implementation : traitImplementation) ->
+            match implementation.selfType with
+            | AST.TRecord (name, _) | AST.TSum (name, _) -> S.add name found
+            | _ -> found)
+          S.empty baseGlobals.implementations
+      in
+      let localTypes, items =
+        TypeIdentity.unify allowInternal baseGlobals.types baseImplemented
+          localTypes items
       in
       let types = M.fold M.add localTypes baseGlobals.types in
       let items, implementations =

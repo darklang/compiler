@@ -770,7 +770,16 @@ let catalog (globals : globals) symbols =
        globals.types (Ok M.empty))
     (fun typeBounds ->
       let catalog =
-        { TraitCatalog.dispatches; implementations; functionBounds; typeBounds }
+        let sameTypes =
+          M.filter_map (fun _ (entry : typeEntry) -> entry.sameAs) globals.types
+        in
+        {
+          TraitCatalog.dispatches;
+          implementations;
+          functionBounds;
+          typeBounds;
+          sameTypes;
+        }
       in
       bind
         (M.fold
