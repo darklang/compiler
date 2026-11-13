@@ -3,88 +3,329 @@ module Darklang.Cli.Packages.Errors
 
 /// Whether an invalid name uses the internal `PACKAGE.` notation, allowing the
 /// CLI to show its source spelling.
-let isInternalPackageName (originalName: List<String>) : Bool =
+let isInternalPackageName(originalName: List<String>): Bool =
   match originalName with
-  | "PACKAGE" :: _ -> true
+  | ["PACKAGE", ...] -> true
   | _ -> false
 
 
-let sourceNameWithoutInternalPrefix (originalName: List<String>) : String =
+let sourceNameWithoutInternalPrefix(originalName: List<String>): String =
   let sourceParts =
     match originalName with
-    | "PACKAGE" :: "Darklang" :: "Stdlib" :: rest ->
-      Stdlib.List.push rest "Stdlib"
-    | "PACKAGE" :: rest -> rest
+    | ["PACKAGE", "Darklang", "Stdlib", ...rest] ->
+      Stdlib.List.prepend(rest, "Stdlib")
+    | ["PACKAGE", ...rest] -> rest
     | _ -> originalName
-  Stdlib.String.join sourceParts "."
+  Stdlib.String.join(sourceParts, ".")
 
 
-let splitLast
-  (parts: List<String>)
+let splitLast(
+  parts: List<String>)
   : Stdlib.Option.Option<(List<String> * String)> =
-  match Stdlib.List.reverse parts with
+  match Stdlib.List.reverse(parts) with
   | [] -> Stdlib.Option.Option.None
-  | name :: reversedModules ->
-    Stdlib.Option.Option.Some((Stdlib.List.reverse reversedModules, name))
+  | [name, ...reversedModules] ->
+    Stdlib.Option.Option.Some((Stdlib.List.reverse(reversedModules), name))
 
 
-/// Suggest the `Stdlib.`-qualified form of an unresolved multi-part name when
-/// an item exists at that standard-library location.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.stdlibSuggestion: Unknown function or value 'LanguageTools.PackageManager.findAny'"
-let stdlibSuggestion
-  (branchId: Uuid)
-  (originalName: List<String>)
-  : Stdlib.Option.Option<String> =
-  match originalName with
-  | "Stdlib" :: _
-  | "Darklang" :: _
-  | "PACKAGE" :: _ -> Stdlib.Option.Option.None
+/// One place a name could live in the standard library: how the user would write it, and where it is.
+/// <param writtenPrefix> is how they spelled the root, `Stdlib` or `Darklang.Stdlib`, and
+/// <param modules> are the modules below it.
+let stdlibCandidate(
+  writtenPrefix: List<String>,
+  modules: List<String>,
+  name: String)
+  : (String * LanguageTools.ProgramTypes.PackageLocation) =
+  let written =
+    Stdlib.List.flatten([ writtenPrefix, modules, [ name ] ])
+    |> Stdlib.String.join(".")
+  let location =
+    LanguageTools.ProgramTypes.PackageLocation
+      { owner = "Darklang"
+        modules = Stdlib.List.prepend(modules, "Stdlib")
+        name = name }
+  (written, location)
+
+
+/// The modules enclosing <param modules>, nearest first, down to the empty root:
+/// `[Int64, Bits]` gives `[Int64]` then `[]`.
+let enclosingModules(modules: List<String>): List<List<String>> =
+  match modules with
+  | [] -> []
   | _ ->
-    match splitLast originalName with
-    | Some((modules, name)) when Stdlib.Bool.not (Stdlib.List.isEmpty modules) ->
-      let location =
-        LanguageTools.ProgramTypes.PackageLocation
-          { owner = "Darklang"
-            modules = Stdlib.List.push modules "Stdlib"
-            name = name }
-      match LanguageTools.PackageManager.findAny branchId location with
-      | Some _ ->
-        Stdlib.Option.Option.Some
-          ("Stdlib." + (Stdlib.String.join originalName "."))
-      | None -> Stdlib.Option.Option.None
-    | _ -> Stdlib.Option.Option.None
+    let parent = Stdlib.List.dropLast(modules)
+    Stdlib.List.prepend(enclosingModules(parent), parent)
 
 
-/// Prints the first parse diagnostic. Returns true when parsing failed.
-let reportParseErrors
-  (diagnostics: List<(LanguageTools.Parser.Range * String)>)
+/// The Stdlib name for a job another language spells differently: `toString` is `display`,
+/// and `Int64.absoluteValue` is the generic `abs`.
+let otherLanguageName(name: String): Stdlib.Option.Option<String> =
+  match name with
+  | "toString" -> Stdlib.Option.Option.Some("display")
+  | "toRepr" -> Stdlib.Option.Option.Some("inspect")
+  | "absoluteValue" | "absolute" -> Stdlib.Option.Option.Some("abs")
+  | _ -> Stdlib.Option.Option.None
+
+
+/// Where an unresolved name might really be, in the order <fn stdlibSuggestion> tries them.
+///
+/// A name without a `Stdlib.` prefix gets one: `Bool.not` -> `Stdlib.Bool.not`. A name already under
+/// `Stdlib.` tries its final name in each enclosing module, nearest first, down to the `Stdlib` root:
+/// `Stdlib.Int64.max` -> `Stdlib.max`. An unprefixed name walks up only from one module, so
+/// `Int64.max` also tries `Stdlib.max`: a deeper one may be the user's own module that does not
+/// exist yet. Last, a name from <fn otherLanguageName> tries its Stdlib one: `Int64.toString` ->
+/// `Stdlib.display`.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.stdlibSuggestionCandidates: Unknown function or value 'otherLanguageName'"
+let stdlibSuggestionCandidates(
+  originalName: List<String>)
+  : List<(String * LanguageTools.ProgramTypes.PackageLocation)> =
+  match splitLast(originalName) with
+  | None -> []
+  | Some((modules, name)) ->
+    let walkUp =
+      fun(writtenPrefix, inner) ->
+        enclosingModules(inner)
+        |> Stdlib.List.map(fun m -> stdlibCandidate(writtenPrefix, m, name))
+
+    let renamed =
+      fun writtenPrefix ->
+        match otherLanguageName(name) with
+        | Some(other) -> [ stdlibCandidate(writtenPrefix, [], other) ]
+        | None -> []
+
+    match modules with
+    | [] -> []
+    | ["Stdlib", ...inner] -> Stdlib.List.concat(walkUp([ "Stdlib" ], inner), renamed([ "Stdlib" ]))
+    | ["Darklang", "Stdlib", ...inner] ->
+      Stdlib.List.concat(
+        walkUp([ "Darklang", "Stdlib" ], inner),
+        renamed([ "Darklang", "Stdlib" ]))
+    | ["Darklang", ...] -> []
+    | ["PACKAGE", ...] -> []
+    | [ _ ] ->
+      Stdlib.List.flatten(
+        [ [ stdlibCandidate([ "Stdlib" ], modules, name) ]
+          walkUp([ "Stdlib" ], modules)
+          renamed([ "Stdlib" ]) ])
+    | _ -> Stdlib.List.prepend(renamed([ "Stdlib" ]), stdlibCandidate([ "Stdlib" ], modules, name))
+
+
+/// The Stdlib name for a conversion people guess another name for: Stdlib turns bytes into text
+/// and back in `Utf8`, so `String.fromBytes` and `Bytes.toString` are `Stdlib.Utf8.decode`.
+let guessedName(originalName: List<String>): Stdlib.Option.Option<String> =
+  let lastTwo =
+    originalName
+    |> Stdlib.List.reverse
+    |> Stdlib.List.take(2)
+    |> Stdlib.List.reverse
+    |> Stdlib.List.map(Stdlib.String.toLowercase)
+  match lastTwo with
+  | [ "string", "frombytes" ] | [ "string", "fromutf8" ] | [ "bytes", "tostring" ] ->
+    Stdlib.Option.Option.Some("Stdlib.Utf8.decode")
+  | [ "string", "tobytes" ] | [ "string", "toutf8" ] | [ "bytes", "fromstring" ] ->
+    Stdlib.Option.Option.Some("Stdlib.Utf8.encode")
+  | _ -> Stdlib.Option.Option.None
+
+
+/// Suggest the standard-library name an unresolved name probably meant, when an item exists there:
+/// a <fn guessedName>, or else the first of <fn stdlibSuggestionCandidates> that is on the branch.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.stdlibSuggestion: Unknown function or value 'LanguageTools.PackageManager.findAny'"
+let stdlibSuggestion(
+  branchId: Uuid,
+  originalName: List<String>)
+  : Stdlib.Option.Option<String> =
+  match guessedName(originalName) with
+  | Some(name) -> Stdlib.Option.Option.Some(name)
+  | None ->
+    stdlibSuggestionCandidates(originalName)
+    |> Stdlib.List.findFirst(fun((_, location)) ->
+      Stdlib.Option.isSome(LanguageTools.PackageManager.findAny(branchId, location)))
+    |> Stdlib.Option.map(fun((written, _)) -> written)
+
+
+/// The modules an unresolved name's module may be, each as (how the user would write it, where
+/// it is): `Stdlib.String` is `Darklang.Stdlib.String`, and a module with no `Stdlib.` in front is
+/// tried as written and under `Stdlib`.
+let closestNameModules(modules: List<String>): List<(List<String> * List<String>)> =
+  match modules with
+  | [] -> []
+  | ["PACKAGE", ...] -> []
+  | ["Stdlib", ...inner] -> [ (modules, Stdlib.List.flatten([ [ "Darklang", "Stdlib" ], inner ])) ]
+  | ["Darklang", ...] -> [ (modules, modules) ]
+  | _ ->
+    [ (modules, modules)
+      (Stdlib.List.prepend(modules, "Stdlib"),
+       Stdlib.List.flatten([ [ "Darklang", "Stdlib" ], modules ])) ]
+
+
+/// How far <param candidate> is from the <param name> that was written, when it is near enough to
+/// suggest: a few edits, ignoring case, or one name inside the other (`toUpper` for
+/// `toUppercase`).
+let nameDistance(name: String, candidate: String): Stdlib.Option.Option<Int64> =
+  let a = Stdlib.String.toLowercase(name)
+  let b = Stdlib.String.toLowercase(candidate)
+  let d = Cli.Config.editDistance(a, b)
+  let shorter = Cli.Config.smaller(Stdlib.String.length(a), Stdlib.String.length(b))
+  let allowed = Cli.Config.smaller(3, Stdlib.max(1, Stdlib.Int64.checkedDivide(Stdlib.String.length(a), 3) |> Stdlib.Result.withDefault(0)))
+
+  if d <= allowed then
+    Stdlib.Option.Option.Some(d)
+  else if shorter >= 4 && (Stdlib.String.contains(a, b) || Stdlib.String.contains(b, a)) then
+    Stdlib.Option.Option.Some(d)
+  else
+    Stdlib.Option.Option.None
+
+
+/// <fn nameDistance>, or 0 when <param candidate> is what Stdlib calls the word written: `size`
+/// is `length` (<fn Search.wordSynonyms>).
+let nearness(name: String, candidate: String): Stdlib.Option.Option<Int64> =
+  let synonyms = Search.wordSynonyms(name) |> Stdlib.List.map(Stdlib.String.toLowercase)
+
+  if Stdlib.List.contains(synonyms, Stdlib.String.toLowercase(candidate)) then
+    Stdlib.Option.Option.Some(0)
+  else
+    nameDistance(name, candidate)
+
+
+/// The (distance, name) pairs of <param sorted> no more than one edit further than the first: a
+/// name that differs only in case leaves out the ones three edits away.
+let nearestOnly(sorted: List<(Int64 * String)>): List<(Int64 * String)> =
+  match sorted with
+  | [] -> []
+  | [(best, _), ...] -> sorted |> Stdlib.List.filter(fun((d, _)) -> d <= best + 1)
+
+
+/// Up to three existing names in the module <param originalName> names that are spelled close to
+/// it or are Stdlib's word for it, nearest first: `Stdlib.List.lenght` and `Stdlib.List.size` give
+/// `Stdlib.List.length`.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.closestNames: Unknown function or value 'Query.allDirectDescendantNames'"
+let closestNames(branchId: Uuid, originalName: List<String>): List<String> =
+  match splitLast(originalName) with
+  | None -> []
+  | Some((modules, name)) ->
+    closestNameModules(modules)
+    |> Stdlib.List.map(fun((written, location)) ->
+      let (_, types, values, fns, _, _, _) =
+        Query.allDirectDescendantNames(branchId, location)
+
+      Stdlib.List.flatten([ fns, values, types ])
+      |> Stdlib.List.filterMap(fun candidate ->
+        nearness(name, candidate)
+        |> Stdlib.Option.map(fun d ->
+          (d, Stdlib.String.join(Stdlib.List.flatten([ written, [ candidate ] ]), ".")))))
+    |> Stdlib.List.flatten
+    |> Stdlib.List.sort
+    |> nearestOnly
+    |> Stdlib.List.map(fun((_, full)) -> full)
+    |> Stdlib.List.unique
+    |> Stdlib.List.take(3)
+
+
+/// The operator a function name stands for, as (its trait, the trait's method, how it is
+/// written), when the name is that method or a usual word for it: `mod` and `modulo` are `%`.
+let operatorOfName(name: String): Stdlib.Option.Option<(String * String * String)> =
+  match Stdlib.String.toLowercase(name) with
+  | "add" | "plus" -> Stdlib.Option.Option.Some(("Add", "add", "a + b"))
+  | "sub" | "subtract" | "minus" -> Stdlib.Option.Option.Some(("Subtract", "subtract", "a - b"))
+  | "mul" | "multiply" | "times" -> Stdlib.Option.Option.Some(("Multiply", "multiply", "a * b"))
+  | "div" | "divide" -> Stdlib.Option.Option.Some(("Divide", "divide", "a / b"))
+  | "mod" | "modulo" -> Stdlib.Option.Option.Some(("Modulo", "modulo", "a % b"))
+  | "pow" | "power" -> Stdlib.Option.Option.Some(("Power", "power", "a ** b"))
+  | "neg" | "negate" -> Stdlib.Option.Option.Some(("Negate", "negate", "-a"))
+  | "shiftleft" -> Stdlib.Option.Option.Some(("ShiftLeft", "shiftLeft", "a << b"))
+  | "shiftright" -> Stdlib.Option.Option.Some(("ShiftRight", "shiftRight", "a >> b"))
+  | "bitwiseand" -> Stdlib.Option.Option.Some(("BitwiseAnd", "bitwiseAnd", "a & b"))
+  | "bitwiseor" -> Stdlib.Option.Option.Some(("BitwiseOr", "bitwiseOr", "a | b"))
+  | "bitwisexor" | "xor" -> Stdlib.Option.Option.Some(("BitwiseXor", "bitwiseXor", "a ^ b"))
+  | "bitwisenot" -> Stdlib.Option.Option.Some(("BitwiseNot", "bitwiseNot", "~a"))
+  | "lessthan" -> Stdlib.Option.Option.Some(("Compare", "lessThan", "a < b"))
+  | "greaterthan" -> Stdlib.Option.Option.Some(("Compare", "greaterThan", "a > b"))
+  | _ -> Stdlib.Option.Option.None
+
+
+/// The operator an unresolved name was reaching for, written out (`a % b`), when its module is a
+/// type with that operator: `Stdlib.Int64.mod` is `%`, since `Int64` implements `Modulo`. A type
+/// without it gets nothing, so `Stdlib.String.mod` is not sent to `%`.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.operatorSuggestion: Unknown function or value 'LanguageTools.PackageManager.findAny'"
+let operatorSuggestion(
+  branchId: Uuid,
+  originalName: List<String>)
+  : Stdlib.Option.Option<String> =
+  match splitLast(originalName) with
+  | None -> Stdlib.Option.Option.None
+  | Some((modules, name)) ->
+    match operatorOfName(name) with
+    | None -> Stdlib.Option.Option.None
+    | Some((traitName, methodName, written)) ->
+      let implemented =
+        closestNameModules(modules)
+        |> Stdlib.List.any(fun((_, location)) ->
+          match location with
+          | [] -> false
+          | [owner, ...inner] ->
+            let method =
+              LanguageTools.ProgramTypes.PackageLocation
+                { owner = owner
+                  modules = Stdlib.List.append(inner, traitName)
+                  name = methodName }
+            Stdlib.Option.isSome(LanguageTools.PackageManager.findAny(branchId, method)))
+      if implemented then Stdlib.Option.Option.Some(written)
+      else Stdlib.Option.Option.None
+
+
+/// What an unresolved name probably meant: the standard-library name it moved to
+/// (<fn stdlibSuggestion>), the operator it is (<fn operatorSuggestion>), or else the names in its
+/// module spelled closest to it.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.didYouMean: Unknown function or value 'stdlibSuggestion'"
+let didYouMean(branchId: Uuid, originalName: List<String>): List<String> =
+  match stdlibSuggestion(branchId, originalName) with
+  | Some(name) -> [ name ]
+  | None ->
+    match operatorSuggestion(branchId, originalName) with
+    | Some(written) -> [ written ]
+    | None -> closestNames(branchId, originalName)
+
+
+/// `Did you mean `A`?`, or `Did you mean `A`, `B` or `C`?`, or "" for no names.
+let didYouMeanText(names: List<String>): String =
+  let quoted = names |> Stdlib.List.map(fun n -> $"`{n}`")
+
+  match Stdlib.List.reverse(quoted) with
+  | [] -> ""
+  | [only] -> $"Did you mean {only}?"
+  | [last, ...restReversed] ->
+    let rest = Stdlib.String.join(Stdlib.List.reverse(restReversed), ", ")
+    $"Did you mean {rest} or {last}?"
+
+
+/// Prints every parse diagnostic, so one save shows all there is to fix. Returns true when
+/// parsing failed.
+let reportParseErrors(
+  diagnostics: List<(LanguageTools.Parser.Range * String)>)
   : Bool =
-  match diagnostics with
-  | [] -> false
-  | (range, message) :: _ ->
-    let lineNum = (range.start.row + 1) |> Stdlib.toString
+  diagnostics
+  |> Stdlib.List.iter(fun((range, message)) ->
+    let lineNum = (range.start.row + 1) |> Stdlib.display
     // 1-based column, matching renderDiagnostic and the line number above
-    let colNum = (range.start.column + 1) |> Stdlib.toString
+    let colNum = (range.start.column + 1) |> Stdlib.display
+    Cli.printErr($"Parse error at line {lineNum}, column {colNum}: {message}"))
 
-    Stdlib.printLine
-      (Stdlib.Cli.UI.Colors.error $"Parse error at line {lineNum}, column {colNum}: {message}")
-
-    true
+  Stdlib.Bool.not(Stdlib.List.isEmpty(diagnostics))
 
 
 /// Whether one authoring command was handed more than one thing, and says so.
 ///
 /// The arguments are joined into one source, so a stray extra one parses as a second
 /// declaration or a bare expression. Taking the first declaration and ignoring the rest
-/// saved `dark val Me.A.x 42L zzznope` as `42L` and reported success.
+/// saved `dark val Me.A.x 42 zzznope` as `42` and reported success.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.WrittenTypes.SourceFile.SourceFile'"
-let reportTrailing (sourceFile: LanguageTools.WrittenTypes.SourceFile.SourceFile) : Bool =
-  let decls = Stdlib.List.length sourceFile.declarations
-  let extra = decls + (Stdlib.List.length sourceFile.exprsToEval) - 1
+let reportTrailing(sourceFile: LanguageTools.WrittenTypes.SourceFile.SourceFile): Bool =
+  let decls = Stdlib.List.length(sourceFile.declarations)
+  let extra = decls + (Stdlib.List.length(sourceFile.exprsToEval)) - 1
 
   if extra > 0 then
-    Cli.printErr "There is something after the definition; nothing was saved."
-    Cli.printHint "  Quote the whole definition as one argument, or pass `-` and pipe it in."
+    Cli.printErr("There is something after the definition; nothing was saved.")
+    Cli.printHint("  Quote the whole definition as one argument, or pass `-` and pipe it in.")
     true
   else
     false
@@ -92,90 +333,160 @@ let reportTrailing (sourceFile: LanguageTools.WrittenTypes.SourceFile.SourceFile
 
 /// The unresolved names in one line, `Nope.missing (line 1), Other.thing (line 3)`, for a surface with no
 /// room for <fn reportUnresolvedNames>'s list: the workbench's footer.
-let unresolvedNamesText
-  (unresolvedNames:
+let unresolvedNamesText(
+  unresolvedNames:
     List<LanguageTools.Parser.Range
       * List<String>
       * LanguageTools.ProgramTypes.NameResolutionError>)
   : String =
   unresolvedNames
-  |> Stdlib.List.map (fun (range, originalName, _err) ->
-    let lineNum = (range.start.row + 1) |> Stdlib.toString
-    $"{Stdlib.String.join originalName "."} (line {lineNum})")
-  |> Stdlib.String.join ", "
+  |> Stdlib.List.map(fun((range, originalName, _err)) ->
+    let lineNum = (range.start.row + 1) |> Stdlib.display
+    $"{Stdlib.String.join(originalName, ".")} (line {lineNum})")
+  |> Stdlib.String.join(", ")
 
 
 /// Checks for invalid names (hard errors) and unresolved names (warnings).
 /// Returns true if there are invalid names (which block creation).
 /// Unresolved names are allowed in WIP — they'll be resolved by WipRefresh when
 /// the missing items are added, and rejected at commit time if still unresolved.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.reportUnresolvedNames: Unknown function or value 'stdlibSuggestion'"
-let reportUnresolvedNames
-  (branchId: Uuid)
-  (unresolvedNames:
+/// Where a name that did not resolve from <param home> (owner first, then modules) is defined
+/// in a module next to it or inside it: `TokKind` saved into `Me.Tiny.Lexer` gives
+/// `Me.Tiny.Types.TokKind`. Up to three, as written in full.
+// @compiler blocked: upstream-dependency diagnostic="nearbyNames: Unknown type 'Packages.PackageLocation'"
+let nearbyNames(
+  branchId: Uuid,
+  home: List<String>,
+  originalName: List<String>)
+  : List<String> =
+  match (splitLast(originalName), home) with
+  | (Some((modules, name)), [owner, ...homeModules]) ->
+    let submodulesOf = fun path ->
+      let (subs, _, _, _, _, _, _) = Query.allDirectDescendantNames(branchId, path)
+      subs |> Stdlib.List.map(fun sub -> Stdlib.List.append(path, sub))
+    let places =
+      match homeModules with
+      | [] -> submodulesOf(home)
+      | _ -> Stdlib.List.concat(submodulesOf(home), submodulesOf(Stdlib.List.dropLast(home)))
+    places
+    |> Stdlib.List.filter(fun place -> place != home)
+    |> Stdlib.List.filterMap(fun place ->
+      let location =
+        LanguageTools.ProgramTypes.PackageLocation
+          { owner = owner
+            modules = Stdlib.List.concat(Stdlib.List.drop(place, 1), modules)
+            name = name }
+      if Stdlib.Option.isSome(LanguageTools.PackageManager.findAny(branchId, location)) then
+        Stdlib.Option.Option.Some(
+          Stdlib.String.join(Stdlib.List.flatten([ place, modules, [ name ] ]), "."))
+      else
+        Stdlib.Option.Option.None)
+    |> Stdlib.List.take(3)
+  | _ -> []
+
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.reportUnresolvedNames: Unknown function or value 'didYouMean'"
+let reportUnresolvedNames(
+  branchId: Uuid,
+  home: List<String>,
+  unresolvedNames:
     List<LanguageTools.Parser.Range
       * List<String>
       * LanguageTools.ProgramTypes.NameResolutionError>)
   : Bool =
   let invalidNames =
     unresolvedNames
-    |> Stdlib.List.filter (fun (_, _, err) ->
+    |> Stdlib.List.filter(fun((_, _, err)) ->
       match err with
       | InvalidName -> true
       | NotFound -> false)
 
-  let notFoundNames =
+  // A missing name under `Stdlib` or `Darklang` cannot arrive later: those owners are reserved,
+  // so nothing a save makes can define it. It is a typo, and the save is refused.
+  let isReserved =
+    fun((_, name, _)) ->
+      match name with
+      | [ "Stdlib", ... ]
+      | [ "Darklang", ... ] -> true
+      | _ -> false
+
+  let notFound =
     unresolvedNames
-    |> Stdlib.List.filter (fun (_, _, err) ->
+    |> Stdlib.List.filter(fun((_, _, err)) ->
       match err with
       | NotFound -> true
       | InvalidName -> false)
 
-  // Print warnings for unresolved names (will be fixed by WipRefresh)
-  if (Stdlib.List.isEmpty notFoundNames) |> Stdlib.Bool.not then
-    Stdlib.printLine
-      (Stdlib.Cli.UI.Colors.warning
-        "Warning: Unresolved references (will resolve when dependencies are added)")
+  let (reservedNames, notFoundNames) = Stdlib.List.partition(notFound, isReserved)
+
+  // Warnings for unresolved names (will be fixed by WipRefresh). On stderr: the save's answer is the
+  // "Created" line, and a warning is never part of it.
+  if (Stdlib.List.isEmpty(notFoundNames)) |> Stdlib.Bool.not then
+    Stdlib.printErrorLine(
+      (Stdlib.Cli.UI.Colors.warning(
+        "Warning: Unresolved references (will resolve when dependencies are added)")))
 
     notFoundNames
-    |> Stdlib.List.iter (fun (range, originalName, _err) ->
-      let lineNum = (range.start.row + 1) |> Stdlib.toString
-      let colNum = range.start.column |> Stdlib.toString
-      let nameStr = Stdlib.String.join originalName "."
+    |> Stdlib.List.iter(fun((range, originalName, _err)) ->
+      let lineNum = (range.start.row + 1) |> Stdlib.display
+      let colNum = range.start.column |> Stdlib.display
+      let nameStr = Stdlib.String.join(originalName, ".")
 
       let suggestion =
-        match stdlibSuggestion branchId originalName with
-        | Some name -> $" Did you mean `{name}`?"
-        | None -> ""
+        let names =
+          match didYouMean(branchId, originalName) with
+          | [] -> nearbyNames(branchId, home, originalName)
+          | names -> names
+        match didYouMeanText(names) with
+        | "" -> ""
+        | text -> " " + text
 
       let message =
         $"  - Not found: {nameStr} (line {lineNum}, column {colNum}).{suggestion}"
-      Stdlib.printLine (Stdlib.Cli.UI.Colors.warning message))
+      Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.warning(message)))
 
-    Stdlib.printLine ""
+    Stdlib.printErrorLine("")
+
+  if (Stdlib.List.isEmpty(reservedNames)) |> Stdlib.Bool.not then
+    Cli.printErr("Error: Not in the standard library, so nothing was saved")
+
+    reservedNames
+    |> Stdlib.List.iter(fun((range, originalName, _err)) ->
+      let lineNum = (range.start.row + 1) |> Stdlib.display
+      let colNum = range.start.column |> Stdlib.display
+      let nameStr = Stdlib.String.join(originalName, ".")
+
+      let suggestion =
+        match didYouMeanText(didYouMean(branchId, originalName)) with
+        | "" -> ""
+        | text -> " " + text
+
+      Cli.printErr($"  - Not found: {nameStr} (line {lineNum}, column {colNum}).{suggestion}"))
+
+    Stdlib.printErrorLine("")
 
   // Print errors for invalid names (these block creation)
-  if (Stdlib.List.isEmpty invalidNames) |> Stdlib.Bool.not then
-    Stdlib.printLine (Stdlib.Cli.UI.Colors.error "Error: Invalid names")
+  if (Stdlib.List.isEmpty(invalidNames)) |> Stdlib.Bool.not then
+    Cli.printErr("Error: Invalid names")
 
     invalidNames
-    |> Stdlib.List.iter (fun (range, originalName, _err) ->
-      let lineNum = (range.start.row + 1) |> Stdlib.toString
-      let colNum = range.start.column |> Stdlib.toString
-      let nameStr = Stdlib.String.join originalName "."
+    |> Stdlib.List.iter(fun((range, originalName, _err)) ->
+      let lineNum = (range.start.row + 1) |> Stdlib.display
+      let colNum = range.start.column |> Stdlib.display
+      let nameStr = Stdlib.String.join(originalName, ".")
 
-      if isInternalPackageName originalName then
-        let suggested = sourceNameWithoutInternalPrefix originalName
+      if isInternalPackageName(originalName) then
+        let suggested = sourceNameWithoutInternalPrefix(originalName)
         let message =
           ($"  - Invalid name: {nameStr} (line {lineNum}, column {colNum}). "
            + $"`PACKAGE.` is internal notation; write `{suggested}`.")
-        Stdlib.printLine (Stdlib.Cli.UI.Colors.error message)
+        Cli.printErr(message)
       else
         let message =
           $"  - Invalid name: {nameStr} (line {lineNum}, column {colNum})"
-        Stdlib.printLine (Stdlib.Cli.UI.Colors.error message))
+        Cli.printErr(message))
 
-    Stdlib.printLine ""
+    Stdlib.printErrorLine("")
     true
   else
-    false
+    Stdlib.Bool.not(Stdlib.List.isEmpty(reservedNames))

@@ -12,35 +12,35 @@ impl Modulo for UInt64 =
   /// Returns the result of wrapping <param a> around so that {{0 <= res < b}}.
   /// The modulus <param b> must be greater than 0
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Modulo for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Modulo for UInt64 requires an explicit replacement contract"
-  let modulo (a: UInt64) (b: UInt64) : UInt64 = Builtin.uint64Mod a b
+  let modulo(a: UInt64, b: UInt64): UInt64 = Builtin.modulo(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Add for UInt64 requires an explicit replacement contract"
 impl Add for UInt64 =
   /// Adds 64-bit unsigned integers together (wraps on overflow)
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Add for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Add for UInt64 requires an explicit replacement contract"
-  let add (a: UInt64) (b: UInt64) : UInt64 = Builtin.uint64Add a b
+  let add(a: UInt64, b: UInt64): UInt64 = Builtin.add(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Subtract for UInt64 requires an explicit replacement contract"
 impl Subtract for UInt64 =
   /// Subtracts 64-bit unsigned integers (wraps on overflow)
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Subtract for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Subtract for UInt64 requires an explicit replacement contract"
-  let subtract (a: UInt64) (b: UInt64) : UInt64 = Builtin.uint64Subtract a b
+  let subtract(a: UInt64, b: UInt64): UInt64 = Builtin.subtract(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Multiply for UInt64 requires an explicit replacement contract"
 impl Multiply for UInt64 =
   /// Multiplies 64-bit unsigned integers (wraps on overflow)
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Multiply for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Multiply for UInt64 requires an explicit replacement contract"
-  let multiply (a: UInt64) (b: UInt64) : UInt64 = Builtin.uint64Multiply a b
+  let multiply(a: UInt64, b: UInt64): UInt64 = Builtin.multiply(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Divide for UInt64 requires an explicit replacement contract"
 impl Divide for UInt64 =
   /// Divides 64-bit unsigned integers
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Divide for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Divide for UInt64 requires an explicit replacement contract"
-  let divide (a: UInt64) (b: UInt64) : UInt64 = Builtin.uint64Divide a b
+  let divide(a: UInt64, b: UInt64): UInt64 = Builtin.divide(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Power for UInt64 requires an explicit replacement contract"
@@ -48,55 +48,57 @@ impl Power for UInt64 =
   /// Raise <param base> to the power of <param exponent>.
   /// Overflow wraps around.
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Power for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Power for UInt64 requires an explicit replacement contract"
-  let power (``base``: UInt64) (exponent: UInt64) : UInt64 =
+  let power(``base``: UInt64, exponent: UInt64): UInt64 =
     // The signed types push this into the builtin; here the ladder stays, because an
     // unsigned exponent is never negative, so there is no error case to push.
-    if ``base`` == 0UL && exponent == 0UL then 1UL
-    else if ``base`` == 0UL then 0UL
-    else if ``base`` == 1UL then 1UL
-    else Builtin.uint64Power ``base`` exponent
+    if ``base`` == 0u64 && exponent == 0u64 then 1u64
+    else if ``base`` == 0u64 then 0u64
+    else if ``base`` == 1u64 then 1u64
+    else Builtin.power(``base``, exponent)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Compare for UInt64 requires an explicit replacement contract"
 impl Compare for UInt64 =
   /// Returns {{true}} if <param a> is less than <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Compare for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Compare for UInt64 requires an explicit replacement contract"
-  let lessThan (a: UInt64) (b: UInt64) : Bool = Builtin.uint64LessThan a b
+  let lessThan(a: UInt64, b: UInt64): Bool = Builtin.lessThan(a, b)
   /// Returns {{true}} if <param a> is less than or equal to <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Compare for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Compare for UInt64 requires an explicit replacement contract"
-  let lessThanOrEqualTo (a: UInt64) (b: UInt64) : Bool =
-    Builtin.uint64LessThanOrEqualTo a b
+  let lessThanOrEqualTo(a: UInt64, b: UInt64): Bool =
+    Builtin.lessThanOrEqualTo(a, b)
   /// Returns {{true}} if <param a> is greater than <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Compare for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Compare for UInt64 requires an explicit replacement contract"
-  let greaterThan (a: UInt64) (b: UInt64) : Bool = Builtin.uint64GreaterThan a b
+  let greaterThan(a: UInt64, b: UInt64): Bool = Builtin.greaterThan(a, b)
   /// Returns {{true}} if <param a> is greater than or equal to <param b>
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Compare for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Compare for UInt64 requires an explicit replacement contract"
-  let greaterThanOrEqualTo (a: UInt64) (b: UInt64) : Bool =
-    Builtin.uint64GreaterThanOrEqualTo a b
+  let greaterThanOrEqualTo(a: UInt64, b: UInt64): Bool =
+    Builtin.greaterThanOrEqualTo(a, b)
 
 
 /// Returns a random integer between <param start> and <param end> (inclusive)
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.random reason=compiler-implementation
-let random (start: UInt64) (``end``: UInt64) : UInt64 =
-  Builtin.uint64Random start ``end``
+let random(start: UInt64, ``end``: UInt64): UInt64 =
+  Stdlib.BigInt.random(Stdlib.BigInt.fromUInt64(start), Stdlib.BigInt.fromUInt64(``end``))
+  |> Stdlib.BigInt.toUInt64
+  |> Builtin.unwrap
 
 
 /// Get the square root of an <type UInt64>
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.sqrt reason=compiler-implementation
-let sqrt (a: UInt64) : Float = Builtin.uint64Sqrt a
+let sqrt(a: UInt64): Float = Stdlib.Float.sqrt(Stdlib.UInt64.toFloat(a))
 
 
 /// Converts an <type UInt64> to a <type Float>
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.toFloat reason=compiler-implementation
-let toFloat (a: UInt64) : Float = Builtin.uint64ToFloat a
+let toFloat(a: UInt64): Float = Builtin.uint64ToFloat(a)
 
 /// Converts a <type Float> to an <type UInt64>, truncating toward zero like
-/// <fn Int.fromFloat>. Returns {{None}} for NaN, infinity, or a result that
+/// <fn BigInt.fromFloat>. Returns {{None}} for NaN, infinity, or a result that
 /// doesn't fit.
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.fromFloat reason=compiler-implementation
-let fromFloat (a: Float) : Stdlib.Option.Option<UInt64> =
-  if Float.isFinite a then
-    a |> Stdlib.Int.fromFloat |> Stdlib.Int.toUInt64
+let fromFloat(a: Float): Stdlib.Option.Option<UInt64> =
+  if Float.isFinite(a) then
+    a |> Stdlib.BigInt.fromFloat |> Stdlib.BigInt.toUInt64
   else
     Stdlib.Option.Option.None
 
@@ -105,9 +107,12 @@ let fromFloat (a: Float) : Stdlib.Option.Option<UInt64> =
 /// (ties to even). Returns {{None}} for NaN, infinity, or a result that
 /// doesn't fit.
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.fromFloatRounded reason=compiler-implementation
-let fromFloatRounded (a: Float) : Stdlib.Option.Option<UInt64> =
-  if Float.isFinite a then
-    a |> Float.round |> Stdlib.Int.toUInt64
+let fromFloatRounded(a: Float): Stdlib.Option.Option<UInt64> =
+  if Float.isFinite(a) && a >= 9223372036854775808.0 then
+    // every Float from 2^63 up is a whole number, so there is nothing to round
+    a |> Stdlib.BigInt.fromFloat |> Stdlib.BigInt.toUInt64
+  else if a >= -1.0 && a < 9223372036854775808.0 then
+    a |> Float.round |> Stdlib.UInt64.fromInt64
   else
     Stdlib.Option.Option.None
 
@@ -117,116 +122,206 @@ let fromFloatRounded (a: Float) : Stdlib.Option.Option<UInt64> =
 /// if the string isn't a valid integer, {{OutOfRange}} if it's outside the
 /// <type UInt64> range).
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.parse reason=compiler-implementation
-let parse
-  (s: String)
+let parse(
+  s: String)
   : Stdlib.Result.Result<UInt64, Stdlib.UInt64.ParseError> =
-  Builtin.uint64Parse s
+  // a plain match: the generic Option.toResult call was a quarter of the cost
+  match Stdlib.BigInt.parse(s) with
+  | Ok(n) ->
+    match Stdlib.BigInt.toUInt64(n) with
+    | Some(i) -> Stdlib.Result.Result.Ok(i)
+    | None -> Stdlib.Result.Result.Error(Stdlib.UInt64.ParseError.OutOfRange)
+  | Error(_) -> Stdlib.Result.Result.Error(Stdlib.UInt64.ParseError.BadFormat)
 
 
 /// Converts an <type Int8> to an <type UInt64>. Returns {{None}} if the value is less than 0
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.fromInt8 reason=compiler-implementation
-let fromInt8 (i: Int8) : Stdlib.Option.Option<UInt64> =
-  Builtin.uint64FromInt8 i
+let fromInt8(i: Int8): Stdlib.Option.Option<UInt64> =
+  Stdlib.BigInt.toUInt64(Stdlib.BigInt.fromInt8(i))
 
 
 /// Converts a <type UInt8> to an <type UInt64>.
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.fromUInt8 reason=compiler-implementation
-let fromUInt8 (i: UInt8) : UInt64 = Builtin.uint64FromUInt8 i
+let fromUInt8(i: UInt8): UInt64 =
+  Stdlib.BigInt.toUInt64(Stdlib.BigInt.fromUInt8(i)) |> Builtin.unwrap
 
 
 /// Converts an <type Int16> to an <type UInt64>. Returns {{None}} if the value is less than 0
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.fromInt16 reason=compiler-implementation
-let fromInt16 (i: Int16) : Stdlib.Option.Option<UInt64> =
-  Builtin.uint64FromInt16 i
+let fromInt16(i: Int16): Stdlib.Option.Option<UInt64> =
+  Stdlib.BigInt.toUInt64(Stdlib.BigInt.fromInt16(i))
 
 
 /// Converts a <type UInt16> to an <type UInt64>
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.fromUInt16 reason=compiler-implementation
-let fromUInt16 (i: UInt16) : UInt64 = Builtin.uint64FromUInt16 i
+let fromUInt16(i: UInt16): UInt64 =
+  Stdlib.BigInt.toUInt64(Stdlib.BigInt.fromUInt16(i)) |> Builtin.unwrap
 
 
 /// Converts an <type Int32> to an <type UInt64>. Returns {{None}} if the value is less than 0
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.fromInt32 reason=compiler-implementation
-let fromInt32 (i: Int32) : Stdlib.Option.Option<UInt64> =
-  Builtin.uint64FromInt32 i
+let fromInt32(i: Int32): Stdlib.Option.Option<UInt64> =
+  Stdlib.BigInt.toUInt64(Stdlib.BigInt.fromInt32(i))
 
 
 /// Converts a <type UInt32> to an <type UInt64>.
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.fromUInt32 reason=compiler-implementation
-let fromUInt32 (i: UInt32) : UInt64 = Builtin.uint64FromUInt32 i
+let fromUInt32(i: UInt32): UInt64 =
+  Stdlib.BigInt.toUInt64(Stdlib.BigInt.fromUInt32(i)) |> Builtin.unwrap
 
 
 /// Converts an <type Int64> to an <type UInt64>. Returns {{None}} if the value is less than 0
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.fromInt64 reason=compiler-implementation
-let fromInt64 (i: Int64) : Stdlib.Option.Option<UInt64> =
-  Builtin.uint64FromInt64 i
+let fromInt64(i: Int64): Stdlib.Option.Option<UInt64> =
+  Stdlib.BigInt.toUInt64(Stdlib.BigInt.fromInt64(i))
 
 
 /// Converts an <type Int128> to an <type UInt64>. Returns {{None}} if the value is less than 0 or greater than 18446744073709551615
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.fromInt128 reason=compiler-implementation
-let fromInt128 (i: Int128) : Stdlib.Option.Option<UInt64> =
-  Builtin.uint64FromInt128 i
+let fromInt128(i: Int128): Stdlib.Option.Option<UInt64> =
+  Stdlib.BigInt.toUInt64(Stdlib.BigInt.fromInt128(i))
 
 
 /// Converts a <type UInt128> to an <type UInt64>. Returns {{None}} if the value is greater than 18446744073709551615
 // @compiler replace: packages/darklang/stdlib/uint64.dark#Darklang.Stdlib.UInt64.fromUInt128 reason=compiler-implementation
-let fromUInt128 (i: UInt128) : Stdlib.Option.Option<UInt64> =
-  Builtin.uint64FromUInt128 i
+let fromUInt128(i: UInt128): Stdlib.Option.Option<UInt64> =
+  Stdlib.BigInt.toUInt64(Stdlib.BigInt.fromUInt128(i))
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl BitwiseAnd for UInt64 requires an explicit replacement contract"
 impl BitwiseAnd for UInt64 =
   /// Bitwise AND on two <type UInt64> values
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl BitwiseAnd for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl BitwiseAnd for UInt64 requires an explicit replacement contract"
-  let bitwiseAnd (a: UInt64) (b: UInt64) : UInt64 = Builtin.uint64BitwiseAnd a b
+  let bitwiseAnd(a: UInt64, b: UInt64): UInt64 = Builtin.bitwiseAnd(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl BitwiseOr for UInt64 requires an explicit replacement contract"
 impl BitwiseOr for UInt64 =
   /// Bitwise OR on two <type UInt64> values
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl BitwiseOr for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl BitwiseOr for UInt64 requires an explicit replacement contract"
-  let bitwiseOr (a: UInt64) (b: UInt64) : UInt64 = Builtin.uint64BitwiseOr a b
+  let bitwiseOr(a: UInt64, b: UInt64): UInt64 = Builtin.bitwiseOr(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl BitwiseXor for UInt64 requires an explicit replacement contract"
 impl BitwiseXor for UInt64 =
   /// Bitwise XOR on two <type UInt64> values
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl BitwiseXor for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl BitwiseXor for UInt64 requires an explicit replacement contract"
-  let bitwiseXor (a: UInt64) (b: UInt64) : UInt64 = Builtin.uint64BitwiseXor a b
+  let bitwiseXor(a: UInt64, b: UInt64): UInt64 = Builtin.bitwiseXor(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl BitwiseNot for UInt64 requires an explicit replacement contract"
 impl BitwiseNot for UInt64 =
   /// Bitwise NOT on a <type UInt64> value
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl BitwiseNot for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl BitwiseNot for UInt64 requires an explicit replacement contract"
-  let bitwiseNot (a: UInt64) : UInt64 = Builtin.uint64BitwiseNot a
+  let bitwiseNot(a: UInt64): UInt64 = Builtin.bitwiseNot(a)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl ShiftLeft for UInt64 requires an explicit replacement contract"
 impl ShiftLeft for UInt64 =
   /// Bitwise left shift of a <type UInt64> value
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl ShiftLeft for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl ShiftLeft for UInt64 requires an explicit replacement contract"
-  let shiftLeft (a: UInt64) (b: UInt64) : UInt64 = Builtin.uint64ShiftLeft a b
+  let shiftLeft(a: UInt64, b: UInt64): UInt64 = Builtin.shiftLeft(a, b)
 
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl ShiftRight for UInt64 requires an explicit replacement contract"
 impl ShiftRight for UInt64 =
   /// Bitwise right shift of a <type UInt64> value
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl ShiftRight for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl ShiftRight for UInt64 requires an explicit replacement contract"
-  let shiftRight (a: UInt64) (b: UInt64) : UInt64 = Builtin.uint64ShiftRight a b
+  let shiftRight(a: UInt64, b: UInt64): UInt64 = Builtin.shiftRight(a, b)
 
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl ToString for UInt64 requires an explicit replacement contract"
-impl ToString for UInt64 =
+// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Display for UInt64 requires an explicit replacement contract"
+impl Display for UInt64 =
   /// Stringify <param int>
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl ToString for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl ToString for UInt64 requires an explicit replacement contract"
-  let toString (uint64: UInt64) : String = Builtin.uint64ToString uint64
+  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Display for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Display for UInt64 requires an explicit replacement contract"
+  let display(uint64: UInt64): String = Builtin.uint64ToString(uint64)
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Zero for UInt64 requires an explicit replacement contract"
 impl Zero for UInt64 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl Zero for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl Zero for UInt64 requires an explicit replacement contract"
-  let zero () : UInt64 = 0UL
+  let zero(): UInt64 = 0u64
 
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl One for UInt64 requires an explicit replacement contract"
 impl One for UInt64 =
   // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.UInt64.impl One for UInt64: Already selected from packages/darklang/stdlib/uint64.dark; importing another declaration of Darklang.Stdlib.UInt64.impl One for UInt64 requires an explicit replacement contract"
-  let one () : UInt64 = 1UL
+  let one(): UInt64 = 1u64
+
+
+// Checked arithmetic. The operators wrap on overflow; these return
+// {{Error Overflow}} instead, going below 0 included.
+
+/// Adds <param a> and <param b>, or {{Error Overflow}} where `+` would wrap
+let checkedAdd(
+  a: UInt64,
+  b: UInt64)
+  : Stdlib.Result.Result<UInt64, Stdlib.Math.Overflow> =
+  let sum = a + b
+  if sum < a then Error(Stdlib.Math.Overflow.Overflow) else Ok(sum)
+
+
+/// Subtracts <param b> from <param a>, or {{Error Overflow}} where `-` would wrap
+let checkedSubtract(
+  a: UInt64,
+  b: UInt64)
+  : Stdlib.Result.Result<UInt64, Stdlib.Math.Overflow> =
+  if b > a then Error(Stdlib.Math.Overflow.Overflow) else Ok(a - b)
+
+
+/// Multiplies <param a> by <param b>, or {{Error Overflow}} where `*` would wrap
+let checkedMultiply(
+  a: UInt64,
+  b: UInt64)
+  : Stdlib.Result.Result<UInt64, Stdlib.Math.Overflow> =
+  let product = Stdlib.BigInt.fromUInt64(a) * Stdlib.BigInt.fromUInt64(b)
+  match Stdlib.BigInt.toUInt64(product) with
+  | Some(fits) -> Ok(fits)
+  | None -> Error(Stdlib.Math.Overflow.Overflow)
+
+
+/// The negation of <param a>: {{Ok 0}} for 0, and {{Error Overflow}} for
+/// anything else, which has no unsigned negation
+let checkedNegate(a: UInt64): Stdlib.Result.Result<UInt64, Stdlib.Math.Overflow> =
+  if a == 0u64 then Ok(a) else Error(Stdlib.Math.Overflow.Overflow)
+
+
+/// The distance of <param a> from zero, which for an unsigned value is always
+/// <param a> itself. Here so every fixed-width type has the same checked set.
+let checkedAbsoluteValue(a: UInt64)
+  : Stdlib.Result.Result<UInt64, Stdlib.Math.Overflow> =
+  Ok(a)
+
+
+/// <param base> raised to the power of <param exponent>, or {{Error Overflow}}
+/// where `**` would wrap
+let checkedPower(
+  ``base``: UInt64,
+  exponent: UInt64)
+  : Stdlib.Result.Result<UInt64, Stdlib.Math.PowerError> =
+  if ``base`` == 0u64 || ``base`` == 1u64 then
+    // 0 and 1 never grow, so `**` is exact whatever the exponent
+    Ok(``base`` ** exponent)
+  else if exponent >= 64u64 then
+    // any other base is at least 2 from zero, and 2 ** 64 is past the UInt64 range
+    Error(Stdlib.Math.PowerError.Overflow)
+  else
+    let result = Stdlib.BigInt.fromUInt64(``base``) ** Stdlib.BigInt.fromUInt64(exponent)
+
+    match Stdlib.BigInt.toUInt64(result) with
+    | Some(fits) -> Ok(fits)
+    | None -> Error(Stdlib.Math.PowerError.Overflow)
+
+
+// Division. `/` raises on a zero divisor and `%` on a modulus that is not positive;
+// these return the reason instead.
+// TODO: make `/` and `%` themselves checked by default; see the TODO on the `divide`
+// builtin in NoModule.fs.
+
+/// Divides <param a> by <param b>, rounding towards zero, or
+/// {{Error DivisionByZero}} where `/` raises.
+let checkedDivide(a: UInt64, b: UInt64): Stdlib.Result.Result<UInt64, Stdlib.Math.DivisionError> =
+  if b == 0u64 then Error(Stdlib.Math.DivisionError.DivisionByZero) else Ok(a / b)
+
+
+/// <param a> wrapped around so that {{0 <= res < b}}, or {{Error ZeroModulus}}
+/// where `%` raises
+let checkedMod(a: UInt64, b: UInt64): Stdlib.Result.Result<UInt64, Stdlib.Math.ModulusError> =
+  if b == 0u64 then Error(Stdlib.Math.ModulusError.ZeroModulus) else Ok(a % b)

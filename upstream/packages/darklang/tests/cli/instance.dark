@@ -7,18 +7,19 @@
 /// removes them if a runtime error interrupts an assertion.
 module Darklang.Cli.Tests.Instance
 
-/// A running instance's identity: where it lives and what binary drives it.
+/// A running instance's identity: where it lives (`dir` is its `<home>/.darklang`) and what binary
+/// drives it.
 type T =
   { dir: String
     cli: String }
 
 
 /// Keep nested instances beside the active store, inside the enclosing fixture.
-/// LocalStore.path is absolute; child process configuration requires that.
+/// LanguageTools.LocalStore.path is absolute; child process configuration requires that.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.root: Unknown function or value 'Stdlib.LocalStore.path'"
-let root () : String =
-  let store = Stdlib.LocalStore.path ()
-  (Stdlib.Cli.Path.parent store) + "/test-instances"
+let root(): String =
+  let store = LanguageTools.LocalStore.path()
+  (Stdlib.Cli.Path.parent(store)) + "/test-instances"
 
 
 /// The store a new instance starts from.
@@ -31,70 +32,96 @@ let root () : String =
 /// is an error rather than a `None`, so every knob spelled as an env var is a grant every
 /// caller has to remember.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.seedFrom: Unknown function or value 'Stdlib.LocalStore.path'"
-let seedFrom () : String =
-  Stdlib.LocalStore.path ()
+let seedFrom(): String =
+  LanguageTools.LocalStore.path()
 
 
 /// The binary an instance drives.
 ///
-/// NOT `scripts/run-cli`: the wrapper sets `DARK_CONFIG_RUNDIR` itself and the container
-/// sets it for every process, and either one wins over what we pass, so an instance
-/// driven through the wrapper quietly uses the dev store instead of its own.
-let cliBinary () : String =
-  match Stdlib.Env.get "DARK_CLI_UNDER_TEST" with
-  | Some path -> path
+/// NOT `scripts/run-cli`: the wrapper re-enters the container with the container's HOME, so an
+/// instance driven through it uses the dev store.
+let cliBinary(): String =
+  match Stdlib.Env.get("DARK_CLI_UNDER_TEST") with
+  | Some(path) -> path
   | None -> "backend/Build/out/Cli/Debug/net10.0/Cli"
 
 
 /// A fresh instance. Fails with a message rather than half-existing.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.create: Unknown function or value 'root'"
-let create () : Stdlib.Result.Result<T, String> =
-  let suffix = Stdlib.toString (Stdlib.Int.random 100000 999999)
-  let dir = $"{root ()}/{suffix}"
-  let src = seedFrom ()
+let create(): Stdlib.Result.Result<T, String> =
+  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
+  let dir = $"{root()}/{suffix}/.darklang"
+  let src = seedFrom()
 
-  if Stdlib.Cli.Unix.fileExists src then
-    match Stdlib.Cli.Unix.ensureDirectoryExists dir with
-    | Error e -> Stdlib.Result.Result.Error $"could not create {dir}: {e}"
-    | Ok _ ->
+  if Stdlib.Cli.Unix.fileExists(src) then
+    match Stdlib.Cli.Unix.ensureDirectoryExists(dir) with
+    | Error(e) -> Stdlib.Result.Result.Error($"could not create {dir}: {e}")
+    | Ok(_) ->
       // `.backup` rather than `cp`, and a read lock rather than a write one, so this is
       // safe against a dev store something else is using.
+      //
+      // Then clear the copy's config. It would otherwise inherit the dev store's current
+      // branch and identity, so if the dev store is on a branch, every test instance
+      // starts there instead of on main. Clear all of it, not just the branch keys.
       let copy =
-        Stdlib.Cli.Unix.executeInDirectoryWithOutput
-          "."
-          $"sqlite3 -cmd '.timeout 10000' {src} '.backup {dir}/data.db'"
+        Stdlib.Cli.Unix.executeInDirectoryWithOutput(
+          ".",
+          $"sqlite3 -cmd '.timeout 10000' {src} '.backup {dir}/data.db' && sqlite3 {dir}/data.db 'DELETE FROM config_v0;'")
 
       if copy.exitCode != 0 then
-        Stdlib.Result.Result.Error $"could not seed {dir} from {src}: {copy.stderr}"
+        Stdlib.Result.Result.Error($"could not seed {dir} from {src}: {copy.stderr}")
       else
-        Stdlib.Result.Result.Ok(T { dir = dir, cli = cliBinary () })
+        Stdlib.Result.Result.Ok(T { dir = dir, cli = cliBinary() })
   else
-    Stdlib.Result.Result.Error
-      $"no store to seed an instance from at {src}; build first"
+    Stdlib.Result.Result.Error(
+      $"no store to seed an instance from at {src}; build first")
+
+
+let home(i: T): String = Stdlib.Cli.Path.parent(i.dir)
 
 
 /// Remove an instance and everything in it. Safe to call twice.
-let dispose (i: T) : Unit =
-  let _ = Stdlib.Cli.Unix.removeDirectory i.dir
+let dispose(i: T): Unit =
+  let _ = Stdlib.Cli.Unix.removeDirectory(home(i))
   ()
 
 
 /// The environment that points a child at this instance rather than at the dev store.
 ///
-/// `DARK_CONFIG_RUNDIR` ends in a separator because `LibConfig.Config` appends the
-/// database name to it directly. `HOME` moves anything that looks under the home
-/// directory; `DARK_CONFIG_DB_NAME` is named rather than inherited, since a caller with
-/// it already set would otherwise point the instance at a file it has no copy of.
-let env (i: T) : List<(String * String)> =
-  [ ("DARK_CONFIG_RUNDIR", $"{i.dir}/")
-    ("DARK_CONFIG_DB_NAME", "data.db")
-    ("HOME", i.dir)
-    ("XDG_CONFIG_HOME", i.dir + "/config") ]
+/// `HOME` (`USERPROFILE` on Windows) moves the store. `DARK_CONFIG_DB_NAME` is named rather than
+/// inherited, since a caller with it set would point the instance at a file it has no copy of.
+let env(i: T): List<(String * String)> =
+  [ ("DARK_CONFIG_DB_NAME", "data.db")
+    ("HOME", home(i))
+    ("USERPROFILE", home(i))
+    ("XDG_CONFIG_HOME", home(i) + "/config") ]
+
+
+/// How long one command in an instance may take before it is stopped. The same limit the F#
+/// harness puts on each command it runs.
+val commandTimeoutMs = 120000
 
 
 /// Run one command in this instance and return everything it said.
-let run (i: T) (args: List<String>) : Stdlib.Result.Result<Stdlib.Cli.Process.Output, String> =
-  Stdlib.Cli.Process.runWithEnv i.cli args (env i)
+///
+/// Under a timeout, so a command that waits forever (on input, on a lock) fails as itself
+/// rather than leaving the whole suite to stop answering. `env` sets the environment, as in
+/// `Process.runWithEnv`, which has no timeout.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.run: Expected TInt, got TInt64"
+let run(i: T, args: List<String>): Stdlib.Result.Result<Stdlib.Cli.Process.Output, String> =
+  let envArgs = env(i) |> Stdlib.List.map(fun pair -> let (k, v) = pair in $"{k}={v}")
+
+  Stdlib.Cli.Process.runWithTimeout(
+    commandTimeoutMs,
+    "/usr/bin/env",
+    Stdlib.List.concat(envArgs, Stdlib.List.prepend(args, i.cli)))
+  |> Stdlib.Result.mapError(fun e ->
+    if e == "Process timed out" then
+      let cmd = Stdlib.String.join(args, " ")
+      let seconds = Stdlib.display(commandTimeoutMs / 1000)
+      $"`{cmd}` gave no answer in {seconds}s"
+    else
+      e)
 
 
 /// What a command printed: stdout, or stderr when stdout said nothing.
@@ -102,14 +129,15 @@ let run (i: T) (args: List<String>) : Stdlib.Result.Result<Stdlib.Cli.Process.Ou
 /// Same rule as `TestSuite.callOutput`, because the reason is the same: a refused command
 /// exits nonzero and explains itself on stdout, so dropping stdout on a failure hides
 /// exactly the text a test wants to read.
-let output (i: T) (args: List<String>) : String =
-  match run i args with
-  | Error e -> $"ERROR: {e}"
-  | Ok out ->
-    let stdout = Stdlib.String.trim out.stdout
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.output: Unknown function or value 'run'"
+let output(i: T, args: List<String>): String =
+  match run(i, args) with
+  | Error(e) -> $"ERROR: {e}"
+  | Ok(out) ->
+    let stdout = Stdlib.String.trim(out.stdout)
     if stdout != "" then stdout
     else
-      let stderr = Stdlib.String.trim out.stderr
+      let stderr = Stdlib.String.trim(out.stderr)
       if stderr == "" then "" else $"ERROR: {stderr}"
 
 
@@ -118,35 +146,80 @@ let output (i: T) (args: List<String>) : String =
 /// Ordinary results dispose immediately. A runtime error escapes to the enclosing
 /// isolation worker, whose host also removes these nested instance directories.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.withInstance: Unknown function or value 'create'"
-let withInstance (f: T -> Stdlib.Test.Result) : Stdlib.Test.Result =
-  match create () with
-  | Error e -> Stdlib.Test.fail e
-  | Ok i ->
-    let result = f i
-    let _ = dispose i
+let withInstance(f: T -> Stdlib.Test.Result): Stdlib.Test.Result =
+  match create() with
+  | Error(e) -> Stdlib.Test.fail(e)
+  | Ok(i) ->
+    let result = f(i)
+    let _ = dispose(i)
     result
 
 
 /// Asserts a command's output contains `needle`.
-let expectContains (i: T) (args: List<String>) (needle: String) : Stdlib.Test.Result =
-  let out = output i args
-  if Stdlib.String.contains out needle then
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.expectContains: Unknown function or value 'output'"
+let expectContains(i: T, args: List<String>, needle: String): Stdlib.Test.Result =
+  let out = output(i, args)
+  if Stdlib.String.contains(out, needle) then
     Stdlib.Test.Result.Pass
   else
-    let cmd = Stdlib.String.join args " "
-    Stdlib.Test.fail $"`{cmd}` did not mention '{needle}'. It said: {out}"
+    let cmd = Stdlib.String.join(args, " ")
+    Stdlib.Test.fail($"`{cmd}` did not mention '{needle}'. It said: {out}")
 
 
 /// Asserts a command's exit code.
-let expectExit (i: T) (args: List<String>) (expected: Int) : Stdlib.Test.Result =
-  let cmd = Stdlib.String.join args " "
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.expectExit: Unknown function or value 'run'"
+let expectExit(i: T, args: List<String>, expected: Int64): Stdlib.Test.Result =
+  let cmd = Stdlib.String.join(args, " ")
 
-  match run i args with
-  | Error e -> Stdlib.Test.fail $"`{cmd}` could not run: {e}"
-  | Ok out ->
+  match run(i, args) with
+  | Error(e) -> Stdlib.Test.fail($"`{cmd}` could not run: {e}")
+  | Ok(out) ->
     if out.exitCode == expected then
       Stdlib.Test.Result.Pass
     else
-      let got = Stdlib.toString out.exitCode
-      let want = Stdlib.toString expected
-      Stdlib.Test.fail $"`{cmd}` exited {got}, expected {want}"
+      let got = Stdlib.display(out.exitCode)
+      let want = Stdlib.display(expected)
+      Stdlib.Test.fail($"`{cmd}` exited {got}, expected {want}")
+
+
+/// A command's exit code and everything it printed, both streams in that order.
+///
+/// Both streams because a refusal and its advice can land on either, and a test
+/// about what a person sees should not depend on which. `-1` when the command could
+/// not start at all.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.ran: Unknown function or value 'run'"
+let ran(i: T, args: List<String>): (Int64 * String) =
+  match run(i, args) with
+  | Error(e) -> (-1, $"could not run: {e}")
+  | Ok(out) -> (out.exitCode, out.stdout + out.stderr)
+
+
+/// Everything a command printed, both streams. See `ran`.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.said: Unknown function or value 'ran'"
+let said(i: T, args: List<String>): String = Stdlib.Tuple2.second(ran(i, args))
+
+
+/// `out` mentions `needle`; `why` says what that means when it does not.
+let says(out: String, needle: String, why: String): Stdlib.Test.Result =
+  if Stdlib.String.contains(out, needle) then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail($"{why}: expected '{needle}' in: {out}")
+
+
+/// `out` does NOT mention `needle`.
+let doesNotSay(out: String, needle: String, why: String): Stdlib.Test.Result =
+  if Stdlib.String.contains(out, needle) then
+    Stdlib.Test.fail($"{why}: did not expect '{needle}' in: {out}")
+  else
+    Stdlib.Test.Result.Pass
+
+
+/// A command exited with `expected`; `why` names the case.
+let exitedWith(code: Int64, expected: Int64, why: String): Stdlib.Test.Result =
+  if code == expected then
+    Stdlib.Test.Result.Pass
+  else
+    let got = Stdlib.display(code)
+    let want = Stdlib.display(expected)
+    Stdlib.Test.fail($"{why}: exited {got}, expected {want}")

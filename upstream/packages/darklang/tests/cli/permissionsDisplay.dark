@@ -1,97 +1,95 @@
 module Darklang.Cli.Tests.PermissionsDisplay
 
-// The Workbench and `permissions show` share this renderer. Requirements are
-// not grants; exact resources are checked at runtime.
+// Function reports omit instance defaults and warn about incomplete analysis.
 
 module PermissionsDisplay =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.LanguageTools.Permissions.Policy'"
-  let packagePolicy (unit: Unit) : Darklang.LanguageTools.Permissions.Policy =
+  let packagePolicy(unit: Unit): Darklang.LanguageTools.Permissions.Policy =
     Darklang.LanguageTools.Permissions.Policy
       { allow =
-          [ Darklang.LanguageTools.Permissions.Rule.Effect Darklang.LanguageTools.Permissions.Effect.Http
-            Darklang.LanguageTools.Permissions.Rule.Effect Darklang.LanguageTools.Permissions.Effect.Clock ]
+          [ Darklang.LanguageTools.Permissions.Rule.Effect(Darklang.LanguageTools.Permissions.Effect.Http)
+            Darklang.LanguageTools.Permissions.Rule.Effect(Darklang.LanguageTools.Permissions.Effect.Clock) ]
         deny = [] }
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.LanguageTools.Permissions.Policy'"
-  let instancePolicy (unit: Unit) : Darklang.LanguageTools.Permissions.Policy =
+  let instancePolicy(unit: Unit): Darklang.LanguageTools.Permissions.Policy =
     Darklang.LanguageTools.Permissions.Policy
       { allow =
           [ Darklang.LanguageTools.Permissions.Rule.Http(
               Darklang.LanguageTools.Permissions.HttpRule
                 { method =
-                    Darklang.LanguageTools.Permissions.Scope.Only "GET"
+                    Darklang.LanguageTools.Permissions.Scope.Only("GET")
                   scheme =
-                    Darklang.LanguageTools.Permissions.Scope.Only "https"
+                    Darklang.LanguageTools.Permissions.Scope.Only("https")
                   host =
-                    Darklang.LanguageTools.Permissions.HostRule.Exact
-                      "api.example.com"
+                    Darklang.LanguageTools.Permissions.HostRule.Exact(
+                      "api.example.com")
                   port =
-                    Darklang.LanguageTools.Permissions.Scope.Only 443
-                  pathPrefix =
-                    Darklang.LanguageTools.Permissions.Scope.Only "/v1"
+                    Darklang.LanguageTools.Permissions.Scope.Only(443)
+                  path =
+                    Darklang.LanguageTools.Permissions.HttpPath.Subtree("/v1")
                   query = Darklang.LanguageTools.Permissions.Scope.All }) ]
         deny = [] }
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.Cli.Permissions.Command.AccessReportFacts'"
-  let approved
-    (unit: Unit)
+  let approved(
+    unit: Unit)
     : Darklang.Cli.Permissions.Command.AccessReportFacts =
     Darklang.Cli.Permissions.Command.AccessReportFacts
       { hash = "123456789abcdef"
         effects = [ Darklang.LanguageTools.Permissions.Effect.Http, Darklang.LanguageTools.Permissions.Effect.Clock ]
         complete = true
-        ceiling = Stdlib.Option.Option.Some [ Darklang.LanguageTools.Permissions.Effect.Http, Darklang.LanguageTools.Permissions.Effect.Clock ]
         bundled = false
-        packagePolicy = Stdlib.Option.Option.Some (packagePolicy ())
+        approvals = [("Acme.Client.fetch", packagePolicy())]
         approvedAs = [ "Acme.Client.fetch" ]
-        instancePolicy = instancePolicy () }
+        olderApproval = Stdlib.Option.Option.None
+        instancePolicy = instancePolicy() }
 
-  // @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Permissions.Command.renderAccessReport'" class=missing-support reason=upstream-dependency
   test approvedReport =
-    Darklang.Cli.Permissions.Command.renderAccessReport (approved ())
-    |> Stdlib.Test.equal
-      [ "access"
-          "  version: 12345678"
-          "  requires: http, clock"
-          "  analysis: complete"
-          "  author ceiling: {Http, Clock}"
-          "  consumer approval: approved for this account (rules below)"
-          "  approved as: Acme.Client.fetch"
-          "  package approval policy:"
-          "    http"
-          "    clock"
-          "  instance policy:"
-          "    http GET 'https://api.example.com:443/v1'"
-          "  run policy: selected when invoked (`--sandbox` denies all)"
-          "  effective: checked per operation: instance ∩ run ∩ package approval ∩ function ceiling"
-          "  exact resources: paths, URLs, ports, names, and arguments are checked at call time" ]
+    Darklang.Cli.Permissions.Command.renderAccessReport("Acme.Client.fetch", approved())
+    |> Stdlib.Test.equal(
+      [ "Acme.Client.fetch"
+        "  Effects: http, clock"
+        "  Remembered approval for Acme.Client.fetch (version 12345678):"
+        "    Allowed:"
+        "      http"
+        "      clock"
+        "    Explicitly denied:"
+        "      none" ])
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.Cli.Permissions.Command.AccessReportFacts'"
-  let unapproved
-    (unit: Unit)
+  let unapproved(
+    unit: Unit)
     : Darklang.Cli.Permissions.Command.AccessReportFacts =
-    let facts = approved ()
+    let facts = approved()
 
     { facts with
         effects = []
         complete = false
-        ceiling = Stdlib.Option.Option.None
-        packagePolicy = Stdlib.Option.Option.None
+        approvals = []
         approvedAs = [] }
 
-  // @compiler xfail compile: "Unknown function or value 'Darklang.Cli.Permissions.Command.renderAccessReport'" class=missing-support reason=upstream-dependency
   test unapprovedReport =
-    Darklang.Cli.Permissions.Command.renderAccessReport (unapproved ())
-    |> Stdlib.Test.equal
-      [ "access"
-          "  version: 12345678"
-          "  requires: not fully known"
-          "  analysis: incomplete: some calls could not be followed, so their effects are not known here"
-          "  author ceiling: not declared (inherits caller limits)"
-          "  consumer approval: not approved for dependency use"
-          "  approved as: none"
-          "  instance policy:"
-          "    http GET 'https://api.example.com:443/v1'"
-          "  run policy: selected when invoked (`--sandbox` denies all)"
-          "  effective: blocked as a dependency; explicitly chosen entry points are treated as roots"
-          "  exact resources: paths, URLs, ports, names, and arguments are checked at call time" ]
+    Darklang.Cli.Permissions.Command.renderAccessReport("Acme.Client.fetch", unapproved())
+    |> Stdlib.Test.equal(
+      [ "Acme.Client.fetch"
+        "  Effects: not fully known"
+        "  Warning: analysis is incomplete; more permissions may be needed."
+        "  Remembered approval: none" ])
+
+  test effectFreeReport =
+    let facts = unapproved()
+    Darklang.Cli.Permissions.Command.renderAccessReport(
+      "Acme.Client.message", { facts with complete = true })
+    |> Stdlib.Test.equal(
+      [ "Acme.Client.message"
+        "  Effects: none"
+        "  Permissions needed: none"
+        "  Remembered approval: none" ])
+
+  test olderApprovalReport =
+    let facts = unapproved()
+    Darklang.Cli.Permissions.Command.renderAccessReport(
+      "Acme.Client.fetch",
+      { facts with complete = true, olderApproval = Stdlib.Option.Option.Some("abcdef0123456789") })
+    |> Stdlib.Test.equal(
+      [ "Acme.Client.fetch"
+        "  Effects: none"
+        "  Permissions needed: none"
+        "  Remembered approval: for an older version (abcdef01); `permissions update Acme.Client.fetch` reviews this one" ])

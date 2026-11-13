@@ -1,29 +1,64 @@
-/// Short-duration parsing. Suffix-based ("30s", "5m", "1h", "2d") so
-/// callers always state intent. Returns the duration in seconds.
+/// Durations in whole seconds. Parse strings like "30s", "5m", "1h" and "2d".
+/// A unit is required: "5" on its own is an error.
 module Darklang.Stdlib.Duration
 
 
-/// Parse a short duration string ("30s", "5m", "1h", "2d") into seconds.
-/// Bare numbers are rejected — every duration must end with a unit.
-// @compiler replace: packages/darklang/stdlib/duration.dark#Darklang.Stdlib.Duration.parse reason=compiler-implementation
-let parse (s: String) : Stdlib.Result.Result<Int, String> =
-  let len = Stdlib.String.length s
-  if len < 2 then
-    Stdlib.Result.Result.Error
-      $"Duration too short: '{s}'; need a number + unit (s/m/h/d), e.g. 5m"
+/// A whole number of seconds. Can be negative.
+type Duration = { seconds: Int64 }
+
+
+type ParseError =
+  /// No unit was given, as in "5" or "".
+  | MissingUnit
+  /// The number is missing or isn't a whole number, as in "s", "xm" or "1.5h".
+  | InvalidNumber
+  /// The unit isn't s, m, h or d, as in "5x" or "5ms".
+  | UnknownUnit
+
+
+/// Create a <type Duration> from <param seconds> seconds.
+let fromSeconds(seconds: Int64): Duration = Duration { seconds = seconds }
+
+
+impl Display for Duration =
+  /// In the largest unit <fn parse> reads that fits exactly: {{90s}}, {{5m}}, {{2d}}
+  let display(d: Duration): String =
+    let s = d.seconds
+    if s == 0 then "0s"
+    else if s % 86400 == 0 then $"{s / 86400}d"
+    else if s % 3600 == 0 then $"{s / 3600}h"
+    else if s % 60 == 0 then $"{s / 60}m"
+    else $"{s}s"
+
+
+/// Get the number of seconds in <param d>.
+let toSeconds(d: Duration): Int64 = d.seconds
+
+
+/// Parse a string like "30s", "5m", "1h", "2d" or "-5m" into a <type Duration>.
+/// The string must end with a unit: s, m, h or d.
+let parse(s: String): Stdlib.Result.Result<Duration, ParseError> =
+  let number =
+    s
+    |> Stdlib.String.toList
+    |> Stdlib.List.takeWhile(fun c -> !Stdlib.Char.isLetter(c))
+    |> Stdlib.String.fromList
+  let unit = Stdlib.String.dropFirst(s, Stdlib.String.length(number))
+  if Stdlib.String.isEmpty(unit) then
+    Stdlib.Result.Result.Error(ParseError.MissingUnit)
   else
-    let unit = Stdlib.String.last s 1
-    let numPart = Stdlib.String.dropLast s 1
-    match Stdlib.Int.parse numPart with
-    | Error _ ->
-      Stdlib.Result.Result.Error
-        $"Invalid duration '{s}'; need a number + unit (s/m/h/d), e.g. 5m"
-    | Ok n ->
+    match Stdlib.Int64.parse(number) with
+    | Ok(n) ->
+      // a count of seconds past Int64 is refused rather than wrapped
+      let times(factor: Int64): Stdlib.Result.Result<Duration, ParseError> =
+        match Stdlib.Int64.checkedMultiply(n, factor) with
+        | Ok(s) -> Stdlib.Result.Result.Ok(fromSeconds(s))
+        | Error(_) -> Stdlib.Result.Result.Error(ParseError.InvalidNumber)
       match unit with
-      | "s" -> Stdlib.Result.Result.Ok n
-      | "m" -> Stdlib.Result.Result.Ok(n * 60)
-      | "h" -> Stdlib.Result.Result.Ok(n * 3600)
-      | "d" -> Stdlib.Result.Result.Ok(n * 86400)
-      | _ ->
-        Stdlib.Result.Result.Error
-          $"Unknown unit '{unit}' in '{s}'; use s, m, h, or d"
+      | "s" -> times(1)
+      | "m" -> times(60)
+      | "h" -> times(3600)
+      | "d" -> times(86400)
+      | _ -> Stdlib.Result.Result.Error(ParseError.UnknownUnit)
+
+    | Error(_) -> Stdlib.Result.Result.Error(ParseError.InvalidNumber)
