@@ -83,7 +83,7 @@ let __decimalToFloat32 (digits: String) (decimalExponent: Int64) (negative: Bool
             else
                 let numerator =
                     if decimalExponent >= 0L then
-                        Stdlib.Int.__value (normalized + Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 decimalExponent))
+                        Stdlib.Int.__value (normalized + Stdlib.String.__repeatInt "0" (Stdlib.Int.fromInt64 decimalExponent))
                     else Stdlib.Int.__value normalized in
                 let denominator =
                     if decimalExponent < 0L then Stdlib.Float.__pow10 (0L - decimalExponent)
@@ -226,8 +226,8 @@ impl Stdlib.Power for Float32 =
 impl Stdlib.Negate for Float32 =
   let negate = Stdlib.Float32.negate
 
-impl Stdlib.ToString for Float32 =
-  let toString = Stdlib.Float32.toString
+impl Stdlib.Display for Float32 =
+  let display = Stdlib.Float32.toString
 
 impl Stdlib.Compare for Float32 =
   let lessThan = Stdlib.Float32.lessThan

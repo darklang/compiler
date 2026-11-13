@@ -103,14 +103,31 @@ let rec checkExpression (globals : globals) locals symbols expected expression =
                     Ok (C.StringText value :: reversed, symbols)
                 | WT.StringInterpolation (_, expr, _, _) ->
                     bind (check symbols None expr) (fun (typ, expr, symbols) ->
+                        let isTypeParameter =
+                          match WrittenCheckingState.resolve symbols typ with
+                          | AST.TVar _ -> true
+                          | _ -> false
+                        in
                         if
-                          Option.is_some
-                            (Unification.reconcileTypes None AST.TString typ)
+                          (not isTypeParameter)
+                          && Option.is_some
+                               (Unification.reconcileTypes None AST.TString typ)
                         then Ok (C.StringExpr expr :: reversed, symbols)
                         else
-                          Error
-                            ("Expected String in string interpolation, got "
-                            ^ StructuralFormat.semanticType typ))))
+                          (* Any other value shows through its Display impl,
+                             or as inspect shows it. *)
+                          let interpolate, symbols =
+                            WrittenCheckingState.internFunction
+                              "Darklang.Stdlib.__interpolate" symbols
+                          in
+                          Ok
+                            ( C.StringExpr
+                                (C.TypeApp
+                                   ( interpolate,
+                                     C.checkedTypeArgs [ typ ],
+                                     NonEmptyList.singleton expr ))
+                              :: reversed,
+                              symbols ))))
           (Ok ([], symbols))
           segments
       in

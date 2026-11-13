@@ -3,7 +3,7 @@
 // === Empty List ===
 
 // Empty list should not default to Int64 element type
-Stdlib.List.length (if true then [] else [true]) = 0
+Stdlib.List.length (if true then [] else [true]) = 0L
 // Top-level char lists use the recursive interpreter value renderer.
 ['a', 'b'] = stdout="['a', 'b']\n"
 
@@ -259,13 +259,13 @@ Stdlib.List.isEmpty ([1L]) = false
 Stdlib.List.isEmpty ([1L, 2L, 3L]) = false
 
 // Stdlib.List.length
-Stdlib.List.length ([]) = 0
-Stdlib.List.length ([1L]) = 1
-Stdlib.List.length ([1L, 2L]) = 2
-Stdlib.List.length ([1L, 2L, 3L]) = 3
-Stdlib.List.length ([1L, 2L, 3L, 4L, 5L]) = 5
+Stdlib.List.length ([]) = 0L
+Stdlib.List.length ([1L]) = 1L
+Stdlib.List.length ([1L, 2L]) = 2L
+Stdlib.List.length ([1L, 2L, 3L]) = 3L
+Stdlib.List.length ([1L, 2L, 3L, 4L, 5L]) = 5L
 // Stdlib.List.length with different types
-Stdlib.List.length ([true, false, true]) = 3
+Stdlib.List.length ([true, false, true]) = 3L
 // =====================================================
 // Large List Literal Tests (6-50 elements)
 // =====================================================
@@ -273,23 +273,23 @@ Stdlib.List.length ([true, false, true]) = 3
 // Int lists (6+)
 match [1L, 2L, 3L, 4L, 5L, 6L] with | [a, b, c, d, e, f] -> a + f | _ -> 0L = 7L
 match [10L, 11L, 12L, 13L, 14L, 15L, 16L] with | [a, b, c, d, e, f, g] -> g - a | _ -> 0L = 6L
-Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L]) 7) 0L = 8L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L]) 7L) 0L = 8L
 match [1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L] with | [a, b, c, d, e, f, g, h, i, j, k, l] -> k + l | _ -> 0L = 23L
-Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L]) 10) 0L = 11L
-Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L]) 18) 0L = 19L
-Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 26L, 27L, 28L, 29L, 30L]) 25) 0L = 26L
-Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 26L, 27L, 28L, 29L, 30L, 31L, 32L, 33L, 34L, 35L, 36L, 37L, 38L, 39L, 40L, 41L, 42L, 43L, 44L, 45L, 46L, 47L, 48L, 49L, 50L]) 49) 0L = 50L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L]) 10L) 0L = 11L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L]) 18L) 0L = 19L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 26L, 27L, 28L, 29L, 30L]) 25L) 0L = 26L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 26L, 27L, 28L, 29L, 30L, 31L, 32L, 33L, 34L, 35L, 36L, 37L, 38L, 39L, 40L, 41L, 42L, 43L, 44L, 45L, 46L, 47L, 48L, 49L, 50L]) 49L) 0L = 50L
 
 // Bool lists (6+)
 match [true, false, true, false, true, false] with | [a, b, c, d, e, f] -> if f then 1L else 0L | _ -> -1L = 0L
 match [false, false, false, false, true, true, true, true] with | [a, b, c, d, e, f, g, h] -> if e && h then 1L else 0L | _ -> -1L = 1L
-Stdlib.Option.withDefault (Stdlib.List.getAt ([true, false, true, false, true, false, true, false, true, false, true, false]) 10) false = true
-Stdlib.List.length ([true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false]) = 16
+Stdlib.Option.withDefault (Stdlib.List.getAt ([true, false, true, false, true, false, true, false, true, false, true, false]) 10L) false = true
+Stdlib.List.length ([true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false]) = 16L
 // String lists (6+)
 match ["a", "b", "c", "d", "e", "f"] with | [a, b, c, d, e, f] -> a + f | _ -> "" = "af"
-Stdlib.Option.withDefault (Stdlib.List.getAt (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"]) 9) "" = "s10"
-Stdlib.Option.withDefault (Stdlib.List.getAt (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12"]) 11) "" = "s12"
-Stdlib.Option.withDefault (Stdlib.List.getAt (["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14", "t15", "t16", "t17", "t18", "t19", "t20"]) 15) "" = "t16"
+Stdlib.Option.withDefault (Stdlib.List.getAt (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"]) 9L) "" = "s10"
+Stdlib.Option.withDefault (Stdlib.List.getAt (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12"]) 11L) "" = "s12"
+Stdlib.Option.withDefault (Stdlib.List.getAt (["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14", "t15", "t16", "t17", "t18", "t19", "t20"]) 15L) "" = "t16"
 
 // Record lists (6+)
 type Item = { id: Int64, name: String } match [Item { id = 1L, name = "one" }, Item { id = 2L, name = "two" }, Item { id = 3L, name = "three" }, Item { id = 4L, name = "four" }, Item { id = 5L, name = "five" }, Item { id = 6L, name = "six" }] with | [a, b, c, d, e, f] -> f.name | _ -> "" = "six"
@@ -301,13 +301,13 @@ type Item = { id: Int64, name: String } match [Item { id = 1L, name = "one" }, I
 // =====================================================
 
 // Basic spread construction - prepend single element
-let x = [2L, 3L] in Stdlib.List.length ([1L] @ x) = 3
+let x = [2L, 3L] in Stdlib.List.length ([1L] @ x) = 3L
 // Prepend multiple elements
-let x = [3L, 4L] in Stdlib.List.length ([1L, 2L] @ x) = 4
+let x = [3L, 4L] in Stdlib.List.length ([1L, 2L] @ x) = 4L
 // Empty spread - just return tail
-let x = [1L, 2L, 3L] in Stdlib.List.length x = 3
+let x = [1L, 2L, 3L] in Stdlib.List.length x = 3L
 // Spread with empty tail (use function to get typed empty list)
-let emptyList () : List<Int64> = []; Stdlib.List.length ([1L, 2L] @ emptyList ()) = 2
+let emptyList () : List<Int64> = []; Stdlib.List.length ([1L, 2L] @ emptyList ()) = 2L
 // Verify element values with pattern matching
 let x = [2L, 3L] in match [1L] @ x with | [a, b, c] -> a + b + c | _ -> 0L = 6L
 
@@ -315,12 +315,12 @@ let x = [2L, 3L] in match [1L] @ x with | [a, b, c] -> a + b + c | _ -> 0L = 6L
 let x = [2L, 3L] in match [10L + 1L] @ x with | [a, b, c] -> a | _ -> 0L = 11L
 
 // Use in match case body
-match [1L, 2L, 3L] with | h :: rest -> Stdlib.List.length ([h] @ rest) | [] -> 0 = 3
+match [1L, 2L, 3L] with | h :: rest -> Stdlib.List.length ([h] @ rest) | [] -> 0L = 3L
 // Rebuild list with modified head
 match [1L, 2L, 3L] with | h :: rest -> (match [h + 10L] @ rest with | [a, b, c] -> a + b + c | _ -> 0L) | [] -> 0L = 16L
 
 // Chain of spreads
-let a = [3L] in let b = [2L] @ a in Stdlib.List.length ([1L] @ b) = 3
+let a = [3L] in let b = [2L] @ a in Stdlib.List.length ([1L] @ b) = 3L
 // =====================================================
 // Lists of Floats
 // =====================================================
@@ -385,17 +385,17 @@ let makeCumulative (table: List<(Int64 * Float)>) (running: Float) : List<(Int64
         | None -> [(c, newRunning)]
         | Some rest -> Stdlib.List.push (makeCumulative rest newRunning) ((c, newRunning))
 
-let selectRandom (table: List<(Int64 * Float)>) (r: Float) (idx: Int) : Int64 =
+let selectRandom (table: List<(Int64 * Float)>) (r: Float) (idx: Int64) : Int64 =
     match Stdlib.List.getAt table idx with
     | None -> 0L
     | Some item ->
         let c = Stdlib.Tuple2.first item in
         let p = Stdlib.Tuple2.second item in
         if r < p then c
-        else if idx + 1 >= Stdlib.List.length table then c
-        else selectRandom table r (idx + 1)
+        else if idx + 1L >= Stdlib.List.length table then c
+        else selectRandom table r (idx + 1L)
 
-let table = [(97L, 0.27), (99L, 0.12), (103L, 0.12), (116L, 0.27)] in let cumulative = makeCumulative table 0.0 in let newSeed = (1L * 3877L + 29573L) % 139968L in let r = Stdlib.Int64.toFloat newSeed / 139968.0 in selectRandom cumulative r 0 = stdout="97\n" stderr=""
+let table = [(97L, 0.27), (99L, 0.12), (103L, 0.12), (116L, 0.27)] in let cumulative = makeCumulative table 0.0 in let newSeed = (1L * 3877L + 29573L) % 139968L in let r = Stdlib.Int64.toFloat newSeed / 139968.0 in selectRandom cumulative r 0L = stdout="97\n" stderr=""
 // =====================================================
 // Lists of Strings
 // =====================================================
@@ -438,10 +438,10 @@ concatStrings (["a", "b", "c"]) = "abc"
 // calculated for navigating to middle elements.
 
 // Access element at index 2 (first element in middle NODE2)
-Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L]) 2) 0L = 3L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L]) 2L) 0L = 3L
 
 // Access element at index 3 (second element in middle NODE2)
-Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L]) 3) 0L = 4L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([1L, 2L, 3L, 4L, 5L, 6L]) 3L) 0L = 4L
 
 // =====================================================
 // DEEP node element extraction offset tests (kills mutation #69)
@@ -574,7 +574,7 @@ match [(1000L, 100L, 10L, 1L), (500L, 50L, 5L, 0L)] with | [(_, _, c, d), (_, _,
 // If - 4 were changed to + 4, groupSizes would return [2, 2, 3, 3]
 // expecting 10 nodes but only having 4, causing incorrect tree construction.
 // The 8th element (at index 7) would not be accessible if tree is malformed.
-Stdlib.Option.withDefault (Stdlib.List.getAt ([10L, 20L, 30L, 40L, 50L, 60L, 70L, 80L]) 7) 0L = 80L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([10L, 20L, 30L, 40L, 50L, 60L, 70L, 80L]) 7L) 0L = 80L
 
 // =====================================================
 // groupSizes nodeCount % 3 == 2 test (kills mutation #91)
@@ -586,7 +586,7 @@ Stdlib.Option.withDefault (Stdlib.List.getAt ([10L, 20L, 30L, 40L, 50L, 60L, 70L
 // If - 2 were changed to + 2, groupSizes would return [2, 3, 3]
 // expecting 8 nodes but only having 5, causing incorrect tree construction.
 // The 9th element (at index 8) would not be accessible if tree is malformed.
-Stdlib.Option.withDefault (Stdlib.List.getAt ([10L, 20L, 30L, 40L, 50L, 60L, 70L, 80L, 90L]) 8) 0L = 90L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([10L, 20L, 30L, 40L, 50L, 60L, 70L, 80L, 90L]) 8L) 0L = 90L
 
 // =====================================================
 // Nested list pattern element extraction test (kills mutation #92)
@@ -628,7 +628,7 @@ match WrapList5 ([10L, 20L, 30L, 40L, 50L]) with | WrapList5 ([a, b, c, d, e]) -
 // If / were changed to *, groupSizes would return [3, 3, 3, 3, 3, 3, 3, 3, 3]
 // expecting 27 nodes but only having 3, causing incorrect tree construction.
 // The 7th element (at index 6) would not be accessible if tree is malformed.
-Stdlib.Option.withDefault (Stdlib.List.getAt ([10L, 20L, 30L, 40L, 50L, 60L, 70L]) 6) 0L = 70L
+Stdlib.Option.withDefault (Stdlib.List.getAt ([10L, 20L, 30L, 40L, 50L, 60L, 70L]) 6L) 0L = 70L
 
 // =====================================================
 // groupSizes nodeCount % 3 == 0 in toAtom (kills mutation #109)
@@ -639,7 +639,7 @@ Stdlib.Option.withDefault (Stdlib.List.getAt ([10L, 20L, 30L, 40L, 50L, 60L, 70L
 // If / were changed to *, the list construction would fail trying to
 // create 9 groups of 3 from only 3 middle nodes.
 // Uses a variable to ensure the list is compiled via toAtom as an argument.
-let xs = [10L, 20L, 30L, 40L, 50L, 60L, 70L] in Stdlib.Option.withDefault (Stdlib.List.getAt xs 6) 0L = 70L
+let xs = [10L, 20L, 30L, 40L, 50L, 60L, 70L] in Stdlib.Option.withDefault (Stdlib.List.getAt xs 6L) 0L = 70L
 
 // =====================================================
 // Single-element list cons pattern empty check (kills mutation #119)

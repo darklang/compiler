@@ -331,18 +331,43 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry))
       needsStreamRcDecHelper = false;
     }
   in
-  let collectRcHelperRequirementsFromInstr requirements instr =
-    let collectReleasePlanRequirements releasePlan requirements =
-      {
-        requirements with
-        plannedListDecHelpers =
-          mergePlannedListDecHelperMaps requirements.plannedListDecHelpers
-            (plannedListDecHelpersInReleasePlan releasePlan);
-        plannedDictDecHelpers =
-          mergePlannedDictDecHelperMaps requirements.plannedDictDecHelpers
-            (plannedDictDecHelpersInReleasePlan releasePlan);
-      }
+  let collectReleasePlanRequirements releasePlan requirements =
+    {
+      requirements with
+      plannedListDecHelpers =
+        mergePlannedListDecHelperMaps requirements.plannedListDecHelpers
+          (plannedListDecHelpersInReleasePlan releasePlan);
+      plannedDictDecHelpers =
+        mergePlannedDictDecHelperMaps requirements.plannedDictDecHelpers
+          (plannedDictDecHelpersInReleasePlan releasePlan);
+    }
+  in
+  (* Every helper a release plan reaches below its root. *)
+  let collectNestedReleasePlanRequirements releasePlan requirements =
+    let withPlanRequirements =
+      collectReleasePlanRequirements releasePlan requirements
     in
+    {
+      withPlanRequirements with
+      listDecHelperLabels =
+        Set.union withPlanRequirements.listDecHelperLabels
+          (listDecHelperLabelsInReleasePlan releasePlan);
+      dictDecHelperLabels =
+        Set.union withPlanRequirements.dictDecHelperLabels
+          (dictDecHelperLabelsInReleasePlan releasePlan);
+      needsClosureRcDecHelper =
+        withPlanRequirements.needsClosureRcDecHelper
+        || rcReleasePlanContains
+             (releasePlanIsRootKind MemoryModel.ClosureHeap)
+             releasePlan;
+      needsStreamRcDecHelper =
+        withPlanRequirements.needsStreamRcDecHelper
+        || rcReleasePlanContains
+             (releasePlanIsRootKind MemoryModel.StreamHeap)
+             releasePlan;
+    }
+  in
+  let collectRcHelperRequirementsFromInstr requirements instr =
     match instr with
     | LIR.RefCountDec (_, _, LIR.TaggedList, metadata) ->
         let releasePlan =
@@ -380,28 +405,7 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry))
           match rcMetadataReleasePlan metadata with
           | None -> requirements
           | Some releasePlan ->
-              let withPlanRequirements =
-                collectReleasePlanRequirements releasePlan requirements
-              in
-              {
-                withPlanRequirements with
-                listDecHelperLabels =
-                  Set.union withPlanRequirements.listDecHelperLabels
-                    (listDecHelperLabelsInReleasePlan releasePlan);
-                dictDecHelperLabels =
-                  Set.union withPlanRequirements.dictDecHelperLabels
-                    (dictDecHelperLabelsInReleasePlan releasePlan);
-                needsClosureRcDecHelper =
-                  withPlanRequirements.needsClosureRcDecHelper
-                  || rcReleasePlanContains
-                       (releasePlanIsRootKind MemoryModel.ClosureHeap)
-                       releasePlan;
-                needsStreamRcDecHelper =
-                  withPlanRequirements.needsStreamRcDecHelper
-                  || rcReleasePlanContains
-                       (releasePlanIsRootKind MemoryModel.StreamHeap)
-                       releasePlan;
-              }
+              collectNestedReleasePlanRequirements releasePlan requirements
         in
         if kind = LIR.StreamHeap then
           { withReleasePlanRequirements with needsStreamRcDecHelper = true }
@@ -430,6 +434,28 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry))
         | None -> requirements)
     | _ -> requirements
   in
+  (* A recursive type's release helper expands the type's own plan, which
+     can reach list, dict and other recursive types' helpers that no
+     instruction names. Close over those types and collect their helpers. *)
+  let recursiveReleasePlan sourceType =
+    MemoryPlanning.rcReleasePlanOfTypeWithSums recordRegistry sumShapeRegistry
+      sourceType
+  in
+  let rec closeRecursiveReleaseTypes types =
+    let next =
+      MemoryPlanning.SemanticTypeSet.fold
+        (fun sourceType acc ->
+          MemoryPlanning.SemanticTypeSet.union acc
+            (MemoryPlanning.recursiveReleaseTypes
+               (recursiveReleasePlan sourceType)))
+        types types
+    in
+    if MemoryPlanning.SemanticTypeSet.equal next types then types
+    else closeRecursiveReleaseTypes next
+  in
+  let recursiveReleaseTypes =
+    closeRecursiveReleaseTypes (recursiveReleaseTypesInFunctions functions)
+  in
   let instructionRcHelperRequirements =
     functions
     |> List.fold_left
@@ -442,6 +468,12 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry))
                        blockRequirements)
                 functionRequirements)
          emptyRcHelperRequirements
+    |> MemoryPlanning.SemanticTypeSet.fold
+         (fun sourceType requirements ->
+           collectNestedReleasePlanRequirements
+             (recursiveReleasePlan sourceType)
+             requirements)
+         recursiveReleaseTypes
   in
   let closureCaptureListDecHelperLabels =
     closureCaptureTypes |> Map.toList
@@ -712,8 +744,7 @@ let translateProgram (LIR.Program (functions, variantRegistry, recordRegistry))
       (closurePayloadSizesFromParams functions)
   in
   let recursiveNominalRcDecHelpers =
-    recursiveReleaseTypesInFunctions functions
-    |> MemoryPlanning.SemanticTypeSet.elements
+    recursiveReleaseTypes |> MemoryPlanning.SemanticTypeSet.elements
     |> List.concat_map
          (generateRecursiveNominalRefCountDecHelper enableLeakCheck
             recordRegistry sumShapeRegistry)

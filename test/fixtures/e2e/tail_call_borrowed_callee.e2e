@@ -23,10 +23,10 @@ borrowedCallFromCallee 4L = 8L
 
 type BorrowedHolder = { xs: List<Int64> }
 
-let borrowedLength (xs: List<Int64>): Int =
+let borrowedLength (xs: List<Int64>): Int64 =
   Stdlib.List.length xs
 
-let borrowedArgFromField (): Int =
+let borrowedArgFromField (): Int64 =
   let holder = BorrowedHolder { xs = [1L, 2L, 3L] }
   borrowedLength holder.xs
-borrowedArgFromField () = 3
+borrowedArgFromField () = 3L

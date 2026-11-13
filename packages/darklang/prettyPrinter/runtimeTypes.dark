@@ -132,7 +132,7 @@ let knownType
     | KTBlob -> "Blob"
     | KTStream inner -> "Stream<" + Darklang.PrettyPrinter.RuntimeTypes.valueType branchId inner + ">"
     | KTTuple (first, second, rest) ->
-        let parts = Stdlib.List.append [first, second] rest in
+        let parts = Stdlib.List.concat [first, second] rest in
         "(" + Stdlib.String.join (Stdlib.List.map parts (fun item -> Darklang.PrettyPrinter.RuntimeTypes.valueType branchId item)) " * " + ")"
     | KTList inner -> "List<" + Darklang.PrettyPrinter.RuntimeTypes.valueType branchId inner + ">"
     | KTDict (key, value) ->
@@ -173,21 +173,21 @@ let declaredKnownType
         Darklang.PrettyPrinter.RuntimeTypes.declaredValueType branchId (Some valueReference) value +
         ">"
     | KTTuple (first, second, rest), Some (TTuple (firstReference, secondReference, restReferences)) ->
-        let items = Stdlib.List.append [first, second] rest in
-        let references = Stdlib.List.append [firstReference, secondReference] restReferences in
-        if Stdlib.List.length items == Stdlib.List.length references then
+        let items = Stdlib.List.concat [first, second] rest in
+        let references = Stdlib.List.concat [firstReference, secondReference] restReferences in
+        if Stdlib.List.__lengthInt items == Stdlib.List.__lengthInt references then
             "(" +
             Stdlib.String.join
-                (Stdlib.List.indexedMap items (fun index item ->
-                    Darklang.PrettyPrinter.RuntimeTypes.declaredValueType branchId (Stdlib.List.getAt references index) item))
+                (Stdlib.List.__indexedMapInt items (fun index item ->
+                    Darklang.PrettyPrinter.RuntimeTypes.declaredValueType branchId (Stdlib.List.__getAtInt references index) item))
                 " * " +
             ")"
         else Darklang.PrettyPrinter.RuntimeTypes.knownType branchId typ
     | KTFn (parameters, result), Some (TFn (parameterReferences, resultReference)) ->
-        if Stdlib.List.length parameters == Stdlib.List.length parameterReferences then
+        if Stdlib.List.__lengthInt parameters == Stdlib.List.__lengthInt parameterReferences then
             let renderedParameters =
-                Stdlib.List.indexedMap parameters (fun index item ->
-                    Darklang.PrettyPrinter.RuntimeTypes.declaredValueType branchId (Stdlib.List.getAt parameterReferences index) item) in
+                Stdlib.List.__indexedMapInt parameters (fun index item ->
+                    Darklang.PrettyPrinter.RuntimeTypes.declaredValueType branchId (Stdlib.List.__getAtInt parameterReferences index) item) in
             Stdlib.String.join
                 (Stdlib.List.push renderedParameters
                     (Darklang.PrettyPrinter.RuntimeTypes.declaredValueType branchId (Some resultReference) result))
@@ -203,8 +203,8 @@ let declaredKnownType
         | _ ->
             renderedName + "<" +
             Stdlib.String.join
-                (Stdlib.List.indexedMap args (fun index item ->
-                    Darklang.PrettyPrinter.RuntimeTypes.declaredValueType branchId (Stdlib.List.getAt declaredArgs index) item))
+                (Stdlib.List.__indexedMapInt args (fun index item ->
+                    Darklang.PrettyPrinter.RuntimeTypes.declaredValueType branchId (Stdlib.List.__getAtInt declaredArgs index) item))
                 ", " +
             ">"
     | _, _ -> Darklang.PrettyPrinter.RuntimeTypes.knownType branchId typ
@@ -217,7 +217,7 @@ let letPattern
     | LPWildcard -> "_"
     | LPUnit -> "()"
     | LPTuple (first, second, rest) ->
-        let parts = Stdlib.List.append [first, second] rest in
+        let parts = Stdlib.List.concat [first, second] rest in
         "(" + Stdlib.String.join (Stdlib.List.map parts (fun item -> Darklang.PrettyPrinter.RuntimeTypes.letPattern item)) ", " + ")"
 
 module Dval =
@@ -245,7 +245,7 @@ module Dval =
     | DDateTime _ -> "DateTime"
     | DUuid _ -> "Uuid"
     | DTuple (first, second, rest) ->
-        let parts = Stdlib.List.append [first, second] rest in
+        let parts = Stdlib.List.concat [first, second] rest in
         "(" + Stdlib.String.join (Stdlib.List.map parts (fun item -> Darklang.PrettyPrinter.RuntimeTypes.Dval.valueTypeName branchId item)) " * " + ")"
     | DList (typ, _) -> "List<" + Darklang.PrettyPrinter.RuntimeTypes.valueType branchId typ + ">"
     | DDict (key, valueType, _) ->
@@ -291,7 +291,7 @@ let dval
     | DDateTime item -> "<DateTime: " + Stdlib.DateTime.toString item + ">"
     | DUuid item -> "<Uuid: " + Stdlib.Uuid.toString item + ">"
     | DTuple (first, second, rest) ->
-        let parts = Stdlib.List.append [first, second] rest in
+        let parts = Stdlib.List.concat [first, second] rest in
         "(" + Stdlib.String.join (Stdlib.List.map parts (fun item -> Darklang.PrettyPrinter.RuntimeTypes.dval branchId item)) ", " + ")"
     | DList (typ, items) ->
         match items with
@@ -320,6 +320,6 @@ let dval
     | DApplicable (AppNamedFn named) -> Darklang.PrettyPrinter.RuntimeTypes.fnName branchId named.name
     | DApplicable (AppLambda _) -> "(lambda)"
     | DDB name -> "<Datastore: " + name + ">"
-    | DBlobPersistent (hash, length) -> "<Blob: " + Stdlib.String.first hash 8 + "… " + Stdlib.Int.toString length + " bytes>"
+    | DBlobPersistent (hash, length) -> "<Blob: " + Stdlib.String.__firstInt hash 8 + "… " + Stdlib.Int.toString length + " bytes>"
     | DBlobEphemeral _ -> "<Blob: ephemeral>"
     | DStreamStub _ -> "<stream: stub>"

@@ -75,14 +75,14 @@ let __normalizeParts (parts: List<String>) (absolute: Bool) (acc: List<String>) 
             match Stdlib.List.last acc with
             | Some previous ->
                 if previous == ".." then
-                    Stdlib.Cli.Path.__normalizeParts rest absolute (Stdlib.List.append acc ([".."]))
+                    Stdlib.Cli.Path.__normalizeParts rest absolute (Stdlib.List.concat acc ([".."]))
                 else
                     Stdlib.Cli.Path.__normalizeParts rest absolute (Stdlib.List.dropLast acc)
             | None ->
                 if absolute then Stdlib.Cli.Path.__normalizeParts rest absolute []
                 else Stdlib.Cli.Path.__normalizeParts rest absolute ([".."])
         else
-            Stdlib.Cli.Path.__normalizeParts rest absolute (Stdlib.List.append acc ([part]))
+            Stdlib.Cli.Path.__normalizeParts rest absolute (Stdlib.List.concat acc ([part]))
 
 let normalize (path: String) : String =
     let absolute = Stdlib.Cli.Path.isAbsolute path in
@@ -119,11 +119,11 @@ let relativeTo (fromPath: String) (toPath: String) : Stdlib.Result.Result<String
         let fromParts = Stdlib.Cli.Path.__nonEmpty (Stdlib.String.split absFrom "/") in
         let toParts = Stdlib.Cli.Path.__nonEmpty (Stdlib.String.split absTo "/") in
         let commonLength = Stdlib.Cli.Path.__commonPrefixLength fromParts toParts 0 in
-        let upCount = Stdlib.List.length fromParts - commonLength in
+        let upCount = Stdlib.List.__lengthInt fromParts - commonLength in
         let ups = Stdlib.List.repeatUnsafe upCount ".." in
-        let tail = Stdlib.List.drop toParts commonLength in
-        let parts = Stdlib.List.append ups tail in
-        if Stdlib.List.length parts == 0 then Ok "."
+        let tail = Stdlib.List.__dropInt toParts commonLength in
+        let parts = Stdlib.List.concat ups tail in
+        if Stdlib.List.__lengthInt parts == 0 then Ok "."
         else Ok (Stdlib.String.join parts "/")
     | (Error error, _) -> Error error
     | (_, Error error) -> Error error

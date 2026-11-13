@@ -153,7 +153,7 @@ let __frame (fromServer: Bool) (data: Blob) (position: Int64)
 let __scan (fromServer: Bool) (data: Blob) (position: Int64) (frames: List<Stdlib.__QuicApplication.Received>)
   : Stdlib.Result.Result<List<Stdlib.__QuicApplication.Received>, Stdlib.__QuicWire.FrameFailure> =
   if position == Stdlib.Blob.__byteLength data then Ok (Stdlib.List.reverse frames)
-  else if Stdlib.List.length frames >= 1024 then Error (Stdlib.__QuicWire.FrameFailure { kind = None, failure = Stdlib.__QuicWire.localFailure "Too many QUIC application frames" })
+  else if Stdlib.List.__lengthInt frames >= 1024 then Error (Stdlib.__QuicWire.FrameFailure { kind = None, failure = Stdlib.__QuicWire.localFailure "Too many QUIC application frames" })
   else Stdlib.__QuicApplication.__frame fromServer data position |> Stdlib.Result.andThen (fun parsed ->
     Stdlib.__QuicApplication.__scan fromServer data parsed.next (Stdlib.List.push frames
       (Stdlib.__QuicApplication.Received { kind = Stdlib.Blob.__getByte data position, frame = parsed.frame })))

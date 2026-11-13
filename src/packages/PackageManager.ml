@@ -313,7 +313,7 @@ let interpreterName name =
   |> String.concat "."
 
 let rec resolvedName element =
-  Result.map (fun name -> hostedName (publicName name)) (resolvedNameAsWritten element)
+  Result.map publicName (resolvedNameAsWritten element)
 
 and resolvedNameAsWritten element =
   let writtenBuiltin =
@@ -334,7 +334,7 @@ and resolvedNameAsWritten element =
       match (name, fields) with
       | "Ok", [ value ] -> (
           (* A trait method call resolves to its trait's location; the call
-             names the method under it, `Darklang.Stdlib.ToString.toString`,
+             names the method under it, `Darklang.Stdlib.Display.display`,
              and the compiler dispatches it. *)
           let traitMethod =
             match Option.map enumCase (tryField "name" value) with
@@ -571,37 +571,9 @@ let infixText element =
       | _ -> unsupportedFeature ("the infix operator " ^ name))
   | _ -> unsupportedFeature ("the infix " ^ name)
 
-(* The interpreter's per-type operator builtins (`Builtin.int64Subtract`,
-   `Builtin.floatLessThan`, ...) are what its infix operators dispatch to, so
-   a call to one means the operator. The compiler has no builtins by those
-   names; it has the operators, which keep the pinned interpreter's meaning
-   of the same builtins. `<type>ToString` is the module's `toString`. *)
+(* How a hosted call to `Builtin.<name>` is compiled: as an operator, or as a
+   call to the library fn of the same meaning. *)
 let builtinOperator name =
-  let types =
-    [
-      "int8"; "uint8"; "int16"; "uint16"; "int32"; "uint32"; "int64"; "uint64";
-      "int128"; "uint128"; "bigInt"; "float";
-    ]
-  in
-  let binary =
-    [
-      ("Add", "+"); ("Subtract", "-"); ("Multiply", "*"); ("LessThan", "<");
-      ("LessThanOrEqualTo", "<="); ("GreaterThan", ">");
-      ("GreaterThanOrEqualTo", ">="); ("BitwiseAnd", "&"); ("BitwiseOr", "|");
-      ("BitwiseXor", "^"); ("ShiftLeft", "<<"); ("ShiftRight", ">>");
-      ("Divide", "/"); ("Mod", "%"); ("Power", "**");
-    ]
-  in
-  let moduleName = function
-    | "bigInt" -> "Int"
-    | "uint8" -> "UInt8"
-    | "uint16" -> "UInt16"
-    | "uint32" -> "UInt32"
-    | "uint64" -> "UInt64"
-    | "uint128" -> "UInt128"
-    | typ -> String.capitalize_ascii typ
-  in
-  let unary = [ ("Negate", "-"); ("BitwiseNot", "~") ] in
   (* Builtins whose pinned counterpart is a library fn of the same arity and
      meaning. Both hex encoders write uppercase (.NET's ToHexString and the
      compiler's "0123456789ABCDEF"), and both decoders report .NET's resource
@@ -609,15 +581,12 @@ let builtinOperator name =
   let renamed =
     [
       ("dictContainsKey", "Stdlib.Dict.member");
-      ("dictFromEntries", "Stdlib.Dict.fromListOverwritingDuplicates");
+      ("dictFromEntries", "Stdlib.Dict.fromList");
       ("dictToEntries", "Stdlib.Dict.toList");
-      ("listAppend", "Stdlib.List.appendOne");
-      ("listPrepend", "Stdlib.List.push");
-      ("listConcat", "Stdlib.List.append");
-      ("listIndexedMap", "Stdlib.List.indexedMapInt64");
       ("bytesConcat", "Stdlib.Blob.concat");
       ("base16Encode", "Stdlib.Blob.toHex");
       ("base16Decode", "Stdlib.Blob.fromHex");
+      ("toRepr", "Stdlib.inspect");
     ]
     @ List.map
         (fun fn ->
@@ -639,6 +608,10 @@ let builtinOperator name =
       ("string", "String"); ("char", "Char"); ("list", "List"); ("dict", "Dict");
       ("bool", "Bool"); ("uuid", "Uuid"); ("dateTime", "DateTime");
       ("bytes", "Blob"); ("float32", "Float32"); ("decimal", "Decimal");
+      ("int8", "Int8"); ("uint8", "UInt8"); ("int16", "Int16");
+      ("uint16", "UInt16"); ("int32", "Int32"); ("uint32", "UInt32");
+      ("int64", "Int64"); ("uint64", "UInt64"); ("int128", "Int128");
+      ("uint128", "UInt128"); ("float", "Float"); ("bigInt", "Int");
     ]
   in
   let byModule fn =
@@ -659,11 +632,13 @@ let builtinOperator name =
       modules
   in
   (* The polymorphic operator builtins (`Builtin.add`), which the trait impls
-     over a type call for its own operator. *)
+     over a type call for its own operator. `**` has no 128-bit lowering here,
+     so `power` calls the compiler's Power implementations, which cover every
+     integer width. *)
   let polymorphicBinary =
     [
       ("add", "+"); ("subtract", "-"); ("multiply", "*"); ("divide", "/");
-      ("modulo", "%"); ("power", "**"); ("lessThan", "<");
+      ("modulo", "%"); ("lessThan", "<");
       ("lessThanOrEqualTo", "<="); ("greaterThan", ">");
       ("greaterThanOrEqualTo", ">="); ("bitwiseAnd", "&"); ("bitwiseOr", "|");
       ("bitwiseXor", "^"); ("shiftLeft", "<<"); ("shiftRight", ">>");
@@ -675,40 +650,10 @@ let builtinOperator name =
       Some (`Binary (List.assoc fn polymorphicBinary))
   | [ "Builtin"; fn ] when List.mem_assoc fn polymorphicUnary ->
       Some (`Unary (List.assoc fn polymorphicUnary))
-  (* `**` has no 128-bit lowering here; the compiler's Power implementations
-     for Int128 and UInt128 do. *)
-  | [ "Builtin"; ("int128Power" | "uint128Power") ] ->
-      Some (`Call "Stdlib.Power.power")
+  | [ "Builtin"; "power" ] -> Some (`Call "Stdlib.Power.power")
   | [ "Builtin"; fn ] when List.mem_assoc fn renamed ->
       Some (`Call (List.assoc fn renamed))
-  | [ "Builtin"; fn ] ->
-      List.find_map
-        (fun typ ->
-          (* `float` is not `float32`: the type name ends where a capital starts. *)
-          let length = String.length typ in
-          if
-            String.starts_with ~prefix:typ fn
-            && (String.length fn = length
-               || Char.uppercase_ascii fn.[length] = fn.[length]
-                  && Char.lowercase_ascii fn.[length] <> fn.[length])
-          then
-            let op = String.sub fn (String.length typ) (String.length fn - String.length typ) in
-            match List.assoc_opt op binary with
-            | Some text -> Some (`Binary text)
-            | None when op = "ToString" ->
-                Some (`Call ("Stdlib." ^ moduleName typ ^ ".toString"))
-            | None -> (
-                match List.assoc_opt op unary with
-                | Some text -> Some (`Unary text)
-                | None when op <> "" ->
-                    Some
-                      (`Call
-                         ("Stdlib." ^ moduleName typ ^ "."
-                         ^ String.uncapitalize_ascii op))
-                | None -> None)
-          else None)
-        types
-      |> fun found -> if Option.is_some found then found else byModule fn
+  | [ "Builtin"; fn ] -> byModule fn
   | _ -> None
 
 let rec convert conversion expression =
@@ -1890,8 +1835,8 @@ let resolveNames config resolutionEnv knownTraits names =
       in
       (* A discovered implementation of a trait the compiler already has, for
          a type it already has, duplicates the compiler's own: the
-         interpreter's `Int64.ToString` beside the embedded one makes every
-         ToString call on Int64 ambiguous. Those are left out. *)
+         interpreter's `Int64.Display` beside the embedded one makes every
+         Display call on Int64 ambiguous. Those are left out. *)
       let duplicatesEmbedded entity =
         (* A trait the compiler declares under the same name (the
            interpreter's own Darklang.Stdlib.BitwiseXor, listed beside a

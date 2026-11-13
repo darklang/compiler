@@ -27,34 +27,34 @@ Stdlib.List.map ([Stdlib.Html.br (), Stdlib.Html.html ([]) ([]), Stdlib.Html.bod
   ["<br>", "<html></html>", "<body></body>", "<head></head>", "<title></title>", "<a></a>", "<div></div>", "<span></span>", "<h1></h1>", "<h2></h2>", "<h3></h3>", "<h4></h4>", "<h5></h5>", "<h6></h6>", "<p></p>", "<ul></ul>", "<ol></ol>", "<li></li>", "<table></table>", "<tr></tr>", "<td></td>", "<th></th>", "<tbody></tbody>", "<thead></thead>", "<tfoot></tfoot>", "<caption></caption>", "<colgroup></colgroup>", "<col>", "<button></button>", "<img>", "<svg></svg>", "<path></path>", "<meta>", "<link>", "<script></script>", "<input>", "<label></label>", "<form></form>", "<section></section>", "<i></i>", "<code></code>", "<pre></pre>", "<nav></nav>", "<footer></footer>", "<article></article>", "<aside></aside>", "<header></header>", "<main></main>", "<figure></figure>", "<figcaption></figcaption>", "<video></video>", "<audio></audio>", "<picture></picture>", "<strong></strong>", "<em></em>", "<b></b>", "<u></u>", "<small></small>", "<mark></mark>", "<del></del>", "<ins></ins>", "<dl></dl>", "<dt></dt>", "<dd></dd>", "<textarea></textarea>", "<select></select>", "<option></option>", "<fieldset></fieldset>", "<legend></legend>", "<details></details>", "<summary></summary>", "<dialog></dialog>"]
 
 // Request records and parser edge behavior.
-let req = Stdlib.Http.Request { url = "https://x?a=1&a=2&bare&bad=a=b&&q=?", headers = [("X", "1")], body = Stdlib.String.toBlob "body" } in req.url = "https://x?a=1&a=2&bare&bad=a=b&&q=?"
+let req = Stdlib.Http.Request { method = "GET", url = "https://x?a=1&a=2&bare&bad=a=b&&q=?", headers = [("X", "1")], body = Stdlib.String.toBlob "body" } in req.url = "https://x?a=1&a=2&bare&bad=a=b&&q=?"
 Stdlib.Http.parseQueryString "https://x?x=1&&x=2&bare&token=a=b&q=?" = Stdlib.Dict.fromListOverwritingDuplicates ([("x", "2"), ("bare", ""), ("token", "a=b"), ("q", "?")])
 Stdlib.Http.parseQueryString "https://x?a+b=%2F" = Stdlib.Dict.fromListOverwritingDuplicates ([("a b", "/")])
 Stdlib.Http.parseQueryString "https://x?q=List+map&word=%C3%A9&bad=%GG&trailing=%" = Stdlib.Dict.fromListOverwritingDuplicates ([("q", "List map"), ("word", "é"), ("bad", "%GG"), ("trailing", "%")])
 Stdlib.Http.parseHeaders " A : one\r\nmalformed\r\nA: two:three\r\n : blank-name " = Stdlib.Dict.fromListOverwritingDuplicates ([("A", "two:three"), ("", "blank-name")])
 
 // Request accessors decode query fields and split on the first equals sign.
-let req = Stdlib.Http.Request { url = "https://x", headers = [], body = Stdlib.Blob.empty } in Stdlib.Http.Request.queryParams req = [("", "")]
-let req = Stdlib.Http.Request { url = "https://x?", headers = [], body = Stdlib.Blob.empty } in Stdlib.Http.Request.queryParams req = [("", "")]
-let req = Stdlib.Http.Request { url = "https://x?a=1&a=2&bad=a=b&bare", headers = [], body = Stdlib.Blob.empty } in Stdlib.Http.Request.queryParams req = [("a", "1"), ("a", "2"), ("bad", "a=b"), ("bare", "")]
-let req = Stdlib.Http.Request { url = "https://x?a=1&a=2", headers = [], body = Stdlib.Blob.empty } in Stdlib.Http.Request.queryParam req "a" = Some "1,2"
-let req = Stdlib.Http.Request { url = "https://x?term=two+words&key=%C3%A9&eq=a=b", headers = [], body = Stdlib.Blob.empty } in Stdlib.Http.Request.queryParams req = [("term", "two words"), ("key", "é"), ("eq", "a=b")]
-let req = Stdlib.Http.Request { url = "https://x?a=1", headers = [], body = Stdlib.Blob.empty } in Stdlib.Http.Request.queryParam req "missing" = None
+let req = Stdlib.Http.Request { method = "GET", url = "https://x", headers = [], body = Stdlib.Blob.empty } in Stdlib.Http.Request.queryParams req = [("", "")]
+let req = Stdlib.Http.Request { method = "GET", url = "https://x?", headers = [], body = Stdlib.Blob.empty } in Stdlib.Http.Request.queryParams req = [("", "")]
+let req = Stdlib.Http.Request { method = "GET", url = "https://x?a=1&a=2&bad=a=b&bare", headers = [], body = Stdlib.Blob.empty } in Stdlib.Http.Request.queryParams req = [("a", "1"), ("a", "2"), ("bad", "a=b"), ("bare", "")]
+let req = Stdlib.Http.Request { method = "GET", url = "https://x?a=1&a=2", headers = [], body = Stdlib.Blob.empty } in Stdlib.Http.Request.queryParam req "a" = Some "1,2"
+let req = Stdlib.Http.Request { method = "GET", url = "https://x?term=two+words&key=%C3%A9&eq=a=b", headers = [], body = Stdlib.Blob.empty } in Stdlib.Http.Request.queryParams req = [("term", "two words"), ("key", "é"), ("eq", "a=b")]
+let req = Stdlib.Http.Request { method = "GET", url = "https://x?a=1", headers = [], body = Stdlib.Blob.empty } in Stdlib.Http.Request.queryParam req "missing" = None
 
 // Response helpers preserve status, header spelling/order, bytes, raw JSON,
 // arbitrary redirects, and duplicate ordered Set-Cookie header pairs.
-let r = Stdlib.Http.response (Stdlib.String.toBlob "ok") 201 in (r.statusCode, r.headers, Stdlib.Blob.toString r.body) = (201, [], Ok "ok")
-let r = Stdlib.Http.responseWithHeaders (Stdlib.String.toBlob "x") ([("Set-Cookie", "a=1"), ("Set-Cookie", "b=2")]) 202 in r.headers = [("Set-Cookie", "a=1"), ("Set-Cookie", "b=2")]
-let r = Stdlib.Http.success (Stdlib.String.toBlob "yes") in (r.statusCode, Stdlib.Blob.toString r.body) = (200, Ok "yes")
-let r = Stdlib.Http.responseWithHtml "<b>x</b>" 203 in (r.statusCode, r.headers, Stdlib.Blob.toString r.body) = (203, [("Content-Type", "text/html; charset=utf-8")], Ok "<b>x</b>")
-let r = Stdlib.Http.responseWithText "hello" 204 in (r.statusCode, r.headers, Stdlib.Blob.toString r.body) = (204, [("Content-Type", "text/plain; charset=utf-8")], Ok "hello")
-let r = Stdlib.Http.responseWithJson "{\"already\":true}" 205 in (r.statusCode, r.headers, Stdlib.Blob.toString r.body) = (205, [("Content-Type", "application/json")], Ok "{\"already\":true}")
-let r = Stdlib.Http.redirectTo "bad url" in (r.statusCode, r.headers, Stdlib.Blob.length r.body) = (302, [("Location", "bad url")], 0)
-let r = Stdlib.Http.badRequest "bad" in (r.statusCode, Stdlib.Blob.toString r.body) = (400, Ok "bad")
-let r = Stdlib.Http.notFound () in (r.statusCode, r.headers, Stdlib.Blob.length r.body) = (404, [], 0)
-let r = Stdlib.Http.unauthorized () in (r.statusCode, Stdlib.Blob.length r.body) = (401, 0)
-let r = Stdlib.Http.forbidden () in (r.statusCode, Stdlib.Blob.length r.body) = (403, 0)
-let r = Stdlib.Http.serverError "boom" in (r.statusCode, Stdlib.Blob.toString r.body) = (500, Ok "boom")
+let r = Stdlib.Http.response 201L (Stdlib.String.toBlob "ok") in (r.statusCode, r.headers, Stdlib.Blob.toString r.body) = (201L, [], Ok "ok")
+let r = Stdlib.Http.responseWithHeaders 202L ([("Set-Cookie", "a=1"), ("Set-Cookie", "b=2")]) (Stdlib.String.toBlob "x") in r.headers = [("Set-Cookie", "a=1"), ("Set-Cookie", "b=2")]
+let r = Stdlib.Http.success (Stdlib.String.toBlob "yes") in (r.statusCode, Stdlib.Blob.toString r.body) = (200L, Ok "yes")
+let r = Stdlib.Http.responseWithHtml 203L "<b>x</b>" in (r.statusCode, r.headers, Stdlib.Blob.toString r.body) = (203L, [("Content-Type", "text/html; charset=utf-8")], Ok "<b>x</b>")
+let r = Stdlib.Http.responseWithText 204L "hello" in (r.statusCode, r.headers, Stdlib.Blob.toString r.body) = (204L, [("Content-Type", "text/plain; charset=utf-8")], Ok "hello")
+let r = Stdlib.Http.responseWithJson 205L "{\"already\":true}" in (r.statusCode, r.headers, Stdlib.Blob.toString r.body) = (205L, [("Content-Type", "application/json")], Ok "{\"already\":true}")
+let r = Stdlib.Http.redirectTo "bad url" in (r.statusCode, r.headers, Stdlib.Blob.length r.body) = (302L, [("Location", "bad url")], 0)
+let r = Stdlib.Http.badRequest "bad" in (r.statusCode, Stdlib.Blob.toString r.body) = (400L, Ok "bad")
+let r = Stdlib.Http.notFound () in (r.statusCode, r.headers, Stdlib.Blob.length r.body) = (404L, [], 0)
+let r = Stdlib.Http.unauthorized () in (r.statusCode, Stdlib.Blob.length r.body) = (401L, 0)
+let r = Stdlib.Http.forbidden () in (r.statusCode, Stdlib.Blob.length r.body) = (403L, 0)
+let r = Stdlib.Http.serverError "boom" in (r.statusCode, Stdlib.Blob.toString r.body) = (500L, Ok "boom")
 
 // Cookie is a structural value only at the pinned revision.
-let c = Stdlib.Http.Cookie { expires = Stdlib.DateTime.fromSeconds 0, maxAge = 60, domain = "example.com", path = "/", secure = true, httpOnly = true, sameSite = "Strict" } in (c.maxAge, c.secure, c.sameSite) = (60, true, "Strict")
+let c = Stdlib.Http.Cookie { expires = Stdlib.DateTime.fromSeconds 0L, maxAge = 60L, domain = "example.com", path = "/", secure = true, httpOnly = true, sameSite = "Strict" } in (c.maxAge, c.secure, c.sameSite) = (60L, true, "Strict")

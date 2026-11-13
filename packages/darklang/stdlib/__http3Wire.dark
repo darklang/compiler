@@ -38,7 +38,7 @@ let parse (maximum: Int64) (data: Blob) : Stdlib.Result.Result<Stdlib.__Http3Wir
 let __settings (data: Blob) (position: Int64) (seen: List<Int64>) (settings: List<(Int64 * Int64)>)
   : Stdlib.Result.Result<List<(Int64 * Int64)>, Stdlib.__Http3Wire.Failure> =
   if position == Stdlib.Blob.__byteLength data then Ok (Stdlib.List.reverse settings)
-  else if Stdlib.List.length seen >= 64 then Error (Stdlib.__Http3Wire.connectionFailure 263L "Too many HTTP/3 settings")
+  else if Stdlib.List.__lengthInt seen >= 64 then Error (Stdlib.__Http3Wire.connectionFailure 263L "Too many HTTP/3 settings")
   else
     match Stdlib.__QuicWire.parseInteger data position with
     | Error _ -> Error (Stdlib.__Http3Wire.connectionFailure 265L "Truncated HTTP/3 setting")

@@ -1,19 +1,19 @@
 // DateTime and Duration parity at canonical public boundaries.
 
-Stdlib.DateTime.toString (Stdlib.DateTime.fromMilliseconds 1564353756123) = "2019-07-28T22:42:36.123Z"
-Stdlib.DateTime.toMilliseconds (Stdlib.DateTime.fromMilliseconds (-1)) = -1
-Stdlib.DateTime.toSeconds (Stdlib.DateTime.fromMilliseconds (-1)) = -1
-Stdlib.DateTime.year (Builtin.unwrap (Stdlib.DateTime.parse "2000-02-29T23:59:59.999Z")) = 2000
-Stdlib.DateTime.month (Builtin.unwrap (Stdlib.DateTime.parse "2000-02-29T23:59:59.999Z")) = 2
-Stdlib.DateTime.day (Builtin.unwrap (Stdlib.DateTime.parse "2000-02-29T23:59:59.999Z")) = 29
-Stdlib.DateTime.fromMilliseconds 0 == Stdlib.DateTime.fromMilliseconds 0 = true
-Stdlib.DateTime.fromMilliseconds 0 == 0 = compileerror="Operator is unavailable for this type"
-let temporalNeedsInt64 (value: Int64): Int64 = value; temporalNeedsInt64 (Stdlib.DateTime.fromMilliseconds 0) = compileerror="Expected TInt64, got TDateTime"
-let temporalNeedsInt (value: Int): Int = value; temporalNeedsInt (Stdlib.DateTime.fromMilliseconds 0) = compileerror="Expected TInt, got TDateTime"
+Stdlib.DateTime.toString (Stdlib.DateTime.fromMilliseconds 1564353756123L) = "2019-07-28T22:42:36.123Z"
+Stdlib.DateTime.toMilliseconds (Stdlib.DateTime.fromMilliseconds (-1L)) = -1L
+Stdlib.DateTime.toSeconds (Stdlib.DateTime.fromMilliseconds (-1L)) = -1L
+Stdlib.DateTime.year (Builtin.unwrap (Stdlib.DateTime.parse "2000-02-29T23:59:59.999Z")) = 2000L
+Stdlib.DateTime.month (Builtin.unwrap (Stdlib.DateTime.parse "2000-02-29T23:59:59.999Z")) = Stdlib.DateTime.Month.February
+Stdlib.DateTime.day (Builtin.unwrap (Stdlib.DateTime.parse "2000-02-29T23:59:59.999Z")) = 29u8
+Stdlib.DateTime.fromMilliseconds 0L == Stdlib.DateTime.fromMilliseconds 0L = true
+Stdlib.DateTime.fromMilliseconds 0L == 0L = compileerror="Operator is unavailable for this type"
+let temporalNeedsInt64 (value: Int64): Int64 = value; temporalNeedsInt64 (Stdlib.DateTime.fromMilliseconds 0L) = compileerror="Expected TInt64, got TDateTime"
+let temporalNeedsInt (value: Int): Int = value; temporalNeedsInt (Stdlib.DateTime.fromMilliseconds 0L) = compileerror="Expected TInt, got TDateTime"
 let temporalNeedsDateTime (value: DateTime): DateTime = value; temporalNeedsDateTime 0L = compileerror="Expected TDateTime, got TInt64"
 let temporalNeedsDateTimeInt (value: DateTime): DateTime = value; temporalNeedsDateTimeInt 0 = compileerror="Expected TDateTime, got TInt"
 
-Stdlib.Duration.parse "+5m" = Ok 300
-Stdlib.Duration.parse " -5m" = Ok (-300)
-Stdlib.Duration.parse " 5 m" = Ok 300
-Stdlib.Duration.parse "9223372036854775808d" = Ok 796899343984252629811200
+Stdlib.Duration.parse "+5m" = Ok (Stdlib.Duration.Duration { seconds = 300L })
+Stdlib.Duration.parse " -5m" = Ok (Stdlib.Duration.Duration { seconds = -300L })
+Stdlib.Duration.parse " 5 m" = Ok (Stdlib.Duration.Duration { seconds = 300L })
+Stdlib.Duration.parse "9223372036854775808d" = Error Stdlib.Duration.ParseError.InvalidNumber

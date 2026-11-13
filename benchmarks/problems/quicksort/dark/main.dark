@@ -4,19 +4,19 @@
 // The Rust reference chooses the middle element and traverses the input once
 // for each of its three partitions. Keep the same source-level work here.
 let getAtOrDefault (list: List<Int64>) (index: Int64) (default_: Int64) : Int64 =
-    match Stdlib.List.getAt list (Stdlib.Int.fromInt64 index) with
+    match Stdlib.List.getAt list index with
     | Some v -> v
     | None -> default_
 
 let quicksort (arr: List<Int64>) : List<Int64> =
-    let len = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.List.length arr)) in
+    let len = Stdlib.List.length arr in
     if len <= 1L then arr
     else
         let pivot = getAtOrDefault arr (len / 2L) 0L in
         let left = Stdlib.List.filter arr (fun x -> x < pivot) in
         let middle = Stdlib.List.filter arr (fun x -> x == pivot) in
         let right = Stdlib.List.filter arr (fun x -> x > pivot) in
-        Stdlib.List.append (Stdlib.List.append (quicksort left) middle) (quicksort right)
+        Stdlib.List.concat (Stdlib.List.concat (quicksort left) middle) (quicksort right)
 
 // Generate pseudo-random list using LCG
 let generateListHelper (n: Int64) (x: Int64) (acc: List<Int64>) : List<Int64> =

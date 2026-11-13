@@ -131,7 +131,7 @@ let x = -3L in let y = -4L in x + y = -7L
 // Large values
 let x = 1000000L in x = 1000000L
 let x = 9223372036854775807L in x = 9223372036854775807L
-let x = -9223372036854775808L in x = -9223372036854775808L
+let x = -9223372036854775808 in x = -9223372036854775808
 
 // Long variable names
 let variable_name_with_underscores = 42L in variable_name_with_underscores = 42L

@@ -26,7 +26,7 @@ Stdlib.Http.badRequest "Your request resulted in an error" =
       body = Stdlib.String.toBlob "Your request resulted in an error" }
 
 // @compiler blocked: compiler-gap
-Stdlib.Http.response (Stdlib.String.toBlob "test") 200 =
+Stdlib.Http.response 200L (Stdlib.String.toBlob "test") =
   Stdlib.Http.Response
     { statusCode = 200
       headers = []
@@ -34,56 +34,56 @@ Stdlib.Http.response (Stdlib.String.toBlob "test") 200 =
 
 // @compiler blocked: compiler-gap
 Stdlib.Http.responseWithHeaders
-  (Stdlib.String.toBlob "test")
+  200L
   [ ("Content-Type", "text/html; charset=utf-8") ]
-  200 =
+  (Stdlib.String.toBlob "test") =
     Stdlib.Http.Response
       { statusCode = 200
         headers = [ ("Content-Type", "text/html; charset=utf-8") ]
         body = Stdlib.String.toBlob "test" }
 
-Stdlib.Http.notFound () = Stdlib.Http.response Stdlib.Blob.empty 404
+Stdlib.Http.notFound () = Stdlib.Http.response 404L Stdlib.Blob.empty
 
-Stdlib.Http.unauthorized () = Stdlib.Http.response Stdlib.Blob.empty 401
+Stdlib.Http.unauthorized () = Stdlib.Http.response 401L Stdlib.Blob.empty
 
-Stdlib.Http.forbidden () = Stdlib.Http.response Stdlib.Blob.empty 403
+Stdlib.Http.forbidden () = Stdlib.Http.response 403L Stdlib.Blob.empty
 
 // @compiler blocked: compiler-gap
 Stdlib.Http.success (Stdlib.String.toBlob "test") =
-  Stdlib.Http.response (Stdlib.String.toBlob "test") 200
+  Stdlib.Http.response 200L (Stdlib.String.toBlob "test")
 
 // @compiler blocked: compiler-gap
-Stdlib.Http.responseWithHtml "test" 200 =
+Stdlib.Http.responseWithHtml 200L "test" =
   Stdlib.Http.responseWithHeaders
-    (Stdlib.String.toBlob "test")
+    200L
     [ ("Content-Type", "text/html; charset=utf-8") ]
-    200
+    (Stdlib.String.toBlob "test")
 
 // @compiler blocked: compiler-gap
-Stdlib.Http.responseWithText "test" 200 =
+Stdlib.Http.responseWithText 200L "test" =
   Stdlib.Http.responseWithHeaders
-    (Stdlib.String.toBlob "test")
+    200L
     [ ("Content-Type", "text/plain; charset=utf-8") ]
-    200
+    (Stdlib.String.toBlob "test")
 
 // @compiler blocked: compiler-gap
-Stdlib.Http.responseWithJson "test" 200 =
+Stdlib.Http.responseWithJson 200L "test" =
   (Stdlib.Http.responseWithHeaders
-    (Stdlib.String.toBlob "test")
+    200L
     [ ("Content-Type", "application/json") ]
-    200)
+    (Stdlib.String.toBlob "test"))
 
 (Stdlib.Http.redirectTo "") =
-  Stdlib.Http.responseWithHeaders Stdlib.Blob.empty [ ("Location", "") ] 302
+  Stdlib.Http.responseWithHeaders 302L [ ("Location", "") ] Stdlib.Blob.empty
 
 (Stdlib.Http.redirectTo "bad url") =
-  Stdlib.Http.responseWithHeaders Stdlib.Blob.empty [ ("Location", "bad url") ] 302
+  Stdlib.Http.responseWithHeaders 302L [ ("Location", "bad url") ] Stdlib.Blob.empty
 
 (Stdlib.Http.redirectTo "http://someothersite.com") =
-  Stdlib.Http.responseWithHeaders Stdlib.Blob.empty [ ("Location", "http://someothersite.com") ] 302
+  Stdlib.Http.responseWithHeaders 302L [ ("Location", "http://someothersite.com") ] Stdlib.Blob.empty
 
 (Stdlib.Http.redirectTo "/relativeUrl") =
-  Stdlib.Http.responseWithHeaders Stdlib.Blob.empty [ ("Location", "/relativeUrl") ] 302
+  Stdlib.Http.responseWithHeaders 302L [ ("Location", "/relativeUrl") ] Stdlib.Blob.empty
 
 
 // parseQueryString: ports the old _middleware.dark fixture.
@@ -165,7 +165,7 @@ module QueryParams =
   // query string both do.
   // @compiler blocked: compiler-gap
   (Stdlib.Http.Request.queryParam
-    (Stdlib.Http.Request { url = "/s?q=a=b", headers = [], body = Stdlib.Blob.empty })
+    (Stdlib.Http.Request { method = "GET", url = "/s?q=a=b", headers = [], body = Stdlib.Blob.empty })
     "q") = Stdlib.Option.Option.Some "a=b"
 
   // Only the first `?` separates the query string; a later one is part of a value.
@@ -186,7 +186,7 @@ module QueryParams =
   // @compiler blocked: compiler-gap
   (Stdlib.Http.Request.queryParam
     (Stdlib.Http.Request
-      { url = "/s?q=a%3Db", headers = [], body = Stdlib.Blob.empty })
+      { method = "GET", url = "/s?q=a%3Db", headers = [], body = Stdlib.Blob.empty })
     "q") = Stdlib.Option.Option.Some "a=b"
 
 
@@ -194,23 +194,24 @@ module RequestHeader =
   // Case-insensitive, as HTTP requires: one stored casing, three asked-for casings.
   (Stdlib.Http.Request.header
     (Stdlib.Http.Request
-      { url = "/", headers = [ ("Authorization", "Bearer t") ], body = Stdlib.Blob.empty })
+      { method = "GET", url = "/", headers = [ ("Authorization", "Bearer t") ], body = Stdlib.Blob.empty })
     "authorization") = Stdlib.Option.Option.Some "Bearer t"
 
   (Stdlib.Http.Request.header
     (Stdlib.Http.Request
-      { url = "/", headers = [ ("authorization", "Bearer t") ], body = Stdlib.Blob.empty })
+      { method = "GET", url = "/", headers = [ ("authorization", "Bearer t") ], body = Stdlib.Blob.empty })
     "AUTHORIZATION") = Stdlib.Option.Option.Some "Bearer t"
 
   (Stdlib.Http.Request.header
     (Stdlib.Http.Request
-      { url = "/", headers = [ ("X-Thing", "v") ], body = Stdlib.Blob.empty })
+      { method = "GET", url = "/", headers = [ ("X-Thing", "v") ], body = Stdlib.Blob.empty })
     "x-other") = Stdlib.Option.Option.None
 
   // A repeated header is legal. The first wins, which is what `queryParam` does too.
   (Stdlib.Http.Request.header
     (Stdlib.Http.Request
-      { url = "/"
+      { method = "GET"
+        url = "/"
         headers = [ ("Accept", "one"), ("accept", "two") ]
         body = Stdlib.Blob.empty })
     "Accept") = Stdlib.Option.Option.Some "one"

@@ -152,9 +152,9 @@ let runWithEnv
     env
     |> Stdlib.List.filter (fun pair ->
       let (k, _v) = pair
-      (Stdlib.String.contains k "=") || (Stdlib.String.contains k " "))
+      (Stdlib.String.__containsBytes k "=") || (Stdlib.String.__containsBytes k " "))
 
-  if (Stdlib.List.length invalid) > 0 then
+  if (Stdlib.List.__lengthInt invalid) > 0 then
     let badName =
       (Stdlib.List.head invalid)
       |> Builtin.unwrap
@@ -171,7 +171,7 @@ let runWithEnv
 
     (run
       "/usr/bin/env"
-      (Stdlib.List.append envArgs (Stdlib.List.append [ program ] args)))
+      (Stdlib.List.concat envArgs (Stdlib.List.concat [ program ] args)))
     |> Stdlib.Result.mapError (fun e -> e.message)
 
 
@@ -315,7 +315,7 @@ let __childDescriptors (stdin: Int) (stdout: Int) (stderr: Int) (pending: Blob) 
   let input = if Stdlib.Blob.length pending == 0 then [] else [(stdin, 4)]
   let output = if outEOF then [] else [(stdout, 1)]
   let error = if errEOF then [] else [(stderr, 1)]
-  Stdlib.List.append input (Stdlib.List.append output error)
+  Stdlib.List.concat input (Stdlib.List.concat output error)
 
 let __childCapture
   (child: Int) (stdout: Int) (stderr: Int) (deadline: Stdlib.Option.Option<Int>)

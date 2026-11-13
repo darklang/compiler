@@ -156,7 +156,7 @@ let toString (d: Decimal) : String =
     else
         let length = Stdlib.String.__byteLength digits in
         let padCount = if scale + 1L > length then scale + 1L - length else 0L in
-        let padded = Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 padCount) + digits in
+        let padded = Stdlib.String.__repeatInt "0" (Stdlib.Int.fromInt64 padCount) + digits in
         let total = Stdlib.String.__byteLength padded in
         sign + Stdlib.String.__byteTake padded (total - scale) + "." + Stdlib.String.__byteDrop padded (total - scale)
 
@@ -181,8 +181,8 @@ impl Stdlib.Modulo for Decimal =
 impl Stdlib.Negate for Decimal =
   let negate = Stdlib.Decimal.negate
 
-impl Stdlib.ToString for Decimal =
-  let toString = Stdlib.Decimal.toString
+impl Stdlib.Display for Decimal =
+  let display = Stdlib.Decimal.toString
 
 impl Stdlib.Compare for Decimal =
   let lessThan = Stdlib.Decimal.lessThan

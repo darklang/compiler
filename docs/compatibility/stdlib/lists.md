@@ -36,7 +36,7 @@ Compiler evidence is anchored in:
 | --- | --- | --- | --- |
 | Literals | `[]` and populated literals accept comma or newline separators, including trailing separators, and normalize to `ListLiteral`. | Canonical parser fixtures and `list_language_parity.e2e`. | parity |
 | Cons patterns | `head :: tail` is pattern syntax, associates right, and chained heads normalize to one internal `PListCons` without reordering bindings. | Syntax fixtures and nested/list-tuple cases in `lists.e2e`. | parity; `PListCons` is internal only |
-| Append | `@` associates right at interpreter precedence and normalizes to `Stdlib.List.append`. Both operands are homogeneous lists. | Canonical parser fixtures, AST-shape tests, and type/value probes in `list_language_parity.e2e`. | parity |
+| Append | `@` associates right at interpreter precedence and normalizes to `Stdlib.List.concat`. Both operands are homogeneous lists. | Canonical parser fixtures, AST-shape tests, and type/value probes in `list_language_parity.e2e`. | parity |
 | Inference | `[]` uses contextual polymorphic inference. A nonempty literal establishes one element type; heterogeneous elements and non-list cons tails are rejected. An aborting element has type `Never` and does not displace the list's concrete element type. | `src/frontend/WrittenChecking.ml`; focused positive and compile-error probes, including upstream `dlist.dark`. | parity result, intentional AOT phase difference |
 | Construction | Elements and append operands evaluate once, left to right, before native structural assembly. The skew-list builder and ownership rules remain native. | `src/passes/anf/AST_to_ANF.ml`; first-failure probes in `list_language_parity.e2e`; skew-list/refcount suites. | retained native equivalence |
 | Representation | Empty is the zero root; populated values use direct-payload skew-binary trees with persistent reference-counted edges. | `packages/darklang/stdlib/list/__skewList.dark`, `src/memory/RuntimeDataLayout.ml`, refcount insertion, and both code generators. | intentional compiler architecture; behavior-equivalent |
@@ -61,16 +61,16 @@ or native implementations are retained. Type variables below are polymorphic.
 
 | Contract group | Public signatures and behavior |
 | --- | --- |
-| Values and construction | `empty : List<a>` is a non-callable value; `singleton`, `push`, `pushBack`, and `append` retain order. `head`, `tail`, `last`, and `splitLast` return `Option` on empty input. |
-| Size and lookup | `length : List<a> -> Int`; `getAt : List<a> * Int -> Option<a>` returns `None` for negative, out-of-range, or non-native-sized indices; `isEmpty`, `contains`, and `findFirst` match interpreter edge cases. |
+| Values and construction | `empty : List<a>` is a non-callable value; `singleton`, `prepend`, `append` (one value at the end), `concat`, `push`, and `pushBack` retain order. `head`, `tail`, `last`, and `splitLast` return `Option` on empty input. |
+| Size and lookup | `length : List<a> -> Int64`; `getAt : List<a> * Int64 -> Option<a>` returns `None` for negative or out-of-range indices; counts and indexes are Int64 throughout, as in the interpreter; `isEmpty`, `contains`, and `findFirst` match interpreter edge cases. |
 | Traversal | `fold`, `map`, `indexedMap`, `filter`, `filterMap`, `flatten`, `reverse`, `interpose`, `interleave`, `drop`, `dropWhile`, `dropLast`, `take`, and `takeWhile` preserve interpreter results and callback order. Counts and indices are public `Int`. |
 | Predicates | `all` and `any` invoke callbacks left to right, once per visited element, and stop at the first decisive result. `findFirst` and `findFirstIndex` stop at the first match. |
-| Pairwise | `map2shortest` and `zipShortest` truncate; `map2` and `zip` return `None` on unequal lengths and `Some` on equal lengths; `unzip` preserves order. |
-| Range and repetition | `range(start, end)` is inclusive and descending bounds return `[]`. `repeatUnsafe(times, value)` returns a list. `repeat(times, value)` returns `Result<List<a>, String>` and uses the canonical negative-count message. Bounds are `Int`. |
+| Pairwise | `map2Shortest` and `zipShortest` truncate; `map2` and `zip` return `Error (LengthMismatch { left, right })` on unequal lengths and `Ok` on equal lengths; `unzip` preserves order. |
+| Range and repetition | `range(start, end)` is inclusive and descending bounds return `[]`. `repeat(times, value)` returns a list, empty for a nonpositive count; the compiler's own `repeatUnsafe` takes an Int count. |
 | Sorting and uniqueness | `sort`, `sortBy`, `unique`, and `uniqueBy` use canonical typed ordering. `dedup` retains the first occurrence of each value without reordering the survivors. `dedup` and `uniqueBy` use dictionary key equality, so repeated NaNs (including nested NaNs) collapse. Function, Blob and Stream keys are rejected, including nested fields; `uniqueBy` sorts its surviving first values. `sortByComparator` is stable, accepts an `Int` comparator, and returns the exact error unless each result is `-1`, `0`, or `1`. |
 | Grouping and callbacks | `groupByWithKey` preserves first-key and member order and evaluates its key callback in source order. `partition` preserves output order, calls its predicate once per element, and observes the interpreter's tail-to-head callback order. `iter` calls a Unit callback left to right and returns Unit. |
 | Random | `randomElement : List<a> -> Option<a>` does not request entropy for `[]`; nonempty input uses rejection sampling and only returns a valid member. |
-| Chunking | Public `ChunkBySizeError.SizeMustBeGreaterThanZero`; `chunkBySize` rejects nonpositive `Int` sizes and otherwise returns ordered chunks with a possibly short final chunk. |
+| Chunking | Public `ChunkBySizeError.SizeMustBeGreaterThanZero`; `chunkBySize` rejects nonpositive `Int64` sizes and otherwise returns ordered chunks with a possibly short final chunk. |
 
 Callback failures propagate from the first callback reached in the specified
 order. The focused suites cover fold/map/indexed-map, pairwise map, filters,

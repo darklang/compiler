@@ -9,10 +9,10 @@ type HuffmanTree =
 type Codec = { tree: HuffmanTree, codes: Dict<String, Int64> }
 
 let symbolKey (symbol: Int64) : String =
-    match Stdlib.String.getByteAt "abcdefghijklmnopqrstuvwxyzABCDEF" (Stdlib.Int.fromInt64 symbol) with
+    match Stdlib.String.getByteAt "abcdefghijklmnopqrstuvwxyzABCDEF" symbol with
     | None -> Builtin.crash "Huffman symbol is out of range"
     | Some byte ->
-        match Stdlib.Char.fromCodepoint (Stdlib.Int.fromUInt8 byte) with
+        match Stdlib.Char.fromCodepoint (Stdlib.UInt32.fromUInt8 byte) with
         | Some char -> Stdlib.Char.toString char
         | None -> Builtin.crash "Huffman symbol is not ASCII"
 

@@ -182,8 +182,8 @@ impl Stdlib.ShiftLeft for Int64 =
 impl Stdlib.ShiftRight for Int64 =
   let shiftRight = Stdlib.Int64.shiftRight
 
-impl Stdlib.ToString for Int64 =
-  let toString = Stdlib.Int64.toString
+impl Stdlib.Display for Int64 =
+  let display = Stdlib.Int64.toString
 
 impl Stdlib.Compare for Int64 =
   let lessThan = Stdlib.Int64.lessThan
@@ -199,6 +199,6 @@ impl Stdlib.One for Int64 =
 
 let fromFloatRounded (a: Float) : Stdlib.Option.Option<Int64> =
   if Float.isFinite a then
-    a |> Float.round |> Stdlib.Int.toInt64
+    a |> Float.__roundInt |> Stdlib.Int.toInt64
   else
     Stdlib.Option.Option.None

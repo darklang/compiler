@@ -87,6 +87,16 @@ def main():
                                 "  [13, 14, 15],\n  [16, 17, 18],\n  [19, 20, 21]\n]")
         assert run('Stdlib.Dict.fromList([("k", Stdlib.Dict.fromList([])), ("j", Stdlib.Dict.fromList([("x", %s)]))])'
                    % long[1], current) == '{\n  "j": {\n    "x": %s\n  },\n  "k": {}\n}' % long[1]
+        # Rendering a record that holds a recursive type releases it through that
+        # type's own helper, which needs the helper for the match-case list inside it.
+        recursive = ("type RcPattern =\n  | RcPVariable(Int64, String)\n"
+                     "type RcCase =\n  { pat: RcPattern\n    whenCondition: Stdlib.Option.Option<RcExpr>\n    rhs: RcExpr }\n"
+                     "type RcExpr =\n  | RcIf(Int64, RcExpr, RcExpr, Stdlib.Option.Option<RcExpr>)\n"
+                     "  | RcMatch(Int64, RcExpr, List<RcCase>)\n"
+                     "type RcValue = { name: String, body: RcExpr }\n"
+                     "type RcClosure = { items: Dict<String, RcValue> }\n"
+                     "RcClosure { items = Stdlib.Dict.empty }")
+        assert run(recursive, current) == "RcClosure { items: {} }"
         # Bytes print as dark eval prints unsaved Bytes: the size and the first 16 in hex.
         assert run("Stdlib.Blob.fromList([171u8])", current) == "<Bytes: 1 byte ab>"
         assert run("(Stdlib.Blob.fromList([]), 1)", current) == "(<Bytes: 0 bytes>, 1)"

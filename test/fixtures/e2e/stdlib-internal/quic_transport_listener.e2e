@@ -1,6 +1,6 @@
 // quic_transport_listener.e2e - Flush a transport rejection before disposing the listener child outbox.
 let listenerClose () : Bool =
-  let secret = Stdlib.String.toBlob (Stdlib.String.repeat "s" 32) in
+  let secret = Stdlib.String.toBlob (Stdlib.String.repeat "s" 32L) in
   let keys = match Stdlib.__QuicCrypto.derive secret with | Ok keys -> keys | Error _ -> Builtin.crash "Test keys" in
   let peer = Stdlib.__Datagram.Endpoint { address = [127L, 0L, 0L, 1L], port = 443L } in
   let (socket, outbox) = Stdlib.HttpServer.Quic.__socket peer in
@@ -19,7 +19,7 @@ let listenerClose () : Bool =
   let context = Stdlib.HttpServer.Quic.Context { config = Stdlib.HttpServer.Config.defaults 443, identity = identity, signals = Stdlib.__Network.ShutdownSignals { lifecycle = life }, socket = parent, secret = secret, limit = 1024L } in
   let owner = Stdlib.HttpServer.Quic.__Owner { source = connection.transport.source, peer = peer, socket = socket, outbox = outbox,
     phase = Stdlib.HttpServer.Quic.__Phase.Initializing (Stdlib.HttpServer.Quic.__Bootstrap { connection = connection, opened = false, index = 0L, offset = 0L, deadline = now + 10000L }) } in
-  let result = Stdlib.HttpServer.Quic.__advance context (fun _request -> Stdlib.Http.responseWithText "unused" 200) owner (Some (Stdlib.__Datagram.Message { peer = peer, payload = wire })) now in
+  let result = Stdlib.HttpServer.Quic.__advance context (fun _request -> Stdlib.Http.responseWithText 200L "unused") owner (Some (Stdlib.__Datagram.Message { peer = peer, payload = wire })) now in
   let valid = match result with
     | Ok (Some owner) ->
       let queued = Stdlib.Stream.__cellGet<List<Blob>> outbox in

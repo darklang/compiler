@@ -1769,7 +1769,7 @@ let parseE2ETestFile path =
   in
   let* inventory =
     if canonical then
-      SourceInventory.parse ~reasons text |> Result.map Option.some
+      SourceInventory.parse ~interpreterSource:true ~reasons text |> Result.map Option.some
     else Ok None
   in
   let* tests =

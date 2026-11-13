@@ -140,8 +140,11 @@ let stableHash value =
         1099511628211L)
     0xcbf29ce484222325L value
 
+(* Helpers rendered as `dark eval` prints carry their own names, so a program
+   holding both kinds (inspect beside a diagnostic) keeps them apart. *)
 let hashed prefix typ =
   prefix
+  ^ (if !evalDisplay then "eval_" else "")
   ^ Printf.sprintf "%016Lx"
       (stableHash (CheckingDiagnostics.typeToHelperIdentityString typ))
 
@@ -611,7 +614,7 @@ and renderBody env typ value state =
                       ( Lte,
                         call next.symbols "Darklang.Stdlib.String.length"
                           [ C.Local shortId ],
-                        C.BigIntLiteral (Z.of_int 80) ),
+                        C.Int64Literal 80L ),
                     C.Local shortId,
                     long ) ),
             next ))
@@ -1050,7 +1053,7 @@ let ensureEvalRenderer env typ state =
   generated (evalRendererName typ) typ TString state (fun value state ->
       let doc, next = docCall env typ value state in
       ( call next.symbols "Darklang.Stdlib.Pretty.render"
-          [ C.BigIntLiteral (Z.of_int 80); doc ],
+          [ C.Int64Literal 80L; doc ],
         next ))
 
 let starts name prefix = Text.startsWith name prefix
@@ -1196,6 +1199,47 @@ let rewriteProgram recordMetadata sumMetadata programType program =
   in
   C.programFromCheckedParts (final.symbols, generated @ List.rev reversed)
 
+(* A call to the impl of <method> for <valueType>, when the type has one. *)
+let traitCall state methodName valueType value =
+  let catalog = C.traitCatalog state.symbols in
+  match M.find_opt methodName catalog.TraitCatalog.dispatches with
+  | None -> None
+  | Some dispatch -> (
+      match TraitResolution.select catalog dispatch [ valueType ] with
+      | Error _ -> None
+      | Ok (target, parameters) ->
+          let target = resolveFunction state.symbols target in
+          let args = N.singleton value in
+          Some
+            (if parameters = [] then C.Call (target, args)
+             else C.TypeApp (target, C.checkedTypeArgs parameters, args)))
+
+(* Stdlib.inspect: the type's Inspect impl when it has one, otherwise the
+   value renderer. *)
+let inspection env valueType value state =
+  match traitCall state "Darklang.Stdlib.Inspect.inspect" valueType value with
+  | Some call -> (call, state)
+  | None ->
+      (* Stdlib.inspect is the interpreter's developer form, `Some(3)`, in
+         either output mode. *)
+      let previous = !evalDisplay in
+      evalDisplay := true;
+      let rendered = renderCall env valueType value state in
+      evalDisplay := previous;
+      rendered
+
+(* `$"{value}"` shows a String as it is, a value whose type has a Display
+   impl through that impl, and any other value as Stdlib.inspect does. *)
+let interpolation env valueType value state =
+  match valueType with
+  | TString -> (value, state)
+  | _ -> (
+      match
+        traitCall state "Darklang.Stdlib.Display.display" valueType value
+      with
+      | Some call -> (call, state)
+      | None -> inspection env valueType value state)
+
 (* Replace concrete diagnostic renderer specializations with the same
    monomorphic renderer used for eval results. *)
 let rewriteDiagnosticRenderers recordMetadata sumMetadata program =
@@ -1214,12 +1258,19 @@ let rewriteDiagnosticRenderers recordMetadata sumMetadata program =
                    [
                      "Darklang.Stdlib.Dict.__renderGenericKey_";
                      "Darklang.Stdlib.Test.__renderValue_";
+                     "Darklang.Stdlib.inspect_";
+                     "Darklang.Stdlib.__interpolate_";
                    ] -> (
               match N.toList definition.C.params with
               | [ (parameter, valueType) ] ->
+                  let valueType = C.semanticType valueType in
+                  let value = C.Local parameter in
                   let body, next =
-                    renderCall env (C.semanticType valueType)
-                      (C.Local parameter) state
+                    if starts definition.C.name "Darklang.Stdlib.__interpolate_"
+                    then interpolation env valueType value state
+                    else if starts definition.C.name "Darklang.Stdlib.inspect_"
+                    then inspection env valueType value state
+                    else renderCall env valueType value state
                   in
                   (C.FunctionDef { definition with C.body }, next)
               | _ ->

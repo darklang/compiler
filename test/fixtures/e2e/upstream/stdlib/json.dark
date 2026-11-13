@@ -568,9 +568,9 @@ module Int128 =
     (Stdlib.Json.parse<Int128> "170141183460469231731687303715884105728") |> err = Result.Error
       "Can't parse JSON `170141183460469231731687303715884105728` as type `Int128` at path: `root`"
 
-    // This is a float that is a valid Int128
+    // Float form, read exactly rather than through a double
     Stdlib.Json.parse<Int128> "1.7E38" = Result.Ok
-      169999999999999998061923293023115935744Q
+      170000000000000000000000000000000000000Q
 
     // This is a float that is slightly above the Int128 max
     (Stdlib.Json.parse<Int128> "1.8E38") |> err = Result.Error
@@ -578,7 +578,7 @@ module Int128 =
 
     // A large negative number that is within Int128 range
     Stdlib.Json.parse<Int128> "-1.7E38" = Result.Ok
-      -169999999999999998061923293023115935744Q
+      -170000000000000000000000000000000000000Q
 
     // A negative number that is too small for Int128
     (Stdlib.Json.parse<Int128> "-1.8E38") |> err = Result.Error
@@ -613,9 +613,9 @@ module Int128 =
 
     (Stdlib.Json.parse<Int128> "\"42\n\"") |> err = Result.Error "Not JSON"
 
-    // (-1.7014118346046923E+38) this result is out of range for Int128 and is wrapped around to the min value
-    Stdlib.Json.parse<Int128> "-170141183460469231731687303715884105800" = Result.Ok
-      -170141183460469231731687303715884105728Q
+    // just past the minimum, which a double rounded onto it
+    (Stdlib.Json.parse<Int128> "-170141183460469231731687303715884105800") |> err = Result.Error
+      "Can't parse JSON `-170141183460469231731687303715884105800` as type `Int128` at path: `root`"
 
     (Stdlib.Json.parse<Int128> "170141183460469231731687303715884105800") |> err = Result.Error
       "Can't parse JSON `170141183460469231731687303715884105800` as type `Int128` at path: `root`"
@@ -643,7 +643,7 @@ module UInt128 =
 
     // This is a large number that is a valid UInt128
     Stdlib.Json.parse<UInt128> "3.4E38" = Result.Ok
-      339999999999999996123846586046231871488Z
+      340000000000000000000000000000000000000Z
 
     // This is a number that is slightly above the UInt128 max
     (Stdlib.Json.parse<UInt128> "3.5E38") |> err = Result.Error
@@ -854,11 +854,11 @@ module String =
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed non risus. Suspendisse lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, dolor."
 
 
-  Stdlib.Json.serialize<String> (Stdlib.String.repeat "a" 100) = "\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""
+  Stdlib.Json.serialize<String> (Stdlib.String.repeat "a" 100L) = "\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""
 
   Stdlib.Json.parse<String>
     "\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"" = Result
-    .Ok(Stdlib.String.repeat "a" 100)
+    .Ok(Stdlib.String.repeat "a" 100L)
 
 
 module DateTime =

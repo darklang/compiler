@@ -48,7 +48,7 @@ let __replace (state: Stdlib.__Http3Uni.State) (stream: Stdlib.__Http3Uni.Stream
   let streams =
     if Stdlib.List.any state.streams (fun previous -> previous.id == stream.id) then
       Stdlib.List.map state.streams (fun previous -> if previous.id == stream.id then stream else previous)
-    else Stdlib.List.append state.streams [stream] in
+    else Stdlib.List.concat state.streams [stream] in
   { state with streams = streams }
 
 let __payload (state: Stdlib.__Http3Uni.State) (stream: Stdlib.__Http3Uni.Stream)
@@ -83,7 +83,7 @@ let receive (state: Stdlib.__Http3Uni.State) (id: Int64) (data: Blob) (finished:
     let known = Stdlib.List.findFirst state.streams (fun stream -> stream.id == id) in
     let stream = match known with | Some stream -> stream | None ->
       Stdlib.__Http3Uni.Stream { id = id, prefix = Stdlib.Blob.empty, kind = None, finished = false } in
-    if Stdlib.Option.isNone known && Stdlib.List.length state.streams >= 16 then Error (Stdlib.__Http3Wire.connectionFailure 263L "HTTP/3 stream profile exhausted")
+    if Stdlib.Option.isNone known && Stdlib.List.__lengthInt state.streams >= 16 then Error (Stdlib.__Http3Wire.connectionFailure 263L "HTTP/3 stream profile exhausted")
     else if stream.finished then
       if Stdlib.Blob.__byteLength data == 0L then Ok (Stdlib.__Http3Uni.Received { state = state, events = [], feedback = Stdlib.Blob.empty })
       else Error (Stdlib.__Http3Wire.connectionFailure 257L "Data after HTTP/3 unidirectional stream end")

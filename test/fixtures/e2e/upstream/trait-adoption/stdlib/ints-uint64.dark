@@ -21,8 +21,8 @@ test sum =
 
 test toString =
   Stdlib.Test.all
-    [ Stdlib.toString 0UL |> Stdlib.Test.equal "0"
-      Stdlib.toString 1UL |> Stdlib.Test.equal "1"
-      Stdlib.toString 18446744073709551615UL
+    [ Stdlib.display 0UL |> Stdlib.Test.equal "0"
+      Stdlib.display 1UL |> Stdlib.Test.equal "1"
+      Stdlib.display 18446744073709551615UL
       |> Stdlib.Test.equal "18446744073709551615" ]
 

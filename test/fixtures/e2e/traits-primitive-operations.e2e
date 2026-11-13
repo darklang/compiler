@@ -10,7 +10,7 @@ Stdlib.Power.power 0Z 0Z = 1Z
 Stdlib.Power.power 2Q -1Q = error="Cannot raise integer to a negative exponent"
 Stdlib.BitwiseXor.bitwiseXor 7L 3L = 4L
 Stdlib.ShiftLeft.shiftLeft 1L 5L = 32L
-Stdlib.ToString.toString 340282366920938463463374607431768211455Z = "340282366920938463463374607431768211455"
+Stdlib.Display.display 340282366920938463463374607431768211455Z = "340282366920938463463374607431768211455"
 Stdlib.max 32767s -32768s = 32767s
 Stdlib.max 65535us 0us = 65535us
 Stdlib.max 2147483647l -2147483648l = 2147483647l

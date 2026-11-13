@@ -15,6 +15,13 @@ val needsValidation :
   AST.semanticType ->
   bool
 
+val mayHoldNaN :
+  Types.aliasRegistry ->
+  Types.indexedTypeRegistry ->
+  Types.indexedSumTypeRegistry ->
+  AST.semanticType ->
+  bool
+
 val generate :
   Types.aliasRegistry ->
   Types.indexedTypeRegistry ->

@@ -39,17 +39,29 @@ let __keyEquals<'k, 'v> (left: Dict<k, v>) (right: Dict<k, v>) : Bool =
                     | Some rightValue -> __key_eq<v> value rightValue
                 else false)
 
-let size<'k, 'v> (dict: Dict<k, v>) : Int =
-    Stdlib.Int.fromInt64 (Stdlib.Dict.__size<k, v> dict)
+let size<'k, 'v> (dict: Dict<k, v>) : Int64 =
+    Stdlib.Dict.__size<k, v> dict
 
 let get<'k, 'v> (dict: Dict<k, v>) (key: k) : Stdlib.Option.Option<v> =
     Stdlib.Dict.__get<k, v> dict (__dict_check_key key)
+
+let set<'k, 'v> (dict: Dict<k, v>) (key: k) (value: v) : Dict<k, v> =
+    Stdlib.Dict.__setOverwriting<k, v> dict (__dict_check_key key) value
 
 // Concrete specializations receive the shared value renderer before ANF.
 let __renderGenericKey<'k> (key: k) : String =
     Builtin.crash "Dictionary key renderer was not specialized"
 
-let set<'k, 'v> (dict: Dict<k, v>) (key: k) (value: v) : Dict<k, v> =
+// NaN is the only key value unequal to itself, and a key holding one could never be found.
+let __refuseNaNKey<'k> (key: k) : k =
+    if key == key then key
+    else
+        Builtin.crash
+            ("Cannot use " + Stdlib.Dict.__renderGenericKey key + " as a dict key. NaN is not equal to itself, so a key holding it could never be found.")
+
+// Dict literals are built entry by entry with this, so a key that two
+// entries compute equal is refused at run time.
+let __setRejectingDuplicate<'k, 'v> (dict: Dict<k, v>) (key: k) (value: v) : Dict<k, v> =
     let key = __dict_check_key key in
     if Stdlib.Dict.__contains<k, v> dict key then
         Builtin.crash
@@ -159,8 +171,9 @@ let __fromListRejecting<'k, 'v> (entries: List<(k * v)>) (dict: Dict<k, v>) : St
         else
             Stdlib.Dict.__fromListRejecting<k, v> tail (Stdlib.Dict.__setOverwriting dict key value)
 
-let fromList<'k, 'v> (entries: List<(k * v)>) : Stdlib.Option.Option<Dict<k, v>> =
-    Stdlib.Dict.__fromListRejecting<k, v> entries (Stdlib.Dict.__empty<k, v> ())
+// The last entry of a repeated key wins, as in the interpreter.
+let fromList<'k, 'v> (entries: List<(k * v)>) : Dict<k, v> =
+    Stdlib.Dict.__fromListOverwritingPublic<k, v> entries (Stdlib.Dict.__empty<k, v> ())
 
 let member<'k, 'v> (dict: Dict<k, v>) (key: k) : Bool =
     Stdlib.Dict.__contains<k, v> dict (__dict_check_key key)

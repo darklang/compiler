@@ -1,13 +1,13 @@
-Stdlib.toString 42L = "42"
-42L.toString = "42"
+Stdlib.display 42L = "42"
+42L.display = "42"
 Stdlib.max 3L 5L = 5L
 Stdlib.min 3L 5L = 3L
 Stdlib.abs -42L = 42L
 Stdlib.clamp 42L 1L 10L = 10L
 Stdlib.sum 0L [1L, 2L, 3L] = 6L
 Stdlib.product 1L [2L, 3L, 4L] = 24L
-Stdlib.ToString.toString true = "true"
-Stdlib.ToString.toString "text" = "text"
+Stdlib.Display.display true = "true"
+Stdlib.Display.display "text" = "text"
 
 type StdlibTraitCount = { value: Int64 }
 impl Stdlib.Compare for StdlibTraitCount =

@@ -49,7 +49,7 @@ let parseParen parseExpr state index =
                   ({ WT.range = opRange; name = "Stdlib" }, opRange);
                   ({ WT.range = opRange; name = "List" }, opRange);
                 ];
-              fn = { WT.range = opRange; name = "append" };
+              fn = { WT.range = opRange; name = "concat" };
             }
           in
           WT.EApply (range, WT.EFnName (opRange, name), [], [ a; b ])

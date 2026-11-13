@@ -5,11 +5,11 @@ let genericIdentity<'a> (value: MaybeItems<'a>): MaybeItems<'a> = value
 let noItems (): MaybeItems<Int64> = NoItems
 match identity None with | None -> true | Some _ -> false = true // leak_check
 match identity (Some []) with | None -> false | Some values -> Stdlib.List.isEmpty values = true // leak_check
-match identity (Some [1L, 2L]) with | None -> 0 | Some values -> Stdlib.List.length values = 2 // leak_check
+match identity (Some [1L, 2L]) with | None -> 0L | Some values -> Stdlib.List.length values = 2L // leak_check
 let value = Some ["a" + "b"] in match value with | None -> "missing" | Some [head] -> head | Some _ -> "wrong" = "ab" // leak_check
 match genericIdentity (noItems ()) with | NoItems -> true | HasItems _ -> false = true // leak_check
 match genericIdentity (HasItems []) with | NoItems -> false | HasItems values -> Stdlib.List.isEmpty values = true // leak_check
-match genericIdentity (HasItems [1L, 2L]) with | NoItems -> 0 | HasItems values -> Stdlib.List.length values = 2 // leak_check
+match genericIdentity (HasItems [1L, 2L]) with | NoItems -> 0L | HasItems values -> Stdlib.List.length values = 2L // leak_check
 identity None != identity (Some []) = true // leak_check
 identity (Some []) == identity (Some []) = true // leak_check
 Stdlib.Option.withDefault (identity None) [1L] = [1L] // leak_check

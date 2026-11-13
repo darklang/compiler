@@ -178,8 +178,8 @@ let __closeTakeState<'a> (state: (Stream<a> * Int)) : Unit =
     let (source, remaining) = state in
     Stdlib.Stream.close<a> source
 
-let take<'a> (stream: Stream<a>) (count: Int) : Stream<a> =
-    let clamped = if count < 0 then 0 else count in
+let take<'a> (stream: Stream<a>) (count: Int64) : Stream<a> =
+    let clamped = if count < 0L then 0 else Stdlib.Int.fromInt64 count in
     let step = fun state -> Stdlib.Stream.__takeStep<a> state in
     let dispose = fun state -> Stdlib.Stream.__closeTakeState<a> state in
     Stdlib.Stream.__fromProducer ((stream, clamped)) step dispose

@@ -107,9 +107,8 @@ let rec convert range conversion expression =
               range )
       | _ -> expression)
 
-(* A call to <name> with <args>, renamed and converted both ways. *)
+(* A call to <name> with <args>, converted both ways. *)
 let adaptedCall range name typeArgs args =
-  let target = C.hostedName name in
   let conversions = C.argumentConversions name in
   let args =
     List.mapi
@@ -119,14 +118,13 @@ let adaptedCall range name typeArgs args =
         | None -> arg)
       args
   in
-  let applied = WT.EApply (range, fnName range (withoutOwner target), typeArgs, args) in
+  let applied = WT.EApply (range, fnName range (withoutOwner name), typeArgs, args) in
   match C.resultConversion name with
   | Some conversion -> convert range conversion applied
   | None -> applied
 
 let adapts name =
-  C.hostedName name <> name
-  || C.argumentConversions name <> []
+  C.argumentConversions name <> []
   || Option.is_some (C.resultConversion name)
 
 let rec expr (e : WT.expr) : WT.expr =
@@ -134,8 +132,6 @@ let rec expr (e : WT.expr) : WT.expr =
   | WT.EApply (range, WT.EFnName (_, name), typeArgs, args)
     when adapts (interpreterName name) ->
       adaptedCall range (interpreterName name) typeArgs (List.map expr args)
-  | WT.EFnName (range, name) when C.hostedName (interpreterName name) <> interpreterName name ->
-      fnName range (withoutOwner (C.hostedName (interpreterName name)))
   | WT.EUnit _ | WT.EBool _ | WT.EInt _ | WT.EInt64 _ | WT.EInt8 _ | WT.EUInt8 _
   | WT.EInt16 _ | WT.EUInt16 _ | WT.EInt32 _ | WT.EUInt32 _ | WT.EUInt64 _
   | WT.EInt128 _ | WT.EUInt128 _ | WT.EFloat _ | WT.EChar _ | WT.EVariable _
@@ -148,10 +144,8 @@ let rec expr (e : WT.expr) : WT.expr =
           List.map
             (function
               | WT.StringText _ as text -> text
-              (* The interpreter interpolates any value through ToString. *)
               | WT.StringInterpolation (r, inner, a, b) ->
-                  WT.StringInterpolation
-                    (r, call r "Stdlib.toString" [ expr inner ], a, b))
+                  WT.StringInterpolation (r, expr inner, a, b))
             segments,
           opening,
           closing )

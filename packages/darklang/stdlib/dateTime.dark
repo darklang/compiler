@@ -6,8 +6,8 @@
 
 module Darklang.Stdlib.DateTime
 
-impl Stdlib.ToString for DateTime =
-  let toString = Stdlib.DateTime.toString
+impl Stdlib.Display for DateTime =
+  let display = Stdlib.DateTime.toString
 
 impl Stdlib.Compare for DateTime =
   let lessThan = Stdlib.DateTime.lessThan
@@ -60,7 +60,7 @@ let __checkedTicks (ticks: Int64) : DateTime =
     else
         Stdlib.DateTime.__fromValidTicks ticks
 
-let fromMilliseconds (milliseconds: Int) : DateTime =
+let __fromMillisecondsInt (milliseconds: Int) : DateTime =
     let milliseconds = Stdlib.DateTime.__intToInt64 milliseconds in
     if milliseconds < Stdlib.DateTime.__floorDiv (Stdlib.DateTime.__minimumTicks ()) 10000L ||
        milliseconds > Stdlib.DateTime.__floorDiv (Stdlib.DateTime.__maximumTicks ()) 10000L then
@@ -68,11 +68,11 @@ let fromMilliseconds (milliseconds: Int) : DateTime =
     else
         Stdlib.DateTime.__fromValidTicks (milliseconds * Stdlib.DateTime.__ticksPerMillisecond ())
 
-let toMilliseconds (date: DateTime) : Int =
+let __toMillisecondsInt (date: DateTime) : Int =
     Stdlib.DateTime.__int64ToInt (
         Stdlib.DateTime.__floorDiv (Stdlib.DateTime.__ticks date) (Stdlib.DateTime.__ticksPerMillisecond ()))
 
-let fromSeconds (seconds: Int) : DateTime =
+let __fromSecondsInt (seconds: Int) : DateTime =
     let seconds = Stdlib.DateTime.__intToInt64 seconds in
     if seconds < Stdlib.DateTime.__floorDiv (Stdlib.DateTime.__minimumTicks ()) 10000000L ||
        seconds > Stdlib.DateTime.__floorDiv (Stdlib.DateTime.__maximumTicks ()) 10000000L then
@@ -80,7 +80,7 @@ let fromSeconds (seconds: Int) : DateTime =
     else
         Stdlib.DateTime.__fromValidTicks (seconds * Stdlib.DateTime.__ticksPerSecond ())
 
-let toSeconds (date: DateTime) : Int =
+let __toSecondsInt (date: DateTime) : Int =
     Stdlib.DateTime.__int64ToInt (
         Stdlib.DateTime.__floorDiv (Stdlib.DateTime.__ticks date) (Stdlib.DateTime.__ticksPerSecond ()))
 
@@ -100,7 +100,7 @@ let __subtractTicks (date: DateTime) (delta: Int64) : DateTime =
     else
         Stdlib.DateTime.__fromValidTicks (ticks - delta)
 
-let addSeconds (date: DateTime) (seconds: Int) : DateTime =
+let __addSecondsInt (date: DateTime) (seconds: Int) : DateTime =
     let seconds = Stdlib.DateTime.__intToInt64 seconds in
     if seconds < 0L - Stdlib.DateTime.__maximumDeltaSeconds () ||
        seconds > Stdlib.DateTime.__maximumDeltaSeconds () then
@@ -108,7 +108,7 @@ let addSeconds (date: DateTime) (seconds: Int) : DateTime =
     else
         Stdlib.DateTime.__addTicks date (seconds * Stdlib.DateTime.__ticksPerSecond ())
 
-let subtractSeconds (date: DateTime) (seconds: Int) : DateTime =
+let __subtractSecondsInt (date: DateTime) (seconds: Int) : DateTime =
     let seconds = Stdlib.DateTime.__intToInt64 seconds in
     if seconds < 0L - Stdlib.DateTime.__maximumDeltaSeconds () ||
        seconds > Stdlib.DateTime.__maximumDeltaSeconds () then
@@ -116,7 +116,7 @@ let subtractSeconds (date: DateTime) (seconds: Int) : DateTime =
     else
         Stdlib.DateTime.__subtractTicks date (seconds * Stdlib.DateTime.__ticksPerSecond ())
 
-let addMilliseconds (date: DateTime) (milliseconds: Int) : DateTime =
+let __addMillisecondsInt (date: DateTime) (milliseconds: Int) : DateTime =
     let milliseconds = Stdlib.DateTime.__intToInt64 milliseconds in
     if milliseconds < 0L - Stdlib.DateTime.__maximumDeltaMilliseconds () ||
        milliseconds > Stdlib.DateTime.__maximumDeltaMilliseconds () then
@@ -124,7 +124,7 @@ let addMilliseconds (date: DateTime) (milliseconds: Int) : DateTime =
     else
         Stdlib.DateTime.__addTicks date (milliseconds * Stdlib.DateTime.__ticksPerMillisecond ())
 
-let subtractMilliseconds (date: DateTime) (milliseconds: Int) : DateTime =
+let __subtractMillisecondsInt (date: DateTime) (milliseconds: Int) : DateTime =
     let milliseconds = Stdlib.DateTime.__intToInt64 milliseconds in
     if milliseconds < 0L - Stdlib.DateTime.__maximumDeltaMilliseconds () ||
        milliseconds > Stdlib.DateTime.__maximumDeltaMilliseconds () then
@@ -156,11 +156,11 @@ let __roundToNearestEven (value: Int64) (divisor: Int64) : Int64 =
     else if value < 0L then quotient - 1L
     else quotient + 1L
 
-let subtract (endDate: DateTime) (startDate: DateTime) : Int =
+let __subtractInt (endDate: DateTime) (startDate: DateTime) : Int =
     Stdlib.DateTime.__int64ToInt (
         Stdlib.DateTime.__roundToNearestEven (Stdlib.DateTime.__ticks endDate - Stdlib.DateTime.__ticks startDate) (Stdlib.DateTime.__ticksPerSecond ()))
 
-let subtractMs (endDate: DateTime) (startDate: DateTime) : Int =
+let __subtractMsInt (endDate: DateTime) (startDate: DateTime) : Int =
     Stdlib.DateTime.__int64ToInt (
         Stdlib.DateTime.__roundToNearestEven (Stdlib.DateTime.__ticks endDate - Stdlib.DateTime.__ticks startDate) (Stdlib.DateTime.__ticksPerMillisecond ()))
 
@@ -192,44 +192,69 @@ let __civilFromDays (days: Int64) : (Int64 * Int64 * Int64) =
 let __daysSinceEpoch (date: DateTime) : Int64 =
     Stdlib.DateTime.__floorDiv (Stdlib.DateTime.__ticks date) (Stdlib.DateTime.__ticksPerDay ())
 
-let year (date: DateTime) : Int =
+let __yearInt (date: DateTime) : Int =
     let parts = Stdlib.DateTime.__civilFromDays (Stdlib.DateTime.__daysSinceEpoch date) in
     Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.first parts)
 
-let month (date: DateTime) : Int =
+let __monthInt (date: DateTime) : Int =
     let parts = Stdlib.DateTime.__civilFromDays (Stdlib.DateTime.__daysSinceEpoch date) in
     Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.second parts)
 
-let day (date: DateTime) : Int =
+let __dayInt (date: DateTime) : Int =
     let parts = Stdlib.DateTime.__civilFromDays (Stdlib.DateTime.__daysSinceEpoch date) in
     Stdlib.DateTime.__int64ToInt (Stdlib.Tuple3.third parts)
 
-let weekday (date: DateTime) : Int =
+let __weekdayInt (date: DateTime) : Int =
     Stdlib.DateTime.__int64ToInt (
         Stdlib.DateTime.__floorMod (Stdlib.DateTime.__daysSinceEpoch date + 3L) 7L + 1L)
 
 let __ticksWithinDay (date: DateTime) : Int64 =
     Stdlib.DateTime.__floorMod (Stdlib.DateTime.__ticks date) (Stdlib.DateTime.__ticksPerDay ())
 
-let hour (date: DateTime) : Int =
+let __hourInt (date: DateTime) : Int =
     Stdlib.DateTime.__int64ToInt (
         Stdlib.DateTime.__ticksWithinDay date / Stdlib.DateTime.__ticksPerHour ())
 
-let minute (date: DateTime) : Int =
+let __minuteInt (date: DateTime) : Int =
     Stdlib.DateTime.__int64ToInt (
         (Stdlib.DateTime.__ticksWithinDay date / Stdlib.DateTime.__ticksPerMinute ()) % 60L)
 
-let second (date: DateTime) : Int =
+let __secondInt (date: DateTime) : Int =
     Stdlib.DateTime.__int64ToInt (
         (Stdlib.DateTime.__ticksWithinDay date / Stdlib.DateTime.__ticksPerSecond ()) % 60L)
 
-let millisecond (date: DateTime) : Int =
+let __millisecondInt (date: DateTime) : Int =
     Stdlib.DateTime.__int64ToInt (
         (Stdlib.DateTime.__ticksWithinDay date / Stdlib.DateTime.__ticksPerMillisecond ()) % 1000L)
 
 let atStartOfDay (date: DateTime) : DateTime =
     Stdlib.DateTime.__fromValidTicks (
         Stdlib.DateTime.__daysSinceEpoch date * Stdlib.DateTime.__ticksPerDay ())
+
+// The public DateTime API in the interpreter's types: Int64 seconds and
+// milliseconds, small unsigned calendar fields, and Month and Weekday enums.
+let __toInt64 (value: Int) : Int64 = Builtin.unwrap (Stdlib.Int.toInt64 value)
+let addSeconds (date: DateTime) (seconds: Int64) : DateTime = Stdlib.DateTime.__addSecondsInt date (Stdlib.Int.fromInt64 seconds)
+let subtractSeconds (date: DateTime) (seconds: Int64) : DateTime = Stdlib.DateTime.__subtractSecondsInt date (Stdlib.Int.fromInt64 seconds)
+let toSeconds (date: DateTime) : Int64 = Stdlib.DateTime.__toInt64 (Stdlib.DateTime.__toSecondsInt date)
+let fromSeconds (seconds: Int64) : DateTime = Stdlib.DateTime.__fromSecondsInt (Stdlib.Int.fromInt64 seconds)
+let toMilliseconds (date: DateTime) : Int64 = Stdlib.DateTime.__toInt64 (Stdlib.DateTime.__toMillisecondsInt date)
+let fromMilliseconds (milliseconds: Int64) : DateTime = Stdlib.DateTime.__fromMillisecondsInt (Stdlib.Int.fromInt64 milliseconds)
+let addMilliseconds (date: DateTime) (milliseconds: Int64) : DateTime = Stdlib.DateTime.__addMillisecondsInt date (Stdlib.Int.fromInt64 milliseconds)
+let subtractMilliseconds (date: DateTime) (milliseconds: Int64) : DateTime = Stdlib.DateTime.__subtractMillisecondsInt date (Stdlib.Int.fromInt64 milliseconds)
+let year (date: DateTime) : Int64 = Stdlib.DateTime.__toInt64 (Stdlib.DateTime.__yearInt date)
+let month (date: DateTime) : Stdlib.DateTime.Month =
+    Builtin.unwrap (Stdlib.DateTime.Month.fromNumber (Builtin.unwrap (Stdlib.Int.toUInt8 (Stdlib.DateTime.__monthInt date))))
+let day (date: DateTime) : UInt8 = Builtin.unwrap (Stdlib.Int.toUInt8 (Stdlib.DateTime.__dayInt date))
+let weekday (date: DateTime) : Stdlib.DateTime.Weekday =
+    Builtin.unwrap (Stdlib.DateTime.Weekday.fromNumber (Builtin.unwrap (Stdlib.Int.toUInt8 (Stdlib.DateTime.__weekdayInt date))))
+let hour (date: DateTime) : UInt8 = Builtin.unwrap (Stdlib.Int.toUInt8 (Stdlib.DateTime.__hourInt date))
+let minute (date: DateTime) : UInt8 = Builtin.unwrap (Stdlib.Int.toUInt8 (Stdlib.DateTime.__minuteInt date))
+let second (date: DateTime) : UInt8 = Builtin.unwrap (Stdlib.Int.toUInt8 (Stdlib.DateTime.__secondInt date))
+let millisecond (date: DateTime) : UInt16 = Builtin.unwrap (Stdlib.Int.toUInt16 (Stdlib.DateTime.__millisecondInt date))
+let subtract (endDate: DateTime) (startDate: DateTime) : Stdlib.Duration.Duration =
+    Stdlib.Duration.fromSeconds (Stdlib.DateTime.__toInt64 (Stdlib.DateTime.__subtractInt endDate startDate))
+let subtractMs (endDate: DateTime) (startDate: DateTime) : Int64 = Stdlib.DateTime.__toInt64 (Stdlib.DateTime.__subtractMsInt endDate startDate)
 
 let now () : DateTime = Stdlib.DateTime.__now ()
 
@@ -449,10 +474,10 @@ let __now () : DateTime =
   | Error e -> Builtin.unwrap (Error e)
 
 let __today () : DateTime =
-  let seconds = Stdlib.DateTime.toSeconds (__now ())
+  let seconds = Stdlib.DateTime.__toSecondsInt (__now ())
   let remainder = seconds % 86400
   let start = if remainder < 0 then seconds - remainder - 86400 else seconds - remainder
-  Stdlib.DateTime.fromSeconds start
+  Stdlib.DateTime.__fromSecondsInt start
 
 let __sleepWith (sleep: Int -> Int -> (Int * Blob)) (seconds: Int) (nanos: Int)
   : Result.Result<Unit, Int> =

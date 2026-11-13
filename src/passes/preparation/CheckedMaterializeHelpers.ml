@@ -67,7 +67,8 @@ let rec collectHelperTypes symbols aliases expr =
         | ( Some
               ( "Darklang.Stdlib.List.reverse" | "Darklang.Stdlib.List.fold"
               | "Darklang.Stdlib.List.push" | "Darklang.Stdlib.List.map"
-              | "Darklang.Stdlib.List.append" | "Darklang.Stdlib.List.head"
+              | "Darklang.Stdlib.List.concat" | "Darklang.Stdlib.List.append"
+              | "Darklang.Stdlib.List.head"
               | "Darklang.Stdlib.List.getAt" | "Darklang.Stdlib.List.indexedMap"
               | "Darklang.Stdlib.Dict.__entries" ),
             _,
@@ -182,11 +183,19 @@ let rec rewriteHelperCalls symbols aliases records sums variants expr =
     when C.functionName id symbols = Some "__dict_check_key"
          && not (Unification.containsTVar (C.semanticType target)) ->
       let typ = Types.resolveType aliases (C.semanticType target) in
+      let key =
+        if DictionaryKeyValidation.mayHoldNaN aliases records sums typ then
+          C.TypeApp
+            ( resolved "Darklang.Stdlib.Dict.__refuseNaNKey",
+              C.checkedTypeArgs [ typ ],
+              NonEmptyList.singleton (recurse key) )
+        else recurse key
+      in
       if DictionaryKeyValidation.needsValidation aliases records sums typ then
         C.Call
           ( resolved (DictionaryKeyValidation.name typ),
-            NonEmptyList.singleton (recurse key) )
-      else recurse key
+            NonEmptyList.singleton key )
+      else key
   | C.TypeApp (id, types, values) -> C.TypeApp (id, types, args values)
   | C.TupleLiteral values -> C.TupleLiteral (C.mapTupleElements recurse values)
   | C.TupleAccess (value, index) -> C.TupleAccess (recurse value, index)

@@ -25,7 +25,7 @@ let split (values: List<Complex>) (takeEven: Bool) (evens: List<Complex>) (odds:
 let combine (evens: List<Complex>) (odds: List<Complex>) (index: Int64) (size: Int64) (lower: List<Complex>) (upper: List<Complex>) : List<Complex> =
     match (evens, odds) with
     | ([], []) ->
-        Stdlib.List.append (Stdlib.List.reverse lower) (Stdlib.List.reverse upper)
+        Stdlib.List.concat (Stdlib.List.reverse lower) (Stdlib.List.reverse upper)
     | (even :: evenRest, odd :: oddRest) ->
         let angle = -6.283185307179586 * Stdlib.Int64.toFloat index / Stdlib.Int64.toFloat size in
         let twiddle = Complex { real = Stdlib.Math.cos angle, imaginary = Stdlib.Math.sin angle } in

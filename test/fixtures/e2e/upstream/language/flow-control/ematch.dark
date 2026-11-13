@@ -358,7 +358,7 @@ module List =
 
   (match [ 1L, 2L, 3L ] with
    | var ->
-     let length = (Stdlib.List.length var) |> Stdlib.Int.toString
+     let length = (Stdlib.List.length var) |> Stdlib.Int64.toString
 
      $"pass with length: {length}"
    | [ 1L, 2L, 3L ] -> "fail"
@@ -746,7 +746,7 @@ module GuardClause =
    | _ -> "fail") = "fail"
 
   (match (5L, "hello") with
-   | (x, y) when x > 0L && Stdlib.String.length y == 5 -> "pass"
+   | (x, y) when x > 0L && Stdlib.String.length y == 5L -> "pass"
    | _ -> "fail") = "pass"
 
   #compileerror="Unbound local variable 'y'"
