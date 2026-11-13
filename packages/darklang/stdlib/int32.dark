@@ -168,8 +168,8 @@ impl Stdlib.ShiftLeft for Int32 =
 impl Stdlib.ShiftRight for Int32 =
   let shiftRight = Stdlib.Int32.shiftRight
 
-impl Stdlib.ToString for Int32 =
-  let toString = Stdlib.Int32.toString
+impl Stdlib.Display for Int32 =
+  let display = Stdlib.Int32.toString
 
 impl Stdlib.Compare for Int32 =
   let lessThan = Stdlib.Int32.lessThan

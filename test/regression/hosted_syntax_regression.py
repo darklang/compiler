@@ -72,10 +72,10 @@ def builtin(name, *args):
     return {"EApply": [2, callee, [], list(args)]}
 
 
-# BigInt and Float keep their own operator builtins, called by name.
+# BigInt's impls call the shared operator builtins, as the integers' do.
 ENTITIES["builtin-ops-hash"] = fn("Hosted.builtinOps", [("x", {"TBigInt": []})], {"TBool": []},
-    builtin("bigIntLessThan", builtin("bigIntSubtract", ARG0, {"EBigInt": [3, 1]}),
-            builtin("bigIntNegate", {"EBigInt": [4, -50]})))
+    builtin("lessThan", builtin("subtract", ARG0, {"EBigInt": [3, 1]}),
+            builtin("negate", {"EBigInt": [4, -50]})))
 
 
 # -(x - 1) * 3 < x % 4, through the polymorphic operator builtins.
@@ -97,16 +97,16 @@ ENTITIES["builtin-bitwise-hash"] = fn("Hosted.builtinBitwise", [("x", INT64)], {
                                       {"EInt64": [5, 1]}), {"EInt64": [6, 1]}))]]})
 
 
-# (2 ** x) / 100 % 10, through the Power, Divide and Modulo builtins and Int64's ToString.
+# (2 ** x) / 100 % 10, through the Power, Divide and Modulo builtins and Int64's Display.
 ENTITIES["builtin-more-hash"] = fn("Hosted.builtinMore", [("x", INT64)], {"TString": []},
     builtin("int64ToString", builtin("modulo", builtin("divide",
         builtin("power", {"EInt64": [3, 2]}, ARG0), {"EInt64": [4, 100]}), {"EInt64": [5, 10]})))
 
 
 # A trait call saved by the interpreter resolves to the trait's location.
-TO_STRING = {"EFnName": [1, dict(originalName=["Darklang", "Stdlib", "ToString", "toString"],
-    resolved={"Ok": [dict(location={"Some": [dict(owner="Darklang", modules=["Stdlib"], name="ToString")]},
-        name={"TraitMethod": [dict(method_="toString", trait_={"Hash": ["to-string-hash"]},
+TO_STRING = {"EFnName": [1, dict(originalName=["Darklang", "Stdlib", "Display", "display"],
+    resolved={"Ok": [dict(location={"Some": [dict(owner="Darklang", modules=["Stdlib"], name="Display")]},
+        name={"TraitMethod": [dict(method_="display", trait_={"Hash": ["display-hash"]},
                                    implFn={"Unknown": []})]})]}), []]}
 ENTITIES["trait-call-hash"] = fn("Hosted.describeNumber", [("x", INT64)], {"TString": []},
     {"EApply": [2, TO_STRING, [], [ARG0]]})

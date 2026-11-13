@@ -145,8 +145,8 @@ impl Stdlib.ShiftLeft for UInt16 =
 impl Stdlib.ShiftRight for UInt16 =
   let shiftRight = Stdlib.UInt16.shiftRight
 
-impl Stdlib.ToString for UInt16 =
-  let toString = Stdlib.UInt16.toString
+impl Stdlib.Display for UInt16 =
+  let display = Stdlib.UInt16.toString
 
 impl Stdlib.Compare for UInt16 =
   let lessThan = Stdlib.UInt16.lessThan

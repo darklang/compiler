@@ -15,4 +15,4 @@ module ParseError =
         match part with
         | Root -> "root"
         | Field name -> "." + name
-        | Index index -> "[" + Stdlib.toString index + "]"
+        | Index index -> "[" + Stdlib.display index + "]"

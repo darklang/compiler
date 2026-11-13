@@ -144,10 +144,8 @@ let rec expr (e : WT.expr) : WT.expr =
           List.map
             (function
               | WT.StringText _ as text -> text
-              (* The interpreter interpolates any value through ToString. *)
               | WT.StringInterpolation (r, inner, a, b) ->
-                  WT.StringInterpolation
-                    (r, call r "Stdlib.toString" [ expr inner ], a, b))
+                  WT.StringInterpolation (r, expr inner, a, b))
             segments,
           opening,
           closing )

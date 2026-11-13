@@ -108,8 +108,8 @@ let toAsciiCode (char: Char) : Stdlib.Option.Option<UInt8> =
     | [codepoint] -> if codepoint < 128L then Stdlib.UInt8.fromInt64 codepoint else None
     | _ -> None
 
-impl Stdlib.ToString for Char =
-  let toString = Stdlib.Char.toString
+impl Stdlib.Display for Char =
+  let display = Stdlib.Char.toString
 
 impl Stdlib.Compare for Char =
   let lessThan = Stdlib.Char.isLessThan

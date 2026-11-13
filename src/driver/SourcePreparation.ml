@@ -486,10 +486,10 @@ let prepareSpecializedProgramForAnf baseTypeReg baseVariantLookup baseFuncNames
           inlined)
   else Ok monomorphized
 
-let prepareProgramForAnf mode baseTypeReg baseVariantLookup baseFuncNames
-    baseFunctions inheritedValues recorder program =
+let prepareProgramForAnf ?prepare mode baseTypeReg baseVariantLookup
+    baseFuncNames baseFunctions inheritedValues recorder program =
   let* monomorphized =
-    specializeProgram mode inheritedValues recorder program
+    specializeProgram ?prepare mode inheritedValues recorder program
   in
   prepareSpecializedProgramForAnf baseTypeReg baseVariantLookup baseFuncNames
     baseFunctions recorder monomorphized
@@ -998,9 +998,46 @@ let convertTypedProgramToUserOnlyWithMode (baseContext : X.pipelineContext) mode
     ValueRendering.rewriteDiagnosticRenderers typeCheckEnv.Types.indexedTypeReg
       typeCheckEnv.Types.indexedSumTypeReg typedProgram
   in
+  (* Specializing can reach inspect and interpolation renderers that the
+     rewrite above has not seen; render them as the program closes. A
+     program reaching none is left as it is. *)
+  let pending program =
+    List.exists
+      (function
+        | C.FunctionDef func -> (
+            List.exists
+              (fun prefix -> String.starts_with ~prefix func.C.name)
+              [ "Darklang.Stdlib.inspect_"; "Darklang.Stdlib.__interpolate_" ]
+            &&
+            match func.C.body with
+            | C.Call (_, args) -> (
+                match NonEmptyList.toList args with
+                | [ C.StringLiteral _ ] -> true
+                | _ -> false)
+            | _ -> false)
+        | _ -> false)
+      (C.programTopLevels program)
+  in
+  let prepare program =
+    if not (pending program) then program
+    else
+      let symbols, tops =
+        ValueRendering.rewriteDiagnosticRenderers
+          typeCheckEnv.Types.indexedTypeReg typeCheckEnv.Types.indexedSumTypeReg
+          program
+        |> C.viewProgram
+      in
+      let symbols, tops =
+        CheckedMaterializeHelpers.materializeEqHelpersInTopLevelsWithIndexedSums
+          symbols typeCheckEnv.Types.aliasReg typeCheckEnv.Types.indexedTypeReg
+          typeCheckEnv.Types.variantLookup typeCheckEnv.Types.indexedSumTypeReg
+          tops
+      in
+      C.programFromCheckedParts (symbols, tops)
+  in
   let* liftedProgram =
     measure recorder "AST -> ANF Program Preparation" (fun () ->
-        prepareProgramForAnf mode baseContext.X.lambdaLiftTypeReg
+        prepareProgramForAnf ~prepare mode baseContext.X.lambdaLiftTypeReg
           baseContext.X.lambdaLiftVariantLookup baseContext.X.baseFuncNames
           baseContext.X.lambdaLiftFunctions baseContext.X.checkedValues recorder
           typedProgram)

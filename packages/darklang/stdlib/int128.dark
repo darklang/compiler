@@ -195,8 +195,8 @@ impl Stdlib.ShiftLeft for Int128 =
 impl Stdlib.ShiftRight for Int128 =
   let shiftRight = Stdlib.Int128.shiftRight
 
-impl Stdlib.ToString for Int128 =
-  let toString = Stdlib.Int128.toString
+impl Stdlib.Display for Int128 =
+  let display = Stdlib.Int128.toString
 
 impl Stdlib.Compare for Int128 =
   let lessThan = Stdlib.Int128.lessThan
