@@ -3,10 +3,10 @@ module Darklang.Stdlib.__Http3Discovery
 
 let allowedHost (trusted: Bool) (host: String) : Bool =
   trusted || (host != "localhost" && host != "metadata" && host != "metadata.google.internal" &&
-    (Stdlib.String.contains host "." || Stdlib.Option.isSome (Stdlib.__DnsWire.ipv6 host)))
+    (Stdlib.String.__containsBytes host "." || Stdlib.Option.isSome (Stdlib.__DnsWire.ipv6 host)))
 
 let allowedAddress (trusted: Bool) (address: List<Int64>) : Bool =
-  let ipv6 = Stdlib.List.length address == 16 in
+  let ipv6 = Stdlib.List.__lengthInt address == 16 in
   let checked = if trusted then
                   if ipv6 then Stdlib.__HttpConnect.checkTrusted6 address else Stdlib.__HttpConnect.checkTrusted4 address
                 else if ipv6 then Stdlib.__HttpConnect.checkGuest6 address else Stdlib.__HttpConnect.checkGuest4 address in

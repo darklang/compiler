@@ -31,7 +31,7 @@ let __refuse (work: Stdlib.__Http2Connection.Work) : Stdlib.__Http2Connection.Wo
 
 let __admit (transport: Stdlib.__HttpTransport.Transport) (work: Stdlib.__Http2Connection.Work) : Stdlib.Result.Result<Stdlib.__Http2Connection.Work, String> =
   if Stdlib.Option.isSome work.connection.wire.goAway then Ok (Stdlib.__Http2Connection.__refuse work)
-  else if Stdlib.Int64.__fromIntUnchecked (Stdlib.List.length work.active) >= work.connection.wire.concurrent then Ok work
+  else if Stdlib.Int64.__fromIntUnchecked (Stdlib.List.__lengthInt work.active) >= work.connection.wire.concurrent then Ok work
   else match work.waiting with
   | [] -> Ok work
   | pending :: rest ->
@@ -77,7 +77,7 @@ let __finish (transport: Stdlib.__HttpTransport.Transport) (work: Stdlib.__Http2
         // an early reset would also cancel its still-in-flight response body.
         let stopped = if stream.position < Stdlib.Blob.__byteLength stream.request.body then
                         Stdlib.__Http2.__writeFrame transport 3L 0L stream.id (Stdlib.__Http2Wire.__u32 0L) else Ok () in
-        stopped |> Stdlib.Result.map (fun _unit -> Stdlib.__Http2Connection.__done work stream (Ok (Stdlib.HttpClient.Response { statusCode = Stdlib.Int.fromInt64 head.status,
+        stopped |> Stdlib.Result.map (fun _unit -> Stdlib.__Http2Connection.__done work stream (Ok (Stdlib.HttpClient.Response { statusCode = head.status,
           headers = head.headers, body = Stdlib.Blob.concat (Stdlib.List.reverse stream.blocks) }))))
 
 let __headers (transport: Stdlib.__HttpTransport.Transport) (work: Stdlib.__Http2Connection.Work) (frame: Stdlib.__Http2Wire.Frame) : Stdlib.Result.Result<Stdlib.__Http2Connection.Work, String> =
@@ -188,9 +188,9 @@ let __run (transport: Stdlib.__HttpTransport.Transport) (work: Stdlib.__Http2Con
         else Stdlib.__Http2Connection.__receive transport round.work |> Stdlib.Result.andThen (Stdlib.__Http2Connection.__run transport)))
 
 let requestMany (transport: Stdlib.__HttpTransport.Transport) (state: Stdlib.__Http2Connection.State) (requests: List<Stdlib.__Http2Connection.Request>) : Stdlib.Result.Result<Stdlib.__Http2Connection.Batch, String> =
-  if Stdlib.List.length requests > 32 || Stdlib.List.fold requests 0L (fun total request -> total + Stdlib.Blob.__byteLength request.body) > 104857600L then Error "HTTP/2 batch request limit exceeded"
+  if Stdlib.List.__lengthInt requests > 32 || Stdlib.List.fold requests 0L (fun total request -> total + Stdlib.Blob.__byteLength request.body) > 104857600L then Error "HTTP/2 batch request limit exceeded"
   else
     let state = { state with wire = { state.wire with frames = 0L } } in
     Stdlib.__Http2Connection.prepare transport state |> Stdlib.Result.andThen (fun state ->
-      let waiting = Stdlib.List.indexedMap requests (fun index request -> Stdlib.__Http2Connection.Pending { index = Stdlib.Int64.__fromIntUnchecked index, request = request }) in
+      let waiting = Stdlib.List.__indexedMapInt requests (fun index request -> Stdlib.__Http2Connection.Pending { index = Stdlib.Int64.__fromIntUnchecked index, request = request }) in
       Stdlib.__Http2Connection.__run transport (Stdlib.__Http2Connection.Work { connection = state, waiting = waiting, active = [], completed = [], total = 0L }))

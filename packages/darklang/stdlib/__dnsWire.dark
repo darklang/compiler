@@ -199,7 +199,7 @@ let __ipv4Parts (parts: List<String>) (acc: List<Int64>) : Stdlib.Option.Option<
 
 let ipv4 (value: String) : Stdlib.Option.Option<List<Int64>> =
     let parts = Stdlib.String.split value "." in
-    if Stdlib.List.length parts != 4 then None
+    if Stdlib.List.__lengthInt parts != 4 then None
     else Stdlib.__DnsWire.__ipv4Parts parts []
 
 let __hexGroup (value: String) (index: Int64) (length: Int64) (acc: Int64) : Stdlib.Option.Option<Int64> =
@@ -240,14 +240,14 @@ let ipv6 (value: String) : Stdlib.Option.Option<List<Int64>> =
     | None ->
         match Stdlib.__DnsWire.__splitGroups value with
         | Some groups ->
-            if Stdlib.List.length groups == 8 then Some (Stdlib.__DnsWire.__groupsToBytes groups []) else None
+            if Stdlib.List.__lengthInt groups == 8 then Some (Stdlib.__DnsWire.__groupsToBytes groups []) else None
         | None -> None
     | Some ((left, right)) ->
-        if Stdlib.String.contains right "::" then None
+        if Stdlib.String.__containsBytes right "::" then None
         else
             match (Stdlib.__DnsWire.__splitGroups left, Stdlib.__DnsWire.__splitGroups right) with
             | (Some leftGroups, Some rightGroups) ->
-                let missing = 8 - Stdlib.List.length leftGroups - Stdlib.List.length rightGroups in
+                let missing = 8 - Stdlib.List.__lengthInt leftGroups - Stdlib.List.__lengthInt rightGroups in
                 if missing < 1 then None
                 else
                     let groups = leftGroups @ Stdlib.__DnsWire.__zeros missing [] @ rightGroups in

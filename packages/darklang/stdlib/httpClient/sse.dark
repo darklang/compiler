@@ -18,16 +18,16 @@ module Sse =
 
   /// Split a `field: value` line into its two parts.
   let splitField (line: String) : (String * String) =
-    match Stdlib.String.indexOf line ":" with
+    match Stdlib.String.__indexOfInt line ":" with
     | None -> (line, "")
     | Some idx ->
-      let field = Stdlib.String.slice line 0 idx
+      let field = Stdlib.String.__sliceInt line 0 idx
       let afterColon =
-        Stdlib.String.slice line (idx + 1) (Stdlib.String.length line)
+        Stdlib.String.__sliceInt line (idx + 1) (Stdlib.String.__lengthInt line)
 
       let value =
         if Stdlib.String.startsWith afterColon " " then
-          Stdlib.String.dropFirst afterColon 1
+          Stdlib.String.__dropFirstInt afterColon 1
         else
           afterColon
 
@@ -98,7 +98,7 @@ module Sse =
             | Ok s -> s
             | Error _ -> ""
 
-          Stdlib.List.append state.currentLines [ tailLine ]
+          Stdlib.List.concat state.currentLines [ tailLine ]
 
       if Stdlib.List.isEmpty pending then
         Stdlib.Option.Option.None
@@ -145,7 +145,7 @@ module Sse =
           let nextState =
             ParseState
               { lastId = state.lastId
-                currentLines = Stdlib.List.append state.currentLines [ line ]
+                currentLines = Stdlib.List.concat state.currentLines [ line ]
                 currentLine = [] }
 
           pullNextEvent bytes nextState
@@ -154,7 +154,7 @@ module Sse =
           ParseState
             { lastId = state.lastId
               currentLines = state.currentLines
-              currentLine = Stdlib.List.append state.currentLine [ b ] }
+              currentLine = Stdlib.List.concat state.currentLine [ b ] }
 
         pullNextEvent bytes nextState
 

@@ -82,11 +82,8 @@ compiler needs them.
 
 ## Observable behavior
 
-- `set` fails if the key already exists. The native error includes the dynamic
-  key, for example: "Cannot add two dictionary entries with the same key
-  `key`".
-- `setOverridingDuplicates` replaces an existing value.
-- `fromList` returns `None` on any duplicate.
+- `set` and `setOverridingDuplicates` replace an existing value.
+- `fromList` returns a Dict and the last occurrence of a key wins.
 - `fromListOverwritingDuplicates` returns a Dict and the last occurrence wins.
 - `merge` is right-biased; removing an absent key is a no-op.
 - `get` returns `Some(value)` or `None`.

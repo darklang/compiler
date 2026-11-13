@@ -27,7 +27,7 @@ let stdinIsInteractive () : Bool =
 let cliTerminalInspectRow (text: String) : (Int * Bool) =
     // This measures plain text: escape payloads are not stripped. Control
     // detection also recognizes the single CRLF grapheme cluster.
-    let width = Stdlib.String.displayWidth text in
+    let width = Stdlib.String.__displayWidthInt text in
     let controls = Stdlib.List.any (Stdlib.String.toList text) Stdlib.Cli.Tui.Text.__isControl in
     (width, controls)
 

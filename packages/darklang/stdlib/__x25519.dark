@@ -15,7 +15,7 @@ type LadderState = {
 }
 
 let __at (limbs: List<Int64>) (index: Int64) : Int64 =
-  match Stdlib.List.getAt limbs (Stdlib.Int.fromInt64 index) with
+  match Stdlib.List.__getAtInt limbs (Stdlib.Int.fromInt64 index) with
   | Some limb -> limb
   | None -> Builtin.crash "Invalid X25519 field shape"
 
@@ -28,7 +28,7 @@ let __constant (value: Int64) : Stdlib.__X25519.Field =
 let __combine (left: Stdlib.__X25519.Field) (right: Stdlib.__X25519.Field)
   (subtract: Bool) : Stdlib.__X25519.Field =
   Stdlib.__X25519.__field
-    (Stdlib.List.map2shortest left.limbs right.limbs
+    (Stdlib.List.map2Shortest left.limbs right.limbs
       (fun a b -> if subtract then a - b else a + b))
 
 let __add (left: Stdlib.__X25519.Field) (right: Stdlib.__X25519.Field)
@@ -182,7 +182,7 @@ let __subtractPrime (source: List<Int64>) (index: Int64)
 
 let __choose (original: List<Int64>) (candidate: List<Int64>)
   (chooseCandidate: Int64) : List<Int64> =
-  Stdlib.List.map2shortest original candidate (fun old replacement ->
+  Stdlib.List.map2Shortest original candidate (fun old replacement ->
     let mask = 0L - chooseCandidate in
     Stdlib.Int64.bitwiseXor old
       (Stdlib.Int64.bitwiseAnd mask (Stdlib.Int64.bitwiseXor old replacement)))

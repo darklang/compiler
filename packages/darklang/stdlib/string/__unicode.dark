@@ -176,7 +176,7 @@ let __decomposeList (codepoints: List<Int64>) (acc: List<Int64>) : List<Int64> =
     | [] -> Stdlib.List.reverse acc
     | codepoint :: rest ->
         let expanded = Stdlib.String.__Unicode.__decomposeCodepoint codepoint in
-        Stdlib.String.__Unicode.__decomposeList rest (Stdlib.List.append (Stdlib.List.reverse expanded) acc)
+        Stdlib.String.__Unicode.__decomposeList rest (Stdlib.List.concat (Stdlib.List.reverse expanded) acc)
 
 let __insertCanonical (codepoint: Int64) (ccc: Int64) (segment: List<Int64>) : List<Int64> =
     match segment with
@@ -188,13 +188,13 @@ let __insertCanonical (codepoint: Int64) (ccc: Int64) (segment: List<Int64>) : L
 
 let __reorder (codepoints: List<Int64>) (segment: List<Int64>) (acc: List<Int64>) : List<Int64> =
     match codepoints with
-    | [] -> Stdlib.List.append (Stdlib.List.reverse acc) segment
+    | [] -> Stdlib.List.concat (Stdlib.List.reverse acc) segment
     | codepoint :: rest ->
         let ccc = Stdlib.String.__Unicode.combiningClass codepoint in
         if ccc == 0L then
             // Completed segments are accumulated backwards: appending to the
             // entire prefix made ordinary large ASCII captures quadratic.
-            Stdlib.String.__Unicode.__reorder rest ([codepoint]) (Stdlib.List.append (Stdlib.List.reverse segment) acc)
+            Stdlib.String.__Unicode.__reorder rest ([codepoint]) (Stdlib.List.concat (Stdlib.List.reverse segment) acc)
         else
             Stdlib.String.__Unicode.__reorder rest (Stdlib.String.__Unicode.__insertCanonical codepoint ccc segment) acc
 
@@ -390,7 +390,7 @@ let __mapCase (codepoints: List<Int64>) (uppercase: Bool) (acc: List<Int64>) : L
     | [] -> Stdlib.List.reverse acc
     | codepoint :: rest ->
         let mapped = if uppercase then Stdlib.String.__Unicode.uppercaseCodepoint codepoint else Stdlib.String.__Unicode.lowercaseCodepoint codepoint in
-        Stdlib.String.__Unicode.__mapCase rest uppercase (Stdlib.List.append (Stdlib.List.reverse mapped) acc)
+        Stdlib.String.__Unicode.__mapCase rest uppercase (Stdlib.List.concat (Stdlib.List.reverse mapped) acc)
 
 let __hasFollowingCased (value: String) (index: Int64) : Bool =
     if index == Stdlib.String.__byteLength value then false
@@ -421,7 +421,7 @@ let __mapCaseUtf8 (value: String) (index: Int64) (uppercase: Bool) (full: Bool) 
                 if Stdlib.String.__Unicode.__Data.isCased codepoint then true
                 else if Stdlib.String.__Unicode.__Data.isCaseIgnorable codepoint then previousCased
                 else false in
-            Stdlib.String.__Unicode.__mapCaseUtf8 value (index + width) uppercase full nextPreviousCased (Stdlib.List.append (Stdlib.List.reverse mapped) acc)
+            Stdlib.String.__Unicode.__mapCaseUtf8 value (index + width) uppercase full nextPreviousCased (Stdlib.List.concat (Stdlib.List.reverse mapped) acc)
 
 let uppercase (value: String) : String =
     Stdlib.String.__Unicode.normalizeValid (Stdlib.String.__fromCodepointsRaw (Stdlib.String.__Unicode.__mapCaseUtf8 value 0L true false false []))

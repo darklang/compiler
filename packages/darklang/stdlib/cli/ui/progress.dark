@@ -2,7 +2,7 @@
 
 module Darklang.Stdlib.Cli.UI.Progress
 
-let bar (current: Int) (total: Int) (label: String) : Unit =
+let __barInt (current: Int) (total: Int) (label: String) : Unit =
     // Compiler String/List internals still take Int64. Keep that adaptation
     // private while retaining the interpreter's public Int signature.
     let current64 = Stdlib.Int.__toInt64Unchecked current in
@@ -11,9 +11,12 @@ let bar (current: Int) (total: Int) (label: String) : Unit =
     let filled =
         if total64 == 0L then 0L else (current64 * width) / total64 in
     let empty = width - filled in
-    let filledStr = Stdlib.String.repeat "#" (Stdlib.Int.fromInt64 filled) in
-    let emptyStr = Stdlib.String.repeat "-" (Stdlib.Int.fromInt64 empty) in
+    let filledStr = Stdlib.String.__repeatInt "#" (Stdlib.Int.fromInt64 filled) in
+    let emptyStr = Stdlib.String.__repeatInt "-" (Stdlib.Int.fromInt64 empty) in
     let pct =
         if total64 == 0L then 0L else (current64 * 100L) / total64 in
     let _ = Builtin.print ($"\r[{filledStr}{emptyStr}] {Stdlib.Int64.toString pct}% {label}") in
     if current64 >= total64 then Builtin.printLine "" else ()
+
+let bar (current: Int64) (total: Int64) (label: String) : Unit =
+  Stdlib.Cli.UI.Progress.__barInt (Stdlib.Int.fromInt64 current) (Stdlib.Int.fromInt64 total) label

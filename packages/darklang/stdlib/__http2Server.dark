@@ -87,7 +87,7 @@ let reset (state: Stdlib.__Http2Server.State) (id: Int64) : Stdlib.Result.Result
       outputs = Stdlib.List.filter state.outputs (fun output -> output.stream != id) }
 
 let __response (config: Stdlib.HttpServer.Config.Config) (method: String) (response: Stdlib.Http.Response) : Stdlib.Result.Result<Stdlib.__Http2Server.Reply, String> =
-  match Stdlib.Int.toInt64 response.statusCode with
+  match Stdlib.Option.Option.Some response.statusCode with
   | None -> Error "Invalid HTTP response status"
   | Some status ->
     if status < 200L || status > 599L || Stdlib.Blob.__byteLength response.body > 104857600L then Error "Invalid HTTP response status or body limit"
@@ -104,7 +104,7 @@ let __frame (kind: Int64) (flags: Int64) (id: Int64) (payload: Blob) (after: Std
     Stdlib.__Http2Server.Output { stream = id, bytes = bytes, offset = 0L, after = after })
 let __queuedBytes (outputs: List<Stdlib.__Http2Server.Output>) : Int64 = Stdlib.List.fold outputs 0L (fun total output -> total + Stdlib.Blob.__byteLength output.bytes)
 let __queue (state: Stdlib.__Http2Server.State) (output: Stdlib.__Http2Server.Output) : Stdlib.Result.Result<Stdlib.__Http2Server.State, Stdlib.__Http2Server.Failure> =
-  if Stdlib.List.length state.outputs >= 256 || Stdlib.__Http2Server.__queuedBytes state.outputs + Stdlib.Blob.__byteLength output.bytes > 262144L then Error (Stdlib.__Http2Server.__connection 11L "HTTP/2 control output budget exhausted")
+  if Stdlib.List.__lengthInt state.outputs >= 256 || Stdlib.__Http2Server.__queuedBytes state.outputs + Stdlib.Blob.__byteLength output.bytes > 262144L then Error (Stdlib.__Http2Server.__connection 11L "HTTP/2 control output budget exhausted")
   else Ok { state with outputs = state.outputs @ [output] }
 
 // Reserve credit once, keeping the same serialized frame through partial writes.
@@ -355,7 +355,7 @@ let reject (state: Stdlib.__Http2Server.State) (failure: Stdlib.__Http2Server.Fa
 let __reply (context: Stdlib.__Http2Server.Context) (state: Stdlib.__Http2Server.State) (stream: Stdlib.__Http2Server.Active) (method: String) (response: Stdlib.Http.Response) (now: Int64) : Stdlib.Result.Result<Stdlib.__Http2Server.State, Stdlib.__Http2Server.Failure> =
   let reply = match Stdlib.__Http2Server.__response context.config method response with
     | Ok reply -> Ok reply
-    | Error _ -> Stdlib.__Http2Server.__response context.config method (Stdlib.Http.responseWithText "500 Internal Server Error" 500) in
+    | Error _ -> Stdlib.__Http2Server.__response context.config method (Stdlib.Http.__responseWithTextInt "500 Internal Server Error" 500) in
   reply |> Stdlib.Result.mapError (fun message -> Stdlib.__Http2Server.__connection 2L message) |> Stdlib.Result.andThen (fun reply ->
     let total = state.total - Stdlib.__Http2Server.__messageSize stream.message + Stdlib.Blob.__byteLength reply.body in
     if total > 104857600L then Error (Stdlib.__Http2Server.__connection 11L "HTTP/2 retained body budget exhausted")
@@ -372,12 +372,12 @@ let dispatch (context: Stdlib.__Http2Server.Context) (state: Stdlib.__Http2Serve
         let valid = match input.expected with | None -> true | Some expected -> expected == input.total in
         if Stdlib.Bool.not valid then Error (Stdlib.__Http2Server.__stream id 1L "HTTP/2 Content-Length mismatch")
         else
-          let request = Stdlib.Http.Request { url = input.head.url, headers = Stdlib.List.push input.head.headers ("x-http-method", input.head.method), body = Stdlib.Blob.concat (Stdlib.List.reverse input.blocks) } in
+          let request = Stdlib.Http.Request { method = input.head.method, url = input.head.url, headers = Stdlib.List.push input.head.headers ("x-http-method", input.head.method), body = Stdlib.Blob.concat (Stdlib.List.reverse input.blocks) } in
           Stdlib.__Http2Server.__reply context state stream input.head.method (context.handler request) now
 
 let applyHeaders (context: Stdlib.__Http2Server.Context) (state: Stdlib.__Http2Server.State) (head: Stdlib.__Http2Server.Decoded) (now: Int64) : Stdlib.Result.Result<Stdlib.__Http2Server.State, Stdlib.__Http2Server.Failure> =
   if head.fresh then
-    if state.draining || Stdlib.List.length state.streams >= 32 then Error (Stdlib.__Http2Server.__stream head.id 7L "HTTP/2 stream refused")
+    if state.draining || Stdlib.List.__lengthInt state.streams >= 32 then Error (Stdlib.__Http2Server.__stream head.id 7L "HTTP/2 stream refused")
     else if state.opened > 1024L then
       Stdlib.__Http2Server.__goAway state 0L false |> Stdlib.Result.andThen (fun next -> Stdlib.__Http2Server.reject next (Stdlib.__Http2Server.__stream head.id 7L "HTTP/2 stream lifetime limit"))
     else
@@ -387,7 +387,7 @@ let applyHeaders (context: Stdlib.__Http2Server.Context) (state: Stdlib.__Http2S
           let stream = Stdlib.__Http2Server.Active { id = head.id, window = state.wire.initialWindow, receiveWindow = 65535L, ended = head.ended, deadline = now + 10000L, message = Stdlib.__Http2Server.Message.Receiving input } in
           let next = { state with streams = state.streams @ [stream], accepted = head.id } in
           let oversized = match expected with | None -> false | Some expected -> expected > context.limit in
-          if oversized then Stdlib.__Http2Server.__reply context next stream request.method (Stdlib.Http.responseWithText "413 Payload Too Large" 413) now
+          if oversized then Stdlib.__Http2Server.__reply context next stream request.method (Stdlib.Http.__responseWithTextInt "413 Payload Too Large" 413) now
           else Stdlib.__Http2Server.dispatch context next head.id now))
   else match Stdlib.__Http2Server.__find state head.id with
     | None -> Ok state
@@ -411,7 +411,7 @@ let __body (context: Stdlib.__Http2Server.Context) (state: Stdlib.__Http2Server.
     | Receiving input ->
       let size = Stdlib.Blob.__byteLength bytes in
       let total = input.total + size in
-      if total > context.limit then Stdlib.__Http2Server.__reply context state { stream with ended = ended } input.head.method (Stdlib.Http.responseWithText "413 Payload Too Large" 413) now
+      if total > context.limit then Stdlib.__Http2Server.__reply context state { stream with ended = ended } input.head.method (Stdlib.Http.__responseWithTextInt "413 Payload Too Large" 413) now
       else if state.total + size > 104857600L then Error (Stdlib.__Http2Server.__connection 11L "HTTP/2 retained body budget exhausted")
       else
         let valid = match input.expected with | None -> true | Some expected -> total <= expected in
@@ -467,7 +467,7 @@ let __expire (context: Stdlib.__Http2Server.Context) (state: Stdlib.__Http2Serve
     let updated =
       if now < stream.deadline then Ok state
       else match stream.message with
-        | Receiving input -> Stdlib.__Http2Server.__reply context state stream input.head.method (Stdlib.Http.responseWithText "408 Request Timeout" 408) now
+        | Receiving input -> Stdlib.__Http2Server.__reply context state stream input.head.method (Stdlib.Http.__responseWithTextInt "408 Request Timeout" 408) now
         | Responding _ ->
           let writing = match state.current with | None -> false | Some output -> output.stream == stream.id in
           if writing then Error (Stdlib.__Http2Server.__connection 2L "HTTP/2 partial response write timed out")

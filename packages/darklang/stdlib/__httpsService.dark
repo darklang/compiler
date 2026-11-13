@@ -70,7 +70,7 @@ let __parameter (state: Stdlib.__HttpsService.Parameters) (key: Int64) (data: Bl
 let __parameters (data: Blob) (position: Int64) (previous: Int64) (state: Stdlib.__HttpsService.Parameters)
   : Stdlib.Result.Result<Stdlib.__HttpsService.Parameters, String> =
   if position == Stdlib.Blob.__byteLength data then Ok state
-  else if Stdlib.List.length state.seen >= 64 then Error "Too many HTTPS service parameters"
+  else if Stdlib.List.__lengthInt state.seen >= 64 then Error "Too many HTTPS service parameters"
   else if Stdlib.Blob.__byteLength data - position < 4L then Error "Truncated HTTPS service parameter"
   else
     let key = Stdlib.__DnsWire.__u16 data position in

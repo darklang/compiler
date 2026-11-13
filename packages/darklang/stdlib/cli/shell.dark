@@ -15,7 +15,7 @@ let getDefaultShell () : Stdlib.Result.Result<Shell, String> =
       match Stdlib.String.trim shell with
       | "/bin/bash" -> Stdlib.Result.Result.Ok Shell.Shell.Bash
       | "/bin/zsh" -> Stdlib.Result.Result.Ok Shell.Shell.Zsh
-      | shell when shell |> Stdlib.String.contains "/fish" ->
+      | shell when shell |> Stdlib.String.__containsBytes "/fish" ->
         Stdlib.Result.Result.Ok Shell.Shell.Fish
       | _ ->
         Stdlib.Result.Result.Error
@@ -26,9 +26,9 @@ let getDefaultShell () : Stdlib.Result.Result<Shell, String> =
     |> Stdlib.Result.andThen (fun shell ->
       match Stdlib.String.trim shell with
       | "/bin/zsh" -> Stdlib.Result.Result.Ok Shell.Shell.Zsh
-      | shell when shell |> Stdlib.String.contains "/bin/bash" ->
+      | shell when shell |> Stdlib.String.__containsBytes "/bin/bash" ->
         Stdlib.Result.Result.Ok Shell.Shell.Bash
-      | shell when shell |> Stdlib.String.contains "/fish" ->
+      | shell when shell |> Stdlib.String.__containsBytes "/fish" ->
         Stdlib.Result.Result.Ok Shell.Shell.Fish
       | _ ->
         Stdlib.Result.Result.Error
