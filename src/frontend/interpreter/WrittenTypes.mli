@@ -122,6 +122,7 @@ type matchPattern =
   | MPList of range * (matchPattern * range option) list * range * range
   | MPListCons of range * matchPattern * matchPattern * range
   | MPOr of range * matchPattern list
+  | MPUnsupported of range * string
   | MPError of range
 
 type stringSegment =

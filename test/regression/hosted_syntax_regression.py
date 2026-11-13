@@ -84,6 +84,19 @@ ENTITIES["builtin-poly-hash"] = fn("Hosted.builtinPoly", [("x", INT64)], {"TBool
                                 {"EInt64": [4, 3]}), builtin("modulo", ARG0, {"EInt64": [5, 4]})))
 
 
+# A `Builtin.negate` the interpreter saved resolved to the Negate trait's method,
+# and (x & 12) | (x ^ 3) << 1 >> 1 through the polymorphic bitwise builtins.
+NEGATE_AS_TRAIT = {"EFnName": [1, dict(originalName=["Builtin", "negate"],
+    resolved={"Ok": [dict(location={"Some": [dict(owner="Darklang", modules=["Stdlib"], name="Negate")]},
+        name={"TraitMethod": [dict(method_="negate", trait_={"Hash": ["negate-trait-hash"]},
+                                   implFn={"Chosen": [dict(location={"None": []},
+                                                           name={"Hash": ["builtin-bitwise-hash"]})]})]})]}), []]}
+ENTITIES["builtin-bitwise-hash"] = fn("Hosted.builtinBitwise", [("x", INT64)], {"TInt64": []},
+    {"EApply": [2, NEGATE_AS_TRAIT, [], [builtin("bitwiseOr", builtin("bitwiseAnd", ARG0, {"EInt64": [3, 12]}),
+        builtin("shiftRight", builtin("shiftLeft", builtin("bitwiseXor", ARG0, {"EInt64": [4, 3]}),
+                                      {"EInt64": [5, 1]}), {"EInt64": [6, 1]}))]]})
+
+
 # (2 ** x) / 100 % 10, through the Power, Divide, Mod and ToString builtins.
 ENTITIES["builtin-more-hash"] = fn("Hosted.builtinMore", [("x", INT64)], {"TString": []},
     builtin("int64ToString", builtin("int64Mod", builtin("int64Divide",
@@ -322,6 +335,7 @@ def main():
             assert run("Hosted.builtinOps 52L\n") is False
             assert run("Hosted.builtinPoly 2L\n") is True
             assert run("Hosted.builtinPoly 0L\n") is False
+            assert run("Hosted.builtinBitwise 13L\n") == -14
             assert str(run("Hosted.doubleBig 12345678901234567890\n")) == "24691357802469135780"
             assert run("Hosted.isHalf 0.5\n") is True
             assert run("Hosted.isHalf 0.25\n") is False

@@ -1,0 +1,13 @@
+// A paren list written directly against a parenthesized function value passes
+// each element as its own argument, as it does for a named function: the
+// operator section in `(==)(a, b)` compares a and b.
+
+(==)(1L, 1L) = true
+(!=)(1L, 2L) = true
+(+)(1L, 2L) = 3L
+(<)(2L, 1L) = false
+(==)(1Q, 1Q) = true
+(==)("a", "b") = false
+(fun(a, b) -> a * b)(6L, 7L) = 42L
+(fun a -> a + 1L)(41L) = 42L
+Stdlib.List.map([1L, 2L], fun x -> (+)(x, 1L)) = [2L, 3L]

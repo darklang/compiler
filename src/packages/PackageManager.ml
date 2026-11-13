@@ -316,8 +316,20 @@ let rec resolvedName element =
   Result.map (fun name -> hostedName (publicName name)) (resolvedNameAsWritten element)
 
 and resolvedNameAsWritten element =
-  match (tryField "resolved" element, tryField "originalName" element) with
-  | Some resolved, Some originalName -> (
+  let writtenBuiltin =
+    match Option.map arrayItems (tryField "originalName" element) with
+    | Some [ owner; name ] -> (
+        match (stringValue owner, stringValue name) with
+        | Ok "Builtin", Ok name -> Some ("Builtin." ^ name)
+        | _ -> None)
+    | _ -> None
+  in
+  match (writtenBuiltin, tryField "resolved" element, tryField "originalName" element) with
+  (* A call written `Builtin.negate` is the builtin, however it was saved: the
+     interpreter can save it resolved to the trait method of the same name,
+     with the calling impl fn itself as the chosen implementation. *)
+  | Some builtin, _, _ -> Ok builtin
+  | None, Some resolved, Some originalName -> (
       let* name, fields = enumCase resolved in
       match (name, fields) with
       | "Ok", [ value ] -> (
@@ -653,7 +665,8 @@ let builtinOperator name =
       ("add", "+"); ("subtract", "-"); ("multiply", "*"); ("divide", "/");
       ("modulo", "%"); ("power", "**"); ("lessThan", "<");
       ("lessThanOrEqualTo", "<="); ("greaterThan", ">");
-      ("greaterThanOrEqualTo", ">=");
+      ("greaterThanOrEqualTo", ">="); ("bitwiseAnd", "&"); ("bitwiseOr", "|");
+      ("bitwiseXor", "^"); ("shiftLeft", "<<"); ("shiftRight", ">>");
     ]
   in
   let polymorphicUnary = [ ("negate", "-"); ("bitwiseNot", "~") ] in

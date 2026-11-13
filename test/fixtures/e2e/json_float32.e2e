@@ -1,0 +1,8 @@
+// Float32 values write to JSON as numbers in their own shortest form, as the
+// interpreter writes them, and read back from JSON numbers.
+
+Stdlib.Json.serialize<Float32> 0.1f32 = "0.1"
+Stdlib.Json.serialize<List<Float32>> [1.5f32, -0.0f32, 1e30f32, 100000000.0f32, 16777216.0f32, 3.0f32, 1e-7f32] = "[1.5,-0.0,1e+30,100000000.0,16777216.0,3.0,1e-7]"
+Stdlib.Json.serialize<Float32> (0.0f32 / 0.0f32) = "\"NaN\""
+Stdlib.Json.parse<Float32> "0.1" = Stdlib.Result.Result.Ok 0.1f32
+Stdlib.Json.parse<List<Float32>> "[1.5, -2]" = Stdlib.Result.Result.Ok [1.5f32, -2.0f32]

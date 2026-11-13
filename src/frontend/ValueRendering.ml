@@ -40,29 +40,84 @@ let resolveFunction symbols name =
 let call symbols name values = C.Call (resolveFunction symbols name, args values)
 
 (* `--syntax=current`: render as the current interpreter's `dark eval` prints.
-   An Option or Result case is bare (`Some(41)`); other types drop the owner
-   and type arguments (`Stdlib.Math.Overflow.Overflow`); integers other than
-   Int64 keep their suffix (`5u8`, `1z`); records keep declaration order; a
-   top-level String prints raw and a top-level Unit prints nothing. *)
+   An Option or Result case is bare (`Some(41)`); a Stdlib type drops the
+   `Darklang` owner (`Stdlib.Math.Overflow.Overflow`) and other package types
+   keep it; a generic type shows its arguments (`Scope<Int64>.Only(443)`);
+   integers other than Int64 keep their suffix (`5u8`, `1z`); DateTimes print
+   as `<DateTime: ...>`; records keep declaration order; a top-level String
+   prints raw and a top-level Unit prints nothing. *)
 let evalDisplay = ref false
+
+(* The interpreter's PrettyPrinter.shortenName from the root module: only the
+   `Darklang` owner in front of `Stdlib` comes off, and the parser's
+   scaffolding owners (`Tests`, `CliScript`) are not printed. *)
+let evalTypeName name =
+  match String.split_on_char '.' name with
+  | "Darklang" :: ("Stdlib" :: _ as rest) -> String.concat "." rest
+  | ("Tests" | "CliScript" | "") :: (_ :: _ as rest) -> String.concat "." rest
+  | _ -> name
+
+(* A type argument as the interpreter's valueType prints it: `_` where the
+   type is not known, `(A * B)` for a tuple, and custom types by full name. *)
+let rec evalTypeArgText typ =
+  match typ with
+  | TVar _ | TInferenceVar _ -> "_"
+  | TInt -> "BigInt"
+  | TBlob -> "Bytes"
+  | TTuple elems -> "(" ^ String.concat " * " (List.map evalTypeArgText elems) ^ ")"
+  | TList elem -> "List<" ^ evalTypeArgText elem ^ ">"
+  | TStream elem -> "Stream<" ^ evalTypeArgText elem ^ ">"
+  | TDict (key, value) ->
+      "Dict<" ^ evalTypeArgText key ^ ", " ^ evalTypeArgText value ^ ">"
+  | TFunction (params, result) ->
+      let grouped text =
+        if Text.contains text " -> " then "(" ^ text ^ ")" else text
+      in
+      let result = grouped (evalTypeArgText result) in
+      (match params with
+      | [ only ] -> grouped (evalTypeArgText only)
+      | params -> "(" ^ String.concat ", " (List.map evalTypeArgText params) ^ ")")
+      ^ " -> " ^ result
+  | TRecord (name, []) | TSum (name, []) -> name
+  | TRecord (name, args) | TSum (name, args) ->
+      name ^ "<" ^ String.concat ", " (List.map evalTypeArgText args) ^ ">"
+  | _ -> CheckingDiagnostics.typeToString typ
+
+let rec typeVariables = function
+  | TVar name | TInferenceVar (_, name) -> [ name ]
+  | TList elem | TStream elem -> typeVariables elem
+  | TDict (key, value) -> typeVariables key @ typeVariables value
+  | TFunction (params, result) ->
+      List.concat_map typeVariables params @ typeVariables result
+  | TTuple elems -> List.concat_map typeVariables elems
+  | TRecord (_, args) | TSum (_, args) -> List.concat_map typeVariables args
+  | _ -> []
+
+(* The interpreter knows a value's type arguments from what it holds, so a
+   parameter that none of the shown fields mention prints as `_`:
+   `MyOpt<_>.Nothing`, `MyOpt<Int64>.Just(1)`. *)
+let evalTypeArgs typeParams typeArgs fieldTypes =
+  if typeArgs = [] || List.length typeParams <> List.length typeArgs then ""
+  else
+    let used = List.concat_map typeVariables fieldTypes in
+    "<"
+    ^ String.concat ", "
+        (List.map2
+           (fun param arg ->
+             if List.mem param used then evalTypeArgText arg else "_")
+           typeParams typeArgs)
+    ^ ">"
 
 let displayTypeText typ =
   let text = CheckingDiagnostics.typeToString typ in
   if not !evalDisplay then text
   else
-    let base =
-      match String.index_opt text '<' with
-      | Some index -> String.sub text 0 index
-      | None -> text
-    in
-    let base =
-      if String.starts_with ~prefix:"Darklang." base then
-        String.sub base 9 (String.length base - 9)
-      else base
-    in
-    match base with
-    | "Stdlib.Option.Option" | "Stdlib.Result.Result" -> ""
-    | _ -> base
+    match typ with
+    | TRecord (name, _) | TSum (name, _) -> (
+        match name with
+        | "Darklang.Stdlib.Option.Option" | "Darklang.Stdlib.Result.Result" -> ""
+        | _ -> evalTypeName name)
+    | _ -> text
 
 let casePrefix typeText = if typeText = "" then "" else typeText ^ "."
 
@@ -119,6 +174,12 @@ let runtimeFunctionNames =
     "Darklang.Stdlib.Float32.__display";
     "Darklang.Stdlib.Blob.__evalDisplay";
     "Darklang.Stdlib.Decimal.__display";
+    "Darklang.Stdlib.List.push";
+    "Darklang.Stdlib.Pretty.concat";
+    "Darklang.Stdlib.Pretty.render";
+    "Darklang.Stdlib.Pretty.text";
+    "Darklang.Stdlib.Pretty.__valueBraced";
+    "Darklang.Stdlib.Pretty.__valueBracketed";
   ]
 
 let applySubstitution subst typ =
@@ -387,7 +448,12 @@ and renderBody env typ value state =
   | TString -> (escapedString state.symbols "\"" value, state)
   | TChar -> (escapedString state.symbols "'" value, state)
   | TDateTime ->
-      (call state.symbols "Darklang.Stdlib.DateTime.toString" [ value ], state)
+      let text = call state.symbols "Darklang.Stdlib.DateTime.toString" [ value ] in
+      ( (if !evalDisplay then
+           concat state.symbols
+             [ C.StringLiteral "<DateTime: "; text; C.StringLiteral ">" ]
+         else text),
+        state )
   | TTuple elems ->
       let items =
         List.mapi (fun index typ -> (typ, C.TupleAccess (value, index))) elems
@@ -519,7 +585,13 @@ and renderBody env typ value state =
                    ])
                  renderedFields)
           in
-          let typeText = displayTypeText typ in
+          let typeText =
+            if !evalDisplay then
+              displayTypeText typ
+              ^ evalTypeArgs typeParams typeArgs
+                  (List.map snd recordInfo.Types.fields)
+            else displayTypeText typ
+          in
           let short =
             concat next.symbols
               ((C.StringLiteral (typeText ^ " { ") :: parts ", ")
@@ -562,6 +634,14 @@ and renderBody env typ value state =
       | Some sumInfo ->
           let subst = typeSubstitution sumInfo.Types.typeParams typeArgs in
           let typeText = displayTypeText typ in
+          let casePrefix (variant : Types.sumVariantInfo) =
+            if !evalDisplay && typeText <> "" then
+              casePrefix
+                (typeText
+                ^ evalTypeArgs sumInfo.Types.typeParams typeArgs
+                    variant.Types.fields)
+            else casePrefix typeText
+          in
           let rec buildCases remaining current acc =
             match remaining with
             | [] -> (List.rev acc, current)
@@ -571,7 +651,7 @@ and renderBody env typ value state =
                     let case =
                       makeCase
                         (constructorPattern typeName variant current.symbols [])
-                        (C.StringLiteral (casePrefix typeText ^ variant.Types.name))
+                        (C.StringLiteral (casePrefix variant ^ variant.Types.name))
                     in
                     buildCases rest current (case :: acc)
                 | fieldTypes ->
@@ -611,7 +691,7 @@ and renderBody env typ value state =
                     let body =
                       concat next.symbols
                         (C.StringLiteral
-                           (casePrefix typeText ^ variant.Types.name ^ "(")
+                           (casePrefix variant ^ variant.Types.name ^ "(")
                          :: separated
                         @ [ C.StringLiteral ")" ])
                     in
@@ -650,6 +730,329 @@ and renderBody env typ value state =
       Crash.crash
         ("Unresolved inference variable in value renderer: " ^ displayName)
 
+(* `--syntax=current` lays a result out as `dark eval` does: each tuple, list,
+   dict, record and case payload is a Stdlib.Pretty group that stays on one
+   line when it fits in 80 columns and otherwise puts one item per line,
+   indented by two. Scalars are text from the renderers above. *)
+let docType = TSum ("Darklang.Stdlib.Pretty.Doc", [])
+let docRendererName = hashed "__dark_render_doc_"
+let docItemsRendererName = hashed "__dark_render_doc_items_"
+let docEntriesRendererName = hashed "__dark_render_doc_entries_"
+let evalRendererName = hashed "__dark_render_eval_"
+
+let docFunctionDef id name parameter parameterType returnType =
+  {
+    (functionDef id name parameter parameterType) with
+    C.returnType = C.checkedType returnType;
+    bodyType = C.checkedType returnType;
+  }
+
+let docText symbols expr = call symbols "Darklang.Stdlib.Pretty.text" [ expr ]
+
+let docConcat symbols left right =
+  call symbols "Darklang.Stdlib.Pretty.concat" [ left; right ]
+
+let docBracketed symbols opening closing parts =
+  call symbols "Darklang.Stdlib.Pretty.__valueBracketed"
+    [ C.StringLiteral opening; C.StringLiteral closing; parts ]
+
+let docBraced symbols opening closing parts =
+  call symbols "Darklang.Stdlib.Pretty.__valueBraced"
+    [ C.StringLiteral opening; C.StringLiteral closing; parts ]
+
+let docPush symbols list value =
+  C.TypeApp
+    ( resolveFunction symbols "Darklang.Stdlib.List.push",
+      C.checkedTypeArgs [ docType ],
+      args [ list; value ] )
+
+(* Reserve a generated function, build its body, and record it. *)
+let generated name parameterType returnType (state : renderState) build =
+  match M.find_opt name state.functions with
+  | Some _ -> (name, state)
+  | None ->
+      let functionId, symbols = C.internFunction name state.symbols in
+      let state = { state with symbols } in
+      let parameter, state = freshBinding "__value" state in
+      let reservedDefinition =
+        docFunctionDef functionId name parameter parameterType returnType
+      in
+      let reserved =
+        { state with functions = M.add name reservedDefinition state.functions }
+      in
+      let body, (built : renderState) = build (C.Local parameter) reserved in
+      ( name,
+        {
+          built with
+          functions =
+            M.add name { reservedDefinition with C.body } built.functions;
+        } )
+
+let rec ensureDocRenderer env typ state =
+  let typ = canonicalRenderType env typ in
+  generated (docRendererName typ) typ docType state (fun value state ->
+      docBody env typ value state)
+
+and docCall env typ value state =
+  match typ with
+  | TVar _ | TInferenceVar _ ->
+      (C.RuntimeError "Cannot render an uninhabited type parameter", state)
+  | _ ->
+      let name, next = ensureDocRenderer env typ state in
+      (call next.symbols name [ value ], next)
+
+and docList env items state =
+  let rec loop remaining current acc =
+    match remaining with
+    | [] -> (C.ListLiteral (List.rev acc), current)
+    | (typ, expr) :: rest ->
+        let doc, next = docCall env typ expr current in
+        loop rest next (doc :: acc)
+  in
+  loop items state []
+
+(* A List<T> as the List<Doc> of its items, in order. *)
+and ensureDocItemsRenderer env elemType state =
+  let listType = TList elemType in
+  generated (docItemsRendererName listType) listType (TList docType) state
+    (fun items state ->
+      let name = docItemsRendererName listType in
+      let headId, state = freshBinding "__head" state in
+      let tailId, state = freshBinding "__tail" state in
+      let head, state = docCall env elemType (C.Local headId) state in
+      let rest = call state.symbols name [ C.Local tailId ] in
+      ( C.Match
+          ( items,
+            args
+              [
+                makeCase (C.PList []) (C.ListLiteral []);
+                makeCase
+                  (C.PListCons ([ C.PVariable headId ], C.PVariable tailId))
+                  (docPush state.symbols rest head);
+              ] ),
+        state ))
+
+(* Dict entries as `key: value` docs, in key order. *)
+and ensureDocEntriesRenderer env keyType valueType state =
+  let listType = TList (TTuple [ keyType; valueType ]) in
+  let name = docEntriesRendererName (TDict (keyType, valueType)) in
+  generated name listType (TList docType) state (fun entries state ->
+      let entryId, state = freshBinding "__entry" state in
+      let tailId, state = freshBinding "__tail" state in
+      let key, state =
+        renderCall env keyType (C.TupleAccess (C.Local entryId, 0)) state
+      in
+      let value, state =
+        docCall env valueType (C.TupleAccess (C.Local entryId, 1)) state
+      in
+      let entry =
+        docConcat state.symbols
+          (docText state.symbols
+             (concat state.symbols [ key; C.StringLiteral ": " ]))
+          value
+      in
+      let rest = call state.symbols name [ C.Local tailId ] in
+      ( C.Match
+          ( entries,
+            args
+              [
+                makeCase (C.PList []) (C.ListLiteral []);
+                makeCase
+                  (C.PListCons ([ C.PVariable entryId ], C.PVariable tailId))
+                  (docPush state.symbols rest entry);
+              ] ),
+        state ))
+
+and docBody env typ value state =
+  let leaf () =
+    let rendered, next = renderCall env typ value state in
+    (docText next.symbols rendered, next)
+  in
+  match typ with
+  | TTuple elems ->
+      let parts, next =
+        docList env
+          (List.mapi (fun index typ -> (typ, C.TupleAccess (value, index))) elems)
+          state
+      in
+      (docBracketed next.symbols "(" ")" parts, next)
+  | TList elem ->
+      let empty, next = renderCall env typ value state in
+      let itemsName, next = ensureDocItemsRenderer env elem next in
+      ( C.Match
+          ( value,
+            args
+              [
+                makeCase (C.PList []) (docText next.symbols empty);
+                makeCase C.PWildcard
+                  (docBracketed next.symbols "[" "]"
+                     (call next.symbols itemsName [ value ]));
+              ] ),
+        next )
+  | TDict ((TVar _ | TInferenceVar _), (TVar _ | TInferenceVar _)) -> leaf ()
+  | TDict (key, valueType) ->
+      let entriesName, next =
+        ensureDocEntriesRenderer env key valueType state
+      in
+      let entriesId, next = freshBinding "__dict_entries" next in
+      let entries =
+        C.TypeApp
+          ( resolveFunction next.symbols "Darklang.Stdlib.Dict.toList",
+            C.checkedTypeArgs [ key; valueType ],
+            N.singleton value )
+      in
+      ( C.Let
+          ( C.LPVariable entriesId,
+            entries,
+            C.Match
+              ( C.Local entriesId,
+                args
+                  [
+                    makeCase (C.PList [])
+                      (docText next.symbols (C.StringLiteral "{}"));
+                    makeCase C.PWildcard
+                      (docBraced next.symbols "{" "}"
+                         (call next.symbols entriesName [ C.Local entriesId ]));
+                  ] ) ),
+        next )
+  | TRecord (typeName, typeArgs) -> (
+      match M.find_opt typeName (Lazy.force env.records) with
+      | None -> leaf ()
+      | Some recordInfo ->
+          let rec collect = function
+            | TVar name | TInferenceVar (_, name) -> [ name ]
+            | TList elem -> collect elem
+            | TDict (key, value) -> collect key @ collect value
+            | TFunction (params, result) ->
+                List.concat_map collect params @ collect result
+            | TTuple elems -> List.concat_map collect elems
+            | TRecord (_, args) | TSum (_, args) -> List.concat_map collect args
+            | _ -> []
+          in
+          let typeParams =
+            if recordInfo.Types.typeParams <> [] then
+              recordInfo.Types.typeParams
+            else
+              List.concat_map (fun (_, typ) -> collect typ) recordInfo.Types.fields
+              |> List.fold_left
+                   (fun names name ->
+                     if List.mem name names then names else names @ [ name ])
+                   []
+          in
+          let subst = typeSubstitution typeParams typeArgs in
+          let rec fields remaining index current acc =
+            match remaining with
+            | [] -> (C.ListLiteral (List.rev acc), current)
+            | (name, typ) :: rest ->
+                let fieldId, symbols =
+                  C.internField typeName name index current.symbols
+                in
+                let doc, next =
+                  docCall env (applySubstitution subst typ)
+                    (C.RecordAccess (value, fieldId))
+                    { current with symbols }
+                in
+                let field =
+                  docConcat next.symbols
+                    (docText next.symbols (C.StringLiteral (name ^ ": ")))
+                    doc
+                in
+                fields rest (index + 1) next (field :: acc)
+          in
+          let parts, next = fields recordInfo.Types.fields 0 state [] in
+          ( docConcat next.symbols
+              (docText next.symbols
+                 (C.StringLiteral
+                    (displayTypeText typ
+                    ^ evalTypeArgs typeParams typeArgs
+                        (List.map snd recordInfo.Types.fields)
+                    ^ " ")))
+              (docBraced next.symbols "{" "}" parts),
+            next ))
+  | TSum (("Uuid" | "Float32" | "Decimal"), []) -> leaf ()
+  | TSum (typeName, typeArgs) -> (
+      match M.find_opt typeName (Lazy.force env.sums) with
+      | None -> leaf ()
+      | Some sumInfo ->
+          let subst = typeSubstitution sumInfo.Types.typeParams typeArgs in
+          let typeText = displayTypeText typ in
+          let prefix (variant : Types.sumVariantInfo) =
+            if typeText = "" then ""
+            else
+              casePrefix
+                (typeText
+                ^ evalTypeArgs sumInfo.Types.typeParams typeArgs
+                    variant.Types.fields)
+          in
+          let rec cases remaining current acc =
+            match remaining with
+            | [] -> (List.rev acc, current)
+            | (variant : Types.sumVariantInfo) :: rest -> (
+                let caseText =
+                  C.StringLiteral (prefix variant ^ variant.Types.name)
+                in
+                match variant.Types.fields with
+                | [] ->
+                    let case =
+                      makeCase
+                        (constructorPattern typeName variant current.symbols [])
+                        (docText current.symbols caseText)
+                    in
+                    cases rest current (case :: acc)
+                | fieldTypes ->
+                    let reversed, current =
+                      List.fold_left
+                        (fun (ids, state) index ->
+                          let id, next =
+                            freshBinding
+                              ("__field_"
+                              ^ string_of_int variant.Types.tag
+                              ^ "_" ^ string_of_int index)
+                              state
+                          in
+                          (id :: ids, next))
+                        ([], current)
+                        (List.mapi (fun index _ -> index) fieldTypes)
+                    in
+                    let fieldIds = List.rev reversed in
+                    let parts, next =
+                      docList env
+                        (List.map2
+                           (fun typ id -> (applySubstitution subst typ, C.Local id))
+                           fieldTypes fieldIds)
+                        current
+                    in
+                    let case =
+                      makeCase
+                        (constructorPattern typeName variant next.symbols
+                           (List.map (fun id -> C.PVariable id) fieldIds))
+                        (docConcat next.symbols
+                           (docText next.symbols caseText)
+                           (docBracketed next.symbols "(" ")" parts))
+                    in
+                    cases rest next (case :: acc))
+          in
+          let cases, next =
+            cases
+              (List.stable_sort
+                 (fun (a : Types.sumVariantInfo) (b : Types.sumVariantInfo) ->
+                   Int.compare a.Types.tag b.Types.tag)
+                 sumInfo.Types.variants)
+              state []
+          in
+          (C.Match (value, args cases), next))
+  | _ -> leaf ()
+
+(* The boundary renderer under `--syntax=current`: the value's document laid
+   out in 80 columns, as `dark eval` prints it. *)
+let ensureEvalRenderer env typ state =
+  let typ = canonicalRenderType env typ in
+  generated (evalRendererName typ) typ TString state (fun value state ->
+      let doc, next = docCall env typ value state in
+      ( call next.symbols "Darklang.Stdlib.Pretty.render"
+          [ C.BigIntLiteral (Z.of_int 80); doc ],
+        next ))
+
 let starts name prefix = Text.startsWith name prefix
 
 let includeRuntimeFunctions symbols =
@@ -676,10 +1079,12 @@ let rewriteProgram recordMetadata sumMetadata programType program =
   let existing = existingRenderers topLevels in
   let renderName, state =
     match programType with
-    | TDateTime -> (None, { functions = existing; symbols })
+    | TDateTime when not !evalDisplay -> (None, { functions = existing; symbols })
     | _ ->
         let name, state =
-          ensureRenderer env programType { functions = existing; symbols }
+          if !evalDisplay then
+            ensureEvalRenderer env programType { functions = existing; symbols }
+          else ensureRenderer env programType { functions = existing; symbols }
         in
         (Some name, state)
   in
@@ -737,7 +1142,7 @@ let rewriteProgram recordMetadata sumMetadata programType program =
       | TUnit, _, _ when !evalDisplay ->
           let id, next = freshBinding "__rendered_unit" state in
           (C.Let (C.LPVariable id, expr, C.StringLiteral ""), next)
-      | TDateTime, _, _ ->
+      | TDateTime, _, _ when not !evalDisplay ->
           ( C.BoundaryRender
               ( resolveFunction state.symbols "Darklang.Stdlib.DateTime.toString",
                 expr ),

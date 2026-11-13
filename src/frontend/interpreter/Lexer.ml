@@ -438,9 +438,9 @@ let letterOrDigit value = letter value || digit value
    Unterminated `$'…`: take to end of line.
    Unknown character: record it, skip it, and keep lexing.
 *)
-(* The current interpreter reads a bare integer as Int64 (darklang/dark@1d3a109);
-   the pinned one, and this compiler's own sources, read it as an Int. The
-   parser sets this while it reads a source that asked for current syntax. *)
+(* The interpreter reads a bare integer as Int64 (darklang/dark@1d3a109);
+   this compiler's own sources read it as an Int. The parser sets this while
+   it reads an interpreter source or one that asked for current syntax. *)
 let bareIntegerIsInt64 = ref false
 
 let tokenize text =
@@ -571,8 +571,8 @@ let tokenize text =
   (* The interpreter's width suffixes since darklang/dark@1d3a109 (`1s8`,
      `1u64`, `1z` for BigInt) are accepted beside the pinned ones. Longer
      suffixes come first, so `1s16` is not read as `1s` followed by `16`.
-     The pinned `s` (Int16) keeps its meaning; the current interpreter reads a
-     bare `s` as Int64, so that one spelling still differs. *)
+     The compiler's own `s` is an Int16; where a bare integer is an Int64, as
+     in the interpreter, `1s` is an Int64 too. *)
   let suffixes =
     [
       "s128"; "u128"; "s16"; "u16"; "s32"; "u32"; "s64"; "u64"; "s8"; "u8";
@@ -638,6 +638,8 @@ let tokenize text =
     | "Q" -> parse 128 true (fun value -> TInt128 value) "Int128"
     | "Z" -> parse 128 false (fun value -> TUInt128 value) "UInt128"
     | "y" -> parse 8 true (fun value -> TInt8 (Z.to_int value)) "Int8"
+    | "s" when !bareIntegerIsInt64 ->
+        parse 64 true (fun value -> TInt64 (Z.to_int64 value)) "Int64"
     | "s" -> parse 16 true (fun value -> TInt16 (Z.to_int value)) "Int16"
     | "l" -> parse 32 true (fun value -> TInt32 (Z.to_int32 value)) "Int32"
     | _ when !bareIntegerIsInt64 ->
@@ -719,16 +721,18 @@ let tokenize text =
     else if digit source.(index) then begin
       (* The current interpreter's Float32 and Decimal literals
          (darklang/dark@1d3a109), `1.5f32` and `19.99dec`: the token keeps
-         the digits as written, and the parser builds the value. *)
+         the digits as written, and the parser builds the value. `1.5f64` is
+         a Float spelled with its width. *)
       let floatSuffix at =
         List.find_opt
           (fun suffix ->
             matchesAt suffix at && not (continue (at + String.length suffix)))
-          [ "f32"; "dec" ]
+          [ "f32"; "f64"; "dec" ]
       in
       let suffixed number at =
         match floatSuffix at with
         | Some "f32" -> Some (TFloat32 number)
+        | Some "f64" -> Option.map (fun value -> TFloat value) (float_of_string_opt number)
         | Some "dec" -> Some (TDecimal number)
         | _ -> None
       in

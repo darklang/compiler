@@ -23,6 +23,22 @@ let upperName name =
    two tuples, NOT a 3-tuple with an or in the middle. Hence `|` is the OUTER
    level here, wrapping tuples (`parsePatternTuple`).
 *)
+(* `p as name` inside another pattern (`Some((a, _) as pair)`,
+   darklang/dark@6a5beac) is read, so its file parses, and refused when
+   compiled: only an arm's top-level `as` is lowered. *)
+let nestedAs state (pattern, next) =
+  let rec more pattern next =
+    match (tok state next, tok state (next + 1)) with
+    | TIdent "as", TIdent _ ->
+        more
+          (WT.MPUnsupported
+             ( span (WT.mpRange pattern) (rng state (next + 1)),
+               "an `as` pattern inside another pattern" ))
+          (next + 2)
+    | _ -> (pattern, next)
+  in
+  more pattern next
+
 let rec parseMatchPattern state index =
   let first, next = parsePatternTuple state index in
   if tok state next <> TBar then (first, next)
@@ -208,12 +224,32 @@ and parsePatternBaseInner state index =
       | TFloat value ->
           let whole, fraction = floatParts state (index + 1) value in
           (WT.MPFloat (range, true, whole, fraction), index + 2)
+      | TFloat32 _ -> (WT.MPUnsupported (range, "a Float32 literal pattern"), index + 2)
+      | TDecimal _ -> (WT.MPUnsupported (range, "a Decimal literal pattern"), index + 2)
       | _ ->
           errExpected state index "a pattern";
           (WT.MPError (rng state index), index + 1))
   | TFloat value ->
       let whole, fraction = floatParts state index value in
       (WT.MPFloat (rng state index, value < 0., whole, fraction), index + 1)
+  | TFloat32 _ -> (WT.MPUnsupported (rng state index, "a Float32 literal pattern"), index + 1)
+  | TDecimal _ -> (WT.MPUnsupported (rng state index, "a Decimal literal pattern"), index + 1)
+  (* A record pattern below an arm's top level, `Some({ age })`, is read
+     and its compilation refused. *)
+  | TLBrace ->
+      let rec close at depth =
+        match tok state at with
+        | TEOF -> at
+        | TLParen | TLBracket | TLBrace -> close (at + 1) (depth + 1)
+        | TRParen | TRBracket | TRBrace when depth = 1 -> at + 1
+        | TRParen | TRBracket | TRBrace -> close (at + 1) (depth - 1)
+        | _ -> close (at + 1) depth
+      in
+      let stop = close (index + 1) 1 in
+      ( WT.MPUnsupported
+          ( span (rng state index) (rng state (stop - 1)),
+            "a record pattern inside another pattern" ),
+        stop )
   | TTrue -> (WT.MPBool (rng state index, true), index + 1)
   | TFalse -> (WT.MPBool (rng state index, false), index + 1)
   | TStringLit value ->
@@ -235,7 +271,7 @@ and parsePatternBaseInner state index =
         (WT.MPUnit (span (rng state index) (rng state (index + 1))), index + 2)
       else
         let opening = rng state index in
-        let inner, next = parseMatchPattern state (index + 1) in
+        let inner, next = nestedAs state (parseMatchPattern state (index + 1)) in
         let closing, stop =
           if tok state next = TRParen then (rng state next, next + 1)
           else begin
@@ -282,7 +318,15 @@ and parsePatternBaseInner state index =
           scanning := false
         end
         else
-        let pattern, stop = parsePatternBase state !current in
+        (* An element may be an or-pattern, `[x, 1 | 2]`, as in the
+           interpreter; it is read and its compilation refused. *)
+        let pattern, stop = nestedAs state (parsePatternOr state !current) in
+        let pattern =
+          match pattern with
+          | WT.MPOr (range, _) ->
+              WT.MPUnsupported (range, "an or-pattern inside a list pattern")
+          | _ -> pattern
+        in
         if stop = !current then begin
           err state DiagnosticCode.unexpected !current
             ("unexpected " ^ foundDesc state !current ^ " in list pattern");
@@ -325,18 +369,14 @@ and parsePatternBaseInner state index =
           (List.fold_right cons (RevBuffer.toList elements) tail, stop))
   | TIdent name when upperName name ->
       let modules, final, next = parseQualified state index in
-      if modules <> [] then begin
-        let fullPath =
-          String.concat "."
-            (List.map (fun ((name : WT.identifier), _) -> name.WT.name) modules
-            @ [ final.WT.name ])
-        in
-        err state DiagnosticCode.pattern index
-          (Printf.sprintf
-             "Invalid match pattern. Enum patterns use the unqualified case \
-              name (e.g. `| %s n`), not a qualified path like `| %s n`."
-             final.WT.name fullPath)
-      end;
+      (* The interpreter accepts a qualified case path
+         (`Stdlib.Result.Result.Ok(x)`); this compiler resolves a case by its
+         unqualified name against the scrutinee's type, so the path is read
+         and its compilation refused rather than truncated. *)
+      let enum range name fields =
+        if modules = [] then WT.MPEnum (range, name, fields)
+        else WT.MPUnsupported (range, "a qualified enum case pattern")
+      in
       if tok state next = TLParen then begin
         let opening = rng state next in
         let fields = RevBuffer.create ()
@@ -347,7 +387,7 @@ and parsePatternBaseInner state index =
           && tok state !current <> TRParen
           && tok state !current <> TEOF
         do
-          let pattern, stop = parsePatternOr state !current in
+          let pattern, stop = nestedAs state (parsePatternOr state !current) in
           RevBuffer.add fields pattern;
           if tok state stop = TComma then current := stop + 1
           else if stop > !current then begin
@@ -368,10 +408,10 @@ and parsePatternBaseInner state index =
         if RevBuffer.length fields = 0 then
           RevBuffer.add fields
             (WT.MPUnit (span opening (rng state (max next (stop - 1)))));
-        ( WT.MPEnum
-            ( span (rng state index) (rng state (max next (stop - 1))),
-              (final.WT.range, final.WT.name),
-              RevBuffer.toList fields ),
+        ( enum
+            (span (rng state index) (rng state (max next (stop - 1))))
+            (final.WT.range, final.WT.name)
+            (RevBuffer.toList fields),
           stop )
       end
       else begin
@@ -388,10 +428,10 @@ and parsePatternBaseInner state index =
           if RevBuffer.length fields > 0 then WT.mpRange (last fields)
           else final.WT.range
         in
-        ( WT.MPEnum
-            ( span (rng state index) endRange,
-              (final.WT.range, final.WT.name),
-              RevBuffer.toList fields ),
+        ( enum
+            (span (rng state index) endRange)
+            (final.WT.range, final.WT.name)
+            (RevBuffer.toList fields),
           !current )
       end
   | TIdent name -> (WT.MPVariable (rng state index, name), index + 1)

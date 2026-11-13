@@ -19,3 +19,11 @@ callFirst (1L, 2L) = 1L
 // Juxtaposed arguments keep their meaning.
 callAdd 20L 22L = 42L
 callAdd (20L) (22L) = 42L
+
+// `f(x)?` unwraps the call's result, and `f(x).field` selects from it.
+type CallPoint = { x: Int64, y: Int64 }
+let callPoint (n: Int64) : CallPoint = CallPoint { x = n, y = n + 1L }
+let callSome (n: Int64) : Stdlib.Option.Option<Int64> = Stdlib.Option.Option.Some n
+let callUnwrapped () : Stdlib.Option.Option<Int64> = Stdlib.Option.Option.Some (callSome(41L)? + 1L)
+callUnwrapped () = Stdlib.Option.Option.Some 42L
+callPoint(41L).y = 42L

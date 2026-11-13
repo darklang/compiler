@@ -1,0 +1,48 @@
+// Ordering operators on Int, Int128 and UInt128 compare values, not the
+// machine words that hold them. Int128 and UInt128 values live in heap blocks,
+// and an Int outside the tagged range lives in a limb buffer. Each function
+// returns the comparison directly, so it is lowered in tail position.
+
+let ltQ (a: Int128) (b: Int128) : Bool = a < b
+let leQ (a: Int128) (b: Int128) : Bool = a <= b
+let gtQ (a: Int128) (b: Int128) : Bool = a > b
+let geQ (a: Int128) (b: Int128) : Bool = a >= b
+let ltZ (a: UInt128) (b: UInt128) : Bool = a < b
+let leZ (a: UInt128) (b: UInt128) : Bool = a <= b
+let gtZ (a: UInt128) (b: UInt128) : Bool = a > b
+let geZ (a: UInt128) (b: UInt128) : Bool = a >= b
+let ltInt (a: Int) (b: Int) : Bool = a < b
+let leInt (a: Int) (b: Int) : Bool = a <= b
+let gtInt (a: Int) (b: Int) : Bool = a > b
+let geInt (a: Int) (b: Int) : Bool = a >= b
+
+gtQ 20Q 1Q = true
+ltQ 20Q 1Q = false
+ltQ 1Q 20Q = true
+geQ 1Q 0Q = true
+leQ 1Q 0Q = false
+geQ -5Q -20Q = true
+geQ -20Q -20Q = true
+leQ -20Q -20Q = true
+gtQ 1Q -1Q = true
+ltQ 1Q -1Q = false
+gtQ 170141183460469231731687303715884105727Q -170141183460469231731687303715884105728Q = true
+leQ 170141183460469231731687303715884105727Q -170141183460469231731687303715884105728Q = false
+
+gtZ 20Z 1Z = true
+ltZ 10Z 1Z = false
+leZ 1Z 0Z = false
+geZ 6Z 1Z = true
+gtZ 340282366920938463463374607431768211455Z 0Z = true
+ltZ 340282366920938463463374607431768211455Z 0Z = false
+gtZ 18446744073709551616Z 18446744073709551615Z = true
+leZ 5Z 5Z = true
+
+gtInt 9223372036854775808 -170141183460469231731687303715884105729 = true
+geInt 9223372036854775808 -170141183460469231731687303715884105729 = true
+ltInt 9223372036854775808 -170141183460469231731687303715884105729 = false
+leInt 9223372036854775808 -170141183460469231731687303715884105729 = false
+ltInt -170141183460469231731687303715884105729 0 = true
+gtInt -170141183460469231731687303715884105729 0 = false
+gtInt 170141183460469231731687303715884105729 170141183460469231731687303715884105728 = true
+leInt 3 3 = true

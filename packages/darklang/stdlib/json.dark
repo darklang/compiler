@@ -559,6 +559,15 @@ let __shortestScientificFloat (numerator: Int) (denominator: Int) (targetBits: U
         if precision >= 17L then candidate
         else Stdlib.Json.__shortestScientificFloat numerator denominator targetBits (precision + 1L)
 
+// A Float32 writes as its own shortest text, as Float32.toString prints it;
+// NaN and the infinities write as Float's do.
+let __serializeFloat32 (value: Float32) : String =
+    let wide = Stdlib.Float32.toFloat value in
+    let bits = Stdlib.Float.__toBits wide in
+    if Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL == 2047UL then
+        Stdlib.Json.__serializeFloat wide
+    else Stdlib.Float32.toString value
+
 let __serializeFloat (value: Float) : String =
     let bits = Stdlib.Float.__toBits value in
     let exponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
@@ -775,6 +784,11 @@ let __viewFloat (source: String) (value: Stdlib.Json.__InternalValueView) : Stdl
             else if text == "-Infinity" then Stdlib.Option.Option.Some (Stdlib.Float.__negativeInfinity ())
             else Stdlib.Option.Option.None
         | None -> Stdlib.Option.Option.None
+
+let __viewFloat32 (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Float32> =
+    match Stdlib.Json.__viewFloat source value with
+    | Some wide -> Stdlib.Option.Option.Some (Stdlib.Float32.fromFloat wide)
+    | None -> Stdlib.Option.Option.None
 
 let __viewChar (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Char> =
     match Stdlib.Json.__stringValue source value with
