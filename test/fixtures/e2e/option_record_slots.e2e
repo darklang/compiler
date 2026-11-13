@@ -1,0 +1,4 @@
+// option_record_slots.e2e - A list holds its own reference to an Option of a record, so the record outlives the code that made it.
+
+type C = { t: String, p: Int64 } let mk (n: Int64): Stdlib.Option.Option<C> = Stdlib.Option.Option.Some (C { t = Stdlib.Int64.toString n, p = n }) let build (n: Int64): List<Stdlib.Option.Option<C>> = if n > 2L then [] else [mk n] @ build (n + 1L) let r = match build 1L with | [Some a, Some b] -> a.t + b.t + Stdlib.Int64.toString (a.p + b.p) | _ -> "other" in r = "123"
+type C = { t: String, p: Int64 } let mk (n: Int64): Stdlib.Option.Option<C> = Stdlib.Option.Option.Some (C { t = "x", p = n }) let l = Stdlib.List.push [] (mk 1L) in Stdlib.List.length l = 1L
