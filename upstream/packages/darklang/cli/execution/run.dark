@@ -1,299 +1,422 @@
 module Darklang.Cli.Run
 
 
-/// Parse <param code> as a script and run it, returning its exit code and the
-/// permission warnings the run recorded. The one call into the host's script
-/// runner: `run <path>` and `scripts run <name>` both come through here.
-///
-/// <param sandbox> runs the body under a deny-all policy, for code you don't
-/// trust; otherwise it runs under the host's configured instance policy.
-///
-/// <param warnPermissions> puts the permission checks into warn-only mode: a
-/// request the policy doesn't cover is recorded and allowed to proceed instead
-/// of failing the run. Each recorded request is (resource, denial reason, the
-/// fn it happened in when known); the list is always empty when
-/// warnPermissions is false.
-///
-/// <param sessionAllow> are rules the user allowed for this run only ("allow
-/// once" at the prompt): they widen the instance layer in memory and are
-/// never saved.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.Permissions.Rule'"
-let parseAndExecute
-  (accountID: Stdlib.Option.Option<Uuid>)
-  (branchId: Uuid)
-  (filename: String)
-  (code: String)
-  (args: List<String>)
-  (allowHarmful: Bool)
-  (sandbox: Bool)
-  (warnPermissions: Bool)
-  (sessionAllow: List<LanguageTools.Permissions.Rule>)
-  : Stdlib.Result.Result<(Int *
+/// Unit succeeds; BigInt and Int64 supply the script's exit code.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError.ExecutionError'"
+let exitCode(
+  value: LanguageTools.RuntimeTypes.Dval)
+  : Stdlib.Result.Result<Int64, ExecutionError.ExecutionError> =
+  match value with
+  | DUnit -> Ok(0)
+  | DInt64(code) -> Ok(code)
+  // a `BigInt` past Int64 is no exit code the OS could carry, so it fails like any other
+  | DBigInt(code) -> Ok(Stdlib.BigInt.toInt64(code) |> Stdlib.Option.withDefault(1))
+  | _ ->
+    Error(
+      ExecutionError.ExecutionError.Runtime(
+        LanguageTools.RuntimeTypes.RuntimeError.Error.CLI(
+          LanguageTools.RuntimeTypes.RuntimeError.CLIs.Error.NonIntReturned(value)),
+        []))
+
+
+/// Run a script and return its exit code and permission warnings.
+/// Sandbox mode adds a deny-all run policy.
+/// Warning mode allows and reports calls outside the run and package policies.
+/// Instance policy and function limits still apply.
+/// Warnings include the resource, reason and caller when known.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError.ExecutionError'"
+let parseAndExecute(
+  accountID: Stdlib.Option.Option<Uuid>,
+  branchId: Uuid,
+  filename: String,
+  code: String,
+  args: List<String>,
+  options: Darklang.Tracing.ScriptOptions)
+  : Stdlib.Result.Result<(Int64 *
                           List<(String * String * Stdlib.Option.Option<String>)>),
                          ExecutionError.ExecutionError> =
-  Builtin.cliParseAndExecuteScript
-    accountID
-    branchId
-    filename
-    code
-    args
-    allowHarmful
-    sandbox
-    warnPermissions
-    sessionAllow
+  let result =
+    Builtin.cliParseAndExecuteScript(
+      accountID,
+      branchId,
+      filename,
+      code,
+      args,
+      options.allowHarmful,
+      options.sandbox,
+      options.warnPermissions)
+  match result with
+  | Ok((value, warnings)) ->
+    let code = (exitCode(value))?
+    Ok((code, warnings))
+  | Error(error) -> Error(error)
 
 
 /// Format permission warnings for the terminal; return [] when there are none.
-let permissionWarningLines
-  (violations: List<(String * String * Stdlib.Option.Option<String>)>)
+let permissionWarningLines(
+  violations: List<(String * String * Stdlib.Option.Option<String>)>)
   : List<String> =
   match violations with
   | [] -> []
   | vs ->
     let entries =
       vs
-      |> Stdlib.List.map (fun v ->
+      |> Stdlib.List.map(fun v ->
         let (resource, needed, via) = v
         match via with
-        | Some fn -> $"  - {resource}: {needed} (in {fn})"
+        | Some(fn) -> $"  - {resource}: {needed} (in {fn})"
         | None -> $"  - {resource}: {needed}")
-    Stdlib.List.append
-      [ "warning: this run went beyond the configured permission policy:" ]
-      entries
+    Stdlib.List.prepend(
+      entries,
+      "warning: this run went beyond the configured permission policy:")
 
 
-// `run-script <path> [args...]` — execute a Dark script file.
-//
-// For calling package fns, use `eval` instead.
+// `run-script <path> [args...]` — execute a Dark script file, or a package function by name.
+
+/// Split runner options from the script path and its arguments. Everything after the path stays
+/// with the script, flags included; `--` ends the options and stays with them. The same rule as the
+/// host's `ScriptArguments.split`, which splits the command line before any Dark runs.
+let splitArguments(args: List<String>): (List<String> * List<String>) =
+  splitArgumentsAfter([], args)
+
+
+/// The split of <param remaining>, with <param options> (newest first) already taken.
+let splitArgumentsAfter(
+  options: List<String>,
+  remaining: List<String>)
+  : (List<String> * List<String>) =
+  match remaining with
+  | [ "--", ...rest ] -> (Stdlib.List.reverse(Stdlib.List.prepend(options, "--")), rest)
+  | [ flag, value, ...rest ] when flag == "--branch" || flag == "--entry-point" ->
+    splitArgumentsAfter(Stdlib.List.prepend(Stdlib.List.prepend(options, flag), value), rest)
+  | [ flag, ...rest ] when isFlag(flag) ->
+    splitArgumentsAfter(Stdlib.List.prepend(options, flag), rest)
+  | _ -> (Stdlib.List.reverse(options), remaining)
+
+
+/// Whether <param arg> starts with a `-`. By its first byte, not its first character, so a `-`
+/// that a combining mark follows still counts, as it does for the host.
+let isFlag(arg: String): Bool =
+  Stdlib.String.getByteAt(arg, 0) == Stdlib.Option.Option.Some(45u8)
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let execute (state: AppState) (args: List<String>) : AppState =
-  let allowHarmful =
-    Stdlib.List.contains args "--allow-harmful"
-  // `dark run` respects the host's configured instance policy by default (same
-  // as `eval`). `--sandbox` adds a deny-all run policy. This is runtime
-  // authorization, not OS containment.
-  let sandbox =
-    Stdlib.List.contains args "--sandbox"
-  // `--warn-permissions` reports requests beyond the policy instead of denying them.
-  let warnPermissions =
-    Stdlib.List.contains args "--warn-permissions"
-  let args =
-    args
-    |> Stdlib.List.filter (fun a ->
-      (a != "--allow-harmful") && (a != "--sandbox") && (a != "--warn-permissions"))
-
-  if sandbox && warnPermissions then
-    Stdlib.printLine
-      (Stdlib.Cli.UI.Colors.error
-        "--sandbox and --warn-permissions cannot be combined: warn-only mode executes denied effects")
-    Cli.exitWith state false
+let execute(state: AppState, args: List<String>): AppState =
+  let (options, script) = splitArguments(args)
+  let asksForHelp =
+    Stdlib.List.contains(options, "--help")
+    || Stdlib.List.contains(options, "-h")
+    || (Stdlib.List.head(args) == Stdlib.Option.Option.Some("help"))
+  if asksForHelp then
+    Registry.executeCommandHelp("run-script", state)
   else
-    match args with
+    executeOptions(
+      state,
+      options,
+      script,
+      Darklang.Tracing.ScriptOptions {
+        allowHarmful = false
+        sandbox = false
+        warnPermissions = false },
+      false)
+
+
+/// Parse the options before the script path. <param stats> is `--stats`: kept out of
+/// `ScriptOptions` because those are saved with the trace for replay, and a replay has no reason
+/// to report what the original cost.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
+let executeOptions(
+  state: AppState,
+  flags: List<String>,
+  script: List<String>,
+  options: Darklang.Tracing.ScriptOptions,
+  stats: Bool)
+  : AppState =
+  match flags with
+  | ["--allow-harmful", ...rest] -> executeOptions(state, rest, script, { options with allowHarmful = true }, stats)
+  | ["--sandbox", ...rest] -> executeOptions(state, rest, script, { options with sandbox = true }, stats)
+  | ["--warn-permissions", ...rest] -> executeOptions(state, rest, script, { options with warnPermissions = true }, stats)
+  | ["--stats", ...rest] -> executeOptions(state, rest, script, options, true)
+  | [] | [ "--" ] ->
+    match script with
+    | [scriptPath, ...scriptArgs] ->
+      if options.sandbox && options.warnPermissions then
+        Cli.printErr("--sandbox and --warn-permissions cannot be combined: warn-only mode executes denied effects")
+        Cli.failed(state)
+      else
+        executeScript(state, scriptPath, scriptArgs, options, stats)
     | [] ->
-      Stdlib.printLine (help state)
-      Cli.exitWith state false
-    | scriptPath :: scriptArgs ->
-      executeScript state scriptPath scriptArgs allowHarmful sandbox warnPermissions
+      Stdlib.printLine(help(state))
+      Cli.failed(state)
+  | [flag, ...] ->
+    Stdlib.printErrorLine($"Unknown run-script option: {flag}. Put script arguments after the file path; use -- before a path starting with '-'.")
+    Cli.failed(state)
 
 
 // Recognize a dotted package name so `run` can suggest `eval` instead of
 // reporting an unhelpful "script not found" error.
-let looksLikePackageName (path: String) : Bool =
-  (Stdlib.String.contains path ".")
-  && (Stdlib.String.contains path "/" |> Stdlib.Bool.not)
-  && (Stdlib.String.endsWith path ".dark" |> Stdlib.Bool.not)
+let looksLikePackageName(path: String): Bool =
+  (Stdlib.String.contains(path, "."))
+  && (Stdlib.String.contains(path, "/") |> Stdlib.Bool.not)
+  && (Stdlib.String.endsWith(path, ".dark") |> Stdlib.Bool.not)
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let executeScript
-  (state: AppState)
-  (scriptPath: String)
-  (args: List<String>)
-  (allowHarmful: Bool)
-  (sandbox: Bool)
-  (warnPermissions: Bool)
+let executeScript(
+  state: AppState,
+  scriptPath: String,
+  args: List<String>,
+  options: Darklang.Tracing.ScriptOptions,
+  stats: Bool)
   : AppState =
-  match Stdlib.Cli.FileSystem.readFile scriptPath with
-  | Error e ->
+  match Stdlib.Cli.FileSystem.readFile(scriptPath) with
+  | Error(NotFound) when looksLikePackageName(scriptPath) ->
+    executePackageFn(state, scriptPath, args, options, stats)
+  | Error(e) ->
     match e with
-    | NotFound ->
-      if looksLikePackageName scriptPath then
-        let argsStr = Stdlib.String.join args " "
-        let evalCmd = Stdlib.String.trim $"dark eval {scriptPath} {argsStr}"
-
-        [ $"{scriptPath} isn't a script file."
-          $"  `run` executes a script; that looks like a package function. Try:  {evalCmd}" ]
-        |> Stdlib.printLines
-      else
-        Stdlib.printLine $"Script not found: {scriptPath}"
-    | OsAccessDenied -> Stdlib.printLine $"Permission denied: {scriptPath}"
-    | Other msg -> Stdlib.printLine $"Could not read script {scriptPath}: {msg}"
+    | NotFound -> Stdlib.printErrorLine($"Script not found: {scriptPath}")
+    | OsAccessDenied -> Stdlib.printErrorLine($"Permission denied: {scriptPath}")
+    | Other(msg) -> Stdlib.printErrorLine($"Could not read script {scriptPath}: {msg}")
     // Every branch above printed a reason the script did not run, so this is a failure. Saying
     // so in the exit code is the only part a script or an agent can read.
     { state with exitCode = 1 }
-  | Ok script ->
-    let scriptSourceCode = Stdlib.String.fromBlobWithReplacement script
-    runScript
-      state
-      scriptPath
-      scriptSourceCode
-      args
-      allowHarmful
-      sandbox
-      warnPermissions
-      []
-      8
+  | Ok(script) ->
+    let scriptSourceCode = Stdlib.Utf8.decodeWithReplacement(script)
+    runScriptMeasured(
+      state,
+      scriptPath,
+      scriptSourceCode,
+      args,
+      options,
+      true,
+      stats)
 
 
-let allowOnce () : String = "Allow once (this run only)"
-let allowAlways () : String = "Allow always (save to the instance policy)"
-let denyChoice () : String = "Deny"
+/// Run the package function <param name> the way a script runs: under the same policy, with
+/// <param args> as its argument, and its Int64 result as the exit code. A function that takes
+/// nothing is called with `()`; one with other parameters is refused with its signature.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
+let executePackageFn(
+  state: AppState,
+  name: String,
+  args: List<String>,
+  options: Darklang.Tracing.ScriptOptions,
+  stats: Bool)
+  : AppState =
+  let branchId = state.currentBranchId
+  let fnName = TraceVerbs.canonicalFnName(branchId, name)
+  let location = LanguageTools.ProgramTypes.parsePackageLocation(fnName)
+
+  match LanguageTools.PackageManager.Function.find(branchId, location) with
+  | None ->
+    Stdlib.printErrorLine($"No script file or function named {name}")
+    { state with exitCode = 1 }
+  | Some(hash) ->
+    match LanguageTools.PackageManager.Function.getSignature(hash) with
+    | Some(fn) ->
+      match fn.parameters |> Stdlib.List.map(fun p -> p.typ) with
+      | [] | [ TUnit ] -> runNullary(state, name, fnName, args, options, stats)
+      | [ TList(TString) ] ->
+        runScriptMeasured(state, name, $"{fnName}(args)", args, options, true, stats)
+      | _ ->
+        let modulePath = Stdlib.List.prepend(location.modules, location.owner)
+        let ctx = Packages.Signatures.rootContext(branchId, modulePath)
+        let shown =
+          fn.parameters
+          |> Stdlib.List.map(fun p ->
+            $"{p.name}: {PrettyPrinter.ProgramTypes.typeReference(ctx, p.typ)}")
+          |> Stdlib.String.join(", ")
+        Stdlib.printErrorLine(
+          $"{name} takes ({shown}); `run` passes the words as a List<String>. Call it with: dark eval '{name}(…)'")
+        { state with exitCode = 1 }
+    | None -> runScriptMeasured(state, name, $"{fnName}(args)", args, options, true, stats)
+
+
+/// <fn executePackageFn> for a function that takes nothing.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Run.runNullary: Unknown function or value 'runScriptMeasured'"
+let runNullary(
+  state: AppState,
+  name: String,
+  fnName: String,
+  args: List<String>,
+  options: Darklang.Tracing.ScriptOptions,
+  stats: Bool)
+  : AppState =
+  match args with
+  | [] -> runScriptMeasured(state, name, $"{fnName}()", args, options, true, stats)
+  | _ ->
+    Stdlib.printErrorLine($"{name} takes no arguments")
+    { state with exitCode = 1 }
+
+
+let allowAlways(): String = "Allow future runs (save to the instance policy)"
+let denyChoice(): String = "Deny"
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let printScriptError (state: AppState) (e: ExecutionError.ExecutionError) : AppState =
-  match e with
-  | Denied denied ->
-    if denied.callStack != "" then
-      Stdlib.printLine $"Error when executing Script. Call-stack:\n{denied.callStack}"
-    else
-      ()
-  | _ -> ()
-  let pretty = ExecutionError.toString state.currentBranchId e
-  Stdlib.printLine $"Script error: {pretty}"
+let printScriptError(state: AppState, e: ExecutionError.ExecutionError): AppState =
+  ExecutionError.printCallStack(state.currentBranchId, "Script", e)
+  let pretty = ExecutionError.toString(state.currentBranchId, e)
+  Stdlib.printErrorLine($"Script error: {pretty}")
   { state with exitCode = 1 }
 
-/// Run the script and, at an interactive terminal, offer to retry an
-/// instance-policy denial. "Once" is temporary; "always" saves the rule.
-/// Sandbox, warning mode, and non-interactive runs never prompt.
+/// Run a script. On denial, offer to save permission for a later run.
+/// Never restart automatically: that could repeat writes or requests.
+/// Only direct terminal runs prompt, with sandbox and warning mode off.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let runScript
-  (state: AppState)
-  (scriptPath: String)
-  (code: String)
-  (args: List<String>)
-  (allowHarmful: Bool)
-  (sandbox: Bool)
-  (warnPermissions: Bool)
-  (sessionAllow: List<LanguageTools.Permissions.Rule>)
-  (promptsLeft: Int)
+let runScript(
+  state: AppState,
+  scriptPath: String,
+  code: String,
+  args: List<String>,
+  options: Darklang.Tracing.ScriptOptions,
+  offerApproval: Bool)
   : AppState =
-  let result =
-    parseAndExecute
-      state.accountID
-      state.currentBranchId
-      scriptPath
-      code
-      args
-      allowHarmful
-      sandbox
-      warnPermissions
-      sessionAllow
+  runScriptMeasured(state, scriptPath, code, args, options, offerApproval, false)
+
+
+/// <fn runScript>, and with <param stats> also what the run cost, the same block `eval --stats`
+/// prints. Only parsing and executing are measured: an approval prompt waits on a person, and
+/// that is not the script's time.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
+let runScriptMeasured(
+  state: AppState,
+  scriptPath: String,
+  code: String,
+  args: List<String>,
+  options: Darklang.Tracing.ScriptOptions,
+  offerApproval: Bool,
+  stats: Bool)
+  : AppState =
+  let run = fun () ->
+    parseAndExecute(
+      state.accountID,
+      state.currentBranchId,
+      scriptPath,
+      code,
+      args,
+      options)
+
+  let (measurement, result) =
+    if stats then
+      // What the script cost, net of the measuring harness itself: see Perf.floor.
+      let harness = LanguageTools.Perf.floor()
+      let (raw, result) = LanguageTools.Perf.measure(run)
+      (Stdlib.Option.Option.Some(LanguageTools.Perf.minus(raw, harness)), result)
+    else
+      (Stdlib.Option.Option.None, run())
+
+  let newState = handleResult(state, result, options, offerApproval)
+
+  match measurement with
+  | Some(m) ->
+    // stdout, after whatever the script printed, as `eval --stats` does.
+    let _ = Stdlib.printLine("")
+    let _ = Stdlib.printLine(LanguageTools.Perf.render(m))
+    let _ =
+      Stdlib.printLine(
+        "  (includes parsing the script; Perf.measure inside it brackets execution alone)")
+
+    newState
+  | None -> newState
+
+
+/// Report what <fn parseAndExecute> returned, and offer to save a denied permission.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
+let handleResult(
+  state: AppState,
+  result: Stdlib.Result.Result<(Int64 *
+                                List<(String * String * Stdlib.Option.Option<String>)>),
+                               ExecutionError.ExecutionError>,
+  options: Darklang.Tracing.ScriptOptions,
+  offerApproval: Bool)
+  : AppState =
   match result with
   | Ok((exitCode, violations)) ->
-    match permissionWarningLines violations with
+    match permissionWarningLines(violations) with
     | [] -> ()
-    | lines -> Stdlib.printLines lines
-    if exitCode == 0 then
-      state
-    else
-      Stdlib.printLine $"Script exited with code {Stdlib.toString exitCode}"
-      { state with exitCode = exitCode }
-  | Error(Denied denied) ->
+    | lines -> lines |> Stdlib.List.iter(fun l -> Stdlib.printErrorLine(l))
+    // The script chose this code and printed its own reason, as a program in any language does.
+    { state with exitCode = exitCode }
+  | Error(Denied(denied)) ->
     let canAsk =
-      promptsLeft > 0
-      && Stdlib.Bool.not sandbox
-      && Stdlib.Bool.not warnPermissions
-      && (Stdlib.Cli.Tui.TerminalSupport.currentFacts ()).inputIsTerminal
+      offerApproval
+      && Stdlib.Bool.not(options.sandbox)
+      && Stdlib.Bool.not(options.warnPermissions)
+      && Stdlib.Cli.UI.Prompt.canAsk()
     match denied.rule with
-    | Some rule when canAsk ->
-      match LanguageTools.Permissions.parseRuleText rule with
-      | Some rules ->
-        Stdlib.printErrorLine
-          (Stdlib.Cli.UI.Colors.warning
-            $"The script wants {denied.resource}, which the instance policy does not allow.")
+    | Some(rule) when canAsk ->
+      match LanguageTools.Permissions.parseRuleText(rule) with
+      | Some(rules) ->
+        Stdlib.printErrorLine(
+          (Stdlib.Cli.UI.Colors.warning(
+            $"The script stopped: the instance policy does not allow {denied.resource}. Earlier effects may already have happened.")))
         let choice =
-          Stdlib.Cli.UI.Prompt.select
-            $"Allow `{rule}`?"
-            [ allowOnce (), allowAlways (), denyChoice () ]
-        if choice == allowOnce () then
-          runScript
-            state
-            scriptPath
-            code
-            args
-            allowHarmful
-            sandbox
-            warnPermissions
-            (Stdlib.List.append sessionAllow rules)
-            (promptsLeft - 1)
-        elif choice == allowAlways () then
-          let _ =
-            Darklang.Cli.Permissions.Command.editPolicy
-              (fun current ->
-                Stdlib.Result.Result.Ok(
-                  { current with allow = Stdlib.List.append current.allow rules }))
-              $"✓ allowed {rule}"
-          runScript
-            state
-            scriptPath
-            code
-            args
-            allowHarmful
-            sandbox
-            warnPermissions
-            (Stdlib.List.append sessionAllow rules)
-            (promptsLeft - 1)
+          Stdlib.Option.withDefault(
+            Stdlib.Cli.UI.Prompt.select($"Allow `{rule}`?", [ denyChoice(), allowAlways() ]),
+            denyChoice())
+        if choice == allowAlways() then
+          Darklang.Cli.Permissions.Command.editInstancePolicy(rules, [], [])
+          Stdlib.printErrorLine("Permission saved. The script has not restarted; rerun it explicitly when ready.")
+          { state with exitCode = 1 }
         else
-          printScriptError state (ExecutionError.ExecutionError.Denied denied)
-      | None -> printScriptError state (ExecutionError.ExecutionError.Denied denied)
-    | _ -> printScriptError state (ExecutionError.ExecutionError.Denied denied)
-  | Error e -> printScriptError state e
+          printScriptError(state, ExecutionError.ExecutionError.Denied(denied))
+      | None -> printScriptError(state, ExecutionError.ExecutionError.Denied(denied))
+    | _ -> printScriptError(state, ExecutionError.ExecutionError.Denied(denied))
+  | Error(e) -> printScriptError(state, e)
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let complete (_state: AppState) (args: List<String>) : List<Completion.CompletionItem> =
+let complete(_state: AppState, args: List<String>): List<Completion.CompletionItem> =
   match args with
   | [] ->
-    let files = Stdlib.Cli.FileSystem.getDirectoryContents "."
-    let currentDir = Stdlib.Cli.FileSystem.currentDirectory ()
+    let files = Stdlib.Cli.FileSystem.getDirectoryContents(".")
+    let currentDir = Stdlib.Cli.FileSystem.currentDirectory()
 
     let directories =
       files
-      |> Stdlib.List.filter (Stdlib.Cli.FileSystem.isDirectoryAtPath currentDir)
+      |> Stdlib.List.filter(fun name ->
+        Stdlib.Cli.FileSystem.isDirectoryAtPath(currentDir, name))
 
     let darkFiles =
-      files |> Stdlib.List.filter (Stdlib.String.endsWith ".dark")
+      files |> Stdlib.List.filter(fun name -> Stdlib.String.endsWith(name, ".dark"))
 
-    let allFiles = Stdlib.List.append directories darkFiles
-    allFiles |> Stdlib.List.map Completion.simple
+    let allFiles = Stdlib.List.concat(directories, darkFiles)
+    allFiles |> Stdlib.List.map(Completion.simple)
 
   | [ partialArg ] ->
-    (Darklang.Cli.Completion.completeFilesystemPath partialArg)
-    |> Stdlib.List.map Completion.simple
+    (Darklang.Cli.Completion.completeFilesystemPath(partialArg))
+    |> Stdlib.List.map(Completion.simple)
 
   | _ -> []
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let help (_state: AppState) : String =
-  [ "Usage: run-script <path> [args...]"
-    "Execute a Dark script file."
+let help(_state: AppState): String =
+  [ "Usage: run-script [options] <path or function> [args...]"
+    "Execute a Dark script file, or a package function by name."
     ""
     "Examples:"
     "  run-script script.dark            - Run a script"
     "  run-script script.dark a b c      - Run with args"
+    "  run-script --stats script.dark    - Run and report what it cost"
     ""
-    "Flags:"
+    "Everything after the path is passed unchanged, including flags and --."
+    "See `docs scripts` for arguments, exit codes and permissions."
+    ""
+    "Flags (before the path):"
     "  --sandbox          - Add a deny-all run policy (not OS containment)."
     "                       By default a script runs under your instance policy (see `permissions`)."
     "  --warn-permissions - UNSAFE audit mode: let requests beyond the run and package"
     "                       policies run and report them; the instance policy and function"
     "                       ceilings still deny. Not with --sandbox."
     "  --allow-harmful    - Opt out of Harmful-deprecation halting."
+    "  --stats            - Also report what the run cost: allocation, time, instructions,"
+    "                       calls and frame pushes, net of the measuring harness, tagged"
+    "                       with the build they came from. Includes parsing the script;"
+    "                       call Perf.measure inside it to measure the work alone."
     ""
-    "When a script is denied by the instance policy at an interactive terminal, run"
-    "offers to allow the exact rule once (this run) or always (saved), then retries."
-    ""
-    "To call a package function, use 'eval' instead:"
-    "  eval (5 + 3)" ]
-  |> Stdlib.String.join "\n"
+    "A function as a command: a package function runs the same way, by name, when it"
+    "takes a List<String> or nothing. The words after its name are the list, and the"
+    "Int64 it returns is the exit code (Unit is 0):"
+    "  let main(args: List<String>): Int64 = ...    // saved as Me.Todo.main"
+    "  run-script Me.Todo.main add \"oat milk\"      // args = [\"add\", \"oat milk\"]"
+    "A function with other parameters goes through eval." ]
+  |> Stdlib.String.join("\n")

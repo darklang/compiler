@@ -4,14 +4,12 @@
 
 // This test used to cause a stack overflow, but now passes everywhere.
 // Let's keep this around to ensure we never regress.
-((Stdlib.List.repeat 348 1L)
- |> Builtin.unwrap
+((Stdlib.List.repeat 348L 1L)
  |> Stdlib.List.map (fun _f -> 1)
- |> Stdlib.List.length) = 348
+ |> Stdlib.List.length) = 348L
 
 // Heavier variant of the stack-overflow regression check.
 // This is slower, but intentionally kept to protect against perf/stack regressions.
-((Stdlib.List.repeat 3480 1L)
- |> Builtin.unwrap
+((Stdlib.List.repeat 3480L 1L)
  |> Stdlib.List.map (fun _f -> 1)
- |> Stdlib.List.length) = 3480
+ |> Stdlib.List.length) = 3480L

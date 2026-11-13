@@ -6,6 +6,10 @@ type BadHeader =
   // Occurs whrn a header key is empty. eg. [ ("", "") ]
   | EmptyKey
   | InvalidContentType
+  /// Occurs when a header name holds a character not allowed in an HTTP token, eg. [ ("X A", "") ]
+  | InvalidName
+  /// Occurs when a header value holds a CR, LF or NUL, eg. [ ("X-A", "a\r\nB: c") ]
+  | InvalidValue
 
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.BadUrlDetails reason=compiler-implementation
 type BadUrlDetails =
@@ -20,40 +24,49 @@ type BadUrlDetails =
 
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.RequestError reason=compiler-implementation
 type RequestError =
-  | BadUrl of BadUrlDetails
+  | BadUrl(BadUrlDetails)
   /// Occurs when the request is cancelled due to a timeout
   | Timeout
-  | BadHeader of BadHeader
-  /// Occurs when there's an issue connecting to the endpoint or an I/O error. eg. network error, DNS failure, certifivate validation error, etc.
+  | BadHeader(BadHeader)
+  /// Occurs when there's an issue connecting to the endpoint or an I/O error. eg. network error, DNS failure, etc.
   | NetworkError
+  /// Occurs when the TLS handshake fails, eg. the server's certificate can't be verified. The message says why.
+  | TlsError(String)
   /// Occurs when the request method is not invalid.
   | BadMethod
 
 // TODO: move this into a RequestError module, along with the type
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.toString reason=compiler-implementation
-let toString (e: RequestError) : String =
+let toString(e: RequestError): String =
   match e with
-  | BadUrl details ->
+  | BadUrl(details) ->
     match details with
     | UnsupportedProtocol -> "Unsupported protocol"
     | InvalidHost -> "Invalid host"
     | InvalidUri -> "Invalid URI"
     | InvalidRequest -> "Invalid request"
   | Timeout -> "Timeout"
-  | BadHeader details ->
+  | BadHeader(details) ->
     match details with
     | EmptyKey -> "Empty key"
     | InvalidContentType -> "Invalid content-type header"
+    | InvalidName -> "Invalid header name"
+    | InvalidValue -> "Header value contains CR, LF or NUL"
   | NetworkError -> "Network Error"
+  | TlsError(message) -> message
   | BadMethod -> "Bad Method"
+
+
+impl Display for RequestError =
+  let display = Stdlib.HttpClient.toString
 
 
 /// The response from a HTTP request
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.Response reason=compiler-implementation
 type Response =
-  { statusCode: Int
+  { statusCode: Int64
     headers: List<(String * String)>
-    body: Blob }
+    body: Bytes }
 
 
 /// A streaming HTTP response. Headers arrive immediately; `body` is a
@@ -62,117 +75,129 @@ type Response =
 /// drained to completion or `Stdlib.Stream.close`d.
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.StreamResponse reason=compiler-implementation
 type StreamResponse =
-  { statusCode: Int
+  { statusCode: Int64
     headers: List<(String * String)>
     body: Stream<UInt8> }
 
 
-/// A GET or HEAD of <param uri>: a read. It runs concurrently with what follows, and
-/// your code waits for the response where it first looks at it, so `List.map get urls`
-/// has every request in flight at once. Any other method is a `BadMethod` error.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpClient.read: Unknown function or value 'Builtin.httpClientRead'"
-let read
-  (method: String)
-  (uri: String)
-  (headers: List<(String * String)>)
-  : Stdlib.Result.Result<Response, RequestError> =
-  Builtin.httpClientRead method uri headers
+/// The request headers as they go to the network: keys trimmed, and an empty key refused.
+/// `request` and `stream` both pass through here, so this is where a request is shaped on
+/// its way out. Whether it is safe to send (a CR, LF or NUL in a header, the network guard,
+/// your grants) is decided below this, by the host.
+let __outgoingHeaders(
+  headers: List<(String * String)>)
+  : Stdlib.Result.Result<List<(String * String)>, RequestError> =
+  match headers with
+  | [] -> Stdlib.Result.Result.Ok(headers)
+  | _ ->
+    let trimmed =
+      Stdlib.List.map(headers, fun h ->
+        (Stdlib.String.trim(Stdlib.Tuple2.first(h)), Stdlib.Tuple2.second(h)))
+
+    if Stdlib.List.any(trimmed, fun h -> Stdlib.Tuple2.first(h) == "") then
+      Stdlib.Result.Result.Error(RequestError.BadHeader(BadHeader.EmptyKey))
+    else
+      Stdlib.Result.Result.Ok(trimmed)
 
 
-/// Make an HTTP call to <param uri>. Returns a <type Result> where the response is
-/// wrapped in {{ Ok }} if a response was successfully received and parsed, and is
-/// wrapped in {{ Error }} otherwise. A GET or HEAD is a `read` (concurrent); any other
-/// method is a write and runs in program order.
+/// Make an HTTP call to <param uri> and read the whole response. Returns a <type Result>
+/// where the response is wrapped in {{ Ok }} if a response was successfully received and
+/// read, and is wrapped in {{ Error }} otherwise, including when the body fails or times
+/// out partway.
 ///
-/// <param body> is IGNORED for GET and HEAD. A read goes through `httpClientRead`, which
-/// takes no body, and carrying one would mean deciding whether a GET with a body is still
-/// a read. Use a method that is a write if you need the body sent.
+/// A GET or HEAD is a read: it runs concurrently with what follows, and your code waits for
+/// the response where it first looks at it, so `List.map get urls` has every request in
+/// flight at once. Any other method is a write and runs in program order. <param body> is
+/// sent whatever the method.
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.request reason=compiler-implementation
-let request
-  (method: String)
-  (uri: String)
-  (headers: List<(String * String)>)
-  (body: Blob)
+let request(
+  method: String,
+  uri: String,
+  headers: List<(String * String)>,
+  body: Bytes)
   : Stdlib.Result.Result<Response, RequestError> =
-  match Stdlib.String.toUppercase method with
-  | "GET" -> read "GET" uri headers
-  | "HEAD" -> read "HEAD" uri headers
-  | _ -> Builtin.httpClientRequest method uri headers body
+  match __outgoingHeaders(headers) with
+  | Ok(headers) -> Builtin.httpClientRequest(method, uri, headers, body)
+  | Error(e) -> Stdlib.Result.Result.Error(e)
 
 
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.get reason=compiler-implementation
-let get
-  (uri: String)
-  (headers: List<(String * String)>)
+let get(
+  uri: String,
+  headers: List<(String * String)>)
   : Stdlib.Result.Result<Response, RequestError> =
-  read "GET" uri headers
+  request("GET", uri, headers, Stdlib.Bytes.empty)
 
 
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.post reason=compiler-implementation
-let post
-  (uri: String)
-  (headers: List<(String * String)>)
-  (body: Blob)
+let post(
+  uri: String,
+  headers: List<(String * String)>,
+  body: Bytes)
   : Stdlib.Result.Result<Response, RequestError> =
-  request "POST" uri headers body
+  request("POST", uri, headers, body)
 
 
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.put reason=compiler-implementation
-let put
-  (uri: String)
-  (headers: List<(String * String)>)
-  (body: Blob)
+let put(
+  uri: String,
+  headers: List<(String * String)>,
+  body: Bytes)
   : Stdlib.Result.Result<Response, RequestError> =
-  request "PUT" uri headers body
+  request("PUT", uri, headers, body)
 
 
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.options reason=compiler-implementation
-let options (uri: String) : Stdlib.Result.Result<Response, RequestError> =
-  request "OPTIONS" uri [] Stdlib.Blob.empty
+let options(uri: String): Stdlib.Result.Result<Response, RequestError> =
+  request("OPTIONS", uri, [], Stdlib.Bytes.empty)
 
 
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.delete reason=compiler-implementation
-let delete (uri: String) : Stdlib.Result.Result<Response, RequestError> =
-  request "DELETE" uri [] Stdlib.Blob.empty
+let delete(uri: String): Stdlib.Result.Result<Response, RequestError> =
+  request("DELETE", uri, [], Stdlib.Bytes.empty)
 
 
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.head reason=compiler-implementation
-let head (uri: String) : Stdlib.Result.Result<Response, RequestError> =
-  read "HEAD" uri []
+let head(uri: String): Stdlib.Result.Result<Response, RequestError> =
+  request("HEAD", uri, [], Stdlib.Bytes.empty)
 
 
-/// Make a streaming HTTP call to <param uri>. The response's body is
-/// a lazy `Stream<UInt8>` — bytes arrive as the server writes them.
-/// Drain with `Stdlib.Stream.toList`, `Stdlib.Stream.toBlob`, or
-/// compose with `Stdlib.Stream.map` / `Stdlib.Stream.filter` etc.
+/// Make a streaming HTTP call to <param uri>, in program order. The response's body is
+/// a lazy `Stream<UInt8>`: bytes arrive as the server writes them. Drain with
+/// `Stdlib.Stream.toList`, `Stdlib.Stream.toBytes`, or compose with `Stdlib.Stream.map` /
+/// `Stdlib.Stream.filter` etc. The timeout covers the response's headers, not its body,
+/// so a long-lived stream is not cut off.
 ///
 /// The underlying socket is released when the body stream drains to
 /// completion or is explicitly closed with `Stdlib.Stream.close`.
-// @compiler blocked: compiler-contract diagnostic="Imported stream takes method, uri and headers; the compiler implementation additionally requires a Blob body."
-let stream
-  (method: String)
-  (uri: String)
-  (headers: List<(String * String)>)
+// @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.stream reason=compiler-implementation
+let stream(
+  method: String,
+  uri: String,
+  headers: List<(String * String)>,
+  body: Bytes)
   : Stdlib.Result.Result<StreamResponse, RequestError> =
-  Builtin.httpClientStream method uri headers
+  match __outgoingHeaders(headers) with
+  | Ok(headers) -> Builtin.httpClientStream(method, uri, headers, body)
+  | Error(e) -> Stdlib.Result.Result.Error(e)
 
 
 /// Returns a header <type (String*String))> with {{'authorization'}} created using HTTP basic auth
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.basicAuth reason=compiler-implementation
-let basicAuth
-  (username: String)
-  (password: String)
+let basicAuth(
+  username: String,
+  password: String)
   : Stdlib.Result.Result<(String * String), String> =
-  if Stdlib.String.contains username "-" then
-    Stdlib.Result.Result.Error "Username cannot contain a hyphen"
+  if Stdlib.String.contains(username, "-") then
+    Stdlib.Result.Result.Error("Username cannot contain a hyphen")
   else
-    let encoded = Stdlib.String.base64Encode $"{username}:{password}"
+    let encoded = Stdlib.Base64.encodeText($"{username}:{password}")
 
     Stdlib.Result.Result.Ok(("authorization", $"basic {encoded}"))
 
 /// Returns a header <type (String*String))> with {{'authorization'}} set to <param token>
 // @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.bearerToken reason=compiler-implementation
-let bearerToken (token: String) : (String * String) =
+let bearerToken(token: String): (String * String) =
   ("authorization", ("bearer " + token))
 
 
@@ -198,7 +223,7 @@ module Sse =
   // Server-Sent Events parsing over a Stream<UInt8>. Consumers
   // compose with the standard Stream builtins:
   //
-  //     HttpClient.stream "GET" url headers
+  //     HttpClient.stream "GET" url headers Stdlib.Bytes.empty
   //     |> Stdlib.Result.map (fun r -> HttpClient.Sse.parse r.body)
   //
   // Implemented as a true streaming parser via `Stdlib.Stream.unfold`:
@@ -219,11 +244,11 @@ module Sse =
   /// lines for the block we're currently assembling; `currentLine`
   /// is the byte buffer for the line we're currently reading.
   ///
-  /// TODO `currentLine` stays `List<UInt8>` (not `Blob`) because it's
+  /// TODO `currentLine` stays `List<UInt8>` (not `Bytes`) because it's
   /// accessed byte-by-byte during the parse — one append per byte and
-  /// frequent fold-over-bytes for the line scan. Blob.concat would
+  /// frequent fold-over-bytes for the line scan. Bytes.concat would
   /// reallocate the whole buffer on every append. Worth revisiting if
-  /// anyone profiles the SSE parser; could become Blob with an
+  /// anyone profiles the SSE parser; could become Bytes with an
   /// internal append-segments representation.
   // @compiler replace: packages/darklang/stdlib/httpClient/sse.dark#Darklang.Stdlib.HttpClient.Sse.ParseState reason=compiler-implementation
   type ParseState =
@@ -236,18 +261,17 @@ module Sse =
   /// spec: if there's no colon, the whole line is the field with an
   /// empty value; the leading space after the colon (if any) is
   /// stripped.
-  // @compiler replace: packages/darklang/stdlib/httpClient/sse.dark#Darklang.Stdlib.HttpClient.Sse.splitField reason=compiler-implementation
-  let splitField (line: String) : (String * String) =
-    match Stdlib.String.indexOf line ":" with
+  let __splitField(line: String): (String * String) =
+    match Stdlib.String.indexOf(line, ":") with
     | None -> (line, "")
-    | Some idx ->
-      let field = Stdlib.String.slice line 0 idx
+    | Some(idx) ->
+      let field = Stdlib.String.slice(line, 0, idx)
       let afterColon =
-        Stdlib.String.slice line (idx + 1) (Stdlib.String.length line)
+        Stdlib.String.slice(line, idx + 1, Stdlib.String.length(line))
 
       let value =
-        if Stdlib.String.startsWith afterColon " " then
-          Stdlib.String.dropFirst afterColon 1
+        if Stdlib.String.startsWith(afterColon, " ") then
+          Stdlib.String.dropFirst(afterColon, 1)
         else
           afterColon
 
@@ -258,20 +282,19 @@ module Sse =
   /// appends (with newline between multiple), `event: …` sets the
   /// event type, `id: …` sets the id, `:` comment lines are skipped,
   /// unknown fields are ignored.
-  // @compiler replace: packages/darklang/stdlib/httpClient/sse.dark#Darklang.Stdlib.HttpClient.Sse.applyLine reason=compiler-implementation
-  let applyLine
-    (data: String)
-    (eventType: String)
-    (id: String)
-    (hasData: Bool)
-    (line: String)
+  let __applyLine(
+    data: String,
+    eventType: String,
+    id: String,
+    hasData: Bool,
+    line: String)
     : (String * String * String * Bool) =
-    if Stdlib.String.isEmpty line then
+    if Stdlib.String.isEmpty(line) then
       (data, eventType, id, hasData)
-    else if Stdlib.String.startsWith line ":" then
+    else if Stdlib.String.startsWith(line, ":") then
       (data, eventType, id, hasData)
     else
-      let (field, value) = splitField line
+      let (field, value) = __splitField(line)
 
       if field == "data" then
         let newData =
@@ -292,15 +315,14 @@ module Sse =
   /// Build an Event from the accumulated lines of one block, if any
   /// `data:` field was seen. `lastId` is the id the block inherits
   /// when no `id:` field appears.
-  // @compiler replace: packages/darklang/stdlib/httpClient/sse.dark#Darklang.Stdlib.HttpClient.Sse.tryEmitBlock reason=compiler-implementation
-  let tryEmitBlock
-    (lines: List<String>)
-    (lastId: String)
+  let __tryEmitBlock(
+    lines: List<String>,
+    lastId: String)
     : Stdlib.Option.Option<Event> =
     let (data, eventType, id, hasData) =
-      Stdlib.List.fold lines (("", "", lastId, false)) (fun acc line ->
+      Stdlib.List.fold(lines, ("", "", lastId, false), fun(acc, line) ->
         let (d, e, i, h) = acc
-        applyLine d e i h line)
+        __applyLine(d, e, i, h, line))
 
     if hasData then
       Stdlib.Option.Option.Some(Event { data = data, eventType = eventType, id = id })
@@ -311,33 +333,33 @@ module Sse =
   /// Pull bytes from the underlying stream until a complete event
   /// terminator (blank line) arrives, then emit. Returns None once
   /// the stream is exhausted and no buffered data remains.
-  // @compiler replace: packages/darklang/stdlib/httpClient/sse.dark#Darklang.Stdlib.HttpClient.Sse.pullNextEvent reason=compiler-implementation
-  let pullNextEvent
-    (bytes: Stream<UInt8>)
-    (state: ParseState)
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpClient.Sse.__pullNextEvent: Unknown function or value 'Stdlib.Bytes.fromList'"
+  let __pullNextEvent(
+    bytes: Stream<UInt8>,
+    state: ParseState)
     : Stdlib.Option.Option<(Event * ParseState)> =
-    match Stdlib.Stream.next<UInt8> bytes with
+    match Stdlib.Stream.next<UInt8>(bytes) with
     | None ->
       // End of stream. Flush any buffered lines as a final event
       // (SSE spec: a trailing blank line is optional).
       let pending =
-        if Stdlib.List.isEmpty state.currentLine then
+        if Stdlib.List.isEmpty(state.currentLine) then
           state.currentLines
         else
           let tailLine =
             match
-              Stdlib.Blob.toString (Stdlib.Blob.fromList state.currentLine)
+              Stdlib.Utf8.decode(Stdlib.Bytes.fromList(state.currentLine))
             with
-            | Ok s -> s
-            | Error _ -> ""
+            | Ok(s) -> s
+            | Error(_) -> ""
 
-          Stdlib.List.append state.currentLines [ tailLine ]
+          Stdlib.List.append(state.currentLines, tailLine)
 
-      if Stdlib.List.isEmpty pending then
+      if Stdlib.List.isEmpty(pending) then
         Stdlib.Option.Option.None
       else
-        match tryEmitBlock pending state.lastId with
-        | Some event ->
+        match __tryEmitBlock(pending, state.lastId) with
+        | Some(event) ->
           let nextState =
             ParseState
               { lastId = event.id, currentLines = [], currentLine = [] }
@@ -345,20 +367,20 @@ module Sse =
           Stdlib.Option.Option.Some((event, nextState))
         | None -> Stdlib.Option.Option.None
 
-    | Some b ->
-      // 10uy = '\n'. End of a line.
-      if b == 10uy then
+    | Some(b) ->
+      // 10u8 = '\n'. End of a line.
+      if b == 10u8 then
         let line =
           match
-            Stdlib.Blob.toString (Stdlib.Blob.fromList state.currentLine)
+            Stdlib.Utf8.decode(Stdlib.Bytes.fromList(state.currentLine))
           with
-          | Ok s -> s
-          | Error _ -> ""
+          | Ok(s) -> s
+          | Error(_) -> ""
 
-        if Stdlib.String.isEmpty line then
+        if Stdlib.String.isEmpty(line) then
           // Blank line terminates the block. Try to emit an Event.
-          match tryEmitBlock state.currentLines state.lastId with
-          | Some event ->
+          match __tryEmitBlock(state.currentLines, state.lastId) with
+          | Some(event) ->
             let nextState =
               ParseState
                 { lastId = event.id, currentLines = [], currentLine = [] }
@@ -372,31 +394,31 @@ module Sse =
                   currentLines = []
                   currentLine = [] }
 
-            pullNextEvent bytes nextState
+            __pullNextEvent(bytes, nextState)
         else
           // Regular line; append and keep reading.
           let nextState =
             ParseState
               { lastId = state.lastId
-                currentLines = Stdlib.List.append state.currentLines [ line ]
+                currentLines = Stdlib.List.append(state.currentLines, line)
                 currentLine = [] }
 
-          pullNextEvent bytes nextState
+          __pullNextEvent(bytes, nextState)
       else
         let nextState =
           ParseState
             { lastId = state.lastId
               currentLines = state.currentLines
-              currentLine = Stdlib.List.append state.currentLine [ b ] }
+              currentLine = Stdlib.List.append(state.currentLine, b) }
 
-        pullNextEvent bytes nextState
+        __pullNextEvent(bytes, nextState)
 
 
   /// Parse an SSE byte stream into a stream of Events. Lazy: events
   /// flow to the consumer as their terminating blank lines arrive,
   /// so a slow LLM response surfaces tokens as they're produced.
   // @compiler replace: packages/darklang/stdlib/httpClient/sse.dark#Darklang.Stdlib.HttpClient.Sse.parse reason=compiler-implementation
-  let parse (bytes: Stream<UInt8>) : Stream<Event> =
+  let parse(bytes: Stream<UInt8>): Stream<Event> =
     let initial = ParseState { lastId = "", currentLines = [], currentLine = [] }
-    Stdlib.Stream.unfold<ParseState, Event> initial (fun state ->
-      pullNextEvent bytes state)
+    Stdlib.Stream.unfold<ParseState, Event>(initial, fun state ->
+      __pullNextEvent(bytes, state))

@@ -12,6 +12,6 @@ module Darklang.Stdlib.Test =
       match test with
       | Pass -> messages
       | Fail failures ->
-        if failures == [] then Stdlib.List.append messages ["Assertion failed"]
-        else Stdlib.List.append messages failures)
+        if failures == [] then Stdlib.List.concat messages ["Assertion failed"]
+        else Stdlib.List.concat messages failures)
     if failures == [] then Result.Pass else Result.Fail failures

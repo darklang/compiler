@@ -3,12 +3,12 @@
 // O((N + M)D) Myers search architecture without quadratic edit-distance tables.
 
 let byteAt (value: String) (index: Int64) : Int64 =
-    match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with
+    match Stdlib.String.getByteAt value index with
     | Some byte -> Stdlib.Int64.fromUInt8 byte
     | None -> Builtin.crash "Myers byte index is out of range"
 
 let stringLengthFrom (value: String) (index: Int64) : Int64 =
-    match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with
+    match Stdlib.String.getByteAt value index with
     | Some _ -> stringLengthFrom value (index + 1L)
     | None -> index
 
@@ -77,9 +77,9 @@ let repetitions = benchmarkArg 2 in
 if blocks <= 0L || insertions <= 0L || repetitions <= 0L then Builtin.crash "Myers workload arguments must be positive"
 else
     let unit = "darklang compiler benchmark: persistent values and recursive paths.\n" in
-    let prefix = Stdlib.String.repeat unit (Stdlib.Int.fromInt64 blocks) in
-    let suffix = Stdlib.String.repeat unit (Stdlib.Int.fromInt64 (blocks + 1L)) in
-    let insertion = Stdlib.String.repeat "<changed-block>" (Stdlib.Int.fromInt64 insertions) in
+    let prefix = Stdlib.String.repeat unit blocks in
+    let suffix = Stdlib.String.repeat unit (blocks + 1L) in
+    let insertion = Stdlib.String.repeat "<changed-block>" insertions in
     let leftText = prefix + suffix in
     let rightText = prefix + insertion + suffix in
     Builtin.printLine (Stdlib.Int64.toString (run repetitions leftText rightText 0L))

@@ -3,11 +3,11 @@
 type LeakPiece = { value: Int64 }
 
 let leakParsePiece (pattern: String) (index: Int64) : (LeakPiece * Int64) =
-    let value = match Stdlib.String.getByteAt pattern (Stdlib.Int.fromInt64 index) with | Some byte -> Stdlib.Int64.fromUInt8 byte | None -> 0L in
+    let value = match Stdlib.String.getByteAt pattern index with | Some byte -> Stdlib.Int64.fromUInt8 byte | None -> 0L in
     (LeakPiece { value = value }, index + 1L)
 
 let leakParsePieces (pattern: String) (index: Int64) (reversed: List<LeakPiece>) : List<LeakPiece> =
-    if Stdlib.Int.fromInt64 index >= Stdlib.String.length pattern then Stdlib.List.reverse reversed
+    if index >= Stdlib.String.length pattern then Stdlib.List.reverse reversed
     else
         let (piece, nextIndex) = leakParsePiece pattern index in
         leakParsePieces pattern nextIndex (Stdlib.List.push reversed piece)

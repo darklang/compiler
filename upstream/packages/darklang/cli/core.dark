@@ -12,13 +12,11 @@ type SubAppAction =
   | Save
   | Exit
   /// Hand off to another command (e.g. a browser launching a foreground app), replacing this page.
-  | LaunchCommand of String
-  /// Drop to the classic prompt, pushing this page so `quit` there returns here instead of leaving the CLI.
-  | LaunchPrompt
+  | LaunchCommand(String)
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.SubApp: Unknown type 'Stdlib.Live.Change'"
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.Live.Change'"
 type SubApp =
-  { onKey: Stdlib.Cli.Stdin.Key.Key -> Stdlib.Cli.Stdin.Modifiers.Modifiers -> Stdlib.Option.Option<String> -> (SubAppAction * SubApp)
+  { onKey: (Stdlib.Cli.Stdin.Key.Key, Stdlib.Cli.Stdin.Modifiers.Modifiers, Stdlib.Option.Option<String>) -> (SubAppAction * SubApp)
     onDisplay: Unit -> Unit
     /// Persist, and return the app as it stands afterwards.
     ///
@@ -36,14 +34,14 @@ type SubApp =
     onResume: Unit -> SubApp
     /// The package store changed under the page (an edit from another process, a pull). The page
     /// re-reads what it shows, or ignores it, and presents.
-    onStoreChanged: Stdlib.Live.Change -> SubApp }
+    onStoreChanged: LanguageTools.Live.Change -> SubApp }
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Page: Unknown type 'Packages.NavInteractive.Session'"
 type Page =
   | MainPrompt
-  | InteractiveNav of Packages.NavInteractive.Session
-  | CompletionPicker of CompletionPicker.Session
-  | SubApp of SubApp
+  | InteractiveNav(Packages.NavInteractive.Session)
+  | CompletionPicker(CompletionPicker.Session)
+  | SubApp(SubApp)
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.AppState: Unknown type 'Packages.State'"
 type AppState =
@@ -83,7 +81,7 @@ type AppState =
     /// command, a failed `eval`, and the `--json` failure paths do, so scripts and agents can
     /// branch on the exit rather than parse prose. (Most commands still report failure in prose
     /// only; they set this as they are touched.)
-    exitCode: Int }
+    exitCode: Int64 }
 
 /// What the prompt shows to your left: where you are in the package tree, and WHICH BRANCH, when you're on
 /// one.
@@ -96,22 +94,21 @@ type AppState =
 /// Only when you're on a branch. Everyone is on main almost all the time, and a prompt that says so every
 /// line is noise you learn to stop reading.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let locationStr (state: AppState) : String =
-  let where = Packages.formatLocation state.packageData.currentLocation
+let locationStr(state: AppState): String =
+  let where = Packages.formatLocation(state.packageData.currentLocation)
 
   match state.currentBranchId with
-  | id when SCM.Branch.isMain id -> where
-  | id -> $"{where} @{SCM.PackageOps.branchName id}"
+  | id when SCM.Branch.isMain(id) -> where
+  | id -> $"{where} @{SCM.PackageOps.branchName(id)}"
 
 /// Refuse a dash-led argument where a name belongs.
 ///
 /// A leading dash means someone mistyped a flag; it is never a name anyone meant
 /// to use. Taken as one it creates a branch called `--frce` that then has to be
 /// found and archived.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.refuseDashLedName: Unknown function or value 'printErr'"
-let refuseDashLedName (kind: String) (name: String) : Bool =
-  if Stdlib.String.startsWith name "-" then
-    printErr $"\"{name}\" starts with a dash, so it's a flag rather than a {kind} name."
+let refuseDashLedName(kind: String, name: String): Bool =
+  if Stdlib.String.startsWith(name, "-") then
+    printErr($"\"{name}\" starts with a dash, so it's a flag rather than a {kind} name.")
 
     true
   else
@@ -122,22 +119,31 @@ let refuseDashLedName (kind: String) (name: String) : Bool =
 //
 // Which stream: would someone piping this command into another program want the line? An error or a
 // hint never is, so those go to stderr.
-let printOk (msg: String) : Unit = Stdlib.printLine (Stdlib.Cli.UI.Colors.success msg)
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.printErr: Unknown function or value 'Stdlib.printErrorLine'"
-let printErr (msg: String) : Unit = Stdlib.printErrorLine (Stdlib.Cli.UI.Colors.error msg)
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.printHint: Unknown function or value 'Stdlib.printErrorLine'"
-let printHint (msg: String) : Unit = Stdlib.printErrorLine (Stdlib.Cli.UI.Colors.hint msg)
+let printOk(msg: String): Unit = Stdlib.printLine(Stdlib.Cli.UI.Colors.success(msg))
+let printErr(msg: String): Unit = Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.error(msg))
+let printHint(msg: String): Unit = Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint(msg))
 
 /// A line of the ANSWER in hint colour. Not `printHint`, which would take it off stdout.
-let printQuiet (msg: String) : Unit = Stdlib.printLine (Stdlib.Cli.UI.Colors.hint msg)
+let printQuiet(msg: String): Unit = Stdlib.printLine(Stdlib.Cli.UI.Colors.hint(msg))
 
 module Stderr =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Stderr.line: Unknown function or value 'Stdlib.printErrorLine'"
-  let line (msg: String) : Unit = Stdlib.printErrorLine msg
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Stderr.ok: Unknown function or value 'Stdlib.printErrorLine'"
-  let ok (msg: String) : Unit = Stdlib.printErrorLine (Stdlib.Cli.UI.Colors.success msg)
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Stderr.hint: Unknown function or value 'Stdlib.printErrorLine'"
-  let hint (msg: String) : Unit = Stdlib.printErrorLine (Stdlib.Cli.UI.Colors.hint msg)
+  let line(msg: String): Unit = Stdlib.printErrorLine(msg)
+  let lines(msgs: List<String>): Unit = Stdlib.List.iter(msgs, fun l -> Stdlib.printErrorLine(l))
+  let ok(msg: String): Unit = Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.success(msg))
+  let hint(msg: String): Unit = Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint(msg))
+
+/// Whether a command asks before it does something it cannot take back, or has its yes already.
+type Confirm =
+  /// Ask, and take only `y` as yes.
+  | Ask
+  /// Go ahead without asking: the command line said `-y` or `--yes`.
+  | Assume
+
+module Confirm =
+  /// {{Assume}} when <param yes>, the way a command reads `-y` or `--yes`.
+  let assumeIf(yes: Bool): Darklang.Cli.Confirm =
+    if yes then Darklang.Cli.Confirm.Assume else Darklang.Cli.Confirm.Ask
+
 
 /// The state a command hands back, given whether it did what it was asked.
 ///
@@ -148,25 +154,30 @@ module Stderr =
 /// An empty ANSWER is not a refusal: a command asked a question and told the truth about it
 /// succeeded, however little there was to say.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let exitWith (state: AppState) (ok: Bool) : AppState =
-  if ok then state else { state with exitCode = 1 }
+let exitWith(state: AppState, ok: Bool): AppState =
+  if ok then state else failed(state)
+
+/// The state a command hands back when it could not do what it was asked, and has printed why:
+/// exit code 1. <fn exitWith> is for when that is worked out at run time.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
+let failed(state: AppState): AppState = { state with exitCode = 1 }
 
 
 /// First 8 hex chars of a hash, for human-readable display.
-let shortHash (h: LanguageTools.ProgramTypes.Hash) : String =
-  LanguageTools.ProgramTypes.hashToString h |> Stdlib.String.slice 0 8
+let shortHash(h: LanguageTools.ProgramTypes.Hash): String =
+  LanguageTools.ProgramTypes.hashToString(h) |> Stdlib.String.slice(0, 8)
 
 
 /// Escape a string for a hand-assembled JSON body. Backslash first, or it would
 /// re-escape the ones the quote pass just wrote.
-let jsonEscape (x: String) : String =
+let jsonEscape(x: String): String =
   x
-  |> Stdlib.String.replaceAll "\\" "\\\\"
-  |> Stdlib.String.replaceAll "\"" "\\\""
+  |> Stdlib.String.replaceAll("\\", "\\\\")
+  |> Stdlib.String.replaceAll("\"", "\\\"")
 
 /// A JSON string literal: escaped and wrapped in quotes.
-let jsonStr (s: String) : String =
-  let escaped = jsonEscape s
+let jsonStr(s: String): String =
+  let escaped = jsonEscape(s)
   $"\"{escaped}\""
 
 
@@ -174,10 +185,10 @@ let jsonStr (s: String) : String =
 /// list and the options, and building the list is 60 records of 6 fields including 3 fn refs each. Calling it
 /// twice per process start was pure duplicate work, on every invocation including `dark version`.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Registry.CommandHandler'"
-let commandOptions (commands: List<Registry.CommandHandler>) : List<String> =
-  let allNames = Stdlib.List.map commands (fun cmd -> cmd.name)
-  let allAliases = Stdlib.List.fold commands [] (fun acc cmd -> Stdlib.List.append acc cmd.aliases)
-  Stdlib.List.append allNames allAliases
+let commandOptions(commands: List<Registry.CommandHandler>): List<String> =
+  let allNames = Stdlib.List.map(commands, fun cmd -> cmd.name)
+  let allAliases = Stdlib.List.fold(commands, [], fun(acc, cmd) -> Stdlib.List.concat(acc, cmd.aliases))
+  Stdlib.List.concat(allNames, allAliases)
 
 /// The branch this run starts on, `SCM.Branch.mainBranchId` for main.
 ///
@@ -189,22 +200,22 @@ let commandOptions (commands: List<Registry.CommandHandler>) : List<String> =
 /// REPL's: one long-lived process where `switch` moves you mid-session, so the state has to move with it
 /// and a command that renders (`status`, `commit`, the workbench) reads it from there.
 /// `SCM.PackageOps.currentBranch ()` is the process's, and it is what the verbs that MUTATE the store use
-/// -- `branch`, `merge`, `discard`, `push` -- because the ops they author route by the process overlay,
+/// -- `branch`, `merge`, `discard`, `push` -- because the ops they author route by the process's branch,
 /// and a state that had drifted from it would report one branch while writing to another.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.resolveStartingBranch: Unknown function or value 'SCM.PackageOps.currentBranch'"
-let resolveStartingBranch () : Uuid = SCM.PackageOps.currentBranch ()
+let resolveStartingBranch(): Uuid = SCM.PackageOps.currentBranch()
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let initState () : AppState =
+let initState(): AppState =
   // No accounts: approval scoping is the only thing that still takes one, and it takes None.
   let accountID = Stdlib.Option.Option.None
-  let branchId = resolveStartingBranch ()
-  let commands = Registry.allCommands ()
+  let branchId = resolveStartingBranch()
+  let commands = Registry.allCommands()
   AppState
     { isExiting = false
-      prompt = Prompt.initState ()
-      packageData = Packages.initState ()
+      prompt = Prompt.initState()
+      packageData = Packages.initState()
       currentPage = Page.MainPrompt
       pageStack = []
       currentBranchId = branchId
@@ -218,13 +229,13 @@ let initState () : AppState =
       cachedFilterPartial = ""
       cachedFilterItems = []
       allCommandsCache = commands
-      commandOptionsCache = commandOptions commands
-      telemetryEnabled = (Stdlib.Env.get "DARK_TELEMETRY") == Stdlib.Option.Option.Some "1"
+      commandOptionsCache = commandOptions(commands)
+      telemetryEnabled = (Stdlib.Env.get("DARK_TELEMETRY")) == Stdlib.Option.Option.Some("1")
       exitCode = 0 }
 
 type Msg =
-  | ProcessInput of String
-  | KeyPressed of key: Stdlib.Cli.Stdin.Key.Key * modifiers: Stdlib.Cli.Stdin.Modifiers.Modifiers * keyChar: Stdlib.Option.Option<String>
+  | ProcessInput(String)
+  | KeyPressed(key: Stdlib.Cli.Stdin.Key.Key, modifiers: Stdlib.Cli.Stdin.Modifiers.Modifiers, keyChar: Stdlib.Option.Option<String>)
   | Exit
 
 
@@ -243,45 +254,127 @@ module ExecutionError =
     { error: LanguageTools.RuntimeTypes.RuntimeError.Error
       resource: String
       rule: Stdlib.Option.Option<String>
-      /// The rendered call stack, printed when the denial stands.
-      callStack: String }
+      callStack: List<LanguageTools.RuntimeTypes.ExecutionPoint> }
 
   /// Boundary type for CLI command failures. Each variant carries its own
   /// structured payload — no flattening to strings at the boundary.
   // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ExecutionError.ExecutionError: Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
   type ExecutionError =
-    | Parse of LanguageTools.Parser.CliScript.ParseError
-    | TypeCheck of LanguageTools.AtRestTypeChecker.Report
-    | Runtime of LanguageTools.RuntimeTypes.RuntimeError.Error
-    | Denied of PermissionDenied
-    | Unhandled of Unhandled
+    | Parse(LanguageTools.Parser.CliScript.ParseError)
+    /// A definite type error found before anything ran, and where each node the report
+    /// names starts in the source: (node id, line, column), both 1-based.
+    | TypeCheck(
+        report: LanguageTools.AtRestTypeChecker.Report,
+        locations: List<(UInt64 * Int64 * Int64)>)
+    | Runtime(
+        error: LanguageTools.RuntimeTypes.RuntimeError.Error,
+        callStack: List<LanguageTools.RuntimeTypes.ExecutionPoint>)
+    | Denied(PermissionDenied)
+    | Unhandled(Unhandled)
+
+  /// `. Did you mean `X`?` for a name that did not resolve, when the standard library has it
+  /// somewhere else or a name near it exists; the same hint `dark fn` gives
+  /// (<fn Packages.Errors.didYouMean>).
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ExecutionError.nameSuggestion: Unknown function or value 'Packages.Errors.didYouMean'"
+  let nameSuggestion(
+    branchId: Uuid,
+    rte: LanguageTools.RuntimeTypes.RuntimeError.Error)
+    : String =
+    match rte with
+    | ParseTimeNameResolution(originalName, NotFound) ->
+      match Packages.Errors.didYouMeanText(Packages.Errors.didYouMean(branchId, originalName)) with
+      | "" -> ""
+      | text -> ". " + text
+    | _ -> ""
 
   // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError'"
-  let toString (branchId: Uuid) (err: ExecutionError) : String =
+  let toString(branchId: Uuid, err: ExecutionError): String =
     match err with
-    | Parse pe -> LanguageTools.Parser.CliScript.ParseError.toString pe
-    | TypeCheck report -> Packages.AtRestCheck.scriptReport branchId report
-    | Runtime rte ->
-      PrettyPrinter.RuntimeTypes.RuntimeError.toString branchId rte
-    | Denied denied ->
-      PrettyPrinter.RuntimeTypes.RuntimeError.toString branchId denied.error
-    | Unhandled u ->
+    | Parse(pe) -> LanguageTools.Parser.CliScript.ParseError.toString(pe)
+    | TypeCheck(report, locations) ->
+      Packages.AtRestCheck.scriptReport(branchId, report, locations)
+    | Runtime(rte, _) ->
+      PrettyPrinter.RuntimeTypes.RuntimeError.toString(branchId, rte)
+      + nameSuggestion(branchId, rte)
+    | Denied(denied) ->
+      PrettyPrinter.RuntimeTypes.RuntimeError.toString(branchId, denied.error)
+    | Unhandled(u) ->
       match u.metadata with
       | [] -> $"Internal error: {u.message}"
       | _ ->
         let lines =
           u.metadata
-          |> Stdlib.List.map (fun (k, v) -> $"  {k}: {v}")
-          |> Stdlib.String.join "\n"
+          |> Stdlib.List.map(fun((k, v)) -> $"  {k}: {v}")
+          |> Stdlib.String.join("\n")
         $"Internal error: {u.message}\n{lines}"
+
+  /// Skip entry-only stacks: they add no useful detail to a missing-name error.
+  let hasReadableFrames(
+    frames: List<LanguageTools.RuntimeTypes.ExecutionPoint>)
+    : Bool =
+    Stdlib.List.any(frames, fun frame ->
+      match frame with
+      | Function(_) -> true
+      | _ -> false)
+
+  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError'"
+  let printCallStack(branchId: Uuid, what: String, error: ExecutionError): Unit =
+    let frames =
+      match error with
+      | Runtime(_, frames) -> frames
+      | Denied(denial) -> denial.callStack
+      | _ -> []
+    let show =
+      match error with
+      | Denied(_) -> frames != []
+      | _ -> hasReadableFrames(frames)
+    if show then
+      let rendered =
+        match error with
+        | Denied(_) -> deniedCallStack(branchId, frames)
+        | _ -> PrettyPrinter.RuntimeTypes.callStack(branchId, frames)
+      let gap =
+        match error with
+        | Denied(_) -> ""
+        | _ -> "\n"
+      Stdlib.printErrorLine($"Error when executing {what}. Call-stack:\n{rendered}{gap}")
+    else
+      ()
+
+  /// A denial's call stack down to the first bundled Darklang function it went through. The
+  /// calls inside that function are how it reaches the resource, and the denial already names
+  /// the resource, so they are counted rather than listed.
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ExecutionError.deniedCallStack: Unknown function or value 'PrettyPrinter.RuntimeTypes.executionPoint'"
+  let deniedCallStack(
+    branchId: Uuid,
+    frames: List<LanguageTools.RuntimeTypes.ExecutionPoint>)
+    : String =
+    let isBundled = fun frame ->
+      let shown = PrettyPrinter.RuntimeTypes.executionPoint(branchId, frame)
+      Stdlib.String.startsWith(shown, "Package Function Darklang.")
+      || Stdlib.String.startsWith(shown, "Lambda in Darklang.")
+      || Stdlib.String.startsWith(shown, "Builtin Function ")
+      || Stdlib.String.startsWith(shown, "Trait Method ")
+
+    let inside =
+      frames
+      |> Stdlib.List.reverse
+      |> Stdlib.List.takeWhile(isBundled)
+      |> Stdlib.List.length
+    let kept = Stdlib.List.length(frames) - inside + 1
+
+    if inside < 2 then
+      PrettyPrinter.RuntimeTypes.callStack(branchId, frames)
+    else
+      let hidden = inside - 1
+      let calls = if hidden == 1 then "call" else "calls"
+      PrettyPrinter.RuntimeTypes.callStack(branchId, Stdlib.List.take(frames, kept))
+      + $"\n  ({Stdlib.display(hidden)} {calls} inside it)"
 
 
 module View =
-  let formatError (message: String) : String =
-    Stdlib.Cli.UI.Colors.error ("Error: " + message)
+  let formatError(message: String): String =
+    Stdlib.Cli.UI.Colors.error("Error: " + message)
 
-  let formatSuccess (message: String) : String =
-    Stdlib.Cli.UI.Colors.success message
-
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.View.formatWelcome: Unknown function or value 'Registry.getCompactCommandList'"
-  let formatWelcome () : String = Registry.getCompactCommandList ()
+  let formatSuccess(message: String): String =
+    Stdlib.Cli.UI.Colors.success(message)

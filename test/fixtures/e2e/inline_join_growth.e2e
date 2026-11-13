@@ -58,7 +58,7 @@ lambdaEmptyListMatch [] = []
 // An empty list as the seed of a generic call: the type variable takes the
 // list and the element is fixed by the other arguments.
 let foldFromEmpty (ids: List<Int64>): List<Int64> =
-  Stdlib.List.fold ids [] (fun acc id -> Stdlib.List.append acc [id])
+  Stdlib.List.fold ids [] (fun acc id -> Stdlib.List.concat acc [id])
 foldFromEmpty [1L, 2L] = [1L, 2L]
 foldFromEmpty [] = []
 
@@ -86,4 +86,5 @@ let inferNotEqualLambda (xs: List<String>): Int =
   xs
   |> Stdlib.List.filter (fun s -> Stdlib.String.trim s != "")
   |> Stdlib.List.length
+  |> Stdlib.Int.fromInt64
 inferNotEqualLambda ["a", " ", "b"] = 2

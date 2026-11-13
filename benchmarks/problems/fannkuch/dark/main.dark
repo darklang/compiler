@@ -3,7 +3,7 @@
 
 // Get element at index (unsafe - assumes valid index)
 let getAt (list: List<Int64>) (index: Int64) : Int64 =
-    match Stdlib.List.getAt list (Stdlib.Int.fromInt64 index) with
+    match Stdlib.List.getAt list index with
     | Some v -> v
     | None -> 0L
 
@@ -15,7 +15,7 @@ let prependReversed (source: List<Int64>) (suffix: List<Int64>) : List<Int64> =
 
 // Reverse the first k+1 values in one source traversal.
 let reversePrefixCollect (source: List<Int64>) (remaining: Int64) (reversed: List<Int64>) : List<Int64> =
-    if remaining < 0L then Stdlib.List.append reversed source
+    if remaining < 0L then Stdlib.List.concat reversed source
     else
         match source with
         | [] -> reversed
@@ -80,15 +80,12 @@ let fannkuchLoop (perm: List<Int64>) (count: List<Int64>) (n: Int64) (maxFlips: 
     else fannkuchLoop newPerm newCount n newMax
 
 // Create initial list [0, 1, 2, ..., n-1]
-let intToInt64 (value: Int) : Int64 =
-    Builtin.unwrap (Stdlib.Int.toInt64 value)
-
 let createRange (n: Int64) : List<Int64> =
-    Stdlib.List.map (Stdlib.List.range 0 (Stdlib.Int.fromInt64 (n - 1L))) intToInt64
+    Stdlib.List.range 0L (n - 1L)
 
 let fannkuch (n: Int64) : Int64 =
     let perm = createRange n in
-    let count = Stdlib.List.map (Stdlib.List.range 1 (Stdlib.Int.fromInt64 n)) intToInt64 in
+    let count = Stdlib.List.range 1L n in
     fannkuchLoop perm count n 0L
 
 // The full profile runs the complete n=9 traversal in both Dark and Rust.

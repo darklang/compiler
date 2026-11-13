@@ -15,21 +15,23 @@ type StaticType =
   | TUInt64
   | TInt128
   | TUInt128
-  | TInt
+  | TBigInt
   | TFloat
+  | TFloat32
+  | TDecimal
   | TChar
   | TString
   | TUuid
   | TDateTime
-  | TBlob
-  | TStream of StaticType
-  | TList of StaticType
-  | TTuple of StaticType * StaticType * List<StaticType>
-  | TDict of key: StaticType * value: StaticType
-  | TCustom of LanguageTools.ProgramTypes.Hash * List<StaticType>
-  | TFn of List<StaticType> * StaticType
-  | TRigidVariable of String
-  | TInferenceVariable of Int
+  | TBytes
+  | TStream(StaticType)
+  | TList(StaticType)
+  | TTuple(StaticType, StaticType, List<StaticType>)
+  | TDict(key: StaticType, value: StaticType)
+  | TCustom(LanguageTools.ProgramTypes.Hash, List<StaticType>)
+  | TFn(List<StaticType>, StaticType)
+  | TRigidVariable(String)
+  | TInferenceVariable(Int64)
 
 // @compiler blocked: constructor-identity diagnostic="Constructor identity collision 201: Darklang.LanguageTools.AtRestTypeChecker.Verdict.Incomplete, Darklang.LanguageTools.WrittenTypes.LetPattern.LPVariable"
 type Verdict =
@@ -43,6 +45,12 @@ type IssueCode =
   | UnknownVariable
   | InvalidArgumentIndex
   | NotCallable
+  /// A call gives a function fewer arguments than it takes. Dark has no partial
+  /// application; a lambda says which arguments come later.
+  | TooFewArguments
+  /// A call gives a function more arguments than it takes. A function that a call
+  /// returns is called by a call of its own: `f(a)(b)`.
+  | TooManyArguments
   | ExplicitTypeArgumentCountMismatch
   | InvalidPattern
   | DuplicatePatternBinding
@@ -50,6 +58,7 @@ type IssueCode =
   | UnknownTupleElement
   | MissingRecordField
   | DuplicateRecordField
+  | DuplicateDictKey
   | UnknownEnumCase
   | EnumFieldCountMismatch
   | InvalidInfixOperand
@@ -85,10 +94,10 @@ type IssueCode =
 
 /// A function or value the checker names in an issue.
 type NameRef =
-  | Builtin of String * Int64
-  | Package of LanguageTools.ProgramTypes.Hash
+  | Builtin(String, Int64)
+  | Package(LanguageTools.ProgramTypes.Hash)
   /// A trait method, by the trait type's hash and the method name
-  | TraitMethod of LanguageTools.ProgramTypes.Hash * String
+  | TraitMethod(LanguageTools.ProgramTypes.Hash, String)
 
 /// Where in the item the checker was working when it found something.
 type Site =
@@ -102,7 +111,9 @@ type Site =
   | Expression
   | StatementBeforeFinalExpression
   | FunctionApplication
-  | FunctionArgument of Int64
+  /// An argument by its zero-based position, and the called function's name as written, when
+  /// the call is to a name
+  | FunctionArgument(Int64, Stdlib.Option.Option<String>)
   | IfWithoutElse
   | RecordFieldAccess
   | InterpolatedSegment
@@ -121,6 +132,8 @@ type Site =
   | PipelineStringConcatenation
   | PipelineComparison
   | PipelineNumericOperator
+  /// The right side of an operator, which must be the left side's type
+  | OperatorOperand(LanguageTools.ProgramTypes.InfixFnName)
 
 /// Which of several same-coded places a name was declared twice.
 type DuplicateSite =
@@ -128,6 +141,7 @@ type DuplicateSite =
   | InFunctionSignature
   | InRecordConstruction
   | InRecordUpdate
+  | InDictLiteral
   | InPattern
 
 /// What the checker could not pin down when it reports an ambiguous type.
@@ -158,28 +172,29 @@ type UntrustedBuiltin =
 /// resolver and could only ever say `Type #a1b2c3d4`, while `contextToStringWith` can
 /// look the hash up and say what the author called it.
 type Context =
+  | InStringInterpolation(Context)
   | NoDetail
-  | At of Site
-  | Unresolved of List<String>
-  | TypeUnavailable of LanguageTools.ProgramTypes.Hash
-  | TraitUnavailable of LanguageTools.ProgramTypes.Hash
+  | At(Site)
+  | Unresolved(List<String>)
+  | TypeUnavailable(LanguageTools.ProgramTypes.Hash)
+  | TraitUnavailable(LanguageTools.ProgramTypes.Hash)
   /// The trait method an impl gets wrong, and what is wrong with it
-  | ImplMethod of LanguageTools.ProgramTypes.Hash * String * String
-  | FunctionUnavailable of NameRef
-  | ValueUnavailable of NameRef
-  | Identifier of String
-  | Identifiers of List<String>
-  | Duplicate of String * DuplicateSite
-  | Ambiguous of AmbiguousSubject
-  | Untrusted of NameRef * UntrustedBuiltin
+  | ImplMethod(LanguageTools.ProgramTypes.Hash, String, String)
+  | FunctionUnavailable(NameRef)
+  | ValueUnavailable(NameRef)
+  | Identifier(String)
+  | Identifiers(List<String>)
+  | Duplicate(String, DuplicateSite)
+  | Ambiguous(AmbiguousSubject)
+  | Untrusted(NameRef, UntrustedBuiltin)
   /// The trait a bound or method call needed an impl of
-  | TraitNeeded of LanguageTools.ProgramTypes.Hash * Stdlib.Option.Option<String>
-  | Arity of Int64 * Int64
-  | NamedArity of String * Int64 * Int64
-  | TypeArity of LanguageTools.ProgramTypes.Hash * Int64 * Int64
-  | ArgumentIndex of Int64
-  | UncoveredPattern of Stdlib.Option.Option<String>
-  | InfixOperandUnsupported of LanguageTools.ProgramTypes.InfixFnName
+  | TraitNeeded(LanguageTools.ProgramTypes.Hash, Stdlib.Option.Option<String>)
+  | Arity(Int64, Int64)
+  | NamedArity(String, Int64, Int64)
+  | TypeArity(LanguageTools.ProgramTypes.Hash, Int64, Int64)
+  | ArgumentIndex(Int64)
+  | UncoveredPattern(Stdlib.Option.Option<String>)
+  | InfixOperandUnsupported(LanguageTools.ProgramTypes.InfixFnName)
   | RecordRequiredForConstruction
   | RecordRequiredForFieldAccess
   | RecordRequiredForUpdate
@@ -197,7 +212,7 @@ type Context =
   | DeclarationTooDeep
   | UnaryMinusOperandNotSignedNumeric
   | BitwiseNotOperandNotInteger
-  | CheckerUnavailable of String
+  | CheckerUnavailable(String)
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.AtRestTypeChecker.Issue: Unknown type 'StaticType'"
 type Issue =
@@ -214,7 +229,7 @@ type ItemReport =
     diagnostics: List<Issue>
     warnings: List<Issue>
 
-    /// Which implementation each trait call in this item resolved to. Save-time pinning
+    /// Which implementation each trait call in this item resolved to. Save-time resolution
     /// is the only caller that reads it; everything that reports to a PERSON reads the
     /// three fields above and ignores this one.
     ///
@@ -236,11 +251,11 @@ type CheckFailure =
   /// Nesting deep enough to exhaust the native stack.
   | TooDeep
   /// Any other runtime error, rendered.
-  | Failed of message: String
+  | Failed(message: String)
 
 /// The report for nothing: no items, so trivially Checked.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Report'"
-let emptyReport () : Report =
+let emptyReport(): Report =
   Report { verdict = Verdict.Checked, items = [], diagnostics = [], warnings = [] }
 
 /// Check package operations before they are persisted or presented as diagnostics.
@@ -248,50 +263,50 @@ let emptyReport () : Report =
 /// Run the checker with error handling around the entire batch.
 /// If a checker error escapes the per-declaration handlers, return Incomplete.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
-let checkPackageOps
-  (ops: List<LanguageTools.ProgramTypes.PackageOp>)
+let checkPackageOps(
+  ops: List<LanguageTools.ProgramTypes.PackageOp>)
   : Report =
-  guarded Run.checkPackageOps ops
+  guarded(Run.checkPackageOps, ops)
 
 /// Check package operations against the implementations bound on <param branchId>.
 ///
-/// What authoring uses, and what save-time pinning reads: a call is pinned to the
+/// What authoring uses, and what save-time resolution reads: a call resolves to the
 /// implementation that is live on the branch being saved to, so the branch is not optional
 /// there the way it is for an editor buffer.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
-let checkPackageOpsOn
-  (branchId: Uuid)
-  (ops: List<LanguageTools.ProgramTypes.PackageOp>)
+let checkPackageOpsOn(
+  branchId: Uuid,
+  ops: List<LanguageTools.ProgramTypes.PackageOp>)
   : Report =
-  guarded (fun (b, o) -> Run.checkPackageOpsOn b o) ((branchId, ops))
+  guarded((fun((b, o)) -> Run.checkPackageOpsOn(b, o)), (branchId, ops))
 
 /// Type-check all declarations visible on the selected branch.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Report'"
-let checkBranch (branchId: Uuid) : Report = guarded Run.checkBranch branchId
+let checkBranch(branchId: Uuid): Report = guarded(Run.checkBranch, branchId)
 
 /// Type-check just the declarations under <param modules>, and everything below them.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Report'"
-let checkModule (branchId: Uuid) (modules: List<String>) : Report =
-  guarded (fun (b, m) -> Run.checkModule b m) ((branchId, modules))
+let checkModule(branchId: Uuid, modules: List<String>): Report =
+  guarded((fun((b, m)) -> Run.checkModule(b, m)), (branchId, modules))
 
 /// Return an Incomplete report if shared work for the batch fails.
 /// Run and Items catch errors for individual declarations separately, preserving
 /// the results of the other declarations.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Report'"
-let guarded (check: 'a -> Report) (input: 'a) : Report =
-  match guard check input with
-  | Ok report -> report
-  | Error failure ->
-    let warning = failureIssue Stdlib.Option.Option.None failure
+let guarded(check: 'a -> Report, input: 'a): Report =
+  match guard(check, input) with
+  | Ok(report) -> report
+  | Error(failure) ->
+    let warning = failureIssue(Stdlib.Option.Option.None, failure)
 
     // This arm empties the WHOLE batch, so say why; callers read `items`, not this.
     // stderr, never stdout: the language server reaches this from its diagnostics, and its stdout
     // is the JSON-RPC channel, where a line of prose is a malformed frame.
-    Stdlib.printErrorLine
+    Stdlib.printErrorLine(
       ("the at-rest checker failed over a whole batch and reported nothing: "
        + (match failure with
           | TooDeep -> "a declaration nests too deep to check"
-          | Failed message -> message))
+          | Failed(message) -> message)))
 
     Report
       { verdict = Verdict.Incomplete
@@ -302,19 +317,19 @@ let guarded (check: 'a -> Report) (input: 'a) : Report =
 /// Use an F# builtin to run the check and catch runtime errors.
 /// Return Ok with the check's result, or Error if the checker itself fails.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.AtRestTypeChecker.guard: Unknown function or value 'Builtin.atRestCheckGuarded'"
-let guard (check: 'a -> 'b) (input: 'a) : Stdlib.Result.Result<'b, CheckFailure> =
-  Builtin.atRestCheckGuarded check input
+let guard(check: 'a -> 'b, input: 'a): Stdlib.Result.Result<'b, CheckFailure> =
+  Builtin.atRestCheckGuarded(check, input)
 
 /// Turn a checker failure into an Incomplete warning.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Issue'"
-let failureIssue
-  (nodeId: Stdlib.Option.Option<UInt64>)
-  (failure: CheckFailure)
+let failureIssue(
+  nodeId: Stdlib.Option.Option<UInt64>,
+  failure: CheckFailure)
   : Issue =
   let context =
     match failure with
     | TooDeep -> Context.DeclarationTooDeep
-    | Failed message -> Context.CheckerUnavailable message
+    | Failed(message) -> Context.CheckerUnavailable(message)
 
   Issue
     { code = IssueCode.UnsupportedConstruct
@@ -324,14 +339,14 @@ let failureIssue
       context = context }
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'StaticType'"
-let staticTypeToStringWith
-  (customTypeName:
-    LanguageTools.ProgramTypes.Hash -> Stdlib.Option.Option<String>)
-  (typ: StaticType)
+let staticTypeToStringWith(
+  customTypeName:
+    LanguageTools.ProgramTypes.Hash -> Stdlib.Option.Option<String>,
+  typ: StaticType)
   : String =
-  let recurse = staticTypeToStringWith customTypeName
-  let wrapped (name: String) (inner: StaticType) : String =
-    name + "<" + recurse inner + ">"
+  let recurse = (fun t -> staticTypeToStringWith(customTypeName, t))
+  let wrapped(name: String, inner: StaticType): String =
+    name + "<" + recurse(inner) + ">"
   match typ with
   | TUnit -> "Unit"
   | TBool -> "Bool"
@@ -345,52 +360,56 @@ let staticTypeToStringWith
   | TUInt64 -> "UInt64"
   | TInt128 -> "Int128"
   | TUInt128 -> "UInt128"
-  | TInt -> "Int"
+  | TBigInt -> "BigInt"
   | TFloat -> "Float"
+  | TFloat32 -> "Float32"
+  | TDecimal -> "Decimal"
   | TChar -> "Char"
   | TString -> "String"
   | TUuid -> "Uuid"
   | TDateTime -> "DateTime"
-  | TBlob -> "Blob"
-  | TStream inner -> wrapped "Stream" inner
-  | TList inner -> wrapped "List" inner
+  | TBytes -> "Bytes"
+  | TStream(inner) -> wrapped("Stream", inner)
+  | TList(inner) -> wrapped("List", inner)
   | TTuple(first, second, rest) ->
     let parts =
-      Stdlib.List.append
-        [ recurse first, recurse second ]
-        (Stdlib.List.map rest recurse)
-    "(" + Stdlib.String.join parts " * " + ")"
-  | TDict(key, value) -> "Dict<" + recurse key + ", " + recurse value + ">"
+      Stdlib.List.concat(
+        [ recurse(first), recurse(second) ],
+        Stdlib.List.map(rest, recurse))
+    "(" + Stdlib.String.join(parts, " * ") + ")"
+  | TDict(key, value) -> "Dict<" + recurse(key) + ", " + recurse(value) + ">"
   | TCustom(hash, args) ->
     let name =
-      match customTypeName hash with
-      | Some name -> name
-      | None -> "type #" + LanguageTools.ProgramTypes.hashToShort hash
-    if Stdlib.List.isEmpty args then name
+      match customTypeName(hash) with
+      | Some(name) -> name
+      | None -> "type #" + LanguageTools.ProgramTypes.hashToShort(hash)
+    if Stdlib.List.isEmpty(args) then name
     else
       name
       + "<"
-      + Stdlib.String.join (Stdlib.List.map args recurse) ", "
+      + Stdlib.String.join(Stdlib.List.map(args, recurse), ", ")
       + ">"
   | TFn(parameters, returnType) ->
     "("
-    + Stdlib.String.join (Stdlib.List.map parameters recurse) ", "
+    + Stdlib.String.join(Stdlib.List.map(parameters, recurse), ", ")
     + ") -> "
-    + recurse returnType
-  | TRigidVariable name -> "'" + name
-  | TInferenceVariable _ -> "_"
+    + recurse(returnType)
+  | TRigidVariable(name) -> "'" + name
+  | TInferenceVariable(_) -> "_"
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'StaticType'"
-let staticTypeToString (typ: StaticType) : String =
-  staticTypeToStringWith (fun _ -> Stdlib.Option.Option.None) typ
+let staticTypeToString(typ: StaticType): String =
+  staticTypeToStringWith((fun _ -> Stdlib.Option.Option.None), typ)
 
-let issueCodeToString (code: IssueCode) : String =
+let issueCodeToString(code: IssueCode): String =
   match code with
   | TypeMismatch -> "TypeMismatch"
   | OccursCheckFailed -> "OccursCheckFailed"
   | UnknownVariable -> "UnknownVariable"
   | InvalidArgumentIndex -> "InvalidArgumentIndex"
   | NotCallable -> "NotCallable"
+  | TooFewArguments -> "TooFewArguments"
+  | TooManyArguments -> "TooManyArguments"
   | ExplicitTypeArgumentCountMismatch -> "ExplicitTypeArgumentCountMismatch"
   | InvalidPattern -> "InvalidPattern"
   | DuplicatePatternBinding -> "DuplicatePatternBinding"
@@ -398,6 +417,7 @@ let issueCodeToString (code: IssueCode) : String =
   | UnknownTupleElement -> "UnknownTupleElement"
   | MissingRecordField -> "MissingRecordField"
   | DuplicateRecordField -> "DuplicateRecordField"
+  | DuplicateDictKey -> "DuplicateDictKey"
   | UnknownEnumCase -> "UnknownEnumCase"
   | EnumFieldCountMismatch -> "EnumFieldCountMismatch"
   | InvalidInfixOperand -> "InvalidInfixOperand"
@@ -424,34 +444,34 @@ let issueCodeToString (code: IssueCode) : String =
   | NonExhaustiveMatch -> "NonExhaustiveMatch"
   | UnsupportedConstruct -> "UnsupportedConstruct"
 
-let nameRefToStringWith
-  (resolve: LanguageTools.ProgramTypes.Hash -> Stdlib.Option.Option<String>)
-  (name: NameRef)
+let nameRefToStringWith(
+  resolve: LanguageTools.ProgramTypes.Hash -> Stdlib.Option.Option<String>,
+  name: NameRef)
   : String =
   match name with
   | Builtin(name, version) ->
-    if version == 0L then
+    if version == 0 then
       $"Builtin.{name}"
     else
-      $"Builtin.{name}_v{Stdlib.toString version}"
-  | Package hash ->
-    match resolve hash with
-    | Some name -> name
+      $"Builtin.{name}_v{Stdlib.display(version)}"
+  | Package(hash) ->
+    match resolve(hash) with
+    | Some(name) -> name
     | None ->
-      let hex = LanguageTools.ProgramTypes.hashToString hash
-      let short = Stdlib.String.slice hex 0 12
+      let hex = LanguageTools.ProgramTypes.hashToString(hash)
+      let short = Stdlib.String.slice(hex, 0, 12)
       $"#{short}"
   | TraitMethod(traitHash, method) ->
     let traitName =
-      match resolve traitHash with
-      | Some name -> name
+      match resolve(traitHash) with
+      | Some(name) -> name
       | None ->
-        let hex = LanguageTools.ProgramTypes.hashToString traitHash
-        $"#{Stdlib.String.slice hex 0 12}"
+        let hex = LanguageTools.ProgramTypes.hashToString(traitHash)
+        $"#{Stdlib.String.slice(hex, 0, 12)}"
     $"{traitName}.{method}"
 
 
-let siteToString (site: Site) : String =
+let siteToString(site: Site): String =
   match site with
   | LambdaReturnValue -> "the lambda's return value"
   | ImplMethodSignatureSite -> "this method, checked against the trait's signature"
@@ -462,17 +482,21 @@ let siteToString (site: Site) : String =
   | Expression -> "this expression"
   | StatementBeforeFinalExpression -> "the statement before the final expression"
   | FunctionApplication -> "this function application"
-  | FunctionArgument position ->
-    $"argument {Stdlib.toString (position + 1L)}"
+  | FunctionArgument(position, callee) ->
+    let argument = $"argument {Stdlib.display(position + 1)}"
+
+    match callee with
+    | Some(name) -> $"`{name}`, {argument}"
+    | None -> argument
   | IfWithoutElse -> "an if without an else"
   | RecordFieldAccess -> "this field access"
   | InterpolatedSegment ->
-    "this interpolated segment, which must already be a String"
+    "this string interpolation"
   | UnitLetPattern -> "a unit let-pattern"
   | TupleLetPattern -> "a tuple let-pattern"
   | MatchPattern -> "a match pattern"
   | ListPattern -> "a list pattern"
-  | ListConsPattern -> "a list-cons pattern"
+  | ListConsPattern -> "a list pattern with a rest"
   | TupleMatchPattern -> "a tuple match pattern"
   | OrPatternBinding -> "an or-pattern binding"
   | PipelineInput -> "the pipeline input"
@@ -483,18 +507,21 @@ let siteToString (site: Site) : String =
   | PipelineStringConcatenation -> "a pipeline string concatenation"
   | PipelineComparison -> "a pipeline comparison"
   | PipelineNumericOperator -> "a pipeline numeric operator"
+  | OperatorOperand(operation) ->
+    $"the right side of `{PrettyPrinter.ProgramTypes.infixFnName(operation)}`"
 
 
-let duplicateSiteToString (site: DuplicateSite) : String =
+let duplicateSiteToString(site: DuplicateSite): String =
   match site with
   | InTypeDeclaration -> "declared"
   | InFunctionSignature -> "declared"
   | InRecordConstruction -> "specified"
   | InRecordUpdate -> "updated"
+  | InDictLiteral -> "used as a key"
   | InPattern -> "bound"
 
 
-let ambiguousSubjectToString (subject: AmbiguousSubject) : String =
+let ambiguousSubjectToString(subject: AmbiguousSubject): String =
   match subject with
   | NumericOperand -> "the numeric operand type"
   | PipelineNumericOperand -> "the numeric pipeline operand type"
@@ -508,7 +535,7 @@ let ambiguousSubjectToString (subject: AmbiguousSubject) : String =
   | ConstrainedType -> "which type a bounded type parameter becomes"
 
 
-let untrustedBuiltinToString (reason: UntrustedBuiltin) : String =
+let untrustedBuiltinToString(reason: UntrustedBuiltin): String =
   match reason with
   | ResultTypeUnconstrained ->
     "its declared result contains type variables no parameter constrains, "
@@ -528,37 +555,39 @@ let untrustedBuiltinToString (reason: UntrustedBuiltin) : String =
 /// <param customTypeName> resolves a content hash to whatever the reader calls it;
 /// pass one that knows the current branch and the messages name types and functions
 /// the way the author wrote them.
-let contextToStringWith
-  (customTypeName:
-    LanguageTools.ProgramTypes.Hash -> Stdlib.Option.Option<String>)
-  (actualName: Stdlib.Option.Option<String>)
-  (code: IssueCode)
-  (context: Context)
+let contextToStringWith(
+  customTypeName:
+    LanguageTools.ProgramTypes.Hash -> Stdlib.Option.Option<String>,
+  actualName: Stdlib.Option.Option<String>,
+  code: IssueCode,
+  context: Context)
   : String =
   let typeName = (fun hash ->
-    match customTypeName hash with
-    | Some name -> name
+    match customTypeName(hash) with
+    | Some(name) -> name
     | None ->
-      let hex = LanguageTools.ProgramTypes.hashToString hash
-      let short = Stdlib.String.slice hex 0 12
+      let hex = LanguageTools.ProgramTypes.hashToString(hash)
+      let short = Stdlib.String.slice(hex, 0, 12)
       $"the type #{short}")
 
-  let name = nameRefToStringWith customTypeName
+  let name = (fun ref -> nameRefToStringWith(customTypeName, ref))
 
   match context with
+  | InStringInterpolation(inner) ->
+    "In string interpolation: " + contextToStringWith(customTypeName, actualName, code, inner)
   | NoDetail -> ""
-  | At site -> $"In {siteToString site}"
-  | Unresolved parts ->
+  | At(site) -> $"In {siteToString(site)}"
+  | Unresolved(parts) ->
     match parts with
     | [] -> "The name is unresolved"
-    | parts -> $"'{Stdlib.String.join parts "."}' is unresolved"
-  | TypeUnavailable hash -> $"{typeName hash} is not available to the checker"
-  | TraitUnavailable hash -> $"The trait {typeName hash} is not available to the checker"
+    | parts -> $"'{Stdlib.String.join(parts, ".")}' is unresolved"
+  | TypeUnavailable(hash) -> $"{typeName(hash)} is not available to the checker"
+  | TraitUnavailable(hash) -> $"The trait {typeName(hash)} is not available to the checker"
   | ImplMethod(traitHash, method, detail) ->
     let traitName =
-      match customTypeName traitHash with
-      | Some name -> name
-      | None -> $"#{Stdlib.String.slice (LanguageTools.ProgramTypes.hashToString traitHash) 0 12}"
+      match customTypeName(traitHash) with
+      | Some(name) -> name
+      | None -> $"#{Stdlib.String.slice(LanguageTools.ProgramTypes.hashToString(traitHash), 0, 12)}"
     match code with
     | ImplMethodSet ->
       match detail with
@@ -569,11 +598,11 @@ let contextToStringWith
     | ImplExceedsCeiling ->
       $"The fn given for `{method}` may do more than {traitName}.{method} allows ({detail})"
     | _ -> $"`{method}` of {traitName}: {detail}"
-  | FunctionUnavailable fn ->
-    $"The signature for {name fn} is not available to the checker"
-  | ValueUnavailable value ->
-    $"The type of {name value} is not available to the checker"
-  | Identifier ident ->
+  | FunctionUnavailable(fn) ->
+    $"The signature for {name(fn)} is not available to the checker"
+  | ValueUnavailable(value) ->
+    $"The type of {name(value)} is not available to the checker"
+  | Identifier(ident) ->
     match code with
     | UnknownVariable -> $"Local variable '{ident}' is not in scope"
     | UnknownRecordField -> $"Record has no field named '{ident}'"
@@ -583,56 +612,63 @@ let contextToStringWith
     | UnknownDeclaredTypeVariable ->
       $"Type variable '{ident}' is not declared in this scope"
     | _ -> $"'{ident}'"
-  | Identifiers idents ->
+  | Identifiers(idents) ->
     let quoted =
-      idents |> Stdlib.List.map (fun ident -> $"'{ident}'") |> Stdlib.String.join ", "
-    let noun = if (Stdlib.List.length idents) == 1 then "field" else "fields"
+      idents |> Stdlib.List.map(fun ident -> $"'{ident}'") |> Stdlib.String.join(", ")
+    let noun = if (Stdlib.List.length(idents)) == 1 then "field" else "fields"
 
     match code with
     | MissingRecordField -> $"Record is missing {noun}: {quoted}"
     | _ -> quoted
   | Duplicate(ident, site) ->
-    $"'{ident}' is {duplicateSiteToString site} more than once"
-  | Ambiguous subject ->
-    $"Cannot determine {ambiguousSubjectToString subject}; add a type annotation"
+    $"'{ident}' is {duplicateSiteToString(site)} more than once"
+  | Ambiguous(subject) ->
+    $"Cannot determine {ambiguousSubjectToString(subject)}; add a type annotation"
   | Untrusted(fn, reason) ->
-    $"{name fn} cannot be checked statically: {untrustedBuiltinToString reason}"
+    $"{name(fn)} cannot be checked statically: {untrustedBuiltinToString(reason)}"
   | Arity(expected, actual) ->
     let noun =
-      if expected == 1L then "1 type argument"
-      else $"{Stdlib.toString expected} type arguments"
-    let verb = if actual == 1L then "was" else "were"
+      if expected == 1 then "1 type argument"
+      else $"{Stdlib.display(expected)} type arguments"
+    let verb = if actual == 1 then "was" else "were"
 
     match code with
+    | TooFewArguments
+    | TooManyArguments ->
+      let args =
+        if expected == 1 then "1 argument"
+        else $"{Stdlib.display(expected)} arguments"
+
+      $"This function takes {args}, but {Stdlib.display(actual)} {verb} given"
     | ExplicitTypeArgumentCountMismatch ->
-      $"Expected {noun}, but {Stdlib.toString actual} {verb} given explicitly"
+      $"Expected {noun}, but {Stdlib.display(actual)} {verb} given explicitly"
     | _ ->
       $"This type declaration expects {noun}, "
-      + $"but {Stdlib.toString actual} {verb} provided"
+      + $"but {Stdlib.display(actual)} {verb} provided"
   | NamedArity(ident, expected, actual) ->
     let noun =
-      if expected == 1L then "1 field" else $"{Stdlib.toString expected} fields"
-    let verb = if actual == 1L then "was" else "were"
+      if expected == 1 then "1 field" else $"{Stdlib.display(expected)} fields"
+    let verb = if actual == 1 then "was" else "were"
 
     $"Case '{ident}' expects {noun}, "
-    + $"but {Stdlib.toString actual} {verb} provided"
+    + $"but {Stdlib.display(actual)} {verb} provided"
   | TypeArity(hash, expected, actual) ->
     let noun =
-      if expected == 1L then "1 type argument"
-      else $"{Stdlib.toString expected} type arguments"
-    let verb = if actual == 1L then "was" else "were"
+      if expected == 1 then "1 type argument"
+      else $"{Stdlib.display(expected)} type arguments"
+    let verb = if actual == 1 then "was" else "were"
 
-    $"{typeName hash} expects {noun}, "
-    + $"but {Stdlib.toString actual} {verb} provided"
-  | ArgumentIndex index ->
-    $"There is no argument at index {Stdlib.toString index}"
-  | UncoveredPattern witness ->
+    $"{typeName(hash)} expects {noun}, "
+    + $"but {Stdlib.display(actual)} {verb} provided"
+  | ArgumentIndex(index) ->
+    $"There is no argument at index {Stdlib.display(index)}"
+  | UncoveredPattern(witness) ->
     match witness with
-    | Some witness -> $"Match is not exhaustive; an uncovered pattern is {witness}"
+    | Some(witness) -> $"Match is not exhaustive; an uncovered pattern is {witness}"
     | None ->
       "Match is not exhaustive; values outside the listed patterns are not covered"
-  | InfixOperandUnsupported operation ->
-    let symbol = PrettyPrinter.ProgramTypes.infixFnName operation
+  | InfixOperandUnsupported(operation) ->
+    let symbol = PrettyPrinter.ProgramTypes.infixFnName(operation)
     $"Operator {symbol} does not accept this operand type"
   | RecordRequiredForConstruction -> "Record construction requires a record type"
   | RecordRequiredForFieldAccess -> "Field access requires a record or tuple"
@@ -660,57 +696,146 @@ let contextToStringWith
   | UnaryMinusOperandNotSignedNumeric ->
     "Unary minus requires a signed integer or Float operand"
   | BitwiseNotOperandNotInteger -> "Bitwise NOT requires an integer operand"
-  | CheckerUnavailable detail -> $"The at-rest checker could not run: {detail}"
+  | CheckerUnavailable(detail) -> $"The at-rest checker could not run: {detail}"
   | TraitNeeded(traitHash, method) ->
     let traitName =
-      match customTypeName traitHash with
-      | Some name -> name
-      | None -> $"#{Stdlib.String.slice (LanguageTools.ProgramTypes.hashToString traitHash) 0 12}"
+      match customTypeName(traitHash) with
+      | Some(name) -> name
+      | None -> $"#{Stdlib.String.slice(LanguageTools.ProgramTypes.hashToString(traitHash), 0, 12)}"
     // `subject` is the type the diagnostic is about, named when we know it. The run-time
     // message for the same situation says "Bool has no implementation of X", and these used
     // to say "this type", which sent the reader looking for which type was meant.
     let subject =
       match actualName with
-      | Some t -> t
+      | Some(t) -> t
       | None -> "This type"
     match code with
     | MissingImpl ->
       match method with
-      | Some m -> $"{subject} has no implementation of {traitName}, so `{traitName}.{m}` cannot run on it"
+      | Some(m) -> $"{subject} has no implementation of {traitName}, so `{traitName}.{m}` cannot run on it"
       | None -> $"{subject} has no implementation of {traitName}, and this function requires one (`'a: {traitName}`)"
     | UnboundTypeParameter ->
       $"{subject} needs a {traitName} implementation, but the function does not declare `'a: {traitName}`"
     | AmbiguousImpl ->
       match method with
-      | Some m -> $"More than one implementation offers `{m}` for {subject}; name the trait, as `{traitName}.{m} value`"
+      | Some(m) -> $"More than one implementation offers `{m}` for {subject}; name the trait, as `{traitName}.{m} value`"
       | None -> $"More than one implementation of {traitName} for {subject} is visible; `dark impls {traitName}` lists them"
     | _ -> $"Needs an implementation of {traitName}"
 
 
+/// What to write when an operator gets an integer and a Float, since Dark never converts one
+/// to the other on its own: "Write the number with a decimal point, as `5.0`, or convert with
+/// `Stdlib.Int64.toFloat(n)`." Empty for any other pair of types. A run that meets the pair says
+/// the same (<fn PrettyPrinter.RuntimeTypes.RuntimeError.mixedNumbersHint>).
+let mixedNumbersHint(left: String, right: String): String =
+  let integers =
+    [ "Int8"
+      "UInt8"
+      "Int16"
+      "UInt16"
+      "Int32"
+      "UInt32"
+      "Int64"
+      "UInt64"
+      "Int128"
+      "UInt128"
+      "BigInt" ]
+  let integer =
+    if right == "Float" && Stdlib.List.contains(integers, left) then
+      Stdlib.Option.Option.Some(left)
+    else if left == "Float" && Stdlib.List.contains(integers, right) then
+      Stdlib.Option.Option.Some(right)
+    else
+      Stdlib.Option.Option.None
+
+  match integer with
+  | Some(name) ->
+    $"Write the number with a decimal point, as `5.0`, or convert with `Stdlib.{name}.toFloat(n)`."
+  | None -> ""
+
+/// Points at `Stdlib.display` when a String was expected and the type found
+/// has a Display impl; the same hint a run gives (<fn PrettyPrinter.RuntimeTypes.RuntimeError.displayHint>).
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'StaticType'"
+let stringExpectedHint(expected: StaticType, actual: StaticType): String =
+  let convertible =
+    match actual with
+    | TInt8
+    | TUInt8
+    | TInt16
+    | TUInt16
+    | TInt32
+    | TUInt32
+    | TInt64
+    | TUInt64
+    | TInt128
+    | TUInt128
+    | TBigInt
+    | TFloat
+    | TFloat32
+    | TDecimal
+    | TBool
+    | TChar
+    | TDateTime
+    | TUuid -> true
+    | _ -> false
+  match expected with
+  | TString when convertible -> " (wrap it in `Stdlib.display`)"
+  | _ -> ""
+
+
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Issue'"
-let issueToStringWith
-  (customTypeName:
-    LanguageTools.ProgramTypes.Hash -> Stdlib.Option.Option<String>)
-  (issue: Issue)
+let issueToStringWith(
+  customTypeName:
+    LanguageTools.ProgramTypes.Hash -> Stdlib.Option.Option<String>,
+  issue: Issue)
   : String =
+  // Only where a value is handed over: an Int64 where `?` wanted a String error wants `mapError`.
+  let hint =
+    fun(expected, actual) ->
+      match (issue.code, issue.context) with
+      | (TypeMismatch, At(FunctionArgument(_, _)))
+      | (TypeMismatch, At(FunctionReturnValue))
+      | (TypeMismatch, At(LambdaReturnValue))
+      | (TypeMismatch, At(ValueBody))
+      | (TypeMismatch, At(Expression))
+      | (TypeMismatch, At(OperatorOperand(_)))
+      | (TypeMismatch, At(PipelineStringConcatenation)) -> stringExpectedHint(expected, actual)
+      | _ -> ""
   let detail =
     match issue.expected with
-    | Some expected ->
+    | Some(expected) ->
       match issue.actual with
-      | Some actual ->
+      | Some(actual) ->
         ": expected "
-        + staticTypeToStringWith customTypeName expected
+        + staticTypeToStringWith(customTypeName, expected)
         + ", got "
-        + staticTypeToStringWith customTypeName actual
+        + staticTypeToStringWith(customTypeName, actual)
+        + hint(expected, actual)
       | None -> ""
     | None -> ""
   let actualName =
     match issue.actual with
-    | Some actual ->
-      Stdlib.Option.Option.Some(staticTypeToStringWith customTypeName actual)
+    | Some(actual) ->
+      Stdlib.Option.Option.Some(staticTypeToStringWith(customTypeName, actual))
     | None -> Stdlib.Option.Option.None
-  (contextToStringWith customTypeName actualName issue.code issue.context) + detail
+  match (issue.context, issue.code, actualName) with
+  | (At(InterpolatedSegment), TypeMismatch, Some(actual)) ->
+    $"String interpolation conversion must return String; got {actual}."
+  | (At(OperatorOperand(operation)), TypeMismatch, Some(right)) when Stdlib.Option.isSome(issue.expected) ->
+    let symbol = PrettyPrinter.ProgramTypes.infixFnName(operation)
+    let (left, toString) =
+      match (issue.expected, issue.actual) with
+      | (Some(expected), Some(actual)) ->
+        (staticTypeToStringWith(customTypeName, expected), stringExpectedHint(expected, actual))
+      | _ -> ("", "")
+    let advice =
+      match mixedNumbersHint(left, right) with
+      | "" -> ""
+      | text -> " " + text
+    $"`{symbol}` needs both sides to be the same type, but got {left} and {right}{toString}.{advice}"
+  | _ ->
+    (contextToStringWith(customTypeName, actualName, issue.code, issue.context)) + detail
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Issue'"
-let issueToString (issue: Issue) : String =
-  issueToStringWith (fun _ -> Stdlib.Option.Option.None) issue
+let issueToString(issue: Issue): String =
+  issueToStringWith((fun _ -> Stdlib.Option.Option.None), issue)

@@ -1,19 +1,17 @@
 upstream:
   schema: 1
   upstream_repository: darklang/dark
-  upstream_revision: 06be3203f31820bcaa99db7bca6756cda3ae5c8d
+  upstream_revision: 7769d0865ef17c2c9edefa04a227fa23200c3783
   target: linux-x64
-source_files: 433
+source_files: 489
 kinds:
-  assertion: 239
-  expression: 2
-  function: 4460
-  implementation: 214
-  named-test: 2120
-  trait: 21
-  trait-method: 25
-  type: 707
-  val: 272
+  function: 5089
+  implementation: 249
+  named-test: 2899
+  trait: 22
+  trait-method: 26
+  type: 808
+  val: 319
 features:
   excluded: 6
   missing: 9
@@ -23,156 +21,235 @@ parser:
   partial: 1
   supported: 30
 builtins:
-  missing: 169
-  present: 79
-  unassessed: 533
+  missing: 170
+  present: 77
+  unassessed: 361
 dispositions:
   packages:
-    blocked: 1922
-    excluded: 2
+    blocked: 2278
+    excluded: 5
     replace: 35
-    run: 1744
+    run: 1823
   stdlib:
-    blocked: 626
-    excluded: 3
-    replace: 1142
-    run: 227
+    blocked: 830
+    replace: 904
+    run: 638
   tests:
-    blocked: 46
-    run: 1692
-    xfail: 621
+    blocked: 57
+    run: 1556
+    xfail: 1286
 reasons:
   packages:
-    aot-type-error: 8
-    compiler-contract: 15
-    compiler-gap: 17
+    aot-type-error: 10
+    compiler-contract: 14
+    compiler-gap: 18
     compiler-implementation: 34
     constructor-identity: 18
-    runtime-reflection: 2
-    script-entrypoint: 1
+    container-adaptation: 3
+    runtime-reflection: 5
     test-counter: 1
     test-diagnostics: 1
-    upstream-dependency: 1862
+    upstream-dependency: 2214
   stdlib:
-    compiler-contract: 6
-    compiler-gap: 1
-    compiler-implementation: 1139
+    compiler-contract: 131
+    compiler-implementation: 901
     compiler-timeout: 1
     constructor-identity: 2
-    container-adaptation: 486
+    container-adaptation: 490
     interpreter-intrinsic: 1
-    runtime-reflection: 3
     test-counter: 2
     test-diagnostics: 2
-    upstream-dependency: 128
+    upstream-dependency: 204
   tests:
     aot-arity-error: 12
-    aot-invalid-field: 17
-    aot-invalid-key: 8
+    aot-invalid-field: 16
+    aot-invalid-key: 6
     aot-match-error: 26
-    aot-name-error: 12
-    aot-type-error: 146
-    compiler-gap: 29
-    compiler-leak: 1
+    aot-name-error: 11
+    aot-type-error: 151
+    compiler-crash: 2
+    compiler-gap: 204
+    compiler-leak: 2
+    compiler-timeout: 1
     diagnostic-difference: 2
-    interpreter-fixture: 45
+    interpreter-fixture: 47
     test-counter: 7
     upstream-bug: 1
-    upstream-dependency: 363
+    upstream-dependency: 857
 expected_failures:
   aot-rejection:
     phases:
-      compile: 221
+      compile: 222
     reasons:
       aot-arity-error: 12
-      aot-invalid-field: 17
-      aot-invalid-key: 8
+      aot-invalid-field: 16
+      aot-invalid-key: 6
       aot-match-error: 26
-      aot-name-error: 12
-      aot-type-error: 146
+      aot-name-error: 11
+      aot-type-error: 151
     sources:
       upstream/packages/darklang/tests/language/aliases.dark: 11
-      upstream/packages/darklang/tests/language/apply.dark: 7
-      upstream/packages/darklang/tests/language/basic.dark: 12
+      upstream/packages/darklang/tests/language/apply.dark: 9
+      upstream/packages/darklang/tests/language/basic.dark: 13
+      upstream/packages/darklang/tests/language/collections.dark: 1
       upstream/packages/darklang/tests/language/conditionals.dark: 8
       upstream/packages/darklang/tests/language/enums.dark: 15
       upstream/packages/darklang/tests/language/equality.dark: 13
       upstream/packages/darklang/tests/language/errorPropagation.dark: 10
-      upstream/packages/darklang/tests/language/errorTypeNames.dark: 8
-      upstream/packages/darklang/tests/language/lambdas.dark: 2
+      upstream/packages/darklang/tests/language/errorTypeNames.dark: 5
+      upstream/packages/darklang/tests/language/lambdas.dark: 7
       upstream/packages/darklang/tests/language/letBindings.dark: 3
       upstream/packages/darklang/tests/language/matchExpressions.dark: 26
       upstream/packages/darklang/tests/language/nestedFunctions.dark: 2
-      upstream/packages/darklang/tests/language/operators.dark: 9
+      upstream/packages/darklang/tests/language/operators.dark: 13
       upstream/packages/darklang/tests/language/pipe.dark: 1
-      upstream/packages/darklang/tests/language/records.dark: 13
-      upstream/packages/darklang/tests/language/stringInterpolation.dark: 3
-      upstream/packages/darklang/tests/language/traits.dark: 9
-      upstream/packages/darklang/tests/language/tupleLiterals.dark: 7
+      upstream/packages/darklang/tests/language/records.dark: 17
+      upstream/packages/darklang/tests/language/stringInterpolation.dark: 1
+      upstream/packages/darklang/tests/language/tailCalls.dark: 1
+      upstream/packages/darklang/tests/language/traits.dark: 8
+      upstream/packages/darklang/tests/language/tupleLiterals.dark: 6
       upstream/packages/darklang/tests/language/unwrap.dark: 6
-      upstream/packages/darklang/tests/stdlib/dict.dark: 23
+      upstream/packages/darklang/tests/stdlib/dict.dark: 15
       upstream/packages/darklang/tests/stdlib/httpclient.dark: 1
       upstream/packages/darklang/tests/stdlib/ints/int64.dark: 1
-      upstream/packages/darklang/tests/stdlib/json.dark: 3
-      upstream/packages/darklang/tests/stdlib/list.dark: 24
+      upstream/packages/darklang/tests/stdlib/json.dark: 2
+      upstream/packages/darklang/tests/stdlib/list.dark: 22
       upstream/packages/darklang/tests/stdlib/option.dark: 1
       upstream/packages/darklang/tests/stdlib/result.dark: 1
-      upstream/packages/darklang/tests/stdlib/string.dark: 2
+      upstream/packages/darklang/tests/stdlib/string.dark: 3
   missing-support:
     phases:
-      compile: 388
-      runtime: 11
+      compile: 971
+      runtime: 92
     reasons:
-      compiler-gap: 29
+      compiler-gap: 199
       test-counter: 7
-      upstream-dependency: 363
+      upstream-dependency: 857
     sources:
-      upstream/packages/darklang/tests/cli/builtinGroups.dark: 3
-      upstream/packages/darklang/tests/cli/commandCompletions.dark: 8
+      upstream/packages/darklang/tests/cli/bashrc.dark: 2
+      upstream/packages/darklang/tests/cli/builtinGroups.dark: 4
+      upstream/packages/darklang/tests/cli/commandCompletions.dark: 9
       upstream/packages/darklang/tests/cli/commandGroups.dark: 3
+      upstream/packages/darklang/tests/cli/docsForAI.dark: 5
+      upstream/packages/darklang/tests/cli/evalAndRun.dark: 17
+      upstream/packages/darklang/tests/cli/file.dark: 1
+      upstream/packages/darklang/tests/cli/flags.dark: 3
       upstream/packages/darklang/tests/cli/golden.dark: 2
-      upstream/packages/darklang/tests/cli/instance-tests.dark: 4
+      upstream/packages/darklang/tests/cli/instance-tests.dark: 5
       upstream/packages/darklang/tests/cli/interactiveTests.dark: 4
-      upstream/packages/darklang/tests/cli/isolation.dark: 11
-      upstream/packages/darklang/tests/cli/outliner.dark: 6
-      upstream/packages/darklang/tests/cli/permissionsDisplay.dark: 2
-      upstream/packages/darklang/tests/cli/permissionsGrammar.dark: 15
+      upstream/packages/darklang/tests/cli/isolation.dark: 13
+      upstream/packages/darklang/tests/cli/jsonShapes.dark: 9
+      upstream/packages/darklang/tests/cli/permissionsGrammar.dark: 13
       upstream/packages/darklang/tests/cli/propagate.dark: 1
-      upstream/packages/darklang/tests/cli/tests-tui.dark: 23
-      upstream/packages/darklang/tests/cli/tests-workbench.dark: 2
-      upstream/packages/darklang/tests/cli/tracesRendering.dark: 9
-      upstream/packages/darklang/tests/language/apply.dark: 2
+      upstream/packages/darklang/tests/cli/scripts.dark: 13
+      upstream/packages/darklang/tests/cli/searchExactSeveral.dark: 1
+      upstream/packages/darklang/tests/cli/searchRanking.dark: 9
+      upstream/packages/darklang/tests/cli/searchShallow.dark: 2
+      upstream/packages/darklang/tests/cli/signaturesSeveral.dark: 2
+      upstream/packages/darklang/tests/cli/signaturesTraitCalls.dark: 2
+      upstream/packages/darklang/tests/cli/telemetry.dark: 1
+      upstream/packages/darklang/tests/cli/tests-tui.dark: 24
+      upstream/packages/darklang/tests/cli/tests-workbench.dark: 4
+      upstream/packages/darklang/tests/cli/tests.dark: 10
+      upstream/packages/darklang/tests/cli/traceVerbs.dark: 18
+      upstream/packages/darklang/tests/cli/traces.dark: 29
+      upstream/packages/darklang/tests/cli/tracesRendering.dark: 12
+      upstream/packages/darklang/tests/cli/viewSeveral.dark: 3
+      upstream/packages/darklang/tests/cli/zshrc.dark: 2
+      upstream/packages/darklang/tests/language/aliases.dark: 2
+      upstream/packages/darklang/tests/language/apply.dark: 6
       upstream/packages/darklang/tests/language/archivedSelf.dark: 1
-      upstream/packages/darklang/tests/language/equality.dark: 2
-      upstream/packages/darklang/tests/language/errorTypeNames.dark: 5
+      upstream/packages/darklang/tests/language/basic.dark: 6
+      upstream/packages/darklang/tests/language/big.dark: 1
+      upstream/packages/darklang/tests/language/collections.dark: 1
+      upstream/packages/darklang/tests/language/equality.dark: 3
+      upstream/packages/darklang/tests/language/errorTypeNames.dark: 8
       upstream/packages/darklang/tests/language/eself.dark: 2
-      upstream/packages/darklang/tests/language/lambdas.dark: 1
+      upstream/packages/darklang/tests/language/fastOps.dark: 2
+      upstream/packages/darklang/tests/language/lambdas.dark: 3
       upstream/packages/darklang/tests/language/letBindings.dark: 1
-      upstream/packages/darklang/tests/language/operators.dark: 1
-      upstream/packages/darklang/tests/language/records.dark: 2
-      upstream/packages/darklang/tests/language/runtimeToProgramTypes.dark: 5
-      upstream/packages/darklang/tests/language/tupleLiterals.dark: 1
-      upstream/packages/darklang/tests/language/unwrap.dark: 5
-      upstream/packages/darklang/tests/languageTools/atRestTypeChecker.dark: 172
+      upstream/packages/darklang/tests/language/matchExpressions.dark: 5
+      upstream/packages/darklang/tests/language/operators.dark: 3
+      upstream/packages/darklang/tests/language/records.dark: 7
+      upstream/packages/darklang/tests/language/runtimeToProgramTypes.dark: 6
+      upstream/packages/darklang/tests/language/tailCalls.dark: 2
+      upstream/packages/darklang/tests/language/traits.dark: 9
+      upstream/packages/darklang/tests/language/tupleLiterals.dark: 2
+      upstream/packages/darklang/tests/language/unwrap.dark: 6
+      upstream/packages/darklang/tests/languageTools/atRestTypeChecker.dark: 186
       upstream/packages/darklang/tests/languageTools/builtinIntrospection.dark: 3
-      upstream/packages/darklang/tests/languageTools/parsedFileShape.dark: 5
-      upstream/packages/darklang/tests/languageTools/perf.dark: 5
+      upstream/packages/darklang/tests/languageTools/live.dark: 6
+      upstream/packages/darklang/tests/languageTools/opWalks.dark: 4
+      upstream/packages/darklang/tests/languageTools/parsedFileShape.dark: 4
+      upstream/packages/darklang/tests/languageTools/parser/diagnostics.dark: 19
+      upstream/packages/darklang/tests/languageTools/parser/trees.dark: 22
+      upstream/packages/darklang/tests/languageTools/perf.dark: 7
       upstream/packages/darklang/tests/languageTools/pickLocation.dark: 8
+      upstream/packages/darklang/tests/languageTools/roundTrip/roundTripExprs.dark: 28
+      upstream/packages/darklang/tests/languageTools/roundTrip/roundTripFunctionDeclarations.dark: 1
+      upstream/packages/darklang/tests/languageTools/roundTrip/roundTripModuleDeclarations.dark: 1
+      upstream/packages/darklang/tests/languageTools/roundTrip/roundTripSourceFiles.dark: 1
+      upstream/packages/darklang/tests/languageTools/roundTrip/roundTripTestDeclarations.dark: 1
+      upstream/packages/darklang/tests/languageTools/roundTrip/roundTripTypeDeclarations.dark: 2
+      upstream/packages/darklang/tests/languageTools/roundTrip/roundTripTypeReferences.dark: 3
+      upstream/packages/darklang/tests/languageTools/roundTrip/roundTripValueDeclarations.dark: 3
       upstream/packages/darklang/tests/languageTools/semanticTokenization.dark: 9
-      upstream/packages/darklang/tests/prettyPrinter/runtimeTypes.dark: 9
+      upstream/packages/darklang/tests/languageTools/valueSearch.dark: 1
+      upstream/packages/darklang/tests/prettyPrinter/runtimeTypes.dark: 14
       upstream/packages/darklang/tests/scm/branchIdentity.dark: 4
-      upstream/packages/darklang/tests/scm/conflicts.dark: 20
-      upstream/packages/darklang/tests/stdlib/altJson.dark: 7
+      upstream/packages/darklang/tests/scm/branches.dark: 10
+      upstream/packages/darklang/tests/scm/cli/branch.dark: 7
+      upstream/packages/darklang/tests/scm/cli/commit.dark: 6
+      upstream/packages/darklang/tests/scm/cli/conflicts.dark: 9
+      upstream/packages/darklang/tests/scm/cli/discard.dark: 5
+      upstream/packages/darklang/tests/scm/cli/history.dark: 3
+      upstream/packages/darklang/tests/scm/cli/merge.dark: 7
+      upstream/packages/darklang/tests/scm/cli/propagation.dark: 5
+      upstream/packages/darklang/tests/scm/cli/rebase.dark: 6
+      upstream/packages/darklang/tests/scm/conflicts.dark: 22
+      upstream/packages/darklang/tests/scm/constraintKinds.dark: 4
+      upstream/packages/darklang/tests/scm/draft.dark: 6
+      upstream/packages/darklang/tests/scm/lww.dark: 6
+      upstream/packages/darklang/tests/scm/propagation.dark: 16
+      upstream/packages/darklang/tests/scm/referenceNames.dark: 2
+      upstream/packages/darklang/tests/scm/removalConflicts.dark: 5
+      upstream/packages/darklang/tests/stdlib/altJson.dark: 12
+      upstream/packages/darklang/tests/stdlib/base16.dark: 5
+      upstream/packages/darklang/tests/stdlib/base64.dark: 6
+      upstream/packages/darklang/tests/stdlib/bytes.dark: 32
+      upstream/packages/darklang/tests/stdlib/char.dark: 2
+      upstream/packages/darklang/tests/stdlib/cli/file.dark: 11
+      upstream/packages/darklang/tests/stdlib/cli/posix.dark: 12
+      upstream/packages/darklang/tests/stdlib/cli/process.dark: 15
       upstream/packages/darklang/tests/stdlib/cli/sgr.dark: 3
-      upstream/packages/darklang/tests/stdlib/dict.dark: 6
-      upstream/packages/darklang/tests/stdlib/discovery.dark: 1
-      upstream/packages/darklang/tests/stdlib/httpclient.dark: 3
-      upstream/packages/darklang/tests/stdlib/json.dark: 3
-      upstream/packages/darklang/tests/stdlib/list.dark: 9
-      upstream/packages/darklang/tests/stdlib/live.dark: 1
-      upstream/packages/darklang/tests/stdlib/pretty.dark: 1
-      upstream/packages/darklang/tests/stdlib/sqlite.dark: 7
-      upstream/packages/darklang/tests/stdlib/string.dark: 2
+      upstream/packages/darklang/tests/stdlib/cli/sys.dark: 2
+      upstream/packages/darklang/tests/stdlib/cli/widgets.dark: 6
+      upstream/packages/darklang/tests/stdlib/codepoint.dark: 1
+      upstream/packages/darklang/tests/stdlib/crypto.dark: 10
+      upstream/packages/darklang/tests/stdlib/dateTime.dark: 7
+      upstream/packages/darklang/tests/stdlib/decimal.dark: 4
+      upstream/packages/darklang/tests/stdlib/dict.dark: 32
+      upstream/packages/darklang/tests/stdlib/exec.dark: 3
+      upstream/packages/darklang/tests/stdlib/float.dark: 11
+      upstream/packages/darklang/tests/stdlib/float32.dark: 5
+      upstream/packages/darklang/tests/stdlib/http.dark: 7
+      upstream/packages/darklang/tests/stdlib/httpclient.dark: 7
+      upstream/packages/darklang/tests/stdlib/httpserver.dark: 3
+      upstream/packages/darklang/tests/stdlib/ints/bigInt.dark: 5
+      upstream/packages/darklang/tests/stdlib/ints/int128.dark: 1
+      upstream/packages/darklang/tests/stdlib/ints/int64.dark: 2
+      upstream/packages/darklang/tests/stdlib/ints/uint128.dark: 1
+      upstream/packages/darklang/tests/stdlib/ints/uint8.dark: 1
+      upstream/packages/darklang/tests/stdlib/json.dark: 31
+      upstream/packages/darklang/tests/stdlib/list.dark: 23
+      upstream/packages/darklang/tests/stdlib/net.dark: 2
+      upstream/packages/darklang/tests/stdlib/regex.dark: 15
+      upstream/packages/darklang/tests/stdlib/result.dark: 1
+      upstream/packages/darklang/tests/stdlib/sse.dark: 8
+      upstream/packages/darklang/tests/stdlib/stream.dark: 2
+      upstream/packages/darklang/tests/stdlib/string.dark: 17
+      upstream/packages/darklang/tests/stdlib/url.dark: 11
+      upstream/packages/darklang/tests/stdlib/utf8.dark: 2
   upstream-bug:
     phases:
       runtime: 1

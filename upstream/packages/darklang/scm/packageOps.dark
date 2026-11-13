@@ -7,11 +7,13 @@ module Darklang.SCM.PackageOps
 // beside it, one file per subject:
 //
 //   packageOpsBindings   what an op says about a name, and what a name holds now
-//   packageOpsDraft      stamping a draft into a commit, and dropping one
+//   packageOpsDraft      what the draft holds, the checks a commit runs, and dropping part of it
 //   packageOpsRepoints   which dependents an edit would move
-//   packageOpsMerge      commit, merge, rebase, archive, settle a conflict
+//   packageOpsMerge      commit, merge, rebase, archive, settle a conflict (the acts are `SCM.Actions`)
 //   packageOpsBranch     branch registry and frontier reads
 //   packageOpsCommits    the commit rows themselves
+//   packageOpsReferenceNames   rename preparation and saved reference names
+//   packageOpsUndo       authored revision history and undo
 //
 // Dark lets several files contribute to one module and see each other's definitions unqualified, so
 // the split is physical only: no new silo, and `package_ops` still has exactly one owner. It is a
@@ -22,11 +24,11 @@ module Darklang.SCM.PackageOps
 /// Add a list of package ops to the database (immediately live on the given branch).
 /// Returns the number of inserted ops on success (duplicates are skipped), or an error message on failure.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
-let add
-  (branchId: Uuid)
-  (ops: List<LanguageTools.ProgramTypes.PackageOp>)
-  : Stdlib.Result.Result<Int, String> =
-  Builtin.scmAddOps branchId (Lineage.recordPrevious branchId ops)
+let add(
+  branchId: Uuid,
+  ops: List<LanguageTools.ProgramTypes.PackageOp>)
+  : Stdlib.Result.Result<Int64, String> =
+  Builtin.scmAddOps(branchId, Lineage.recordPrevious(branchId, ops))
 
 
 /// THE authoring boundary: stabilize a batch and store it, refusing what stabilization would corrupt.
@@ -41,79 +43,79 @@ let add
 /// Every authoring surface goes through here rather than calling `add`: the CLI's fn/type/value/module
 /// commands, the workbench, and the LSP's file provider.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
-let addAuthored
-  (branchId: Uuid)
-  (ops: List<LanguageTools.ProgramTypes.PackageOp>)
+let addAuthored(
+  branchId: Uuid,
+  ops: List<LanguageTools.ProgramTypes.PackageOp>)
   : Stdlib.Result.Result<LanguageTools.AtRestTypeChecker.Report, String> =
-  let duplicates = LanguageTools.PackageManager.duplicateDeclarations ops
+  let duplicates = LanguageTools.PackageManager.duplicateDeclarations(ops)
 
-  if Stdlib.Bool.not (Stdlib.List.isEmpty duplicates) then
+  if Stdlib.Bool.not(Stdlib.List.isEmpty(duplicates)) then
     Stdlib.Result.Result.Error(
-      "Declared more than once: " + (Stdlib.String.join duplicates ", "))
+      "Declared more than once: " + (Stdlib.String.join(duplicates, ", ")))
   else
     let stabilizedOps =
       ops
       |> LanguageTools.PackageManager.resolveTraitCalls
       |> LanguageTools.PackageManager.stabilizeHashes
 
-    let added = add branchId stabilizedOps
+    let added = add(branchId, stabilizedOps)
 
     // A value is evaluated after its ops are stored, so a value that fails has already landed. Take
     // its binding back out, or "Could not save" is untrue: the value sits in the draft, and every
     // later commit either refuses on it or commits a value nobody can read.
-    match unevaluatedValuesBoundBy branchId stabilizedOps with
+    match unevaluatedValuesBoundBy(branchId, stabilizedOps) with
     | [] ->
       match added with
-      | Ok _ ->
+      | Ok(_) ->
         Stdlib.Result.Result.Ok(
-          LanguageTools.AtRestTypeChecker.checkPackageOpsOn branchId stabilizedOps)
-      | Error message -> Stdlib.Result.Result.Error message
-    | failed -> Stdlib.Result.Result.Error(takeBackFailedValues branchId stabilizedOps added failed)
+          LanguageTools.AtRestTypeChecker.checkPackageOpsOn(branchId, stabilizedOps))
+      | Error(message) -> Stdlib.Result.Result.Error(message)
+    | failed -> Stdlib.Result.Result.Error(takeBackFailedValues(branchId, stabilizedOps, added, failed))
 
 
 /// Unbind the values a save could not evaluate, and say what that left. A batch (`dark module`,
 /// the editor) can hold good items beside the bad value, and those stay.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
-let takeBackFailedValues
-  (branchId: Uuid)
-  (ops: List<LanguageTools.ProgramTypes.PackageOp>)
-  (added: Stdlib.Result.Result<Int, String>)
-  (failed: List<(LanguageTools.ProgramTypes.PackageLocation * String)>)
+let takeBackFailedValues(
+  branchId: Uuid,
+  ops: List<LanguageTools.ProgramTypes.PackageOp>,
+  added: Stdlib.Result.Result<Int64, String>,
+  failed: List<(LanguageTools.ProgramTypes.PackageLocation * String)>)
   : String =
-  let failedLocations = failed |> Stdlib.List.map (fun (loc, _) -> loc)
+  let failedLocations = failed |> Stdlib.List.map(fun((loc, _)) -> loc)
 
   let names =
     failedLocations
-    |> Stdlib.List.map PrettyPrinter.ProgramTypes.PackageLocation.packageLocation
-    |> Stdlib.String.join ", "
+    |> Stdlib.List.map(PrettyPrinter.ProgramTypes.PackageLocation.packageLocation)
+    |> Stdlib.String.join(", ")
 
   let why =
     match added with
-    | Error message -> message
-    | Ok _ -> $"{names} could not be evaluated"
+    | Error(message) -> message
+    | Ok(_) -> $"{names} could not be evaluated"
 
   let kept =
     ops
-    |> Stdlib.List.filterMap (fun op ->
+    |> Stdlib.List.filterMap(fun op ->
       match op with
       | SetName(loc, _, _) ->
-        if Stdlib.List.contains failedLocations loc then
+        if Stdlib.List.contains(failedLocations, loc) then
           Stdlib.Option.Option.None
         else
           Stdlib.Option.Option.Some(
-            PrettyPrinter.ProgramTypes.PackageLocation.packageLocation loc)
+            PrettyPrinter.ProgramTypes.PackageLocation.packageLocation(loc))
       | _ -> Stdlib.Option.Option.None)
 
   let keptNote =
     match kept with
     | [] -> ""
     | kept ->
-      let keptList = Stdlib.String.join kept ", "
+      let keptList = Stdlib.String.join(kept, ", ")
       $" The rest of this save was kept: {keptList}."
 
-  match unbind branchId failed with
-  | Ok _ -> $"{why}\nNothing was saved for {names}.{keptNote}"
-  | Error e ->
+  match unbind(branchId, failed) with
+  | Ok(_) -> $"{why}\nNothing was saved for {names}.{keptNote}"
+  | Error(e) ->
     $"{why}\n{names} is still in your draft, and taking it back out failed: {e}. `dark discard {names}` removes it."
 
 
@@ -121,17 +123,17 @@ let takeBackFailedValues
 /// failed on. Asked of the store, by the hash each name holds now, because the save restabilizes
 /// and refreshes hashes after the ones in hand.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
-let unevaluatedValuesBoundBy
-  (branchId: Uuid)
-  (ops: List<LanguageTools.ProgramTypes.PackageOp>)
+let unevaluatedValuesBoundBy(
+  branchId: Uuid,
+  ops: List<LanguageTools.ProgramTypes.PackageOp>)
   : List<(LanguageTools.ProgramTypes.PackageLocation * String)> =
   ops
-  |> Stdlib.List.filterMap (fun op ->
+  |> Stdlib.List.filterMap(fun op ->
     match op with
-    | SetName(loc, PackageValue _, _) ->
-      match liveBindingFor branchId loc with
-      | Some b ->
-        if b.itemType == "value" && Stdlib.Bool.not (valueEvaluated b.hash) then
+    | SetName(loc, PackageValue(_), _) ->
+      match liveBindingFor(branchId, loc) with
+      | Some(b) ->
+        if b.itemType == "value" && Stdlib.Bool.not(valueEvaluated(b.hash)) then
           Stdlib.Option.Option.Some((loc, b.hash))
         else
           Stdlib.Option.Option.None
@@ -139,13 +141,11 @@ let unevaluatedValuesBoundBy
     | _ -> Stdlib.Option.Option.None)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.valueEvaluated: Unknown function or value 'Stdlib.Sqlite.queryOneP'"
-let valueEvaluated (hash: String) : Bool =
-  Stdlib.Sqlite.queryOneP
-    (localDb ())
-    "SELECT 1 AS ok FROM package_values WHERE hash = @p0 AND rt_dval IS NOT NULL"
-    [ hash ]
-  |> Stdlib.Option.isSome
+/// Whether the value at <param hash> has a stored runtime value: false when its evaluation never ran
+/// or failed, and when there is no such value.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.valueEvaluated: Unknown function or value 'Builtin.pmValueEvaluated'"
+let valueEvaluated(hash: String): Bool =
+  Builtin.pmValueEvaluated(LanguageTools.ProgramTypes.Hash.Hash(hash))
 
 
 /// Drop the bindings to exactly these (name, hash) pairs from the draft, leaving the name on
@@ -154,39 +154,129 @@ let valueEvaluated (hash: String) : Bool =
 /// would go on refusing every commit. Anything else this save added that uses one of these values is
 /// left referencing nothing, and is refused as unresolved, which is what it is.
 // @compiler blocked: compiler-gap diagnostic="Darklang.SCM.PackageOps.unbind: Constructor pattern requires an enum scrutinee"
-let unbind
-  (branchId: Uuid)
-  (bindings: List<(LanguageTools.ProgramTypes.PackageLocation * String)>)
-  : Stdlib.Result.Result<Int, String> =
-  let hashes = bindings |> Stdlib.List.map (fun (_, hash) -> hash)
+let unbind(
+  branchId: Uuid,
+  bindings: List<(LanguageTools.ProgramTypes.PackageLocation * String)>)
+  : Stdlib.Result.Result<Int64, String> =
+  let hashes = bindings |> Stdlib.List.map(fun((_, hash)) -> hash)
 
-  let isOneOf (op: LanguageTools.ProgramTypes.PackageOp) : Bool =
+  let isOneOf(op: LanguageTools.ProgramTypes.PackageOp): Bool =
     match op with
     | SetName(loc, target, _) ->
       let hash =
-        LanguageTools.ProgramTypes.hashToString
-          (LanguageTools.ProgramTypes.Reference.hash target)
+        LanguageTools.ProgramTypes.hashToString(
+          LanguageTools.ProgramTypes.Reference.hash(target))
 
-      Stdlib.List.contains bindings (loc, hash)
-    | AddValue v ->
-      Stdlib.List.contains hashes (LanguageTools.ProgramTypes.hashToString v.hash)
+      Stdlib.List.contains(bindings, (loc, hash))
+    | SetReferenceNames(loc, target, _, _) ->
+      Stdlib.List.contains(bindings,
+        (loc, LanguageTools.ProgramTypes.hashToString(LanguageTools.ProgramTypes.Reference.hash(target))))
+    | AddValue(v) ->
+      Stdlib.List.contains(hashes, LanguageTools.ProgramTypes.hashToString(v.hash))
     | _ -> false
 
-  if SCM.Branch.isMain branchId then
-    SCM.Draft.rewriteBy (fun draft ->
-      draft |> Stdlib.List.filter (fun d -> Stdlib.Bool.not (isOneOf d.op)))
-  else
-    let ids =
-      decodeOpRowEntries (Branches.ownOpRows branchId)
-      |> Stdlib.List.filterMap (fun (id, _, op) ->
-        if isOneOf op then Stdlib.Option.Option.Some id else Stdlib.Option.Option.None)
+  // The draft's ops (on a branch, its own) that say one of these bindings, dropped as one action.
+  let rows =
+    if SCM.Branch.isMain(branchId) then
+      draftOpRowsFor(branchId)
+    else
+      Branches.ownOpRows(branchId)
 
-    dropBranchOps branchId ids
+  let ids =
+    decodeOpRowEntries(rows)
+    |> Stdlib.List.filterMap(fun((id, _, op)) ->
+      if isOneOf(op) then Stdlib.Option.Option.Some(id) else Stdlib.Option.Option.None)
+
+  dropBranchOps(branchId, ids)
 
 
 // the op-log DATA-ACCESS SILO
-// This module OWNS every SQL query against `package_ops`. Callers (the `dark ops` CLI, doctor) go
-// through the typed functions below and never hand-roll SQL. There should be no op-log SQL outside here.
+// This module OWNS every read of `package_ops`. Callers (the `dark ops` CLI, doctor) go through the typed
+// functions below and never hand-roll SQL. The reads go through one builtin, `scmOps`, and the SQL lives
+// with it in F# (`LibDB.ScmOps`), which also decodes the op blobs. What to make of the answer stays here.
+
+
+/// Which ops `query` is asked for. Every op is on one branch; main is a branch like any other.
+type OpFilter =
+  /// Every op in the log, newest first by when it landed here.
+  | Recent
+  /// The ops whose id starts with this, newest first.
+  | IdPrefix(prefix: String)
+  /// The ops a commit holds, oldest first.
+  | InCommit(hash: String)
+  /// The ops a branch can SEE (its own and its ancestors', up to main's), newest first.
+  | Visible(branchId: Uuid)
+  /// The ops a branch can see that landed at or after <param since> (a `created_at`), oldest first:
+  /// ids, with `ts` the `created_at`. See `landedSince`.
+  | LandedSince(branchId: Uuid, since: String)
+  /// The ops that landed at the newest `created_at` in the log, on any branch: ids, with `ts` that
+  /// `created_at`. See `landedLast`.
+  | LandedLast
+  /// These ops, oldest first. An id the log does not hold is skipped.
+  | Ids(ids: List<String>)
+  /// A branch's draft: its uncommitted ops, oldest first.
+  | Draft(branchId: Uuid)
+  /// The draft's ids, sorted by id.
+  | DraftIds(branchId: Uuid)
+  /// A branch's own ops, committed or not, oldest first, with `source` filled.
+  | Own(branchId: Uuid)
+  /// The ops written on a branch that a merge has since moved to its parent.
+  | MergedFrom(branchId: Uuid)
+  /// Every op of main's, oldest first.
+  | Main
+  /// One row whose `ts` sorts after everything in the log: its latest stamp plus a second, or now
+  /// for an empty log.
+  | NextStamp
+
+
+/// One op-log row. `ts` is the authoring stamp (for the `Landed` cases, when the op landed here), ""
+/// where the case does not read it; `sizeBytes` is the blob's size, 0 where the case does not read the
+/// blob; `source` is what put the op on the branch, for `Own` only.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.OpRow: Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
+type OpRow =
+  { id: String
+    ts: String
+    sizeBytes: Int64
+    source: String
+    /// The op, decoded. None where the case reads ids only, and for an op this build cannot read.
+    op: Stdlib.Option.Option<LanguageTools.ProgramTypes.PackageOp> }
+
+
+/// What `query` answers with. `total` counts every match when the limit was 0 (and `ops` is then
+/// empty); otherwise it is how many rows came back.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.OpPage: Unknown type 'OpRow'"
+type OpPage = { total: Int64, ops: List<OpRow> }
+
+
+/// The ops <param filter> selects, at most <param limit> of them; a negative limit means all of them,
+/// and 0 asks only for the count.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpPage'"
+let query(filter: OpFilter, limit: Int64): OpPage = Builtin.scmOps(filter, limit)
+
+
+/// Every row <param filter> selects.
+// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpRow'"
+let rowsOf(filter: OpFilter): List<OpRow> = (query(filter, -1)).ops
+
+
+/// The ids of every op <param filter> selects, in its order.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.idsOf: Unknown function or value 'rowsOf'"
+let idsOf(filter: OpFilter): List<String> =
+  rowsOf(filter) |> Stdlib.List.map(fun r -> r.id)
+
+
+/// How many ops <param filter> selects.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.countOf: Unknown function or value 'query'"
+let countOf(filter: OpFilter): Int64 = (query(filter, 0)).total
+
+
+/// The `ts` of a one-row stamp case.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.stampOf: Unknown function or value 'rowsOf'"
+let stampOf(filter: OpFilter): String =
+  rowsOf(filter)
+  |> Stdlib.List.head
+  |> Stdlib.Option.map(fun r -> r.ts)
+  |> Stdlib.Option.withDefault("")
 
 
 /// A lightweight op-log row for display (no op_blob decode): what `dark ops` shows.
@@ -205,13 +295,12 @@ type OpSummary =
 /// What a branch REF resolved to. A DU rather than an Option because "no such branch" and "that could be
 /// several branches" want different words from the caller, and an Option would flatten them into one.
 type BranchRefResult =
-  | Found of Uuid
+  | Found(Uuid)
   /// Not a live name, not an id, not a prefix: a name this store has never had. The ONE miss a write
   /// verb may answer by starting a branch.
   | NotFound
   /// A full id, and no branch here has it: a peer's, or a mispaste. Never something to start a branch
   /// named after.
-  | UnknownId of Uuid
+  | UnknownId(Uuid)
   /// The prefix matched more than one branch.
   | Ambiguous
-

@@ -39,10 +39,10 @@ impl Stdlib.ShiftRight for OperatorCount =
   let shiftRight (a: OperatorCount) (b: OperatorCount) : OperatorCount = OperatorCount { value = a.value >> b.value }
 impl Stdlib.BitwiseNot for OperatorCount =
   let bitwiseNot (a: OperatorCount) : OperatorCount = OperatorCount { value = ~a.value }
-impl Stdlib.ToString for OperatorCount =
-  let toString (a: OperatorCount) : String = Stdlib.Int64.toString a.value
+impl Stdlib.Display for OperatorCount =
+  let display (a: OperatorCount) : String = Stdlib.Int64.toString a.value
 let genericCountNegate<'a: Stdlib.Negate> (a: 'a) : 'a = -a
-let renderAnyCount<'a: ToString> (a: 'a) : String = a.toString
+let renderAnyCount<'a: Display> (a: 'a) : String = a.display
 (OperatorCount { value = 20L }) - (OperatorCount { value = 8L }) = OperatorCount { value = 12L }
 (OperatorCount { value = 6L }) * (OperatorCount { value = 7L }) = OperatorCount { value = 42L }
 (OperatorCount { value = 42L }) / (OperatorCount { value = 7L }) = OperatorCount { value = 6L }

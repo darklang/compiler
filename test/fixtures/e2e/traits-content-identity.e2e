@@ -7,9 +7,9 @@ impl OriginalIdentity for Int64 =
 AliasIdentity.renderIdentity 42L = "shared"
 42L.renderIdentity = "shared"
 
-trait SharedToString<'a> =
-  let toString (value: 'a) : String
-SharedToString.toString 42L = "42"
+trait SharedDisplay<'a> =
+  let display (value: 'a) : String
+SharedDisplay.display 42L = "42"
 
 trait OrderedIdentity<'a> =
   let renderIdentity (value: 'a) : String

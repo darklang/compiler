@@ -1,6 +1,6 @@
 module Darklang.Cli.Docs.Errors
 
-let content () : String =
+let content(): String =
   """# Common Errors
 
 ## Parse errors -> CHECK INDENTATION FIRST
@@ -27,15 +27,16 @@ let content () : String =
   - Integer / and ** can raise out-of-range runtime errors
   - Bitwise operators (& | ^ << >> ~) are traits; a Float operand says no implementation
   - Inside a match arm, `|` is the arm separator: write `| A -> (a | b)`
-  - List concat: use Stdlib.List.append
+  - List concat: use Stdlib.List.concat
 
 ## Enum errors
   - Option/Result expressions use bare `Some`, `None`, `Ok`, and `Error`
   - Other enum expressions use `TypeName.Case`
-  - Matching: just Case (no prefix)
+  - Matching: just Case, or Type.Case
+  - Fields go in parentheses: `Ok(x)`, `| Ok(x) ->`
 
 ## Some + tuple
-  - Use `Some ((a, b))` with double parens
+  - Use `Some((a, b))` with double parens
 
 ## Debug
   1. Simplify expression

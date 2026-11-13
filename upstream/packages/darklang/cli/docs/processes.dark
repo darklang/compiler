@@ -1,6 +1,6 @@
 module Darklang.Cli.Docs.Processes
 
-let content () : String =
+let content(): String =
   """# Processes: things run at once, pause, and resume
 
 Every trace is a process the runtime owns: it can run beside others, be paused,
@@ -9,27 +9,26 @@ writing anything.
 
 ## Concurrency, without writing anything
 
-Reads run at the same time. Writes keep program order. `await x` waits for a
+Reads run at the same time. Writes keep program order. `Stdlib.await(x)` waits for a
 value here instead of wherever it is first used.
 
-  let pages = Stdlib.List.map urls (fun u -> Stdlib.HttpClient.get u [])  // all in flight
-  Stdlib.printLine "fetching"                                             // a write: now, in order
-  let count = Stdlib.List.length pages                                    // looks: waits for all
+  let pages = Stdlib.List.map(urls, fun u -> Stdlib.HttpClient.get(u, []))  // all in flight
+  Stdlib.printLine("fetching")                                            // a write: now, in order
+  let count = Stdlib.List.length(pages)                                   // looks: waits for all
 
-A read is a call whose effects are all reads (a file, env, db or package
+A read is a call whose effects are all reads (a file, env or package
 read, an HTTP GET or HEAD). Anything else runs in order.
 
 ## When you want control
 
-  let h = Stdlib.Exec.spawn (fun () -> Stdlib.Cli.File.writeText log "done")  // in the background
-  Stdlib.Exec.await h                                    // wait for it
-  Stdlib.Exec.awaitWithin 500L h                         // ... or give up after 500 ms: None
-  Stdlib.Exec.select [ h1; h2 ]                          // the first to finish
-  Stdlib.Exec.cancel h                                   // stop it, and its children
-  Stdlib.List.parallelMap items fib                      // CPU-bound work across the cores
+  let h = Stdlib.Exec.spawn(fun () -> Stdlib.Cli.File.writeText(log, "done"))  // in the background
+  Stdlib.Exec.await(h)                                   // wait for it
+  Stdlib.Exec.awaitWithin(500, h)                       // ... or give up after 500 ms: None
+  Stdlib.Exec.select([ h1; h2 ])                         // the first to finish
+  Stdlib.Exec.cancel(h)                                  // stop it, and its children
+  Stdlib.List.parallelMap(items, fib)                    // CPU-bound work across the cores
 
-A process spawned this way dies with its parent unless `Exec.spawnDetached`;
-either way it ends when the `dark` command it runs in exits.
+A process spawned this way dies with its parent.
 Spawning is the `concurrency` effect; a policy can forbid it.
 
 ## See what is running
@@ -103,7 +102,8 @@ Finding your way to a function, from either direction:
   traces calls <fn>             the runs that went through one function
   traces fns [n]                ... and the other way: which functions recent
                                 runs went through, most first
-  dark view <fn>                ends with how many runs went through it
+  dark view <fn>                ends with how many runs went through it,
+                                and so does `dark edit <fn>` after it lands
 
 And the rest:
 
@@ -121,11 +121,14 @@ when a file it read has changed since. The oldest are dropped once there are
 more than `trace.keep` traces (a served request is one) or `trace.maxMb` of
 log; a suspended trace's never.
 
-What the log holds: what each effect was given and returned. Secret request
-headers (`authorization`, `cookie`, `set-cookie`, `x-api-key`) are stored as
-`[redacted]`, and an environment read's value is not stored at all (a resume
-reads the environment again). Everything else is in the clear: a key file a run
-read, a response body, what it printed.
+What the log holds: what each effect was given and returned. HTTP credentials
+are stored as `[redacted]`, in requests made and requests served alike: any
+header or query parameter whose name contains auth, cookie, key, token, secret,
+password, session or credential (`Authorization`, `Cookie`, `Set-Cookie`,
+`X-API-Key`, `?access_token=`), and a URL's `user:password@`. An environment
+read's value is not stored at all (a resume reads the environment again).
+Everything else is in the clear: a key file a run read, a request or response
+body, what it printed.
 
 What the log does NOT hold: the value of anything pure. `traces show` does not
 read values off a disk, it RE-RUNS the function with every effectful call

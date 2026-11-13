@@ -2,12 +2,12 @@
 // directly evaluates recursive expressions over an in-memory program.
 
 let byteAt (value: String) (index: Int64) : Int64 =
-    match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with
+    match Stdlib.String.getByteAt value index with
     | Some byte -> Stdlib.Int64.fromUInt8 byte
     | None -> Builtin.crash "Warden byte index is out of range"
 
 let stringLengthFrom (value: String) (index: Int64) : Int64 =
-    match Stdlib.String.getByteAt value (Stdlib.Int.fromInt64 index) with
+    match Stdlib.String.getByteAt value index with
     | Some _ -> stringLengthFrom value (index + 1L)
     | None -> index
 
@@ -16,7 +16,7 @@ let stringLength (value: String) : Int64 = stringLengthFrom value 0L
 let sliceFrom (value: String) (index: Int64) (end_: Int64) (reversed: List<Char>) : String =
     if index >= end_ then Stdlib.String.fromList (Stdlib.List.reverse reversed)
     else
-        match Stdlib.Char.fromCodepoint (Stdlib.Int.fromInt64 (byteAt value index)) with
+        match Stdlib.Char.fromCodepoint (Builtin.unwrap (Stdlib.UInt32.fromInt64 (byteAt value index))) with
         | Some char -> sliceFrom value (index + 1L) end_ (Stdlib.List.push reversed char)
         | None -> Builtin.crash "Warden source is not ASCII"
 
@@ -150,6 +150,6 @@ let repetitions = benchmarkArg 1 in
 if expressionCount <= 0L || repetitions <= 0L then Builtin.crash "Warden workload arguments must be positive"
 else
     let statement = "x * x + y * 3 + (x + y) * (x - y) + x / 2;\n" in
-    let source = Stdlib.String.repeat statement (Stdlib.Int.fromInt64 expressionCount) in
+    let source = Stdlib.String.repeat statement expressionCount in
     let lexed = lex source 0L (stringLength source) 0L Stdlib.Dict.empty in
     Builtin.printLine (Stdlib.Int64.toString (run repetitions 0L lexed.tokens lexed.count 0L))

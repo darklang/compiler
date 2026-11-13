@@ -9,18 +9,55 @@ module Darklang.GitHub
 
 val darklangRepoBaseUrl = "https://api.github.com/repos/darklang/dark"
 
+/// Why a release lookup failed, so `update` and `install` can tell a network
+/// failure from a release that isn't there.
+type ReleaseError =
+  /// The request didn't complete: no network, DNS, TLS, a timeout
+  | RequestFailed(Stdlib.HttpClient.RequestError)
+  /// GitHub answered with a status other than 200
+  | BadStatus(Int64)
+  /// GitHub's answer wasn't the JSON a release has
+  | UnexpectedResponse
+  | NoReleases
+  | ReleaseNotFound(String)
+  /// This OS and architecture have no build
+  | UnsupportedHost
+  /// The release has no binary for this platform id
+  | NoAssetForPlatform(String)
+  /// The release has no checksums file, so its download can't be checked
+  | NoChecksums(String)
+
+/// The sentence a person reads.
+let releaseErrorMessage(e: ReleaseError): String =
+  match e with
+  | RequestFailed(requestError) ->
+    $"Couldn't reach the GitHub API: {Stdlib.HttpClient.toString(requestError)}"
+  | BadStatus(code) ->
+    $"The GitHub API answered with status {Stdlib.display(code)}"
+  | UnexpectedResponse -> "Couldn't read the GitHub API's answer"
+  | NoReleases -> "No releases found"
+  | ReleaseNotFound(tag) -> $"No release is tagged {tag}"
+  | UnsupportedHost -> "No Darklang build for this OS and architecture"
+  | NoAssetForPlatform(platformId) ->
+    $"No asset named `-{platformId}.gz` in this release"
+  | NoChecksums(tag) ->
+    $"Release {tag} has no checksums file, so its download can't be checked"
+
 /// A baseline function for fetching data from the GitHub API
-let fetchString
-  (url: String)
-  : Stdlib.Result.Result<String, String> =
+let __fetchString(
+  url: String)
+  : Stdlib.Result.Result<String, ReleaseError> =
   let headers =
     [ ("accept", "application/vnd.github+json")
       ("user-Agent", "darklang") ]
 
-  match Stdlib.HttpClient.get url headers with
-  | Ok r ->
-    r.body |> Stdlib.String.fromBlobWithReplacement |> Stdlib.Result.Result.Ok
-  | Error _e -> Stdlib.Result.Result.Error "Failed to make GitHub API request"
+  match Stdlib.HttpClient.get(url, headers) with
+  | Ok(r) ->
+    if r.statusCode == 200 then
+      r.body |> Stdlib.Utf8.decodeWithReplacement |> Stdlib.Result.Result.Ok
+    else
+      Stdlib.Result.Result.Error(ReleaseError.BadStatus(r.statusCode))
+  | Error(e) -> Stdlib.Result.Result.Error(ReleaseError.RequestFailed(e))
 
 
 module Releases =
@@ -34,100 +71,141 @@ module Releases =
 
   /// Get tag of the most recent Darklang release, from the GitHub API
   /// (i.e. `v0.0.19`)
-  ///
-  /// TODO: typify the error type
-  let getLatestReleaseTag () : Stdlib.Result.Result<String, String> =
-    match fetchString $"{darklangRepoBaseUrl}/releases" with
-    | Ok releasesJsonString ->
-      match Stdlib.Json.parse<List<Release>> releasesJsonString with
-      | Ok releases ->
-        match Stdlib.List.head releases with
-        | Some latestRelease -> latestRelease.tag_name |> Stdlib.Result.Result.Ok
-        | None -> Stdlib.Result.Result.Error "No releases found"
-      | Error _e ->
-        Stdlib.Result.Result.Error "Couldn't parse releases JSON string"
-    | Error _e ->
-      Stdlib.Result.Result.Error "Couldn't fetch releases list from GitHub API"
+  let getLatestReleaseTag(): Stdlib.Result.Result<String, ReleaseError> =
+    match __fetchString($"{darklangRepoBaseUrl}/releases") with
+    | Ok(releasesJsonString) ->
+      match Stdlib.Json.parse<List<Release>>(releasesJsonString) with
+      | Ok(releases) ->
+        match Stdlib.List.head(releases) with
+        | Some(latestRelease) -> latestRelease.tag_name |> Stdlib.Result.Result.Ok
+        | None -> Stdlib.Result.Result.Error(ReleaseError.NoReleases)
+      | Error(_e) -> Stdlib.Result.Result.Error(ReleaseError.UnexpectedResponse)
+    | Error(e) -> Stdlib.Result.Result.Error(e)
+
+  /// The published releases, newest first: the first hundred, which is the most GitHub
+  /// returns on one page.
+  let list(): Stdlib.Result.Result<List<Release>, String> =
+    match __fetchString($"{darklangRepoBaseUrl}/releases?per_page=100") with
+    | Ok(releasesJsonString) ->
+      match Stdlib.Json.parse<List<Release>>(releasesJsonString) with
+      | Ok(releases) -> Stdlib.Result.Result.Ok(releases)
+      | Error(_e) ->
+        Stdlib.Result.Result.Error("Couldn't parse releases JSON string")
+    | Error(_e) ->
+      Stdlib.Result.Result.Error("Couldn't fetch releases list from GitHub API")
+
+  /// The build a release shipped, in the form the CLI prints its own (`alpha-abe74e7`). Asset
+  /// names are `darklang-alpha-<build>-<platform>.gz`, and the CLI's own build is the first seven
+  /// characters of the same hash.
+  let buildOf(release: Release): Stdlib.Option.Option<String> =
+    release.assets
+    |> Stdlib.List.head
+    |> Stdlib.Option.andThen(fun asset ->
+      Stdlib.List.getAt(Stdlib.String.split(asset.name, "-"), 2))
+    |> Stdlib.Option.map(fun hash -> $"alpha-{Stdlib.String.slice(hash, 0, 7)}")
+
+  /// The tag of the release that shipped <param cliVersion> (`v0.0.104`), if one of these did.
+  /// The tag appears nowhere in the binary, so the build is the only way to find it.
+  let tagFor(
+    releases: List<Release>,
+    cliVersion: String)
+    : Stdlib.Option.Option<String> =
+    releases
+    |> Stdlib.List.findFirst(fun r -> buildOf(r) == Stdlib.Option.Option.Some(cliVersion))
+    |> Stdlib.Option.map(fun r -> r.tag_name)
 
   /// Get the build hash version from the latest release assets
-  /// Returns in CLI format (e.g. "alpha-abe74e7") for version comparison
-  let getLatestReleaseBuildHash () : Stdlib.Result.Result<String, String> =
-    match fetchString $"{darklangRepoBaseUrl}/releases" with
-    | Ok releasesJsonString ->
-      match Stdlib.Json.parse<List<Release>> releasesJsonString with
-      | Ok releases ->
-        match Stdlib.List.head releases with
-        | Some latestRelease ->
-          match Stdlib.List.head latestRelease.assets with
-          | Some firstAsset ->
-            // Asset name format: darklang-alpha-BUILDHASH-platform
-            let parts = Stdlib.String.split firstAsset.name "-"
-            match Stdlib.List.getAt parts 2 with
-            | Some hash ->
-              // Return in same format as CLI version (first 7 chars)
-              Stdlib.Result.Result.Ok $"alpha-{Stdlib.String.slice hash 0 7}"
-            | None ->
-              // Fallback to tag name if we can't parse hash
-              Stdlib.Result.Result.Ok latestRelease.tag_name
-          | None ->
-            // No assets, fallback to tag name
-            Stdlib.Result.Result.Ok latestRelease.tag_name
-        | None -> Stdlib.Result.Result.Error "No releases found"
-      | Error _e ->
-        Stdlib.Result.Result.Error "Couldn't parse releases JSON string"
-    | Error _e ->
-      Stdlib.Result.Result.Error "Couldn't fetch releases list from GitHub API"
+  /// Returns in CLI format (e.g. "alpha-abe74e7") for version comparison, or the tag when the
+  /// release has no asset to read a build from.
+  let getLatestReleaseBuildHash(): Stdlib.Result.Result<String, String> =
+    match list() with
+    | Ok(releases) ->
+      match Stdlib.List.head(releases) with
+      | Some(latestRelease) ->
+        buildOf(latestRelease)
+        |> Stdlib.Option.withDefault(latestRelease.tag_name)
+        |> Stdlib.Result.Result.Ok
+      | None -> Stdlib.Result.Result.Error("No releases found")
+    | Error(e) -> Stdlib.Result.Result.Error(e)
 
 
   /// The asset for one platform id, matched by SUFFIX.
   ///
   /// `install.sh` matches `-<rid>.gz` for the same reason: `contains` lets `linux-arm` match the
   /// `linux-arm64` asset, so an armv7l machine is handed an arm64 binary.
-  let assetUrlFor
-    (assets: List<Asset>)
-    (platformId: String)
-    : Stdlib.Option.Option<String> =
+  let assetFor(
+    assets: List<Asset>,
+    platformId: String)
+    : Stdlib.Option.Option<Asset> =
     assets
-    |> Stdlib.List.findFirst (fun a ->
-      Stdlib.String.endsWith a.name $"-{platformId}.gz")
-    |> Stdlib.Option.map (fun a -> a.browser_download_url)
+    |> Stdlib.List.findFirst(fun a ->
+      Stdlib.String.endsWith(a.name, $"-{platformId}.gz"))
+
+
+  /// <fn assetFor>, as its download URL.
+  let assetUrlFor(
+    assets: List<Asset>,
+    platformId: String)
+    : Stdlib.Option.Option<String> =
+    assetFor(assets, platformId) |> Stdlib.Option.map(fun a -> a.browser_download_url)
+
+
+  /// The release's checksums file, `darklang-alpha-<build>-sha256sums.txt`: what `sha256sum`
+  /// printed for every binary in it.
+  let sumsUrlFor(assets: List<Asset>): Stdlib.Option.Option<String> =
+    assets
+    |> Stdlib.List.findFirst(fun a -> Stdlib.String.endsWith(a.name, "-sha256sums.txt"))
+    |> Stdlib.Option.map(fun a -> a.browser_download_url)
 
 
   /// The runtime id whose asset this host wants, as the release matrix spells it.
   /// Its own function so it can be tested; `getDownloadUrl` fetches before it is observable.
-  let platformId (host: Stdlib.Cli.Host.Host) : Stdlib.Result.Result<String, String> =
+  let platformId(host: Stdlib.Cli.Host.Host): Stdlib.Result.Result<String, String> =
     match host.os, host.arch with
     | Linux, Arm -> "linux-arm" |> Stdlib.Result.Result.Ok
     | Linux, Arm64 | Linux, Aarch64 -> "linux-arm64" |> Stdlib.Result.Result.Ok
-    | Linux, X86_64 -> "linux-x64" |> Stdlib.Result.Result.Ok
+    // The musl build is fully static, so it runs on glibc systems too. `install.sh` installs it
+    // on every x64 Linux, and an update must not switch such an install back to glibc.
+    | Linux, X86_64 -> "linux-musl-x64" |> Stdlib.Result.Result.Ok
     | MacOS, Arm64 -> "osx-arm64" |> Stdlib.Result.Result.Ok
     | MacOS, X86_64 -> "osx-x64" |> Stdlib.Result.Result.Ok
-    | _, _ -> Stdlib.Result.Result.Error "Unsupported OS or Arch"
+    | _, _ -> Stdlib.Result.Result.Error("Unsupported OS or Arch")
 
 
-  /// Get the appropriate URL to download the latest release of the `darklang` cli exe,
-  /// corresponding to the current OS and Architecture
+  /// One binary to download: its asset name, its URL, and the URL of the checksums file that
+  /// lists it.
+  type Download =
+    { name: String
+      url: String
+      sumsUrl: String }
+
+
+  /// The binary in release <param releaseTag> for this host's OS and architecture.
   ///
-  /// TODO typify the error type
-  let getDownloadUrl
-    (host: Stdlib.Cli.Host.Host)
-    (releaseTag: String)
-    : Stdlib.Result.Result<String, String> =
-    match platformId host with
-    | Ok hostStr ->
-      let fetched =
-        fetchString $"{darklangRepoBaseUrl}/releases/tags/{releaseTag}"
-
-      match fetched with
-      | Ok releaseJsonString ->
-        match Stdlib.Json.parse<Release> releaseJsonString with
-        | Ok release ->
-          match assetUrlFor release.assets hostStr with
-          | Some url -> url |> Stdlib.Result.Result.Ok
-          | None ->
-            Stdlib.Result.Result.Error $"No asset named `-{hostStr}.gz` in this release"
-        | Error _e ->
-          Stdlib.Result.Result.Error "Couldn't parse release JSON string"
-      | Error _e ->
-        Stdlib.Result.Result.Error "Couldn't fetch release from GitHub API"
-    | Error e -> Stdlib.Result.Result.Error $"Couldn't determine host: {e}"
+  /// A release with no checksums file is an error, so nothing installs a download it can't check.
+  let getDownload(
+    host: Stdlib.Cli.Host.Host,
+    releaseTag: String)
+    : Stdlib.Result.Result<Download, ReleaseError> =
+    match platformId(host) with
+    | Error(_e) -> Stdlib.Result.Result.Error(ReleaseError.UnsupportedHost)
+    | Ok(hostStr) ->
+      match __fetchString($"{darklangRepoBaseUrl}/releases/tags/{releaseTag}") with
+      | Error(BadStatus(404)) ->
+        Stdlib.Result.Result.Error(ReleaseError.ReleaseNotFound(releaseTag))
+      | Error(e) -> Stdlib.Result.Result.Error(e)
+      | Ok(releaseJsonString) ->
+        match Stdlib.Json.parse<Release>(releaseJsonString) with
+        | Error(_e) -> Stdlib.Result.Result.Error(ReleaseError.UnexpectedResponse)
+        | Ok(release) ->
+          match assetFor(release.assets, hostStr), sumsUrlFor(release.assets) with
+          | None, _ ->
+            Stdlib.Result.Result.Error(ReleaseError.NoAssetForPlatform(hostStr))
+          | Some(_), None ->
+            Stdlib.Result.Result.Error(ReleaseError.NoChecksums(releaseTag))
+          | Some(asset), Some(sumsUrl) ->
+            Stdlib.Result.Result.Ok(
+              Download
+                { name = asset.name
+                  url = asset.browser_download_url
+                  sumsUrl = sumsUrl })

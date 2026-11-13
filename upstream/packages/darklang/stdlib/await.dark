@@ -6,5 +6,5 @@ module Darklang.Stdlib
 /// the wait point: a builtin always gets values. (`Exec.await` is the one for a handle from
 /// `Exec.spawn`.)
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.await: Unknown function or value 'Builtin.runtimeForce'"
-let await (x: 'a) : 'a =
-  Builtin.runtimeForce x
+let await(x: 'a): 'a =
+  Builtin.runtimeForce(x)

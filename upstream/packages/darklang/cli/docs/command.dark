@@ -26,13 +26,22 @@ module Topics =
       content: Unit -> String
       subtopics: List<DocTopic> }
 
-  let allTopics () : List<DocTopic> =
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Docs.Command.Topics.allTopics: Unknown function or value 'Docs.Syntax.content'"
+  let allTopics(): List<DocTopic> =
     [ DocTopic
         { name = "for-ai"
           description = "AI agent guide - start here"
           aliases = [ "ai", "agent" ]
           context = "cli"
           content = Docs.ForAI.content
+          subtopics = forAISubtopics() }
+
+      DocTopic
+        { name = "scripts"
+          description = "Run .dark files"
+          aliases = [ "script", "run-script", "run" ]
+          context = "cli"
+          content = Docs.Scripts.content
           subtopics = [] }
 
       DocTopic
@@ -97,6 +106,14 @@ module Topics =
           aliases = [ "ops" ]
           context = "general"
           content = Docs.Operators.content
+          subtopics = [] }
+
+      DocTopic
+        { name = "escapes"
+          description = "String escapes: what a backslash means in a string or char"
+          aliases = [ "escape", "string-escapes" ]
+          context = "general"
+          content = Docs.Escapes.content
           subtopics = [] }
 
       DocTopic
@@ -192,7 +209,6 @@ module Topics =
               "merge"
               "rebase"
               "conflicts"
-              "sync"
               "constraints"
               "draft"
               // NOT "ops" -- `operators` already claims that alias, and `findTopic` resolves in list
@@ -222,130 +238,216 @@ module Topics =
           content = fun () -> "Run `docs signatures` to render. See `docs signatures --help`."
           subtopics = [] } ]
 
-  let findTopic (name: String) : Stdlib.Option.Option<DocTopic> =
-    let topics = allTopics ()
-    let lowerName = Stdlib.String.toLowercase name
+  /// The reference sections `docs for-ai` leaves out, so its first read stays short:
+  /// `docs for-ai tests` and the rest.
+  let forAISubtopics(): List<DocTopic> =
+    [ subtopic("packages", "Saving declarations, changing what exists, the type checker", [ "authoring", "edit" ], Docs.ForAIParts.packages)
+      subtopic("tests", "Package tests in full", [ "test", "testing" ], Docs.ForAIParts.tests)
+      subtopic("permissions", "Rules, profiles and package approvals", [ "perms", "http", "files" ], Docs.ForAIParts.permissions)
+      subtopic("traces", "What a run did, and things that run at once", [ "live", "processes" ], Docs.ForAIParts.traces)
+      subtopic("scm", "Drafts, commits, branches, deprecation", [ "branches", "commits" ], Docs.ForAIParts.scm)
+      subtopic("syntax", "The full syntax notes and name resolution", [ "names" ], Docs.ForAIParts.syntax) ]
+
+  let subtopic(
+    name: String,
+    description: String,
+    aliases: List<String>,
+    content: Unit -> String)
+    : DocTopic =
+    DocTopic
+      { name = name
+        description = description
+        aliases = aliases
+        context = "cli"
+        content = content
+        subtopics = [] }
+
+  /// The topic in <param topics> called <param name>, or with it as an alias.
+  let findIn(topics: List<DocTopic>, name: String): Stdlib.Option.Option<DocTopic> =
+    let lowerName = Stdlib.String.toLowercase(name)
+
+    match Stdlib.List.findFirst(topics, fun t -> Stdlib.String.toLowercase(t.name) == lowerName) with
+    | Some(t) -> Stdlib.Option.Option.Some(t)
+    | None ->
+      topics
+      |> Stdlib.List.findFirst(fun t ->
+        t.aliases
+        |> Stdlib.List.any(fun a -> Stdlib.String.toLowercase(a) == lowerName))
+
+  /// `docs <topic>`'s subtopics, one per line, for when a name is not one of them.
+  let formatSubtopicList(topic: DocTopic): String =
+    topic.subtopics
+    |> Stdlib.List.map(fun t -> $"  docs {topic.name} {t.name} - {t.description}")
+    |> Stdlib.String.join("\n")
+
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Docs.Command.Topics.findTopic: Unknown function or value 'allTopics'"
+  let findTopic(name: String): Stdlib.Option.Option<DocTopic> =
+    let topics = allTopics()
+    let lowerName = Stdlib.String.toLowercase(name)
 
     let byName =
       topics
-      |> Stdlib.List.findFirst (fun t -> Stdlib.String.toLowercase t.name == lowerName)
+      |> Stdlib.List.findFirst(fun t -> Stdlib.String.toLowercase(t.name) == lowerName)
 
     match byName with
-    | Some t -> Stdlib.Option.Option.Some t
+    | Some(t) -> Stdlib.Option.Option.Some(t)
     | None ->
       topics
-      |> Stdlib.List.findFirst (fun t ->
+      |> Stdlib.List.findFirst(fun t ->
         t.aliases
-        |> Stdlib.List.any (fun a -> Stdlib.String.toLowercase a == lowerName))
+        |> Stdlib.List.any(fun a -> Stdlib.String.toLowercase(a) == lowerName))
 
-  let formatTopicList () : String =
-    let topics = allTopics ()
+  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Docs.Command.Topics.formatTopicList: Unknown function or value 'allTopics'"
+  let formatTopicList(): String =
+    let topics = allTopics()
 
     let lines =
       topics
-      |> Stdlib.List.map (fun t ->
+      |> Stdlib.List.map(fun t ->
         let aliasStr =
           match t.aliases with
           | [] -> ""
           | aliases ->
-            let joined = Stdlib.String.join aliases ", "
+            let joined = Stdlib.String.join(aliases, ", ")
             $" ({joined})"
 
         let contextTag =
           match t.context with
           | "general" -> ""
-          | ctx -> Stdlib.Cli.UI.Colors.dimText $" [{ctx}]"
+          | ctx -> Stdlib.Cli.UI.Colors.dimText($" [{ctx}]")
 
-        $"  {Stdlib.Cli.UI.Colors.command t.name}{Stdlib.Cli.UI.Colors.dimText aliasStr} - {t.description}{contextTag}")
+        $"  {Stdlib.Cli.UI.Colors.command(t.name)}{Stdlib.Cli.UI.Colors.dimText(aliasStr)} - {t.description}{contextTag}")
 
     let header =
-      [ Stdlib.Cli.UI.Colors.info "Available documentation topics:"
+      [ Stdlib.Cli.UI.Colors.info("Available documentation topics:")
         "" ]
 
     let footer =
       [ ""
-        "Usage: " + Stdlib.Cli.UI.Colors.command "docs <topic>"
+        "Usage: " + Stdlib.Cli.UI.Colors.command("docs <topic>")
         ""
-        "Start with: " + Stdlib.Cli.UI.Colors.command "docs for-ai" ]
+        "Start with: " + Stdlib.Cli.UI.Colors.command("docs for-ai") ]
 
-    (Stdlib.List.append (Stdlib.List.append header lines) footer)
-    |> Stdlib.String.join "\n"
+    (Stdlib.List.concat(Stdlib.List.concat(header, lines), footer))
+    |> Stdlib.String.join("\n")
 
 
 // Topics that don't render from static text — they delegate to a live command
 // with access to AppState. Returns Some new-state if `name` is a live topic.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let dispatchLive
-  (state: Cli.AppState)
-  (name: String)
-  (rest: List<String>)
+let dispatchLive(
+  state: Cli.AppState,
+  name: String,
+  rest: List<String>)
   : Stdlib.Option.Option<Cli.AppState> =
-  let lower = Stdlib.String.toLowercase name
+  let lower = Stdlib.String.toLowercase(name)
   match lower with
-  | "signatures" -> Stdlib.Option.Option.Some (Packages.Signatures.execute state rest)
-  | "sigs" -> Stdlib.Option.Option.Some (Packages.Signatures.execute state rest)
-  | "api" -> Stdlib.Option.Option.Some (Packages.Signatures.execute state rest)
-  | "stdlib" -> Stdlib.Option.Option.Some (StdlibOverview.execute state rest)
-  | "lib" -> Stdlib.Option.Option.Some (StdlibOverview.execute state rest)
+  | "signatures" -> Stdlib.Option.Option.Some(Packages.Signatures.execute(state, rest))
+  | "sigs" -> Stdlib.Option.Option.Some(Packages.Signatures.execute(state, rest))
+  | "api" -> Stdlib.Option.Option.Some(Packages.Signatures.execute(state, rest))
+  | "stdlib" -> Stdlib.Option.Option.Some(StdlibOverview.execute(state, rest))
+  | "lib" -> Stdlib.Option.Option.Some(StdlibOverview.execute(state, rest))
   | _ -> Stdlib.Option.Option.None
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let execute (state: Cli.AppState) (args: List<String>) : Cli.AppState =
+let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
   match args with
   | [] ->
-    Stdlib.printLine (Topics.formatTopicList ())
+    Stdlib.printLine(Topics.formatTopicList())
     state
 
-  | topicName :: rest ->
-    match dispatchLive state topicName rest with
-    | Some newState -> newState
+  | [topicName, ...rest] ->
+    match dispatchLive(state, topicName, rest) with
+    | Some(newState) -> newState
     | None ->
-      match Topics.findTopic topicName with
-      | Some topic ->
-        let contentFn = topic.content
-        Stdlib.printLine (contentFn ())
-        state
+      match Topics.findTopic(topicName) with
+      | Some(topic) ->
+        match (topic.subtopics, rest) with
+        | ([ _, ... ], [ _, ... ]) ->
+          // Several parts in one call, so a reader needs one more turn at most.
+          let unknown =
+            rest
+            |> Stdlib.List.filter(fun name ->
+              Stdlib.Option.isNone(Topics.findIn(topic.subtopics, name)))
+
+          match unknown with
+          | [] ->
+            rest
+            |> Stdlib.List.filterMap(fun name -> Topics.findIn(topic.subtopics, name))
+            |> Stdlib.List.uniqueBy(fun sub -> sub.name)
+            |> Stdlib.List.map(fun sub ->
+              let contentFn = sub.content
+              contentFn())
+            |> Stdlib.String.join("\n\n")
+            |> Stdlib.printLine
+
+            state
+          | _ ->
+            let names = Stdlib.String.join(unknown, ", ")
+            let noun = if Stdlib.List.length(unknown) == 1 then "part" else "parts"
+
+            Stdlib.printErrorLine(
+              Stdlib.Cli.UI.Colors.error($"Unknown {noun} of docs {topic.name}: {names}"))
+            Stdlib.printErrorLine("")
+            Stdlib.printErrorLine(Topics.formatSubtopicList(topic))
+            Cli.failed(state)
+        | _ ->
+          let contentFn = topic.content
+          Stdlib.printLine(contentFn())
+          state
       | None ->
-        Stdlib.printLine (Stdlib.Cli.UI.Colors.error $"Unknown topic: {topicName}")
-        Stdlib.printLine ""
-        Stdlib.printLine (Topics.formatTopicList ())
-        Cli.exitWith state false
+        Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.error($"Unknown topic: {topicName}"))
+        Stdlib.printErrorLine("")
+        Stdlib.printErrorLine(Topics.formatTopicList())
+        Cli.failed(state)
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let help (_state: Cli.AppState) : String =
-  [ Stdlib.Cli.UI.Colors.info "Usage: " + Stdlib.Cli.UI.Colors.command "docs [topic]"
+let help(_state: Cli.AppState): String =
+  [ Stdlib.Cli.UI.Colors.info("Usage: ") + Stdlib.Cli.UI.Colors.command("docs [topic]")
     "Browse in-CLI documentation."
     ""
-    Stdlib.Cli.UI.Colors.info "Examples:"
-    "  " + Stdlib.Cli.UI.Colors.command "docs" + "         - List all topics"
-    "  " + Stdlib.Cli.UI.Colors.command "docs for-ai" + "  - AI agent quick start"
-    "  " + Stdlib.Cli.UI.Colors.command "docs syntax" + "  - Language syntax reference"
-    "  " + Stdlib.Cli.UI.Colors.command "docs errors" + "  - Common errors and fixes" ]
-  |> Stdlib.String.join "\n"
+    Stdlib.Cli.UI.Colors.info("Examples:")
+    "  " + Stdlib.Cli.UI.Colors.command("docs") + "         - List all topics"
+    "  " + Stdlib.Cli.UI.Colors.command("docs for-ai") + "  - AI agent quick start"
+    "  " + Stdlib.Cli.UI.Colors.command("docs for-ai tests") + "  - One of its longer sections"
+    "  " + Stdlib.Cli.UI.Colors.command("docs for-ai tests scm") + "  - Several sections at once"
+    "  " + Stdlib.Cli.UI.Colors.command("docs syntax") + "  - Language syntax reference"
+    "  " + Stdlib.Cli.UI.Colors.command("docs errors") + "  - Common errors and fixes" ]
+  |> Stdlib.String.join("\n")
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let complete
-  (state: Cli.AppState)
-  (args: List<String>)
+let complete(
+  state: Cli.AppState,
+  args: List<String>)
   : List<Cli.Completion.CompletionItem> =
   match args with
   | [] ->
-    let topics = Topics.allTopics ()
+    let topics = Topics.allTopics()
 
     topics
-    |> Stdlib.List.map (fun t -> Cli.Completion.withDescription t.name t.description)
+    |> Stdlib.List.map(fun t -> Cli.Completion.withDescription(t.name, t.description))
   | [ partial ] ->
-    let topics = Topics.allTopics ()
-    let lowerPartial = Stdlib.String.toLowercase partial
+    let topics = Topics.allTopics()
+    let lowerPartial = Stdlib.String.toLowercase(partial)
 
     topics
-    |> Stdlib.List.filter (fun t ->
-      (Stdlib.String.startsWith (Stdlib.String.toLowercase t.name) lowerPartial)
+    |> Stdlib.List.filter(fun t ->
+      (Stdlib.String.startsWith(Stdlib.String.toLowercase(t.name), lowerPartial))
       || (t.aliases
-          |> Stdlib.List.any (fun a ->
-            Stdlib.String.startsWith (Stdlib.String.toLowercase a) lowerPartial)))
-    |> Stdlib.List.map (fun t -> Cli.Completion.withDescription t.name t.description)
+          |> Stdlib.List.any(fun a ->
+            Stdlib.String.startsWith(Stdlib.String.toLowercase(a), lowerPartial))))
+    |> Stdlib.List.map(fun t -> Cli.Completion.withDescription(t.name, t.description))
+  | [ topicName, partial ] ->
+    match Topics.findTopic(topicName) with
+    | Some(topic) ->
+      let lowerPartial = Stdlib.String.toLowercase(partial)
+
+      topic.subtopics
+      |> Stdlib.List.filter(fun t ->
+        Stdlib.String.startsWith(Stdlib.String.toLowercase(t.name), lowerPartial))
+      |> Stdlib.List.map(fun t -> Cli.Completion.withDescription(t.name, t.description))
+    | None -> []
   | _ -> []

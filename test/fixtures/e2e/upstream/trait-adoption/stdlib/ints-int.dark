@@ -17,8 +17,8 @@ module Darklang.Stdlib.Int.Tests
 // --- boundary: largest small value vs first big value ---
 test toStringAndParse =
   Stdlib.Test.all
-    [ Stdlib.toString 5 |> Stdlib.Test.equal "5"
-      Stdlib.toString 9223372036854775808
+    [ Stdlib.display 5 |> Stdlib.Test.equal "5"
+      Stdlib.display 9223372036854775808
       |> Stdlib.Test.equal "9223372036854775808"
       Stdlib.Int.parse "9223372036854775808"
       |> Stdlib.Test.equal (Ok 9223372036854775808)
