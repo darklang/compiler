@@ -1,0 +1,14 @@
+// regex_scan.e2e - Builtin.regexScan: matches with their groups, and the patterns the interpreter refuses.
+
+Stdlib.Regex.findAll "a1b22c333" "\\d+" = Ok ["1", "22", "333"]
+Stdlib.Regex.split "a, b,c" ",\\s*" = Ok ["a", "b", "c"]
+Stdlib.Regex.replaceAll "aaa" "a*" "-" = Ok "--"
+Stdlib.Regex.isMatch "Hello" "^h" = Ok false
+Stdlib.Regex.find "x" "(" = Error (Stdlib.Regex.RegexError.InvalidPattern ("not enough )", 1L))
+Stdlib.Regex.find "x" "(?=a)" = Error (Stdlib.Regex.RegexError.UnsupportedSyntax "lookahead or lookbehind")
+Stdlib.Regex.find "x" "(a)\\1" = Error (Stdlib.Regex.RegexError.UnsupportedSyntax "backreference")
+Stdlib.Regex.findMatch "key=val" (Stdlib.Regex.ofPattern "(?<k>\\w+)=(\\w+)") |> Stdlib.Result.map (fun m -> Stdlib.Option.map m (fun m -> (m.text, Stdlib.List.length m.captures, Stdlib.Dict.get m.namedCaptures "k" |> Stdlib.Option.map (fun c -> Stdlib.Option.map c (fun c -> c.text))))) = Ok (Some (("key=val", 1L, Some (Some "key"))))
+Stdlib.Regex.findAllMatches "a\nb" (Stdlib.Regex.Regex { pattern = "^\\w$", options = Stdlib.Regex.Options { caseInsensitive = false, multiline = true } }) |> Stdlib.Result.map (fun ms -> Stdlib.List.length ms) = Ok 2L
+Stdlib.Regex.findAll "aBc ABC" (Stdlib.Regex.escape "abc") = Ok []
+Stdlib.Regex.findAllMatches "aBc ABC" (Stdlib.Regex.Regex { pattern = "abc", options = Stdlib.Regex.Options { caseInsensitive = true, multiline = false } }) |> Stdlib.Result.map (fun ms -> Stdlib.List.map ms (fun m -> m.range.start)) = Ok [0L, 4L]
+Stdlib.Regex.replaceAllWith "a1b2" "(\\d)" (fun m -> "<" + m.text + ">") = Ok "a<1>b<2>"
