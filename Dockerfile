@@ -118,6 +118,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       pkg-config \
       python3 \
       python3-venv \
+      python3-yaml \
       shellcheck \
       sudo \
       tzdata \
