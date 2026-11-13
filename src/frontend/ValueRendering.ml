@@ -1164,11 +1164,19 @@ let ensureEvalRenderer env typ state =
 
 let starts name prefix = Text.startsWith name prefix
 
-let renderEnv recordMetadata sumMetadata =
+(* A type merged with another of the same content has several names too. *)
+let renderEnv symbols recordMetadata sumMetadata =
+  let sameTypes = (C.traitCatalog symbols).TraitCatalog.sameTypes in
   {
     records = lazy recordMetadata;
     sums = lazy sumMetadata;
-    sharedShapes = lazy (sharedShapeNames recordMetadata sumMetadata);
+    sharedShapes =
+      lazy
+        (M.fold
+           (fun name canonical shared ->
+             StringOrder.Set.add name (StringOrder.Set.add canonical shared))
+           sameTypes
+           (sharedShapeNames recordMetadata sumMetadata));
   }
 
 let includeRuntimeFunctions symbols =
@@ -1191,7 +1199,7 @@ let rewriteProgram recordMetadata sumMetadata programType program =
   let symbols = includeRuntimeFunctions symbols in
   (* Type checking already built and overlaid these immutable indexes. Keep
     them lazy so primitive renderers do not inspect declaration metadata. *)
-  let env = renderEnv recordMetadata sumMetadata in
+  let env = renderEnv symbols recordMetadata sumMetadata in
   let existing = existingRenderers topLevels in
   let renderName, state =
     match programType with
@@ -1364,7 +1372,7 @@ let interpolation env valueType value state =
 let rewriteDiagnosticRenderers recordMetadata sumMetadata program =
   let symbols, topLevels = C.viewProgram program in
   let symbols = includeRuntimeFunctions symbols in
-  let env = renderEnv recordMetadata sumMetadata in
+  let env = renderEnv symbols recordMetadata sumMetadata in
   let existing = existingRenderers topLevels in
   let initial = { functions = existing; symbols } in
   let reversed, final =

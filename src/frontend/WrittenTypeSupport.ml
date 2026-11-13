@@ -28,6 +28,7 @@ type typeEntry = {
   path : string list;
   definition : WT.typeDefinition;
   bounds : WT.typeParamBound list;
+  sameAs : string option;
 }
 
 type typeInventory = typeEntry M.t
