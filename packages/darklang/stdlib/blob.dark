@@ -165,12 +165,23 @@ let __fromHex (value: String) (index: Int64) (acc: List<Int64>) : Stdlib.Result.
         let high = Stdlib.Blob.__hexValue (Stdlib.String.__byteAtUnchecked value index) in
         let low = Stdlib.Blob.__hexValue (Stdlib.String.__byteAtUnchecked value (index + 1L)) in
         if high < 0L || low < 0L then
-            Error "Invalid hex string: The input is not a valid hex string as it contains a non-hex character."
+            Error "Invalid hex string: Format_BadHexChar"
         else Stdlib.Blob.__fromHex value (index + 2L) (Stdlib.List.push acc (high * 16L + low))
 
+// The length of value in UTF-16 code units, as .NET counts a string.
+let __utf16Length (value: String) (index: Int64) (count: Int64) : Int64 =
+    if index >= Stdlib.String.__byteLength value then count
+    else
+        let byte = Stdlib.String.__byteAtUnchecked value index in
+        let units = if byte >= 128L && byte < 192L then 0L else if byte >= 240L then 2L else 1L in
+        Stdlib.Blob.__utf16Length value (index + 1L) (count + units)
+
+// The interpreter's messages are .NET's Convert.FromHexString exceptions,
+// which it reports by resource key; the length is checked first, in UTF-16
+// code units.
 let fromHex (value: String) : Stdlib.Result.Result<Blob, String> =
-    if Stdlib.String.__byteLength value % 2L != 0L then
-        Error "Invalid hex string: The input is not a valid hex string as its length is not a multiple of 2."
+    if Stdlib.Blob.__utf16Length value 0L 0L % 2L != 0L then
+        Error "Invalid hex string: Format_BadHexLength"
     else Stdlib.Blob.__fromHex value 0L []
 
 let toBase64 (blob: Blob) : String =
@@ -259,3 +270,68 @@ let toString (blob: Blob) : Stdlib.Result.Result<String, String> =
     let invalidIndex = Stdlib.Blob.__validateUtf8 blob 0L (Stdlib.Blob.__byteLength blob) in
     if invalidIndex < 0L then Ok (Stdlib.Blob.__copyToString blob)
     else Error (Stdlib.Blob.__invalidUtf8 (Stdlib.Blob.__getByte blob invalidIndex) invalidIndex)
+
+// The interpreter's Bytes builtins that the Blob module had no counterpart for,
+// with the interpreter's Int64 indexes and counts.
+
+/// Some byte at <param index>, or None when it is out of range.
+let getAt (blob: Blob) (index: Int64) : Stdlib.Option.Option<UInt8> =
+    if index < 0L || index >= Stdlib.Blob.__byteLength blob then None
+    else Some (Stdlib.Blob.__int64ToUInt8 (Stdlib.Blob.__getByte blob index))
+
+let __indexOfFrom (blob: Blob) (byte: Int64) (index: Int64) (length: Int64) : Stdlib.Option.Option<Int64> =
+    if index >= length then None
+    else if Stdlib.Blob.__getByte blob index == byte then Some index
+    else Stdlib.Blob.__indexOfFrom blob byte (index + 1L) length
+
+/// Some index of the first <param byte> at or after <param start>, or None
+/// when there is none or <param start> is out of range.
+let indexOf (blob: Blob) (byte: UInt8) (start: Int64) : Stdlib.Option.Option<Int64> =
+    let length = Stdlib.Blob.__byteLength blob in
+    if start < 0L || start >= length then None
+    else Stdlib.Blob.__indexOfFrom blob (Stdlib.Blob.__uint8ToInt64 byte) start length
+
+let __segmentAt (blob: Blob) (segment: Blob) (at: Int64) (offset: Int64) (count: Int64) : Bool =
+    if offset >= count then true
+    else if Stdlib.Blob.__getByte blob (at + offset) != Stdlib.Blob.__getByte segment offset then false
+    else Stdlib.Blob.__segmentAt blob segment at (offset + 1L) count
+
+let __indexOfSegmentFrom (blob: Blob) (segment: Blob) (at: Int64) (last: Int64) (count: Int64) : Stdlib.Option.Option<Int64> =
+    if at > last then None
+    else if Stdlib.Blob.__segmentAt blob segment at 0L count then Some at
+    else Stdlib.Blob.__indexOfSegmentFrom blob segment (at + 1L) last count
+
+/// Some index of the first <param segment> at or after <param start>, or None
+/// when there is none or <param start> is out of range. An empty segment is
+/// found at <param start>.
+let indexOfSegment (blob: Blob) (segment: Blob) (start: Int64) : Stdlib.Option.Option<Int64> =
+    let length = Stdlib.Blob.__byteLength blob in
+    let count = Stdlib.Blob.__byteLength segment in
+    if start < 0L || start > length then None
+    else Stdlib.Blob.__indexOfSegmentFrom blob segment start (length - count) count
+
+/// The first <param count> bytes. Every Blob here is in memory, so this is
+/// always Some.
+let peek (blob: Blob) (count: Int64) : Stdlib.Option.Option<Blob> =
+    let length = Stdlib.Blob.__byteLength blob in
+    let n = if count < 0L then 0L else if count > length then length else count in
+    Some (Stdlib.Blob.slice blob (Stdlib.Int.fromInt64 0L) (Stdlib.Int.fromInt64 n))
+
+let __previewPairs (blob: Blob) (index: Int64) (stop: Int64) : String =
+    if index >= stop then ""
+    else
+        let byte = Stdlib.Blob.__getByte blob index in
+        let pair = Stdlib.String.toLowercase (Stdlib.Blob.__byteToHex byte) in
+        let rest = Stdlib.Blob.__previewPairs blob (index + 1L) stop in
+        if rest == "" then pair else pair + " " + rest
+
+// How the current interpreter prints unsaved Bytes, for --syntax=current:
+// the length, then the first 16 bytes in lower-case hex pairs.
+let __evalDisplay (blob: Blob) : String =
+    let n = Stdlib.Blob.__byteLength blob in
+    let size = Stdlib.Int64.toString n + (if n == 1L then " byte" else " bytes") in
+    if n == 0L then "<Bytes: " + size + ">"
+    else
+        let shown = if n > 16L then 16L else n in
+        let more = if n > 16L then " ..." else "" in
+        "<Bytes: " + size + " " + Stdlib.Blob.__previewPairs blob 0L shown + more + ">"

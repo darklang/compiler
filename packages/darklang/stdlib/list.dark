@@ -9,6 +9,9 @@ module Darklang.Stdlib.List
 
 type ChunkBySizeError = | SizeMustBeGreaterThanZero
 
+// What main's List.zip and List.map2 answer when their lists differ in length.
+type LengthMismatch = { left: Int64, right: Int64 }
+
 type IndexError =
   /// The resolved index was outside the bounds of the list.
   | IndexOutOfBounds
@@ -45,6 +48,10 @@ let singleton (value: 'a) : List<'a> =
 // Prepend an element to a list - O(1) worst case
 let push<'t> (list: List<t>) (value: t) : List<t> =
     Stdlib.List.__push<t> list value
+
+// The interpreter's List.append: one value added at the end.
+let appendOne<'t> (list: List<t>) (value: t) : List<t> =
+    Stdlib.List.append<t> list [value]
 
 // Internal: force concrete monomorphization of push for compiler-generated list literals
 let __pushInt64 (list: List<Int64>) (value: Int64) : List<Int64> =
@@ -349,6 +356,10 @@ let repeat
 let indexedMap<'a, 'b> (list: List<a>) (fn: Int -> a -> b) : List<b> =
     Stdlib.List.__indexedMapHelper<a, b> list fn 0 (Stdlib.List.__empty<b> ())
 
+// The interpreter's List.indexedMap, whose index is an Int64.
+let indexedMapInt64<'a, 'b> (list: List<a>) (fn: Int64 -> a -> b) : List<b> =
+    Stdlib.List.indexedMap<a, b> list (fun index value -> fn (Builtin.unwrap (Stdlib.Int.toInt64 index)) value)
+
 let __indexedMapHelper<'a, 'b> (list: List<a>) (fn: Int -> a -> b) (index: Int) (acc: List<b>) : List<b> =
     if Stdlib.List.__isEmpty<a> list then Stdlib.List.__reverse<b> acc
     else
@@ -452,6 +463,26 @@ let map2
     Option.Option.None
   else
     Option.Option.Some(map2shortest as_ bs fn)
+
+// Main's List.map2 and List.zip: Error with both lengths when they differ.
+let __lengthMismatch<'a, 'b> (listA: List<a>) (listB: List<b>) : Stdlib.Option.Option<Stdlib.List.LengthMismatch> =
+    let left = Stdlib.List.length listA in
+    let right = Stdlib.List.length listB in
+    if left == right then None
+    else
+        Some (Stdlib.List.LengthMismatch {
+            left = Builtin.unwrap (Stdlib.Int.toInt64 left),
+            right = Builtin.unwrap (Stdlib.Int.toInt64 right) })
+
+let map2Checked<'a, 'b, 'c> (listA: List<a>) (listB: List<b>) (fn: a -> b -> c) : Stdlib.Result.Result<List<c>, Stdlib.List.LengthMismatch> =
+    match Stdlib.List.__lengthMismatch listA listB with
+    | Some mismatch -> Error mismatch
+    | None -> Ok (Stdlib.List.map2shortest listA listB fn)
+
+let zipChecked<'a, 'b> (listA: List<a>) (listB: List<b>) : Stdlib.Result.Result<List<(a * b)>, Stdlib.List.LengthMismatch> =
+    match Stdlib.List.__lengthMismatch listA listB with
+    | Some mismatch -> Error mismatch
+    | None -> Ok (Stdlib.List.zipShortest listA listB)
 
 let zipShortest<'a, 'b> (listA: List<a>) (listB: List<b>) : List<(a * b)> =
     match (listA, listB) with

@@ -289,7 +289,7 @@ let[@warning "-4"] rec checkMatchPattern globals symbols prebound expected
                           map
                             (fun (fields, bindings, symbols) ->
                               let tag =
-                                caseTag globals.collidingCases canonical
+                                caseTag globals.collidingCases globals.types canonical
                                   caseName ordinal
                               in
                               let id, symbols =
@@ -425,7 +425,7 @@ let[@warning "-4"] matchIsExhaustive globals symbols scrutineeType scrutinee
                   (fun ordinal (_, (variant : WT.enumCaseSyntax)) ->
                     let name = snd variant.WT.name in
                     let tag =
-                      caseTag globals.collidingCases canonical name ordinal
+                      caseTag globals.collidingCases globals.types canonical name ordinal
                     in
                     let id, _ =
                       WrittenCheckingState.internConstructor canonical name tag

@@ -107,12 +107,20 @@ let parsePrimary grammar state index =
       | TFloat value ->
           let whole, fraction = floatParts state (index + 1) value in
           (WT.EFloat (range, true, whole, fraction), index + 2)
+      | TFloat32 text ->
+          (float32Literal state (index + 1) true range text, index + 2)
+      | TDecimal text ->
+          (decimalLiteral state (index + 1) true range text, index + 2)
       | _ ->
           parsePrefix grammar state index
             ProgramTypesShim.InfixFnName.negateBuiltinName)
   | TFloat value ->
       let whole, fraction = floatParts state index value in
       (WT.EFloat (rng state index, value < 0., whole, fraction), index + 1)
+  | TFloat32 text ->
+      (float32Literal state index false (rng state index) text, index + 1)
+  | TDecimal text ->
+      (decimalLiteral state index false (rng state index) text, index + 1)
   | TTrue -> (WT.EBool (rng state index, true), index + 1)
   | TFalse -> (WT.EBool (rng state index, false), index + 1)
   | TStringLit value ->

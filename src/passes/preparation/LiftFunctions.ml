@@ -553,7 +553,13 @@ let liftLambdasInProgram baseRegistry baseVariants baseFunctions program =
              (fun lookup (index, (variant : AST.variant)) ->
                let tag =
                  if Names.mem variant.AST.name collisions then
-                   AST.constructorRuntimeIdentity owner variant.AST.name
+                   AST.constructorRuntimeIdentity owner variant.AST.name index
+                     (List.filter_map
+                        (fun (other : AST.variant) ->
+                          if Names.mem other.AST.name collisions then
+                            Some other.AST.name
+                          else None)
+                        variants)
                  else index
                in
                let info = (owner, parameters, tag, variant.AST.fields) in

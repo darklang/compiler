@@ -1,0 +1,242 @@
+// Stdlib.Float32.dark - IEEE-754 binary32 over the root FLOAT32(Float) sum.
+//
+// A Float32 is held as the Float with exactly its value: every binary32 is a
+// binary64, so widening is the payload itself, and equality and ordering are
+// the payload's. Each result is rounded once more to binary32, ties to even,
+// which is what the interpreter's .NET `float32` conversion does. For + - * /
+// and sqrt, rounding the binary64 result again is exact (53 >= 2 * 24 + 2).
+
+module Darklang.Stdlib.Float32
+
+type ParseError = | BadFormat
+
+let toFloat (value: Float32) : Float =
+    match value with
+    | FLOAT32 f -> f
+
+// `numerator / denominator`, both positive, rounded to the nearest binary32
+// (ties to even) and returned as the Float of that value. Out of range is
+// infinity; below half the smallest subnormal is zero.
+let __ratioToFloat32 (numerator: Int) (denominator: Int) : Float =
+    let decimalLengthDifference =
+        Stdlib.String.__byteLength (Stdlib.Int.toString numerator)
+            - Stdlib.String.__byteLength (Stdlib.Int.toString denominator) in
+    let estimate = decimalLengthDifference * 3322L / 1000L in
+    let exponent = Stdlib.Float.__binaryExponent numerator denominator estimate in
+    if exponent > 127L then Stdlib.Float.__infinity ()
+    else if exponent >= -126L then
+        let significand = Stdlib.Float.__roundRatioAtShift numerator denominator (23L - exponent) in
+        let twoTo24 = Stdlib.Float.__powerOfTwo 24L in
+        if Stdlib.Int.greaterThanOrEqualTo significand twoTo24 then
+            if exponent == 127L then Stdlib.Float.__infinity ()
+            else Stdlib.Float.__scaleByPowerOfTwo (Stdlib.Int.toFloat significand) (exponent - 23L)
+        else Stdlib.Float.__scaleByPowerOfTwo (Stdlib.Int.toFloat significand) (exponent - 23L)
+    else
+        let significand = Stdlib.Float.__roundRatioAtShift numerator denominator 149L in
+        Stdlib.Float.__scaleByPowerOfTwo (Stdlib.Int.toFloat significand) (-149L)
+
+// The exact binary64 value of a finite, nonzero Float as (significand, power
+// of two): |value| = significand * 2 ** exponent.
+let __exactParts (value: Float) : (Int * Int64) =
+    let bits = Stdlib.Float.__toBits value in
+    let rawExponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
+    let mantissa = Stdlib.UInt64.bitwiseAnd bits 4503599627370495UL in
+    if rawExponent == 0UL then (Stdlib.Int.fromUInt64 mantissa, -1074L)
+    else
+        ( Stdlib.Int.fromUInt64 (mantissa + 4503599627370496UL),
+          Stdlib.Float.__smallUInt64ToInt64 rawExponent - 1075L )
+
+let __roundFloat (value: Float) : Float =
+    if value != value then value
+    else if value == 0.0 then value
+    else if Stdlib.Float.__isInfinite value then value
+    else
+        let negative = Stdlib.Float.__isNegative value in
+        let (significand, exponent) = Stdlib.Float32.__exactParts value in
+        let magnitude =
+            if exponent >= 0L then
+                Stdlib.Float32.__ratioToFloat32 (Stdlib.Float.__shiftLeftDecimal significand exponent) (Stdlib.Int.fromInt64 1L)
+            else
+                Stdlib.Float32.__ratioToFloat32 significand (Stdlib.Float.__powerOfTwo (0L - exponent)) in
+        if negative then 0.0 - magnitude
+        else magnitude
+
+/// Rounds <param a> to the nearest Float32, ties to even. Out of range is infinity.
+let fromFloat (a: Float) : Float32 = FLOAT32 (Stdlib.Float32.__roundFloat a)
+
+/// The Float32 nearest <param a>, ties to even, rounded once.
+let fromInt64 (a: Int64) : Float32 =
+    if a == 0L then FLOAT32 0.0
+    else
+        let magnitude =
+            Stdlib.Float32.__ratioToFloat32 (Stdlib.Int.absoluteValue (Stdlib.Int.fromInt64 a)) (Stdlib.Int.fromInt64 1L) in
+        FLOAT32 (if a < 0L then 0.0 - magnitude else magnitude)
+
+let __decimalToFloat32 (digits: String) (decimalExponent: Int64) (negative: Bool) : Float =
+    let normalized = Stdlib.Int.__normalizeMagnitude digits in
+    if normalized == "0" then if negative then -0.0 else 0.0
+    else
+        let decimalMagnitude = Stdlib.String.__byteLength normalized + decimalExponent in
+        let magnitude =
+            if decimalMagnitude > 40L then Stdlib.Float.__infinity ()
+            else if decimalMagnitude < -50L then 0.0
+            else
+                let numerator =
+                    if decimalExponent >= 0L then
+                        Stdlib.Int.__value (normalized + Stdlib.String.repeat "0" (Stdlib.Int.fromInt64 decimalExponent))
+                    else Stdlib.Int.__value normalized in
+                let denominator =
+                    if decimalExponent < 0L then Stdlib.Float.__pow10 (0L - decimalExponent)
+                    else Stdlib.Int.fromInt64 1L in
+                Stdlib.Float32.__ratioToFloat32 numerator denominator in
+        if negative then 0.0 - magnitude else magnitude
+
+/// The Float32 nearest the number in <param s>, rounded once from the decimal.
+let parse (s: String) : Stdlib.Result.Result<Float32, Stdlib.Float32.ParseError> =
+    let value = Stdlib.String.trim s in
+    if value == "NaN" || value == "+NaN" || value == "-NaN" then Ok (FLOAT32 (Stdlib.Float.__nan ()))
+    else if value == "Infinity" || value == "+Infinity" then Ok (FLOAT32 (Stdlib.Float.__infinity ()))
+    else if value == "-Infinity" then Ok (FLOAT32 (Stdlib.Float.__negativeInfinity ()))
+    else if Stdlib.String.__byteLength value == 0L then Error Stdlib.Float32.ParseError.BadFormat
+    else
+        let first = Stdlib.String.__byteAtUnchecked value 0L in
+        let negative = first == 45L in
+        let hasSign = negative || first == 43L in
+        let start = if hasSign then 1L else 0L in
+        match Stdlib.Float.__scanMantissa value start "" 0L false false with
+        | Error _ -> Error Stdlib.Float32.ParseError.BadFormat
+        | Ok ((digits, fractionalDigits, exponent)) ->
+            Ok (FLOAT32 (Stdlib.Float32.__decimalToFloat32 digits (exponent - fractionalDigits) negative))
+
+let __shortest (value: Float) (exactText: String) (scale: Int64) (negative: Bool) (precision: Int64) : String =
+    let exactLength = Stdlib.String.__byteLength exactText in
+    let originalExponent = exactLength - scale - 1L in
+    let roundedText = Stdlib.Float.__roundedSignificand exactText precision in
+    let carried = Stdlib.String.__byteLength roundedText > precision in
+    let exponent = if carried then originalExponent + 1L else originalExponent in
+    let digits = Stdlib.Float.__stripDecimalTrailingZeros roundedText in
+    let decimalExponent = exponent - Stdlib.String.__byteLength digits + 1L in
+    let parsed = Stdlib.Float32.__decimalToFloat32 digits decimalExponent negative in
+    if parsed == value then Stdlib.Float.__renderDecimalCandidate digits exponent negative
+    else if precision >= 9L then Builtin.crash "Float32.toString failed to find a round-trip decimal"
+    else Stdlib.Float32.__shortest value exactText scale negative (precision + 1L)
+
+/// The shortest decimal that reads back to the same Float32, e.g. `0.1`, `1e+16`.
+let toString (value: Float32) : String =
+    let f = Stdlib.Float32.toFloat value in
+    if f != f then "NaN"
+    else if Stdlib.Float.__isInfinite f then (if f > 0.0 then "Infinity" else "-Infinity")
+    else if f == 0.0 then (if Stdlib.Float.__isNegative f then "-0.0" else "0.0")
+    else
+        let negative = Stdlib.Float.__isNegative f in
+        let (significand, binaryExponent) = Stdlib.Float32.__exactParts f in
+        let significandText = Stdlib.Int.toString significand in
+        let exactText =
+            if binaryExponent >= 0L then Stdlib.Float.__multiplyTextByDigit significandText 2L binaryExponent
+            else Stdlib.Float.__multiplyTextByDigit significandText 5L (0L - binaryExponent) in
+        let scale = if binaryExponent >= 0L then 0L else 0L - binaryExponent in
+        let text = Stdlib.Float32.__shortest (if negative then 0.0 - f else f) exactText scale false 1L in
+        if negative then "-" + text else text
+
+// A binary32 value's significand scaled into [2 ** 23, 2 ** 24), with its power of two.
+let __normalize (s: Int) (e: Int64) : (Int * Int64) =
+    if Stdlib.Int.greaterThanOrEqualTo s (Stdlib.Float.__powerOfTwo 24L) then
+        Stdlib.Float32.__normalize (Stdlib.Int.shiftRight s (Stdlib.Int.fromInt64 1L)) (e + 1L)
+    else if Stdlib.Int.lessThan s (Stdlib.Float.__powerOfTwo 23L) then
+        Stdlib.Float32.__normalize (Stdlib.Int.shiftLeft s (Stdlib.Int.fromInt64 1L)) (e - 1L)
+    else (s, e)
+
+// How `dark eval` shows a Float32: `1.5f32`, and NaN and the infinities bare.
+let __display (value: Float32) : String =
+    let f = Stdlib.Float32.toFloat value in
+    if f != f || Stdlib.Float.__isInfinite f then Stdlib.Float32.toString value
+    else Stdlib.Float32.toString value + "f32"
+
+/// The IEEE 754 binary32 bit pattern of <param a>.
+let toBits (a: Float32) : UInt32 =
+    let f = Stdlib.Float32.toFloat a in
+    let sign = if Stdlib.Float.__isNegative f then 2147483648ul else 0ul in
+    if f != f then 2143289344ul + sign
+    else if Stdlib.Float.__isInfinite f then 2139095040ul + sign
+    else if f == 0.0 then sign
+    else
+        let (significand, exponent) = Stdlib.Float32.__exactParts f in
+        let (s, e) = Stdlib.Float32.__normalize significand exponent in
+        let biased = e + 23L + 127L in
+        let fieldValue =
+            if biased >= 1L then
+                Stdlib.Int.add
+                    (Stdlib.Int.shiftLeft (Stdlib.Int.fromInt64 biased) (Stdlib.Int.fromInt64 23L))
+                    (Stdlib.Int.subtract s (Stdlib.Float.__powerOfTwo 23L))
+            else Stdlib.Int.shiftRight s (Stdlib.Int.fromInt64 (1L - biased)) in
+        match Stdlib.Int.toUInt32 fieldValue with
+        | Some field -> field + sign
+        | None -> Builtin.crash "Float32.toBits: field out of range"
+
+/// The Float32 whose IEEE 754 binary32 bit pattern is <param bits>.
+let fromBits (bits: UInt32) : Float32 =
+    let negative = Stdlib.UInt32.shiftRight bits 31ul == 1ul in
+    let rawExponent = Stdlib.UInt32.bitwiseAnd (Stdlib.UInt32.shiftRight bits 23ul) 255ul in
+    let mantissa = Stdlib.Int.fromUInt32 (Stdlib.UInt32.bitwiseAnd bits 8388607ul) in
+    let magnitude =
+        if rawExponent == 255ul then
+            if mantissa == Stdlib.Int.fromInt64 0L then Stdlib.Float.__infinity () else Stdlib.Float.__nan ()
+        else if rawExponent == 0ul then
+            Stdlib.Float.__scaleByPowerOfTwo (Stdlib.Int.toFloat mantissa) (-149L)
+        else
+            let e = Stdlib.Int64.fromUInt32 rawExponent in
+            Stdlib.Float.__scaleByPowerOfTwo
+                (Stdlib.Int.toFloat (Stdlib.Int.add mantissa (Stdlib.Float.__powerOfTwo 23L)))
+                (e - 150L) in
+    FLOAT32 (if negative then 0.0 - magnitude else magnitude)
+
+let sqrt (a: Float32) : Float32 = Stdlib.Float32.fromFloat (Stdlib.Float.sqrt (Stdlib.Float32.toFloat a))
+
+let add (a: Float32) (b: Float32) : Float32 =
+    Stdlib.Float32.fromFloat (Stdlib.Float32.toFloat a + Stdlib.Float32.toFloat b)
+let subtract (a: Float32) (b: Float32) : Float32 =
+    Stdlib.Float32.fromFloat (Stdlib.Float32.toFloat a - Stdlib.Float32.toFloat b)
+let multiply (a: Float32) (b: Float32) : Float32 =
+    Stdlib.Float32.fromFloat (Stdlib.Float32.toFloat a * Stdlib.Float32.toFloat b)
+let divide (a: Float32) (b: Float32) : Float32 =
+    Stdlib.Float32.fromFloat (Stdlib.Float32.toFloat a / Stdlib.Float32.toFloat b)
+let power (a: Float32) (b: Float32) : Float32 =
+    Stdlib.Float32.fromFloat (Stdlib.Float.power (Stdlib.Float32.toFloat a) (Stdlib.Float32.toFloat b))
+let negate (a: Float32) : Float32 = FLOAT32 (Stdlib.Float32.toFloat a * -1.0)
+let lessThan (a: Float32) (b: Float32) : Bool = Stdlib.Float32.toFloat a < Stdlib.Float32.toFloat b
+let lessThanOrEqualTo (a: Float32) (b: Float32) : Bool = Stdlib.Float32.toFloat a <= Stdlib.Float32.toFloat b
+let greaterThan (a: Float32) (b: Float32) : Bool = Stdlib.Float32.toFloat a > Stdlib.Float32.toFloat b
+let greaterThanOrEqualTo (a: Float32) (b: Float32) : Bool = Stdlib.Float32.toFloat a >= Stdlib.Float32.toFloat b
+
+impl Stdlib.Add for Float32 =
+  let add = Stdlib.Float32.add
+
+impl Stdlib.Subtract for Float32 =
+  let subtract = Stdlib.Float32.subtract
+
+impl Stdlib.Multiply for Float32 =
+  let multiply = Stdlib.Float32.multiply
+
+impl Stdlib.Divide for Float32 =
+  let divide = Stdlib.Float32.divide
+
+impl Stdlib.Power for Float32 =
+  let power = Stdlib.Float32.power
+
+impl Stdlib.Negate for Float32 =
+  let negate = Stdlib.Float32.negate
+
+impl Stdlib.ToString for Float32 =
+  let toString = Stdlib.Float32.toString
+
+impl Stdlib.Compare for Float32 =
+  let lessThan = Stdlib.Float32.lessThan
+  let lessThanOrEqualTo = Stdlib.Float32.lessThanOrEqualTo
+  let greaterThan = Stdlib.Float32.greaterThan
+  let greaterThanOrEqualTo = Stdlib.Float32.greaterThanOrEqualTo
+
+impl Stdlib.Zero for Float32 =
+  let zero () : Float32 = FLOAT32 0.0
+
+impl Stdlib.One for Float32 =
+  let one () : Float32 = FLOAT32 1.0

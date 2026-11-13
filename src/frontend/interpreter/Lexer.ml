@@ -718,33 +718,19 @@ let tokenize text =
       push (keyword (substring source index (stop - index))) stop None
     else if digit source.(index) then begin
       (* The current interpreter's Float32 and Decimal literals
-         (darklang/dark@1d3a109) have no lowering here, so they are refused
-         with the reason a compilability report names. *)
+         (darklang/dark@1d3a109), `1.5f32` and `19.99dec`: the token keeps
+         the digits as written, and the parser builds the value. *)
       let floatSuffix at =
         List.find_opt
           (fun suffix ->
             matchesAt suffix at && not (continue (at + String.length suffix)))
           [ "f32"; "dec" ]
       in
-      let unsupportedFloatSuffix at =
+      let suffixed number at =
         match floatSuffix at with
-        | Some "f32" ->
-            Some
-              ( "f32",
-                "can't compile: uses a Float32 literal, which this compiler \
-                 does not support" )
-        | Some "dec" ->
-            Some
-              ( "dec",
-                "can't compile: uses a Decimal literal, which this compiler \
-                 does not support" )
+        | Some "f32" -> Some (TFloat32 number)
+        | Some "dec" -> Some (TDecimal number)
         | _ -> None
-      in
-      let refuseSuffix at =
-        match unsupportedFloatSuffix at with
-        | Some (suffix, message) ->
-            push (TFloat 0.) (at + String.length suffix) (Some message)
-        | None -> Crash.crash "refuseSuffix: no unsupported suffix"
       in
       let digitEnd = scanWhile (fun scan -> digit source.(scan)) (index + 1) in
       let fraction =
@@ -779,10 +765,14 @@ let tokenize text =
             float_of_string_opt number
           else None
         in
+        match (value, suffixed number stop) with
+        | Some value, _ when not (continue stop) -> push (TFloat value) stop None
+        | Some _, Some _ when exponent && floatSuffix stop = Some "dec" ->
+            push (TDecimal "0") (stop + 3)
+              (Some ("a Decimal literal has no exponent: " ^ number ^ "dec"))
+        | Some _, Some token -> push token (stop + 3) None
+        | value, _ -> (
         match value with
-        | Some value when not (continue stop) -> push (TFloat value) stop None
-        | Some _ when Option.is_some (unsupportedFloatSuffix stop) ->
-            refuseSuffix stop
         | Some _ ->
             let stop = scanWhile continue stop in
             push (TFloat 0.) stop
@@ -790,23 +780,22 @@ let tokenize text =
                  ("invalid number literal: "
                  ^ substring source index (stop - index)))
         | None ->
-            push (TFloat 0.) stop (Some ("malformed float literal: " ^ number))
+            push (TFloat 0.) stop (Some ("malformed float literal: " ^ number)))
       end
       else
         let digits = substring source index (digitEnd - index) in
-        match intToken digits digitEnd with
-        | Ok (token, suffixLength) when not (continue (digitEnd + suffixLength))
-          ->
+        match (suffixed digits digitEnd, intToken digits digitEnd) with
+        | Some token, _ -> push token (digitEnd + 3) None
+        | None, Ok (token, suffixLength)
+          when not (continue (digitEnd + suffixLength)) ->
             push token (digitEnd + suffixLength) None
-        | _ when Option.is_some (unsupportedFloatSuffix digitEnd) ->
-            refuseSuffix digitEnd
-        | Ok (_, suffixLength) ->
+        | None, Ok (_, suffixLength) ->
             let stop = scanWhile continue (digitEnd + suffixLength) in
             push (TInt64 0L) stop
               (Some
                  ("invalid number literal: "
                  ^ substring source index (stop - index)))
-        | Error message ->
+        | None, Error message ->
             let count =
               Option.fold ~none:0 ~some:String.length (suffixAt digitEnd)
             in

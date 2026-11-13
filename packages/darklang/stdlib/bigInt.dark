@@ -1,0 +1,14 @@
+// Stdlib.BigInt.dark - the interpreter's BigInt module where its types differ from Int's.
+//
+// The interpreter calls arbitrary-precision integers BigInt and gives the
+// module its own ParseError; the compiler's type is Int. Hosted BigInt code
+// reaches the Int builtins, and BigInt.parse answers with BigInt's error.
+
+module Darklang.Stdlib.BigInt
+
+type ParseError = | BadFormat
+
+let parse (s: String) : Stdlib.Result.Result<Int, Stdlib.BigInt.ParseError> =
+    match Stdlib.Int.parse s with
+    | Ok value -> Ok value
+    | Error _ -> Error Stdlib.BigInt.ParseError.BadFormat

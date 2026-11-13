@@ -123,3 +123,11 @@
  (alias runtest)
  (deps stdin_input_regression.py)
  (action (run python3 %{dep:stdin_input_regression.py} %{exe:../../bin/dark.exe})))
+(rule
+ (alias runtest)
+ (deps check_generic_regression.py)
+ (action (run python3 %{dep:check_generic_regression.py} %{exe:../../bin/dark.exe})))
+(rule
+ (alias runtest)
+ (deps embedded_trait_regression.py)
+ (action (run python3 %{dep:embedded_trait_regression.py} %{exe:../../bin/dark.exe})))

@@ -174,7 +174,8 @@ let isIntLit = function
   | TInt _ | TInt64 _ | TInt8 _ | TUInt8 _ | TInt16 _ | TUInt16 _ | TInt32 _
   | TUInt32 _ | TUInt64 _ | TInt128 _ | TUInt128 _ ->
       true
-  | TFloat _ | TStringLit _ | TCharLit _ | TInterpString | TTrue | TFalse
+  | TFloat _ | TFloat32 _ | TDecimal _ | TStringLit _ | TCharLit _
+  | TInterpString | TTrue | TFalse
   | TPlus | TPlusPlus | TMinus | TStar | TStarStar | TSlash | TLParen | TRParen
   | TLet | TVal | TIn | TIf | TElif | TThen | TElse | TType | TTrait | TImpl
   | TCons | TColon | TComma | TSemicolon | TDot | TLBrace | TRBrace | TBar | TOf
@@ -205,7 +206,9 @@ let canStartAtom token =
        ]
   ||
   match token with
-  | TFloat _ | TCharLit _ | TStringLit _ | TIdent _ -> true
+  | TFloat _ | TFloat32 _ | TDecimal _ | TCharLit _ | TStringLit _ | TIdent _
+    ->
+      true
   | _ -> false
 [@@warning "-4"]
 
@@ -441,6 +444,83 @@ let floatParts state index value =
       err state code index message;
       ("0", "0")
 
+(* The exact decimal digits of a finite float, as (whole, fraction). *)
+let exactFloatParts value =
+  let bits = Int64.bits_of_float (Float.abs value) in
+  let exponent = Int64.to_int (Int64.shift_right_logical bits 52) land 0x7ff in
+  let mantissa = Z.of_int64 (Int64.logand bits 0xFFFFFFFFFFFFFL) in
+  let significand, power =
+    if exponent = 0 then (mantissa, -1074)
+    else (Z.add mantissa (Z.shift_left Z.one 52), exponent - 1075)
+  in
+  if power >= 0 then (Z.to_string (Z.shift_left significand power), "0")
+  else
+    let places = -power in
+    let digits = Z.to_string (Z.mul significand (Z.pow (Z.of_int 5) places)) in
+    let padding = max 0 (places + 1 - String.length digits) in
+    let padded = String.make padding '0' ^ digits in
+    let cut = String.length padded - places in
+    let rec trim fraction =
+      let length = String.length fraction in
+      if length > 1 && fraction.[length - 1] = '0' then
+        trim (String.sub fraction 0 (length - 1))
+      else fraction
+    in
+    (String.sub padded 0 cut, trim (String.sub padded cut places))
+
+(* A Float32 or Decimal literal is a value of the root sum that holds it:
+   `1.5f32` is `FLOAT32(1.5)`, the binary32 nearest the digits held as the
+   Float of exactly that value, and `1.10dec` is `DECIMAL(110, 2)`. *)
+let rootCase range typeName caseName fields =
+  WT.EEnum
+    ( range,
+      {
+        WT.range;
+        modules = [];
+        typ = { WT.range; name = typeName };
+        typeArgs = [];
+      },
+      (range, caseName),
+      fields,
+      range )
+
+let float32Literal state index negative range text =
+  let nearest =
+    Int32.float_of_bits
+      (Int32.bits_of_float (Option.value (float_of_string_opt text) ~default:0.))
+  in
+  let whole, fraction =
+    if Float.is_finite nearest then exactFloatParts nearest
+    else (
+      err state "PARSE-FLOAT-RANGE" index
+        ("Float32 literal out of range: " ^ text ^ "f32");
+      ("0", "0"))
+  in
+  rootCase range "Float32" "FLOAT32" [ WT.EFloat (range, negative, whole, fraction) ]
+
+let decimalLiteral state index negative range text =
+  let whole, fraction =
+    match String.index_opt text '.' with
+    | Some point ->
+        ( String.sub text 0 point,
+          String.sub text (point + 1) (String.length text - point - 1) )
+    | None -> (text, "")
+  in
+  let unscaled = Z.of_string (whole ^ fraction) in
+  let scale = String.length fraction in
+  let unscaled, scale =
+    if scale > 28 || Z.geq unscaled (Z.shift_left Z.one 96) then (
+      err state "PARSE-DECIMAL-RANGE" index
+        ("Decimal literal out of range: " ^ text ^ "dec");
+      (Z.zero, 0))
+    else (unscaled, scale)
+  in
+  rootCase range "Decimal" "DECIMAL"
+    [
+      WT.EInt (range, (range, if negative then Z.neg unscaled else unscaled));
+      WT.EInt64 (range, (range, Int64.of_int scale), range);
+    ]
+
 (*
    Reject invalid escapes / codepoints in string, char, and interpolated-string
    literals (triple-quoted forms are raw, so skipped). A diagnostic here becomes a
@@ -659,7 +739,7 @@ let isNegLitArg state index =
   let signed =
     match tok state (index + 1) with
     | TInt _ | TInt64 _ | TInt8 _ | TInt16 _ | TInt32 _ | TInt128 _ | TFloat _
-      ->
+    | TFloat32 _ | TDecimal _ ->
         true
     | _ -> false
   in

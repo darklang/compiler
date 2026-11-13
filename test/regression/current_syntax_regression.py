@@ -33,6 +33,36 @@ def main():
         assert run("Stdlib.Result.Result.Ok((5u8, 3s16))", current) == "Ok((5u8, 3s16))"
         assert run('"a\\"b"', current) == 'a"b'
         assert run('["a\\"b"]', current) == '["a\\"b"]'
+        # Stdlib calls have the interpreter's types and meaning, and dicts and
+        # Uuids print as `dark eval` prints them.
+        assert run('Stdlib.String.slice("hello world", 2, 7)', current) == "llo w"
+        assert run('"hello" |> Stdlib.String.slice(1, 3)', current) == "el"
+        assert run("Stdlib.List.length([1, 2, 3])", current) == "3"
+        assert run('Stdlib.String.indexOf("hello", "l")', current) == "Some(2)"
+        assert run('Stdlib.Dict.fromList([("a", 1), ("a", 2)])', current) == '{ "a": 2 }'
+        assert run('Stdlib.Dict.fromList([("a", Stdlib.Dict.fromList([(1, 2)]))])', current) == '{ "a": { 1: 2 } }'
+        assert run('Stdlib.Uuid.parse("6fad2a6c-a7b6-4b9e-bf01-5cb6ac1ebe62")', current) == \
+            "Ok(<Uuid: 6fad2a6c-a7b6-4b9e-bf01-5cb6ac1ebe62>)"
+        # Fns whose meaning changed on main: append adds one value, repeat answers
+        # the list, padStart and padEnd pad with a Char.
+        assert run("Stdlib.List.append([1, 2], 3)", current) == "[1, 2, 3]"
+        assert run("Stdlib.List.prepend([1, 2], 3)", current) == "[3, 1, 2]"
+        assert run("Stdlib.List.indexedMap([5, 6], fun(i, x) -> i * x)", current) == "[0, 6]"
+        assert run("2s128 ** 10s128", current) == "1024s128"
+        assert run("2u128 ** 100u128", current) == "1267650600228229401496703205376u128"
+        assert run('$"a{1 + 1}b{1.5}{\"c\"}"', current) == "a2b1.5c"
+        assert run("Stdlib.List.concat([1], [2, 3])", current) == "[1, 2, 3]"
+        assert run('Stdlib.List.zip([1, 2], ["a", "b"])', current) == 'Ok([(1, "a"), (2, "b")])'
+        assert run("Stdlib.List.zip([1, 2], [3])", current) == "Error(Stdlib.List.LengthMismatch { left: 2, right: 1 })"
+        assert run("Stdlib.List.map2Shortest([1, 2, 3], [10, 20], fun(a, b) -> a + b)", current) == "[11, 22]"
+        assert run('Stdlib.List.repeat(3, "a")', current) == '["a", "a", "a"]'
+        assert run("Stdlib.String.padStart(\"7\", '0', 3)", current) == "007"
+        assert run("Stdlib.String.padEnd(\"7\", '.', 3)", current) == "7.."
+        # Bytes print as dark eval prints unsaved Bytes: the size and the first 16 in hex.
+        assert run("Stdlib.Blob.fromList([171u8])", current) == "<Bytes: 1 byte ab>"
+        assert run("(Stdlib.Blob.fromList([]), 1)", current) == "(<Bytes: 0 bytes>, 1)"
+        assert run("Stdlib.Blob.fromList([0u8, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8, 9u8, 10u8, 11u8, 12u8, 13u8, 14u8, 15u8, 16u8])", current) == \
+            "<Bytes: 17 bytes 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f ...>"
         # Without the flag a bare integer is still an Int, printed as before.
         pinned = compile_("Stdlib.Int64.add(20, 22)")
         assert pinned.returncode != 0, pinned.stdout + pinned.stderr

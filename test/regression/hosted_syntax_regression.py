@@ -51,7 +51,7 @@ ENTITIES = {
     "record-hash": fn("Hosted.recordPattern", [("x", INT64)], INT64,
         {"EMatch": [1, ARG0, [dict(pat={"MPRecord": [2, [["a", {"MPVariable": [3, "a"]}]]]},
                                    whenCondition={"None": []}, rhs={"EInt64": [4, 1]})]]}),
-    "decimal-hash": fn("Hosted.price", [], {"TDecimal": []}, {"EDecimal": [1, "19.99"]}),
+    "decimal-hash": fn("Hosted.price", [("x", INT64)], {"TDecimal": []}, {"EDecimal": [1, 19.99]}),
 }
 
 
@@ -76,6 +76,12 @@ def builtin(name, *args):
 ENTITIES["builtin-ops-hash"] = fn("Hosted.builtinOps", [("x", INT64)], {"TBool": []},
     builtin("int64LessThan", builtin("int64Subtract", ARG0, {"EInt64": [3, 1]}),
             builtin("int64Negate", {"EInt64": [4, -50]})))
+
+
+# -(x - 1) * 3 < x % 4, through the polymorphic operator builtins.
+ENTITIES["builtin-poly-hash"] = fn("Hosted.builtinPoly", [("x", INT64)], {"TBool": []},
+    builtin("lessThan", builtin("multiply", builtin("negate", builtin("subtract", ARG0, {"EInt64": [3, 1]})),
+                                {"EInt64": [4, 3]}), builtin("modulo", ARG0, {"EInt64": [5, 4]})))
 
 
 # (2 ** x) / 100 % 10, through the Power, Divide, Mod and ToString builtins.
@@ -118,8 +124,13 @@ TYPES["box-type-hash"] = ("Hosted.__Box", dict(hash={"Hash": ["box-type-hash"]},
         dict(name="value", typ=INT64, description="")]]})))
 ENTITIES["box-hash"] = fn("Hosted.boxed", [("x", INT64)], INT64,
     {"ERecordFieldAccess": [1, {"ERecord": [2, BOX_NAME, [], [["value", ARG0]]]}, "value"]})
+# Recursive through `self`, which names the helper the way its declaration does:
+# if x <= 0 then 1 else self(x - 1) + 1.
 ENTITIES["helper-hash"] = fn("Hosted.__helper", [("x", INT64)], INT64,
-    infix("ArithmeticPlus", ARG0, {"EInt64": [3, 1]}))
+    {"EIf": [6, infix("ComparisonLessThanOrEqual", ARG0, {"EInt64": [3, 0]}), {"EInt64": [4, 1]},
+             {"Some": [infix("ArithmeticPlus",
+                             {"EApply": [7, {"ESelf": [8]}, [], [infix("ArithmeticMinus", ARG0, {"EInt64": [9, 1]})]]},
+                             {"EInt64": [5, 1]})]}]})
 ENTITIES["uses-helper-hash"] = fn("Hosted.usesHelper", [("x", INT64)], INT64,
     {"EApply": [2, {"EFnName": [1, HELPER_NAME, []]}, [], [ARG0]]})
 ENTITIES["braces-hash"] = fn("Hosted.braces", [("x", INT64)], {"TString": []},
@@ -149,6 +160,74 @@ ENTITIES["slices-hash"] = fn("Hosted.slices", [("x", INT64)], {"TString": []},
     {"EPipe": [1, {"EApply": [2, {"EFnName": [3, SLICE, [], []]}, [],
         [{"EString": [4, [{"StringText": ["abcdef"]}]]}, {"EInt64": [5, 1]}, {"EInt64": [6, 5]}]]},
         [{"EPipeFnCall": [7, SLICE, [], [{"EInt64": [8, 1]}, ARG0], []]}]]})
+# String.indexOf answers Option<Int64> here and Option<Int> in the compiler; a
+# piped DateTime.fromSeconds takes its Int64 as the piped value:
+# (indexOf "abcdef" "d" |> withDefault 0) + toSeconds (x |> fromSeconds).
+def stdlib(modules, name, hash_):
+    return dict(originalName=["Stdlib"] + modules + [name], resolved={"Ok": [dict(
+        name={"Package": [{"Hash": [hash_]}]},
+        location={"Some": [dict(owner="Darklang", modules=["Stdlib"] + modules, name=name)]})]})
+INDEX_OF = stdlib(["String"], "indexOf", "index-of-hash")
+WITH_DEFAULT = stdlib(["Option"], "withDefault", "with-default-hash")
+FROM_SECONDS = stdlib(["DateTime"], "fromSeconds", "from-seconds-hash")
+TO_SECONDS = stdlib(["DateTime"], "toSeconds", "to-seconds-hash")
+ENTITIES["conversions-hash"] = fn("Hosted.conversions", [("x", INT64)], INT64,
+    infix("ArithmeticPlus",
+        {"EPipe": [1, {"EApply": [2, {"EFnName": [3, INDEX_OF, [], []]}, [],
+            [{"EString": [4, [{"StringText": ["abcdef"]}]]}, {"EString": [5, [{"StringText": ["d"]}]]}]]},
+            [{"EPipeFnCall": [6, WITH_DEFAULT, [], [{"EInt64": [7, 0]}], []]}]]},
+        {"EApply": [8, {"EFnName": [9, TO_SECONDS, [], []]}, [],
+            [{"EPipe": [10, ARG0, [{"EPipeFnCall": [11, FROM_SECONDS, [], [], []]}]]}]]}))
+# The interpreter's Dict.fromList keeps the last of a repeated key:
+# Dict.size (Dict.fromList [(1, x); (1, x)]) is 1.
+FROM_LIST = stdlib(["Dict"], "fromList", "from-list-hash")
+DICT_SIZE = stdlib(["Dict"], "size", "dict-size-hash")
+ENTITIES["dict-last-hash"] = fn("Hosted.dictLast", [("x", INT64)], INT64,
+    {"EApply": [1, {"EFnName": [2, DICT_SIZE, [], []]}, [], [
+        {"EApply": [3, {"EFnName": [4, FROM_LIST, [], []]}, [], [{"EList": [5, [
+            {"ETuple": [6, {"EInt64": [7, 1]}, ARG0, []]},
+            {"ETuple": [8, {"EInt64": [9, 1]}, ARG0, []]}]]}]]}]]})
+# A record field named by a keyword: (Tagged { type = x }).type.
+TAGGED_NAME = dict(originalName=["Hosted", "Tagged"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["tagged-type-hash"]}]},
+    location={"Some": [dict(owner="Hosted", modules=[], name="Tagged")]})]})
+TYPES["tagged-type-hash"] = ("Hosted.Tagged", dict(hash={"Hash": ["tagged-type-hash"]}, description="",
+    deprecated={"NotDeprecated": []}, declaration=dict(typeParams=[], definition={"Record": [[
+        dict(name="type", typ=INT64, description="")]]})))
+ENTITIES["tagged-hash"] = fn("Hosted.tagged", [("x", INT64)], INT64,
+    {"ERecordFieldAccess": [1, {"ERecord": [2, TAGGED_NAME, [], [["type", ARG0]]]}, "type"]})
+# `as` inside other patterns, refutable and not, with and without a guard:
+# match (x, 1) with | (5 as five, n) -> five * 10 + n
+#                   | ((a as b), _) when b > 5 -> a + b | _ -> 0
+def case(pat, rhs, guard=None):
+    return dict(pat=pat, rhs=rhs, whenCondition={"Some": [guard]} if guard else {"None": []})
+VAR = lambda name: {"EVariable": [1, name]}
+ENTITIES["as-hash"] = fn("Hosted.asPatterns", [("x", INT64)], INT64,
+    {"EMatch": [1, {"ETuple": [2, ARG0, {"EInt64": [3, 1]}, []]}, [
+        case({"MPTuple": [4, {"MPAs": [5, {"MPInt64": [6, 5]}, "five"]}, {"MPVariable": [7, "n"]}, []]},
+             infix("ArithmeticPlus", infix("ArithmeticMultiply", VAR("five"), {"EInt64": [8, 10]}), VAR("n"))),
+        case({"MPTuple": [9, {"MPAs": [10, {"MPVariable": [11, "a"]}, "b"]}, {"MPVariable": [12, "_"]}, []]},
+             infix("ArithmeticPlus", VAR("a"), VAR("b")),
+             infix("ComparisonGreaterThan", VAR("b"), {"EInt64": [13, 5]})),
+        case({"MPVariable": [14, "_"]}, {"EInt64": [15, 0]})]]})
+# Equal type declarations share a hash: the server answers the hash with
+# Hosted.First, while this fn names it Hosted.Second.
+SECOND_NAME = dict(originalName=["Hosted", "Second"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["shared-type-hash"]}]},
+    location={"Some": [dict(owner="Hosted", modules=[], name="Second")]})]})
+TYPES["shared-type-hash"] = ("Hosted.First", dict(hash={"Hash": ["shared-type-hash"]}, description="",
+    deprecated={"NotDeprecated": []}, declaration=dict(typeParams=[], definition={"Record": [[
+        dict(name="width", typ=INT64, description="")]]})))
+ENTITIES["second-name-hash"] = fn("Hosted.secondName", [("x", INT64)], INT64,
+    {"ERecordFieldAccess": [1, {"ERecord": [2, SECOND_NAME, [], [["width", ARG0]]]}, "width"]})
+# A hosted record as a dictionary key: Dict.size (Dict.fromList [(Tagged { type = x }, true)]).
+ENTITIES["record-key-hash"] = fn("Hosted.recordKey", [("x", INT64)], INT64,
+    {"EApply": [1, {"EFnName": [2, DICT_SIZE, [], []]}, [], [
+        {"EApply": [3, {"EFnName": [4, FROM_LIST, [], []]}, [], [{"EList": [5, [
+            {"ETuple": [6, {"ERecord": [7, TAGGED_NAME, [], [["type", ARG0]]]}, {"EBool": [8, True]}, []]}]]}]]}]]})
+# Builtin.bytesLength answers an Int64; the compiler's Blob.length an Int.
+ENTITIES["bytes-length-hash"] = fn("Hosted.bytesLen", [("b", {"TBytes": []})], INT64,
+    builtin("bytesLength", ARG0))
 # `**` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("int128Power", ARG0, {"EInt128": [3, 3]}))
@@ -230,16 +309,24 @@ def main():
             assert run("Hosted.counts 7L\n") == 3
             assert run("Hosted.boxed 42L\n") == 42
             assert run("Hosted.slices 3L\n") == "cd"
+            assert run("Hosted.conversions 100L\n") == 103
+            assert run('Hosted.bytesLen (Stdlib.Blob.fromString "abc")\n') == 3
+            assert run("Hosted.dictLast 5L\n") == 1
+            assert run("Hosted.recordKey 5L\n") == 1
+            assert run("Hosted.tagged 7L\n") == 7
+            assert run("Hosted.secondName 4L\n") == 4
+            assert [run(f"Hosted.asPatterns {x}L\n") for x in (5, 7, 1)] == [51, 14, 0]
             assert run("Hosted.braces 1L\n") == "a{b}c"
             assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"
             assert run("Hosted.builtinOps 52L\n") is False
+            assert run("Hosted.builtinPoly 2L\n") is True
+            assert run("Hosted.builtinPoly 0L\n") is False
             assert str(run("Hosted.doubleBig 12345678901234567890\n")) == "24691357802469135780"
             assert run("Hosted.isHalf 0.5\n") is True
             assert run("Hosted.isHalf 0.25\n") is False
             assert str(run('Stdlib.Blob.length (Hosted.sameBytes (Stdlib.Blob.fromString "abc"))\n')) == "3"
-            for text, feature in (("Hosted.recordPattern 1L\n", "uses a record pattern"),
-                                  ("Hosted.price\n", "uses the Decimal type")):
+            for text, feature in (("Hosted.recordPattern 1L\n", "uses a record pattern"),):
                 refused = compile_(text)
                 output = refused.stdout + refused.stderr
                 assert refused.returncode != 0, output
@@ -263,13 +350,23 @@ def main():
                 " the compiler's pinned name is Stdlib.Dict.member"], reasons
             # --check answers per package item, without a caller or arguments.
             checked = subprocess.run([compiler, "--check", "--package-server",
-                f"http://127.0.0.1:{server.server_port}", "Hosted.pipePlus", "Hosted.price"],
+                f"http://127.0.0.1:{server.server_port}", "Hosted.pipePlus", "Hosted.price",
+                "Hosted.recordPattern", "Hosted.__helper"],
                 env=env, capture_output=True, text=True, timeout=300)
             assert checked.returncode == 1, checked.stdout + checked.stderr
             assert checked.stdout.splitlines() == [
                 "Hosted.pipePlus: compiles",
-                "Hosted.price: can't compile: uses the Decimal type, which this compiler does not support",
+                "Hosted.price: compiles",
+                "Hosted.recordPattern: can't compile: uses a record pattern, which this compiler does not support",
+                "Hosted.__helper: compiles",
             ], checked.stdout + checked.stderr
+            # Under --syntax=current a rendered package unit, which converts its own
+            # stdlib calls, is not converted a second time as the script is.
+            current = subprocess.run([compiler, "--syntax=current", "--package-server",
+                f"http://127.0.0.1:{server.server_port}", "--check", "Hosted.bytesLen",
+                "Hosted.conversions", "Hosted.recordKey"], env=env, capture_output=True, text=True, timeout=300)
+            assert current.stdout.splitlines() == ["Hosted.bytesLen: compiles",
+                "Hosted.conversions: compiles", "Hosted.recordKey: compiles"], current.stdout + current.stderr
         server.shutdown()
     print("Hosted operators, pipes, BigInt, Bytes and float patterns render; unsupported features name themselves, and batch and --check reports give the reason")
 

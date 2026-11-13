@@ -40,6 +40,7 @@ val findByName :
 val parseHashJson : string -> (string, string) result
 val locationName : Yojson.Raw.t -> (string, string) result
 val resolvedName : Yojson.Raw.t -> (string, string) result
+val publicName : string -> string
 val renderType : Yojson.Raw.t -> (string, string) result
 val renderLetPattern : Yojson.Raw.t -> (string, string) result
 val renderMatchPattern : Yojson.Raw.t -> (string, string) result

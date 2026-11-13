@@ -198,6 +198,9 @@ let rec generateStructuralEquality resolve left right typ gen registry variants
           in
           compareElements (List.map snd fields) (fun atom index ->
               A.RecordGet (descriptor, atom, index)))
+  (* 1.10dec == 1.1dec: Decimal equality compares the numbers, not the scales. *)
+  | AST.TSum ("Decimal", []) ->
+      single (A.Call (resolve "Darklang.Stdlib.Decimal.__equals", [ left; right ]))
   | AST.TSum (name, args) -> (
       let payload =
         Option.value (M.find_opt name cases) ~default:M.empty

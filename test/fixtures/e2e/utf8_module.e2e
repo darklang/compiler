@@ -1,0 +1,4 @@
+// The interpreter's Utf8 module: encode, decode and decode with replacement.
+Stdlib.Utf8.decode (Stdlib.Utf8.encode "héllo") = Ok "héllo"
+Stdlib.Blob.length (Stdlib.Utf8.encode "héllo") = 6
+Stdlib.Utf8.decodeWithReplacement (Stdlib.Utf8.encode "abc") = "abc"

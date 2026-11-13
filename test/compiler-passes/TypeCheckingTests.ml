@@ -308,6 +308,29 @@ let testConstructorIdentityCollisionRejected () =
     "Constructor identity collision 1236: CollisionType151Tc.CollisionCaseTc, \
      CollisionType155Tc.CollisionCaseTc"
 
+(* TString and TUInt128 of WrittenTypes.TypeReference.Builtin, both names other
+   sums use too, hash to one tag (1649); such a sum's cases take its slot
+   plus their ordinals instead, so they differ. *)
+let testCasesOfOneSumGetDistinctTags () =
+  let sum owner cases =
+    TypeDef
+      (SumTypeDef
+         (owner, [], List.map (fun case -> { AST.name = case; fields = [] }) cases))
+  in
+  match
+    checkProgram
+      (Program
+         [
+           sum "Darklang.LanguageTools.WrittenTypes.TypeReference.Builtin"
+             [ "TString"; "TUInt128" ];
+           sum "OtherBuiltinTc" [ "TString"; "TUInt128" ];
+           Expression ([], UnitLiteral);
+         ])
+  with
+  | Ok _ -> Ok ()
+  | Error error ->
+      Error ("Expected distinct tags for one sum's cases, got: " ^ D.typeErrorToString error)
+
 let testRecursiveGroupsReceiveStableTypedIdentities () =
   let source =
     "let groupEven (n: Int64) : Int64 = if n == 0L then 1L else groupOdd (n - \
@@ -517,6 +540,7 @@ let tests =
     ("Empty nominal declarations rejected", testEmptyNominalDeclarationsRejected);
     ( "Invalid declaration type references rejected",
       testInvalidDeclarationTypeReferencesRejected );
+    ("Cases of one sum get distinct tags", testCasesOfOneSumGetDistinctTags);
     ( "Constructor identity collision rejected",
       testConstructorIdentityCollisionRejected );
     ( "Recursive groups receive stable typed identities",

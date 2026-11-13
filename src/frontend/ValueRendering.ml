@@ -116,6 +116,9 @@ let runtimeFunctionNames =
     "Darklang.Stdlib.UInt64.toString";
     "Darklang.Stdlib.UInt8.toString";
     "Darklang.Stdlib.Uuid.toString";
+    "Darklang.Stdlib.Float32.__display";
+    "Darklang.Stdlib.Blob.__evalDisplay";
+    "Darklang.Stdlib.Decimal.__display";
   ]
 
 let applySubstitution subst typ =
@@ -302,15 +305,18 @@ and ensureDictItemsRenderer env keyType valueType (state : renderState) =
       in
       let entryKey = C.TupleAccess (C.Local entryId, 0) in
       let entryValue = C.TupleAccess (C.Local entryId, 1) in
+      (* `dark eval` shows every key as the value it is: { "a": 1 }. *)
       let renderedKey, withKeyRenderer =
         match keyType with
-        | TString ->
+        | TString when not !evalDisplay ->
             ( call reserved.symbols "Darklang.Stdlib.Dict.__renderKey"
                 [ entryKey ],
               reserved )
         | _ -> renderCall env keyType entryKey reserved
       in
-      let separator = if keyType = TString then " = " else ": " in
+      let separator =
+        if keyType = TString && not !evalDisplay then " = " else ": "
+      in
       let renderedValue, withValueRenderer =
         renderCall env valueType entryValue withKeyRenderer
       in
@@ -418,7 +424,7 @@ and renderBody env typ value state =
   (* An unconstrained Dict value can only be the polymorphic empty literal;
     no value renderer is needed because there are no entries to inspect. *)
   | TDict ((TVar _ | TInferenceVar _), (TVar _ | TInferenceVar _)) ->
-      (C.StringLiteral "Dict { }", state)
+      (C.StringLiteral (if !evalDisplay then "{}" else "Dict { }"), state)
   | TDict (key, valueType) ->
       let itemsName, next = ensureDictItemsRenderer env key valueType state in
       let entriesId, next = freshBinding "__dict_entries" next in
@@ -435,11 +441,12 @@ and renderBody env typ value state =
               ( C.Local entriesId,
                 args
                   [
-                    makeCase (C.PList []) (C.StringLiteral "Dict { }");
+                    makeCase (C.PList [])
+                      (C.StringLiteral (if !evalDisplay then "{}" else "Dict { }"));
                     makeCase C.PWildcard
                       (concat next.symbols
                          [
-                           C.StringLiteral "Dict { ";
+                           C.StringLiteral (if !evalDisplay then "{ " else "Dict { ");
                            call next.symbols itemsName [ C.Local entriesId ];
                            C.StringLiteral " }";
                          ]);
@@ -537,7 +544,17 @@ and renderBody env typ value state =
                     long ) ),
             next ))
   | TSum ("Uuid", []) ->
-      (call state.symbols "Darklang.Stdlib.Uuid.toString" [ value ], state)
+      let text = call state.symbols "Darklang.Stdlib.Uuid.toString" [ value ] in
+      ( (if !evalDisplay then
+           concat state.symbols
+             [ C.StringLiteral "<Uuid: "; text; C.StringLiteral ">" ]
+         else text),
+        state )
+  (* `dark eval` shows these as they are written: 1.5f32 and 1.10dec. *)
+  | TSum ("Float32", []) ->
+      (call state.symbols "Darklang.Stdlib.Float32.__display" [ value ], state)
+  | TSum ("Decimal", []) ->
+      (call state.symbols "Darklang.Stdlib.Decimal.__display" [ value ], state)
   | TSum (typeName, typeArgs) -> (
       match M.find_opt typeName (Lazy.force env.sums) with
       | None ->
@@ -616,6 +633,10 @@ and renderBody env typ value state =
           in
           (C.Match (value, args cases), next))
   | TFunction _ -> (C.StringLiteral "(lambda)", state)
+  | TBlob when !evalDisplay ->
+      (* As the current interpreter prints unsaved Bytes: the length and the
+     first 16 bytes in hex. *)
+      (call state.symbols "Darklang.Stdlib.Blob.__evalDisplay" [ value ], state)
   | TBlob ->
       (* The interpreter deliberately does not expose ephemeral Blob payloads
      or process-local identities through value rendering. *)

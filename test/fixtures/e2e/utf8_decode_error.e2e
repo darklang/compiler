@@ -1,0 +1,9 @@
+// Utf8.decode words a failure as the interpreter does: the .NET message for the first invalid
+// sequence, with its bytes as the Unicode maximal subpart and its index.
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [195u8]) = Stdlib.Result.Result.Error "Invalid UTF-8: Argument_InvalidCodePageBytesIndex, [C3], 0"
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [104u8, 105u8, 255u8, 254u8]) = Stdlib.Result.Result.Error "Invalid UTF-8: Argument_InvalidCodePageBytesIndex, [FF], 2"
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [65u8, 226u8, 130u8, 65u8]) = Stdlib.Result.Result.Error "Invalid UTF-8: Argument_InvalidCodePageBytesIndex, [E2][82], 1"
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [237u8, 160u8, 128u8]) = Stdlib.Result.Result.Error "Invalid UTF-8: Argument_InvalidCodePageBytesIndex, [ED], 0"
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [240u8, 159u8, 152u8]) = Stdlib.Result.Result.Error "Invalid UTF-8: Argument_InvalidCodePageBytesIndex, [F0][9F][98], 0"
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [244u8, 144u8, 128u8, 128u8]) = Stdlib.Result.Result.Error "Invalid UTF-8: Argument_InvalidCodePageBytesIndex, [F4], 0"
+Stdlib.Utf8.decode (Stdlib.Blob.fromList [104u8, 105u8]) = Stdlib.Result.Result.Ok "hi"
