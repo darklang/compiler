@@ -145,6 +145,9 @@ ENV HOME=/home/agent
 ENV CARGO_HOME=/usr/local/cargo
 ENV RUSTUP_HOME=/usr/local/rustup
 ENV PATH=/home/agent/.opam/dark/bin:/opt/ocaml/bin:/home/agent/.local/bin:/usr/local/cargo/bin:$PATH
+ENV OPAM_SWITCH_PREFIX=/home/agent/.opam/dark
+ENV OCAMLPATH=/home/agent/.opam/dark/lib
+ENV CAML_LD_LIBRARY_PATH=/home/agent/.opam/dark/lib/stublibs:/opt/ocaml/lib/ocaml/stublibs
 
 # Native compiler dependencies use a pinned switch.
 RUN opam init --bare --disable-sandboxing --yes && \
