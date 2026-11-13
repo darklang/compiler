@@ -72,10 +72,10 @@ def builtin(name, *args):
     return {"EApply": [2, callee, [], list(args)]}
 
 
-# The interpreter's stdlib calls its per-type operator builtins by name.
-ENTITIES["builtin-ops-hash"] = fn("Hosted.builtinOps", [("x", INT64)], {"TBool": []},
-    builtin("int64LessThan", builtin("int64Subtract", ARG0, {"EInt64": [3, 1]}),
-            builtin("int64Negate", {"EInt64": [4, -50]})))
+# BigInt and Float keep their own operator builtins, called by name.
+ENTITIES["builtin-ops-hash"] = fn("Hosted.builtinOps", [("x", {"TBigInt": []})], {"TBool": []},
+    builtin("bigIntLessThan", builtin("bigIntSubtract", ARG0, {"EBigInt": [3, 1]}),
+            builtin("bigIntNegate", {"EBigInt": [4, -50]})))
 
 
 # -(x - 1) * 3 < x % 4, through the polymorphic operator builtins.
@@ -97,10 +97,10 @@ ENTITIES["builtin-bitwise-hash"] = fn("Hosted.builtinBitwise", [("x", INT64)], {
                                       {"EInt64": [5, 1]}), {"EInt64": [6, 1]}))]]})
 
 
-# (2 ** x) / 100 % 10, through the Power, Divide, Mod and ToString builtins.
+# (2 ** x) / 100 % 10, through the Power, Divide and Modulo builtins and Int64's ToString.
 ENTITIES["builtin-more-hash"] = fn("Hosted.builtinMore", [("x", INT64)], {"TString": []},
-    builtin("int64ToString", builtin("int64Mod", builtin("int64Divide",
-        builtin("int64Power", {"EInt64": [3, 2]}, ARG0), {"EInt64": [4, 100]}), {"EInt64": [5, 10]})))
+    builtin("int64ToString", builtin("modulo", builtin("divide",
+        builtin("power", {"EInt64": [3, 2]}, ARG0), {"EInt64": [4, 100]}), {"EInt64": [5, 10]})))
 
 
 # A trait call saved by the interpreter resolves to the trait's location.
@@ -241,9 +241,9 @@ ENTITIES["record-key-hash"] = fn("Hosted.recordKey", [("x", INT64)], INT64,
 # Builtin.bytesLength answers an Int64; the compiler's Blob.length an Int.
 ENTITIES["bytes-length-hash"] = fn("Hosted.bytesLen", [("b", {"TBytes": []})], INT64,
     builtin("bytesLength", ARG0))
-# `**` on Int128 goes through the compiler's Power implementation.
+# `Builtin.power` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
-    builtin("int128Power", ARG0, {"EInt128": [3, 3]}))
+    builtin("power", ARG0, {"EInt128": [3, 3]}))
 
 
 ENTITIES["deep-hash"] = fn("Hosted.deepAdds", [("x", INT64)], INT64, nested_adds(180))
@@ -312,7 +312,7 @@ def main():
             assert run("Hosted.operators 10L\n") == 1036
             assert run("Hosted.pipePlus 41L\n") == 42
             assert run("Hosted.deepAdds 1L\n") == 181
-            assert run("Hosted.builtinOps 50L\n") is True
+            assert run("Hosted.builtinOps 50\n") is True
             assert run("Hosted.overflowName ()\n") == "overflow"
             assert run("Hosted.describeNumber 42L\n") == "42"
             assert run("Hosted.renamedBuiltins 1L\n") is True
@@ -332,7 +332,7 @@ def main():
             assert run("Hosted.braces 1L\n") == "a{b}c"
             assert str(run("Hosted.int128Power 2Q\n")) == "8"
             assert run("Hosted.builtinMore 7L\n") == "1"
-            assert run("Hosted.builtinOps 52L\n") is False
+            assert run("Hosted.builtinOps 52\n") is False
             assert run("Hosted.builtinPoly 2L\n") is True
             assert run("Hosted.builtinPoly 0L\n") is False
             assert run("Hosted.builtinBitwise 13L\n") == -14
