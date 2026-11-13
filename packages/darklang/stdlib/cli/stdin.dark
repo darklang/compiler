@@ -7,7 +7,10 @@ let isInteractive () : Bool = Builtin.stdinIsInteractive ()
 
 let readLine () : String = Builtin.stdinReadLine ()
 
-let readAll () : String = Builtin.stdinReadAll ()
+/// Read all of stdin, until EOF. Bytes that are not UTF-8 read as U+FFFD here; the
+/// interpreter returns an Error naming them.
+let readAll () : Stdlib.Result.Result<String, String> =
+  Stdlib.Result.Result.Ok (Builtin.stdinReadAll ())
 
 let readKey () : Stdlib.Cli.Stdin.KeyRead.KeyRead = Builtin.stdinReadKey ()
 
