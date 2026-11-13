@@ -204,7 +204,6 @@ test namedGroups =
   | _ -> Stdlib.Test.fail("expected a match")
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Regex.compile'" class=missing-support reason=upstream-dependency
 test findAllMatches =
   let found =
     Stdlib.Regex.compile("(\\w)=(\\d)")
@@ -224,7 +223,6 @@ test positionsCountCharacters =
   | _ -> Stdlib.Test.fail("expected a match")
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Regex.compile'" class=missing-support reason=upstream-dependency
 test badPattern =
   Stdlib.Test.all(
     [ Stdlib.Regex.isMatch("x", "a(")
@@ -238,7 +236,6 @@ test badPattern =
       |> Stdlib.Test.equal(Ok("ok")) ])
 
 
-// @compiler xfail runtime: "Uncaught exception: Invalid regex pattern" class=missing-support reason=compiler-gap
 test backtrackingConstructsAreRefused =
   Stdlib.Test.all(
     [ Stdlib.Regex.isMatch("aa", "(a)\\1")
@@ -252,7 +249,6 @@ test backtrackingConstructsAreRefused =
       |> Stdlib.Test.equal(Error(Stdlib.Regex.RegexError.UnsupportedSyntax("\\G"))) ])
 
 
-// @compiler xfail runtime: "Out of heap memory" class=missing-support reason=compiler-gap
 test pathologicalPatternStaysFast =
   // Backtracking takes exponential time here and would run out of time; this is linear.
   Stdlib.Regex.isMatch(Stdlib.String.repeat("a", 30000) + "!", "^(a+)+$")
@@ -270,7 +266,6 @@ test invalidUnicodeMatch =
       Stdlib.Regex.findAll("a😀b", ".+") |> Stdlib.Test.equal(Ok([ "a😀b" ])) ])
 
 
-// @compiler xfail runtime: "assertion 2: expected Darklang.Stdlib.Result.Result<String, Darklang.Stdlib.Regex.RegexError>.Ok(\"$2$1 $2$1\"), got Darklang.Stdlib.Result.Result<String, Darklang.Stdlib.Regex.RegexError>.Ok(\"1a 2b\")" class=missing-support reason=compiler-gap
 test replacementIsLiteral =
   Stdlib.Test.all(
     [ Stdlib.Regex.replace("2026-11", "(\\d+)-(\\d+)", "$2/$1")
@@ -306,7 +301,6 @@ test scanLimitAndCollect =
       |> Stdlib.Test.equal(Ok(([ "a", "b2c" ], []))) ])
 
 // replaceMatches replaces the first match or every one, as its Limit says
-// @compiler xfail compile: "Field access requires a record value" class=missing-support reason=compiler-gap
 test replaceMatchesLimit =
   let digits = Stdlib.Regex.ofPattern("\\d")
   let bracket = fun m -> "[" + m.text + "]"
@@ -317,7 +311,6 @@ test replaceMatchesLimit =
       Stdlib.Regex.replaceMatches("a1b2", digits, Stdlib.Regex.Limit.All, bracket)
       |> Stdlib.Test.equal(Ok("a[1]b[2]")) ])
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Regex.replaceWith'" class=missing-support reason=upstream-dependency
 test replaceWithACallback =
   let swap(m: Stdlib.Regex.Match): String =
     Stdlib.String.join(Stdlib.List.reverse(Stdlib.Option.values(captureTexts(m))), "")
@@ -330,12 +323,10 @@ test replaceWithACallback =
       Stdlib.Regex.replaceAllWith("x", "y", swap) |> Stdlib.Test.equal(Ok("x")) ])
 
 
-// @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<List<String>, Darklang.Stdlib.Regex.RegexError>.Ok([\"a\", \"b\", \"c\"]), got Darklang.Stdlib.Result.Result<List<String>, Darklang.Stdlib.Regex.RegexError>.Ok([\"a\", \"1\", \"b\", \"2\", \"c\"])" class=missing-support reason=compiler-gap
 test splitLeavesGroupsOut =
   Stdlib.Regex.split("a1b2c", "(\\d)") |> Stdlib.Test.equal(Ok([ "a", "b", "c" ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Regex.compileWith'" class=missing-support reason=upstream-dependency
 test options =
   let found =
     Stdlib.Regex.compileWith(

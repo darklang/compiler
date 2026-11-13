@@ -1,0 +1,5 @@
+// __regexScan.dark - The interpreter's regexScan, on the compiler's own matcher.
+module Builtin
+
+let regexScan (pattern: String) (caseInsensitive: Bool) (multiline: Bool) (input: String) (firstOnly: Bool) (withMatches: Bool) : Stdlib.Result.Result<(List<String> * List<Stdlib.Regex.Match>), Stdlib.Regex.RegexError> =
+    Stdlib.Regex.__Engine.scan pattern caseInsensitive multiline input firstOnly withMatches

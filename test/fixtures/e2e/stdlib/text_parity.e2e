@@ -18,9 +18,9 @@ Stdlib.String.indexOfEgc "😀x" "x" = Some 1
 
 // Regex returns full matches and advances deterministically after empty matches.
 Stdlib.Regex.find "test123" "\\d+" = Stdlib.Result.Result.Ok (Some "123")
-Stdlib.Regex.split "a1b22c" "(\\d+)" = Stdlib.Result.Result.Ok (["a", "1", "b", "22", "c"])
+Stdlib.Regex.split "a1b22c" "(\\d+)" = Stdlib.Result.Result.Ok (["a", "b", "c"])
 Stdlib.Regex.replace "a1b2" "(\\d)" "$1" = Stdlib.Result.Result.Ok ("a$1b2")
-Stdlib.Regex.replaceAll "a1b2" "(\\d)" "<$1>" = Stdlib.Result.Result.Ok ("a<1>b<2>")
+Stdlib.Regex.replaceAll "a1b2" "(\\d)" "<$1>" = Stdlib.Result.Result.Ok ("a<$1>b<$1>")
 Stdlib.Regex.split "abc" "\\d+" = Stdlib.Result.Result.Ok (["abc"])
 // main answers Error (RegexError.InvalidPattern ...); the compiler still raises.
-Stdlib.Regex.find "abc" "[" = exit=1 stderr="Uncaught exception: Invalid regex pattern\n"
+Stdlib.Regex.find "abc" "[" = Stdlib.Result.Result.Error (Stdlib.Regex.RegexError.InvalidPattern ("unterminated [", 1L))

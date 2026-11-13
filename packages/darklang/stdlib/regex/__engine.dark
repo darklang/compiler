@@ -1,0 +1,565 @@
+// regex/__engine.dark - Builtin.regexScan's matcher: a backtracking engine over the
+// input's characters that refuses what the interpreter's non-backtracking one refuses.
+
+module Darklang.Stdlib.Regex.__Engine
+
+type ClassItem =
+    | Single of Char
+    | Span of Char * Char
+    | Shorthand of Char
+
+type Node =
+    | Lit of Char
+    | AnyChar
+    | Class of Bool * List<Stdlib.Regex.__Engine.ClassItem>
+    | LineStart
+    | LineEnd
+    | InputStart
+    | InputEnd
+    | InputEndNewline
+    | Boundary of Bool
+    | Capture of Int64 * List<List<Stdlib.Regex.__Engine.Node>>
+    | Plain of List<List<Stdlib.Regex.__Engine.Node>>
+    | Repeat of Stdlib.Regex.__Engine.Node * Int64 * Stdlib.Option.Option<Int64> * Bool
+
+type Parser = { rest: List<Char>, pos: Int64, unnamed: Int64, names: List<String>, flags: List<Char> }
+
+type Options = { caseInsensitive: Bool, multiline: Bool }
+
+
+
+type Cursor = { rest: List<Char>, pos: Int64, prev: Stdlib.Option.Option<Char> }
+
+type Instr =
+    | Consume of Stdlib.Regex.__Engine.Node
+    | Assert of Stdlib.Regex.__Engine.Node
+    | Split of Int64 * Int64
+    | Jmp of Int64
+    | Save of Int64
+    | Match
+
+type Vm = { program: Dict<Int64, Stdlib.Regex.__Engine.Instr>, options: Stdlib.Regex.__Engine.Options, unnamed: Int64 }
+
+type Step = { cursor: Stdlib.Regex.__Engine.Cursor, visited: Dict<Int64, Bool>, threads: List<(Int64 * Dict<Int64, Int64>)> }
+
+let invalid<'a> (message: String) (pos: Int64) : Stdlib.Result.Result<a, Stdlib.Regex.RegexError> =
+    Error (Stdlib.Regex.RegexError.InvalidPattern (message, pos))
+
+let unsupported<'a> (construct: String) : Stdlib.Result.Result<a, Stdlib.Regex.RegexError> =
+    Error (Stdlib.Regex.RegexError.UnsupportedSyntax construct)
+
+let advance (p: Stdlib.Regex.__Engine.Parser) (count: Int64) : Stdlib.Regex.__Engine.Parser =
+    { p with rest = Stdlib.List.drop p.rest count, pos = p.pos + count }
+
+let hexValue (c: Char) : Stdlib.Option.Option<Int64> =
+    Stdlib.String.indexOf "0123456789abcdef" (Stdlib.Char.toString (Stdlib.Char.toLowercase c))
+
+let hexChar (digits: List<Char>) : Stdlib.Option.Option<Char> =
+    let values = Stdlib.List.filterMap digits Stdlib.Regex.__Engine.hexValue in
+    if Stdlib.List.length values != Stdlib.List.length digits then Stdlib.Option.Option.None
+    else
+        let code = Stdlib.List.fold values 0L (fun acc v -> acc * 16L + v) in
+        Stdlib.Option.Option.Some (Stdlib.Char.__asChar (Stdlib.String.__fromCodepoints [code]))
+
+// The character an escape outside a class or inside one stands for, if it is one.
+let escapedChar (c: Char) : Stdlib.Option.Option<Char> =
+    if c == 'n' then Stdlib.Option.Option.Some '\n'
+    else if c == 't' then Stdlib.Option.Option.Some '\t'
+    else if c == 'r' then Stdlib.Option.Option.Some '\r'
+    else if c == 'f' then Stdlib.Regex.__Engine.hexChar ['0', 'c']
+    else if c == 'v' then Stdlib.Regex.__Engine.hexChar ['0', 'b']
+    else if c == 'e' then Stdlib.Regex.__Engine.hexChar ['1', 'b']
+    else if c == '0' then Stdlib.Regex.__Engine.hexChar ['0', '0']
+    else if Stdlib.Char.isASCIILetter c || Stdlib.Char.isDigit c then Stdlib.Option.Option.None
+    else Stdlib.Option.Option.Some c
+
+// After a backslash: hex escapes and the single-character ones.
+let escape (p: Stdlib.Regex.__Engine.Parser) (c: Char) : Stdlib.Result.Result<(Char * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    let hex = fun count ->
+        match Stdlib.Regex.__Engine.hexChar (Stdlib.List.take (Stdlib.List.drop p.rest 2L) count) with
+        | Some value -> Ok ((value, Stdlib.Regex.__Engine.advance p (2L + count)))
+        | None -> Stdlib.Regex.__Engine.invalid "too few or invalid hex digits" p.pos in
+    if c == 'x' then hex 2L
+    else if c == 'u' then hex 4L
+    else
+        match Stdlib.Regex.__Engine.escapedChar c with
+        | Some value -> Ok ((value, Stdlib.Regex.__Engine.advance p 2L))
+        | None -> Stdlib.Regex.__Engine.invalid "unrecognized escape" (p.pos + 1L)
+
+let classSingle (start: Int64) (acc: List<Stdlib.Regex.__Engine.ClassItem>) (result: Stdlib.Result.Result<(Char * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError>) : Stdlib.Result.Result<(List<Stdlib.Regex.__Engine.ClassItem> * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    match result with
+    | Error e -> Error e
+    | Ok ((c, after)) ->
+        match after.rest with
+        | dash :: next :: _ when dash == '-' && next != ']' ->
+            match Stdlib.Regex.__Engine.classChar (Stdlib.Regex.__Engine.advance after 1L) with
+            | Error e -> Error e
+            | Ok ((Some last, afterLast)) ->
+                if Stdlib.Char.isLessThan last c then Stdlib.Regex.__Engine.invalid "range in reverse order" afterLast.pos
+                else Stdlib.Regex.__Engine.classItems afterLast start (Stdlib.List.push acc (Stdlib.Regex.__Engine.ClassItem.Span (c, last))) false
+            | Ok ((None, _)) -> Stdlib.Regex.__Engine.invalid "a class like \\d cannot end a range" after.pos
+        | _ -> Stdlib.Regex.__Engine.classItems after start (Stdlib.List.push acc (Stdlib.Regex.__Engine.ClassItem.Single c)) false
+
+let classItems (p: Stdlib.Regex.__Engine.Parser) (start: Int64) (acc: List<Stdlib.Regex.__Engine.ClassItem>) (first: Bool) : Stdlib.Result.Result<(List<Stdlib.Regex.__Engine.ClassItem> * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    match p.rest with
+    | [] -> Stdlib.Regex.__Engine.invalid "unterminated [" p.pos
+    | c :: rest ->
+        if c == ']' && Stdlib.Bool.not first then Ok ((Stdlib.List.reverse acc, Stdlib.Regex.__Engine.advance p 1L))
+        else if c == '\\' then
+            match rest with
+            | k :: _ when k == 'd' || k == 'w' || k == 's' || k == 'D' || k == 'W' || k == 'S' ->
+                Stdlib.Regex.__Engine.classItems (Stdlib.Regex.__Engine.advance p 2L) start (Stdlib.List.push acc (Stdlib.Regex.__Engine.ClassItem.Shorthand k)) false
+            | k :: _ when k == 'b' ->
+                match Stdlib.Regex.__Engine.hexChar ['0', '8'] with
+                | Some backspace -> Stdlib.Regex.__Engine.classSingle start acc (Ok ((backspace, Stdlib.Regex.__Engine.advance p 2L)))
+                | None -> Stdlib.Regex.__Engine.invalid "unrecognized escape" p.pos
+            | k :: _ -> Stdlib.Regex.__Engine.classSingle start acc (Stdlib.Regex.__Engine.escape p k)
+            | [] -> Stdlib.Regex.__Engine.invalid "unterminated [" start
+        else Stdlib.Regex.__Engine.classSingle start acc (Ok ((c, Stdlib.Regex.__Engine.advance p 1L)))
+
+// One character of a class, or None for a shorthand like \d.
+let classChar (p: Stdlib.Regex.__Engine.Parser) : Stdlib.Result.Result<(Stdlib.Option.Option<Char> * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    match p.rest with
+    | '\\' :: k :: _ ->
+        if k == 'd' || k == 'w' || k == 's' || k == 'D' || k == 'W' || k == 'S' then Ok ((Stdlib.Option.Option.None, p))
+        else
+            match Stdlib.Regex.__Engine.escape p k with
+            | Ok ((c, after)) -> Ok ((Stdlib.Option.Option.Some c, after))
+            | Error e -> Error e
+    | c :: _ -> Ok ((Stdlib.Option.Option.Some c, Stdlib.Regex.__Engine.advance p 1L))
+    | [] -> Stdlib.Regex.__Engine.invalid "unterminated [" p.pos
+
+let groupName (chars: List<Char>) (close: Char) (acc: List<Char>) : Stdlib.Option.Option<(String * Int64)> =
+    match chars with
+    | [] -> Stdlib.Option.Option.None
+    | c :: rest ->
+        if c == close then
+            if Stdlib.List.isEmpty acc then Stdlib.Option.Option.None
+            else Stdlib.Option.Option.Some ((Stdlib.String.fromList (Stdlib.List.reverse acc), Stdlib.List.length acc + 1L))
+        else if Stdlib.Char.isASCIILetter c || Stdlib.Char.isDigit c || c == '_' then Stdlib.Regex.__Engine.groupName rest close (Stdlib.List.push acc c)
+        else Stdlib.Option.Option.None
+
+let digits (chars: List<Char>) (value: Int64) (count: Int64) : (Int64 * Int64) =
+    match chars with
+    | c :: rest when Stdlib.Char.isDigit c ->
+        match Stdlib.Regex.__Engine.hexValue c with
+        | Some d -> Stdlib.Regex.__Engine.digits rest (value * 10L + d) (count + 1L)
+        | None -> (value, count)
+    | _ -> (value, count)
+
+// A {n}, {n,} or {n,m} quantifier at the start of chars: (min, max, length).
+let braces (chars: List<Char>) : Stdlib.Option.Option<(Int64 * Stdlib.Option.Option<Int64> * Int64)> =
+    match chars with
+    | open_ :: rest when open_ == '{' ->
+        let (low, lowCount) = Stdlib.Regex.__Engine.digits rest 0L 0L in
+        if lowCount == 0L then Stdlib.Option.Option.None
+        else
+            match Stdlib.List.drop rest lowCount with
+            | close :: _ when close == '}' -> Stdlib.Option.Option.Some ((low, Stdlib.Option.Option.Some low, lowCount + 2L))
+            | comma :: afterComma when comma == ',' ->
+                let (high, highCount) = Stdlib.Regex.__Engine.digits afterComma 0L 0L in
+                match Stdlib.List.drop afterComma highCount with
+                | close :: _ when close == '}' ->
+                    Stdlib.Option.Option.Some ((low, (if highCount == 0L then Stdlib.Option.Option.None else Stdlib.Option.Option.Some high), lowCount + highCount + 3L))
+                | _ -> Stdlib.Option.Option.None
+            | _ -> Stdlib.Option.Option.None
+    | _ -> Stdlib.Option.Option.None
+
+let isQuantifierStart (chars: List<Char>) : Bool =
+    match chars with
+    | c :: _ when c == '*' || c == '+' || c == '?' -> true
+    | _ -> Stdlib.Option.isSome (Stdlib.Regex.__Engine.braces chars)
+
+let quantify (node: Stdlib.Regex.__Engine.Node) (p: Stdlib.Regex.__Engine.Parser) : Stdlib.Result.Result<(Stdlib.Regex.__Engine.Node * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    let bounds =
+        match p.rest with
+        | c :: _ when c == '*' -> Stdlib.Option.Option.Some ((0L, Stdlib.Option.Option.None, 1L))
+        | c :: _ when c == '+' -> Stdlib.Option.Option.Some ((1L, Stdlib.Option.Option.None, 1L))
+        | c :: _ when c == '?' -> Stdlib.Option.Option.Some ((0L, Stdlib.Option.Option.Some 1L, 1L))
+        | _ -> Stdlib.Regex.__Engine.braces p.rest in
+    match bounds with
+    | None -> Ok ((node, p))
+    | Some ((low, high, length)) ->
+        match high with
+        | Some h when h < low -> Stdlib.Regex.__Engine.invalid "{x,y} with x greater than y" (p.pos + length)
+        | _ ->
+            let after = Stdlib.Regex.__Engine.advance p length in
+            let (isLazy, after) =
+                match after.rest with
+                | c :: _ when c == '?' -> (true, Stdlib.Regex.__Engine.advance after 1L)
+                | _ -> (false, after) in
+            if Stdlib.Regex.__Engine.isQuantifierStart after.rest then Stdlib.Regex.__Engine.invalid "nested quantifier" (after.pos + 1L)
+            else Ok ((Stdlib.Regex.__Engine.Node.Repeat (node, low, high, isLazy), after))
+
+let groupBody (key: Stdlib.Option.Option<Int64>) (inner: Stdlib.Regex.__Engine.Parser) : Stdlib.Result.Result<(Stdlib.Regex.__Engine.Node * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    match Stdlib.Regex.__Engine.alternatives inner [] with
+    | Error e -> Error e
+    | Ok ((alts, after)) ->
+        match after.rest with
+        | close :: _ when close == ')' ->
+            let node =
+                match key with
+                | Some name -> Stdlib.Regex.__Engine.Node.Capture (name, alts)
+                | None -> Stdlib.Regex.__Engine.Node.Plain alts in
+            Ok ((node, Stdlib.Regex.__Engine.advance after 1L))
+        | _ -> Stdlib.Regex.__Engine.invalid "not enough )" after.pos
+
+let namedGroup (p: Stdlib.Regex.__Engine.Parser) (name: String) (length: Int64) : Stdlib.Result.Result<(Stdlib.Regex.__Engine.Node * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    if Stdlib.List.contains p.names name then Stdlib.Regex.__Engine.invalid "invalid group name" p.pos
+    else Stdlib.Regex.__Engine.groupBody (Stdlib.Option.Option.Some (0L - 1L - Stdlib.List.length p.names)) { (Stdlib.Regex.__Engine.advance p (3L + length)) with names = Stdlib.List.push p.names name }
+
+// (?im) and (?im:...) turn options on for the whole pattern here, as the
+// options a pattern is compiled with do.
+let inlineOptions (p: Stdlib.Regex.__Engine.Parser) (chars: List<Char>) (acc: List<Char>) (length: Int64) : Stdlib.Result.Result<(Stdlib.Regex.__Engine.Node * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    match chars with
+    | c :: rest when Stdlib.String.contains "imnsx-" (Stdlib.Char.toString c) -> Stdlib.Regex.__Engine.inlineOptions p rest (Stdlib.List.push acc c) (length + 1L)
+    | c :: _ when c == ')' ->
+        Ok ((Stdlib.Regex.__Engine.Node.Plain [[]], { (Stdlib.Regex.__Engine.advance p (length + 1L)) with flags = Stdlib.List.concat p.flags acc }))
+    | c :: _ when c == ':' ->
+        Stdlib.Regex.__Engine.groupBody Stdlib.Option.Option.None { (Stdlib.Regex.__Engine.advance p (length + 1L)) with flags = Stdlib.List.concat p.flags acc }
+    | _ -> Stdlib.Regex.__Engine.invalid "invalid group" (p.pos + 2L)
+
+let group (p: Stdlib.Regex.__Engine.Parser) : Stdlib.Result.Result<(Stdlib.Regex.__Engine.Node * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    match Stdlib.List.drop p.rest 1L with
+    | q :: next :: more when q == '?' ->
+        if next == ':' then Stdlib.Regex.__Engine.groupBody Stdlib.Option.Option.None (Stdlib.Regex.__Engine.advance p 3L)
+        else if next == '=' || next == '!' then Stdlib.Regex.__Engine.unsupported "lookahead or lookbehind"
+        else if next == '>' then Stdlib.Regex.__Engine.unsupported "atomic group"
+        else if next == '(' then Stdlib.Regex.__Engine.unsupported "conditional"
+        else if Stdlib.String.contains "imnsx-" (Stdlib.Char.toString next) then Stdlib.Regex.__Engine.inlineOptions p (Stdlib.List.drop p.rest 2L) [] 2L
+        else if next == '<' || next == ''' then
+            match more with
+            | look :: _ when next == '<' && (look == '=' || look == '!') -> Stdlib.Regex.__Engine.unsupported "lookahead or lookbehind"
+            | _ ->
+                match Stdlib.Regex.__Engine.groupName more (if next == '<' then '>' else ''') [] with
+                | Some ((name, length)) ->
+                    if Stdlib.Char.isDigit (Stdlib.Option.withDefault (Stdlib.List.head (Stdlib.String.toList name)) 'a') then Stdlib.Regex.__Engine.invalid "invalid group name" (p.pos + 3L)
+                    else Stdlib.Regex.__Engine.namedGroup p name length
+                | None -> Stdlib.Regex.__Engine.invalid "invalid group name" (p.pos + 3L)
+        else Stdlib.Regex.__Engine.invalid "invalid group" (p.pos + 2L)
+    | _ ->
+        let number = p.unnamed + 1L in
+        Stdlib.Regex.__Engine.groupBody (Stdlib.Option.Option.Some number) { (Stdlib.Regex.__Engine.advance p 1L) with unnamed = number }
+
+let atom (p: Stdlib.Regex.__Engine.Parser) : Stdlib.Result.Result<(Stdlib.Regex.__Engine.Node * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    let one = fun node -> Ok ((node, Stdlib.Regex.__Engine.advance p 1L)) in
+    let shorthand = fun k -> Stdlib.Regex.__Engine.Node.Class (false, [Stdlib.Regex.__Engine.ClassItem.Shorthand k]) in
+    match p.rest with
+    | [] -> Stdlib.Regex.__Engine.invalid "invalid pattern" p.pos
+    | c :: rest ->
+        if c == '(' then Stdlib.Regex.__Engine.group p
+        else if c == '[' then
+            let (negated, start) =
+                match rest with
+                | caret :: _ when caret == '^' -> (true, Stdlib.Regex.__Engine.advance p 2L)
+                | _ -> (false, Stdlib.Regex.__Engine.advance p 1L) in
+            match Stdlib.Regex.__Engine.classItems start p.pos [] true with
+            | Ok ((items, after)) -> Ok ((Stdlib.Regex.__Engine.Node.Class (negated, items), after))
+            | Error e -> Error e
+        else if c == '.' then one Stdlib.Regex.__Engine.Node.AnyChar
+        else if c == '^' then one Stdlib.Regex.__Engine.Node.LineStart
+        else if c == '$' then one Stdlib.Regex.__Engine.Node.LineEnd
+        else if c == '*' || c == '+' || c == '?' then Stdlib.Regex.__Engine.invalid "quantifier after nothing" (p.pos + 1L)
+        else if c == '\\' then
+            match rest with
+            | [] -> Stdlib.Regex.__Engine.invalid "ends in an unescaped backslash" (p.pos + 1L)
+            | k :: _ ->
+                let two = fun node -> Ok ((node, Stdlib.Regex.__Engine.advance p 2L)) in
+                if k == 'd' || k == 'w' || k == 's' || k == 'D' || k == 'W' || k == 'S' then two (shorthand k)
+                else if k == 'b' then two (Stdlib.Regex.__Engine.Node.Boundary true)
+                else if k == 'B' then two (Stdlib.Regex.__Engine.Node.Boundary false)
+                else if k == 'A' then two Stdlib.Regex.__Engine.Node.InputStart
+                else if k == 'z' then two Stdlib.Regex.__Engine.Node.InputEnd
+                else if k == 'Z' then two Stdlib.Regex.__Engine.Node.InputEndNewline
+                else if k == 'G' then Stdlib.Regex.__Engine.unsupported "\\G"
+                else if k == 'k' || (Stdlib.Char.isDigit k && k != '0') then Stdlib.Regex.__Engine.unsupported "backreference"
+                else
+                    match Stdlib.Regex.__Engine.escape p k with
+                    | Ok ((value, after)) -> Ok ((Stdlib.Regex.__Engine.Node.Lit value, after))
+                    | Error e -> Error e
+        else one (Stdlib.Regex.__Engine.Node.Lit c)
+
+let sequence (p: Stdlib.Regex.__Engine.Parser) (acc: List<Stdlib.Regex.__Engine.Node>) : Stdlib.Result.Result<(List<Stdlib.Regex.__Engine.Node> * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    match p.rest with
+    | c :: _ when c == '|' || c == ')' -> Ok ((Stdlib.List.reverse acc, p))
+    | [] -> Ok ((Stdlib.List.reverse acc, p))
+    | _ ->
+        match Stdlib.Regex.__Engine.atom p with
+        | Error e -> Error e
+        | Ok ((node, after)) ->
+            match Stdlib.Regex.__Engine.quantify node after with
+            | Error e -> Error e
+            | Ok ((node, after)) -> Stdlib.Regex.__Engine.sequence after (Stdlib.List.push acc node)
+
+let alternatives (p: Stdlib.Regex.__Engine.Parser) (acc: List<List<Stdlib.Regex.__Engine.Node>>) : Stdlib.Result.Result<(List<List<Stdlib.Regex.__Engine.Node>> * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    match Stdlib.Regex.__Engine.sequence p [] with
+    | Error e -> Error e
+    | Ok ((nodes, after)) ->
+        let acc = Stdlib.List.push acc nodes in
+        match after.rest with
+        | bar :: _ when bar == '|' -> Stdlib.Regex.__Engine.alternatives (Stdlib.Regex.__Engine.advance after 1L) acc
+        | _ -> Ok ((acc, after))
+
+let parse (pattern: String) : Stdlib.Result.Result<(List<List<Stdlib.Regex.__Engine.Node>> * Stdlib.Regex.__Engine.Parser), Stdlib.Regex.RegexError> =
+    let start = Stdlib.Regex.__Engine.Parser { rest = Stdlib.String.toList pattern, pos = 0L, unnamed = 0L, names = [], flags = [] } in
+    match Stdlib.Regex.__Engine.alternatives start [] with
+    | Error e -> Error e
+    | Ok ((alts, after)) ->
+        match after.rest with
+        | [] -> Ok ((alts, after))
+        | _ -> Stdlib.Regex.__Engine.invalid "too many )" after.pos
+
+let isWord (c: Stdlib.Option.Option<Char>) : Bool =
+    match c with
+    | Some c -> Stdlib.Regex.__isAlphanumeric c || c == '_'
+    | None -> false
+
+let shorthandMatches (kind: Char) (c: Char) : Bool =
+    let lower = Stdlib.Char.toLowercase kind in
+    let matched =
+        if lower == 'd' then Stdlib.Char.isDigit c
+        else if lower == 'w' then Stdlib.Regex.__Engine.isWord (Stdlib.Option.Option.Some c)
+        else Stdlib.Regex.__isWhitespace c in
+    if lower == kind then matched else Stdlib.Bool.not matched
+
+let itemMatches (item: Stdlib.Regex.__Engine.ClassItem) (c: Char) : Bool =
+    match item with
+    | Single expected -> c == expected
+    | Span (low, high) -> Stdlib.Char.isGreaterThanOrEqualTo c low && Stdlib.Char.isLessThanOrEqualTo c high
+    | Shorthand kind -> Stdlib.Regex.__Engine.shorthandMatches kind c
+
+let charMatches (options: Stdlib.Regex.__Engine.Options) (test: Char -> Bool) (c: Char) : Bool =
+    test c || (options.caseInsensitive && (test (Stdlib.Char.toLowercase c) || test (Stdlib.Char.toUppercase c)))
+
+let step (options: Stdlib.Regex.__Engine.Options) (test: Char -> Bool) (cur: Stdlib.Regex.__Engine.Cursor) : Stdlib.Option.Option<Stdlib.Regex.__Engine.Cursor> =
+    match cur.rest with
+    | c :: rest ->
+        if Stdlib.Regex.__Engine.charMatches options test c then
+            Stdlib.Option.Option.Some (Stdlib.Regex.__Engine.Cursor { rest = rest, pos = cur.pos + 1L, prev = Stdlib.Option.Option.Some c })
+        else Stdlib.Option.Option.None
+    | [] -> Stdlib.Option.Option.None
+
+let atEnd (rest: List<Char>) (beforeNewline: Bool) : Bool =
+    match rest with
+    | [] -> true
+    | [c] -> beforeNewline && c == '\n'
+    | _ -> false
+
+// The matcher is a Pike VM: every thread advances one character at a time, in
+// priority order, so matching is linear in the input, as the interpreter's
+// non-backtracking engine is, and the first match is the one backtracking finds.
+let compileAlternatives (alts: List<List<Stdlib.Regex.__Engine.Node>>) (pc: Int64) (unnamed: Int64) : List<Stdlib.Regex.__Engine.Instr> =
+    match alts with
+    | [] -> []
+    | [only] -> Stdlib.Regex.__Engine.compileSequence only pc unnamed
+    | first :: rest ->
+        let firstCode = Stdlib.Regex.__Engine.compileSequence first (pc + 1L) unnamed in
+        let restStart = pc + 2L + Stdlib.List.length firstCode in
+        let restCode = Stdlib.Regex.__Engine.compileAlternatives rest restStart unnamed in
+        [Stdlib.Regex.__Engine.Instr.Split (pc + 1L, restStart)] @ firstCode @ [Stdlib.Regex.__Engine.Instr.Jmp (restStart + Stdlib.List.length restCode)] @ restCode
+
+let compileSequence (nodes: List<Stdlib.Regex.__Engine.Node>) (pc: Int64) (unnamed: Int64) : List<Stdlib.Regex.__Engine.Instr> =
+    match nodes with
+    | [] -> []
+    | node :: rest ->
+        let code = Stdlib.Regex.__Engine.compileNode node pc unnamed in
+        code @ Stdlib.Regex.__Engine.compileSequence rest (pc + Stdlib.List.length code) unnamed
+
+// Group k's bounds live in slots 2k and 2k+1; named group j follows the unnamed ones.
+let slot (key: Int64) (unnamed: Int64) : Int64 =
+    if key > 0L then key * 2L else (unnamed - key) * 2L
+
+let compileCopies (node: Stdlib.Regex.__Engine.Node) (count: Int64) (pc: Int64) (unnamed: Int64) : List<Stdlib.Regex.__Engine.Instr> =
+    if count <= 0L then []
+    else
+        let code = Stdlib.Regex.__Engine.compileNode node pc unnamed in
+        code @ Stdlib.Regex.__Engine.compileCopies node (count - 1L) (pc + Stdlib.List.length code) unnamed
+
+// count optional copies, each skipping to end: x(x(x)?)? written flat.
+let compileOptional (node: Stdlib.Regex.__Engine.Node) (count: Int64) (isLazy: Bool) (pc: Int64) (endPc: Int64) (unnamed: Int64) : List<Stdlib.Regex.__Engine.Instr> =
+    if count <= 0L then []
+    else
+        let code = Stdlib.Regex.__Engine.compileNode node (pc + 1L) unnamed in
+        let split = if isLazy then Stdlib.Regex.__Engine.Instr.Split (endPc, pc + 1L) else Stdlib.Regex.__Engine.Instr.Split (pc + 1L, endPc) in
+        [split] @ code @ Stdlib.Regex.__Engine.compileOptional node (count - 1L) isLazy (pc + 1L + Stdlib.List.length code) endPc unnamed
+
+let compileNode (node: Stdlib.Regex.__Engine.Node) (pc: Int64) (unnamed: Int64) : List<Stdlib.Regex.__Engine.Instr> =
+    match node with
+    | Capture (key, alts) ->
+        let inner = Stdlib.Regex.__Engine.compileAlternatives alts (pc + 1L) unnamed in
+        let start = Stdlib.Regex.__Engine.slot key unnamed in
+        [Stdlib.Regex.__Engine.Instr.Save start] @ inner @ [Stdlib.Regex.__Engine.Instr.Save (start + 1L)]
+    | Plain alts -> Stdlib.Regex.__Engine.compileAlternatives alts pc unnamed
+    | Repeat (inner, low, high, isLazy) ->
+        let required = Stdlib.Regex.__Engine.compileCopies inner low pc unnamed in
+        let afterRequired = pc + Stdlib.List.length required in
+        match high with
+        | Some h ->
+            // The optional copies' length does not depend on where they jump to.
+            let size = Stdlib.List.length (Stdlib.Regex.__Engine.compileOptional inner (h - low) isLazy afterRequired 0L unnamed) in
+            required @ Stdlib.Regex.__Engine.compileOptional inner (h - low) isLazy afterRequired (afterRequired + size) unnamed
+        | None ->
+            let body = Stdlib.Regex.__Engine.compileNode inner (afterRequired + 1L) unnamed in
+            let exit = afterRequired + 2L + Stdlib.List.length body in
+            let split = if isLazy then Stdlib.Regex.__Engine.Instr.Split (exit, afterRequired + 1L) else Stdlib.Regex.__Engine.Instr.Split (afterRequired + 1L, exit) in
+            required @ [split] @ body @ [Stdlib.Regex.__Engine.Instr.Jmp afterRequired]
+    | Lit _ -> [Stdlib.Regex.__Engine.Instr.Consume node]
+    | AnyChar -> [Stdlib.Regex.__Engine.Instr.Consume node]
+    | Class (_, _) -> [Stdlib.Regex.__Engine.Instr.Consume node]
+    | _ -> [Stdlib.Regex.__Engine.Instr.Assert node]
+
+let consumes (options: Stdlib.Regex.__Engine.Options) (node: Stdlib.Regex.__Engine.Node) (c: Char) : Bool =
+    match node with
+    | Lit expected -> Stdlib.Regex.__Engine.charMatches options (fun x -> x == expected) c
+    | AnyChar -> c != '\n'
+    | Class (negated, items) ->
+        Stdlib.Regex.__Engine.charMatches options (fun x -> Stdlib.List.any items (fun item -> Stdlib.Regex.__Engine.itemMatches item x)) c != negated
+    | _ -> false
+
+let holds (options: Stdlib.Regex.__Engine.Options) (node: Stdlib.Regex.__Engine.Node) (cur: Stdlib.Regex.__Engine.Cursor) : Bool =
+    match node with
+    | LineStart -> cur.pos == 0L || (options.multiline && cur.prev == Stdlib.Option.Option.Some '\n')
+    | LineEnd -> Stdlib.Regex.__Engine.atEnd cur.rest true || (options.multiline && Stdlib.List.head cur.rest == Stdlib.Option.Option.Some '\n')
+    | InputStart -> cur.pos == 0L
+    | InputEnd -> Stdlib.List.isEmpty cur.rest
+    | InputEndNewline -> Stdlib.Regex.__Engine.atEnd cur.rest true
+    | Boundary wanted -> (Stdlib.Regex.__Engine.isWord cur.prev != Stdlib.Regex.__Engine.isWord (Stdlib.List.head cur.rest)) == wanted
+    | _ -> false
+
+// Follow the jumps, splits, saves and assertions from pc, adding each thread
+// that stops at a consuming instruction or the match, in priority order.
+let addThread (vm: Stdlib.Regex.__Engine.Vm) (pc: Int64) (caps: Dict<Int64, Int64>) (step: Stdlib.Regex.__Engine.Step) : Stdlib.Regex.__Engine.Step =
+    if Stdlib.Dict.member step.visited pc then step
+    else
+        let step = { step with visited = Stdlib.Dict.set step.visited pc true } in
+        match Stdlib.Dict.get vm.program pc with
+        | Some (Jmp target) -> Stdlib.Regex.__Engine.addThread vm target caps step
+        | Some (Split (first, second)) -> Stdlib.Regex.__Engine.addThread vm second caps (Stdlib.Regex.__Engine.addThread vm first caps step)
+        | Some (Save index) -> Stdlib.Regex.__Engine.addThread vm (pc + 1L) (Stdlib.Dict.set caps index step.cursor.pos) step
+        | Some (Assert node) ->
+            if Stdlib.Regex.__Engine.holds vm.options node step.cursor then Stdlib.Regex.__Engine.addThread vm (pc + 1L) caps step
+            else step
+        | Some _ -> { step with threads = Stdlib.List.push step.threads (pc, caps) }
+        | None -> step
+
+let startStep (cursor: Stdlib.Regex.__Engine.Cursor) : Stdlib.Regex.__Engine.Step =
+    Stdlib.Regex.__Engine.Step { cursor = cursor, visited = Stdlib.Dict.empty, threads = [] }
+
+// Run the threads (highest priority first) over the character at cur: the next
+// step's threads, and the captures of a match found, which ends the lower-priority ones.
+let stepThreads (vm: Stdlib.Regex.__Engine.Vm) (threads: List<(Int64 * Dict<Int64, Int64>)>) (cur: Stdlib.Regex.__Engine.Cursor) (next: Stdlib.Regex.__Engine.Step) : (Stdlib.Regex.__Engine.Step * Stdlib.Option.Option<Dict<Int64, Int64>>) =
+    match threads with
+    | [] -> (next, Stdlib.Option.Option.None)
+    | (pc, caps) :: rest ->
+        match Stdlib.Dict.get vm.program pc with
+        | Some Match -> (next, Stdlib.Option.Option.Some caps)
+        | Some (Consume node) ->
+            match cur.rest with
+            | c :: _ when Stdlib.Regex.__Engine.consumes vm.options node c ->
+                Stdlib.Regex.__Engine.stepThreads vm rest cur (Stdlib.Regex.__Engine.addThread vm (pc + 1L) caps next)
+            | _ -> Stdlib.Regex.__Engine.stepThreads vm rest cur next
+        | _ -> Stdlib.Regex.__Engine.stepThreads vm rest cur next
+
+let run (vm: Stdlib.Regex.__Engine.Vm) (threads: List<(Int64 * Dict<Int64, Int64>)>) (cur: Stdlib.Regex.__Engine.Cursor) (best: Stdlib.Option.Option<Dict<Int64, Int64>>) : Stdlib.Option.Option<Dict<Int64, Int64>> =
+    // Until something matches, a new attempt starts here, below every older one.
+    let current =
+        match best with
+        | Some _ -> threads
+        | None -> Stdlib.List.reverse (Stdlib.Regex.__Engine.addThread vm 0L Stdlib.Dict.empty (Stdlib.Regex.__Engine.Step { cursor = cur, visited = Stdlib.Dict.fromListOverwritingDuplicates (Stdlib.List.map threads (fun t -> let (pc, _) = t in (pc, true))), threads = Stdlib.List.reverse threads })).threads in
+    let following =
+        match cur.rest with
+        | c :: rest -> Stdlib.Regex.__Engine.Cursor { rest = rest, pos = cur.pos + 1L, prev = Stdlib.Option.Option.Some c }
+        | [] -> cur in
+    let (next, found) = Stdlib.Regex.__Engine.stepThreads vm current cur (Stdlib.Regex.__Engine.startStep following) in
+    let best = match found with | Some caps -> Stdlib.Option.Option.Some caps | None -> best in
+    let nextThreads = Stdlib.List.reverse next.threads in
+    if Stdlib.List.isEmpty cur.rest then best
+    else if Stdlib.List.isEmpty nextThreads && Stdlib.Option.isSome best then best
+    else Stdlib.Regex.__Engine.run vm nextThreads following best
+
+let firstMatch (vm: Stdlib.Regex.__Engine.Vm) (cur: Stdlib.Regex.__Engine.Cursor) : Stdlib.Option.Option<Dict<Int64, Int64>> =
+    Stdlib.Regex.__Engine.run vm [] cur Stdlib.Option.Option.None
+
+// The cursor at pos, walking from cur.
+let seek (cur: Stdlib.Regex.__Engine.Cursor) (pos: Int64) : Stdlib.Regex.__Engine.Cursor =
+    if cur.pos >= pos then cur
+    else
+        match cur.rest with
+        | c :: rest -> Stdlib.Regex.__Engine.seek (Stdlib.Regex.__Engine.Cursor { rest = rest, pos = cur.pos + 1L, prev = Stdlib.Option.Option.Some c }) pos
+        | [] -> cur
+
+let groupCaps (caps: Dict<Int64, Int64>) (unnamed: Int64) (keys: List<Int64>) (acc: Dict<Int64, (Int64 * Int64)>) : Dict<Int64, (Int64 * Int64)> =
+    match keys with
+    | [] -> acc
+    | key :: rest ->
+        let start = Stdlib.Regex.__Engine.slot key unnamed in
+        match (Stdlib.Dict.get caps start, Stdlib.Dict.get caps (start + 1L)) with
+        | (Some s, Some e) -> Stdlib.Regex.__Engine.groupCaps caps unnamed rest (Stdlib.Dict.set acc key (s, e))
+        | _ -> Stdlib.Regex.__Engine.groupCaps caps unnamed rest acc
+
+// Every match from cur on: (start, end, captures), each search after an empty
+// match starting one character later.
+let search (vm: Stdlib.Regex.__Engine.Vm) (keys: List<Int64>) (cur: Stdlib.Regex.__Engine.Cursor) (firstOnly: Bool) (acc: List<(Int64 * Int64 * Dict<Int64, (Int64 * Int64)>)>) : List<(Int64 * Int64 * Dict<Int64, (Int64 * Int64)>)> =
+    match Stdlib.Regex.__Engine.firstMatch vm cur with
+    | Some caps ->
+        let start = Stdlib.Option.withDefault (Stdlib.Dict.get caps 0L) cur.pos in
+        let end_ = Stdlib.Option.withDefault (Stdlib.Dict.get caps 1L) start in
+        let groups = Stdlib.Regex.__Engine.groupCaps caps vm.unnamed keys Stdlib.Dict.empty in
+        let acc = Stdlib.List.push acc (start, end_, groups) in
+        let after = Stdlib.Regex.__Engine.seek cur end_ in
+        if firstOnly then Stdlib.List.reverse acc
+        else if end_ > start then Stdlib.Regex.__Engine.search vm keys after firstOnly acc
+        else
+            match after.rest with
+            | c :: rest -> Stdlib.Regex.__Engine.search vm keys (Stdlib.Regex.__Engine.Cursor { rest = rest, pos = after.pos + 1L, prev = Stdlib.Option.Option.Some c }) firstOnly acc
+            | [] -> Stdlib.List.reverse acc
+    | None -> Stdlib.List.reverse acc
+
+let range (start: Int64) (end_: Int64) : Stdlib.Regex.Range =
+    Stdlib.Regex.Range { start = start, end = end_ }
+
+let capture (input: String) (caps: Dict<Int64, (Int64 * Int64)>) (key: Int64) : Stdlib.Option.Option<Stdlib.Regex.Capture> =
+    match Stdlib.Dict.get caps key with
+    | Some ((start, end_)) ->
+        Stdlib.Option.Option.Some (Stdlib.Regex.Capture { text = Stdlib.String.slice input start end_, range = Stdlib.Regex.__Engine.range start end_ })
+    | None -> Stdlib.Option.Option.None
+
+// Named groups are keyed -1, -2, ... in the order they open.
+let namedEntry (input: String) (caps: Dict<Int64, (Int64 * Int64)>) (names: List<String>) (index: Int64) : (String * Stdlib.Option.Option<Stdlib.Regex.Capture>) =
+    let name = Stdlib.Option.withDefault (Stdlib.List.head (Stdlib.List.drop names (index - 1L))) "" in
+    (name, Stdlib.Regex.__Engine.capture input caps (0L - index))
+
+// The lists here are built with List.map: building a List<Option<record>> in a
+// recursive function returns corrupt values (compiler bug, round 17 report).
+let found (input: String) (parser: Stdlib.Regex.__Engine.Parser) (m: (Int64 * Int64 * Dict<Int64, (Int64 * Int64)>)) : Stdlib.Regex.Match =
+    let (start, end_, caps) = m in
+    let names = Stdlib.List.reverse parser.names in
+    Stdlib.Regex.Match {
+        text = Stdlib.String.slice input start end_,
+        range = Stdlib.Regex.__Engine.range start end_,
+        captures = Stdlib.List.map (Stdlib.List.range 1L parser.unnamed) (Stdlib.Regex.__Engine.capture input caps),
+        namedCaptures = Stdlib.Dict.fromListOverwritingDuplicates (Stdlib.List.map (Stdlib.List.range 1L (Stdlib.List.length names)) (Stdlib.Regex.__Engine.namedEntry input caps names))
+    }
+
+let pieces (input: String) (matches: List<(Int64 * Int64 * Dict<Int64, (Int64 * Int64)>)>) (last: Int64) (acc: List<String>) : List<String> =
+    match matches with
+    | [] -> Stdlib.List.reverse (Stdlib.List.push acc (Stdlib.String.slice input last (Stdlib.String.length input)))
+    | (start, end_, _) :: rest -> Stdlib.Regex.__Engine.pieces input rest end_ (Stdlib.List.push acc (Stdlib.String.slice input last start))
+
+let scan (pattern: String) (caseInsensitive: Bool) (multiline: Bool) (input: String) (firstOnly: Bool) (withMatches: Bool) : Stdlib.Result.Result<(List<String> * List<Stdlib.Regex.Match>), Stdlib.Regex.RegexError> =
+    match Stdlib.Regex.__Engine.parse pattern with
+    | Error e -> Error e
+    | Ok ((alts, parser)) ->
+        let flag = fun c -> Stdlib.List.contains parser.flags c in
+        let options = Stdlib.Regex.__Engine.Options { caseInsensitive = caseInsensitive || flag 'i', multiline = multiline || flag 'm' } in
+        let body = Stdlib.Regex.__Engine.compileAlternatives alts 1L parser.unnamed in
+        let code = [Stdlib.Regex.__Engine.Instr.Save 0L] @ body @ [Stdlib.Regex.__Engine.Instr.Save 1L, Stdlib.Regex.__Engine.Instr.Match] in
+        let program = Stdlib.Dict.fromListOverwritingDuplicates (Stdlib.List.indexedMap code (fun i instr -> (i, instr))) in
+        let vm = Stdlib.Regex.__Engine.Vm { program = program, options = options, unnamed = parser.unnamed } in
+        let keys = Stdlib.List.range 1L parser.unnamed @ Stdlib.List.map (Stdlib.List.range 1L (Stdlib.List.length parser.names)) (fun j -> 0L - j) in
+        let start = Stdlib.Regex.__Engine.Cursor { rest = Stdlib.String.toList input, pos = 0L, prev = Stdlib.Option.Option.None } in
+        let matches = Stdlib.Regex.__Engine.search vm keys start firstOnly [] in
+        let built =
+            if withMatches then Stdlib.List.map matches (Stdlib.Regex.__Engine.found input parser)
+            else [] in
+        Ok ((Stdlib.Regex.__Engine.pieces input matches 0L [], built))
