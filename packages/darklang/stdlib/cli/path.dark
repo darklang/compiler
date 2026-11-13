@@ -59,6 +59,7 @@ let withExtension (path: String) (extension: String) : String =
     let name = Stdlib.Cli.Path.basename path in
     let dot = Stdlib.Cli.Path.__lastDot name 0L (-1L) in
     let stem = if dot > 0L then Stdlib.String.__byteSlice name 0L dot else name in
+    let extension = if extension == "" || Stdlib.String.startsWith extension "." then extension else "." + extension in
     let newName = stem + extension in
     if dir == "." then newName else Stdlib.Cli.Path.join ([dir, newName])
 
