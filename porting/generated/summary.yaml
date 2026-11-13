@@ -35,8 +35,8 @@ dispositions:
     replace: 917
     run: 649
   tests:
-    blocked: 56
-    run: 1631
+    blocked: 57
+    run: 1630
     xfail: 1212
 reasons:
   packages:
@@ -70,6 +70,7 @@ reasons:
     compiler-crash: 2
     compiler-gap: 131
     compiler-leak: 2
+    compiler-timeout: 1
     diagnostic-difference: 2
     interpreter-fixture: 47
     test-counter: 7
