@@ -41,7 +41,7 @@ Paths below are relative to interpreter `packages/darklang/`.
 
 | Package / item | Decision and rationale |
 | --- | --- |
-| `stdlib/localStore.dark`: `Darklang.Stdlib.LocalStore.path` | Defer as SQLite support: `Builtin.localDbPath` obtains the interpreter's current SQLite database path. Other LocalStore items were not individually reviewed. |
+| `languageTools/localStore.dark`: `Darklang.LanguageTools.LocalStore.path` | Defer as SQLite support: `Builtin.localDbPath` obtains the interpreter's current SQLite database path. Other LocalStore items were not individually reviewed. |
 | `languageTools/interpreterStats.dark`: `Darklang.LanguageTools.InterpreterStats.reset` | Defer interpreter instrumentation: `Builtin.interpreterStatsReset` resets and enables interpreter VM counters, which compiled programs do not have. Other items were not individually reviewed. |
 | `languageTools/packageManager.dark`: `Darklang.LanguageTools.PackageManager.Type.find` | Defer runtime package-manager lookups, including names, locations and other metadata. Interpreter main-store lookup uses SQLite; compile-time hosted imports are a separate feature. Pure helpers remain in scope and other lookups require individual classification. |
 | `stdlib/cli/daemon.dark`: `Darklang.Stdlib.Cli.Daemon.launcher`, `launchDetached` | Defer interpreter-based launching. `launchDetached` invokes `nohup <executable> eval '<expression>'`; a compiled application does not provide the interpreter's `eval` command. The executable-path API now exists, but does not resolve this mismatch. Other daemon helpers remain individually unreviewed. |

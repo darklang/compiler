@@ -181,8 +181,8 @@ impl Stdlib.Modulo for Decimal =
 impl Stdlib.Negate for Decimal =
   let negate = Stdlib.Decimal.negate
 
-impl Stdlib.ToString for Decimal =
-  let toString = Stdlib.Decimal.toString
+impl Stdlib.Display for Decimal =
+  let display = Stdlib.Decimal.toString
 
 impl Stdlib.Compare for Decimal =
   let lessThan = Stdlib.Decimal.lessThan

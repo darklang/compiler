@@ -226,8 +226,8 @@ impl Stdlib.Power for Float32 =
 impl Stdlib.Negate for Float32 =
   let negate = Stdlib.Float32.negate
 
-impl Stdlib.ToString for Float32 =
-  let toString = Stdlib.Float32.toString
+impl Stdlib.Display for Float32 =
+  let display = Stdlib.Float32.toString
 
 impl Stdlib.Compare for Float32 =
   let lessThan = Stdlib.Float32.lessThan

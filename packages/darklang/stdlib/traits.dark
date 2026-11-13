@@ -92,13 +92,11 @@ trait Compare<'a> =
   let greaterThanOrEqualTo (a: 'a) (b: 'a) : Bool
 
 
-/// A value rendered as text for a person: `p.toString`, or `ToString.toString p`.
-/// Every builtin type implements it, so `toString` works on any of them;
-/// `Stdlib.toRepr` stays the structural debug form.
-// CLEANUP if this splits, it splits into `ToString` for what a person reads and
-// `ToDebugString` for the derived one. Nothing more elaborate.
-trait ToString<'a> =
-  let toString (v: 'a) : String
+/// Text for a person: `p.display`, or `Display.display p`. A type has it only when someone
+/// writes an impl. String interpolation uses it, and falls back to <fn Stdlib.inspect> for a
+/// type without one.
+trait Display<'a> =
+  let display (v: 'a) : String
 
 
 // Written once over the traits above, for any type that implements them.
@@ -146,5 +144,18 @@ let product<'a: Multiply> (seed: 'a) (xs: List<'a>) : 'a =
   Stdlib.List.fold xs seed (fun acc x -> acc * x)
 
 
-/// <param v> as text, for any type with a `ToString`
-let toString<'a: ToString> (v: 'a) : String = ToString.toString v
+/// <param v> as text for a person, for any type with a `Display`. <fn Stdlib.inspect>
+/// shows any value.
+let display<'a: Display> (v: 'a) : String = Display.display v
+
+
+/// <param value> for a developer: its structure, with quotes on strings, as `dark eval`
+/// prints it. Each use is specialized to the value renderer for its type.
+let inspect<'a> (value: 'a) : String =
+  Builtin.crash "Stdlib.inspect was not specialized"
+
+
+// What `$"{value}"` shows: the type's Display when it has one, otherwise inspect. Each use is
+// specialized to one or the other for its type.
+let __interpolate<'a> (value: 'a) : String =
+  Builtin.crash "Interpolation was not specialized"

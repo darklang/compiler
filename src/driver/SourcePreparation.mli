@@ -36,6 +36,7 @@ val importInheritedValues :
 val materializeProgramValues : CheckedAST.program -> CheckedAST.program
 
 val prepareProgramForAnf :
+  ?prepare:(CheckedAST.program -> CheckedAST.program) ->
   monomorphizationMode ->
   TypeRegistries.typeRegistry ->
   LoweringPrimitives.variantLookup ->

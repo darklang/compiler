@@ -48,9 +48,9 @@ def main():
             dict(originalName=["Hosted", "ToText", "toText"], resolved={"Error": ["unresolved"]}),
             [], [], []]}]]}))
     entities[("function", "stdlib-hash")] = ("Hosted.stdlibDescribe", dict(typeParams=["a"],
-        bounds=[dict(param="a", trait_=dict(trait_=reference("Darklang.Stdlib.ToString", "stdlib-trait-hash"), typeArgs=[]))],
+        bounds=[dict(param="a", trait_=dict(trait_=reference("Darklang.Stdlib.Display", "stdlib-trait-hash"), typeArgs=[]))],
         parameters=[dict(name="value", typ=variable)], returnType={"TString": []},
-        body={"EApply": [1, {"EFnName": [2, dict(originalName=["Darklang", "Stdlib", "ToString", "toString"],
+        body={"EApply": [1, {"EFnName": [2, dict(originalName=["Darklang", "Stdlib", "Display", "display"],
             resolved={"Error": ["unresolved"]}), []]}, [], [{"EArg": [3, 0]}]]}))
     # Ceilings affect content identity even though trait ceiling checking is deferred.
     ceiling_signature = dict(signature, permissionCeiling={"Some": [[]]})
