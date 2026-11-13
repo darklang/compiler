@@ -74,10 +74,8 @@ merged with each program's small fresh summary.
 | alias | its resolved wire shape |
 
 Integer parsing accepts decimal and exponent spellings only when their value is
-integral and in range. Fixed-width integers and `Int` use the retained exact
-lexeme. For `Int128` and `UInt128`, exponent-form input preserves the pinned
-interpreter's binary64 fallback (and therefore its observable boundary
-rounding); plain integer lexemes remain exact. Character parsing requires one
+integral and in range. Every integer width and `Int` read the exact lexeme,
+never through a double, as the pinned interpreter does. Character parsing requires one
 extended grapheme cluster. UUID and DateTime strings use their public parsers.
 Tuple arity is exact. Lists, Dict values, record fields, and enum arguments add
 their index/field to the error path. Records require every declared field,
