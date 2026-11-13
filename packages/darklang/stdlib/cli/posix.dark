@@ -5,7 +5,7 @@ module Darklang.Stdlib.Cli.Posix
 
 /// Structured error from posix operations, carrying the errno code.
 type Error =
-  { errno: Int
+  { errno: Int64
     message: String }
 
 /// Result of a stat() call.
@@ -174,13 +174,9 @@ let uname () : Result.Result<(String * String * String), Error> =
 
 
 /// Send a signal to a process
-let kill (pid: Int) (signal: Int) : Result.Result<Unit, Error> =
-  Builtin.syscallKill pid signal
+let kill (pid: Pid) (signal: Signal) : Result.Result<Unit, Error> =
+  Builtin.syscallKill (Stdlib.Int.fromInt64 (Pid.toInt64 pid)) (Stdlib.Int.fromInt64 (Signal.toInt64 signal))
   |> Stdlib.Result.mapError Stdlib.Cli.Posix.__fromErrno
-
-val sigterm = 15
-val sigkill = 9
-val sigint = 2
 
 /// Common errno values (Linux/macOS)
 /// Stat file-type mask and constants
@@ -200,13 +196,11 @@ let isDirectory (path: String) : Bool =
 
 /// Check if a process is running via kill(pid, 0).
 /// Signal 0 checks process existence without sending a signal.
-let isProcessRunning (pid: Int) : Bool =
-  match kill pid 0 with
+let isProcessRunning (pid: Pid) : Bool =
+  // EPERM means the process exists but we lack permission to signal it
+  match Builtin.syscallKill (Stdlib.Int.fromInt64 (Pid.toInt64 pid)) 0 with
   | Ok _ -> true
-  | Error e ->
-    // EPERM means the process exists but we lack permission to signal it
-    if e.errno == Errno.eperm then true
-    else false
+  | Error errno -> Stdlib.Int.toInt64 errno == Some Errno.eperm
 
 
 /// Create a directory and all missing parents (like mkdir -p).
@@ -699,7 +693,7 @@ let __fromErrno (errno: Int) : Stdlib.Cli.Posix.Error =
         else if errno == 132 then "Operation not possible due to RF-kill"
         else if errno == 133 then "Memory page has hardware error"
         else Stdlib.String.append "Unknown error " (__decimal errno)
-    Stdlib.Cli.Posix.Error { errno = errno
+    Stdlib.Cli.Posix.Error { errno = Stdlib.Int.__toInt64Unchecked errno
                             message = message }
 
 
@@ -715,12 +709,12 @@ let __writeAll
   else
     match write bytes with
     | Error error ->
-      if error.errno == 4 then __writeAll write bytes written
+      if error.errno == 4L then __writeAll write bytes written
       else Stdlib.Result.Result.Error error
     | Ok count ->
       if count <= 0 || count > length then
         Stdlib.Result.Result.Error (Stdlib.Cli.Posix.Error {
-          errno = 5, message = "write made invalid progress" })
+          errno = 5L, message = "write made invalid progress" })
       else if count == length then Stdlib.Result.Result.Ok (written + count)
       else
         let rest = Stdlib.Blob.slice bytes count (length - count)
@@ -770,7 +764,7 @@ let __tempRetry
   : Result.Result<'a, Stdlib.Cli.Posix.Error> =
   match create remaining with
   | Error error ->
-    if error.errno == 17 && remaining > 0 then __tempRetry create (remaining - 1)
+    if error.errno == 17L && remaining > 0 then __tempRetry create (remaining - 1)
     else Stdlib.Result.Result.Error error
   | Ok value -> Stdlib.Result.Result.Ok value
 

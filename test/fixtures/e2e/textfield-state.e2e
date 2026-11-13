@@ -1,0 +1,2 @@
+// A TextField's cursor is an Int64, as in the interpreter.
+(Stdlib.Cli.UI.TextField.empty).cursor + 1L = 1L

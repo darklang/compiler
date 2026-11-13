@@ -1073,9 +1073,14 @@ let checkItems (options : checkCliOptions) =
                   let error = attempt (checkProbe name) in
                   (* The first specialization that compiles, or else the first
                      error that is not about the number of type arguments. *)
+                  (* A trait-bounded generic (`min<'a: Compare>`) leaves its
+                     obligation unresolved until it has type arguments. *)
+                  let needsTypes =
+                    CompilabilityReason.undetermined error
+                    || Text.contains error "Unresolved trait obligation '"
+                  in
                   let error, specialized =
-                    if not (CompilabilityReason.undetermined error) then
-                      (error, None)
+                    if not needsTypes then (error, None)
                     else
                       let rec probe typeFailure = function
                         | [] -> (Option.value typeFailure ~default:error, None)

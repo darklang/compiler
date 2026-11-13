@@ -38,7 +38,8 @@ let tuple checkExpression literal globals locals symbols expected elements =
             (C.TupleLiteral { C.first; second; rest = List.map snd rest })
       | _ -> Error "Tuple syntax must contain at least two expressions")
 
-let list checkExpression literal globals locals symbols expected contents =
+let list checkExpression literal globals locals symbols expected
+    (range : WrittenTypes.range) contents =
   let check = checkExpression globals locals in
   let elementExpected =
     match expected with Some (AST.TList typ) -> Some typ | _ -> None
@@ -73,8 +74,15 @@ let list checkExpression literal globals locals symbols expected contents =
     (fun (elements, inferred, symbols) ->
       match orElse inferred elementExpected with
       | None ->
-          literal expected symbols
-            (AST.TList (AST.TVar Unification.emptyListElementVar))
+          (* Each `[]` has its own unknown element type, so `([], [])` or
+             `f([], [])` does not make two lists one type. *)
+          let element =
+            Unification.emptyListElementVar ^ "_"
+            ^ string_of_int range.Tokenizer.start.Tokenizer.row
+            ^ "_"
+            ^ string_of_int range.Tokenizer.start.Tokenizer.column
+          in
+          literal expected symbols (AST.TList (AST.TVar element))
             (C.ListLiteral [])
       | Some typ ->
           literal expected symbols (AST.TList typ) (C.ListLiteral elements))

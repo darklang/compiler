@@ -364,7 +364,7 @@ let __bitwiseXor (a: Int) (b: Int) : Int =
 let __validateShiftCount (count: Int) : Int64 =
     match Stdlib.Int.__toInt64 count with
     | Some value when value >= 0L && value <= 2147483647L -> value
-    | _ -> Builtin.crash "Encountered out-of-range value for type of Int"
+    | _ -> Builtin.crash "Encountered an out-of-range integer value"
 
 let __shiftLeft (value: Int) (count: Int) : Int = Stdlib.Int.__shiftLeftByInt64 value (Stdlib.Int.__validateShiftCount count)
 let __shiftRight (value: Int) (count: Int) : Int = Stdlib.Int.__shiftRightByInt64 value (Stdlib.Int.__validateShiftCount count)
@@ -510,7 +510,7 @@ let __sqrt (value: Int) : Float = Stdlib.Float.sqrt (Stdlib.Int.__toFloat value)
 let __fromFloat (value: Float) : Int =
     let bits = Stdlib.Float.__toBits value in
     let rawExponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
-    if rawExponent == 2047UL then Builtin.crash "Encountered out-of-range value for type of Int"
+    if rawExponent == 2047UL then Builtin.crash "Encountered an out-of-range integer value"
     else if rawExponent == 0UL then Stdlib.Int.__zero ()
     else if value >= -4611686018427387904.0 && value < 4611686018427387904.0 then
         Stdlib.Int.__small (Stdlib.Float.__toInt64Unchecked value)

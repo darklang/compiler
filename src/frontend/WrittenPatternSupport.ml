@@ -64,6 +64,28 @@ let rec checkLetPattern pattern typ symbols =
       Ok (C.LPVariable id, M.singleton name (typ, id), symbols)
   | WT.LPTuple (_, first, _, second, rest, _, _) -> (
       let patterns = first :: second :: List.map snd rest in
+      (* A parameter of an unannotated lambda, the form a package fn's local
+         `let f(x: T) = ...` arrives in, has no type yet: the tuple pattern
+         gives it one, with an unknown per element. *)
+      let typ, symbols =
+        match WrittenCheckingState.resolve symbols typ with
+        | (AST.TVar _ | AST.TInferenceVar _) as unknown -> (
+            let elements, fresh =
+              WrittenCheckingState.freshenType S.empty
+                (AST.TTuple
+                   (List.mapi
+                      (fun index _ ->
+                        let name = "t$tuple_element_" ^ string_of_int index in
+                        AST.TInferenceVar (name, name))
+                      patterns))
+                symbols
+            in
+            match WrittenCheckingState.constrain unknown elements fresh with
+            | Ok constrained ->
+                (WrittenCheckingState.resolve constrained unknown, constrained)
+            | Error _ -> (unknown, symbols))
+        | resolved -> (resolved, symbols)
+      in
       match typ with
       | AST.TTuple types when List.length patterns = List.length types ->
           let result =
@@ -456,21 +478,35 @@ let[@warning "-4"] matchIsExhaustive globals symbols scrutineeType scrutinee
              [ [] ] types)
     | _ -> [ C.PWildcard ]
   in
+  let uncons = function
+    | C.PList (head :: rest) -> Some (head, C.PList rest)
+    | C.PListCons ([ head ], tail) -> Some (head, tail)
+    | C.PListCons (head :: heads, tail) -> Some (head, C.PListCons (heads, tail))
+    | _ -> None
+  in
+  let rec irrefutable = function
+    | C.PWildcard | C.PVariable _ | C.PUnit -> true
+    | C.PTuple patterns -> List.for_all irrefutable patterns
+    | _ -> false
+  in
   let rec coversWitness pattern witness =
     if patternCoversAny pattern then true
     else
       match (pattern, witness) with
+      (* A wildcard witness stands for a value of a type not known yet, such
+         as the `'a` of an Option<'a> still being inferred: a tuple of
+         variables covers it. *)
+      | _, C.PWildcard -> irrefutable pattern
       | C.PBool left, C.PBool right -> left = right
       | C.PUnit, C.PUnit -> true
-      | C.PList [], C.PList [] -> true
-      | C.PList left, C.PList right when List.length left = List.length right ->
-          List.for_all2 coversWitness left right
-      | C.PListCons ([ head ], tail), C.PList [ single ] ->
-          coversWitness head single && coversWitness tail (C.PList [])
-      | C.PListCons (leftHeads, leftTail), C.PListCons (rightHeads, rightTail)
-        when List.length leftHeads = List.length rightHeads ->
-          List.for_all2 coversWitness leftHeads rightHeads
-          && coversWitness leftTail rightTail
+      | ( (C.PList _ | C.PListCons _), (C.PList _ | C.PListCons _) ) -> (
+          (* One head at a time, so `x :: y :: rest` (one cons of two heads)
+             is compared with the witness `x :: (y :: _)`. *)
+          match (uncons pattern, uncons witness) with
+          | None, None -> true
+          | Some (left, leftRest), Some (right, rightRest) ->
+              coversWitness left right && coversWitness leftRest rightRest
+          | _ -> false)
       | ( C.PConstructor (leftId, leftFields),
           C.PConstructor (rightId, rightFields) )
         when leftId = rightId

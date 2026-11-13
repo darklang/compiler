@@ -130,7 +130,7 @@ let __readAll () : String = Stdlib.Cli.__Stdin.__stdinCollect (Stdlib.Cli.__Stdi
 
 let __readExactly (length: Int) : String =
     let count = Builtin.__posixInt32 length in
-    if count < 0L then Builtin.crash "Encountered out-of-range value for type of Int"
+    if count < 0L then Builtin.crash "Encountered an out-of-range integer value"
     else Stdlib.Cli.__Stdin.__stdinCollect (Stdlib.Cli.__Stdin.__stdinStart ()) (__mapped_alloc 4096L) 4096L 0L count 2L
 
 let __stdinReady (state: RawPtr) (milliseconds: Int64) : Bool =

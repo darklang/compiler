@@ -1,0 +1,4 @@
+// A recursive local fn without annotations, called only from inside another
+// local fn, takes its parameter types from that call, as the merge in a
+// hosted List.sortWith does.
+(let merge = (fun left right -> (match (left, right) with | ([], _) -> right | (_, []) -> left | ((x :: xs), (y :: ys)) -> if x <= y then Stdlib.List.prepend (merge xs right) x else Stdlib.List.prepend (merge left ys) y)) in (let go = (fun l -> merge l [2L, 4L]) in go [1L, 3L, 5L])) = [1L, 2L, 3L, 4L, 5L]

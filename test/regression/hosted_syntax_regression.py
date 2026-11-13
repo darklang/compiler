@@ -241,12 +241,73 @@ ENTITIES["record-key-hash"] = fn("Hosted.recordKey", [("x", INT64)], INT64,
 # Builtin.bytesLength answers an Int64; the compiler's Blob.length an Int.
 ENTITIES["bytes-length-hash"] = fn("Hosted.bytesLen", [("b", {"TBytes": []})], INT64,
     builtin("bytesLength", ARG0))
+# An uncalled builtin, as in `val empty = Builtin.bytesEmpty`, is the same
+# library item as a call: Builtin.bytesLength(Builtin.bytesEmpty).
+BYTES_EMPTY = {"EValue": [1, dict(originalName=["Builtin", "bytesEmpty"], resolved={"Ok": [dict(
+    name={"Builtin": [dict(name="bytesEmpty", version=0)]}, location={"None": []})]})]}
+ENTITIES["bytes-empty-hash"] = fn("Hosted.emptyBytesLen", [("x", INT64)], INT64,
+    builtin("bytesLength", BYTES_EMPTY))
+# `val keywords = Builtin.parserKeywords` is the interpreter lexer's reserved words.
+KEYWORDS = {"EValue": [1, dict(originalName=["Builtin", "parserKeywords"], resolved={"Ok": [dict(
+    name={"Builtin": [dict(name="parserKeywords", version=0)]}, location={"None": []})]})]}
+ENTITIES["keywords-hash"] = fn("Hosted.keywords", [("x", INT64)], {"TList": [{"TString": []}]}, KEYWORDS)
+# A capitalized type parameter, as in `impl Display for Result<'Ok, 'Err>`.
+ENTITIES["capital-param-hash"] = ("Hosted.firstOk", dict(typeParams=["Ok"], bounds=[],
+    returnType={"TVariable": ["Ok"]}, body=ARG0,
+    parameters=[dict(name="value", typ={"TVariable": ["Ok"]})]))
+# Int16 literals stay Int16 where a bare integer is an Int64.
+ENTITIES["int16-hash"] = fn("Hosted.int16Zero", [("x", INT64)], {"TInt16": []},
+    {"EMatch": [1, {"EInt16": [2, 0]}, [
+        dict(pat={"MPInt16": [3, 0]}, whenCondition={"None": []}, rhs={"EInt16": [4, -7]}),
+        dict(pat={"MPVariable": [5, "_other"]}, whenCondition={"None": []}, rhs={"EInt16": [6, 1]})]]})
+# Equal fns share a hash: the entity arrives as Hosted.A.first, and a caller
+# names it Hosted.B.second.
+ENTITIES["shared-fn-hash"] = fn("Hosted.A.first", [("x", INT64)], INT64, ARG0)
+ENTITIES["calls-shared-hash"] = fn("Hosted.callsShared", [("x", INT64)], INT64,
+    {"EApply": [2, {"EFnName": [1, dict(originalName=["Hosted", "B", "second"], resolved={"Ok": [dict(
+        name={"Package": [{"Hash": ["shared-fn-hash"]}]},
+        location={"Some": [dict(owner="Hosted", modules=["B"], name="second")]})]}), []]}, [], [ARG0]]})
+# The server finds Hosted.B.second by name, and answers with the fn at Hosted.A.first.
+FIND_ALSO = {"Hosted.B.second": "shared-fn-hash"}
+# The compiler's Tui.Text.clipToWidth takes an Int64 width, as the interpreter's does.
+CLIP = {"EFnName": [1, dict(originalName=["Stdlib", "Cli", "Tui", "Text", "clipToWidth"], resolved={"Ok": [dict(
+    name={"Package": [{"Hash": ["clip-hash"]}]},
+    location={"Some": [dict(owner="Darklang", modules=["Stdlib", "Cli", "Tui", "Text"], name="clipToWidth")]})]}), []]}
+ENTITIES["clip-caller-hash"] = fn("Hosted.clipped", [("x", INT64)], {"TString": []},
+    {"EApply": [2, CLIP, [], [{"EString": [3, [{"StringText": ["abcdef"]}]]}, ARG0]]})
+# The compiler's syscallClose answers an Int errno; the interpreter's, an Int64.
+ENTITIES["close-bad-hash"] = fn("Hosted.closeBad", [("x", INT64)], INT64,
+    {"EMatch": [1, builtin("syscallClose", {"EBigInt": [2, -1]}), [
+        dict(pat={"MPEnum": [3, "Error", [{"MPVariable": [4, "e"]}]]}, whenCondition={"None": []},
+             rhs={"EVariable": [5, "e"]}),
+        dict(pat={"MPVariable": [6, "_other"]}, whenCondition={"None": []}, rhs={"EInt64": [7, 0]})]]})
+# A builtin whose arguments convert, passed as a value: it converts as a call would.
+NANOSLEEP = {"EFnName": [1, dict(originalName=["Builtin", "syscallNanosleep"], resolved={"Ok": [dict(
+    name={"Builtin": [dict(name="syscallNanosleep", version=0)]}, location={"None": []})]}), [], []]}
+ENTITIES["sleep-value-hash"] = fn("Hosted.sleepZero", [("x", INT64)], INT64,
+    {"EApply": [2, {"ELambda": [3, [{"LPVariable": [4, "f"]}],
+        {"ELet": [5, {"LPTuple": [6, {"LPVariable": [7, "rc"]}, {"LPWildcard": [8]}, []]},
+            {"EApply": [9, {"EVariable": [10, "f"]}, [], [{"EInt64": [11, 0]}, {"EInt64": [12, 0]}]]},
+            {"EVariable": [13, "rc"]}]}]}, [], [NANOSLEEP]]})
 # `Builtin.power` on Int128 goes through the compiler's Power implementation.
 ENTITIES["int128-power-hash"] = fn("Hosted.int128Power", [("x", {"TInt128": []})], {"TInt128": []},
     builtin("power", ARG0, {"EInt128": [3, 3]}))
 
 
 ENTITIES["deep-hash"] = fn("Hosted.deepAdds", [("x", INT64)], INT64, nested_adds(180))
+
+
+def else_if_chain(count):
+    # if x == 0 then 0 else if x == 1 then 10 ... else -1, as Posix.__fromErrno
+    # writes its 130 errnos: deeper than the parser's limit as nested parentheses.
+    body = {"EInt64": [1, -1]}
+    for index in reversed(range(count)):
+        body = {"EIf": [2, infix("ComparisonEquals", ARG0, {"EInt64": [3, index]}),
+                        {"EInt64": [4, index * 10]}, {"Some": [body]}]}
+    return body
+
+
+ENTITIES["else-if-hash"] = fn("Hosted.elseIfChain", [("x", INT64)], INT64, else_if_chain(150))
 
 
 # `type Overflow = | Overflow`: one case, named like its type, as in Stdlib.Math.
@@ -275,6 +336,8 @@ def main():
                 for hash_, (name, _) in ENTITIES.items():
                     if name == parts[2]:
                         payload = {"Hash": [hash_]}
+                if parts[2] in FIND_ALSO:
+                    payload = {"Hash": [FIND_ALSO[parts[2]]]}
             elif len(parts) == 4 and parts[:3] == ["type", "get", "with-location"]:
                 if parts[3] in TYPES:
                     name, body = TYPES[parts[3]]
@@ -298,11 +361,14 @@ def main():
             source = directory / "input.dark"
             program = directory / "program"
 
-            def compile_(text):
+            def compile_with(flags, text):
                 source.write_text(text)
-                return subprocess.run([compiler, "-q", "--emit-result", "--package-server",
+                return subprocess.run([compiler, "-q", "--emit-result", *flags, "--package-server",
                     f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                     env=env, capture_output=True, text=True, timeout=300)
+
+            def compile_(text):
+                return compile_with([], text)
 
             def run(text):
                 result = compile_(text)
@@ -312,6 +378,7 @@ def main():
             assert run("Hosted.operators 10L\n") == 1036
             assert run("Hosted.pipePlus 41L\n") == 42
             assert run("Hosted.deepAdds 1L\n") == 181
+            assert [run(f"Hosted.elseIfChain {x}L\n") for x in (0, 149, 150)] == [0, 1490, -1]
             assert run("Hosted.builtinOps 50\n") is True
             assert run("Hosted.overflowName ()\n") == "overflow"
             assert run("Hosted.describeNumber 42L\n") == "42"
@@ -324,6 +391,18 @@ def main():
             assert run("Hosted.slices 3L\n") == "cd"
             assert run("Hosted.conversions 100L\n") == 103
             assert run('Hosted.bytesLen (Stdlib.Blob.fromString "abc")\n') == 3
+            assert run("Hosted.emptyBytesLen 1L\n") == 0
+            assert run("Hosted.keywords 1L\n") == ["let", "val", "in", "if", "elif", "then", "else",
+                "type", "trait", "impl", "of", "match", "with", "fun", "when", "true", "false", "_"]
+            assert run("Hosted.firstOk 7L\n") == 7
+            assert run("Hosted.callsShared 7L\n") == 7
+            assert run("Hosted.clipped 3L\n") == "abc"
+            assert run("Hosted.closeBad 1L\n") == 9
+            assert run("Hosted.sleepZero 1L\n") == 0
+            assert run("Hosted.B.second 7L\n") == 7
+            current = compile_with(["--syntax=current"], "Hosted.int16Zero(1)\n")
+            assert current.returncode == 0, current.stdout + current.stderr
+            assert subprocess.check_output([str(program)], text=True, timeout=10) == "-7s16\n"
             assert run("Hosted.dictLast 5L\n") == 1
             assert run("Hosted.recordKey 5L\n") == 1
             assert run("Hosted.tagged 7L\n") == 7

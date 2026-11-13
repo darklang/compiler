@@ -200,12 +200,22 @@ let decodeDictName typ = namedPlan "__dark_json_decode_dict_" typ
 let makeCase pattern body =
   { patterns = N.singleton pattern; guard = None; body }
 
+(* A type merged into another of the same content is an alias of it. *)
+let rec owned (env : env) name =
+  match M.find_opt name env.aliases with
+  | Some (_, (AST.TRecord (target, _) | AST.TSum (target, _))) when target <> name ->
+      owned env target
+  | _ -> name
+[@@warning "-4"]
+
 let typeId (env : env) name =
+  let name = owned env name in
   match tryFindTypeId name env.symbols with
   | Some id -> id
   | None -> Crash.crash ("Generated JSON type was not interned: " ^ name)
 
 let constructor (env : env) owner caseName payload =
+  let owner = owned env owner in
   match tryFindConstructorId owner caseName env.symbols with
   | Some id ->
       Constructor
@@ -216,6 +226,7 @@ let constructor (env : env) owner caseName payload =
         ("JSON constructor was not interned: " ^ owner ^ "." ^ caseName)
 
 let constructorPattern (env : env) owner caseName fields =
+  let owner = owned env owner in
   match tryFindConstructorId owner caseName env.symbols with
   | Some id -> PConstructor (id, fields)
   | None ->
@@ -223,6 +234,7 @@ let constructorPattern (env : env) owner caseName fields =
         ("JSON constructor pattern was not interned: " ^ owner ^ "." ^ caseName)
 
 let fieldId (env : env) owner fieldName =
+  let owner = owned env owner in
   match tryFindFieldId owner fieldName env.symbols with
   | Some id -> id
   | None ->
@@ -233,7 +245,7 @@ let fieldId (env : env) owner fieldName =
 let recordLiteral (env : env) typeName typeArgs fields =
   let owner = typeId env typeName in
   let fieldCount =
-    match M.find_opt typeName env.records with
+    match M.find_opt (owned env typeName) env.records with
     | Some info -> List.length info.Types.fields
     | None ->
         Crash.crash ("Generated JSON record type '" ^ typeName ^ "' is absent")
@@ -310,7 +322,8 @@ let rec typeReference (env : env) typ =
         (Some (StringLiteral ""))
     in
     let fqNameType =
-      AST.TSum ("Darklang.LanguageTools.RuntimeTypes.FQTypeName.FQTypeName", [])
+      AST.TSum
+        (owned env "Darklang.LanguageTools.RuntimeTypes.FQTypeName.FQTypeName", [])
     in
     let fqName =
       constructor env
@@ -347,7 +360,7 @@ let rec typeReference (env : env) typ =
   | AST.TUInt64 -> nullary "TUInt64"
   | AST.TInt128 -> nullary "TInt128"
   | AST.TUInt128 -> nullary "TUInt128"
-  | AST.TInt -> nullary "TInt"
+  | AST.TInt -> nullary "TBigInt"
   | AST.TFloat64 -> nullary "TFloat"
   | AST.TChar -> nullary "TChar"
   | AST.TString -> nullary "TString"
@@ -776,6 +789,7 @@ and serializeBody (env : env) typ value writer (state : state) =
   | AST.TUInt128 -> raw "Darklang.Stdlib.UInt128.toString"
   | AST.TFloat64 -> raw "Darklang.Stdlib.Json.__serializeFloat"
   | AST.TSum ("Float32", []) -> raw "Darklang.Stdlib.Json.__serializeFloat32"
+  | AST.TSum ("Decimal", []) -> raw "Darklang.Stdlib.Decimal.toString"
   | AST.TString | AST.TChar -> Ok (writerString env writer value, state)
   | AST.TSum ("Uuid", []) ->
       Ok
@@ -1510,6 +1524,7 @@ and decodeBody (env : env) typ source view path (state : state) =
   | AST.TUInt128 -> optional "Darklang.Stdlib.Json.__viewUInt128"
   | AST.TFloat64 -> optional "Darklang.Stdlib.Json.__viewFloat"
   | AST.TSum ("Float32", []) -> optional "Darklang.Stdlib.Json.__viewFloat32"
+  | AST.TSum ("Decimal", []) -> optional "Darklang.Stdlib.Json.__viewDecimal"
   | AST.TSum ("Uuid", []) -> optional "Darklang.Stdlib.Json.__viewUuid"
   | AST.TDateTime -> optional "Darklang.Stdlib.Json.__viewDateTime"
   | AST.TList elemType ->
@@ -1928,9 +1943,44 @@ let rec mapExpr rewrite symbols expr =
   in
   rewrite symbols mapped
 
+(* checkedSerialize<T> v is Ok (serialize<T> v): a type with no JSON form is
+   refused when serialize<T> is planned, so nothing is left to check at run time. *)
+let checkedSerializeAsSerialize program =
+  let symbols, topLevels = viewProgram program in
+  match
+    ( tryFindFunctionId "Darklang.Stdlib.Json.checkedSerialize" symbols,
+      tryFindFunctionId "Darklang.Stdlib.Json.serialize" symbols )
+  with
+  | Some checkedId, Some serializeId ->
+      let rewrite current expr =
+        match expr with
+        | TypeApp (id, typeArgs, values) when id = checkedId ->
+            let okId, current =
+              internFunction "Darklang.Stdlib.Json.__serialized" current
+            in
+            ( Call (okId, N.singleton (TypeApp (serializeId, typeArgs, values))),
+              current )
+        | _ -> (expr, current)
+      in
+      let topLevels, symbols =
+        mapFold
+          (fun current topLevel ->
+            match topLevel with
+            | FunctionDef fn ->
+                let body, next = mapExpr rewrite current fn.body in
+                (FunctionDef { fn with body }, next)
+            | Expression expr ->
+                let expr, next = mapExpr rewrite current expr in
+                (Expression expr, next)
+            | other -> (other, current))
+          symbols topLevels
+      in
+      programFromCheckedParts (symbols, topLevels)
+  | _ -> program
+
 let rewriteProgramWithSession (session : planningSession option)
     (env : Types.typeCheckEnv) program =
-  let symbols, topLevels = viewProgram program in
+  let symbols, topLevels = viewProgram (checkedSerializeAsSerialize program) in
   let serializeId =
     tryFindFunctionId "Darklang.Stdlib.Json.serialize" symbols
   in
@@ -2217,6 +2267,9 @@ let rewriteProgramWithSession (session : planningSession option)
                 allocateBinding "__json_parse_result" symbols1
               in
               let viewId, symbols3 = allocateBinding "__json_view" symbols2 in
+              let errorId, symbols3 =
+                allocateBinding "__json_parse_error" symbols3
+              in
               let parsed =
                 call finalPlanningEnv "Darklang.Stdlib.Json.__parseRoot"
                   [ Local sourceId ]
@@ -2247,11 +2300,8 @@ let rewriteProgramWithSession (session : planningSession option)
                               makeCase
                                 (constructorPattern planningEnv
                                    "Darklang.Stdlib.Result.Result" "Error"
-                                   [ PWildcard ])
-                                (error finalPlanningEnv
-                                   (constructor finalPlanningEnv
-                                      "Darklang.Stdlib.Json.ParseError.ParseError"
-                                      "NotJson" None));
+                                   [ PVariable errorId ])
+                                (error finalPlanningEnv (Local errorId));
                             ] ) ) ),
                 symbols3 )
           | _ -> (expr, currentSymbols)

@@ -447,6 +447,11 @@ let lowerExpression (toANFCore : LoweringCallbacks.expressionLowerer)
                     A.Return (A.Var id) ) )
           in
           Ok (sequence setups body, gen))
+  | C.BinOp (op, left, right) when Option.is_some (O.shortCircuit op left right)
+    -> (
+      match O.shortCircuit op left right with
+      | Some conditional -> anf conditional gen
+      | None -> Crash.crash "Short-circuit operator lost its conditional")
   | C.BinOp (op, left, right) ->
       let* leftSetup, leftAtom, gen = bound left gen in
       let* rightSetup, rightAtom, gen = bound right gen in
@@ -485,6 +490,13 @@ let lowerExpression (toANFCore : LoweringCallbacks.expressionLowerer)
                   (equality
                      (A.Call
                         ( functionId "Darklang.Stdlib.Int.__equals",
+                          [ leftAtom; rightAtom ] ))
+                     gen)
+            | Ok AST.TBlob ->
+                Ok
+                  (equality
+                     (A.Call
+                        ( functionId "Darklang.Stdlib.Blob.__equals",
                           [ leftAtom; rightAtom ] ))
                      gen)
             | Ok typ when Option.is_some (P.canonicalBufferKindForType typ) ->

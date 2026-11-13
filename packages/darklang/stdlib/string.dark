@@ -2,7 +2,7 @@
 
 module Darklang.Stdlib.String
 
-// Ordinal UTF-16 ordering; only the sign of the result is significant.
+// Code point ordering; only the sign of the result is significant.
 let compare (left: String) (right: String) : Int64 = __compare left right
 
 val newline = "\n"
@@ -912,11 +912,11 @@ let splitN (value: String) (separator: String) (n: Int64) : List<String> =
 // Pads with a Char up to an Int64 length; a string already that long is unchanged.
 let padStart (value: String) (padWith: Char) (goalLength: Int64) : String =
     let padCount = goalLength - Stdlib.String.length value in
-    if padCount <= 0L then value else Stdlib.String.repeat (Stdlib.String.fromChar padWith) padCount + value
+    if padCount <= 0L || padCount > 2147483647L then value else Stdlib.String.repeat (Stdlib.String.fromChar padWith) padCount + value
 
 let padEnd (value: String) (padWith: Char) (goalLength: Int64) : String =
     let padCount = goalLength - Stdlib.String.length value in
-    if padCount <= 0L then value else value + Stdlib.String.repeat (Stdlib.String.fromChar padWith) padCount
+    if padCount <= 0L || padCount > 2147483647L then value else value + Stdlib.String.repeat (Stdlib.String.fromChar padWith) padCount
 
 let random (length: Int64) : Result.Result<String, String> =
     Stdlib.String.__randomInt (Stdlib.Int.fromInt64 length)

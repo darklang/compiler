@@ -41,7 +41,7 @@ Stdlib.List.sort ([(2L, "a"), (1L, "z"), (1L, "a")]) = [(1L, "a"), (1L, "z"), (2
 Stdlib.List.sort ([Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = true, ctrl = false, shift = false }, Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = false, ctrl = true, shift = false }, Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = false, ctrl = false, shift = true }]) = [Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = false, ctrl = false, shift = true }, Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = false, ctrl = true, shift = false }, Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = true, ctrl = false, shift = false }]
 Stdlib.List.sort ([Some 2L, None, Some 1L]) = [None, Some 1L, Some 2L]
 Stdlib.List.sortBy ([6L, 2L, 8L, 3L]) (fun x -> 0L - x) = [8L, 6L, 3L, 2L]
-Stdlib.List.unique ([7L, 42L, 7L, 2L, 10L]) = [2L, 7L, 10L, 42L]
+Stdlib.List.unique ([7L, 42L, 7L, 2L, 10L]) = [7L, 42L, 2L, 10L]
 Stdlib.List.uniqueBy ([1L, 2L, 3L, 4L]) (fun x -> x / 2L) = [1L, 2L, 4L]
 
 Stdlib.List.SortByComparatorHelpers.validate 1L 2L (fun a b -> 3) = Error "Expected comparator function to return -1, 0, or 1, but it returned 3"

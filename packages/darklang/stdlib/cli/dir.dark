@@ -66,7 +66,7 @@ let listRecursive (path: String) : Result.Result<List<String>, Posix.Error> =
             if Posix.isDirectory fullPath then
               match listRecursive fullPath with
               | Ok subEntries ->
-                Stdlib.Result.Result.Ok(Stdlib.List.concat subEntries collected)
+                Stdlib.Result.Result.Ok(Stdlib.List.concat (Stdlib.List.reverse subEntries) collected)
               | Error e -> Stdlib.Result.Result.Error e
             else
               Stdlib.Result.Result.Ok(Stdlib.List.push collected fullPath)
@@ -115,7 +115,8 @@ let deleteRecursive (path: String) : Result.Result<Unit, Posix.Error> =
   | Error e -> Stdlib.Result.Result.Error e
 
 
-/// Walk a directory tree, returning all entries (files and directories) as full paths.
+/// Walk a directory tree, returning all entries (files and directories) as full paths, each
+/// directory before its contents, in listing order.
 /// Does not follow symlinks — symlinks are included as entries but not recursed into.
 let walk (path: String) : Result.Result<List<String>, Posix.Error> =
   match Posix.listDir path with
@@ -137,7 +138,7 @@ let walk (path: String) : Result.Result<List<String>, Posix.Error> =
               | Ok subEntries ->
                 Stdlib.Result.Result.Ok(
                   Stdlib.List.concat
-                    subEntries
+                    (Stdlib.List.reverse subEntries)
                     (Stdlib.List.push collected fullPath))
               | Error e -> Stdlib.Result.Result.Error e
             else

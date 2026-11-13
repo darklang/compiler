@@ -286,6 +286,7 @@ fragments use `__` even where the interpreter also has private helpers.
 | `packages/darklang/stdlib/__httpsDns.dark` | `Darklang.Stdlib.__HttpsDns` | Compiler support: HTTP/2, HTTP/3, QUIC, or TLS protocol implementation |
 | `packages/darklang/stdlib/__prettyValue.dark` | `Darklang.Stdlib.Pretty` | Compiler support: the value groups `--syntax=current` lays out with the imported Pretty |
 | `packages/darklang/stdlib/char.dark` | `Darklang.Stdlib.Char`  | `packages/darklang/stdlib/char.dark` |
+| `packages/darklang/stdlib/codepoint.dark` | `Darklang.Stdlib.Codepoint`  | `packages/darklang/stdlib/codepoint.dark` |
 | `packages/darklang/stdlib/regex.dark` | `Darklang.Stdlib.Regex`  | `packages/darklang/stdlib/regex.dark` |
 | `packages/darklang/stdlib/base64.dark` | `Darklang.Stdlib.Base64`  | `packages/darklang/stdlib/base64.dark` |
 | `packages/darklang/stdlib/x509.dark` | `Darklang.Stdlib.X509`  | `packages/darklang/stdlib/x509.dark` |

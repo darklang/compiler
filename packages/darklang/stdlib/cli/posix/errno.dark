@@ -1,16 +1,16 @@
 module Darklang.Stdlib.Cli.Posix.Errno
 
 /// Invalid argument
-val einval = 22
+val einval = 22L
 
 /// No such process
-val esrch = 3
+val esrch = 3L
 
 /// Operation not permitted
-val eperm = 1
+val eperm = 1L
 
 /// No such file or directory: a parent component is missing
-val enoent = 2
+val enoent = 2L
 
 /// File exists
-val eexist = 17
+val eexist = 17L

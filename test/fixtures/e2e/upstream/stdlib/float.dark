@@ -41,21 +41,21 @@ Stdlib.Float.truncate 2147483647.000009 = 2147483647L
 
 // NaN / Infinity have no Int representation -> Dark error, not a host crash
 Stdlib.Float.ceiling Builtin.testNan =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 Stdlib.Float.roundUp Builtin.testInfinity =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 // @compiler blocked: compiler-gap
 Stdlib.Float.floor Builtin.testNegativeInfinity =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 Stdlib.Float.roundDown Builtin.testNan =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 Stdlib.Float.round Builtin.testInfinity =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 Stdlib.Float.truncate Builtin.testNan =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 // @compiler blocked: compiler-gap
 Stdlib.Float.roundTowardsZero Builtin.testNegativeInfinity =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 
 // @compiler blocked: compiler-gap
 Stdlib.Float.absoluteValue Builtin.testNegativeInfinity = Builtin.testInfinity
@@ -258,12 +258,12 @@ Stdlib.Float.toInt -1.5 = -1
 Stdlib.Float.floor -1.5 = -2L
 // NaN and infinities cannot become Ints.
 Stdlib.Float.toInt Builtin.testNan =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 Stdlib.Float.toInt Builtin.testInfinity =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 // @compiler blocked: compiler-gap
 Stdlib.Float.toInt Builtin.testNegativeInfinity =
-  error="Encountered out-of-range value for type of Int"
+  error="Encountered an out-of-range integer value"
 
 
 // IEEE 754 binary64 representations.

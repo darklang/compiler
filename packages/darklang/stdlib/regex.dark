@@ -410,23 +410,3 @@ let __split (input: List<Char>) (branches: List<List<Stdlib.Regex.__Piece>>) (ac
 
 let __splitText (input: String) (pattern: String) : List<String> =
     Stdlib.Regex.__split (Stdlib.String.toList input) (Stdlib.Regex.__parse pattern) []
-
-// The public functions answer a Result, as in the interpreter. This engine
-// reads every pattern it is given, so none answers an Error.
-let isMatch (input: String) (pattern: String) : Stdlib.Result.Result<Bool, Stdlib.Regex.RegexError> =
-    Ok (Stdlib.Regex.__isMatchText input pattern)
-
-let find (input: String) (pattern: String) : Stdlib.Result.Result<Stdlib.Option.Option<String>, Stdlib.Regex.RegexError> =
-    Ok (Stdlib.Regex.__findText input pattern)
-
-let findAll (input: String) (pattern: String) : Stdlib.Result.Result<List<String>, Stdlib.Regex.RegexError> =
-    Ok (Stdlib.Regex.__findAllText input pattern)
-
-let replace (input: String) (pattern: String) (replacement: String) : Stdlib.Result.Result<String, Stdlib.Regex.RegexError> =
-    Ok (Stdlib.Regex.__replaceText input pattern replacement)
-
-let replaceAll (input: String) (pattern: String) (replacement: String) : Stdlib.Result.Result<String, Stdlib.Regex.RegexError> =
-    Ok (Stdlib.Regex.__replaceAllText input pattern replacement)
-
-let split (input: String) (pattern: String) : Stdlib.Result.Result<List<String>, Stdlib.Regex.RegexError> =
-    Ok (Stdlib.Regex.__splitText input pattern)

@@ -69,6 +69,8 @@ let rec convert range conversion expression =
       call range "Builtin.unwrap" [ call range ("Stdlib.Int.to" ^ typ) [ expression ] ]
   | C.OptionOf inner -> mapThrough "Stdlib.Option.map" inner
   | C.ResultOf inner -> mapThrough "Stdlib.Result.map" inner
+  | C.ErrorOf inner -> mapThrough "Stdlib.Result.mapError" inner
+  | C.Both (first, second) -> convert range second (convert range first expression)
   | C.ListOf inner -> mapThrough "Stdlib.List.map" inner
   | C.TupleOf parts -> (
       let names = List.mapi (fun index _ -> "part" ^ string_of_int index ^ "'") parts in

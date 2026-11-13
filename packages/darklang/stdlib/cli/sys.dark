@@ -41,8 +41,8 @@ let cpuCount () : Int =
 
 
 /// Get the current process ID.
-let currentPid () : Int =
-  Builtin.syscallGetpid ()
+let currentPid () : Int64 =
+  Stdlib.Int.__toInt64Unchecked (Builtin.syscallGetpid ())
 
 
 /// Check if the current user is root (uid 0).

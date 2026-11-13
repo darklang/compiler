@@ -3,7 +3,7 @@
 module Darklang.Stdlib
 
 let printError (str: String) : Unit =
-    let _ = Stdlib.Cli.Posix.fdWrite (Stdlib.Int.fromInt64 2L) (Stdlib.String.toBlob str) in
+    let _ = Stdlib.Cli.Posix.fdWrite (Stdlib.Int.fromInt64 2L) (Stdlib.String.toBlob (Stdlib.__Console.forFd 2L str)) in
     ()
 
 let printErrorLine (str: String) : Unit = Stdlib.printError (str + "\n")

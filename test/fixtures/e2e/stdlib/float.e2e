@@ -76,7 +76,7 @@ Stdlib.Float.round 3.5 = 4L
 Stdlib.Float.roundTowardsZero (-1.75) = -1L
 Stdlib.Float.truncate (-1.75) = -1L
 Stdlib.Float.toInt 100000000000000000000.0 = 100000000000000000000
-Stdlib.Float.ceiling (1.0 / 0.0) = error="Encountered out-of-range value for type of Int"
+Stdlib.Float.ceiling (1.0 / 0.0) = error="Encountered an out-of-range integer value"
 
 // IEEE classification and clamp deliberately reject only NaN limits
 Stdlib.Float.isNaN Builtin.testNan = true

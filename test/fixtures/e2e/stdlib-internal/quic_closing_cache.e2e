@@ -20,7 +20,7 @@ let checkClosingCache (mode: Int64) : Bool =
       let closing = Stdlib.__QuicConnection.Closing { reason = reason, peer = peer, source = source, destination = Stdlib.String.toBlob "clientid", keys = keys, phase = false, deadline = if mode == 3L then now - 1000L else now + 30000L, number = 10L, lastSent = if mode == 2L then now else now - 1000L } in
       let recent = [Stdlib.HttpServer.Quic.Recent { source = source, expires = if mode == 6L then now - 1000L else now + 30000L, closing = Some closing }] in
       let identity = Stdlib.TlsServerIdentity.Identity { certificates = [], key = Stdlib.__RsaPrivate.Key { modulus = Stdlib.Blob.empty, exponent = Stdlib.Blob.empty, privateExponent = Stdlib.Blob.empty } } in
-      let config = Stdlib.HttpServer.Config.Config { port = 1000, maxBodyBytes = 1024, injectStandardHeaders = false, canonicalizeFromForwardedProto = false, logRequests = false } in
+      let config = Stdlib.HttpServer.Config.Config { address = "127.0.0.1", port = Stdlib.Net.Port { __port = 1000L }, maxBodyBytes = 1024L, injectStandardHeaders = false, canonicalizeFromForwardedProto = false, logRequests = false } in
       let context = Stdlib.HttpServer.Quic.Context { config = config, identity = identity, signals = signals, socket = socket, secret = Stdlib.String.toBlob "01234567890123456789012345678901", limit = 1024L } in
       let result = Stdlib.HttpServer.Quic.__step context (fun _request -> Stdlib.Http.responseWithText 200L "unused") (Stdlib.HttpServer.Quic.__Runtime { recent = recent, owners = [] }) 1L in
       Stdlib.__Datagram.close socket

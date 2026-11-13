@@ -1,0 +1,3 @@
+// An Option whose payload type is still being inferred, matched with a tuple
+// of variables, is matched exhaustively, as in a hosted Traversal.applyPath.
+(Stdlib.List.fold [1L, 2L] (0L, Stdlib.Option.Option.None) (fun acc x -> (let (n, listed) = acc in (match listed with | Some((a, b)) -> (n + x + a + b, Stdlib.Option.Option.Some((a, b))) | None -> (n + x, Stdlib.Option.Option.Some((1L, 2L))))))) = (6L, Stdlib.Option.Option.Some((1L, 2L)))

@@ -1,0 +1,38 @@
+// Declarations with the same content are one type, as in the interpreter's
+// content-addressed store, when they live in different modules. Two in one
+// module, and Stdlib's, keep the names their authors wrote.
+
+module SameA =
+  type Hash = HashOf of String
+  type Point = { x: Int64, y: Int64 }
+  type Ints = Done | More of Int64 * Ints
+  type Wrap<'t> = { item: t }
+  type Diff = { v: Int64 }
+
+module SameB =
+  type Hash = HashOf of String
+  type Point = { x: Int64, y: Int64 }
+  type Ints = Done | More of Int64 * Ints
+  type Wrap<'t> = { item: t }
+  type Diff = { w: Int64 }
+
+  let text (h: Hash) : String = match h with | HashOf s -> s
+  let sum (p: Point) : Int64 = p.x + p.y
+  let first (xs: Ints) : Int64 = match xs with | More (n, _) -> n | Done -> 0L
+  let unwrap (w: Wrap<String>) : String = w.item
+  let width (d: Diff) : Int64 = d.w
+
+  (text (SameA.Hash.HashOf "abc")) = "abc"
+  (sum (SameA.Point { x = 1L, y = 2L })) = 3L
+  (first (SameA.Ints.More (1L, SameA.Ints.Done))) = 1L
+  (unwrap (SameA.Wrap { item = "w" })) = "w"
+  #compileerror="SameB.Diff"
+  (width (SameA.Diff { v = 1L })) = 0L
+
+module SameC =
+  type Left = { a: String }
+  type Right = { a: String }
+  let right (r: Right) : String = r.a
+
+  #compileerror="SameC.Right"
+  (right (Left { a = "l" })) = "l"

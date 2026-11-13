@@ -11,18 +11,15 @@ Stdlib.String.newline = "\n"
 Stdlib.Math.pi = 3.141592653589793
 Stdlib.Math.tau = 6.283185307179586
 Stdlib.Math.e = 2.718281828459045
-Stdlib.Cli.Posix.sigterm = 15
-Stdlib.Cli.Posix.sigkill = 9
 Stdlib.List.isEmpty Stdlib.List.empty = true
 Stdlib.Dict.isEmpty Stdlib.Dict.empty = true
 Stdlib.AltJson.Builder.empty = []
 Stdlib.Blob.length Stdlib.Blob.empty = 0
-Stdlib.Cli.Posix.sigint = 2
 Stdlib.Cli.Posix.Modes.defaultDir = 493
 Stdlib.Cli.Posix.Modes.defaultFile = 420
 Stdlib.HttpClient.ContentType.json = ("content-type", "application/json")
-Stdlib.HttpServer.Config.defaultMaxBodyBytes = 31457280
+Stdlib.HttpServer.Config.defaultMaxBodyBytes = 31457280L
 Stdlib.Pretty.empty = Stdlib.Pretty.Doc.Empty
-Stdlib.Cli.UI.TextField.empty = Stdlib.Cli.UI.TextField.State { text = "", cursor = 0 }
+Stdlib.Cli.UI.TextField.empty = Stdlib.Cli.UI.TextField.State { text = "", cursor = 0L }
 Stdlib.Cli.Tui.TerminalSession.Ansi.restoreInline = "\u001b[?2026l\u001b[0m\u001b[r\u001b[?25h"
 Darklang.LanguageTools.PackageManager.PickContext.empty.currentModule = []

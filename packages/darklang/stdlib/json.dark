@@ -26,17 +26,23 @@ let __viewIsDuplicate (view: Stdlib.Json.__InternalValueView) : Bool =
 let __markDuplicate (view: Stdlib.Json.__InternalValueView) : Stdlib.Json.__InternalValueView =
     Stdlib.Int64.bitwiseOr view 2147483648L
 
+// A scan answers the index after what it read, or a negative number naming
+// the byte where the text stopped being JSON: `__failAt index`.
+let __failAt (index: Int64) : Int64 = -2L - index
+
+let __failureIndex (scanned: Int64) : Int64 = -2L - scanned
+
 let __scanStringChars (source: String) (index: Int64) (length: Int64) : Int64 =
-    if index >= length then -1L
+    if index >= length then Stdlib.Json.__failAt length
     else
         let byte = Stdlib.String.__byteAtUnchecked source index in
         if byte == 34L then index + 1L
-        else if byte < 32L then -1L
+        else if byte < 32L then Stdlib.Json.__failAt index
         else if byte != 92L then
             let decoded = Stdlib.String.__decodeUtf8At source index in
             let consumed = Stdlib.Tuple2.second decoded in
             Stdlib.Json.__scanStringChars source (index + consumed) length
-        else if index + 1L >= length then -1L
+        else if index + 1L >= length then Stdlib.Json.__failAt length
         else
             let escaped = Stdlib.String.__byteAtUnchecked source (index + 1L) in
             if escaped == 34L || escaped == 92L || escaped == 47L
@@ -45,99 +51,161 @@ let __scanStringChars (source: String) (index: Int64) (length: Int64) : Int64 =
                 Stdlib.Json.__scanStringChars source (index + 2L) length
             else if escaped == 117L then
                 let first = Stdlib.AltJson.__hex4 source (index + 2L) length in
-                if first < 0L then -1L
+                if first < 0L then Stdlib.Json.__failAt (index + 2L)
                 else if first >= 55296L && first <= 56319L then
                     if index + 12L > length
                        || Stdlib.String.__byteAtUnchecked source (index + 6L) != 92L
-                       || Stdlib.String.__byteAtUnchecked source (index + 7L) != 117L then -1L
+                       || Stdlib.String.__byteAtUnchecked source (index + 7L) != 117L then Stdlib.Json.__failAt (index + 6L)
                     else
                         let second = Stdlib.AltJson.__hex4 source (index + 8L) length in
-                        if second < 56320L || second > 57343L then -1L
+                        if second < 56320L || second > 57343L then Stdlib.Json.__failAt (index + 8L)
                         else Stdlib.Json.__scanStringChars source (index + 12L) length
-                else if first >= 56320L && first <= 57343L then -1L
+                else if first >= 56320L && first <= 57343L then Stdlib.Json.__failAt (index + 2L)
                 else Stdlib.Json.__scanStringChars source (index + 6L) length
-            else -1L
+            else Stdlib.Json.__failAt (index + 1L)
 
 let __scanString (source: String) (index: Int64) (length: Int64) : Int64 =
-    if index >= length || Stdlib.String.__byteAtUnchecked source index != 34L then -1L
+    if index >= length then Stdlib.Json.__failAt length
+    else if Stdlib.String.__byteAtUnchecked source index != 34L then Stdlib.Json.__failAt index
     else Stdlib.Json.__scanStringChars source (index + 1L) length
 
+// Trivia ends where the next token starts; an unterminated comment runs to
+// the end of the text.
+let __skipTrivia (source: String) (index: Int64) (length: Int64) : Int64 =
+    let skipped = Stdlib.AltJson.__skipTrivia source index length in
+    if skipped < 0L then Stdlib.Json.__failAt length else skipped
+
+// Where a number __scanNumber refused stops being a JSON number: a missing
+// digit, a second leading zero, or an empty fraction or exponent.
+let __numberFailure (source: String) (index: Int64) (length: Int64) : Int64 =
+    let afterSign =
+        if index < length && Stdlib.String.__byteAtUnchecked source index == 45L then index + 1L
+        else index in
+    let first = if afterSign < length then Stdlib.String.__byteAtUnchecked source afterSign else -1L in
+    if first < 48L || first > 57L then afterSign
+    else
+        let afterInteger =
+            if first == 48L then afterSign + 1L
+            else Stdlib.AltJson.__scanDigits source (afterSign + 1L) length in
+        let next = if afterInteger < length then Stdlib.String.__byteAtUnchecked source afterInteger else -1L in
+        if first == 48L && next >= 48L && next <= 57L then afterInteger
+        else if next == 46L then
+            let fractionEnd = Stdlib.AltJson.__scanDigits source (afterInteger + 1L) length in
+            if fractionEnd == afterInteger + 1L then fractionEnd
+            else Stdlib.Json.__exponentFailure source fractionEnd length
+        else Stdlib.Json.__exponentFailure source afterInteger length
+
+let __exponentFailure (source: String) (marker: Int64) (length: Int64) : Int64 =
+    let signAt = marker + 1L in
+    if signAt < length
+       && (Stdlib.String.__byteAtUnchecked source signAt == 43L
+           || Stdlib.String.__byteAtUnchecked source signAt == 45L) then signAt + 1L
+    else signAt
+
 let __scanArray (source: String) (index: Int64) (length: Int64) : Int64 =
-    let current = Stdlib.AltJson.__skipTrivia source index length in
-    if current < 0L || current >= length then -1L
+    let current = Stdlib.Json.__skipTrivia source index length in
+    if current < 0L then current
+    else if current >= length then Stdlib.Json.__failAt length
     else if Stdlib.String.__byteAtUnchecked source current == 93L then current + 1L
     else
         let scannedValue = Stdlib.Json.__scanValue source current length in
-        if scannedValue < 0L then -1L
+        if scannedValue < 0L then scannedValue
         else
             let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
-            let afterTrivia = Stdlib.AltJson.__skipTrivia source afterValue length in
-            if afterTrivia < 0L || afterTrivia >= length then -1L
+            let afterTrivia = Stdlib.Json.__skipTrivia source afterValue length in
+            if afterTrivia < 0L then afterTrivia
+            else if afterTrivia >= length then Stdlib.Json.__failAt length
             else
                 let separator = Stdlib.String.__byteAtUnchecked source afterTrivia in
                 if separator == 93L then afterTrivia + 1L
                 else if separator == 44L then
-                    let afterComma = Stdlib.AltJson.__skipTrivia source (afterTrivia + 1L) length in
-                    if afterComma < 0L || afterComma >= length
-                       || Stdlib.String.__byteAtUnchecked source afterComma == 93L then
-                        -1L
+                    let afterComma = Stdlib.Json.__skipTrivia source (afterTrivia + 1L) length in
+                    if afterComma < 0L then afterComma
+                    else if afterComma >= length then Stdlib.Json.__failAt length
+                    else if Stdlib.String.__byteAtUnchecked source afterComma == 93L then
+                        Stdlib.Json.__failAt afterComma
                     else
                         let rest = Stdlib.Json.__scanArray source afterComma length in
-                        if rest < 0L then -1L else Stdlib.Int64.bitwiseAnd rest 4294967295L
-                else -1L
+                        if rest < 0L then rest else Stdlib.Int64.bitwiseAnd rest 4294967295L
+                else Stdlib.Json.__failAt afterTrivia
 
 let __scanObject (source: String) (index: Int64) (length: Int64) : Int64 =
-    let current = Stdlib.AltJson.__skipTrivia source index length in
-    if current < 0L || current >= length then -1L
+    let current = Stdlib.Json.__skipTrivia source index length in
+    if current < 0L then current
+    else if current >= length then Stdlib.Json.__failAt length
     else if Stdlib.String.__byteAtUnchecked source current == 125L then current + 1L
     else
         let afterKey = Stdlib.Json.__scanString source current length in
-        if afterKey < 0L then -1L
+        if afterKey < 0L then afterKey
         else
-            let colon = Stdlib.AltJson.__skipTrivia source afterKey length in
-            if colon < 0L || colon >= length || Stdlib.String.__byteAtUnchecked source colon != 58L then
-                -1L
+            let colon = Stdlib.Json.__skipTrivia source afterKey length in
+            if colon < 0L then colon
+            else if colon >= length then Stdlib.Json.__failAt length
+            else if Stdlib.String.__byteAtUnchecked source colon != 58L then Stdlib.Json.__failAt colon
             else
                 let scannedValue = Stdlib.Json.__scanValue source (colon + 1L) length in
-                if scannedValue < 0L then -1L
+                if scannedValue < 0L then scannedValue
                 else
                     let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
-                    let afterTrivia = Stdlib.AltJson.__skipTrivia source afterValue length in
-                    if afterTrivia < 0L || afterTrivia >= length then -1L
+                    let afterTrivia = Stdlib.Json.__skipTrivia source afterValue length in
+                    if afterTrivia < 0L then afterTrivia
+                    else if afterTrivia >= length then Stdlib.Json.__failAt length
                     else
                         let separator = Stdlib.String.__byteAtUnchecked source afterTrivia in
                         if separator == 125L then Stdlib.Int64.bitwiseOr (afterTrivia + 1L) 4611686018427387904L
                         else if separator == 44L then
-                            let afterComma = Stdlib.AltJson.__skipTrivia source (afterTrivia + 1L) length in
-                            if afterComma < 0L || afterComma >= length
-                               || Stdlib.String.__byteAtUnchecked source afterComma == 125L then
-                                -1L
+                            let afterComma = Stdlib.Json.__skipTrivia source (afterTrivia + 1L) length in
+                            if afterComma < 0L then afterComma
+                            else if afterComma >= length then Stdlib.Json.__failAt length
+                            else if Stdlib.String.__byteAtUnchecked source afterComma == 125L then
+                                Stdlib.Json.__failAt afterComma
                             else
                                 let rest = Stdlib.Json.__scanObject source afterComma length in
-                                if rest < 0L then -1L else Stdlib.Int64.bitwiseAnd rest 4294967295L
-                        else -1L
+                                if rest < 0L then rest else Stdlib.Int64.bitwiseAnd rest 4294967295L
+                        else Stdlib.Json.__failAt afterTrivia
+
+// The first byte from index at which text stops spelling word.
+let __literalFailure (source: String) (index: Int64) (length: Int64) (word: String) (offset: Int64) : Int64 =
+    if offset >= Stdlib.String.__byteLength word then -1L
+    else if index + offset >= length then index + offset
+    else if Stdlib.String.__byteAtUnchecked source (index + offset) != Stdlib.String.__byteAtUnchecked word offset then index + offset
+    else Stdlib.Json.__literalFailure source index length word (offset + 1L)
+
+let __scanLiteral (source: String) (index: Int64) (length: Int64) (word: String) : Int64 =
+    let failure = Stdlib.Json.__literalFailure source index length word 0L in
+    if failure < 0L then index + Stdlib.String.__byteLength word else Stdlib.Json.__failAt failure
 
 let __scanValue (source: String) (index: Int64) (length: Int64) : Int64 =
-    let start = Stdlib.AltJson.__skipTrivia source index length in
-    if start < 0L || start >= length then -1L
+    let start = Stdlib.Json.__skipTrivia source index length in
+    if start < 0L then start
+    else if start >= length then Stdlib.Json.__failAt length
     else
         let byte = Stdlib.String.__byteAtUnchecked source start in
-        if byte == 110L && start + 4L <= length
-           && Stdlib.String.__byteSlice source start (start + 4L) == "null" then
-            start + 4L
-        else if byte == 116L && start + 4L <= length
-                && Stdlib.String.__byteSlice source start (start + 4L) == "true" then
-            start + 4L
-        else if byte == 102L && start + 5L <= length
-                && Stdlib.String.__byteSlice source start (start + 5L) == "false" then
-            start + 5L
+        if byte == 110L then Stdlib.Json.__scanLiteral source start length "null"
+        else if byte == 116L then Stdlib.Json.__scanLiteral source start length "true"
+        else if byte == 102L then Stdlib.Json.__scanLiteral source start length "false"
         else if byte == 34L then
             Stdlib.Json.__scanString source start length
         else if byte == 91L then Stdlib.Json.__scanArray source (start + 1L) length
         else if byte == 123L then Stdlib.Json.__scanObject source (start + 1L) length
         else if byte == 45L || (byte >= 48L && byte <= 57L) then
-            Stdlib.AltJson.__scanNumber source start length
-        else -1L
+            let scanned = Stdlib.AltJson.__scanNumber source start length in
+            if scanned < 0L then Stdlib.Json.__failAt (Stdlib.Json.__numberFailure source start length)
+            else scanned
+        else Stdlib.Json.__failAt start
+
+// The line and column of a byte, both counted from 1, the column in
+// characters: UTF-8 continuation bytes do not start one.
+let __lineAndColumn (source: String) (target: Int64) (index: Int64) (line: Int64) (column: Int64) : Stdlib.Json.ParseError.ParseError =
+    if index >= target then Stdlib.Json.ParseError.ParseError.NotJson (line, column)
+    else
+        let byte = Stdlib.String.__byteAtUnchecked source index in
+        if byte == 10L then Stdlib.Json.__lineAndColumn source target (index + 1L) (line + 1L) 1L
+        else if byte >= 128L && byte < 192L then Stdlib.Json.__lineAndColumn source target (index + 1L) line column
+        else Stdlib.Json.__lineAndColumn source target (index + 1L) line (column + 1L)
+
+let __notJsonAt (source: String) (index: Int64) : Stdlib.Json.ParseError.ParseError =
+    Stdlib.Json.__lineAndColumn source index 0L 1L 1L
 
 // Typed JSON keeps shallow raw slices rather than building the recursive
 // RawJson tree. The shared scanner owns syntax validation; generated decoders
@@ -153,20 +221,21 @@ let __skipTriviaBackward (source: String) (endIndex: Int64) : Int64 =
 
 let __parseRoot (source: String) : Stdlib.Result.Result<Stdlib.Json.__InternalValueView, Stdlib.Json.ParseError.ParseError> =
     let length = Stdlib.String.__byteLength source in
-    let start = Stdlib.AltJson.__skipTrivia source 0L length in
-    if start < 0L then Stdlib.Result.Result.Error Stdlib.Json.ParseError.ParseError.NotJson
+    let scannedValue = Stdlib.Json.__scanValue source 0L length in
+    if scannedValue < 0L then
+        Stdlib.Result.Result.Error (Stdlib.Json.__notJsonAt source (Stdlib.Json.__failureIndex scannedValue))
     else
-        let scannedValue = Stdlib.Json.__scanValue source start length in
-        if scannedValue < 0L then Stdlib.Result.Result.Error Stdlib.Json.ParseError.ParseError.NotJson
-        else
-            let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
-            let endIndex = Stdlib.AltJson.__skipTrivia source afterValue length in
-            if endIndex == length then
-                let view = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft start 32L) afterValue in
-                if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904L) != 0L then
-                    Stdlib.Result.Result.Ok (Stdlib.Int64.bitwiseOr view -9223372036854775808L)
-                else Stdlib.Result.Result.Ok view
-            else Stdlib.Result.Result.Error Stdlib.Json.ParseError.ParseError.NotJson
+        let start = Stdlib.AltJson.__skipTrivia source 0L length in
+        let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
+        let endIndex = Stdlib.Json.__skipTrivia source afterValue length in
+        if endIndex < 0L then
+            Stdlib.Result.Result.Error (Stdlib.Json.__notJsonAt source (Stdlib.Json.__failureIndex endIndex))
+        else if endIndex == length then
+            let view = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft start 32L) afterValue in
+            if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904L) != 0L then
+                Stdlib.Result.Result.Ok (Stdlib.Int64.bitwiseOr view -9223372036854775808L)
+            else Stdlib.Result.Result.Ok view
+        else Stdlib.Result.Result.Error (Stdlib.Json.__notJsonAt source endIndex)
 
 // Concrete return types at these boundaries keep list projections unambiguous
 // for ownership lowering.
@@ -743,6 +812,10 @@ let __viewFloat32 (source: String) (value: Stdlib.Json.__InternalValueView) : St
     | Some wide -> Stdlib.Option.Option.Some (Stdlib.Float32.fromFloat wide)
     | None -> Stdlib.Option.Option.None
 
+let __viewDecimal (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Decimal> =
+    if Stdlib.Json.__isNumber source value then Stdlib.AltJson.__numberToDecimal (Stdlib.Json.__viewText source value)
+    else Stdlib.Option.Option.None
+
 let __viewChar (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Char> =
     match Stdlib.Json.__stringValue source value with
     | Some text ->
@@ -775,3 +848,9 @@ let serialize<'a> (value: a) : String =
 
 let parse<'a> (json: String) : Stdlib.Result.Result<a, Stdlib.Json.ParseError.ParseError> =
     Builtin.crash "Json.parse was not specialized"
+
+let checkedSerialize<'a> (value: a) : Stdlib.Result.Result<String, Stdlib.Json.SerializeError.SerializeError> =
+    Builtin.crash "Json.checkedSerialize was not specialized"
+
+let __serialized (json: String) : Stdlib.Result.Result<String, Stdlib.Json.SerializeError.SerializeError> =
+    Ok json
