@@ -226,6 +226,8 @@ packages/darklang/stdlib/__prettyValue.dark
 packages/darklang/stdlib/char.dark
 packages/darklang/stdlib/codepoint.dark
 packages/darklang/stdlib/regex.dark
+packages/darklang/stdlib/regex/__engine.dark
+packages/darklang/stdlib/__builtin/__regexScan.dark
 packages/darklang/stdlib/base64.dark
 packages/darklang/stdlib/x509.dark
 packages/darklang/stdlib/__x509Identity.dark
