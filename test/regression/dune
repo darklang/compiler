@@ -135,3 +135,7 @@
  (alias runtest)
  (deps embedded_trait_regression.py)
  (action (run python3 %{dep:embedded_trait_regression.py} %{exe:../../bin/dark.exe})))
+(rule
+ (alias runtest)
+ (deps agreement_regression.py agreement-baseline.jsonl)
+ (action (run python3 %{dep:agreement_regression.py} %{exe:../../bin/dark.exe} %{dep:agreement-baseline.jsonl})))
