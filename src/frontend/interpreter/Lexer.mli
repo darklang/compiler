@@ -18,6 +18,8 @@ val hasInvalidEscapeInterp : string -> bool
 val hasSingleCloseBraceInterp : string -> bool -> bool
 val maxInterpNesting : int
 
+val bareIntegerIsInt64 : bool ref
+
 val tokenize :
   string ->
   (spannedToken list * (Tokenizer.tokenRange * string) list, string) result

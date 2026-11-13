@@ -143,10 +143,44 @@ let parseParen parseExpr state index =
    each element is its own offside statement, so a wrapped element's args
    don't grab the NEXT element (`[ f a\n f b ]` stays two elements)
 *)
+(* `Stdlib.List.flatten [[a], b, [c]]`, which is what the current
+   interpreter lowers `[a, ...b, c]` to (darklang/dark@0781818). *)
+let spreadList range opening closing elements =
+  let groups = RevBuffer.create () and pending = ref [] in
+  let flush () =
+    if !pending <> [] then begin
+      RevBuffer.add groups
+        (WT.EList (range, List.rev !pending, opening, closing), None);
+      pending := []
+    end
+  in
+  List.iter
+    (fun (value, spread) ->
+      if spread then begin
+        flush ();
+        RevBuffer.add groups (value, None)
+      end
+      else pending := (value, None) :: !pending)
+    elements;
+  flush ();
+  let name text = { WT.range; name = text } in
+  WT.EApply
+    ( range,
+      WT.EFnName
+        ( range,
+          {
+            WT.range;
+            modules = [ (name "Stdlib", range); (name "List", range) ];
+            fn = name "flatten";
+          } ),
+      [],
+      [ WT.EList (range, RevBuffer.toList groups, opening, closing) ] )
+
 let parseList parseExpr state index =
   let opening = rng state index in
   withElementScope state (fun () ->
       let elements = RevBuffer.create ()
+      and spreads = RevBuffer.create ()
       and stop = ref (index + 1)
       and more = ref true in
       while
@@ -156,6 +190,9 @@ let parseList parseExpr state index =
         && not (declBarrier state !stop)
       do
         setStmtCol state (rng state !stop).start.column;
+        let spread = tok state !stop = TDotDotDot in
+        if spread then incr stop;
+        RevBuffer.add spreads spread;
         let value, after = parseExpr state !stop in
         if after = !stop then begin
           err state DiagnosticCode.unexpected !stop
@@ -177,9 +214,16 @@ let parseList parseExpr state index =
         end
       done;
       let closing, after = close state !stop TRBracket "]" "[" opening in
-      ( WT.EList
-          (span opening closing, RevBuffer.toList elements, opening, closing),
-        after ))
+      let spreadFlags = RevBuffer.toList spreads in
+      let elements = RevBuffer.toList elements in
+      if List.exists Fun.id spreadFlags
+         && List.length spreadFlags = List.length elements
+      then
+        ( spreadList (span opening closing) opening closing
+            (List.map2 (fun (value, _) spread -> (value, spread)) elements
+               spreadFlags),
+          after )
+      else (WT.EList (span opening closing, elements, opening, closing), after))
 
 (*
    `Type { name = value, … }`. `i` is the `{`.

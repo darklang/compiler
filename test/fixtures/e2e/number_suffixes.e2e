@@ -1,0 +1,13 @@
+// The interpreter's integer width suffixes since darklang/dark@1d3a109,
+// accepted beside the pinned spellings.
+
+(Stdlib.Int8.add 100s8 27s8) = 127y
+(Stdlib.UInt8.add 200u8 55u8) = 255uy
+(Stdlib.Int16.add 1s16 1s16) = 2s
+(Stdlib.UInt16.add 1u16 1u16) = 2us
+(Stdlib.Int32.add 1s32 1s32) = 2l
+(Stdlib.UInt32.add 1u32 1u32) = 2ul
+(Stdlib.Int64.add 20s64 22s64) = 42L
+(Stdlib.UInt64.add 20u64 22u) = 42UL
+-128s8 = -128y
+12345678901234567890z * 2z = 24691357802469135780

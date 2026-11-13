@@ -438,6 +438,11 @@ let letterOrDigit value = letter value || digit value
    Unterminated `$'…`: take to end of line.
    Unknown character: record it, skip it, and keep lexing.
 *)
+(* The current interpreter reads a bare integer as Int64 (darklang/dark@1d3a109);
+   the pinned one, and this compiler's own sources, read it as an Int. The
+   parser sets this while it reads a source that asked for current syntax. *)
+let bareIntegerIsInt64 = ref false
+
 let tokenize text =
   let source = units text in
   let length = Array.length source in
@@ -563,7 +568,17 @@ let tokenize text =
     pendingTrivia := [];
     (spanned, stop, endPosition)
   in
-  let suffixes = [ "uy"; "us"; "ul"; "UL"; "L"; "Q"; "Z"; "y"; "s"; "l" ] in
+  (* The interpreter's width suffixes since darklang/dark@1d3a109 (`1s8`,
+     `1u64`, `1z` for BigInt) are accepted beside the pinned ones. Longer
+     suffixes come first, so `1s16` is not read as `1s` followed by `16`.
+     The pinned `s` (Int16) keeps its meaning; the current interpreter reads a
+     bare `s` as Int64, so that one spelling still differs. *)
+  let suffixes =
+    [
+      "s128"; "u128"; "s16"; "u16"; "s32"; "u32"; "s64"; "u64"; "s8"; "u8";
+      "uy"; "us"; "ul"; "UL"; "L"; "Q"; "Z"; "y"; "s"; "l"; "u"; "z";
+    ]
+  in
   let suffixAt index =
     List.find_opt (fun suffix -> matchesAt suffix index) suffixes
   in
@@ -589,7 +604,25 @@ let tokenize text =
           Ok (constructor (Z.neg bound), String.length suffix)
         else error
     in
+    let uint64 value =
+      TUInt64
+        (Z.to_int64
+           (if Z.testbit value 63 then Z.sub value (Z.shift_left Z.one 64)
+            else value))
+    in
     match suffix with
+    | "s8" -> parse 8 true (fun value -> TInt8 (Z.to_int value)) "Int8"
+    | "u8" -> parse 8 false (fun value -> TUInt8 (Z.to_int value)) "UInt8"
+    | "s16" -> parse 16 true (fun value -> TInt16 (Z.to_int value)) "Int16"
+    | "u16" -> parse 16 false (fun value -> TUInt16 (Z.to_int value)) "UInt16"
+    | "s32" -> parse 32 true (fun value -> TInt32 (Z.to_int32 value)) "Int32"
+    | "u32" -> parse 32 false (fun value -> TUInt32 (Z.to_int64 value)) "UInt32"
+    | "s64" -> parse 64 true (fun value -> TInt64 (Z.to_int64 value)) "Int64"
+    | "u64" | "u" -> parse 64 false uint64 "UInt64"
+    | "s128" -> parse 128 true (fun value -> TInt128 value) "Int128"
+    | "u128" -> parse 128 false (fun value -> TUInt128 value) "UInt128"
+    | "z" ->
+        if ascii then Ok (TInt (Z.of_string_base 10 digits), 1) else invalid
     | "uy" -> parse 8 false (fun value -> TUInt8 (Z.to_int value)) "UInt8"
     | "us" -> parse 16 false (fun value -> TUInt16 (Z.to_int value)) "UInt16"
     | "ul" -> parse 32 false (fun value -> TUInt32 (Z.to_int64 value)) "UInt32"
@@ -607,6 +640,8 @@ let tokenize text =
     | "y" -> parse 8 true (fun value -> TInt8 (Z.to_int value)) "Int8"
     | "s" -> parse 16 true (fun value -> TInt16 (Z.to_int value)) "Int16"
     | "l" -> parse 32 true (fun value -> TInt32 (Z.to_int32 value)) "Int32"
+    | _ when !bareIntegerIsInt64 ->
+        parse 64 true (fun value -> TInt64 (Z.to_int64 value)) "Int64"
     | _ -> if ascii then Ok (TInt (Z.of_string_base 10 digits), 0) else invalid
   in
   let rec scanString index closing =
@@ -682,6 +717,35 @@ let tokenize text =
       let stop = scanWhile continue (index + 1) in
       push (keyword (substring source index (stop - index))) stop None
     else if digit source.(index) then begin
+      (* The current interpreter's Float32 and Decimal literals
+         (darklang/dark@1d3a109) have no lowering here, so they are refused
+         with the reason a compilability report names. *)
+      let floatSuffix at =
+        List.find_opt
+          (fun suffix ->
+            matchesAt suffix at && not (continue (at + String.length suffix)))
+          [ "f32"; "dec" ]
+      in
+      let unsupportedFloatSuffix at =
+        match floatSuffix at with
+        | Some "f32" ->
+            Some
+              ( "f32",
+                "can't compile: uses a Float32 literal, which this compiler \
+                 does not support" )
+        | Some "dec" ->
+            Some
+              ( "dec",
+                "can't compile: uses a Decimal literal, which this compiler \
+                 does not support" )
+        | _ -> None
+      in
+      let refuseSuffix at =
+        match unsupportedFloatSuffix at with
+        | Some (suffix, message) ->
+            push (TFloat 0.) (at + String.length suffix) (Some message)
+        | None -> Crash.crash "refuseSuffix: no unsupported suffix"
+      in
       let digitEnd = scanWhile (fun scan -> digit source.(scan)) (index + 1) in
       let fraction =
         digitEnd + 1 < length
@@ -717,6 +781,8 @@ let tokenize text =
         in
         match value with
         | Some value when not (continue stop) -> push (TFloat value) stop None
+        | Some _ when Option.is_some (unsupportedFloatSuffix stop) ->
+            refuseSuffix stop
         | Some _ ->
             let stop = scanWhile continue stop in
             push (TFloat 0.) stop
@@ -732,6 +798,8 @@ let tokenize text =
         | Ok (token, suffixLength) when not (continue (digitEnd + suffixLength))
           ->
             push token (digitEnd + suffixLength) None
+        | _ when Option.is_some (unsupportedFloatSuffix digitEnd) ->
+            refuseSuffix digitEnd
         | Ok (_, suffixLength) ->
             let stop = scanWhile continue (digitEnd + suffixLength) in
             push (TInt64 0L) stop

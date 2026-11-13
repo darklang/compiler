@@ -259,12 +259,29 @@ and parsePatternBaseInner state index =
       let opening = rng state index in
       let elements = RevBuffer.create ()
       and current = ref (index + 1)
-      and scanning = ref true in
+      and scanning = ref true
+      and rest = ref None in
       while
         !scanning
         && tok state !current <> TRBracket
         && tok state !current <> TEOF
       do
+        (* `[x, ...rest]` (darklang/dark@0781818): the last element may be a
+           rest pattern, which means what `x :: rest` meant. *)
+        if tok state !current = TDotDotDot && RevBuffer.length elements > 0
+        then begin
+          (* A bare `...` ignores the rest: `[first, ...]`. *)
+          let pattern, stop =
+            if tok state (!current + 1) = TRBracket then
+              (WT.MPVariable (rng state !current, "_"), !current + 1)
+            else parsePatternBase state (!current + 1)
+          in
+          rest := Some (rng state !current, pattern);
+          current := stop;
+          if tok state !current = TComma then incr current;
+          scanning := false
+        end
+        else
         let pattern, stop = parsePatternBase state !current in
         if stop = !current then begin
           err state DiagnosticCode.unexpected !current
@@ -295,9 +312,17 @@ and parsePatternBaseInner state index =
           (zeroWidthAtEnd (rng state !current), !current)
         end
       in
-      ( WT.MPList
-          (span opening closing, RevBuffer.toList elements, opening, closing),
-        stop )
+      (match !rest with
+      | None ->
+          ( WT.MPList
+              (span opening closing, RevBuffer.toList elements, opening, closing),
+            stop )
+      | Some (dots, tail) ->
+          let cons (head, _) tail =
+            WT.MPListCons
+              (span (WT.mpRange head) (WT.mpRange tail), head, tail, dots)
+          in
+          (List.fold_right cons (RevBuffer.toList elements) tail, stop))
   | TIdent name when upperName name ->
       let modules, final, next = parseQualified state index in
       if modules <> [] then begin

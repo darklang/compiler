@@ -1,0 +1,14 @@
+// `| pattern as name` (darklang/dark@6a5beac) and record patterns that leave
+// fields out, with `{ name }` shorthand (darklang/dark@0851642).
+
+type MPoint = { x: Int64, y: Int64, z: Int64 }
+type MShape = | MCircle(Int64) | MDot
+
+match Stdlib.Option.Option.Some 41L with | Some(n) as whole -> (n, whole) | None -> (0L, Stdlib.Option.Option.None) = (41L, Stdlib.Option.Option.Some 41L)
+match [1L, 2L] with | [first, ...] as all -> (first, all) | [] -> (0L, []) = (1L, [1L, 2L])
+match MShape.MCircle(3L) with | MCircle(r) as s when r > 2L -> s | _ -> MShape.MDot = MShape.MCircle(3L)
+match MPoint { x = 1L, y = 2L, z = 3L } with | { x, z } -> x + z = 4L
+match MPoint { x = 1L, y = 2L, z = 3L } with | { y = second } -> second = 2L
+match MPoint { x = 5L, y = 2L, z = 3L } with | { x } when x > 4L -> x | { y } -> y = 5L
+match MPoint { x = 1L, y = 2L, z = 3L } with | { x = 1L } -> 0L = compileerror="can't compile: uses a record pattern field that is not a name"
+match Stdlib.Option.Option.Some 1L with | Some(x as y) -> y | None -> 0L = compileerror="can't compile: uses an `as` pattern inside another pattern"
