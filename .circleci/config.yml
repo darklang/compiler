@@ -34,6 +34,10 @@ jobs:
           name: Check porting framework consistency (not behavior)
           command: docker exec dark-ci bash scripts/check-porting
       - run:
+          name: Prepare the stdlib cache
+          command: docker exec dark-ci bash -c 'cd /tmp && /workspace/_build/default/bin/dark.exe -q -e "1L" -o /tmp/warm'
+          no_output_timeout: 15m
+      - run:
           name: Run native regression checks
           command: docker exec dark-ci dune runtest
           no_output_timeout: 15m

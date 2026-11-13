@@ -8,9 +8,9 @@ Stdlib.Cli.FileSystem.isDirectory "." = true
 
 match Stdlib.Cli.FileSystem.readFile "README.md" with | Ok blob -> (match Stdlib.Blob.toString blob with | Ok text -> Stdlib.String.length text > 0L | Error _ -> false) | Error _ -> false = stdout="true\n" stderr="" isolated=true
 
-Stdlib.List.length (Stdlib.Cli.FileSystem.listDirectory ".") > 0L = true isolated=true
+Stdlib.List.length (Stdlib.Result.withDefault (Stdlib.Cli.FileSystem.listDirectory ".") []) > 0L = true isolated=true
 
-Stdlib.Cli.FileSystem.listDirectory "/definitely/missing/dark-directory" = []
+Stdlib.Cli.FileSystem.listDirectory "/definitely/missing/dark-directory" = Error Stdlib.Cli.FileSystem.FileError.NotFound
 
 Stdlib.Cli.FileSystem.readFile "/definitely/missing/dark-file" = Error Stdlib.Cli.FileSystem.FileError.NotFound
 
