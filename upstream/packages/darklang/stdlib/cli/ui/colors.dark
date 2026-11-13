@@ -192,8 +192,6 @@ let prompt(text: String): String = colorize(promptColor, text)
 // @compiler replace: packages/darklang/stdlib/cli/ui/colors.dark#Darklang.Stdlib.Cli.UI.Colors.logo reason=compiler-implementation
 let logo(text: String): String = colorize(logoColor, text)
 // One-shot colourisers, for the times you want a coloured string rather than a code to compose with.
-// These were a second module (`Stdlib.Cli.UI.Color`) with the same names as the codes above, which meant
-// `Color.red` and `Colors.red` were different things one letter apart.
 // @compiler replace: packages/darklang/stdlib/cli/ui/colors.dark#Darklang.Stdlib.Cli.UI.Colors.redText reason=compiler-implementation
 let redText(text: String): String = colorize(red, text)
 // @compiler replace: packages/darklang/stdlib/cli/ui/colors.dark#Darklang.Stdlib.Cli.UI.Colors.greenText reason=compiler-implementation

@@ -19,7 +19,6 @@ let fnWithBody(
               description = "" } ]
       returnType = Darklang.LanguageTools.ProgramTypes.TypeReference.TInt64
       description = description
-      permissionCeiling = Stdlib.Option.Option.None
       bounds = [] }
 
 

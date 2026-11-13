@@ -34,6 +34,10 @@ impl Display for Pid =
   /// The process ID, {{4242}}
   let display(pid: Pid): String = Stdlib.display(pid.__pid)
 
+impl Inspect for Pid =
+  /// {{Pid(4242)}}: the field is private, so not the record
+  let inspect(pid: Pid): String = $"Pid({pid.__pid})"
+
 
 /// A process exit status, 0 to 255. Build one with <fn ExitCode.fromInt64>, or name one
 /// (<val ExitCode.success>); the field is not for constructing directly.
@@ -60,6 +64,10 @@ module ExitCode =
 impl Display for ExitCode =
   /// The exit status, {{1}}
   let display(code: ExitCode): String = Stdlib.display(code.__exitCode)
+
+impl Inspect for ExitCode =
+  /// {{ExitCode(1)}}: the field is private, so not the record
+  let inspect(code: ExitCode): String = $"ExitCode({code.__exitCode})"
 
 
 /// Standard permission modes
@@ -305,8 +313,18 @@ module Signal =
     | SIGKILL -> 9
     | SIGTERM -> 15
 
+impl Display for Signal =
+  /// The signal's name, {{SIGTERM}}
+  let display(signal: Signal): String =
+    match signal with
+    | SIGHUP -> "SIGHUP"
+    | SIGINT -> "SIGINT"
+    | SIGQUIT -> "SIGQUIT"
+    | SIGKILL -> "SIGKILL"
+    | SIGTERM -> "SIGTERM"
+
 /// Send <param signal> to the process <param pid>
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Darklang.Stdlib.Cli.Posix.Pid -> Darklang.Stdlib.Cli.Posix.Signal -> Darklang.Stdlib.Result.Result<Unit, Darklang.Stdlib.Cli.Posix.Error>, replacement Int -> Int -> Darklang.Stdlib.Result.Result<Unit, Darklang.Stdlib.Cli.Posix.Error>"
+// @compiler replace: packages/darklang/stdlib/cli/posix.dark#Darklang.Stdlib.Cli.Posix.kill reason=compiler-implementation
 let kill(pid: Pid, signal: Signal): Result.Result<Unit, Error> =
   Builtin.syscallKill(Stdlib.Cli.Posix.Pid.toInt64(pid), Stdlib.Cli.Posix.Signal.toInt64(signal))
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
@@ -366,7 +384,7 @@ let isDirectory(path: String): Bool =
 
 /// Check if a process is running via kill(pid, 0).
 /// Signal 0 checks process existence without sending a signal.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Darklang.Stdlib.Cli.Posix.Pid -> Bool, replacement Int -> Bool"
+// @compiler replace: packages/darklang/stdlib/cli/posix.dark#Darklang.Stdlib.Cli.Posix.isProcessRunning reason=compiler-implementation
 let isProcessRunning(pid: Pid): Bool =
   // EPERM means the process exists but we lack permission to signal it
   match Builtin.syscallKill(Stdlib.Cli.Posix.Pid.toInt64(pid), 0) with
@@ -493,8 +511,12 @@ let __kernelSignedField(bytes: Bytes, offset: Int64, width: Int64)
   match __kernelField(bytes, offset, width) with
   | Error(e) -> Error(e)
   | Ok(n) ->
-    let modulus = 256 ** width
-    Ok(if n >= modulus / 2 then n - modulus else n)
+    // For a width of 8 both wrap, and the field is already signed.
+    let half = 128 * __byteRange(width - 1)
+    Ok(if n >= half then n - 2 * half else n)
+
+let __byteRange(width: Int64): Int64 =
+  if width <= 0 then 1 else 256 * __byteRange(width - 1)
 
 // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch"
 type __KernelMetadata =
@@ -643,7 +665,7 @@ let __pathGetCwd(): Result.Result<String, Posix.Error> =
 let __decimal(value: Int64): String =
     if value < 0 then Stdlib.String.append("-", __decimal(0 - value))
     else
-        let quotient = value / 10
+        let quotient = Stdlib.Int64.checkedDivide(value, 10) |> Stdlib.Result.withDefault(0)
         let digit = value - quotient * 10
         let suffix =
             if digit == 0 then "0" else if digit == 1 then "1"

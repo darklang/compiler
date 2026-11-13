@@ -211,12 +211,24 @@ let testRows(
         [ Stdlib.Cli.UI.Colors.dimText($"  {runHint}") ] ])
 
 
-/// <param includeTests> appends a function's tests (`view --include-tests`).
+/// Whether viewing a function also shows its tests. `--include-tests` asks for them.
+type Tests =
+  | Show
+  | Hide
+
+module Tests =
+  /// {{Show}} when <param asked>, the way `view` reads `--include-tests`.
+  let showIf(asked: Bool): Darklang.Cli.Packages.View.Tests =
+    if asked then
+      Darklang.Cli.Packages.View.Tests.Show
+    else
+      Darklang.Cli.Packages.View.Tests.Hide
+
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let entityRows(
   branchId: Uuid,
   location: PackageLocation,
-  includeTests: Bool)
+  tests: Tests)
   : List<String> =
   match location with
   | Module(path) ->
@@ -314,7 +326,7 @@ let entityRows(
 
     Stdlib.List.flatten([
       [ locationStr
-        Stdlib.String.repeat("=", Stdlib.String.length(locationStr))
+        (Stdlib.String.checkedRepeat("=", Stdlib.String.length(locationStr)) |> Stdlib.Result.withDefault(""))
         "" ]
       sameNamedTypeRows
       sectionRows("submodule", "/", submodules)
@@ -377,7 +389,7 @@ let entityRows(
         sourceRows(highlighted)
         [ "" ]
         permissionLines |> Stdlib.List.map(Stdlib.Cli.UI.Colors.dimText)
-        if includeTests then
+        if tests == Tests.Show then
           testRows(
             branchId,
             name,
@@ -484,9 +496,9 @@ let entityRows(
 let viewEntity(
   branchId: Uuid,
   location: PackageLocation,
-  includeTests: Bool)
+  tests: Tests)
   : Unit =
-  entityRows(branchId, location, includeTests) |> Stdlib.printLines
+  entityRows(branchId, location, tests) |> Stdlib.printLines
 
 
 /// What `view` shows. Source is the default and the only one that works for every kind of item; the
@@ -611,7 +623,7 @@ let astRows(
   |> Stdlib.List.map(fun l ->
     // The signature is depth 0 and the body starts at depth 0 too, so the tree reads as a block under
     // the signature rather than being pushed a level in by scaffolding that isn't there any more.
-    let indent = Stdlib.String.repeat("  ", l.depth)
+    let indent = (Stdlib.String.checkedRepeat("  ", l.depth) |> Stdlib.Result.withDefault(""))
     let label = Stdlib.Cli.UI.Colors.keyword(l.label)
 
     if l.detail == "" then
@@ -696,7 +708,7 @@ let viewCompiled(
       | Some(instrs) -> instructionRows(branchId, instrs) |> Stdlib.printLines
       | None ->
         Cli.printErr("No compiled instructions stored for this function.")
-    | Source -> viewEntity(branchId, location, false)
+    | Source -> viewEntity(branchId, location, Tests.Hide)
     | Raw -> printRaw(branchId, location)
 
 
@@ -816,7 +828,7 @@ let viewOne(
         Cli.printErr(e)
         { state with exitCode = 1 }
     | Source ->
-      viewEntity(branchId, location, includeTests)
+      viewEntity(branchId, location, Tests.showIf(includeTests))
       // Show the trace hint only for the human-readable source view.
       printTraceHint(branchId, location)
       state

@@ -106,7 +106,7 @@ type NamedReference =
 
 /// Read the reference names used by each caller at its current location and version.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.namedReferences: Unknown function or value 'namedReferencesFor'"
-let namedReferences(branchId: Uuid): List<NamedReference> =
+let namedReferences(branchId: Uuid): Stdlib.Result.Result<List<NamedReference>, String> =
   namedReferencesFor(branchId, [])
 
 /// Read what this caller references, using the names it follows on this branch.
@@ -115,8 +115,10 @@ let dependencyEdges(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,
   source: LanguageTools.ProgramTypes.Reference)
-  : List<(LanguageTools.ProgramTypes.Hash * LanguageTools.ProgramTypes.ItemKind * LanguageTools.ProgramTypes.PackageLocation)> =
+  : Stdlib.Result.Result<List<(LanguageTools.ProgramTypes.Hash * LanguageTools.ProgramTypes.ItemKind * LanguageTools.ProgramTypes.PackageLocation)>, String> =
   namedReferencesFor(branchId, [ (location, source) ])
-  |> Stdlib.List.map(fun((_, _, target, name)) ->
-    (LanguageTools.ProgramTypes.Reference.hash(target), LanguageTools.ProgramTypes.Reference.kind(target), name))
-  |> Stdlib.List.unique
+  |> Stdlib.Result.map(fun edges ->
+    edges
+    |> Stdlib.List.map(fun((_, _, target, name)) ->
+      (LanguageTools.ProgramTypes.Reference.hash(target), LanguageTools.ProgramTypes.Reference.kind(target), name))
+    |> Stdlib.List.unique)

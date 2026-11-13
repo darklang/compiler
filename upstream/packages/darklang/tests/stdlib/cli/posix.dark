@@ -205,6 +205,16 @@ test pidFromInt64 =
       |> Stdlib.Result.isError
       |> Stdlib.Test.equal(true) ])
 
+// @compiler xfail runtime: "assertion 3: expected \"[ExitCode(0)]\", got \"[Stdlib.Cli.Posix.ExitCode { __exitCode: 0 }]\"" class=missing-support reason=compiler-gap
+test pidAndExitCodeInspect =
+  Stdlib.Test.all(
+    [ Stdlib.Cli.Posix.Pid.fromInt64(4242)
+      |> Stdlib.Result.map(Stdlib.inspect)
+      |> Stdlib.Test.equal(Ok("Pid(4242)"))
+      Stdlib.inspect(Stdlib.Cli.Posix.ExitCode.failure) |> Stdlib.Test.equal("ExitCode(1)")
+      Stdlib.inspect([ Stdlib.Cli.Posix.ExitCode.success ]) |> Stdlib.Test.equal("[ExitCode(0)]")
+      $"{Some(Stdlib.Cli.Posix.ExitCode.failure)}" |> Stdlib.Test.equal("Some(ExitCode(1))") ])
+
 test exitCodeFromInt64 =
   Stdlib.Test.all(
     [ Stdlib.Cli.Posix.ExitCode.fromInt64(0)
@@ -234,8 +244,12 @@ test signalNumbers =
   |> Stdlib.Test.equal([ 1, 2, 3, 9, 15 ])
 
 // Signal 0 checks existence; the current process is always running.
-// @compiler xfail compile: "Expected TInt64, got TInt" class=missing-support reason=compiler-gap
 test isProcessRunningSelf =
   match Stdlib.Cli.Posix.Pid.fromInt64(Stdlib.Cli.Sys.currentPid()) with
   | Ok(me) -> Stdlib.Cli.Posix.isProcessRunning(me) |> Stdlib.Test.equal(true)
   | Error(e) -> Stdlib.Test.expect(false, Stdlib.display(e))
+
+test signalDisplay =
+  Stdlib.Test.all(
+    [ Stdlib.display(Stdlib.Cli.Posix.Signal.SIGTERM) |> Stdlib.Test.equal("SIGTERM")
+      $"sent {Stdlib.Cli.Posix.Signal.SIGKILL}" |> Stdlib.Test.equal("sent SIGKILL") ])

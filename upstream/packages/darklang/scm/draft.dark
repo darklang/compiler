@@ -31,8 +31,12 @@ type Picture =
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Draft.read: Unknown function or value 'SCM.PackageOps.draftBindings'"
 let read(unit: Unit): Picture =
   let bindings = SCM.PackageOps.draftBindings()
-  let (stale, repoints) = SCM.PackageOps.dependencyReview(bindings)
-  let pendingConstraints = SCM.Constraints.pendingWithOutdated(SCM.Constraints.outdatedFindings(stale))
+  let review = SCM.PackageOps.dependencyReview(bindings)
+  // A review that fails repoints nothing; `pendingConstraints.blocked` says why.
+  let (_, repoints) = review |> Stdlib.Result.withDefault(([], []))
+  let pendingConstraints =
+    SCM.Constraints.pendingWithOutdated(
+      review |> Stdlib.Result.map(fun((stale, _)) -> SCM.Constraints.outdatedFindings(stale)))
 
   Picture
     { bindings = bindings
@@ -63,8 +67,12 @@ type Counts =
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Draft.counts: Unknown function or value 'SCM.PackageOps.draftBindings'"
 let counts(unit: Unit): Counts =
   let bindings = SCM.PackageOps.draftBindings()
-  let (stale, repoints) = SCM.PackageOps.dependencyReview(bindings)
-  let pendingConstraints = SCM.Constraints.pendingWithOutdated(SCM.Constraints.outdatedFindings(stale))
+  let review = SCM.PackageOps.dependencyReview(bindings)
+  // A review that fails repoints nothing; `pendingConstraints.blocked` says why.
+  let (_, repoints) = review |> Stdlib.Result.withDefault(([], []))
+  let pendingConstraints =
+    SCM.Constraints.pendingWithOutdated(
+      review |> Stdlib.Result.map(fun((stale, _)) -> SCM.Constraints.outdatedFindings(stale)))
   let propagated = SCM.PackageOps.propagatedNames()
   let draftNames =
     bindings |> Stdlib.List.map(fun b -> SCM.Conflicts.fqn(b.owner, b.modules, b.name))

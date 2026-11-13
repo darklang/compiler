@@ -621,7 +621,10 @@ let __copyCopy(source: String, destination: String)
 /// retries, callback coalescing, rearming after replacement, and cleanup.
 
 // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int64 -> Int64 -> Bool, replacement Int -> Int -> Bool"
-let __watchHas(mask: Int64, flag: Int64): Bool = (mask / flag) % 2 == 1
+let __watchHas(mask: Int64, flag: Int64): Bool =
+  match Stdlib.Int64.checkedDivide(mask, flag) with
+  | Ok(q) -> Stdlib.Int64.checkedMod(q, 2) == Ok(1)
+  | Error(_) -> false
 
 /// inotify_event headers are 16 bytes followed by a kernel-sized name field.
 /// A batch produces one notification; invalidation asks the caller to rearm.

@@ -280,6 +280,13 @@ test statusNamed =
       |> Stdlib.Test.equal(500)
       Stdlib.display(Stdlib.Http.Status.notFound) |> Stdlib.Test.equal("404") ])
 
+// @compiler xfail runtime: "assertion 2: expected \"[Status(200)]\", got \"[Stdlib.Http.Status { __status: 200 }]\"" class=missing-support reason=compiler-gap
+test statusInspect =
+  Stdlib.Test.all(
+    [ Stdlib.inspect(Stdlib.Http.Status.notFound) |> Stdlib.Test.equal("Status(404)")
+      Stdlib.inspect([ Stdlib.Http.Status.ok ]) |> Stdlib.Test.equal("[Status(200)]")
+      $"{Some(Stdlib.Http.Status.created)}" |> Stdlib.Test.equal("Some(Status(201))") ])
+
 test statusClasses =
   Stdlib.Test.all(
     [ Stdlib.Http.Status.isSuccess(Stdlib.Http.Status.created) |> Stdlib.Test.equal(true)

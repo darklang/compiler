@@ -33,6 +33,7 @@ packages/darklang/cli/docs/syntaxAtAGlance.dark
 packages/darklang/cli/docs/terminalUi.dark
 packages/darklang/cli/docs/traits.dark
 packages/darklang/cli/docs/types.dark
+packages/darklang/cli/effects.dark
 packages/darklang/cli/entry.dark
 packages/darklang/cli/execution/eval.dark
 packages/darklang/cli/execution/repl.dark
@@ -360,7 +361,6 @@ packages/darklang/tests/language/big.dark
 packages/darklang/tests/language/collections.dark
 packages/darklang/tests/language/conditionals.dark
 packages/darklang/tests/language/earg.dark
-packages/darklang/tests/language/effectCeiling.dark
 packages/darklang/tests/language/enums.dark
 packages/darklang/tests/language/equality.dark
 packages/darklang/tests/language/errorPropagation.dark
@@ -430,6 +430,7 @@ packages/darklang/tests/stdlib/bool.dark
 packages/darklang/tests/stdlib/bytes.dark
 packages/darklang/tests/stdlib/char.dark
 packages/darklang/tests/stdlib/cli/color.dark
+packages/darklang/tests/stdlib/cli/dir.dark
 packages/darklang/tests/stdlib/cli/file.dark
 packages/darklang/tests/stdlib/cli/glob.dark
 packages/darklang/tests/stdlib/cli/path.dark

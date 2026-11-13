@@ -6,9 +6,10 @@ module Darklang.Cli.Installation.Helpers
 /// the sync wire stamps it, and both mean the same thing by it.
 let buildHash(): String = Builtin.getBuildHash()
 
-/// Hashes the installed runtime files; identical files keep the same cache key.
+/// Hashes the installed runtime files; identical files keep the same cache key. An errno when
+/// they cannot be read.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Installation.Helpers.runtimeHash: Unknown function or value 'Builtin.getRuntimeHash'"
-let runtimeHash(): String = Builtin.getRuntimeHash()
+let runtimeHash(): Stdlib.Result.Result<String, Int64> = Builtin.getRuntimeHash()
 
 let cliVersion(): String = "alpha-" + (buildHash())
 

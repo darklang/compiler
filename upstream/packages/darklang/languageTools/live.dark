@@ -431,7 +431,7 @@ let refresh(branchId: Uuid, lg: LastGood): LastGood =
 // @compiler excluded: runtime-reflection
 let applicable(lg: LastGood): Stdlib.Result.Result<'f, String> =
   match lg.hash with
-  | Some(hash) -> Builtin.applicableByHash(LanguageTools.ProgramTypes.hashToString(hash))
+  | Some(hash) -> Builtin.applicableByHash(LanguageTools.ProgramTypes.hashToString(hash), entryName(lg.entry))
   | None ->
     match lg.problem with
     | Some(problem) -> Stdlib.Result.Result.Error(problem)

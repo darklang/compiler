@@ -1243,15 +1243,31 @@ module Uuid =
           "Can't parse JSON `\"00000000-0000-0000-0000-00000000000\"` as type `Uuid` at path: `root`")))
 
 module BadTypes =
-  // @compiler error-message compile: "Cannot parse JSON into function type (Int64) -> Int64: JSON cannot represent executable functions" reason=diagnostic-difference
+  // @compiler xfail compile: "Cannot parse JSON into function type (Int64) -> Int64: JSON cannot represent executable functions" class=missing-support reason=compiler-gap
   test rejects1 =
-    (Stdlib.Json.parse<Int64 -> Int64>("{}"))
-    => raises "Unsupported type in JSON: Int64 -> Int64. Some types are not supported in Json serialization, and cannot be used as type arguments to Stdlib.Json.parse or Stdlib.Json.serialize"
+    (Stdlib.Json.parse<Int64 -> Int64>("{}")) |> err
+    |> Stdlib.Test.equal(Result.Error("Can't parse JSON as type `Int64 -> Int64`, which has no JSON form"))
 
   // @compiler xfail compile: "Unsupported type in JSON: (Int64) -> Int64. Some types are not supported in Json serialization" class=missing-support reason=compiler-gap
   test rejects2 =
     (Stdlib.Json.serialize<Int64 -> Int64>(fun i -> 5))
     => raises "Cannot serialize (lambda) into JSON"
+
+  // @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Display'" class=missing-support reason=upstream-dependency
+  test checkedRejects =
+    Stdlib.Json.checkedSerialize<Int64 -> Int64>(fun i -> 5)
+    |> Stdlib.Result.mapError(fun e -> Stdlib.display(e))
+    |> Stdlib.Test.equal(Result.Error("Cannot serialize a function into JSON"))
+
+  // @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Display'" class=missing-support reason=upstream-dependency
+  test checkedRejectsIntKeys =
+    Stdlib.Json.checkedSerialize<Dict<Int64, String>>(Dict { 1: "a" })
+    |> Stdlib.Result.mapError(fun e -> Stdlib.display(e))
+    |> Stdlib.Test.equal(Result.Error("Cannot serialize a dict into JSON: JSON object keys must be Strings, but this dict's keys are Int64"))
+
+  test checkedSerializes =
+    Stdlib.Json.checkedSerialize<List<Int64>>([ 1, 2 ])
+    |> Stdlib.Test.equal(Result.Ok("[1,2]"))
 
 module List =
   type MyString = String
@@ -1549,7 +1565,12 @@ module Dict =
   // @compiler error-message runtime: "Cannot serialize dictionary into JSON: keys must be String, but this dictionary has Int64 keys" reason=diagnostic-difference
   test rejects1 =
     (Stdlib.Json.serialize<Dict<Int64, String>>(Dict { 1: "a" }))
-    => raises "Cannot serialize { 1: \"a\" } into JSON"
+    => raises "Cannot serialize { 1: \"a\" } into JSON: JSON object keys must be Strings, but this dict's keys are Int64"
+
+  // @compiler error-message runtime: "Cannot serialize dictionary into JSON: keys must be String, but this dictionary has Int64 keys" reason=diagnostic-difference
+  test rejectsNested =
+    (Stdlib.Json.serialize<List<Dict<Int64, String>>>([ Dict { 1: "a" } ]))
+    => raises "Cannot serialize { 1: \"a\" } into JSON: JSON object keys must be Strings, but this dict's keys are Int64"
 
   module Errors =
     test parseErrors =
@@ -1749,6 +1770,31 @@ module UserDefinedRecords =
       |> Stdlib.Test.equal(
         Result.Ok(
           Profile { Name = "Bob", Nickname = Option.Some("B"), Age = Option.None }))
+
+    // @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<Darklang.Stdlib.Json.Tests.UserDefinedRecords.Profile, Darklang.Stdlib.Json.ParseError.ParseError>.Ok(Darklang.Stdlib.Json.Tests.UserDefinedRecords.Profile {" class=missing-support reason=compiler-gap
+    test plainValuesAreSome =
+      Stdlib.Json.parse<Profile>("""{ "Name": "Bob", "Nickname": "B", "Age": 42 }""")
+      |> Stdlib.Test.equal(
+        Result.Ok(
+          Profile { Name = "Bob", Nickname = Option.Some("B"), Age = Option.Some(42) }))
+
+    // @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<Darklang.Stdlib.Json.Tests.UserDefinedRecords.Profile, Darklang.Stdlib.Json.ParseError.ParseError>.Ok(Darklang.Stdlib.Json.Tests.UserDefinedRecords.Profile {" class=missing-support reason=compiler-gap
+    test nullIsNone =
+      Stdlib.Json.parse<Profile>("""{ "Name": "Bob", "Nickname": null, "Age": null }""")
+      |> Stdlib.Test.equal(
+        Result.Ok(Profile { Name = "Bob", Nickname = Option.None, Age = Option.None }))
+
+    test serializedProfileParses =
+      let p = Profile { Name = "Bob", Nickname = Option.Some("B"), Age = Option.None }
+      Stdlib.Json.parse<Profile>(Stdlib.Json.serialize<Profile>(p))
+      |> Stdlib.Test.equal(Result.Ok(p))
+
+    // @compiler xfail runtime: "as type `Int64` at path: `root.Age`" class=missing-support reason=compiler-gap
+    test plainValueOfWrongTypeIsAnError =
+      (Stdlib.Json.parse<Profile>("""{ "Name": "Bob", "Age": "old" }""")) |> err
+      |> Stdlib.Test.equal(
+        Result.Error(
+          "Can't parse JSON `\"old\"` as type `Int64` at path: `root.Age`"))
 
     // @compiler xfail runtime: "got Darklang.Stdlib.Result.Result<Darklang.Stdlib.Json.Tests.UserDefinedRecords.Combo<Int64, Darklang.Stdlib.Option.Option<Int64>>, Darklang.Stdlib.Json.ParseError.ParseError>.Error(Darklang.Stdlib.Json.ParseError.ParseError.RecordMiss" class=missing-support reason=compiler-gap
     test missingTypeArgOptionIsNone =

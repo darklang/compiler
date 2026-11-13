@@ -87,7 +87,6 @@ type Collect =
 /// The text between matches, which always has one more entry than the matches, and
 /// the matches. Every other fn here is built on this. <param limit> says how many
 /// matches, and <param collect> whether to build them or only the text between.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Regex.scan: Unknown function or value 'Builtin.regexScan'"
 let scan(
   input: String,
   regex: Regex,
@@ -120,13 +119,11 @@ let ofPattern(pattern: String): Regex =
 
 
 /// Checks <param pattern>, for reuse with <fn findMatch> and <fn findAllMatches>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Regex.compile: Unknown function or value 'compileWith'"
 let compile(pattern: String): Stdlib.Result.Result<Regex, RegexError> =
   compileWith(pattern, defaultOptions)
 
 
 /// <fn compile>, with case-insensitive or multiline matching.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Regex.compileWith: Unknown function or value 'scan'"
 let compileWith(
   pattern: String,
   options: Options)
@@ -136,7 +133,6 @@ let compileWith(
 
 
 /// The first match of <param regex> in <param input>, with its groups.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Regex.findMatch: Unknown function or value 'scan'"
 let findMatch(
   input: String,
   regex: Regex)
@@ -146,7 +142,6 @@ let findMatch(
 
 
 /// Every match of <param regex> in <param input>, with its groups.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Regex.findAllMatches: Unknown function or value 'scan'"
 let findAllMatches(
   input: String,
   regex: Regex)
@@ -156,7 +151,6 @@ let findAllMatches(
 
 
 /// Whether the regex <param pattern> matches anywhere in <param input>.
-// @compiler replace: packages/darklang/stdlib/regex.dark#Darklang.Stdlib.Regex.isMatch reason=compiler-implementation
 let isMatch(
   input: String,
   pattern: String)
@@ -169,7 +163,6 @@ let isMatch(
 
 
 /// The text of the first match of the regex <param pattern> in <param input>.
-// @compiler replace: packages/darklang/stdlib/regex.dark#Darklang.Stdlib.Regex.find reason=compiler-implementation
 let find(
   input: String,
   pattern: String)
@@ -179,7 +172,6 @@ let find(
 
 
 /// The text of every match of the regex <param pattern> in <param input>.
-// @compiler replace: packages/darklang/stdlib/regex.dark#Darklang.Stdlib.Regex.findAll reason=compiler-implementation
 let findAll(
   input: String,
   pattern: String)
@@ -191,7 +183,6 @@ let findAll(
 /// Replaces the first match of the regex <param pattern> in <param input> with
 /// <param replacement>, as written: `$1` is just those two characters. For the
 /// groups, use <fn replaceWith>.
-// @compiler replace: packages/darklang/stdlib/regex.dark#Darklang.Stdlib.Regex.replace reason=compiler-implementation
 let replace(
   input: String,
   pattern: String,
@@ -205,7 +196,6 @@ let replace(
 /// Replaces every match of the regex <param pattern> in <param input> with <param
 /// replacement>, as written: `$1` is just those two characters. For the groups, use
 /// <fn replaceAllWith>.
-// @compiler replace: packages/darklang/stdlib/regex.dark#Darklang.Stdlib.Regex.replaceAll reason=compiler-implementation
 let replaceAll(
   input: String,
   pattern: String,
@@ -218,7 +208,6 @@ let replaceAll(
 
 /// Replaces the first match of the regex <param pattern> in <param input> with what
 /// <param fn> makes of it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Regex.replaceWith: Unknown function or value 'replaceMatches'"
 let replaceWith(
   input: String,
   pattern: String,
@@ -229,7 +218,6 @@ let replaceWith(
 
 /// Replaces every match of the regex <param pattern> in <param input> with what
 /// <param fn> makes of it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Regex.replaceAllWith: Unknown function or value 'replaceMatches'"
 let replaceAllWith(
   input: String,
   pattern: String,
@@ -240,7 +228,6 @@ let replaceAllWith(
 
 /// Replaces each match of <param regex> in <param input> with what <param fn> makes
 /// of it, as many as <param limit> says.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Regex.replaceMatches: Unknown function or value 'scan'"
 let replaceMatches(
   input: String,
   regex: Regex,
@@ -260,7 +247,6 @@ let replaceMatches(
 
 /// Splits <param input> at every match of the regex <param pattern>. Groups in the
 /// pattern are not included in the result.
-// @compiler replace: packages/darklang/stdlib/regex.dark#Darklang.Stdlib.Regex.split reason=compiler-implementation
 let split(
   input: String,
   pattern: String)

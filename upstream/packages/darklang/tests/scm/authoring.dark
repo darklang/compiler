@@ -54,7 +54,7 @@ let authorAll(m: String, sources: List<String>): Stdlib.Result.Result<Unit, Stri
 /// A branch off <param parent>, as `dark switch <name>` makes one.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Authoring.branchOff: Unknown function or value 'Darklang.SCM.PackageOps.ensureBranch'"
 let branchOff(name: String, parent: Uuid): Uuid =
-  let (id, _) = Darklang.SCM.PackageOps.ensureBranch(name, parent)
+  let (id, _) = Darklang.SCM.PackageOps.ensureBranch(name, parent) |> Builtin.unwrap
   id
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Authoring.hashIn: Unknown function or value 'Darklang.SCM.Propagation.hashOn'"

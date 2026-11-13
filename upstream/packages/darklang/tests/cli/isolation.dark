@@ -1,7 +1,6 @@
 /// Regression checks for typed integration-test process isolation.
 module Darklang.Cli.Tests.Isolation
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.Sys.isTerminal'" class=missing-support reason=upstream-dependency
 test stdinIsNonInteractive =
   Stdlib.Cli.Sys.isTerminal(0) |> Stdlib.Test.equal(false)
 
