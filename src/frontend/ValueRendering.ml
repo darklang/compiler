@@ -580,7 +580,11 @@ and renderBody env typ value state =
         next )
   | TList elem ->
       let itemsName, next = ensureListItemsRenderer env elem state in
-      let typeName = CheckingDiagnostics.typeToString typ in
+      (* An empty list carries no element type at runtime in the
+        interpreter, so `dark eval` prints `List<_> []` for a literal `[]`. *)
+      let typeName =
+        if !evalDisplay then "List<_>" else CheckingDiagnostics.typeToString typ
+      in
       ( C.Match
           ( value,
             args
@@ -595,7 +599,8 @@ and renderBody env typ value state =
                      ]);
               ] ),
         next )
-  | TStream _ -> (C.StringLiteral "<stream>", state)
+  | TStream _ ->
+      (C.StringLiteral (if !evalDisplay then "<stream: stub>" else "<stream>"), state)
   (* An unconstrained Dict value can only be the polymorphic empty literal;
     no value renderer is needed because there are no entries to inspect. *)
   | TDict ((TVar _ | TInferenceVar _), (TVar _ | TInferenceVar _)) ->

@@ -201,7 +201,6 @@
 {"id": "stdlib/result.dark:Darklang.Stdlib.Result.Tests.join#1", "expr": "Darklang.Stdlib.Result.join(Ok(Ok(\"test\")))", "eval": "Ok(\"test\")"}
 {"id": "stdlib/result.dark:Darklang.Stdlib.Result.Tests.values#1", "expr": "Darklang.Stdlib.Result.values([ Ok(1), Ok(2), Ok(3) ])", "eval": "Ok([1, 2, 3])"}
 {"id": "stdlib/stream.dark:Darklang.Stdlib.Stream.Tests.composedTransformsOverUnboundedSourceAreLazy#1", "expr": "let naturals =\n  Darklang.Stdlib.Stream.unfold(0, fun n -> Darklang.Stdlib.Option.Option.Some((n + 1, n + 1)))\nlet evens = Darklang.Stdlib.Stream.filter(naturals, fun n -> n % 2 == 0)\nlet doubled = Darklang.Stdlib.Stream.map(evens, fun n -> n * 2)\nDarklang.Stdlib.Stream.toList(Darklang.Stdlib.Stream.take(doubled, 3))", "eval": "[4, 8, 12]"}
-{"id": "stdlib/string.dark:Darklang.Stdlib.String.Tests.toList#1", "expr": "Darklang.Stdlib.String.toList(\"\")", "eval": "List<Char> []"}
 {"id": "stdlib/string.dark:Darklang.Stdlib.String.Tests.toList#9", "expr": "(Darklang.Stdlib.String.toList(\"ab1\")) |> Darklang.Stdlib.String.fromList", "eval": "ab1"}
 {"id": "stdlib/string.dark:Darklang.Stdlib.String.Tests.join#1", "expr": "Darklang.Stdlib.String.join([ \"a\", \"b\", \"c\", \"d\" ], \"|\")", "eval": "a|b|c|d"}
 {"id": "stdlib/string.dark:Darklang.Stdlib.String.Tests.randomPairIsDifferent#1", "expr": "(Darklang.Stdlib.String.random(5)) == (Darklang.Stdlib.String.random(5))", "eval": "false"}
@@ -248,3 +247,24 @@
 {"id": "gen:Darklang.Stdlib.Url.isHexDigit#1", "expr": "Darklang.Stdlib.Url.isHexDigit('a')", "eval": "true"}
 {"id": "gen:Darklang.Stdlib.Url.isSubDelim#1", "expr": "Darklang.Stdlib.Url.isSubDelim('a')", "eval": "false"}
 {"id": "gen:Darklang.Stdlib.Url.parseIPLiteral#1", "expr": "Darklang.Stdlib.Url.parseIPLiteral(\"\")", "eval": "None"}
+{"id": "language/collections.dark:Darklang.Language.Tests.Collections.listLiterals#1", "expr": "[]", "eval": "List<_> []"}
+{"id": "stdlib/dict.dark:Darklang.Stdlib.Dict.Tests.nonStringKeysKeyOrdering#6", "expr": "Darklang.Stdlib.Dict.keys(Dict { [ 2 ]: 1, [ 1, 9 ]: 2, []: 3 })", "eval": "[List<_> [], [1, 9], [2]]"}
+{"id": "stdlib/http.dark:Darklang.Stdlib.Http.Tests.responseBuilders#4", "expr": "Darklang.Stdlib.Http.notFound()", "eval": "Stdlib.Http.Response {\n  statusCode: 404,\n  headers: List<_> [],\n  body: <Bytes: 0 bytes>\n}"}
+{"id": "stdlib/json.dark:Darklang.Stdlib.Json.Tests.List.parse#1", "expr": "Darklang.Stdlib.Json.parse<List<Int64>>(\"[]\")", "eval": "Ok(List<_> [])"}
+{"id": "stdlib/list.dark:Darklang.Stdlib.List.Tests.map#4", "expr": "Darklang.Stdlib.List.map([], fun x -> x + 1)", "eval": "List<_> []"}
+{"id": "stdlib/list.dark:Darklang.Stdlib.List.Tests.filter#2", "expr": "Darklang.Stdlib.List.filter([], fun item -> true)", "eval": "List<_> []"}
+{"id": "stdlib/list.dark:Darklang.Stdlib.List.Tests.flatten#2", "expr": "Darklang.Stdlib.List.flatten([ [ [] ] ])", "eval": "[List<_> []]"}
+{"id": "stdlib/list.dark:Darklang.Stdlib.List.Tests.partition#2", "expr": "Darklang.Stdlib.List.partition([], fun _ -> true)", "eval": "(List<_> [], List<_> [])"}
+{"id": "stdlib/list.dark:Darklang.Stdlib.List.Tests.append#3", "expr": "Darklang.Stdlib.List.append([ [ 1 ] ], [])", "eval": "[[1], List<_> []]"}
+{"id": "stdlib/list.dark:Darklang.Stdlib.List.Tests.repeat#10", "expr": "Darklang.Stdlib.List.repeat(3, [])", "eval": "[List<_> [], List<_> [], List<_> []]"}
+{"id": "stdlib/list.dark:Darklang.Stdlib.List.Tests.take#7", "expr": "Darklang.Stdlib.List.take([], 4)", "eval": "List<_> []"}
+{"id": "stdlib/list.dark:Darklang.Stdlib.List.Tests.zip#4", "expr": "Darklang.Stdlib.List.zip([], [])", "eval": "Ok(List<_> [])"}
+{"id": "stdlib/option.dark:Darklang.Stdlib.Option.Tests.toList#2", "expr": "Darklang.Stdlib.Option.toList(None)", "eval": "List<_> []"}
+{"id": "stdlib/result.dark:Darklang.Stdlib.Result.Tests.collect#5", "expr": "Darklang.Stdlib.Result.collect([])", "eval": "Ok(List<_> [])"}
+{"id": "stdlib/regex.dark:Darklang.Stdlib.Regex.Tests.findAll#2", "expr": "Darklang.Stdlib.Regex.findAll(\"hello world\", \"x\")", "eval": "Ok(List<_> [])"}
+{"id": "stdlib/string.dark:Darklang.Stdlib.String.Tests.splitOnNewline#1", "expr": "Darklang.Stdlib.String.splitOnNewline(\"\")", "eval": "List<_> []"}
+{"id": "gen+ct:Darklang.Stdlib.Html.a#3", "expr": "Darklang.Stdlib.Html.a([ (\"\", None), (\"a\", Some(\"a\")), (\"héllo 👍🏽 é\", None) ], [])", "eval": "Stdlib.Html.Node.HtmlTag(\n  Stdlib.Html.HtmlTag {\n    name: \"a\",\n    attrs: [(\"\", None), (\"a\", Some(\"a\")), (\"héllo 👍🏽 é\", None)],\n    children: List<_> []\n  }\n)"}
+{"id": "fx:Darklang.Stdlib.HttpServer.matchRoute#1", "expr": "Darklang.Stdlib.HttpServer.matchRoute(\"\", \"a\")", "eval": "Stdlib.HttpServer.RouteMatch { matched: false, vars: List<_> [] }"}
+{"id": "cli/evalAndRun.dark:Darklang.Cli.Tests.EvalAndRun.splitArgumentsLikeTheHost#1", "expr": "let split(args: List<String>): (List<String> * List<String>) =\n  Darklang.Cli.Run.splitArguments(args)\nsplit([])", "eval": "(List<_> [], List<_> [])"}
+{"id": "fx:Darklang.Stdlib.Stream.fromList#3", "expr": "Darklang.Stdlib.Stream.fromList([ 0, 1, -1 ])", "eval": "<stream: stub>"}
+{"id": "fx:Darklang.Stdlib.Stream.unfold#2", "expr": "Darklang.Stdlib.Stream.unfold(1, (fun x0 -> None))", "eval": "<stream: stub>"}
