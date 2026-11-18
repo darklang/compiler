@@ -1446,7 +1446,7 @@ test formatRejectsUnknownDirectives =
 
 
 // The clock and sleep syscalls behind now, monotonic time and sleep
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.fromList'" class=missing-support reason=upstream-dependency
+// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-contract
 test clockSyscalls =
   let interruptedOnce = fun(seconds, _) ->
     if seconds == 1 then

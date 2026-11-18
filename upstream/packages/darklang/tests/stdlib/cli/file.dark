@@ -130,7 +130,6 @@ test watchVnodeEventsWalksSeveralEvents =
 
 
 // countNewlines
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.File.__countNewlines'" class=missing-support reason=upstream-dependency
 test countNewlines =
   Stdlib.Test.all(
     [ Stdlib.Cli.File.__countNewlines(Stdlib.Bytes.empty)
@@ -151,7 +150,6 @@ test countNewlines =
 
 
 // dropThroughFirstNewline
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.File.__dropThroughFirstNewline'" class=missing-support reason=upstream-dependency
 test dropThroughFirstNewline =
   let drop(text: String): Stdlib.Result.Result<String, String> =
     Stdlib.Utf8.decode(

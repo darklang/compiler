@@ -136,7 +136,7 @@ test bufferGrowth =
 
 // Account parsing handles missing users and malformed rows
 // Kernel records are little-endian; an 8-byte field covers all of Int64.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.fromList'" class=missing-support reason=upstream-dependency
+// @compiler xfail compile: "Expected TList TUInt8, got TBlob" class=missing-support reason=compiler-gap
 test kernelSignedField =
   let field(bytes: List<UInt8>, width: Int64): Stdlib.Result.Result<Int64, Int64> =
     Stdlib.Cli.Posix.__kernelSignedField(Stdlib.Bytes.fromList(bytes), 0, width)
@@ -236,7 +236,7 @@ test tempRetry =
 
 
 // Partial writes complete, zero-progress writes fail, and errors propagate
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.length'" class=missing-support reason=upstream-dependency
+// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-contract
 test writeAll =
   Stdlib.Test.all(
     [ Stdlib.Cli.Posix.__writeAll(

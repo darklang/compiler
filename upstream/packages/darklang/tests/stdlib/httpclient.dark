@@ -200,7 +200,7 @@ test rejectsEmptyHeaderKey =
   |> Stdlib.Test.equal(errBadHeaderEmptyKey())
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
+// @compiler xfail runtime: "expected \"Empty key\", got \"Invalid request\"" class=missing-support reason=compiler-gap
 test streamRejectsAKeyThatTrimsToNothing =
   (match Stdlib.HttpClient.stream(
            "GET",
@@ -213,7 +213,7 @@ test streamRejectsAKeyThatTrimsToNothing =
 
 
 // type errors for bad `method` are OK
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
+// @compiler xfail compile: "Unknown function or value 'errBadMethod'" class=missing-support reason=upstream-dependency
 test rejectsBadMethods =
   Stdlib.Test.all(
     [ Stdlib.HttpClient.request(
@@ -239,7 +239,7 @@ test rejectsBadMethods =
 
 
 // unsupported protocols
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
+// @compiler xfail compile: "Unknown function or value 'errUnsupportedProtocol'" class=missing-support reason=upstream-dependency
 test rejectsUnsupportedProtocols =
   Stdlib.Test.all(
     [ Stdlib.HttpClient.request(
@@ -261,7 +261,6 @@ test rejectsUnsupportedProtocols =
 
 
 // totally bogus URLs
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
 test rejectsBogusUrls =
   Stdlib.Test.all(
     [ Stdlib.HttpClient.request("get", "", [], Stdlib.Bytes.empty)
@@ -464,7 +463,6 @@ test missingHostFails =
 // Middleware, over a send that never reaches the network
 // ---------------------------
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpClient.Tests.__request: Unknown function or value 'Stdlib.Bytes.empty'"
 let __request(
   url: String,
   headers: List<(String * String)>)
@@ -806,7 +804,6 @@ test timeoutSetsTheField =
       |> Stdlib.Test.equal("GET https://a.test/ 10") ])
 
 
-// @compiler xfail compile: "Expected TBool, got TString" class=missing-support reason=compiler-gap
 test theCallersOwnValuesWin =
   let caller =
     { __request("https://a.test/", []) with

@@ -841,7 +841,6 @@ module Sse =
   /// Pull bytes from the underlying stream until a complete event
   /// terminator (blank line) arrives, then emit. Returns None once
   /// the stream is exhausted and no buffered data remains.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpClient.Sse.__pullNextEvent: Unknown function or value 'Stdlib.Bytes.fromList'"
   let __pullNextEvent(bytes: Stream<UInt8>, state: ParseState): Option<(Event * ParseState)> =
     match Stream.next<UInt8>(bytes) with
     | None ->

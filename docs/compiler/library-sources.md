@@ -106,6 +106,7 @@ fragments use `__` even where the interpreter also has private helpers.
 | `packages/darklang/stdlib/__builtin/__childRuntime.dark` | `Builtin` | Owned argv launch, supervision and opaque child byte cells |
 | `packages/darklang/stdlib/__builtin/__buildInfo.dark` | `Builtin` | Compiler revision substituted at build time, corresponding to interpreter `getBuildHash` (`backend/src/Builtins/Builtins.Cli/Libs/Environment.fs`) |
 | `packages/darklang/stdlib/__builtin/__executable.dark` | `Builtin` | Runtime executable path via Linux readlinkat or Darwin proc_info, with captured AT_EXECFN/argv/cwd/PATH fallbacks (`backend/src/Builtins/Builtins.Cli/Libs/Directory.fs`) |
+| `packages/darklang/stdlib/__builtin/__bytes.dark` | `Builtin` | Interpreter Bytes builtins over the native Blob (`backend/src/Builtins/Builtins.Pure/Libs/Bytes.fs`) |
 | `packages/darklang/stdlib/tuple2.dark` | `Darklang.Stdlib.Tuple2`  | `packages/darklang/stdlib/tuple2.dark` |
 | `packages/darklang/stdlib/tuple3.dark` | `Darklang.Stdlib.Tuple3`  | `packages/darklang/stdlib/tuple3.dark` |
 | `packages/darklang/stdlib/result.dark` | `Darklang.Stdlib.Result`  | `packages/darklang/stdlib/result.dark` |

@@ -2,14 +2,12 @@ module Darklang.Stdlib.String.Tests
 
 // `e`, a combining acute accent and `x`, decoded rather than written: decoding normalizes it to `éx`,
 // as every String is.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.String.Tests.decomposedEx: Unknown function or value 'Stdlib.Bytes.fromList'"
 let decomposedEx(): String =
   Stdlib.Utf8.decodeWithReplacement(
     Stdlib.Bytes.fromList([ 101u8, 204u8, 129u8, 120u8 ]))
 
 
 // A combining acute accent on its own, which stays as it is.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.String.Tests.acute: Unknown function or value 'Stdlib.Bytes.fromList'"
 let acute(): String =
   Stdlib.Utf8.decodeWithReplacement(Stdlib.Bytes.fromList([ 204u8, 129u8 ]))
 
@@ -208,7 +206,6 @@ test append =
       Stdlib.String.append("Z̤͔ͧ̑̓ä͖̭̈̇lͮ̒ͫǧ̗͚̚o̙̔ͮ̇͐̇", "👨‍❤️‍💋‍👨") |> Stdlib.Test.equal("Z̤͔ͧ̑̓ä͖̭̈̇lͮ̒ͫǧ̗͚̚o̙̔ͮ̇͐̇👨‍❤️‍💋‍👨") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'acute'" class=missing-support reason=upstream-dependency
 test join =
   Stdlib.Test.all(
     [ Stdlib.String.join([ "a", "b", "c", "d" ], "|")
@@ -252,7 +249,6 @@ test joinRejectsNonStrings =
   => raises "Darklang.Stdlib.String.join's 1st parameter `l` expects List<String>, but got List<Int64> ([1, 2])"
 
 
-// @compiler xfail compile: "Unknown function or value 'acute'" class=missing-support reason=upstream-dependency
 test interpolationNormalizesLikeAppend =
   let pr = [ "🇵", "🇷" ]
   let thumb = "👍"
@@ -274,7 +270,6 @@ test interpolationNormalizesLikeAppend =
 
 
 // Both sides of `interpolationNormalizesLikeAppend` normalize; this checks the bytes.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.toList'" class=missing-support reason=upstream-dependency
 test interpolationNormalizesToComposedBytes =
   let e = "e"
   Stdlib.Test.all(
@@ -982,7 +977,6 @@ test prepend =
       |> Stdlib.Test.equal("🧟‍♂️żółw🧑🏽‍🦰🧑🏻‍🍼✋✋🏻✋🏿") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'decomposedEx'" class=missing-support reason=upstream-dependency
 test replaceAll =
   Stdlib.Test.all(
     [ Stdlib.String.replaceAll("abcABCcbaCBA", "b", "x")
@@ -1496,7 +1490,6 @@ test last =
       Stdlib.String.last("👨‍❤️‍💋‍👨👩‍👩‍👧‍👦🏳️‍⚧️‍️🇵🇷", 1) |> Stdlib.Test.equal("🇵🇷") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'decomposedEx'" class=missing-support reason=upstream-dependency
 test contains =
   Stdlib.Test.all(
     [ Stdlib.String.contains("﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽", "2223")
@@ -1681,7 +1674,6 @@ test padEnd =
       Stdlib.String.padEnd("ab", '👨‍👩‍👧‍👦', 4) |> Stdlib.Test.equal("ab👨‍👩‍👧‍👦👨‍👩‍👧‍👦") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'decomposedEx'" class=missing-support reason=upstream-dependency
 test indexOf =
   Stdlib.Test.all(
     [ Stdlib.String.indexOf("hello world", "world")
@@ -1760,7 +1752,6 @@ test indexOf =
       |> Stdlib.Test.equal(Stdlib.Option.Option.None) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'decomposedEx'" class=missing-support reason=upstream-dependency
 test lastIndexOf =
   Stdlib.Test.all(
     [ Stdlib.String.lastIndexOf("hello world hello", "hello")
@@ -1823,7 +1814,6 @@ test lastIndexOf =
       |> Stdlib.Test.equal(Stdlib.Option.Option.Some(7)) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'decomposedEx'" class=missing-support reason=upstream-dependency
 test compare =
   Stdlib.Test.all(
     [ Stdlib.String.compare("a", "b") < 0 |> Stdlib.Test.equal(true)
@@ -1854,7 +1844,6 @@ test compare =
       |> Stdlib.Test.equal([ "a", "é", "ｱ", "😀" ]) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'decomposedEx'" class=missing-support reason=upstream-dependency
 test head =
   Stdlib.Test.all(
     [ Stdlib.String.head("hello world")
@@ -1869,7 +1858,6 @@ test head =
       |> Stdlib.Test.equal(Stdlib.Option.Option.Some([ 195u8, 169u8 ])) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'decomposedEx'" class=missing-support reason=upstream-dependency
 test charAt =
   Stdlib.Test.all(
     [ Stdlib.String.charAt("", 0)
@@ -2036,7 +2024,6 @@ test getByteAt =
       |> Stdlib.Test.equal(Stdlib.Option.Option.None) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.getAt'" class=missing-support reason=upstream-dependency
 test getByteAtMatchesToBytes =
   // Match the full UTF-8 encoding.
   Stdlib.String.getByteAt("héllo", 2)
@@ -2122,7 +2109,6 @@ module MapEffects =
 
 
 // Appending composes: the bytes are the composed characters'.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.toList'" class=missing-support reason=upstream-dependency
 test appendComposesUnicode =
   Stdlib.Test.all(
     [ Stdlib.String.append("a", "̂")

@@ -16,7 +16,6 @@ let digest(algorithm: DigestAlgorithm, data: Bytes): Bytes =
 
 /// Computes the HMAC (hash-based message authentication code, RFC 2104) of <param data> under
 /// <param key>, over the <param algorithm> digest.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Crypto.hmac: Unknown function or value 'Stdlib.Bytes.length'"
 let hmac(algorithm: DigestAlgorithm, key: Bytes, data: Bytes): Bytes =
   let size = __blockSize(algorithm)
   // A key longer than a block is hashed first; then it is zero-padded to a block.
@@ -37,7 +36,6 @@ let __blockSize(algorithm: DigestAlgorithm): Int64 =
 
 
 /// Every byte of <param block> XORed with <param pad>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Crypto.__xorEach: Unknown function or value 'Stdlib.Bytes.fromList'"
 let __xorEach(block: List<UInt8>, pad: UInt8): Bytes =
   block
   |> List.map(fun b -> b ^ pad)

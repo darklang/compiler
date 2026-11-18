@@ -6,7 +6,6 @@
 // List<Event> for structural comparison.
 module Darklang.Stdlib.HttpClient.Sse.Tests
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpClient.Sse.Tests.parse: Unknown function or value 'Stdlib.Bytes.toList'"
 let parse(source: String): List<Stdlib.HttpClient.Sse.Event> =
   source
   |> Stdlib.Utf8.encode
@@ -17,7 +16,6 @@ let parse(source: String): List<Stdlib.HttpClient.Sse.Event> =
 
 
 // single event with just a data field
-// @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
 test singleDataEvent =
   parse("data: hello\n\n")
   |> Stdlib.Test.equal(
@@ -25,12 +23,10 @@ test singleDataEvent =
 
 
 // empty body yields no events
-// @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
 test emptyBody = parse("") |> Stdlib.Test.equal([])
 
 
 // multiple events separated by blank lines
-// @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
 test multipleEvents =
   parse("data: first\n\ndata: second\n\ndata: third\n\n")
   |> Stdlib.Test.equal(
@@ -40,7 +36,6 @@ test multipleEvents =
 
 
 // event type and id are parsed
-// @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
 test eventTypeAndId =
   parse("event: update\nid: 42\ndata: payload\n\n")
   |> Stdlib.Test.equal(
@@ -49,7 +44,6 @@ test eventTypeAndId =
 
 
 // id persists across events per the SSE spec
-// @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
 test idPersists =
   parse("id: 42\ndata: one\n\ndata: two\n\n")
   |> Stdlib.Test.equal(
@@ -58,7 +52,6 @@ test idPersists =
 
 
 // comment lines (starting with `:`) are ignored
-// @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
 test commentLinesIgnored =
   parse(
     ": this is a comment\ndata: hello\n\n: another comment\ndata: world\n\n")
@@ -68,7 +61,6 @@ test commentLinesIgnored =
 
 
 // multi-line `data:` fields are joined with a newline
-// @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
 test multiLineData =
   parse("data: line one\ndata: line two\n\n")
   |> Stdlib.Test.equal(
@@ -77,7 +69,6 @@ test multiLineData =
 
 
 // blocks without a data field are not dispatched (spec: empty data = skip)
-// @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
 test blocksWithoutDataSkipped =
   parse("event: ping\n\ndata: real\n\n")
   |> Stdlib.Test.equal(

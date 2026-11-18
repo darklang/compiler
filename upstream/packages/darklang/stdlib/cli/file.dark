@@ -79,7 +79,6 @@ let readLines(path: String): Result<List<String>, Posix.Error> =
   readText(path) |> Result.map(fun text -> String.splitOnNewline(text))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.File.__countNewlines: Unknown function or value 'Stdlib.Bytes.indexOfFrom'"
 let __countNewlines(blob: Bytes): Int64 =
   let countFrom(start: Int64, count: Int64): Int64 =
     match Bytes.indexOfFrom(blob, 10u8, start) with
@@ -90,7 +89,6 @@ let __countNewlines(blob: Bytes): Int64 =
 
 
 /// Everything after the first newline in <param bytes>; empty if there is none.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.File.__dropThroughFirstNewline: Unknown function or value 'Stdlib.Bytes.indexOf'"
 let __dropThroughFirstNewline(bytes: Bytes): Bytes =
   match Bytes.indexOf(bytes, 10u8) with
   | Some(i) -> Bytes.drop(bytes, i + 1)

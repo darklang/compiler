@@ -4,7 +4,6 @@ module Darklang.Stdlib.HttpServer.Tests
 
 // Route a request to /notes through a GET and a POST handler, returning the
 // status and body text.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpServer.Tests.routeNotes: Unknown function or value 'Stdlib.Bytes.empty'"
 let routeNotes(
   method: String,
   headers: List<(String * String)>)
@@ -30,7 +29,7 @@ let routeNotes(
 
 // The request's `method` picks the handler, and a header that looks like a
 // method does not.
-// @compiler xfail compile: "Unknown function or value 'routeNotes'" class=missing-support reason=upstream-dependency
+// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test routeRequestByMethod =
   Stdlib.Test.all(
     [ routeNotes("GET", []) |> Stdlib.Test.equal((200, "list"))
@@ -45,7 +44,6 @@ test routeRequestByMethod =
 
 // `get`/`post` build the Handler a record literal would, so a route table reads as
 // routes.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
 test routes =
   Stdlib.Test.all(
     [ (Stdlib.HttpServer.get("/ping", fun req ->
@@ -99,7 +97,6 @@ test getPath =
 // Middleware: Handler -> Handler
 // ---------------------------
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpServer.Tests.__req: Unknown function or value 'Stdlib.Bytes.empty'"
 let __req(url: String, headers: List<(String * String)>): Stdlib.Http.Request =
   Stdlib.Http.Request
     { method = "GET", url = url, headers = headers, body = Stdlib.Bytes.empty }

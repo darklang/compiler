@@ -1,0 +1,36 @@
+// The interpreter's Bytes builtins over the native Blob, with its Int64 indexes and counts.
+module Builtin
+
+val bytesEmpty = Stdlib.Blob.empty
+
+let bytesLength (bytes: Blob) : Int64 = Stdlib.Blob.__byteLength bytes
+
+let bytesGetAt (bytes: Blob) (index: Int64) : Stdlib.Option.Option<UInt8> =
+    Stdlib.Blob.getAt bytes index
+
+let bytesIndexOf (bytes: Blob) (byte: UInt8) (start: Int64) : Stdlib.Option.Option<Int64> =
+    Stdlib.Blob.indexOf bytes byte start
+
+let __lastIndexOfFrom (bytes: Blob) (byte: Int64) (index: Int64) : Stdlib.Option.Option<Int64> =
+    if index < 0L then None
+    else if Stdlib.Blob.__getByte bytes index == byte then Some index
+    else Builtin.__lastIndexOfFrom bytes byte (index - 1L)
+
+let bytesLastIndexOf (bytes: Blob) (byte: UInt8) (start: Int64) : Stdlib.Option.Option<Int64> =
+    if start < 0L || start >= Stdlib.Blob.__byteLength bytes then None
+    else Builtin.__lastIndexOfFrom bytes (Stdlib.Blob.__uint8ToInt64 byte) start
+
+let bytesIndexOfSegment (bytes: Blob) (segment: Blob) (start: Int64) : Stdlib.Option.Option<Int64> =
+    Stdlib.Blob.indexOfSegment bytes segment start
+
+let bytesConcat (values: List<Blob>) : Blob = Stdlib.Blob.concat values
+
+let bytesSlice (bytes: Blob) (start: Int64) (length: Int64) : Blob =
+    Stdlib.Blob.slice bytes (Stdlib.Int.fromInt64 start) (Stdlib.Int.fromInt64 length)
+
+let bytesPeek (bytes: Blob) (count: Int64) : Stdlib.Option.Option<Blob> =
+    Stdlib.Blob.peek bytes count
+
+let bytesToList (bytes: Blob) : List<UInt8> = Stdlib.Blob.toList bytes
+
+let bytesFromList (bytes: List<UInt8>) : Blob = Stdlib.Blob.fromList bytes
