@@ -15,11 +15,11 @@ Stdlib.Char.toAsciiCode 'ä͖̭̈̇' = None
 Stdlib.Char.toAsciiCode 'a' = Some 97u8
 Stdlib.Char.toAsciiCode '\u007f' = Some 127u8
 Stdlib.Char.isASCII 'ä͖̭̈̇' = false
-Stdlib.Float.isFinite 1.0 = true
-Stdlib.Float.isFinite (1.0 / 0.0) = false
-Stdlib.Float.isFinite (0.0 / 0.0) = false
-Stdlib.Float.clampRefusingNaN 3.0 2.0 1.0 = Ok 2.0
-Stdlib.Float.clampRefusingNaN 1.0 (0.0 / 0.0) 2.0 = Error "clampRefusingNaN requires limits that are numbers"
+Stdlib.Float64.isFinite 1.0 = true
+Stdlib.Float64.isFinite (1.0 / 0.0) = false
+Stdlib.Float64.isFinite (0.0 / 0.0) = false
+Stdlib.Float64.clampRefusingNaN 3.0 2.0 1.0 = Ok 2.0
+Stdlib.Float64.clampRefusingNaN 1.0 (0.0 / 0.0) 2.0 = Error "clampRefusingNaN requires limits that are numbers"
 Stdlib.String.compare "a" "b" < 0L = true
 Stdlib.String.compare "😀" "\uE000" > 0L = true
 Stdlib.String.compare "é" "é" = 0L
@@ -41,11 +41,11 @@ let fn = (fun x -> x + 1L) in Stdlib.List.length (Stdlib.List.dedup [fn, fn]) = 
 let first = Stdlib.String.toBlob "same" in let second = Stdlib.String.toBlob "same" in Stdlib.List.length (Stdlib.List.dedup [first, second, first]) = compileerror="cannot be used as a Dict key"
 Stdlib.List.setAt [1L, 2L, 3L] 3L 9L = Error Stdlib.List.IndexError.IndexOutOfBounds
 Stdlib.List.setAt ["a", "b", "c"] -1L "replacement" = Ok ["a", "b", "replacement"]
-Stdlib.Float.isFinite (-1.0 / 0.0) = false
-Stdlib.Float.isFinite -0.0 = true
-Stdlib.Float.isNaN (Builtin.unwrap (Stdlib.Float.clampRefusingNaN (0.0 / 0.0) 1.0 2.0)) = true
-Stdlib.Float.toBits -0.0 = 9223372036854775808UL
-Stdlib.Float.toBits (-1.0) = 13830554455654793216UL
+Stdlib.Float64.isFinite (-1.0 / 0.0) = false
+Stdlib.Float64.isFinite -0.0 = true
+Stdlib.Float64.isNaN (Builtin.unwrap (Stdlib.Float64.clampRefusingNaN (0.0 / 0.0) 1.0 2.0)) = true
+Stdlib.Float64.toBits -0.0 = 9223372036854775808UL
+Stdlib.Float64.toBits (-1.0) = 13830554455654793216UL
 
 // Key equality is total, including NaNs nested inside comparable values.
 let nan = 0.0 / 0.0 in Stdlib.List.length (Stdlib.List.dedup [(nan, 1L), (nan, 1L)]) = 1L
@@ -55,10 +55,10 @@ Stdlib.List.uniqueBy [3, 1, 2, 3] (fun value -> value) = [3, 1, 2]
 let nan = 0.0 / 0.0 in Stdlib.List.uniqueBy [3L, 1L, 2L] (fun _ -> nan) = [3L]
 let nan = 0.0 / 0.0 in Stdlib.List.uniqueBy [3L, 1L, 2L] (fun _ -> (nan, 1L)) = [3L]
 Stdlib.List.uniqueBy [3L, 1L] (fun _ -> Stdlib.String.toBlob "key") = compileerror="cannot be used as a Dict key"
-Stdlib.Float.clamp 1.0 0.0 2.0 = compileerror="Unknown function"
-Stdlib.Float.clampRefusingNaN 0.5 1.0 (0.0 / 0.0) = Error "clampRefusingNaN requires limits that are numbers"
-Stdlib.Float.clampRefusingNaN (1.0 / 0.0) -1.0 0.5 = Ok 0.5
-Stdlib.Float.clampRefusingNaN (-1.0 / 0.0) -1.0 0.5 = Ok -1.0
+Stdlib.Float64.clamp 1.0 0.0 2.0 = compileerror="Unknown function"
+Stdlib.Float64.clampRefusingNaN 0.5 1.0 (0.0 / 0.0) = Error "clampRefusingNaN requires limits that are numbers"
+Stdlib.Float64.clampRefusingNaN (1.0 / 0.0) -1.0 0.5 = Ok 0.5
+Stdlib.Float64.clampRefusingNaN (-1.0 / 0.0) -1.0 0.5 = Ok -1.0
 let dedup<'a> (values: List<a>) : List<a> = Stdlib.List.dedup values; let fn = (fun x -> x + 1L) in dedup [fn, fn] = compileerror="cannot be used as a Dict key"
 let dedup<'a> (values: List<a>) : List<a> = Stdlib.List.dedup values; dedup [Stdlib.String.toBlob "key"] = compileerror="cannot be used as a Dict key"
 type Key = { value: Float }; let nan = 0.0 / 0.0 in Stdlib.List.length (Stdlib.List.dedup [Key { value = nan }, Key { value = nan }]) = 1L

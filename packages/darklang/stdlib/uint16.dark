@@ -88,8 +88,8 @@ let __fromIntUnchecked (value: Int) : UInt16 =
     | Some result -> result
     | None -> Builtin.crash "Internal UInt16 conversion invariant failed"
 let random (start: UInt16) (finish: UInt16) : UInt16 = Stdlib.UInt16.__fromIntUnchecked (Stdlib.Int.random (Stdlib.Int.fromUInt16 start) (Stdlib.Int.fromUInt16 finish))
-let toFloat (value: UInt16) : Float = Stdlib.Int.toFloat (Stdlib.Int.fromUInt16 value)
-let sqrt (value: UInt16) : Float = Stdlib.Float.sqrt (Stdlib.UInt16.toFloat value)
+let toFloat64 (value: UInt16) : Float = Stdlib.Int.toFloat64 (Stdlib.Int.fromUInt16 value)
+let sqrt (value: UInt16) : Float = Stdlib.Float64.sqrt (Stdlib.UInt16.toFloat64 value)
 let parse (value: String) : Stdlib.Result.Result<UInt16, Stdlib.UInt16.ParseError> =
     match Stdlib.Int.parse value with
     | Error _ -> Error Stdlib.UInt16.ParseError.BadFormat

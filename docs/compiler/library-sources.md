@@ -114,7 +114,7 @@ fragments use `__` even where the interpreter also has private helpers.
 | `packages/darklang/stdlib/list.dark` | `Darklang.Stdlib.List`  | `packages/darklang/stdlib/list.dark` |
 | `packages/darklang/stdlib/__print.dark` | `Darklang.Stdlib`  | `packages/darklang/stdlib/print.dark` |
 | `packages/darklang/stdlib/fun.dark` | `Darklang.Stdlib.Fun`  | `packages/darklang/stdlib/fun.dark` |
-| `packages/darklang/stdlib/float.dark` | `Darklang.Stdlib.Float`  | `packages/darklang/stdlib/float.dark` |
+| `packages/darklang/stdlib/float64.dark` | `Darklang.Stdlib.Float64`  | `packages/darklang/stdlib/float64.dark` |
 | `packages/darklang/stdlib/cli/__posix.dark` | `Darklang.Stdlib.Cli.__Posix` | Private native syscall boundary for interpreter POSIX operations |
 | `packages/darklang/stdlib/cli/posix.dark` | `Darklang.Stdlib.Cli.Posix`  | `packages/darklang/stdlib/cli/posix.dark` |
 | `packages/darklang/stdlib/cli/posix/__error.dark` | `Darklang.Stdlib.Cli.Posix` | Private conversion from the existing native CLI error record |

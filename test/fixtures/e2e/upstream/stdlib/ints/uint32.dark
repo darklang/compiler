@@ -75,8 +75,8 @@ Stdlib.UInt32.toString 1ul = "1"
 Stdlib.UInt32.toString 0ul = "0" // UInt32 lower limit
 Stdlib.UInt32.toString 4294967295ul = "4294967295" // UInt32 upper limit
 
-Stdlib.UInt32.toFloat 2ul = 2.0
-Stdlib.UInt32.toFloat 0ul = 0.0
+Stdlib.UInt32.toFloat64 2ul = 2.0
+Stdlib.UInt32.toFloat64 0ul = 0.0
 
 Stdlib.UInt32.sqrt 4ul = 2.0
 Stdlib.UInt32.sqrt 100ul = 10.0

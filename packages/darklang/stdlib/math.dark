@@ -58,8 +58,8 @@ let __fma (a: Float) (b: Float) (c: Float) : Float =
     else r
 
 let __copySign (magnitude: Float) (sign: Float) : Float =
-    let m = Stdlib.Float.absoluteValue magnitude in
-    if sign < 0.0 then Stdlib.Float.negate m else m
+    let m = Stdlib.Float64.absoluteValue magnitude in
+    if sign < 0.0 then Stdlib.Float64.negate m else m
 
 // glibc's __sincostab: sin and cos of i/128 for i in 0..109, each as a value and
 // a correction.
@@ -1385,7 +1385,7 @@ let __sinCosTable (i: Int64) : Float =
 
 // The table entry for the multiple of 1/128 nearest |x|, given big + |x|.
 let __tableIndex (u: Float) : Int64 =
-    Stdlib.Float.__toInt64Unchecked ((u - 52776558133248.0) * 128.0) * 4L
+    Stdlib.Float64.__toInt64Unchecked ((u - 52776558133248.0) * 128.0) * 4L
 
 // glibc's TAYLOR_SIN.
 let __taylorSin (xx: Float) (x: Float) (dx: Float) : Float =
@@ -1397,9 +1397,9 @@ let __taylorSin (xx: Float) (x: Float) (dx: Float) : Float =
 
 // glibc's do_cos.
 let __doCos (x0: Float) (dx0: Float) : Float =
-    let dx = if x0 < 0.0 then Stdlib.Float.negate dx0 else dx0 in
-    let u = 52776558133248.0 + Stdlib.Float.absoluteValue x0 in
-    let x = Stdlib.Float.absoluteValue x0 - (u - 52776558133248.0) + dx in
+    let dx = if x0 < 0.0 then Stdlib.Float64.negate dx0 else dx0 in
+    let u = 52776558133248.0 + Stdlib.Float64.absoluteValue x0 in
+    let x = Stdlib.Float64.absoluteValue x0 - (u - 52776558133248.0) + dx in
     let xx = x * x in
     let s = Stdlib.Math.__fma (x * xx) (Stdlib.Math.__fma xx 0.008333332142857223 -0.16666666666666488) x in
     let c = xx * Stdlib.Math.__fma xx (Stdlib.Math.__fma xx 0.001388888740079376 -0.04166666666666644) 0.5 in
@@ -1408,16 +1408,16 @@ let __doCos (x0: Float) (dx0: Float) : Float =
     let ssn = Stdlib.Math.__sinCosTable (k + 1L) in
     let cs = Stdlib.Math.__sinCosTable (k + 2L) in
     let ccs = Stdlib.Math.__sinCosTable (k + 3L) in
-    let cor = Stdlib.Math.__fma (Stdlib.Float.negate sn) s (Stdlib.Math.__fma (Stdlib.Float.negate cs) c (Stdlib.Math.__fma (Stdlib.Float.negate s) ssn ccs)) in
+    let cor = Stdlib.Math.__fma (Stdlib.Float64.negate sn) s (Stdlib.Math.__fma (Stdlib.Float64.negate cs) c (Stdlib.Math.__fma (Stdlib.Float64.negate s) ssn ccs)) in
     cs + cor
 
 // glibc's do_sin.
 let __doSin (x0: Float) (dx0: Float) : Float =
-    if Stdlib.Float.absoluteValue x0 < 0.126 then Stdlib.Math.__taylorSin (x0 * x0) x0 dx0
+    if Stdlib.Float64.absoluteValue x0 < 0.126 then Stdlib.Math.__taylorSin (x0 * x0) x0 dx0
     else
-        let dx = if x0 <= 0.0 then Stdlib.Float.negate dx0 else dx0 in
-        let u = 52776558133248.0 + Stdlib.Float.absoluteValue x0 in
-        let x = Stdlib.Float.absoluteValue x0 - (u - 52776558133248.0) in
+        let dx = if x0 <= 0.0 then Stdlib.Float64.negate dx0 else dx0 in
+        let u = 52776558133248.0 + Stdlib.Float64.absoluteValue x0 in
+        let x = Stdlib.Float64.absoluteValue x0 - (u - 52776558133248.0) in
         let xx = x * x in
         let s = x + Stdlib.Math.__fma (x * xx) (Stdlib.Math.__fma xx 0.008333332142857223 -0.16666666666666488) dx in
         let c = Stdlib.Math.__fma x dx (xx * Stdlib.Math.__fma xx (Stdlib.Math.__fma xx 0.001388888740079376 -0.04166666666666644) 0.5) in
@@ -1426,21 +1426,21 @@ let __doSin (x0: Float) (dx0: Float) : Float =
         let ssn = Stdlib.Math.__sinCosTable (k + 1L) in
         let cs = Stdlib.Math.__sinCosTable (k + 2L) in
         let ccs = Stdlib.Math.__sinCosTable (k + 3L) in
-        let cor = Stdlib.Math.__fma cs s (Stdlib.Math.__fma (Stdlib.Float.negate sn) c (Stdlib.Math.__fma s ccs ssn)) in
+        let cor = Stdlib.Math.__fma cs s (Stdlib.Math.__fma (Stdlib.Float64.negate sn) c (Stdlib.Math.__fma s ccs ssn)) in
         Stdlib.Math.__copySign (sn + cor) x0
 
 // glibc's do_sincos: quadrant n of the reduced argument a + da.
 let __doSinCos (a: Float) (da: Float) (n: Int64) : Float =
     let value = if Stdlib.Int64.bitwiseAnd n 1L == 1L then Stdlib.Math.__doCos a da else Stdlib.Math.__doSin a da in
-    if Stdlib.Int64.bitwiseAnd n 2L == 2L then Stdlib.Float.negate value else value
+    if Stdlib.Int64.bitwiseAnd n 2L == 2L then Stdlib.Float64.negate value else value
 
 // glibc's reduce_sincos, then do_sincos with the quadrant moved by offset (1 for
 // cos).
 let __reduceAndEvaluate (x: Float) (offset: Int64) : Float =
     let t = Stdlib.Math.__fma x 0.6366197723675814 6755399441055744.0 in
     let xn = t - 6755399441055744.0 in
-    let y = Stdlib.Math.__fma (Stdlib.Float.negate xn) -1.3909067564377153e-08 (Stdlib.Math.__fma (Stdlib.Float.negate xn) 1.5707963407039642 x) in
-    let n = Stdlib.Float.__toInt64Unchecked xn + offset in
+    let y = Stdlib.Math.__fma (Stdlib.Float64.negate xn) -1.3909067564377153e-08 (Stdlib.Math.__fma (Stdlib.Float64.negate xn) 1.5707963407039642 x) in
+    let n = Stdlib.Float64.__toInt64Unchecked xn + offset in
     let t1 = xn * -4.97899623147991e-17 in
     let t2 = y - t1 in
     let db = (y - t2) - t1 in
@@ -1680,7 +1680,7 @@ let __scaleDownBy24 (value: Float) (times: Int64) : Float =
 
 // One half of __branred's product: x times 2/pi, as (b, bb, sum).
 let __branredHalf (x: Float) : (Float * Float * Float) =
-    let exponent = Stdlib.Float.__smallUInt64ToInt64 (Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight (Stdlib.Float.__toBits x) 52UL) 2047UL) in
+    let exponent = Stdlib.Float64.__smallUInt64ToInt64 (Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight (Stdlib.Float64.__toBits x) 52UL) 2047UL) in
     let k = if exponent < 450L then 0L else (exponent - 450L) / 24L in
     let gor = Stdlib.Math.__scaleDownBy24 2.4733040147310453e+173 k in
     let r0 = x * Stdlib.Math.__twoOverPiDigit k * gor in
@@ -1725,7 +1725,7 @@ let __branred (x0: Float) : (Int64 * Float * Float) =
     let (b2, bb2, sum2) = Stdlib.Math.__branredHalf x2 in
     let sum = sum1 + sum2 in
     let b = b1 + b2 in
-    let bb = if Stdlib.Float.absoluteValue b1 > Stdlib.Float.absoluteValue b2 then (b1 - b) + b2 else (b2 - b) + b1 in
+    let bb = if Stdlib.Float64.absoluteValue b1 > Stdlib.Float64.absoluteValue b2 then (b1 - b) + b2 else (b2 - b) + b1 in
     let (b, sum) =
         if b > 0.5 then (b - 1.0, sum + 1.0)
         else if b < -0.5 then (b + 1.0, sum - 1.0)
@@ -1738,10 +1738,10 @@ let __branred (x0: Float) : (Int64 * Float * Float) =
     let b = s * 1.5707963267948966 in
     let bb = (((t1 * 1.5707963407039642 - b) + t1 * -1.3909067675399456e-08) + t2 * 1.5707963407039642) + (t2 * -1.3909067675399456e-08 + s * 6.123233995736766e-17 + t * 1.5707963267948966) in
     let s = b + bb in
-    (Stdlib.Int64.bitwiseAnd (Stdlib.Float.__toInt64Unchecked sum) 3L, s, (b - s) + bb)
+    (Stdlib.Int64.bitwiseAnd (Stdlib.Float64.__toInt64Unchecked sum) 3L, s, (b - s) + bb)
 
 let sin (value: Float) : Float =
-    let m = Stdlib.Float.absoluteValue value in
+    let m = Stdlib.Float64.absoluteValue value in
     if m < 1.4901161193847656e-08 then value
     else if m < 0.85546875 then Stdlib.Math.__doSin value 0.0
     else if m < 2.4262638092041016 then Stdlib.Math.__copySign (Stdlib.Math.__doCos (1.5707963267948966 - m) 6.123233995736766e-17) value
@@ -1752,7 +1752,7 @@ let sin (value: Float) : Float =
         Stdlib.Math.__doSinCos a da n
 
 let cos (value: Float) : Float =
-    let m = Stdlib.Float.absoluteValue value in
+    let m = Stdlib.Float64.absoluteValue value in
     if m < 7.450580596923828e-09 then 1.0
     else if m < 0.85546875 then Stdlib.Math.__doCos value 0.0
     else if m < 2.4262638092041016 then
@@ -1771,7 +1771,7 @@ let __atanSeries (value: Float) (squared: Float) (term: Float) (index: Int64) (r
     if remaining == 0L then total
     else
         let nextTerm = 0.0 - term * squared in
-        Stdlib.Math.__atanSeries value squared nextTerm (index + 1L) (remaining - 1L) (total + nextTerm / Stdlib.Int64.toFloat (index * 2L + 1L))
+        Stdlib.Math.__atanSeries value squared nextTerm (index + 1L) (remaining - 1L) (total + nextTerm / Stdlib.Int64.toFloat64 (index * 2L + 1L))
 
 let __atanPositive (value: Float) : Float =
     if value > 1.0 then Stdlib.Math.pi / 2.0 - Stdlib.Math.__atanPositive (1.0 / value)
@@ -1780,74 +1780,74 @@ let __atanPositive (value: Float) : Float =
     else Stdlib.Math.__atanSeries value (value * value) value 1L 28L value
 
 let atan (value: Float) : Float =
-    if Stdlib.Float.isNaN value then value
+    if Stdlib.Float64.isNaN value then value
     else if value == 0.0 then value
-    else if Stdlib.Float.__isInfinite value then
+    else if Stdlib.Float64.__isInfinite value then
         if value < 0.0 then 0.0 - Stdlib.Math.pi / 2.0 else Stdlib.Math.pi / 2.0
     else if value < 0.0 then 0.0 - Stdlib.Math.__atanPositive (0.0 - value)
     else Stdlib.Math.__atanPositive value
 
 let atan2 (y: Float) (x: Float) : Float =
-    if Stdlib.Float.isNaN x || Stdlib.Float.isNaN y then Stdlib.Float.__nan ()
-    else if Stdlib.Float.__isInfinite y && Stdlib.Float.__isInfinite x then
+    if Stdlib.Float64.isNaN x || Stdlib.Float64.isNaN y then Stdlib.Float64.__nan ()
+    else if Stdlib.Float64.__isInfinite y && Stdlib.Float64.__isInfinite x then
         if y > 0.0 then
             if x > 0.0 then Stdlib.Math.pi / 4.0 else 3.0 * Stdlib.Math.pi / 4.0
         else if x > 0.0 then 0.0 - Stdlib.Math.pi / 4.0
         else 0.0 - 3.0 * Stdlib.Math.pi / 4.0
-    else if Stdlib.Float.__isInfinite y then
+    else if Stdlib.Float64.__isInfinite y then
         if y > 0.0 then Stdlib.Math.pi / 2.0 else 0.0 - Stdlib.Math.pi / 2.0
-    else if Stdlib.Float.__isInfinite x then
-        if x > 0.0 then if Stdlib.Float.__isNegative y then -0.0 else 0.0
-        else if Stdlib.Float.__isNegative y then 0.0 - Stdlib.Math.pi else Stdlib.Math.pi
+    else if Stdlib.Float64.__isInfinite x then
+        if x > 0.0 then if Stdlib.Float64.__isNegative y then -0.0 else 0.0
+        else if Stdlib.Float64.__isNegative y then 0.0 - Stdlib.Math.pi else Stdlib.Math.pi
     else if x > 0.0 then Stdlib.Math.atan (y / x)
     else if x < 0.0 then
-        if Stdlib.Float.__isNegative y then Stdlib.Math.atan (y / x) - Stdlib.Math.pi
+        if Stdlib.Float64.__isNegative y then Stdlib.Math.atan (y / x) - Stdlib.Math.pi
         else Stdlib.Math.atan (y / x) + Stdlib.Math.pi
     else if y > 0.0 then Stdlib.Math.pi / 2.0
     else if y < 0.0 then 0.0 - Stdlib.Math.pi / 2.0
-    else if Stdlib.Float.__isNegative x then
-        if Stdlib.Float.__isNegative y then 0.0 - Stdlib.Math.pi else Stdlib.Math.pi
+    else if Stdlib.Float64.__isNegative x then
+        if Stdlib.Float64.__isNegative y then 0.0 - Stdlib.Math.pi else Stdlib.Math.pi
     else y
 
 let asin (value: Float) : Stdlib.Option.Option<Float> =
-    if Stdlib.Float.isNaN value || value < -1.0 || value > 1.0 then None
+    if Stdlib.Float64.isNaN value || value < -1.0 || value > 1.0 then None
     else if value == 1.0 then Some (Stdlib.Math.pi / 2.0)
     else if value == -1.0 then Some (0.0 - Stdlib.Math.pi / 2.0)
     else if value == 0.0 then Some value
-    else Some (Stdlib.Math.atan2 value (Stdlib.Float.sqrt (1.0 - value * value)))
+    else Some (Stdlib.Math.atan2 value (Stdlib.Float64.sqrt (1.0 - value * value)))
 
 let acos (value: Float) : Stdlib.Option.Option<Float> =
-    if Stdlib.Float.isNaN value || value < -1.0 || value > 1.0 then None
+    if Stdlib.Float64.isNaN value || value < -1.0 || value > 1.0 then None
     else if value == 1.0 then Some 0.0
     else if value == -1.0 then Some Stdlib.Math.pi
-    else Some (Stdlib.Math.atan2 (Stdlib.Float.sqrt (1.0 - value * value)) value)
+    else Some (Stdlib.Math.atan2 (Stdlib.Float64.sqrt (1.0 - value * value)) value)
 
 let cosh (value: Float) : Float =
-    if Stdlib.Float.isNaN value then value
+    if Stdlib.Float64.isNaN value then value
     else
-        let magnitude = Stdlib.Float.absoluteValue value in
-        let positive = Stdlib.Float.__exp magnitude in
+        let magnitude = Stdlib.Float64.absoluteValue value in
+        let positive = Stdlib.Float64.__exp magnitude in
         (positive + 1.0 / positive) / 2.0
 
 let sinh (value: Float) : Float =
-    if value == 0.0 || Stdlib.Float.isNaN value then value
+    if value == 0.0 || Stdlib.Float64.isNaN value then value
     else
-        let magnitude = Stdlib.Float.absoluteValue value in
-        let positive = Stdlib.Float.__exp magnitude in
+        let magnitude = Stdlib.Float64.absoluteValue value in
+        let positive = Stdlib.Float64.__exp magnitude in
         let result = (positive - 1.0 / positive) / 2.0 in
         if value < 0.0 then 0.0 - result else result
 
 // Saturation avoids overflow; the small-input series avoids cancellation.
 let tanh (value: Float) : Float =
-    if value == 0.0 || Stdlib.Float.isNaN value then value
+    if value == 0.0 || Stdlib.Float64.isNaN value then value
     else
-        let magnitude = Stdlib.Float.absoluteValue value in
+        let magnitude = Stdlib.Float64.absoluteValue value in
         let result =
             if magnitude > 20.0 then 1.0
             else if magnitude < 0.00001 then
                 let squared = magnitude * magnitude in
                 magnitude * (1.0 + squared * (-0.3333333333333333 + squared * 0.13333333333333333))
             else
-                let negative = Stdlib.Float.__exp (0.0 - 2.0 * magnitude) in
+                let negative = Stdlib.Float64.__exp (0.0 - 2.0 * magnitude) in
                 (1.0 - negative) / (1.0 + negative) in
         if value < 0.0 then 0.0 - result else result

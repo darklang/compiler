@@ -247,17 +247,17 @@ module NonStringKeys =
   module FloatKeys =
     Stdlib.Dict.get (Dict { 0.0: "zero" }) -0.0 = Stdlib.Option.Option.Some "zero"
 
-    (let nan = Stdlib.Float.sqrt -1.0
+    (let nan = Stdlib.Float64.sqrt -1.0
      nan == nan) = false
 
-    (let nan = Stdlib.Float.sqrt -1.0
+    (let nan = Stdlib.Float64.sqrt -1.0
      Dict { nan: "nan" }) = error="Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
 
-    Stdlib.Dict.set (Dict { 1.0: "one" }) (Stdlib.Float.sqrt -1.0) "nan" = error="Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
+    Stdlib.Dict.set (Dict { 1.0: "one" }) (Stdlib.Float64.sqrt -1.0) "nan" = error="Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
 
-    Stdlib.Dict.set (Dict { }) [ 1.0, Stdlib.Float.sqrt -1.0 ] "nan" = error="Cannot use [1.0, NaN] as a dict key. NaN is not equal to itself, so a key holding it could never be found."
+    Stdlib.Dict.set (Dict { }) [ 1.0, Stdlib.Float64.sqrt -1.0 ] "nan" = error="Cannot use [1.0, NaN] as a dict key. NaN is not equal to itself, so a key holding it could never be found."
 
-    Stdlib.Dict.get (Dict { 1.0: "one" }) (Stdlib.Float.sqrt -1.0) = error="Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
+    Stdlib.Dict.get (Dict { 1.0: "one" }) (Stdlib.Float64.sqrt -1.0) = error="Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
 
     (let inf = 1.0 / 0.0
      Stdlib.Dict.get (Dict { inf: "inf" }) inf) = Stdlib.Option.Option.Some "inf"

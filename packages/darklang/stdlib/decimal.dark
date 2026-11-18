@@ -14,7 +14,7 @@ let toParts (d: Decimal) : (Int * Int64) =
     match d with
     | DECIMAL (unscaled, scale) -> (unscaled, scale)
 
-let __limit () : Int = Stdlib.Float.__powerOfTwo 96L
+let __limit () : Int = Stdlib.Float64.__powerOfTwo 96L
 
 let __fits (unscaled: Int) : Bool =
     Stdlib.Int.lessThan (Stdlib.Int.absoluteValue unscaled) (Stdlib.Decimal.__limit ())
@@ -32,7 +32,7 @@ let __zero () : Int = Stdlib.Int.fromInt64 0L
 
 // numerator / denominator (denominator > 0), rounded half to even.
 let __divideRounded (numerator: Int) (denominator: Int) : Int =
-    let magnitude = Stdlib.Float.__roundedQuotient (Stdlib.Int.absoluteValue numerator) denominator in
+    let magnitude = Stdlib.Float64.__roundedQuotient (Stdlib.Int.absoluteValue numerator) denominator in
     if Stdlib.Int.lessThan numerator (Stdlib.Decimal.__zero ()) then Stdlib.Int.negate magnitude
     else magnitude
 
@@ -43,7 +43,7 @@ let __fitFrom (unscaled: Int) (scale: Int64) (target: Int64) : Decimal =
     else
         let rounded =
             if target >= scale then unscaled
-            else Stdlib.Decimal.__divideRounded unscaled (Stdlib.Float.__pow10 (scale - target)) in
+            else Stdlib.Decimal.__divideRounded unscaled (Stdlib.Float64.__pow10 (scale - target)) in
         if Stdlib.Decimal.__fits rounded then DECIMAL (rounded, target)
         else Stdlib.Decimal.__fitFrom unscaled scale (target - 1L)
 
@@ -52,7 +52,7 @@ let __fit (unscaled: Int) (scale: Int64) : Decimal =
 
 let __scaledTo (d: Decimal) (scale: Int64) : Int =
     let (unscaled, own) = Stdlib.Decimal.toParts d in
-    Stdlib.Int.multiply unscaled (Stdlib.Float.__pow10 (scale - own))
+    Stdlib.Int.multiply unscaled (Stdlib.Float64.__pow10 (scale - own))
 
 let __commonScale (a: Decimal) (b: Decimal) : Int64 =
     let (_, sa) = Stdlib.Decimal.toParts a in
@@ -77,8 +77,8 @@ let multiply (a: Decimal) (b: Decimal) : Decimal =
 let __divideFrom (ua: Int) (sa: Int64) (ub: Int) (sb: Int64) (scale: Int64) : Decimal =
     // ua / 10**sa / (ub / 10**sb) * 10**scale = ua * 10**(scale - sa + sb) / ub
     let shift = scale - sa + sb in
-    let numerator = if shift >= 0L then Stdlib.Int.multiply ua (Stdlib.Float.__pow10 shift) else ua in
-    let denominator = if shift >= 0L then ub else Stdlib.Int.multiply ub (Stdlib.Float.__pow10 (0L - shift)) in
+    let numerator = if shift >= 0L then Stdlib.Int.multiply ua (Stdlib.Float64.__pow10 shift) else ua in
+    let denominator = if shift >= 0L then ub else Stdlib.Int.multiply ub (Stdlib.Float64.__pow10 (0L - shift)) in
     let quotient = Stdlib.Int.divide numerator denominator in
     let exact =
         match Stdlib.Int.remainder numerator denominator with
@@ -93,8 +93,8 @@ let __divideFrom (ua: Int) (sa: Int64) (ub: Int) (sb: Int64) (scale: Int64) : De
 
 let __roundedQuotientAt (ua: Int) (sa: Int64) (ub: Int) (sb: Int64) (scale: Int64) : Decimal =
     let shift = scale - sa + sb in
-    let numerator = if shift >= 0L then Stdlib.Int.multiply ua (Stdlib.Float.__pow10 shift) else ua in
-    let denominator = if shift >= 0L then ub else Stdlib.Int.multiply ub (Stdlib.Float.__pow10 (0L - shift)) in
+    let numerator = if shift >= 0L then Stdlib.Int.multiply ua (Stdlib.Float64.__pow10 shift) else ua in
+    let denominator = if shift >= 0L then ub else Stdlib.Int.multiply ub (Stdlib.Float64.__pow10 (0L - shift)) in
     let negative = Stdlib.Int.lessThan denominator (Stdlib.Decimal.__zero ()) in
     let rounded =
         Stdlib.Decimal.__divideRounded

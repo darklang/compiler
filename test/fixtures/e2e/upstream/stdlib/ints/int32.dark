@@ -91,9 +91,9 @@ Stdlib.Int32.sqrt 4l = 2.0
 Stdlib.Int32.sqrt 100l = 10.0
 Stdlib.Int32.sqrt 86l = 9.273618495495704
 
-Stdlib.Int32.toFloat 2l = 2.0
-Stdlib.Int32.toFloat 955656l = 955656.0
-Stdlib.Int32.toFloat -10l = -10.0
+Stdlib.Int32.toFloat64 2l = 2.0
+Stdlib.Int32.toFloat64 955656l = 955656.0
+Stdlib.Int32.toFloat64 -10l = -10.0
 
 Stdlib.Int32.add 10l 9l = 19l
 Stdlib.Int32.add 88l 9l = 97l

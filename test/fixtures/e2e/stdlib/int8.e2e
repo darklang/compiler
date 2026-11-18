@@ -153,8 +153,8 @@ Stdlib.Int8.sum ([10y, 20y, 30y]) = 60y
 // Stdlib.Int8.sqrt - not implemented
 // Stdlib.Int8.sqrt(4) = 2.0
 
-// Stdlib.Int8.toFloat - not implemented
-// Stdlib.Int8.toFloat(2) = 2.0
+// Stdlib.Int8.toFloat64 - not implemented
+// Stdlib.Int8.toFloat64(2) = 2.0
 
 // Stdlib.Int8.parse - needs Result type (blocked by type checker bug)
 // Stdlib.Int8.parse("1") = Ok(1)

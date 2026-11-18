@@ -19,7 +19,7 @@ let s = dynamicString "abc" in __stringRefcount s = stdout="1\n" stderr="" // fr
 let s = "a" + "b" in 0L = stdout="0\n" stderr="" // string concat reclaimed
 let src = "a" + "bc" in let s = Stdlib.String.slice src 0L 1L in 0L = stdout="0\n" stderr="" // unaligned string slice reclaimed
 let s = Stdlib.String.fromList (['a']) in 0L = stdout="0\n" stderr="" // unaligned string builder reclaimed
-let s = Stdlib.Float.toString 1.25 in 0L = stdout="0\n" stderr="" // float toString result reclaimed
+let s = Stdlib.Float64.toString 1.25 in 0L = stdout="0\n" stderr="" // float toString result reclaimed
 let sign = if false then "-" else "" in let s = sign + "1" in 0L = stdout="0\n" stderr="" // branch-selected literal string reclaimed
 let s = Stdlib.String.toUppercase ("a" + "b") in 0L = stdout="0\n" stderr="" // string toUpperCase result and input reclaimed
 let s = Stdlib.String.replaceAll "a,b,c" "," "|" in 0L = stdout="0\n" stderr="" // string replace result and intermediate splits reclaimed

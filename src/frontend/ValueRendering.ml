@@ -264,7 +264,7 @@ let runtimeFunctionNames =
     "Darklang.Stdlib.DateTime.toString";
     "Darklang.Stdlib.Dict.__renderKey";
     "Darklang.Stdlib.Dict.toList";
-    "Darklang.Stdlib.Float.toString";
+    "Darklang.Stdlib.Float64.toString";
     "Darklang.Stdlib.Int.toString";
     "Darklang.Stdlib.Int128.toString";
     "Darklang.Stdlib.Int16.toString";
@@ -553,7 +553,7 @@ and renderBody env typ value state =
   | TInt128 -> (suffixed state "Darklang.Stdlib.Int128.toString" "s128" value, state)
   | TUInt128 -> (suffixed state "Darklang.Stdlib.UInt128.toString" "u128" value, state)
   | TFloat64 ->
-      (call state.symbols "Darklang.Stdlib.Float.toString" [ value ], state)
+      (call state.symbols "Darklang.Stdlib.Float64.toString" [ value ], state)
   | TString -> (escapedString state.symbols "\"" value, state)
   | TChar -> (escapedString state.symbols "'" value, state)
   | TDateTime ->

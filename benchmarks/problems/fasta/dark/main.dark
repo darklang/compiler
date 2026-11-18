@@ -49,7 +49,7 @@ let makeRandomFasta (n: Int64) (table: List<(Int64 * Float)>) (seed: Int64) (i: 
     if i >= n then (checksum, seed)
     else
         let newSeed = (seed * 3877L + 29573L) % 139968L in
-        let r = Stdlib.Int64.toFloat newSeed / 139968.0 in
+        let r = Stdlib.Int64.toFloat64 newSeed / 139968.0 in
         let c = selectRandom table r 0L in
         let newChecksum = (checksum + c * (i + 1L)) % 1000000007L in
         makeRandomFasta n table newSeed (i + 1L) newChecksum

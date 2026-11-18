@@ -73,7 +73,7 @@ and parseRecordDef state index =
   and stop = ref (index + 1)
   and more = ref true in
   while !more && tok state !stop <> TRBrace && tok state !stop <> TEOF do
-    match (tok state !stop, tok state (!stop + 1)) with
+    match (fieldTok state !stop, tok state (!stop + 1)) with
     | TIdent name, TColon ->
         let nameRange = rng state !stop and colon = rng state (!stop + 1) in
         let typ, after = TypeParser.parseTypeRef state (!stop + 2) in

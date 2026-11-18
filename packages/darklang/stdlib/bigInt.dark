@@ -5,8 +5,8 @@
 
 module Darklang.Stdlib.BigInt
 
-let toFloat (value: BigInt) : Float = Stdlib.Int.toFloat value
-let fromFloat (value: Float) : BigInt = Stdlib.Int.fromFloat value
+let toFloat64 (value: BigInt) : Float = Stdlib.Int.toFloat64 value
+let fromFloat64 (value: Float) : BigInt = Stdlib.Int.fromFloat64 value
 let random (start: BigInt) (end_: BigInt) : BigInt = Stdlib.Int.random start end_
 
 let parse (value: String) : Stdlib.Result.Result<BigInt, Stdlib.BigInt.ParseError> =

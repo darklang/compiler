@@ -264,7 +264,7 @@ and parsePostfix state value index =
   let digits text =
     text <> "" && String.for_all (fun c -> c >= '0' && c <= '9') text
   in
-  match (tok state index, tok state (index + 1)) with
+  match (tok state index, fieldTok state (index + 1)) with
   | TQuestion, _ ->
       let question = rng state index in
       if (rng state (index - 1)).end_ <> question.start then

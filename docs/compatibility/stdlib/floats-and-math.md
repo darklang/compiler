@@ -4,11 +4,11 @@ The [source ledger](../../porting/README.md) owns current support and test dispo
 Float bit representation and hyperbolic tangent follow interpreter
 `e76430be5`; the original rounding/parsing comparison used `0b3888d8e4f30d48ecd738f5cbe5cc2b8d958460`.
 
-The compiler implementation is in `packages/darklang/stdlib/float.dark` and
+The compiler implementation is in `packages/darklang/stdlib/float64.dark` and
 `packages/darklang/stdlib/math.dark`. Public values continue to render through
 `src/frontend/ValueRendering.ml` and
 `src/passes/anf/PrintInsertion.ml`, both of which call the same
-`Stdlib.Float.toString` implementation. Focused executable coverage is in
+`Stdlib.Float64.toString` implementation. Focused executable coverage is in
 `test/fixtures/e2e/stdlib/float.e2e` and `math.e2e`.
 
 ## Public surface

@@ -4,11 +4,11 @@ let duplicatedFirst (x: Int64): Int64 = x + 1L
 let duplicatedSecond (x: Int64): Int64 = x + 2L
 
 // Qualified package/module spellings resolve exactly.
-Stdlib.Float.sqrt 4.0 = 2.0
+Stdlib.Float64.sqrt 4.0 = 2.0
 
 // The interpreter's canonical stdlib root and its public shortcut name the
 // same declaration.
-Darklang.Stdlib.Float.sqrt 9.0 = 3.0
+Darklang.Stdlib.Float64.sqrt 9.0 = 3.0
 
 // Option and Result retain their interpreter-wide short type and constructor
 // spellings without implicitly opening the rest of the standard library.
@@ -20,7 +20,7 @@ let canonicalOption (value: Int64): Darklang.Stdlib.Option.Option<Int64> = Darkl
 let shortcutResult (value: Int64): Stdlib.Result.Result<Int64, String> = Stdlib.Result.Result.Ok value in shortcutResult 7L = Ok 7L
 
 // The compiler no longer inserts an implicit Stdlib qualifier.
-Float.sqrt 4.0 = compileerror="Unknown function or value 'Float.sqrt'"
+Float64.sqrt 4.0 = compileerror="Unknown function or value 'Float64.sqrt'"
 Stdlib.Bytes.create 0L = compileerror="Unknown function or value 'Stdlib.Bytes.create'"
 
 // Lexical callable values shadow a same-spelled top-level function.

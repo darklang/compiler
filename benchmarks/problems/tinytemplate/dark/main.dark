@@ -400,7 +400,7 @@ let format (value: Value) : Stdlib.Result.Result<String, TemplateError> =
     | NullValue -> Ok ""
     | BoolValue boolean -> Ok (if boolean then "true" else "false")
     | IntValue number -> Ok (Stdlib.Int64.toString number)
-    | FloatValue number -> Ok (Stdlib.Float.toString number)
+    | FloatValue number -> Ok (Stdlib.Float64.toString number)
     | StringValue text -> Ok (escape text)
     | ArrayValue _ -> Error (GenericError "Expected a printable value but found array or object.")
     | ObjectValue _ -> Error (GenericError "Expected a printable value but found array or object.")

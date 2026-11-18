@@ -14,4 +14,4 @@ Stdlib.Math.sin 1.0 = 0.8414709848078965
 Stdlib.Math.cos 1.0 = 0.5403023058681398
 Stdlib.Math.sin (-0.0) = -0.0
 Stdlib.Math.cos 0.0 = 1.0
-Stdlib.Float.isNaN (Stdlib.Math.sin (1.0 / 0.0)) = true
+Stdlib.Float64.isNaN (Stdlib.Math.sin (1.0 / 0.0)) = true

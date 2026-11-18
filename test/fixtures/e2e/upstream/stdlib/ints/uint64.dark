@@ -55,8 +55,8 @@ Stdlib.UInt64.sqrt 4UL = 2.0
 Stdlib.UInt64.sqrt 100UL = 10.0
 Stdlib.UInt64.sqrt 86UL = 9.273618495495704
 
-Stdlib.UInt64.toFloat 2UL = 2.0
-Stdlib.UInt64.toFloat 955656UL = 955656.0
+Stdlib.UInt64.toFloat64 2UL = 2.0
+Stdlib.UInt64.toFloat64 955656UL = 955656.0
 
 Stdlib.UInt64.add 10UL 9UL = 19UL
 Stdlib.UInt64.add 88UL 9UL = 97UL

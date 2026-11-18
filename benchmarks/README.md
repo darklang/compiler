@@ -447,7 +447,7 @@ substituted at the `Stdlib.Cli.__Args.int64` boundary. That copy also
 translates the compiler's documented interpreter-compatibility spellings where
 the interpreter surface differs (including dictionary type
 arguments, tuple projections, enum-value qualification, and unwrapping
-`Int64.fromFloat` conversions. Out-of-range conversions still fail.
+`Int64.fromFloat64` conversions. Out-of-range conversions still fail.
 Each parallel interpreter worker receives a private copy of the prepared
 rundir, preventing trace-store lock contention from affecting the measurement.
 The runner validates exact stdout before recording the instruction count. The

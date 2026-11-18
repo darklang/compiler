@@ -5,7 +5,7 @@ let addConstantFact (x: Int64) : Int64 = x + constantIntFact ()
 addConstantFact 1L = 42L
 
 let constantFloatFact () : Float = -0.0
-let floatBitsFact () : UInt64 = Stdlib.Float.toBits (constantFloatFact ())
+let floatBitsFact () : UInt64 = Stdlib.Float64.toBits (constantFloatFact ())
 floatBitsFact () = 9223372036854775808UL
 
 let effectfulConstantFact () : Int64 = let _ = Builtin.print "called" in 7L

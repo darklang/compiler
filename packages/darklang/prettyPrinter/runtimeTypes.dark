@@ -65,7 +65,7 @@ let typeReference
     | TInt128 -> "Int128"
     | TUInt128 -> "UInt128"
     | TBigInt -> "BigInt"
-    | TFloat -> "Float"
+    | TFloat64 -> "Float64"
     | TChar -> "Char"
     | TString -> "String"
     | TUuid -> "Uuid"
@@ -124,7 +124,7 @@ let knownType
     | KTInt128 -> "Int128"
     | KTUInt128 -> "UInt128"
     | KTBigInt -> "BigInt"
-    | KTFloat -> "Float"
+    | KTFloat64 -> "Float64"
     | KTChar -> "Char"
     | KTString -> "String"
     | KTUuid -> "Uuid"
@@ -239,7 +239,7 @@ module Dval =
     | DInt128 _ -> "Int128"
     | DUInt128 _ -> "UInt128"
     | DBigInt _ -> "BigInt"
-    | DFloat _ -> "Float"
+    | DFloat64 _ -> "Float64"
     | DChar _ -> "Char"
     | DString _ -> "String"
     | DDateTime _ -> "DateTime"
@@ -285,7 +285,7 @@ let dval
     | DInt128 item -> Stdlib.Int128.toString item
     | DUInt128 item -> Stdlib.UInt128.toString item
     | DBigInt item -> Stdlib.Int.toString item + "z"
-    | DFloat item -> Stdlib.Float.toString item
+    | DFloat64 item -> Stdlib.Float64.toString item
     | DChar item -> "'" + Stdlib.Char.toString item + "'"
     | DString item -> Stdlib.AltJson.__quote item
     | DDateTime item -> "<DateTime: " + Stdlib.DateTime.toString item + ">"

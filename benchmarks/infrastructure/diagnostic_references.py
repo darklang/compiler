@@ -161,11 +161,11 @@ def adapt_interpreter_source(source: str, arguments: tuple[str, ...]) -> str:
         "(Stdlib.Tuple2.second (checksum data 0L 0L))",
     )
     transformed = transformed.replace("Stdlib.String.equals left right", "left == right")
-    if "Stdlib.Int64.fromFloat" in transformed:
-        transformed = transformed.replace("Stdlib.Int64.fromFloat", "interpreterInt64FromFloat")
+    if "Stdlib.Int64.fromFloat64" in transformed:
+        transformed = transformed.replace("Stdlib.Int64.fromFloat64", "interpreterInt64FromFloat")
         transformed = (
             "let interpreterInt64FromFloat (value: Float) : Int64 =\n"
-            "    match Stdlib.Int64.fromFloat value with\n"
+            "    match Stdlib.Int64.fromFloat64 value with\n"
             "    | Some number -> number\n"
             "    | None -> Builtin.testRuntimeError \"float is outside Int64 range\"\n\n"
             + transformed

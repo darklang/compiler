@@ -71,14 +71,14 @@ Stdlib.Int.toInt128 (2 ** 100) =
 Stdlib.Int.toInt128 (2 ** 200) = Stdlib.Option.Option.None
 Stdlib.Int.toUInt128 (2 ** 200) = Stdlib.Option.Option.None
 
-// --- fromFloat: truncates toward zero; NaN/Infinity have no Int, so OutOfRange ---
-Stdlib.Int.fromFloat 3.9 = 3
-Stdlib.Int.fromFloat -3.9 = -3
-Stdlib.Int.fromFloat (0.0 / 0.0) =
+// --- fromFloat64: truncates toward zero; NaN/Infinity have no Int, so OutOfRange ---
+Stdlib.Int.fromFloat64 3.9 = 3
+Stdlib.Int.fromFloat64 -3.9 = -3
+Stdlib.Int.fromFloat64 (0.0 / 0.0) =
   error="Encountered an out-of-range integer value"
-Stdlib.Int.fromFloat (1.0 / 0.0) =
+Stdlib.Int.fromFloat64 (1.0 / 0.0) =
   error="Encountered an out-of-range integer value"
-Stdlib.Int.fromFloat (-1.0 / 0.0) =
+Stdlib.Int.fromFloat64 (-1.0 / 0.0) =
   error="Encountered an out-of-range integer value"
 
 

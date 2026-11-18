@@ -54,20 +54,10 @@ let parseDecl parseBlock state index =
         },
       after )
   else
+    (* `val limit: Int64 = 6`: the type is optional, and the value's own type stands. *)
     let next =
-      if tok state next = TColon then begin
-        state.diagnostics :=
-          {
-            code = DiagnosticCode.unexpected;
-            severity = DiagError;
-            range = rng state next;
-            message = "Value annotations are not supported";
-            related = [];
-            hint = Some "remove ': Type' from this value declaration";
-          }
-          :: !(state.diagnostics);
+      if tok state next = TColon then
         snd (TypeParser.parseTypeRef state (next + 1))
-      end
       else next
     in
     let equals, next =

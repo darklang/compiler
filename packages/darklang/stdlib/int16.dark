@@ -109,8 +109,8 @@ let __fromIntUnchecked (value: Int) : Int16 =
     | Some result -> result
     | None -> Builtin.crash "Internal Int16 conversion invariant failed"
 let random (start: Int16) (finish: Int16) : Int16 = Stdlib.Int16.__fromIntUnchecked (Stdlib.Int.random (Stdlib.Int.fromInt16 start) (Stdlib.Int.fromInt16 finish))
-let toFloat (value: Int16) : Float = Stdlib.Int.toFloat (Stdlib.Int.fromInt16 value)
-let sqrt (value: Int16) : Float = Stdlib.Float.sqrt (Stdlib.Int16.toFloat value)
+let toFloat64 (value: Int16) : Float = Stdlib.Int.toFloat64 (Stdlib.Int.fromInt16 value)
+let sqrt (value: Int16) : Float = Stdlib.Float64.sqrt (Stdlib.Int16.toFloat64 value)
 let parse (value: String) : Stdlib.Result.Result<Int16, Stdlib.Int16.ParseError> =
     match Stdlib.Int.parse value with
     | Error _ -> Error Stdlib.Int16.ParseError.BadFormat

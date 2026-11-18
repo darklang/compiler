@@ -238,7 +238,7 @@ let parseRecord parseExpr state typeName nameRange index =
       and stop = ref (index + 1)
       and more = ref true in
       while !more && tok state !stop <> TRBrace && tok state !stop <> TEOF do
-        match (tok state !stop, tok state (!stop + 1)) with
+        match (fieldTok state !stop, tok state (!stop + 1)) with
         | TIdent name, TEquals ->
             let nameRange = rng state !stop in
             setStmtCol state nameRange.start.column;
@@ -337,7 +337,7 @@ let parseRecordUpdate parseExpr state index =
       and stop = ref next
       and more = ref true in
       while !more && tok state !stop <> TRBrace && tok state !stop <> TEOF do
-        match (tok state !stop, tok state (!stop + 1)) with
+        match (fieldTok state !stop, tok state (!stop + 1)) with
         | TIdent name, TEquals ->
             let nameRange = rng state !stop
             and equals = rng state (!stop + 1) in

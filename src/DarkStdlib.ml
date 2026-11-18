@@ -40,21 +40,21 @@ let boolIntrinsicModule : AST.moduleDef =
 
 (*
    Intrinsic Stdlib.Int64 functions
-   toFloat : (Int64) -> Float
+   toFloat64 : (Int64) -> Float64
 *)
 let int64IntrinsicModule : AST.moduleDef =
   {
     AST.name = "Darklang.Stdlib.Int64";
     functions =
-      integerBitwiseFunctions TInt64 @ [ fn "toFloat" [] [ TInt64 ] TFloat64 ];
+      integerBitwiseFunctions TInt64 @ [ fn "toFloat64" [] [ TInt64 ] TFloat64 ];
   }
 
 (*
-   Intrinsic Stdlib.Float functions
+   Intrinsic Stdlib.Float64 functions
 *)
 let floatIntrinsicModule : AST.moduleDef =
   {
-    AST.name = "Darklang.Stdlib.Float";
+    AST.name = "Darklang.Stdlib.Float64";
     functions =
       [
         fn "sqrt" [] [ TFloat64 ] TFloat64;

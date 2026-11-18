@@ -108,8 +108,8 @@ let __fromIntUnchecked (value: Int) : Int8 =
 
 let random (start: Int8) (finish: Int8) : Int8 =
     Stdlib.Int8.__fromIntUnchecked (Stdlib.Int.random (Stdlib.Int.fromInt8 start) (Stdlib.Int.fromInt8 finish))
-let toFloat (value: Int8) : Float = Stdlib.Int.toFloat (Stdlib.Int.fromInt8 value)
-let sqrt (value: Int8) : Float = Stdlib.Float.sqrt (Stdlib.Int8.toFloat value)
+let toFloat64 (value: Int8) : Float = Stdlib.Int.toFloat64 (Stdlib.Int.fromInt8 value)
+let sqrt (value: Int8) : Float = Stdlib.Float64.sqrt (Stdlib.Int8.toFloat64 value)
 let parse (value: String) : Stdlib.Result.Result<Int8, Stdlib.Int8.ParseError> =
     match Stdlib.Int.parse value with
     | Error _ -> Error Stdlib.Int8.ParseError.BadFormat

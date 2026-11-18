@@ -1,22 +1,22 @@
 Stdlib.Math.pi = 3.14159265359
 Stdlib.Math.e = 2.71828182846
-Stdlib.Math.tau = Stdlib.Float.multiply 2.0 Stdlib.Math.pi
+Stdlib.Math.tau = Stdlib.Float64.multiply 2.0 Stdlib.Math.pi
 
 
-Stdlib.Math.degrees -180.0 = Stdlib.Float.negate Stdlib.Math.pi
-Stdlib.Math.degrees 360.0 = Stdlib.Float.multiply 2.0 Stdlib.Math.pi
+Stdlib.Math.degrees -180.0 = Stdlib.Float64.negate Stdlib.Math.pi
+Stdlib.Math.degrees 360.0 = Stdlib.Float64.multiply 2.0 Stdlib.Math.pi
 
-Stdlib.Math.radians (Stdlib.Float.negate 3.141592653589793) = Stdlib.Float.negate Stdlib.Math.pi
-Stdlib.Math.radians 6.283185307179586 = Stdlib.Float.multiply 2.0 Stdlib.Math.pi
+Stdlib.Math.radians (Stdlib.Float64.negate 3.141592653589793) = Stdlib.Float64.negate Stdlib.Math.pi
+Stdlib.Math.radians 6.283185307179586 = Stdlib.Float64.multiply 2.0 Stdlib.Math.pi
 
 
-Stdlib.Math.sin (Stdlib.Float.divide Stdlib.Math.pi 2.0) = 1.0
+Stdlib.Math.sin (Stdlib.Float64.divide Stdlib.Math.pi 2.0) = 1.0
 Stdlib.Math.sin 0.0 = 0.0
 
 Stdlib.Math.cos 0.0 = 1.0
 Stdlib.Math.cos Stdlib.Math.pi = -1.0
 
-Stdlib.Math.tan (Stdlib.Float.divide Stdlib.Math.pi 4.0) = 1.0
+Stdlib.Math.tan (Stdlib.Float64.divide Stdlib.Math.pi 4.0) = 1.0
 Stdlib.Math.tan 0.0 = 0.0
 
 Stdlib.Math.atan 0.0 = 0.0
@@ -47,5 +47,5 @@ Stdlib.Math.sinh 1.0 = 1.17520119364
 Stdlib.Math.tanh 0.0 = 0.0
 
 
-Stdlib.Math.turns (Stdlib.Float.negate 0.5) = Stdlib.Float.negate Stdlib.Math.pi
-Stdlib.Math.turns 1.0 = Stdlib.Float.multiply 2.0 Stdlib.Math.pi
+Stdlib.Math.turns (Stdlib.Float64.negate 0.5) = Stdlib.Float64.negate Stdlib.Math.pi
+Stdlib.Math.turns 1.0 = Stdlib.Float64.multiply 2.0 Stdlib.Math.pi

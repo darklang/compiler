@@ -27,7 +27,7 @@ let applyPair (left: Body) (right: Body) (dt: Float) : (Body * Body) =
     let dx = left.x - right.x in
     let dy = left.y - right.y in
     let dz = left.z - right.z in
-    let dist = Stdlib.Float.sqrt (dx * dx + dy * dy + dz * dz) in
+    let dist = Stdlib.Float64.sqrt (dx * dx + dy * dy + dz * dz) in
     let mag = dt / (dist * dist * dist) in
     let left2 = {
         left with
@@ -83,7 +83,7 @@ let potential (left: Body) (right: Body) : Float =
     let dx = left.x - right.x in
     let dy = left.y - right.y in
     let dz = left.z - right.z in
-    let dist = Stdlib.Float.sqrt (dx * dx + dy * dy + dz * dz) in
+    let dist = Stdlib.Float64.sqrt (dx * dx + dy * dy + dz * dz) in
     (left.mass * right.mass) / dist
 
 let energy (system: System) : Float =
@@ -183,4 +183,4 @@ let benchmarkArg (index: Int) : Int64 =
 
 let system = offsetMomentum (initialSystem ()) in
 let finalSystem = advance system 0.01 (benchmarkArg 0) in
-Builtin.printLine (Stdlib.Int64.toString (Builtin.unwrap (Stdlib.Int64.fromFloat (energy finalSystem * 1000000.0))))
+Builtin.printLine (Stdlib.Int64.toString (Builtin.unwrap (Stdlib.Int64.fromFloat64 (energy finalSystem * 1000000.0))))

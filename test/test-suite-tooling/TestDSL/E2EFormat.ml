@@ -1735,7 +1735,10 @@ let parseCanonicalE2ETestFile path raw (inventory : SourceInventory.source) =
                   ^ " () with\n" ^ "| Pass -> true\n" ^ "| Fail messages ->\n"
                   ^ "  let _ = Stdlib.printLine \"Imported test failed\" in\n"
                   ^ "  let _ = Stdlib.List.iter messages Stdlib.printLine in\n"
-                  ^ "  false",
+                  ^ "  false\n" ^ "| other ->\n"
+                  ^ "  if Stdlib.Test.passed other then true\n" ^ "  else\n"
+                  ^ "    let _ = Stdlib.printLine \"Imported test failed\" in\n"
+                  ^ "    false",
                   "true" )
           in
           make node test.W.keywordTest.T.start source expectation []

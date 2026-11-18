@@ -108,8 +108,8 @@ let __fromIntUnchecked (value: Int) : Int32 =
     | Some result -> result
     | None -> Builtin.crash "Internal Int32 conversion invariant failed"
 let random (start: Int32) (finish: Int32) : Int32 = Stdlib.Int32.__fromIntUnchecked (Stdlib.Int.random (Stdlib.Int.fromInt32 start) (Stdlib.Int.fromInt32 finish))
-let toFloat (value: Int32) : Float = Stdlib.Int.toFloat (Stdlib.Int.fromInt32 value)
-let sqrt (value: Int32) : Float = Stdlib.Float.sqrt (Stdlib.Int32.toFloat value)
+let toFloat64 (value: Int32) : Float = Stdlib.Int.toFloat64 (Stdlib.Int.fromInt32 value)
+let sqrt (value: Int32) : Float = Stdlib.Float64.sqrt (Stdlib.Int32.toFloat64 value)
 let parse (value: String) : Stdlib.Result.Result<Int32, Stdlib.Int32.ParseError> =
     match Stdlib.Int.parse value with
     | Error _ -> Error Stdlib.Int32.ParseError.BadFormat

@@ -169,8 +169,8 @@ Stdlib.UInt64.sum ([10UL, 20UL, 30UL]) = 60UL
 // Stdlib.UInt64.sqrt - not implemented
 // Stdlib.UInt64.sqrt(4) = 2.0
 
-// Stdlib.UInt64.toFloat - not implemented
-// Stdlib.UInt64.toFloat(2) = 2.0
+// Stdlib.UInt64.toFloat64 - not implemented
+// Stdlib.UInt64.toFloat64(2) = 2.0
 
 // Stdlib.UInt64.parse - needs Result type (blocked by type checker bug)
 // Stdlib.UInt64.parse("1") = Ok(1)

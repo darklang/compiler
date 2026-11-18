@@ -92,11 +92,11 @@ let __fromIntUnchecked (value: Int) : UInt64 =
     | Some result -> result
     | None -> Builtin.crash "Internal UInt64 conversion invariant failed"
 let random (start: UInt64) (finish: UInt64) : UInt64 = Stdlib.UInt64.__fromIntUnchecked (Stdlib.Int.random (Stdlib.Int.fromUInt64 start) (Stdlib.Int.fromUInt64 finish))
-let toFloat (value: UInt64) : Float = Stdlib.Int.toFloat (Stdlib.Int.fromUInt64 value)
-let sqrt (value: UInt64) : Float = Stdlib.Float.sqrt (Stdlib.UInt64.toFloat value)
-let fromFloat (a: Float) : Stdlib.Option.Option<UInt64> =
-  if Float.isFinite a then
-    a |> Stdlib.Int.fromFloat |> Stdlib.Int.toUInt64
+let toFloat64 (value: UInt64) : Float = Stdlib.Int.toFloat64 (Stdlib.Int.fromUInt64 value)
+let sqrt (value: UInt64) : Float = Stdlib.Float64.sqrt (Stdlib.UInt64.toFloat64 value)
+let fromFloat64 (a: Float) : Stdlib.Option.Option<UInt64> =
+  if Float64.isFinite a then
+    a |> Stdlib.Int.fromFloat64 |> Stdlib.Int.toUInt64
   else
     Stdlib.Option.Option.None
 let parse (value: String) : Stdlib.Result.Result<UInt64, Stdlib.UInt64.ParseError> =
@@ -170,7 +170,7 @@ impl Stdlib.One for UInt64 =
   let one () : UInt64 = 1UL
 
 let fromFloatRounded (a: Float) : Stdlib.Option.Option<UInt64> =
-  if Float.isFinite a then
-    a |> Float.__roundInt |> Stdlib.Int.toUInt64
+  if Float64.isFinite a then
+    a |> Float64.__roundInt |> Stdlib.Int.toUInt64
   else
     Stdlib.Option.Option.None

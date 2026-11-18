@@ -233,7 +233,7 @@ let emitFloatToBits (_ctx : funcCtx) dest src =
   | _ -> Error "FloatToBits with virtual FP register"
 
 (*
-   Call Stdlib.Float.toString(D0)
+   Call Stdlib.Float64.toString(D0)
 *)
 let emitFloatToString (_ctx : funcCtx) dest src =
   match src with
@@ -243,7 +243,7 @@ let emitFloatToString (_ctx : funcCtx) dest src =
       |> Result.map (fun destReg ->
           (if xmm <> X86_64.XMM0 then [ X86_64.MOVSD_reg (X86_64.XMM0, xmm) ]
            else [])
-          @ [ X86_64.CALL "Darklang.Stdlib.Float.toString" ]
+          @ [ X86_64.CALL "Darklang.Stdlib.Float64.toString" ]
           @
           if destReg <> X86_64.RAX then [ X86_64.MOV_reg (destReg, X86_64.RAX) ]
           else [])

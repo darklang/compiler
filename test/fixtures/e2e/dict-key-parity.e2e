@@ -2,7 +2,7 @@
 // Equal keys are one key, and the later key replaces the stored one: 0.0 then -0.0 keeps -0.0.
 type ParityKey = { number: Float, label: String }
 type ParitySum = | ParitySum of number: Float * label: String
-let nanValue () : Float = Stdlib.Float.sqrt -1.0
+let nanValue () : Float = Stdlib.Float64.sqrt -1.0
 let n = nanValue () in Dict { 1L: n } == Dict { 1L: n } = false
 let n = nanValue () in Dict { 1L: [n] } == Dict { 1L: [n] } = false
 let n = nanValue () in Dict { n: "value" } = exit=1 stderr="Uncaught exception: Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found.\n"
@@ -13,7 +13,7 @@ let n = nanValue () in Stdlib.Dict.member (Dict { ParitySum (1.0, "key"): "sum" 
 let n = nanValue () in Stdlib.Dict.remove (Dict { Some 1.0: "option" }) (Some n) = error="as a dict key. NaN is not equal to itself, so a key holding it could never be found."
 let n = nanValue () in Stdlib.Dict.fromList [(Dict { 1L: n }, "dict")] = error="as a dict key. NaN is not equal to itself, so a key holding it could never be found."
 Stdlib.Dict.get (Dict { [1.0]: "one" }) [2.0] = None
-Stdlib.List.map (Stdlib.Dict.keys (Stdlib.Dict.fromList [(1.5, 1L), (-2.5, 2L), (0.0, 3L), (-0.0, 4L)])) (fun k -> Stdlib.Float.toString k) = ["-2.5", "-0.0", "1.5"]
-Stdlib.List.map (Stdlib.Dict.keys (Stdlib.Dict.set (Stdlib.Dict.fromList [(1.0, 1L), (2.0, 2L), (-0.0, 3L)]) 0.0 4L)) (fun k -> Stdlib.Float.toString k) = ["0.0", "1.0", "2.0"]
+Stdlib.List.map (Stdlib.Dict.keys (Stdlib.Dict.fromList [(1.5, 1L), (-2.5, 2L), (0.0, 3L), (-0.0, 4L)])) (fun k -> Stdlib.Float64.toString k) = ["-2.5", "-0.0", "1.5"]
+Stdlib.List.map (Stdlib.Dict.keys (Stdlib.Dict.set (Stdlib.Dict.fromList [(1.0, 1L), (2.0, 2L), (-0.0, 3L)]) 0.0 4L)) (fun k -> Stdlib.Float64.toString k) = ["0.0", "1.0", "2.0"]
 Stdlib.Dict.get (Stdlib.Dict.fromList [(1.0, 1L), (2.0, 2L), (-0.0, 3L), (0.0, 4L)]) -0.0 = Some 4L
 Stdlib.Dict.toList (Stdlib.Dict.fromList [([1.0], "a"), ([2.0], "b"), ([0.0], "c"), ([-0.0], "d")]) = [([-0.0], "d"), ([1.0], "a"), ([2.0], "b")]

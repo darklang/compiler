@@ -102,8 +102,8 @@ identity_integer_double_negation (-9223372036854775808L) = -9223372036854775808L
 // identity_float_double_negation
 let identity_float_double_negation (x: Float) : Float = -(-x)
 identity_float_double_negation (-3.5) = -3.5 disable_opt_inline=true
-Stdlib.Float.toBits (identity_float_double_negation (-0.0)) = 9223372036854775808UL disable_opt_inline=true
-Stdlib.Float.toBits (identity_float_double_negation 0.0) = 0UL disable_opt_inline=true
+Stdlib.Float64.toBits (identity_float_double_negation (-0.0)) = 9223372036854775808UL disable_opt_inline=true
+Stdlib.Float64.toBits (identity_float_double_negation 0.0) = 0UL disable_opt_inline=true
 
 // combine_add_single_use_int64_negation_right
 let combine_add_single_use_int64_negation_right (x: Int64) (y: Int64) : Int64 = x + (-y)

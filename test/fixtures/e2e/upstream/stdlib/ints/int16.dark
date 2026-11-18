@@ -102,8 +102,8 @@ Stdlib.Int16.toString -1s = "-1"
 Stdlib.Int16.toString -32768s = "-32768" // Int16 lower limit
 Stdlib.Int16.toString 32767s = "32767" // Int16 upper limit
 
-Stdlib.Int16.toFloat 2s = 2.0
-Stdlib.Int16.toFloat -10s = -10.0
+Stdlib.Int16.toFloat64 2s = 2.0
+Stdlib.Int16.toFloat64 -10s = -10.0
 
 (Stdlib.List.range 1L 5L)
 |> Stdlib.List.map (fun x -> Stdlib.Int16.random 1s 2s)

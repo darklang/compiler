@@ -272,7 +272,7 @@ let __parseRaw (source: String) : Stdlib.Result.Result<Stdlib.AltJson.__Internal
 let __floatDigits (text: String) (index: Int64) (endIndex: Int64) (acc: Float) : Float =
     if index >= endIndex then acc
     else
-        Stdlib.AltJson.__floatDigits text (index + 1L) endIndex (acc * 10.0 + Stdlib.Int64.toFloat (Stdlib.String.__byteAtUnchecked text index - (48L)))
+        Stdlib.AltJson.__floatDigits text (index + 1L) endIndex (acc * 10.0 + Stdlib.Int64.toFloat64 (Stdlib.String.__byteAtUnchecked text index - (48L)))
 
 let __pow10 (exponent: Int64) (acc: Float) : Float =
     if exponent == 0L then acc
@@ -336,7 +336,7 @@ let __ratioToFloat (numerator: Int) (denominator: Int) : Stdlib.Option.Option<Fl
                 if shift < 0L then Stdlib.Int.shiftLeft denominator (Stdlib.Int.fromInt64 (0L - shift))
                 else denominator in
             let rounded = Stdlib.AltJson.__roundRatio scaledNumerator scaledDenominator in
-            let asFloat = Stdlib.Int.toFloat rounded in
+            let asFloat = Stdlib.Int.toFloat64 rounded in
             // Recompute after the BigInt operations so this primitive value need not
             // remain live across their native calls.
             let finalExponent = Stdlib.AltJson.__binaryExponent numerator denominator in
@@ -538,7 +538,7 @@ let __quote (value: String) : String =
     "\"" + Stdlib.AltJson.__escapeStringAt value 0L (Stdlib.String.__byteLength value) "" + "\""
 
 let __formatNumber (value: Float) : String =
-    let rendered = Stdlib.Float.toString value in
+    let rendered = Stdlib.Float64.toString value in
     if Stdlib.String.endsWith rendered ".0" then
         Stdlib.String.__byteSlice rendered 0L (Stdlib.String.__byteLength rendered - (2L))
     else rendered

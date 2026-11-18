@@ -29,9 +29,9 @@ let countRow (y: Int64) (startX: Int64) (endX: Int64) (size: Int64) (maxIter: In
     if startX >= endX then
         count
     else
-        let sizeF = Stdlib.Int64.toFloat size in
-        let xf = Stdlib.Int64.toFloat startX in
-        let yf = Stdlib.Int64.toFloat y in
+        let sizeF = Stdlib.Int64.toFloat64 size in
+        let xf = Stdlib.Int64.toFloat64 startX in
+        let yf = Stdlib.Int64.toFloat64 y in
         let cr = 2.0 * xf / sizeF - 1.5 in
         let ci = 2.0 * yf / sizeF - 1.0 in
         let inSet = iterate cr ci 0.0 0.0 0L maxIter in

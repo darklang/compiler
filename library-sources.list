@@ -46,7 +46,7 @@ packages/darklang/stdlib/list/sortByComparatorHelpers.dark
 packages/darklang/stdlib/list.dark
 packages/darklang/stdlib/__print.dark
 packages/darklang/stdlib/fun.dark
-packages/darklang/stdlib/float.dark
+packages/darklang/stdlib/float64.dark
 packages/darklang/stdlib/float32.dark
 packages/darklang/stdlib/decimal.dark
 packages/darklang/stdlib/cli/__posix.dark

@@ -268,6 +268,20 @@ let rng state index =
 let txt state index =
   if index < state.tokenCount then state.toks.(index).text else ""
 
+(* A record field may be named by a keyword (`r.type`, `{ type = 1 }`). *)
+let fieldTok state index =
+  let text = txt state index in
+  if
+    text <> ""
+    && text.[0] >= 'a' && text.[0] <= 'z'
+    && String.for_all
+         (fun c ->
+           (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+           || (c >= '0' && c <= '9') || c = '_')
+         text
+  then TIdent text
+  else tok state index
+
 (*
    `///` doc comment attached to the token at `i` (a declaration keyword), if any
 *)

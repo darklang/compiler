@@ -484,7 +484,7 @@ let functions (globals : globals) =
     | AST.TUInt32 -> Some "UInt32"
     | AST.TUInt64 -> Some "UInt64"
     | AST.TUInt128 -> Some "UInt128"
-    | AST.TFloat64 -> Some "Float"
+    | AST.TFloat64 -> Some "Float64"
     | AST.TBool -> Some "Bool"
     | AST.TString -> Some "String"
     | AST.TChar -> Some "Char"
