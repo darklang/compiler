@@ -88,10 +88,6 @@ let defaultCachePath () =
         | Some path when path <> "" -> Filename.concat path ".local/share"
         | _ -> "")
   in
-  let directory =
-    if Sys.file_exists directory && Sys.is_directory directory then directory
-    else ""
-  in
   Filename.concat (Filename.concat directory "dark-compiler") "packages.sqlite3"
 
 let defaultConfig () =
@@ -169,12 +165,17 @@ let requestNetwork client config path =
         answer
       with ex -> Error ("Package server GET " ^ uri ^ " failed: " ^ message ex))
 
+(* `dark compile` serves each compile on a fresh port with a one-time password,
+   so neither is part of the key. *)
 let cacheKey config path =
-  let rec trim index =
-    if index > 0 && config.server.[index - 1] = '/' then trim (index - 1)
-    else index
+  let server =
+    Uri.to_string
+      (Uri.with_port (Uri.with_userinfo (Uri.of_string config.server) None) None)
   in
-  String.sub config.server 0 (trim (String.length config.server)) ^ path
+  let rec trim index =
+    if index > 0 && server.[index - 1] = '/' then trim (index - 1) else index
+  in
+  String.sub server 0 (trim (String.length server)) ^ path
 
 let fetchByHash client config path =
   let key = cacheKey config path in
