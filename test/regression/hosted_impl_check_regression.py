@@ -18,7 +18,7 @@ def location(name):
 
 def reference(name, hash_):
     return dict(originalName=name.split("."), resolved={"Ok": [dict(
-        name={"Package": [{"Hash": [hash_]}]}, location={"Some": [location(name)]})]})
+        name={"Package": [{"Hash": [hash_]}]}, location=location(name))]})
 
 
 def main():

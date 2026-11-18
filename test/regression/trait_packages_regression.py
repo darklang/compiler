@@ -18,7 +18,7 @@ def location(name):
 
 def reference(name, hash_):
     return dict(originalName=name.split("."), resolved={"Ok": [dict(
-        name={"Package": [{"Hash": [hash_]}]}, location={"Some": [location(name)]})]})
+        name={"Package": [{"Hash": [hash_]}]}, location=location(name))]})
 
 
 def main():
@@ -53,7 +53,7 @@ def main():
         body={"EApply": [1, {"EFnName": [2, dict(originalName=["Darklang", "Stdlib", "Display", "display"],
             resolved={"Error": ["unresolved"]}), []]}, [], [{"EArg": [3, 0]}]]}))
     # Ceilings affect content identity even though trait ceiling checking is deferred.
-    ceiling_signature = dict(signature, permissionCeiling={"Some": [[]]})
+    ceiling_signature = dict(signature, permissionCeiling=[])
     entities[("trait", "ceiling-trait-hash")] = ("Hosted.CeilingText", dict(
         typeParams=["a"], bounds=[], methods=[ceiling_signature]))
     requests = []

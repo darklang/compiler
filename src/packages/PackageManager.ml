@@ -350,23 +350,12 @@ and resolvedNameAsWritten element =
             | None -> name
           in
           match tryField "location" value with
-          | Some location -> (
-              let* name, fields = enumCase location in
-              match (name, fields) with
-              | "Some", [ value ] -> Result.map withMethod (locationName value)
-              | "None", [] ->
-                  let+ names =
-                    ResultList.mapResults stringValue (arrayItems originalName)
-                  in
-                  String.concat "." names
-              | _ ->
-                  Error
-                    ("Invalid resolved package location: "
-                    ^ Yojson.Raw.to_string location))
-          | None ->
-              Error
-                ("Invalid resolved package name: " ^ Yojson.Raw.to_string value)
-          )
+          | Some `Null | None ->
+              let+ names =
+                ResultList.mapResults stringValue (arrayItems originalName)
+              in
+              String.concat "." names
+          | Some location -> Result.map withMethod (locationName location))
       | "Error", _ ->
           let+ names =
             ResultList.mapResults stringValue (arrayItems originalName)
@@ -852,13 +841,11 @@ let rec renderExpr parameters selfName element =
         | Ok ("EIf", [ _; condition; yes; no ]) -> (
             let* condition = recurse condition in
             let* yes = recurse yes in
-            let* name, fields = enumCase no in
-            match (name, fields) with
-            | "Some", [ value ] ->
+            match no with
+            | `Null -> Ok ("if " ^ condition ^ " then " ^ yes)
+            | value ->
                 let+ no = chain value in
-                "if " ^ condition ^ " then " ^ yes ^ " else " ^ no
-            | "None", [] -> Ok ("if " ^ condition ^ " then " ^ yes)
-            | _ -> Error ("Invalid optional else case " ^ name))
+                "if " ^ condition ^ " then " ^ yes ^ " else " ^ no)
         | _ -> recurse element
       in
       let+ text = chain element in
@@ -945,10 +932,10 @@ let rec renderExpr parameters selfName element =
       let case element =
         match
           ( tryField "pat" element,
-            tryField "whenCondition" element,
+            Option.value ~default:`Null (tryField "whenCondition" element),
             tryField "rhs" element )
         with
-        | Some pattern, Some guard, Some body -> (
+        | Some pattern, guard, Some body -> (
             let* () =
               if containsOrWithAs pattern then
                 unsupportedFeature "an `as` pattern inside an or-pattern"
@@ -976,12 +963,10 @@ let rec renderExpr parameters selfName element =
             let refutable =
               List.exists (fun (_, _, irrefutable) -> not irrefutable) bindings
             in
-            let* name, fields = enumCase guard in
             let* guard =
-              match (name, fields) with
-              | "None", [] -> Ok None
-              | "Some", [ condition ] -> Result.map Option.some (recurse condition)
-              | _ -> Error ("Invalid match guard " ^ name)
+              match guard with
+              | `Null -> Ok None
+              | condition -> Result.map Option.some (recurse condition)
             in
             let+ body = recurse body in
             let body =
@@ -1095,8 +1080,8 @@ let parseLocatedEntity kind hash json =
 let tryPackageHash element =
   match (tryField "name" element, tryField "location" element) with
   | Some name, Some location -> (
-      match (enumCase name, enumCase location) with
-      | Ok ("Package", [ hash ]), Ok ("Some", [ location ]) -> (
+      match (enumCase name, location) with
+      | Ok ("Package", [ hash ]), (`Assoc _ as location) -> (
           match (enumCase hash, locationName location) with
           | Ok ("Hash", [ hash ]), Ok name ->
               Option.map
@@ -1192,10 +1177,9 @@ let renderTraitCeiling method_ =
   match tryField "permissionCeiling" method_ with
   | None -> Ok ""
   | Some ceiling -> (
-      let* case, fields = enumCase ceiling in
-      match (case, fields) with
-      | "None", [] -> Ok ""
-      | "Some", [ effects ] ->
+      match ceiling with
+      | `Null -> Ok ""
+      | `List _ as effects ->
           let+ effects =
             ResultList.mapResults
               (fun effect_ ->

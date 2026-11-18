@@ -1551,7 +1551,7 @@ let packageManagerFixture =
          );
          ( "function/get/with-location/0f116690f2572bcfff9e18effd2589ad4fc7672fc46088c219229a7821a122f4",
            200,
-           {|{"entity":{"body":{"EInt":[5376903518395640452,5]},"description":"","hash":{"Hash":["0f116690f2572bcfff9e18effd2589ad4fc7672fc46088c219229a7821a122f4"]},"parameters":[{"description":"","name":"_","typ":{"TUnit":[]}}],"permissionCeiling":{"None":[]},"returnType":{"TInt":[]},"typeParams":[]},"location":{"modules":["Test"],"name":"returnsInt","owner":"Darklang"}}|}
+           {|{"entity":{"body":{"EInt":[5376903518395640452,5]},"description":"","hash":{"Hash":["0f116690f2572bcfff9e18effd2589ad4fc7672fc46088c219229a7821a122f4"]},"parameters":[{"description":"","name":"_","typ":{"TUnit":[]}}],"permissionCeiling":null,"returnType":{"TInt":[]},"typeParams":[]},"location":{"modules":["Test"],"name":"returnsInt","owner":"Darklang"}}|}
          );
          ("type/find/Darklang.Test", 404, "");
          ("type/find/Darklang.Test.returnsInt", 404, "");
