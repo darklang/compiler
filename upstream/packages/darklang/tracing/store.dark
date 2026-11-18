@@ -9,7 +9,6 @@
 /// and write of them is a builtin.
 module Darklang.Tracing.Store
 
-
 /// Is this trace being recorded? Worth asking before reporting an empty result: with recording
 /// off, every query returns empty whatever ran.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.enabled: Unknown function or value 'Builtin.tracesRecording'"
@@ -20,11 +19,11 @@ let enabled(): Bool =
 /// The lasting setting: `trace.record` in this instance's store config, which the boot reads.
 /// `None` when nothing is stored, in which case the environment or the default decides.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.storedSetting: Unknown function or value 'Stdlib.LocalStore.configGet'"
-let storedSetting(): Stdlib.Option.Option<Bool> =
+let storedSetting(): Option<Bool> =
   match LanguageTools.LocalStore.configGet("trace.record") with
-  | Some("on") -> Stdlib.Option.Option.Some(true)
-  | Some("off") -> Stdlib.Option.Option.Some(false)
-  | _ -> Stdlib.Option.Option.None
+  | Some("on") -> Option.Some(true)
+  | Some("off") -> Option.Some(false)
+  | _ -> Option.None
 
 
 /// Turn recording on or off for this instance: the stored setting, plus this process, so a
@@ -32,7 +31,7 @@ let storedSetting(): Stdlib.Option.Option<Bool> =
 /// is the same setting by the other door, and takes effect on the next command.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.setRecording: Unknown function or value 'Stdlib.LocalStore.configSet'"
 let setRecording(on: Bool): Unit =
-  let _ = LanguageTools.LocalStore.configSet("trace.record", (if on then "on" else "off"))
+  let _ = LanguageTools.LocalStore.configSet("trace.record", if on then "on" else "off")
   Builtin.tracesApplyRecording(on)
 
 
@@ -70,27 +69,27 @@ let find(pattern: String, limit: Int64): List<Trace> =
 
 /// Full payload for one trace: its row, its inputs and its calls.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.view: Unknown function or value 'query'"
-let view(traceID: String): Stdlib.Option.Option<TraceData> =
+let view(traceID: String): Option<TraceData> =
   (query(TraceQuery.Detail(traceID))).detail
 
 
 /// Read saved CLI input without loading the result.
 /// Returns None for HTTP traces, or missing or corrupt input.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.getScriptOrEvalInput: Unknown function or value 'query'"
-let getScriptOrEvalInput(traceID: String): Stdlib.Option.Option<ScriptOrEvalInput> =
+let getScriptOrEvalInput(traceID: String): Option<ScriptOrEvalInput> =
   (query(TraceQuery.SavedInput(traceID))).savedInput
 
 
 /// One trace by id, if it is still here.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.get: Unknown function or value 'read'"
-let get(traceID: String): Stdlib.Option.Option<Trace> =
+let get(traceID: String): Option<Trace> =
   Stdlib.List.head(read(TraceQuery.ById(traceID)))
 
 
 /// A new trace branched from <param traceID>, keeping its log up to <param at> (a position from
 /// `traces show`; the whole log when {{None}}), suspended, so `resume` takes it from there.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.fork: Unknown function or value 'Builtin.tracesFork'"
-let fork(traceID: String, at: Stdlib.Option.Option<Int64>): Stdlib.Result.Result<String, String> =
+let fork(traceID: String, at: Option<Int64>): Result<String, String> =
   Builtin.tracesFork(traceID, at)
 
 
@@ -113,7 +112,7 @@ let setPinned(traceID: String, pinned: Bool): Bool =
 /// rather than a function; the hashes are what `traces resume` compares against the
 /// store to say which of a trace's callees have been edited since.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.fnsWithHashes: Unknown function or value 'query'"
-let fnsWithHashes(traceID: String): List<String * String> =
+let fnsWithHashes(traceID: String): List<(String * String)> =
   (query(TraceQuery.FnsOf(traceID))).fns
 
 
@@ -123,14 +122,14 @@ let fnsWithHashes(traceID: String): List<String * String> =
 /// recomputes values by replaying, so it can only show what it reaches; this is what HAPPENED,
 /// including passes a replay that stopped early will never get to.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.recordedLoopPasses: Unknown function or value 'query'"
-let recordedLoopPasses(traceID: String): List<String * Int64> =
+let recordedLoopPasses(traceID: String): List<(String * Int64)> =
   (query(TraceQuery.LoopPasses(traceID))).counts
 
 
 /// Just the names of `fnsWithHashes`.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.fnsOf: Unknown function or value 'fnsWithHashes'"
 let fnsOf(traceID: String): List<String> =
-  (fnsWithHashes(traceID)) |> Stdlib.List.map(fun pair -> Stdlib.Tuple2.first(pair))
+  fnsWithHashes(traceID) |> Stdlib.List.map(fun pair -> Stdlib.Tuple2.first(pair))
 
 
 /// The traces that went through <param fnName>, newest first. Answers at the shipped recording
@@ -141,7 +140,7 @@ let fnsOf(traceID: String): List<String> =
 /// function", this one answers "I have not got a function in mind, what have the runs been
 /// about". `hotspots` reads the effect log and so can only ever name builtins.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.fnCounts: Unknown function or value 'query'"
-let fnCounts(traceLimit: Int64): List<String * Int64> =
+let fnCounts(traceLimit: Int64): List<(String * Int64)> =
   (query(TraceQuery.FnCounts(traceLimit))).counts
 
 
@@ -169,20 +168,16 @@ let wentThrough(fnName: String, fnHash: String, limit: Int64): List<Trace> =
 /// falls back to the name when the store has no such function. That fallback is what lets a run
 /// whose code has since gone stay distinguishable from a typo.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.wentThroughNamed: Unknown function or value 'wentThrough'"
-let wentThroughNamed(
-  branchId: Uuid,
-  fnName: String,
-  limit: Int64)
-  : List<Trace> =
+let wentThroughNamed(branchId: Uuid, fnName: String, limit: Int64): List<Trace> =
   wentThrough(fnName, hashNamed(branchId, fnName), limit)
 
 
 /// The hash a person's name for a function resolves to here, or "" when the store has none.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.hashNamed: Unknown function or value 'Darklang.LanguageTools.PackageManager.Function.find'"
 let hashNamed(branchId: Uuid, fnName: String): String =
-  Darklang.LanguageTools.PackageManager.Function.find(
+  LanguageTools.PackageManager.Function.find(
     branchId,
-    Darklang.LanguageTools.ProgramTypes.parsePackageLocation(fnName))
+    LanguageTools.ProgramTypes.parsePackageLocation(fnName))
   |> Stdlib.Option.map(fun h ->
     match h with
     | Hash(v) -> v)
@@ -208,11 +203,7 @@ let timeInNamed(branchId: Uuid, fnName: String, limit: Int64): List<TimeInFn> =
   (query(TraceQuery.TimeIn(fnName, hashNamed(branchId, fnName), limit))).totals
   |> Stdlib.List.map(fun row ->
     let (traceId, calls, totalUs, slowestUs) = row
-    TimeInFn
-      { traceId = traceId
-        calls = calls
-        totalUs = totalUs
-        slowestUs = slowestUs })
+    TimeInFn { traceId = traceId, calls = calls, totalUs = totalUs, slowestUs = slowestUs })
 
 
 /// One frame the replay walked. `parent` is "" at the entry. A loop's passes are the frames
@@ -243,7 +234,7 @@ type ViewFrame =
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.viewTraceTree: Unknown function or value 'Builtin.cliViewTrace'"
 let viewTraceTree(
   /// The CLI passes the logged-in account. None keeps the caller's account.
-  accountID: Stdlib.Option.Option<Uuid>,
+  accountID: Option<Uuid>,
   branchId: Uuid,
   traceID: String,
   /// Extra iterations to keep, as (site, which one, counting from 0). A view holds the first
@@ -251,9 +242,9 @@ let viewTraceTree(
   /// again and asking for it. `[]` for an ordinary view.
   focus: List<(Int64 * Int64)>)
   : (List<(Int64 * LanguageTools.RuntimeTypes.Dval)> *
-    List<ViewFrame> *
-    List<(String * Int64 * LanguageTools.RuntimeTypes.Dval)> *
-    Stdlib.Option.Option<ReplayStop>) =
+     List<ViewFrame> *
+     List<(String * Int64 * LanguageTools.RuntimeTypes.Dval)> *
+     Option<ReplayStop>) =
   let (values, frames, frameValues, problem) =
     Builtin.cliViewTrace(accountID, branchId, traceID, focus)
 
@@ -261,7 +252,6 @@ let viewTraceTree(
     frames
     |> Stdlib.List.map(fun row ->
       let (id, parent, callSite, kind, callee, ord, args) = row
-
       ViewFrame
         { id = id
           parent = parent
@@ -283,14 +273,13 @@ let viewTraceTree(
 /// `// = 140` beside a line. `viewTraceTree` is the same replay with the frames as well.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.viewTrace: Unknown function or value 'viewTraceTree'"
 let viewTrace(
-  accountID: Stdlib.Option.Option<Uuid>,
+  accountID: Option<Uuid>,
   branchId: Uuid,
   traceID: String)
-  : (List<(Int64 * LanguageTools.RuntimeTypes.Dval)> * Stdlib.Option.Option<ReplayStop>) =
+  : (List<(Int64 * LanguageTools.RuntimeTypes.Dval)> * Option<ReplayStop>) =
   // Through `viewTraceTree` rather than the builtin: one Dark wrapper per builtin is the
   // rule, and a second reference to `cliViewTrace` is what the builtin-access test catches.
   let (values, _frames, _frameValues, problem) = viewTraceTree(accountID, branchId, traceID, [])
-
   (values, problem)
 
 
@@ -299,23 +288,20 @@ let viewTrace(
 /// What was typed is matched as plain text, quotes and wildcards included. The store hands
 /// back up to six ids, enough to tell "one more" from "several more"; the message shows five.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Store.resolveID: Unknown function or value 'query'"
-let resolveID(input: String): Stdlib.Result.Result<String, String> =
+let resolveID(input: String): Result<String, String> =
   match (query(TraceQuery.IdsStartingWith(input))).ids with
-  | [ fullID ] -> Stdlib.Result.Result.Ok(fullID)
-  | [] ->
-    Stdlib.Result.Result.Error(
-      $"no trace whose id starts with {input} -- `dark traces` lists them")
+  | [fullID] -> Result.Ok(fullID)
+  | [] -> Result.Error($"no trace whose id starts with {input} -- `dark traces` lists them")
   | candidates ->
     // Six were asked for, so a sixth means "at least one more", not "one more".
     let shown = Stdlib.List.take(candidates, 5)
-    let suffix =
-      if (Stdlib.List.length(candidates)) > 5 then "\n  and more" else ""
+    let suffix = if Stdlib.List.length(candidates) > 5 then "\n  and more" else ""
     let body =
       shown
       |> Stdlib.List.map(fun id -> $"  {Stdlib.String.slice(id, 0, 12)}")
       |> Stdlib.String.join("\n")
-    Stdlib.Result.Result.Error(
-      $"more than one trace starts with {input}; give more of the id:\n{body}{suffix}")
+
+    Result.Error($"more than one trace starts with {input}; give more of the id:\n{body}{suffix}")
 
 
 /// Per-fn totals over the last <param traceLimit> traces:

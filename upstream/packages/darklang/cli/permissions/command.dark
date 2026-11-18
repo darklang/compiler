@@ -8,8 +8,9 @@ type AccessReportFacts =
     approvals: List<(String * LanguageTools.Permissions.Policy)>
     approvedAs: List<String>
     /// The version an approval under this name is for, when that is another version.
-    olderApproval: Stdlib.Option.Option<String>
+    olderApproval: Option<String>
     instancePolicy: LanguageTools.Permissions.Policy }
+
 
 // Builtin wrappers.
 // The policy builtins are called only from these wrappers (tests/builtin).
@@ -18,23 +19,54 @@ type AccessReportFacts =
 let currentPolicy(): LanguageTools.Permissions.Policy =
   Builtin.pmPolicyGetInstance()
 
-/// Change the instance policy: replace it whole, or add and remove rules.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.changePolicy: Unknown function or value 'Builtin.pmPolicyEditInstance'"
-let changePolicy(edit: LanguageTools.Permissions.PolicyEdit): Unit =
-  Builtin.pmPolicyEditInstance(edit)
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.writePolicy: Unknown function or value 'Command.changePolicy'"
-let writePolicy(policy: LanguageTools.Permissions.Policy): Unit =
-  Command.changePolicy(LanguageTools.Permissions.PolicyEdit.Replace(policy))
+/// Read the instance rules and a token used to detect changes before saving.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.instanceSnapshot: Unknown function or value 'Builtin.pmPolicyReviewToken'"
+let instanceSnapshot(): (String * LanguageTools.Permissions.Policy) =
+  Builtin.pmPolicyReviewToken()
 
-/// Atomically edit the instance policy. Removals apply before additions.
+
+/// Save only if permissions have not changed since this token was read.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.commitInstancePolicy: Unknown function or value 'Builtin.pmPolicyEditInstance'"
+let commitInstancePolicy(expected: String, policy: LanguageTools.Permissions.Policy): Unit =
+  Builtin.pmPolicyEditInstance(expected, policy)
+
+
+/// Normalize file paths before comparing rules, including relative paths and `~`.
+/// Use the same host normalization as saving a rule.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.canonicalRule: Unknown function or value 'Builtin.pmPolicyNormalizeRule'"
+let canonicalRule(rule: LanguageTools.Permissions.Rule): LanguageTools.Permissions.Rule =
+  match rule with
+  | FileRead(_) | FileWrite(_) -> Builtin.pmPolicyNormalizeRule(rule)
+  | _ -> rule
+
+
+/// Apply removals before additions, preserving rule order and eliminating duplicates.
+let applyInstanceEdit(
+  policy: LanguageTools.Permissions.Policy,
+  allow: List<LanguageTools.Permissions.Rule>,
+  deny: List<LanguageTools.Permissions.Rule>,
+  remove: List<LanguageTools.Permissions.Rule>)
+  : LanguageTools.Permissions.Policy =
+  let keep(rule: LanguageTools.Permissions.Rule): Bool =
+    Stdlib.Bool.not(Stdlib.List.contains(remove, rule))
+
+  { policy with
+      allow = Stdlib.List.unique(Stdlib.List.concat(Stdlib.List.filter(policy.allow, keep), allow))
+      deny = Stdlib.List.unique(Stdlib.List.concat(Stdlib.List.filter(policy.deny, keep), deny)) }
+
+
+/// Read the instance rules, apply the edit, and save if permissions are still unchanged.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.editInstancePolicy: Unknown function or value 'Command.changePolicy'"
 let editInstancePolicy(
   allow: List<LanguageTools.Permissions.Rule>,
   deny: List<LanguageTools.Permissions.Rule>,
   remove: List<LanguageTools.Permissions.Rule>)
   : Unit =
-  Command.changePolicy(LanguageTools.Permissions.PolicyEdit.Change(allow, deny, remove))
+  let (expected, policy) = instanceSnapshot()
+  let remove = Stdlib.List.map(remove, canonicalRule)
+  commitInstancePolicy(expected, applyInstanceEdit(policy, allow, deny, remove))
+
 
 /// The effects a policy decides on: all but `Raise`, which no rule grants or denies.
 let permissionEffects(
@@ -42,62 +74,124 @@ let permissionEffects(
   : List<LanguageTools.Permissions.Effect> =
   effects |> Stdlib.List.filter(fun e -> e != LanguageTools.Permissions.Effect.Raise)
 
+
 /// The transitive permission requirements and whether analysis was complete.
 /// Incomplete analysis returns the effects found with `false`; fetch once and
 /// pass the result around because this walks the function's closure.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.permissionRequirementsForHash: Unknown function or value 'Builtin.pmFnPermissionRequirements'"
-let permissionRequirementsForHash(
-  hash: String)
-  : (List<LanguageTools.Permissions.Effect> * Bool) =
+let permissionRequirementsForHash(hash: String): (List<LanguageTools.Permissions.Effect> * Bool) =
   let (effects, complete) = Builtin.pmFnPermissionRequirements(hash)
-  (Command.permissionEffects(effects), complete)
+  (permissionEffects(effects), complete)
 
-/// Remove one named approval, or every named approval for a hash.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.withdraw: Unknown function or value 'Builtin.pmPolicyWithdraw'"
-let withdraw(
-  accountID: Stdlib.Option.Option<Uuid>,
+
+/// Remove named approvals or commit the saved policy calculated by this command.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.removeSavedAccess: Unknown function or value 'Builtin.pmPolicyRemove'"
+let removeSavedAccess(
+  accountID: Option<Uuid>,
   target: LanguageTools.Permissions.ApprovalTarget)
   : Unit =
-  Builtin.pmPolicyWithdraw(accountID, target)
+  Builtin.pmPolicyRemove(accountID, target)
 
-/// Withdraw every named approval for one immutable version.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.revokeHash: Unknown function or value 'Command.withdraw'"
-let revokeHash(
-  accountID: Stdlib.Option.Option<Uuid>,
+
+/// Read this account's approvals and a token used to detect changes before saving.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approvalSnapshot: Unknown function or value 'Builtin.pmPolicyApprovals'"
+let approvalSnapshot(accountID: Option<Uuid>): (String * List<LanguageTools.Permissions.Approval>) =
+  Builtin.pmPolicyApprovals(accountID)
+
+
+let approvalNamesForHash(
+  approvals: List<LanguageTools.Permissions.Approval>,
   hash: String)
-  : Unit =
-  Command.withdraw(accountID, LanguageTools.Permissions.ApprovalTarget.Hash(hash))
+  : List<String> =
+  approvals
+  |> Stdlib.List.filter(fun approval -> approval.hash == hash)
+  |> Stdlib.List.filterMap(fun approval -> approval.name)
+
+
+let versionsFromApprovals(
+  approvals: List<LanguageTools.Permissions.Approval>)
+  : List<(String * String)> =
+  approvals
+  |> Stdlib.List.filterMap(fun approval ->
+    approval.name |> Stdlib.Option.map(fun name -> (name, approval.hash)))
+
+
+/// Return all approvals, or filter by hash.
+/// If the hash has no approvals, return an entry with no name or policy.
+let approvalsMatching(
+  approvals: List<LanguageTools.Permissions.Approval>,
+  hash: Option<String>)
+  : List<LanguageTools.Permissions.Approval> =
+  match hash with
+  | None -> approvals
+  | Some(hash) ->
+    let matching = Stdlib.List.filter(approvals, fun approval -> approval.hash == hash)
+    if Stdlib.List.isEmpty(matching) then
+      [ LanguageTools.Permissions.Approval
+          { hash = hash, name = Option.None, policy = Option.None, explicitRules = Option.None } ]
+    else
+      matching
+
+
+/// Remove every approval for this hash together, if permissions are still unchanged.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.revokeHash: Unknown function or value 'Command.withdraw'"
+let revokeHash(accountID: Option<Uuid>, hash: String): Bool =
+  let (expected, approvals) = approvalSnapshot(accountID)
+  let names = approvalNamesForHash(approvals, hash)
+  if Stdlib.List.isEmpty(names) then
+    printErr($"{hash} has no approval; `permissions approvals` lists the ones that do")
+    false
+  else
+    removeSavedAccess(accountID, LanguageTools.Permissions.ApprovalTarget.Names(expected, names))
+    Stdlib.printLine(Stdlib.Cli.UI.Colors.success("✓ package approval revoked"))
+    true
+
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approvedHashes: Unknown function or value 'Builtin.pmPolicyListPackages'"
-let approvedHashes(accountID: Stdlib.Option.Option<Uuid>): List<String> =
-  Builtin.pmPolicyListPackages(accountID)
+let approvedHashes(accountID: Option<Uuid>): List<String> =
+  let (_, approvals) = approvalSnapshot(accountID)
+  versionsFromApprovals(approvals)
+  |> Stdlib.List.map(Stdlib.Tuple2.second)
+  |> Stdlib.List.unique
 
-/// Whether this immutable function is bundled first-party code, plus the
-/// account's consumer policy when it has one.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.packageAccess: Unknown function or value 'Command.approvalsOf'"
-let packageAccess(
-  accountID: Stdlib.Option.Option<Uuid>,
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.packageAccessFor: Unknown function or value 'Builtin.pmFnIsBundled'"
+let packageAccessFor(
+  named: List<LanguageTools.Permissions.Approval>,
   hash: String)
   : (Bool * List<(String * LanguageTools.Permissions.Policy)>) =
   let approvals =
-    Command.approvalsOf(accountID, Stdlib.Option.Option.Some(hash))
+    approvalsMatching(named, Option.Some(hash))
     |> Stdlib.List.filterMap(fun approval ->
-      match (approval.name, approval.policy) with
-      | (Some(name), Some(policy)) -> Some((name, policy))
-      | _ -> None)
+      match approval.name, approval.policy with
+      | Some(name), Some(policy) -> Option.Some((name, policy))
+      | _ -> Option.None)
+
   (Builtin.pmFnIsBundled(hash), approvals)
+
+
+/// Return whether code is bundled, plus the named approvals for its hash.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.packageAccess: Unknown function or value 'Command.approvalsOf'"
+let packageAccess(
+  accountID: Option<Uuid>,
+  hash: String)
+  : (Bool * List<(String * LanguageTools.Permissions.Policy)>) =
+  let (_, approvals) = approvalSnapshot(accountID)
+  packageAccessFor(approvals, hash)
+
 
 /// The rules the consumer wrote when approving <param hash> as a root; None
 /// for a derived approval.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.explicitApprovalFor: Unknown function or value 'Command.approvalsOf'"
 let explicitApprovalFor(
-  accountID: Stdlib.Option.Option<Uuid>,
+  accountID: Option<Uuid>,
   name: String)
-  : Stdlib.Option.Option<LanguageTools.Permissions.Policy> =
-  Command.approvalsOf(accountID, Stdlib.Option.Option.None)
-  |> Stdlib.List.filter(fun a -> a.name == Stdlib.Option.Option.Some(name))
+  : Option<LanguageTools.Permissions.Policy> =
+  approvalsOf(accountID, Option.None)
+  |> Stdlib.List.filter(fun a -> a.name == Option.Some(name))
   |> Stdlib.List.head
   |> Stdlib.Option.andThen(fun approval -> approval.explicitRules)
+
 
 /// Whether existing approvals were recorded under different approval-analysis
 /// semantics than this host's — a re-review signal (enforcement stays
@@ -106,72 +200,105 @@ let explicitApprovalFor(
 let approvalsStale(): Bool =
   Builtin.pmPolicyApprovalsStale()
 
+
 /// Every (logical name, approved version) pair for this account.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approvedVersions: Unknown function or value 'Command.approvalsOf'"
-let approvedVersions(
-  accountID: Stdlib.Option.Option<Uuid>)
-  : List<(String * String)> =
-  Command.approvalsOf(accountID, Stdlib.Option.Option.None)
-  |> Stdlib.List.filterMap(fun approval ->
-    approval.name |> Stdlib.Option.map(fun name -> (name, approval.hash)))
+let approvedVersions(accountID: Option<Uuid>): List<(String * String)> =
+  let (_, approvals) = approvalSnapshot(accountID)
+  versionsFromApprovals(approvals)
+
 
 /// Approvals as this account sees them, one per (hash, name). With <param hash>, the entries for
 /// that hash (one with no name when no name points at it); with None, one per approved name.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approvalsOf: Unknown function or value 'Builtin.pmPolicyApprovals'"
 let approvalsOf(
-  accountID: Stdlib.Option.Option<Uuid>,
-  hash: Stdlib.Option.Option<String>)
+  accountID: Option<Uuid>,
+  hash: Option<String>)
   : List<LanguageTools.Permissions.Approval> =
-  Builtin.pmPolicyApprovals(accountID, hash)
+  let (_, approvals) = approvalSnapshot(accountID)
+  approvalsMatching(approvals, hash)
+
 
 /// Each named approval, including separate names with identical code, marking
 /// the ones whose function has changed since.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.namedApprovals: Unknown function or value 'Command.approvedVersions'"
-let namedApprovals(
-  accountID: Stdlib.Option.Option<Uuid>,
-  branchId: Uuid)
-  : List<String> =
-  Command.approvedVersions(accountID)
+let namedApprovals(accountID: Option<Uuid>, branchId: Uuid): List<String> =
+  approvedVersions(accountID)
   |> Stdlib.List.map(fun((name, hash)) ->
     let older =
-      match Command.latestVersion(branchId, name) with
+      match latestVersion(branchId, name) with
       | Some(latest) when latest != hash -> ", for an older version"
       | _ -> ""
-    $"  {name}  (version {Command.shortVersion(hash)}{older})")
+
+    $"  {name}  (version {shortVersion(hash)}{older})")
+
 
 /// Capture before showing a review; mutations compare it atomically when saving.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.reviewToken: Unknown function or value 'Builtin.pmPolicyReviewToken'"
-let reviewToken(): String = Builtin.pmPolicyReviewToken()
+let reviewToken(): String =
+  let (expected, _) = instanceSnapshot()
+  expected
+
+
+/// Whether approving goes ahead when the shown requirements are incomplete.
+type Incomplete =
+  | Acknowledge
+  | Refuse
+
+
+/// Whether approving goes ahead when the permission contract changed since the last approval,
+/// or returns the differences without saving.
+type ContractChange =
+  | Acknowledge
+  | Refuse
+
 
 /// Remember access for an immutable closure under its logical name, atomically. The builtin
 /// compares the contract before storing approval; a changed contract returns diffs for explicit
 /// review. `rules` optionally narrows the consumer's policy; None approves the analyzed effect set.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approveVersionFor: Unknown function or value 'Builtin.pmPolicyApproveVersion'"
 let approveVersionFor(
-  accountID: Stdlib.Option.Option<Uuid>,
+  accountID: Option<Uuid>,
   name: String,
   expected: String,
   hash: String,
-  rules: Stdlib.Option.Option<LanguageTools.Permissions.Policy>,
-  acknowledgeIncomplete: Bool,
-  acknowledgeContractChange: Bool)
-  : Stdlib.Result.Result<Unit, LanguageTools.Permissions.ApprovalFailure> =
+  rules: Option<LanguageTools.Permissions.Policy>,
+  incomplete: Incomplete,
+  contractChange: ContractChange)
+  : Result<Unit, LanguageTools.Permissions.ApprovalFailure> =
   Builtin.pmPolicyApproveVersion(
     accountID,
     name,
     expected,
     hash,
     rules,
-    acknowledgeIncomplete,
-    acknowledgeContractChange)
+    incomplete == Incomplete.Acknowledge,
+    contractChange == ContractChange.Acknowledge)
 
-/// Withdraw a name's remembered access; name resolution is unchanged.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.unapproveVersionFor: Unknown function or value 'Command.withdraw'"
-let unapproveVersionFor(
-  accountID: Stdlib.Option.Option<Uuid>,
-  name: String)
-  : Unit =
-  Command.withdraw(accountID, LanguageTools.Permissions.ApprovalTarget.Name(name))
+
+/// Check the proposed update without saving, so all changes are visible before confirmation.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.reviewVersionFor: Unknown function or value 'Builtin.pmPolicyReviewVersion'"
+let reviewVersionFor(
+  accountID: Option<Uuid>,
+  name: String,
+  expected: String,
+  hash: String,
+  rules: Option<LanguageTools.Permissions.Policy>,
+  incomplete: Incomplete)
+  : Result<(Bool * List<LanguageTools.Permissions.ApprovalReviewReason>), String> =
+  Builtin.pmPolicyReviewVersion(
+    accountID,
+    name,
+    expected,
+    hash,
+    rules,
+    incomplete == Incomplete.Acknowledge)
+
+
+/// Remove a name's remembered access; name resolution is unchanged.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.removeNamedApprovalFor: Unknown function or value 'removeSavedAccess'"
+let removeNamedApprovalFor(accountID: Option<Uuid>, expected: String, name: String): Unit =
+  removeSavedAccess(accountID, LanguageTools.Permissions.ApprovalTarget.Names(expected, [ name ]))
 
 
 // Requirements display.
@@ -179,189 +306,202 @@ let unapproveVersionFor(
 let shortVersion(hash: String): String =
   Stdlib.String.slice(hash, 0, 8)
 
+
 let requirementSummary(requirements: List<LanguageTools.Permissions.Effect>): String =
-  if Stdlib.List.isEmpty(requirements) then "effect-free"
+  if Stdlib.List.isEmpty(requirements) then
+    "effect-free"
   else
-    Stdlib.String.join(
-      requirements |> Stdlib.List.map(LanguageTools.Permissions.effectName),
-      ", ")
+    Stdlib.String.join(requirements |> Stdlib.List.map(LanguageTools.Permissions.effectName), ", ")
+
 
 /// One line for a `permissionRequirementsForHash` result. When the analysis
 /// could not follow everything, the effects it did find are shown and the
 /// remainder is called unknown. It does not say why: a callback, a package
 /// value, and an implementation picked at run time all look the same here.
-let describeRequirements(
-  requirements: (List<LanguageTools.Permissions.Effect> * Bool))
-  : String =
+let describeRequirements(requirements: (List<LanguageTools.Permissions.Effect> * Bool)): String =
   match requirements with
-  | (effects, true) -> Command.requirementSummary(effects)
-  | ([], false) -> "not fully known"
-  | (effects, false) -> Command.requirementSummary(effects) + ", possibly more"
+  | effects, true -> requirementSummary(effects)
+  | [], false -> "not fully known"
+  | effects, false -> requirementSummary(effects) + ", possibly more"
+
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.requirementDisplay: Unknown function or value 'Command.permissionRequirementsForHash'"
 let requirementDisplay(hash: String): String =
-  Command.describeRequirements(Command.permissionRequirementsForHash(hash))
+  describeRequirements(permissionRequirementsForHash(hash))
+
 
 /// The bracketed requirements badge listings show next to a function,
 /// e.g. `[file-read]`; callers colour it for their view.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.requirementBadge: Unknown function or value 'Command.requirementDisplay'"
 let requirementBadge(hash: LanguageTools.ProgramTypes.Hash): String =
-  "[" + Command.requirementDisplay(LanguageTools.ProgramTypes.hashToString(hash)) + "]"
+  "[" + requirementDisplay(LanguageTools.ProgramTypes.hashToString(hash)) + "]"
+
 
 /// Effects describe the body; runtime permissions check the actual resources.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.policyLinesForHash: Unknown function or value 'Command.permissionRequirementsForHash'"
 let policyLinesForHash(hash: String): List<String> =
-  let requirementsLine = "permission requirements: " + Command.requirementDisplay(hash)
-  let (_, reasons) = Cli.Effects.reasons(hash)
-  if Stdlib.List.any(reasons, fun((effect, _)) -> effect == LanguageTools.Permissions.Effect.Raise) then
+  let requirementsLine = "permission requirements: " + requirementDisplay(hash)
+  let (_, reasons) = Effects.reasons(hash)
+  if
+    Stdlib.List.any(reasons, fun((effect, _)) -> effect == LanguageTools.Permissions.Effect.Raise)
+  then
     [ requirementsLine, "can raise a runtime error" ]
-  else [ requirementsLine ]
+  else
+    [ requirementsLine ]
+
 
 /// Label grants and explicit blocks separately, including when either is empty.
 let policyLines(policy: LanguageTools.Permissions.Policy): List<String> =
   let ruleLines(rules: List<LanguageTools.Permissions.Rule>): List<String> =
-    if Stdlib.List.isEmpty(rules) then [ "  none" ]
-    else rules |> Stdlib.List.map(fun rule ->
-      "  " + LanguageTools.Permissions.renderRule(rule))
+    if Stdlib.List.isEmpty(rules) then
+      [ "  none" ]
+    else
+      rules |> Stdlib.List.map(fun rule -> "  " + LanguageTools.Permissions.renderRule(rule))
+
   Stdlib.List.flatten(
-    [ [ "Allowed:" ]
-      ruleLines(policy.allow)
-      [ "Explicitly denied:" ]
-      ruleLines(policy.deny) ])
+    [ [ "Allowed:" ], ruleLines(policy.allow), [ "Explicitly denied:" ], ruleLines(policy.deny) ])
+
 
 /// The instance policy as `permissions list` prints it.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.instancePolicyLines: Unknown function or value 'Command.currentPolicy'"
 let instancePolicyLines(): List<String> =
   Stdlib.List.flatten(
     [ [ "Instance defaults:" ]
-      Command.policyLines(Command.currentPolicy())
+      policyLines(currentPolicy())
       [ "Unlisted access needs a remembered approval or --allow. Explicit denies win." ] ])
 
-let indentedPolicyLines(
-  policy: LanguageTools.Permissions.Policy)
-  : List<String> =
-  Command.policyLines(policy) |> Stdlib.List.map(fun line -> "    " + line)
+
+let indentedPolicyLines(policy: LanguageTools.Permissions.Policy): List<String> =
+  policyLines(policy) |> Stdlib.List.map(fun line -> "    " + line)
+
 
 /// Show only this function's effects and remembered approvals.
-let renderAccessReport(
-  name: String,
-  facts: Command.AccessReportFacts)
-  : List<String> =
+let renderAccessReport(name: String, facts: AccessReportFacts): List<String> =
   let effectFree = facts.complete && Stdlib.List.isEmpty(facts.effects)
   let effects =
-    if effectFree then "none"
-    else Command.describeRequirements((facts.effects, facts.complete))
+    if effectFree then
+      "none"
+    else
+      describeRequirements((facts.effects, facts.complete))
+
   let analysisLines =
-    if facts.complete then []
-    else [ "  Warning: analysis is incomplete; more permissions may be needed." ]
+    if facts.complete then
+      []
+    else
+      [ "  Warning: analysis is incomplete; more permissions may be needed." ]
+
   let packageLines =
     if Stdlib.List.isEmpty(facts.approvals) then
       match facts.olderApproval with
       | Some(version) ->
-        [ $"  Remembered approval: for an older version ({Command.shortVersion(version)}); `permissions update {name}` reviews this one" ]
+        [ $"  Remembered approval: for an older version ({shortVersion(version)}); `permissions update {name}` reviews this one" ]
       | None -> [ "  Remembered approval: none" ]
     else
       facts.approvals
       |> Stdlib.List.map(fun((approvedName, policy)) ->
         Stdlib.List.prepend(
-          Command.indentedPolicyLines(policy),
-          $"  Remembered approval for {approvedName} (version {Command.shortVersion(facts.hash)}):"))
+          indentedPolicyLines(policy),
+          $"  Remembered approval for {approvedName} (version {shortVersion(facts.hash)}):"))
       |> Stdlib.List.flatten
+
   Stdlib.List.flatten(
     [ [ name, $"  Effects: {effects}" ]
-      (if effectFree then [ "  Permissions needed: none" ] else [])
+      if effectFree then [ "  Permissions needed: none" ] else []
       analysisLines
       packageLines ])
 
+
 /// Facts shared by the function report and workbench detail pane.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.accessFacts: Unknown function or value 'Command.permissionRequirementsForHash'"
-let accessFacts(
-  accountID: Stdlib.Option.Option<Uuid>,
-  hash: String)
-  : Command.AccessReportFacts =
-  let (effects, complete) = Command.permissionRequirementsForHash(hash)
-  let (bundled, approvals) = Command.packageAccess(accountID, hash)
-  let approvedAs =
-    Command.approvedVersions(accountID)
-    |> Stdlib.List.filter(fun pair ->
-      let (_name, approvedHash) = pair in approvedHash == hash)
-    |> Stdlib.List.map(Stdlib.Tuple2.first)
-  Command.AccessReportFacts
+let accessFacts(accountID: Option<Uuid>, hash: String): AccessReportFacts =
+  let (effects, complete) = permissionRequirementsForHash(hash)
+  let (_, named) = approvalSnapshot(accountID)
+  let (bundled, approvals) = packageAccessFor(named, hash)
+  let approvedAs = approvalNamesForHash(named, hash)
+  AccessReportFacts
     { hash = hash
       effects = effects
       complete = complete
       bundled = bundled
       approvals = approvals
       approvedAs = approvedAs
-      olderApproval = Stdlib.Option.Option.None
-      instancePolicy = Command.currentPolicy() }
+      olderApproval = Option.None
+      instancePolicy = currentPolicy() }
 
 
 // Instance policy edits.
 
 let invalidRule(args: List<String>): String =
-  Command.invalidRuleText(Stdlib.String.join(args, " "))
+  invalidRuleText(Stdlib.String.join(args, " "))
+
 
 /// The message for <param text> that did not parse, naming the current form of an old one.
 let invalidRuleText(text: String): String =
   match Stdlib.String.split(Stdlib.String.trim(text), " ") with
-  | [ "http-server", port ] when Stdlib.Result.isOk(Stdlib.Int64.parse(port)) ->
+  | ["http-server", port] when Stdlib.Result.isOk(Stdlib.Int64.parse(port)) ->
     $"invalid permission rule: {text}. http-server takes an address and a port, e.g. http-server 127.0.0.1 {port}"
   | _ -> $"invalid permission rule: {text}"
+
 
 /// External shells have already grouped quoted arguments, while the
 /// interactive CLI's general command splitter leaves quote fragments in the
 /// list. Re-tokenize only the latter; direct argv remains lossless for an
 /// argument that itself contains spaces.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.parseRuleArgs: Unknown function or value 'LanguageTools.Permissions.parseRuleText'"
-let parseRuleArgs(
-  args: List<String>)
-  : Stdlib.Option.Option<List<LanguageTools.Permissions.Rule>> =
+let parseRuleArgs(args: List<String>): Option<List<LanguageTools.Permissions.Rule>> =
   let hasQuotedFragment =
     args
     |> Stdlib.List.any(fun arg ->
       Stdlib.String.startsWith(arg, "'") || Stdlib.String.startsWith(arg, "\""))
+
   if hasQuotedFragment then
     LanguageTools.Permissions.parseRuleText(Stdlib.String.join(args, " "))
   else
     LanguageTools.Permissions.parseRule(args)
 
+
 /// Read-modify-write the instance policy and report. <param edit> returns the
 /// next policy, or the message for input that did not parse.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.editPolicy: Unknown function or value 'Command.currentPolicy'"
 let editPolicy(
-  edit: LanguageTools.Permissions.Policy -> Stdlib.Result.Result<LanguageTools.Permissions.Policy, String>,
+  edit: LanguageTools.Permissions.Policy -> Result<LanguageTools.Permissions.Policy, String>,
   success: String)
   : Bool =
-  match edit(Command.currentPolicy()) with
+  let (expected, current) = instanceSnapshot()
+  match edit(current) with
   | Ok(next) ->
-    Command.writePolicy(next)
+    commitInstancePolicy(expected, next)
     Stdlib.printLine(Stdlib.Cli.UI.Colors.success(success))
     true
   | Error(message) ->
-    Cli.printErr(message)
+    printErr(message)
     false
+
 
 /// One rule, or several separated by `;` like `set`. Error is the first rule that did not parse.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.parseRuleList: Unknown function or value 'LanguageTools.Permissions.parseRuleText'"
-let parseRuleList(
-  args: List<String>)
-  : Stdlib.Result.Result<List<LanguageTools.Permissions.Rule>, String> =
+let parseRuleList(args: List<String>): Result<List<LanguageTools.Permissions.Rule>, String> =
   if Stdlib.List.any(args, fun arg -> Stdlib.String.contains(arg, ";")) then
-    (Stdlib.String.split(Stdlib.String.join(args, " "), ";"))
+    Stdlib.String.split(Stdlib.String.join(args, " "), ";")
     |> Stdlib.List.map(Stdlib.String.trim)
     |> Stdlib.List.filter(fun spec -> spec != "")
-    |> Stdlib.List.fold(Stdlib.Result.Result.Ok([]), fun(result, spec) ->
+    |> Stdlib.List.fold(Result.Ok([]), fun(result, spec) ->
       match result with
-      | Error(bad) -> Stdlib.Result.Result.Error(bad)
+      | Error(bad) -> Result.Error(bad)
       | Ok(rules) ->
         match LanguageTools.Permissions.parseRuleText(spec) with
-        | Some(more) -> Stdlib.Result.Result.Ok(Stdlib.List.concat(rules, more))
-        | None -> Stdlib.Result.Result.Error(spec))
+        | Some(more) -> Result.Ok(Stdlib.List.concat(rules, more))
+        | None -> Result.Error(spec))
   else
-    match Command.parseRuleArgs(args) with
-    | Some(rules) -> Stdlib.Result.Result.Ok(rules)
-    | None -> Stdlib.Result.Result.Error(Stdlib.String.join(args, " "))
+    let parsed =
+      match args with
+      | [spec] -> LanguageTools.Permissions.parseRuleText(spec)
+      | _ -> parseRuleArgs(args)
+
+    match parsed with
+    | Some(rules) -> Result.Ok(rules)
+    | None -> Result.Error(Stdlib.String.join(args, " "))
+
 
 /// Parse rule arguments and pass them to <param edit>, or report invalid input. One rule that does
 /// not parse saves none of them.
@@ -371,27 +511,27 @@ let editRules(
   edit: List<LanguageTools.Permissions.Rule> -> Unit,
   success: String)
   : Bool =
-  match Command.parseRuleList(args) with
+  match parseRuleList(args) with
   | Error(bad) ->
-    Cli.printErr(Command.invalidRule([ bad ]))
+    printErr(invalidRule([ bad ]))
     false
   | Ok(rules) ->
     edit(rules)
     Stdlib.printLine(Stdlib.Cli.UI.Colors.success(success))
     true
 
+
 /// `set a; deny b; c` replaces the whole policy.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.replacePolicy: Unknown function or value 'LanguageTools.Permissions.parse'"
-let replacePolicy(
-  specs: List<String>)
-  : Stdlib.Result.Result<LanguageTools.Permissions.Policy, String> =
+let replacePolicy(specs: List<String>): Result<LanguageTools.Permissions.Policy, String> =
   let specs =
-    (Stdlib.String.split(Stdlib.String.join(specs, " "), ";"))
+    Stdlib.String.split(Stdlib.String.join(specs, " "), ";")
     |> Stdlib.List.map(Stdlib.String.trim)
     |> Stdlib.List.filter(fun spec -> spec != "")
+
   match LanguageTools.Permissions.parse(specs) with
-  | Ok(policy) -> Stdlib.Result.Result.Ok(policy)
-  | Error(bad) -> Stdlib.Result.Result.Error(Command.invalidRuleText(bad))
+  | Ok(policy) -> Result.Ok(policy)
+  | Error(bad) -> Result.Error(invalidRuleText(bad))
 
 
 // Named consumer approvals.
@@ -401,62 +541,75 @@ let replacePolicy(
 
 /// Resolve a logical name to its latest published version on this branch.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.latestVersion: Unknown function or value 'LanguageTools.PackageManager.Function.find'"
-let latestVersion(
-  branchId: Uuid,
-  name: String)
-  : Stdlib.Option.Option<String> =
+let latestVersion(branchId: Uuid, name: String): Option<String> =
   let location = LanguageTools.ProgramTypes.parsePackageLocation(name)
   match LanguageTools.PackageManager.Function.find(branchId, location) with
-  | Some(hash) ->
-    Stdlib.Option.Option.Some(LanguageTools.ProgramTypes.hashToString(hash))
-  | None -> Stdlib.Option.Option.None
+  | Some(hash) -> Option.Some(LanguageTools.ProgramTypes.hashToString(hash))
+  | None -> Option.None
+
 
 /// The version this account has APPROVED for <param name>, if any.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approvedVersionOf: Unknown function or value 'Command.approvedVersions'"
-let approvedVersionOf(
-  accountID: Stdlib.Option.Option<Uuid>,
-  name: String)
-  : Stdlib.Option.Option<String> =
-  (Command.approvedVersions(accountID))
+let approvedVersionOf(accountID: Option<Uuid>, name: String): Option<String> =
+  approvedVersions(accountID)
   |> Stdlib.List.findFirst(fun pair ->
-    let (approvedName, _hash) = pair in approvedName == name)
-  |> Stdlib.Option.map(fun pair -> let (_name, hash) = pair in hash)
+    let (approvedName, _hash) = pair
+    approvedName == name)
+  |> Stdlib.Option.map(fun pair ->
+    let (_name, hash) = pair
+    hash)
+
 
 /// `requirements`/`show` accept a logical name (resolved to its latest version)
 /// or a raw hash for diagnostics.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let resolveVersionArg(
-  state: Cli.AppState,
-  arg: String)
-  : Stdlib.Option.Option<String> =
+let resolveVersionArg(state: AppState, arg: String): Option<String> =
   if Stdlib.String.contains(arg, ".") then
-    Command.latestVersion(state.currentBranchId, arg)
+    latestVersion(state.currentBranchId, arg)
   else
     // A raw hash must name a stored version; otherwise the analysis would
     // report an unknown version as merely "incomplete".
-    match
-      LanguageTools.PackageManager.Function.get(
-        LanguageTools.ProgramTypes.Hash.Hash(arg))
-    with
-    | Some(_) -> Stdlib.Option.Option.Some(arg)
-    | None -> Stdlib.Option.Option.None
+    match LanguageTools.PackageManager.Function.get(LanguageTools.ProgramTypes.Hash.Hash(arg)) with
+    | Some(_) -> Option.Some(arg)
+    | None -> Option.None
 
-/// Print a version's requirements, warning when analysis is incomplete.
-/// Returns completeness so callers can acknowledge a possibly short list.
+
+/// Keep version and requirements labels aligned; do not repeat an unchanged version.
+let approvalMetadataLines(
+  hash: String,
+  previousVersion: Option<String>,
+  requirements: (List<LanguageTools.Permissions.Effect> * Bool))
+  : List<String> =
+  let current = shortVersion(hash)
+  let version =
+    match previousVersion with
+    | Some(previous) when previous == hash -> $"{current} (unchanged)"
+    | Some(previous) -> $"{shortVersion(previous)} → {current}"
+    | None -> current
+
+  [ $"  Version:       {version}", $"  Requirements:  {describeRequirements(requirements)}" ]
+
+
+/// Print the review heading and return the requirements already read for it.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.showVersionRequirements: Unknown function or value 'Command.permissionRequirementsForHash'"
-let showVersionRequirements(heading: String, hash: String): Bool =
-  let requirements = Command.permissionRequirementsForHash(hash)
+let showVersionRequirements(
+  name: String,
+  previousVersion: Option<String>,
+  hash: String)
+  : (List<LanguageTools.Permissions.Effect> * Bool) =
+  let requirements = permissionRequirementsForHash(hash)
   let (_effects, complete) = requirements
-  Stdlib.printLine(heading)
-  Stdlib.printLine(
-    $"  permission requirements: {Command.describeRequirements(requirements)}")
+  Stdlib.printLine(Stdlib.Cli.UI.Colors.boldText(name))
+  Stdlib.printLines(approvalMetadataLines(hash, previousVersion, requirements))
   if Stdlib.Bool.not(complete) then
     Stdlib.printErrorLine(
-      (Stdlib.Cli.UI.Colors.warning(
-        "  some calls in this function could not be followed (a callback, a package value, or an implementation picked at run time), so the list above may be short. The instance and run policies still bound whatever it does.")))
+      Stdlib.Cli.UI.Colors.warning(
+        "  Analysis is incomplete; more permissions may be needed at runtime."))
   else
     ()
-  complete
+
+  requirements
+
 
 /// Take `--yes`/`-y` out of the arguments, reporting whether it was there.
 ///
@@ -464,10 +617,11 @@ let showVersionRequirements(heading: String, hash: String): Bool =
 /// looks like a person. It is stripped before the rules are parsed, so it is
 /// never mistaken for a permission rule.
 let takeYesFlag(args: List<String>): (Bool * List<String>) =
-  let isYesFlag(a: String): Bool = (a == "--yes") || (a == "-y")
+  let isYesFlag(a: String): Bool = a == "--yes" || a == "-y"
   let yes = args |> Stdlib.List.any(isYesFlag)
   let rest = args |> Stdlib.List.filter(fun a -> Stdlib.Bool.not(isYesFlag(a)))
   (yes, rest)
+
 
 /// Show the full replacement before any write. Previewing never prompts or
 /// edits policy; --yes uses the same host-only writer as `permissions set`.
@@ -478,426 +632,678 @@ let profile(args: List<String>): Bool =
     Stdlib.printLines(Profiles.listing)
     true
   | _ ->
-    match Command.takeYesFlag(args) with
-    | (_, []) ->
-      Cli.printErr("profile needs a name")
+    match takeYesFlag(args) with
+    | _, [] ->
+      printErr("profile needs a name")
       false
-    | (apply, [name, ...rest]) ->
+    | apply, [name, ...rest] ->
       match Profiles.resolve(name, rest) with
       | Error(message) ->
-        Cli.printErr(message)
+        printErr(message)
         false
       | Ok(policy) ->
-        Stdlib.printLine(
-          $"Profile {name} replaces the entire instance policy, including denies:")
-        Stdlib.printLines(Command.indentedPolicyLines(policy))
+        let (expected, _) = instanceSnapshot()
+        Stdlib.printLine($"Profile {name} replaces the entire instance policy, including denies:")
+        Stdlib.printLines(indentedPolicyLines(policy))
         if apply then
-          Command.writePolicy(policy)
+          commitInstancePolicy(expected, policy)
           Stdlib.printLine(Stdlib.Cli.UI.Colors.success($"✓ applied profile {name}"))
         else
-          Cli.Stderr.hint("Preview only. Repeat with --yes to apply.")
+          Stderr.hint("Preview only. Repeat with --yes to apply.")
+
         true
+
 
 /// The rules given after a name on `approve`/`update`, `;`-separated like
 /// `set`. Ok None when there are none.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.parseApprovalRules: Unknown function or value 'Command.replacePolicy'"
 let parseApprovalRules(
   specs: List<String>)
-  : Stdlib.Result.Result<Stdlib.Option.Option<LanguageTools.Permissions.Policy>, String> =
-  if Stdlib.List.isEmpty(specs) then Stdlib.Result.Result.Ok(Stdlib.Option.Option.None)
+  : Result<Option<LanguageTools.Permissions.Policy>, String> =
+  if Stdlib.List.isEmpty(specs) then
+    Result.Ok(Option.None)
   else
-    match Command.replacePolicy(specs) with
-    | Ok(policy) -> Stdlib.Result.Result.Ok(Stdlib.Option.Option.Some(policy))
-    | Error(message) -> Stdlib.Result.Result.Error(message)
+    match replacePolicy(specs) with
+    | Ok(policy) ->
+      // Compare and show the same file paths the host will save.
+      let normalize(
+        rules: List<LanguageTools.Permissions.Rule>)
+        : List<LanguageTools.Permissions.Rule> =
+        rules
+        |> Stdlib.List.map(canonicalRule)
+        |> Stdlib.List.unique
+
+      Result.Ok(
+        Option.Some({ policy with allow = normalize(policy.allow), deny = normalize(policy.deny) }))
+    | Error(message) -> Result.Error(message)
+
 
 /// Refuse to remember access with nobody at a terminal to confirm it.
 let needsYes(): String =
   "no terminal to confirm at; add --yes to remember this access"
 
-/// Lines describing the policy a version is approved under, for the prompt.
-let describeApprovalRules(
-  rules: Stdlib.Option.Option<LanguageTools.Permissions.Policy>)
+
+/// Adding access keeps both saved grants and explicit denies.
+let addApprovalRules(
+  saved: LanguageTools.Permissions.Policy,
+  added: LanguageTools.Permissions.Policy)
+  : LanguageTools.Permissions.Policy =
+  { saved with
+      allow = Stdlib.List.unique(Stdlib.List.concat(saved.allow, added.allow))
+      deny = Stdlib.List.unique(Stdlib.List.concat(saved.deny, added.deny)) }
+
+
+/// Show additions and removals separately for grants and explicit denies.
+let approvalChanges(
+  before: LanguageTools.Permissions.Policy,
+  after: LanguageTools.Permissions.Policy)
   : List<String> =
-  match rules with
-  | None -> []
-  | Some(policy) ->
-    Stdlib.List.prepend(
-      Command.indentedPolicyLines(policy),
-      "  additional grants for this entry and its helpers:")
+  let changes(
+    label: String,
+    old: List<LanguageTools.Permissions.Rule>,
+    next: List<LanguageTools.Permissions.Rule>)
+    : List<String> =
+    let removed =
+      old
+      |> Stdlib.List.filter(fun rule -> Stdlib.Bool.not(Stdlib.List.contains(next, rule)))
+      |> Stdlib.List.map(fun rule -> "  - " + label + LanguageTools.Permissions.renderRule(rule))
+
+    let added =
+      next
+      |> Stdlib.List.filter(fun rule -> Stdlib.Bool.not(Stdlib.List.contains(old, rule)))
+      |> Stdlib.List.map(fun rule -> "  + " + label + LanguageTools.Permissions.renderRule(rule))
+
+    Stdlib.List.concat(removed, added)
+
+  Stdlib.List.concat(
+    changes("allow ", before.allow, after.allow),
+    changes("deny ", before.deny, after.deny))
+
+
+/// Show explicit rules, inferred permissions, or no extra access when analysis is incomplete.
+let policyForReview(
+  rules: Option<LanguageTools.Permissions.Policy>,
+  requirements: (List<LanguageTools.Permissions.Effect> * Bool))
+  : LanguageTools.Permissions.Policy =
+  match rules, requirements with
+  | Some(policy), _ -> policy
+  | None, (effects, true) ->
+    LanguageTools.Permissions.Policy
+      { allow =
+          Stdlib.List.map(effects, fun effect -> LanguageTools.Permissions.Rule.Effect(effect))
+        deny = [] }
+  | None, (_, false) -> LanguageTools.Permissions.empty()
+
+
+/// Show the changes and complete result without repeating the old policy or empty sections.
+let approvalReviewLines(
+  previous: Option<LanguageTools.Permissions.Approval>,
+  policy: LanguageTools.Permissions.Policy)
+  : List<String> =
+  let before =
+    previous
+    |> Stdlib.Option.andThen(fun approval -> approval.policy)
+    |> Stdlib.Option.withDefault(LanguageTools.Permissions.empty())
+
+  let changes = approvalChanges(before, policy)
+  let after =
+    Stdlib.List.concat(
+      Stdlib.List.map(policy.allow, fun rule ->
+        "  allow " + LanguageTools.Permissions.renderRule(rule)),
+      Stdlib.List.map(policy.deny, fun rule ->
+        "  deny " + LanguageTools.Permissions.renderRule(rule)))
+
+  Stdlib.List.flatten(
+    [ [ "", "Changes" ]
+      if Stdlib.List.isEmpty(changes) then [ "  No rule changes." ] else changes
+      [ "", "After saving" ]
+      if Stdlib.List.isEmpty(after) then [ "  none" ] else after
+      [ "" ] ])
+
+
+/// Color reinforces the + / - markers; the text remains readable without it.
+let showApprovalReview(
+  previous: Option<LanguageTools.Permissions.Approval>,
+  policy: LanguageTools.Permissions.Policy)
+  : Unit =
+  approvalReviewLines(previous, policy)
+  |> Stdlib.List.iter(fun line ->
+    let styled =
+      if line == "Changes" || line == "After saving" then
+        Stdlib.Cli.UI.Colors.boldText(line)
+      else if Stdlib.String.startsWith(line, "  + ") then
+        Stdlib.Cli.UI.Colors.success(line)
+      else if Stdlib.String.startsWith(line, "  - ") then
+        Stdlib.Cli.UI.Colors.error(line)
+      else
+        line
+
+    Stdlib.printLine(styled))
+
+
+/// Format the differences found by the host's version comparison.
+let approvalReviewReasonText(reason: LanguageTools.Permissions.ApprovalReviewReason): String =
+  match reason with
+  | ApprovedVersionUnavailable(hash) ->
+    $"the previously approved version {hash} is no longer available for comparison"
+  | FunctionTypeChanged -> "the function's type changed"
+  | PermissionAnalysisIncomplete -> "permission analysis is incomplete"
+  | RequiredPermissionsChanged(before, after) ->
+    "permission requirements changed from "
+    + requirementSummary(before)
+    + " to "
+    + requirementSummary(after)
+
 
 let approvalFailureText(failure: LanguageTools.Permissions.ApprovalFailure): String =
   match failure with
   | Refused(message) -> Stdlib.Cli.UI.Colors.error(message)
   | ContractChanged(diffs) ->
     Stdlib.Cli.UI.Colors.warning(
-      ("the permission contract changed — review required:\n"
-       + (diffs |> Stdlib.List.map(fun diff -> $"    {diff}") |> Stdlib.String.join("\n"))))
+      "Review notes:\n"
+      + (diffs
+         |> Stdlib.List.map(fun diff -> "  " + approvalReviewReasonText(diff))
+         |> Stdlib.String.join("\n")))
 
-/// Approve <param hash> for <param name> and report: <param accepted> on success, the refusal (then
-/// <param kept>) when it cannot be approved. Answers whether it approved, and Some diffs when
-/// approving wants a second review of a changed contract and <param acknowledgeContractChange> was
-/// false; the caller shows them and asks.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approveReporting: Unknown function or value 'Command.approveVersionFor'"
-let approveReporting(
-  accountID: Stdlib.Option.Option<Uuid>,
+
+/// Ask only when the saved version, rules, or approval metadata would change.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.reviewAndApprove: Unknown function or value 'reviewVersionFor'"
+let reviewAndApprove(
+  accountID: Option<Uuid>,
   name: String,
   expected: String,
   hash: String,
-  rules: Stdlib.Option.Option<LanguageTools.Permissions.Policy>,
-  acknowledgeIncomplete: Bool,
-  acknowledgeContractChange: Bool,
-  accepted: String,
+  rules: Option<LanguageTools.Permissions.Policy>,
+  requirements: (List<LanguageTools.Permissions.Effect> * Bool),
+  previous: Option<LanguageTools.Permissions.Approval>,
+  acceptWithoutPrompt: Bool,
   kept: String)
-  : (Bool * Stdlib.Option.Option<List<String>>) =
-  match
-    Command.approveVersionFor(
-      accountID,
-      name,
-      expected,
-      hash,
-      rules,
-      acknowledgeIncomplete,
-      acknowledgeContractChange)
-  with
-  | Ok(_) ->
-    Stdlib.printLine(Stdlib.Cli.UI.Colors.success(accepted))
-    (true, Stdlib.Option.Option.None)
-  | Error(Refused(message)) ->
-    Cli.printErr(message)
-    if kept != "" then Cli.Stderr.line(kept) else ()
-    (false, Stdlib.Option.Option.None)
-  | Error(ContractChanged(diffs)) -> (false, Stdlib.Option.Option.Some(diffs))
+  : Bool =
+  let (_effects, complete) = requirements
+  let incomplete = if complete then Incomplete.Refuse else Incomplete.Acknowledge
+  match reviewVersionFor(accountID, name, expected, hash, rules, incomplete) with
+  | Error(message) ->
+    printErr(message)
+    Stderr.line(kept)
+    false
+  | Ok((false, _)) ->
+    Stdlib.printLine("Already approved; no changes.")
+    true
+  | Ok((true, reasons)) ->
+    if Stdlib.List.isEmpty(reasons) then
+      ()
+    else
+      Stdlib.printErrorLine(
+        approvalFailureText(LanguageTools.Permissions.ApprovalFailure.ContractChanged(reasons)))
 
+    showApprovalReview(previous, policyForReview(rules, requirements))
+    if Stdlib.Bool.not(acceptWithoutPrompt || Stdlib.Cli.UI.Prompt.canAsk()) then
+      printErr(needsYes())
+      false
+    else if acceptWithoutPrompt || Stdlib.Cli.UI.Prompt.confirm("Save these permissions?") then
+      match approveVersionFor(
+              accountID,
+              name,
+              expected,
+              hash,
+              rules,
+              incomplete,
+              ContractChange.Acknowledge) with
+      | Ok(_) ->
+        Stdlib.printLine(
+          Stdlib.Cli.UI.Colors.success($"✓ Saved permissions for {name} ({shortVersion(hash)})"))
+
+        true
+      | Error(failure) ->
+        Stdlib.printErrorLine(approvalFailureText(failure))
+        Stderr.line(kept)
+        false
+    else
+      Stdlib.printLine(kept)
+      true
+
+
+/// Add only the rules the user supplied. Missing rules never save or ask for confirmation.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let approveNamed(
-  state: Cli.AppState,
+  state: AppState,
   acceptWithoutPrompt: Bool,
   name: String,
   specs: List<String>)
   : Bool =
-  let expected = Command.reviewToken()
-  match Command.parseApprovalRules(specs) with
+  match parseApprovalRules(specs) with
   | Error(message) ->
-    Cli.printErr(message)
+    printErr(message)
     false
-  | Ok(rules) ->
-    match Command.latestVersion(state.currentBranchId, name) with
+  | Ok(givenRules) ->
+    match latestVersion(state.currentBranchId, name) with
     | None ->
-      Cli.printErr($"unknown function: {name}")
+      printErr($"unknown function: {name}")
       false
     | Some(hash) ->
-      let complete =
-        Command.showVersionRequirements($"{name} {Command.shortVersion(hash)}", hash)
-      Stdlib.printLines(Command.describeApprovalRules(rules))
-      if Stdlib.Bool.not(acceptWithoutPrompt || Stdlib.Cli.UI.Prompt.canAsk()) then
-        Cli.printErr(Command.needsYes())
-        false
-      else if acceptWithoutPrompt || Stdlib.Cli.UI.Prompt.confirm("Remember this access for this code version?") then
-        // An explicit `permissions approve <name>` showed the requirements and
-        // named this exact version; that is the contract review, so a changed
-        // contract is acknowledged up front and no second review can be asked.
-        let (approved, _diffs) =
-          Command.approveReporting(
-            state.accountID,
-            name,
-            expected,
-            hash,
-            rules,
-            Stdlib.Bool.not(complete),
-            true,
-            $"✓ remembered access for {name} {Command.shortVersion(hash)}",
-            "")
-        approved
-      else
-        // Declining at the prompt is an answer, not a failure.
-        Stdlib.printLine("not approved")
-        true
+      let added = Stdlib.Option.withDefault(givenRules, LanguageTools.Permissions.empty())
+      if Stdlib.List.isEmpty(added.allow) && Stdlib.List.isEmpty(added.deny) then
+        printErr("No permission rules specified.")
+        Stderr.line("Usage: permissions approve --for <fn> '<rule>'")
+        let (effects, complete) = permissionRequirementsForHash(hash)
+        if complete && Stdlib.List.isEmpty(effects) then
+          Stderr.line("This function needs no permissions, so no approval is necessary.")
+        else
+          Stderr.hint($"Use `permissions requirements {name}` to inspect its requirements.")
 
-/// Review access for newer code; declining leaves the old approval unchanged.
-/// A changed contract requires a second confirmation. `--yes` is the explicit
-/// yes to both, and is required without a terminal.
+        false
+      else
+        let (expected, named) = approvalSnapshot(state.accountID)
+        let previous =
+          named |> Stdlib.List.findFirst(fun approval -> approval.name == Option.Some(name))
+
+        let policy =
+          match previous with
+          | Some(approval) when approval.hash == hash ->
+            match approval.policy with
+            | Some(saved) -> addApprovalRules(saved, added)
+            | None -> added
+          | _ -> added
+
+        let rules = Option.Some(policy)
+        let previousVersion = previous |> Stdlib.Option.map(fun approval -> approval.hash)
+        let requirements = showVersionRequirements(name, previousVersion, hash)
+        match previous with
+        | Some(approval) when approval.hash != hash ->
+          Stdlib.printLine("  Code changed. Previous grants are not carried forward by approve.")
+          Stdlib.printLine("  Use `permissions update` to review carrying them to the new version.")
+        | _ -> ()
+
+        reviewAndApprove(
+          state.accountID,
+          name,
+          expected,
+          hash,
+          rules,
+          requirements,
+          previous,
+          acceptWithoutPrompt,
+          "not approved")
+
+
+/// Show the complete update, then ask once. Declining keeps the saved approval.
+/// `--yes` accepts the review without a prompt and is required without a terminal.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let updateNamed(
-  state: Cli.AppState,
+  state: AppState,
   acceptWithoutPrompt: Bool,
   name: String,
   specs: List<String>)
   : Bool =
   let accountID = state.accountID
-  let expected = Command.reviewToken()
-  match Command.parseApprovalRules(specs) with
+  let (expected, named) = approvalSnapshot(accountID)
+  let previous = named |> Stdlib.List.findFirst(fun approval -> approval.name == Option.Some(name))
+  match parseApprovalRules(specs) with
   | Error(message) ->
-    Cli.printErr(message)
+    printErr(message)
     false
   | Ok(givenRules) ->
-    match Command.approvedVersionOf(accountID, name) with
+    match previous |> Stdlib.Option.map(fun approval -> approval.hash) with
     | None ->
-      Cli.printErr($"{name} has no remembered approval; run `permissions approve {name}` first")
+      printErr(
+        $"{name} has no remembered approval; run `permissions approve --for {name} '<rule>'` first")
+
       false
     | Some(approved) ->
-      match Command.latestVersion(state.currentBranchId, name) with
+      match latestVersion(state.currentBranchId, name) with
       | None ->
-        Cli.printErr($"unknown function: {name}")
+        printErr($"unknown function: {name}")
         false
       | Some(latest) ->
-        // Rules given now win; otherwise the rules the consumer wrote when
-        // approving carry over, and a derived effect set is recomputed from
-        // the new version. Provenance is stored with the approval, so an
-        // explicit `clock` is never mistaken for a derived one.
+        // Keep rules the user explicitly approved and add any new rules.
+        // For changed code, recompute rules inferred from its effects.
+        // Use remove --for to take access away.
+        let saved =
+          if approved == latest && Stdlib.Option.isSome(givenRules) then
+            previous |> Stdlib.Option.andThen(fun approval -> approval.policy)
+          else
+            previous |> Stdlib.Option.andThen(fun approval -> approval.explicitRules)
+
         let rules =
-          match givenRules with
-          | Some(_) -> givenRules
-          | None -> Command.explicitApprovalFor(accountID, name)
-        let complete =
-          Command.showVersionRequirements(
-            $"{name}: {Command.shortVersion(approved)} → {Command.shortVersion(latest)}",
-            latest)
-        Stdlib.printLines(Command.describeApprovalRules(rules))
-        let acknowledgeIncomplete = Stdlib.Bool.not(complete)
-        let kept =
-          "Approval unchanged."
-        let accepted =
-          $"✓ remembered access for {name} {Command.shortVersion(latest)}"
-        let approve(
-          acknowledgeContractChange: Bool)
-          : (Bool * Stdlib.Option.Option<List<String>>) =
-          Command.approveReporting(
-            accountID,
-            name,
-            expected,
-            latest,
-            rules,
-            acknowledgeIncomplete,
-            acknowledgeContractChange,
-            accepted,
-            kept)
-        if Stdlib.Bool.not(acceptWithoutPrompt || Stdlib.Cli.UI.Prompt.canAsk()) then
-          Cli.printErr(Command.needsYes())
-          false
-        else if Stdlib.Bool.not(acceptWithoutPrompt || Stdlib.Cli.UI.Prompt.confirm("Remember access for the current code version?")) then
-          // Declining leaves the old approval unchanged; it cannot authorize the new code.
-          Stdlib.printLine(kept)
-          true
-        else
-          let (approvedFirst, review) = approve(false)
-          match review with
-          | None -> approvedFirst
-          | Some(diffs) ->
-            // What the next question asks about, so on stderr with the question.
-            Stdlib.printErrorLine(
-              (Command.approvalFailureText(
-                LanguageTools.Permissions.ApprovalFailure.ContractChanged(diffs))))
-            // The differences were shown; accepting them is the review.
-            let acceptChanged =
-              acceptWithoutPrompt
-              || (Stdlib.Cli.UI.Prompt.confirm(
-                    "Approve this code version and its changed permission requirements?"))
-            if acceptChanged then
-              let (approvedSecond, _review) = approve(true)
-              approvedSecond
-            else
-              Stdlib.printLine(kept)
-              true
+          match saved, givenRules with
+          | Some(saved), Some(added) -> Option.Some(addApprovalRules(saved, added))
+          | Some(saved), None -> Option.Some(saved)
+          | None, _ -> givenRules
+
+        let requirements = showVersionRequirements(name, Option.Some(approved), latest)
+        reviewAndApprove(
+          accountID,
+          name,
+          expected,
+          latest,
+          rules,
+          requirements,
+          previous,
+          acceptWithoutPrompt,
+          "Approval unchanged.")
+
 
 /// Run <param show> against the version <param target> names, or report an
 /// unknown function.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let withVersion(
-  state: Cli.AppState,
-  target: String,
-  show: String -> List<String>)
-  : Bool =
-  match Command.resolveVersionArg(state, target) with
+let withVersion(state: AppState, target: String, show: String -> List<String>): Bool =
+  match resolveVersionArg(state, target) with
   | None ->
-    Cli.printErr($"unknown function: {target}")
+    printErr($"unknown function: {target}")
     false
   | Some(hash) ->
     Stdlib.printLines(show(hash))
     true
 
+
 let printListOrNone(items: List<String>): Unit =
-  if Stdlib.List.isEmpty(items) then Stdlib.printLine("none")
-  else Stdlib.printLines(items)
+  if Stdlib.List.isEmpty(items) then
+    Stdlib.printLine("none")
+  else
+    Stdlib.printLines(items)
 
 
 /// Every subcommand with the usage it prints when its argument is missing;
 /// None for the ones that take no argument. Drives `execute`'s
 /// missing-argument arm and `complete`.
 val subcommands =
-  [ ("list", Stdlib.Option.Option.None)
-    ("profile", Stdlib.Option.Option.None)
-    ("allow", Stdlib.Option.Option.Some("allow <rule>;…"))
-    ("deny", Stdlib.Option.Option.Some("deny <rule>;…"))
-    ("remove", Stdlib.Option.Option.Some("remove <rule>;…"))
+  [ ("list", Option.None)
+    ("profile", Option.None)
+    ("allow", Option.Some("allow <rule>;…"))
+    ("deny", Option.Some("deny <rule>;…"))
+    ("remove", Option.Some("remove [--for <fn>] <rules> | remove --for <fn> --all"))
     // `set` with nothing would otherwise replace the policy with deny-all;
     // that is what `clear` is for.
-    ("set", Stdlib.Option.Option.Some("set <rule>;… (or `clear`)"))
-    ("clear", Stdlib.Option.Option.None)
-    ("approve", Stdlib.Option.Option.Some("approve <fn> [rule,…]"))
-    ("update", Stdlib.Option.Option.Some("update <fn> [rule,…]"))
-    ("unapprove", Stdlib.Option.Option.Some("unapprove <fn>"))
-    ("approved", Stdlib.Option.Option.None)
-    ("requirements", Stdlib.Option.Option.Some("requirements <fn|hash>"))
-    ("show", Stdlib.Option.Option.Some("show <fn|hash>"))
-    ("approvals", Stdlib.Option.Option.None)
-    ("revoke-package", Stdlib.Option.Option.Some("revoke-package <hash>")) ]
+    ("set", Option.Some("set <rule>;… (or `clear`)"))
+    ("clear", Option.None)
+    ("approve", Option.Some("approve --for <fn> <rules>"))
+    ("update", Option.Some("update <fn> [rule,…]"))
+    ("unapprove", Option.Some("unapprove <fn>"))
+    ("approved", Option.None)
+    ("requirements", Option.Some("requirements <fn|hash>"))
+    ("show", Option.Some("show <fn|hash>"))
+    ("approvals", Option.None)
+    ("revoke-package", Option.Some("revoke-package <hash>")) ]
+
 
 /// The usage line for a subcommand given without its argument, if it needs one.
-let usageOf(subcommand: String): Stdlib.Option.Option<String> =
-  Command.subcommands
+let usageOf(subcommand: String): Option<String> =
+  subcommands
   |> Stdlib.List.findFirst(fun((name, _usage)) -> name == subcommand)
   |> Stdlib.Option.andThen(fun((_name, usage)) -> usage)
 
+
+/// Parse named permission options wherever they occur, including --for=<name>.
+let permissionArgs(args: List<String>): FlagParser.Parsed =
+  let normalized =
+    args
+    |> Stdlib.List.map(fun arg ->
+      if Stdlib.String.startsWith(arg, "--for=") then
+        [ "--for", Stdlib.String.slice(arg, 6, Stdlib.String.length(arg)) ]
+      else
+        [ arg ])
+    |> Stdlib.List.flatten
+
+  FlagParser.parse(
+    FlagParser.Spec
+      { flags = [ ("--yes", [ "-y" ]), ("--all", []) ], valueFlags = [ ("--for", []) ] },
+    normalized)
+
+
+/// If --for is present, require one nonempty value and reject repeated flags.
+let permissionTarget(parsed: FlagParser.Parsed): Result<Option<String>, String> =
+  let targets = parsed.options |> Stdlib.List.filter(fun((flag, _)) -> flag == "--for")
+  match targets with
+  | [] -> Result.Ok(Option.None)
+  | [(_, name)] when name != "" && Stdlib.Bool.not(Stdlib.String.startsWith(name, "-")) ->
+    Result.Ok(Option.Some(name))
+  | [_] -> Result.Error("--for needs a function name or a saved script name")
+  | _ -> Result.Error("Specify --for only once.")
+
+
+/// Remove all saved rules for a name, including approvals of older code or scripts.
+// @compiler blocked: upstream-dependency diagnostic="removeNamedApproval: Unknown type 'AppState'"
+let removeNamedApproval(state: AppState, name: String): AppState =
+  let (expected, approvals) = approvalSnapshot(state.accountID)
+  if Stdlib.List.any(approvals, fun approval -> approval.name == Option.Some(name)) then
+    removeNamedApprovalFor(state.accountID, expected, name)
+    Stdlib.printLine(
+      Stdlib.Cli.UI.Colors.success(
+        $"✓ Removed remembered approval for {name}. Other rules may still allow access."))
+
+    state
+  else
+    printErr($"{name} has no remembered approval; `permissions approved` lists the ones that do")
+    failed(state)
+
+
+/// Calculate an exact rule removal before writing anything. Missing rules refuse the whole edit.
+let removeApprovalRules(
+  policy: LanguageTools.Permissions.Policy,
+  rules: List<LanguageTools.Permissions.Rule>)
+  : Result<LanguageTools.Permissions.Policy, String> =
+  let saved = Stdlib.List.concat(policy.allow, policy.deny)
+  if Stdlib.List.isEmpty(rules) then
+    Result.Error("Give a saved rule to remove, or use --all.")
+  else if
+    Stdlib.List.any(rules, fun rule -> Stdlib.Bool.not(Stdlib.List.contains(saved, rule)))
+  then
+    Result.Error("A requested rule is not saved; nothing was removed.")
+  else
+    let keep(rule: LanguageTools.Permissions.Rule): Bool =
+      Stdlib.Bool.not(Stdlib.List.contains(rules, rule))
+
+    Result.Ok(
+      { policy with
+          allow = Stdlib.List.filter(policy.allow, keep)
+          deny = Stdlib.List.filter(policy.deny, keep) })
+
+
+/// Read the saved rules, remove the requested ones, and save if permissions are unchanged.
+// @compiler blocked: upstream-dependency diagnostic="removeNamedRules: Unknown type 'AppState'"
+let removeNamedRules(
+  state: AppState,
+  name: String,
+  rules: List<LanguageTools.Permissions.Rule>)
+  : AppState =
+  let (expected, approvals) = approvalSnapshot(state.accountID)
+  let saved =
+    approvals
+    |> Stdlib.List.findFirst(fun approval -> approval.name == Option.Some(name))
+    |> Stdlib.Option.andThen(fun approval -> approval.policy)
+
+  match saved with
+  | None ->
+    printErr($"{name} has no remembered approval.")
+    failed(state)
+  | Some(policy) ->
+    match removeApprovalRules(policy, Stdlib.List.map(rules, canonicalRule)) with
+    | Error(message) ->
+      printErr(message)
+      Stderr.hint($"Use `permissions show {name}` to see its rules.")
+      failed(state)
+    | Ok(edited) ->
+      removeSavedAccess(
+        state.accountID,
+        LanguageTools.Permissions.ApprovalTarget.EditPolicy(name, expected, edited))
+
+      Stdlib.printLine(
+        Stdlib.Cli.UI.Colors.success(
+          $"✓ Removed saved rules for {name}. Other rules may still allow access."))
+
+      state
+
+
+/// Remove exact saved rules, or every saved rule for one named approval.
+// @compiler blocked: upstream-dependency diagnostic="removeRules: Unknown type 'AppState'"
+let removeRules(state: AppState, args: List<String>): AppState =
+  let parsed = permissionArgs(args)
+  let all = FlagParser.hasFlag(parsed, "--all")
+  match permissionTarget(parsed), all, parsed.positionals with
+  | Error(message), _, _ ->
+    printErr(message)
+    failed(state)
+  | _, true, [_, ...] ->
+    printErr("--all cannot be combined with individual rules; nothing was removed")
+    failed(state)
+  | Ok(None), true, [] ->
+    printErr("--all requires --for <fn>; `permissions clear` clears instance rules")
+    failed(state)
+  | Ok(Some(name)), true, [] -> removeNamedApproval(state, name)
+  | _, false, [] ->
+    printErr("Give a rule to remove, or use --for <fn> --all.")
+    failed(state)
+  | Ok(target), false, specs ->
+    match parseRuleList(specs) with
+    | Error(bad) ->
+      printErr(invalidRule([ bad ]))
+      failed(state)
+    | Ok(rules) ->
+      if Stdlib.List.isEmpty(rules) then
+        printErr("Give a rule to remove, or use --for <fn> --all.")
+        failed(state)
+      else
+        match target with
+        | None ->
+          editInstancePolicy([], [], rules)
+          Stdlib.printLine(Stdlib.Cli.UI.Colors.success("✓ rule removed"))
+          state
+        | Some(name) -> removeNamedRules(state, name, rules)
+
+
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
+let execute(state: AppState, args: List<String>): AppState =
   match args with
-  | []
-  | [ "list" ] ->
-    Stdlib.printLines(Command.instancePolicyLines())
+  | [] | ["list"] ->
+    Stdlib.printLines(instancePolicyLines())
     state
-  | [ "help" ] ->
-    Stdlib.printLine(Command.help(state))
+  | ["help"] ->
+    Stdlib.printLine(help(state))
     state
-  | ["profile", ...args] -> Cli.exitWith(state, Command.profile(args))
+  | ["profile", ...args] -> exitWith(state, profile(args))
   // Before the `[<subcommand>, ...args]` arms: a subcommand given with no
   // argument must report usage, not run with an empty argument list (`set`
   // with nothing would replace the policy with deny-all).
-  | [ subcommand ] when Stdlib.Option.isSome(Command.usageOf(subcommand)) ->
-    let usage = Stdlib.Option.withDefault(Command.usageOf(subcommand), "")
-    Cli.printErr($"missing argument; usage: permissions {usage}")
-    Cli.failed(state)
+  | [subcommand] when Stdlib.Option.isSome(usageOf(subcommand)) ->
+    let usage = Stdlib.Option.withDefault(usageOf(subcommand), "")
+    printErr($"missing argument; usage: permissions {usage}")
+    failed(state)
   | ["allow", ...rule] ->
-    Cli.exitWith(state, (Command.editRules(
-      rule,
-      (fun rules -> Command.editInstancePolicy(rules, [], [])),
-      "✓ policy updated")))
+    exitWith(
+      state,
+      editRules(rule, (fun rules -> editInstancePolicy(rules, [], [])), "✓ policy updated"))
   | ["deny", ...rule] ->
-    Cli.exitWith(state, (Command.editRules(
-      rule,
-      (fun rules -> Command.editInstancePolicy([], rules, [])),
-      "✓ policy updated")))
-  | ["remove", ...rule] ->
-    Cli.exitWith(state, (Command.editRules(
-      rule,
-      (fun rules -> Command.editInstancePolicy([], [], rules)),
-      "✓ rule removed")))
-  | [ "clear" ] ->
-    Cli.exitWith(state, (Command.editPolicy(
-      (fun _ -> Stdlib.Result.Result.Ok(LanguageTools.Permissions.empty())),
-      "✓ policy is now deny-all")))
+    exitWith(
+      state,
+      editRules(rule, (fun rules -> editInstancePolicy([], rules, [])), "✓ policy updated"))
+  | ["remove", ...args] -> removeRules(state, args)
+  | ["clear"] ->
+    exitWith(
+      state,
+      editPolicy(
+        (fun _ -> Result.Ok(LanguageTools.Permissions.empty())),
+        "✓ policy is now deny-all"))
   | ["set", ...specs] ->
-    Cli.exitWith(state, Command.editPolicy((fun _ -> Command.replacePolicy(specs)), "✓ policy replaced"))
-  | ["approve", ...rest] ->
-    match Command.takeYesFlag(rest) with
-    | (acceptWithoutPrompt, [name, ...rules]) ->
-      Cli.exitWith(state, Command.approveNamed(state, acceptWithoutPrompt, name, rules))
-    | (_, []) ->
-      Cli.printErr("approve needs a function name")
-      Cli.failed(state)
+    exitWith(state, editPolicy((fun _ -> replacePolicy(specs)), "✓ policy replaced"))
+  | ["approve", ...args] ->
+    let parsed = permissionArgs(args)
+    let yes = FlagParser.hasFlag(parsed, "--yes")
+    match permissionTarget(parsed), parsed.positionals with
+    | Error(message), _ ->
+      printErr(message)
+      failed(state)
+    | Ok(Some(name)), rules -> exitWith(state, approveNamed(state, yes, name, rules))
+    // Keep the positional spelling used by existing scripts.
+    | Ok(None), [name, ...rules] -> exitWith(state, approveNamed(state, yes, name, rules))
+    | Ok(None), [] ->
+      printErr("approve needs --for <fn>")
+      failed(state)
   | ["update", ...rest] ->
-    match Command.takeYesFlag(rest) with
-    | (acceptWithoutPrompt, [name, ...rules]) ->
-      Cli.exitWith(state, Command.updateNamed(state, acceptWithoutPrompt, name, rules))
-    | (_, []) ->
-      Cli.printErr("update needs a function name")
-      Cli.failed(state)
-  | [ "unapprove", name ] ->
-    // An approval is keyed by the name as it was approved, so an unmatched name withdraws nothing;
-    // say so rather than report a release that did not happen.
-    let approvedNames =
-      Command.approvedVersions(state.accountID)
-      |> Stdlib.List.map(fun pair -> let (approvedName, _hash) = pair in approvedName)
-    if Stdlib.List.contains(approvedNames, name) then
-      Command.unapproveVersionFor(state.accountID, name)
-      Stdlib.printLine(
-        (Stdlib.Cli.UI.Colors.success(
-          $"✓ Removed remembered approval for {name}. Other rules may still allow access.")))
-      state
-    else
-      Cli.printErr($"{name} has no remembered approval; `permissions approved` lists the ones that do")
-      Cli.failed(state)
-  | [ "requirements", target ] ->
-    Cli.exitWith(state, (Command.withVersion(state, target, fun hash ->
-      [ Command.requirementDisplay(hash) ])))
-  | [ "show", target ] ->
+    match takeYesFlag(rest) with
+    | acceptWithoutPrompt, [name, ...rules] ->
+      exitWith(state, updateNamed(state, acceptWithoutPrompt, name, rules))
+    | _, [] ->
+      printErr("update needs a function name")
+      failed(state)
+  | ["unapprove", name] -> removeNamedApproval(state, name)
+  | ["requirements", target] ->
+    exitWith(state, withVersion(state, target, fun hash -> [ requirementDisplay(hash) ]))
+  | ["show", target] ->
     if Stdlib.String.startsWith(target, "script:") then
-      match Command.explicitApprovalFor(state.accountID, target) with
+      match explicitApprovalFor(state.accountID, target) with
       | None ->
-        Cli.printErr($"No remembered approval for {target}")
-        Cli.failed(state)
+        printErr($"No remembered approval for {target}")
+        failed(state)
       | Some(policy) ->
         Stdlib.printLine($"Remembered approval for {target}:")
-        Stdlib.List.iter(Command.indentedPolicyLines(policy), Stdlib.printLine)
+        Stdlib.List.iter(indentedPolicyLines(policy), Stdlib.printLine)
         Stdlib.printLine("Applies only to the reviewed source and dependency versions.")
         Stdlib.printLine("Instance denies and run restrictions still win.")
         state
     else
-      let name = Cli.TraceVerbs.canonicalFnName(state.currentBranchId, target)
-      Cli.exitWith(state, Command.withVersion(state, name, fun hash ->
-        let facts = Command.accessFacts(state.accountID, hash)
-        let facts =
-          if target == hash then facts
-          else { facts with
-            approvals = Stdlib.List.filter(facts.approvals, fun((n, _)) -> n == name)
-            approvedAs = Stdlib.List.filter(facts.approvedAs, fun n -> n == name)
-            olderApproval =
-              match Command.approvedVersionOf(state.accountID, name) with
-              | Some(version) when version != hash -> Stdlib.Option.Option.Some(version)
-              | _ -> Stdlib.Option.Option.None }
-        Command.renderAccessReport(name, facts)))
-  | [ "revoke-package", hash ] ->
-    // A hash that was never approved revokes nothing; say so rather than report a revoke.
-    if Stdlib.List.contains(Command.approvedHashes(state.accountID), hash) then
-      Command.revokeHash(state.accountID, hash)
-      Stdlib.printLine(Stdlib.Cli.UI.Colors.success("✓ package approval revoked"))
-      state
-    else
-      Cli.printErr($"{hash} has no approval; `permissions approvals` lists the ones that do")
-      Cli.failed(state)
-  | [ "approved" ] | [ "approvals" ] ->
-    let approvals = Command.namedApprovals(state.accountID, state.currentBranchId)
+      let name = TraceVerbs.canonicalFnName(state.currentBranchId, target)
+      exitWith(
+        state,
+        withVersion(state, name, fun hash ->
+          let facts = accessFacts(state.accountID, hash)
+          let facts =
+            if target == hash then
+              facts
+            else
+              { facts with
+                  approvals = Stdlib.List.filter(facts.approvals, fun((n, _)) -> n == name)
+                  approvedAs = Stdlib.List.filter(facts.approvedAs, fun n -> n == name)
+                  olderApproval =
+                    match approvedVersionOf(state.accountID, name) with
+                    | Some(version) when version != hash -> Option.Some(version)
+                    | _ -> Option.None }
+
+          renderAccessReport(name, facts)))
+  | ["revoke-package", hash] -> exitWith(state, revokeHash(state.accountID, hash))
+  | ["approved"] | ["approvals"] ->
+    let approvals = namedApprovals(state.accountID, state.currentBranchId)
     if Stdlib.List.isEmpty(approvals) then
       Stdlib.printLine("Remembered approvals: none")
     else
       Stdlib.printLine("Remembered approvals:")
       Stdlib.printLines(approvals)
-    if Command.approvalsStale() then
+
+    if approvalsStale() then
       Stdlib.printErrorLine(
-        (Stdlib.Cli.UI.Colors.warning(
-          "! approval analysis changed since these were approved; re-review with `permissions approve <fn>`")))
+        Stdlib.Cli.UI.Colors.warning(
+          "! approval analysis changed since these were approved; re-review with `permissions update <fn>`"))
     else
       ()
+
     state
   | _ ->
-    Cli.printErr("unknown permissions command: " + Stdlib.String.join(args, " "))
-    Stdlib.printErrorLine(Command.help(state))
-    Cli.failed(state)
+    printErr("unknown permissions command: " + Stdlib.String.join(args, " "))
+    Stdlib.printErrorLine(help(state))
+    failed(state)
+
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let complete(
-  _state: Cli.AppState,
-  args: List<String>)
-  : List<Cli.Completion.CompletionItem> =
+let complete(_state: AppState, args: List<String>): List<Completion.CompletionItem> =
   match args with
-  | [ "profile" ] ->
-    Profiles.all |> Stdlib.List.map(fun profile -> Cli.Completion.simple(profile.name))
+  | ["profile"] -> Profiles.all |> Stdlib.List.map(fun profile -> Completion.simple(profile.name))
   // Wildcards, not `_root`: every branch of an or-pattern has to bind the same names, and the
   // first one binds nothing. Nothing here reads the root anyway.
-  | [ "profile", "default" ]
-  | [ "profile", "read-only", _ ]
-  | [ "profile", "local-dev", _ ] -> [ Cli.Completion.simple("--yes") ]
+  | ["profile", "default"] | ["profile", "read-only", _] | ["profile", "local-dev", _] ->
+    [ Completion.simple("--yes") ]
   | ["profile", ...] -> []
-  | _ ->
-    Command.subcommands
-    |> Stdlib.List.map(fun((name, _usage)) -> Cli.Completion.simple(name))
+  | ["approve", ...] -> [ Completion.simple("--for"), Completion.simple("--yes") ]
+  | ["remove", ...] -> [ Completion.simple("--for"), Completion.simple("--all") ]
+  | _ -> subcommands |> Stdlib.List.map(fun((name, _usage)) -> Completion.simple(name))
+
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let help(_state: Cli.AppState): String =
+let help(_state: AppState): String =
   [ "Usage: permissions [list] | allow <rule>;… | deny <rule>;… | remove <rule>;…"
     "                   | set <rule>;… | clear"
     "                   | profile [name [ABSOLUTE-ROOT] [--yes]]"
-    "                   | approve <fn> [rules] | update <fn> [rules] | unapprove <fn>"
-    "                   | approved"
+    "                   | approve --for <fn> <rules> | update <fn> [rules]"
+    "                   | remove --for <name> <rules> | remove --for <name> --all"
+    "                   | unapprove <name> | approved"
     "                   | requirements <fn|hash> | show <fn|hash>"
     "                   | approvals | revoke-package <hash>"
     ""
@@ -928,17 +1334,26 @@ let help(_state: Cli.AppState): String =
     "  HTTPS GET permits any host on port 443; HTTP serving permits any port on 127.0.0.1."
     ""
     "Named approvals:"
-    "  --yes, -y      skip the confirmation; required without a terminal"
-    "  approve <fn>   remember access for the current code and its dependencies."
+    "  --yes, -y      skip confirmation when saving; required without a terminal"
+    "                 An unchanged approval returns immediately without saving or prompting."
+    "  approve --for <fn> <rules> add access, keeping this version's saved rules."
+    "                 Rules are required; omitting them saves nothing and never prompts."
     "                 Edits run immediately but do not inherit the old approval."
     "                 Rules allow access to this entry and its helpers, in addition"
     "                 to instance defaults. Separate names have separate grants, e.g."
-    "                 approve MyApp.fetch http GET 'https://api.example.com'"
+    "                 approve --for MyApp.fetch 'http GET https://api.example.com'"
+    "  remove --for <name> <rules> remove exact rules from this saved approval."
+    "                 Other grants and denies stay; instance rules are unchanged."
+    "  remove --for <name> --all forget all saved access for this name."
+    "                 --all cannot be combined with rules. Plain `all` is one rule."
+    "                 Names can also be script:/absolute/path from `approved`."
     "  update <fn>    review access for the current version; declining leaves the"
-    "                 approval unchanged. A changed permission contract asks again."
-    "                 Rules on approve carry over unless new ones are given"
-    "  unapprove <name> withdraw a function or script approval; other rules still apply"
-    "  revoke-package <hash> withdraw all named approvals of that version"
+    "                 approval unchanged. Changes are shown before one confirmation."
+    "                 Explicit rules carry over after review; new rules add to them."
+    "                 Inferred effects are recomputed when the code changes."
+    "  unapprove <name> alias for remove --for <name> --all; other rules still apply"
+    "  approve <fn> <rules> remains accepted for existing scripts."
+    "  revoke-package <hash> remove all named approvals of that version"
     ""
     "Rules:"
     "  <effect>                         e.g. clock, random, stdout, http, process,"

@@ -5,18 +5,28 @@ module Darklang.Stdlib.HttpServer.Tests
 // Route a request to /notes through a GET and a POST handler, returning the
 // status and body text.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpServer.Tests.routeNotes: Unknown function or value 'Stdlib.Bytes.empty'"
-let routeNotes(method: String, headers: List<String * String>): (Int64 * String) =
+let routeNotes(
+  method: String,
+  headers: List<(String * String)>)
+  : (Int64 * String) =
   let handlers =
-    [ Stdlib.HttpServer.get("/notes", fun req -> Stdlib.Http.responseWithText(200, "list"))
-      Stdlib.HttpServer.post("/notes", fun req -> Stdlib.Http.responseWithText(200, "created")) ]
+    [ Stdlib.HttpServer.get("/notes", fun req ->
+        Stdlib.Http.responseWithText(200, "list"))
+
+      Stdlib.HttpServer.post("/notes", fun req ->
+        Stdlib.Http.responseWithText(200, "created")) ]
 
   let response =
     Stdlib.HttpServer.routeRequest(
       handlers,
       Stdlib.Http.Request
-        { method = method, url = "/notes", headers = headers, body = Stdlib.Bytes.empty })
+        { method = method
+          url = "/notes"
+          headers = headers
+          body = Stdlib.Bytes.empty })
 
   (response.statusCode, Stdlib.Utf8.decodeWithReplacement(response.body))
+
 
 // The request's `method` picks the handler, and a header that looks like a
 // method does not.
@@ -24,9 +34,14 @@ let routeNotes(method: String, headers: List<String * String>): (Int64 * String)
 test routeRequestByMethod =
   Stdlib.Test.all(
     [ routeNotes("GET", []) |> Stdlib.Test.equal((200, "list"))
+
       routeNotes("POST", []) |> Stdlib.Test.equal((200, "created"))
-      routeNotes("GET", [ ("x-http-method", "POST") ]) |> Stdlib.Test.equal((200, "list"))
-      (Stdlib.Tuple2.first(routeNotes("DELETE", []))) |> Stdlib.Test.equal(404) ])
+
+      routeNotes("GET", [ ("x-http-method", "POST") ])
+      |> Stdlib.Test.equal((200, "list"))
+
+      Stdlib.Tuple2.first(routeNotes("DELETE", [])) |> Stdlib.Test.equal(404) ])
+
 
 // `get`/`post` build the Handler a record literal would, so a route table reads as
 // routes.
@@ -37,16 +52,23 @@ test routes =
          Stdlib.Http.Response
            { statusCode = 200, headers = [], body = Stdlib.Bytes.empty })).route
       |> Stdlib.Test.equal("/ping")
+
       (Stdlib.HttpServer.get("/ping", fun req ->
          Stdlib.Http.Response
-           { statusCode = 200, headers = [], body = Stdlib.Bytes.empty })).method
+           { statusCode = 200
+             headers = []
+             body = Stdlib.Bytes.empty })).method
       |> Stdlib.Test.equal("GET")
+
       (Stdlib.HttpServer.post("/ops", fun req ->
          Stdlib.Http.Response
-           { statusCode = 200, headers = [], body = Stdlib.Bytes.empty })).method
+           { statusCode = 200
+             headers = []
+             body = Stdlib.Bytes.empty })).method
       |> Stdlib.Test.equal("POST") ])
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
+
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.table'" class=missing-support reason=upstream-dependency
 test getPath =
   [ ("/users/42?x=1", "/users/42")
     ("http://localhost:9000/a/b?x=1", "/a/b")
@@ -66,11 +88,176 @@ test getPath =
     // Asterisk form never reaches a handler (the listener answers 400), but
     // does not crash here either.
     ("*", "/*") ]
-  |> Stdlib.List.map(fun pair ->
-    let (url, expected) = pair
-
+  |> Stdlib.Test.table(fun((url, expected)) ->
     Stdlib.HttpServer.getPath(
       Stdlib.Http.Request
         { method = "GET", url = url, headers = [], body = Stdlib.Bytes.empty })
     |> Stdlib.Test.equal(expected))
-  |> Stdlib.Test.all
+
+
+// ---------------------------
+// Middleware: Handler -> Handler
+// ---------------------------
+
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpServer.Tests.__req: Unknown function or value 'Stdlib.Bytes.empty'"
+let __req(url: String, headers: List<(String * String)>): Stdlib.Http.Request =
+  Stdlib.Http.Request
+    { method = "GET", url = url, headers = headers, body = Stdlib.Bytes.empty }
+
+
+/// Answers with the url it saw as the body, and its request headers as its own.
+let __echoHandler(req: Stdlib.Http.Request): Stdlib.Http.Response =
+  Stdlib.Http.responseWithHeaders(200, req.headers, Stdlib.Utf8.encode(req.url))
+
+
+// @compiler blocked: upstream-dependency diagnostic="__run: Unknown type 'Stdlib.HttpServer.Middleware'"
+let __run(
+  middlewares: List<Stdlib.HttpServer.Middleware>,
+  req: Stdlib.Http.Request)
+  : Stdlib.Http.Response =
+  Stdlib.HttpServer.Middleware.__handle(middlewares, __echoHandler, req)
+
+
+// @compiler blocked: upstream-dependency diagnostic="serverStackRunsFirstListedOutermost: Unknown type 'Stdlib.HttpServer.Middleware'"
+test serverStackRunsFirstListedOutermost =
+  let tag = fun name ->
+    Stdlib.HttpServer.Middleware.onResponse(fun r ->
+      { r with headers = Stdlib.List.append(r.headers, ("x-seen", name)) })
+
+  (__run([ tag("outer"), tag("inner") ], __req("http://a.test/", []))).headers
+  |> Stdlib.Test.equal([ ("x-seen", "inner"), ("x-seen", "outer") ])
+
+
+// @compiler xfail compile: "Unknown function or value '__run'" class=missing-support reason=upstream-dependency
+test serverEmptyStackIsTheHandler =
+  (__run([], __req("http://a.test/x", []))).body
+  |> Stdlib.Test.equal(Stdlib.Utf8.encode("http://a.test/x"))
+
+
+// @compiler blocked: upstream-dependency diagnostic="standardHeadersUnlessSet: Unknown type 'Stdlib.HttpServer.Middleware'"
+test standardHeadersUnlessSet =
+  Stdlib.Test.all(
+    [ (__run(
+         [ Stdlib.HttpServer.Middleware.standardHeaders() ],
+         __req("http://a.test/", []))).headers
+      |> Stdlib.Test.equal(
+        [ (
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains; preload") ])
+
+      (__run(
+         [ Stdlib.HttpServer.Middleware.standardHeaders() ],
+         __req(
+           "http://a.test/",
+           [ ("strict-transport-security", "max-age=1") ]))).headers
+      |> Stdlib.Test.equal([ ("strict-transport-security", "max-age=1") ]) ])
+
+
+// @compiler blocked: upstream-dependency diagnostic="forwardedProtoRewritesTheUrl: Unknown type 'Stdlib.HttpServer.Middleware'"
+test forwardedProtoRewritesTheUrl =
+  let urlFor = fun headers ->
+    Stdlib.Utf8.decodeWithReplacement(
+      (__run(
+         [ Stdlib.HttpServer.Middleware.trustForwardedProto() ],
+         __req("http://a.test:8080/p?q=1", headers))).body)
+
+  Stdlib.Test.all(
+    [ urlFor([ ("X-Forwarded-Proto", "https") ])
+      |> Stdlib.Test.equal("https://a.test/p?q=1")
+
+      urlFor([ ("x-forwarded-proto", " HTTPS ") ])
+      |> Stdlib.Test.equal("https://a.test/p?q=1")
+
+      urlFor([ ("X-Forwarded-Proto", "http") ])
+      |> Stdlib.Test.equal("http://a.test:8080/p?q=1")
+
+      urlFor([]) |> Stdlib.Test.equal("http://a.test:8080/p?q=1") ])
+
+
+// @compiler blocked: upstream-dependency diagnostic="logRequestsPassesTheResponseThrough: Unknown type 'Stdlib.HttpServer.Middleware'"
+test logRequestsPassesTheResponseThrough =
+  let r =
+    __run(
+      [ Stdlib.HttpServer.Middleware.logRequests() ],
+      __req("http://a.test/x", [ ("A", "1") ]))
+
+  (r.statusCode, r.headers) |> Stdlib.Test.equal((200, [ ("A", "1") ]))
+
+
+// @compiler blocked: upstream-dependency diagnostic="onRequestRewritesForTheHandler: Unknown type 'Stdlib.HttpServer.Middleware'"
+test onRequestRewritesForTheHandler =
+  (__run(
+     [ Stdlib.HttpServer.Middleware.onRequest(fun req ->
+         { req with url = req.url + "#seen" }) ],
+     __req("http://a.test/", []))).body
+  |> Stdlib.Test.equal(Stdlib.Utf8.encode("http://a.test/#seen"))
+
+
+// @compiler xfail compile: "Unknown field 'middleware' on Darklang.Stdlib.HttpServer.Config.Config" class=missing-support reason=compiler-gap
+test configDefaultsCarryTheStack =
+  Stdlib.List.length(
+    (Stdlib.HttpServer.Config.defaults(Stdlib.Net.Port.httpAlt)).middleware)
+  |> Stdlib.Test.equal(2)
+
+
+// @compiler blocked: upstream-dependency diagnostic="corsAllowsListedOrigins: Unknown type 'Stdlib.HttpServer.Middleware'"
+test corsAllowsListedOrigins =
+  let cors = Stdlib.HttpServer.Middleware.cors([ "https://app.test" ])
+  let preflight =
+    { __req(
+        "http://a.test/x",
+        [ ("Origin", "https://app.test")
+          ("Access-Control-Request-Method", "PUT")
+          ("Access-Control-Request-Headers", "Content-Type") ]) with
+        method = "OPTIONS" }
+
+  Stdlib.Test.all(
+    [ (let r = __run([ cors ], preflight)
+       (r.statusCode, r.headers))
+      |> Stdlib.Test.equal(
+        (
+          204,
+          [ ("Access-Control-Allow-Methods", "PUT")
+            ("Access-Control-Max-Age", "600")
+            ("Access-Control-Allow-Headers", "Content-Type")
+            ("Access-Control-Allow-Origin", "https://app.test")
+            ("Vary", "Origin") ]))
+
+      (__run(
+         [ cors ],
+         __req("http://a.test/x", [ ("Origin", "https://app.test") ]))).headers
+      |> Stdlib.Test.equal(
+        [ ("Origin", "https://app.test")
+          ("Access-Control-Allow-Origin", "https://app.test")
+          ("Vary", "Origin") ])
+
+      (__run(
+         [ cors ],
+         __req("http://a.test/x", [ ("Origin", "https://evil.test") ]))).headers
+      |> Stdlib.Test.equal([ ("Origin", "https://evil.test") ])
+
+      (__run(
+         [ Stdlib.HttpServer.Middleware.cors([ "*" ]) ],
+         __req("http://a.test/x", [ ("Origin", "https://any.test") ]))).headers
+      |> Stdlib.Test.equal(
+        [ ("Origin", "https://any.test")
+          ("Access-Control-Allow-Origin", "*") ]) ])
+
+
+// @compiler blocked: upstream-dependency diagnostic="requestIdKeepsOrMakesOne: Unknown type 'Stdlib.HttpServer.Middleware'"
+test requestIdKeepsOrMakesOne =
+  let run = fun headers ->
+    __run(
+      [ Stdlib.HttpServer.Middleware.requestId() ],
+      __req("http://a.test/", headers))
+
+  Stdlib.Test.all(
+    [ (run([ ("X-Request-Id", "abc") ])).headers
+      |> Stdlib.Test.equal([ ("X-Request-Id", "abc"), ("X-Request-Id", "abc") ])
+
+      (let r = run([])
+       match r.headers with
+       | [("X-Request-Id", seen), ("X-Request-Id", sent)] ->
+         seen == sent && Stdlib.String.length(sent) == 36
+       | _ -> false)
+      |> Stdlib.Test.equal(true) ])

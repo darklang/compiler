@@ -1,6 +1,5 @@
 module Darklang.Stdlib
 
-
 /// Wait here for a value that may still be a read in flight, rather than where it is first
 /// used. Calling a function does not wait for its arguments, so this is the one way to choose
 /// the wait point: a builtin always gets values. (`Exec.await` is the one for a handle from
@@ -8,3 +7,12 @@ module Darklang.Stdlib
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.await: Unknown function or value 'Builtin.runtimeForce'"
 let await(x: 'a): 'a =
   Builtin.runtimeForce(x)
+
+
+/// <param fn> applied to <param x>, computed apart from the program, so <param fn> may only
+/// compute. When <param x> is a read still in flight (an `HttpClient.get`, say) it is not waited
+/// for here: the answer is a read in flight too, and <param fn> runs when <param x> arrives.
+/// What `HttpClient.Middleware.onResponse` is built on.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.__whenReady: Unknown function or value 'Builtin.runtimeWhenReady'"
+let __whenReady(x: 'a, fn: 'a -> 'b): 'b =
+  Builtin.runtimeWhenReady(x, fn)

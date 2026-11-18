@@ -5,17 +5,15 @@ files:
   Builtins.Cli/Libs/Environment.fs:
     getBuildHash_v0: present
     getRuntimeHash_v0: missing
-    runtimeEnvironmentGet_v0: present
     runtimeEnvironmentGetAll_v0: present
+    runtimeEnvironmentGet_v0: present
   Builtins.Cli/Libs/Output.fs:
-    debug_v0: missing
-    print_v0: unassessed
-    printError_v0: missing
     printErrorLine_v0: missing
+    printError_v0: missing
     printLine_v0: unassessed
+    print_v0: unassessed
     stdoutCaptureStart_v0: missing
     stdoutCaptureStop_v0: missing
-    stdoutClear_v0: missing
   Builtins.Cli/Libs/Posix.fs:
     runtimeAuthorizeReadPath_v0: present
     runtimeTargetArchitecture_v0: present
@@ -40,85 +38,50 @@ files:
     syscallUnlinkAt_v0: present
     syscallWrite_v0: present
   Builtins.Cli/Libs/RuntimeChild.fs:
-    runtimeChildBufferGet_v0: present
     runtimeChildBufferSet_v0: present
-    runtimeChildClose_v0: present
-    runtimeChildClosePort_v0: present
-    runtimeChildDescriptors_v0: present
-    runtimeChildKill_v0: present
-    runtimeChildPoll_v0: present
-    runtimeChildStart_v0: present
-    runtimeChildWait_v0: present
   Builtins.Cli/Libs/Stdin.fs:
     hostAwait_v0: missing
-    stdinIsInteractive_v0: present
+    stdinCheckedReadLine_v0: unassessed
     stdinReadAll_v0: present
     stdinReadKey_v0: present
     stdinReadLine_v0: present
   Builtins.Cli/Libs/Syscall.fs:
-    syscallClockGettime_v0: present
-    syscallCloneFile_v0: present
-    syscallCopyFileRange_v0: present
-    syscallFchmod_v0: present
-    syscallFclonefileAt_v0: present
-    syscallFcntlGetPath_v0: present
-    syscallFstat_v0: present
-    syscallFtruncate_v0: present
-    syscallGetentropy_v0: present
-    syscallGettimeofday_v0: present
-    syscallInotifyAddWatch_v0: present
-    syscallInotifyInit1_v0: present
-    syscallKeventVnode_v0: present
-    syscallKqueue_v0: present
-    syscallMachAbsoluteTime_v0: present
-    syscallMachTimebaseInfo_v0: present
     syscallNanosleep_v0: present
-    syscallPollDarwin_v0: present
-    syscallPpoll_v0: present
-    syscallPread_v0: present
-    syscallPwrite_v0: present
-    syscallSchedGetaffinity_v0: present
-    syscallSetattrlistTimes_v0: present
-    syscallSysctl_v0: present
-    syscallUname_v0: present
-    syscallUtimensAt_v0: present
   Builtins.Cli/Libs/Terminal.fs:
     cliGetLogDir_v0: missing
     cliTerminalClipToWidth_v0: unassessed
-    cliTerminalColorEnabled_v0: present
-    cliTerminalInspectRow_v0: present
-    cliTerminalPositionAfter_v0: missing
+    cliTerminalIsatty_v0: unassessed
     cliTerminalRestoreArm_v0: missing
     cliTerminalRestoreDisarm_v0: missing
-    cliTerminalSessionInfo_v0: present
     cliTerminalSize_v0: present
     cliTerminalStripSgr_v0: missing
     cliTerminalStyledWidth_v0: unassessed
     cliTerminalWrapAtColumn_v0: missing
+    cliTerminalWrapWithCursor_v0: unassessed
   Builtins.CliHost/Libs/Cli.fs:
     cliEvaluateExpression_v0: missing
     cliParseAndExecuteScript_v0: missing
     cliViewTrace_v0: missing
     testRunIsolated_v0: missing
   Builtins.Http.Client/Libs/HttpClient.fs:
-    httpClientRead_v0: missing
     httpClientRequest_v0: unassessed
     httpClientStream_v0: unassessed
   Builtins.Http.Server/Libs/HttpServer.fs:
-    httpServerServe_v0: unassessed
     httpServerServeLive_v0: missing
+    httpServerServe_v0: unassessed
   Builtins.Language/Libs/Exec.fs:
-    execAwait_v0: missing
     execAwaitWithin_v0: missing
-    execCancel_v0: missing
+    execAwait_v0: missing
     execInspect_v0: missing
-    execKill_v0: missing
     execList_v0: missing
     execMachineList_v0: missing
     execSelect_v0: missing
     execSpawn_v0: missing
-    execSpawnDetached_v0: missing
+    execStop_v0: unassessed
     execWorkerCount_v0: missing
+  Builtins.Language/Libs/Formatter.fs:
+    formatterComments_v0: unassessed
+    formatterParse_v0: unassessed
   Builtins.Language/Libs/Instrumentation.fs:
     gcAllocatedBytes_v0: missing
     interpreterStatsEnableDetailedTiming_v0: missing
@@ -128,10 +91,9 @@ files:
     getAllBuiltinFns_v0: missing
     getAllBuiltinValues_v0: missing
     getBuiltinFn_v0: missing
+    permissionNormalizeHttpRule_v0: unassessed
   Builtins.Language/Libs/Parser.fs:
-    parserParseDiagnostics_v0: missing
-    parserParsePackageToWrittenTypes_v0: missing
-    parserParseToWrittenTypes_v0: missing
+    parse_v0: unassessed
   Builtins.Language/Libs/Reflection.fs:
     inspectImpl_v0: missing
     reflect_v0: missing
@@ -139,344 +101,214 @@ files:
   Builtins.Matter/Libs/PM/AtRestCheckGuard.fs:
     atRestCheckGuarded_v0: missing
   Builtins.Matter/Libs/PM/PackageOps.fs:
-    packageOpBindsAName_v0: missing
-    packageOpFromBlobOption_v0: missing
-    pmDuplicateDeclarations_v0: missing
     pmResolveTraitCalls_v0: missing
     pmStabilizeHashes_v0: missing
-    pmUnresolvedNames_v0: missing
     scmAddOps_v0: missing
-    scmApplyMergedOps_v0: missing
     scmCurrentBranch_v0: missing
-    scmGetCommitNamedOps_v0: missing
+    scmHealth_v0: unassessed
     scmInvalidateCaches_v0: missing
-    scmRebuildDraftKeeping_v0: missing
-    scmRecordBranchArchived_v0: missing
-    scmRecordBranchMerged_v0: missing
-    scmResolveBranch_v0: missing
-    scmSelectBranch_v0: missing
-    scmStoreBranchOpStamped_v0: missing
-    value/scmMainBranchId_v0: unassessed
   Builtins.Matter/Libs/PM/PackageTests.fs:
     pmExecuteTest_v0: missing
-    pmTestIsCacheSafe_v0: missing
     pmTestRaiseRuntimeError_v0: missing
+    pmTestReran_v0: unassessed
+    pmTestResultGetMany_v0: unassessed
+    pmTestResultGet_v0: unassessed
+    pmTestResultPut_v0: unassessed
+    pmTestRunsInProcess_v0: unassessed
     pmTestWithStoreSnapshot_v0: missing
     pmTestWorkerExecute_v0: missing
-    testCounterValue_v0: missing
-    testIncrementCounter_v0: missing
+    pmTestsAreCacheSafe_v0: unassessed
+    testCounter_v0: unassessed
+    testOnRealClock_v0: unassessed
   Builtins.Matter/Libs/PM/Packages.fs:
     applicableByHash_v0: missing
-    applicableByName_v0: missing
     applicableTryApply_v0: missing
-    pmBitwiseNotImplCandidates_v0: missing
+    pmApplyReferenceNames_v0: unassessed
+    pmBindingsNamed_v0: unassessed
     pmCallerCounts_v0: missing
+    pmDependencyReview_v0: unassessed
+    pmDependents_v0: unassessed
     pmDocsAt_v0: missing
     pmEvaluateValue_v0: missing
-    pmFindFn_v0: missing
-    pmFindTest_v0: missing
-    pmFindTrait_v0: missing
-    pmFindTraitImpl_v0: missing
-    pmFindType_v0: missing
-    pmFindValue_v0: missing
     pmFindValuesByValueType_v0: missing
+    pmFind_v0: unassessed
     pmFnInstructions_v0: missing
     pmGetCurrentDeprecation_v0: missing
     pmGetDeprecationSets_v0: missing
-    pmGetFn_v0: missing
     pmGetFnSignature_v0: missing
-    pmGetLocationsByFn_v0: missing
-    pmGetLocationsByTest_v0: missing
-    pmGetLocationsByTrait_v0: missing
-    pmGetLocationsByTraitImpl_v0: missing
-    pmGetLocationsByType_v0: missing
-    pmGetLocationsByValue_v0: missing
-    pmGetTest_v0: missing
-    pmGetTrait_v0: missing
-    pmGetTraitImpl_v0: missing
-    pmGetType_v0: missing
-    pmGetValue_v0: missing
+    pmGet_v0: unassessed
     pmImplCandidates_v0: missing
-    pmInfixImplCandidates_v0: missing
-    pmNegateImplCandidates_v0: missing
-    pmOwnerHasItems_v0: missing
+    pmImplPathsBelow_v0: unassessed
+    pmLiveReferenceSources_v0: unassessed
+    pmLocations_v0: unassessed
+    pmNamedReferences_v0: unassessed
+    pmOperatorTrait_v0: unassessed
     pmPropagate_v0: missing
-    pmSearch_v0: missing
-    pmSearchNames_v0: missing
+    pmReferenceNameOverrides_v0: unassessed
+    pmRevisionOperations_v0: unassessed
     pmSearchNamesAndHashes_v0: missing
+    pmSearch_v0: missing
     pmSetName_v0: missing
-  Builtins.Matter/Libs/PM/Permissions.fs:
-    pmFnPermissionRequirements_v0: missing
-    pmPolicyApprovalsStale_v0: missing
-    pmPolicyApproveVersion_v0: missing
-    pmPolicyApprovedVersions_v0: missing
-    pmPolicyEditInstance_v0: missing
-    pmPolicyExplicitApproval_v0: missing
-    pmPolicyGetInstance_v0: missing
-    pmPolicyListPackages_v0: missing
-    pmPolicyPackageAccess_v0: missing
-    pmPolicyRevokePackage_v0: missing
-    pmPolicySetInstance_v0: missing
-    pmPolicyUnapproveVersion_v0: missing
+    pmStoredReferenceSnapshots_v0: unassessed
+    pmValueEvaluated_v0: unassessed
+  Builtins.Matter/Libs/PM/Scm.fs:
+    scmBindings_v0: unassessed
+    scmBranches_v0: unassessed
+    scmCommits_v0: unassessed
+    scmConflicts_v0: unassessed
+    scmDeps_v0: unassessed
+    scmOps_v0: unassessed
+  Builtins.Matter/Libs/PM/ScmActions.fs:
+    scmBranch_v0: unassessed
+    scmCommit_v0: unassessed
+    scmDetect_v0: unassessed
+    scmDiscard_v0: unassessed
+    scmLwwBeats_v0: unassessed
+    scmMerge_v0: unassessed
+    scmResolve_v0: unassessed
   Builtins.Matter/Libs/PM/Seed.fs:
     pmSeedExport_v0: missing
   Builtins.Matter/Libs/PM/Store.fs:
     configGet_v0: missing
+    configKeys_v0: unassessed
     configSet_v0: missing
     hostWatchGet_v0: missing
     hostWatchSet_v0: missing
-    localDbBackupTo_v0: missing
     localDbPath_v0: missing
-    localDbRestoreFrom_v0: missing
+    storeBackup_v0: unassessed
     storeVersion_v0: missing
-  Builtins.Matter/Libs/Sqlite.fs:
-    sqliteExec_v0: missing
-    sqliteExecBatch_v0: missing
-    sqliteQuery_v0: missing
   Builtins.Matter/Libs/Traces.fs:
     tracesApplyRecording_v0: missing
     tracesArmResume_v0: missing
-    tracesClear_v0: missing
-    tracesClearBefore_v0: missing
     tracesDelete_v0: missing
-    tracesFind_v0: missing
-    tracesFnCounts_v0: missing
-    tracesFnsOf_v0: missing
     tracesFork_v0: missing
-    tracesGet_v0: missing
-    tracesGetInput_v0: missing
-    tracesHotspots_v0: missing
-    tracesList_v0: missing
-    tracesListByFn_v0: missing
-    tracesLoopPasses_v0: missing
-    tracesPruneKeep_v0: missing
+    tracesQuery_v0: unassessed
     tracesRecording_v0: missing
-    tracesView_v0: missing
-    tracesWentThrough_v0: missing
-  Builtins.Pure/Libs/AltJson.fs:
-    altJsonFormat_v0: unassessed
-    altJsonParse_v0: unassessed
+    tracesSetPinned_v0: unassessed
+  Builtins.Pure/Libs/Base16.fs:
+    base16Decode_v0: unassessed
+    base16Encode_v0: unassessed
   Builtins.Pure/Libs/Base64.fs:
     base64Decode_v0: unassessed
     base64Encode_v0: unassessed
-    base64UrlEncode_v0: unassessed
-  Builtins.Pure/Libs/Blob.fs:
-    blobConcat_v0: unassessed
-    blobFromBase64_v0: unassessed
-    blobFromBytes_v0: unassessed
-    blobFromHex_v0: unassessed
-    blobFromString_v0: unassessed
-    blobLength_v0: unassessed
-    blobSlice_v0: unassessed
-    blobToBase64_v0: unassessed
-    blobToBytes_v0: unassessed
-    blobToHex_v0: unassessed
-    blobToString_v0: unassessed
+  Builtins.Pure/Libs/BigInt.fs:
+    bigIntFromFloat64_v0: unassessed
+    bigIntFromInt128_v0: unassessed
+    bigIntFromInt16_v0: unassessed
+    bigIntFromInt32_v0: unassessed
+    bigIntFromInt64_v0: unassessed
+    bigIntFromInt8_v0: unassessed
+    bigIntFromUInt128_v0: unassessed
+    bigIntFromUInt16_v0: unassessed
+    bigIntFromUInt32_v0: unassessed
+    bigIntFromUInt64_v0: unassessed
+    bigIntFromUInt8_v0: unassessed
+    bigIntParse_v0: unassessed
+    bigIntToFloat64_v0: unassessed
+    bigIntToInt128_v0: unassessed
+    bigIntToInt16_v0: unassessed
+    bigIntToInt32_v0: unassessed
+    bigIntToInt64_v0: unassessed
+    bigIntToInt8_v0: unassessed
+    bigIntToString_v0: unassessed
+    bigIntToUInt128_v0: unassessed
+    bigIntToUInt16_v0: unassessed
+    bigIntToUInt32_v0: unassessed
+    bigIntToUInt64_v0: unassessed
+    bigIntToUInt8_v0: unassessed
   Builtins.Pure/Libs/Bool.fs:
     boolNot_v0: present
+  Builtins.Pure/Libs/Bytes.fs:
+    bytesConcat_v0: unassessed
+    bytesFromList_v0: unassessed
+    bytesGetAt_v0: unassessed
+    bytesIndexOfSegment_v0: unassessed
+    bytesIndexOf_v0: unassessed
+    bytesLastIndexOf_v0: unassessed
+    bytesLength_v0: unassessed
+    bytesPeek_v0: unassessed
+    bytesSlice_v0: unassessed
+    bytesToList_v0: unassessed
   Builtins.Pure/Libs/Char.fs:
     charFromCodepoint_v0: unassessed
-    charIsAlphanumeric_v0: unassessed
-    charIsGreaterThan_v0: unassessed
     charIsGreaterThanOrEqualTo_v0: unassessed
-    charIsLessThan_v0: unassessed
+    charIsGreaterThan_v0: unassessed
     charIsLessThanOrEqualTo_v0: unassessed
-    charIsLetter_v0: unassessed
-    charIsWhitespace_v0: unassessed
-    charToAsciiCode_v0: unassessed
-    charToCodepoint_v0: unassessed
+    charIsLessThan_v0: unassessed
     charToLowercase_v0: unassessed
     charToString_v0: unassessed
     charToUppercase_v0: unassessed
+    codepointIsAlphanumeric_v0: unassessed
+    codepointIsLetter_v0: unassessed
+    codepointIsWhitespace_v0: unassessed
   Builtins.Pure/Libs/Crypto.fs:
     cryptoConstantTimeEquals_v0: missing
-    cryptoMd5_v0: unassessed
-    cryptoSha1hmac_v0: unassessed
-    cryptoSha256_v0: unassessed
-    cryptoSha256hmac_v0: unassessed
-    cryptoSha384_v0: unassessed
+    cryptoDigest_v0: unassessed
   Builtins.Pure/Libs/DateTime.fs:
-    dateTimeAddMilliseconds_v0: unassessed
-    dateTimeAddSeconds_v0: unassessed
-    dateTimeAtStartOfDay_v0: unassessed
-    dateTimeDay_v0: unassessed
-    dateTimeFromMilliseconds_v0: unassessed
-    dateTimeFromSeconds_v0: unassessed
     dateTimeFromUnixTicks_v0: present
-    dateTimeGreaterThan_v0: unassessed
-    dateTimeGreaterThanOrEqualTo_v0: unassessed
-    dateTimeHour_v0: unassessed
-    dateTimeLessThan_v0: unassessed
-    dateTimeLessThanOrEqualTo_v0: unassessed
-    dateTimeMillisecond_v0: unassessed
-    dateTimeMinute_v0: unassessed
-    dateTimeMonth_v0: unassessed
     dateTimeParse_v0: unassessed
-    dateTimeSecond_v0: unassessed
-    dateTimeSubtract_v0: unassessed
-    dateTimeSubtractMilliseconds_v0: unassessed
-    dateTimeSubtractMs_v0: unassessed
-    dateTimeSubtractSeconds_v0: unassessed
-    dateTimeToMilliseconds_v0: unassessed
-    dateTimeToSeconds_v0: unassessed
     dateTimeToString_v0: unassessed
-    dateTimeToStringISO8601BasicDate_v0: unassessed
-    dateTimeToStringISO8601BasicDateTime_v0: unassessed
-    dateTimeWeekday_v0: unassessed
-    dateTimeYear_v0: unassessed
+    dateTimeToUnixTicks_v0: unassessed
+  Builtins.Pure/Libs/Decimal.fs:
+    decimalFromParts_v0: unassessed
+    decimalToParts_v0: unassessed
   Builtins.Pure/Libs/Dict.fs:
-    dictFromList_v0: unassessed
-    dictFromListOverwritingDuplicates_v0: unassessed
+    dictContainsKey_v0: unassessed
+    dictFilter_v0: unassessed
+    dictFromEntries_v0: unassessed
     dictGet_v0: unassessed
     dictKeys_v0: unassessed
-    dictMember_v0: unassessed
+    dictMap_v0: unassessed
     dictMerge_v0: unassessed
     dictRemove_v0: unassessed
     dictSet_v0: unassessed
-    dictSetOverridingDuplicates_v0: unassessed
     dictSize_v0: unassessed
-    dictToList_v0: unassessed
+    dictToEntries_v0: unassessed
     dictValues_v0: unassessed
-  Builtins.Pure/Libs/Float.fs:
-    floatCeiling_v0: unassessed
-    floatFloor_v0: unassessed
-    floatIsNaN_v0: unassessed
-    floatParse_v0: unassessed
-    floatRound_v0: unassessed
-    floatRoundDown_v0: unassessed
-    floatRoundTowardsZero_v0: unassessed
-    floatRoundUp_v0: unassessed
-    floatSqrt_v0: missing
-    floatToBits_v0: unassessed
-    floatToString_v0: unassessed
-    floatTruncate_v0: unassessed
-  Builtins.Pure/Libs/Int.fs:
-    intAdd_v0: unassessed
-    intBitwiseAnd_v0: unassessed
-    intBitwiseNot_v0: unassessed
-    intBitwiseOr_v0: unassessed
-    intBitwiseXor_v0: unassessed
-    intDivide_v0: unassessed
-    intFromFloat_v0: unassessed
-    intFromInt128_v0: unassessed
-    intFromInt16_v0: unassessed
-    intFromInt32_v0: unassessed
-    intFromInt64_v0: unassessed
-    intFromInt8_v0: unassessed
-    intFromUInt128_v0: unassessed
-    intFromUInt16_v0: unassessed
-    intFromUInt32_v0: unassessed
-    intFromUInt64_v0: unassessed
-    intFromUInt8_v0: unassessed
-    intGreaterThan_v0: unassessed
-    intGreaterThanOrEqualTo_v0: unassessed
-    intLessThan_v0: unassessed
-    intLessThanOrEqualTo_v0: unassessed
-    intMod_v0: unassessed
-    intMultiply_v0: unassessed
-    intNegate_v0: unassessed
-    intParse_v0: unassessed
-    intPower_v0: unassessed
-    intRemainder_v0: unassessed
-    intShiftLeft_v0: unassessed
-    intShiftRight_v0: unassessed
-    intSqrt_v0: unassessed
-    intSubtract_v0: unassessed
-    intToFloat_v0: unassessed
-    intToInt128_v0: unassessed
-    intToInt16_v0: unassessed
-    intToInt32_v0: unassessed
-    intToInt64_v0: unassessed
-    intToInt8_v0: unassessed
-    intToString_v0: unassessed
-    intToUInt128_v0: unassessed
-    intToUInt16_v0: unassessed
-    intToUInt32_v0: unassessed
-    intToUInt64_v0: unassessed
-    intToUInt8_v0: unassessed
+  Builtins.Pure/Libs/Float32.fs:
+    float32FromBits_v0: unassessed
+    float32FromFloat64_v0: unassessed
+    float32FromInt64_v0: unassessed
+    float32Parse_v0: unassessed
+    float32ToBits_v0: unassessed
+    float32ToFloat64_v0: unassessed
+    float32ToString_v0: unassessed
+  Builtins.Pure/Libs/Float64.fs:
+    float64Ceiling_v0: unassessed
+    float64Floor_v0: unassessed
+    float64Parse_v0: unassessed
+    float64Round_v0: unassessed
+    float64Sqrt_v0: unassessed
+    float64ToBits_v0: unassessed
+    float64ToString_v0: unassessed
+    float64Truncate_v0: unassessed
   Builtins.Pure/Libs/Int128.fs:
-    int128FromInt16_v0: unassessed
-    int128FromInt32_v0: unassessed
-    int128FromInt64_v0: unassessed
-    int128FromInt8_v0: unassessed
-    int128FromUInt16_v0: unassessed
-    int128FromUInt32_v0: unassessed
-    int128FromUInt64_v0: unassessed
-    int128FromUInt8_v0: unassessed
-    int128Parse_v0: unassessed
-    int128Remainder_v0: unassessed
-    int128Sqrt_v0: unassessed
-    int128ToFloat_v0: unassessed
+    int128ToFloat64_v0: unassessed
     int128ToString_v0: unassessed
   Builtins.Pure/Libs/Int16.fs:
-    int16FromInt128_v0: unassessed
-    int16FromInt32_v0: unassessed
-    int16FromInt64_v0: unassessed
-    int16FromInt8_v0: unassessed
-    int16FromUInt128_v0: unassessed
-    int16FromUInt16_v0: unassessed
-    int16FromUInt32_v0: unassessed
-    int16FromUInt64_v0: unassessed
-    int16FromUInt8_v0: unassessed
-    int16Parse_v0: unassessed
-    int16Remainder_v0: unassessed
-    int16Sqrt_v0: unassessed
-    int16ToFloat_v0: unassessed
+    int16ToFloat64_v0: unassessed
     int16ToString_v0: unassessed
   Builtins.Pure/Libs/Int32.fs:
-    int32FromInt128_v0: unassessed
-    int32FromInt16_v0: unassessed
-    int32FromInt64_v0: unassessed
-    int32FromInt8_v0: unassessed
-    int32FromUInt128_v0: unassessed
-    int32FromUInt16_v0: unassessed
-    int32FromUInt32_v0: unassessed
-    int32FromUInt64_v0: unassessed
-    int32FromUInt8_v0: unassessed
-    int32Parse_v0: unassessed
-    int32Remainder_v0: unassessed
-    int32Sqrt_v0: unassessed
-    int32ToFloat_v0: unassessed
+    int32ToFloat64_v0: unassessed
     int32ToString_v0: unassessed
   Builtins.Pure/Libs/Int64.fs:
-    int64FromInt128_v0: unassessed
-    int64FromInt16_v0: unassessed
-    int64FromInt32_v0: unassessed
-    int64FromInt8_v0: unassessed
-    int64FromUInt128_v0: unassessed
-    int64FromUInt16_v0: unassessed
-    int64FromUInt32_v0: unassessed
-    int64FromUInt64_v0: unassessed
-    int64FromUInt8_v0: unassessed
-    int64Parse_v0: unassessed
-    int64Remainder_v0: unassessed
-    int64Sqrt_v0: unassessed
-    int64ToFloat_v0: unassessed
+    int64ToFloat64_v0: unassessed
     int64ToString_v0: unassessed
   Builtins.Pure/Libs/Int8.fs:
-    int8FromInt128_v0: unassessed
-    int8FromInt16_v0: unassessed
-    int8FromInt32_v0: unassessed
-    int8FromInt64_v0: unassessed
-    int8FromUInt128_v0: unassessed
-    int8FromUInt16_v0: unassessed
-    int8FromUInt32_v0: unassessed
-    int8FromUInt64_v0: unassessed
-    int8FromUInt8_v0: unassessed
-    int8Parse_v0: unassessed
-    int8Remainder_v0: unassessed
-    int8Sqrt_v0: unassessed
-    int8ToFloat_v0: unassessed
+    int8ToFloat64_v0: unassessed
     int8ToString_v0: unassessed
   Builtins.Pure/Libs/Json.fs:
+    jsonCheckedSerialize_v0: unassessed
     jsonParse_v0: unassessed
     jsonSerialize_v0: unassessed
   Builtins.Pure/Libs/List.fs:
     listAny_v0: unassessed
     listAppend_v0: unassessed
+    listConcat_v0: unassessed
     listContains_v0: unassessed
-    listFilter_v0: unassessed
+    listDrop_v0: unassessed
     listFilterMap_v0: unassessed
+    listFilter_v0: unassessed
     listFindFirst_v0: unassessed
     listFlatten_v0: unassessed
     listFold_v0: unassessed
@@ -484,22 +316,22 @@ files:
     listIndexedMap_v0: unassessed
     listIsEmpty_v0: unassessed
     listLength_v0: unassessed
-    listMap_v0: unassessed
     listMap2shortest_v0: unassessed
-    listPush_v0: unassessed
-    listPushBack_v0: unassessed
+    listMap_v0: unassessed
+    listPrepend_v0: unassessed
     listRange_v0: unassessed
     listReverse_v0: unassessed
-    listSort_v0: unassessed
+    listSetAt_v0: unassessed
     listSortBy_v0: unassessed
+    listSort_v0: unassessed
     listTake_v0: unassessed
     listUnique_v0: unassessed
     listZipShortest_v0: unassessed
   Builtins.Pure/Libs/Math.fs:
     mathAcos_v0: unassessed
     mathAsin_v0: unassessed
-    mathAtan_v0: unassessed
     mathAtan2_v0: unassessed
+    mathAtan_v0: unassessed
     mathCos_v0: unassessed
     mathCosh_v0: unassessed
     mathSin_v0: unassessed
@@ -514,10 +346,10 @@ files:
     bitwiseXor_v0: missing
     divide_v0: missing
     equals_v0: missing
-    greaterThan_v0: missing
     greaterThanOrEqualTo_v0: missing
-    lessThan_v0: missing
+    greaterThan_v0: missing
     lessThanOrEqualTo_v0: missing
+    lessThan_v0: missing
     modulo_v0: missing
     multiply_v0: missing
     negate_v0: present
@@ -529,12 +361,7 @@ files:
     subtract_v0: missing
     unwrap_v0: present
   Builtins.Pure/Libs/Regex.fs:
-    regexFind_v0: unassessed
-    regexFindAll_v0: unassessed
-    regexIsMatch_v0: unassessed
-    regexReplace_v0: unassessed
-    regexReplaceAll_v0: unassessed
-    regexSplit_v0: unassessed
+    regexScan_v0: unassessed
   Builtins.Pure/Libs/Stream.fs:
     streamClose_v0: unassessed
     streamConcat_v0: unassessed
@@ -543,7 +370,7 @@ files:
     streamMap_v0: unassessed
     streamNext_v0: unassessed
     streamTake_v0: unassessed
-    streamToBlob_v0: unassessed
+    streamToBytes_v0: unassessed
     streamToList_v0: unassessed
     streamUnfold_v0: unassessed
   Builtins.Pure/Libs/String.fs:
@@ -553,16 +380,12 @@ files:
     stringContains_v0: unassessed
     stringDisplayWidth_v0: unassessed
     stringDropFirst_v0: unassessed
-    stringFromBlob_v0: unassessed
-    stringFromBlobWithReplacement_v0: unassessed
-    stringFromBytes_v0: unassessed
+    stringEndsWith_v0: unassessed
     stringGetByteAt_v0: unassessed
     stringIndexOf_v0: unassessed
-    stringIndexOfEgc_v0: unassessed
     stringIsEmpty_v0: unassessed
     stringJoin_v0: unassessed
     stringLastIndexOf_v0: unassessed
-    stringLastIndexOfEgc_v0: unassessed
     stringLength_v0: unassessed
     stringRepeat_v0: unassessed
     stringReplaceAll_v0: unassessed
@@ -570,101 +393,42 @@ files:
     stringSlice_v0: unassessed
     stringSplit_v0: unassessed
     stringStartsWith_v0: unassessed
-    stringToBlob_v0: unassessed
     stringToCodepoints_v0: unassessed
     stringToList_v0: unassessed
     stringToLowercase_v0: unassessed
     stringToUppercase_v0: unassessed
-    stringTrim_v0: unassessed
     stringTrimEnd_v0: unassessed
     stringTrimStart_v0: unassessed
+    stringTrim_v0: unassessed
   Builtins.Pure/Libs/UInt128.fs:
-    uint128FromUInt16_v0: unassessed
-    uint128FromUInt32_v0: unassessed
-    uint128FromUInt64_v0: unassessed
-    uint128FromUInt8_v0: unassessed
-    uint128Parse_v0: unassessed
-    uint128Sqrt_v0: unassessed
-    uint128ToFloat_v0: unassessed
+    uint128ToFloat64_v0: unassessed
     uint128ToString_v0: unassessed
   Builtins.Pure/Libs/UInt16.fs:
-    uint16FromInt128_v0: unassessed
-    uint16FromInt16_v0: unassessed
-    uint16FromInt32_v0: unassessed
-    uint16FromInt64_v0: unassessed
-    uint16FromInt8_v0: unassessed
-    uint16FromUInt128_v0: unassessed
-    uint16FromUInt32_v0: unassessed
-    uint16FromUInt64_v0: unassessed
-    uint16FromUInt8_v0: unassessed
-    uint16Parse_v0: unassessed
-    uint16Sqrt_v0: unassessed
-    uint16ToFloat_v0: unassessed
+    uint16ToFloat64_v0: unassessed
     uint16ToString_v0: unassessed
   Builtins.Pure/Libs/UInt32.fs:
-    uint32FromInt128_v0: unassessed
-    uint32FromInt16_v0: unassessed
-    uint32FromInt32_v0: unassessed
-    uint32FromInt64_v0: unassessed
-    uint32FromInt8_v0: unassessed
-    uint32FromUInt128_v0: unassessed
-    uint32FromUInt16_v0: unassessed
-    uint32FromUInt64_v0: unassessed
-    uint32FromUInt8_v0: unassessed
-    uint32Parse_v0: unassessed
-    uint32Sqrt_v0: unassessed
-    uint32ToFloat_v0: unassessed
+    uint32ToFloat64_v0: unassessed
     uint32ToString_v0: unassessed
   Builtins.Pure/Libs/UInt64.fs:
-    uint64FromInt128_v0: unassessed
-    uint64FromInt16_v0: unassessed
-    uint64FromInt32_v0: unassessed
-    uint64FromInt64_v0: unassessed
-    uint64FromInt8_v0: unassessed
-    uint64FromUInt128_v0: unassessed
-    uint64FromUInt16_v0: unassessed
-    uint64FromUInt32_v0: unassessed
-    uint64FromUInt8_v0: unassessed
-    uint64Parse_v0: unassessed
-    uint64Sqrt_v0: unassessed
-    uint64ToFloat_v0: unassessed
+    uint64ToFloat64_v0: unassessed
     uint64ToString_v0: unassessed
   Builtins.Pure/Libs/UInt8.fs:
-    uint8FromInt128_v0: unassessed
-    uint8FromInt16_v0: unassessed
-    uint8FromInt32_v0: unassessed
-    uint8FromInt64_v0: unassessed
-    uint8FromInt8_v0: unassessed
-    uint8FromUInt128_v0: unassessed
-    uint8FromUInt16_v0: unassessed
-    uint8FromUInt32_v0: unassessed
-    uint8FromUInt64_v0: unassessed
-    uint8Parse_v0: unassessed
-    uint8Sqrt_v0: unassessed
-    uint8ToFloat_v0: unassessed
+    uint8ToFloat64_v0: unassessed
     uint8ToString_v0: unassessed
+  Builtins.Pure/Libs/Utf8.fs:
+    utf8DecodeWithReplacement_v0: unassessed
+    utf8Decode_v0: unassessed
+    utf8Encode_v0: unassessed
   Builtins.Pure/Libs/Uuid.fs:
     uuidParse_v0: unassessed
     uuidToString_v0: unassessed
   Builtins.Pure/Libs/X509.fs:
     x509PemCertificatePublicKey_v0: unassessed
   Builtins.Random/Libs/Random.fs:
-    int16Random_v0: unassessed
-    int32Random_v0: unassessed
-    int64Random_v0: unassessed
-    int8Random_v0: unassessed
-    intRandom_v0: unassessed
-    listRandomElement_v0: unassessed
-    uint16Random_v0: unassessed
-    uint32Random_v0: unassessed
-    uint64Random_v0: unassessed
-    uint8Random_v0: unassessed
+    bigIntRandom_v0: unassessed
   Builtins.Random/Libs/Uuid.fs:
+    uuidGenerateV7_v0: unassessed
     uuidGenerate_v0: unassessed
-  Builtins.Time/Libs/RuntimeClock.fs:
-    runtimeDelayTicks_v0: present
-    runtimeMonotonicCounter_v0: present
-    runtimeRealtimeTicks_v0: present
 bindings:
   builtins:backend/src/Builtins/Builtins.Pure/Libs/Bool.fs#fn/boolNot/v0:
   - src/frontend/WrittenApplicationSupport.ml

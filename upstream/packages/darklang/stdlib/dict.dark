@@ -1,22 +1,27 @@
 module Darklang.Stdlib.Dict
 
-
 /// Returns an empty dictionary
 // @compiler replace: packages/darklang/stdlib/dict.dark#Darklang.Stdlib.Dict.empty reason=compiler-implementation
-val empty = Dict { }
+val empty = Dict {}
+
 
 /// The empty dict, for the same reason an empty list is a zero
-impl Stdlib.Zero for Dict<'k, 'v> =
-  let zero(): Dict<'k, 'v> = Dict { }
+impl Zero for Dict<'k, 'v> =
+  let zero(): Dict<'k, 'v> =
+    Dict {}
+
 
 /// Returns {{true}} if the <param dict> contains no entries
 // @compiler replace: packages/darklang/stdlib/dict.dark#Darklang.Stdlib.Dict.isEmpty reason=compiler-implementation
-let isEmpty(dict: Dict<'k, 'v>): Bool = dict == Dict.empty
+let isEmpty(dict: Dict<'k, 'v>): Bool =
+  dict == empty
+
 
 /// Returns a dictionary with a single entry {{<param key>: <param value>}}
 // @compiler replace: packages/darklang/stdlib/dict.dark#Darklang.Stdlib.Dict.singleton reason=compiler-implementation
 let singleton(key: 'k, value: 'v): Dict<'k, 'v> =
-  Stdlib.Dict.set(Dict { }, key, value)
+  set(Dict {}, key, value)
+
 
 /// Returns the number of entries in <param dict>
 // @compiler replace: packages/darklang/stdlib/dict.dark#Darklang.Stdlib.Dict.size reason=compiler-implementation
@@ -27,7 +32,7 @@ let size(dict: Dict<'k, 'v>): Int64 =
 /// If the <param dict> contains <param key>, returns the corresponding value,
 /// wrapped in an <type Option>: {{Some value}}. Otherwise, returns {{None}}.
 // @compiler replace: packages/darklang/stdlib/dict.dark#Darklang.Stdlib.Dict.get reason=compiler-implementation
-let get(dict: Dict<'k, 'v>, key: 'k): Stdlib.Option.Option<'v> =
+let get(dict: Dict<'k, 'v>, key: 'k): Option<'v> =
   Builtin.dictGet(dict, key)
 
 
@@ -49,15 +54,11 @@ let set(dict: Dict<'k, 'v>, key: 'k, value: 'v): Dict<'k, 'v> =
 /// or {{Error (DuplicateKey key)}} if <param key> is already in <param dict>.
 /// <fn Dict.set> replaces the existing value instead.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Dict.insert: Unknown function or value 'Stdlib.Dict.containsKey'"
-let insert(
-  dict: Dict<'k, 'v>,
-  key: 'k,
-  value: 'v)
-  : Result.Result<Dict<'k, 'v>, DuplicateKey<'k>> =
-  if Stdlib.Dict.containsKey(dict, key) then
-    Result.Result.Error(Stdlib.Dict.DuplicateKey.DuplicateKey(key))
+let insert(dict: Dict<'k, 'v>, key: 'k, value: 'v): Result<Dict<'k, 'v>, DuplicateKey<'k>> =
+  if containsKey(dict, key) then
+    Result.Error(DuplicateKey.DuplicateKey(key))
   else
-    Result.Result.Ok(Stdlib.Dict.set(dict, key, value))
+    Result.Ok(set(dict, key, value))
 
 
 /// If the <param dict> contains <param key>, returns a copy of <param dict> with <param key> and its associated value removed. Otherwise, returns <param dict> unchanged.
@@ -69,14 +70,10 @@ let remove(dict: Dict<'k, 'v>, key: 'k): Dict<'k, 'v> =
 /// Calls <param fn> with {{Some value}} if <param dict> contains <param key>, or
 /// {{None}} if it does not. If <param fn> returns {{Some newValue}}, sets <param key>
 /// to <var newValue>; if it returns {{None}}, removes <param key>.
-let update(
-  dict: Dict<'k, 'v>,
-  key: 'k,
-  fn: Option.Option<'v> -> Option.Option<'v>)
-  : Dict<'k, 'v> =
-  match fn(Stdlib.Dict.get(dict, key)) with
-  | Some(value) -> Stdlib.Dict.set(dict, key, value)
-  | None -> Stdlib.Dict.remove(dict, key)
+let update(dict: Dict<'k, 'v>, key: 'k, fn: Option<'v> -> Option<'v>): Dict<'k, 'v> =
+  match fn(get(dict, key)) with
+  | Some(value) -> set(dict, key, value)
+  | None -> remove(dict, key)
 
 
 /// Combines <param left> and <param right>, using the value from <param right>
@@ -91,29 +88,20 @@ let merge(left: Dict<'k, 'v>, right: Dict<'k, 'v>): Dict<'k, 'v> =
 /// If a key appears in both, returns {{Error (DuplicateKey key)}} for the
 /// first duplicate in key order.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Dict.mergeUnique: Unknown function or value 'Stdlib.Dict.containsKey'"
-let mergeUnique(
-  left: Dict<'k, 'v>,
-  right: Dict<'k, 'v>)
-  : Result.Result<Dict<'k, 'v>, DuplicateKey<'k>> =
-  match
-    List.findFirst(Stdlib.Dict.keys(right), fun k -> Stdlib.Dict.containsKey(left, k))
-  with
-  | Some(key) -> Result.Result.Error(Stdlib.Dict.DuplicateKey.DuplicateKey(key))
-  | None -> Result.Result.Ok(Stdlib.Dict.merge(left, right))
+let mergeUnique(left: Dict<'k, 'v>, right: Dict<'k, 'v>): Result<Dict<'k, 'v>, DuplicateKey<'k>> =
+  match List.findFirst(keys(right), fun k -> containsKey(left, k)) with
+  | Some(key) -> Result.Error(DuplicateKey.DuplicateKey(key))
+  | None -> Result.Ok(merge(left, right))
 
 
 /// Combines <param left> and <param right>. For each key in both,
 /// calls <param fn> with the key, left value, and right value to get the new value.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Dict.mergeWith: Unknown function or value 'Stdlib.Dict.toEntries'"
-let mergeWith(
-  left: Dict<'k, 'v>,
-  right: Dict<'k, 'v>,
-  fn: ('k, 'v, 'v) -> 'v)
-  : Dict<'k, 'v> =
-  List.fold(Stdlib.Dict.toEntries(right), left, fun(acc, (key, rightValue)) ->
-    match Stdlib.Dict.get(acc, key) with
-    | Some(leftValue) -> Stdlib.Dict.set(acc, key, fn(key, leftValue, rightValue))
-    | None -> Stdlib.Dict.set(acc, key, rightValue))
+let mergeWith(left: Dict<'k, 'v>, right: Dict<'k, 'v>, fn: ('k, 'v, 'v) -> 'v): Dict<'k, 'v> =
+  List.fold(toEntries(right), left, fun(acc, (key, rightValue)) ->
+    match get(acc, key) with
+    | Some(leftValue) -> set(acc, key, fn(key, leftValue, rightValue))
+    | None -> set(acc, key, rightValue))
 
 
 /// Keeps the entries of <param dict> whose key is also a key of <param keep>.
@@ -122,7 +110,7 @@ let mergeWith(
 /// is {{Dict { "b": 2 }}}. The opposite of <fn Dict.differenceKeys>.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Dict.intersectKeys: Unknown function or value 'Stdlib.Dict.containsKey'"
 let intersectKeys(dict: Dict<'k, 'v>, keep: Dict<'k, 'b>): Dict<'k, 'v> =
-  Stdlib.Dict.filter(dict, fun(k, _) -> Stdlib.Dict.containsKey(keep, k))
+  filter(dict, fun(k, _) -> containsKey(keep, k))
 
 
 /// Keeps the entries of <param dict> whose key is not a key of <param drop>.
@@ -131,8 +119,7 @@ let intersectKeys(dict: Dict<'k, 'v>, keep: Dict<'k, 'b>): Dict<'k, 'v> =
 /// is {{Dict { "a": 1 }}}. The opposite of <fn Dict.intersectKeys>.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Dict.differenceKeys: Unknown function or value 'Stdlib.Dict.containsKey'"
 let differenceKeys(dict: Dict<'k, 'v>, drop: Dict<'k, 'b>): Dict<'k, 'v> =
-  Stdlib.Dict.filter(dict, fun(k, _) ->
-    Stdlib.Bool.not(Stdlib.Dict.containsKey(drop, k)))
+  filter(dict, fun(k, _) -> Bool.not(containsKey(drop, k)))
 
 
 /// Returns <param dict>'s keys in a <type List>, in key order
@@ -157,7 +144,8 @@ let toEntries(dict: Dict<'k, 'v>): List<('k * 'v)> =
 /// Returns <param dict>'s entries as a list of {{(key, value)}} tuples, in key order.
 /// Alias of <fn Dict.toEntries>.
 // @compiler replace: packages/darklang/stdlib/dict.dark#Darklang.Stdlib.Dict.toList reason=compiler-implementation
-let toList(dict: Dict<'k, 'v>): List<('k * 'v)> = Stdlib.Dict.toEntries(dict)
+let toList(dict: Dict<'k, 'v>): List<('k * 'v)> =
+  toEntries(dict)
 
 
 /// Returns a <type dict> with <param entries>. Each value in <param entries>
@@ -174,35 +162,31 @@ let fromEntries(entries: List<('k * 'v)>): Dict<'k, 'v> =
 /// repeated key. Alias of <fn Dict.fromEntries>.
 // @compiler replace: packages/darklang/stdlib/dict.dark#Darklang.Stdlib.Dict.fromList reason=compiler-implementation
 let fromList(entries: List<('k * 'v)>): Dict<'k, 'v> =
-  Stdlib.Dict.fromEntries(entries)
+  fromEntries(entries)
 
 
 /// Builds a dictionary from <param entries> and returns it in {{Ok}}.
 /// Returns {{Error (DuplicateKey key)}} for the first repeated key encountered
 /// in list order. <fn Dict.fromEntries> keeps the last value for each key instead.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Dict.fromEntriesUnique: Unknown function or value 'Stdlib.Dict.fromEntries'"
-let fromEntriesUnique(
-  entries: List<('k * 'v)>)
-  : Result.Result<Dict<'k, 'v>, DuplicateKey<'k>> =
-  let dict = Stdlib.Dict.fromEntries(entries)
-
-  if Stdlib.Dict.size(dict) == Stdlib.List.length(entries) then
-    Result.Result.Ok(dict)
+let fromEntriesUnique(entries: List<('k * 'v)>): Result<Dict<'k, 'v>, DuplicateKey<'k>> =
+  let dict = fromEntries(entries)
+  if size(dict) == List.length(entries) then
+    Result.Ok(dict)
   else
     // A duplicate exists; scan the entries again to find the first repeated key.
-    let (_, duplicate) =
-      List.fold(entries, (Dict { }, Option.Option.None), fun((seen, found), (key, _)) ->
-        match found with
-        | Some(_) -> (seen, found)
-        | None ->
-          if Stdlib.Dict.containsKey(seen, key) then
-            (seen, Option.Option.Some(key))
-          else
-            (Stdlib.Dict.set(seen, key, true), found))
+    let (_, duplicate) = List.fold(entries, (Dict {}, Option.None), fun((seen, found), (key, _)) ->
+      match found with
+      | Some(_) -> (seen, found)
+      | None ->
+        if containsKey(seen, key) then
+          (seen, Option.Some(key))
+        else
+          (set(seen, key, true), found))
 
     match duplicate with
-    | Some(key) -> Result.Result.Error(Stdlib.Dict.DuplicateKey.DuplicateKey(key))
-    | None -> Result.Result.Ok(dict)
+    | Some(key) -> Result.Error(DuplicateKey.DuplicateKey(key))
+    | None -> Result.Ok(dict)
 
 
 /// Returns {{true}} if the <param dict> contains an entry with <param key>,
@@ -224,22 +208,22 @@ let map(dict: Dict<'k, 'v>, fn: ('k, 'v) -> 'b): Dict<'k, 'b> =
 
 /// Calls <param fn> on each value in <param dict>, keeping the keys.
 let mapValues(dict: Dict<'k, 'v>, fn: 'v -> 'b): Dict<'k, 'b> =
-  Stdlib.Dict.map(dict, fun(_, v) -> fn(v))
+  map(dict, fun(_, v) -> fn(v))
 
 
 /// Evaluates {{fn key value}} on every entry in <param dict>. Returns {{()}}.
 // @compiler replace: packages/darklang/stdlib/dict.dark#Darklang.Stdlib.Dict.iter reason=compiler-implementation
 let iter(dict: Dict<'k, 'v>, fn: ('k, 'v) -> Unit): Unit =
-  dict |> Stdlib.Dict.toEntries |> List.iter(fun((k, v)) -> fn(k, v))
+  dict
+  |> toEntries
+  |> List.iter(fun((k, v)) -> fn(k, v))
 
 
 /// Folds <param dict> into a single value, by calling {{fn acc key value}} on each
 /// entry in key order, starting from <param init>.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Dict.fold: Unknown function or value 'Stdlib.Dict.toEntries'"
 let fold(dict: Dict<'k, 'v>, init: 'b, fn: ('b, 'k, 'v) -> 'b): 'b =
-  // CLEANUP The lambda below adds a second call per entry, about 2x slower.
-  // A `dictFold` builtin would fix it, if real code ever needs it.
-  List.fold(Stdlib.Dict.toEntries(dict), init, fun(acc, (k, v)) -> fn(acc, k, v))
+  List.fold(toEntries(dict), init, fun(acc, (k, v)) -> fn(acc, k, v))
 
 
 /// Evaluates {{fn key value}} on every entry in <param dict>. Returns a <type
@@ -255,14 +239,11 @@ let filter(dict: Dict<'k, 'v>, fn: ('k, 'v) -> Bool): Dict<'k, 'v> =
 /// If {{fn key value}} returns {{Some newValue}}, adds the entry <var key>: <var newValue> to the new dictionary.
 /// This function combines <fn Dict.filter> and <fn Dict.map>.
 // @compiler replace: packages/darklang/stdlib/dict.dark#Darklang.Stdlib.Dict.filterMap reason=compiler-implementation
-let filterMap(
-  dict: Dict<'k, 'v>,
-  fn: ('k, 'v) -> Option.Option<'b>)
-  : Dict<'k, 'b> =
+let filterMap(dict: Dict<'k, 'v>, fn: ('k, 'v) -> Option<'b>): Dict<'k, 'b> =
   dict
-  |> Stdlib.Dict.toEntries
+  |> toEntries
   |> List.filterMap(fun((k, v)) ->
     match fn(k, v) with
-    | None -> Option.Option.None
-    | Some(newValue) -> Option.Option.Some((k, newValue)))
-  |> Stdlib.Dict.fromEntries
+    | None -> Option.None
+    | Some(newValue) -> Option.Some((k, newValue)))
+  |> fromEntries

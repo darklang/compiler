@@ -2,17 +2,17 @@
 
 [How to read and update this ledger](../README.md).
 
-Interpreter revision: `f280a56cf80badb8f70e6e09999894ce0d07f19e`.
+Interpreter revision: `84aaabc91929ecb4bb0dd83afaecd45c9d9e0238`.
 
-The complete corpus contains 498 source files. Items are counted directly from parsed source annotations.
+The complete corpus contains 510 source files. Items are counted directly from parsed source annotations.
 
 A run disposition means selected, not a passing execution receipt. Replacement contracts are checked independently.
 
 | Area | Source dispositions |
 | --- | --- |
-| packages | 2,332 blocked, 5 excluded, 35 replace, 1,851 run |
-| stdlib | 792 blocked, 920 replace, 707 run |
-| tests | 60 blocked, 1,644 run, 1,291 xfail |
+| packages | 2,510 blocked, 5 excluded, 35 replace, 1,957 run |
+| stdlib | 861 blocked, 905 replace, 740 run |
+| tests | 75 blocked, 1,642 run, 1,436 xfail |
 
 ## Expected test failures
 
@@ -23,9 +23,8 @@ Upstream bugs record interpreter behavior or test expectations that the compiler
 
 | Class | Compile | Runtime | Total |
 | --- | ---: | ---: | ---: |
-| `aot-rejection` | 226 | 0 | 226 |
-| `missing-support` | 996 | 68 | 1,064 |
-| `upstream-bug` | 0 | 1 | 1 |
+| `aot-rejection` | 225 | 0 | 225 |
+| `missing-support` | 1,128 | 83 | 1,211 |
 
 | Class | Reason | Tests |
 | --- | --- | ---: |
@@ -34,12 +33,11 @@ Upstream bugs record interpreter behavior or test expectations that the compiler
 | `aot-rejection` | `aot-invalid-key` | 6 |
 | `aot-rejection` | `aot-match-error` | 26 |
 | `aot-rejection` | `aot-name-error` | 11 |
-| `aot-rejection` | `aot-type-error` | 155 |
+| `aot-rejection` | `aot-type-error` | 154 |
 | `missing-support` | `compiler-contract` | 2 |
-| `missing-support` | `compiler-gap` | 150 |
+| `missing-support` | `compiler-gap` | 178 |
 | `missing-support` | `test-counter` | 7 |
-| `missing-support` | `upstream-dependency` | 905 |
-| `upstream-bug` | `upstream-bug` | 1 |
+| `missing-support` | `upstream-dependency` | 1,024 |
 
 ### Remaining support by source
 
@@ -51,50 +49,60 @@ Each row links to the authoritative per-test annotations. A named test remains o
 | [packages/darklang/tests/cli/builtinGroups.dark](../../../upstream/packages/darklang/tests/cli/builtinGroups.dark) | 4 |
 | [packages/darklang/tests/cli/commandCompletions.dark](../../../upstream/packages/darklang/tests/cli/commandCompletions.dark) | 9 |
 | [packages/darklang/tests/cli/commandGroups.dark](../../../upstream/packages/darklang/tests/cli/commandGroups.dark) | 3 |
+| [packages/darklang/tests/cli/deleteModule.dark](../../../upstream/packages/darklang/tests/cli/deleteModule.dark) | 7 |
+| [packages/darklang/tests/cli/docsExamples.dark](../../../upstream/packages/darklang/tests/cli/docsExamples.dark) | 2 |
 | [packages/darklang/tests/cli/docsForAI.dark](../../../upstream/packages/darklang/tests/cli/docsForAI.dark) | 7 |
-| [packages/darklang/tests/cli/evalAndRun.dark](../../../upstream/packages/darklang/tests/cli/evalAndRun.dark) | 17 |
+| [packages/darklang/tests/cli/edit.dark](../../../upstream/packages/darklang/tests/cli/edit.dark) | 7 |
+| [packages/darklang/tests/cli/evalAndRun.dark](../../../upstream/packages/darklang/tests/cli/evalAndRun.dark) | 21 |
+| [packages/darklang/tests/cli/file.dark](../../../upstream/packages/darklang/tests/cli/file.dark) | 2 |
 | [packages/darklang/tests/cli/flags.dark](../../../upstream/packages/darklang/tests/cli/flags.dark) | 3 |
 | [packages/darklang/tests/cli/fnSaveIssues.dark](../../../upstream/packages/darklang/tests/cli/fnSaveIssues.dark) | 1 |
 | [packages/darklang/tests/cli/fnSaveLines.dark](../../../upstream/packages/darklang/tests/cli/fnSaveLines.dark) | 2 |
+| [packages/darklang/tests/cli/format.dark](../../../upstream/packages/darklang/tests/cli/format.dark) | 6 |
 | [packages/darklang/tests/cli/golden.dark](../../../upstream/packages/darklang/tests/cli/golden.dark) | 2 |
 | [packages/darklang/tests/cli/instance-tests.dark](../../../upstream/packages/darklang/tests/cli/instance-tests.dark) | 5 |
 | [packages/darklang/tests/cli/interactiveTests.dark](../../../upstream/packages/darklang/tests/cli/interactiveTests.dark) | 4 |
 | [packages/darklang/tests/cli/isolation.dark](../../../upstream/packages/darklang/tests/cli/isolation.dark) | 12 |
 | [packages/darklang/tests/cli/jsonShapes.dark](../../../upstream/packages/darklang/tests/cli/jsonShapes.dark) | 10 |
-| [packages/darklang/tests/cli/moduleParseErrors.dark](../../../upstream/packages/darklang/tests/cli/moduleParseErrors.dark) | 1 |
-| [packages/darklang/tests/cli/moduleSaveLines.dark](../../../upstream/packages/darklang/tests/cli/moduleSaveLines.dark) | 2 |
+| [packages/darklang/tests/cli/moduleParseErrors.dark](../../../upstream/packages/darklang/tests/cli/moduleParseErrors.dark) | 2 |
+| [packages/darklang/tests/cli/moduleSaveLines.dark](../../../upstream/packages/darklang/tests/cli/moduleSaveLines.dark) | 5 |
 | [packages/darklang/tests/cli/nearbyNames.dark](../../../upstream/packages/darklang/tests/cli/nearbyNames.dark) | 1 |
+| [packages/darklang/tests/cli/permissionsDisplay.dark](../../../upstream/packages/darklang/tests/cli/permissionsDisplay.dark) | 2 |
 | [packages/darklang/tests/cli/permissionsGrammar.dark](../../../upstream/packages/darklang/tests/cli/permissionsGrammar.dark) | 19 |
 | [packages/darklang/tests/cli/propagate.dark](../../../upstream/packages/darklang/tests/cli/propagate.dark) | 1 |
-| [packages/darklang/tests/cli/scripts.dark](../../../upstream/packages/darklang/tests/cli/scripts.dark) | 11 |
+| [packages/darklang/tests/cli/scripts.dark](../../../upstream/packages/darklang/tests/cli/scripts.dark) | 12 |
 | [packages/darklang/tests/cli/searchExactSeveral.dark](../../../upstream/packages/darklang/tests/cli/searchExactSeveral.dark) | 1 |
+| [packages/darklang/tests/cli/searchLimits.dark](../../../upstream/packages/darklang/tests/cli/searchLimits.dark) | 2 |
 | [packages/darklang/tests/cli/searchRanking.dark](../../../upstream/packages/darklang/tests/cli/searchRanking.dark) | 11 |
 | [packages/darklang/tests/cli/searchShallow.dark](../../../upstream/packages/darklang/tests/cli/searchShallow.dark) | 2 |
 | [packages/darklang/tests/cli/signaturesSeveral.dark](../../../upstream/packages/darklang/tests/cli/signaturesSeveral.dark) | 4 |
 | [packages/darklang/tests/cli/signaturesTraitCalls.dark](../../../upstream/packages/darklang/tests/cli/signaturesTraitCalls.dark) | 2 |
 | [packages/darklang/tests/cli/stdlibTypoRefused.dark](../../../upstream/packages/darklang/tests/cli/stdlibTypoRefused.dark) | 2 |
 | [packages/darklang/tests/cli/telemetry.dark](../../../upstream/packages/darklang/tests/cli/telemetry.dark) | 1 |
+| [packages/darklang/tests/cli/testSelection.dark](../../../upstream/packages/darklang/tests/cli/testSelection.dark) | 2 |
 | [packages/darklang/tests/cli/tests-tui.dark](../../../upstream/packages/darklang/tests/cli/tests-tui.dark) | 24 |
 | [packages/darklang/tests/cli/tests-workbench.dark](../../../upstream/packages/darklang/tests/cli/tests-workbench.dark) | 4 |
-| [packages/darklang/tests/cli/tests.dark](../../../upstream/packages/darklang/tests/cli/tests.dark) | 17 |
-| [packages/darklang/tests/cli/traceVerbs.dark](../../../upstream/packages/darklang/tests/cli/traceVerbs.dark) | 18 |
+| [packages/darklang/tests/cli/tests.dark](../../../upstream/packages/darklang/tests/cli/tests.dark) | 20 |
+| [packages/darklang/tests/cli/traceVerbs.dark](../../../upstream/packages/darklang/tests/cli/traceVerbs.dark) | 19 |
 | [packages/darklang/tests/cli/traces.dark](../../../upstream/packages/darklang/tests/cli/traces.dark) | 29 |
 | [packages/darklang/tests/cli/tracesRendering.dark](../../../upstream/packages/darklang/tests/cli/tracesRendering.dark) | 12 |
+| [packages/darklang/tests/cli/viewRawModule.dark](../../../upstream/packages/darklang/tests/cli/viewRawModule.dark) | 4 |
 | [packages/darklang/tests/cli/viewSeveral.dark](../../../upstream/packages/darklang/tests/cli/viewSeveral.dark) | 3 |
+| [packages/darklang/tests/cli/workbenchRepl.dark](../../../upstream/packages/darklang/tests/cli/workbenchRepl.dark) | 1 |
 | [packages/darklang/tests/cli/zshrc.dark](../../../upstream/packages/darklang/tests/cli/zshrc.dark) | 2 |
 | [packages/darklang/tests/language/aliases.dark](../../../upstream/packages/darklang/tests/language/aliases.dark) | 2 |
 | [packages/darklang/tests/language/apply.dark](../../../upstream/packages/darklang/tests/language/apply.dark) | 7 |
 | [packages/darklang/tests/language/archivedSelf.dark](../../../upstream/packages/darklang/tests/language/archivedSelf.dark) | 1 |
 | [packages/darklang/tests/language/basic.dark](../../../upstream/packages/darklang/tests/language/basic.dark) | 4 |
 | [packages/darklang/tests/language/big.dark](../../../upstream/packages/darklang/tests/language/big.dark) | 1 |
-| [packages/darklang/tests/language/collections.dark](../../../upstream/packages/darklang/tests/language/collections.dark) | 1 |
+| [packages/darklang/tests/language/collections.dark](../../../upstream/packages/darklang/tests/language/collections.dark) | 5 |
 | [packages/darklang/tests/language/equality.dark](../../../upstream/packages/darklang/tests/language/equality.dark) | 2 |
 | [packages/darklang/tests/language/errorTypeNames.dark](../../../upstream/packages/darklang/tests/language/errorTypeNames.dark) | 8 |
 | [packages/darklang/tests/language/eself.dark](../../../upstream/packages/darklang/tests/language/eself.dark) | 2 |
-| [packages/darklang/tests/language/fastOps.dark](../../../upstream/packages/darklang/tests/language/fastOps.dark) | 2 |
-| [packages/darklang/tests/language/lambdas.dark](../../../upstream/packages/darklang/tests/language/lambdas.dark) | 3 |
+| [packages/darklang/tests/language/fastOps.dark](../../../upstream/packages/darklang/tests/language/fastOps.dark) | 3 |
+| [packages/darklang/tests/language/lambdas.dark](../../../upstream/packages/darklang/tests/language/lambdas.dark) | 5 |
 | [packages/darklang/tests/language/letBindings.dark](../../../upstream/packages/darklang/tests/language/letBindings.dark) | 1 |
-| [packages/darklang/tests/language/matchExpressions.dark](../../../upstream/packages/darklang/tests/language/matchExpressions.dark) | 5 |
+| [packages/darklang/tests/language/matchExpressions.dark](../../../upstream/packages/darklang/tests/language/matchExpressions.dark) | 6 |
 | [packages/darklang/tests/language/operators.dark](../../../upstream/packages/darklang/tests/language/operators.dark) | 3 |
 | [packages/darklang/tests/language/records.dark](../../../upstream/packages/darklang/tests/language/records.dark) | 7 |
 | [packages/darklang/tests/language/runtimeToProgramTypes.dark](../../../upstream/packages/darklang/tests/language/runtimeToProgramTypes.dark) | 6 |
@@ -102,16 +110,17 @@ Each row links to the authoritative per-test annotations. A named test remains o
 | [packages/darklang/tests/language/traits.dark](../../../upstream/packages/darklang/tests/language/traits.dark) | 9 |
 | [packages/darklang/tests/language/tupleLiterals.dark](../../../upstream/packages/darklang/tests/language/tupleLiterals.dark) | 2 |
 | [packages/darklang/tests/language/unwrap.dark](../../../upstream/packages/darklang/tests/language/unwrap.dark) | 6 |
-| [packages/darklang/tests/languageTools/atRestTypeChecker.dark](../../../upstream/packages/darklang/tests/languageTools/atRestTypeChecker.dark) | 200 |
-| [packages/darklang/tests/languageTools/builtinIntrospection.dark](../../../upstream/packages/darklang/tests/languageTools/builtinIntrospection.dark) | 3 |
+| [packages/darklang/tests/languageTools/atRestTypeChecker.dark](../../../upstream/packages/darklang/tests/languageTools/atRestTypeChecker.dark) | 201 |
+| [packages/darklang/tests/languageTools/builtinIntrospection.dark](../../../upstream/packages/darklang/tests/languageTools/builtinIntrospection.dark) | 4 |
+| [packages/darklang/tests/languageTools/formatter.dark](../../../upstream/packages/darklang/tests/languageTools/formatter.dark) | 15 |
 | [packages/darklang/tests/languageTools/live.dark](../../../upstream/packages/darklang/tests/languageTools/live.dark) | 9 |
 | [packages/darklang/tests/languageTools/opWalks.dark](../../../upstream/packages/darklang/tests/languageTools/opWalks.dark) | 4 |
 | [packages/darklang/tests/languageTools/parsedFileShape.dark](../../../upstream/packages/darklang/tests/languageTools/parsedFileShape.dark) | 4 |
-| [packages/darklang/tests/languageTools/parser/diagnostics.dark](../../../upstream/packages/darklang/tests/languageTools/parser/diagnostics.dark) | 19 |
+| [packages/darklang/tests/languageTools/parser/diagnostics.dark](../../../upstream/packages/darklang/tests/languageTools/parser/diagnostics.dark) | 21 |
 | [packages/darklang/tests/languageTools/parser/trees.dark](../../../upstream/packages/darklang/tests/languageTools/parser/trees.dark) | 22 |
 | [packages/darklang/tests/languageTools/perf.dark](../../../upstream/packages/darklang/tests/languageTools/perf.dark) | 7 |
 | [packages/darklang/tests/languageTools/pickLocation.dark](../../../upstream/packages/darklang/tests/languageTools/pickLocation.dark) | 8 |
-| [packages/darklang/tests/languageTools/roundTrip/roundTripExprs.dark](../../../upstream/packages/darklang/tests/languageTools/roundTrip/roundTripExprs.dark) | 28 |
+| [packages/darklang/tests/languageTools/roundTrip/roundTripExprs.dark](../../../upstream/packages/darklang/tests/languageTools/roundTrip/roundTripExprs.dark) | 29 |
 | [packages/darklang/tests/languageTools/roundTrip/roundTripFunctionDeclarations.dark](../../../upstream/packages/darklang/tests/languageTools/roundTrip/roundTripFunctionDeclarations.dark) | 1 |
 | [packages/darklang/tests/languageTools/roundTrip/roundTripModuleDeclarations.dark](../../../upstream/packages/darklang/tests/languageTools/roundTrip/roundTripModuleDeclarations.dark) | 1 |
 | [packages/darklang/tests/languageTools/roundTrip/roundTripSourceFiles.dark](../../../upstream/packages/darklang/tests/languageTools/roundTrip/roundTripSourceFiles.dark) | 1 |
@@ -135,55 +144,58 @@ Each row links to the authoritative per-test annotations. A named test remains o
 | [packages/darklang/tests/scm/conflicts.dark](../../../upstream/packages/darklang/tests/scm/conflicts.dark) | 21 |
 | [packages/darklang/tests/scm/draft.dark](../../../upstream/packages/darklang/tests/scm/draft.dark) | 6 |
 | [packages/darklang/tests/scm/lww.dark](../../../upstream/packages/darklang/tests/scm/lww.dark) | 6 |
-| [packages/darklang/tests/scm/propagation.dark](../../../upstream/packages/darklang/tests/scm/propagation.dark) | 16 |
+| [packages/darklang/tests/scm/propagation.dark](../../../upstream/packages/darklang/tests/scm/propagation.dark) | 17 |
 | [packages/darklang/tests/scm/referenceNames.dark](../../../upstream/packages/darklang/tests/scm/referenceNames.dark) | 2 |
 | [packages/darklang/tests/scm/removalConflicts.dark](../../../upstream/packages/darklang/tests/scm/removalConflicts.dark) | 5 |
-| [packages/darklang/tests/stdlib/altJson.dark](../../../upstream/packages/darklang/tests/stdlib/altJson.dark) | 6 |
+| [packages/darklang/tests/stdlib/altJson.dark](../../../upstream/packages/darklang/tests/stdlib/altJson.dark) | 7 |
 | [packages/darklang/tests/stdlib/base16.dark](../../../upstream/packages/darklang/tests/stdlib/base16.dark) | 5 |
 | [packages/darklang/tests/stdlib/base64.dark](../../../upstream/packages/darklang/tests/stdlib/base64.dark) | 2 |
 | [packages/darklang/tests/stdlib/bytes.dark](../../../upstream/packages/darklang/tests/stdlib/bytes.dark) | 32 |
 | [packages/darklang/tests/stdlib/char.dark](../../../upstream/packages/darklang/tests/stdlib/char.dark) | 2 |
+| [packages/darklang/tests/stdlib/cli/dir.dark](../../../upstream/packages/darklang/tests/stdlib/cli/dir.dark) | 1 |
 | [packages/darklang/tests/stdlib/cli/file.dark](../../../upstream/packages/darklang/tests/stdlib/cli/file.dark) | 10 |
-| [packages/darklang/tests/stdlib/cli/posix.dark](../../../upstream/packages/darklang/tests/stdlib/cli/posix.dark) | 12 |
-| [packages/darklang/tests/stdlib/cli/process.dark](../../../upstream/packages/darklang/tests/stdlib/cli/process.dark) | 9 |
-| [packages/darklang/tests/stdlib/cli/sgr.dark](../../../upstream/packages/darklang/tests/stdlib/cli/sgr.dark) | 3 |
+| [packages/darklang/tests/stdlib/cli/posix.dark](../../../upstream/packages/darklang/tests/stdlib/cli/posix.dark) | 13 |
+| [packages/darklang/tests/stdlib/cli/process.dark](../../../upstream/packages/darklang/tests/stdlib/cli/process.dark) | 11 |
+| [packages/darklang/tests/stdlib/cli/sgr.dark](../../../upstream/packages/darklang/tests/stdlib/cli/sgr.dark) | 4 |
 | [packages/darklang/tests/stdlib/cli/sys.dark](../../../upstream/packages/darklang/tests/stdlib/cli/sys.dark) | 2 |
 | [packages/darklang/tests/stdlib/cli/widgets.dark](../../../upstream/packages/darklang/tests/stdlib/cli/widgets.dark) | 6 |
 | [packages/darklang/tests/stdlib/crypto.dark](../../../upstream/packages/darklang/tests/stdlib/crypto.dark) | 10 |
-| [packages/darklang/tests/stdlib/dateTime.dark](../../../upstream/packages/darklang/tests/stdlib/dateTime.dark) | 10 |
-| [packages/darklang/tests/stdlib/decimal.dark](../../../upstream/packages/darklang/tests/stdlib/decimal.dark) | 3 |
-| [packages/darklang/tests/stdlib/dict.dark](../../../upstream/packages/darklang/tests/stdlib/dict.dark) | 32 |
+| [packages/darklang/tests/stdlib/dateTime.dark](../../../upstream/packages/darklang/tests/stdlib/dateTime.dark) | 22 |
+| [packages/darklang/tests/stdlib/decimal.dark](../../../upstream/packages/darklang/tests/stdlib/decimal.dark) | 6 |
+| [packages/darklang/tests/stdlib/dict.dark](../../../upstream/packages/darklang/tests/stdlib/dict.dark) | 33 |
 | [packages/darklang/tests/stdlib/exec.dark](../../../upstream/packages/darklang/tests/stdlib/exec.dark) | 3 |
-| [packages/darklang/tests/stdlib/float.dark](../../../upstream/packages/darklang/tests/stdlib/float.dark) | 11 |
 | [packages/darklang/tests/stdlib/float32.dark](../../../upstream/packages/darklang/tests/stdlib/float32.dark) | 5 |
+| [packages/darklang/tests/stdlib/float64.dark](../../../upstream/packages/darklang/tests/stdlib/float64.dark) | 11 |
 | [packages/darklang/tests/stdlib/http.dark](../../../upstream/packages/darklang/tests/stdlib/http.dark) | 6 |
-| [packages/darklang/tests/stdlib/httpclient.dark](../../../upstream/packages/darklang/tests/stdlib/httpclient.dark) | 10 |
-| [packages/darklang/tests/stdlib/httpserver.dark](../../../upstream/packages/darklang/tests/stdlib/httpserver.dark) | 3 |
+| [packages/darklang/tests/stdlib/httpclient.dark](../../../upstream/packages/darklang/tests/stdlib/httpclient.dark) | 35 |
+| [packages/darklang/tests/stdlib/httpserver.dark](../../../upstream/packages/darklang/tests/stdlib/httpserver.dark) | 5 |
 | [packages/darklang/tests/stdlib/ints/bigInt.dark](../../../upstream/packages/darklang/tests/stdlib/ints/bigInt.dark) | 5 |
 | [packages/darklang/tests/stdlib/ints/int128.dark](../../../upstream/packages/darklang/tests/stdlib/ints/int128.dark) | 1 |
-| [packages/darklang/tests/stdlib/ints/int64.dark](../../../upstream/packages/darklang/tests/stdlib/ints/int64.dark) | 2 |
+| [packages/darklang/tests/stdlib/ints/int64.dark](../../../upstream/packages/darklang/tests/stdlib/ints/int64.dark) | 4 |
 | [packages/darklang/tests/stdlib/ints/uint128.dark](../../../upstream/packages/darklang/tests/stdlib/ints/uint128.dark) | 1 |
 | [packages/darklang/tests/stdlib/ints/uint8.dark](../../../upstream/packages/darklang/tests/stdlib/ints/uint8.dark) | 1 |
-| [packages/darklang/tests/stdlib/json.dark](../../../upstream/packages/darklang/tests/stdlib/json.dark) | 19 |
-| [packages/darklang/tests/stdlib/list.dark](../../../upstream/packages/darklang/tests/stdlib/list.dark) | 20 |
+| [packages/darklang/tests/stdlib/json.dark](../../../upstream/packages/darklang/tests/stdlib/json.dark) | 29 |
+| [packages/darklang/tests/stdlib/list.dark](../../../upstream/packages/darklang/tests/stdlib/list.dark) | 19 |
 | [packages/darklang/tests/stdlib/net.dark](../../../upstream/packages/darklang/tests/stdlib/net.dark) | 2 |
 | [packages/darklang/tests/stdlib/regex.dark](../../../upstream/packages/darklang/tests/stdlib/regex.dark) | 6 |
 | [packages/darklang/tests/stdlib/result.dark](../../../upstream/packages/darklang/tests/stdlib/result.dark) | 1 |
 | [packages/darklang/tests/stdlib/sse.dark](../../../upstream/packages/darklang/tests/stdlib/sse.dark) | 8 |
 | [packages/darklang/tests/stdlib/stream.dark](../../../upstream/packages/darklang/tests/stdlib/stream.dark) | 2 |
-| [packages/darklang/tests/stdlib/string.dark](../../../upstream/packages/darklang/tests/stdlib/string.dark) | 18 |
-| [packages/darklang/tests/stdlib/url.dark](../../../upstream/packages/darklang/tests/stdlib/url.dark) | 11 |
+| [packages/darklang/tests/stdlib/string.dark](../../../upstream/packages/darklang/tests/stdlib/string.dark) | 20 |
+| [packages/darklang/tests/stdlib/test.dark](../../../upstream/packages/darklang/tests/stdlib/test.dark) | 5 |
+| [packages/darklang/tests/stdlib/url.dark](../../../upstream/packages/darklang/tests/stdlib/url.dark) | 13 |
 | [packages/darklang/tests/stdlib/utf8.dark](../../../upstream/packages/darklang/tests/stdlib/utf8.dark) | 3 |
+| [packages/darklang/tests/stdlib/uuid.dark](../../../upstream/packages/darklang/tests/stdlib/uuid.dark) | 1 |
 
 | Kind | Items |
 | --- | --- |
-| function | 5,171 |
-| implementation | 260 |
-| named-test | 2,995 |
+| function | 5,478 |
+| implementation | 261 |
+| named-test | 3,153 |
 | trait | 22 |
 | trait-method | 26 |
-| type | 839 |
-| val | 324 |
+| type | 875 |
+| val | 351 |
 
 ## Reasons
 
@@ -200,32 +212,31 @@ Tags are defined in [the glossary](../../../porting/compiler-reasons.json).
 | packages | `runtime-reflection` | 5 |
 | packages | `test-counter` | 1 |
 | packages | `test-diagnostics` | 1 |
-| packages | `upstream-dependency` | 2,266 |
-| stdlib | `compiler-contract` | 115 |
-| stdlib | `compiler-implementation` | 917 |
+| packages | `upstream-dependency` | 2,444 |
+| stdlib | `compiler-contract` | 129 |
+| stdlib | `compiler-implementation` | 902 |
 | stdlib | `compiler-timeout` | 1 |
 | stdlib | `constructor-identity` | 2 |
 | stdlib | `container-adaptation` | 490 |
 | stdlib | `interpreter-intrinsic` | 1 |
 | stdlib | `test-counter` | 2 |
 | stdlib | `test-diagnostics` | 2 |
-| stdlib | `upstream-dependency` | 182 |
+| stdlib | `upstream-dependency` | 237 |
 | tests | `aot-arity-error` | 12 |
 | tests | `aot-invalid-field` | 16 |
 | tests | `aot-invalid-key` | 6 |
 | tests | `aot-match-error` | 26 |
 | tests | `aot-name-error` | 11 |
-| tests | `aot-type-error` | 155 |
+| tests | `aot-type-error` | 154 |
 | tests | `compiler-contract` | 2 |
-| tests | `compiler-crash` | 2 |
-| tests | `compiler-gap` | 155 |
+| tests | `compiler-crash` | 3 |
+| tests | `compiler-gap` | 183 |
 | tests | `compiler-leak` | 2 |
 | tests | `compiler-timeout` | 1 |
 | tests | `diagnostic-difference` | 2 |
 | tests | `interpreter-fixture` | 47 |
 | tests | `test-counter` | 7 |
-| tests | `upstream-bug` | 1 |
-| tests | `upstream-dependency` | 908 |
+| tests | `upstream-dependency` | 1,041 |
 
 ## Separate capability assessments
 
@@ -233,4 +244,4 @@ Tags are defined in [the glossary](../../../porting/compiler-reasons.json).
 | --- | --- |
 | features | 6 excluded, 9 missing, 1 partial, 199 supported |
 | parser | 1 partial, 30 supported |
-| builtins | 170 missing, 77 present, 361 unassessed |
+| builtins | 89 missing, 37 present, 243 unassessed |

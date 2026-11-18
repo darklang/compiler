@@ -5,10 +5,19 @@ module Darklang.Stdlib.Test
 type Result =
   | Pass
   | Fail(messages: List<String>)
+  /// The failing checks of an `all`, each with its position in the list, from 1.
+  | FailedChecks(checks: List<(Int64 * Result)>)
+  /// Each row of a `table`, named by its arguments, with how it went.
+  | Rows(rows: List<(String * Result)>)
 
-let pass(): Result = Result.Pass
 
-let fail(message: String): Result = Result.Fail([ message ])
+let pass(): Result =
+  Result.Pass
+
+
+let fail(message: String): Result =
+  Result.Fail([ message ])
+
 
 /// Inject an uncaught runtime exception to test propagation and rendering.
 /// Available only inside a running package test; never returns a value.
@@ -16,11 +25,13 @@ let fail(message: String): Result = Result.Fail([ message ])
 let raiseRuntimeError(message: String): Int64 =
   Builtin.pmTestRaiseRuntimeError(message)
 
+
 /// This test's counter, after adding one to it if <param increment>. Callers
 /// use `incrementCounter` and `counterValue`.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Test.counter: Unknown function or value 'Builtin.testCounter'"
 let counter(increment: Bool): Int64 =
   Builtin.testCounter(increment)
+
 
 /// Increment this test's counter and return the value unchanged. Use to check
 /// how often a callback or expression runs. The counter starts at zero for each
@@ -30,6 +41,7 @@ let incrementCounter(value: 'a): 'a =
   let _ = counter(true)
   value
 
+
 /// Return this test's counter, which starts at zero for each test run.
 /// Tests using the counter rerun rather than reuse a cached pass.
 /// Only available in package tests; no database or host permissions needed.
@@ -37,8 +49,18 @@ let incrementCounter(value: 'a): 'a =
 let counterValue(): Int64 =
   counter(false)
 
+
+/// Run <param f> on the real clock. A package test runs on a virtual one, where
+/// sleeps and timers finish at once; wrap a test whose waits must take real time,
+/// such as one racing a timeout against real I/O. Only available in package tests.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Test.onRealClock: Unknown function or value 'Builtin.testOnRealClock'"
+let onRealClock(f: Unit -> 'a): 'a =
+  Builtin.testOnRealClock(f)
+
+
 let expect(condition: Bool, message: String): Result =
   if condition then Result.Pass else Result.Fail([ message ])
+
 
 /// Compare two Dark values. Written value-first so pipeline style reads:
 /// `actual |> Stdlib.Test.equal expected`.
@@ -47,30 +69,67 @@ let equal(actual: 'a, expected: 'a): Result =
   if actual == expected then
     Result.Pass
   else
-    Result.Fail([ $"expected {Stdlib.inspect(expected)}, got {Stdlib.inspect(actual)}" ])
+    Result.Fail([ $"expected {inspect(expected)}, got {inspect(actual)}" ])
+
 
 // @compiler replace: packages/darklang/stdlib/test.dark#Darklang.Stdlib.Test.notEqual reason=test-diagnostics
 let notEqual(actual: 'a, unexpected: 'a): Result =
   if actual != unexpected then
     Result.Pass
   else
-    Result.Fail([ $"did not expect {Stdlib.inspect(unexpected)}" ])
+    Result.Fail([ $"did not expect {inspect(unexpected)}" ])
+
+
+/// Whether <param result> passed: `Pass`, or a table whose rows all passed.
+let passed(result: Result): Bool =
+  match result with
+  | Pass -> true
+  | Rows(rows) -> List.all(rows, fun((_, row)) -> passed(row))
+  | _ -> false
+
 
 /// Combine assertions without stopping at the first failure.
-let all(tests: List<Result>): Result =
-  let failures =
-    tests
-    |> Stdlib.List.indexedMap(fun(index, test) ->
-      match test with
-      | Pass -> []
-      | Fail(messages) ->
-        let assertion = Stdlib.display(index + 1)
-        match messages with
-        | [] -> [ $"assertion {assertion}: failed without a message" ]
-        | _ ->
-          messages
-          |> Stdlib.List.map(fun message ->
-            $"assertion {assertion}: {message}"))
-    |> Stdlib.List.flatten
+let all(checks: List<Result>): Result =
+  let failed =
+    checks
+    |> List.indexedMap(fun(index, check) -> (index + 1, check))
+    |> List.filter(fun((_, check)) -> Bool.not(passed(check)))
 
-  if Stdlib.List.isEmpty(failures) then Result.Pass else Result.Fail(failures)
+  if List.isEmpty(failed) then Result.Pass else Result.FailedChecks(failed)
+
+
+/// <param check> as a test in the group <param name>, inside its module:
+/// `test emptyInput = Stdlib.Test.group("parsing", ...)` runs as
+/// `Module › parsing › emptyInput`, and a filter can name the group.
+let group(name: String, check: Result): Result =
+  check
+
+
+/// <param check> on each of <param rows>. Each row is its own test, named by its
+/// arguments: `[ ("a", 1), ("", 0) ] |> Stdlib.Test.table(fun((s, n)) -> ...)`
+/// gives the tests `("a", 1)` and `("", 0)`. A row that raises fails only itself.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Test.table: Unknown function or value 'LanguageTools.Live.apply'"
+let table(rows: List<'a>, check: 'a -> Result): Result =
+  rows
+  |> List.map(fun row ->
+    // A lambda, so the call runs under this test's policies rather than as an approval root.
+    let result =
+      match LanguageTools.Live.apply(fun r -> check(r), row) with
+      | Ok(result) -> result
+      | Error(message) -> Result.Fail([ $"error: {message}" ])
+
+    (rowName(row), result))
+  |> Result.Rows
+
+
+/// How a `table` names <param row>: its value in parentheses, on one line and
+/// at most 60 characters.
+let rowName(row: 'a): String =
+  let shown =
+    inspect(row)
+    |> String.split("\n")
+    |> List.map(String.trim)
+    |> String.join(" ")
+
+  let shown = if String.startsWith(shown, "(") then shown else $"({shown})"
+  if String.length(shown) > 60 then String.first(shown, 59) + "…" else shown

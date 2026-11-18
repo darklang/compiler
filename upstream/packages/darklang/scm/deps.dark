@@ -7,8 +7,7 @@ module Darklang.SCM.Deps
 // Several names can point at the same content, so keep the names separate when finding callers.
 //
 // Plain edge reads by hash go through `scmDeps`, and the SQL lives with it in F# (`LibDB.ScmDeps`).
-// Name-aware reads (callers, reference names) go through `pmDependents` and `namedReferencesFor`.
-
+// Name-aware reads (callers, reference names) go through `dependents` and `namedReferencesFor`.
 
 /// What `query` is asked.
 type DepQuery =
@@ -31,17 +30,19 @@ type DepEdge =
 
 /// The recorded dependency edges <param q> asks for.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.query: Unknown function or value 'Builtin.scmDeps'"
-let query(q: DepQuery): List<DepEdge> = Builtin.scmDeps(q)
+let query(q: DepQuery): List<DepEdge> =
+  Builtin.scmDeps(q)
 
 
-/// The `item_type` column, which only ever holds what `ItemKind.toString` wrote.
 // CLEANUP: a string `toString` would not have written reads as `Fn`, which is a guess. It should
 // either raise, or this should return a `Result` or an `Option` and make the six callers say what
 // they want done. Left as a default for now because the column has one writer, so it cannot
 // currently fire; this is the one place to change when that stops being true.
+/// The `item_type` column, which only ever holds what `ItemKind.toString` wrote.
 let kindOf(s: String): LanguageTools.ProgramTypes.ItemKind =
   LanguageTools.ProgramTypes.ItemKind.fromString(s)
   |> Stdlib.Option.withDefault(LanguageTools.ProgramTypes.ItemKind.Fn)
+
 
 let locationOf(
   owner: String,
@@ -49,9 +50,8 @@ let locationOf(
   name: String)
   : LanguageTools.ProgramTypes.PackageLocation =
   let mods = if modules == "" then [] else Stdlib.String.split(modules, ".")
+  LanguageTools.ProgramTypes.PackageLocation { owner = owner, modules = mods, name = name }
 
-  LanguageTools.ProgramTypes.PackageLocation
-    { owner = owner, modules = mods, name = name }
 
 /// Everything <param source> references (forward dependencies), as (hash, kind).
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.dependenciesOf: Unknown function or value 'query'"
@@ -62,24 +62,52 @@ let dependenciesOf(
   |> Stdlib.List.map(fun e ->
     (LanguageTools.ProgramTypes.Hash.Hash(e.dependsOnHash), e.dependsOnType))
 
+
+/// Why a name-aware read (`dependents`, `namedReferencesFor`, `review`) could not answer.
+type ReadError =
+  /// A caller's names need its stored body, and the body is gone.
+  | StoredDeclarationMissing
+
+
+let readErrorToString(e: ReadError): String =
+  match e with
+  | StoredDeclarationMissing -> "Cannot read reference names: stored declaration is missing"
+
+
 /// Find callers of these names using this branch's saved reference names.
 /// A rename updates these names without changing the caller's content hash.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.dependents: Unknown function or value 'Builtin.pmDependents'"
+let dependents(
+  branch: Uuid,
+  targets: List<(LanguageTools.ProgramTypes.PackageLocation * LanguageTools.ProgramTypes.ItemKind)>)
+  : Result<
+  List<
+    (LanguageTools.ProgramTypes.Hash *
+     LanguageTools.ProgramTypes.PackageLocation *
+     LanguageTools.ProgramTypes.ItemKind)>,
+  String> =
+  Builtin.pmDependents(branch, targets) |> Stdlib.Result.mapError(readErrorToString)
+
+
+/// <fn dependents>, for callers with no way to report a failed read yet.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.dependentsFor: Unknown function or value 'Builtin.pmDependents'"
 let dependentsFor(
   branch: Uuid,
   targets: List<(LanguageTools.ProgramTypes.PackageLocation * LanguageTools.ProgramTypes.ItemKind)>)
-  : List<(LanguageTools.ProgramTypes.Hash * LanguageTools.ProgramTypes.PackageLocation * LanguageTools.ProgramTypes.ItemKind)> =
-  Builtin.pmDependents(branch, targets)
+  : List<
+  (LanguageTools.ProgramTypes.Hash *
+   LanguageTools.ProgramTypes.PackageLocation *
+   LanguageTools.ProgramTypes.ItemKind)> =
+  dependents(branch, targets) |> Builtin.unwrap
 
 
 /// The name MAIN gives this hash, if any.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.mainLocationOf: Unknown function or value 'SCM.Bindings.query'"
-let mainLocationOf(
-  h: String)
-  : Stdlib.Option.Option<LanguageTools.ProgramTypes.PackageLocation> =
-  SCM.Bindings.query(SCM.Bindings.BindingFilter.LocationOf(SCM.Branch.mainBranchId, h))
+let mainLocationOf(h: String): Option<LanguageTools.ProgramTypes.PackageLocation> =
+  Bindings.query(Bindings.BindingFilter.LocationOf(Branch.mainBranchId, h))
   |> Stdlib.List.head
   |> Stdlib.Option.map(fun b -> locationOf(b.owner, b.modules, b.name))
+
 
 /// Resolve hashes to a location on the current branch, for display. A hash can be live at several
 /// names; this takes one, main's first, since the callers are rendering a label rather than driving a
@@ -89,25 +117,28 @@ let mainLocationOf(
 let resolveLocations(
   hashes: List<LanguageTools.ProgramTypes.Hash>)
   : List<(LanguageTools.ProgramTypes.Hash * LanguageTools.ProgramTypes.PackageLocation)> =
-  let branchId = SCM.PackageOps.currentBranch()
-
+  let branchId = PackageOps.currentBranch()
   hashes
   |> Stdlib.List.filterMap(fun hash ->
     let h = LanguageTools.ProgramTypes.hashToString(hash)
-
-    SCM.Bindings.query(SCM.Bindings.BindingFilter.LocationOf(branchId, h))
+    Bindings.query(Bindings.BindingFilter.LocationOf(branchId, h))
     |> Stdlib.List.head
     |> Stdlib.Option.map(fun b -> (hash, locationOf(b.owner, b.modules, b.name))))
 
 
 /// A named edge: caller location, caller version, referenced version, referenced name.
 type NamedReference =
-  (LanguageTools.ProgramTypes.PackageLocation * LanguageTools.ProgramTypes.Reference * LanguageTools.ProgramTypes.Reference * LanguageTools.ProgramTypes.PackageLocation)
+  (LanguageTools.ProgramTypes.PackageLocation *
+   LanguageTools.ProgramTypes.Reference *
+   LanguageTools.ProgramTypes.Reference *
+   LanguageTools.ProgramTypes.PackageLocation)
+
 
 /// Read the reference names used by each caller at its current location and version.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.namedReferences: Unknown function or value 'namedReferencesFor'"
-let namedReferences(branchId: Uuid): Stdlib.Result.Result<List<NamedReference>, String> =
+let namedReferences(branchId: Uuid): Result<List<NamedReference>, String> =
   namedReferencesFor(branchId, [])
+
 
 /// Read what this caller references, using the names it follows on this branch.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.dependencyEdges: Unknown function or value 'namedReferencesFor'"
@@ -115,10 +146,18 @@ let dependencyEdges(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,
   source: LanguageTools.ProgramTypes.Reference)
-  : Stdlib.Result.Result<List<(LanguageTools.ProgramTypes.Hash * LanguageTools.ProgramTypes.ItemKind * LanguageTools.ProgramTypes.PackageLocation)>, String> =
+  : Result<
+  List<
+    (LanguageTools.ProgramTypes.Hash *
+     LanguageTools.ProgramTypes.ItemKind *
+     LanguageTools.ProgramTypes.PackageLocation)>,
+  String> =
   namedReferencesFor(branchId, [ (location, source) ])
   |> Stdlib.Result.map(fun edges ->
     edges
     |> Stdlib.List.map(fun((_, _, target, name)) ->
-      (LanguageTools.ProgramTypes.Reference.hash(target), LanguageTools.ProgramTypes.Reference.kind(target), name))
+      (
+        LanguageTools.ProgramTypes.Reference.hash(target),
+        LanguageTools.ProgramTypes.Reference.kind(target),
+        name))
     |> Stdlib.List.unique)

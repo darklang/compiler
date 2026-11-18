@@ -32,43 +32,51 @@ Save a module, run its `main` by name, and test it:
 
 Save the module again to change it.
 
+Printing and stdin need no approval; files, HTTP and the environment need permission:
+
+  printf 'a\nb\n' | run Me.Lines.main
+  run Me.Report.main data.csv
+
+To read files for this run, add `--allow "file read $PWD"` to `run`.
+A server also needs its port: `--allow "http-server 127.0.0.1 8080; file read $PWD"`
+covers the server and its request handlers. If you already have permission, omit it.
+
 ## Workflow
 
-  search --batch "List.map" "Json.serialize" --fn  # three results per query
+  search --batch "List.map" "Json.serialize" --fn  # up to 20 results per section
   docs signatures Stdlib.String Stdlib.List        # every fn in these modules
-  view <name>                                      # one item's source
+  view <name> --raw                                # source for patches
   eval 'Stdlib.List.length([1, 2])'                # one expression
   status                                           # what changed
   commit "message" -y                              # record it
-  run app.dark [args]                              # a file instead; `docs scripts`
 
-`search` takes `--fn`, `--type`, `--val` or `--test` to narrow, and `--with-docs`
-for full comments. To find a function by what it takes and returns, search the
-types: `search bytes to string` or `search String->Int64`.
+`search` takes `--fn`, `--type`, `--val` or `--test` to narrow results,
+`--with-docs` for comments, and `--limit N` for results per section.
+Search by input and return types: `search bytes to string` or `search String->Int64`.
 
 Answers go on stdout; errors, hints and logs go on stderr; a refusal exits
 non-zero. Under `--json` a refusal leaves stdout empty, so test the exit code.
 
 ## Functions most programs need
 
-  Stdlib.Int64.parse(s)   Stdlib.Float.parse(s)   # Result<_, ParseError>
-  Stdlib.Int64.toFloat(n)   Stdlib.Float.round(x)  # round gives an Int64
-  Stdlib.abs(x)   Stdlib.min(a, b)   Stdlib.max(a, b)   # any number type
+  Stdlib.Int64.parse(s)   Stdlib.Float64.parse(s)   // Result<_, ParseError>
+  Stdlib.Int64.toFloat64(n)   Stdlib.Float64.round(x)  // round gives an Int64
+  Stdlib.abs(x)   Stdlib.min(a, b)   Stdlib.max(a, b)   // any number type
   Stdlib.String.split(s, ",")   Stdlib.String.join(xs, ",")   Stdlib.String.trim(s)
   Stdlib.String.toList(s)   Stdlib.String.padStart(s, '0', 2)
   Stdlib.List.range(1, n)   Stdlib.List.getAt(xs, i)   Stdlib.List.contains(xs, x)
-  Stdlib.Int64.random(1, 6)   Stdlib.List.randomElement(xs)   # both ends included
-  Stdlib.Cli.Stdin.readLineOrEnd()   # Option<String>, None at the end of input
-  Stdlib.Cli.Posix.sleep(1000.0)   Stdlib.DateTime.now()            # sleep takes ms
+  Stdlib.Int64.random(1, 6)   Stdlib.List.randomElement(xs)   // both ends included
+  Stdlib.Cli.Stdin.readLineOrEnd()   // Option<String>, None at the end of input
+  Stdlib.Cli.Posix.sleep(1000.0)   Stdlib.DateTime.now()            // sleep takes ms
 
 ## Files, HTTP and JSON
 
-  Stdlib.Cli.FileSystem.readFileAsString(path)       # Result<String, FileError>
+  Stdlib.Cli.FileSystem.readFileAsString(path)       // Result<String, FileError>
   Stdlib.Cli.FileSystem.writeFile(path, Stdlib.Utf8.encode(text))
   Stdlib.String.splitOnNewline(text)
-  Stdlib.HttpClient.get(url, [("user-agent", "me")]) # r.statusCode, r.body (Bytes)
-  Stdlib.Utf8.decode(r.body)                         # Result<String, String>
-  Stdlib.Json.parse<Profile>(text)                   # Result<Profile, ParseError>
+  Stdlib.HttpClient.get(url, [("user-agent", "me")]) // r.statusCode, r.body (Bytes)
+  Stdlib.Utf8.decode(r.body)                         // Result<String, String>
+  Stdlib.Json.parse<Profile>(text)                   // Result<Profile, ParseError>
   Stdlib.Json.serialize<Profile>(value)
 
 A JSON object parses into a record: extra fields are ignored, and a field that
@@ -80,9 +88,9 @@ runner approval, without asking in chat first. Retry only if safe. Details:
 
 ## Mistakes that cost a run
 
-- There is no `Stdlib.Int64.toString`. `$"{x}"` works for any value: it uses the
-  type's `Display` impl (Strings, numbers, Bool, Char, DateTime, Uuid, Option,
-  Result, ...; `impls Display`) and falls back to `Stdlib.inspect(x)`.
+- `$"{x}"` works for any value: it uses the type's `Display` impl (Strings,
+  numbers, Bool, Char, DateTime, Uuid, Option, Result, ...; `impls Display`) and
+  falls back to `Stdlib.inspect(x)`.
   `Stdlib.display(x)` needs a `Display` impl; `Stdlib.inspect(x)` shows any value.
   An operator is not a function either: `a % b`, not `Stdlib.Int64.mod(a, b)`.
 - Operands must have one type: `1 + 2.0` is an error.
@@ -90,7 +98,6 @@ runner approval, without asking in chat first. Retry only if safe. Details:
 - `|>` passes the left value as the first argument. An `if` or `match` on its
   left needs parentheses.
 - Every line of a block but the last returns Unit: `let _ = f(x)` drops a value.
-- Lambdas: `fun x ->`, `fun(acc, x) ->`; one tuple parameter is `fun((a, b)) ->`.
 - A tuple inside a constructor keeps its own parentheses: `Some((a, b))`.
   Tuple parts are `pair.1`, `pair.2`, or `let (a, b) = pair`.
 - Records: `State { count = 0 }` builds, `{ state with count = 1 }` updates.
@@ -98,7 +105,8 @@ runner approval, without asking in chat first. Retry only if safe. Details:
 - `f(x)?` returns early from the function on `Error` or `None`.
 - Modules are not values: `let c = Stdlib.List` is invalid.
 - A nested function annotates its parameters and cannot call one defined below it.
-- A keyword such as `type` is a name only in double backticks: ``type``.
+- A keyword such as type is a name in backticks: let `type` = 1. After a `.` and
+  as a record field name it needs none: r.type, { type = 1 }.
 - `Stdlib.X` is `Darklang.Stdlib.X`. Your own names go under an owner such as
   `Me`; `Darklang` is reserved.
 
@@ -112,5 +120,5 @@ Logs: ~/.darklang/logs/cli.log
   docs for-ai scm           drafts, commits, branches, deprecation
   docs for-ai syntax        the rest of the syntax notes, and name resolution
   docs for-ai tests http-server   several parts and topics in one call
-  docs scripts | syntax | errors | stdlib | signatures <module>
+  docs syntax | errors | stdlib | signatures <module>
   help <command>"""

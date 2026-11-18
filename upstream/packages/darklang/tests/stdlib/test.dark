@@ -14,53 +14,242 @@ let is(
     Stdlib.Test.Result.Fail(
       [ $"expected {Stdlib.inspect(expected)}, got {Stdlib.inspect(actual)}" ])
 
-test pass =
-  Stdlib.Test.pass() |> is(Stdlib.Test.Result.Pass)
 
-test fail =
-  Stdlib.Test.fail("nope") |> is(Stdlib.Test.Result.Fail([ "nope" ]))
+test pass = Stdlib.Test.pass() |> is(Stdlib.Test.Result.Pass)
+
+
+test fail = Stdlib.Test.fail("nope") |> is(Stdlib.Test.Result.Fail([ "nope" ]))
+
 
 test expect =
   Stdlib.Test.all(
     [ Stdlib.Test.expect(true, "unused") |> is(Stdlib.Test.Result.Pass)
+
       Stdlib.Test.expect(false, "it was false")
       |> is(Stdlib.Test.Result.Fail([ "it was false" ])) ])
+
 
 test equal =
   Stdlib.Test.all(
     [ Stdlib.Test.equal(8, 8) |> is(Stdlib.Test.Result.Pass)
+
       Stdlib.Test.equal(8, 9)
       |> is(Stdlib.Test.Result.Fail([ "expected 9, got 8" ]))
+
       (8 |> Stdlib.Test.equal(8)) |> is(Stdlib.Test.Result.Pass) ])
+
 
 test notEqual =
   Stdlib.Test.all(
     [ Stdlib.Test.notEqual(1, 2) |> is(Stdlib.Test.Result.Pass)
+
       Stdlib.Test.notEqual(1, 1)
       |> is(Stdlib.Test.Result.Fail([ "did not expect 1" ])) ])
+
 
 test all =
   Stdlib.Test.all(
     [ Stdlib.Test.all([]) |> is(Stdlib.Test.Result.Pass)
+
       Stdlib.Test.all([ Stdlib.Test.pass(), Stdlib.Test.pass() ])
       |> is(Stdlib.Test.Result.Pass)
+
       // Every failure is kept, in order, not just the first.
       Stdlib.Test.all(
         [ Stdlib.Test.fail("a")
           Stdlib.Test.pass()
           Stdlib.Test.Result.Fail([ "b", "c" ]) ])
       |> is(
-        (Stdlib.Test.Result.Fail(
-          [ "assertion 1: a", "assertion 3: b", "assertion 3: c" ]))) ])
+        Stdlib.Test.Result.FailedChecks(
+          [ (1, Stdlib.Test.Result.Fail([ "a" ]))
+            (3, Stdlib.Test.Result.Fail([ "b", "c" ])) ])) ])
+
 
 test emptyFailureIsPreserved =
   Stdlib.Test.all(
     [ Stdlib.Test.all([ Stdlib.Test.Result.Fail([]) ])
-      |> is(Stdlib.Test.Result.Fail([ "assertion 1: failed without a message" ]))
+      |> is(Stdlib.Test.Result.FailedChecks([ (1, Stdlib.Test.Result.Fail([])) ]))
+
       Stdlib.Test.all(
         [ Stdlib.Test.pass()
           Stdlib.Test.Result.Fail([])
           Stdlib.Test.fail("another failure") ])
       |> is(
-        (Stdlib.Test.Result.Fail(
-          [ "assertion 2: failed without a message", "assertion 3: another failure" ]))) ])
+        Stdlib.Test.Result.FailedChecks(
+          [ (2, Stdlib.Test.Result.Fail([]))
+            (3, Stdlib.Test.Result.Fail([ "another failure" ])) ])) ])
+
+
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.table'" class=missing-support reason=upstream-dependency
+test table =
+  Stdlib.Test.all(
+    [ // Every row is kept, named by its arguments, passing or not.
+      Stdlib.Test.table([ (1, 1), (1, 2) ], fun((a, b)) -> a |> Stdlib.Test.equal(b))
+      |> is(
+        Stdlib.Test.Result.Rows(
+          [ ("(1, 1)", Stdlib.Test.Result.Pass)
+            ("(1, 2)", Stdlib.Test.Result.Fail([ "expected 2, got 1" ])) ]))
+
+      // A row that raises fails only itself; the rows after it still run.
+      Stdlib.Test.table([ 0, 3 ], fun n -> (6 / n) |> Stdlib.Test.equal(2))
+      |> is(
+        Stdlib.Test.Result.Rows(
+          [ ("(0)", Stdlib.Test.Result.Fail([ "error: Cannot divide by 0" ]))
+            ("(3)", Stdlib.Test.Result.Pass) ]))
+
+      Stdlib.Test.rowName(Stdlib.String.repeat("x", 80))
+      |> Stdlib.Test.equal("(\"" + Stdlib.String.repeat("x", 57) + "…")
+
+      // Inside an `all`, a table passes when all its rows do.
+      Stdlib.Test.all([ Stdlib.Test.table([ 1 ], fun _ -> Stdlib.Test.pass()) ])
+      |> is(Stdlib.Test.Result.Pass) ])
+
+
+/// A package test runs on a virtual clock: an hour's sleep finishes at once, and
+/// the clock moves by exactly the hour.
+// @compiler xfail runtime: "expected 3600000, got 3600" class=missing-support reason=compiler-gap
+test sleepTakesNoRealTime =
+  let before = Stdlib.DateTime.now()
+  let _ = Stdlib.Cli.Posix.sleep(3600000.0)
+  Stdlib.DateTime.subtractMs(Stdlib.DateTime.now(), before)
+  |> Stdlib.Test.equal(3600000)
+
+
+/// `onRealClock` sleeps for real, which always takes a little longer than asked.
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.onRealClock'" class=missing-support reason=upstream-dependency
+test onRealClockTakesRealTime =
+  let elapsed = Stdlib.Test.onRealClock(fun () ->
+    let before = Stdlib.DateTime.__ticks(Stdlib.DateTime.now())
+    let _ = Stdlib.Cli.Posix.sleep(10.0)
+    Stdlib.DateTime.__ticks(Stdlib.DateTime.now()) - before)
+
+  Stdlib.Test.expect(elapsed > 100000, $"slept {display(elapsed)} ticks")
+
+
+// A body for `failureLines` below to read: what `dark test run` prints for a
+// failure comes from the stored source.
+test shownFixture =
+  Stdlib.Test.all(
+    [ Stdlib.Test.pass()
+      Stdlib.String.length("ab") |> Stdlib.Test.equal(2)
+      Stdlib.Test.all([ Stdlib.Test.pass(), Stdlib.Test.pass() ]) ])
+
+
+test groupedFixture =
+  Stdlib.Test.group(
+    "parsing",
+    Stdlib.Test.all([ Stdlib.Test.pass(), Stdlib.String.length("ab") |> Stdlib.Test.equal(2) ]))
+
+
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.table'" class=missing-support reason=upstream-dependency
+test tableFixture =
+  [ ("a", 1), ("abc", 3) ]
+  |> Stdlib.Test.table(fun((s, n)) -> Stdlib.String.length(s) |> Stdlib.Test.equal(n))
+
+
+// @compiler blocked: upstream-dependency diagnostic="fixtureBody: Unknown type 'LanguageTools.ProgramTypes.Expr'"
+let fixtureBody(name: String): Option<LanguageTools.ProgramTypes.Expr> =
+  LanguageTools.PackageManager.Test.find(
+    SCM.Branch.mainBranchId,
+    LanguageTools.ProgramTypes.PackageLocation
+      { owner = "Darklang", modules = [ "Stdlib", "Test", "Tests" ], name = name })
+  |> Stdlib.Option.andThen(LanguageTools.PackageManager.Test.get)
+  |> Stdlib.Option.map(fun test -> test.body)
+
+
+// @compiler blocked: upstream-dependency diagnostic="failureLines: Unknown type 'PrettyPrinter.ProgramTypes.Context'"
+test failureLines =
+  match fixtureBody("shownFixture") with
+  | None -> Stdlib.Test.fail("shownFixture is not stored")
+  | Some(body) ->
+    let ctx =
+      PrettyPrinter.ProgramTypes.Context.forModule(
+        SCM.Branch.mainBranchId,
+        [ "Darklang", "Stdlib", "Test", "Tests" ])
+
+    let lines(result: Stdlib.Test.Result): List<String> =
+      LanguageTools.PackageManager.Test.failureLines(ctx, body, result)
+
+    Stdlib.Test.all(
+      [ // A failing item shows its position and source, then what went wrong.
+        lines(
+          Stdlib.Test.Result.FailedChecks(
+            [ (2, Stdlib.Test.Result.Fail([ "expected 3, got 2" ])) ]))
+        |> Stdlib.Test.equal(
+          [ "2: Stdlib.String.length(\"ab\") |> Stdlib.Test.equal(2)"
+            "   expected 3, got 2" ])
+
+        lines(Stdlib.Test.Result.FailedChecks([ (1, Stdlib.Test.Result.Fail([])) ]))
+        |> Stdlib.Test.equal([ "1: Stdlib.Test.pass()", "   failed without a message" ])
+
+        // A nested `all` adds its positions to the path.
+        lines(
+          Stdlib.Test.Result.FailedChecks(
+            [ (3,
+               Stdlib.Test.Result.FailedChecks(
+                 [ (2, Stdlib.Test.Result.Fail([ "no" ])) ])) ]))
+        |> Stdlib.Test.equal([ "3 > 2: Stdlib.Test.pass()", "       no" ])
+
+        // A test that is not an `all` shows its messages alone.
+        lines(Stdlib.Test.Result.Fail([ "a" ])) |> Stdlib.Test.equal([ "a" ]) ])
+
+
+
+// @compiler xfail compile: "Unknown function or value 'fixtureBody'" class=missing-support reason=upstream-dependency
+test group =
+  Stdlib.Test.all(
+    [ Stdlib.Test.group("parsing", Stdlib.Test.fail("a"))
+      |> is(Stdlib.Test.Result.Fail([ "a" ]))
+
+      fixtureBody("groupedFixture")
+      |> Stdlib.Option.andThen(LanguageTools.PackageManager.Test.testGroup)
+      |> Stdlib.Test.equal(Stdlib.Option.Option.Some("parsing"))
+
+      fixtureBody("shownFixture")
+      |> Stdlib.Option.andThen(LanguageTools.PackageManager.Test.testGroup)
+      |> Stdlib.Test.equal(Stdlib.Option.Option.None) ])
+
+
+// @compiler blocked: upstream-dependency diagnostic="groupedFailureLines: Unknown type 'PrettyPrinter.ProgramTypes.Context'"
+test groupedFailureLines =
+  match fixtureBody("groupedFixture") with
+  | None -> Stdlib.Test.fail("groupedFixture is not stored")
+  | Some(body) ->
+    let ctx =
+      PrettyPrinter.ProgramTypes.Context.forModule(
+        SCM.Branch.mainBranchId,
+        [ "Darklang", "Stdlib", "Test", "Tests" ])
+
+    // A failing check inside a group still shows its source.
+    LanguageTools.PackageManager.Test.failureLines(
+      ctx,
+      body,
+      Stdlib.Test.Result.FailedChecks([ (2, Stdlib.Test.Result.Fail([ "no" ])) ]))
+    |> Stdlib.Test.equal(
+      [ "2: Stdlib.String.length(\"ab\") |> Stdlib.Test.equal(2)", "   no" ])
+
+
+// @compiler blocked: upstream-dependency diagnostic="rowFailureLines: Unknown type 'PrettyPrinter.ProgramTypes.Context'"
+test rowFailureLines =
+  match fixtureBody("tableFixture") with
+  | None -> Stdlib.Test.fail("tableFixture is not stored")
+  | Some(body) ->
+    let ctx =
+      PrettyPrinter.ProgramTypes.Context.forModule(
+        SCM.Branch.mainBranchId,
+        [ "Darklang", "Stdlib", "Test", "Tests" ])
+
+    Stdlib.Test.all(
+      [ // A failing row shows the table's check, then what went wrong.
+        LanguageTools.PackageManager.Test.rowFailureLines(
+          ctx,
+          body,
+          Stdlib.Test.Result.Fail([ "expected 3, got 2" ]))
+        |> Stdlib.Test.equal(
+          [ "Stdlib.String.length(s) |> Stdlib.Test.equal(n)", "expected 3, got 2" ])
+
+        // One test per row written out in place.
+        LanguageTools.PackageManager.Test.testCount(body) |> Stdlib.Test.equal(2)
+        fixtureBody("shownFixture")
+        |> Stdlib.Option.map(LanguageTools.PackageManager.Test.testCount)
+        |> Stdlib.Test.equal(Stdlib.Option.Option.Some(1)) ])

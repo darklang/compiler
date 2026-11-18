@@ -4,7 +4,10 @@ module Darklang.Cli.PropagateCmd
 
 let dotted(loc: LanguageTools.ProgramTypes.PackageLocation): String =
   let mods = SCM.Propagation.modulesOf(loc)
-  if mods == "" then $"{loc.owner}.{loc.name}" else $"{loc.owner}.{mods}.{loc.name}"
+  if mods == "" then
+    $"{loc.owner}.{loc.name}"
+  else
+    $"{loc.owner}.{mods}.{loc.name}"
 
 
 /// Turn what a human typed into a location, resolved relative to where they are.
@@ -12,7 +15,7 @@ let dotted(loc: LanguageTools.ProgramTypes.PackageLocation): String =
 let resolve(
   state: AppState,
   arg: String)
-  : Stdlib.Result.Result<LanguageTools.ProgramTypes.PackageLocation, String> =
+  : Result<LanguageTools.ProgramTypes.PackageLocation, String> =
   Packages.Location.parseRelativeTo(state.packageData.currentLocation, arg)
 
 
@@ -25,8 +28,13 @@ let cascadeAndForce(
   fromHash: LanguageTools.ProgramTypes.Hash,
   toHash: LanguageTools.ProgramTypes.Hash)
   : Bool =
-  match SCM.Propagation.repointDependents(state.currentBranchId, loc, kind, [fromHash], toHash) with
+  match SCM.Propagation.repointDependents(
+          state.currentBranchId,
+          loc,
+          kind,
+          [ fromHash ],
+          toHash) with
   | Error(e) ->
-    Cli.printErr($"  cascade failed: {e}")
+    printErr($"  cascade failed: {e}")
     false
   | Ok(_) -> true

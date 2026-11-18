@@ -7,7 +7,6 @@ module Darklang.Stdlib
 //   impl Add for Vec =
 //     let add (a: Vec) (b: Vec) : Vec = Vec { x = a.x + b.x, y = a.y + b.y }
 
-
 /// `a + b`
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Add requires an explicit replacement contract"
 trait Add<'a> =
@@ -47,7 +46,7 @@ trait Modulo<'a> =
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Power requires an explicit replacement contract"
 trait Power<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Power: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Power requires an explicit replacement contract"
-  let power(``base``: 'a, exponent: 'a): 'a
+  let power(base: 'a, exponent: 'a): 'a
 
 
 /// `-a`
@@ -138,10 +137,10 @@ trait Compare<'a> =
   let greaterThanOrEqualTo(a: 'a, b: 'a): Bool
 
 
+// TODO: Add Display for Unit, List and tuples.
 /// Text for a person: `p.display`, or `Display.display(p)`. A type has it only when someone
 /// writes an impl, and that impl decides what to show. String interpolation uses it, and
 /// falls back to <fn Stdlib.inspect> for a type without one.
-// TODO: Add Display for Unit, List and tuples.
 // @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Display requires an explicit replacement contract"
 trait Display<'a> =
   // @compiler blocked: container-adaptation diagnostic="Containing trait Darklang.Stdlib.Display: Already selected from packages/darklang/stdlib/traits.dark; importing another declaration of Darklang.Stdlib.Display requires an explicit replacement contract"
@@ -165,12 +164,14 @@ trait Inspect<'a> =
 
 /// The larger of two values of any type with a `Compare` impl
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.max reason=compiler-implementation
-let max<'a: Compare>(a: 'a, b: 'a): 'a = if a > b then a else b
+let max<'a: Compare>(a: 'a, b: 'a): 'a =
+  if a > b then a else b
 
 
 /// The smaller of two values of any type with a `Compare` impl
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.min reason=compiler-implementation
-let min<'a: Compare>(a: 'a, b: 'a): 'a = if a < b then a else b
+let min<'a: Compare>(a: 'a, b: 'a): 'a =
+  if a < b then a else b
 
 
 /// The distance of <param value> from zero. A fixed-width minimum wraps back to itself, since it
@@ -182,30 +183,34 @@ let abs<'a: Compare + Negate + Zero>(value: 'a): 'a =
 
 /// <param value> held between the two limits, whichever order they are given in. A NaN limit
 /// compares false against everything, so the value comes back unclamped;
-/// <fn Float.clampRefusingNaN> returns a Result instead when that is the wrong answer.
+/// <fn Float64.clampRefusingNaN> returns a Result instead when that is the wrong answer.
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.clamp reason=compiler-implementation
 let clamp<'a: Compare>(value: 'a, limitA: 'a, limitB: 'a): 'a =
   let low = if limitA < limitB then limitA else limitB
   let high = if limitA > limitB then limitA else limitB
-  if value < low then low
-  else if value > high then high
-  else value
+  if value < low then
+    low
+  else if value > high then
+    high
+  else
+    value
 
 
 /// <param xs> added up from <param seed>: `Stdlib.sum 0 [ 1, 2 ]` is `3`. The seed is what
 /// `[]` sums to, which is why it is an argument and not `Zero.zero`.
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.sum reason=compiler-implementation
 let sum<'a: Add>(seed: 'a, xs: List<'a>): 'a =
-  Stdlib.List.fold(xs, seed, fun(acc, x) -> acc + x)
+  List.fold(xs, seed, fun(acc, x) -> acc + x)
 
 
 /// <param xs> multiplied together from <param seed>, for any type with a `Multiply`
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.product reason=compiler-implementation
 let product<'a: Multiply>(seed: 'a, xs: List<'a>): 'a =
-  Stdlib.List.fold(xs, seed, fun(acc, x) -> acc * x)
+  List.fold(xs, seed, fun(acc, x) -> acc * x)
 
 
 /// <param v> as text for a person, for any type with a `Display`. <fn Stdlib.inspect>
 /// shows any value.
 // @compiler replace: packages/darklang/stdlib/traits.dark#Darklang.Stdlib.display reason=compiler-implementation
-let display<'a: Display>(v: 'a): String = Display.display(v)
+let display<'a: Display>(v: 'a): String =
+  Display.display(v)

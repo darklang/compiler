@@ -1,5 +1,34 @@
 module Darklang.Stdlib.Cli.Dir.Tests
 
+// A recursive listing reads permitted link targets and handles dangling links as errors.
+// @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<Darklang.Stdlib.Result.Result<(Int64, Bool), Darklang.Stdlib.Cli.Posix.Error>, Darklang.Stdlib.Cli.Posix.Error>.Ok(Darkla" class=missing-support reason=compiler-gap
+test recursiveListingCanBeReadWithSymlinks =
+  Stdlib.Cli.Dir.withTemp(fun root ->
+    let file = $"{root}/file"
+    let link = $"{root}/link"
+    let dangling = $"{root}/dangling"
+    Stdlib.Cli.File.writeText(file, "contents")
+    |> Stdlib.Result.andThen(fun _ -> Stdlib.Cli.File.createSymlink(file, link))
+    |> Stdlib.Result.andThen(fun _ ->
+      Stdlib.Cli.File.createSymlink($"{root}/missing", dangling))
+    |> Stdlib.Result.andThen(fun _ -> Stdlib.Cli.Dir.listRecursive(root))
+    |> Stdlib.Result.map(fun paths ->
+      paths
+      |> Stdlib.List.map(fun path ->
+        match Stdlib.Cli.FileSystem.readFile(path) with
+        | Ok(bytes) ->
+          (path == file || path == link)
+          && bytes == Stdlib.Utf8.encode("contents")
+        | Error(NotFound) -> path == dangling
+        | Error(_) -> false)
+      |> (fun results ->
+            (
+              Stdlib.List.length(results),
+              Stdlib.List.all(results, fun ok -> ok)))))
+  |> Stdlib.Test.equal(
+    Stdlib.Result.Result.Ok(Stdlib.Result.Result.Ok((3, true))))
+
+
 // walk lists each directory before its contents, in listing order; listRecursive lists the files
 // the same way; deleteRecursive removes the lot
 test walkKeepsSubtreeOrder =
@@ -10,13 +39,27 @@ test walkKeepsSubtreeOrder =
         Stdlib.Cli.File.writeText($"{sub}/a", "a")
         Stdlib.Cli.File.writeText($"{sub}/b", "b")
         Stdlib.Cli.File.writeText($"{sub}/c", "c") ]
+
     let listed = Stdlib.Cli.Dir.listFullPaths(sub)
     let walked = Stdlib.Cli.Dir.walk(root)
     let files = Stdlib.Cli.Dir.listRecursive(root)
     let deleted = Stdlib.Cli.Dir.deleteRecursive(sub)
-    (made,
-     walked == Stdlib.Result.map(listed, fun paths -> Stdlib.List.prepend(paths, sub)),
-     files == listed,
-     deleted,
-     Stdlib.Cli.Posix.isDirectory(sub)))
-  |> Stdlib.Test.equal(Ok(([ Ok(), Ok(), Ok(), Ok() ], true, true, Ok(), false)))
+    (
+      made,
+      walked
+      == Stdlib.Result.map(listed, fun paths ->
+        Stdlib.List.prepend(paths, sub)),
+      files == listed,
+      deleted,
+      Stdlib.Cli.Posix.isDirectory(sub)))
+  |> Stdlib.Test.equal(
+    Stdlib.Result.Result.Ok(
+      (
+        [ Stdlib.Result.Result.Ok()
+          Stdlib.Result.Result.Ok()
+          Stdlib.Result.Result.Ok()
+          Stdlib.Result.Result.Ok() ],
+        true,
+        true,
+        Stdlib.Result.Result.Ok(),
+        false)))

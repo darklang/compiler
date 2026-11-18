@@ -4,10 +4,9 @@ module Darklang.Cli.Packages.Delete
 // target still has live dependents, it refuses unless `--ignore-dependents`
 // is set. Implementation is a thin shim over `Deprecate.execute`.
 
-
 type ParsedArgs =
-  { itemType: Stdlib.Option.Option<String>
-    target: Stdlib.Option.Option<String>
+  { itemType: Option<String>
+    target: Option<String>
     message: String
     autoConfirm: Bool
     ignoreDependents: Bool
@@ -36,8 +35,8 @@ let parseArgs(args: List<String>): ParsedArgs =
     { itemType = Stdlib.List.getAt(p.positionals, 0)
       target = Stdlib.List.getAt(p.positionals, 1)
       message = FlagParser.getOptionOr(p, "--message", "")
-      autoConfirm = (FlagParser.hasFlag(p, "--yes")) || forced
-      ignoreDependents = (FlagParser.hasFlag(p, "--ignore-dependents")) || forced
+      autoConfirm = FlagParser.hasFlag(p, "--yes") || forced
+      ignoreDependents = FlagParser.hasFlag(p, "--ignore-dependents") || forced
       dryRun = FlagParser.hasFlag(p, "--dry-run")
       json = FlagParser.hasFlag(p, "--json")
       parseErrors = p.errors }
@@ -63,14 +62,9 @@ let countLiveDependents(
 
 /// Translate delete's ParsedArgs into the equivalent `deprecate --kind obsolete`
 /// args.
-let toDeprecateArgs(
-  parsed: ParsedArgs,
-  itemTypeStr: String,
-  target: String)
-  : List<String> =
+let toDeprecateArgs(parsed: ParsedArgs, itemTypeStr: String, target: String): List<String> =
   let baseArgs = [ itemTypeStr, target, "--kind", "obsolete" ]
-  let messageArgs =
-    if parsed.message != "" then [ "-m", parsed.message ] else []
+  let messageArgs = if parsed.message != "" then [ "-m", parsed.message ] else []
   let confirmArgs = if parsed.autoConfirm then [ "--yes" ] else []
   let dryRunArgs = if parsed.dryRun then [ "--dry-run" ] else []
   let jsonArgs = if parsed.json then [ "--json" ] else []
@@ -78,25 +72,24 @@ let toDeprecateArgs(
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
+let execute(state: AppState, args: List<String>): AppState =
   let parsed = parseArgs(args)
   let branchId = state.currentBranchId
-
-  match (parsed.itemType, parsed.target) with
+  match parsed.itemType, parsed.target with
   | _ when Stdlib.Bool.not(Stdlib.List.isEmpty(parsed.parseErrors)) ->
-    Cli.printErr(FlagParser.parseErrorsMessage(parsed.parseErrors))
+    printErr(FlagParser.parseErrorsMessage(parsed.parseErrors))
     Stdlib.printErrorLine(help(state))
-    Cli.failed(state)
-  | (None, _) ->
+    failed(state)
+  | None, _ ->
     Stdlib.printLine(help(state))
-    Cli.failed(state)
-  | (Some(itemTypeStr), targetOpt) ->
+    failed(state)
+  | Some(itemTypeStr), targetOpt ->
     // `delete <name>` with no kind: the store knows what kind lives at a name, so asking is
     // ceremony -- infer it (each kind tried, at most one resolves, the same way `undeprecate`
     // does), and keep the explicit form for a hash or a collision.
     let (itemTypeStr, targetOpt) =
-      match (LanguageTools.ProgramTypes.ItemKind.fromString(itemTypeStr), targetOpt) with
-      | (None, None) ->
+      match LanguageTools.ProgramTypes.ItemKind.fromString(itemTypeStr), targetOpt with
+      | None, None ->
         let inferred =
           [ LanguageTools.ProgramTypes.ItemKind.Fn
             LanguageTools.ProgramTypes.ItemKind.Type
@@ -108,43 +101,51 @@ let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
             Deprecate.resolveTarget(branchId, state.packageData.currentLocation, k, itemTypeStr)
             |> Stdlib.Option.map(fun _ -> k))
 
-        (match inferred with
-         | [ k ] -> (LanguageTools.ProgramTypes.ItemKind.toString(k), Stdlib.Option.Option.Some(itemTypeStr))
-         | _ -> (itemTypeStr, targetOpt))
+        match inferred with
+        | [k] -> (LanguageTools.ProgramTypes.ItemKind.toString(k), Option.Some(itemTypeStr))
+        | _ -> (itemTypeStr, targetOpt)
       | _ -> (itemTypeStr, targetOpt)
 
     match LanguageTools.ProgramTypes.ItemKind.fromString(itemTypeStr) with
+    | None when targetOpt == Option.None && moduleHasItems(state, itemTypeStr) ->
+      deleteModule(state, itemTypeStr, parsed)
     | None ->
       Stdlib.printErrorLine(
-        (Stdlib.Cli.UI.Colors.error(
-          $"Error: '{itemTypeStr}' names neither an item kind nor a live item. Expected `delete <name>`, or `delete <fn|type|value|trait|impl|test> <name-or-hash>`.")))
-      Stdlib.printErrorLine("Usage: delete [fn|type|value|trait|impl|test] <name-or-hash> [options]")
-      Cli.failed(state)
+        Stdlib.Cli.UI.Colors.error(
+          $"Error: '{itemTypeStr}' names neither an item kind nor a live item. Expected `delete <name>`, or `delete <fn|type|value|trait|impl|test> <name-or-hash>`."))
+
+      Stdlib.printErrorLine(
+        "Usage: delete [fn|type|value|trait|impl|test] <name-or-hash> [options]")
+
+      failed(state)
     | Some(itemKind) ->
       match targetOpt with
       | None ->
-        Cli.printErr("Error: Missing target (location or hash)")
-        Cli.failed(state)
+        printErr("Error: Missing target (location or hash)")
+        failed(state)
       | Some(target) ->
         let currentLoc = state.packageData.currentLocation
         match Location.parseRelativeTo(currentLoc, target) with
         | Error(errMsg) ->
-          Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.error($"Could not resolve {itemTypeStr} {target}: {errMsg}"))
-          Cli.failed(state)
+          Stdlib.printErrorLine(
+            Stdlib.Cli.UI.Colors.error($"Could not resolve {itemTypeStr} {target}: {errMsg}"))
+
+          failed(state)
         | Ok(targetLoc) ->
           match Deprecate.resolveTarget(branchId, currentLoc, itemKind, target) with
           | None ->
-            Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.error($"Could not resolve {itemTypeStr} {target}"))
-            Cli.failed(state)
+            Stdlib.printErrorLine(
+              Stdlib.Cli.UI.Colors.error($"Could not resolve {itemTypeStr} {target}"))
+
+            failed(state)
           | Some(_targetRef) ->
             // Only gate `delete` adds over `deprecate --kind obsolete`: refuse
             // when LIVE dependents exist. Deprecated-only callers don't block.
             let depCount = countLiveDependents(branchId, targetLoc, itemKind)
             if depCount > 0 && Stdlib.Bool.not(parsed.ignoreDependents) then
-              Cli.printErr((
-                  $"""{Cli.Text.plural(depCount, "live dependent")} still {
-                    if depCount == 1 then "references" else "reference"
-                  } this item."""))
+              printErr(
+                $"""{Text.plural(depCount, "live dependent")} still {if depCount == 1 then "references" else "reference"} this item.""")
+
               Stdlib.printErrorLine(
                 "Use `deprecate` to give them time to migrate, or pass `--ignore-dependents` / `--force`.")
 
@@ -153,11 +154,160 @@ let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
               Deprecate.execute(state, toDeprecateArgs(parsed, itemTypeStr, target))
 
 
+/// The live items in the module <param path> (owner first) and every module under it, as
+/// (kind, full name).
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Delete.moduleItems: Unknown function or value 'Query.allDirectDescendantNamesAndHashes'"
+let moduleItems(
+  branchId: Uuid,
+  path: List<String>)
+  : List<(LanguageTools.ProgramTypes.ItemKind * String)> =
+  let (subs, types, values, fns, traits, impls, tests) =
+    Query.allDirectDescendantNamesAndHashes(branchId, path)
+
+  let sets = Query.loadDeprecationSets(branchId)
+  let here =
+    [ (LanguageTools.ProgramTypes.ItemKind.Type, types)
+      (LanguageTools.ProgramTypes.ItemKind.Value, values)
+      (LanguageTools.ProgramTypes.ItemKind.Fn, fns)
+      (LanguageTools.ProgramTypes.ItemKind.Trait, traits)
+      (LanguageTools.ProgramTypes.ItemKind.TraitImpl, impls)
+      (LanguageTools.ProgramTypes.ItemKind.Test, tests) ]
+    |> Stdlib.List.map(fun((kind, items)) ->
+      Query.filterHiddenPairs(path, items, sets, Query.Deprecated.Hide, Query.Internal.Show)
+      |> Stdlib.List.map(fun((name, _)) ->
+        (kind, Stdlib.String.join(Stdlib.List.append(path, name), "."))))
+    |> Stdlib.List.flatten
+
+  let below =
+    subs
+    |> Stdlib.List.map(fun sub -> moduleItems(branchId, Stdlib.List.append(path, sub)))
+    |> Stdlib.List.flatten
+
+  Stdlib.List.concat(here, below)
+
+
+/// <param name> as a module path, owner first.
+// @compiler blocked: upstream-dependency diagnostic="modulePath: Unknown type 'AppState'"
+let modulePath(state: AppState, name: String): Option<List<String>> =
+  match Location.parseRelativeTo(state.packageData.currentLocation, name + ".__module__") with
+  | Ok(location) -> Option.Some(Stdlib.List.prepend(location.modules, location.owner))
+  | Error(_) -> Option.None
+
+
+// @compiler blocked: upstream-dependency diagnostic="moduleHasItems: Unknown type 'AppState'"
+let moduleHasItems(state: AppState, name: String): Bool =
+  match modulePath(state, name) with
+  | Some(path) ->
+    Stdlib.Bool.not(Stdlib.List.isEmpty(moduleItems(state.currentBranchId, path)))
+  | None -> false
+
+
+/// `delete <module>`: every live item in it, in one batch, so their order does not matter and
+/// only dependents outside the module hold it back.
+// @compiler blocked: upstream-dependency diagnostic="deleteModule: Unknown type 'AppState'"
+let deleteModule(state: AppState, name: String, parsed: ParsedArgs): AppState =
+  let branchId = state.currentBranchId
+  let currentLoc = state.packageData.currentLocation
+  let path = modulePath(state, name) |> Stdlib.Option.withDefault([])
+  let shown = Stdlib.String.join(path, ".")
+  if Stdlib.List.length(path) < 2 then
+    printErr($"Won't delete all of {shown} at once; delete one module: delete {shown}.<module>")
+    failed(state)
+  else
+    let items =
+      moduleItems(branchId, path)
+      |> Stdlib.List.filterMap(fun((kind, full)) ->
+        match Location.parseRelativeTo(currentLoc, full),
+              Deprecate.resolveTarget(branchId, currentLoc, kind, full) with
+        | Ok(location), Some(reference) -> Option.Some((kind, full, location, reference))
+        | _ -> Option.None)
+
+    if Stdlib.List.isEmpty(items) then
+      printErr($"Nothing in {shown} resolves to an item to delete; nothing was deleted")
+      failed(state)
+    else
+      deleteModuleItems(state, path, items, parsed)
+
+
+// @compiler blocked: upstream-dependency diagnostic="deleteModuleItems: Unknown type 'AppState'"
+let deleteModuleItems(
+  state: AppState,
+  path: List<String>,
+  items:
+    List<(LanguageTools.ProgramTypes.ItemKind *
+    String *
+    LanguageTools.ProgramTypes.PackageLocation *
+    LanguageTools.ProgramTypes.Reference)>,
+  parsed: ParsedArgs)
+  : AppState =
+  let branchId = state.currentBranchId
+  let shown = Stdlib.String.join(path, ".")
+  let depth = Stdlib.List.length(path)
+  let sets = Query.loadDeprecationSets(branchId)
+  let outside =
+    SCM.Deps.dependentsFor(
+      SCM.PackageOps.currentBranch(),
+      items |> Stdlib.List.map(fun((kind, _, location, _)) -> (location, kind)))
+    |> Stdlib.List.filter(fun((hash, location, _)) ->
+      let home = Stdlib.List.prepend(location.modules, location.owner)
+      Stdlib.List.take(home, depth) != path && Stdlib.Bool.not(Query.isDeprecated(sets, hash)))
+    |> Stdlib.List.map(fun((_, location, _)) ->
+      PrettyPrinter.ProgramTypes.PackageLocation.packageLocation(location))
+    |> Stdlib.List.unique
+
+  let total = Stdlib.List.length(items)
+  let count = Text.plural(total, "item")
+  if Stdlib.Bool.not(Stdlib.List.isEmpty(outside)) && Stdlib.Bool.not(parsed.ignoreDependents) then
+    printErr($"Used from outside {shown}: " + Stdlib.String.join(outside, ", "))
+    Stdlib.printErrorLine("Pass `--ignore-dependents` / `--force` to delete it anyway.")
+    failed(state)
+  else
+    Stdlib.printErrorLine($"  Will delete {count} in {shown}:")
+    items
+    |> Stdlib.List.take(10)
+    |> Stdlib.List.iter(fun((_, full, _, _)) -> Stdlib.printErrorLine($"    {full}"))
+    if total > 10 then
+      Stdlib.printErrorLine($"    and {Stdlib.display(total - 10)} more")
+    if parsed.dryRun then
+      Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint("(dry-run, no op emitted)"))
+      state
+    else if
+      Prompt.confirmExplicit(
+        Confirm.assumeIf(parsed.autoConfirm),
+        Stdlib.Cli.UI.Colors.warning("Proceed? (y/n): "))
+    then
+      let ops =
+        items
+        |> Stdlib.List.map(fun((_, _, location, reference)) ->
+          LanguageTools.ProgramTypes.PackageOp.Deprecate(
+            location,
+            reference,
+            LanguageTools.ProgramTypes.DeprecationKind.Obsolete,
+            parsed.message,
+            Option.None))
+
+      match SCM.PackageOps.add(branchId, ops) with
+      | Ok(_) ->
+        Stdlib.printLine(Stdlib.Cli.UI.Colors.success($"Deleted {shown}"))
+        state
+      | Error(e) ->
+        printErr($"Delete failed: {e}")
+        failed(state)
+    else
+      if Stdlib.Cli.UI.Prompt.canAsk() then
+        Stderr.line("Delete cancelled.")
+      else
+        printErr($"no terminal to confirm at; add --yes to delete {shown}")
+
+      failed(state)
+
+
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let help(_state: Cli.AppState): String =
+let help(_state: AppState): String =
   [ "Take a fn/type/value/trait/impl/test off the shelf (sugar for deprecate --kind obsolete)."
     ""
     "Usage: delete <fn|type|value|trait|impl|test> <name-or-hash> [options]"
+    "       delete <module> [options]    - everything in it and the modules under it"
     ""
     "Refuses without --ignore-dependents when the target has live dependents."
     ""
@@ -181,8 +331,5 @@ let help(_state: Cli.AppState): String =
 
 // `delete` IS `deprecate --kind obsolete` with a dependents check, so it completes the same way.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let complete(
-  state: Cli.AppState,
-  args: List<String>)
-  : List<Cli.Completion.CompletionItem> =
+let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   Deprecate.complete(state, args)

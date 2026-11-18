@@ -1,6 +1,5 @@
 module Darklang.Stdlib.Tuple3
 
-
 /// Returns a triple with the given values
 // @compiler replace: packages/darklang/stdlib/tuple3.dark#Darklang.Stdlib.Tuple3.create reason=compiler-implementation
 let create(first: 'a, second: 'b, third: 'c): ('a * 'b * 'c) =

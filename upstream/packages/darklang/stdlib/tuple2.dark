@@ -1,9 +1,9 @@
 module Darklang.Stdlib.Tuple2
 
-
 /// Returns a pair with the given values
 // @compiler replace: packages/darklang/stdlib/tuple2.dark#Darklang.Stdlib.Tuple2.create reason=compiler-implementation
-let create(first: 'a, second: 'b): ('a * 'b) = (first, second)
+let create(first: 'a, second: 'b): ('a * 'b) =
+  (first, second)
 
 
 /// Returns the first value of a pair
@@ -43,10 +43,6 @@ let mapSecond(tuple: ('a * 'b), fn: 'b -> 'c): ('a * 'c) =
 
 /// Transform both values in a pair
 // @compiler replace: packages/darklang/stdlib/tuple2.dark#Darklang.Stdlib.Tuple2.mapBoth reason=compiler-implementation
-let mapBoth(
-  tuple: ('a * 'b),
-  fnFirst: 'a -> 'c,
-  fnSecond: 'b -> 'd)
-  : ('c * 'd) =
+let mapBoth(tuple: ('a * 'b), fnFirst: 'a -> 'c, fnSecond: 'b -> 'd): ('c * 'd) =
   let (first, second) = tuple
   (fnFirst(first), fnSecond(second))

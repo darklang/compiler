@@ -14,11 +14,11 @@ module Darklang.SCM.Conflicts
 // winner the fold picks are one answer. Merge and rebase detect and record in F#; this module holds the
 // shapes, the reads, and how a conflict is shown.
 
-
 /// The branch this process is on. Asked of `SCM.Branches`, not of `SCM.PackageOps` (which spells the same
 /// thing `currentBranch`): PackageOps depends on this module, so reaching back would close the loop.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.onBranch: Unknown function or value 'Branches.current'"
-let onBranch(): Uuid = Branches.current()
+let onBranch(): Uuid =
+  Branches.current()
 
 
 // the shapes
@@ -35,13 +35,13 @@ type Binding =
     /// WHO wrote it, when that is known. "" for anything read out of the local projection, which does not
     /// record authorship per name; the local side of a conflict is labelled by the caller instead.
     author: String
-
     /// The hash this binding REPLACED, when the op said. `None` means no predecessor was recorded, as by a
     /// parser that had no store to ask.
     ///
     /// Two bindings of one name that BOTH say None were each created from nothing. One that names the
     /// other's hash descends from it, which is an ordinary edit and not a conflict.
-    previous: Stdlib.Option.Option<String> }
+    previous: Option<String> }
+
 
 /// A name ENDING, as the other side told it. `dark rename` authors one of these for the old name.
 ///
@@ -55,7 +55,8 @@ type Removal =
     author: String
     /// What the name held when it was ended. A removal of exactly what you hold is an ordinary
     /// removal; a removal of something you have since edited is the divergence.
-    previous: Stdlib.Option.Option<String> }
+    previous: Option<String> }
+
 
 /// A recorded per-name base: the hash two sides last AGREED on. "" = the name did not exist at the base.
 type NameBase =
@@ -63,6 +64,7 @@ type NameBase =
     modules: String
     name: String
     baseHash: String }
+
 
 /// One competing version of a name at a reconciliation point. `side` is "local" or "incoming"; `author` is
 /// a best-effort label (an identity or a source id) -- ops aren't signed yet, so it's attribution, not proof.
@@ -77,6 +79,7 @@ type Candidate =
     text: String
     originTs: String
     author: String }
+
 
 /// A recorded conflict. `autoResolvedTo` is the hash the deterministic fold picked; the LOSER stays here in
 /// `candidates` so the choice is reviewable and reversible rather than silent.
@@ -109,6 +112,7 @@ type ConflictFilter =
   /// Whether anything was ever overridden: at most one row, only `id` filled.
   | AnyOverridden
 
+
 /// One row of the `conflicts` table as the store holds it. `candidates` is the stored JSON, parsed by
 /// `conflictFromRow`. Fields a filter doesn't fill are "".
 type ConflictRow =
@@ -125,9 +129,11 @@ type ConflictRow =
     status: String
     resolvedBy: String }
 
+
 /// The recorded conflicts <param filter> selects.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.query: Unknown function or value 'Builtin.scmConflicts'"
-let query(filter: ConflictFilter): List<ConflictRow> = Builtin.scmConflicts(filter)
+let query(filter: ConflictFilter): List<ConflictRow> =
+  Builtin.scmConflicts(filter)
 
 
 // small shared helpers
@@ -137,9 +143,11 @@ let query(filter: ConflictFilter): List<ConflictRow> = Builtin.scmConflicts(filt
 let bindingKey(owner: String, modules: String, name: String): String =
   $"{owner}/{modules}/{name}"
 
+
 /// The human-facing dotted name for a location.
 let fqn(owner: String, modules: String, name: String): String =
   if modules == "" then $"{owner}.{name}" else $"{owner}.{modules}.{name}"
+
 
 // the auto-resolution rule
 
@@ -151,7 +159,7 @@ let fqn(owner: String, modules: String, name: String): String =
 /// trait for one type are settled by it too (`SCM.Constraints`).
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.beats: Unknown function or value 'SCM.Actions.beats'"
 let beats(aTs: String, aHash: String, bTs: String, bHash: String): Bool =
-  SCM.Actions.beats(aTs, aHash, bTs, bHash)
+  Actions.beats(aTs, aHash, bTs, bHash)
 
 
 // THE DETECTOR (in F#: `LibDB.ScmDetect`)
@@ -168,8 +176,8 @@ let detect(
   incoming: List<Binding>,
   bases: List<NameBase>)
   : List<Conflict> =
-  SCM.Actions.detect(
-    SCM.Actions.DetectRequest
+  Actions.detect(
+    Actions.DetectRequest
       { localLabel = localLabel
         incomingLabel = incomingLabel
         local = local
@@ -187,8 +195,8 @@ let detectRemovals(
   local: List<Binding>,
   removals: List<Removal>)
   : List<Conflict> =
-  SCM.Actions.detect(
-    SCM.Actions.DetectRequest
+  Actions.detect(
+    Actions.DetectRequest
       { localLabel = localLabel
         incomingLabel = incomingLabel
         local = local
@@ -200,7 +208,7 @@ let detectRemovals(
 // reading the LOCAL side (the `locations` projection)
 
 /// A binding read out of the `locations` projection, as a conflict's local side.
-let bindingOf(row: SCM.Bindings.BindingRow): Binding =
+let bindingOf(row: Bindings.BindingRow): Binding =
   Binding
     { owner = row.owner
       modules = row.modules
@@ -213,6 +221,7 @@ let bindingOf(row: SCM.Bindings.BindingRow): Binding =
       // Projected onto `locations` by the fold, off the `SetName` that wrote it.
       previous = row.previous }
 
+
 /// What main currently binds, restricted to <param names> (bare names), so a reconciliation never scans
 /// the whole `locations` projection. The detector matches on the full (owner, modules, name) key anyway.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.localBindingsFor: Unknown function or value 'SCM.Bindings.query'"
@@ -220,9 +229,8 @@ let localBindingsFor(names: List<String>): List<Binding> =
   match names with
   | [] -> []
   | _ ->
-    SCM.Bindings.query(
-      SCM.Bindings.BindingFilter.ByBareNames(SCM.Branch.mainBranchId, Stdlib.List.unique(names))
-    )
+    Bindings.query(
+      Bindings.BindingFilter.ByBareNames(Branch.mainBranchId, Stdlib.List.unique(names)))
     |> Stdlib.List.map(bindingOf)
 
 
@@ -230,7 +238,8 @@ let localBindingsFor(names: List<String>): List<Binding> =
 
 /// The bases a BRANCH recorded when it first touched each name (the parent's hash at the fork point).
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.branchBases: Unknown function or value 'SCM.Branches.baseRecords'"
-let branchBases(branchId: Uuid): List<NameBase> = SCM.Branches.baseRecords(branchId)
+let branchBases(branchId: Uuid): List<NameBase> =
+  Branches.baseRecords(branchId)
 
 
 // the `conflicts` table (record / read / resolve)
@@ -256,6 +265,7 @@ let conflictFromRow(row: ConflictRow): Conflict =
       status = row.status
       resolvedBy = row.resolvedBy }
 
+
 /// Settle a wording disagreement by SAYING the chosen text, and close the record.
 ///
 /// An op, not a local opinion: it syncs, a peer folding it lands on the same wording, and re-folding
@@ -263,16 +273,12 @@ let conflictFromRow(row: ConflictRow): Conflict =
 /// replaced, so the op reads as an ordinary edit made on top of what this store holds -- which is
 /// exactly what it is, once a person has looked at both.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.settleWording: Unknown function or value 'SCM.Actions.resolve'"
-let settleWording(
-  branchId: Uuid,
-  c: Conflict,
-  text: String)
-  : Stdlib.Result.Result<Unit, String> =
-  match SCM.Actions.resolve(SCM.Actions.Resolution.Reword(branchId, c.id, text)) with
-  | Ok(_) -> Stdlib.Result.Result.Ok()
+let settleWording(branchId: Uuid, c: Conflict, text: String): Result<Unit, String> =
+  match Actions.resolve(Actions.Resolution.Reword(branchId, c.id, text)) with
+  | Ok(_) -> Result.Ok()
   | Error(Refused(UnreadablePart(part))) ->
-    Stdlib.Result.Result.Error($"#{c.id} names a part this build cannot read: {part}")
-  | Error(e) -> Stdlib.Result.Result.Error(SCM.Actions.failureMessage(e))
+    Result.Error($"#{c.id} names a part this build cannot read: {part}")
+  | Error(e) -> Result.Error(Actions.failureMessage(e))
 
 
 /// Is this conflict about WHICH VERSION a name holds?
@@ -293,21 +299,19 @@ let aboutABinding(kind: String): Bool =
 /// branch's from main would answer for a projection that hasn't happened yet. Each branch sees its own.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.pending: Unknown function or value 'query'"
 let pending(): List<Conflict> =
-  let recorded =
-    query(ConflictFilter.Pending(onBranch())) |> Stdlib.List.map(conflictFromRow)
+  let recorded = query(ConflictFilter.Pending(onBranch())) |> Stdlib.List.map(conflictFromRow)
 
   // A conflict whose name has since been bound to something that is NEITHER candidate was settled by
   // events, not by a person: an override's cascade repointed the callers, or a later edit moved on. Left
   // pending it asks for a choice between two versions nobody runs any more. Settled here, at the point
   // it is noticed, and recorded under what superseded it.
   let branchId = onBranch()
-
   let liveByName =
     PackageOps.liveBindingsFor(
       branchId,
-      (recorded
-       |> Stdlib.List.filter(fun c -> aboutABinding(c.kind))
-       |> Stdlib.List.map(fun c -> Deps.locationOf(c.owner, c.modules, c.name))))
+      recorded
+      |> Stdlib.List.filter(fun c -> aboutABinding(c.kind))
+      |> Stdlib.List.map(fun c -> Deps.locationOf(c.owner, c.modules, c.name)))
 
   recorded
   |> Stdlib.List.filter(fun c ->
@@ -320,9 +324,7 @@ let pending(): List<Conflict> =
     else
       match Stdlib.Dict.get(liveByName, bindingKey(c.owner, c.modules, c.name)) with
       | Some(live) ->
-        let stillACandidate =
-          c.candidates |> Stdlib.List.any(fun cand -> cand.hash == live.hash)
-
+        let stillACandidate = c.candidates |> Stdlib.List.any(fun cand -> cand.hash == live.hash)
         if stillACandidate then
           true
         else
@@ -333,11 +335,13 @@ let pending(): List<Conflict> =
           | Error(_) -> true
       | None -> true)
 
+
 /// How many conflicts are waiting -- the number `dark status` and `dark commit` surface. Runs the same
 /// sweep as `pending`, so the count and the list never disagree about a superseded one.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.pendingCount: Unknown function or value 'pending'"
 let pendingCount(): Int64 =
   Stdlib.List.length(pending())
+
 
 /// The conflict on THIS branch whose id starts with <param rawPrefix> (ids are short already; a prefix
 /// keeps them typeable).
@@ -345,7 +349,7 @@ let pendingCount(): Int64 =
 /// Branch-scoped like `pending`, so the ids you can act on are exactly the ids you were just shown -- an
 /// unscoped lookup would let an id pasted from main's list resolve while standing on a branch.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.getByIdPrefix: Unknown function or value 'query'"
-let getByIdPrefix(rawPrefix: String): Stdlib.Option.Option<Conflict> =
+let getByIdPrefix(rawPrefix: String): Option<Conflict> =
   // `dark conflicts` prints ids as `#509907c8`, so a copy-paste brings the `#` along. Accept what we print.
   let idPrefix =
     if Stdlib.String.startsWith(rawPrefix, "#") then
@@ -357,34 +361,41 @@ let getByIdPrefix(rawPrefix: String): Stdlib.Option.Option<Conflict> =
   // you were working on. Matched as owner.modules.name so a fully-dotted name is unambiguous, and only
   // among THIS branch's conflicts, pending ones first.
   match query(ConflictFilter.ByRef(idPrefix, onBranch())) with
-  | [ row ] -> Stdlib.Option.Option.Some(conflictFromRow(row))
-  | _ -> Stdlib.Option.Option.None
+  | [row] -> Option.Some(conflictFromRow(row))
+  | _ -> Option.None
+
 
 /// Close a conflict as ACKED: the auto-pick stands. An Error says the record is still open.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.ack: Unknown function or value 'SCM.Actions.resolve'"
-let ack(id: String): Stdlib.Result.Result<Unit, String> =
-  match SCM.Actions.resolve(SCM.Actions.Resolution.Ack(id)) with
-  | Ok(_) -> Stdlib.Result.Result.Ok()
-  | Error(e) -> Stdlib.Result.Result.Error(SCM.Actions.failureMessage(e))
+let ack(id: String): Result<Unit, String> =
+  match Actions.resolve(Actions.Resolution.Ack(id)) with
+  | Ok(_) -> Result.Ok()
+  | Error(e) -> Result.Error(Actions.failureMessage(e))
+
 
 /// Close a conflict as SUPERSEDED: the name has since moved to <param liveHash>, which is neither side.
 /// An Error says the record is still open.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.supersede: Unknown function or value 'SCM.Actions.resolve'"
-let supersede(id: String, liveHash: String): Stdlib.Result.Result<Unit, String> =
-  match SCM.Actions.resolve(SCM.Actions.Resolution.Supersede(id, liveHash)) with
-  | Ok(_) -> Stdlib.Result.Result.Ok()
-  | Error(e) -> Stdlib.Result.Result.Error(SCM.Actions.failureMessage(e))
+let supersede(id: String, liveHash: String): Result<Unit, String> =
+  match Actions.resolve(Actions.Resolution.Supersede(id, liveHash)) with
+  | Ok(_) -> Result.Ok()
+  | Error(e) -> Result.Error(Actions.failureMessage(e))
 
 
 // rendering (one place, so pretty and --json never drift)
 
 let shortHash(h: String): String =
-  if h == "" then "(none)"
-  else if Stdlib.String.length(h) <= 8 then h
-  else Stdlib.String.first(h, 8)
+  if h == "" then
+    "(none)"
+  else if Stdlib.String.length(h) <= 8 then
+    h
+  else
+    Stdlib.String.first(h, 8)
 
-let candidateFor(c: Conflict, side: String): Stdlib.Option.Option<Candidate> =
+
+let candidateFor(c: Conflict, side: String): Option<Candidate> =
   Stdlib.List.findFirst(c.candidates, fun cand -> cand.side == side)
+
 
 /// One line per conflict: the name, which side the fold kept, and the id to inspect with.
 let summaryLine(c: Conflict): String =
@@ -396,6 +407,7 @@ let summaryLine(c: Conflict): String =
   let dotted = fqn(c.owner, c.modules, c.name)
   $"  #{c.id}  {dotted}   auto: {kept} ({c.reason})   [{c.status}]"
 
+
 /// The full block for one conflict: both candidates, the auto-pick, and why.
 ///
 /// A wording disagreement shows the TEXTS. A hash is what identifies a version, and a sentence is
@@ -403,12 +415,13 @@ let summaryLine(c: Conflict): String =
 /// act on, and acting on it is the point of the screen.
 let detailLines(c: Conflict): List<String> =
   let dotted = fqn(c.owner, c.modules, c.name)
-
   let candidateLines =
     c.candidates
     |> Stdlib.List.map(fun cand ->
       let mark = if cand.hash == c.autoResolvedTo then "kept" else "over"
+
       let who = if cand.author == "" then cand.side else $"{cand.side} ({cand.author})"
+
       let what =
         if cand.removed then
           "REMOVED the name"
