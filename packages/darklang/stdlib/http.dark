@@ -16,15 +16,15 @@ let urlDecode (value: String) : String =
     | first :: rest ->
         let decodedBytes =
             Stdlib.List.fold rest (Stdlib.String.toBytes first) (fun acc piece ->
-                let hex = Stdlib.String.__sliceInt piece 0 2 in
+                let hex = Stdlib.String.__sliceInt piece 0z 2z in
                 let parsed =
-                    if Stdlib.String.__lengthInt hex == 2 then Stdlib.Blob.fromHex hex
+                    if Stdlib.String.__lengthInt hex == 2z then Stdlib.Blob.fromHex hex
                     else Error "not an escape" in
                 match parsed with
                 | Ok blob ->
                     Stdlib.List.concat
                         (Stdlib.List.concat acc (Stdlib.Blob.toList blob))
-                        (Stdlib.String.toBytes (Stdlib.String.__dropFirstInt piece 2))
+                        (Stdlib.String.toBytes (Stdlib.String.__dropFirstInt piece 2z))
                 | Error _ ->
                     Stdlib.List.concat acc (Stdlib.String.toBytes ("%" + piece))) in
         Stdlib.String.fromBytesWithReplacement decodedBytes
@@ -111,7 +111,7 @@ let responseWithHeaders (statusCode: Int64) (headers: List<(String * String)>) (
     Stdlib.Http.Response { statusCode = statusCode, headers = headers, body = body }
 
 let success (body: Blob) : Stdlib.Http.Response =
-    Stdlib.Http.__responseInt body 200
+    Stdlib.Http.__responseInt body 200z
 
 let responseWithHtml (statusCode: Int64) (body: String) : Stdlib.Http.Response =
     Stdlib.Http.responseWithHeaders statusCode ([("Content-Type", "text/html; charset=utf-8")]) (Stdlib.String.toBlob body)
@@ -123,22 +123,22 @@ let responseWithJson (statusCode: Int64) (json: String) : Stdlib.Http.Response =
     Stdlib.Http.responseWithHeaders statusCode ([("Content-Type", "application/json")]) (Stdlib.String.toBlob json)
 
 let redirectTo (url: String) : Stdlib.Http.Response =
-    Stdlib.Http.__responseWithHeadersInt Stdlib.Blob.empty ([("Location", url)]) 302
+    Stdlib.Http.__responseWithHeadersInt Stdlib.Blob.empty ([("Location", url)]) 302z
 
 let badRequest (error: String) : Stdlib.Http.Response =
-    Stdlib.Http.__responseInt (Stdlib.String.toBlob error) 400
+    Stdlib.Http.__responseInt (Stdlib.String.toBlob error) 400z
 
 let notFound () : Stdlib.Http.Response =
-    Stdlib.Http.__responseInt Stdlib.Blob.empty 404
+    Stdlib.Http.__responseInt Stdlib.Blob.empty 404z
 
 let unauthorized () : Stdlib.Http.Response =
-    Stdlib.Http.__responseInt Stdlib.Blob.empty 401
+    Stdlib.Http.__responseInt Stdlib.Blob.empty 401z
 
 let forbidden () : Stdlib.Http.Response =
-    Stdlib.Http.__responseInt Stdlib.Blob.empty 403
+    Stdlib.Http.__responseInt Stdlib.Blob.empty 403z
 
 let serverError (error: String) : Stdlib.Http.Response =
-    Stdlib.Http.__responseInt (Stdlib.String.toBlob error) 500
+    Stdlib.Http.__responseInt (Stdlib.String.toBlob error) 500z
 
 type Cookie =
   { expires: DateTime

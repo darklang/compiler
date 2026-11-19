@@ -22,7 +22,6 @@ let loadStdlib includeTests =
   in
   let load (filename, text) =
     SourceInventory.parse
-      ~interpreterSource:(String.starts_with ~prefix:"upstream/" filename)
       ~annotations:(CompilerAnnotations.forSource sidecar filename)
       ~reasons
       (ContentEncoding.decodeContent None text)

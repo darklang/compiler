@@ -24,7 +24,7 @@ let readKey () : Stdlib.Cli.Stdin.KeyRead.KeyRead = Builtin.stdinReadKey ()
 /// `keyChar` `repeat` times so a pasted secret arrives whole.
 let readSecret () : String =
   // Secret key input requires a terminal on stdin, even if stdout is a tty.
-  if Stdlib.Bool.not (Builtin.__isTerminal 0L) then
+  if Stdlib.Bool.not (Builtin.__isTerminal 0) then
     readLine ()
   else
     Stdlib.Cli.__Stdin.__secretLoop []

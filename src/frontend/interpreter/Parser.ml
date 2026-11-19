@@ -229,11 +229,9 @@ let parseSyntaxWithRootScope rootScope source =
    Tree-wide rules have one implementation in Validation. Run them only
    after a clean syntax pass so recovery holes do not create cascaded errors.
 *)
-(* Interpreter sources at the pin in porting/sources.yaml (everything under
-   upstream/) read a bare integer as an Int64 and `1s` as an Int64, as that
-   interpreter does; this compiler's own sources read a bare integer as an
-   Int. Set for the extent of reading or compiling such a source. *)
-let interpreterSource = ref false
+(* Every source reads a bare integer and `1s` as an Int64, as the interpreter
+   does. Only tools reading the earlier dialect turn this off. *)
+let interpreterSource = ref true
 
 let withInterpreterSource enabled f =
   let previous = !interpreterSource in

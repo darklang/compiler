@@ -11,9 +11,9 @@ type PickContext =
 let __countMatchingPrefixInt (a: List<String>) (b: List<String>) : Int =
     match (a, b) with
     | (aHead :: aTail, bHead :: bTail) ->
-        if aHead == bHead then 1 + Darklang.LanguageTools.PackageManager.__countMatchingPrefixInt aTail bTail
-        else 0
-    | _ -> 0
+        if aHead == bHead then 1z + Darklang.LanguageTools.PackageManager.__countMatchingPrefixInt aTail bTail
+        else 0z
+    | _ -> 0z
 
 let __asked (preferred: Stdlib.Option.Option<Darklang.LanguageTools.ProgramTypes.PackageLocation>) (locations: List<Darklang.LanguageTools.ProgramTypes.PackageLocation>) : Stdlib.Option.Option<Darklang.LanguageTools.ProgramTypes.PackageLocation> =
     match preferred with

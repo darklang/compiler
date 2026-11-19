@@ -16,22 +16,22 @@ let subtract (a: UInt16) (b: UInt16) : UInt16 = a - b
 
 let multiply (a: UInt16) (b: UInt16) : UInt16 = a * b
 
-let divide (a: UInt16) (b: UInt16) : UInt16 = if b == 0us then Builtin.crash "Cannot divide by 0" else a / b
+let divide (a: UInt16) (b: UInt16) : UInt16 = if b == 0u16 then Builtin.crash "Cannot divide by 0" else a / b
 
 let max (a: UInt16) (b: UInt16) : UInt16 = if a > b then a else b
 
 let min (a: UInt16) (b: UInt16) : UInt16 = if a < b then a else b
 
-let mod (a: UInt16) (b: UInt16) : UInt16 = if b == 0us then Builtin.crash "Cannot evaluate modulus against 0" else a % b
+let mod (a: UInt16) (b: UInt16) : UInt16 = if b == 0u16 then Builtin.crash "Cannot evaluate modulus against 0" else a % b
 
 
 
 let __powerLoop (base: UInt16) (exponent: UInt16) (result: UInt16) : UInt16 =
-    if exponent == 0us then result
+    if exponent == 0u16 then result
     else
-        let next = if (exponent % 2us) == 1us then result * base else result in
-        Stdlib.UInt16.__powerLoop (base * base) (exponent / 2us) next
-let power (base: UInt16) (exponent: UInt16) : UInt16 = Stdlib.UInt16.__powerLoop base exponent 1us
+        let next = if (exponent % 2u16) == 1u16 then result * base else result in
+        Stdlib.UInt16.__powerLoop (base * base) (exponent / 2u16) next
+let power (base: UInt16) (exponent: UInt16) : UInt16 = Stdlib.UInt16.__powerLoop base exponent 1u16
 
 let clamp (value: UInt16) (limitA: UInt16) (limitB: UInt16) : UInt16 =
     let lower = Stdlib.UInt16.min limitA limitB in
@@ -49,39 +49,39 @@ let lessThanOrEqualTo (a: UInt16) (b: UInt16) : Bool = a <= b
 // Count number of set bits (population count)
 // Uses parallel bit counting algorithm (SWAR)
 let __popcount (x: UInt16) : UInt16 =
-    let mask1 = 21845us in
-    let mask2 = 13107us in
-    let mask3 = 3855us in
-    let mask4 = 31us in
-    let x = x - Stdlib.UInt16.bitwiseAnd (Stdlib.UInt16.shiftRight x 1us) mask1 in
-    let x = Stdlib.UInt16.bitwiseAnd x mask2 + Stdlib.UInt16.bitwiseAnd (Stdlib.UInt16.shiftRight x 2us) mask2 in
-    let x = Stdlib.UInt16.bitwiseAnd (x + Stdlib.UInt16.shiftRight x 4us) mask3 in
-    let x = x + Stdlib.UInt16.shiftRight x 8us in
+    let mask1 = 21845u16 in
+    let mask2 = 13107u16 in
+    let mask3 = 3855u16 in
+    let mask4 = 31u16 in
+    let x = x - Stdlib.UInt16.bitwiseAnd (Stdlib.UInt16.shiftRight x 1u16) mask1 in
+    let x = Stdlib.UInt16.bitwiseAnd x mask2 + Stdlib.UInt16.bitwiseAnd (Stdlib.UInt16.shiftRight x 2u16) mask2 in
+    let x = Stdlib.UInt16.bitwiseAnd (x + Stdlib.UInt16.shiftRight x 4u16) mask3 in
+    let x = x + Stdlib.UInt16.shiftRight x 8u16 in
     Stdlib.UInt16.bitwiseAnd x mask4
 
 // Convert a single digit (0us-9us) to its string representation
 let __digitToString (n: UInt16) : String =
     match n with
-    | 0us -> "0"
-    | 1us -> "1"
-    | 2us -> "2"
-    | 3us -> "3"
-    | 4us -> "4"
-    | 5us -> "5"
-    | 6us -> "6"
-    | 7us -> "7"
-    | 8us -> "8"
-    | 9us -> "9"
+    | 0u16 -> "0"
+    | 1u16 -> "1"
+    | 2u16 -> "2"
+    | 3u16 -> "3"
+    | 4u16 -> "4"
+    | 5u16 -> "5"
+    | 6u16 -> "6"
+    | 7u16 -> "7"
+    | 8u16 -> "8"
+    | 9u16 -> "9"
     | _ -> "?"
 
 // Convert an integer to its string representation
 let toString (n: UInt16) : String =
-    if n < 10us then Stdlib.UInt16.__digitToString n
-    else Stdlib.UInt16.toString (n / 10us) + Stdlib.UInt16.__digitToString (n % 10us)
+    if n < 10u16 then Stdlib.UInt16.__digitToString n
+    else Stdlib.UInt16.toString (n / 10u16) + Stdlib.UInt16.__digitToString (n % 10u16)
 
 // Sum all integers in a list
 let sum (list: List<UInt16>) : UInt16 =
-    Stdlib.List.fold list 0us (fun acc x -> acc + x)
+    Stdlib.List.fold list 0u16 (fun acc x -> acc + x)
 
 let __fromIntUnchecked (value: Int) : UInt16 =
     match Stdlib.Int.toUInt16 value with
@@ -155,7 +155,7 @@ impl Stdlib.Compare for UInt16 =
   let greaterThanOrEqualTo = Stdlib.UInt16.greaterThanOrEqualTo
 
 impl Stdlib.Zero for UInt16 =
-  let zero () : UInt16 = 0us
+  let zero () : UInt16 = 0u16
 
 impl Stdlib.One for UInt16 =
-  let one () : UInt16 = 1us
+  let one () : UInt16 = 1u16

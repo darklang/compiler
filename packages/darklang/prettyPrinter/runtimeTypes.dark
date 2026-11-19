@@ -24,7 +24,7 @@ let fnName
     : String =
     match name with
     | Builtin builtin ->
-        if builtin.version == 0l then "Builtin." + builtin.name
+        if builtin.version == 0s32 then "Builtin." + builtin.name
         else "Builtin." + builtin.name + "_v" + Stdlib.Int32.toString builtin.version
     | Package hash -> Darklang.PrettyPrinter.RuntimeTypes.__runtimeHash hash
 
@@ -34,7 +34,7 @@ let valueName
     : String =
     match name with
     | Builtin builtin ->
-        if builtin.version == 0l then builtin.name
+        if builtin.version == 0s32 then builtin.name
         else builtin.name + "_v" + Stdlib.Int32.toString builtin.version
     | Package hash -> Darklang.PrettyPrinter.RuntimeTypes.__runtimeHash hash
 
@@ -320,6 +320,6 @@ let dval
     | DApplicable (AppNamedFn named) -> Darklang.PrettyPrinter.RuntimeTypes.fnName branchId named.name
     | DApplicable (AppLambda _) -> "(lambda)"
     | DDB name -> "<Datastore: " + name + ">"
-    | DBlobPersistent (hash, length) -> "<Blob: " + Stdlib.String.__firstInt hash 8 + "… " + Stdlib.Int.toString length + " bytes>"
+    | DBlobPersistent (hash, length) -> "<Blob: " + Stdlib.String.__firstInt hash 8z + "… " + Stdlib.Int.toString length + " bytes>"
     | DBlobEphemeral _ -> "<Blob: ephemeral>"
     | DStreamStub _ -> "<stream: stub>"

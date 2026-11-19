@@ -28,7 +28,7 @@ module ParseError =
     | NotJson of line: Int64 * column: Int64
 
   let __copyString (value: String) : String =
-      Stdlib.String.__byteSlice value 0L (Stdlib.String.__byteLength value)
+      Stdlib.String.__byteSlice value 0 (Stdlib.String.__byteLength value)
 
   let __copyPathPart (part: Stdlib.Json.ParseError.JsonPath.Part.Part) : Stdlib.Json.ParseError.JsonPath.Part.Part =
       match part with

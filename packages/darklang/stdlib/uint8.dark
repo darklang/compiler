@@ -16,22 +16,22 @@ let subtract (a: UInt8) (b: UInt8) : UInt8 = a - b
 
 let multiply (a: UInt8) (b: UInt8) : UInt8 = a * b
 
-let divide (a: UInt8) (b: UInt8) : UInt8 = if b == 0uy then Builtin.crash "Cannot divide by 0" else a / b
+let divide (a: UInt8) (b: UInt8) : UInt8 = if b == 0u8 then Builtin.crash "Cannot divide by 0" else a / b
 
 let max (a: UInt8) (b: UInt8) : UInt8 = if a > b then a else b
 
 let min (a: UInt8) (b: UInt8) : UInt8 = if a < b then a else b
 
-let mod (a: UInt8) (b: UInt8) : UInt8 = if b == 0uy then Builtin.crash "Cannot evaluate modulus against 0" else a % b
+let mod (a: UInt8) (b: UInt8) : UInt8 = if b == 0u8 then Builtin.crash "Cannot evaluate modulus against 0" else a % b
 
 
 
 let __powerLoop (base: UInt8) (exponent: UInt8) (result: UInt8) : UInt8 =
-    if exponent == 0uy then result
+    if exponent == 0u8 then result
     else
-        let next = if (exponent % 2uy) == 1uy then result * base else result in
-        Stdlib.UInt8.__powerLoop (base * base) (exponent / 2uy) next
-let power (base: UInt8) (exponent: UInt8) : UInt8 = Stdlib.UInt8.__powerLoop base exponent 1uy
+        let next = if (exponent % 2u8) == 1u8 then result * base else result in
+        Stdlib.UInt8.__powerLoop (base * base) (exponent / 2u8) next
+let power (base: UInt8) (exponent: UInt8) : UInt8 = Stdlib.UInt8.__powerLoop base exponent 1u8
 
 let clamp (value: UInt8) (limitA: UInt8) (limitB: UInt8) : UInt8 =
     let lower = Stdlib.UInt8.min limitA limitB in
@@ -49,37 +49,37 @@ let lessThanOrEqualTo (a: UInt8) (b: UInt8) : Bool = a <= b
 // Count number of set bits (population count)
 // Uses parallel bit counting algorithm (SWAR)
 let __popcount (x: UInt8) : UInt8 =
-    let mask1 = 85uy in
-    let mask2 = 51uy in
-    let mask3 = 15uy in
-    let x = x - Stdlib.UInt8.bitwiseAnd (Stdlib.UInt8.shiftRight x 1uy) mask1 in
-    let x = Stdlib.UInt8.bitwiseAnd x mask2 + Stdlib.UInt8.bitwiseAnd (Stdlib.UInt8.shiftRight x 2uy) mask2 in
-    let x = Stdlib.UInt8.bitwiseAnd (x + Stdlib.UInt8.shiftRight x 4uy) mask3 in
+    let mask1 = 85u8 in
+    let mask2 = 51u8 in
+    let mask3 = 15u8 in
+    let x = x - Stdlib.UInt8.bitwiseAnd (Stdlib.UInt8.shiftRight x 1u8) mask1 in
+    let x = Stdlib.UInt8.bitwiseAnd x mask2 + Stdlib.UInt8.bitwiseAnd (Stdlib.UInt8.shiftRight x 2u8) mask2 in
+    let x = Stdlib.UInt8.bitwiseAnd (x + Stdlib.UInt8.shiftRight x 4u8) mask3 in
     x
 
 // Convert a single digit (0uy-9uy) to its string representation
 let __digitToString (n: UInt8) : String =
     match n with
-    | 0uy -> "0"
-    | 1uy -> "1"
-    | 2uy -> "2"
-    | 3uy -> "3"
-    | 4uy -> "4"
-    | 5uy -> "5"
-    | 6uy -> "6"
-    | 7uy -> "7"
-    | 8uy -> "8"
-    | 9uy -> "9"
+    | 0u8 -> "0"
+    | 1u8 -> "1"
+    | 2u8 -> "2"
+    | 3u8 -> "3"
+    | 4u8 -> "4"
+    | 5u8 -> "5"
+    | 6u8 -> "6"
+    | 7u8 -> "7"
+    | 8u8 -> "8"
+    | 9u8 -> "9"
     | _ -> "?"
 
 // Convert an integer to its string representation
 let toString (n: UInt8) : String =
-    if n < 10uy then Stdlib.UInt8.__digitToString n
-    else Stdlib.UInt8.toString (n / 10uy) + Stdlib.UInt8.__digitToString (n % 10uy)
+    if n < 10u8 then Stdlib.UInt8.__digitToString n
+    else Stdlib.UInt8.toString (n / 10u8) + Stdlib.UInt8.__digitToString (n % 10u8)
 
 // Sum all integers in a list
 let sum (list: List<UInt8>) : UInt8 =
-    Stdlib.List.fold list 0uy (fun acc x -> acc + x)
+    Stdlib.List.fold list 0u8 (fun acc x -> acc + x)
 
 let __fromIntUnchecked (value: Int) : UInt8 =
     match Stdlib.Int.toUInt8 value with
@@ -153,7 +153,7 @@ impl Stdlib.Compare for UInt8 =
   let greaterThanOrEqualTo = Stdlib.UInt8.greaterThanOrEqualTo
 
 impl Stdlib.Zero for UInt8 =
-  let zero () : UInt8 = 0uy
+  let zero () : UInt8 = 0u8
 
 impl Stdlib.One for UInt8 =
-  let one () : UInt8 = 1uy
+  let one () : UInt8 = 1u8

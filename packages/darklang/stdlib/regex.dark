@@ -40,10 +40,10 @@ let __takeDelimited (chars: List<Char>) (open_: Char) (close_: Char) (depth: Int
     | char :: rest ->
         if escaped then Stdlib.Regex.__takeDelimited rest open_ close_ depth false (Stdlib.List.push (Stdlib.List.push acc '\\') char)
         else if char == '\\' then Stdlib.Regex.__takeDelimited rest open_ close_ depth true acc
-        else if char == open_ then Stdlib.Regex.__takeDelimited rest open_ close_ (depth + 1L) false (Stdlib.List.push acc char)
+        else if char == open_ then Stdlib.Regex.__takeDelimited rest open_ close_ (depth + 1) false (Stdlib.List.push acc char)
         else if char == close_ then
-            if depth == 1L then Ok ((Stdlib.String.fromList (Stdlib.List.reverse acc), rest))
-            else Stdlib.Regex.__takeDelimited rest open_ close_ (depth - 1L) false (Stdlib.List.push acc char)
+            if depth == 1 then Ok ((Stdlib.String.fromList (Stdlib.List.reverse acc), rest))
+            else Stdlib.Regex.__takeDelimited rest open_ close_ (depth - 1) false (Stdlib.List.push acc char)
         else Stdlib.Regex.__takeDelimited rest open_ close_ depth false (Stdlib.List.push acc char)
 
 let __takeClass (chars: List<Char>) (escaped: Bool) (acc: List<Char>) : Stdlib.Result.Result<(String * List<Char>), String> =
@@ -61,9 +61,9 @@ let __digits (chars: List<Char>) (value: Int64) (saw: Bool) : (Int64 * Bool * Li
     | char :: rest ->
         match Stdlib.Char.__toAsciiCodeInt char with
         | Some code ->
-            if code >= 48 && code <= 57 then
+            if code >= 48z && code <= 57z then
                 match Stdlib.Int.toInt64 code with
-                | Some c -> Stdlib.Regex.__digits rest (value * 10L + c - 48L) true
+                | Some c -> Stdlib.Regex.__digits rest (value * 10 + c - 48) true
                 | None -> (value, saw, chars)
             else (value, saw, chars)
         | None -> (value, saw, chars)
@@ -71,13 +71,13 @@ let __digits (chars: List<Char>) (value: Int64) (saw: Bool) : (Int64 * Bool * Li
 let __quantifier (chars: List<Char>) : Stdlib.Result.Result<(Stdlib.Regex.__Quantifier * List<Char>), String> =
     let quantified =
         match chars with
-        | [] -> Ok ((1L, Some 1L, chars))
+        | [] -> Ok ((1, Some 1, chars))
         | quantifierStart :: rest ->
-            if quantifierStart == '*' then Ok ((0L, None, rest))
-            else if quantifierStart == '+' then Ok ((1L, None, rest))
-            else if quantifierStart == '?' then Ok ((0L, Some 1L, rest))
-            else if quantifierStart != '{' then Ok ((1L, Some 1L, chars))
-            else (let first = Stdlib.Regex.__digits rest 0L false in
+            if quantifierStart == '*' then Ok ((0, None, rest))
+            else if quantifierStart == '+' then Ok ((1, None, rest))
+            else if quantifierStart == '?' then Ok ((0, Some 1, rest))
+            else if quantifierStart != '{' then Ok ((1, Some 1, chars))
+            else (let first = Stdlib.Regex.__digits rest 0 false in
              let minimum = Stdlib.Tuple3.first first in
              let sawMinimum = Stdlib.Tuple3.second first in
              let afterMinimum = Stdlib.Tuple3.third first in
@@ -89,7 +89,7 @@ let __quantifier (chars: List<Char>) : Stdlib.Result.Result<(Stdlib.Regex.__Quan
                      if delimiter == '}' then Ok ((minimum, Some minimum, afterDelimiter))
                      else if delimiter != ',' then Error "invalid repetition"
                      else
-                         let second = Stdlib.Regex.__digits afterDelimiter 0L false in
+                         let second = Stdlib.Regex.__digits afterDelimiter 0 false in
                          let maximum = Stdlib.Tuple3.first second in
                          let sawMaximum = Stdlib.Tuple3.second second in
                          let afterMaximum = Stdlib.Tuple3.third second in
@@ -128,7 +128,7 @@ let __atom (chars: List<Char>) : Stdlib.Result.Result<(Stdlib.Regex.__Atom * Lis
             | Error error -> Error error
             | Ok value -> Ok ((Stdlib.Regex.__Atom.CharacterClass (Stdlib.Tuple2.first value), Stdlib.Tuple2.second value))
         else if char == '(' then
-            match Stdlib.Regex.__takeDelimited rest '(' ')' 1L false [] with
+            match Stdlib.Regex.__takeDelimited rest '(' ')' 1 false [] with
             | Error error -> Error error
             | Ok value ->
                 let pattern = Stdlib.Tuple2.first value in
@@ -260,10 +260,10 @@ let __repeatFrom (candidates: List<Stdlib.Regex.__Candidate>) (plan: Stdlib.Rege
         let combinedCaptures = Stdlib.List.concat state.captures candidate.captures in
         let fromCandidate =
             if Stdlib.List.isEmpty candidate.value then
-                if state.count + 1L >= plan.minimum then
+                if state.count + 1 >= plan.minimum then
                     [Stdlib.Regex.__Candidate { remaining = candidate.remaining, value = combinedValue, captures = combinedCaptures, atStart = candidate.atStart }]
                 else []
-            else Stdlib.Regex.__repeat plan candidate.remaining candidate.atStart (Stdlib.Regex.__RepeatState { count = state.count + 1L, value = combinedValue, captures = combinedCaptures }) in
+            else Stdlib.Regex.__repeat plan candidate.remaining candidate.atStart (Stdlib.Regex.__RepeatState { count = state.count + 1, value = combinedValue, captures = combinedCaptures }) in
         Stdlib.List.concat fromCandidate (Stdlib.Regex.__repeatFrom rest plan state)
 
 let __repeat (plan: Stdlib.Regex.__RepeatPlan) (input: List<Char>) (atStart: Bool) (state: Stdlib.Regex.__RepeatState) : List<Stdlib.Regex.__Candidate> =
@@ -300,7 +300,7 @@ let __matchPieces (pieces: List<Stdlib.Regex.__Piece>) (input: List<Char>) (atSt
             maximum = piece.quantifier.maximum,
             isLazy = piece.quantifier.isLazy
         } in
-        Stdlib.Regex.__continue (Stdlib.Regex.__repeat plan input atStart (Stdlib.Regex.__RepeatState { count = 0L, value = [], captures = [] })) rest
+        Stdlib.Regex.__continue (Stdlib.Regex.__repeat plan input atStart (Stdlib.Regex.__RepeatState { count = 0, value = [], captures = [] })) rest
 
 let __matchBranches (branches: List<List<Stdlib.Regex.__Piece>>) (input: List<Char>) (atStart: Bool) : List<Stdlib.Regex.__Candidate> =
     match branches with
@@ -358,7 +358,7 @@ let __replaceText (input: String) (pattern: String) (replacement: String) : Stri
 let __captureAt (captures: List<String>) (index: Int64) : String =
     match captures with
     | [] -> ""
-    | capture :: rest -> if index == 1L then capture else Stdlib.Regex.__captureAt rest (index - 1L)
+    | capture :: rest -> if index == 1 then capture else Stdlib.Regex.__captureAt rest (index - 1)
 
 let __expandReplacement (chars: List<Char>) (full: String) (captures: List<String>) (acc: String) : String =
     match chars with
@@ -374,9 +374,9 @@ let __expandReplacement (chars: List<Char>) (full: String) (captures: List<Strin
                 else
                     match Stdlib.Char.__toAsciiCodeInt substitution with
                     | Some code ->
-                        if code >= 49 && code <= 57 then
+                        if code >= 49z && code <= 57z then
                             match Stdlib.Int.toInt64 code with
-                            | Some value -> Stdlib.Regex.__expandReplacement after full captures (acc + Stdlib.Regex.__captureAt captures (value - 48L))
+                            | Some value -> Stdlib.Regex.__expandReplacement after full captures (acc + Stdlib.Regex.__captureAt captures (value - 48))
                             | None -> Stdlib.Regex.__expandReplacement after full captures (acc + "$" + Stdlib.Char.toString substitution)
                         else Stdlib.Regex.__expandReplacement after full captures (acc + "$" + Stdlib.Char.toString substitution)
                     | None -> Stdlib.Regex.__expandReplacement after full captures (acc + "$" + Stdlib.Char.toString substitution)

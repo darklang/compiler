@@ -18,19 +18,19 @@ let __failureMessage (failure: Stdlib.__Http3.Failure) : String =
   match failure with | Fatal message -> message | Protocol ((_state, error)) -> error.message
 
 let __uni (fromServer: Bool) : Stdlib.__Http3Uni.State =
-  match Stdlib.__Http3Uni.createWithCapacity fromServer 4096L with
+  match Stdlib.__Http3Uni.createWithCapacity fromServer 4096 with
   | Ok state -> state
   | Error _ -> Builtin.crash "Fixed HTTP/3 QPACK capacity is invalid"
 
 let __capacity (connection: Stdlib.__QuicConnection.State) (deadline: Int64)
   : Stdlib.Result.Result<Stdlib.__QuicConnection.State, String> =
-  if connection.flow.peer.streamsUni >= 3L && (connection.flow.role == Stdlib.__QuicFlow.Role.Server || connection.flow.peer.streamsBidi >= 1L) &&
-    connection.flow.peer.uni >= 12L && connection.flow.peer.data >= 14L then Ok connection
+  if connection.flow.peer.streamsUni >= 3 && (connection.flow.role == Stdlib.__QuicFlow.Role.Server || connection.flow.peer.streamsBidi >= 1) &&
+    connection.flow.peer.uni >= 12 && connection.flow.peer.data >= 14 then Ok connection
   else match Stdlib.__Network.monotonicMillis () with
   | Error _ -> Error "HTTP/3 clock failed"
   | Ok now ->
     if now >= deadline then Error "HTTP/3 initial stream credit timed out"
-    else Stdlib.__QuicConnection.poll connection 10L |> Stdlib.Result.andThen (fun next -> Stdlib.__Http3.__capacity next deadline)
+    else Stdlib.__QuicConnection.poll connection 10 |> Stdlib.Result.andThen (fun next -> Stdlib.__Http3.__capacity next deadline)
 
 let __initialBytes (connection: Stdlib.__QuicConnection.State) (id: Int64) (bytes: Blob) (offset: Int64) (deadline: Int64) : Stdlib.Result.Result<Stdlib.__QuicConnection.State, String> =
   if offset == Stdlib.Blob.__byteLength bytes then Ok connection
@@ -48,7 +48,7 @@ let __initialBytes (connection: Stdlib.__QuicConnection.State) (id: Int64) (byte
           let streamCredit = sender.credit - sender.offset in
           let connectionCredit = connection.flow.peer.data - connection.flow.sent in
           let credit = if streamCredit < connectionCredit then streamCredit else connectionCredit in
-          if credit <= 0L then Stdlib.__QuicConnection.poll connection 10L |> Stdlib.Result.andThen (fun next -> Stdlib.__Http3.__initialBytes next id bytes offset deadline)
+          if credit <= 0 then Stdlib.__QuicConnection.poll connection 10 |> Stdlib.Result.andThen (fun next -> Stdlib.__Http3.__initialBytes next id bytes offset deadline)
           else
             let remaining = Stdlib.Blob.__byteLength bytes - offset in
             let size = if remaining < credit then remaining else credit in
@@ -57,50 +57,50 @@ let __initialBytes (connection: Stdlib.__QuicConnection.State) (id: Int64) (byte
 
 let initialize (ready: Stdlib.__QuicClient.Ready) (headOnly: Bool) (timeout: Int64)
   : Stdlib.Result.Result<Stdlib.__Http3.State, String> =
-  if timeout < 1L || timeout > 60000L then Error "Invalid HTTP/3 exchange timeout"
+  if timeout < 1 || timeout > 60000 then Error "Invalid HTTP/3 exchange timeout"
   else match Stdlib.__Network.monotonicMillis () with
   | Error _ -> Error "HTTP/3 clock failed"
   | Ok now ->
     let deadline = now + timeout in
     Stdlib.__QuicConnection.fromClient ready |> Stdlib.Result.mapError Stdlib.__QuicConnection.__reportFailure |> Stdlib.Result.andThen (fun connection ->
       Stdlib.__Http3.__capacity connection deadline |> Stdlib.Result.andThen (fun connection ->
-      Stdlib.__QuicConnection.openStream connection 2L |> Stdlib.Result.andThen (fun connection ->
-      Stdlib.__QuicConnection.openStream connection 6L |> Stdlib.Result.andThen (fun connection ->
-      Stdlib.__QuicConnection.openStream connection 10L |> Stdlib.Result.andThen (fun connection ->
-      Stdlib.__QuicConnection.openStream connection 0L |> Stdlib.Result.andThen (fun connection ->
-        Stdlib.__Http3Wire.settingsWithQpack 4096L 1L |> Stdlib.Result.andThen (Stdlib.__Http3Wire.serialize 4L) |> Stdlib.Result.andThen (fun settings ->
-          Stdlib.__Http3.__initialBytes connection 2L (Stdlib.Blob.concat [Stdlib.Blob.__fromInt64List [0L], settings]) 0L deadline
-            |> Stdlib.Result.andThen (fun connection -> Stdlib.__Http3.__initialBytes connection 6L (Stdlib.Blob.__fromInt64List [2L]) 0L deadline)
-            |> Stdlib.Result.andThen (fun connection -> Stdlib.__Http3.__initialBytes connection 10L (Stdlib.Blob.__fromInt64List [3L]) 0L deadline)
+      Stdlib.__QuicConnection.openStream connection 2 |> Stdlib.Result.andThen (fun connection ->
+      Stdlib.__QuicConnection.openStream connection 6 |> Stdlib.Result.andThen (fun connection ->
+      Stdlib.__QuicConnection.openStream connection 10 |> Stdlib.Result.andThen (fun connection ->
+      Stdlib.__QuicConnection.openStream connection 0 |> Stdlib.Result.andThen (fun connection ->
+        Stdlib.__Http3Wire.settingsWithQpack 4096 1 |> Stdlib.Result.andThen (Stdlib.__Http3Wire.serialize 4) |> Stdlib.Result.andThen (fun settings ->
+          Stdlib.__Http3.__initialBytes connection 2 (Stdlib.Blob.concat [Stdlib.Blob.__fromInt64List [0], settings]) 0 deadline
+            |> Stdlib.Result.andThen (fun connection -> Stdlib.__Http3.__initialBytes connection 6 (Stdlib.Blob.__fromInt64List [2]) 0 deadline)
+            |> Stdlib.Result.andThen (fun connection -> Stdlib.__Http3.__initialBytes connection 10 (Stdlib.Blob.__fromInt64List [3]) 0 deadline)
             |> Stdlib.Result.map (fun connection -> Stdlib.__Http3.State { connection = connection,
-              uni = Stdlib.__Http3.__uni true, stream = 0L, message = Stdlib.__Http3Message.create (Response headOnly), deadline = deadline, feedback = Stdlib.Blob.empty }))))))))
+              uni = Stdlib.__Http3.__uni true, stream = 0, message = Stdlib.__Http3Message.create (Response headOnly), deadline = deadline, feedback = Stdlib.Blob.empty }))))))))
 
 let initializeServer (ready: Stdlib.__QuicServer.Ready) (signals: Stdlib.__Network.ShutdownSignals) (timeout: Int64) : Stdlib.Result.Result<Stdlib.__Http3.State, String> =
-  if timeout < 1L || timeout > 60000L then Error "Invalid HTTP/3 exchange timeout"
+  if timeout < 1 || timeout > 60000 then Error "Invalid HTTP/3 exchange timeout"
   else match Stdlib.__Network.monotonicMillis () with
   | Error _ -> Error "HTTP/3 clock failed"
   | Ok now ->
     let deadline = now + timeout in
     Stdlib.__QuicConnection.fromServer ready signals |> Stdlib.Result.mapError Stdlib.__QuicConnection.__reportFailure |> Stdlib.Result.andThen (fun connection ->
       Stdlib.__Http3.__capacity connection deadline |> Stdlib.Result.andThen (fun connection ->
-      Stdlib.__QuicConnection.openStream connection 3L |> Stdlib.Result.andThen (fun connection ->
-      Stdlib.__QuicConnection.openStream connection 7L |> Stdlib.Result.andThen (fun connection ->
-      Stdlib.__QuicConnection.openStream connection 11L |> Stdlib.Result.andThen (fun connection ->
-        Stdlib.__Http3Wire.settingsWithQpack 4096L 1L |> Stdlib.Result.andThen (Stdlib.__Http3Wire.serialize 4L) |> Stdlib.Result.andThen (fun settings ->
-          Stdlib.__Http3.__initialBytes connection 3L (Stdlib.Blob.concat [Stdlib.Blob.__fromInt64List [0L], settings]) 0L deadline
-            |> Stdlib.Result.andThen (fun connection -> Stdlib.__Http3.__initialBytes connection 7L (Stdlib.Blob.__fromInt64List [2L]) 0L deadline)
-            |> Stdlib.Result.andThen (fun connection -> Stdlib.__Http3.__initialBytes connection 11L (Stdlib.Blob.__fromInt64List [3L]) 0L deadline)
+      Stdlib.__QuicConnection.openStream connection 3 |> Stdlib.Result.andThen (fun connection ->
+      Stdlib.__QuicConnection.openStream connection 7 |> Stdlib.Result.andThen (fun connection ->
+      Stdlib.__QuicConnection.openStream connection 11 |> Stdlib.Result.andThen (fun connection ->
+        Stdlib.__Http3Wire.settingsWithQpack 4096 1 |> Stdlib.Result.andThen (Stdlib.__Http3Wire.serialize 4) |> Stdlib.Result.andThen (fun settings ->
+          Stdlib.__Http3.__initialBytes connection 3 (Stdlib.Blob.concat [Stdlib.Blob.__fromInt64List [0], settings]) 0 deadline
+            |> Stdlib.Result.andThen (fun connection -> Stdlib.__Http3.__initialBytes connection 7 (Stdlib.Blob.__fromInt64List [2]) 0 deadline)
+            |> Stdlib.Result.andThen (fun connection -> Stdlib.__Http3.__initialBytes connection 11 (Stdlib.Blob.__fromInt64List [3]) 0 deadline)
             |> Stdlib.Result.map (fun connection -> Stdlib.__Http3.State { connection = connection, uni = Stdlib.__Http3.__uni false,
-              stream = 0L, message = Stdlib.__Http3Message.create Request, deadline = deadline, feedback = Stdlib.Blob.empty })))))))
+              stream = 0, message = Stdlib.__Http3Message.create Request, deadline = deadline, feedback = Stdlib.Blob.empty })))))))
 
 // Decoder feedback is flow-controlled like any other critical stream. Retain
 // bounded unsent bytes rather than failing when the peer's credit is exhausted.
 let __feedback (state: Stdlib.__Http3.State) (bytes: Blob) : Stdlib.Result.Result<Stdlib.__Http3.State, String> =
   let pending = Stdlib.Blob.concat [state.feedback, bytes] in
-  if Stdlib.Blob.__byteLength pending > 65536L then Error "QPACK feedback buffer exceeds limit"
-  else if Stdlib.Blob.__byteLength pending == 0L then Ok state
+  if Stdlib.Blob.__byteLength pending > 65536 then Error "QPACK feedback buffer exceeds limit"
+  else if Stdlib.Blob.__byteLength pending == 0 then Ok state
   else
-    let id = if state.connection.flow.role == Stdlib.__QuicFlow.Role.Client then 10L else 11L in
+    let id = if state.connection.flow.role == Stdlib.__QuicFlow.Role.Client then 10 else 11 in
     match Stdlib.__QuicFlow.channel state.connection.flow id with
     | None -> Builtin.crash "HTTP/3 decoder stream is not open"
     | Some channel ->
@@ -112,9 +112,9 @@ let __feedback (state: Stdlib.__Http3.State) (bytes: Blob) : Stdlib.Result.Resul
         let credit = if streamCredit < connectionCredit then streamCredit else connectionCredit in
         let length = Stdlib.Blob.__byteLength pending in
         let available = if credit < length then credit else length in
-        let size = if available > 900L then 900L else available in
-        if size <= 0L then Ok { state with feedback = pending }
-        else Stdlib.__QuicConnection.write state.connection id (Stdlib.__Http2Wire.__slice pending 0L size) false
+        let size = if available > 900 then 900 else available in
+        if size <= 0 then Ok { state with feedback = pending }
+        else Stdlib.__QuicConnection.write state.connection id (Stdlib.__Http2Wire.__slice pending 0 size) false
           |> Stdlib.Result.map (fun connection -> { state with connection = connection, feedback = Stdlib.__Http2Wire.__slice pending size (length - size) })
 
 // A reset discards queued HEADERS, but cannot release references that the peer
@@ -122,7 +122,7 @@ let __feedback (state: Stdlib.__Http3.State) (bytes: Blob) : Stdlib.Result.Resul
 let __stopOutput (state: Stdlib.__Http3.State) (stream: Int64) (code: Int64) : Stdlib.Result.Result<Stdlib.__Http3.State, String> =
   let unsent = match Stdlib.__QuicFlow.channel state.connection.flow stream with
     | None -> false
-    | Some channel -> match channel.send with | None -> false | Some sender -> sender.offset == 0L in
+    | Some channel -> match channel.send with | None -> false | Some sender -> sender.offset == 0 in
   Stdlib.__QuicFlow.stop state.connection.flow (Stdlib.__QuicApplication.StreamLimit { id = stream, value = code }) |> Stdlib.Result.mapError Stdlib.__QuicWire.message |> Stdlib.Result.andThen (fun stopped ->
     Stdlib.__QuicConnection.__queue (Stdlib.__QuicConnection.__flow state.connection stopped.state) stopped.frames |> Stdlib.Result.map (fun connection ->
       { state with connection = connection, uni = if unsent then { state.uni with outgoing = Stdlib.__QpackEncoder.discardUnsent state.uni.outgoing stream } else state.uni }))
@@ -131,7 +131,7 @@ let __stopOutput (state: Stdlib.__Http3.State) (stream: Int64) (code: Int64) : S
 // its critical stream has no send credit yet.
 let __abortStream (state: Stdlib.__Http3.State) (stream: Int64) (code: Int64) : Stdlib.Result.Result<Stdlib.__Http3.State, String> =
   Stdlib.__Http3.__stopOutput state stream code |> Stdlib.Result.andThen (fun state ->
-    Stdlib.__QuicApplication.streamLimit 5L stream code |> Stdlib.Result.andThen (Stdlib.__QuicConnection.__queue state.connection) |> Stdlib.Result.andThen (fun connection ->
+    Stdlib.__QuicApplication.streamLimit 5 stream code |> Stdlib.Result.andThen (Stdlib.__QuicConnection.__queue state.connection) |> Stdlib.Result.andThen (fun connection ->
       Stdlib.__Http3.__feedback { state with connection = connection } (Stdlib.__QpackDecoder.cancel stream)))
 
 // Single-response callers invalidate the connection on any error. Only typed
@@ -150,7 +150,7 @@ let __reportFailure (failure: Stdlib.__Http3.Failure) : String =
 
 let __controls (state: Stdlib.__Http3.State) : Stdlib.Result.Result<Stdlib.__Http3.State, Stdlib.__Http3.Failure> =
   Stdlib.List.fold state.connection.flow.channels (Ok state) (fun result channel ->
-    if channel.id % 4L != (if state.connection.flow.role == Stdlib.__QuicFlow.Role.Client then 3L else 2L) then result
+    if channel.id % 4 != (if state.connection.flow.role == Stdlib.__QuicFlow.Role.Client then 3 else 2) then result
     else result |> Stdlib.Result.andThen (fun current ->
       Stdlib.__QuicConnection.read current.connection channel.id |> Stdlib.Result.mapError Stdlib.__Http3.__fatal |> Stdlib.Result.andThen (fun read ->
         Stdlib.__Http3Uni.receive current.uni channel.id read.bytes read.finished (Stdlib.Option.isSome read.reset)
@@ -162,7 +162,7 @@ let __encoderBytes (state: Stdlib.__Http3.State) (id: Int64) (bytes: Blob) (offs
   if offset == Stdlib.Blob.__byteLength bytes then Ok state
   else
     let remaining = Stdlib.Blob.__byteLength bytes - offset in
-    let size = if remaining > 900L then 900L else remaining in
+    let size = if remaining > 900 then 900 else remaining in
     Stdlib.__QuicConnection.write state.connection id (Stdlib.__Http2Wire.__slice bytes offset size) false
       |> Stdlib.Result.andThen (fun connection -> Stdlib.__Http3.__encoderBytes { state with connection = connection } id bytes (offset + size))
 
@@ -172,7 +172,7 @@ let __encoderBytes (state: Stdlib.__Http3.State) (id: Int64) (bytes: Blob) (offs
 let encodeHeaders (state: Stdlib.__Http3.State) (stream: Int64) (fields: List<(String * String)>) : Stdlib.Result.Result<Stdlib.__Http3.Headers, String> =
   Stdlib.__Http3.__controls state |> Stdlib.Result.mapError Stdlib.__Http3.__reportFailure |> Stdlib.Result.andThen (fun state ->
     Stdlib.__Http3Control.checkFields state.uni.control fields |> Stdlib.Result.andThen (fun _unit ->
-      let id = if state.connection.flow.role == Stdlib.__QuicFlow.Role.Client then 6L else 7L in
+      let id = if state.connection.flow.role == Stdlib.__QuicFlow.Role.Client then 6 else 7 in
       match Stdlib.__QuicFlow.channel state.connection.flow id with
       | None -> Builtin.crash "HTTP/3 encoder stream is not open"
       | Some channel -> match channel.send with
@@ -181,10 +181,10 @@ let encodeHeaders (state: Stdlib.__Http3.State) (stream: Int64) (fields: List<(S
           let connectionCredit = state.connection.flow.peer.data - state.connection.flow.sent in
           let streamCredit = sender.credit - sender.offset in
           let credit = if streamCredit < connectionCredit then streamCredit else connectionCredit in
-          let budget = if credit < 0L then 0L else if credit > 65536L then 65536L else credit in
+          let budget = if credit < 0 then 0 else if credit > 65536 then 65536 else credit in
           Stdlib.__QpackEncoder.encode state.uni.outgoing stream fields budget |> Stdlib.Result.andThen (fun encoded ->
-            Stdlib.__Http3Wire.serialize 1L encoded.bytes |> Stdlib.Result.andThen (fun bytes ->
-              Stdlib.__Http3.__encoderBytes { state with uni = { state.uni with outgoing = encoded.state } } id encoded.instructions 0L
+            Stdlib.__Http3Wire.serialize 1 encoded.bytes |> Stdlib.Result.andThen (fun bytes ->
+              Stdlib.__Http3.__encoderBytes { state with uni = { state.uni with outgoing = encoded.state } } id encoded.instructions 0
                 |> Stdlib.Result.map (fun next -> Stdlib.__Http3.Headers { state = next, bytes = bytes })))))
 
 // GOAWAY is an exclusive request boundary, independent of the selected stream.
@@ -196,7 +196,7 @@ let rejected (state: Stdlib.__Http3.State) : Bool =
 // Preserve transport keys, recovery and both QPACK tables between requests.
 let nextRequest (state: Stdlib.__Http3.State) (stream: Int64) (headOnly: Bool) (timeout: Int64)
   : Stdlib.Result.Result<Stdlib.__Http3.State, String> =
-  if stream <= state.stream || stream % 4L != 0L || timeout < 1L || timeout > 60000L then Error "Invalid HTTP/3 next request"
+  if stream <= state.stream || stream % 4 != 0 || timeout < 1 || timeout > 60000 then Error "Invalid HTTP/3 next request"
   else match Stdlib.__Network.monotonicMillis () with
   | Error _ -> Error "HTTP/3 clock failed"
   | Ok now ->
@@ -235,7 +235,7 @@ let poll (state: Stdlib.__Http3.State) : Stdlib.Result.Result<Stdlib.__Http3.Rec
   | Error _ -> Error "HTTP/3 clock failed"
   | Ok now ->
     if now >= state.deadline then Error "HTTP/3 exchange timed out"
-    else Stdlib.__QuicConnection.poll state.connection 10L |> Stdlib.Result.andThen (fun connection ->
+    else Stdlib.__QuicConnection.poll state.connection 10 |> Stdlib.Result.andThen (fun connection ->
       Stdlib.__Http3.__drain { state with connection = connection } |> Stdlib.Result.mapError Stdlib.__Http3.__reportFailure)
 
 let receive (state: Stdlib.__Http3.State) : Stdlib.Result.Result<Stdlib.__Http3.Received, String> =
@@ -252,18 +252,18 @@ let receive (state: Stdlib.__Http3.State) : Stdlib.Result.Result<Stdlib.__Http3.
 // The caller retains unsent bytes when credit is unavailable and drains the response.
 let sendCredit (state: Stdlib.__Http3.State) : Int64 =
   match Stdlib.__QuicFlow.channel state.connection.flow state.stream with
-  | None -> 0L
+  | None -> 0
   | Some channel ->
-    if Stdlib.Option.isSome channel.stopped then 0L
+    if Stdlib.Option.isSome channel.stopped then 0
     else match channel.send with
-    | None -> 0L
+    | None -> 0
     | Some sender ->
-      if sender.finished then 0L
+      if sender.finished then 0
       else
         let stream = sender.credit - sender.offset in
         let connection = state.connection.flow.peer.data - state.connection.flow.sent in
         let available = if stream < connection then stream else connection in
-        if available > 900L then 900L else available
+        if available > 900 then 900 else available
 
 let write (state: Stdlib.__Http3.State) (bytes: Blob) (finished: Bool)
   : Stdlib.Result.Result<Stdlib.__Http3.State, String> =

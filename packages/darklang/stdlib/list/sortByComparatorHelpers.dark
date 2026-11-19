@@ -11,7 +11,7 @@ module SortByComparatorHelpers =
     : Result.Result<Int, String> =
     let result = comparator x y
 
-    if result == -1 || result == 0 || result == 1 then
+    if result == -1z || result == 0z || result == 1z then
       Result.Result.Ok result
     else
       Result.Result.Error
@@ -29,7 +29,7 @@ module SortByComparatorHelpers =
       match validate x y comparator with
       | Error msg -> Result.Result.Error msg
       | Ok result ->
-        if result <= 0 then
+        if result <= 0z then
           match merge xs right comparator with
           | Error msg -> Result.Result.Error msg
           | Ok merged -> Result.Result.Ok(push merged x)

@@ -1,68 +1,68 @@
 // Private native child ownership adapter. Shared Dark owns all process algorithms.
 module Builtin
 
-let __childState () : RawPtr = __word_to_rawptr 0L
-let __childLaunch (argv: RawPtr) (environment: RawPtr) (inheritTerminal: Int64) (ports: RawPtr) : Int64 = -38L
-let __childWait4 (pid: Int64) (status: RawPtr) (options: Int64) (usage: RawPtr) : Int64 = -38L
+let __childState () : RawPtr = __word_to_rawptr 0
+let __childLaunch (argv: RawPtr) (environment: RawPtr) (inheritTerminal: Int64) (ports: RawPtr) : Int64 = -38
+let __childWait4 (pid: Int64) (status: RawPtr) (options: Int64) (usage: RawPtr) : Int64 = -38
 
 let __childAddress (index: Int64) : RawPtr =
-    __word_to_rawptr (__rawptr_to_word (Builtin.__childState ()) + index * 64L)
+    __word_to_rawptr (__rawptr_to_word (Builtin.__childState ()) + index * 64)
 
 let __childFind (token: Int64) (index: Int64) : Int64 =
-    if token <= 0L || index > 63L then 0L
-    else if __raw_get<Int64> (Builtin.__childAddress index) 0L == token then index
-    else Builtin.__childFind token (index + 1L)
+    if token <= 0 || index > 63 then 0
+    else if __raw_get<Int64> (Builtin.__childAddress index) 0 == token then index
+    else Builtin.__childFind token (index + 1)
 
 let __childFree (index: Int64) : Int64 =
-    if index > 63L then 0L
-    else if __raw_get<Int64> (Builtin.__childAddress index) 0L == 0L then index
-    else Builtin.__childFree (index + 1L)
+    if index > 63 then 0
+    else if __raw_get<Int64> (Builtin.__childAddress index) 0 == 0 then index
+    else Builtin.__childFree (index + 1)
 
 let __withChildArgv (args: List<String>) (vector: RawPtr) (offset: Int64) (fn: RawPtr -> Int64) : Int64 =
     match args with
-    | [] -> let _ = __raw_write_word vector offset 0L in fn vector
+    | [] -> let _ = __raw_write_word vector offset 0 in fn vector
     | arg :: rest ->
         Stdlib.Cli.__Posix.__withCString arg (fun ptr ->
             let _ = __raw_write_word vector offset (__rawptr_to_word ptr) in
-            Builtin.__withChildArgv rest vector (offset + 8L) fn)
+            Builtin.__withChildArgv rest vector (offset + 8) fn)
 
 let __childStartAt (program: String) (args: List<String>) (inheritTerminal: Bool) (slot: Int64) : Int64 =
     let allArgs = Stdlib.List.push args program in
-    let vector = __mapped_alloc (Builtin.__posixInt64 (Stdlib.List.__lengthInt allArgs + 1) * 8L) in
+    let vector = __mapped_alloc (Builtin.__posixInt64 (Stdlib.List.__lengthInt allArgs + 1z) * 8) in
     let record = Builtin.__childAddress slot in
-    let _ = __raw_write_word record 16L -1L in
-    let _ = __raw_write_word record 24L -1L in
-    let _ = __raw_write_word record 32L -1L in
+    let _ = __raw_write_word record 16 -1 in
+    let _ = __raw_write_word record 24 -1 in
+    let _ = __raw_write_word record 32 -1 in
     let stack = Builtin.__startupStack () in
-    let argc = __raw_get<Int64> stack 0L in
-    let environment = __word_to_rawptr (__rawptr_to_word stack + (argc + 2L) * 8L) in
-    let pid = Builtin.__withChildArgv allArgs vector 0L (fun argv ->
-        Builtin.__childLaunch argv environment (if inheritTerminal then 1L else 0L)
-            (__word_to_rawptr (__rawptr_to_word record + 16L))) in
+    let argc = __raw_get<Int64> stack 0 in
+    let environment = __word_to_rawptr (__rawptr_to_word stack + (argc + 2) * 8) in
+    let pid = Builtin.__withChildArgv allArgs vector 0 (fun argv ->
+        Builtin.__childLaunch argv environment (if inheritTerminal then 1 else 0)
+            (__word_to_rawptr (__rawptr_to_word record + 16))) in
     let _ = __mapped_free vector in
-    if pid < 0L then pid
+    if pid < 0 then pid
     else
         let state = Builtin.__childState () in
-        let token = __raw_get<Int64> state 0L + 1L in
-        let _ = __raw_write_word state 0L token in
-        let _ = __raw_write_word record 0L token in
-        let _ = __raw_write_word record 8L pid in
-        let _ = __raw_write_word record 40L -1L in
-        let _ = __raw_write_word record 48L 0L in
-        let _ = __raw_write_word record 56L 0L in
+        let token = __raw_get<Int64> state 0 + 1 in
+        let _ = __raw_write_word state 0 token in
+        let _ = __raw_write_word record 0 token in
+        let _ = __raw_write_word record 8 pid in
+        let _ = __raw_write_word record 40 -1 in
+        let _ = __raw_write_word record 48 0 in
+        let _ = __raw_write_word record 56 0 in
         token
 
 let __childCandidates (programs: List<String>) (args: List<String>) (inheritTerminal: Bool) (slot: Int64) : Int64 =
     match programs with
-    | [] -> -2L
+    | [] -> -2
     | program :: rest ->
         let rc = Builtin.__childStartAt program args inheritTerminal slot in
-        if rc == -2L then Builtin.__childCandidates rest args inheritTerminal slot else rc
+        if rc == -2 then Builtin.__childCandidates rest args inheritTerminal slot else rc
 
 let runtimeChildStart (program: String) (args: List<String>) (inheritTerminal: Bool) : Stdlib.Result.Result<Int, Int> =
-    let slot = Builtin.__childFree 1L in
-    if slot == 0L || __raw_get<Int64> (Builtin.__childState ()) 0L == 9223372036854775807L then Error 24
-    else if Stdlib.String.__containsBytes program "\0" || Stdlib.List.any args (fun arg -> Stdlib.String.__containsBytes arg "\0") then Error 22
+    let slot = Builtin.__childFree 1 in
+    if slot == 0 || __raw_get<Int64> (Builtin.__childState ()) 0 == 9223372036854775807 then Error 24z
+    else if Stdlib.String.__containsBytes program "\0" || Stdlib.List.any args (fun arg -> Stdlib.String.__containsBytes arg "\0") then Error 22z
     else
         let programs = if Stdlib.String.__containsBytes program "/" then [program]
                        else
@@ -72,35 +72,35 @@ let runtimeChildStart (program: String) (args: List<String>) (inheritTerminal: B
         Builtin.__syscallIntResult (Builtin.__childCandidates programs args inheritTerminal slot)
 
 let runtimeChildDescriptors (handle: Int) : Stdlib.Result.Result<List<Int>, Int> =
-    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1L in
-    if slot == 0L then Error 9
+    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1 in
+    if slot == 0 then Error 9z
     else
         let record = Builtin.__childAddress slot in
-        let stdin = __raw_get<Int64> record 16L in
-        let stdout = __raw_get<Int64> record 24L in
-        let stderr = __raw_get<Int64> record 32L in
-        if stdin == -1L && stdout == -1L && stderr == -1L then Ok []
+        let stdin = __raw_get<Int64> record 16 in
+        let stdout = __raw_get<Int64> record 24 in
+        let stderr = __raw_get<Int64> record 32 in
+        if stdin == -1 && stdout == -1 && stderr == -1 then Ok []
         else Ok [Stdlib.Int.fromInt64 stdin, Stdlib.Int.fromInt64 stdout, Stdlib.Int.fromInt64 stderr]
 
 let runtimeChildPoll (handle: Int) : Stdlib.Result.Result<Stdlib.Option.Option<Int>, Int> =
-    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1L in
-    if slot == 0L then Error 9
+    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1 in
+    if slot == 0 then Error 9z
     else
         let record = Builtin.__childAddress slot in
-        let cached = __raw_get<Int64> record 40L in
-        if cached >= 0L then Ok (Some (Stdlib.Int.fromInt64 cached))
+        let cached = __raw_get<Int64> record 40 in
+        if cached >= 0 then Ok (Some (Stdlib.Int.fromInt64 cached))
         else
-            let status = __mapped_alloc 8L in
-            let _ = __raw_write_word status 0L 0L in
-            let rc = Builtin.__childWait4 (__raw_get<Int64> record 8L) status 1L (__word_to_rawptr 0L) in
-            let raw = __raw_get<Int64> status 0L in
+            let status = __mapped_alloc 8 in
+            let _ = __raw_write_word status 0 0 in
+            let rc = Builtin.__childWait4 (__raw_get<Int64> record 8) status 1 (__word_to_rawptr 0) in
+            let raw = __raw_get<Int64> status 0 in
             let _ = __mapped_free status in
-            if rc < 0L then Error (Stdlib.Int.fromInt64 (0L - rc))
-            else if rc == 0L then Ok None
+            if rc < 0 then Error (Stdlib.Int.fromInt64 (0 - rc))
+            else if rc == 0 then Ok None
             else
-                let signal = Stdlib.Int64.bitwiseAnd raw 127L in
-                let exitCode = if signal == 0L then Stdlib.Int64.bitwiseAnd (raw / 256L) 255L else 128L + signal in
-                let _ = __raw_write_word record 40L exitCode in
+                let signal = Stdlib.Int64.bitwiseAnd raw 127 in
+                let exitCode = if signal == 0 then Stdlib.Int64.bitwiseAnd (raw / 256) 255 else 128 + signal in
+                let _ = __raw_write_word record 40 exitCode in
                 Ok (Some (Stdlib.Int.fromInt64 exitCode))
 
 let runtimeChildKill (handle: Int) : Stdlib.Result.Result<Unit, Int> =
@@ -108,88 +108,88 @@ let runtimeChildKill (handle: Int) : Stdlib.Result.Result<Unit, Int> =
     | Error e -> Error e
     | Ok (Some _) -> Ok (())
     | Ok None ->
-        let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1L in
-        match Stdlib.Cli.__kill (__raw_get<Int64> (Builtin.__childAddress slot) 8L) 9L with
+        let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1 in
+        match Stdlib.Cli.__kill (__raw_get<Int64> (Builtin.__childAddress slot) 8) 9 with
         | Ok _ -> Ok (())
         | Error e -> Error (Stdlib.Int.fromInt64 e.errno)
 
 let runtimeChildWait (handle: Int) : Stdlib.Result.Result<Int, Int> =
-    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1L in
-    if slot == 0L then Error 9
+    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1 in
+    if slot == 0 then Error 9z
     else
         let record = Builtin.__childAddress slot in
-        let cached = __raw_get<Int64> record 40L in
-        if cached >= 0L then Ok (Stdlib.Int.fromInt64 cached)
+        let cached = __raw_get<Int64> record 40 in
+        if cached >= 0 then Ok (Stdlib.Int.fromInt64 cached)
         else
-            let status = __mapped_alloc 8L in
-            let _ = __raw_write_word status 0L 0L in
-            let rc = Builtin.__childWait4 (__raw_get<Int64> record 8L) status 0L (__word_to_rawptr 0L) in
-            let raw = __raw_get<Int64> status 0L in
+            let status = __mapped_alloc 8 in
+            let _ = __raw_write_word status 0 0 in
+            let rc = Builtin.__childWait4 (__raw_get<Int64> record 8) status 0 (__word_to_rawptr 0) in
+            let raw = __raw_get<Int64> status 0 in
             let _ = __mapped_free status in
-            if rc < 0L then Error (Stdlib.Int.fromInt64 (0L - rc))
+            if rc < 0 then Error (Stdlib.Int.fromInt64 (0 - rc))
             else
-                let signal = Stdlib.Int64.bitwiseAnd raw 127L in
-                let exitCode = if signal == 0L then Stdlib.Int64.bitwiseAnd (raw / 256L) 255L else 128L + signal in
-                let _ = __raw_write_word record 40L exitCode in
+                let signal = Stdlib.Int64.bitwiseAnd raw 127 in
+                let exitCode = if signal == 0 then Stdlib.Int64.bitwiseAnd (raw / 256) 255 else 128 + signal in
+                let _ = __raw_write_word record 40 exitCode in
                 Ok (Stdlib.Int.fromInt64 exitCode)
 
 let runtimeChildClosePort (handle: Int) (index: Int) : Stdlib.Result.Result<Unit, Int> =
-    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1L in
-    if slot == 0L || index < 0 || index > 2 then Error 9
+    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1 in
+    if slot == 0 || index < 0z || index > 2z then Error 9z
     else
         let record = Builtin.__childAddress slot in
-        let offset = 16L + Builtin.__posixInt64 index * 8L in
+        let offset = 16 + Builtin.__posixInt64 index * 8 in
         let fd = __raw_get<Int64> record offset in
-        if fd < 0L then Ok (())
+        if fd < 0 then Ok (())
         else
-            let _ = __raw_write_word record offset -1L in
+            let _ = __raw_write_word record offset -1 in
             Builtin.__syscallUnitResult (Stdlib.Cli.__Posix.__close fd)
 
 let runtimeChildBufferGet (handle: Int) (index: Int) : Stdlib.Result.Result<Blob, Int> =
-    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1L in
-    if slot == 0L || index < 0 || index > 1 then Error 9
+    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1 in
+    if slot == 0 || index < 0z || index > 1z then Error 9z
     else
-        let address = __raw_get<Int64> (Builtin.__childAddress slot) (48L + Builtin.__posixInt64 index * 8L) in
-        if address == 0L then Ok (Stdlib.Blob.fromList [])
+        let address = __raw_get<Int64> (Builtin.__childAddress slot) (48 + Builtin.__posixInt64 index * 8) in
+        if address == 0 then Ok (Stdlib.Blob.fromList [])
         else
             let ptr = __word_to_rawptr address in
-            Ok (Stdlib.Cli.__Posix.__bufferBytes ptr 8L (8L + __raw_get<Int64> ptr 0L) [])
+            Ok (Stdlib.Cli.__Posix.__bufferBytes ptr 8 (8 + __raw_get<Int64> ptr 0) [])
 
 let runtimeChildBufferSet (handle: Int) (index: Int) (bytes: Blob) : Stdlib.Result.Result<Unit, Int> =
-    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1L in
-    if slot == 0L || index < 0 || index > 1 then Error 9
+    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1 in
+    if slot == 0 || index < 0z || index > 1z then Error 9z
     else
         let record = Builtin.__childAddress slot in
-        let offset = 48L + Builtin.__posixInt64 index * 8L in
+        let offset = 48 + Builtin.__posixInt64 index * 8 in
         let old = __raw_get<Int64> record offset in
         let length = Stdlib.Blob.__byteLength bytes in
-        let ptr = __mapped_alloc (8L + length) in
-        let _ = __raw_write_word ptr 0L length in
-        let _ = Stdlib.Cli.__Posix.__writeBytes bytes (__word_to_rawptr (__rawptr_to_word ptr + 8L)) 0L in
+        let ptr = __mapped_alloc (8 + length) in
+        let _ = __raw_write_word ptr 0 length in
+        let _ = Stdlib.Cli.__Posix.__writeBytes bytes (__word_to_rawptr (__rawptr_to_word ptr + 8)) 0 in
         let _ = __raw_write_word record offset (__rawptr_to_word ptr) in
-        let _ = if old == 0L then () else __mapped_free (__word_to_rawptr old) in
+        let _ = if old == 0 then () else __mapped_free (__word_to_rawptr old) in
         Ok (())
 
 let runtimeChildClose (handle: Int) : Stdlib.Result.Result<Unit, Int> =
-    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1L in
-    if slot == 0L then Error 9
+    let slot = Builtin.__childFind (Builtin.__posixInt64 handle) 1 in
+    if slot == 0 then Error 9z
     else
         let record = Builtin.__childAddress slot in
-        let _ = Builtin.runtimeChildClosePort handle 0 in
-        let _ = Builtin.runtimeChildClosePort handle 1 in
-        let _ = Builtin.runtimeChildClosePort handle 2 in
+        let _ = Builtin.runtimeChildClosePort handle 0z in
+        let _ = Builtin.runtimeChildClosePort handle 1z in
+        let _ = Builtin.runtimeChildClosePort handle 2z in
         match Builtin.runtimeChildKill handle with
         | Error e -> Error e
         | Ok _ ->
-            let status = __mapped_alloc 8L in
-            let rc = if __raw_get<Int64> record 40L >= 0L then 0L
-                     else Builtin.__childWait4 (__raw_get<Int64> record 8L) status 0L (__word_to_rawptr 0L) in
+            let status = __mapped_alloc 8 in
+            let rc = if __raw_get<Int64> record 40 >= 0 then 0
+                     else Builtin.__childWait4 (__raw_get<Int64> record 8) status 0 (__word_to_rawptr 0) in
             let _ = __mapped_free status in
-            if rc < 0L && rc != -10L then Error (Stdlib.Int.fromInt64 (0L - rc))
+            if rc < 0 && rc != -10 then Error (Stdlib.Int.fromInt64 (0 - rc))
             else
-                let first = __raw_get<Int64> record 48L in
-                let second = __raw_get<Int64> record 56L in
-                let _ = if first == 0L then () else __mapped_free (__word_to_rawptr first) in
-                let _ = if second == 0L then () else __mapped_free (__word_to_rawptr second) in
-                let _ = __raw_write_word record 0L 0L in
+                let first = __raw_get<Int64> record 48 in
+                let second = __raw_get<Int64> record 56 in
+                let _ = if first == 0 then () else __mapped_free (__word_to_rawptr first) in
+                let _ = if second == 0 then () else __mapped_free (__word_to_rawptr second) in
+                let _ = __raw_write_word record 0 0 in
                 Ok (())

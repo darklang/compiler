@@ -10,187 +10,187 @@ type __InternalValueView = Int64
 type __InternalEnumObject = EnumNotObject | EnumNoFields | EnumOneField of String * Stdlib.Json.__InternalValueView | EnumManyFields of List<String>
 
 let __makeView (start: Int64) (endIndex: Int64) : Stdlib.Json.__InternalValueView =
-    Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft start 32L) endIndex
+    Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft start 32) endIndex
 
 let __viewStart (view: Stdlib.Json.__InternalValueView) : Int64 =
-    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight view 32L) 2147483647L
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight view 32) 2147483647
 
 let __viewEnd (view: Stdlib.Json.__InternalValueView) : Int64 =
-    Stdlib.Int64.bitwiseAnd view 2147483647L
+    Stdlib.Int64.bitwiseAnd view 2147483647
 
-let __viewHasSingleField (view: Stdlib.Json.__InternalValueView) : Bool = view < 0L
+let __viewHasSingleField (view: Stdlib.Json.__InternalValueView) : Bool = view < 0
 
 let __viewIsDuplicate (view: Stdlib.Json.__InternalValueView) : Bool =
-    (Stdlib.Int64.bitwiseAnd view 2147483648L) != 0L
+    (Stdlib.Int64.bitwiseAnd view 2147483648) != 0
 
 let __markDuplicate (view: Stdlib.Json.__InternalValueView) : Stdlib.Json.__InternalValueView =
-    Stdlib.Int64.bitwiseOr view 2147483648L
+    Stdlib.Int64.bitwiseOr view 2147483648
 
 // A scan answers the index after what it read, or a negative number naming
 // the byte where the text stopped being JSON: `__failAt index`.
-let __failAt (index: Int64) : Int64 = -2L - index
+let __failAt (index: Int64) : Int64 = -2 - index
 
-let __failureIndex (scanned: Int64) : Int64 = -2L - scanned
+let __failureIndex (scanned: Int64) : Int64 = -2 - scanned
 
 let __scanStringChars (source: String) (index: Int64) (length: Int64) : Int64 =
     if index >= length then Stdlib.Json.__failAt length
     else
         let byte = Stdlib.String.__byteAtUnchecked source index in
-        if byte == 34L then index + 1L
-        else if byte < 32L then Stdlib.Json.__failAt index
-        else if byte != 92L then
+        if byte == 34 then index + 1
+        else if byte < 32 then Stdlib.Json.__failAt index
+        else if byte != 92 then
             let decoded = Stdlib.String.__decodeUtf8At source index in
             let consumed = Stdlib.Tuple2.second decoded in
             Stdlib.Json.__scanStringChars source (index + consumed) length
-        else if index + 1L >= length then Stdlib.Json.__failAt length
+        else if index + 1 >= length then Stdlib.Json.__failAt length
         else
-            let escaped = Stdlib.String.__byteAtUnchecked source (index + 1L) in
-            if escaped == 34L || escaped == 92L || escaped == 47L
-               || escaped == 98L || escaped == 102L || escaped == 110L
-               || escaped == 114L || escaped == 116L then
-                Stdlib.Json.__scanStringChars source (index + 2L) length
-            else if escaped == 117L then
-                let first = Stdlib.AltJson.__hex4 source (index + 2L) length in
-                if first < 0L then Stdlib.Json.__failAt (index + 2L)
-                else if first >= 55296L && first <= 56319L then
-                    if index + 12L > length
-                       || Stdlib.String.__byteAtUnchecked source (index + 6L) != 92L
-                       || Stdlib.String.__byteAtUnchecked source (index + 7L) != 117L then Stdlib.Json.__failAt (index + 6L)
+            let escaped = Stdlib.String.__byteAtUnchecked source (index + 1) in
+            if escaped == 34 || escaped == 92 || escaped == 47
+               || escaped == 98 || escaped == 102 || escaped == 110
+               || escaped == 114 || escaped == 116 then
+                Stdlib.Json.__scanStringChars source (index + 2) length
+            else if escaped == 117 then
+                let first = Stdlib.AltJson.__hex4 source (index + 2) length in
+                if first < 0 then Stdlib.Json.__failAt (index + 2)
+                else if first >= 55296 && first <= 56319 then
+                    if index + 12 > length
+                       || Stdlib.String.__byteAtUnchecked source (index + 6) != 92
+                       || Stdlib.String.__byteAtUnchecked source (index + 7) != 117 then Stdlib.Json.__failAt (index + 6)
                     else
-                        let second = Stdlib.AltJson.__hex4 source (index + 8L) length in
-                        if second < 56320L || second > 57343L then Stdlib.Json.__failAt (index + 8L)
-                        else Stdlib.Json.__scanStringChars source (index + 12L) length
-                else if first >= 56320L && first <= 57343L then Stdlib.Json.__failAt (index + 2L)
-                else Stdlib.Json.__scanStringChars source (index + 6L) length
-            else Stdlib.Json.__failAt (index + 1L)
+                        let second = Stdlib.AltJson.__hex4 source (index + 8) length in
+                        if second < 56320 || second > 57343 then Stdlib.Json.__failAt (index + 8)
+                        else Stdlib.Json.__scanStringChars source (index + 12) length
+                else if first >= 56320 && first <= 57343 then Stdlib.Json.__failAt (index + 2)
+                else Stdlib.Json.__scanStringChars source (index + 6) length
+            else Stdlib.Json.__failAt (index + 1)
 
 let __scanString (source: String) (index: Int64) (length: Int64) : Int64 =
     if index >= length then Stdlib.Json.__failAt length
-    else if Stdlib.String.__byteAtUnchecked source index != 34L then Stdlib.Json.__failAt index
-    else Stdlib.Json.__scanStringChars source (index + 1L) length
+    else if Stdlib.String.__byteAtUnchecked source index != 34 then Stdlib.Json.__failAt index
+    else Stdlib.Json.__scanStringChars source (index + 1) length
 
 // Trivia ends where the next token starts; an unterminated comment runs to
 // the end of the text.
 let __skipTrivia (source: String) (index: Int64) (length: Int64) : Int64 =
     let skipped = Stdlib.AltJson.__skipTrivia source index length in
-    if skipped < 0L then Stdlib.Json.__failAt length else skipped
+    if skipped < 0 then Stdlib.Json.__failAt length else skipped
 
 // Where a number __scanNumber refused stops being a JSON number: a missing
 // digit, a second leading zero, or an empty fraction or exponent.
 let __numberFailure (source: String) (index: Int64) (length: Int64) : Int64 =
     let afterSign =
-        if index < length && Stdlib.String.__byteAtUnchecked source index == 45L then index + 1L
+        if index < length && Stdlib.String.__byteAtUnchecked source index == 45 then index + 1
         else index in
-    let first = if afterSign < length then Stdlib.String.__byteAtUnchecked source afterSign else -1L in
-    if first < 48L || first > 57L then afterSign
+    let first = if afterSign < length then Stdlib.String.__byteAtUnchecked source afterSign else -1 in
+    if first < 48 || first > 57 then afterSign
     else
         let afterInteger =
-            if first == 48L then afterSign + 1L
-            else Stdlib.AltJson.__scanDigits source (afterSign + 1L) length in
-        let next = if afterInteger < length then Stdlib.String.__byteAtUnchecked source afterInteger else -1L in
-        if first == 48L && next >= 48L && next <= 57L then afterInteger
-        else if next == 46L then
-            let fractionEnd = Stdlib.AltJson.__scanDigits source (afterInteger + 1L) length in
-            if fractionEnd == afterInteger + 1L then fractionEnd
+            if first == 48 then afterSign + 1
+            else Stdlib.AltJson.__scanDigits source (afterSign + 1) length in
+        let next = if afterInteger < length then Stdlib.String.__byteAtUnchecked source afterInteger else -1 in
+        if first == 48 && next >= 48 && next <= 57 then afterInteger
+        else if next == 46 then
+            let fractionEnd = Stdlib.AltJson.__scanDigits source (afterInteger + 1) length in
+            if fractionEnd == afterInteger + 1 then fractionEnd
             else Stdlib.Json.__exponentFailure source fractionEnd length
         else Stdlib.Json.__exponentFailure source afterInteger length
 
 let __exponentFailure (source: String) (marker: Int64) (length: Int64) : Int64 =
-    let signAt = marker + 1L in
+    let signAt = marker + 1 in
     if signAt < length
-       && (Stdlib.String.__byteAtUnchecked source signAt == 43L
-           || Stdlib.String.__byteAtUnchecked source signAt == 45L) then signAt + 1L
+       && (Stdlib.String.__byteAtUnchecked source signAt == 43
+           || Stdlib.String.__byteAtUnchecked source signAt == 45) then signAt + 1
     else signAt
 
 let __scanArray (source: String) (index: Int64) (length: Int64) : Int64 =
     let current = Stdlib.Json.__skipTrivia source index length in
-    if current < 0L then current
+    if current < 0 then current
     else if current >= length then Stdlib.Json.__failAt length
-    else if Stdlib.String.__byteAtUnchecked source current == 93L then current + 1L
+    else if Stdlib.String.__byteAtUnchecked source current == 93 then current + 1
     else
         let scannedValue = Stdlib.Json.__scanValue source current length in
-        if scannedValue < 0L then scannedValue
+        if scannedValue < 0 then scannedValue
         else
-            let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
+            let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295 in
             let afterTrivia = Stdlib.Json.__skipTrivia source afterValue length in
-            if afterTrivia < 0L then afterTrivia
+            if afterTrivia < 0 then afterTrivia
             else if afterTrivia >= length then Stdlib.Json.__failAt length
             else
                 let separator = Stdlib.String.__byteAtUnchecked source afterTrivia in
-                if separator == 93L then afterTrivia + 1L
-                else if separator == 44L then
-                    let afterComma = Stdlib.Json.__skipTrivia source (afterTrivia + 1L) length in
-                    if afterComma < 0L then afterComma
+                if separator == 93 then afterTrivia + 1
+                else if separator == 44 then
+                    let afterComma = Stdlib.Json.__skipTrivia source (afterTrivia + 1) length in
+                    if afterComma < 0 then afterComma
                     else if afterComma >= length then Stdlib.Json.__failAt length
-                    else if Stdlib.String.__byteAtUnchecked source afterComma == 93L then
+                    else if Stdlib.String.__byteAtUnchecked source afterComma == 93 then
                         Stdlib.Json.__failAt afterComma
                     else
                         let rest = Stdlib.Json.__scanArray source afterComma length in
-                        if rest < 0L then rest else Stdlib.Int64.bitwiseAnd rest 4294967295L
+                        if rest < 0 then rest else Stdlib.Int64.bitwiseAnd rest 4294967295
                 else Stdlib.Json.__failAt afterTrivia
 
 let __scanObject (source: String) (index: Int64) (length: Int64) : Int64 =
     let current = Stdlib.Json.__skipTrivia source index length in
-    if current < 0L then current
+    if current < 0 then current
     else if current >= length then Stdlib.Json.__failAt length
-    else if Stdlib.String.__byteAtUnchecked source current == 125L then current + 1L
+    else if Stdlib.String.__byteAtUnchecked source current == 125 then current + 1
     else
         let afterKey = Stdlib.Json.__scanString source current length in
-        if afterKey < 0L then afterKey
+        if afterKey < 0 then afterKey
         else
             let colon = Stdlib.Json.__skipTrivia source afterKey length in
-            if colon < 0L then colon
+            if colon < 0 then colon
             else if colon >= length then Stdlib.Json.__failAt length
-            else if Stdlib.String.__byteAtUnchecked source colon != 58L then Stdlib.Json.__failAt colon
+            else if Stdlib.String.__byteAtUnchecked source colon != 58 then Stdlib.Json.__failAt colon
             else
-                let scannedValue = Stdlib.Json.__scanValue source (colon + 1L) length in
-                if scannedValue < 0L then scannedValue
+                let scannedValue = Stdlib.Json.__scanValue source (colon + 1) length in
+                if scannedValue < 0 then scannedValue
                 else
-                    let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
+                    let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295 in
                     let afterTrivia = Stdlib.Json.__skipTrivia source afterValue length in
-                    if afterTrivia < 0L then afterTrivia
+                    if afterTrivia < 0 then afterTrivia
                     else if afterTrivia >= length then Stdlib.Json.__failAt length
                     else
                         let separator = Stdlib.String.__byteAtUnchecked source afterTrivia in
-                        if separator == 125L then Stdlib.Int64.bitwiseOr (afterTrivia + 1L) 4611686018427387904L
-                        else if separator == 44L then
-                            let afterComma = Stdlib.Json.__skipTrivia source (afterTrivia + 1L) length in
-                            if afterComma < 0L then afterComma
+                        if separator == 125 then Stdlib.Int64.bitwiseOr (afterTrivia + 1) 4611686018427387904
+                        else if separator == 44 then
+                            let afterComma = Stdlib.Json.__skipTrivia source (afterTrivia + 1) length in
+                            if afterComma < 0 then afterComma
                             else if afterComma >= length then Stdlib.Json.__failAt length
-                            else if Stdlib.String.__byteAtUnchecked source afterComma == 125L then
+                            else if Stdlib.String.__byteAtUnchecked source afterComma == 125 then
                                 Stdlib.Json.__failAt afterComma
                             else
                                 let rest = Stdlib.Json.__scanObject source afterComma length in
-                                if rest < 0L then rest else Stdlib.Int64.bitwiseAnd rest 4294967295L
+                                if rest < 0 then rest else Stdlib.Int64.bitwiseAnd rest 4294967295
                         else Stdlib.Json.__failAt afterTrivia
 
 // The first byte from index at which text stops spelling word.
 let __literalFailure (source: String) (index: Int64) (length: Int64) (word: String) (offset: Int64) : Int64 =
-    if offset >= Stdlib.String.__byteLength word then -1L
+    if offset >= Stdlib.String.__byteLength word then -1
     else if index + offset >= length then index + offset
     else if Stdlib.String.__byteAtUnchecked source (index + offset) != Stdlib.String.__byteAtUnchecked word offset then index + offset
-    else Stdlib.Json.__literalFailure source index length word (offset + 1L)
+    else Stdlib.Json.__literalFailure source index length word (offset + 1)
 
 let __scanLiteral (source: String) (index: Int64) (length: Int64) (word: String) : Int64 =
-    let failure = Stdlib.Json.__literalFailure source index length word 0L in
-    if failure < 0L then index + Stdlib.String.__byteLength word else Stdlib.Json.__failAt failure
+    let failure = Stdlib.Json.__literalFailure source index length word 0 in
+    if failure < 0 then index + Stdlib.String.__byteLength word else Stdlib.Json.__failAt failure
 
 let __scanValue (source: String) (index: Int64) (length: Int64) : Int64 =
     let start = Stdlib.Json.__skipTrivia source index length in
-    if start < 0L then start
+    if start < 0 then start
     else if start >= length then Stdlib.Json.__failAt length
     else
         let byte = Stdlib.String.__byteAtUnchecked source start in
-        if byte == 110L then Stdlib.Json.__scanLiteral source start length "null"
-        else if byte == 116L then Stdlib.Json.__scanLiteral source start length "true"
-        else if byte == 102L then Stdlib.Json.__scanLiteral source start length "false"
-        else if byte == 34L then
+        if byte == 110 then Stdlib.Json.__scanLiteral source start length "null"
+        else if byte == 116 then Stdlib.Json.__scanLiteral source start length "true"
+        else if byte == 102 then Stdlib.Json.__scanLiteral source start length "false"
+        else if byte == 34 then
             Stdlib.Json.__scanString source start length
-        else if byte == 91L then Stdlib.Json.__scanArray source (start + 1L) length
-        else if byte == 123L then Stdlib.Json.__scanObject source (start + 1L) length
-        else if byte == 45L || (byte >= 48L && byte <= 57L) then
+        else if byte == 91 then Stdlib.Json.__scanArray source (start + 1) length
+        else if byte == 123 then Stdlib.Json.__scanObject source (start + 1) length
+        else if byte == 45 || (byte >= 48 && byte <= 57) then
             let scanned = Stdlib.AltJson.__scanNumber source start length in
-            if scanned < 0L then Stdlib.Json.__failAt (Stdlib.Json.__numberFailure source start length)
+            if scanned < 0 then Stdlib.Json.__failAt (Stdlib.Json.__numberFailure source start length)
             else scanned
         else Stdlib.Json.__failAt start
 
@@ -200,40 +200,40 @@ let __lineAndColumn (source: String) (target: Int64) (index: Int64) (line: Int64
     if index >= target then Stdlib.Json.ParseError.ParseError.NotJson (line, column)
     else
         let byte = Stdlib.String.__byteAtUnchecked source index in
-        if byte == 10L then Stdlib.Json.__lineAndColumn source target (index + 1L) (line + 1L) 1L
-        else if byte >= 128L && byte < 192L then Stdlib.Json.__lineAndColumn source target (index + 1L) line column
-        else Stdlib.Json.__lineAndColumn source target (index + 1L) line (column + 1L)
+        if byte == 10 then Stdlib.Json.__lineAndColumn source target (index + 1) (line + 1) 1
+        else if byte >= 128 && byte < 192 then Stdlib.Json.__lineAndColumn source target (index + 1) line column
+        else Stdlib.Json.__lineAndColumn source target (index + 1) line (column + 1)
 
 let __notJsonAt (source: String) (index: Int64) : Stdlib.Json.ParseError.ParseError =
-    Stdlib.Json.__lineAndColumn source index 0L 1L 1L
+    Stdlib.Json.__lineAndColumn source index 0 1 1
 
 // Typed JSON keeps shallow raw slices rather than building the recursive
 // RawJson tree. The shared scanner owns syntax validation; generated decoders
 // only select fields and construct values of their statically known target
 // types.
 let __skipTriviaBackward (source: String) (endIndex: Int64) : Int64 =
-    if endIndex <= 0L then 0L
+    if endIndex <= 0 then 0
     else
-        let byte = Stdlib.String.__byteAtUnchecked source (endIndex - 1L) in
-        if byte == 32L || byte == 9L || byte == 10L || byte == 13L then
-            Stdlib.Json.__skipTriviaBackward source (endIndex - 1L)
+        let byte = Stdlib.String.__byteAtUnchecked source (endIndex - 1) in
+        if byte == 32 || byte == 9 || byte == 10 || byte == 13 then
+            Stdlib.Json.__skipTriviaBackward source (endIndex - 1)
         else endIndex
 
 let __parseRoot (source: String) : Stdlib.Result.Result<Stdlib.Json.__InternalValueView, Stdlib.Json.ParseError.ParseError> =
     let length = Stdlib.String.__byteLength source in
-    let scannedValue = Stdlib.Json.__scanValue source 0L length in
-    if scannedValue < 0L then
+    let scannedValue = Stdlib.Json.__scanValue source 0 length in
+    if scannedValue < 0 then
         Stdlib.Result.Result.Error (Stdlib.Json.__notJsonAt source (Stdlib.Json.__failureIndex scannedValue))
     else
-        let start = Stdlib.AltJson.__skipTrivia source 0L length in
-        let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
+        let start = Stdlib.AltJson.__skipTrivia source 0 length in
+        let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295 in
         let endIndex = Stdlib.Json.__skipTrivia source afterValue length in
-        if endIndex < 0L then
+        if endIndex < 0 then
             Stdlib.Result.Result.Error (Stdlib.Json.__notJsonAt source (Stdlib.Json.__failureIndex endIndex))
         else if endIndex == length then
-            let view = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft start 32L) afterValue in
-            if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904L) != 0L then
-                Stdlib.Result.Result.Ok (Stdlib.Int64.bitwiseOr view -9223372036854775808L)
+            let view = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft start 32) afterValue in
+            if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904) != 0 then
+                Stdlib.Result.Result.Ok (Stdlib.Int64.bitwiseOr view -9223372036854775808)
             else Stdlib.Result.Result.Ok view
         else Stdlib.Result.Result.Error (Stdlib.Json.__notJsonAt source endIndex)
 
@@ -267,18 +267,18 @@ let __viewByte (source: String) (view: Stdlib.Json.__InternalValueView) : Int64 
     Stdlib.String.__byteAtUnchecked source (Stdlib.Json.__viewStart view)
 
 let __isNull (source: String) (view: Stdlib.Json.__InternalValueView) : Bool =
-    Stdlib.Json.__viewEnd view - Stdlib.Json.__viewStart view == 4L
+    Stdlib.Json.__viewEnd view - Stdlib.Json.__viewStart view == 4
     && Stdlib.String.__byteSlice source (Stdlib.Json.__viewStart view) (Stdlib.Json.__viewEnd view) == "null"
 
 let __boolValue (source: String) (view: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Bool> =
     let byte = Stdlib.Json.__viewByte source view in
     let text = Stdlib.Json.__viewText source view in
-    if byte == 116L && text == "true" then Stdlib.Option.Option.Some true
-    else if byte == 102L && text == "false" then Stdlib.Option.Option.Some false
+    if byte == 116 && text == "true" then Stdlib.Option.Option.Some true
+    else if byte == 102 && text == "false" then Stdlib.Option.Option.Some false
     else Stdlib.Option.Option.None
 
 let __stringValue (source: String) (view: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<String> =
-    if Stdlib.String.__byteAtUnchecked source (Stdlib.Json.__viewStart view) != 34L then Stdlib.Option.Option.None
+    if Stdlib.String.__byteAtUnchecked source (Stdlib.Json.__viewStart view) != 34 then Stdlib.Option.Option.None
     else
         match Stdlib.AltJson.__parseString source (Stdlib.Json.__viewStart view) (Stdlib.Json.__viewEnd view) with
         | ParsedString (decoded, afterString) ->
@@ -288,32 +288,32 @@ let __stringValue (source: String) (view: Stdlib.Json.__InternalValueView) : Std
 
 let __isNumber (source: String) (view: Stdlib.Json.__InternalValueView) : Bool =
     let byte = Stdlib.Json.__viewByte source view in
-    byte == 45L || (byte >= 48L && byte <= 57L)
+    byte == 45 || (byte >= 48 && byte <= 57)
 
 let __collectArrayItems (source: String) (index: Int64) (limit: Int64) : Stdlib.Option.Option<List<Stdlib.Json.__InternalValueView>> =
     let current = Stdlib.AltJson.__skipTrivia source index limit in
-    if current < 0L || current >= limit then Stdlib.Option.Option.None
-    else if Stdlib.String.__byteAtUnchecked source current == 93L then
-        if current + 1L == limit then Stdlib.Option.Option.Some []
+    if current < 0 || current >= limit then Stdlib.Option.Option.None
+    else if Stdlib.String.__byteAtUnchecked source current == 93 then
+        if current + 1 == limit then Stdlib.Option.Option.Some []
         else Stdlib.Option.Option.None
     else
         let scannedValue = Stdlib.Json.__scanValue source current limit in
-        if scannedValue < 0L then Stdlib.Option.Option.None
+        if scannedValue < 0 then Stdlib.Option.Option.None
         else
-            let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
-            let plainValue = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft current 32L) afterValue in
+            let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295 in
+            let plainValue = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft current 32) afterValue in
             let value =
-                if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904L) != 0L then
-                    Stdlib.Int64.bitwiseOr plainValue -9223372036854775808L
+                if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904) != 0 then
+                    Stdlib.Int64.bitwiseOr plainValue -9223372036854775808
                 else plainValue in
             let afterTrivia = Stdlib.AltJson.__skipTrivia source afterValue limit in
-            if afterTrivia < 0L || afterTrivia >= limit then Stdlib.Option.Option.None
+            if afterTrivia < 0 || afterTrivia >= limit then Stdlib.Option.Option.None
             else
                 let separator = Stdlib.String.__byteAtUnchecked source afterTrivia in
-                if separator == 93L && afterTrivia + 1L == limit then
+                if separator == 93 && afterTrivia + 1 == limit then
                     Stdlib.Option.Option.Some ([value])
-                else if separator == 44L then
-                    match Stdlib.Json.__collectArrayItems source (afterTrivia + 1L) limit with
+                else if separator == 44 then
+                    match Stdlib.Json.__collectArrayItems source (afterTrivia + 1) limit with
                     | Some rest ->
                         Stdlib.Option.Option.Some (
                             Stdlib.List.push rest value)
@@ -321,74 +321,74 @@ let __collectArrayItems (source: String) (index: Int64) (limit: Int64) : Stdlib.
                 else Stdlib.Option.Option.None
 
 let __arrayItems (source: String) (view: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<List<Stdlib.Json.__InternalValueView>> =
-    if Stdlib.Json.__viewByte source view != 91L then Stdlib.Option.Option.None
-    else Stdlib.Json.__collectArrayItems source (Stdlib.Json.__viewStart view + 1L) (Stdlib.Json.__viewEnd view)
+    if Stdlib.Json.__viewByte source view != 91 then Stdlib.Option.Option.None
+    else Stdlib.Json.__collectArrayItems source (Stdlib.Json.__viewStart view + 1) (Stdlib.Json.__viewEnd view)
 
 let __arrayStart (source: String) (view: Stdlib.Json.__InternalValueView) : Int64 =
-    if Stdlib.Json.__viewByte source view != 91L then -1L
-    else Stdlib.Json.__viewStart view + 1L
+    if Stdlib.Json.__viewByte source view != 91 then -1
+    else Stdlib.Json.__viewStart view + 1
 
 // Streaming list traversal. Results other than -1 and -2 are packed item
 // views; flagged single-field objects intentionally have a negative value.
 let __arrayNext (source: String) (arrayView: Stdlib.Json.__InternalValueView) (nextIndex: Int64) : Stdlib.Json.__InternalValueView =
     let limit = Stdlib.Json.__viewEnd arrayView in
     let current = Stdlib.AltJson.__skipTrivia source nextIndex limit in
-    if current < 0L || current >= limit then -2L
-    else if Stdlib.String.__byteAtUnchecked source current == 93L then
-        if current + 1L == limit then -1L else -2L
+    if current < 0 || current >= limit then -2
+    else if Stdlib.String.__byteAtUnchecked source current == 93 then
+        if current + 1 == limit then -1 else -2
     else
         let scannedValue = Stdlib.Json.__scanValue source current limit in
-        if scannedValue < 0L then -2L
+        if scannedValue < 0 then -2
         else
-            let plainView = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft current 32L) (Stdlib.Int64.bitwiseAnd scannedValue 4294967295L) in
-            if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904L) != 0L then
-                Stdlib.Int64.bitwiseOr plainView -9223372036854775808L
+            let plainView = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft current 32) (Stdlib.Int64.bitwiseAnd scannedValue 4294967295) in
+            if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904) != 0 then
+                Stdlib.Int64.bitwiseOr plainView -9223372036854775808
             else plainView
 
 let __arrayAfter (source: String) (arrayView: Stdlib.Json.__InternalValueView) (itemView: Stdlib.Json.__InternalValueView) : Int64 =
     let limit = Stdlib.Json.__viewEnd arrayView in
     let afterTrivia = Stdlib.AltJson.__skipTrivia source (Stdlib.Json.__viewEnd itemView) limit in
-    if afterTrivia < 0L || afterTrivia >= limit then -2L
+    if afterTrivia < 0 || afterTrivia >= limit then -2
     else
         let separator = Stdlib.String.__byteAtUnchecked source afterTrivia in
-        if separator == 93L then afterTrivia
-        else if separator == 44L then afterTrivia + 1L
-        else -2L
+        if separator == 93 then afterTrivia
+        else if separator == 44 then afterTrivia + 1
+        else -2
 
 let __collectObjectFields (source: String) (index: Int64) (limit: Int64) : Stdlib.Option.Option<List<(String * Stdlib.Json.__InternalValueView)>> =
     let current = Stdlib.AltJson.__skipTrivia source index limit in
-    if current < 0L || current >= limit then Stdlib.Option.Option.None
-    else if Stdlib.String.__byteAtUnchecked source current == 125L then
-        if current + 1L == limit then Stdlib.Option.Option.Some []
+    if current < 0 || current >= limit then Stdlib.Option.Option.None
+    else if Stdlib.String.__byteAtUnchecked source current == 125 then
+        if current + 1 == limit then Stdlib.Option.Option.Some []
         else Stdlib.Option.Option.None
     else
         match Stdlib.AltJson.__parseString source current limit with
         | InvalidString -> Stdlib.Option.Option.None
         | ParsedString (key, afterKey) ->
             let colon = Stdlib.AltJson.__skipTrivia source afterKey limit in
-            if colon < 0L || colon >= limit || Stdlib.String.__byteAtUnchecked source colon != 58L then
+            if colon < 0 || colon >= limit || Stdlib.String.__byteAtUnchecked source colon != 58 then
                 Stdlib.Option.Option.None
             else
-                let valueStart = Stdlib.AltJson.__skipTrivia source (colon + 1L) limit in
+                let valueStart = Stdlib.AltJson.__skipTrivia source (colon + 1) limit in
                 let scannedValue = Stdlib.Json.__scanValue source valueStart limit in
-                if scannedValue < 0L then Stdlib.Option.Option.None
+                if scannedValue < 0 then Stdlib.Option.Option.None
                 else
-                    let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
-                    let plainValue = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft valueStart 32L) afterValue in
+                    let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295 in
+                    let plainValue = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft valueStart 32) afterValue in
                     let value =
-                        if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904L) != 0L then
-                            Stdlib.Int64.bitwiseOr plainValue -9223372036854775808L
+                        if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904) != 0 then
+                            Stdlib.Int64.bitwiseOr plainValue -9223372036854775808
                         else plainValue in
                     let field =
                         (key, value) in
                     let afterTrivia = Stdlib.AltJson.__skipTrivia source afterValue limit in
-                    if afterTrivia < 0L || afterTrivia >= limit then Stdlib.Option.Option.None
+                    if afterTrivia < 0 || afterTrivia >= limit then Stdlib.Option.Option.None
                     else
                         let separator = Stdlib.String.__byteAtUnchecked source afterTrivia in
-                        if separator == 125L && afterTrivia + 1L == limit then
+                        if separator == 125 && afterTrivia + 1 == limit then
                             Stdlib.Option.Option.Some ([field])
-                        else if separator == 44L then
-                            match Stdlib.Json.__collectObjectFields source (afterTrivia + 1L) limit with
+                        else if separator == 44 then
+                            match Stdlib.Json.__collectObjectFields source (afterTrivia + 1) limit with
                             | Some rest ->
                                 Stdlib.Option.Option.Some (
                                     Stdlib.List.push rest field)
@@ -396,32 +396,32 @@ let __collectObjectFields (source: String) (index: Int64) (limit: Int64) : Stdli
                         else Stdlib.Option.Option.None
 
 let __objectFields (source: String) (view: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<List<(String * Stdlib.Json.__InternalValueView)>> =
-    if Stdlib.Json.__viewByte source view != 123L then Stdlib.Option.Option.None
-    else Stdlib.Json.__collectObjectFields source (Stdlib.Json.__viewStart view + 1L) (Stdlib.Json.__viewEnd view)
+    if Stdlib.Json.__viewByte source view != 123 then Stdlib.Option.Option.None
+    else Stdlib.Json.__collectObjectFields source (Stdlib.Json.__viewStart view + 1) (Stdlib.Json.__viewEnd view)
 
 let __collectObjectFieldMap (source: String) (index: Int64) (limit: Int64) (acc: Dict<String, Stdlib.Json.__InternalValueView>) : Stdlib.Option.Option<Dict<String, Stdlib.Json.__InternalValueView>> =
     let current = Stdlib.AltJson.__skipTrivia source index limit in
-    if current < 0L || current >= limit then Stdlib.Option.Option.None
-    else if Stdlib.String.__byteAtUnchecked source current == 125L then
-        if current + 1L == limit then Stdlib.Option.Option.Some acc
+    if current < 0 || current >= limit then Stdlib.Option.Option.None
+    else if Stdlib.String.__byteAtUnchecked source current == 125 then
+        if current + 1 == limit then Stdlib.Option.Option.Some acc
         else Stdlib.Option.Option.None
     else
         match Stdlib.AltJson.__parseString source current limit with
         | InvalidString -> Stdlib.Option.Option.None
         | ParsedString (key, afterKey) ->
             let colon = Stdlib.AltJson.__skipTrivia source afterKey limit in
-            if colon < 0L || colon >= limit || Stdlib.String.__byteAtUnchecked source colon != 58L then
+            if colon < 0 || colon >= limit || Stdlib.String.__byteAtUnchecked source colon != 58 then
                 Stdlib.Option.Option.None
             else
-                let valueStart = Stdlib.AltJson.__skipTrivia source (colon + 1L) limit in
+                let valueStart = Stdlib.AltJson.__skipTrivia source (colon + 1) limit in
                 let scannedValue = Stdlib.Json.__scanValue source valueStart limit in
-                if scannedValue < 0L then Stdlib.Option.Option.None
+                if scannedValue < 0 then Stdlib.Option.Option.None
                 else
-                    let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295L in
-                    let plainValue = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft valueStart 32L) afterValue in
+                    let afterValue = Stdlib.Int64.bitwiseAnd scannedValue 4294967295 in
+                    let plainValue = Stdlib.Int64.bitwiseOr (Stdlib.Int64.shiftLeft valueStart 32) afterValue in
                     let value =
-                        if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904L) != 0L then
-                            Stdlib.Int64.bitwiseOr plainValue -9223372036854775808L
+                        if (Stdlib.Int64.bitwiseAnd scannedValue 4611686018427387904) != 0 then
+                            Stdlib.Int64.bitwiseOr plainValue -9223372036854775808
                         else plainValue in
                     let field =
                         match Stdlib.Dict.get acc key with
@@ -430,18 +430,18 @@ let __collectObjectFieldMap (source: String) (index: Int64) (limit: Int64) (acc:
                     let nextAcc =
                         Stdlib.Dict.setOverridingDuplicates acc key field in
                     let afterTrivia = Stdlib.AltJson.__skipTrivia source afterValue limit in
-                    if afterTrivia < 0L || afterTrivia >= limit then Stdlib.Option.Option.None
+                    if afterTrivia < 0 || afterTrivia >= limit then Stdlib.Option.Option.None
                     else
                         let separator = Stdlib.String.__byteAtUnchecked source afterTrivia in
-                        if separator == 125L && afterTrivia + 1L == limit then Stdlib.Option.Option.Some nextAcc
-                        else if separator == 44L then
-                            Stdlib.Json.__collectObjectFieldMap source (afterTrivia + 1L) limit nextAcc
+                        if separator == 125 && afterTrivia + 1 == limit then Stdlib.Option.Option.Some nextAcc
+                        else if separator == 44 then
+                            Stdlib.Json.__collectObjectFieldMap source (afterTrivia + 1) limit nextAcc
                         else Stdlib.Option.Option.None
 
 let __objectFieldMap (source: String) (view: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Dict<String, Stdlib.Json.__InternalValueView>> =
-    if Stdlib.Json.__viewByte source view != 123L then Stdlib.Option.Option.None
+    if Stdlib.Json.__viewByte source view != 123 then Stdlib.Option.Option.None
     else
-        Stdlib.Json.__collectObjectFieldMap source (Stdlib.Json.__viewStart view + 1L) (Stdlib.Json.__viewEnd view) (Dict { })
+        Stdlib.Json.__collectObjectFieldMap source (Stdlib.Json.__viewStart view + 1) (Stdlib.Json.__viewEnd view) (Dict { })
 
 let __fieldNames (fields: List<(String * Stdlib.Json.__InternalValueView)>) : List<String> =
     if Stdlib.List.isEmpty fields then []
@@ -459,26 +459,26 @@ let __enumCandidate (source: String) (view: Stdlib.Json.__InternalValueView) : S
     let endIndex = Stdlib.Json.__viewEnd view in
     if Stdlib.Bool.not (Stdlib.Json.__viewHasSingleField view) then
         Stdlib.Json.__enumObject source view
-    else if Stdlib.Json.__viewByte source view != 123L
-       || endIndex <= start + 1L
-       || Stdlib.String.__byteAtUnchecked source (endIndex - 1L) != 125L then
+    else if Stdlib.Json.__viewByte source view != 123
+       || endIndex <= start + 1
+       || Stdlib.String.__byteAtUnchecked source (endIndex - 1) != 125 then
         Stdlib.Json.__InternalEnumObject.EnumNotObject
     else
-        let current = Stdlib.AltJson.__skipTrivia source (start + 1L) (endIndex - 1L) in
-        if current < 0L || current >= endIndex - 1L then
+        let current = Stdlib.AltJson.__skipTrivia source (start + 1) (endIndex - 1) in
+        if current < 0 || current >= endIndex - 1 then
             Stdlib.Json.__InternalEnumObject.EnumNoFields
         else
-            match Stdlib.AltJson.__parseString source current (endIndex - 1L) with
+            match Stdlib.AltJson.__parseString source current (endIndex - 1) with
             | InvalidString -> Stdlib.Json.__InternalEnumObject.EnumNotObject
             | ParsedString (key, afterKey) ->
-                let colon = Stdlib.AltJson.__skipTrivia source afterKey (endIndex - 1L) in
-                if colon < 0L || colon >= endIndex - 1L
-                   || Stdlib.String.__byteAtUnchecked source colon != 58L then
+                let colon = Stdlib.AltJson.__skipTrivia source afterKey (endIndex - 1) in
+                if colon < 0 || colon >= endIndex - 1
+                   || Stdlib.String.__byteAtUnchecked source colon != 58 then
                     Stdlib.Json.__InternalEnumObject.EnumNotObject
                 else
-                    let valueStart = Stdlib.AltJson.__skipTrivia source (colon + 1L) (endIndex - 1L) in
-                    let valueEnd = Stdlib.Json.__skipTriviaBackward source (endIndex - 1L) in
-                    if valueStart < 0L || valueStart >= valueEnd then
+                    let valueStart = Stdlib.AltJson.__skipTrivia source (colon + 1) (endIndex - 1) in
+                    let valueEnd = Stdlib.Json.__skipTriviaBackward source (endIndex - 1) in
+                    if valueStart < 0 || valueStart >= valueEnd then
                         Stdlib.Json.__InternalEnumObject.EnumNotObject
                     else
                         Stdlib.Json.__InternalEnumObject.EnumOneField(
@@ -543,31 +543,31 @@ let __padNumber (value: String) (goalLength: Int64) : String =
 
 let __floatRatio (value: Float) : (Int * Int) =
     let bits = Stdlib.Float64.__toBits value in
-    let rawExponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
-    let mantissa = Stdlib.UInt64.bitwiseAnd bits 4503599627370495UL in
+    let rawExponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52u64) 2047u64 in
+    let mantissa = Stdlib.UInt64.bitwiseAnd bits 4503599627370495u64 in
     let significand =
-        if rawExponent == 0UL then Stdlib.Int.fromUInt64 mantissa
-        else Stdlib.Int.add (Stdlib.Int.fromUInt64 mantissa) (Stdlib.Int.shiftLeft 1 52) in
+        if rawExponent == 0u64 then Stdlib.Int.fromUInt64 mantissa
+        else Stdlib.Int.add (Stdlib.Int.fromUInt64 mantissa) (Stdlib.Int.shiftLeft 1z 52z) in
     let binaryExponent =
-        if rawExponent == 0UL then -1074L
-        else Stdlib.Float64.__smallUInt64ToInt64 rawExponent - (1023L) - 52L in
-    if binaryExponent >= 0L then
-        (Stdlib.Int.shiftLeft significand (Stdlib.Int.fromInt64 binaryExponent), 1)
+        if rawExponent == 0u64 then -1074
+        else Stdlib.Float64.__smallUInt64ToInt64 rawExponent - (1023) - 52 in
+    if binaryExponent >= 0 then
+        (Stdlib.Int.shiftLeft significand (Stdlib.Int.fromInt64 binaryExponent), 1z)
     else
-        (significand, Stdlib.Int.shiftLeft 1 (Stdlib.Int.fromInt64 (0L - binaryExponent)))
+        (significand, Stdlib.Int.shiftLeft 1z (Stdlib.Int.fromInt64 (0 - binaryExponent)))
 
 let __formatFloatPrecision (numerator: Int) (denominator: Int) (precision: Int64) : String =
     let integerPart = Stdlib.Int.divide numerator denominator in
     let integerText = Stdlib.Int.toString integerPart in
     let integerDigits = Stdlib.String.__byteLength integerText in
     let fractionDigits0 = precision - integerDigits in
-    let fractionDigits = if fractionDigits0 < 1L then 1L else fractionDigits0 in
-    let decimalScale = Stdlib.Int.power 10 (Stdlib.Int.fromInt64 fractionDigits) in
+    let fractionDigits = if fractionDigits0 < 1 then 1 else fractionDigits0 in
+    let decimalScale = Stdlib.Int.power 10z (Stdlib.Int.fromInt64 fractionDigits) in
     let rounded = Stdlib.AltJson.__roundRatio (Stdlib.Int.multiply numerator decimalScale) denominator in
     let scaledText0 = Stdlib.Int.toString rounded in
-    let scaledText = Stdlib.Json.__padNumber scaledText0 (fractionDigits + 1L) in
+    let scaledText = Stdlib.Json.__padNumber scaledText0 (fractionDigits + 1) in
     let split = Stdlib.String.__byteLength scaledText - fractionDigits in
-    let whole = Stdlib.String.__byteSlice scaledText 0L split in
+    let whole = Stdlib.String.__byteSlice scaledText 0 split in
     let fraction = Stdlib.Float64.__stripDecimalTrailingZeros (Stdlib.String.__byteDrop scaledText split) in
     whole + "." + fraction
 
@@ -575,162 +575,162 @@ let __shortestFloat (numerator: Int) (denominator: Int) (targetBits: UInt64) (pr
     let candidate = Stdlib.Json.__formatFloatPrecision numerator denominator precision in
     match Stdlib.AltJson.__numberToFloat candidate with
     | Some parsed ->
-        if Stdlib.Float64.__toBits parsed == targetBits || precision >= 17L then candidate
-        else Stdlib.Json.__shortestFloat numerator denominator targetBits (precision + 1L)
+        if Stdlib.Float64.__toBits parsed == targetBits || precision >= 17 then candidate
+        else Stdlib.Json.__shortestFloat numerator denominator targetBits (precision + 1)
     | None ->
-        if precision >= 17L then candidate
-        else Stdlib.Json.__shortestFloat numerator denominator targetBits (precision + 1L)
+        if precision >= 17 then candidate
+        else Stdlib.Json.__shortestFloat numerator denominator targetBits (precision + 1)
 
 let __decimalExponentAboveOne (numerator: Int) (denominator: Int) (exponent: Int64) : Int64 =
-    let tenfold = Stdlib.Int.multiply denominator 10 in
+    let tenfold = Stdlib.Int.multiply denominator 10z in
     if Stdlib.Int.lessThan numerator tenfold then exponent
-    else Stdlib.Json.__decimalExponentAboveOne numerator tenfold (exponent + 1L)
+    else Stdlib.Json.__decimalExponentAboveOne numerator tenfold (exponent + 1)
 
 let __decimalExponentBelowOne (numerator: Int) (denominator: Int) (exponent: Int64) : Int64 =
     if Stdlib.Int.greaterThanOrEqualTo numerator denominator then exponent
-    else Stdlib.Json.__decimalExponentBelowOne (Stdlib.Int.multiply numerator 10) denominator (exponent - 1L)
+    else Stdlib.Json.__decimalExponentBelowOne (Stdlib.Int.multiply numerator 10z) denominator (exponent - 1)
 
 let __decimalExponent (numerator: Int) (denominator: Int) : Int64 =
     if Stdlib.Int.greaterThanOrEqualTo numerator denominator then
-        Stdlib.Json.__decimalExponentAboveOne numerator denominator 0L
+        Stdlib.Json.__decimalExponentAboveOne numerator denominator 0
     else
-        Stdlib.Json.__decimalExponentBelowOne (Stdlib.Int.multiply numerator 10) denominator (-1L)
+        Stdlib.Json.__decimalExponentBelowOne (Stdlib.Int.multiply numerator 10z) denominator (-1)
 
 let __scientificExponent (exponent: Int64) : String =
-    let sign = if exponent < 0L then "-" else "+" in
+    let sign = if exponent < 0 then "-" else "+" in
     let magnitude = Stdlib.Int64.toString (Stdlib.Int64.absoluteValue exponent) in
-    "E" + sign + Stdlib.Json.__padNumber magnitude 2L
+    "E" + sign + Stdlib.Json.__padNumber magnitude 2
 
 let __formatScientificPrecision (numerator: Int) (denominator: Int) (precision: Int64) : String =
     let exponent = Stdlib.Json.__decimalExponent numerator denominator in
-    let scale = precision - 1L - exponent in
-    let power = Stdlib.Int.power 10 (Stdlib.Int.fromInt64 (Stdlib.Int64.absoluteValue scale)) in
-    let scaleAfterPower = precision - 1L - Stdlib.Json.__decimalExponent numerator denominator in
+    let scale = precision - 1 - exponent in
+    let power = Stdlib.Int.power 10z (Stdlib.Int.fromInt64 (Stdlib.Int64.absoluteValue scale)) in
+    let scaleAfterPower = precision - 1 - Stdlib.Json.__decimalExponent numerator denominator in
     let rounded =
-        if scaleAfterPower >= 0L then Stdlib.AltJson.__roundRatio (Stdlib.Int.multiply numerator power) denominator
+        if scaleAfterPower >= 0 then Stdlib.AltJson.__roundRatio (Stdlib.Int.multiply numerator power) denominator
         else Stdlib.AltJson.__roundRatio numerator (Stdlib.Int.multiply denominator power) in
     let roundedText = Stdlib.Int.toString rounded in
     let carried =
-        Stdlib.String.__byteLength roundedText > 1L
-        && Stdlib.String.__byteAtUnchecked roundedText 0L == 49L
-        && Stdlib.Json.__allZero roundedText 1L (Stdlib.String.__byteLength roundedText) in
+        Stdlib.String.__byteLength roundedText > 1
+        && Stdlib.String.__byteAtUnchecked roundedText 0 == 49
+        && Stdlib.Json.__allZero roundedText 1 (Stdlib.String.__byteLength roundedText) in
     let digits0 =
-        if carried then Stdlib.String.__byteSlice roundedText 0L (Stdlib.String.__byteLength roundedText - (1L))
+        if carried then Stdlib.String.__byteSlice roundedText 0 (Stdlib.String.__byteLength roundedText - (1))
         else roundedText in
     let digits = Stdlib.Float64.__stripDecimalTrailingZeros digits0 in
     let mantissa =
-        if Stdlib.String.__byteLength digits == 1L then digits
-        else Stdlib.String.__byteTake digits 1L + "." + Stdlib.String.__byteDrop digits 1L in
-    let finalExponent = Stdlib.Json.__decimalExponent numerator denominator + (if carried then 1L else 0L) in
+        if Stdlib.String.__byteLength digits == 1 then digits
+        else Stdlib.String.__byteTake digits 1 + "." + Stdlib.String.__byteDrop digits 1 in
+    let finalExponent = Stdlib.Json.__decimalExponent numerator denominator + (if carried then 1 else 0) in
     mantissa + Stdlib.Json.__scientificExponent finalExponent
 
 let __shortestScientificFloat (numerator: Int) (denominator: Int) (targetBits: UInt64) (precision: Int64) : String =
     let candidate = Stdlib.Json.__formatScientificPrecision numerator denominator precision in
     match Stdlib.AltJson.__numberToFloat candidate with
     | Some parsed ->
-        if Stdlib.Float64.__toBits parsed == targetBits || precision >= 17L then candidate
-        else Stdlib.Json.__shortestScientificFloat numerator denominator targetBits (precision + 1L)
+        if Stdlib.Float64.__toBits parsed == targetBits || precision >= 17 then candidate
+        else Stdlib.Json.__shortestScientificFloat numerator denominator targetBits (precision + 1)
     | None ->
-        if precision >= 17L then candidate
-        else Stdlib.Json.__shortestScientificFloat numerator denominator targetBits (precision + 1L)
+        if precision >= 17 then candidate
+        else Stdlib.Json.__shortestScientificFloat numerator denominator targetBits (precision + 1)
 
 // A Float32 writes as its own shortest text, as Float32.toString prints it;
 // NaN and the infinities write as Float's do.
 let __serializeFloat32 (value: Float32) : String =
     let wide = Stdlib.Float32.toFloat64 value in
     let bits = Stdlib.Float64.__toBits wide in
-    if Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL == 2047UL then
+    if Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52u64) 2047u64 == 2047u64 then
         Stdlib.Json.__serializeFloat wide
     else Stdlib.Float32.toString value
 
 let __serializeFloat (value: Float) : String =
     let bits = Stdlib.Float64.__toBits value in
-    let exponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
-    let fraction = Stdlib.UInt64.bitwiseAnd bits 4503599627370495UL in
-    if exponent == 2047UL then
-        if fraction != 0UL then "\"NaN\""
-        else if Stdlib.UInt64.shiftRight bits 63UL == 1UL then "\"-Infinity\""
+    let exponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52u64) 2047u64 in
+    let fraction = Stdlib.UInt64.bitwiseAnd bits 4503599627370495u64 in
+    if exponent == 2047u64 then
+        if fraction != 0u64 then "\"NaN\""
+        else if Stdlib.UInt64.shiftRight bits 63u64 == 1u64 then "\"-Infinity\""
         else "\"Infinity\""
     else
         let absolute = Stdlib.Float64.absoluteValue value in
-        if absolute == 0.0 then if Stdlib.UInt64.shiftRight bits 63UL == 1UL then "-0.0" else "0.0"
+        if absolute == 0.0 then if Stdlib.UInt64.shiftRight bits 63u64 == 1u64 then "-0.0" else "0.0"
         else
             let (numerator, denominator) = Stdlib.Json.__floatRatio absolute in
             let rendered =
                 if absolute >= 10000000000000000.0 || absolute < 0.0001 then
-                    Stdlib.Json.__shortestScientificFloat numerator denominator (Stdlib.Float64.__toBits absolute) 1L
+                    Stdlib.Json.__shortestScientificFloat numerator denominator (Stdlib.Float64.__toBits absolute) 1
                 else
-                    Stdlib.Json.__shortestFloat numerator denominator (Stdlib.Float64.__toBits absolute) 1L in
-            if Stdlib.UInt64.shiftRight bits 63UL == 1UL then "-" + rendered else rendered
+                    Stdlib.Json.__shortestFloat numerator denominator (Stdlib.Float64.__toBits absolute) 1 in
+            if Stdlib.UInt64.shiftRight bits 63u64 == 1u64 then "-" + rendered else rendered
 
 let __allZero (text: String) (index: Int64) (endIndex: Int64) : Bool =
     if index >= endIndex then true
-    else if Stdlib.String.__byteAtUnchecked text index != 48L then false
-    else Stdlib.Json.__allZero text (index + 1L) endIndex
+    else if Stdlib.String.__byteAtUnchecked text index != 48 then false
+    else Stdlib.Json.__allZero text (index + 1) endIndex
 
 let __stripLeadingZeroes (text: String) (index: Int64) : String =
-    if index + 1L >= Stdlib.String.__byteLength text then Stdlib.String.__byteDrop text index
-    else if Stdlib.String.__byteAtUnchecked text index == 48L then Stdlib.Json.__stripLeadingZeroes text (index + 1L)
+    if index + 1 >= Stdlib.String.__byteLength text then Stdlib.String.__byteDrop text index
+    else if Stdlib.String.__byteAtUnchecked text index == 48 then Stdlib.Json.__stripLeadingZeroes text (index + 1)
     else Stdlib.String.__byteDrop text index
 
 let __mantissaDigits (text: String) : String =
-    let dot = Stdlib.AltJson.__findNumberMarker text 0L 46L 46L in
-    if dot < 0L then text
-    else Stdlib.String.__byteSlice text 0L dot + Stdlib.String.__byteDrop text (dot + 1L)
+    let dot = Stdlib.AltJson.__findNumberMarker text 0 46 46 in
+    if dot < 0 then text
+    else Stdlib.String.__byteSlice text 0 dot + Stdlib.String.__byteDrop text (dot + 1)
 
 let __mantissaFractionCount (text: String) : Int64 =
-    let dot = Stdlib.AltJson.__findNumberMarker text 0L 46L 46L in
-    if dot < 0L then 0L else Stdlib.String.__byteLength text - dot - 1L
+    let dot = Stdlib.AltJson.__findNumberMarker text 0 46 46 in
+    if dot < 0 then 0 else Stdlib.String.__byteLength text - dot - 1
 
 let __shiftIntegerDigits (digits: String) (shift: Int64) : Stdlib.Option.Option<String> =
-    if Stdlib.Json.__allZero digits 0L (Stdlib.String.__byteLength digits) then
+    if Stdlib.Json.__allZero digits 0 (Stdlib.String.__byteLength digits) then
         Stdlib.Option.Option.Some "0"
-    else if shift >= 0L then
+    else if shift >= 0 then
         Stdlib.Option.Option.Some (digits + Stdlib.String.__repeatInt "0" (Stdlib.Int.fromInt64 shift))
     else
-        let remove = 0L - shift in
+        let remove = 0 - shift in
         let length = Stdlib.String.__byteLength digits in
         if remove > length || Stdlib.Json.__allZero digits (length - remove) length == false then
             Stdlib.Option.Option.None
-        else Stdlib.Option.Option.Some (Stdlib.String.__byteSlice digits 0L (length - remove))
+        else Stdlib.Option.Option.Some (Stdlib.String.__byteSlice digits 0 (length - remove))
 
 let __applyIntegerExponent (digits: String) (fractionCount: Int64) (exponentText: String) : Stdlib.Option.Option<String> =
     let length = Stdlib.String.__byteLength exponentText in
-    let first = Stdlib.String.__byteAtUnchecked exponentText 0L in
-    if first == 45L then
-        let magnitude = Stdlib.AltJson.__parseSmallExponent exponentText 1L length 0L in
-        if magnitude > 1000L then Stdlib.Option.Option.None
-        else Stdlib.Json.__shiftIntegerDigits digits (0L - magnitude - fractionCount)
-    else if first == 43L then
-        let magnitude = Stdlib.AltJson.__parseSmallExponent exponentText 1L length 0L in
-        if magnitude > 1000L then Stdlib.Option.Option.None
+    let first = Stdlib.String.__byteAtUnchecked exponentText 0 in
+    if first == 45 then
+        let magnitude = Stdlib.AltJson.__parseSmallExponent exponentText 1 length 0 in
+        if magnitude > 1000 then Stdlib.Option.Option.None
+        else Stdlib.Json.__shiftIntegerDigits digits (0 - magnitude - fractionCount)
+    else if first == 43 then
+        let magnitude = Stdlib.AltJson.__parseSmallExponent exponentText 1 length 0 in
+        if magnitude > 1000 then Stdlib.Option.Option.None
         else Stdlib.Json.__shiftIntegerDigits digits (magnitude - fractionCount)
     else
-        let magnitude = Stdlib.AltJson.__parseSmallExponent exponentText 0L length 0L in
-        if magnitude > 1000L then Stdlib.Option.Option.None
+        let magnitude = Stdlib.AltJson.__parseSmallExponent exponentText 0 length 0 in
+        if magnitude > 1000 then Stdlib.Option.Option.None
         else Stdlib.Json.__shiftIntegerDigits digits (magnitude - fractionCount)
 
 let __unsignedIntegerLexeme (text: String) : Stdlib.Option.Option<String> =
-    let exponentMarker = Stdlib.AltJson.__findNumberMarker text 0L 101L 69L in
-    let mantissa = if exponentMarker < 0L then text else Stdlib.String.__byteSlice text 0L exponentMarker in
+    let exponentMarker = Stdlib.AltJson.__findNumberMarker text 0 101 69 in
+    let mantissa = if exponentMarker < 0 then text else Stdlib.String.__byteSlice text 0 exponentMarker in
     let digits = Stdlib.Json.__mantissaDigits mantissa in
     // Zero remains exactly zero regardless of exponent magnitude; do this
     // before the expansion bound used to protect non-zero values.
-    if Stdlib.Json.__allZero digits 0L (Stdlib.String.__byteLength digits) then
+    if Stdlib.Json.__allZero digits 0 (Stdlib.String.__byteLength digits) then
         Stdlib.Option.Option.Some "0"
-    else if exponentMarker < 0L then
-        Stdlib.Json.__shiftIntegerDigits digits (0L - Stdlib.Json.__mantissaFractionCount text)
+    else if exponentMarker < 0 then
+        Stdlib.Json.__shiftIntegerDigits digits (0 - Stdlib.Json.__mantissaFractionCount text)
     else
-        Stdlib.Json.__applyIntegerExponent digits (Stdlib.Json.__mantissaFractionCount mantissa) (Stdlib.String.__byteDrop text (exponentMarker + 1L))
+        Stdlib.Json.__applyIntegerExponent digits (Stdlib.Json.__mantissaFractionCount mantissa) (Stdlib.String.__byteDrop text (exponentMarker + 1))
 
 let __normalizeIntegerMagnitude (value: String) : String =
-    Stdlib.Json.__stripLeadingZeroes (if value == "" then "0" else value) 0L
+    Stdlib.Json.__stripLeadingZeroes (if value == "" then "0" else value) 0
 
 // Convert every integer-valued JSON number spelling to canonical decimal
 // without passing through Float. Large exponents are bounded before expansion.
 let __integerLexeme (text: String) : Stdlib.Option.Option<String> =
-    if Stdlib.String.__byteAtUnchecked text 0L == 45L then
-        (match Stdlib.Json.__unsignedIntegerLexeme (Stdlib.String.__byteDrop text 1L) with
+    if Stdlib.String.__byteAtUnchecked text 0 == 45 then
+        (match Stdlib.Json.__unsignedIntegerLexeme (Stdlib.String.__byteDrop text 1) with
         | None -> Stdlib.Option.Option.None
         | Some value -> Stdlib.Option.Option.Some ("-" + Stdlib.Json.__normalizeIntegerMagnitude value))
     else
@@ -825,7 +825,7 @@ let __viewDecimal (source: String) (value: Stdlib.Json.__InternalValueView) : St
 let __viewChar (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Char> =
     match Stdlib.Json.__stringValue source value with
     | Some text ->
-        if Stdlib.String.__lengthInt text == 1 then
+        if Stdlib.String.__lengthInt text == 1z then
             Stdlib.Option.Option.Some (Stdlib.Char.__asChar text)
         else Stdlib.Option.Option.None
     | None -> Stdlib.Option.Option.None
@@ -843,7 +843,7 @@ let __viewDateTime (source: String) (value: Stdlib.Json.__InternalValueView) : S
     | Some text ->
         // JSON holds an instant: a UTC timestamp, not a bare date or an offset.
         let length = Stdlib.String.__byteLength text in
-        if (length == 20L || length == 24L) && Stdlib.String.endsWith text "Z" then
+        if (length == 20 || length == 24) && Stdlib.String.endsWith text "Z" then
             match Stdlib.DateTime.parse text with
             | Ok dateTime -> Stdlib.Option.Option.Some dateTime
             | Error _ -> Stdlib.Option.Option.None

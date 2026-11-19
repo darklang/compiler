@@ -7,111 +7,111 @@ type Record =
     | Alias of name: String * canonical: String
 
 let __labelByte (byte: Int64) : Bool =
-    (byte >= 48L && byte <= 57L) ||
-    (byte >= 65L && byte <= 90L) ||
-    (byte >= 97L && byte <= 122L) || byte == 45L || byte == 95L
+    (byte >= 48 && byte <= 57) ||
+    (byte >= 65 && byte <= 90) ||
+    (byte >= 97 && byte <= 122) || byte == 45 || byte == 95
 
 let __validLabel (value: String) (index: Int64) (length: Int64) : Bool =
     if index >= length then true
     else
         Stdlib.__DnsWire.__labelByte (Stdlib.String.__byteAtUnchecked value index) &&
-        Stdlib.__DnsWire.__validLabel value (index + 1L) length
+        Stdlib.__DnsWire.__validLabel value (index + 1) length
 
 let __encodeLabels (labels: List<String>) (acc: List<Int64>) : Stdlib.Result.Result<List<Int64>, String> =
     match labels with
-    | [] -> Ok (acc @ [0L])
+    | [] -> Ok (acc @ [0])
     | label :: rest ->
         let length = Stdlib.String.__byteLength label in
-        if length == 0L || length > 63L ||
-            Stdlib.Bool.not (Stdlib.__DnsWire.__validLabel label 0L length) then
+        if length == 0 || length > 63 ||
+            Stdlib.Bool.not (Stdlib.__DnsWire.__validLabel label 0 length) then
             Error "Invalid DNS name"
         else
             Stdlib.__DnsWire.__encodeLabels rest
                 (acc @ [length] @ Stdlib.Blob.__toInt64List (Stdlib.String.toBlob label))
 
 let query (identifier: Int64) (host: String) (kind: Int64) : Stdlib.Result.Result<Blob, String> =
-    if identifier < 0L || identifier > 65535L || (kind != 1L && kind != 28L) then
+    if identifier < 0 || identifier > 65535 || (kind != 1 && kind != 28) then
         Error "Invalid DNS query"
-    else if host == "" || Stdlib.String.__byteLength host > 253L then
+    else if host == "" || Stdlib.String.__byteLength host > 253 then
         Error "Invalid DNS name"
     else
         let normalized =
             if Stdlib.String.endsWith host "." then
-                Stdlib.String.__byteSlice host 0L (Stdlib.String.__byteLength host - 1L)
+                Stdlib.String.__byteSlice host 0 (Stdlib.String.__byteLength host - 1)
             else host in
         match Stdlib.__DnsWire.__encodeLabels (Stdlib.String.split normalized ".") [] with
         | Error message -> Error message
         | Ok name ->
             Ok (Stdlib.Blob.__fromInt64List (
-                [identifier / 256L, identifier % 256L, 1L, 0L,
-                 0L, 1L, 0L, 0L, 0L, 0L, 0L, 0L] @
-                name @ [kind / 256L, kind % 256L, 0L, 1L]))
+                [identifier / 256, identifier % 256, 1, 0,
+                 0, 1, 0, 0, 0, 0, 0, 0] @
+                name @ [kind / 256, kind % 256, 0, 1]))
 
 let __u16 (blob: Blob) (offset: Int64) : Int64 =
-    Stdlib.Blob.__getByte blob offset * 256L + Stdlib.Blob.__getByte blob (offset + 1L)
+    Stdlib.Blob.__getByte blob offset * 256 + Stdlib.Blob.__getByte blob (offset + 1)
 
 let __u32 (blob: Blob) (offset: Int64) : Int64 =
-    Stdlib.__DnsWire.__u16 blob offset * 65536L + Stdlib.__DnsWire.__u16 blob (offset + 2L)
+    Stdlib.__DnsWire.__u16 blob offset * 65536 + Stdlib.__DnsWire.__u16 blob (offset + 2)
 
 let __name (blob: Blob) (position: Int64) (returnPosition: Int64) (depth: Int64) (parts: List<String>) (total: Int64) : Stdlib.Result.Result<(String * Int64), String> =
     let length = Stdlib.Blob.__byteLength blob in
-    if depth > 16L || position >= length || total > 253L then Error "Invalid DNS name compression"
+    if depth > 16 || position >= length || total > 253 then Error "Invalid DNS name compression"
     else
         let tag = Stdlib.Blob.__getByte blob position in
-        if tag == 0L then
-            let next = if returnPosition >= 0L then returnPosition else position + 1L in
+        if tag == 0 then
+            let next = if returnPosition >= 0 then returnPosition else position + 1 in
             Ok ((Stdlib.String.join (Stdlib.List.reverse parts) ".", next))
-        else if Stdlib.Int64.bitwiseAnd tag 192L == 192L then
-            if position + 1L >= length then Error "Truncated DNS name"
+        else if Stdlib.Int64.bitwiseAnd tag 192 == 192 then
+            if position + 1 >= length then Error "Truncated DNS name"
             else
-                let target = Stdlib.Int64.bitwiseAnd tag 63L * 256L + Stdlib.Blob.__getByte blob (position + 1L) in
+                let target = Stdlib.Int64.bitwiseAnd tag 63 * 256 + Stdlib.Blob.__getByte blob (position + 1) in
                 if target >= position then Error "Invalid DNS name compression"
                 else
-                    let next = if returnPosition >= 0L then returnPosition else position + 2L in
-                    Stdlib.__DnsWire.__name blob target next (depth + 1L) parts total
-        else if tag > 63L || position + 1L + tag > length then
+                    let next = if returnPosition >= 0 then returnPosition else position + 2 in
+                    Stdlib.__DnsWire.__name blob target next (depth + 1) parts total
+        else if tag > 63 || position + 1 + tag > length then
             Error "Truncated DNS name"
         else
-            let labelBlob = Stdlib.Blob.slice blob (Stdlib.Int.fromInt64 (position + 1L)) (Stdlib.Int.fromInt64 tag) in
+            let labelBlob = Stdlib.Blob.slice blob (Stdlib.Int.fromInt64 (position + 1)) (Stdlib.Int.fromInt64 tag) in
             match Stdlib.Blob.toString labelBlob with
             | Error _ -> Error "Invalid DNS name"
             | Ok label ->
-                if Stdlib.Bool.not (Stdlib.__DnsWire.__validLabel label 0L tag) then Error "Invalid DNS name"
+                if Stdlib.Bool.not (Stdlib.__DnsWire.__validLabel label 0 tag) then Error "Invalid DNS name"
                 else
-                    Stdlib.__DnsWire.__name blob (position + 1L + tag) returnPosition depth
-                        (Stdlib.List.push parts label) (total + tag + 1L)
+                    Stdlib.__DnsWire.__name blob (position + 1 + tag) returnPosition depth
+                        (Stdlib.List.push parts label) (total + tag + 1)
 
 let __records (blob: Blob) (offset: Int64) (remaining: Int64) (acc: List<Stdlib.__DnsWire.Record>) : Stdlib.Result.Result<List<Stdlib.__DnsWire.Record>, String> =
-    if remaining <= 0L then Ok (Stdlib.List.reverse acc)
+    if remaining <= 0 then Ok (Stdlib.List.reverse acc)
     else
-        match Stdlib.__DnsWire.__name blob offset (-1L) 0L [] 0L with
+        match Stdlib.__DnsWire.__name blob offset (-1) 0 [] 0 with
         | Error message -> Error message
         | Ok ((name, afterName)) ->
             let length = Stdlib.Blob.__byteLength blob in
-            if afterName + 10L > length then Error "Truncated DNS record"
+            if afterName + 10 > length then Error "Truncated DNS record"
             else
                 let kind = Stdlib.__DnsWire.__u16 blob afterName in
-                let class_ = Stdlib.__DnsWire.__u16 blob (afterName + 2L) in
-                let dataLength = Stdlib.__DnsWire.__u16 blob (afterName + 8L) in
-                let dataStart = afterName + 10L in
+                let class_ = Stdlib.__DnsWire.__u16 blob (afterName + 2) in
+                let dataLength = Stdlib.__DnsWire.__u16 blob (afterName + 8) in
+                let dataStart = afterName + 10 in
                 let next = dataStart + dataLength in
                 if next > length then Error "Truncated DNS record"
-                else if class_ != 1L then Stdlib.__DnsWire.__records blob next (remaining - 1L) acc
-                else if (kind == 1L && dataLength == 4L) || (kind == 28L && dataLength == 16L) then
-                    Stdlib.__DnsWire.__records blob next (remaining - 1L)
+                else if class_ != 1 then Stdlib.__DnsWire.__records blob next (remaining - 1) acc
+                else if (kind == 1 && dataLength == 4) || (kind == 28 && dataLength == 16) then
+                    Stdlib.__DnsWire.__records blob next (remaining - 1)
                         (Stdlib.List.push acc (Stdlib.__DnsWire.Record.Address(name, kind, dataStart, dataLength)))
-                else if kind == 5L then
-                    match Stdlib.__DnsWire.__name blob dataStart (-1L) 0L [] 0L with
+                else if kind == 5 then
+                    match Stdlib.__DnsWire.__name blob dataStart (-1) 0 [] 0 with
                     | Error message -> Error message
                     | Ok ((canonical, afterCanonical)) ->
                         if afterCanonical != next then Error "Malformed DNS alias"
-                        else Stdlib.__DnsWire.__records blob next (remaining - 1L)
+                        else Stdlib.__DnsWire.__records blob next (remaining - 1)
                                 (Stdlib.List.push acc (Stdlib.__DnsWire.Record.Alias(name, canonical)))
-                else Stdlib.__DnsWire.__records blob next (remaining - 1L) acc
+                else Stdlib.__DnsWire.__records blob next (remaining - 1) acc
 
 let __addressBytes (blob: Blob) (offset: Int64) (remaining: Int64) (acc: List<Int64>) : List<Int64> =
-    if remaining <= 0L then Stdlib.List.reverse acc
-    else Stdlib.__DnsWire.__addressBytes blob (offset + 1L) (remaining - 1L)
+    if remaining <= 0 then Stdlib.List.reverse acc
+    else Stdlib.__DnsWire.__addressBytes blob (offset + 1) (remaining - 1)
             (Stdlib.List.push acc (Stdlib.Blob.__getByte blob offset))
 
 let __addresses (blob: Blob) (records: List<Stdlib.__DnsWire.Record>) (name: String) (kind: Int64) (acc: List<List<Int64>>) : List<List<Int64>> =
@@ -137,44 +137,44 @@ let __alias (records: List<Stdlib.__DnsWire.Record>) (name: String) : Stdlib.Opt
         | Address (_, _, _, _) -> Stdlib.__DnsWire.__alias rest name
 
 let __resolve (blob: Blob) (records: List<Stdlib.__DnsWire.Record>) (name: String) (kind: Int64) (hops: Int64) : Stdlib.Result.Result<List<List<Int64>>, String> =
-    if hops > 8L then Error "DNS alias chain too long"
+    if hops > 8 then Error "DNS alias chain too long"
     else
         let addresses = Stdlib.__DnsWire.__addresses blob records name kind [] in
         match addresses with
         | [] ->
             match Stdlib.__DnsWire.__alias records name with
             | None -> Error "No DNS address"
-            | Some canonical -> Stdlib.__DnsWire.__resolve blob records canonical kind (hops + 1L)
+            | Some canonical -> Stdlib.__DnsWire.__resolve blob records canonical kind (hops + 1)
         | _ -> Ok addresses
 
 let answers (blob: Blob) (identifier: Int64) (host: String) (kind: Int64) : Stdlib.Result.Result<List<List<Int64>>, String> =
     let length = Stdlib.Blob.__byteLength blob in
-    if length < 12L || length > 4096L then Error "Invalid DNS packet size"
-    else if identifier < 0L || identifier > 65535L || Stdlib.__DnsWire.__u16 blob 0L != identifier then
+    if length < 12 || length > 4096 then Error "Invalid DNS packet size"
+    else if identifier < 0 || identifier > 65535 || Stdlib.__DnsWire.__u16 blob 0 != identifier then
         Error "DNS transaction mismatch"
     else
-        let flags = Stdlib.__DnsWire.__u16 blob 2L in
-        let questionCount = Stdlib.__DnsWire.__u16 blob 4L in
-        let answerCount = Stdlib.__DnsWire.__u16 blob 6L in
-        if Stdlib.Int64.bitwiseAnd flags 32768L == 0L ||
-            Stdlib.Int64.bitwiseAnd flags 30720L != 0L ||
-            Stdlib.Int64.bitwiseAnd flags 512L != 0L ||
-            questionCount != 1L || answerCount > 64L then
+        let flags = Stdlib.__DnsWire.__u16 blob 2 in
+        let questionCount = Stdlib.__DnsWire.__u16 blob 4 in
+        let answerCount = Stdlib.__DnsWire.__u16 blob 6 in
+        if Stdlib.Int64.bitwiseAnd flags 32768 == 0 ||
+            Stdlib.Int64.bitwiseAnd flags 30720 != 0 ||
+            Stdlib.Int64.bitwiseAnd flags 512 != 0 ||
+            questionCount != 1 || answerCount > 64 then
             Error "Invalid DNS response"
-        else if Stdlib.Int64.bitwiseAnd flags 15L != 0L then Error "DNS response error"
+        else if Stdlib.Int64.bitwiseAnd flags 15 != 0 then Error "DNS response error"
         else
-            match Stdlib.__DnsWire.__name blob 12L (-1L) 0L [] 0L with
+            match Stdlib.__DnsWire.__name blob 12 (-1) 0 [] 0 with
             | Error message -> Error message
             | Ok ((question, afterName)) ->
-                if afterName + 4L > length then Error "Truncated DNS question"
+                if afterName + 4 > length then Error "Truncated DNS question"
                 else if Stdlib.String.toLowercase question != Stdlib.String.toLowercase host ||
                     Stdlib.__DnsWire.__u16 blob afterName != kind ||
-                    Stdlib.__DnsWire.__u16 blob (afterName + 2L) != 1L then
+                    Stdlib.__DnsWire.__u16 blob (afterName + 2) != 1 then
                     Error "DNS question mismatch"
                 else
-                    match Stdlib.__DnsWire.__records blob (afterName + 4L) answerCount [] with
+                    match Stdlib.__DnsWire.__records blob (afterName + 4) answerCount [] with
                     | Error message -> Error message
-                    | Ok records -> Stdlib.__DnsWire.__resolve blob records (Stdlib.String.toLowercase question) kind 0L
+                    | Ok records -> Stdlib.__DnsWire.__resolve blob records (Stdlib.String.toLowercase question) kind 0
 
 let __addressFields (line: String) : List<String> =
     let beforeComment =
@@ -188,35 +188,35 @@ let __ipv4Parts (parts: List<String>) (acc: List<Int64>) : Stdlib.Option.Option<
     match parts with
     | [] -> Some (Stdlib.List.reverse acc)
     | part :: rest ->
-        if part == "" || Stdlib.String.__byteLength part > 3L ||
-            Stdlib.Bool.not (Stdlib.__HttpWire.__portDigits part 0L (Stdlib.String.__byteLength part)) then None
+        if part == "" || Stdlib.String.__byteLength part > 3 ||
+            Stdlib.Bool.not (Stdlib.__HttpWire.__portDigits part 0 (Stdlib.String.__byteLength part)) then None
         else
             match Stdlib.Int64.parse part with
             | Error _ -> None
             | Ok byte ->
-                if byte < 0L || byte > 255L then None
+                if byte < 0 || byte > 255 then None
                 else Stdlib.__DnsWire.__ipv4Parts rest (Stdlib.List.push acc byte)
 
 let ipv4 (value: String) : Stdlib.Option.Option<List<Int64>> =
     let parts = Stdlib.String.split value "." in
-    if Stdlib.List.__lengthInt parts != 4 then None
+    if Stdlib.List.__lengthInt parts != 4z then None
     else Stdlib.__DnsWire.__ipv4Parts parts []
 
 let __hexGroup (value: String) (index: Int64) (length: Int64) (acc: Int64) : Stdlib.Option.Option<Int64> =
     if index >= length then Some acc
     else
         let digit = Stdlib.__HttpWire.__hexValue (Stdlib.String.__byteAtUnchecked value index) in
-        if digit < 0L then None
-        else Stdlib.__DnsWire.__hexGroup value (index + 1L) length (acc * 16L + digit)
+        if digit < 0 then None
+        else Stdlib.__DnsWire.__hexGroup value (index + 1) length (acc * 16 + digit)
 
 let __ipv6Groups (parts: List<String>) (acc: List<Int64>) : Stdlib.Option.Option<List<Int64>> =
     match parts with
     | [] -> Some (Stdlib.List.reverse acc)
     | part :: rest ->
         let length = Stdlib.String.__byteLength part in
-        if length == 0L || length > 4L then None
+        if length == 0 || length > 4 then None
         else
-            match Stdlib.__DnsWire.__hexGroup part 0L length 0L with
+            match Stdlib.__DnsWire.__hexGroup part 0 length 0 with
             | None -> None
             | Some group -> Stdlib.__DnsWire.__ipv6Groups rest (Stdlib.List.push acc group)
 
@@ -225,38 +225,38 @@ let __splitGroups (value: String) : Stdlib.Option.Option<List<Int64>> =
     else Stdlib.__DnsWire.__ipv6Groups (Stdlib.String.split value ":") []
 
 let __zeros (count: Int) (acc: List<Int64>) : List<Int64> =
-    if count <= 0 then acc
-    else Stdlib.__DnsWire.__zeros (count - 1) (Stdlib.List.push acc 0L)
+    if count <= 0z then acc
+    else Stdlib.__DnsWire.__zeros (count - 1z) (Stdlib.List.push acc 0)
 
 let __groupsToBytes (groups: List<Int64>) (acc: List<Int64>) : List<Int64> =
     match groups with
     | [] -> Stdlib.List.reverse acc
     | group :: rest ->
         Stdlib.__DnsWire.__groupsToBytes rest
-            (Stdlib.List.push (Stdlib.List.push acc (group / 256L)) (group % 256L))
+            (Stdlib.List.push (Stdlib.List.push acc (group / 256)) (group % 256))
 
 let ipv6 (value: String) : Stdlib.Option.Option<List<Int64>> =
     match Stdlib.String.splitFirst value "::" with
     | None ->
         match Stdlib.__DnsWire.__splitGroups value with
         | Some groups ->
-            if Stdlib.List.__lengthInt groups == 8 then Some (Stdlib.__DnsWire.__groupsToBytes groups []) else None
+            if Stdlib.List.__lengthInt groups == 8z then Some (Stdlib.__DnsWire.__groupsToBytes groups []) else None
         | None -> None
     | Some ((left, right)) ->
         if Stdlib.String.__containsBytes right "::" then None
         else
             match (Stdlib.__DnsWire.__splitGroups left, Stdlib.__DnsWire.__splitGroups right) with
             | (Some leftGroups, Some rightGroups) ->
-                let missing = 8 - Stdlib.List.__lengthInt leftGroups - Stdlib.List.__lengthInt rightGroups in
-                if missing < 1 then None
+                let missing = 8z - Stdlib.List.__lengthInt leftGroups - Stdlib.List.__lengthInt rightGroups in
+                if missing < 1z then None
                 else
                     let groups = leftGroups @ Stdlib.__DnsWire.__zeros missing [] @ rightGroups in
                     Some (Stdlib.__DnsWire.__groupsToBytes groups [])
             | _ -> None
 
 let __address (value: String) (kind: Int64) : Stdlib.Option.Option<List<Int64>> =
-    if kind == 1L then Stdlib.__DnsWire.ipv4 value
-    else if kind == 28L then Stdlib.__DnsWire.ipv6 value
+    if kind == 1 then Stdlib.__DnsWire.ipv4 value
+    else if kind == 28 then Stdlib.__DnsWire.ipv6 value
     else None
 
 let __hostsLines (lines: List<String>) (host: String) (kind: Int64) (acc: List<List<Int64>>) : List<List<Int64>> =
@@ -308,7 +308,7 @@ type ResolveError =
 
 let __queryUdp4Once (nameserver: List<Int64>) (port: Int64) (host: String) (kind: Int64)
     (timeoutMs: Int64) : Stdlib.Result.Result<List<List<Int64>>, Stdlib.__DnsWire.ResolveError> =
-    let identifier = Stdlib.Int64.random 0L 65535L in
+    let identifier = Stdlib.Int64.random 0 65535 in
     match Stdlib.__DnsWire.query identifier host kind with
     | Error message -> Error (Stdlib.__DnsWire.ResolveError.InvalidQuery message)
     | Ok packet ->
@@ -331,8 +331,8 @@ let __queryUdp4Attempts (nameserver: List<Int64>) (port: Int64) (host: String) (
     | Error error ->
         match error with
         | NetworkError code ->
-            if remaining > 1L && (code == 4L || code == 11L || code == 110L || code == 111L) then
-                Stdlib.__DnsWire.__queryUdp4Attempts nameserver port host kind timeoutMs (remaining - 1L)
+            if remaining > 1 && (code == 4 || code == 11 || code == 110 || code == 111) then
+                Stdlib.__DnsWire.__queryUdp4Attempts nameserver port host kind timeoutMs (remaining - 1)
             else Error error
         | _ -> Error error
     | result -> result
@@ -341,16 +341,16 @@ let queryUdp4 (nameserver: List<Int64>) (port: Int64) (host: String) (kind: Int6
     (timeoutMs: Int64) (attempts: Int64)
     : Stdlib.Result.Result<List<List<Int64>>, Stdlib.__DnsWire.ResolveError> =
     if Stdlib.Bool.not (Stdlib.__Network.__validAddress false nameserver) ||
-        port <= 0L || port > 65535L || timeoutMs <= 0L || timeoutMs > 10000L ||
-        attempts <= 0L || attempts > 3L then
+        port <= 0 || port > 65535 || timeoutMs <= 0 || timeoutMs > 10000 ||
+        attempts <= 0 || attempts > 3 then
         Error (Stdlib.__DnsWire.ResolveError.InvalidQuery "Invalid DNS transport parameters")
-    else if kind != 1L && kind != 28L then
+    else if kind != 1 && kind != 28 then
         Error (Stdlib.__DnsWire.ResolveError.InvalidQuery "Invalid DNS query")
     else Stdlib.__DnsWire.__queryUdp4Attempts nameserver port host kind timeoutMs attempts
 
 let __queryUdp6Once (nameserver: List<Int64>) (port: Int64) (host: String) (kind: Int64)
     (timeoutMs: Int64) : Stdlib.Result.Result<List<List<Int64>>, Stdlib.__DnsWire.ResolveError> =
-    let identifier = Stdlib.Int64.random 0L 65535L in
+    let identifier = Stdlib.Int64.random 0 65535 in
     match Stdlib.__DnsWire.query identifier host kind with
     | Error message -> Error (Stdlib.__DnsWire.ResolveError.InvalidQuery message)
     | Ok packet ->
@@ -373,8 +373,8 @@ let __queryUdp6Attempts (nameserver: List<Int64>) (port: Int64) (host: String) (
     | Error error ->
         match error with
         | NetworkError code ->
-            if remaining > 1L && (code == 4L || code == 11L || code == 110L || code == 111L) then
-                Stdlib.__DnsWire.__queryUdp6Attempts nameserver port host kind timeoutMs (remaining - 1L)
+            if remaining > 1 && (code == 4 || code == 11 || code == 110 || code == 111) then
+                Stdlib.__DnsWire.__queryUdp6Attempts nameserver port host kind timeoutMs (remaining - 1)
             else Error error
         | _ -> Error error
     | result -> result
@@ -383,10 +383,10 @@ let queryUdp6 (nameserver: List<Int64>) (port: Int64) (host: String) (kind: Int6
     (timeoutMs: Int64) (attempts: Int64)
     : Stdlib.Result.Result<List<List<Int64>>, Stdlib.__DnsWire.ResolveError> =
     if Stdlib.Bool.not (Stdlib.__Network.__validAddress true nameserver) ||
-        port <= 0L || port > 65535L || timeoutMs <= 0L || timeoutMs > 10000L ||
-        attempts <= 0L || attempts > 3L then
+        port <= 0 || port > 65535 || timeoutMs <= 0 || timeoutMs > 10000 ||
+        attempts <= 0 || attempts > 3 then
         Error (Stdlib.__DnsWire.ResolveError.InvalidQuery "Invalid DNS transport parameters")
-    else if kind != 1L && kind != 28L then
+    else if kind != 1 && kind != 28 then
         Error (Stdlib.__DnsWire.ResolveError.InvalidQuery "Invalid DNS query")
     else Stdlib.__DnsWire.__queryUdp6Attempts nameserver port host kind timeoutMs attempts
 
@@ -401,17 +401,17 @@ let __queryNameservers (servers: List<String>) (host: String) (kind: Int64)
             match Stdlib.__DnsWire.ipv6 server with
             | None -> Stdlib.__DnsWire.__queryNameservers rest host kind previous
             | Some address ->
-                match Stdlib.__DnsWire.queryUdp6 address 53L host kind 1000L 2L with
+                match Stdlib.__DnsWire.queryUdp6 address 53 host kind 1000 2 with
                 | Ok answers -> Ok answers
                 | Error error -> Stdlib.__DnsWire.__queryNameservers rest host kind error
         | Some address ->
-            match Stdlib.__DnsWire.queryUdp4 address 53L host kind 1000L 2L with
+            match Stdlib.__DnsWire.queryUdp4 address 53 host kind 1000 2 with
             | Ok answers -> Ok answers
             | Error error -> Stdlib.__DnsWire.__queryNameservers rest host kind error
 
 let resolve (host: String) (kind: Int64)
     : Stdlib.Result.Result<List<List<Int64>>, Stdlib.__DnsWire.ResolveError> =
-    if kind != 1L && kind != 28L then
+    if kind != 1 && kind != 28 then
         Error (Stdlib.__DnsWire.ResolveError.InvalidQuery "Invalid DNS query")
     else
         match Stdlib.__DnsWire.__address host kind with

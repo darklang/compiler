@@ -7,7 +7,7 @@ let __clipToWidth
     (available: Int)
     (result: String)
     : String =
-    if available <= 0 then
+    if available <= 0z then
         result
     else
         match remaining with

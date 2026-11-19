@@ -4,12 +4,12 @@ module Darklang.Stdlib.__QuicIdle
 type State = { timeout: Int64, started: Int64, sentSinceReceive: Bool }
 
 let negotiated (local: Int64) (peer: Int64) : Int64 =
-  if local == 0L then peer
-  else if peer == 0L || local < peer then local
+  if local == 0 then peer
+  else if peer == 0 || local < peer then local
   else peer
 
 let create (local: Int64) (peer: Int64) (now: Int64) : Stdlib.Result.Result<Stdlib.__QuicIdle.State, String> =
-  if local < 0L || peer < 0L || local > 4611686018427387903L || peer > 4611686018427387903L || now < 0L || now > 4611686018427387903L then Error "Invalid QUIC idle timeout"
+  if local < 0 || peer < 0 || local > 4611686018427387903 || peer > 4611686018427387903 || now < 0 || now > 4611686018427387903 then Error "Invalid QUIC idle timeout"
   else Ok (Stdlib.__QuicIdle.State { timeout = Stdlib.__QuicIdle.negotiated local peer, started = now, sentSinceReceive = false })
 
 // Call only after successful authenticated packet processing. Unauthenticated
@@ -23,8 +23,8 @@ let sent (state: Stdlib.__QuicIdle.State) (eliciting: Bool) (now: Int64) : Stdli
   else { state with started = now, sentSinceReceive = true }
 
 let expired (state: Stdlib.__QuicIdle.State) (now: Int64) (pto: Int64) : Stdlib.Result.Result<Bool, String> =
-  if now < state.started || now > 4611686018427387903L || pto < 0L || pto > 1537228672809129301L then Error "Invalid QUIC idle clock"
-  else if state.timeout == 0L then Ok false
+  if now < state.started || now > 4611686018427387903 || pto < 0 || pto > 1537228672809129301 then Error "Invalid QUIC idle clock"
+  else if state.timeout == 0 then Ok false
   else
-    let period = if state.timeout < 3L * pto then 3L * pto else state.timeout in
+    let period = if state.timeout < 3 * pto then 3 * pto else state.timeout in
     Ok (now - state.started >= period)

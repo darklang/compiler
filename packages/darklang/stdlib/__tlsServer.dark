@@ -41,12 +41,12 @@ let __step (context: Stdlib.__TlsServer.Context) (owner: Stdlib.__TlsServer.Owne
       | Ready accepted ->
         if accepted.ready.protocol == "h2" then
           let transport = Stdlib.__Tls13ServerTcp.transport handshake.connection context.http.signals None accepted in
-          let owner = Stdlib.__TlsServer.Http2 { connection = handshake.connection, transport = transport, state = Stdlib.__Http2Server.initial Stdlib.Blob.empty, deadline = now + 10000L } in
+          let owner = Stdlib.__TlsServer.Http2 { connection = handshake.connection, transport = transport, state = Stdlib.__Http2Server.initial Stdlib.Blob.empty, deadline = now + 10000 } in
           Ok (Stdlib.__TlsServer.Step { owner = Some (Stdlib.__TlsServer.Owner.Http2 owner), stopped = false })
         else
           let transport = Stdlib.__Tls13ServerTcp.transport handshake.connection context.http.signals None accepted in
           let buffer = Stdlib.__Http1Server.RequestBuffer { bytes = Stdlib.Blob.empty, continued = false } in
-          let owner = Stdlib.__Http1Server.Owner { connection = handshake.connection, transport = transport, phase = Stdlib.__Http1Server.Phase.AwaitRequest buffer, started = now, deadline = now + 10000L, requests = 0L } in
+          let owner = Stdlib.__Http1Server.Owner { connection = handshake.connection, transport = transport, phase = Stdlib.__Http1Server.Phase.AwaitRequest buffer, started = now, deadline = now + 10000, requests = 0 } in
           Ok (Stdlib.__TlsServer.Step { owner = Some (Stdlib.__TlsServer.Owner.Http1 owner), stopped = false })
       | _ -> Ok (Stdlib.__TlsServer.Step { owner = Some (Stdlib.__TlsServer.Owner.Handshake { handshake with state = state }), stopped = false })
 
@@ -62,7 +62,7 @@ let __size (owner: Stdlib.__TlsServer.Owner) : Int64 =
     | Input input -> Stdlib.__TlsServer.__inputSize input
     | Output output -> Stdlib.Blob.__byteLength output.bytes + Stdlib.__TlsServer.__inputSize output.after
     | Ready accepted -> Stdlib.Blob.__byteLength accepted.pending
-let __total (owners: List<Stdlib.__TlsServer.Owner>) : Int64 = Stdlib.List.fold owners 0L (fun total owner -> total + Stdlib.__TlsServer.__size owner)
+let __total (owners: List<Stdlib.__TlsServer.Owner>) : Int64 = Stdlib.List.fold owners 0 (fun total owner -> total + Stdlib.__TlsServer.__size owner)
 
 let __round (context: Stdlib.__TlsServer.Context) (now: Int64) (remaining: List<Stdlib.__TlsServer.Owner>) (next: List<Stdlib.__TlsServer.Owner>) : Stdlib.Result.Result<Stdlib.__TlsServer.Round, String> =
   match remaining with
@@ -76,11 +76,11 @@ let __round (context: Stdlib.__TlsServer.Context) (now: Int64) (remaining: List<
       else match step.owner with
       | None -> Stdlib.__TlsServer.__round context now rest next
       | Some candidate ->
-        if Stdlib.__TlsServer.__size candidate + Stdlib.__TlsServer.__total (rest @ next) > 105906176L then
+        if Stdlib.__TlsServer.__size candidate + Stdlib.__TlsServer.__total (rest @ next) > 105906176 then
           let candidate = match candidate with
             | Handshake _ -> let _ = Stdlib.__TlsServer.__close candidate in None
             | Http2 _ -> let _ = Stdlib.__TlsServer.__close candidate in None
-            | Http1 current -> Some (Stdlib.__TlsServer.Owner.Http1 (Stdlib.__Http1Server.__status context.http current now 503)) in
+            | Http1 current -> Some (Stdlib.__TlsServer.Owner.Http1 (Stdlib.__Http1Server.__status context.http current now 503z)) in
           Stdlib.__TlsServer.__round context now rest (match candidate with | None -> next | Some candidate -> Stdlib.List.push next candidate)
         else Stdlib.__TlsServer.__round context now rest (Stdlib.List.push next candidate)
 
@@ -106,26 +106,26 @@ let __loop (context: Stdlib.__TlsServer.Context) (listener: Stdlib.__Network.Tcp
     Stdlib.__TlsServer.__round context now owners [] |> Stdlib.Result.andThen (fun round ->
       if round.stopped then let _ = Stdlib.__TlsServer.__closeAll round.owners in Ok ()
       else
-        let accepting = Stdlib.List.__lengthInt round.owners < 64 in
+        let accepting = Stdlib.List.__lengthInt round.owners < 64z in
         let listenerInterest = Stdlib.__Network.Interest { watch = listener.watch, readable = accepting, writable = false } in
         let interests = Stdlib.List.push (Stdlib.List.filterMap round.owners Stdlib.__TlsServer.__interest) listenerInterest in
-        match Stdlib.__Network.waitSockets interests (if Stdlib.List.any round.owners Stdlib.__TlsServer.__immediate then 0L else 100L) with
+        match Stdlib.__Network.waitSockets interests (if Stdlib.List.any round.owners Stdlib.__TlsServer.__immediate then 0 else 100) with
         | Error code ->
-          if code == 4L then Stdlib.__TlsServer.__loop context listener round.owners
+          if code == 4 then Stdlib.__TlsServer.__loop context listener round.owners
           else let _ = Stdlib.__TlsServer.__closeAll round.owners in Error "TLS HTTP readiness failed"
         | Ok events ->
-          if Stdlib.List.any events (fun event -> event.index == 0L && (event.failed || event.closed)) then
+          if Stdlib.List.any events (fun event -> event.index == 0 && (event.failed || event.closed)) then
             let _ = Stdlib.__TlsServer.__closeAll round.owners in Error "TLS HTTP listener failed"
-          else if accepting && Stdlib.List.any events (fun event -> event.index == 0L && event.readable) then
-            match Stdlib.__Network.acceptTcp listener 100L with
+          else if accepting && Stdlib.List.any events (fun event -> event.index == 0 && event.readable) then
+            match Stdlib.__Network.acceptTcp listener 100 with
             | Error code ->
-              if code == 4L || code == 11L || code == 35L then Stdlib.__TlsServer.__loop context listener round.owners
+              if code == 4 || code == 11 || code == 35 then Stdlib.__TlsServer.__loop context listener round.owners
               else let _ = Stdlib.__TlsServer.__closeAll round.owners in Error "TLS HTTP accept failed"
             | Ok connection ->
               match Stdlib.__Network.monotonicMillis () with
               | Error _ -> let _ = Stdlib.__Network.closeTcp connection in let _ = Stdlib.__TlsServer.__closeAll round.owners in Error "TLS HTTP clock failed"
               | Ok admitted ->
-                let owner = Stdlib.__TlsServer.Handshake { connection = connection, state = Stdlib.__Tls13ServerPoll.initial (), deadline = admitted + 10000L } in
+                let owner = Stdlib.__TlsServer.Handshake { connection = connection, state = Stdlib.__Tls13ServerPoll.initial (), deadline = admitted + 10000 } in
                 Stdlib.__TlsServer.__loop context listener (round.owners @ [Stdlib.__TlsServer.Owner.Handshake owner])
           else Stdlib.__TlsServer.__loop context listener round.owners)
   | _, _ -> let _ = Stdlib.__TlsServer.__closeAll owners in Error "TLS HTTP clock or shutdown check failed"

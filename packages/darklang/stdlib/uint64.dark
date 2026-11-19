@@ -16,22 +16,22 @@ let subtract (a: UInt64) (b: UInt64) : UInt64 = a - b
 
 let multiply (a: UInt64) (b: UInt64) : UInt64 = a * b
 
-let divide (a: UInt64) (b: UInt64) : UInt64 = if b == 0UL then Builtin.crash "Cannot divide by 0" else a / b
+let divide (a: UInt64) (b: UInt64) : UInt64 = if b == 0u64 then Builtin.crash "Cannot divide by 0" else a / b
 
 let max (a: UInt64) (b: UInt64) : UInt64 = if a > b then a else b
 
 let min (a: UInt64) (b: UInt64) : UInt64 = if a < b then a else b
 
-let mod (a: UInt64) (b: UInt64) : UInt64 = if b == 0UL then Builtin.crash "Cannot evaluate modulus against 0" else a % b
+let mod (a: UInt64) (b: UInt64) : UInt64 = if b == 0u64 then Builtin.crash "Cannot evaluate modulus against 0" else a % b
 
 
 
 let __powerLoop (base: UInt64) (exponent: UInt64) (result: UInt64) : UInt64 =
-    if exponent == 0UL then result
+    if exponent == 0u64 then result
     else
-        let next = if (exponent % 2UL) == 1UL then result * base else result in
-        Stdlib.UInt64.__powerLoop (base * base) (exponent / 2UL) next
-let power (base: UInt64) (exponent: UInt64) : UInt64 = Stdlib.UInt64.__powerLoop base exponent 1UL
+        let next = if (exponent % 2u64) == 1u64 then result * base else result in
+        Stdlib.UInt64.__powerLoop (base * base) (exponent / 2u64) next
+let power (base: UInt64) (exponent: UInt64) : UInt64 = Stdlib.UInt64.__powerLoop base exponent 1u64
 
 let clamp (value: UInt64) (limitA: UInt64) (limitB: UInt64) : UInt64 =
     let lower = Stdlib.UInt64.min limitA limitB in
@@ -49,43 +49,43 @@ let lessThanOrEqualTo (a: UInt64) (b: UInt64) : Bool = a <= b
 // Count number of set bits (population count)
 // Uses parallel bit counting algorithm (SWAR)
 let __popcount (x: UInt64) : UInt64 =
-    let mask1 = 6148914691236517205UL in
-    let mask2 = 3689348814741910323UL in
-    let mask3 = 1085102592571150095UL in
-    let mult = 72340172838076673UL in
-    let x = x - Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight x 1UL) mask1 in
-    let x = Stdlib.UInt64.bitwiseAnd x mask2 + Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight x 2UL) mask2 in
-    let x = Stdlib.UInt64.bitwiseAnd (x + Stdlib.UInt64.shiftRight x 4UL) mask3 in
-    Stdlib.UInt64.shiftRight (x * mult) 56UL
+    let mask1 = 6148914691236517205u64 in
+    let mask2 = 3689348814741910323u64 in
+    let mask3 = 1085102592571150095u64 in
+    let mult = 72340172838076673u64 in
+    let x = x - Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight x 1u64) mask1 in
+    let x = Stdlib.UInt64.bitwiseAnd x mask2 + Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight x 2u64) mask2 in
+    let x = Stdlib.UInt64.bitwiseAnd (x + Stdlib.UInt64.shiftRight x 4u64) mask3 in
+    Stdlib.UInt64.shiftRight (x * mult) 56u64
 
 // Convert a single digit (0UL-9UL) to its string representation
 let __digitToString (n: UInt64) : String =
     match n with
-    | 0UL -> "0"
-    | 1UL -> "1"
-    | 2UL -> "2"
-    | 3UL -> "3"
-    | 4UL -> "4"
-    | 5UL -> "5"
-    | 6UL -> "6"
-    | 7UL -> "7"
-    | 8UL -> "8"
-    | 9UL -> "9"
+    | 0u64 -> "0"
+    | 1u64 -> "1"
+    | 2u64 -> "2"
+    | 3u64 -> "3"
+    | 4u64 -> "4"
+    | 5u64 -> "5"
+    | 6u64 -> "6"
+    | 7u64 -> "7"
+    | 8u64 -> "8"
+    | 9u64 -> "9"
     | _ -> "?"
 
 // Convert an integer to its string representation
 let toString (n: UInt64) : String =
-    if Stdlib.UInt64.shiftRight n 63UL == 1UL then
-        let quotient = Stdlib.UInt64.shiftRight n 1UL / 5UL in
-        let remainder = n - (quotient * 10UL) in
+    if Stdlib.UInt64.shiftRight n 63u64 == 1u64 then
+        let quotient = Stdlib.UInt64.shiftRight n 1u64 / 5u64 in
+        let remainder = n - (quotient * 10u64) in
         // Decimal fragments are ASCII and therefore already closed under NFC.
         __string_concat_raw (Stdlib.UInt64.toString quotient) (Stdlib.UInt64.__digitToString remainder)
-    else if n < 10UL then Stdlib.UInt64.__digitToString n
-    else __string_concat_raw (Stdlib.UInt64.toString (n / 10UL)) (Stdlib.UInt64.__digitToString (n % 10UL))
+    else if n < 10u64 then Stdlib.UInt64.__digitToString n
+    else __string_concat_raw (Stdlib.UInt64.toString (n / 10u64)) (Stdlib.UInt64.__digitToString (n % 10u64))
 
 // Sum all integers in a list
 let sum (list: List<UInt64>) : UInt64 =
-    Stdlib.List.fold list 0UL (fun acc x -> acc + x)
+    Stdlib.List.fold list 0u64 (fun acc x -> acc + x)
 
 let __fromIntUnchecked (value: Int) : UInt64 =
     match Stdlib.Int.toUInt64 value with
@@ -164,10 +164,10 @@ impl Stdlib.Compare for UInt64 =
   let greaterThanOrEqualTo = Stdlib.UInt64.greaterThanOrEqualTo
 
 impl Stdlib.Zero for UInt64 =
-  let zero () : UInt64 = 0UL
+  let zero () : UInt64 = 0u64
 
 impl Stdlib.One for UInt64 =
-  let one () : UInt64 = 1UL
+  let one () : UInt64 = 1u64
 
 let fromFloatRounded (a: Float) : Stdlib.Option.Option<UInt64> =
   if Float64.isFinite a then

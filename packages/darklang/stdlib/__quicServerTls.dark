@@ -8,7 +8,7 @@ let __start (identity: Stdlib.TlsServerIdentity.Identity) (clientHello: Blob) (p
   Stdlib.__Tls13ServerHello.parse clientHello |> Stdlib.Result.andThen (fun hello ->
     Stdlib.__Tls13ServerHello.selectProtocol hello ["h3"] |> Stdlib.Result.andThen (fun protocol ->
       if protocol != "h3" then Error "QUIC TLS requires h3 ALPN"
-      else match Stdlib.__Tls13ServerHello.__find hello.extensions 57L with
+      else match Stdlib.__Tls13ServerHello.__find hello.extensions 57 with
       | None -> Error "Missing QUIC client transport parameters"
       | Some client ->
         Stdlib.__QuicParameters.parseClient client clientSource |> Stdlib.Result.andThen (fun clientParameters ->

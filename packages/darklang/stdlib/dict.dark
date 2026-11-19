@@ -78,38 +78,38 @@ let remove<'k, 'v> (dict: Dict<k, v>) (key: k) : Dict<k, v> =
 // Code point order, which is UTF-8 byte order: how the interpreter orders
 // Strings, both for `<` and sorting and for a Dict's keys.
 let __compareString (left: String) (right: String) : Int32 =
-    Stdlib.Dict.__compareStringFrom left right 0L
+    Stdlib.Dict.__compareStringFrom left right 0
 
 let __compareStringFrom (left: String) (right: String) (index: Int64) : Int32 =
     if index >= Stdlib.String.__byteLength left then
-        if index >= Stdlib.String.__byteLength right then 0l else -1l
-    else if index >= Stdlib.String.__byteLength right then 1l
+        if index >= Stdlib.String.__byteLength right then 0s32 else -1s32
+    else if index >= Stdlib.String.__byteLength right then 1s32
     else
         let leftByte = Stdlib.String.__byteAtUnchecked left index in
         let rightByte = Stdlib.String.__byteAtUnchecked right index in
-        if leftByte < rightByte then -1l
-        else if leftByte > rightByte then 1l
-        else Stdlib.Dict.__compareStringFrom left right (index + 1L)
+        if leftByte < rightByte then -1s32
+        else if leftByte > rightByte then 1s32
+        else Stdlib.Dict.__compareStringFrom left right (index + 1)
 
 let __isIdentifierStart (byte: Int64) : Bool =
-    (byte >= 65L && byte <= 90L) || (byte >= 97L && byte <= 122L) || byte == 95L
+    (byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122) || byte == 95
 
 let __isIdentifierRest (byte: Int64) : Bool =
-    Stdlib.Dict.__isIdentifierStart byte || (byte >= 48L && byte <= 57L) || byte == 39L
+    Stdlib.Dict.__isIdentifierStart byte || (byte >= 48 && byte <= 57) || byte == 39
 
 let __isIdentifierAt (key: String) (index: Int64) : Bool =
     if index >= Stdlib.String.__byteLength key then true
     else if Stdlib.Dict.__isIdentifierRest (Stdlib.String.__byteAtUnchecked key index) then
-        Stdlib.Dict.__isIdentifierAt key (index + 1L)
+        Stdlib.Dict.__isIdentifierAt key (index + 1)
     else false
 
 let __renderKey (key: String) : String =
     if key == "" then "___"
-    else if key != "___" && Stdlib.Dict.__isIdentifierStart (Stdlib.String.__byteAtUnchecked key 0L) && Stdlib.Dict.__isIdentifierAt key 1L then "" + key
+    else if key != "___" && Stdlib.Dict.__isIdentifierStart (Stdlib.String.__byteAtUnchecked key 0) && Stdlib.Dict.__isIdentifierAt key 1 then "" + key
     else "``" + key + "``"
 
 let __copyKey (key: String) : String =
-    Stdlib.String.__byteSlice key 0L (Stdlib.String.__byteLength key)
+    Stdlib.String.__byteSlice key 0 (Stdlib.String.__byteLength key)
 
 let __insertEntry<'k, 'v> (entry: (k * v)) (sorted: List<(k * v)>) : List<(k * v)> =
     match sorted with
@@ -117,7 +117,7 @@ let __insertEntry<'k, 'v> (entry: (k * v)) (sorted: List<(k * v)>) : List<(k * v
     | head :: tail ->
         let (entryKey, _) = entry in
         let (headKey, _) = head in
-        if __compare<k> entryKey headKey < 0L then Stdlib.List.push sorted entry
+        if __compare<k> entryKey headKey < 0 then Stdlib.List.push sorted entry
         else Stdlib.List.push (Stdlib.Dict.__insertEntry<k, v> entry tail) head
 
 let __sortEntries<'k, 'v> (entries: List<(k * v)>) (sorted: List<(k * v)>) : List<(k * v)> =

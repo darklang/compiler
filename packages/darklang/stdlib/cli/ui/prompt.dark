@@ -17,7 +17,7 @@ let select (question: String) (choices: List<String>) : String =
         Stdlib.List.__indexedMapInt choices (fun i choice ->
             Builtin.printLine (
                 "  " +
-                Stdlib.Cli.UI.Colors.boldText (Stdlib.Int.toString (i + 1)) +
+                Stdlib.Cli.UI.Colors.boldText (Stdlib.Int.toString (i + 1z)) +
                 ". " + choice)) in
     let _ = Builtin.print "Enter number: " in
     let input = Builtin.stdinReadLine (()) in
@@ -26,8 +26,8 @@ let select (question: String) (choices: List<String>) : String =
         let _ = Builtin.printLine (Stdlib.Cli.UI.Colors.redText "Please enter a number") in
         Stdlib.Cli.UI.Prompt.select question choices
     else
-        let n = Stdlib.Result.withDefault parsed (Stdlib.Int.fromInt64 0L) in
-        let index = Stdlib.Int.subtract n (Stdlib.Int.fromInt64 1L) in
+        let n = Stdlib.Result.withDefault parsed (Stdlib.Int.fromInt64 0) in
+        let index = Stdlib.Int.subtract n (Stdlib.Int.fromInt64 1) in
         match Stdlib.List.__getAtInt choices index with
         | Some choice -> choice
         | None ->

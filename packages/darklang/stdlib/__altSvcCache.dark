@@ -11,36 +11,36 @@ let origin (url: Stdlib.__HttpWire.Url) : String =
   url.scheme + "://" + Stdlib.String.toLowercase url.host + ":" + Stdlib.Int64.toString url.port
 
 let __trim (entries: List<Stdlib.__AltSvcCache.Entry>) (remaining: Int64) : List<Stdlib.__AltSvcCache.Entry> =
-  if remaining == 0L then []
-  else match entries with | [] -> [] | entry :: rest -> Stdlib.List.push (Stdlib.__AltSvcCache.__trim rest (remaining - 1L)) entry
+  if remaining == 0 then []
+  else match entries with | [] -> [] | entry :: rest -> Stdlib.List.push (Stdlib.__AltSvcCache.__trim rest (remaining - 1)) entry
 
 let lookup (state: Stdlib.__AltSvcCache.State) (url: Stdlib.__HttpWire.Url) (now: Int64) : Stdlib.__AltSvcCache.Lookup =
-  let live = if now < 0L then [] else Stdlib.List.filter state.entries (fun entry -> entry.expires > now) in
+  let live = if now < 0 then [] else Stdlib.List.filter state.entries (fun entry -> entry.expires > now) in
   let key = Stdlib.__AltSvcCache.origin url in
   let services = if url.scheme != "https" then [] else Stdlib.List.filterMap live (fun entry -> if entry.origin == key then Some entry.service else None) in
   Stdlib.__AltSvcCache.Lookup { state = Stdlib.__AltSvcCache.State { entries = live }, services = services }
 
 let __httpDate (text: String) : Stdlib.Result.Result<Int64, String> =
-  if Stdlib.String.__byteLength text != 29L || Stdlib.String.__byteSlice text 3L 5L != ", " ||
-    Stdlib.String.__byteSlice text 7L 8L != " " || Stdlib.String.__byteSlice text 11L 12L != " " || Stdlib.String.__byteSlice text 16L 17L != " " ||
-    Stdlib.String.__byteSlice text 25L 29L != " GMT" ||
-    Stdlib.Bool.not (Stdlib.List.contains ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] (Stdlib.String.__byteSlice text 0L 3L)) then Error "Invalid response Date"
+  if Stdlib.String.__byteLength text != 29 || Stdlib.String.__byteSlice text 3 5 != ", " ||
+    Stdlib.String.__byteSlice text 7 8 != " " || Stdlib.String.__byteSlice text 11 12 != " " || Stdlib.String.__byteSlice text 16 17 != " " ||
+    Stdlib.String.__byteSlice text 25 29 != " GMT" ||
+    Stdlib.Bool.not (Stdlib.List.contains ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] (Stdlib.String.__byteSlice text 0 3)) then Error "Invalid response Date"
   else
     let months = [("Jan", "01"), ("Feb", "02"), ("Mar", "03"), ("Apr", "04"), ("May", "05"), ("Jun", "06"), ("Jul", "07"), ("Aug", "08"), ("Sep", "09"), ("Oct", "10"), ("Nov", "11"), ("Dec", "12")] in
-    match Stdlib.List.findFirst months (fun pair -> let (name, _) = pair in name == Stdlib.String.__byteSlice text 8L 11L) with
+    match Stdlib.List.findFirst months (fun pair -> let (name, _) = pair in name == Stdlib.String.__byteSlice text 8 11) with
     | None -> Error "Invalid response Date"
     | Some ((_, month)) ->
-      let iso = Stdlib.String.__byteSlice text 12L 16L + "-" + month + "-" + Stdlib.String.__byteSlice text 5L 7L + "T" + Stdlib.String.__byteSlice text 17L 25L + "Z" in
+      let iso = Stdlib.String.__byteSlice text 12 16 + "-" + month + "-" + Stdlib.String.__byteSlice text 5 7 + "T" + Stdlib.String.__byteSlice text 17 25 + "Z" in
       Stdlib.DateTime.parse iso |> Stdlib.Result.mapError (fun _error -> "Invalid response Date") |> Stdlib.Result.andThen (fun date ->
         match Stdlib.Int.toInt64 (Stdlib.DateTime.__toSecondsInt date) with | None -> Error "Invalid response Date" | Some seconds -> Ok seconds)
 
 let __age (headers: List<(String * String)>) (utc: Int64) : Stdlib.Result.Result<Int64, String> =
   let ages = Stdlib.List.filterMap headers (fun pair -> let (name, value) = pair in if Stdlib.String.toLowercase name == "age" then Some value else None) in
   let dates = Stdlib.List.filterMap headers (fun pair -> let (name, value) = pair in if Stdlib.String.toLowercase name == "date" then Some value else None) in
-  let age = match ages with | [] -> Ok 0L | [age] -> Stdlib.__AltSvc.__age age 0L 0L | _ -> Error "Duplicate response Age" in
+  let age = match ages with | [] -> Ok 0 | [age] -> Stdlib.__AltSvc.__age age 0 0 | _ -> Error "Duplicate response Age" in
   let apparent = match dates with
-    | [] -> Ok 0L
-    | [date] -> Stdlib.__AltSvcCache.__httpDate date |> Stdlib.Result.map (fun at -> if utc <= at then 0L else if utc - at > 86400L then 86400L else utc - at)
+    | [] -> Ok 0
+    | [date] -> Stdlib.__AltSvcCache.__httpDate date |> Stdlib.Result.map (fun at -> if utc <= at then 0 else if utc - at > 86400 then 86400 else utc - at)
     | _ -> Error "Duplicate response Date" in
   age |> Stdlib.Result.andThen (fun age -> apparent |> Stdlib.Result.map (fun apparent -> if age > apparent then age else apparent))
 
@@ -48,7 +48,7 @@ let __entries (endpoints: List<Stdlib.__AltSvc.Endpoint>) (key: String) (now: In
   Stdlib.List.filterMap endpoints (fun endpoint ->
     if endpoint.lifetime <= age then None
     else Some (Stdlib.__AltSvcCache.Entry { origin = key, service = endpoint.service,
-      expires = now + (endpoint.lifetime - age) * 1000L }))
+      expires = now + (endpoint.lifetime - age) * 1000 }))
 
 // A full request duration overestimates transit time for buffered responses,
 // intentionally shortening freshness rather than extending an old advertisement.
@@ -59,14 +59,14 @@ let learn (state: Stdlib.__AltSvcCache.State) (url: Stdlib.__HttpWire.Url) (stat
   let others = Stdlib.List.filter live (fun entry -> entry.origin != key) in
   let fields = Stdlib.List.filterMap headers (fun pair -> let (name, value) = pair in if Stdlib.String.toLowercase name == "alt-svc" then Some value else None) in
   if url.scheme != "https" then Stdlib.__AltSvcCache.State { entries = live }
-  else if status == 421 then Stdlib.__AltSvcCache.State { entries = others }
+  else if status == 421z then Stdlib.__AltSvcCache.State { entries = others }
   else if fields == [] then Stdlib.__AltSvcCache.State { entries = live }
-  else if started < 0L || now < started || now > 9223372036768375807L || utc < 0L || utc > 253402300799L then Stdlib.__AltSvcCache.State { entries = others }
+  else if started < 0 || now < started || now > 9223372036768375807 || utc < 0 || utc > 253402300799 then Stdlib.__AltSvcCache.State { entries = others }
   else
     match Stdlib.__AltSvc.parse url.host (Stdlib.String.join fields ","), Stdlib.__AltSvcCache.__age headers utc with
     | Ok (Services endpoints), Ok age ->
       let duration = now - started in
-      let elapsed = if duration >= 86400000L then 86400L else (duration + 999L) / 1000L in
+      let elapsed = if duration >= 86400000 then 86400 else (duration + 999) / 1000 in
       let created = Stdlib.__AltSvcCache.__entries endpoints key now (age + elapsed) in
-      Stdlib.__AltSvcCache.State { entries = Stdlib.__AltSvcCache.__trim (created @ others) 32L }
+      Stdlib.__AltSvcCache.State { entries = Stdlib.__AltSvcCache.__trim (created @ others) 32 }
     | _, _ -> Stdlib.__AltSvcCache.State { entries = others }

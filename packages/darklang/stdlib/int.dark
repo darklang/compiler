@@ -126,7 +126,7 @@ impl Stdlib.Compare for Int =
   let greaterThanOrEqualTo = Stdlib.Int.greaterThanOrEqualTo
 
 impl Stdlib.Zero for Int =
-  let zero () : Int = 0
+  let zero () : Int = 0z
 
 impl Stdlib.One for Int =
-  let one () : Int = 1
+  let one () : Int = 1z

@@ -12,16 +12,16 @@ module Darklang.Stdlib.Dict
 let __empty<'k, 'v> () : Dict<k, v> = __empty_dict<k, v> ()
 
 let __get<'k, 'v> (dict: Dict<k, v>) (key: k) : Stdlib.Option.Option<v> =
-    Stdlib.Dict.__getHelper<k, v> dict key (__hash<k> key) 0L
+    Stdlib.Dict.__getHelper<k, v> dict key (__hash<k> key) 0
 
 let __setOverwriting<'k, 'v> (dict: Dict<k, v>) (key: k) (value: v) : Dict<k, v> =
-    Stdlib.Dict.__setHelper<k, v> dict key (__hash<k> key) value 0L
+    Stdlib.Dict.__setHelper<k, v> dict key (__hash<k> key) value 0
 
 let __remove<'k, 'v> (dict: Dict<k, v>) (key: k) : Dict<k, v> =
-    Stdlib.Dict.__removeHelper<k, v> dict key (__hash<k> key) 0L
+    Stdlib.Dict.__removeHelper<k, v> dict key (__hash<k> key) 0
 
 let __contains<'k, 'v> (dict: Dict<k, v>) (key: k) : Bool =
-    Stdlib.Dict.__containsHelper<k, v> dict key (__hash<k> key) 0L
+    Stdlib.Dict.__containsHelper<k, v> dict key (__hash<k> key) 0
 
 let __size<'k, 'v> (dict: Dict<k, v>) : Int64 =
     Stdlib.Dict.__sizeHelper<k, v> dict
@@ -57,28 +57,28 @@ let __merge<'k, 'v> (left: Dict<k, v>) (right: Dict<k, v>) : Dict<k, v> =
     Stdlib.Dict.__mergeHelper<k, v> right left
 
 let __getOrDefault<'k, 'v> (dict: Dict<k, v>) (key: k) (fallback: v) : v =
-    Stdlib.Dict.__getOrDefaultHelper<k, v> dict key (__hash<k> key) 0L fallback
+    Stdlib.Dict.__getOrDefaultHelper<k, v> dict key (__hash<k> key) 0 fallback
 
 let __hashChunk (hash: Int64) (level: Int64) : Int64 =
-    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight hash (level * 6L)) 63L
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight hash (level * 6)) 63
 
 // Check if bit is set in bitmap
 let __hasBit (bitmap: Int64) (bit: Int64) : Bool =
-    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight bitmap bit) 1L == 1L
+    Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight bitmap bit) 1 == 1
 
 // Count bits below position in bitmap (for compressed array index)
 let __childIndex (bitmap: Int64) (bit: Int64) : Int64 =
-    let lowerBits = Stdlib.Int64.shiftLeft 1L bit in
-    Stdlib.Int64.__popcount (Stdlib.Int64.bitwiseAnd bitmap (lowerBits - 1L))
+    let lowerBits = Stdlib.Int64.shiftLeft 1 bit in
+    Stdlib.Int64.__popcount (Stdlib.Int64.bitwiseAnd bitmap (lowerBits - 1))
 
 // Set a bit in bitmap
 let __setBit (bitmap: Int64) (bit: Int64) : Int64 =
-    Stdlib.Int64.bitwiseXor bitmap (Stdlib.Int64.shiftLeft 1L bit)
+    Stdlib.Int64.bitwiseXor bitmap (Stdlib.Int64.shiftLeft 1 bit)
 
 // Clear a bit in bitmap (for remove)
 // A bitwise complement is equivalent to XOR with an all-ones value.
 let __clearBit (bitmap: Int64) (bit: Int64) : Int64 =
-    Stdlib.Int64.bitwiseAnd bitmap (Stdlib.Int64.bitwiseXor (0L - 1L) (Stdlib.Int64.shiftLeft 1L bit))
+    Stdlib.Int64.bitwiseAnd bitmap (Stdlib.Int64.bitwiseXor (0 - 1) (Stdlib.Int64.shiftLeft 1 bit))
 
 // =============================================================================
 // Pointer tagging helpers
@@ -103,17 +103,17 @@ let __setTag<'k, 'v> (ptr: RawPtr) (tag: Int64) : Dict<k, v> =
 
 // Allocate a leaf node: [key:8][value:8][refcount:8] = 24 bytes
 let __allocLeaf<'k, 'v> (key: k) (value: v) : Dict<k, v> =
-    let ptr = __raw_alloc 24L in
-    let _ = __raw_slot_init<k> ptr 0L key in
-    let _ = __raw_slot_init<v> ptr 8L value in
-    let _ = __raw_write_word ptr 16L 1L in
-    Stdlib.Dict.__setTag<k, v> ptr 2L
+    let ptr = __raw_alloc 24 in
+    let _ = __raw_slot_init<k> ptr 0 key in
+    let _ = __raw_slot_init<v> ptr 8 value in
+    let _ = __raw_write_word ptr 16 1 in
+    Stdlib.Dict.__setTag<k, v> ptr 2
 
 // Allocate an internal node: [bitmap:8][children...][refcount:8]
 let __allocInternal (bitmap: Int64) (numChildren: Int64) : RawPtr =
-    let ptr = __raw_alloc (16L + (numChildren * 8L)) in
-    let _ = __raw_write_word ptr 0L bitmap in
-    let _ = __raw_write_word ptr (8L + (numChildren * 8L)) 1L in
+    let ptr = __raw_alloc (16 + (numChildren * 8)) in
+    let _ = __raw_write_word ptr 0 bitmap in
+    let _ = __raw_write_word ptr (8 + (numChildren * 8)) 1 in
     ptr
 
 // =============================================================================
@@ -125,148 +125,148 @@ let __allocInternal (bitmap: Int64) (numChildren: Int64) : RawPtr =
 // Allocate a collision node with 2 initial entries
 let __allocCollision<'k, 'v> (key1: k) (val1: v) (key2: k) (val2: v) : Dict<k, v> =
     // 8 bytes for count + 2 * 16 bytes for entries + refcount = 48 bytes
-    let ptr = __raw_alloc 48L in
-    let _ = __raw_write_word ptr 0L 2L in  // count = 2
-    let _ = __raw_slot_init<k> ptr 8L key1 in
-    let _ = __raw_slot_init<v> ptr 16L val1 in
-    let _ = __raw_slot_init<k> ptr 24L key2 in
-    let _ = __raw_slot_init<v> ptr 32L val2 in
-    let _ = __raw_write_word ptr 40L 1L in
-    Stdlib.Dict.__setTag<k, v> ptr 3L
+    let ptr = __raw_alloc 48 in
+    let _ = __raw_write_word ptr 0 2 in  // count = 2
+    let _ = __raw_slot_init<k> ptr 8 key1 in
+    let _ = __raw_slot_init<v> ptr 16 val1 in
+    let _ = __raw_slot_init<k> ptr 24 key2 in
+    let _ = __raw_slot_init<v> ptr 32 val2 in
+    let _ = __raw_write_word ptr 40 1 in
+    Stdlib.Dict.__setTag<k, v> ptr 3
 
 // Get count from collision node
 let __collisionCount<'k, 'v> (ptr: RawPtr) : Int64 =
-    __raw_get<Int64> ptr 0L
+    __raw_get<Int64> ptr 0
 
 // Find key in collision node, returns index (0-based) or -1 if not found
 let __findInCollision<'k, 'v> (ptr: RawPtr) (key: k) (count: Int64) (i: Int64) : Int64 =
-    if i >= count then (-1L)
+    if i >= count then (-1)
     else
-        let offset = 8L + (i * 16L) in
+        let offset = 8 + (i * 16) in
         let storedKey = __raw_get<k> ptr offset in
         if __key_eq<k> storedKey key then i
-        else Stdlib.Dict.__findInCollision<k, v> ptr key count (i + 1L)
+        else Stdlib.Dict.__findInCollision<k, v> ptr key count (i + 1)
 
 // Get value from collision node at index
 let __getCollisionValue<'k, 'v> (ptr: RawPtr) (idx: Int64) : v =
-    let offset = 8L + (idx * 16L) + 8L in
+    let offset = 8 + (idx * 16) + 8 in
     __raw_get<v> ptr offset
 
 // Get key from collision node at index
 let __getCollisionKey<'k, 'v> (ptr: RawPtr) (idx: Int64) : k =
-    let offset = 8L + (idx * 16L) in
+    let offset = 8 + (idx * 16) in
     __raw_get<k> ptr offset
 
 // Lookup in collision node
 let __getFromCollision<'k, 'v> (ptr: RawPtr) (key: k) : Stdlib.Option.Option<v> =
     let count = Stdlib.Dict.__collisionCount<k, v> ptr in
-    let idx = Stdlib.Dict.__findInCollision<k, v> ptr key count 0L in
-    if idx >= 0L then Some (Stdlib.Dict.__getCollisionValue<k, v> ptr idx)
+    let idx = Stdlib.Dict.__findInCollision<k, v> ptr key count 0 in
+    if idx >= 0 then Some (Stdlib.Dict.__getCollisionValue<k, v> ptr idx)
     else None
 
 // Copy collision entries except one index
 let __copyCollisionExcept<'k, 'v> (oldPtr: RawPtr) (newPtr: RawPtr) (count: Int64) (exceptIdx: Int64) (i: Int64) (destI: Int64) : Unit =
     if i >= count then ()
     else if i == exceptIdx then
-        Stdlib.Dict.__copyCollisionExcept<k, v> oldPtr newPtr count exceptIdx (i + 1L) destI
+        Stdlib.Dict.__copyCollisionExcept<k, v> oldPtr newPtr count exceptIdx (i + 1) destI
     else
-        let srcOffset = 8L + (i * 16L) in
-        let destOffset = 8L + (destI * 16L) in
+        let srcOffset = 8 + (i * 16) in
+        let destOffset = 8 + (destI * 16) in
         let key = __raw_get<k> oldPtr srcOffset in
-        let value = __raw_get<v> oldPtr (srcOffset + 8L) in
+        let value = __raw_get<v> oldPtr (srcOffset + 8) in
         let _ = __raw_slot_init<k> newPtr destOffset key in
-        let _ = __raw_slot_init<v> newPtr (destOffset + 8L) value in
-        Stdlib.Dict.__copyCollisionExcept<k, v> oldPtr newPtr count exceptIdx (i + 1L) (destI + 1L)
+        let _ = __raw_slot_init<v> newPtr (destOffset + 8) value in
+        Stdlib.Dict.__copyCollisionExcept<k, v> oldPtr newPtr count exceptIdx (i + 1) (destI + 1)
 
 // Copy all collision entries
 let __copyAllCollision<'k, 'v> (oldPtr: RawPtr) (newPtr: RawPtr) (count: Int64) (i: Int64) : Unit =
     if i >= count then ()
     else
-        let offset = 8L + (i * 16L) in
+        let offset = 8 + (i * 16) in
         let key = __raw_get<k> oldPtr offset in
-        let value = __raw_get<v> oldPtr (offset + 8L) in
+        let value = __raw_get<v> oldPtr (offset + 8) in
         let _ = __raw_slot_init<k> newPtr offset key in
-        let _ = __raw_slot_init<v> newPtr (offset + 8L) value in
-        Stdlib.Dict.__copyAllCollision<k, v> oldPtr newPtr count (i + 1L)
+        let _ = __raw_slot_init<v> newPtr (offset + 8) value in
+        Stdlib.Dict.__copyAllCollision<k, v> oldPtr newPtr count (i + 1)
 
 // Copy collision entries, putting the given entry at one index
 let __copyCollisionReplacing<'k, 'v> (oldPtr: RawPtr) (newPtr: RawPtr) (count: Int64) (replaceIdx: Int64) (key: k) (value: v) (i: Int64) : Unit =
     if i >= count then ()
     else
-        let offset = 8L + (i * 16L) in
+        let offset = 8 + (i * 16) in
         let _ =
             if i == replaceIdx then
                 let _ = __raw_slot_init<k> newPtr offset key in
-                __raw_slot_init<v> newPtr (offset + 8L) value
+                __raw_slot_init<v> newPtr (offset + 8) value
             else
                 let _ = __raw_slot_init<k> newPtr offset (__raw_get<k> oldPtr offset) in
-                __raw_slot_init<v> newPtr (offset + 8L) (__raw_get<v> oldPtr (offset + 8L)) in
-        Stdlib.Dict.__copyCollisionReplacing<k, v> oldPtr newPtr count replaceIdx key value (i + 1L)
+                __raw_slot_init<v> newPtr (offset + 8) (__raw_get<v> oldPtr (offset + 8)) in
+        Stdlib.Dict.__copyCollisionReplacing<k, v> oldPtr newPtr count replaceIdx key value (i + 1)
 
 // Update or add entry in collision node
 let __setInCollision<'k, 'v> (ptr: RawPtr) (key: k) (value: v) : Dict<k, v> =
     let count = Stdlib.Dict.__collisionCount<k, v> ptr in
-    let idx = Stdlib.Dict.__findInCollision<k, v> ptr key count 0L in
-    if idx >= 0L then
+    let idx = Stdlib.Dict.__findInCollision<k, v> ptr key count 0 in
+    if idx >= 0 then
         // Key exists - the new key replaces it too, as a leaf's does: 0.0 and -0.0 are one key
-        let newPtr = __raw_alloc (16L + (count * 16L)) in
-        let _ = __raw_write_word newPtr 0L count in
-        let _ = Stdlib.Dict.__copyCollisionReplacing<k, v> ptr newPtr count idx key value 0L in
-        let _ = __raw_write_word newPtr (8L + (count * 16L)) 1L in
-        Stdlib.Dict.__setTag<k, v> newPtr 3L
+        let newPtr = __raw_alloc (16 + (count * 16)) in
+        let _ = __raw_write_word newPtr 0 count in
+        let _ = Stdlib.Dict.__copyCollisionReplacing<k, v> ptr newPtr count idx key value 0 in
+        let _ = __raw_write_word newPtr (8 + (count * 16)) 1 in
+        Stdlib.Dict.__setTag<k, v> newPtr 3
     else
         // Key doesn't exist - create new collision node with added entry
-        let newCount = count + 1L in
-        let newPtr = __raw_alloc (16L + (newCount * 16L)) in
-        let _ = __raw_write_word newPtr 0L newCount in
-        let _ = Stdlib.Dict.__copyAllCollision<k, v> ptr newPtr count 0L in
-        let newOffset = 8L + (count * 16L) in
+        let newCount = count + 1 in
+        let newPtr = __raw_alloc (16 + (newCount * 16)) in
+        let _ = __raw_write_word newPtr 0 newCount in
+        let _ = Stdlib.Dict.__copyAllCollision<k, v> ptr newPtr count 0 in
+        let newOffset = 8 + (count * 16) in
         let _ = __raw_slot_init<k> newPtr newOffset key in
-        let _ = __raw_slot_init<v> newPtr (newOffset + 8L) value in
-        let _ = __raw_write_word newPtr (8L + (newCount * 16L)) 1L in
-        Stdlib.Dict.__setTag<k, v> newPtr 3L
+        let _ = __raw_slot_init<v> newPtr (newOffset + 8) value in
+        let _ = __raw_write_word newPtr (8 + (newCount * 16)) 1 in
+        Stdlib.Dict.__setTag<k, v> newPtr 3
 
 // Remove entry from collision node
 let __removeFromCollision<'k, 'v> (ptr: RawPtr) (key: k) : Dict<k, v> =
     let count = Stdlib.Dict.__collisionCount<k, v> ptr in
-    let idx = Stdlib.Dict.__findInCollision<k, v> ptr key count 0L in
-    if idx < 0L then
+    let idx = Stdlib.Dict.__findInCollision<k, v> ptr key count 0 in
+    if idx < 0 then
         // Key not found - return unchanged
-        Stdlib.Dict.__setTag<k, v> ptr 3L
-    else if count == 2L then
+        Stdlib.Dict.__setTag<k, v> ptr 3
+    else if count == 2 then
         // Removing one of two entries - collapse to leaf
-        let otherIdx = if idx == 0L then 1L else 0L in
+        let otherIdx = if idx == 0 then 1 else 0 in
         let otherKey = Stdlib.Dict.__getCollisionKey<k, v> ptr otherIdx in
         let otherValue = Stdlib.Dict.__getCollisionValue<k, v> ptr otherIdx in
         Stdlib.Dict.__allocLeaf<k, v> otherKey otherValue
     else
         // Remove entry - create smaller collision node
-        let newCount = count - 1L in
-        let newPtr = __raw_alloc (16L + (newCount * 16L)) in
-        let _ = __raw_write_word newPtr 0L newCount in
-        let _ = Stdlib.Dict.__copyCollisionExcept<k, v> ptr newPtr count idx 0L 0L in
-        let _ = __raw_write_word newPtr (8L + (newCount * 16L)) 1L in
-        Stdlib.Dict.__setTag<k, v> newPtr 3L
+        let newCount = count - 1 in
+        let newPtr = __raw_alloc (16 + (newCount * 16)) in
+        let _ = __raw_write_word newPtr 0 newCount in
+        let _ = Stdlib.Dict.__copyCollisionExcept<k, v> ptr newPtr count idx 0 0 in
+        let _ = __raw_write_word newPtr (8 + (newCount * 16)) 1 in
+        Stdlib.Dict.__setTag<k, v> newPtr 3
 
 // Check if key exists in collision node
 let __containsInCollision<'k, 'v> (ptr: RawPtr) (key: k) : Bool =
     let count = Stdlib.Dict.__collisionCount<k, v> ptr in
-    let idx = Stdlib.Dict.__findInCollision<k, v> ptr key count 0L in
-    idx >= 0L
+    let idx = Stdlib.Dict.__findInCollision<k, v> ptr key count 0 in
+    idx >= 0
 
 // Collect keys from collision node
 let __collectCollisionKeys<'k, 'v> (ptr: RawPtr) (count: Int64) (i: Int64) (acc: List<k>) : List<k> =
     if i >= count then acc
     else
         let key = Stdlib.Dict.__getCollisionKey<k, v> ptr i in
-        Stdlib.Dict.__collectCollisionKeys<k, v> ptr count (i + 1L) (Stdlib.List.push<k> acc key)
+        Stdlib.Dict.__collectCollisionKeys<k, v> ptr count (i + 1) (Stdlib.List.push<k> acc key)
 
 // Collect values from collision node
 let __collectCollisionValues<'k, 'v> (ptr: RawPtr) (count: Int64) (i: Int64) (acc: List<v>) : List<v> =
     if i >= count then acc
     else
         let value = Stdlib.Dict.__getCollisionValue<k, v> ptr i in
-        Stdlib.Dict.__collectCollisionValues<k, v> ptr count (i + 1L) (Stdlib.List.push<v> acc value)
+        Stdlib.Dict.__collectCollisionValues<k, v> ptr count (i + 1) (Stdlib.List.push<v> acc value)
 
 // Collect entries from collision node
 let __collectCollisionEntries<'k, 'v> (ptr: RawPtr) (count: Int64) (i: Int64) (acc: List<(k * v)>) : List<(k * v)> =
@@ -274,7 +274,7 @@ let __collectCollisionEntries<'k, 'v> (ptr: RawPtr) (count: Int64) (i: Int64) (a
     else
         let key = Stdlib.Dict.__getCollisionKey<k, v> ptr i in
         let value = Stdlib.Dict.__getCollisionValue<k, v> ptr i in
-        Stdlib.Dict.__collectCollisionEntries<k, v> ptr count (i + 1L) (Stdlib.List.push<(k * v)> acc ((key, value)))
+        Stdlib.Dict.__collectCollisionEntries<k, v> ptr count (i + 1) (Stdlib.List.push<(k * v)> acc ((key, value)))
 
 // Fold over collision node entries
 let __foldCollision<'k, 'v, 'a> (ptr: RawPtr) (count: Int64) (i: Int64) (acc: a) (f: a -> k -> v -> a) : a =
@@ -282,22 +282,22 @@ let __foldCollision<'k, 'v, 'a> (ptr: RawPtr) (count: Int64) (i: Int64) (acc: a)
     else
         let key = Stdlib.Dict.__getCollisionKey<k, v> ptr i in
         let value = Stdlib.Dict.__getCollisionValue<k, v> ptr i in
-        Stdlib.Dict.__foldCollision<k, v, a> ptr count (i + 1L) (f acc key value) f
+        Stdlib.Dict.__foldCollision<k, v, a> ptr count (i + 1) (f acc key value) f
 
 // Map over collision node entries
 let __mapCollision<'k, 'v, 'w> (ptr: RawPtr) (count: Int64) (f: k -> v -> w) : Dict<k, w> =
     // Collision nodes have >= 2 entries, so we can safely get key0/key1
-    let key0 = Stdlib.Dict.__getCollisionKey<k, v> ptr 0L in
-    let val0 = Stdlib.Dict.__getCollisionValue<k, v> ptr 0L in
-    let key1 = Stdlib.Dict.__getCollisionKey<k, v> ptr 1L in
-    let val1 = Stdlib.Dict.__getCollisionValue<k, v> ptr 1L in
+    let key0 = Stdlib.Dict.__getCollisionKey<k, v> ptr 0 in
+    let val0 = Stdlib.Dict.__getCollisionValue<k, v> ptr 0 in
+    let key1 = Stdlib.Dict.__getCollisionKey<k, v> ptr 1 in
+    let val1 = Stdlib.Dict.__getCollisionValue<k, v> ptr 1 in
     let newVal0 = f key0 val0 in
     let newVal1 = f key1 val1 in
     let result = Stdlib.Dict.__allocCollision<k, w> key0 newVal0 key1 newVal1 in
-    Stdlib.Dict.__mapCollisionRest<k, v, w> ptr (Stdlib.Dict.__clearTag<k, w> result) count 2L f
+    Stdlib.Dict.__mapCollisionRest<k, v, w> ptr (Stdlib.Dict.__clearTag<k, w> result) count 2 f
 
 let __mapCollisionRest<'k, 'v, 'w> (oldPtr: RawPtr) (newPtr: RawPtr) (count: Int64) (i: Int64) (f: k -> v -> w) : Dict<k, w> =
-    if i >= count then Stdlib.Dict.__setTag<k, w> newPtr 3L
+    if i >= count then Stdlib.Dict.__setTag<k, w> newPtr 3
     else
         // For additional entries beyond first 2, we need to add them
         // This is a simplification - we use setInCollision which handles growing
@@ -305,7 +305,7 @@ let __mapCollisionRest<'k, 'v, 'w> (oldPtr: RawPtr) (newPtr: RawPtr) (count: Int
         let value = Stdlib.Dict.__getCollisionValue<k, v> oldPtr i in
         let newValue = f key value in
         let newNode = Stdlib.Dict.__setInCollision<k, w> newPtr key newValue in
-        Stdlib.Dict.__mapCollisionRest<k, v, w> oldPtr (Stdlib.Dict.__clearTag<k, w> newNode) count (i + 1L) f
+        Stdlib.Dict.__mapCollisionRest<k, v, w> oldPtr (Stdlib.Dict.__clearTag<k, w> newNode) count (i + 1) f
 
 // =============================================================================
 // Stdlib.Dict.empty - returns an empty dictionary
@@ -317,24 +317,24 @@ let __getHelper<'k, 'v> (node: Dict<k, v>) (key: k) (keyHash: Int64) (level: Int
     else
         let tag = Stdlib.Dict.__getTag<k, v> node in
         let ptr = Stdlib.Dict.__clearTag<k, v> node in
-        if tag == 2L then
+        if tag == 2 then
             // Leaf node
-            let storedKey = __raw_get<k> ptr 0L in
+            let storedKey = __raw_get<k> ptr 0 in
             if __key_eq<k> storedKey key then
-                Some (__raw_get<v> ptr 8L)
+                Some (__raw_get<v> ptr 8)
             else
                 None
-        else if tag == 1L then
+        else if tag == 1 then
             // Internal node
             let chunk = Stdlib.Dict.__hashChunk keyHash level in
-            let bitmap = __raw_get<Int64> ptr 0L in
+            let bitmap = __raw_get<Int64> ptr 0 in
             if Stdlib.Dict.__hasBit bitmap chunk then
                 let idx = Stdlib.Dict.__childIndex bitmap chunk in
-                let child = __raw_get<Dict<k, v>> ptr (8L + (idx * 8L)) in
-                Stdlib.Dict.__getHelper<k, v> child key keyHash (level + 1L)
+                let child = __raw_get<Dict<k, v>> ptr (8 + (idx * 8)) in
+                Stdlib.Dict.__getHelper<k, v> child key keyHash (level + 1)
             else
                 None
-        else if tag == 3L then
+        else if tag == 3 then
             // Collision node - linear search
             Stdlib.Dict.__getFromCollision<k, v> ptr key
         else
@@ -347,25 +347,25 @@ let __getOrDefaultHelper<'k, 'v> (node: Dict<k, v>) (key: k) (keyHash: Int64) (l
     else
         let tag = Stdlib.Dict.__getTag<k, v> node in
         let ptr = Stdlib.Dict.__clearTag<k, v> node in
-        if tag == 2L then
-            let storedKey = __raw_get<k> ptr 0L in
+        if tag == 2 then
+            let storedKey = __raw_get<k> ptr 0 in
             if __key_eq<k> storedKey key then
-                __raw_get<v> ptr 8L
+                __raw_get<v> ptr 8
             else
                 fallback
-        else if tag == 1L then
+        else if tag == 1 then
             let chunk = Stdlib.Dict.__hashChunk keyHash level in
-            let bitmap = __raw_get<Int64> ptr 0L in
+            let bitmap = __raw_get<Int64> ptr 0 in
             if Stdlib.Dict.__hasBit bitmap chunk then
                 let idx = Stdlib.Dict.__childIndex bitmap chunk in
-                let child = __raw_get<Dict<k, v>> ptr (8L + (idx * 8L)) in
-                Stdlib.Dict.__getOrDefaultHelper<k, v> child key keyHash (level + 1L) fallback
+                let child = __raw_get<Dict<k, v>> ptr (8 + (idx * 8)) in
+                Stdlib.Dict.__getOrDefaultHelper<k, v> child key keyHash (level + 1) fallback
             else
                 fallback
-        else if tag == 3L then
+        else if tag == 3 then
             let count = Stdlib.Dict.__collisionCount<k, v> ptr in
-            let idx = Stdlib.Dict.__findInCollision<k, v> ptr key count 0L in
-            if idx >= 0L then Stdlib.Dict.__getCollisionValue<k, v> ptr idx
+            let idx = Stdlib.Dict.__findInCollision<k, v> ptr key count 0 in
+            if idx >= 0 then Stdlib.Dict.__getCollisionValue<k, v> ptr idx
             else fallback
         else
             fallback
@@ -377,33 +377,33 @@ let __setHelper<'k, 'v> (node: Dict<k, v>) (key: k) (keyHash: Int64) (value: v) 
     else
         let tag = Stdlib.Dict.__getTag<k, v> node in
         let ptr = Stdlib.Dict.__clearTag<k, v> node in
-        if tag == 2L then
+        if tag == 2 then
             // Leaf node - check if same key or need to expand
-            let storedKey = __raw_get<k> ptr 0L in
+            let storedKey = __raw_get<k> ptr 0 in
             if __key_eq<k> storedKey key then
                 // Same key - replace value (create new leaf)
                 Stdlib.Dict.__allocLeaf<k, v> key value
             else
                 // Different key - need to expand to internal node
-                let storedValue = __raw_get<v> ptr 8L in
+                let storedValue = __raw_get<v> ptr 8 in
                 let storedKeyHash = __hash<k> storedKey in
                 Stdlib.Dict.__expandLeaf<k, v> storedKey storedKeyHash storedValue key keyHash value level
-        else if tag == 1L then
+        else if tag == 1 then
             // Internal node - recurse into appropriate child
             let chunk = Stdlib.Dict.__hashChunk keyHash level in
-            let bitmap = __raw_get<Int64> ptr 0L in
+            let bitmap = __raw_get<Int64> ptr 0 in
             let idx = Stdlib.Dict.__childIndex bitmap chunk in
             if Stdlib.Dict.__hasBit bitmap chunk then
                 // Child exists - update it
-                let oldChild = __raw_get<Dict<k, v>> ptr (8L + (idx * 8L)) in
-                let newChild = Stdlib.Dict.__setHelper<k, v> oldChild key keyHash value (level + 1L) in
+                let oldChild = __raw_get<Dict<k, v>> ptr (8 + (idx * 8)) in
+                let newChild = Stdlib.Dict.__setHelper<k, v> oldChild key keyHash value (level + 1) in
                 Stdlib.Dict.__copyInternalWithUpdate<k, v> ptr bitmap idx newChild
             else
                 // No child at this position - insert new leaf
                 let newLeaf = Stdlib.Dict.__allocLeaf<k, v> key value in
                 let newBitmap = Stdlib.Dict.__setBit bitmap chunk in
                 Stdlib.Dict.__copyInternalWithInsert<k, v> ptr bitmap newBitmap idx newLeaf
-        else if tag == 3L then
+        else if tag == 3 then
             // Collision node - update or add
             Stdlib.Dict.__setInCollision<k, v> ptr key value
         else
@@ -416,100 +416,100 @@ let __expandLeaf<'k, 'v> (key1: k) (key1Hash: Int64) (val1: v) (key2: k) (key2Ha
     let chunk2 = Stdlib.Dict.__hashChunk key2Hash level in
     if chunk1 == chunk2 then
         // Same chunk - need to go deeper
-        if level >= 10L then
+        if level >= 10 then
             // Max depth reached - create collision node
             Stdlib.Dict.__allocCollision<k, v> key1 val1 key2 val2
         else
             // Create internal node with single child (recursive case)
-            let child = Stdlib.Dict.__expandLeaf<k, v> key1 key1Hash val1 key2 key2Hash val2 (level + 1L) in
-            let bitmap = Stdlib.Dict.__setBit 0L chunk1 in
-            let newNode = Stdlib.Dict.__allocInternal bitmap 1L in
-            let _ = __raw_slot_init<Dict<k, v>> newNode 8L child in
-            Stdlib.Dict.__setTag<k, v> newNode 1L
+            let child = Stdlib.Dict.__expandLeaf<k, v> key1 key1Hash val1 key2 key2Hash val2 (level + 1) in
+            let bitmap = Stdlib.Dict.__setBit 0 chunk1 in
+            let newNode = Stdlib.Dict.__allocInternal bitmap 1 in
+            let _ = __raw_slot_init<Dict<k, v>> newNode 8 child in
+            Stdlib.Dict.__setTag<k, v> newNode 1
     else
         // Different chunks - create internal node with both leaves
-        let bitmap = Stdlib.Dict.__setBit (Stdlib.Dict.__setBit 0L chunk1) chunk2 in
-        let newNode = Stdlib.Dict.__allocInternal bitmap 2L in
+        let bitmap = Stdlib.Dict.__setBit (Stdlib.Dict.__setBit 0 chunk1) chunk2 in
+        let newNode = Stdlib.Dict.__allocInternal bitmap 2 in
         // Store children in order of their chunks
         if chunk1 < chunk2 then
-            let _ = __raw_slot_init<Dict<k, v>> newNode 8L (Stdlib.Dict.__allocLeaf<k, v> key1 val1) in
-            let _ = __raw_slot_init<Dict<k, v>> newNode 16L (Stdlib.Dict.__allocLeaf<k, v> key2 val2) in
-            Stdlib.Dict.__setTag<k, v> newNode 1L
+            let _ = __raw_slot_init<Dict<k, v>> newNode 8 (Stdlib.Dict.__allocLeaf<k, v> key1 val1) in
+            let _ = __raw_slot_init<Dict<k, v>> newNode 16 (Stdlib.Dict.__allocLeaf<k, v> key2 val2) in
+            Stdlib.Dict.__setTag<k, v> newNode 1
         else
-            let _ = __raw_slot_init<Dict<k, v>> newNode 8L (Stdlib.Dict.__allocLeaf<k, v> key2 val2) in
-            let _ = __raw_slot_init<Dict<k, v>> newNode 16L (Stdlib.Dict.__allocLeaf<k, v> key1 val1) in
-            Stdlib.Dict.__setTag<k, v> newNode 1L
+            let _ = __raw_slot_init<Dict<k, v>> newNode 8 (Stdlib.Dict.__allocLeaf<k, v> key2 val2) in
+            let _ = __raw_slot_init<Dict<k, v>> newNode 16 (Stdlib.Dict.__allocLeaf<k, v> key1 val1) in
+            Stdlib.Dict.__setTag<k, v> newNode 1
 
 // Copy internal node with one child updated
 let __copyInternalWithUpdate<'k, 'v> (oldPtr: RawPtr) (bitmap: Int64) (updateIdx: Int64) (newChild: Dict<k, v>) : Dict<k, v> =
     let numChildren = Stdlib.Int64.__popcount bitmap in
     let newNode = Stdlib.Dict.__allocInternal bitmap numChildren in
     // Copy all children, replacing the one at updateIdx
-    Stdlib.Dict.__copyChildren<k, v> oldPtr newNode numChildren updateIdx newChild 0L
+    Stdlib.Dict.__copyChildren<k, v> oldPtr newNode numChildren updateIdx newChild 0
 
 // Copy children from old node to new node, updating one
 let __copyChildren<'k, 'v> (oldPtr: RawPtr) (newPtr: RawPtr) (numChildren: Int64) (updateIdx: Int64) (newChild: Dict<k, v>) (i: Int64) : Dict<k, v> =
     if i >= numChildren then
-        Stdlib.Dict.__setTag<k, v> newPtr 1L
+        Stdlib.Dict.__setTag<k, v> newPtr 1
     else
-        let offset = 8L + (i * 8L) in
+        let offset = 8 + (i * 8) in
         if i == updateIdx then
             let _ = __raw_slot_init<Dict<k, v>> newPtr offset newChild in
-            Stdlib.Dict.__copyChildren<k, v> oldPtr newPtr numChildren updateIdx newChild (i + 1L)
+            Stdlib.Dict.__copyChildren<k, v> oldPtr newPtr numChildren updateIdx newChild (i + 1)
         else
             let child = __raw_get<Dict<k, v>> oldPtr offset in
             let _ = __raw_slot_init<Dict<k, v>> newPtr offset child in
-            Stdlib.Dict.__copyChildren<k, v> oldPtr newPtr numChildren updateIdx newChild (i + 1L)
+            Stdlib.Dict.__copyChildren<k, v> oldPtr newPtr numChildren updateIdx newChild (i + 1)
 
 // Copy internal node with a new child inserted at position
 let __copyInternalWithInsert<'k, 'v> (oldPtr: RawPtr) (oldBitmap: Int64) (newBitmap: Int64) (insertIdx: Int64) (newChild: Dict<k, v>) : Dict<k, v> =
     let oldNumChildren = Stdlib.Int64.__popcount oldBitmap in
-    let newNumChildren = oldNumChildren + 1L in
+    let newNumChildren = oldNumChildren + 1 in
     let newNode = Stdlib.Dict.__allocInternal newBitmap newNumChildren in
     // Copy children, inserting new one at insertIdx
-    Stdlib.Dict.__copyChildrenWithInsert<k, v> oldPtr newNode oldNumChildren insertIdx newChild 0L 0L
+    Stdlib.Dict.__copyChildrenWithInsert<k, v> oldPtr newNode oldNumChildren insertIdx newChild 0 0
 
 // Copy children from old node to new node, inserting one
 let __copyChildrenWithInsert<'k, 'v> (oldPtr: RawPtr) (newPtr: RawPtr) (oldNumChildren: Int64) (insertIdx: Int64) (newChild: Dict<k, v>) (oldI: Int64) (newI: Int64) : Dict<k, v> =
     if newI == insertIdx then
         // Insert the new child here
-        let offset = 8L + (newI * 8L) in
+        let offset = 8 + (newI * 8) in
         let _ = __raw_slot_init<Dict<k, v>> newPtr offset newChild in
-        Stdlib.Dict.__copyChildrenWithInsert<k, v> oldPtr newPtr oldNumChildren insertIdx newChild oldI (newI + 1L)
+        Stdlib.Dict.__copyChildrenWithInsert<k, v> oldPtr newPtr oldNumChildren insertIdx newChild oldI (newI + 1)
     else if oldI >= oldNumChildren then
-        Stdlib.Dict.__setTag<k, v> newPtr 1L
+        Stdlib.Dict.__setTag<k, v> newPtr 1
     else
         // Copy from old node
-        let oldOffset = 8L + (oldI * 8L) in
-        let newOffset = 8L + (newI * 8L) in
+        let oldOffset = 8 + (oldI * 8) in
+        let newOffset = 8 + (newI * 8) in
         let child = __raw_get<Dict<k, v>> oldPtr oldOffset in
         let _ = __raw_slot_init<Dict<k, v>> newPtr newOffset child in
-        Stdlib.Dict.__copyChildrenWithInsert<k, v> oldPtr newPtr oldNumChildren insertIdx newChild (oldI + 1L) (newI + 1L)
+        Stdlib.Dict.__copyChildrenWithInsert<k, v> oldPtr newPtr oldNumChildren insertIdx newChild (oldI + 1) (newI + 1)
 
 let __copyChildrenExcluding<'k, 'v> (oldPtr: RawPtr) (newPtr: RawPtr) (oldNumChildren: Int64) (excludeIdx: Int64) (oldI: Int64) (newI: Int64) : Dict<k, v> =
     if oldI >= oldNumChildren then
-        Stdlib.Dict.__setTag<k, v> newPtr 1L
+        Stdlib.Dict.__setTag<k, v> newPtr 1
     else if oldI == excludeIdx then
         // Skip this child
-        Stdlib.Dict.__copyChildrenExcluding<k, v> oldPtr newPtr oldNumChildren excludeIdx (oldI + 1L) newI
+        Stdlib.Dict.__copyChildrenExcluding<k, v> oldPtr newPtr oldNumChildren excludeIdx (oldI + 1) newI
     else
         // Copy this child
-        let oldOffset = 8L + (oldI * 8L) in
-        let newOffset = 8L + (newI * 8L) in
+        let oldOffset = 8 + (oldI * 8) in
+        let newOffset = 8 + (newI * 8) in
         let child = __raw_get<Dict<k, v>> oldPtr oldOffset in
         let _ = __raw_slot_init<Dict<k, v>> newPtr newOffset child in
-        Stdlib.Dict.__copyChildrenExcluding<k, v> oldPtr newPtr oldNumChildren excludeIdx (oldI + 1L) (newI + 1L)
+        Stdlib.Dict.__copyChildrenExcluding<k, v> oldPtr newPtr oldNumChildren excludeIdx (oldI + 1) (newI + 1)
 
 // Copy internal node with one child removed
 let __copyInternalWithRemove<'k, 'v> (oldPtr: RawPtr) (oldBitmap: Int64) (newBitmap: Int64) (removeIdx: Int64) : Dict<k, v> =
     let oldNumChildren = Stdlib.Int64.__popcount oldBitmap in
-    let newNumChildren = oldNumChildren - 1L in
-    if newNumChildren == 0L then
+    let newNumChildren = oldNumChildren - 1 in
+    if newNumChildren == 0 then
         // No children left - return empty
         __empty_dict<k, v> ()
     else
         let newNode = Stdlib.Dict.__allocInternal newBitmap newNumChildren in
-        Stdlib.Dict.__copyChildrenExcluding<k, v> oldPtr newNode oldNumChildren removeIdx 0L 0L
+        Stdlib.Dict.__copyChildrenExcluding<k, v> oldPtr newNode oldNumChildren removeIdx 0 0
 
 // Remove helper - recursive removal
 let __removeHelper<'k, 'v> (node: Dict<k, v>) (key: k) (keyHash: Int64) (level: Int64) : Dict<k, v> =
@@ -519,36 +519,36 @@ let __removeHelper<'k, 'v> (node: Dict<k, v>) (key: k) (keyHash: Int64) (level: 
     else
         let tag = Stdlib.Dict.__getTag<k, v> node in
         let ptr = Stdlib.Dict.__clearTag<k, v> node in
-        if tag == 2L then
+        if tag == 2 then
             // Leaf node
-            let storedKey = __raw_get<k> ptr 0L in
+            let storedKey = __raw_get<k> ptr 0 in
             if __key_eq<k> storedKey key then
                 // Found the key - return empty to remove it
                 __empty_dict<k, v> ()
             else
                 // Different key - not found, return unchanged
                 node
-        else if tag == 1L then
+        else if tag == 1 then
             // Internal node
             let chunk = Stdlib.Dict.__hashChunk keyHash level in
-            let bitmap = __raw_get<Int64> ptr 0L in
+            let bitmap = __raw_get<Int64> ptr 0 in
             if Stdlib.Dict.__hasBit bitmap chunk then
                 let idx = Stdlib.Dict.__childIndex bitmap chunk in
-                let oldChild = __raw_get<Dict<k, v>> ptr (8L + (idx * 8L)) in
-                let newChild = Stdlib.Dict.__removeHelper<k, v> oldChild key keyHash (level + 1L) in
+                let oldChild = __raw_get<Dict<k, v>> ptr (8 + (idx * 8)) in
+                let newChild = Stdlib.Dict.__removeHelper<k, v> oldChild key keyHash (level + 1) in
                 if __dict_is_null<k, v> newChild then
                     // Child was removed - need to update this node
                     let numChildren = Stdlib.Int64.__popcount bitmap in
-                    if numChildren == 1L then
+                    if numChildren == 1 then
                         // This was the only child - return empty
                         __empty_dict<k, v> ()
-                    else if numChildren == 2L then
+                    else if numChildren == 2 then
                         // Two children, one being removed - check if we can collapse
                         // Get the other child index (0 if we're removing 1, 1 if removing 0)
-                        let otherIdx = 1L - idx in
-                        let otherChild = __raw_get<Dict<k, v>> ptr (8L + (otherIdx * 8L)) in
+                        let otherIdx = 1 - idx in
+                        let otherChild = __raw_get<Dict<k, v>> ptr (8 + (otherIdx * 8)) in
                         let otherTag = Stdlib.Dict.__getTag<k, v> otherChild in
-                        if otherTag == 2L then
+                        if otherTag == 2 then
                             // Other child is a leaf - collapse to it
                             otherChild
                         else
@@ -565,7 +565,7 @@ let __removeHelper<'k, 'v> (node: Dict<k, v>) (key: k) (keyHash: Int64) (level: 
             else
                 // Bit not set - key not in this subtree
                 node
-        else if tag == 3L then
+        else if tag == 3 then
             // Collision node - remove from collision
             Stdlib.Dict.__removeFromCollision<k, v> ptr key
         else
@@ -578,21 +578,21 @@ let __containsHelper<'k, 'v> (node: Dict<k, v>) (key: k) (keyHash: Int64) (level
     else
         let tag = Stdlib.Dict.__getTag<k, v> node in
         let ptr = Stdlib.Dict.__clearTag<k, v> node in
-        if tag == 2L then
+        if tag == 2 then
             // Leaf node
-            let storedKey = __raw_get<k> ptr 0L in
+            let storedKey = __raw_get<k> ptr 0 in
             __key_eq<k> storedKey key
-        else if tag == 1L then
+        else if tag == 1 then
             // Internal node
             let chunk = Stdlib.Dict.__hashChunk keyHash level in
-            let bitmap = __raw_get<Int64> ptr 0L in
+            let bitmap = __raw_get<Int64> ptr 0 in
             if Stdlib.Dict.__hasBit bitmap chunk then
                 let idx = Stdlib.Dict.__childIndex bitmap chunk in
-                let child = __raw_get<Dict<k, v>> ptr (8L + (idx * 8L)) in
-                Stdlib.Dict.__containsHelper<k, v> child key keyHash (level + 1L)
+                let child = __raw_get<Dict<k, v>> ptr (8 + (idx * 8)) in
+                Stdlib.Dict.__containsHelper<k, v> child key keyHash (level + 1)
             else
                 false
-        else if tag == 3L then
+        else if tag == 3 then
             // Collision node
             Stdlib.Dict.__containsInCollision<k, v> ptr key
         else
@@ -601,27 +601,27 @@ let __containsHelper<'k, 'v> (node: Dict<k, v>) (key: k) (keyHash: Int64) (level
 // Count entries in dict
 let __sizeHelper<'k, 'v> (node: Dict<k, v>) : Int64 =
     if __dict_is_null<k, v> node then
-        0L
+        0
     else
         let tag = Stdlib.Dict.__getTag<k, v> node in
         let ptr = Stdlib.Dict.__clearTag<k, v> node in
-        if tag == 2L then
-            1L
-        else if tag == 1L then
-            let bitmap = __raw_get<Int64> ptr 0L in
-            Stdlib.Dict.__countChildren<k, v> ptr bitmap 0L
-        else if tag == 3L then
+        if tag == 2 then
+            1
+        else if tag == 1 then
+            let bitmap = __raw_get<Int64> ptr 0 in
+            Stdlib.Dict.__countChildren<k, v> ptr bitmap 0
+        else if tag == 3 then
             // Collision node - return count of entries
             Stdlib.Dict.__collisionCount<k, v> ptr
         else
-            0L
+            0
 
 let __countChildren<'k, 'v> (ptr: RawPtr) (bitmap: Int64) (idx: Int64) : Int64 =
-    if bitmap == 0L then
-        0L
+    if bitmap == 0 then
+        0
     else
-        let child = __raw_get<Dict<k, v>> ptr (8L + (idx * 8L)) in
-        Stdlib.Dict.__sizeHelper<k, v> child + Stdlib.Dict.__countChildren<k, v> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1L)) (idx + 1L)
+        let child = __raw_get<Dict<k, v>> ptr (8 + (idx * 8)) in
+        Stdlib.Dict.__sizeHelper<k, v> child + Stdlib.Dict.__countChildren<k, v> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1)) (idx + 1)
 
 // =============================================================================
 // Dict Enumeration (Generic)
@@ -634,25 +634,25 @@ let __keysHelper<'k, 'v> (node: Dict<k, v>) (acc: List<k>) : List<k> =
     else
         let tag = Stdlib.Dict.__getTag<k, v> node in
         let ptr = Stdlib.Dict.__clearTag<k, v> node in
-        if tag == 2L then
-            let key = __raw_get<k> ptr 0L in
+        if tag == 2 then
+            let key = __raw_get<k> ptr 0 in
             Stdlib.List.push<k> acc key
-        else if tag == 1L then
-            let bitmap = __raw_get<Int64> ptr 0L in
-            Stdlib.Dict.__collectKeysFromChildren<k, v> ptr bitmap 0L acc
-        else if tag == 3L then
+        else if tag == 1 then
+            let bitmap = __raw_get<Int64> ptr 0 in
+            Stdlib.Dict.__collectKeysFromChildren<k, v> ptr bitmap 0 acc
+        else if tag == 3 then
             let count = Stdlib.Dict.__collisionCount<k, v> ptr in
-            Stdlib.Dict.__collectCollisionKeys<k, v> ptr count 0L acc
+            Stdlib.Dict.__collectCollisionKeys<k, v> ptr count 0 acc
         else
             acc
 
 let __collectKeysFromChildren<'k, 'v> (ptr: RawPtr) (bitmap: Int64) (idx: Int64) (acc: List<k>) : List<k> =
-    if bitmap == 0L then
+    if bitmap == 0 then
         acc
     else
-        let child = __raw_get<Dict<k, v>> ptr (8L + (idx * 8L)) in
+        let child = __raw_get<Dict<k, v>> ptr (8 + (idx * 8)) in
         let newAcc = Stdlib.Dict.__keysHelper<k, v> child acc in
-        Stdlib.Dict.__collectKeysFromChildren<k, v> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1L)) (idx + 1L) newAcc
+        Stdlib.Dict.__collectKeysFromChildren<k, v> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1)) (idx + 1) newAcc
 
 // Get all values from dict
 let __valuesHelper<'k, 'v> (node: Dict<k, v>) (acc: List<v>) : List<v> =
@@ -661,25 +661,25 @@ let __valuesHelper<'k, 'v> (node: Dict<k, v>) (acc: List<v>) : List<v> =
     else
         let tag = Stdlib.Dict.__getTag<k, v> node in
         let ptr = Stdlib.Dict.__clearTag<k, v> node in
-        if tag == 2L then
-            let value = __raw_get<v> ptr 8L in
+        if tag == 2 then
+            let value = __raw_get<v> ptr 8 in
             Stdlib.List.push<v> acc value
-        else if tag == 1L then
-            let bitmap = __raw_get<Int64> ptr 0L in
-            Stdlib.Dict.__collectValuesFromChildren<k, v> ptr bitmap 0L acc
-        else if tag == 3L then
+        else if tag == 1 then
+            let bitmap = __raw_get<Int64> ptr 0 in
+            Stdlib.Dict.__collectValuesFromChildren<k, v> ptr bitmap 0 acc
+        else if tag == 3 then
             let count = Stdlib.Dict.__collisionCount<k, v> ptr in
-            Stdlib.Dict.__collectCollisionValues<k, v> ptr count 0L acc
+            Stdlib.Dict.__collectCollisionValues<k, v> ptr count 0 acc
         else
             acc
 
 let __collectValuesFromChildren<'k, 'v> (ptr: RawPtr) (bitmap: Int64) (idx: Int64) (acc: List<v>) : List<v> =
-    if bitmap == 0L then
+    if bitmap == 0 then
         acc
     else
-        let child = __raw_get<Dict<k, v>> ptr (8L + (idx * 8L)) in
+        let child = __raw_get<Dict<k, v>> ptr (8 + (idx * 8)) in
         let newAcc = Stdlib.Dict.__valuesHelper<k, v> child acc in
-        Stdlib.Dict.__collectValuesFromChildren<k, v> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1L)) (idx + 1L) newAcc
+        Stdlib.Dict.__collectValuesFromChildren<k, v> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1)) (idx + 1) newAcc
 
 // Get all entries from dict as key-value tuples
 let __entriesHelper<'k, 'v> (node: Dict<k, v>) (acc: List<(k * v)>) : List<(k * v)> =
@@ -688,26 +688,26 @@ let __entriesHelper<'k, 'v> (node: Dict<k, v>) (acc: List<(k * v)>) : List<(k * 
     else
         let tag = Stdlib.Dict.__getTag<k, v> node in
         let ptr = Stdlib.Dict.__clearTag<k, v> node in
-        if tag == 2L then
-            let key = __raw_get<k> ptr 0L in
-            let value = __raw_get<v> ptr 8L in
+        if tag == 2 then
+            let key = __raw_get<k> ptr 0 in
+            let value = __raw_get<v> ptr 8 in
             Stdlib.List.push<(k * v)> acc ((key, value))
-        else if tag == 1L then
-            let bitmap = __raw_get<Int64> ptr 0L in
-            Stdlib.Dict.__collectEntriesFromChildren<k, v> ptr bitmap 0L acc
-        else if tag == 3L then
+        else if tag == 1 then
+            let bitmap = __raw_get<Int64> ptr 0 in
+            Stdlib.Dict.__collectEntriesFromChildren<k, v> ptr bitmap 0 acc
+        else if tag == 3 then
             let count = Stdlib.Dict.__collisionCount<k, v> ptr in
-            Stdlib.Dict.__collectCollisionEntries<k, v> ptr count 0L acc
+            Stdlib.Dict.__collectCollisionEntries<k, v> ptr count 0 acc
         else
             acc
 
 let __collectEntriesFromChildren<'k, 'v> (ptr: RawPtr) (bitmap: Int64) (idx: Int64) (acc: List<(k * v)>) : List<(k * v)> =
-    if bitmap == 0L then
+    if bitmap == 0 then
         acc
     else
-        let child = __raw_get<Dict<k, v>> ptr (8L + (idx * 8L)) in
+        let child = __raw_get<Dict<k, v>> ptr (8 + (idx * 8)) in
         let newAcc = Stdlib.Dict.__entriesHelper<k, v> child acc in
-        Stdlib.Dict.__collectEntriesFromChildren<k, v> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1L)) (idx + 1L) newAcc
+        Stdlib.Dict.__collectEntriesFromChildren<k, v> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1)) (idx + 1) newAcc
 
 // Fold over all entries in the dictionary
 let __foldHelper<'k, 'v, 'a> (node: Dict<k, v>) (acc: a) (f: a -> k -> v -> a) : a =
@@ -716,26 +716,26 @@ let __foldHelper<'k, 'v, 'a> (node: Dict<k, v>) (acc: a) (f: a -> k -> v -> a) :
     else
         let tag = Stdlib.Dict.__getTag<k, v> node in
         let ptr = Stdlib.Dict.__clearTag<k, v> node in
-        if tag == 2L then
-            let key = __raw_get<k> ptr 0L in
-            let value = __raw_get<v> ptr 8L in
+        if tag == 2 then
+            let key = __raw_get<k> ptr 0 in
+            let value = __raw_get<v> ptr 8 in
             f acc key value
-        else if tag == 1L then
-            let bitmap = __raw_get<Int64> ptr 0L in
-            Stdlib.Dict.__foldChildren<k, v, a> ptr bitmap 0L acc f
-        else if tag == 3L then
+        else if tag == 1 then
+            let bitmap = __raw_get<Int64> ptr 0 in
+            Stdlib.Dict.__foldChildren<k, v, a> ptr bitmap 0 acc f
+        else if tag == 3 then
             let count = Stdlib.Dict.__collisionCount<k, v> ptr in
-            Stdlib.Dict.__foldCollision<k, v, a> ptr count 0L acc f
+            Stdlib.Dict.__foldCollision<k, v, a> ptr count 0 acc f
         else
             acc
 
 let __foldChildren<'k, 'v, 'a> (ptr: RawPtr) (bitmap: Int64) (idx: Int64) (acc: a) (f: a -> k -> v -> a) : a =
-    if bitmap == 0L then
+    if bitmap == 0 then
         acc
     else
-        let child = __raw_get<Dict<k, v>> ptr (8L + (idx * 8L)) in
+        let child = __raw_get<Dict<k, v>> ptr (8 + (idx * 8)) in
         let newAcc = Stdlib.Dict.__foldHelper<k, v, a> child acc f in
-        Stdlib.Dict.__foldChildren<k, v, a> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1L)) (idx + 1L) newAcc f
+        Stdlib.Dict.__foldChildren<k, v, a> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1)) (idx + 1) newAcc f
 
 // Map over all values in the dictionary
 let __mapHelper<'k, 'v, 'w> (node: Dict<k, v>) (f: k -> v -> w) : Dict<k, w> =
@@ -744,17 +744,17 @@ let __mapHelper<'k, 'v, 'w> (node: Dict<k, v>) (f: k -> v -> w) : Dict<k, w> =
     else
         let tag = Stdlib.Dict.__getTag<k, v> node in
         let ptr = Stdlib.Dict.__clearTag<k, v> node in
-        if tag == 2L then
-            let key = __raw_get<k> ptr 0L in
-            let value = __raw_get<v> ptr 8L in
+        if tag == 2 then
+            let key = __raw_get<k> ptr 0 in
+            let value = __raw_get<v> ptr 8 in
             let newValue = f key value in
             Stdlib.Dict.__allocLeaf<k, w> key newValue
-        else if tag == 1L then
-            let bitmap = __raw_get<Int64> ptr 0L in
+        else if tag == 1 then
+            let bitmap = __raw_get<Int64> ptr 0 in
             let numChildren = Stdlib.Int64.__popcount bitmap in
             let newPtr = Stdlib.Dict.__allocInternal bitmap numChildren in
-            Stdlib.Dict.__mapChildren<k, v, w> ptr newPtr bitmap 0L numChildren f
-        else if tag == 3L then
+            Stdlib.Dict.__mapChildren<k, v, w> ptr newPtr bitmap 0 numChildren f
+        else if tag == 3 then
             let count = Stdlib.Dict.__collisionCount<k, v> ptr in
             Stdlib.Dict.__mapCollision<k, v, w> ptr count f
         else
@@ -762,12 +762,12 @@ let __mapHelper<'k, 'v, 'w> (node: Dict<k, v>) (f: k -> v -> w) : Dict<k, w> =
 
 let __mapChildren<'k, 'v, 'w> (oldPtr: RawPtr) (newPtr: RawPtr) (bitmap: Int64) (idx: Int64) (numChildren: Int64) (f: k -> v -> w) : Dict<k, w> =
     if idx >= numChildren then
-        Stdlib.Dict.__setTag<k, w> newPtr 1L
+        Stdlib.Dict.__setTag<k, w> newPtr 1
     else
-        let child = __raw_get<Dict<k, v>> oldPtr (8L + (idx * 8L)) in
+        let child = __raw_get<Dict<k, v>> oldPtr (8 + (idx * 8)) in
         let mappedChild = Stdlib.Dict.__mapHelper<k, v, w> child f in
-        let _ = __raw_slot_init<Dict<k, w>> newPtr (8L + (idx * 8L)) mappedChild in
-        Stdlib.Dict.__mapChildren<k, v, w> oldPtr newPtr bitmap (idx + 1L) numChildren f
+        let _ = __raw_slot_init<Dict<k, w>> newPtr (8 + (idx * 8)) mappedChild in
+        Stdlib.Dict.__mapChildren<k, v, w> oldPtr newPtr bitmap (idx + 1) numChildren f
 
 // Filter entries in the dictionary
 let __filterHelper<'k, 'v> (node: Dict<k, v>) (acc: Dict<k, v>) (f: k -> v -> Bool) : Dict<k, v> =
@@ -776,23 +776,23 @@ let __filterHelper<'k, 'v> (node: Dict<k, v>) (acc: Dict<k, v>) (f: k -> v -> Bo
     else
         let tag = Stdlib.Dict.__getTag<k, v> node in
         let ptr = Stdlib.Dict.__clearTag<k, v> node in
-        if tag == 2L then
-            let key = __raw_get<k> ptr 0L in
-            let value = __raw_get<v> ptr 8L in
+        if tag == 2 then
+            let key = __raw_get<k> ptr 0 in
+            let value = __raw_get<v> ptr 8 in
             if f key value then Stdlib.Dict.__setOverwriting<k, v> acc key value else acc
-        else if tag == 1L then
-            let bitmap = __raw_get<Int64> ptr 0L in
-            Stdlib.Dict.__filterChildren<k, v> ptr bitmap 0L acc f
+        else if tag == 1 then
+            let bitmap = __raw_get<Int64> ptr 0 in
+            Stdlib.Dict.__filterChildren<k, v> ptr bitmap 0 acc f
         else
             acc
 
 let __filterChildren<'k, 'v> (ptr: RawPtr) (bitmap: Int64) (idx: Int64) (acc: Dict<k, v>) (f: k -> v -> Bool) : Dict<k, v> =
-    if bitmap == 0L then
+    if bitmap == 0 then
         acc
     else
-        let child = __raw_get<Dict<k, v>> ptr (8L + (idx * 8L)) in
+        let child = __raw_get<Dict<k, v>> ptr (8 + (idx * 8)) in
         let newAcc = Stdlib.Dict.__filterHelper<k, v> child acc f in
-        Stdlib.Dict.__filterChildren<k, v> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1L)) (idx + 1L) newAcc f
+        Stdlib.Dict.__filterChildren<k, v> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1)) (idx + 1) newAcc f
 
 // =============================================================================
 // Stdlib.Dict.merge - Combine two dictionaries
@@ -805,23 +805,23 @@ let __mergeHelper<'k, 'v> (source: Dict<k, v>) (target: Dict<k, v>) : Dict<k, v>
     else
         let tag = Stdlib.Dict.__getTag<k, v> source in
         let ptr = Stdlib.Dict.__clearTag<k, v> source in
-        if tag == 2L then
-            let key = __raw_get<k> ptr 0L in
-            let value = __raw_get<v> ptr 8L in
+        if tag == 2 then
+            let key = __raw_get<k> ptr 0 in
+            let value = __raw_get<v> ptr 8 in
             Stdlib.Dict.__setOverwriting<k, v> target key value
-        else if tag == 1L then
-            let bitmap = __raw_get<Int64> ptr 0L in
-            Stdlib.Dict.__mergeChildren<k, v> ptr bitmap 0L target
+        else if tag == 1 then
+            let bitmap = __raw_get<Int64> ptr 0 in
+            Stdlib.Dict.__mergeChildren<k, v> ptr bitmap 0 target
         else
             target
 
 let __mergeChildren<'k, 'v> (ptr: RawPtr) (bitmap: Int64) (idx: Int64) (target: Dict<k, v>) : Dict<k, v> =
-    if bitmap == 0L then
+    if bitmap == 0 then
         target
     else
-        let child = __raw_get<Dict<k, v>> ptr (8L + (idx * 8L)) in
+        let child = __raw_get<Dict<k, v>> ptr (8 + (idx * 8)) in
         let newTarget = Stdlib.Dict.__mergeHelper<k, v> child target in
-        Stdlib.Dict.__mergeChildren<k, v> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1L)) (idx + 1L) newTarget
+        Stdlib.Dict.__mergeChildren<k, v> ptr (Stdlib.Int64.bitwiseAnd bitmap (bitmap - 1)) (idx + 1) newTarget
 
 // =============================================================================
 // Stdlib.Dict.fromList - Construct dictionary from list of pairs

@@ -12,12 +12,12 @@ let bytesIndexOf (bytes: Blob) (byte: UInt8) (start: Int64) : Stdlib.Option.Opti
     Stdlib.Blob.indexOf bytes byte start
 
 let __lastIndexOfFrom (bytes: Blob) (byte: Int64) (index: Int64) : Stdlib.Option.Option<Int64> =
-    if index < 0L then None
+    if index < 0 then None
     else if Stdlib.Blob.__getByte bytes index == byte then Some index
-    else Builtin.__lastIndexOfFrom bytes byte (index - 1L)
+    else Builtin.__lastIndexOfFrom bytes byte (index - 1)
 
 let bytesLastIndexOf (bytes: Blob) (byte: UInt8) (start: Int64) : Stdlib.Option.Option<Int64> =
-    if start < 0L || start >= Stdlib.Blob.__byteLength bytes then None
+    if start < 0 || start >= Stdlib.Blob.__byteLength bytes then None
     else Builtin.__lastIndexOfFrom bytes (Stdlib.Blob.__uint8ToInt64 byte) start
 
 let bytesIndexOfSegment (bytes: Blob) (segment: Blob) (start: Int64) : Stdlib.Option.Option<Int64> =

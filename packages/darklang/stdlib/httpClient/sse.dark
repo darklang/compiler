@@ -21,13 +21,13 @@ module Sse =
     match Stdlib.String.__indexOfInt line ":" with
     | None -> (line, "")
     | Some idx ->
-      let field = Stdlib.String.__sliceInt line 0 idx
+      let field = Stdlib.String.__sliceInt line 0z idx
       let afterColon =
-        Stdlib.String.__sliceInt line (idx + 1) (Stdlib.String.__lengthInt line)
+        Stdlib.String.__sliceInt line (idx + 1z) (Stdlib.String.__lengthInt line)
 
       let value =
         if Stdlib.String.startsWith afterColon " " then
-          Stdlib.String.__dropFirstInt afterColon 1
+          Stdlib.String.__dropFirstInt afterColon 1z
         else
           afterColon
 
@@ -114,7 +114,7 @@ module Sse =
 
     | Some b ->
       // 10uy = '\n'. End of a line.
-      if b == 10uy then
+      if b == 10u8 then
         let line =
           match
             Stdlib.Blob.toString (Stdlib.Blob.fromList state.currentLine)

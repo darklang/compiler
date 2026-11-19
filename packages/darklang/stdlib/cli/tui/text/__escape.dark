@@ -4,17 +4,17 @@ module Darklang.Stdlib.Cli.Tui.Text
 
 let __isCsiFinal (cluster: Char) : Bool =
     match Stdlib.Char.__toCodepointInt cluster with
-    | Some codepoint -> codepoint >= 64 && codepoint <= 126
+    | Some codepoint -> codepoint >= 64z && codepoint <= 126z
     | None -> false
 
 let __isControl (cluster: Char) : Bool =
     match Stdlib.Char.__toCodepointInt cluster with
     | None -> (Stdlib.Char.toString cluster) == "\r\n"
-    | Some codepoint -> codepoint < 32 || (codepoint >= 127 && codepoint <= 159)
+    | Some codepoint -> codepoint < 32z || (codepoint >= 127z && codepoint <= 159z)
 
 let __isEscape (cluster: Char) : Bool =
     match Stdlib.Char.__toCodepointInt cluster with
-    | Some codepoint -> codepoint == 27
+    | Some codepoint -> codepoint == 27z
     | None -> false
 
 let __scanCsi

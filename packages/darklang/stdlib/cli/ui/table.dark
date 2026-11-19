@@ -4,7 +4,7 @@ module Darklang.Stdlib.Cli.UI.Table
 
 let __pad (value: String) (width: Int) : String =
     let padding = width - Stdlib.String.__lengthInt value in
-    if padding <= 0 then value else value + Stdlib.String.__repeatInt " " padding
+    if padding <= 0z then value else value + Stdlib.String.__repeatInt " " padding
 
 let __maxCellLength (rows: List<List<String>>) (index: Int) (current: Int) : Int =
     match rows with
@@ -21,8 +21,8 @@ let __columnWidths (columns: List<String>) (rows: List<List<String>>) (index: In
     | [] -> []
     | header :: rest ->
         let width =
-            Stdlib.Int.max (Stdlib.String.__lengthInt header) (Stdlib.Cli.UI.Table.__maxCellLength rows index 0) in
-        Stdlib.List.push (Stdlib.Cli.UI.Table.__columnWidths rest rows (index + 1)) width
+            Stdlib.Int.max (Stdlib.String.__lengthInt header) (Stdlib.Cli.UI.Table.__maxCellLength rows index 0z) in
+        Stdlib.List.push (Stdlib.Cli.UI.Table.__columnWidths rest rows (index + 1z)) width
 
 let __headerLine (columns: List<String>) (widths: List<Int>) : String =
     match (columns, widths) with
@@ -64,7 +64,7 @@ let __printRows (columns: List<String>) (widths: List<Int>) (rows: List<List<Str
         Stdlib.Cli.UI.Table.__printRows columns widths rest
 
 let print (columns: List<String>) (rows: List<List<String>>) : Unit =
-    let widths = Stdlib.Cli.UI.Table.__columnWidths columns rows 0 in
+    let widths = Stdlib.Cli.UI.Table.__columnWidths columns rows 0z in
     let _ = Builtin.printLine (Stdlib.Cli.UI.Colors.boldText (Stdlib.Cli.UI.Table.__headerLine columns widths)) in
     let _ = Builtin.printLine (Stdlib.Cli.UI.Table.__separatorLine widths) in
     Stdlib.Cli.UI.Table.__printRows columns widths rows

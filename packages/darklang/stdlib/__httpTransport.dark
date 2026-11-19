@@ -19,7 +19,7 @@ let __idleTcp (connection: Stdlib.__Network.TcpConnection) : Bool =
   match connection.watch with
   | None -> false
   | Some watch ->
-    match Stdlib.__Network.waitSockets [Stdlib.__Network.Interest { watch = watch, readable = true, writable = false }] 0L with
+    match Stdlib.__Network.waitSockets [Stdlib.__Network.Interest { watch = watch, readable = true, writable = false }] 0 with
     | Error _ -> false
     | Ok events -> events == []
 
@@ -28,31 +28,31 @@ let __idleSecure (connection: Stdlib.__Network.TcpConnection) (cell: RawPtr) (li
   | None -> false
   | Some _ ->
     let state = Stdlib.Stream.__cellGet<Stdlib.__Tls13Client.ApplicationState> cell in
-    Stdlib.Blob.__byteLength state.pending == 0L && Stdlib.Blob.__byteLength state.outgoing == 0L && Stdlib.__HttpTransport.__idleTcp connection
+    Stdlib.Blob.__byteLength state.pending == 0 && Stdlib.Blob.__byteLength state.outgoing == 0 && Stdlib.__HttpTransport.__idleTcp connection
 
 // Ciphertext is queued after advancing its traffic keys, and retired only by
 // the actual positive send count. Never reseal a partially sent record.
 let __pollOutput (cell: RawPtr) (write: Blob -> Stdlib.Result.Result<Stdlib.Option.Option<Int64>, String>) : Stdlib.Result.Result<Bool, String> =
   let state = Stdlib.Stream.__cellGet<Stdlib.__Tls13Client.ApplicationState> cell in
   let remaining = Stdlib.Blob.__byteLength state.outgoing - state.outgoingOffset in
-  if remaining == 0L then Ok true
+  if remaining == 0 then Ok true
   else write (Stdlib.__Http2Wire.__slice state.outgoing state.outgoingOffset remaining) |> Stdlib.Result.andThen (fun sent ->
     match sent with
     | None -> Ok false
     | Some size ->
-      if size <= 0L || size > remaining then Error "Invalid TLS write progress"
+      if size <= 0 || size > remaining then Error "Invalid TLS write progress"
       else
         let done = size == remaining in
-        let next = if done then { state with outgoing = Stdlib.Blob.empty, outgoingOffset = 0L }
+        let next = if done then { state with outgoing = Stdlib.Blob.empty, outgoingOffset = 0 }
                    else { state with outgoingOffset = state.outgoingOffset + size } in
         let _ = Stdlib.Stream.__cellSet cell next in Ok done)
 
 let __drainOutput (connection: Stdlib.__Network.TcpConnection) (cell: RawPtr) : Stdlib.Result.Result<Unit, String> =
   let state = Stdlib.Stream.__cellGet<Stdlib.__Tls13Client.ApplicationState> cell in
   let remaining = Stdlib.Blob.__byteLength state.outgoing - state.outgoingOffset in
-  if remaining == 0L then Ok ()
+  if remaining == 0 then Ok ()
   else Stdlib.__Tls13Client.__send connection (Stdlib.__Http2Wire.__slice state.outgoing state.outgoingOffset remaining) |> Stdlib.Result.map (fun _unit ->
-    Stdlib.Stream.__cellSet cell { state with outgoing = Stdlib.Blob.empty, outgoingOffset = 0L })
+    Stdlib.Stream.__cellSet cell { state with outgoing = Stdlib.Blob.empty, outgoingOffset = 0 })
 
 let __pollWriteTcp (connection: Stdlib.__Network.TcpConnection) (bytes: Blob) : Stdlib.Result.Result<Stdlib.Option.Option<Int64>, String> =
   Stdlib.__Network.pollWriteTcp connection bytes |> Stdlib.Result.mapError (fun _code -> "TLS application write failed")
@@ -68,13 +68,13 @@ let __pollWriteSecureStep (cell: RawPtr) (bytes: Blob)
     if Stdlib.Bool.not drained then Ok None
     else
       let length = Stdlib.Blob.__byteLength bytes in
-      if length == 0L then Ok (Some 0L)
+      if length == 0 then Ok (Some 0)
       else
-        let size = if length > 2048L then 2048L else length in
+        let size = if length > 2048 then 2048 else length in
         let state = Stdlib.Stream.__cellGet<Stdlib.__Tls13Client.ApplicationState> cell in
-        Stdlib.__Tls13.sealRecord state.updates.send 23L (Stdlib.__Http2Wire.__slice bytes 0L size) |> Stdlib.Result.andThen (fun sealed ->
+        Stdlib.__Tls13.sealRecord state.updates.send 23 (Stdlib.__Http2Wire.__slice bytes 0 size) |> Stdlib.Result.andThen (fun sealed ->
           let updates = { state.updates with send = sealed.nextKeys } in
-          let _ = Stdlib.Stream.__cellSet cell { state with updates = updates, outgoing = sealed.bytes, outgoingOffset = 0L } in
+          let _ = Stdlib.Stream.__cellSet cell { state with updates = updates, outgoing = sealed.bytes, outgoingOffset = 0 } in
           Stdlib.__HttpTransport.__pollOutput cell write |> Stdlib.Result.map (fun _drained -> Some size)))
 
 let __pollWriteSecure (connection: Stdlib.__Network.TcpConnection) (cell: RawPtr) (lifecycle: Stream<Unit>) (bytes: Blob) : Stdlib.Result.Result<Stdlib.Option.Option<Int64>, String> =
@@ -100,10 +100,10 @@ let __pollTcp (connection: Stdlib.__Network.TcpConnection) : Stdlib.Result.Resul
 
 let __pollSecureStep (connection: Stdlib.__Network.TcpConnection) (cell: RawPtr) (lifecycle: Stream<Unit>) (budget: Int64)
   (write: Blob -> Stdlib.Result.Result<Stdlib.Option.Option<Int64>, String>) : Stdlib.Result.Result<Stdlib.Option.Option<Blob>, String> =
-  if budget == 0L then Ok None
+  if budget == 0 then Ok None
   else Stdlib.__HttpTransport.__pollOutput cell write |> Stdlib.Result.andThen (fun _drained ->
     let state = Stdlib.Stream.__cellGet<Stdlib.__Tls13Client.ApplicationState> cell in
-    if state.records >= 8192L then Error "TLS HTTP response record limit exceeded"
+    if state.records >= 8192 then Error "TLS HTTP response record limit exceeded"
     else match Stdlib.__Tls13.parseRecord state.pending with
     | Error (Invalid message) -> Error message
     | Error Incomplete ->
@@ -111,30 +111,30 @@ let __pollSecureStep (connection: Stdlib.__Network.TcpConnection) (cell: RawPtr)
         match available with
         | None -> Ok None
         | Some bytes ->
-          if Stdlib.Blob.__byteLength bytes == 0L then Error "TLS peer closed without close_notify"
+          if Stdlib.Blob.__byteLength bytes == 0 then Error "TLS peer closed without close_notify"
           else
             let _ = Stdlib.Stream.__cellSet cell { state with pending = Stdlib.Blob.concat [state.pending, bytes] } in
-            Stdlib.__HttpTransport.__pollSecureStep connection cell lifecycle (budget - 1L) write)
+            Stdlib.__HttpTransport.__pollSecureStep connection cell lifecycle (budget - 1) write)
     | Ok record ->
       Stdlib.__Tls13KeyUpdate.process state.updates state.keys record |> Stdlib.Result.andThen (fun processed ->
         let outgoing = match processed.reply with
           | None -> state.outgoing
           | Some bytes -> Stdlib.Blob.concat [Stdlib.__Http2Wire.__slice state.outgoing state.outgoingOffset (Stdlib.Blob.__byteLength state.outgoing - state.outgoingOffset), bytes] in
-        let offset = match processed.reply with | None -> state.outgoingOffset | Some _bytes -> 0L in
-        if Stdlib.Blob.__byteLength outgoing > 32768L then Error "TLS output queue exceeds limit"
+        let offset = match processed.reply with | None -> state.outgoingOffset | Some _bytes -> 0 in
+        if Stdlib.Blob.__byteLength outgoing > 32768 then Error "TLS output queue exceeds limit"
         else
-          let next = { state with keys = processed.receive, pending = record.remaining, records = state.records + 1L, updates = processed.state, outgoing = outgoing, outgoingOffset = offset } in
+          let next = { state with keys = processed.receive, pending = record.remaining, records = state.records + 1, updates = processed.state, outgoing = outgoing, outgoingOffset = offset } in
           let _ = Stdlib.Stream.__cellSet cell next in
           if processed.closed then let _ = Stdlib.Stream.close lifecycle in Ok (Some Stdlib.Blob.empty)
           else match processed.data with
-          | Some bytes when Stdlib.Blob.__byteLength bytes != 0L -> Ok (Some bytes)
-          | _ -> Stdlib.__HttpTransport.__pollSecureStep connection cell lifecycle (budget - 1L) write))
+          | Some bytes when Stdlib.Blob.__byteLength bytes != 0 -> Ok (Some bytes)
+          | _ -> Stdlib.__HttpTransport.__pollSecureStep connection cell lifecycle (budget - 1) write))
 
 let __pollSecure (connection: Stdlib.__Network.TcpConnection) (cell: RawPtr) (lifecycle: Stream<Unit>) : Stdlib.Result.Result<Stdlib.Option.Option<Blob>, String> =
   match Stdlib.Stream.next lifecycle with
   | None -> Error "HTTP transport is closed"
   | Some _ ->
-    let result = Stdlib.__HttpTransport.__pollSecureStep connection cell lifecycle 32L (fun bytes -> Stdlib.__HttpTransport.__pollWriteTcp connection bytes) in
+    let result = Stdlib.__HttpTransport.__pollSecureStep connection cell lifecycle 32 (fun bytes -> Stdlib.__HttpTransport.__pollWriteTcp connection bytes) in
     match result with
     | Ok available -> Ok available
     | Error message -> let _ = Stdlib.Stream.close lifecycle in Error message
@@ -164,11 +164,11 @@ let __writeSecure (connection: Stdlib.__Network.TcpConnection) (cell: RawPtr)
   | Some _ ->
     Stdlib.__HttpTransport.__drainSecure connection cell lifecycle |> Stdlib.Result.andThen (fun _unit ->
     let remaining = Stdlib.Blob.__byteLength bytes - offset in
-    if remaining == 0L then Ok ()
+    if remaining == 0 then Ok ()
     else
-      let size = if remaining > 2048L then 2048L else remaining in
+      let size = if remaining > 2048 then 2048 else remaining in
       let state = Stdlib.Stream.__cellGet<Stdlib.__Tls13Client.ApplicationState> cell in
-      Stdlib.__Tls13.sealRecord state.updates.send 23L (Stdlib.__Http2Wire.__slice bytes offset size) |> Stdlib.Result.andThen (fun sealed ->
+      Stdlib.__Tls13.sealRecord state.updates.send 23 (Stdlib.__Http2Wire.__slice bytes offset size) |> Stdlib.Result.andThen (fun sealed ->
         let updates = { state.updates with send = sealed.nextKeys } in
         let _ = Stdlib.Stream.__cellSet cell { state with updates = updates } in
         match Stdlib.__Network.writeTcp connection sealed.bytes with
@@ -194,7 +194,7 @@ let secure (connection: Stdlib.__Network.TcpConnection) (keys: Stdlib.__Tls13Cli
     pollWrite = fun bytes -> Stdlib.__HttpTransport.__pollWriteSecure connection cell lifecycle bytes,
     flush = fun _unit -> Stdlib.__HttpTransport.__flushSecure connection cell lifecycle,
     read = fun _unit -> Stdlib.__HttpTransport.__readSecure connection cell lifecycle,
-    write = fun bytes -> Stdlib.__HttpTransport.__writeSecure connection cell lifecycle bytes 0L }
+    write = fun bytes -> Stdlib.__HttpTransport.__writeSecure connection cell lifecycle bytes 0 }
 
 let __readPlain (connection: Stdlib.__Network.TcpConnection)
   (signals: Stdlib.Option.Option<Stdlib.__Network.ShutdownSignals>) (deadline: Int64)
@@ -207,9 +207,9 @@ let __readPlain (connection: Stdlib.__Network.TcpConnection)
   | Ok false, Ok now ->
     if now >= deadline then Error "HTTP application read timed out"
     else
-      match Stdlib.__Network.readTcp connection 4096L with
+      match Stdlib.__Network.readTcp connection 4096 with
       | Error code ->
-        if code == 4L || code == 11L || code == 35L then Stdlib.__HttpTransport.__readPlain connection signals deadline
+        if code == 4 || code == 11 || code == 35 then Stdlib.__HttpTransport.__readPlain connection signals deadline
         else Error "HTTP application read failed"
       | Ok bytes -> Ok bytes
   | _, _ -> Error "HTTP clock or shutdown check failed"
@@ -218,7 +218,7 @@ let __plainRead (connection: Stdlib.__Network.TcpConnection)
   (signals: Stdlib.Option.Option<Stdlib.__Network.ShutdownSignals>) : Stdlib.Result.Result<Blob, String> =
   match Stdlib.__Network.monotonicMillis () with
   | Error _ -> Error "HTTP clock failed"
-  | Ok now -> Stdlib.__HttpTransport.__readPlain connection signals (now + 10000L)
+  | Ok now -> Stdlib.__HttpTransport.__readPlain connection signals (now + 10000)
 
 let __plain (connection: Stdlib.__Network.TcpConnection)
   (signals: Stdlib.Option.Option<Stdlib.__Network.ShutdownSignals>) : Stdlib.__HttpTransport.Transport =

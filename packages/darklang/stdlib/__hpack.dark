@@ -9,459 +9,459 @@ type Text = { value: String, next: Int64 }
 type Encoder = { table: Stdlib.__Hpack.State, minimum: Stdlib.Option.Option<Int64> }
 type Encoded = { bytes: Blob, state: Stdlib.__Hpack.Encoder }
 
-let initial () : Stdlib.__Hpack.State = Stdlib.__Hpack.State { entries = [], limit = 4096L }
+let initial () : Stdlib.__Hpack.State = Stdlib.__Hpack.State { entries = [], limit = 4096 }
 
 let __static (index: Int64) : Stdlib.Option.Option<(String * String)> =
   match index with
-  | 1L -> Some ((":authority", ""))
-  | 2L -> Some ((":method", "GET"))
-  | 3L -> Some ((":method", "POST"))
-  | 4L -> Some ((":path", "/"))
-  | 5L -> Some ((":path", "/index.html"))
-  | 6L -> Some ((":scheme", "http"))
-  | 7L -> Some ((":scheme", "https"))
-  | 8L -> Some ((":status", "200"))
-  | 9L -> Some ((":status", "204"))
-  | 10L -> Some ((":status", "206"))
-  | 11L -> Some ((":status", "304"))
-  | 12L -> Some ((":status", "400"))
-  | 13L -> Some ((":status", "404"))
-  | 14L -> Some ((":status", "500"))
-  | 15L -> Some (("accept-charset", ""))
-  | 16L -> Some (("accept-encoding", "gzip, deflate"))
-  | 17L -> Some (("accept-language", ""))
-  | 18L -> Some (("accept-ranges", ""))
-  | 19L -> Some (("accept", ""))
-  | 20L -> Some (("access-control-allow-origin", ""))
-  | 21L -> Some (("age", ""))
-  | 22L -> Some (("allow", ""))
-  | 23L -> Some (("authorization", ""))
-  | 24L -> Some (("cache-control", ""))
-  | 25L -> Some (("content-disposition", ""))
-  | 26L -> Some (("content-encoding", ""))
-  | 27L -> Some (("content-language", ""))
-  | 28L -> Some (("content-length", ""))
-  | 29L -> Some (("content-location", ""))
-  | 30L -> Some (("content-range", ""))
-  | 31L -> Some (("content-type", ""))
-  | 32L -> Some (("cookie", ""))
-  | 33L -> Some (("date", ""))
-  | 34L -> Some (("etag", ""))
-  | 35L -> Some (("expect", ""))
-  | 36L -> Some (("expires", ""))
-  | 37L -> Some (("from", ""))
-  | 38L -> Some (("host", ""))
-  | 39L -> Some (("if-match", ""))
-  | 40L -> Some (("if-modified-since", ""))
-  | 41L -> Some (("if-none-match", ""))
-  | 42L -> Some (("if-range", ""))
-  | 43L -> Some (("if-unmodified-since", ""))
-  | 44L -> Some (("last-modified", ""))
-  | 45L -> Some (("link", ""))
-  | 46L -> Some (("location", ""))
-  | 47L -> Some (("max-forwards", ""))
-  | 48L -> Some (("proxy-authenticate", ""))
-  | 49L -> Some (("proxy-authorization", ""))
-  | 50L -> Some (("range", ""))
-  | 51L -> Some (("referer", ""))
-  | 52L -> Some (("refresh", ""))
-  | 53L -> Some (("retry-after", ""))
-  | 54L -> Some (("server", ""))
-  | 55L -> Some (("set-cookie", ""))
-  | 56L -> Some (("strict-transport-security", ""))
-  | 57L -> Some (("transfer-encoding", ""))
-  | 58L -> Some (("user-agent", ""))
-  | 59L -> Some (("vary", ""))
-  | 60L -> Some (("via", ""))
-  | 61L -> Some (("www-authenticate", ""))
+  | 1 -> Some ((":authority", ""))
+  | 2 -> Some ((":method", "GET"))
+  | 3 -> Some ((":method", "POST"))
+  | 4 -> Some ((":path", "/"))
+  | 5 -> Some ((":path", "/index.html"))
+  | 6 -> Some ((":scheme", "http"))
+  | 7 -> Some ((":scheme", "https"))
+  | 8 -> Some ((":status", "200"))
+  | 9 -> Some ((":status", "204"))
+  | 10 -> Some ((":status", "206"))
+  | 11 -> Some ((":status", "304"))
+  | 12 -> Some ((":status", "400"))
+  | 13 -> Some ((":status", "404"))
+  | 14 -> Some ((":status", "500"))
+  | 15 -> Some (("accept-charset", ""))
+  | 16 -> Some (("accept-encoding", "gzip, deflate"))
+  | 17 -> Some (("accept-language", ""))
+  | 18 -> Some (("accept-ranges", ""))
+  | 19 -> Some (("accept", ""))
+  | 20 -> Some (("access-control-allow-origin", ""))
+  | 21 -> Some (("age", ""))
+  | 22 -> Some (("allow", ""))
+  | 23 -> Some (("authorization", ""))
+  | 24 -> Some (("cache-control", ""))
+  | 25 -> Some (("content-disposition", ""))
+  | 26 -> Some (("content-encoding", ""))
+  | 27 -> Some (("content-language", ""))
+  | 28 -> Some (("content-length", ""))
+  | 29 -> Some (("content-location", ""))
+  | 30 -> Some (("content-range", ""))
+  | 31 -> Some (("content-type", ""))
+  | 32 -> Some (("cookie", ""))
+  | 33 -> Some (("date", ""))
+  | 34 -> Some (("etag", ""))
+  | 35 -> Some (("expect", ""))
+  | 36 -> Some (("expires", ""))
+  | 37 -> Some (("from", ""))
+  | 38 -> Some (("host", ""))
+  | 39 -> Some (("if-match", ""))
+  | 40 -> Some (("if-modified-since", ""))
+  | 41 -> Some (("if-none-match", ""))
+  | 42 -> Some (("if-range", ""))
+  | 43 -> Some (("if-unmodified-since", ""))
+  | 44 -> Some (("last-modified", ""))
+  | 45 -> Some (("link", ""))
+  | 46 -> Some (("location", ""))
+  | 47 -> Some (("max-forwards", ""))
+  | 48 -> Some (("proxy-authenticate", ""))
+  | 49 -> Some (("proxy-authorization", ""))
+  | 50 -> Some (("range", ""))
+  | 51 -> Some (("referer", ""))
+  | 52 -> Some (("refresh", ""))
+  | 53 -> Some (("retry-after", ""))
+  | 54 -> Some (("server", ""))
+  | 55 -> Some (("set-cookie", ""))
+  | 56 -> Some (("strict-transport-security", ""))
+  | 57 -> Some (("transfer-encoding", ""))
+  | 58 -> Some (("user-agent", ""))
+  | 59 -> Some (("vary", ""))
+  | 60 -> Some (("via", ""))
+  | 61 -> Some (("www-authenticate", ""))
   | _ -> None
 
 let __dynamic (entries: List<(String * String)>) (index: Int64) : Stdlib.Option.Option<(String * String)> =
   match entries with
   | [] -> None
-  | entry :: rest -> if index == 0L then Some entry else Stdlib.__Hpack.__dynamic rest (index - 1L)
+  | entry :: rest -> if index == 0 then Some entry else Stdlib.__Hpack.__dynamic rest (index - 1)
 
 let __lookup (state: Stdlib.__Hpack.State) (index: Int64) : Stdlib.Option.Option<(String * String)> =
-  if index <= 0L then None
-  else if index <= 61L then Stdlib.__Hpack.__static index
-  else Stdlib.__Hpack.__dynamic state.entries (index - 62L)
+  if index <= 0 then None
+  else if index <= 61 then Stdlib.__Hpack.__static index
+  else Stdlib.__Hpack.__dynamic state.entries (index - 62)
 
 let __pow2 (exponent: Int64) : Int64 =
-  if exponent == 0L then 1L else 2L * Stdlib.__Hpack.__pow2 (exponent - 1L)
+  if exponent == 0 then 1 else 2 * Stdlib.__Hpack.__pow2 (exponent - 1)
 
 let __integerRest (data: Blob) (position: Int64) (value: Int64) (factor: Int64)
   : Stdlib.Result.Result<Stdlib.__Hpack.Number, String> =
   if position >= Stdlib.Blob.__byteLength data then Error "Truncated HPACK integer"
-  else if factor > 268435456L then Error "HPACK integer overflow"
+  else if factor > 268435456 then Error "HPACK integer overflow"
   else
     let byte = Stdlib.Blob.__getByte data position in
-    let nextValue = value + (byte % 128L) * factor in
-    if nextValue > 2147483647L then Error "HPACK integer overflow"
-    else if byte < 128L then Ok (Stdlib.__Hpack.Number { value = nextValue, next = position + 1L })
-    else Stdlib.__Hpack.__integerRest data (position + 1L) nextValue (factor * 128L)
+    let nextValue = value + (byte % 128) * factor in
+    if nextValue > 2147483647 then Error "HPACK integer overflow"
+    else if byte < 128 then Ok (Stdlib.__Hpack.Number { value = nextValue, next = position + 1 })
+    else Stdlib.__Hpack.__integerRest data (position + 1) nextValue (factor * 128)
 
 let integer (data: Blob) (position: Int64) (prefix: Int64)
   : Stdlib.Result.Result<Stdlib.__Hpack.Number, String> =
-  if prefix < 1L || prefix > 8L then Error "Invalid HPACK integer prefix"
-  else if position < 0L || position >= Stdlib.Blob.__byteLength data then Error "Truncated HPACK integer"
+  if prefix < 1 || prefix > 8 then Error "Invalid HPACK integer prefix"
+  else if position < 0 || position >= Stdlib.Blob.__byteLength data then Error "Truncated HPACK integer"
   else
-    let mask = Stdlib.__Hpack.__pow2 prefix - 1L in
+    let mask = Stdlib.__Hpack.__pow2 prefix - 1 in
     let value = Stdlib.Int64.bitwiseAnd (Stdlib.Blob.__getByte data position) mask in
-    if value < mask then Ok (Stdlib.__Hpack.Number { value = value, next = position + 1L })
-    else Stdlib.__Hpack.__integerRest data (position + 1L) value 1L
+    if value < mask then Ok (Stdlib.__Hpack.Number { value = value, next = position + 1 })
+    else Stdlib.__Hpack.__integerRest data (position + 1) value 1
 
 let __huffmanSymbol (length: Int64) (code: Int64) : Stdlib.Option.Option<Int64> =
   match length with
-  | 5L ->
+  | 5 ->
     match code with
-    | 0L -> Some 48L
-    | 1L -> Some 49L
-    | 2L -> Some 50L
-    | 3L -> Some 97L
-    | 4L -> Some 99L
-    | 5L -> Some 101L
-    | 6L -> Some 105L
-    | 7L -> Some 111L
-    | 8L -> Some 115L
-    | 9L -> Some 116L
+    | 0 -> Some 48
+    | 1 -> Some 49
+    | 2 -> Some 50
+    | 3 -> Some 97
+    | 4 -> Some 99
+    | 5 -> Some 101
+    | 6 -> Some 105
+    | 7 -> Some 111
+    | 8 -> Some 115
+    | 9 -> Some 116
     | _ -> None
-  | 6L ->
+  | 6 ->
     match code with
-    | 20L -> Some 32L
-    | 21L -> Some 37L
-    | 22L -> Some 45L
-    | 23L -> Some 46L
-    | 24L -> Some 47L
-    | 25L -> Some 51L
-    | 26L -> Some 52L
-    | 27L -> Some 53L
-    | 28L -> Some 54L
-    | 29L -> Some 55L
-    | 30L -> Some 56L
-    | 31L -> Some 57L
-    | 32L -> Some 61L
-    | 33L -> Some 65L
-    | 34L -> Some 95L
-    | 35L -> Some 98L
-    | 36L -> Some 100L
-    | 37L -> Some 102L
-    | 38L -> Some 103L
-    | 39L -> Some 104L
-    | 40L -> Some 108L
-    | 41L -> Some 109L
-    | 42L -> Some 110L
-    | 43L -> Some 112L
-    | 44L -> Some 114L
-    | 45L -> Some 117L
+    | 20 -> Some 32
+    | 21 -> Some 37
+    | 22 -> Some 45
+    | 23 -> Some 46
+    | 24 -> Some 47
+    | 25 -> Some 51
+    | 26 -> Some 52
+    | 27 -> Some 53
+    | 28 -> Some 54
+    | 29 -> Some 55
+    | 30 -> Some 56
+    | 31 -> Some 57
+    | 32 -> Some 61
+    | 33 -> Some 65
+    | 34 -> Some 95
+    | 35 -> Some 98
+    | 36 -> Some 100
+    | 37 -> Some 102
+    | 38 -> Some 103
+    | 39 -> Some 104
+    | 40 -> Some 108
+    | 41 -> Some 109
+    | 42 -> Some 110
+    | 43 -> Some 112
+    | 44 -> Some 114
+    | 45 -> Some 117
     | _ -> None
-  | 7L ->
+  | 7 ->
     match code with
-    | 92L -> Some 58L
-    | 93L -> Some 66L
-    | 94L -> Some 67L
-    | 95L -> Some 68L
-    | 96L -> Some 69L
-    | 97L -> Some 70L
-    | 98L -> Some 71L
-    | 99L -> Some 72L
-    | 100L -> Some 73L
-    | 101L -> Some 74L
-    | 102L -> Some 75L
-    | 103L -> Some 76L
-    | 104L -> Some 77L
-    | 105L -> Some 78L
-    | 106L -> Some 79L
-    | 107L -> Some 80L
-    | 108L -> Some 81L
-    | 109L -> Some 82L
-    | 110L -> Some 83L
-    | 111L -> Some 84L
-    | 112L -> Some 85L
-    | 113L -> Some 86L
-    | 114L -> Some 87L
-    | 115L -> Some 89L
-    | 116L -> Some 106L
-    | 117L -> Some 107L
-    | 118L -> Some 113L
-    | 119L -> Some 118L
-    | 120L -> Some 119L
-    | 121L -> Some 120L
-    | 122L -> Some 121L
-    | 123L -> Some 122L
+    | 92 -> Some 58
+    | 93 -> Some 66
+    | 94 -> Some 67
+    | 95 -> Some 68
+    | 96 -> Some 69
+    | 97 -> Some 70
+    | 98 -> Some 71
+    | 99 -> Some 72
+    | 100 -> Some 73
+    | 101 -> Some 74
+    | 102 -> Some 75
+    | 103 -> Some 76
+    | 104 -> Some 77
+    | 105 -> Some 78
+    | 106 -> Some 79
+    | 107 -> Some 80
+    | 108 -> Some 81
+    | 109 -> Some 82
+    | 110 -> Some 83
+    | 111 -> Some 84
+    | 112 -> Some 85
+    | 113 -> Some 86
+    | 114 -> Some 87
+    | 115 -> Some 89
+    | 116 -> Some 106
+    | 117 -> Some 107
+    | 118 -> Some 113
+    | 119 -> Some 118
+    | 120 -> Some 119
+    | 121 -> Some 120
+    | 122 -> Some 121
+    | 123 -> Some 122
     | _ -> None
-  | 8L ->
+  | 8 ->
     match code with
-    | 248L -> Some 38L
-    | 249L -> Some 42L
-    | 250L -> Some 44L
-    | 251L -> Some 59L
-    | 252L -> Some 88L
-    | 253L -> Some 90L
+    | 248 -> Some 38
+    | 249 -> Some 42
+    | 250 -> Some 44
+    | 251 -> Some 59
+    | 252 -> Some 88
+    | 253 -> Some 90
     | _ -> None
-  | 10L ->
+  | 10 ->
     match code with
-    | 1016L -> Some 33L
-    | 1017L -> Some 34L
-    | 1018L -> Some 40L
-    | 1019L -> Some 41L
-    | 1020L -> Some 63L
+    | 1016 -> Some 33
+    | 1017 -> Some 34
+    | 1018 -> Some 40
+    | 1019 -> Some 41
+    | 1020 -> Some 63
     | _ -> None
-  | 11L ->
+  | 11 ->
     match code with
-    | 2042L -> Some 39L
-    | 2043L -> Some 43L
-    | 2044L -> Some 124L
+    | 2042 -> Some 39
+    | 2043 -> Some 43
+    | 2044 -> Some 124
     | _ -> None
-  | 12L ->
+  | 12 ->
     match code with
-    | 4090L -> Some 35L
-    | 4091L -> Some 62L
+    | 4090 -> Some 35
+    | 4091 -> Some 62
     | _ -> None
-  | 13L ->
+  | 13 ->
     match code with
-    | 8184L -> Some 0L
-    | 8185L -> Some 36L
-    | 8186L -> Some 64L
-    | 8187L -> Some 91L
-    | 8188L -> Some 93L
-    | 8189L -> Some 126L
+    | 8184 -> Some 0
+    | 8185 -> Some 36
+    | 8186 -> Some 64
+    | 8187 -> Some 91
+    | 8188 -> Some 93
+    | 8189 -> Some 126
     | _ -> None
-  | 14L ->
+  | 14 ->
     match code with
-    | 16380L -> Some 94L
-    | 16381L -> Some 125L
+    | 16380 -> Some 94
+    | 16381 -> Some 125
     | _ -> None
-  | 15L ->
+  | 15 ->
     match code with
-    | 32764L -> Some 60L
-    | 32765L -> Some 96L
-    | 32766L -> Some 123L
+    | 32764 -> Some 60
+    | 32765 -> Some 96
+    | 32766 -> Some 123
     | _ -> None
-  | 19L ->
+  | 19 ->
     match code with
-    | 524272L -> Some 92L
-    | 524273L -> Some 195L
-    | 524274L -> Some 208L
+    | 524272 -> Some 92
+    | 524273 -> Some 195
+    | 524274 -> Some 208
     | _ -> None
-  | 20L ->
+  | 20 ->
     match code with
-    | 1048550L -> Some 128L
-    | 1048551L -> Some 130L
-    | 1048552L -> Some 131L
-    | 1048553L -> Some 162L
-    | 1048554L -> Some 184L
-    | 1048555L -> Some 194L
-    | 1048556L -> Some 224L
-    | 1048557L -> Some 226L
+    | 1048550 -> Some 128
+    | 1048551 -> Some 130
+    | 1048552 -> Some 131
+    | 1048553 -> Some 162
+    | 1048554 -> Some 184
+    | 1048555 -> Some 194
+    | 1048556 -> Some 224
+    | 1048557 -> Some 226
     | _ -> None
-  | 21L ->
+  | 21 ->
     match code with
-    | 2097116L -> Some 153L
-    | 2097117L -> Some 161L
-    | 2097118L -> Some 167L
-    | 2097119L -> Some 172L
-    | 2097120L -> Some 176L
-    | 2097121L -> Some 177L
-    | 2097122L -> Some 179L
-    | 2097123L -> Some 209L
-    | 2097124L -> Some 216L
-    | 2097125L -> Some 217L
-    | 2097126L -> Some 227L
-    | 2097127L -> Some 229L
-    | 2097128L -> Some 230L
+    | 2097116 -> Some 153
+    | 2097117 -> Some 161
+    | 2097118 -> Some 167
+    | 2097119 -> Some 172
+    | 2097120 -> Some 176
+    | 2097121 -> Some 177
+    | 2097122 -> Some 179
+    | 2097123 -> Some 209
+    | 2097124 -> Some 216
+    | 2097125 -> Some 217
+    | 2097126 -> Some 227
+    | 2097127 -> Some 229
+    | 2097128 -> Some 230
     | _ -> None
-  | 22L ->
+  | 22 ->
     match code with
-    | 4194258L -> Some 129L
-    | 4194259L -> Some 132L
-    | 4194260L -> Some 133L
-    | 4194261L -> Some 134L
-    | 4194262L -> Some 136L
-    | 4194263L -> Some 146L
-    | 4194264L -> Some 154L
-    | 4194265L -> Some 156L
-    | 4194266L -> Some 160L
-    | 4194267L -> Some 163L
-    | 4194268L -> Some 164L
-    | 4194269L -> Some 169L
-    | 4194270L -> Some 170L
-    | 4194271L -> Some 173L
-    | 4194272L -> Some 178L
-    | 4194273L -> Some 181L
-    | 4194274L -> Some 185L
-    | 4194275L -> Some 186L
-    | 4194276L -> Some 187L
-    | 4194277L -> Some 189L
-    | 4194278L -> Some 190L
-    | 4194279L -> Some 196L
-    | 4194280L -> Some 198L
-    | 4194281L -> Some 228L
-    | 4194282L -> Some 232L
-    | 4194283L -> Some 233L
+    | 4194258 -> Some 129
+    | 4194259 -> Some 132
+    | 4194260 -> Some 133
+    | 4194261 -> Some 134
+    | 4194262 -> Some 136
+    | 4194263 -> Some 146
+    | 4194264 -> Some 154
+    | 4194265 -> Some 156
+    | 4194266 -> Some 160
+    | 4194267 -> Some 163
+    | 4194268 -> Some 164
+    | 4194269 -> Some 169
+    | 4194270 -> Some 170
+    | 4194271 -> Some 173
+    | 4194272 -> Some 178
+    | 4194273 -> Some 181
+    | 4194274 -> Some 185
+    | 4194275 -> Some 186
+    | 4194276 -> Some 187
+    | 4194277 -> Some 189
+    | 4194278 -> Some 190
+    | 4194279 -> Some 196
+    | 4194280 -> Some 198
+    | 4194281 -> Some 228
+    | 4194282 -> Some 232
+    | 4194283 -> Some 233
     | _ -> None
-  | 23L ->
+  | 23 ->
     match code with
-    | 8388568L -> Some 1L
-    | 8388569L -> Some 135L
-    | 8388570L -> Some 137L
-    | 8388571L -> Some 138L
-    | 8388572L -> Some 139L
-    | 8388573L -> Some 140L
-    | 8388574L -> Some 141L
-    | 8388575L -> Some 143L
-    | 8388576L -> Some 147L
-    | 8388577L -> Some 149L
-    | 8388578L -> Some 150L
-    | 8388579L -> Some 151L
-    | 8388580L -> Some 152L
-    | 8388581L -> Some 155L
-    | 8388582L -> Some 157L
-    | 8388583L -> Some 158L
-    | 8388584L -> Some 165L
-    | 8388585L -> Some 166L
-    | 8388586L -> Some 168L
-    | 8388587L -> Some 174L
-    | 8388588L -> Some 175L
-    | 8388589L -> Some 180L
-    | 8388590L -> Some 182L
-    | 8388591L -> Some 183L
-    | 8388592L -> Some 188L
-    | 8388593L -> Some 191L
-    | 8388594L -> Some 197L
-    | 8388595L -> Some 231L
-    | 8388596L -> Some 239L
+    | 8388568 -> Some 1
+    | 8388569 -> Some 135
+    | 8388570 -> Some 137
+    | 8388571 -> Some 138
+    | 8388572 -> Some 139
+    | 8388573 -> Some 140
+    | 8388574 -> Some 141
+    | 8388575 -> Some 143
+    | 8388576 -> Some 147
+    | 8388577 -> Some 149
+    | 8388578 -> Some 150
+    | 8388579 -> Some 151
+    | 8388580 -> Some 152
+    | 8388581 -> Some 155
+    | 8388582 -> Some 157
+    | 8388583 -> Some 158
+    | 8388584 -> Some 165
+    | 8388585 -> Some 166
+    | 8388586 -> Some 168
+    | 8388587 -> Some 174
+    | 8388588 -> Some 175
+    | 8388589 -> Some 180
+    | 8388590 -> Some 182
+    | 8388591 -> Some 183
+    | 8388592 -> Some 188
+    | 8388593 -> Some 191
+    | 8388594 -> Some 197
+    | 8388595 -> Some 231
+    | 8388596 -> Some 239
     | _ -> None
-  | 24L ->
+  | 24 ->
     match code with
-    | 16777194L -> Some 9L
-    | 16777195L -> Some 142L
-    | 16777196L -> Some 144L
-    | 16777197L -> Some 145L
-    | 16777198L -> Some 148L
-    | 16777199L -> Some 159L
-    | 16777200L -> Some 171L
-    | 16777201L -> Some 206L
-    | 16777202L -> Some 215L
-    | 16777203L -> Some 225L
-    | 16777204L -> Some 236L
-    | 16777205L -> Some 237L
+    | 16777194 -> Some 9
+    | 16777195 -> Some 142
+    | 16777196 -> Some 144
+    | 16777197 -> Some 145
+    | 16777198 -> Some 148
+    | 16777199 -> Some 159
+    | 16777200 -> Some 171
+    | 16777201 -> Some 206
+    | 16777202 -> Some 215
+    | 16777203 -> Some 225
+    | 16777204 -> Some 236
+    | 16777205 -> Some 237
     | _ -> None
-  | 25L ->
+  | 25 ->
     match code with
-    | 33554412L -> Some 199L
-    | 33554413L -> Some 207L
-    | 33554414L -> Some 234L
-    | 33554415L -> Some 235L
+    | 33554412 -> Some 199
+    | 33554413 -> Some 207
+    | 33554414 -> Some 234
+    | 33554415 -> Some 235
     | _ -> None
-  | 26L ->
+  | 26 ->
     match code with
-    | 67108832L -> Some 192L
-    | 67108833L -> Some 193L
-    | 67108834L -> Some 200L
-    | 67108835L -> Some 201L
-    | 67108836L -> Some 202L
-    | 67108837L -> Some 205L
-    | 67108838L -> Some 210L
-    | 67108839L -> Some 213L
-    | 67108840L -> Some 218L
-    | 67108841L -> Some 219L
-    | 67108842L -> Some 238L
-    | 67108843L -> Some 240L
-    | 67108844L -> Some 242L
-    | 67108845L -> Some 243L
-    | 67108846L -> Some 255L
+    | 67108832 -> Some 192
+    | 67108833 -> Some 193
+    | 67108834 -> Some 200
+    | 67108835 -> Some 201
+    | 67108836 -> Some 202
+    | 67108837 -> Some 205
+    | 67108838 -> Some 210
+    | 67108839 -> Some 213
+    | 67108840 -> Some 218
+    | 67108841 -> Some 219
+    | 67108842 -> Some 238
+    | 67108843 -> Some 240
+    | 67108844 -> Some 242
+    | 67108845 -> Some 243
+    | 67108846 -> Some 255
     | _ -> None
-  | 27L ->
+  | 27 ->
     match code with
-    | 134217694L -> Some 203L
-    | 134217695L -> Some 204L
-    | 134217696L -> Some 211L
-    | 134217697L -> Some 212L
-    | 134217698L -> Some 214L
-    | 134217699L -> Some 221L
-    | 134217700L -> Some 222L
-    | 134217701L -> Some 223L
-    | 134217702L -> Some 241L
-    | 134217703L -> Some 244L
-    | 134217704L -> Some 245L
-    | 134217705L -> Some 246L
-    | 134217706L -> Some 247L
-    | 134217707L -> Some 248L
-    | 134217708L -> Some 250L
-    | 134217709L -> Some 251L
-    | 134217710L -> Some 252L
-    | 134217711L -> Some 253L
-    | 134217712L -> Some 254L
+    | 134217694 -> Some 203
+    | 134217695 -> Some 204
+    | 134217696 -> Some 211
+    | 134217697 -> Some 212
+    | 134217698 -> Some 214
+    | 134217699 -> Some 221
+    | 134217700 -> Some 222
+    | 134217701 -> Some 223
+    | 134217702 -> Some 241
+    | 134217703 -> Some 244
+    | 134217704 -> Some 245
+    | 134217705 -> Some 246
+    | 134217706 -> Some 247
+    | 134217707 -> Some 248
+    | 134217708 -> Some 250
+    | 134217709 -> Some 251
+    | 134217710 -> Some 252
+    | 134217711 -> Some 253
+    | 134217712 -> Some 254
     | _ -> None
-  | 28L ->
+  | 28 ->
     match code with
-    | 268435426L -> Some 2L
-    | 268435427L -> Some 3L
-    | 268435428L -> Some 4L
-    | 268435429L -> Some 5L
-    | 268435430L -> Some 6L
-    | 268435431L -> Some 7L
-    | 268435432L -> Some 8L
-    | 268435433L -> Some 11L
-    | 268435434L -> Some 12L
-    | 268435435L -> Some 14L
-    | 268435436L -> Some 15L
-    | 268435437L -> Some 16L
-    | 268435438L -> Some 17L
-    | 268435439L -> Some 18L
-    | 268435440L -> Some 19L
-    | 268435441L -> Some 20L
-    | 268435442L -> Some 21L
-    | 268435443L -> Some 23L
-    | 268435444L -> Some 24L
-    | 268435445L -> Some 25L
-    | 268435446L -> Some 26L
-    | 268435447L -> Some 27L
-    | 268435448L -> Some 28L
-    | 268435449L -> Some 29L
-    | 268435450L -> Some 30L
-    | 268435451L -> Some 31L
-    | 268435452L -> Some 127L
-    | 268435453L -> Some 220L
-    | 268435454L -> Some 249L
+    | 268435426 -> Some 2
+    | 268435427 -> Some 3
+    | 268435428 -> Some 4
+    | 268435429 -> Some 5
+    | 268435430 -> Some 6
+    | 268435431 -> Some 7
+    | 268435432 -> Some 8
+    | 268435433 -> Some 11
+    | 268435434 -> Some 12
+    | 268435435 -> Some 14
+    | 268435436 -> Some 15
+    | 268435437 -> Some 16
+    | 268435438 -> Some 17
+    | 268435439 -> Some 18
+    | 268435440 -> Some 19
+    | 268435441 -> Some 20
+    | 268435442 -> Some 21
+    | 268435443 -> Some 23
+    | 268435444 -> Some 24
+    | 268435445 -> Some 25
+    | 268435446 -> Some 26
+    | 268435447 -> Some 27
+    | 268435448 -> Some 28
+    | 268435449 -> Some 29
+    | 268435450 -> Some 30
+    | 268435451 -> Some 31
+    | 268435452 -> Some 127
+    | 268435453 -> Some 220
+    | 268435454 -> Some 249
     | _ -> None
-  | 30L ->
+  | 30 ->
     match code with
-    | 1073741820L -> Some 10L
-    | 1073741821L -> Some 13L
-    | 1073741822L -> Some 22L
-    | 1073741823L -> Some 256L
+    | 1073741820 -> Some 10
+    | 1073741821 -> Some 13
+    | 1073741822 -> Some 22
+    | 1073741823 -> Some 256
     | _ -> None
   | _ -> None
 
 let __huffman (data: Blob) (bit: Int64) (code: Int64) (length: Int64)
   (bytes: List<Int64>) (count: Int64) : Stdlib.Result.Result<Blob, String> =
-  if bit == Stdlib.Blob.__byteLength data * 8L then
-    if length == 0L || (length <= 7L && code == Stdlib.__Hpack.__pow2 length - 1L) then
+  if bit == Stdlib.Blob.__byteLength data * 8 then
+    if length == 0 || (length <= 7 && code == Stdlib.__Hpack.__pow2 length - 1) then
       Ok (Stdlib.Blob.__fromInt64List (Stdlib.List.reverse bytes))
     else Error "Invalid HPACK Huffman padding"
-  else if length >= 30L then Error "Invalid HPACK Huffman code"
+  else if length >= 30 then Error "Invalid HPACK Huffman code"
   else
-    let byte = Stdlib.Blob.__getByte data (bit / 8L) in
-    let nextCode = code * 2L + (byte / Stdlib.__Hpack.__pow2 (7L - bit % 8L)) % 2L in
-    let nextLength = length + 1L in
+    let byte = Stdlib.Blob.__getByte data (bit / 8) in
+    let nextCode = code * 2 + (byte / Stdlib.__Hpack.__pow2 (7 - bit % 8)) % 2 in
+    let nextLength = length + 1 in
     match Stdlib.__Hpack.__huffmanSymbol nextLength nextCode with
-    | None -> Stdlib.__Hpack.__huffman data (bit + 1L) nextCode nextLength bytes count
+    | None -> Stdlib.__Hpack.__huffman data (bit + 1) nextCode nextLength bytes count
     | Some symbol ->
-      if symbol == 256L then Error "HPACK Huffman EOS in string"
-      else if count >= 65536L then Error "HPACK string too large"
-      else Stdlib.__Hpack.__huffman data (bit + 1L) 0L 0L (Stdlib.List.push bytes symbol) (count + 1L)
+      if symbol == 256 then Error "HPACK Huffman EOS in string"
+      else if count >= 65536 then Error "HPACK string too large"
+      else Stdlib.__Hpack.__huffman data (bit + 1) 0 0 (Stdlib.List.push bytes symbol) (count + 1)
 
 let text (data: Blob) (position: Int64) : Stdlib.Result.Result<Stdlib.__Hpack.Text, String> =
-  match Stdlib.__Hpack.integer data position 7L with
+  match Stdlib.__Hpack.integer data position 7 with
   | Error message -> Error message
   | Ok number ->
-    if number.value > 65536L then Error "HPACK string too large"
+    if number.value > 65536 then Error "HPACK string too large"
     else if number.next + number.value > Stdlib.Blob.__byteLength data then Error "Truncated HPACK string"
     else
       let encoded = Stdlib.__Http2Wire.__slice data number.next number.value in
-      let bytes = if Stdlib.Blob.__getByte data position >= 128L then
-                    Stdlib.__Hpack.__huffman encoded 0L 0L 0L [] 0L
+      let bytes = if Stdlib.Blob.__getByte data position >= 128 then
+                    Stdlib.__Hpack.__huffman encoded 0 0 0 [] 0
                   else Ok encoded in
       match bytes with
       | Error message -> Error message
@@ -472,7 +472,7 @@ let text (data: Blob) (position: Int64) : Stdlib.Result.Result<Stdlib.__Hpack.Te
 
 let __entrySize (entry: (String * String)) : Int64 =
   let (name, value) = entry in
-  32L + Stdlib.String.__byteLength name + Stdlib.String.__byteLength value
+  32 + Stdlib.String.__byteLength name + Stdlib.String.__byteLength value
 
 let checkFieldBudget (fields: List<(String * String)>) (remaining: Int64) : Stdlib.Result.Result<Unit, String> =
   match fields with
@@ -498,38 +498,38 @@ let __decode (state: Stdlib.__Hpack.State) (data: Blob) (position: Int64)
   : Stdlib.Result.Result<Stdlib.__Hpack.Decoded, String> =
   if position == Stdlib.Blob.__byteLength data then
     Ok (Stdlib.__Hpack.Decoded { headers = Stdlib.List.reverse headers, state = state })
-  else if count >= 256L || size > 65536L then Error "HPACK header list too large"
+  else if count >= 256 || size > 65536 then Error "HPACK header list too large"
   else
     let first = Stdlib.Blob.__getByte data position in
-    if first >= 128L then
-      match Stdlib.__Hpack.integer data position 7L with
+    if first >= 128 then
+      match Stdlib.__Hpack.integer data position 7 with
       | Error message -> Error message
       | Ok number ->
         match Stdlib.__Hpack.__lookup state number.value with
         | None -> Error "Invalid HPACK index"
         | Some entry ->
           let nextSize = size + Stdlib.__Hpack.__entrySize entry in
-          if nextSize > 65536L then Error "HPACK header list too large"
-          else Stdlib.__Hpack.__decode state data number.next (Stdlib.List.push headers entry) nextSize (count + 1L)
-    else if first >= 32L && first < 64L then
-      if count != 0L then Error "HPACK table update after a header"
+          if nextSize > 65536 then Error "HPACK header list too large"
+          else Stdlib.__Hpack.__decode state data number.next (Stdlib.List.push headers entry) nextSize (count + 1)
+    else if first >= 32 && first < 64 then
+      if count != 0 then Error "HPACK table update after a header"
       else
-        match Stdlib.__Hpack.integer data position 5L with
+        match Stdlib.__Hpack.integer data position 5 with
         | Error message -> Error message
         | Ok number ->
-          if number.value > 4096L then Error "HPACK table exceeds advertised limit"
+          if number.value > 4096 then Error "HPACK table exceeds advertised limit"
           else
             let nextState = Stdlib.__Hpack.State {
               entries = Stdlib.__Hpack.__retain state.entries number.value, limit = number.value } in
             Stdlib.__Hpack.__decode nextState data number.next headers size count
     else
-      let indexed = first >= 64L in
-      let prefix = if indexed then 6L else 4L in
+      let indexed = first >= 64 in
+      let prefix = if indexed then 6 else 4 in
       match Stdlib.__Hpack.integer data position prefix with
       | Error message -> Error message
       | Ok number ->
         let name =
-          if number.value == 0L then Stdlib.__Hpack.text data number.next
+          if number.value == 0 then Stdlib.__Hpack.text data number.next
           else
             match Stdlib.__Hpack.__lookup state number.value with
             | None -> Error "Invalid HPACK index"
@@ -544,302 +544,302 @@ let __decode (state: Stdlib.__Hpack.State) (data: Blob) (position: Int64)
           | Ok value ->
             let entry = (name.value, value.value) in
             let nextSize = size + Stdlib.__Hpack.__entrySize entry in
-            if nextSize > 65536L then Error "HPACK header list too large"
+            if nextSize > 65536 then Error "HPACK header list too large"
             else
               let nextState = if indexed then Stdlib.__Hpack.__add state entry else state in
-              Stdlib.__Hpack.__decode nextState data value.next (Stdlib.List.push headers entry) nextSize (count + 1L)
+              Stdlib.__Hpack.__decode nextState data value.next (Stdlib.List.push headers entry) nextSize (count + 1)
 
 let decode (state: Stdlib.__Hpack.State) (data: Blob) : Stdlib.Result.Result<Stdlib.__Hpack.Decoded, String> =
-  if state.limit < 0L || state.limit > 4096L || Stdlib.Blob.__byteLength data > 65536L then
+  if state.limit < 0 || state.limit > 4096 || Stdlib.Blob.__byteLength data > 65536 then
     Error "Invalid HPACK decoder bounds"
-  else Stdlib.__Hpack.__decode state data 0L [] 0L 0L
+  else Stdlib.__Hpack.__decode state data 0 [] 0 0
 
 let __encodeRest (value: Int64) : List<Int64> =
-  if value < 128L then [value]
-  else Stdlib.List.push (Stdlib.__Hpack.__encodeRest (value / 128L)) (128L + value % 128L)
+  if value < 128 then [value]
+  else Stdlib.List.push (Stdlib.__Hpack.__encodeRest (value / 128)) (128 + value % 128)
 
 let encodeInteger (prefix: Int64) (flags: Int64) (value: Int64) : Blob =
-  let mask = Stdlib.__Hpack.__pow2 prefix - 1L in
+  let mask = Stdlib.__Hpack.__pow2 prefix - 1 in
   if value < mask then Stdlib.Blob.__fromInt64List [flags + value]
   else Stdlib.Blob.__fromInt64List (Stdlib.List.push (Stdlib.__Hpack.__encodeRest (value - mask)) (flags + mask))
 
 // RFC 7541 Appendix B, inverse of the decoding table above.
 let __huffmanCode (byte: Int64) : (Int64 * Int64) =
   match byte with
-  | 0L -> (8184L, 13L)
-  | 1L -> (8388568L, 23L)
-  | 2L -> (268435426L, 28L)
-  | 3L -> (268435427L, 28L)
-  | 4L -> (268435428L, 28L)
-  | 5L -> (268435429L, 28L)
-  | 6L -> (268435430L, 28L)
-  | 7L -> (268435431L, 28L)
-  | 8L -> (268435432L, 28L)
-  | 9L -> (16777194L, 24L)
-  | 10L -> (1073741820L, 30L)
-  | 11L -> (268435433L, 28L)
-  | 12L -> (268435434L, 28L)
-  | 13L -> (1073741821L, 30L)
-  | 14L -> (268435435L, 28L)
-  | 15L -> (268435436L, 28L)
-  | 16L -> (268435437L, 28L)
-  | 17L -> (268435438L, 28L)
-  | 18L -> (268435439L, 28L)
-  | 19L -> (268435440L, 28L)
-  | 20L -> (268435441L, 28L)
-  | 21L -> (268435442L, 28L)
-  | 22L -> (1073741822L, 30L)
-  | 23L -> (268435443L, 28L)
-  | 24L -> (268435444L, 28L)
-  | 25L -> (268435445L, 28L)
-  | 26L -> (268435446L, 28L)
-  | 27L -> (268435447L, 28L)
-  | 28L -> (268435448L, 28L)
-  | 29L -> (268435449L, 28L)
-  | 30L -> (268435450L, 28L)
-  | 31L -> (268435451L, 28L)
-  | 32L -> (20L, 6L)
-  | 33L -> (1016L, 10L)
-  | 34L -> (1017L, 10L)
-  | 35L -> (4090L, 12L)
-  | 36L -> (8185L, 13L)
-  | 37L -> (21L, 6L)
-  | 38L -> (248L, 8L)
-  | 39L -> (2042L, 11L)
-  | 40L -> (1018L, 10L)
-  | 41L -> (1019L, 10L)
-  | 42L -> (249L, 8L)
-  | 43L -> (2043L, 11L)
-  | 44L -> (250L, 8L)
-  | 45L -> (22L, 6L)
-  | 46L -> (23L, 6L)
-  | 47L -> (24L, 6L)
-  | 48L -> (0L, 5L)
-  | 49L -> (1L, 5L)
-  | 50L -> (2L, 5L)
-  | 51L -> (25L, 6L)
-  | 52L -> (26L, 6L)
-  | 53L -> (27L, 6L)
-  | 54L -> (28L, 6L)
-  | 55L -> (29L, 6L)
-  | 56L -> (30L, 6L)
-  | 57L -> (31L, 6L)
-  | 58L -> (92L, 7L)
-  | 59L -> (251L, 8L)
-  | 60L -> (32764L, 15L)
-  | 61L -> (32L, 6L)
-  | 62L -> (4091L, 12L)
-  | 63L -> (1020L, 10L)
-  | 64L -> (8186L, 13L)
-  | 65L -> (33L, 6L)
-  | 66L -> (93L, 7L)
-  | 67L -> (94L, 7L)
-  | 68L -> (95L, 7L)
-  | 69L -> (96L, 7L)
-  | 70L -> (97L, 7L)
-  | 71L -> (98L, 7L)
-  | 72L -> (99L, 7L)
-  | 73L -> (100L, 7L)
-  | 74L -> (101L, 7L)
-  | 75L -> (102L, 7L)
-  | 76L -> (103L, 7L)
-  | 77L -> (104L, 7L)
-  | 78L -> (105L, 7L)
-  | 79L -> (106L, 7L)
-  | 80L -> (107L, 7L)
-  | 81L -> (108L, 7L)
-  | 82L -> (109L, 7L)
-  | 83L -> (110L, 7L)
-  | 84L -> (111L, 7L)
-  | 85L -> (112L, 7L)
-  | 86L -> (113L, 7L)
-  | 87L -> (114L, 7L)
-  | 88L -> (252L, 8L)
-  | 89L -> (115L, 7L)
-  | 90L -> (253L, 8L)
-  | 91L -> (8187L, 13L)
-  | 92L -> (524272L, 19L)
-  | 93L -> (8188L, 13L)
-  | 94L -> (16380L, 14L)
-  | 95L -> (34L, 6L)
-  | 96L -> (32765L, 15L)
-  | 97L -> (3L, 5L)
-  | 98L -> (35L, 6L)
-  | 99L -> (4L, 5L)
-  | 100L -> (36L, 6L)
-  | 101L -> (5L, 5L)
-  | 102L -> (37L, 6L)
-  | 103L -> (38L, 6L)
-  | 104L -> (39L, 6L)
-  | 105L -> (6L, 5L)
-  | 106L -> (116L, 7L)
-  | 107L -> (117L, 7L)
-  | 108L -> (40L, 6L)
-  | 109L -> (41L, 6L)
-  | 110L -> (42L, 6L)
-  | 111L -> (7L, 5L)
-  | 112L -> (43L, 6L)
-  | 113L -> (118L, 7L)
-  | 114L -> (44L, 6L)
-  | 115L -> (8L, 5L)
-  | 116L -> (9L, 5L)
-  | 117L -> (45L, 6L)
-  | 118L -> (119L, 7L)
-  | 119L -> (120L, 7L)
-  | 120L -> (121L, 7L)
-  | 121L -> (122L, 7L)
-  | 122L -> (123L, 7L)
-  | 123L -> (32766L, 15L)
-  | 124L -> (2044L, 11L)
-  | 125L -> (16381L, 14L)
-  | 126L -> (8189L, 13L)
-  | 127L -> (268435452L, 28L)
-  | 128L -> (1048550L, 20L)
-  | 129L -> (4194258L, 22L)
-  | 130L -> (1048551L, 20L)
-  | 131L -> (1048552L, 20L)
-  | 132L -> (4194259L, 22L)
-  | 133L -> (4194260L, 22L)
-  | 134L -> (4194261L, 22L)
-  | 135L -> (8388569L, 23L)
-  | 136L -> (4194262L, 22L)
-  | 137L -> (8388570L, 23L)
-  | 138L -> (8388571L, 23L)
-  | 139L -> (8388572L, 23L)
-  | 140L -> (8388573L, 23L)
-  | 141L -> (8388574L, 23L)
-  | 142L -> (16777195L, 24L)
-  | 143L -> (8388575L, 23L)
-  | 144L -> (16777196L, 24L)
-  | 145L -> (16777197L, 24L)
-  | 146L -> (4194263L, 22L)
-  | 147L -> (8388576L, 23L)
-  | 148L -> (16777198L, 24L)
-  | 149L -> (8388577L, 23L)
-  | 150L -> (8388578L, 23L)
-  | 151L -> (8388579L, 23L)
-  | 152L -> (8388580L, 23L)
-  | 153L -> (2097116L, 21L)
-  | 154L -> (4194264L, 22L)
-  | 155L -> (8388581L, 23L)
-  | 156L -> (4194265L, 22L)
-  | 157L -> (8388582L, 23L)
-  | 158L -> (8388583L, 23L)
-  | 159L -> (16777199L, 24L)
-  | 160L -> (4194266L, 22L)
-  | 161L -> (2097117L, 21L)
-  | 162L -> (1048553L, 20L)
-  | 163L -> (4194267L, 22L)
-  | 164L -> (4194268L, 22L)
-  | 165L -> (8388584L, 23L)
-  | 166L -> (8388585L, 23L)
-  | 167L -> (2097118L, 21L)
-  | 168L -> (8388586L, 23L)
-  | 169L -> (4194269L, 22L)
-  | 170L -> (4194270L, 22L)
-  | 171L -> (16777200L, 24L)
-  | 172L -> (2097119L, 21L)
-  | 173L -> (4194271L, 22L)
-  | 174L -> (8388587L, 23L)
-  | 175L -> (8388588L, 23L)
-  | 176L -> (2097120L, 21L)
-  | 177L -> (2097121L, 21L)
-  | 178L -> (4194272L, 22L)
-  | 179L -> (2097122L, 21L)
-  | 180L -> (8388589L, 23L)
-  | 181L -> (4194273L, 22L)
-  | 182L -> (8388590L, 23L)
-  | 183L -> (8388591L, 23L)
-  | 184L -> (1048554L, 20L)
-  | 185L -> (4194274L, 22L)
-  | 186L -> (4194275L, 22L)
-  | 187L -> (4194276L, 22L)
-  | 188L -> (8388592L, 23L)
-  | 189L -> (4194277L, 22L)
-  | 190L -> (4194278L, 22L)
-  | 191L -> (8388593L, 23L)
-  | 192L -> (67108832L, 26L)
-  | 193L -> (67108833L, 26L)
-  | 194L -> (1048555L, 20L)
-  | 195L -> (524273L, 19L)
-  | 196L -> (4194279L, 22L)
-  | 197L -> (8388594L, 23L)
-  | 198L -> (4194280L, 22L)
-  | 199L -> (33554412L, 25L)
-  | 200L -> (67108834L, 26L)
-  | 201L -> (67108835L, 26L)
-  | 202L -> (67108836L, 26L)
-  | 203L -> (134217694L, 27L)
-  | 204L -> (134217695L, 27L)
-  | 205L -> (67108837L, 26L)
-  | 206L -> (16777201L, 24L)
-  | 207L -> (33554413L, 25L)
-  | 208L -> (524274L, 19L)
-  | 209L -> (2097123L, 21L)
-  | 210L -> (67108838L, 26L)
-  | 211L -> (134217696L, 27L)
-  | 212L -> (134217697L, 27L)
-  | 213L -> (67108839L, 26L)
-  | 214L -> (134217698L, 27L)
-  | 215L -> (16777202L, 24L)
-  | 216L -> (2097124L, 21L)
-  | 217L -> (2097125L, 21L)
-  | 218L -> (67108840L, 26L)
-  | 219L -> (67108841L, 26L)
-  | 220L -> (268435453L, 28L)
-  | 221L -> (134217699L, 27L)
-  | 222L -> (134217700L, 27L)
-  | 223L -> (134217701L, 27L)
-  | 224L -> (1048556L, 20L)
-  | 225L -> (16777203L, 24L)
-  | 226L -> (1048557L, 20L)
-  | 227L -> (2097126L, 21L)
-  | 228L -> (4194281L, 22L)
-  | 229L -> (2097127L, 21L)
-  | 230L -> (2097128L, 21L)
-  | 231L -> (8388595L, 23L)
-  | 232L -> (4194282L, 22L)
-  | 233L -> (4194283L, 22L)
-  | 234L -> (33554414L, 25L)
-  | 235L -> (33554415L, 25L)
-  | 236L -> (16777204L, 24L)
-  | 237L -> (16777205L, 24L)
-  | 238L -> (67108842L, 26L)
-  | 239L -> (8388596L, 23L)
-  | 240L -> (67108843L, 26L)
-  | 241L -> (134217702L, 27L)
-  | 242L -> (67108844L, 26L)
-  | 243L -> (67108845L, 26L)
-  | 244L -> (134217703L, 27L)
-  | 245L -> (134217704L, 27L)
-  | 246L -> (134217705L, 27L)
-  | 247L -> (134217706L, 27L)
-  | 248L -> (134217707L, 27L)
-  | 249L -> (268435454L, 28L)
-  | 250L -> (134217708L, 27L)
-  | 251L -> (134217709L, 27L)
-  | 252L -> (134217710L, 27L)
-  | 253L -> (134217711L, 27L)
-  | 254L -> (134217712L, 27L)
-  | 255L -> (67108846L, 26L)
+  | 0 -> (8184, 13)
+  | 1 -> (8388568, 23)
+  | 2 -> (268435426, 28)
+  | 3 -> (268435427, 28)
+  | 4 -> (268435428, 28)
+  | 5 -> (268435429, 28)
+  | 6 -> (268435430, 28)
+  | 7 -> (268435431, 28)
+  | 8 -> (268435432, 28)
+  | 9 -> (16777194, 24)
+  | 10 -> (1073741820, 30)
+  | 11 -> (268435433, 28)
+  | 12 -> (268435434, 28)
+  | 13 -> (1073741821, 30)
+  | 14 -> (268435435, 28)
+  | 15 -> (268435436, 28)
+  | 16 -> (268435437, 28)
+  | 17 -> (268435438, 28)
+  | 18 -> (268435439, 28)
+  | 19 -> (268435440, 28)
+  | 20 -> (268435441, 28)
+  | 21 -> (268435442, 28)
+  | 22 -> (1073741822, 30)
+  | 23 -> (268435443, 28)
+  | 24 -> (268435444, 28)
+  | 25 -> (268435445, 28)
+  | 26 -> (268435446, 28)
+  | 27 -> (268435447, 28)
+  | 28 -> (268435448, 28)
+  | 29 -> (268435449, 28)
+  | 30 -> (268435450, 28)
+  | 31 -> (268435451, 28)
+  | 32 -> (20, 6)
+  | 33 -> (1016, 10)
+  | 34 -> (1017, 10)
+  | 35 -> (4090, 12)
+  | 36 -> (8185, 13)
+  | 37 -> (21, 6)
+  | 38 -> (248, 8)
+  | 39 -> (2042, 11)
+  | 40 -> (1018, 10)
+  | 41 -> (1019, 10)
+  | 42 -> (249, 8)
+  | 43 -> (2043, 11)
+  | 44 -> (250, 8)
+  | 45 -> (22, 6)
+  | 46 -> (23, 6)
+  | 47 -> (24, 6)
+  | 48 -> (0, 5)
+  | 49 -> (1, 5)
+  | 50 -> (2, 5)
+  | 51 -> (25, 6)
+  | 52 -> (26, 6)
+  | 53 -> (27, 6)
+  | 54 -> (28, 6)
+  | 55 -> (29, 6)
+  | 56 -> (30, 6)
+  | 57 -> (31, 6)
+  | 58 -> (92, 7)
+  | 59 -> (251, 8)
+  | 60 -> (32764, 15)
+  | 61 -> (32, 6)
+  | 62 -> (4091, 12)
+  | 63 -> (1020, 10)
+  | 64 -> (8186, 13)
+  | 65 -> (33, 6)
+  | 66 -> (93, 7)
+  | 67 -> (94, 7)
+  | 68 -> (95, 7)
+  | 69 -> (96, 7)
+  | 70 -> (97, 7)
+  | 71 -> (98, 7)
+  | 72 -> (99, 7)
+  | 73 -> (100, 7)
+  | 74 -> (101, 7)
+  | 75 -> (102, 7)
+  | 76 -> (103, 7)
+  | 77 -> (104, 7)
+  | 78 -> (105, 7)
+  | 79 -> (106, 7)
+  | 80 -> (107, 7)
+  | 81 -> (108, 7)
+  | 82 -> (109, 7)
+  | 83 -> (110, 7)
+  | 84 -> (111, 7)
+  | 85 -> (112, 7)
+  | 86 -> (113, 7)
+  | 87 -> (114, 7)
+  | 88 -> (252, 8)
+  | 89 -> (115, 7)
+  | 90 -> (253, 8)
+  | 91 -> (8187, 13)
+  | 92 -> (524272, 19)
+  | 93 -> (8188, 13)
+  | 94 -> (16380, 14)
+  | 95 -> (34, 6)
+  | 96 -> (32765, 15)
+  | 97 -> (3, 5)
+  | 98 -> (35, 6)
+  | 99 -> (4, 5)
+  | 100 -> (36, 6)
+  | 101 -> (5, 5)
+  | 102 -> (37, 6)
+  | 103 -> (38, 6)
+  | 104 -> (39, 6)
+  | 105 -> (6, 5)
+  | 106 -> (116, 7)
+  | 107 -> (117, 7)
+  | 108 -> (40, 6)
+  | 109 -> (41, 6)
+  | 110 -> (42, 6)
+  | 111 -> (7, 5)
+  | 112 -> (43, 6)
+  | 113 -> (118, 7)
+  | 114 -> (44, 6)
+  | 115 -> (8, 5)
+  | 116 -> (9, 5)
+  | 117 -> (45, 6)
+  | 118 -> (119, 7)
+  | 119 -> (120, 7)
+  | 120 -> (121, 7)
+  | 121 -> (122, 7)
+  | 122 -> (123, 7)
+  | 123 -> (32766, 15)
+  | 124 -> (2044, 11)
+  | 125 -> (16381, 14)
+  | 126 -> (8189, 13)
+  | 127 -> (268435452, 28)
+  | 128 -> (1048550, 20)
+  | 129 -> (4194258, 22)
+  | 130 -> (1048551, 20)
+  | 131 -> (1048552, 20)
+  | 132 -> (4194259, 22)
+  | 133 -> (4194260, 22)
+  | 134 -> (4194261, 22)
+  | 135 -> (8388569, 23)
+  | 136 -> (4194262, 22)
+  | 137 -> (8388570, 23)
+  | 138 -> (8388571, 23)
+  | 139 -> (8388572, 23)
+  | 140 -> (8388573, 23)
+  | 141 -> (8388574, 23)
+  | 142 -> (16777195, 24)
+  | 143 -> (8388575, 23)
+  | 144 -> (16777196, 24)
+  | 145 -> (16777197, 24)
+  | 146 -> (4194263, 22)
+  | 147 -> (8388576, 23)
+  | 148 -> (16777198, 24)
+  | 149 -> (8388577, 23)
+  | 150 -> (8388578, 23)
+  | 151 -> (8388579, 23)
+  | 152 -> (8388580, 23)
+  | 153 -> (2097116, 21)
+  | 154 -> (4194264, 22)
+  | 155 -> (8388581, 23)
+  | 156 -> (4194265, 22)
+  | 157 -> (8388582, 23)
+  | 158 -> (8388583, 23)
+  | 159 -> (16777199, 24)
+  | 160 -> (4194266, 22)
+  | 161 -> (2097117, 21)
+  | 162 -> (1048553, 20)
+  | 163 -> (4194267, 22)
+  | 164 -> (4194268, 22)
+  | 165 -> (8388584, 23)
+  | 166 -> (8388585, 23)
+  | 167 -> (2097118, 21)
+  | 168 -> (8388586, 23)
+  | 169 -> (4194269, 22)
+  | 170 -> (4194270, 22)
+  | 171 -> (16777200, 24)
+  | 172 -> (2097119, 21)
+  | 173 -> (4194271, 22)
+  | 174 -> (8388587, 23)
+  | 175 -> (8388588, 23)
+  | 176 -> (2097120, 21)
+  | 177 -> (2097121, 21)
+  | 178 -> (4194272, 22)
+  | 179 -> (2097122, 21)
+  | 180 -> (8388589, 23)
+  | 181 -> (4194273, 22)
+  | 182 -> (8388590, 23)
+  | 183 -> (8388591, 23)
+  | 184 -> (1048554, 20)
+  | 185 -> (4194274, 22)
+  | 186 -> (4194275, 22)
+  | 187 -> (4194276, 22)
+  | 188 -> (8388592, 23)
+  | 189 -> (4194277, 22)
+  | 190 -> (4194278, 22)
+  | 191 -> (8388593, 23)
+  | 192 -> (67108832, 26)
+  | 193 -> (67108833, 26)
+  | 194 -> (1048555, 20)
+  | 195 -> (524273, 19)
+  | 196 -> (4194279, 22)
+  | 197 -> (8388594, 23)
+  | 198 -> (4194280, 22)
+  | 199 -> (33554412, 25)
+  | 200 -> (67108834, 26)
+  | 201 -> (67108835, 26)
+  | 202 -> (67108836, 26)
+  | 203 -> (134217694, 27)
+  | 204 -> (134217695, 27)
+  | 205 -> (67108837, 26)
+  | 206 -> (16777201, 24)
+  | 207 -> (33554413, 25)
+  | 208 -> (524274, 19)
+  | 209 -> (2097123, 21)
+  | 210 -> (67108838, 26)
+  | 211 -> (134217696, 27)
+  | 212 -> (134217697, 27)
+  | 213 -> (67108839, 26)
+  | 214 -> (134217698, 27)
+  | 215 -> (16777202, 24)
+  | 216 -> (2097124, 21)
+  | 217 -> (2097125, 21)
+  | 218 -> (67108840, 26)
+  | 219 -> (67108841, 26)
+  | 220 -> (268435453, 28)
+  | 221 -> (134217699, 27)
+  | 222 -> (134217700, 27)
+  | 223 -> (134217701, 27)
+  | 224 -> (1048556, 20)
+  | 225 -> (16777203, 24)
+  | 226 -> (1048557, 20)
+  | 227 -> (2097126, 21)
+  | 228 -> (4194281, 22)
+  | 229 -> (2097127, 21)
+  | 230 -> (2097128, 21)
+  | 231 -> (8388595, 23)
+  | 232 -> (4194282, 22)
+  | 233 -> (4194283, 22)
+  | 234 -> (33554414, 25)
+  | 235 -> (33554415, 25)
+  | 236 -> (16777204, 24)
+  | 237 -> (16777205, 24)
+  | 238 -> (67108842, 26)
+  | 239 -> (8388596, 23)
+  | 240 -> (67108843, 26)
+  | 241 -> (134217702, 27)
+  | 242 -> (67108844, 26)
+  | 243 -> (67108845, 26)
+  | 244 -> (134217703, 27)
+  | 245 -> (134217704, 27)
+  | 246 -> (134217705, 27)
+  | 247 -> (134217706, 27)
+  | 248 -> (134217707, 27)
+  | 249 -> (268435454, 28)
+  | 250 -> (134217708, 27)
+  | 251 -> (134217709, 27)
+  | 252 -> (134217710, 27)
+  | 253 -> (134217711, 27)
+  | 254 -> (134217712, 27)
+  | 255 -> (67108846, 26)
   | _ -> Builtin.crash "Invalid byte in HTTP Huffman encoder"
 
 let __emitHuffman (bits: Int64) (length: Int64) (output: List<Int64>) : (Int64 * Int64 * List<Int64>) =
-  if length < 8L then (bits, length, output)
+  if length < 8 then (bits, length, output)
   else
-    let factor = Stdlib.__Hpack.__pow2 (length - 8L) in
-    Stdlib.__Hpack.__emitHuffman (bits % factor) (length - 8L) (Stdlib.List.push output (bits / factor))
+    let factor = Stdlib.__Hpack.__pow2 (length - 8) in
+    Stdlib.__Hpack.__emitHuffman (bits % factor) (length - 8) (Stdlib.List.push output (bits / factor))
 
 let __encodeHuffman (bytes: Blob) (position: Int64) (bits: Int64) (length: Int64) (output: List<Int64>) : Blob =
   if position == Stdlib.Blob.__byteLength bytes then
-    let output = if length == 0L then output else
-      let padding = Stdlib.__Hpack.__pow2 (8L - length) in
-      Stdlib.List.push output (bits * padding + padding - 1L) in
+    let output = if length == 0 then output else
+      let padding = Stdlib.__Hpack.__pow2 (8 - length) in
+      Stdlib.List.push output (bits * padding + padding - 1) in
     Stdlib.Blob.__fromInt64List (Stdlib.List.reverse output)
   else
     let (code, width) = Stdlib.__Hpack.__huffmanCode (Stdlib.Blob.__getByte bytes position) in
     let (nextBits, nextLength, nextOutput) = Stdlib.__Hpack.__emitHuffman (bits * Stdlib.__Hpack.__pow2 width + code) (length + width) output in
-    Stdlib.__Hpack.__encodeHuffman bytes (position + 1L) nextBits nextLength nextOutput
+    Stdlib.__Hpack.__encodeHuffman bytes (position + 1) nextBits nextLength nextOutput
 
 let __sensitive (name: String) : Bool =
   name == "authorization" || name == "proxy-authorization" || name == "cookie" || name == "set-cookie"
@@ -850,14 +850,14 @@ let __staticIndex (name: String) (value: String) (exact: Bool) (index: Int64) : 
   | Some entry ->
     let (entryName, entryValue) = entry in
     if entryName == name && (Stdlib.Bool.not exact || entryValue == value) then Some index
-    else Stdlib.__Hpack.__staticIndex name value exact (index + 1L)
+    else Stdlib.__Hpack.__staticIndex name value exact (index + 1)
 
 let encodeText (value: String) : Blob =
   let raw = Stdlib.String.toBlob value in
-  let compressed = Stdlib.__Hpack.__encodeHuffman raw 0L 0L 0L [] in
+  let compressed = Stdlib.__Hpack.__encodeHuffman raw 0 0 0 [] in
   let huffman = Stdlib.Blob.__byteLength compressed < Stdlib.Blob.__byteLength raw in
   let bytes = if huffman then compressed else raw in
-  Stdlib.Blob.concat [Stdlib.__Hpack.encodeInteger 7L (if huffman then 128L else 0L) (Stdlib.Blob.__byteLength bytes), bytes]
+  Stdlib.Blob.concat [Stdlib.__Hpack.encodeInteger 7 (if huffman then 128 else 0) (Stdlib.Blob.__byteLength bytes), bytes]
 
 let __encode (headers: List<(String * String)>) (size: Int64) (count: Int64)
   (blocks: List<Blob>) : Stdlib.Result.Result<Blob, String> =
@@ -866,22 +866,22 @@ let __encode (headers: List<(String * String)>) (size: Int64) (count: Int64)
   | entry :: rest ->
     let (name, value) = entry in
     let nextSize = size + Stdlib.__Hpack.__entrySize entry in
-    if count >= 256L || nextSize > 65536L then Error "HPACK header list too large"
+    if count >= 256 || nextSize > 65536 then Error "HPACK header list too large"
     else if name == "" then Error "Empty HTTP header name"
     else
-      let exact = if Stdlib.__Hpack.__sensitive name then None else Stdlib.__Hpack.__staticIndex name value true 1L in
+      let exact = if Stdlib.__Hpack.__sensitive name then None else Stdlib.__Hpack.__staticIndex name value true 1 in
       let encoded = match exact with
-      | Some index -> Stdlib.__Hpack.encodeInteger 7L 128L index
+      | Some index -> Stdlib.__Hpack.encodeInteger 7 128 index
       | None ->
         // Name references still carry never-indexed values for sensitive fields.
-        let reference = match Stdlib.__Hpack.__staticIndex name value false 1L with
-        | Some index -> Stdlib.__Hpack.encodeInteger 4L 16L index
-        | None -> Stdlib.Blob.concat [Stdlib.Blob.__fromInt64List [16L], Stdlib.__Hpack.encodeText name] in
+        let reference = match Stdlib.__Hpack.__staticIndex name value false 1 with
+        | Some index -> Stdlib.__Hpack.encodeInteger 4 16 index
+        | None -> Stdlib.Blob.concat [Stdlib.Blob.__fromInt64List [16], Stdlib.__Hpack.encodeText name] in
         Stdlib.Blob.concat [reference, Stdlib.__Hpack.encodeText value] in
-      Stdlib.__Hpack.__encode rest nextSize (count + 1L) (Stdlib.List.push blocks encoded)
+      Stdlib.__Hpack.__encode rest nextSize (count + 1) (Stdlib.List.push blocks encoded)
 
 let encode (headers: List<(String * String)>) : Stdlib.Result.Result<Blob, String> =
-  Stdlib.__Hpack.__encode headers 0L 0L []
+  Stdlib.__Hpack.__encode headers 0 0 []
 
 let encoder () : Stdlib.__Hpack.Encoder =
   Stdlib.__Hpack.Encoder { table = Stdlib.__Hpack.initial (), minimum = None }
@@ -889,9 +889,9 @@ let encoder () : Stdlib.__Hpack.Encoder =
 // A bounded encoder may choose less capacity than the peer permits. Preserve
 // the smallest intermediate capacity so a shrink/grow cannot hide evictions.
 let resizeEncoder (state: Stdlib.__Hpack.Encoder) (maximum: Int64) : Stdlib.Result.Result<Stdlib.__Hpack.Encoder, String> =
-  if maximum < 0L || maximum > 4294967295L then Error "Invalid HPACK encoder capacity"
+  if maximum < 0 || maximum > 4294967295 then Error "Invalid HPACK encoder capacity"
   else
-    let limit = if maximum > 4096L then 4096L else maximum in
+    let limit = if maximum > 4096 then 4096 else maximum in
     if limit == state.table.limit then Ok state
     else
       let minimum = match state.minimum with | Some value -> if value < limit then value else limit | None -> limit in
@@ -903,12 +903,12 @@ let __dynamicIndex (entries: List<(String * String)>) (name: String) (value: Str
   | entry :: rest ->
     let (entryName, entryValue) = entry in
     if entryName == name && (Stdlib.Bool.not exact || entryValue == value) then Some index
-    else Stdlib.__Hpack.__dynamicIndex rest name value exact (index + 1L)
+    else Stdlib.__Hpack.__dynamicIndex rest name value exact (index + 1)
 
 let __encoderIndex (table: Stdlib.__Hpack.State) (name: String) (value: String) (exact: Bool) : Stdlib.Option.Option<Int64> =
-  match Stdlib.__Hpack.__staticIndex name value exact 1L with
+  match Stdlib.__Hpack.__staticIndex name value exact 1 with
   | Some index -> Some index
-  | None -> Stdlib.__Hpack.__dynamicIndex table.entries name value exact 62L
+  | None -> Stdlib.__Hpack.__dynamicIndex table.entries name value exact 62
 
 let __encodeDynamic (state: Stdlib.__Hpack.Encoder) (headers: List<(String * String)>) (size: Int64) (count: Int64) (blocks: List<Blob>) : Stdlib.Result.Result<Stdlib.__Hpack.Encoded, String> =
   match headers with
@@ -917,28 +917,28 @@ let __encodeDynamic (state: Stdlib.__Hpack.Encoder) (headers: List<(String * Str
     let (name, value) = entry in
     let nextSize = size + Stdlib.__Hpack.__entrySize entry in
     if name == "" then Error "Empty HTTP header name"
-    else if count >= 256L || nextSize > 65536L then Error "HPACK header list too large"
+    else if count >= 256 || nextSize > 65536 then Error "HPACK header list too large"
     else
       let sensitive = Stdlib.__Hpack.__sensitive name in
       let exact = if sensitive then None else Stdlib.__Hpack.__encoderIndex state.table name value true in
       let indexed = Stdlib.Bool.not sensitive && Stdlib.__Hpack.__entrySize entry <= state.table.limit in
       let bytes = match exact with
-      | Some index -> Stdlib.__Hpack.encodeInteger 7L 128L index
+      | Some index -> Stdlib.__Hpack.encodeInteger 7 128 index
       | None ->
-        let prefix = if indexed then 6L else 4L in
-        let flags = if indexed then 64L else 16L in
+        let prefix = if indexed then 6 else 4 in
+        let flags = if indexed then 64 else 16 in
         let reference = match Stdlib.__Hpack.__encoderIndex state.table name value false with
         | Some index -> Stdlib.__Hpack.encodeInteger prefix flags index
-        | None -> Stdlib.Blob.concat [Stdlib.__Hpack.encodeInteger prefix flags 0L, Stdlib.__Hpack.encodeText name] in
+        | None -> Stdlib.Blob.concat [Stdlib.__Hpack.encodeInteger prefix flags 0, Stdlib.__Hpack.encodeText name] in
         Stdlib.Blob.concat [reference, Stdlib.__Hpack.encodeText value] in
       let table = if indexed && Stdlib.Option.isNone exact then Stdlib.__Hpack.__add state.table entry else state.table in
-      Stdlib.__Hpack.__encodeDynamic { state with table = table } rest nextSize (count + 1L) (Stdlib.List.push blocks bytes)
+      Stdlib.__Hpack.__encodeDynamic { state with table = table } rest nextSize (count + 1) (Stdlib.List.push blocks bytes)
 
 let encodeDynamic (state: Stdlib.__Hpack.Encoder) (headers: List<(String * String)>) : Stdlib.Result.Result<Stdlib.__Hpack.Encoded, String> =
   let updates = match state.minimum with
   | None -> []
   | Some minimum ->
-    if minimum == state.table.limit then [Stdlib.__Hpack.encodeInteger 5L 32L minimum]
-    else [Stdlib.__Hpack.encodeInteger 5L 32L state.table.limit, Stdlib.__Hpack.encodeInteger 5L 32L minimum] in
-  Stdlib.__Hpack.__encodeDynamic { state with minimum = None } headers 0L 0L updates
+    if minimum == state.table.limit then [Stdlib.__Hpack.encodeInteger 5 32 minimum]
+    else [Stdlib.__Hpack.encodeInteger 5 32 state.table.limit, Stdlib.__Hpack.encodeInteger 5 32 minimum] in
+  Stdlib.__Hpack.__encodeDynamic { state with minimum = None } headers 0 0 updates
 

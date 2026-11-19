@@ -17,8 +17,8 @@ let subtract (a: Int32) (b: Int32) : Int32 = a - b
 let multiply (a: Int32) (b: Int32) : Int32 = a * b
 
 let divide (a: Int32) (b: Int32) : Int32 =
-    if b == 0l then Builtin.crash "Cannot divide by 0"
-    else if a == -2147483648l && b == -1l then -2147483648l
+    if b == 0s32 then Builtin.crash "Cannot divide by 0"
+    else if a == -2147483648s32 && b == -1s32 then -2147483648s32
     else a / b
 
 let max (a: Int32) (b: Int32) : Int32 = if a > b then a else b
@@ -26,26 +26,26 @@ let max (a: Int32) (b: Int32) : Int32 = if a > b then a else b
 let min (a: Int32) (b: Int32) : Int32 = if a < b then a else b
 
 let mod (a: Int32) (b: Int32) : Int32 =
-    if b == 0l then Builtin.crash "Cannot evaluate modulus against 0"
-    else if b < 0l then Builtin.crash "Cannot evaluate modulus against a negative number"
+    if b == 0s32 then Builtin.crash "Cannot evaluate modulus against 0"
+    else if b < 0s32 then Builtin.crash "Cannot evaluate modulus against a negative number"
     else a % b
 let remainder (a: Int32) (b: Int32) : Stdlib.Result.Result<Int32, String> =
-    if b == 0l then Error "Cannot divide by 0"
-    else if b == -1l then Ok 0l
+    if b == 0s32 then Error "Cannot divide by 0"
+    else if b == -1s32 then Ok 0s32
     else Ok (a - ((a / b) * b))
 
-let absoluteValue (a: Int32) : Int32 = if a < 0l then 0l - a else a
+let absoluteValue (a: Int32) : Int32 = if a < 0s32 then 0s32 - a else a
 
-let negate (a: Int32) : Int32 = 0l - a
+let negate (a: Int32) : Int32 = 0s32 - a
 
 let __powerLoop (base: Int32) (exponent: Int32) (result: Int32) : Int32 =
-    if exponent == 0l then result
+    if exponent == 0s32 then result
     else
-        let next = if (exponent % 2l) == 1l then result * base else result in
-        Stdlib.Int32.__powerLoop (base * base) (exponent / 2l) next
+        let next = if (exponent % 2s32) == 1s32 then result * base else result in
+        Stdlib.Int32.__powerLoop (base * base) (exponent / 2s32) next
 let power (base: Int32) (exponent: Int32) : Int32 =
-    if exponent < 0l then Builtin.crash "Cannot raise integer to a negative exponent"
-    else Stdlib.Int32.__powerLoop base exponent 1l
+    if exponent < 0s32 then Builtin.crash "Cannot raise integer to a negative exponent"
+    else Stdlib.Int32.__powerLoop base exponent 1s32
 
 let clamp (value: Int32) (limitA: Int32) (limitB: Int32) : Int32 =
     let lower = Stdlib.Int32.min limitA limitB in
@@ -63,45 +63,45 @@ let lessThanOrEqualTo (a: Int32) (b: Int32) : Bool = a <= b
 // Count number of set bits (population count)
 // Uses parallel bit counting algorithm (SWAR)
 let __popcount (x: Int32) : Int32 =
-    let mask1 = 1431655765l in
-    let mask2 = 858993459l in
-    let mask3 = 252645135l in
-    let mask4 = 63l in
-    let x = x - Stdlib.Int32.bitwiseAnd (Stdlib.Int32.shiftRight x 1l) mask1 in
-    let x = Stdlib.Int32.bitwiseAnd x mask2 + Stdlib.Int32.bitwiseAnd (Stdlib.Int32.shiftRight x 2l) mask2 in
-    let x = Stdlib.Int32.bitwiseAnd (x + Stdlib.Int32.shiftRight x 4l) mask3 in
-    let x = x + Stdlib.Int32.shiftRight x 8l in
-    let x = x + Stdlib.Int32.shiftRight x 16l in
+    let mask1 = 1431655765s32 in
+    let mask2 = 858993459s32 in
+    let mask3 = 252645135s32 in
+    let mask4 = 63s32 in
+    let x = x - Stdlib.Int32.bitwiseAnd (Stdlib.Int32.shiftRight x 1s32) mask1 in
+    let x = Stdlib.Int32.bitwiseAnd x mask2 + Stdlib.Int32.bitwiseAnd (Stdlib.Int32.shiftRight x 2s32) mask2 in
+    let x = Stdlib.Int32.bitwiseAnd (x + Stdlib.Int32.shiftRight x 4s32) mask3 in
+    let x = x + Stdlib.Int32.shiftRight x 8s32 in
+    let x = x + Stdlib.Int32.shiftRight x 16s32 in
     Stdlib.Int32.bitwiseAnd x mask4
 
 // Convert a single digit (0l-9l) to its string representation
 let __digitToString (n: Int32) : String =
     match n with
-    | 0l -> "0"
-    | 1l -> "1"
-    | 2l -> "2"
-    | 3l -> "3"
-    | 4l -> "4"
-    | 5l -> "5"
-    | 6l -> "6"
-    | 7l -> "7"
-    | 8l -> "8"
-    | 9l -> "9"
+    | 0s32 -> "0"
+    | 1s32 -> "1"
+    | 2s32 -> "2"
+    | 3s32 -> "3"
+    | 4s32 -> "4"
+    | 5s32 -> "5"
+    | 6s32 -> "6"
+    | 7s32 -> "7"
+    | 8s32 -> "8"
+    | 9s32 -> "9"
     | _ -> Builtin.crash "Stdlib.Int32.__digitToString expected a digit from 0 to 9"
 
 // Convert an integer to its string representation
 let toString (n: Int32) : String =
-    if n < 0l then
-        if n < -9l then
-            let quotient = n / 10l in
-            Stdlib.Int32.toString quotient + Stdlib.Int32.__digitToString (0l - (n - (quotient * 10l)))
-        else "-" + Stdlib.Int32.__digitToString (0l - n)
-    else if n < 10l then Stdlib.Int32.__digitToString n
-    else Stdlib.Int32.toString (n / 10l) + Stdlib.Int32.__digitToString (n % 10l)
+    if n < 0s32 then
+        if n < -9s32 then
+            let quotient = n / 10s32 in
+            Stdlib.Int32.toString quotient + Stdlib.Int32.__digitToString (0s32 - (n - (quotient * 10s32)))
+        else "-" + Stdlib.Int32.__digitToString (0s32 - n)
+    else if n < 10s32 then Stdlib.Int32.__digitToString n
+    else Stdlib.Int32.toString (n / 10s32) + Stdlib.Int32.__digitToString (n % 10s32)
 
 // Sum all integers in a list
 let sum (list: List<Int32>) : Int32 =
-    Stdlib.List.fold list 0l (fun acc x -> acc + x)
+    Stdlib.List.fold list 0s32 (fun acc x -> acc + x)
 
 let __fromIntUnchecked (value: Int) : Int32 =
     match Stdlib.Int.toInt32 value with
@@ -178,7 +178,7 @@ impl Stdlib.Compare for Int32 =
   let greaterThanOrEqualTo = Stdlib.Int32.greaterThanOrEqualTo
 
 impl Stdlib.Zero for Int32 =
-  let zero () : Int32 = 0l
+  let zero () : Int32 = 0s32
 
 impl Stdlib.One for Int32 =
-  let one () : Int32 = 1l
+  let one () : Int32 = 1s32

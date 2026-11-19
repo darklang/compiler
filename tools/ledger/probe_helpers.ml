@@ -36,7 +36,6 @@ let main includePackages allBlocked root manifest output =
   in
   let parse file text =
     I.parse
-      ~interpreterSource:(String.starts_with ~prefix:"upstream/" file)
       ~annotations:(CompilerAnnotations.forSource sidecar file)
       ~reasons text
     |> require

@@ -6,7 +6,7 @@ let allowedHost (trusted: Bool) (host: String) : Bool =
     (Stdlib.String.__containsBytes host "." || Stdlib.Option.isSome (Stdlib.__DnsWire.ipv6 host)))
 
 let allowedAddress (trusted: Bool) (address: List<Int64>) : Bool =
-  let ipv6 = Stdlib.List.__lengthInt address == 16 in
+  let ipv6 = Stdlib.List.__lengthInt address == 16z in
   let checked = if trusted then
                   if ipv6 then Stdlib.__HttpConnect.checkTrusted6 address else Stdlib.__HttpConnect.checkTrusted4 address
                 else if ipv6 then Stdlib.__HttpConnect.checkGuest6 address else Stdlib.__HttpConnect.checkGuest4 address in
@@ -17,18 +17,18 @@ let __addresses (addresses: List<List<Int64>>) (port: Int64) (origin: String) (r
   match addresses with
   | [] -> None
   | address :: rest ->
-    if remaining == 0L then None
+    if remaining == 0 then None
     else if Stdlib.Bool.not (Stdlib.__Http3Discovery.allowedAddress trusted address) then
-      Stdlib.__Http3Discovery.__addresses rest port origin roots trusted deadline (remaining - 1L)
+      Stdlib.__Http3Discovery.__addresses rest port origin roots trusted deadline (remaining - 1)
     else match Stdlib.__Network.monotonicMillis () with
     | Error _ -> None
     | Ok now ->
       if now >= deadline then None
       else
-        let timeout = if deadline - now > 1500L then 1500L else deadline - now in
+        let timeout = if deadline - now > 1500 then 1500 else deadline - now in
         match Stdlib.__QuicClient.connect (Stdlib.__Datagram.Endpoint { address = address, port = port }) origin roots timeout with
         | Ok ready -> Some ready
-        | Error _ -> Stdlib.__Http3Discovery.__addresses rest port origin roots trusted deadline (remaining - 1L)
+        | Error _ -> Stdlib.__Http3Discovery.__addresses rest port origin roots trusted deadline (remaining - 1)
 
 let __resolved (host: String) (kind: Int64) : List<List<Int64>> =
   match Stdlib.__DnsWire.resolve host kind with | Ok addresses -> addresses | Error _ -> []
@@ -38,22 +38,22 @@ let __services (services: List<Stdlib.__HttpsService.Service>) (origin: String) 
   match services with
   | [] -> None
   | service :: rest ->
-    if remaining == 0L then None
-    else if Stdlib.Bool.not (Stdlib.__Http3Discovery.allowedHost trusted service.host) || service.port < 1L || service.port > 65535L then
-      Stdlib.__Http3Discovery.__services rest origin roots trusted deadline (remaining - 1L)
+    if remaining == 0 then None
+    else if Stdlib.Bool.not (Stdlib.__Http3Discovery.allowedHost trusted service.host) || service.port < 1 || service.port > 65535 then
+      Stdlib.__Http3Discovery.__services rest origin roots trusted deadline (remaining - 1)
     else match Stdlib.__Network.monotonicMillis () with
     | Error _ -> None
     | Ok now ->
       if now >= deadline then None
       else
         let hints = service.ipv4 @ service.ipv6 in
-        match Stdlib.__Http3Discovery.__addresses hints service.port origin roots trusted deadline 3L with
+        match Stdlib.__Http3Discovery.__addresses hints service.port origin roots trusted deadline 3 with
         | Some ready -> Some ready
         | None ->
-          let addresses = Stdlib.__Http3Discovery.__resolved service.host 1L @ Stdlib.__Http3Discovery.__resolved service.host 28L in
-          match Stdlib.__Http3Discovery.__addresses addresses service.port origin roots trusted deadline 3L with
+          let addresses = Stdlib.__Http3Discovery.__resolved service.host 1 @ Stdlib.__Http3Discovery.__resolved service.host 28 in
+          match Stdlib.__Http3Discovery.__addresses addresses service.port origin roots trusted deadline 3 with
           | Some ready -> Some ready
-          | None -> Stdlib.__Http3Discovery.__services rest origin roots trusted deadline (remaining - 1L)
+          | None -> Stdlib.__Http3Discovery.__services rest origin roots trusted deadline (remaining - 1)
 
 // Only parsed advertisements admit QUIC. TLS always uses the URL's host,
 // even when the service target or port differs from the original authority.
@@ -62,7 +62,7 @@ let connect (services: List<Stdlib.__HttpsService.Service>) (origin: String) (ro
   if Stdlib.Bool.not (Stdlib.__Http3Discovery.allowedHost trusted origin) then None
   else match Stdlib.__Network.monotonicMillis () with
   | Error _ -> None
-  | Ok now -> Stdlib.__Http3Discovery.__services (Stdlib.List.sortBy services (fun service -> service.priority)) origin roots trusted (now + 5000L) 3L
+  | Ok now -> Stdlib.__Http3Discovery.__services (Stdlib.List.sortBy services (fun service -> service.priority)) origin roots trusted (now + 5000) 3
 
 let discover (url: Stdlib.__HttpWire.Url) (roots: List<Blob>) (trusted: Bool) : Stdlib.Option.Option<Stdlib.__QuicClient.Ready> =
   if url.scheme != "https" || Stdlib.Bool.not (Stdlib.__Http3Discovery.allowedHost trusted url.host) ||

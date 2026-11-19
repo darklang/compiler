@@ -9,20 +9,20 @@ let __slugifyFilter (codepoints: List<Int64>) (reversed: List<Int64>) : List<Int
     | [] -> Stdlib.List.reverse reversed
     | codepoint :: rest ->
         let keep =
-            (codepoint >= 97L && codepoint <= 122L) ||
-            (codepoint >= 48L && codepoint <= 57L) ||
-            codepoint == 45L || codepoint == 95L ||
-            (codepoint != 11L && Stdlib.String.__Unicode.isWhitespace codepoint) in
+            (codepoint >= 97 && codepoint <= 122) ||
+            (codepoint >= 48 && codepoint <= 57) ||
+            codepoint == 45 || codepoint == 95 ||
+            (codepoint != 11 && Stdlib.String.__Unicode.isWhitespace codepoint) in
         Builtin.__slugifyFilter rest (if keep then Stdlib.List.push reversed codepoint else reversed)
 
 let __slugifySeparators (codepoints: List<Int64>) (previousSeparator: Bool) (reversed: List<Int64>) : String =
     match codepoints with
     | [] -> Stdlib.String.__fromCodepoints (Stdlib.List.reverse reversed)
     | codepoint :: rest ->
-        let separator = codepoint == 45L || codepoint == 95L || Stdlib.String.__Unicode.isWhitespace codepoint in
+        let separator = codepoint == 45 || codepoint == 95 || Stdlib.String.__Unicode.isWhitespace codepoint in
         let next =
             if separator then
-                if previousSeparator then reversed else Stdlib.List.push reversed 45L
+                if previousSeparator then reversed else Stdlib.List.push reversed 45
             else Stdlib.List.push reversed codepoint in
         Builtin.__slugifySeparators rest separator next
 
@@ -45,20 +45,20 @@ let runtimeEnvironmentGetAll () : Dict<String, String> =
 
 // The digits from `index` as a number, or -1 when one is missing.
 let __dateTimeDigits (value: String) (index: Int64) (count: Int64) : Int64 =
-    match Stdlib.DateTime.__parseDigits value index count 0L with
+    match Stdlib.DateTime.__parseDigits value index count 0 with
     | Ok ((number, _)) -> number
-    | Error _ -> -1L
+    | Error _ -> -1
 
 // ISO 8601 as the interpreter reads it: YYYY-MM-DD, or YYYY-MM-DDThh:mm:ss
 // with an optional .fff and then Z or an offset such as +02:00.
 let dateTimeParse (value: String) : Stdlib.Result.Result<DateTime, Stdlib.DateTime.ParseError> =
     let at = fun index byte -> Stdlib.DateTime.__hasByte value index byte in
     let length = Stdlib.String.__byteLength value in
-    let year = Builtin.__dateTimeDigits value 0L 4L in
-    let month = Builtin.__dateTimeDigits value 5L 2L in
-    let day = Builtin.__dateTimeDigits value 8L 2L in
-    let dateSyntax = at 4L 45L && at 7L 45L && year >= 0L && month >= 0L && day >= 0L in
-    let validDate = year >= 1L && month >= 1L && month <= 12L && day >= 1L && day <= Stdlib.DateTime.__daysInMonth month year in
+    let year = Builtin.__dateTimeDigits value 0 4 in
+    let month = Builtin.__dateTimeDigits value 5 2 in
+    let day = Builtin.__dateTimeDigits value 8 2 in
+    let dateSyntax = at 4 45 && at 7 45 && year >= 0 && month >= 0 && day >= 0 in
+    let validDate = year >= 1 && month >= 1 && month <= 12 && day >= 1 && day <= Stdlib.DateTime.__daysInMonth month year in
     let instant = fun hour minute second millisecond offsetMinutes ->
         if Stdlib.Bool.not validDate then Error Stdlib.DateTime.ParseError.InvalidDate
         else
@@ -69,28 +69,28 @@ let dateTimeParse (value: String) : Stdlib.Result.Result<DateTime, Stdlib.DateTi
                 second * Stdlib.DateTime.__ticksPerSecond () +
                 millisecond * Stdlib.DateTime.__ticksPerMillisecond ())) in
     if Stdlib.Bool.not dateSyntax then Error Stdlib.DateTime.ParseError.InvalidFormat
-    else if length == 10L then instant 0L 0L 0L 0L 0L
+    else if length == 10 then instant 0 0 0 0 0
     else
-        let hour = Builtin.__dateTimeDigits value 11L 2L in
-        let minute = Builtin.__dateTimeDigits value 14L 2L in
-        let second = Builtin.__dateTimeDigits value 17L 2L in
+        let hour = Builtin.__dateTimeDigits value 11 2 in
+        let minute = Builtin.__dateTimeDigits value 14 2 in
+        let second = Builtin.__dateTimeDigits value 17 2 in
         let validTime =
-            at 10L 84L && at 13L 58L && at 16L 58L &&
-            hour >= 0L && hour <= 23L && minute >= 0L && minute <= 59L && second >= 0L && second <= 59L in
-        let fractional = at 19L 46L in
-        let millisecond = if fractional then Builtin.__dateTimeDigits value 20L 3L else 0L in
-        let zone = if fractional then 23L else 19L in
+            at 10 84 && at 13 58 && at 16 58 &&
+            hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 && second >= 0 && second <= 59 in
+        let fractional = at 19 46 in
+        let millisecond = if fractional then Builtin.__dateTimeDigits value 20 3 else 0 in
+        let zone = if fractional then 23 else 19 in
         let offset =
-            if at zone 90L && length == zone + 1L then Some 0L
-            else if (at zone 43L || at zone 45L) && at (zone + 3L) 58L && length == zone + 6L then
-                let hours = Builtin.__dateTimeDigits value (zone + 1L) 2L in
-                let minutes = Builtin.__dateTimeDigits value (zone + 4L) 2L in
-                if hours >= 0L && hours <= 23L && minutes >= 0L && minutes <= 59L then
-                    Some ((if at zone 45L then -1L else 1L) * (hours * 60L + minutes))
+            if at zone 90 && length == zone + 1 then Some 0
+            else if (at zone 43 || at zone 45) && at (zone + 3) 58 && length == zone + 6 then
+                let hours = Builtin.__dateTimeDigits value (zone + 1) 2 in
+                let minutes = Builtin.__dateTimeDigits value (zone + 4) 2 in
+                if hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59 then
+                    Some ((if at zone 45 then -1 else 1) * (hours * 60 + minutes))
                 else None
             else None in
         match offset with
         | Some minutes ->
-            if validTime && millisecond >= 0L then instant hour minute second millisecond minutes
+            if validTime && millisecond >= 0 then instant hour minute second millisecond minutes
             else Error Stdlib.DateTime.ParseError.InvalidFormat
         | None -> Error Stdlib.DateTime.ParseError.InvalidFormat

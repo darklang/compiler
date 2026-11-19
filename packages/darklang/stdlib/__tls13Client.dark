@@ -31,13 +31,13 @@ let __receiveRecord (connection: Stdlib.__Network.TcpConnection) (pending: Blob)
                       pending = record.remaining })
     | Error (Invalid message) -> Error message
     | Error Incomplete ->
-      if Stdlib.Blob.__byteLength pending > 16645L then
+      if Stdlib.Blob.__byteLength pending > 16645 then
         Error "TLS record buffer limit exceeded"
       else
-        match Stdlib.__Network.readTcp connection 4096L with
+        match Stdlib.__Network.readTcp connection 4096 with
         | Error _ -> Error "TLS socket read failed"
         | Ok bytes ->
-          if Stdlib.Blob.__byteLength bytes == 0L then Error "TLS peer closed during record"
+          if Stdlib.Blob.__byteLength bytes == 0 then Error "TLS peer closed during record"
           else Stdlib.__Tls13Client.__receiveRecord connection
                  (Stdlib.Blob.concat [pending, bytes])
 
@@ -52,7 +52,7 @@ let __hello (connection: Stdlib.__Network.TcpConnection) (host: String) (protoco
   match Stdlib.__X25519.generateKeyPair () with
   | Error message -> Error message
   | Ok pair ->
-    match Stdlib.Crypto.__secureRandomBytes 32L with
+    match Stdlib.Crypto.__secureRandomBytes 32 with
     | Error message -> Error message
     | Ok random ->
       match Stdlib.__Tls13.clientHelloWithProtocols host random pair.publicKey protocols with
@@ -67,12 +67,12 @@ let __hello (connection: Stdlib.__Network.TcpConnection) (host: String) (protoco
             match Stdlib.__Tls13Client.__receiveRecord connection Stdlib.Blob.empty with
             | Error message -> Error message
             | Ok received ->
-              if received.record.contentType != 22L then Error "Expected TLS ServerHello"
+              if received.record.contentType != 22 then Error "Expected TLS ServerHello"
               else
                 match Stdlib.__Tls13.parseServerHello received.record.payload with
                 | Error _ -> Error "Invalid TLS ServerHello"
                 | Ok hello ->
-                  if Stdlib.Blob.__byteLength hello.remaining != 0L then
+                  if Stdlib.Blob.__byteLength hello.remaining != 0 then
                     Error "Unexpected bytes after TLS ServerHello"
                   else
                     match Stdlib.__X25519.sharedSecret pair.privateKey hello.keyShare with
@@ -86,19 +86,19 @@ let __serverFlight (connection: Stdlib.__Network.TcpConnection)
   : Stdlib.Result.Result<(Stdlib.__Tls13Handshake.ServerFlight * Blob), String> =
   if state.phase == Stdlib.__Tls13Handshake.FlightPhase.ServerFinished then
     Ok ((state, pending))
-  else if count >= 96L then Error "TLS server handshake record limit exceeded"
+  else if count >= 96 then Error "TLS server handshake record limit exceeded"
   else
     match Stdlib.__Tls13Client.__receiveRecord connection pending with
     | Error message -> Error message
     | Ok received ->
-      if received.record.contentType == 20L &&
+      if received.record.contentType == 20 &&
          Stdlib.Blob.toHex received.record.payload == "01" then
-        Stdlib.__Tls13Client.__serverFlight connection state received.pending (count + 1L)
+        Stdlib.__Tls13Client.__serverFlight connection state received.pending (count + 1)
       else
         match Stdlib.__Tls13Handshake.consumeServerRecord state received.record with
         | Error message -> Error message
         | Ok next ->
-          Stdlib.__Tls13Client.__serverFlight connection next received.pending (count + 1L)
+          Stdlib.__Tls13Client.__serverFlight connection next received.pending (count + 1)
 
 let __entryDer (entries: List<Stdlib.__Tls13Certificate.Entry>) : List<Blob> =
   match entries with
@@ -111,27 +111,27 @@ let __pemLine (state: Stdlib.__Tls13Client.PemState) (line: String)
   if text == "-----BEGIN CERTIFICATE-----" then
     if state.inside then Error "Nested X.509 certificate in trust bundle"
     else Ok (Stdlib.__Tls13Client.PemState {
-      line = [], lineLength = 0L, encoded = "", inside = true,
+      line = [], lineLength = 0, encoded = "", inside = true,
       count = state.count, roots = state.roots })
   else if text == "-----END CERTIFICATE-----" then
     if Stdlib.Bool.not state.inside then Error "Unexpected X.509 certificate end"
-    else if state.count >= 2048L then Error "X.509 trust bundle certificate limit exceeded"
+    else if state.count >= 2048 then Error "X.509 trust bundle certificate limit exceeded"
     else
       match Stdlib.Base64.decode state.encoded with
       | Error message -> Error message
       | Ok der -> Ok (Stdlib.__Tls13Client.PemState {
-        line = [], lineLength = 0L, encoded = "", inside = false,
-        count = state.count + 1L,
+        line = [], lineLength = 0, encoded = "", inside = false,
+        count = state.count + 1,
         roots = Stdlib.List.push state.roots der })
   else if state.inside then
     if Stdlib.String.__byteLength state.encoded +
-       Stdlib.String.__byteLength text > 8192L then
+       Stdlib.String.__byteLength text > 8192 then
       Error "X.509 trust certificate exceeds size limit"
     else Ok (Stdlib.__Tls13Client.PemState {
-      line = [], lineLength = 0L, encoded = state.encoded + text, inside = true,
+      line = [], lineLength = 0, encoded = state.encoded + text, inside = true,
       count = state.count, roots = state.roots })
   else Ok (Stdlib.__Tls13Client.PemState {
-    line = [], lineLength = 0L, encoded = "", inside = false,
+    line = [], lineLength = 0, encoded = "", inside = false,
     count = state.count, roots = state.roots })
 
 // Scan the bundle as bytes. Converting or slicing the entire CA file would
@@ -142,23 +142,23 @@ let __pemBytes (bundle: Blob) (index: Int64) (end_: Int64)
   if index == end_ then Ok state
   else
     let byte = Stdlib.Blob.__getByte bundle index in
-    if byte == 10L then
+    if byte == 10 then
       let lineBytes = Stdlib.Blob.__fromInt64List (Stdlib.List.reverse state.line) in
       match Stdlib.Blob.toString lineBytes with
       | Error _ -> Error "X.509 trust bundle is not PEM text"
       | Ok line ->
         match Stdlib.__Tls13Client.__pemLine state line with
         | Error message -> Error message
-        | Ok next -> Stdlib.__Tls13Client.__pemBytes bundle (index + 1L) end_ next
-    else if state.lineLength >= 128L || byte < 9L || byte > 126L then
+        | Ok next -> Stdlib.__Tls13Client.__pemBytes bundle (index + 1) end_ next
+    else if state.lineLength >= 128 || byte < 9 || byte > 126 then
       Error "Invalid X.509 trust bundle line"
     else
       let next = Stdlib.__Tls13Client.PemState {
         line = Stdlib.List.push state.line byte,
-        lineLength = state.lineLength + 1L,
+        lineLength = state.lineLength + 1,
         encoded = state.encoded, inside = state.inside,
         count = state.count, roots = state.roots } in
-      Stdlib.__Tls13Client.__pemBytes bundle (index + 1L) end_ next
+      Stdlib.__Tls13Client.__pemBytes bundle (index + 1) end_ next
 
 let __pemChunks (bundle: Blob) (offset: Int64)
   (state: Stdlib.__Tls13Client.PemState)
@@ -166,26 +166,26 @@ let __pemChunks (bundle: Blob) (offset: Int64)
   let length = Stdlib.Blob.__byteLength bundle in
   if offset == length then
     match Stdlib.__Tls13Client.__pemBytes
-            (Stdlib.Blob.__fromInt64List [10L]) 0L 1L state with
+            (Stdlib.Blob.__fromInt64List [10]) 0 1 state with
     | Error message -> Error message
     | Ok completed ->
       if completed.inside then Error "Unterminated X.509 certificate in trust bundle"
-      else if completed.count == 0L then Error "X.509 trust bundle contains no certificates"
+      else if completed.count == 0 then Error "X.509 trust bundle contains no certificates"
       else Ok (Stdlib.List.reverse completed.roots)
   else
     let remaining = length - offset in
-    let chunkLength = if remaining > 1024L then 1024L else remaining in
+    let chunkLength = if remaining > 1024 then 1024 else remaining in
     match Stdlib.__Tls13Client.__pemBytes bundle offset (offset + chunkLength) state with
     | Error message -> Error message
     | Ok next -> Stdlib.__Tls13Client.__pemChunks bundle (offset + chunkLength) next
 
 let parsePemBundle (contents: Blob) : Stdlib.Result.Result<List<Blob>, String> =
-  if Stdlib.Blob.__byteLength contents > 1048576L then
+  if Stdlib.Blob.__byteLength contents > 1048576 then
     Error "X.509 trust bundle exceeds size limit"
-  else Stdlib.__Tls13Client.__pemChunks contents 0L
+  else Stdlib.__Tls13Client.__pemChunks contents 0
          (Stdlib.__Tls13Client.PemState {
-           line = [], lineLength = 0L, encoded = "", inside = false,
-           count = 0L, roots = [] })
+           line = [], lineLength = 0, encoded = "", inside = false,
+           count = 0, roots = [] })
 
 let __readBundle (paths: List<String>) : Stdlib.Result.Result<List<Blob>, String> =
   match paths with
@@ -220,16 +220,16 @@ let __authenticate (flight: Stdlib.__Tls13Handshake.ServerFlight)
         | Ok verify ->
           let length = Stdlib.Blob.__byteLength flight.transcript in
           let verifyLength = Stdlib.Blob.__byteLength verifyBytes in
-          let finishedLength = if flight.cipherSuite == 4866L then 52L else 36L in
+          let finishedLength = if flight.cipherSuite == 4866 then 52 else 36 in
           if length < verifyLength + finishedLength then Error "Invalid TLS handshake transcript"
           else
-            let prefix = Stdlib.Blob.slice flight.transcript 0
+            let prefix = Stdlib.Blob.slice flight.transcript 0z
                            (Stdlib.Int.fromInt64 (length - verifyLength - finishedLength)) in
-            let input = if flight.cipherSuite == 4866L then
+            let input = if flight.cipherSuite == 4866 then
                           Stdlib.__Tls13Certificate.certificateVerifyInput384 prefix
                         else Stdlib.__Tls13Certificate.certificateVerifyInput prefix in
             let checked =
-              if verify.algorithm == 1027L then
+              if verify.algorithm == 1027 then
                 Stdlib.__P256.verifySha256 leaf.spki input verify.signature
               else
                 match Stdlib.__RsaSpki.parse leaf.spki with
@@ -243,33 +243,33 @@ let __authenticate (flight: Stdlib.__Tls13Handshake.ServerFlight)
   | _ -> Error "TLS server certificate flight is incomplete"
 
 let __masterSecret (shared: Blob) : Stdlib.Result.Result<Blob, String> =
-  let zero = Stdlib.Blob.__fromInt64List (Stdlib.List.repeatUnsafe 32 0L) in
+  let zero = Stdlib.Blob.__fromInt64List (Stdlib.List.repeatUnsafe 32z 0) in
   let early = Stdlib.__Tls13.hkdfExtract zero zero in
   let emptyHash = Stdlib.Crypto.sha256 Stdlib.Blob.empty in
-  match Stdlib.__Tls13.hkdfExpandLabel early "derived" emptyHash 32L with
+  match Stdlib.__Tls13.hkdfExpandLabel early "derived" emptyHash 32 with
   | Error message -> Error message
   | Ok earlyDerived ->
     let handshake = Stdlib.__Tls13.hkdfExtract earlyDerived shared in
-    match Stdlib.__Tls13.hkdfExpandLabel handshake "derived" emptyHash 32L with
+    match Stdlib.__Tls13.hkdfExpandLabel handshake "derived" emptyHash 32 with
     | Error message -> Error message
     | Ok handshakeDerived -> Ok (Stdlib.__Tls13.hkdfExtract handshakeDerived zero)
 
 let __masterSecret384 (shared: Blob) : Stdlib.Result.Result<Blob, String> =
-  let zero = Stdlib.Blob.__fromInt64List (Stdlib.List.repeatUnsafe 48 0L) in
+  let zero = Stdlib.Blob.__fromInt64List (Stdlib.List.repeatUnsafe 48z 0) in
   let early = Stdlib.__Tls13.hkdfExtract384 zero zero in
   let emptyHash = Stdlib.Crypto.sha384 Stdlib.Blob.empty in
-  match Stdlib.__Tls13.hkdfExpandLabel384 early "derived" emptyHash 48L with
+  match Stdlib.__Tls13.hkdfExpandLabel384 early "derived" emptyHash 48 with
   | Error message -> Error message
   | Ok earlyDerived ->
     let handshake = Stdlib.__Tls13.hkdfExtract384 earlyDerived shared in
-    match Stdlib.__Tls13.hkdfExpandLabel384 handshake "derived" emptyHash 48L with
+    match Stdlib.__Tls13.hkdfExpandLabel384 handshake "derived" emptyHash 48 with
     | Error message -> Error message
     | Ok handshakeDerived -> Ok (Stdlib.__Tls13.hkdfExtract384 handshakeDerived zero)
 
 let __finish (connection: Stdlib.__Network.TcpConnection)
   (flight: Stdlib.__Tls13Handshake.ServerFlight) (shared: Blob) (pending: Blob)
   : Stdlib.Result.Result<Stdlib.__Tls13Client.SecureKeys, String> =
-  let is384 = flight.cipherSuite == 4866L in
+  let is384 = flight.cipherSuite == 4866 in
   let masterSecret = if is384 then Stdlib.__Tls13Client.__masterSecret384 shared
                      else Stdlib.__Tls13Client.__masterSecret shared in
   match masterSecret with
@@ -277,11 +277,11 @@ let __finish (connection: Stdlib.__Network.TcpConnection)
   | Ok master ->
     let hash = if is384 then Stdlib.Crypto.sha384 flight.transcript
                else Stdlib.Crypto.sha256 flight.transcript in
-    let length = if is384 then 48L else 32L in
+    let length = if is384 then 48 else 32 in
     let expand = if is384 then Stdlib.__Tls13.hkdfExpandLabel384
                  else Stdlib.__Tls13.hkdfExpandLabel in
     let trafficKeys = if is384 then Stdlib.__Tls13.trafficKeys384
-                      else if flight.cipherSuite == 4867L then Stdlib.__Tls13.trafficKeysChaCha
+                      else if flight.cipherSuite == 4867 then Stdlib.__Tls13.trafficKeysChaCha
                       else Stdlib.__Tls13.trafficKeys in
     match expand master "c ap traffic" hash length with
     | Error message -> Error message
@@ -303,12 +303,12 @@ let __finish (connection: Stdlib.__Network.TcpConnection)
             match verify with
             | Error message -> Error message
             | Ok verifyData ->
-              let finishedHeader = Stdlib.Blob.__fromInt64List [20L, 0L, 0L, length] in
+              let finishedHeader = Stdlib.Blob.__fromInt64List [20, 0, 0, length] in
               let finishedMessage = Stdlib.Blob.concat [finishedHeader, verifyData] in
               match trafficKeys flight.clientHandshakeSecret with
               | Error message -> Error message
               | Ok handshakeKeys ->
-                match Stdlib.__Tls13.sealRecord handshakeKeys 22L finishedMessage with
+                match Stdlib.__Tls13.sealRecord handshakeKeys 22 finishedMessage with
                 | Error message -> Error message
                 | Ok sealed ->
                   match Stdlib.__Tls13Client.__send connection sealed.bytes with
@@ -326,7 +326,7 @@ let handshakeWithProtocols (connection: Stdlib.__Network.TcpConnection) (host: S
             shared clientHello serverHello cipherSuite with
     | Error message -> Error message
     | Ok initial ->
-      match Stdlib.__Tls13Client.__serverFlight connection initial pending 0L with
+      match Stdlib.__Tls13Client.__serverFlight connection initial pending 0 with
       | Error message -> Error message
       | Ok ((flight, remaining)) ->
         match Stdlib.__Tls13Client.__authenticate flight host roots with
@@ -347,24 +347,24 @@ let handshake (connection: Stdlib.__Network.TcpConnection) (host: String)
   | Ok negotiated -> Ok negotiated.keys
 
 let __framedComplete (method: String) (response: Blob) (informational: Int64) : Bool =
-  if informational > 8L then false
+  if informational > 8 then false
   else
     match Stdlib.__HttpWire.parseResponse method false response with
     | Error _ -> false
     | Ok parsed ->
-      if parsed.statusCode == 101L then false
-      else if parsed.statusCode < 200L then
-        Stdlib.__Tls13Client.__framedComplete method parsed.remaining (informational + 1L)
+      if parsed.statusCode == 101 then false
+      else if parsed.statusCode < 200 then
+        Stdlib.__Tls13Client.__framedComplete method parsed.remaining (informational + 1)
       else true
 
 let applicationState (secure: Stdlib.__Tls13Client.SecureKeys) : Stdlib.__Tls13Client.ApplicationState =
-  Stdlib.__Tls13Client.ApplicationState { keys = secure.server, pending = secure.pending, records = 0L,
+  Stdlib.__Tls13Client.ApplicationState { keys = secure.server, pending = secure.pending, records = 0,
     updates = Stdlib.__Tls13KeyUpdate.create secure.serverSecret secure.clientSecret secure.client true,
-    outgoing = Stdlib.Blob.empty, outgoingOffset = 0L }
+    outgoing = Stdlib.Blob.empty, outgoingOffset = 0 }
 
 let __readApplication (connection: Stdlib.__Network.TcpConnection)
   (method: String) (state: Stdlib.__Tls13Client.ApplicationState) (response: Blob) : Stdlib.Result.Result<Blob, String> =
-  if state.records > 8192L || Stdlib.Blob.__byteLength response > 104923136L then
+  if state.records > 8192 || Stdlib.Blob.__byteLength response > 104923136 then
     Error "TLS HTTP response limit exceeded"
   else
     match Stdlib.__Tls13Client.readApplicationChunk connection state with
@@ -373,25 +373,25 @@ let __readApplication (connection: Stdlib.__Network.TcpConnection)
     | Ok (Some pair) ->
       let (bytes, next) = pair in
       let updated = Stdlib.Blob.concat [response, bytes] in
-      if Stdlib.__Tls13Client.__framedComplete method updated 0L then Ok updated
+      if Stdlib.__Tls13Client.__framedComplete method updated 0 then Ok updated
       else Stdlib.__Tls13Client.__readApplication connection method next updated
 
 let __copyBytes (source: Blob) (index: Int64) (end_: Int64)
   (bytes: List<Int64>) : Blob =
   if index == end_ then Stdlib.Blob.__fromInt64List (Stdlib.List.reverse bytes)
-  else Stdlib.__Tls13Client.__copyBytes source (index + 1L) end_
+  else Stdlib.__Tls13Client.__copyBytes source (index + 1) end_
          (Stdlib.List.push bytes (Stdlib.Blob.__getByte source index))
 
 let __sendApplication (connection: Stdlib.__Network.TcpConnection)
   (keys: Stdlib.__Tls13.TrafficKeys) (request: Blob) (offset: Int64)
   : Stdlib.Result.Result<Stdlib.__Tls13.TrafficKeys, String> =
   let remaining = Stdlib.Blob.__byteLength request - offset in
-  if remaining == 0L then Ok keys
+  if remaining == 0 then Ok keys
   else
-    let chunkLength = if remaining > 2048L then 2048L else remaining in
+    let chunkLength = if remaining > 2048 then 2048 else remaining in
     let chunk = Stdlib.__Tls13Client.__copyBytes request offset
                   (offset + chunkLength) [] in
-    match Stdlib.__Tls13.sealRecord keys 23L chunk with
+    match Stdlib.__Tls13.sealRecord keys 23 chunk with
     | Error message -> Error message
     | Ok sealed ->
       match Stdlib.__Tls13Client.__send connection sealed.bytes with
@@ -404,7 +404,7 @@ let exchange (connection: Stdlib.__Network.TcpConnection) (host: String) (method
   match Stdlib.__Tls13Client.handshake connection host roots with
   | Error message -> Error message
   | Ok secure ->
-    match Stdlib.__Tls13Client.__sendApplication connection secure.client request 0L with
+    match Stdlib.__Tls13Client.__sendApplication connection secure.client request 0 with
     | Error message -> Error message
     | Ok send -> Stdlib.__Tls13Client.__readApplication connection method (Stdlib.__Tls13Client.applicationState { secure with client = send }) Stdlib.Blob.empty
 
@@ -414,23 +414,23 @@ let beginExchange (connection: Stdlib.__Network.TcpConnection) (host: String)
   match Stdlib.__Tls13Client.handshake connection host roots with
   | Error message -> Error message
   | Ok secure ->
-    match Stdlib.__Tls13Client.__sendApplication connection secure.client request 0L with
+    match Stdlib.__Tls13Client.__sendApplication connection secure.client request 0 with
     | Error message -> Error message
     | Ok send -> Ok (Stdlib.__Tls13Client.applicationState { secure with client = send })
 
 let readApplicationChunk (connection: Stdlib.__Network.TcpConnection)
   (state: Stdlib.__Tls13Client.ApplicationState)
   : Stdlib.Result.Result<Stdlib.Option.Option<(Blob * Stdlib.__Tls13Client.ApplicationState)>, String> =
-  if state.records >= 8192L then Error "TLS HTTP response record limit exceeded"
+  if state.records >= 8192 then Error "TLS HTTP response record limit exceeded"
   else
     match Stdlib.__Tls13Client.__receiveRecord connection state.pending with
     | Error message -> Error message
     | Ok received ->
       Stdlib.__Tls13KeyUpdate.process state.updates state.keys received.record |> Stdlib.Result.andThen (fun processed ->
-        let next = { state with keys = processed.receive, pending = received.pending, records = state.records + 1L, updates = processed.state } in
+        let next = { state with keys = processed.receive, pending = received.pending, records = state.records + 1, updates = processed.state } in
         let replied = match processed.reply with | None -> Ok () | Some bytes -> Stdlib.__Tls13Client.__send connection bytes in
         replied |> Stdlib.Result.andThen (fun _unit ->
           if processed.closed then Ok None
           else match processed.data with
-          | Some bytes -> if Stdlib.Blob.__byteLength bytes != 0L then Ok (Some ((bytes, next))) else Stdlib.__Tls13Client.readApplicationChunk connection next
+          | Some bytes -> if Stdlib.Blob.__byteLength bytes != 0 then Ok (Some ((bytes, next))) else Stdlib.__Tls13Client.readApplicationChunk connection next
           | None -> Stdlib.__Tls13Client.readApplicationChunk connection next))

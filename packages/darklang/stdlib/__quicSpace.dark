@@ -17,18 +17,18 @@ let __state (state: Stdlib.__QuicSpace.State) (received: Stdlib.__QuicAck.State)
     queued = queued, nextToken = nextToken, ackPending = ackPending }
 
 let create () : Stdlib.Result.Result<Stdlib.__QuicSpace.State, String> =
-  match Stdlib.__QuicRecovery.create 1200L, Stdlib.__QuicReassembly.create 1048576L with
+  match Stdlib.__QuicRecovery.create 1200, Stdlib.__QuicReassembly.create 1048576 with
   | Ok recovery, Ok crypto -> Ok (Stdlib.__QuicSpace.State {
       received = Stdlib.__QuicAck.empty, recovery = recovery, crypto = crypto,
-      queued = [], nextToken = 0L, ackPending = false })
+      queued = [], nextToken = 0, ackPending = false })
   | _, _ -> Error "QUIC packet space creation failed"
 
 let queue (state: Stdlib.__QuicSpace.State) (payload: Blob) : Stdlib.Result.Result<Stdlib.__QuicSpace.State, String> =
-  if Stdlib.Blob.__byteLength payload == 0L || Stdlib.Blob.__byteLength payload > 1000L then Error "Invalid QUIC reliable frame size"
-  else if Stdlib.List.__lengthInt state.queued >= 2048 || state.nextToken == 4611686018427387903L then Error "QUIC send queue exhausted"
+  if Stdlib.Blob.__byteLength payload == 0 || Stdlib.Blob.__byteLength payload > 1000 then Error "Invalid QUIC reliable frame size"
+  else if Stdlib.List.__lengthInt state.queued >= 2048z || state.nextToken == 4611686018427387903 then Error "QUIC send queue exhausted"
   else Ok (Stdlib.__QuicSpace.__state state state.received state.recovery state.crypto
     (Stdlib.List.concat state.queued [Stdlib.__QuicSpace.Transmission { token = state.nextToken, payload = payload, probe = false }])
-    (state.nextToken + 1L) state.ackPending)
+    (state.nextToken + 1) state.ackPending)
 
 let __retransmit (packets: List<Stdlib.__QuicRecovery.Packet>) (items: List<Stdlib.__QuicSpace.Transmission>) (probe: Bool)
   : List<Stdlib.__QuicSpace.Transmission> =
@@ -46,11 +46,11 @@ let __updated (state: Stdlib.__QuicSpace.State) (update: Stdlib.__QuicRecovery.U
   let queued = if update.probe then (match queued with | first :: rest -> Stdlib.List.push rest (Stdlib.__QuicSpace.Transmission { token = first.token, payload = first.payload, probe = true }) | [] -> []) else queued in
   let next = Stdlib.__QuicSpace.__state state state.received update.state state.crypto queued state.nextToken state.ackPending in
   if update.probe && Stdlib.List.isEmpty queued then
-    Stdlib.__QuicSpace.queue next (Stdlib.Blob.__fromInt64List [1L]) |> Stdlib.Result.map (fun probe ->
+    Stdlib.__QuicSpace.queue next (Stdlib.Blob.__fromInt64List [1]) |> Stdlib.Result.map (fun probe ->
       Stdlib.__QuicSpace.__state probe probe.received probe.recovery probe.crypto
         (Stdlib.List.map probe.queued (fun item -> Stdlib.__QuicSpace.Transmission { token = item.token, payload = item.payload, probe = true }))
         probe.nextToken probe.ackPending)
-  else if Stdlib.List.__lengthInt queued > 2048 then Error "QUIC retransmission queue exhausted"
+  else if Stdlib.List.__lengthInt queued > 2048z then Error "QUIC retransmission queue exhausted"
   else Ok next
 
 let acknowledge (state: Stdlib.__QuicSpace.State) (ack: Stdlib.__QuicFrames.Ack) (now: Int64) (delay: Int64) (maxDelay: Int64)
@@ -69,7 +69,7 @@ let __frames (state: Stdlib.__QuicSpace.State) (frames: List<Stdlib.__QuicFrames
   match frames with
   | [] -> Ok state
   | Close _ :: _ -> Error "Peer closed QUIC during handshake"
-  | Ack ack :: rest -> Stdlib.__QuicSpace.acknowledge state ack now 0L 0L |> Stdlib.Result.andThen (fun next -> Stdlib.__QuicSpace.__frames next rest now)
+  | Ack ack :: rest -> Stdlib.__QuicSpace.acknowledge state ack now 0 0 |> Stdlib.Result.andThen (fun next -> Stdlib.__QuicSpace.__frames next rest now)
   | Crypto frame :: rest ->
     Stdlib.__QuicReassembly.insert state.crypto frame.offset frame.bytes |> Stdlib.Result.andThen (fun crypto ->
       Stdlib.__QuicSpace.__frames (Stdlib.__QuicSpace.__state state state.received state.recovery crypto state.queued state.nextToken state.ackPending) rest now)
@@ -95,7 +95,7 @@ let __ackOnly (state: Stdlib.__QuicSpace.State) (padded: Bool) : Stdlib.Result.R
 // ACK; ordinary ACK-only packets neither consume window nor start a PTO.
 let prepare (state: Stdlib.__QuicSpace.State) (now: Int64) (overhead: Int64) (padded: Bool)
   : Stdlib.Result.Result<Stdlib.Option.Option<Stdlib.__QuicSpace.Plan>, String> =
-  if overhead < 21L || overhead > 1199L then Error "Invalid QUIC packet overhead"
+  if overhead < 21 || overhead > 1199 then Error "Invalid QUIC packet overhead"
   else
     let ack = if state.ackPending then Stdlib.__QuicAck.encode state.received else Ok Stdlib.Blob.empty in
     ack |> Stdlib.Result.andThen (fun ack ->
@@ -103,40 +103,40 @@ let prepare (state: Stdlib.__QuicSpace.State) (now: Int64) (overhead: Int64) (pa
         | first :: _ -> Some first
         | [] -> None in
       let reliable = match item with | Some first -> first.payload | None -> Stdlib.Blob.empty in
-      let eliciting = Stdlib.Blob.__byteLength reliable > 0L || (padded && state.ackPending) in
+      let eliciting = Stdlib.Blob.__byteLength reliable > 0 || (padded && state.ackPending) in
       let probe = match item with | Some first -> first.probe | None -> false in
-      let payload = Stdlib.Blob.concat [ack, reliable, if padded && state.ackPending && Stdlib.Blob.__byteLength reliable == 0L then Stdlib.Blob.__fromInt64List [1L] else Stdlib.Blob.empty] in
-      let size = if padded then 1200L else overhead + Stdlib.Blob.__byteLength payload in
-      if Stdlib.Blob.__byteLength payload == 0L then Ok None
-      else if size > 1200L || overhead + Stdlib.Blob.__byteLength payload > 1200L then Error "QUIC frames exceed path datagram size"
+      let payload = Stdlib.Blob.concat [ack, reliable, if padded && state.ackPending && Stdlib.Blob.__byteLength reliable == 0 then Stdlib.Blob.__fromInt64List [1] else Stdlib.Blob.empty] in
+      let size = if padded then 1200 else overhead + Stdlib.Blob.__byteLength payload in
+      if Stdlib.Blob.__byteLength payload == 0 then Ok None
+      else if size > 1200 || overhead + Stdlib.Blob.__byteLength payload > 1200 then Error "QUIC frames exceed path datagram size"
       else if eliciting && Stdlib.Bool.not probe && size > state.recovery.congestion.window - state.recovery.congestion.inFlight then Stdlib.__QuicSpace.__ackOnly state padded
       else
         Stdlib.__QuicRecovery.pacingDelay state.recovery now size |> Stdlib.Result.andThen (fun delay ->
-          if eliciting && delay > 0L then Stdlib.__QuicSpace.__ackOnly state padded
+          if eliciting && delay > 0 then Stdlib.__QuicSpace.__ackOnly state padded
           else Ok (Some (Stdlib.__QuicSpace.Plan { payload = payload, reliable = reliable,
             token = (match item with | Some first -> first.token | None -> state.nextToken),
-            probe = probe, queued = Stdlib.Blob.__byteLength reliable > 0L, ackEliciting = eliciting }))))
+            probe = probe, queued = Stdlib.Blob.__byteLength reliable > 0, ackEliciting = eliciting }))))
 
 // A conservative common cap across live encryption levels prevents each
 // packet space from independently spending a whole congestion window.
 let prepareShared (state: Stdlib.__QuicSpace.State) (now: Int64) (overhead: Int64) (padded: Bool) (budget: (Int64 * Int64))
   : Stdlib.Result.Result<Stdlib.Option.Option<Stdlib.__QuicSpace.Plan>, String> =
   let (otherWindow, otherInFlight) = budget in
-  if otherWindow < 2400L || otherInFlight < 0L then Error "Invalid QUIC shared congestion budget"
+  if otherWindow < 2400 || otherInFlight < 0 then Error "Invalid QUIC shared congestion budget"
   else Stdlib.__QuicSpace.prepare state now overhead padded |> Stdlib.Result.andThen (fun plan ->
     match plan with
     | None -> Stdlib.__QuicSpace.__ackOnly state padded
     | Some plan ->
       let window = if state.recovery.congestion.window < otherWindow then state.recovery.congestion.window else otherWindow in
-      let size = if padded then 1200L else overhead + Stdlib.Blob.__byteLength plan.payload in
+      let size = if padded then 1200 else overhead + Stdlib.Blob.__byteLength plan.payload in
       if plan.ackEliciting && Stdlib.Bool.not plan.probe && size > window - state.recovery.congestion.inFlight - otherInFlight then Stdlib.__QuicSpace.__ackOnly state padded
       else Ok (Some plan))
 
 let sent (state: Stdlib.__QuicSpace.State) (plan: Stdlib.__QuicSpace.Plan) (size: Int64) (now: Int64)
   : Stdlib.Result.Result<Stdlib.__QuicSpace.State, String> =
   Stdlib.__QuicRecovery.sent state.recovery (Stdlib.__QuicRecovery.Packet {
-    number = state.recovery.largestSent + 1L, at = now, size = size, token = plan.token, payload = plan.reliable })
+    number = state.recovery.largestSent + 1, at = now, size = size, token = plan.token, payload = plan.reliable })
     plan.ackEliciting plan.probe |> Stdlib.Result.map (fun recovery ->
       Stdlib.__QuicSpace.__state state state.received recovery state.crypto
-        (if plan.queued then Stdlib.List.__dropInt state.queued 1 else state.queued)
-        (if plan.ackEliciting && Stdlib.Bool.not plan.queued then state.nextToken + 1L else state.nextToken) false)
+        (if plan.queued then Stdlib.List.__dropInt state.queued 1z else state.queued)
+        (if plan.ackEliciting && Stdlib.Bool.not plan.queued then state.nextToken + 1 else state.nextToken) false)

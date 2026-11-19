@@ -3,7 +3,7 @@
 module Darklang.Stdlib.Cli.__Args
 
 let get (index: Int) : Stdlib.Result.Result<String, String> =
-    if index < 0 then Error "argument index must not be negative"
+    if index < 0z then Error "argument index must not be negative"
     else
         match Stdlib.Int.toInt64 index with
         | None -> Error "command-line argument index is out of range"

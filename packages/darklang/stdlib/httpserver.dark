@@ -29,9 +29,9 @@ let parseRouteSegments (route: String) : List<RouteSegment> =
     if String.isEmpty seg then
       Option.Option.None
     else if String.startsWith seg ":" then
-      Option.Option.Some(RouteSegment.Variable (String.__dropFirstInt seg 1))
+      Option.Option.Some(RouteSegment.Variable (String.__dropFirstInt seg 1z))
     else if String.startsWith seg "*" then
-      Option.Option.Some(RouteSegment.Wildcard (String.__dropFirstInt seg 1))
+      Option.Option.Some(RouteSegment.Wildcard (String.__dropFirstInt seg 1z))
     else
       Option.Option.Some(RouteSegment.Literal seg))
 
@@ -70,7 +70,7 @@ let matchRouteSegments (routeSegs: List<RouteSegment>) (pathSegs: List<String>) 
   let routeLen = List.__lengthInt routeSegs
   let pathLen = List.__lengthInt pathSegs
 
-  if (routeLen == 0) && (pathLen == 0) then
+  if (routeLen == 0z) && (pathLen == 0z) then
     RouteMatch { matched = true, vars = [] }
   else if routeLen != pathLen then
     RouteMatch { matched = false, vars = [] }
@@ -226,7 +226,7 @@ let __responseBytesFor (method: String) (config: Stdlib.HttpServer.Config.Config
             else
                 match Stdlib.__HttpWire.parseResponseHead "HEAD" bytes with
                 | Error _ -> Error "Invalid HTTP response headers"
-                | Ok head -> Ok (Stdlib.Blob.slice bytes 0
+                | Ok head -> Ok (Stdlib.Blob.slice bytes 0z
                     (Stdlib.Int.fromInt64 (Stdlib.Blob.__byteLength bytes - Stdlib.Blob.__byteLength head.remaining)))
 
 let __responseBytes (method: String) (config: Stdlib.HttpServer.Config.Config) (response: Stdlib.Http.Response)
@@ -250,7 +250,7 @@ type __ReadError =
 // so HEAD suppresses bodies even when request decoding cannot finish.
 let __statusError (status: Int) (buffer: Blob) : Stdlib.HttpServer.__ReadError =
     let method =
-        match Stdlib.__HttpWire.__line buffer 0L with
+        match Stdlib.__HttpWire.__line buffer 0 with
         | Error _ -> None
         | Ok ((line, _)) ->
             match Stdlib.__HttpWire.__requestLine line with
@@ -259,17 +259,17 @@ let __statusError (status: Int) (buffer: Blob) : Stdlib.HttpServer.__ReadError =
     Stdlib.HttpServer.__ReadError.Status ((status, method))
 
 let __expectContinue (buffer: Blob) : Stdlib.Result.Result<Bool, String> =
-    match Stdlib.__HttpWire.__line buffer 0L with
+    match Stdlib.__HttpWire.__line buffer 0 with
     | Error _ -> Ok false
     | Ok ((_, afterLine)) ->
-        match Stdlib.__HttpWire.__headers buffer afterLine 0L afterLine [] with
+        match Stdlib.__HttpWire.__headers buffer afterLine 0 afterLine [] with
         | Error _ -> Ok false
         | Ok ((headers, _)) ->
             let expectations = Stdlib.List.filter headers (fun pair -> let (name, _) = pair in
                 Stdlib.String.toLowercase name == "expect") in
             if Stdlib.List.any expectations (fun pair -> let (_, value) = pair in
                 Stdlib.String.toLowercase value != "100-continue") then Error "Unsupported expectation"
-            else Ok (Stdlib.List.__lengthInt expectations > 0)
+            else Ok (Stdlib.List.__lengthInt expectations > 0z)
 
 let __readRequest (transport: Stdlib.__HttpTransport.Transport) (signals: Stdlib.__Network.ShutdownSignals)
     (limit: Int64) (deadline: Int64) (continued: Bool) (buffer: Blob) : Stdlib.Result.Result<Stdlib.__HttpWire.ParsedRequest, Stdlib.HttpServer.__ReadError> =
@@ -280,17 +280,17 @@ let __readRequest (transport: Stdlib.__HttpTransport.Transport) (signals: Stdlib
         match Stdlib.__Network.monotonicMillis () with
         | Error code -> Error (Stdlib.HttpServer.__ReadError.Transport ("Monotonic clock failed: " + Stdlib.Int64.toString code))
         | Ok now ->
-            if now >= deadline then Error (Stdlib.HttpServer.__statusError 408 buffer)
-            else if Stdlib.Blob.__byteLength buffer > limit + 1048576L then Error (Stdlib.HttpServer.__statusError 413 buffer)
+            if now >= deadline then Error (Stdlib.HttpServer.__statusError 408z buffer)
+            else if Stdlib.Blob.__byteLength buffer > limit + 1048576 then Error (Stdlib.HttpServer.__statusError 413z buffer)
             else
                 match Stdlib.__HttpWire.parseRequestWithLimit limit buffer with
                 | Ok parsed -> Ok parsed
                 | Error (Invalid message) ->
-                    if message == "HTTP body too large" then Error (Stdlib.HttpServer.__statusError 413 buffer)
-                    else Error (Stdlib.HttpServer.__statusError 400 buffer)
+                    if message == "HTTP body too large" then Error (Stdlib.HttpServer.__statusError 413z buffer)
+                    else Error (Stdlib.HttpServer.__statusError 400z buffer)
                 | Error Incomplete ->
                     match Stdlib.HttpServer.__expectContinue buffer with
-                    | Error _ -> Error (Stdlib.HttpServer.__statusError 417 buffer)
+                    | Error _ -> Error (Stdlib.HttpServer.__statusError 417z buffer)
                     | Ok expect ->
                         let acknowledged =
                             if expect && Stdlib.Bool.not continued then
@@ -305,11 +305,11 @@ let __readRequest (transport: Stdlib.__HttpTransport.Transport) (signals: Stdlib
                                 else (match Stdlib.__Network.shutdownRequested signals, Stdlib.__Network.monotonicMillis () with
                                 | Ok true, _ -> Error Stdlib.HttpServer.__ReadError.Shutdown
                                 | Ok false, Ok now ->
-                                    if now >= deadline then Error (Stdlib.HttpServer.__statusError 408 buffer)
+                                    if now >= deadline then Error (Stdlib.HttpServer.__statusError 408z buffer)
                                     else Error (Stdlib.HttpServer.__ReadError.Transport message)
                                 | _, _ -> Error (Stdlib.HttpServer.__ReadError.Transport "HTTP server clock or shutdown check failed"))
                             | Ok chunk ->
-                                if Stdlib.Blob.__byteLength chunk == 0L then Error (Stdlib.HttpServer.__statusError 400 buffer)
+                                if Stdlib.Blob.__byteLength chunk == 0 then Error (Stdlib.HttpServer.__statusError 400z buffer)
                                 else Stdlib.HttpServer.__readRequest transport signals limit deadline (continued || expect) (Stdlib.Blob.concat [buffer, chunk])
 
 let __handleHttp1Transport (config: Stdlib.HttpServer.Config.Config) (handler: Stdlib.Http.Request -> Stdlib.Http.Response)
@@ -319,7 +319,7 @@ let __handleHttp1Transport (config: Stdlib.HttpServer.Config.Config) (handler: S
     match Stdlib.__Network.monotonicMillis () with
     | Error code -> Error ("Monotonic clock failed: " + Stdlib.Int64.toString code)
     | Ok started ->
-        let parsed = Stdlib.HttpServer.__readRequest transport signals limit (started + 10000L) false pending in
+        let parsed = Stdlib.HttpServer.__readRequest transport signals limit (started + 10000) false pending in
         match parsed with
         | Error Shutdown -> Ok true
         | Error (Transport _) -> Ok false
@@ -337,7 +337,7 @@ let __handleHttp1Transport (config: Stdlib.HttpServer.Config.Config) (handler: S
                 match parsed with
                 | Error (Status details) ->
                     let (status, _) = details in
-                    if status == 413 then Stdlib.Http.__responseWithTextInt "413 Payload Too Large" 413
+                    if status == 413z then Stdlib.Http.__responseWithTextInt "413 Payload Too Large" 413z
                     else Stdlib.Http.__responseWithTextInt "Invalid HTTP request" status
                 | Ok request ->
                     match Stdlib.HttpServer.__request config request with
@@ -351,11 +351,11 @@ let __handleHttp1Transport (config: Stdlib.HttpServer.Config.Config) (handler: S
                 | Error _ ->
                     let head = "HTTP/1.1 500 Internal Server Error\r\nConnection: close\r\nContent-Length: 21\r\n\r\n" in
                     let message = if method == "HEAD" then head else head + "Internal server error" in
-                    (Stdlib.String.toBlob message, 500L) in
+                    (Stdlib.String.toBlob message, 500) in
             let _ = transport.write bytes in
             // A response the server writes itself is logged whatever the middleware.
             let _ =
-                if serverWritten || status == 500L && response.statusCode != 500L then
+                if serverWritten || status == 500 && response.statusCode != 500 then
                     match Stdlib.__Network.monotonicMillis () with
                     | Error _ -> ()
                     | Ok finished -> Stdlib.printErrorLine ("[HttpServer] " + method + " " + target + " " +
@@ -367,7 +367,7 @@ let __handleHttp1 (config: Stdlib.HttpServer.Config.Config) (handler: Stdlib.Htt
     (signals: Stdlib.__Network.ShutdownSignals) (connection: Stdlib.__Network.TcpConnection) (limit: Int64) (pending: Blob) : Stdlib.Result.Result<Bool, String> =
     match Stdlib.__Network.monotonicMillis () with
     | Error _ -> Error "HTTP server clock failed"
-    | Ok now -> Stdlib.HttpServer.__handleHttp1Transport config handler signals (Stdlib.__HttpTransport.plainWithDeadline connection signals (now + 10000L)) limit pending
+    | Ok now -> Stdlib.HttpServer.__handleHttp1Transport config handler signals (Stdlib.__HttpTransport.plainWithDeadline connection signals (now + 10000)) limit pending
 
 // A response can finish before the request upload. Bounded draining avoids
 // closing TCP with queued unread DATA, which can reset the delivered response.
@@ -375,33 +375,33 @@ let __handleHttp1 (config: Stdlib.HttpServer.Config.Config) (handler: Stdlib.Htt
 // Keep accepting late flow-control credits until EOF or the bounded deadline.
 let __drainHttp2 (connection: Stdlib.__Network.TcpConnection) (signals: Stdlib.__Network.ShutdownSignals)
     (deadline: Int64) (remaining: Int64) : Bool =
-    if remaining <= 0L then false
+    if remaining <= 0 then false
     else
         match Stdlib.__Network.shutdownRequested signals, Stdlib.__Network.monotonicMillis () with
         | Ok true, _ -> true
         | Ok false, Ok now ->
             if now >= deadline then false
             else
-                match Stdlib.__Network.readTcp connection 4096L with
+                match Stdlib.__Network.readTcp connection 4096 with
                 | Error code ->
-                    if code == 4L || code == 11L || code == 35L then Stdlib.HttpServer.__drainHttp2 connection signals deadline remaining else false
+                    if code == 4 || code == 11 || code == 35 then Stdlib.HttpServer.__drainHttp2 connection signals deadline remaining else false
                 | Ok bytes ->
                     let size = Stdlib.Blob.__byteLength bytes in
-                    if size == 0L then false
+                    if size == 0 then false
                     else Stdlib.HttpServer.__drainHttp2 connection signals deadline (remaining - size)
         | _, _ -> false
 
 let __dispatchPrelude (config: Stdlib.HttpServer.Config.Config) (handler: Stdlib.Http.Request -> Stdlib.Http.Response)
     (signals: Stdlib.__Network.ShutdownSignals) (connection: Stdlib.__Network.TcpConnection)
     (limit: Int64) (deadline: Int64) (pending: Blob) : Stdlib.Result.Result<Bool, String> =
-    if Stdlib.Bool.not (Stdlib.__Http2Wire.isPrefacePrefix pending 0L) then
+    if Stdlib.Bool.not (Stdlib.__Http2Wire.isPrefacePrefix pending 0) then
         Stdlib.HttpServer.__handleHttp1 config handler signals connection limit pending
-    else if Stdlib.Blob.__byteLength pending >= 24L then
+    else if Stdlib.Blob.__byteLength pending >= 24 then
         let transport = Stdlib.__HttpTransport.plainWithShutdown connection signals in
         let served = Stdlib.__Http2.serve transport pending config (fun request -> Stdlib.HttpServer.__http2Handler handler request) in
         let stopped =
             match served, Stdlib.__Network.monotonicMillis () with
-            | Ok (), Ok now -> Stdlib.HttpServer.__drainHttp2 connection signals (now + 10000L) 131072L
+            | Ok (), Ok now -> Stdlib.HttpServer.__drainHttp2 connection signals (now + 10000) 131072
             | _, _ -> false in
         let _ = Stdlib.__HttpTransport.close transport in
         match served with
@@ -413,13 +413,13 @@ let __dispatchPrelude (config: Stdlib.HttpServer.Config.Config) (handler: Stdlib
         | Ok false, Ok now ->
             if now >= deadline then Ok false
             else
-                match Stdlib.__Network.readTcp connection 4096L with
+                match Stdlib.__Network.readTcp connection 4096 with
                 | Error code ->
-                    if code == 4L || code == 11L || code == 35L then
+                    if code == 4 || code == 11 || code == 35 then
                         Stdlib.HttpServer.__dispatchPrelude config handler signals connection limit deadline pending
                     else Ok false
                 | Ok bytes ->
-                    if Stdlib.Blob.__byteLength bytes == 0L then Ok false
+                    if Stdlib.Blob.__byteLength bytes == 0 then Ok false
                     else Stdlib.HttpServer.__dispatchPrelude config handler signals connection limit deadline (Stdlib.Blob.concat [pending, bytes])
         | _, _ -> Error "HTTP server clock or shutdown check failed"
 
@@ -428,7 +428,7 @@ let __handleConnection (config: Stdlib.HttpServer.Config.Config) (handler: Stdli
     : Stdlib.Result.Result<Bool, String> =
     match Stdlib.__Network.monotonicMillis () with
     | Error _ -> Error "HTTP server clock failed"
-    | Ok now -> Stdlib.HttpServer.__dispatchPrelude config handler signals connection limit (now + 10000L) Stdlib.Blob.empty
+    | Ok now -> Stdlib.HttpServer.__dispatchPrelude config handler signals connection limit (now + 10000) Stdlib.Blob.empty
 
 /// The address to bind, as main reads config.address: localhost or a plain IPv4 address.
 let __bindAddress (address: String) : Stdlib.Result.Result<List<Int64>, String> =
@@ -436,9 +436,9 @@ let __bindAddress (address: String) : Stdlib.Result.Result<List<Int64>, String> 
     let parts = Stdlib.String.split address "." in
     let octets = Stdlib.List.filterMap parts (fun part ->
         match Stdlib.Int64.parse part with
-        | Ok n -> if n >= 0L && n <= 255L && Stdlib.Int64.toString n == part then Stdlib.Option.Option.Some n else Stdlib.Option.Option.None
+        | Ok n -> if n >= 0 && n <= 255 && Stdlib.Int64.toString n == part then Stdlib.Option.Option.Some n else Stdlib.Option.Option.None
         | Error _ -> Stdlib.Option.Option.None) in
-    if Stdlib.List.length parts == 4L && Stdlib.List.length octets == 4L then Ok octets
+    if Stdlib.List.length parts == 4 && Stdlib.List.length octets == 4 then Ok octets
     else Error ("Invalid bind address: " + address + "; use an IPv4 address or localhost")
 
 /// Bind before announcing, serve bounded persistent HTTP/1.1 connections or one HTTP/2 exchange,
@@ -448,7 +448,7 @@ let serveOn (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (ha
     let port = Stdlib.Net.Port.toInt64 config.port in
     let limit = config.maxBodyBytes in
     let handler = Stdlib.HttpServer.Middleware.wrap config.middleware handler in
-    if port <= 0L || port > 65535L || limit < 0L || limit > 104857600L then Error "Invalid HTTP server configuration"
+    if port <= 0 || port > 65535 || limit < 0 || limit > 104857600 then Error "Invalid HTTP server configuration"
     else
         match Stdlib.__Network.monotonicMillis () with
         | Error code -> Error ("Monotonic clock unavailable: " + Stdlib.Int64.toString code)
@@ -457,7 +457,7 @@ let serveOn (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (ha
             | Error code -> Error ("Shutdown setup failed: " + Stdlib.Int64.toString code)
             | Ok signals ->
                 let result =
-                    match (if Stdlib.List.__lengthInt address == 16 then Stdlib.__Network.listenTcp6 address port else Stdlib.__Network.listenTcp4 address port) with
+                    match (if Stdlib.List.__lengthInt address == 16z then Stdlib.__Network.listenTcp6 address port else Stdlib.__Network.listenTcp4 address port) with
                     | Error code -> Error ("Cannot bind HTTP server: " + Stdlib.Int64.toString code)
                     | Ok listener ->
                         let _ = onListening () in

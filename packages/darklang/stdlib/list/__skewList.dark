@@ -7,27 +7,27 @@
 module Darklang.Stdlib.List
 
 // Low pointer tags. Empty is the null pointer rather than an allocation.
-let __TAG_EMPTY () : Int64 = 0L
-let __TAG_DIGIT () : Int64 = 1L
-let __TAG_LEAF () : Int64 = 2L
-let __TAG_NODE () : Int64 = 3L
+let __TAG_EMPTY () : Int64 = 0
+let __TAG_DIGIT () : Int64 = 1
+let __TAG_LEAF () : Int64 = 2
+let __TAG_NODE () : Int64 = 3
 
 // Digit layout: [weight][suffix length][tree][rest][refcount].
-let __DIGIT_WEIGHT_OFF () : Int64 = 0L
-let __DIGIT_LENGTH_OFF () : Int64 = 8L
-let __DIGIT_TREE_OFF () : Int64 = 16L
-let __DIGIT_REST_OFF () : Int64 = 24L
-let __DIGIT_RC_OFF () : Int64 = 32L
+let __DIGIT_WEIGHT_OFF () : Int64 = 0
+let __DIGIT_LENGTH_OFF () : Int64 = 8
+let __DIGIT_TREE_OFF () : Int64 = 16
+let __DIGIT_REST_OFF () : Int64 = 24
+let __DIGIT_RC_OFF () : Int64 = 32
 
 // Leaf layout: [value][refcount].
-let __LEAF_VALUE_OFF () : Int64 = 0L
-let __LEAF_RC_OFF () : Int64 = 8L
+let __LEAF_VALUE_OFF () : Int64 = 0
+let __LEAF_RC_OFF () : Int64 = 8
 
 // Internal tree layout: [value][left][right][refcount].
-let __NODE_VALUE_OFF () : Int64 = 0L
-let __NODE_LEFT_OFF () : Int64 = 8L
-let __NODE_RIGHT_OFF () : Int64 = 16L
-let __NODE_RC_OFF () : Int64 = 24L
+let __NODE_VALUE_OFF () : Int64 = 0
+let __NODE_LEFT_OFF () : Int64 = 8
+let __NODE_RIGHT_OFF () : Int64 = 16
+let __NODE_RC_OFF () : Int64 = 24
 
 let __getTag<'a> (value: List<a>) : Int64 =
     __list_get_tag<a> value
@@ -42,26 +42,26 @@ let __isNull<'a> (value: List<a>) : Bool =
     __list_is_null<a> value
 
 let __allocLeaf<'a> (value: a) : List<a> =
-    let ptr = __raw_alloc 16L in
+    let ptr = __raw_alloc 16 in
     let _ = __raw_slot_init<a> ptr (Stdlib.List.__LEAF_VALUE_OFF ()) value in
-    let _ = __raw_write_word ptr (Stdlib.List.__LEAF_RC_OFF ()) 1L in
+    let _ = __raw_write_word ptr (Stdlib.List.__LEAF_RC_OFF ()) 1 in
     Stdlib.List.__fromRawPtr<a> ptr (Stdlib.List.__TAG_LEAF ())
 
 let __allocNode<'a> (value: a) (left: List<a>) (right: List<a>) : List<a> =
-    let ptr = __raw_alloc 32L in
+    let ptr = __raw_alloc 32 in
     let _ = __raw_slot_init<a> ptr (Stdlib.List.__NODE_VALUE_OFF ()) value in
     let _ = __raw_slot_init<List<a>> ptr (Stdlib.List.__NODE_LEFT_OFF ()) left in
     let _ = __raw_slot_init<List<a>> ptr (Stdlib.List.__NODE_RIGHT_OFF ()) right in
-    let _ = __raw_write_word ptr (Stdlib.List.__NODE_RC_OFF ()) 1L in
+    let _ = __raw_write_word ptr (Stdlib.List.__NODE_RC_OFF ()) 1 in
     Stdlib.List.__fromRawPtr<a> ptr (Stdlib.List.__TAG_NODE ())
 
 let __allocDigit<'a> (weight: Int64) (length: Int64) (tree: List<a>) (rest: List<a>) : List<a> =
-    let ptr = __raw_alloc 40L in
+    let ptr = __raw_alloc 40 in
     let _ = __raw_write_word ptr (Stdlib.List.__DIGIT_WEIGHT_OFF ()) weight in
     let _ = __raw_write_word ptr (Stdlib.List.__DIGIT_LENGTH_OFF ()) length in
     let _ = __raw_slot_init<List<a>> ptr (Stdlib.List.__DIGIT_TREE_OFF ()) tree in
     let _ = __raw_slot_init<List<a>> ptr (Stdlib.List.__DIGIT_REST_OFF ()) rest in
-    let _ = __raw_write_word ptr (Stdlib.List.__DIGIT_RC_OFF ()) 1L in
+    let _ = __raw_write_word ptr (Stdlib.List.__DIGIT_RC_OFF ()) 1 in
     Stdlib.List.__fromRawPtr<a> ptr (Stdlib.List.__TAG_DIGIT ())
 
 let __digitWeight<'a> (digit: List<a>) : Int64 =
@@ -77,7 +77,7 @@ let __digitRest<'a> (digit: List<a>) : List<a> =
     __raw_get<List<a>> (Stdlib.List.__toRawPtr<a> digit) (Stdlib.List.__DIGIT_REST_OFF ())
 
 let __treeValue<'a> (tree: List<a>) : a =
-    __raw_get<a> (Stdlib.List.__toRawPtr<a> tree) 0L
+    __raw_get<a> (Stdlib.List.__toRawPtr<a> tree) 0
 
 let __nodeLeft<'a> (tree: List<a>) : List<a> =
     __raw_get<List<a>> (Stdlib.List.__toRawPtr<a> tree) (Stdlib.List.__NODE_LEFT_OFF ())
@@ -92,7 +92,7 @@ let __isEmpty<'a> (list: List<a>) : Bool =
     Stdlib.List.__isNull<a> list
 
 let __length<'a> (list: List<a>) : Int64 =
-    if Stdlib.List.__isNull<a> list then 0L
+    if Stdlib.List.__isNull<a> list then 0
     else Stdlib.List.__digitLength<a> list
 
 let __lengthFloat (list: List<Float>) : Int64 =
@@ -100,7 +100,7 @@ let __lengthFloat (list: List<Float>) : Int64 =
 
 let __singleton<'a> (value: a) : List<a> =
     let tree = Stdlib.List.__allocLeaf<a> value in
-    Stdlib.List.__allocDigit<a> 1L 1L tree (Stdlib.List.__empty<a> ())
+    Stdlib.List.__allocDigit<a> 1 1 tree (Stdlib.List.__empty<a> ())
 
 // Prepend in worst-case O(1). Equal leading weights perform one skew carry.
 let __push<'a> (list: List<a>) (value: a) : List<a> =
@@ -110,16 +110,16 @@ let __push<'a> (list: List<a>) (value: a) : List<a> =
         let firstRest = Stdlib.List.__digitRest<a> list in
         if Stdlib.List.__isNull<a> firstRest then
             let tree = Stdlib.List.__allocLeaf<a> value in
-            Stdlib.List.__allocDigit<a> 1L (Stdlib.List.__digitLength<a> list + 1L) tree list
+            Stdlib.List.__allocDigit<a> 1 (Stdlib.List.__digitLength<a> list + 1) tree list
         else
             let firstWeight = Stdlib.List.__digitWeight<a> list in
             let secondWeight = Stdlib.List.__digitWeight<a> firstRest in
             if firstWeight == secondWeight then
                 let tree = Stdlib.List.__allocNode<a> value (Stdlib.List.__digitTree<a> list) (Stdlib.List.__digitTree<a> firstRest) in
-                Stdlib.List.__allocDigit<a> (firstWeight + firstWeight + 1L) (Stdlib.List.__digitLength<a> list + 1L) tree (Stdlib.List.__digitRest<a> firstRest)
+                Stdlib.List.__allocDigit<a> (firstWeight + firstWeight + 1) (Stdlib.List.__digitLength<a> list + 1) tree (Stdlib.List.__digitRest<a> firstRest)
             else
                 let tree = Stdlib.List.__allocLeaf<a> value in
-                Stdlib.List.__allocDigit<a> 1L (Stdlib.List.__digitLength<a> list + 1L) tree list
+                Stdlib.List.__allocDigit<a> 1 (Stdlib.List.__digitLength<a> list + 1) tree list
 
 let __headUnsafe<'a> (list: List<a>) : a =
     Stdlib.List.__treeValue<a> (Stdlib.List.__digitTree<a> list)
@@ -134,24 +134,24 @@ let __tail<'a> (list: List<a>) : List<a> =
         Stdlib.List.__empty<a> ()
     else
         let weight = Stdlib.List.__digitWeight<a> list in
-        if weight == 1L then
+        if weight == 1 then
             Stdlib.List.__digitRest<a> list
         else
             let tree = Stdlib.List.__digitTree<a> list in
-            let childWeight = (weight - 1L) / 2L in
-            let newLength = Stdlib.List.__digitLength<a> list - (1L) in
+            let childWeight = (weight - 1) / 2 in
+            let newLength = Stdlib.List.__digitLength<a> list - (1) in
             let rightDigit = Stdlib.List.__allocDigit<a> childWeight (newLength - childWeight) (Stdlib.List.__nodeRight<a> tree) (Stdlib.List.__digitRest<a> list) in
             Stdlib.List.__allocDigit<a> childWeight newLength (Stdlib.List.__nodeLeft<a> tree) rightDigit
 
 let __treeGetAt<'a> (tree: List<a>) (weight: Int64) (index: Int64) : a =
-    if index == 0L then
+    if index == 0 then
         Stdlib.List.__treeValue<a> tree
     else
-        let childWeight = (weight - 1L) / 2L in
+        let childWeight = (weight - 1) / 2 in
         if index <= childWeight then
-            Stdlib.List.__treeGetAt<a> (Stdlib.List.__nodeLeft<a> tree) childWeight (index - 1L)
+            Stdlib.List.__treeGetAt<a> (Stdlib.List.__nodeLeft<a> tree) childWeight (index - 1)
         else
-            Stdlib.List.__treeGetAt<a> (Stdlib.List.__nodeRight<a> tree) childWeight (index - childWeight - 1L)
+            Stdlib.List.__treeGetAt<a> (Stdlib.List.__nodeRight<a> tree) childWeight (index - childWeight - 1)
 
 let __digitsGetAt<'a> (digits: List<a>) (index: Int64) : a =
     let weight = Stdlib.List.__digitWeight<a> digits in
@@ -161,27 +161,27 @@ let __digitsGetAt<'a> (digits: List<a>) (index: Int64) : a =
         Stdlib.List.__digitsGetAt<a> (Stdlib.List.__digitRest<a> digits) (index - weight)
 
 let __getAt<'a> (list: List<a>) (index: Int64) : Stdlib.Option.Option<a> =
-    if index < 0L then None
+    if index < 0 then None
     else if index >= Stdlib.List.__length<a> list then None
     else Some (Stdlib.List.__digitsGetAt<a> list index)
 
 let __getAtOrDefault<'a> (list: List<a>) (index: Int64) (default_: a) : a =
-    if index < 0L then default_
+    if index < 0 then default_
     else if index >= Stdlib.List.__length<a> list then default_
     else Stdlib.List.__digitsGetAt<a> list index
 
 let __treeSetAt<'a> (tree: List<a>) (weight: Int64) (index: Int64) (replacement: a) : List<a> =
-    if weight == 1L then
+    if weight == 1 then
         Stdlib.List.__allocLeaf<a> replacement
-    else if index == 0L then
+    else if index == 0 then
         Stdlib.List.__allocNode<a> replacement (Stdlib.List.__nodeLeft<a> tree) (Stdlib.List.__nodeRight<a> tree)
     else
-        let childWeight = (weight - 1L) / 2L in
+        let childWeight = (weight - 1) / 2 in
         if index <= childWeight then
-            let newLeft = Stdlib.List.__treeSetAt<a> (Stdlib.List.__nodeLeft<a> tree) childWeight (index - 1L) replacement in
+            let newLeft = Stdlib.List.__treeSetAt<a> (Stdlib.List.__nodeLeft<a> tree) childWeight (index - 1) replacement in
             Stdlib.List.__allocNode<a> (Stdlib.List.__treeValue<a> tree) newLeft (Stdlib.List.__nodeRight<a> tree)
         else
-            let newRight = Stdlib.List.__treeSetAt<a> (Stdlib.List.__nodeRight<a> tree) childWeight (index - childWeight - 1L) replacement in
+            let newRight = Stdlib.List.__treeSetAt<a> (Stdlib.List.__nodeRight<a> tree) childWeight (index - childWeight - 1) replacement in
             Stdlib.List.__allocNode<a> (Stdlib.List.__treeValue<a> tree) (Stdlib.List.__nodeLeft<a> tree) newRight
 
 let __digitsSetAt<'a> (digits: List<a>) (index: Int64) (replacement: a) : List<a> =
@@ -194,7 +194,7 @@ let __digitsSetAt<'a> (digits: List<a>) (index: Int64) (replacement: a) : List<a
         Stdlib.List.__allocDigit<a> weight (Stdlib.List.__digitLength<a> digits) (Stdlib.List.__digitTree<a> digits) newRest
 
 let __setAt<'a> (list: List<a>) (index: Int64) (replacement: a) : List<a> =
-    if index < 0L then list
+    if index < 0 then list
     else if index >= Stdlib.List.__length<a> list then list
     else Stdlib.List.__digitsSetAt<a> list index replacement
 
@@ -235,7 +235,7 @@ let __concat<'a> (left: List<a>) (right: List<a>) : List<a> =
     Stdlib.List.__prependReversed<a> (Stdlib.List.__reverse<a> left) right
 
 let __last<'a> (list: List<a>) : Stdlib.Option.Option<a> =
-    Stdlib.List.__getAt<a> list (Stdlib.List.__length<a> list - (1L))
+    Stdlib.List.__getAt<a> list (Stdlib.List.__length<a> list - (1))
 
 let __init<'a> (list: List<a>) : List<a> =
     if Stdlib.List.__isNull<a> list then Stdlib.List.__empty<a> ()

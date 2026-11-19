@@ -17,8 +17,8 @@ let subtract (a: Int8) (b: Int8) : Int8 = a - b
 let multiply (a: Int8) (b: Int8) : Int8 = a * b
 
 let divide (a: Int8) (b: Int8) : Int8 =
-    if b == 0y then Builtin.crash "Cannot divide by 0"
-    else if a == -128y && b == -1y then -128y
+    if b == 0s8 then Builtin.crash "Cannot divide by 0"
+    else if a == -128s8 && b == -1s8 then -128s8
     else a / b
 
 let max (a: Int8) (b: Int8) : Int8 = if a > b then a else b
@@ -26,24 +26,24 @@ let max (a: Int8) (b: Int8) : Int8 = if a > b then a else b
 let min (a: Int8) (b: Int8) : Int8 = if a < b then a else b
 
 let mod (a: Int8) (b: Int8) : Int8 =
-    if b == 0y then Builtin.crash "Cannot evaluate modulus against 0"
-    else if b < 0y then Builtin.crash "Cannot evaluate modulus against a negative number"
+    if b == 0s8 then Builtin.crash "Cannot evaluate modulus against 0"
+    else if b < 0s8 then Builtin.crash "Cannot evaluate modulus against a negative number"
     else a % b
 
 let remainder (a: Int8) (b: Int8) : Stdlib.Result.Result<Int8, String> =
-    if b == 0y then Error "Cannot divide by 0"
-    else if b == -1y then Ok 0y
+    if b == 0s8 then Error "Cannot divide by 0"
+    else if b == -1s8 then Ok 0s8
     else Ok (a - ((a / b) * b))
 
-let absoluteValue (a: Int8) : Int8 = if a < 0y then 0y - a else a
+let absoluteValue (a: Int8) : Int8 = if a < 0s8 then 0s8 - a else a
 
-let negate (a: Int8) : Int8 = 0y - a
+let negate (a: Int8) : Int8 = 0s8 - a
 
 let power (base: Int8) (exponent: Int8) : Int8 =
-    if exponent < 0y then Builtin.crash "Cannot raise integer to a negative exponent"
+    if exponent < 0s8 then Builtin.crash "Cannot raise integer to a negative exponent"
     else
         let result =
-            Stdlib.Int.__wrapSigned (Stdlib.Int.__power (Stdlib.Int.__fromInt8 base) (Stdlib.Int.__fromInt8 exponent)) 8L in
+            Stdlib.Int.__wrapSigned (Stdlib.Int.__power (Stdlib.Int.__fromInt8 base) (Stdlib.Int.__fromInt8 exponent)) 8 in
         match Stdlib.Int.__toInt8 result with
         | Some value -> value
         | None -> Builtin.crash "Internal Int8 power normalization invariant failed"
@@ -64,42 +64,42 @@ let lessThanOrEqualTo (a: Int8) (b: Int8) : Bool = a <= b
 // Count number of set bits (population count)
 // Uses parallel bit counting algorithm (SWAR)
 let __popcount (x: Int8) : Int8 =
-    let mask1 = 85y in
-    let mask2 = 51y in
-    let mask3 = 15y in
-    let x = x - Stdlib.Int8.bitwiseAnd (Stdlib.Int8.shiftRight x 1y) mask1 in
-    let x = Stdlib.Int8.bitwiseAnd x mask2 + Stdlib.Int8.bitwiseAnd (Stdlib.Int8.shiftRight x 2y) mask2 in
-    let x = Stdlib.Int8.bitwiseAnd (x + Stdlib.Int8.shiftRight x 4y) mask3 in
+    let mask1 = 85s8 in
+    let mask2 = 51s8 in
+    let mask3 = 15s8 in
+    let x = x - Stdlib.Int8.bitwiseAnd (Stdlib.Int8.shiftRight x 1s8) mask1 in
+    let x = Stdlib.Int8.bitwiseAnd x mask2 + Stdlib.Int8.bitwiseAnd (Stdlib.Int8.shiftRight x 2s8) mask2 in
+    let x = Stdlib.Int8.bitwiseAnd (x + Stdlib.Int8.shiftRight x 4s8) mask3 in
     x
 
 // Convert a single digit (0y-9y) to its string representation
 let __digitToString (n: Int8) : String =
     match n with
-    | 0y -> "0"
-    | 1y -> "1"
-    | 2y -> "2"
-    | 3y -> "3"
-    | 4y -> "4"
-    | 5y -> "5"
-    | 6y -> "6"
-    | 7y -> "7"
-    | 8y -> "8"
-    | 9y -> "9"
+    | 0s8 -> "0"
+    | 1s8 -> "1"
+    | 2s8 -> "2"
+    | 3s8 -> "3"
+    | 4s8 -> "4"
+    | 5s8 -> "5"
+    | 6s8 -> "6"
+    | 7s8 -> "7"
+    | 8s8 -> "8"
+    | 9s8 -> "9"
     | _ -> "?"
 
 // Convert an integer to its string representation
 let toString (n: Int8) : String =
-    if n < 0y then
-        if n < -9y then
-            let quotient = n / 10y in
-            Stdlib.Int8.toString quotient + Stdlib.Int8.__digitToString (0y - (n - (quotient * 10y)))
-        else "-" + Stdlib.Int8.__digitToString (0y - n)
-    else if n < 10y then Stdlib.Int8.__digitToString n
-    else Stdlib.Int8.toString (n / 10y) + Stdlib.Int8.__digitToString (n % 10y)
+    if n < 0s8 then
+        if n < -9s8 then
+            let quotient = n / 10s8 in
+            Stdlib.Int8.toString quotient + Stdlib.Int8.__digitToString (0s8 - (n - (quotient * 10s8)))
+        else "-" + Stdlib.Int8.__digitToString (0s8 - n)
+    else if n < 10s8 then Stdlib.Int8.__digitToString n
+    else Stdlib.Int8.toString (n / 10s8) + Stdlib.Int8.__digitToString (n % 10s8)
 
 // Sum all integers in a list
 let sum (list: List<Int8>) : Int8 =
-    Stdlib.List.fold list 0y (fun acc x -> acc + x)
+    Stdlib.List.fold list 0s8 (fun acc x -> acc + x)
 
 let __fromIntUnchecked (value: Int) : Int8 =
     match Stdlib.Int.toInt8 value with
@@ -179,7 +179,7 @@ impl Stdlib.Compare for Int8 =
   let greaterThanOrEqualTo = Stdlib.Int8.greaterThanOrEqualTo
 
 impl Stdlib.Zero for Int8 =
-  let zero () : Int8 = 0y
+  let zero () : Int8 = 0s8
 
 impl Stdlib.One for Int8 =
-  let one () : Int8 = 1y
+  let one () : Int8 = 1s8

@@ -30,7 +30,6 @@ let check native root =
       (fun file ->
         let* source =
           SourceInventory.parse
-            ~interpreterSource:(String.starts_with ~prefix:"upstream/" file)
             ~annotations:(CompilerAnnotations.forSource sidecar file)
             ~reasons (read (Filename.concat root file))
         in

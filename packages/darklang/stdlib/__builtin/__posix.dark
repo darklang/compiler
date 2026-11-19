@@ -9,7 +9,7 @@ let __posixInt64 (value: Int) : Int64 =
 
 let __posixInt32 (value: Int) : Int64 =
     let narrowed = Builtin.__posixInt64 value in
-    if narrowed < -2147483648L || narrowed > 2147483647L then Builtin.crash "Encountered an out-of-range integer value"
+    if narrowed < -2147483648 || narrowed > 2147483647 then Builtin.crash "Encountered an out-of-range integer value"
     else narrowed
 
 let __checkedOpen (path: String) (flags: Int) (mode: Int) : Stdlib.Result.Result<Int, Stdlib.Cli.Posix.Error> =
@@ -38,11 +38,11 @@ let __checkedRename (oldpath: String) (newpath: String) : Stdlib.Result.Result<U
 let __checkedChmod (path: String) (mode: Int) : Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
     let mode = Builtin.__posixInt32 mode in
     if Stdlib.Cli.__Posix.__mac () then
-        Stdlib.Cli.__Posix.__withEntry path (fun fd name -> Stdlib.Cli.__Posix.__unitResult (Stdlib.Cli.__Posix.__chmodAt fd name mode 32L))
+        Stdlib.Cli.__Posix.__withEntry path (fun fd name -> Stdlib.Cli.__Posix.__unitResult (Stdlib.Cli.__Posix.__chmodAt fd name mode 32))
     else Stdlib.Cli.__Posix.__metadataPath path (fun heldFd held ->
-        let rc = Stdlib.Cli.__Posix.__withCString "" (fun ptr -> Stdlib.Cli.__Posix.__chmodAt2 heldFd ptr mode 4096L) in
-        if rc == -38L || rc == -22L then
-            Stdlib.Cli.__Posix.__withCString held (fun ptr -> Stdlib.Cli.__Posix.__unitResult (Stdlib.Cli.__Posix.__chmodAt (Stdlib.Cli.__Posix.__cwdFd ()) ptr mode 0L))
+        let rc = Stdlib.Cli.__Posix.__withCString "" (fun ptr -> Stdlib.Cli.__Posix.__chmodAt2 heldFd ptr mode 4096) in
+        if rc == -38 || rc == -22 then
+            Stdlib.Cli.__Posix.__withCString held (fun ptr -> Stdlib.Cli.__Posix.__unitResult (Stdlib.Cli.__Posix.__chmodAt (Stdlib.Cli.__Posix.__cwdFd ()) ptr mode 0))
         else Stdlib.Cli.__Posix.__unitResult rc)
 
 let __checkedSymlink (target: String) (linkpath: String) : Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =

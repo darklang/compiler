@@ -20,7 +20,7 @@ let close (state: Stdlib.__Http1Pool.State) : Unit =
 
 let take (state: Stdlib.__Http1Pool.State) (origin: Stdlib.__HttpWire.Url) (now: Int64) : Stdlib.__Http1Pool.Lease =
   Stdlib.List.fold state.entries (Stdlib.__Http1Pool.Lease { state = Stdlib.__Http1Pool.empty, transport = None }) (fun lease entry ->
-    if now < entry.idle || now - entry.idle >= 30000L then
+    if now < entry.idle || now - entry.idle >= 30000 then
       let _ = Stdlib.__HttpTransport.close entry.transport in lease
     else if Stdlib.__Http1Pool.sameOrigin entry.origin origin then
       if Stdlib.Option.isNone lease.transport && entry.transport.idle () then { lease with transport = Some entry.transport }
@@ -31,26 +31,26 @@ let __retain (entries: List<Stdlib.__Http1Pool.Entry>) (count: Int64) : List<Std
   match entries with
   | [] -> []
   | entry :: rest ->
-    if count >= 8L then
+    if count >= 8 then
       let _ = Stdlib.__HttpTransport.close entry.transport in Stdlib.__Http1Pool.__retain rest count
-    else Stdlib.List.push (Stdlib.__Http1Pool.__retain rest (count + 1L)) entry
+    else Stdlib.List.push (Stdlib.__Http1Pool.__retain rest (count + 1)) entry
 
 let put (state: Stdlib.__Http1Pool.State) (origin: Stdlib.__HttpWire.Url) (transport: Stdlib.__HttpTransport.Transport) (now: Int64) : Stdlib.__Http1Pool.State =
   let remaining = Stdlib.List.filter state.entries (fun entry ->
     if Stdlib.__Http1Pool.sameOrigin entry.origin origin then let _ = Stdlib.__HttpTransport.close entry.transport in false else true) in
   let entry = Stdlib.__Http1Pool.Entry { origin = origin, transport = transport, idle = now } in
-  Stdlib.__Http1Pool.State { entries = Stdlib.__Http1Pool.__retain (Stdlib.List.push remaining entry) 0L }
+  Stdlib.__Http1Pool.State { entries = Stdlib.__Http1Pool.__retain (Stdlib.List.push remaining entry) 0 }
 
 let __closeHeader (headers: List<(String * String)>) : Bool =
   Stdlib.List.any headers (fun header -> let (name, value) = header in
     Stdlib.String.toLowercase name == "connection" && Stdlib.List.any (Stdlib.String.split value ",") (fun token -> Stdlib.String.toLowercase (Stdlib.String.trim token) == "close"))
 
 let reusable (method: String) (wire: Blob) (remaining: Blob) : Bool =
-  if method == "CONNECT" || Stdlib.Blob.__byteLength remaining != 0L then false
-  else match Stdlib.__HttpWire.__line wire 0L, Stdlib.__HttpWire.parseResponseHead method wire with
+  if method == "CONNECT" || Stdlib.Blob.__byteLength remaining != 0 then false
+  else match Stdlib.__HttpWire.__line wire 0, Stdlib.__HttpWire.parseResponseHead method wire with
   | Ok ((line, _next)), Ok head ->
     let framed = match head.mode with | UntilClose -> false | _ -> true in
-    Stdlib.String.startsWith line "HTTP/1.1 " && head.statusCode >= 200L && framed && Stdlib.Bool.not (Stdlib.__Http1Pool.__closeHeader head.headers)
+    Stdlib.String.startsWith line "HTTP/1.1 " && head.statusCode >= 200 && framed && Stdlib.Bool.not (Stdlib.__Http1Pool.__closeHeader head.headers)
   | _, _ -> false
 
 let __error (message: String) : Stdlib.HttpClient.RequestError =
@@ -58,15 +58,15 @@ let __error (message: String) : Stdlib.HttpClient.RequestError =
 
 let streamHead (transport: Stdlib.__HttpTransport.Transport) (method: String) (buffer: Blob) (informational: Int64)
   : Stdlib.Result.Result<Stdlib.__Http1Pool.StreamHead, Stdlib.HttpClient.RequestError> =
-  if Stdlib.Blob.__byteLength buffer > 65536L || informational > 8L then Error (Stdlib.HttpClient.__ioFailure "Response head is too large")
+  if Stdlib.Blob.__byteLength buffer > 65536 || informational > 8 then Error (Stdlib.HttpClient.__ioFailure "Response head is too large")
   else match Stdlib.__HttpWire.parseResponseHead method buffer with
   | Ok head ->
-    if head.statusCode == 101L then Error (Stdlib.HttpClient.__ioFailure "Unexpected informational response")
-    else if head.statusCode < 200L then Stdlib.__Http1Pool.streamHead transport method head.remaining (informational + 1L)
+    if head.statusCode == 101 then Error (Stdlib.HttpClient.__ioFailure "Unexpected informational response")
+    else if head.statusCode < 200 then Stdlib.__Http1Pool.streamHead transport method head.remaining (informational + 1)
     else Ok (Stdlib.__Http1Pool.StreamHead { head = head, wire = buffer })
   | Error (Invalid message) -> Error (Stdlib.HttpClient.__ioFailure message)
   | Error Incomplete -> transport.read () |> Stdlib.Result.mapError Stdlib.__Http1Pool.__error |> Stdlib.Result.andThen (fun bytes ->
-    if Stdlib.Blob.__byteLength bytes == 0L then Error (Stdlib.HttpClient.__ioFailure "Connection closed before the response head")
+    if Stdlib.Blob.__byteLength bytes == 0 then Error (Stdlib.HttpClient.__ioFailure "Connection closed before the response head")
     else Stdlib.__Http1Pool.streamHead transport method (Stdlib.Blob.concat [buffer, bytes]) informational)
 
 let openStream (trusted: Bool) (roots: Stdlib.Option.Option<List<Blob>>) (alternatives: List<Stdlib.__HttpsService.Service>)
@@ -77,7 +77,7 @@ let openStream (trusted: Bool) (roots: Stdlib.Option.Option<List<Blob>>) (altern
     | Quic ready ->
       match Stdlib.__Http3Connection.open ready with
       | Error message -> let _ = Stdlib.__QuicClient.close ready in Error (Stdlib.__Http1Pool.__error message)
-      | Ok state -> Ok (Stdlib.__Http1Pool.StreamOpened.Http3 (Stdlib.__Http3Pool.Entry { origin = prepared.url, state = state, idle = 0L }))
+      | Ok state -> Ok (Stdlib.__Http1Pool.StreamOpened.Http3 (Stdlib.__Http3Pool.Entry { origin = prepared.url, state = state, idle = 0 }))
     | Tcp ((connection, authorities)) ->
       match authorities with
       | None -> Ok (Stdlib.__Http1Pool.StreamOpened.Http1 (Stdlib.__HttpTransport.plain connection))
@@ -89,32 +89,32 @@ let openStream (trusted: Bool) (roots: Stdlib.Option.Option<List<Blob>>) (altern
           if negotiated.protocol != "h2" then Ok (Stdlib.__Http1Pool.StreamOpened.Http1 transport)
           else match Stdlib.__Http2Connection.open transport with
             | Error message -> let _ = Stdlib.__HttpTransport.close transport in Error (Stdlib.__Http1Pool.__error message)
-            | Ok state -> Ok (Stdlib.__Http1Pool.StreamOpened.Http2 (Stdlib.__Http2Pool.Entry { origin = prepared.url, transport = transport, state = state, idle = 0L })))
+            | Ok state -> Ok (Stdlib.__Http1Pool.StreamOpened.Http2 (Stdlib.__Http2Pool.Entry { origin = prepared.url, transport = transport, state = state, idle = 0 })))
 
 let __response (parsed: Stdlib.__HttpWire.ParsedResponse) : Stdlib.HttpClient.__Received =
   Stdlib.HttpClient.__Received { statusCode = parsed.statusCode, headers = parsed.headers, body = parsed.body }
 
 let __read (transport: Stdlib.__HttpTransport.Transport) (method: String) (buffer: Blob) (informational: Int64)
   : Stdlib.Result.Result<Stdlib.__Http1Pool.Read, Stdlib.HttpClient.RequestError> =
-  if Stdlib.Blob.__byteLength buffer > 104923136L || informational > 8L then Error (Stdlib.HttpClient.__ioFailure "Response is too large")
+  if Stdlib.Blob.__byteLength buffer > 104923136 || informational > 8 then Error (Stdlib.HttpClient.__ioFailure "Response is too large")
   else match Stdlib.__HttpWire.parseResponse method false buffer with
   | Ok parsed ->
-    if parsed.statusCode == 101L then Error (Stdlib.HttpClient.__ioFailure "Unexpected informational response")
-    else if parsed.statusCode < 200L then Stdlib.__Http1Pool.__read transport method parsed.remaining (informational + 1L)
+    if parsed.statusCode == 101 then Error (Stdlib.HttpClient.__ioFailure "Unexpected informational response")
+    else if parsed.statusCode < 200 then Stdlib.__Http1Pool.__read transport method parsed.remaining (informational + 1)
     else Ok (Stdlib.__Http1Pool.Read { response = Stdlib.__Http1Pool.__response parsed, reusable = Stdlib.__Http1Pool.reusable method buffer parsed.remaining })
   | Error (Invalid message) -> Error (Stdlib.HttpClient.__ioFailure message)
   | Error Incomplete ->
     transport.read () |> Stdlib.Result.mapError Stdlib.__Http1Pool.__error |> Stdlib.Result.andThen (fun bytes ->
-      if Stdlib.Blob.__byteLength bytes != 0L then Stdlib.__Http1Pool.__read transport method (Stdlib.Blob.concat [buffer, bytes]) informational
+      if Stdlib.Blob.__byteLength bytes != 0 then Stdlib.__Http1Pool.__read transport method (Stdlib.Blob.concat [buffer, bytes]) informational
       else match Stdlib.__HttpWire.parseResponse method true buffer with
-        | Ok parsed when parsed.statusCode >= 200L -> Ok (Stdlib.__Http1Pool.Read { response = Stdlib.__Http1Pool.__response parsed, reusable = false })
+        | Ok parsed when parsed.statusCode >= 200 -> Ok (Stdlib.__Http1Pool.Read { response = Stdlib.__Http1Pool.__response parsed, reusable = false })
         | _ -> Error (Stdlib.HttpClient.__ioFailure "Connection closed before a final response"))
 
 let __exchange (transport: Stdlib.__HttpTransport.Transport) (prepared: Stdlib.HttpClient.__Prepared)
   : Stdlib.Result.Result<Stdlib.__Http1Pool.Completed, Stdlib.HttpClient.RequestError> =
   // Once a write is attempted, never replay a request on another connection.
   let result = transport.write prepared.bytes |> Stdlib.Result.mapError Stdlib.__Http1Pool.__error
-    |> Stdlib.Result.andThen (fun _unit -> Stdlib.__Http1Pool.__read transport prepared.method Stdlib.Blob.empty 0L) in
+    |> Stdlib.Result.andThen (fun _unit -> Stdlib.__Http1Pool.__read transport prepared.method Stdlib.Blob.empty 0) in
   match result with
   | Error error -> let _ = Stdlib.__HttpTransport.close transport in Error error
   | Ok read ->
@@ -145,6 +145,6 @@ let perform (loan: Stdlib.Option.Option<Stdlib.__HttpTransport.Transport>) (trus
               match Stdlib.__Http2Connection.open transport with
               | Error message -> let _ = Stdlib.__HttpTransport.close transport in Error (Stdlib.HttpClient.__failure message)
               | Ok state ->
-                let entry = Stdlib.__Http2Pool.Entry { origin = prepared.url, transport = transport, state = state, idle = 0L } in
+                let entry = Stdlib.__Http2Pool.Entry { origin = prepared.url, transport = transport, state = state, idle = 0 } in
                 Stdlib.__Http2Pool.exchange entry prepared.method prepared.url headers body
                   |> Stdlib.Result.map (fun completed -> Stdlib.__Http1Pool.Completed { response = completed.response, reusable = Stdlib.Option.map completed.entry (fun entry -> Stdlib.__Http1Pool.Reusable.Http2 entry) }))

@@ -6,13 +6,13 @@ type Body = { state: Stdlib.__Http3.State, events: List<Stdlib.__Http3Message.Ev
 type Upload = { state: Stdlib.__Http3.State, events: List<Stdlib.__Http3Message.Event>, finished: Bool }
 
 let __final (events: List<Stdlib.__Http3Message.Event>) : Bool =
-  Stdlib.List.any events (fun event -> match event with | ResponseHead head -> head.status >= 200L | _ -> false)
+  Stdlib.List.any events (fun event -> match event with | ResponseHead head -> head.status >= 200 | _ -> false)
 
 let __head (state: Stdlib.__Http3.State) (events: List<Stdlib.__Http3Message.Event>) (finished: Bool)
   : Stdlib.Result.Result<Stdlib.__Http3Client.Reply, String> =
   match events with
   | ResponseHead head :: rest ->
-    if head.status >= 200L then Ok (Stdlib.__Http3Client.Reply { state = state, head = head, events = rest, finished = finished })
+    if head.status >= 200 then Ok (Stdlib.__Http3Client.Reply { state = state, head = head, events = rest, finished = finished })
     else Stdlib.__Http3Client.__head state rest finished
   | _ :: rest -> Stdlib.__Http3Client.__head state rest finished
   | [] ->
@@ -25,11 +25,11 @@ let __head (state: Stdlib.__Http3.State) (events: List<Stdlib.__Http3Message.Eve
 let __send (state: Stdlib.__Http3.State) (wire: Blob) (position: Int64) (last: Bool)
   : Stdlib.Result.Result<Stdlib.__Http3Client.Upload, String> =
   let remaining = Stdlib.Blob.__byteLength wire - position in
-  if remaining == 0L then Ok (Stdlib.__Http3Client.Upload { state = state, events = [], finished = false })
+  if remaining == 0 then Ok (Stdlib.__Http3Client.Upload { state = state, events = [], finished = false })
   else
     let credit = Stdlib.__Http3.sendCredit state in
     let size = if remaining < credit then remaining else credit in
-    let written = if size == 0L then Ok state else Stdlib.__Http3.write state (Stdlib.__Http2Wire.__slice wire position size) (last && size == remaining) in
+    let written = if size == 0 then Ok state else Stdlib.__Http3.write state (Stdlib.__Http2Wire.__slice wire position size) (last && size == remaining) in
     written |> Stdlib.Result.andThen (fun state -> Stdlib.__Http3.poll state) |> Stdlib.Result.andThen (fun received ->
       if received.finished || Stdlib.__Http3Client.__final received.events then
         Ok (Stdlib.__Http3Client.Upload { state = received.state, events = received.events, finished = received.finished })
@@ -39,11 +39,11 @@ let __send (state: Stdlib.__Http3.State) (wire: Blob) (position: Int64) (last: B
 let __upload (state: Stdlib.__Http3.State) (body: Blob) (position: Int64)
   : Stdlib.Result.Result<Stdlib.__Http3Client.Reply, String> =
   let remaining = Stdlib.Blob.__byteLength body - position in
-  if remaining == 0L then Stdlib.__Http3Client.__head state [] false
+  if remaining == 0 then Stdlib.__Http3Client.__head state [] false
   else
-    let size = if remaining > 896L then 896L else remaining in
-    Stdlib.__Http3Wire.serialize 0L (Stdlib.__Http2Wire.__slice body position size)
-      |> Stdlib.Result.andThen (fun wire -> Stdlib.__Http3Client.__send state wire 0L (size == remaining))
+    let size = if remaining > 896 then 896 else remaining in
+    Stdlib.__Http3Wire.serialize 0 (Stdlib.__Http2Wire.__slice body position size)
+      |> Stdlib.Result.andThen (fun wire -> Stdlib.__Http3Client.__send state wire 0 (size == remaining))
       |> Stdlib.Result.andThen (fun uploaded ->
         if uploaded.finished || Stdlib.__Http3Client.__final uploaded.events then Stdlib.__Http3Client.__head uploaded.state uploaded.events uploaded.finished
         else Stdlib.__Http3Client.__upload uploaded.state body (position + size))
@@ -56,12 +56,12 @@ let __bodyNext (cell: RawPtr) : Stdlib.Option.Option<UInt8> =
     match Stdlib.UInt8.fromInt64 (Stdlib.Blob.__getByte body.bytes body.position) with
     | None -> Builtin.crash "Invalid HTTP/3 body byte"
     | Some byte ->
-      let _ = Stdlib.Stream.__cellSet cell { body with position = body.position + 1L } in
+      let _ = Stdlib.Stream.__cellSet cell { body with position = body.position + 1 } in
       Some byte
   else
     match body.events with
     | BodyChunk bytes :: rest ->
-      let _ = Stdlib.Stream.__cellSet cell { body with events = rest, bytes = bytes, position = 0L } in
+      let _ = Stdlib.Stream.__cellSet cell { body with events = rest, bytes = bytes, position = 0 } in
       Stdlib.__Http3Client.__bodyNext cell
     | _ :: rest ->
       let _ = Stdlib.Stream.__cellSet cell { body with events = rest } in
@@ -75,7 +75,7 @@ let __bodyNext (cell: RawPtr) : Stdlib.Option.Option<UInt8> =
         Builtin.crash message
       | Ok received ->
         let _ = Stdlib.Stream.__cellSet cell (Stdlib.__Http3Client.Body { state = received.state,
-          events = received.events, bytes = Stdlib.Blob.empty, position = 0L, finished = received.finished }) in
+          events = received.events, bytes = Stdlib.Blob.empty, position = 0, finished = received.finished }) in
         Stdlib.__Http3Client.__bodyNext cell
 
 let __bodyClose (cell: RawPtr) : Unit =
@@ -86,12 +86,12 @@ let __bodyClose (cell: RawPtr) : Unit =
 let __startState (state: Stdlib.__Http3.State) (method: String) (url: Stdlib.__HttpWire.Url)
   (headers: List<(String * String)>) (body: Blob)
   : Stdlib.Result.Result<Stdlib.__Http3Client.Reply, String> =
-  if Stdlib.Blob.__byteLength body > 104857600L then Error "HTTP/3 request body exceeds limit"
+  if Stdlib.Blob.__byteLength body > 104857600 then Error "HTTP/3 request body exceeds limit"
   else Stdlib.__Http2Fields.requestFields method url headers body |> Stdlib.Result.andThen (fun fields ->
     Stdlib.__Http3.encodeHeaders state state.stream fields |> Stdlib.Result.andThen (fun encoded ->
-      Stdlib.__Http3Client.__send encoded.state encoded.bytes 0L (Stdlib.Blob.__byteLength body == 0L) |> Stdlib.Result.andThen (fun uploaded ->
+      Stdlib.__Http3Client.__send encoded.state encoded.bytes 0 (Stdlib.Blob.__byteLength body == 0) |> Stdlib.Result.andThen (fun uploaded ->
         if uploaded.finished || Stdlib.__Http3Client.__final uploaded.events then Stdlib.__Http3Client.__head uploaded.state uploaded.events uploaded.finished
-        else Stdlib.__Http3Client.__upload uploaded.state body 0L)))
+        else Stdlib.__Http3Client.__upload uploaded.state body 0)))
 
 let __start (ready: Stdlib.__QuicClient.Ready) (method: String) (url: Stdlib.__HttpWire.Url)
   (headers: List<(String * String)>) (body: Blob) (timeout: Int64)
@@ -106,7 +106,7 @@ let stream (ready: Stdlib.__QuicClient.Ready) (method: String) (url: Stdlib.__Ht
   | Error message -> let _ = Stdlib.__QuicClient.close ready in Error message
   | Ok reply ->
     let initial = Stdlib.__Http3Client.Body { state = reply.state, events = reply.events,
-      bytes = Stdlib.Blob.empty, position = 0L, finished = reply.finished } in
+      bytes = Stdlib.Blob.empty, position = 0, finished = reply.finished } in
     let cell = Stdlib.Stream.__cellNew initial in
     let body = Stdlib.Stream.__new (fun _unit -> Stdlib.__Http3Client.__bodyNext cell) (fun _unit -> Stdlib.__Http3Client.__bodyClose cell) in
     Ok (Stdlib.HttpClient.__StreamReceived { statusCode = reply.head.status, headers = reply.head.headers, body = body })

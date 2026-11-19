@@ -10,11 +10,11 @@ type FoundValue<'a> =
       value: a }
 
 let parseNamespace (targetNamespace: String) : List<String> =
-    if Stdlib.String.__byteLength targetNamespace == 0L then []
+    if Stdlib.String.__byteLength targetNamespace == 0 then []
     else Stdlib.String.split targetNamespace "."
 
 let isValueInNamespace (namespaceParts: List<String>) (valuePath: List<String>) : Bool =
-    if Stdlib.List.__lengthInt namespaceParts == 0 then true
+    if Stdlib.List.__lengthInt namespaceParts == 0z then true
     else Stdlib.List.__takeInt valuePath (Stdlib.List.__lengthInt namespaceParts) == namespaceParts
 
 let buildPathFromLocation (owner: String) (modules: List<String>) (name: String) : String =

@@ -14,79 +14,79 @@ let __send (fd: Int64) (ipv6: Bool) (lifecycle: Stream<Unit>)
   (peer: Stdlib.__Datagram.Endpoint) (payload: Blob) (timeoutMs: Int64)
   : Stdlib.Result.Result<Unit, Int64> =
   match Stdlib.Stream.next lifecycle with
-  | None -> Error 9L
+  | None -> Error 9
   | Some _ ->
     if Stdlib.Bool.not (Stdlib.__Network.__validAddress ipv6 peer.address) ||
-       peer.port <= 0L || peer.port > 65535L || timeoutMs < 0L || timeoutMs > 10000L then Error 22L
-    else if Stdlib.Blob.__byteLength payload > 4096L then Error 90L
+       peer.port <= 0 || peer.port > 65535 || timeoutMs < 0 || timeoutMs > 10000 then Error 22
+    else if Stdlib.Blob.__byteLength payload > 4096 then Error 90
     else
-      match (if timeoutMs == 0L then Ok () else Stdlib.__Network.__setTimeout fd timeoutMs) with
+      match (if timeoutMs == 0 then Ok () else Stdlib.__Network.__setTimeout fd timeoutMs) with
       | Error code -> Error code
       | Ok () ->
         let address = Stdlib.__Network.__socketAddress ipv6 peer.address peer.port in
-        let sent = Stdlib.__Network.__sendToWithMode fd payload address (if ipv6 then 28L else 16L) (timeoutMs == 0L) in
-        let _ = __raw_free_sized address (if ipv6 then 32L else 16L) in
-        if sent < 0L then Error (0L - sent)
-        else if sent != Stdlib.Blob.__byteLength payload then Error 90L
+        let sent = Stdlib.__Network.__sendToWithMode fd payload address (if ipv6 then 28 else 16) (timeoutMs == 0) in
+        let _ = __raw_free_sized address (if ipv6 then 32 else 16) in
+        if sent < 0 then Error (0 - sent)
+        else if sent != Stdlib.Blob.__byteLength payload then Error 90
         else Ok ()
 
 let __addressBytes (ptr: RawPtr) (index: Int64) (remaining: Int64) (acc: List<Int64>) : List<Int64> =
-  if remaining == 0L then Stdlib.List.reverse acc
-  else Stdlib.__Datagram.__addressBytes ptr (index + 1L) (remaining - 1L) (Stdlib.List.push acc (__raw_get_byte ptr index))
+  if remaining == 0 then Stdlib.List.reverse acc
+  else Stdlib.__Datagram.__addressBytes ptr (index + 1) (remaining - 1) (Stdlib.List.push acc (__raw_get_byte ptr index))
 
 let __decode (ipv6: Bool) (peer: RawPtr) (buffer: RawPtr) (size: Int64)
   : Stdlib.Result.Result<Stdlib.__Datagram.Message, Int64> =
-  let darwin = Stdlib.Cli.__hostOSCode () == 2L in
-  let family = __raw_get_byte peer (if darwin then 9L else 8L) in
-  if __raw_get<Int64> peer 0L != (if ipv6 then 28L else 16L) ||
-     family != (if ipv6 then (if darwin then 30L else 10L) else 2L) then Error 22L
+  let darwin = Stdlib.Cli.__hostOSCode () == 2 in
+  let family = __raw_get_byte peer (if darwin then 9 else 8) in
+  if __raw_get<Int64> peer 0 != (if ipv6 then 28 else 16) ||
+     family != (if ipv6 then (if darwin then 30 else 10) else 2) then Error 22
   else
-    let address = Stdlib.__Datagram.__addressBytes peer (if ipv6 then 16L else 12L) (if ipv6 then 16L else 4L) [] in
-    let port = (__raw_get_byte peer 10L) * 256L + __raw_get_byte peer 11L in
-    let payload = Stdlib.__Network.__copyReceived buffer 0L size [] in
+    let address = Stdlib.__Datagram.__addressBytes peer (if ipv6 then 16 else 12) (if ipv6 then 16 else 4) [] in
+    let port = (__raw_get_byte peer 10) * 256 + __raw_get_byte peer 11 in
+    let payload = Stdlib.__Network.__copyReceived buffer 0 size [] in
     Ok (Stdlib.__Datagram.Message { peer = Stdlib.__Datagram.Endpoint { address = address, port = port }, payload = payload })
 
 let __receive (fd: Int64) (ipv6: Bool) (lifecycle: Stream<Unit>) (timeoutMs: Int64)
   : Stdlib.Result.Result<Stdlib.__Datagram.Message, Int64> =
   match Stdlib.Stream.next lifecycle with
-  | None -> Error 9L
+  | None -> Error 9
   | Some _ ->
-    if timeoutMs < 0L || timeoutMs > 10000L then Error 22L
+    if timeoutMs < 0 || timeoutMs > 10000 then Error 22
     else
-      match (if timeoutMs == 0L then Ok () else Stdlib.__Network.__setTimeout fd timeoutMs) with
+      match (if timeoutMs == 0 then Ok () else Stdlib.__Network.__setTimeout fd timeoutMs) with
       | Error code -> Error code
       | Ok () ->
-        let buffer = __raw_alloc 4097L in
-        let peer = __raw_alloc 40L in
-        let _ = __raw_write_word peer 0L (if ipv6 then 28L else 16L) in
-        let _ = __raw_write_word peer 8L 0L in
-        let _ = __raw_write_word peer 16L 0L in
-        let _ = __raw_write_word peer 24L 0L in
-        let _ = __raw_write_word peer 32L 0L in
-        let received = Stdlib.__Network.__receiveFromWithMode fd buffer 4097L peer (timeoutMs == 0L) in
+        let buffer = __raw_alloc 4097 in
+        let peer = __raw_alloc 40 in
+        let _ = __raw_write_word peer 0 (if ipv6 then 28 else 16) in
+        let _ = __raw_write_word peer 8 0 in
+        let _ = __raw_write_word peer 16 0 in
+        let _ = __raw_write_word peer 24 0 in
+        let _ = __raw_write_word peer 32 0 in
+        let received = Stdlib.__Network.__receiveFromWithMode fd buffer 4097 peer (timeoutMs == 0) in
         let result =
-          if received < 0L then Error (0L - received)
-          else if received > 4096L then Error 90L
+          if received < 0 then Error (0 - received)
+          else if received > 4096 then Error 90
           else Stdlib.__Datagram.__decode ipv6 peer buffer received in
-        let _ = __raw_free_sized peer 40L in
-        let _ = __raw_free_sized buffer 4097L in
+        let _ = __raw_free_sized peer 40 in
+        let _ = __raw_free_sized buffer 4097 in
         result
 
 let __bind (ipv6: Bool) (address: List<Int64>) (port: Int64)
   : Stdlib.Result.Result<Stdlib.__Datagram.Socket, Int64> =
-  if Stdlib.Bool.not (Stdlib.__Network.__validAddress ipv6 address) || port < 0L || port > 65535L then Error 22L
+  if Stdlib.Bool.not (Stdlib.__Network.__validAddress ipv6 address) || port < 0 || port > 65535 then Error 22
   else
     let fd = if ipv6 then Stdlib.__Network.__udp6Socket () else Stdlib.__Network.__udp4Socket () in
-    if fd < 0L then Error (0L - fd)
+    if fd < 0 then Error (0 - fd)
     else
       let lifecycle = Stdlib.Stream.__new (fun _unit -> Some ()) (fun _unit -> let _ = Stdlib.__Network.__close fd in ()) in
       let address = Stdlib.__Network.__socketAddress ipv6 address port in
       let marked = Stdlib.__Network.__cloexec fd in
-      let bound = if marked < 0L then marked else if ipv6 then Stdlib.__Network.__bind6 fd address else Stdlib.__Network.__bind4 fd address in
-      let _ = __raw_free_sized address (if ipv6 then 32L else 16L) in
-      if bound < 0L then
+      let bound = if marked < 0 then marked else if ipv6 then Stdlib.__Network.__bind6 fd address else Stdlib.__Network.__bind4 fd address in
+      let _ = __raw_free_sized address (if ipv6 then 32 else 16) in
+      if bound < 0 then
         let _ = Stdlib.Stream.close lifecycle in
-        Error (0L - bound)
+        Error (0 - bound)
       else Ok (Stdlib.__Datagram.Socket {
         lifecycle = lifecycle,
         watch = Some (Stdlib.__Network.Watch { descriptor = fd, lifecycle = lifecycle }),
@@ -103,40 +103,40 @@ let bind6 (address: List<Int64>) (port: Int64) : Stdlib.Result.Result<Stdlib.__D
 // stale readiness cannot block the shared listener or change descriptor mode.
 let readable (socket: Stdlib.__Datagram.Socket) : Stdlib.Result.Result<Bool, Int64> =
   match Stdlib.Stream.next socket.lifecycle with
-  | None -> Error 9L
+  | None -> Error 9
   | Some _ ->
     match socket.watch with
-    | None -> Error 22L
-    | Some watch -> Stdlib.__Network.waitSockets [Stdlib.__Network.Interest { watch = watch, readable = true, writable = false }] 0L |> Stdlib.Result.andThen (fun events ->
-      if Stdlib.List.any events (fun event -> event.failed || event.closed) then Error 5L
+    | None -> Error 22
+    | Some watch -> Stdlib.__Network.waitSockets [Stdlib.__Network.Interest { watch = watch, readable = true, writable = false }] 0 |> Stdlib.Result.andThen (fun events ->
+      if Stdlib.List.any events (fun event -> event.failed || event.closed) then Error 5
       else Ok (Stdlib.List.any events (fun event -> event.readable)))
 
 let poll (socket: Stdlib.__Datagram.Socket) : Stdlib.Result.Result<Stdlib.Option.Option<Stdlib.__Datagram.Message>, Int64> =
   Stdlib.__Datagram.readable socket |> Stdlib.Result.andThen (fun ready ->
     if Stdlib.Bool.not ready then Ok None
-    else match socket.receive 0L with
+    else match socket.receive 0 with
     | Ok datagram -> Ok (Some datagram)
-    | Error code -> if code == 11L || code == 35L || code == 4L then Ok None else Error code)
+    | Error code -> if code == 11 || code == 35 || code == 4 then Ok None else Error code)
 
 // A datagram is atomic. False retains the caller's sealed packet unchanged;
 // retrying does not reserve another packet number or encrypt it again.
 let pollSend (socket: Stdlib.__Datagram.Socket) (peer: Stdlib.__Datagram.Endpoint) (payload: Blob)
   : Stdlib.Result.Result<Bool, Int64> =
   match Stdlib.Stream.next socket.lifecycle with
-  | None -> Error 9L
+  | None -> Error 9
   | Some () -> match socket.watch with
-    | None -> Error 22L
-    | Some _ -> match socket.send peer payload 0L with
+    | None -> Error 22
+    | Some _ -> match socket.send peer payload 0 with
       | Ok () -> Ok true
-      | Error code -> if code == 11L || code == 35L || code == 4L then Ok false else Error code
+      | Error code -> if code == 11 || code == 35 || code == 4 then Ok false else Error code
 
 let close (socket: Stdlib.__Datagram.Socket) : Unit =
   Stdlib.Stream.close socket.lifecycle
 
 let send (socket: Stdlib.__Datagram.Socket) (peer: Stdlib.__Datagram.Endpoint) (payload: Blob) (timeoutMs: Int64)
   : Stdlib.Result.Result<Unit, Int64> =
-  if timeoutMs <= 0L then Error 22L else socket.send peer payload timeoutMs
+  if timeoutMs <= 0 then Error 22 else socket.send peer payload timeoutMs
 
 let receive (socket: Stdlib.__Datagram.Socket) (timeoutMs: Int64)
   : Stdlib.Result.Result<Stdlib.__Datagram.Message, Int64> =
-  if timeoutMs <= 0L then Error 22L else socket.receive timeoutMs
+  if timeoutMs <= 0 then Error 22 else socket.receive timeoutMs

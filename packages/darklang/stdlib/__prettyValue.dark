@@ -10,7 +10,7 @@ let __valueGroup (opening: String) (closing: String) (opener: Stdlib.Pretty.Doc)
         Stdlib.Pretty.Doc.Concat(
             Stdlib.Pretty.text opening,
             Stdlib.Pretty.Doc.Concat(
-                Stdlib.Pretty.Doc.Nest(2L, Stdlib.Pretty.Doc.Concat(opener, inner)),
+                Stdlib.Pretty.Doc.Nest(2, Stdlib.Pretty.Doc.Concat(opener, inner)),
                 Stdlib.Pretty.Doc.Concat(opener, Stdlib.Pretty.text closing))))
 
 let __valueBracketed (opening: String) (closing: String) (parts: List<Stdlib.Pretty.Doc>) : Stdlib.Pretty.Doc =
