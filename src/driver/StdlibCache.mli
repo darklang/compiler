@@ -7,7 +7,8 @@ val defaultDirectory : unit -> string option
 (* The prepared stdlib for [target], read from [directory] (default
    [defaultDirectory ()]) when this exact executable stored it there before,
    otherwise built and stored. A cache that cannot be read or written only
-   costs the rebuild; with no directory nothing is cached. *)
+   costs the rebuild; with no directory nothing is cached. One process at a
+   time prepares into a directory; the others wait for its result. *)
 val buildStdlib :
   ?directory:string ->
   Platform.target ->

@@ -38,18 +38,17 @@ let read path : CompilationContexts.stdlibResult option =
         Some (Marshal.from_channel channel))
   with Sys_error _ | End_of_file | Failure _ -> None
 
+let rec createDirectory path =
+  if path <> "" && path <> "/" && not (Sys.file_exists path) then (
+    createDirectory (Filename.dirname path);
+    try Unix.mkdir path 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
+
 (* Write to a private temporary file, then rename, so a concurrent reader
    sees either nothing or a complete value. A failed write only loses the
    cache. *)
 let write path (stdlib : CompilationContexts.stdlibResult) =
   let directory = Filename.dirname path in
   try
-    let rec create path =
-      if path <> "" && path <> "/" && not (Sys.file_exists path) then (
-        create (Filename.dirname path);
-        try Unix.mkdir path 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
-    in
-    create directory;
     let temporary, channel =
       Filename.open_temp_file ~mode:[ Open_binary ] ~temp_dir:directory
         "stdlib-" ".partial"
@@ -75,6 +74,36 @@ let write path (stdlib : CompilationContexts.stdlibResult) =
           (Sys.readdir directory))
   with Sys_error _ | Unix.Unix_error _ | Invalid_argument _ -> ()
 
+(* Only the lock holder writes, so any partial file left while holding it
+   belongs to a writer that was killed. *)
+let removePartials directory =
+  try
+    Array.iter
+      (fun name ->
+        if String.starts_with ~prefix:"stdlib-" name && Filename.check_suffix name ".partial"
+        then try Sys.remove (Filename.concat directory name) with Sys_error _ -> ())
+      (Sys.readdir directory)
+  with Sys_error _ -> ()
+
+(* One preparation at a time per cache directory: a second process waits for
+   the first one's result rather than building its own copy, which would
+   double the memory. The kernel drops the lock when its holder exits, however
+   it exits. *)
+let withLock directory operation =
+  match
+    createDirectory directory;
+    Unix.openfile (Filename.concat directory "stdlib.lock")
+      [ Unix.O_RDWR; Unix.O_CREAT; Unix.O_CLOEXEC ] 0o644
+  with
+  | exception (Sys_error _ | Unix.Unix_error _) -> None
+  | lock ->
+      Fun.protect
+        ~finally:(fun () -> Unix.close lock)
+        (fun () ->
+          match Unix.lockf lock Unix.F_LOCK 0 with
+          | exception Unix.Unix_error _ -> None
+          | () -> Some (operation ()))
+
 let buildStdlib ?directory target =
   let directory =
     match directory with Some _ -> directory | None -> defaultDirectory ()
@@ -83,9 +112,18 @@ let buildStdlib ?directory target =
   | None, _ | _, None -> StdlibCompilation.buildStdlib target
   | Some directory, Some digest -> (
       let path = cachePath directory target digest in
+      let build () =
+        match read path with
+        | Some stdlib -> Ok stdlib
+        | None ->
+            removePartials directory;
+            let built = StdlibCompilation.buildStdlib target in
+            (match built with Ok stdlib -> write path stdlib | Error _ -> ());
+            built
+      in
       match read path with
       | Some stdlib -> Ok stdlib
-      | None ->
-          let built = StdlibCompilation.buildStdlib target in
-          (match built with Ok stdlib -> write path stdlib | Error _ -> ());
-          built)
+      | None -> (
+          match withLock directory build with
+          | Some built -> built
+          | None -> StdlibCompilation.buildStdlib target))
