@@ -1486,10 +1486,7 @@ let runTestsWithProgressReporter completedTestReporter args =
           let library =
             if imported then Lazy.force importedStdlib else baseStdlib
           in
-          (* Imported tests are interpreter sources: a bare integer is an
-             Int64. *)
-          Parser.withInterpreterSource imported (fun () ->
-              runE2EFile library suiteName progressLabel tests))
+          runE2EFile library suiteName progressLabel tests)
         (R.sourceFileGroups testsArray)
     in
 

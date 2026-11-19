@@ -10,10 +10,6 @@ val parseTokensAt :
 val parseTokens : Lexer.spannedToken array -> ParserSupport.parseResult
 val parse : string -> ParserSupport.parseResult
 
-(* Read the sources parsed by [f] as interpreter sources at the pin: a bare
-   integer is an Int64. *)
-val withInterpreterSource : bool -> (unit -> 'a) -> 'a
-
 val parseFor :
   ?adaptStdlib:bool ->
   Validation.mode ->

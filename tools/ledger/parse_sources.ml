@@ -67,7 +67,7 @@ let check reasons sidecar directory path =
       In_channel.input_all
   in
   let items, diagnostics =
-    match SourceInventory.parse ~interpreterSource:true
+    match SourceInventory.parse
         ~annotations:
           (CompilerAnnotations.forSource sidecar
              (if String.starts_with ~prefix:"upstream/" path then path

@@ -1775,7 +1775,7 @@ let parseE2ETestFile path =
       let* sidecar =
         CompilerAnnotations.parseSidecar EmbeddedStdlib.upstreamAnnotations
       in
-      SourceInventory.parse ~interpreterSource:true
+      SourceInventory.parse
         ~annotations:(CompilerAnnotations.forSource sidecar path)
         ~reasons text
       |> Result.map Option.some

@@ -1,7 +1,5 @@
-(* convert_dialect.ml - Rewrite compiler packages from the earlier dialect to current Dark syntax.
+(* convert_dialect.ml - Rewrite Dark sources from the earlier call syntax to current Dark syntax.
 
-   convert_dialect literals FILE...  bare integers become `z`, `L` goes, other
-                                     widths take their bit-count suffix
    convert_dialect syntax FILE...    calls, lambdas, patterns and function
                                      headers take their arguments in one paren list
    convert_dialect check BEFORE AFTER  both files parse to the same tree
@@ -26,8 +24,8 @@ let rec keys (declarations : WrittenTypes.declaration list) =
           ])
     declarations
 
-let parsed ~current text =
-  Parser.withInterpreterSource current (fun () -> Parser.parse text)
+let parsed text =
+  Parser.parse text
   |> fun result ->
   match (result.ParserSupport.diagnostics, result.ParserSupport.parsed) with
   | [], Some (WrittenTypes.SourceFile tree) ->
@@ -54,51 +52,6 @@ let splice scalars edits =
         go stop rest (text :: Text.ofScalars (Array.sub scalars at (start - at)) :: acc)
   in
   String.concat "" (go 0 edits [])
-
-let literal (previous : Lexer.spannedToken option) (token : Lexer.spannedToken) =
-  let text = token.Lexer.text in
-  let ends suffix = String.ends_with ~suffix text in
-  let swap old fresh = Some (String.sub text 0 (String.length text - String.length old) ^ fresh) in
-  let fieldAccess =
-    match previous with
-    | Some { Lexer.token = T.TDot; range; _ } -> range.T.end_ = token.Lexer.range.T.start
-    | _ -> false
-  in
-  match token.Lexer.token with
-  | _ when fieldAccess -> None
-  | T.TInt _ when not (ends "z") -> Some (text ^ "z")
-  | T.TInt64 _ when ends "L" -> swap "L" ""
-  | T.TInt8 _ when ends "y" -> swap "y" "s8"
-  | T.TUInt8 _ when ends "uy" -> swap "uy" "u8"
-  | T.TInt16 _ when ends "s" -> swap "s" "s16"
-  | T.TUInt16 _ when ends "us" -> swap "us" "u16"
-  | T.TInt32 _ when ends "l" -> swap "l" "s32"
-  | T.TUInt32 _ when ends "ul" -> swap "ul" "u32"
-  | T.TUInt64 _ when ends "UL" -> swap "UL" "u64"
-  | T.TInt128 _ when ends "Q" -> swap "Q" "s128"
-  | T.TUInt128 _ when ends "Z" -> swap "Z" "u128"
-  | _ -> None
-
-let literals text =
-  match Lexer.tokenize text with
-  | Error message -> Error message
-  | Ok (tokens, _) ->
-      let scalars = Text.scalars text in
-      let lines = offsets scalars in
-      let edits =
-        List.fold_left
-          (fun (previous, edits) (token : Lexer.spannedToken) ->
-            ( Some token,
-              match literal previous token with
-              | Some fresh ->
-                  (index lines token.Lexer.range.T.start, index lines token.Lexer.range.T.end_, fresh)
-                  :: edits
-              | None -> edits ))
-          (None, []) tokens
-        |> snd |> List.rev
-      in
-      Ok (splice scalars edits, List.length edits)
-
 
 (* ---- call syntax: `f a b` -> `f(a, b)`, `fun a b ->` -> `fun(a, b) ->`,
    `let f (a: A) (b: B) : R =` -> `let f(a: A, b: B): R =` ---- *)
@@ -430,7 +383,7 @@ let syntax text =
   match Lexer.tokenize text with
   | Error message -> Error message
   | Ok (tokens, _) -> (
-      match (Parser.withInterpreterSource true (fun () -> Parser.parse text)).ParserSupport.parsed with
+      match (Parser.parse text).ParserSupport.parsed with
       | None -> Error "no syntax tree"
       | Some (W.SourceFile tree) -> (
           let scalars = Text.scalars text in
@@ -451,15 +404,15 @@ let syntax text =
           with Manual (message, pos) ->
             Error (Printf.sprintf "line %d: %s" (pos.T.row + 1) message)))
 
-let convert ~before pass path =
+let convert pass path =
   let text = read path in
-  match parsed ~current:before text with
+  match parsed text with
   | Error message -> Error (path ^ ": does not parse in the earlier dialect\n" ^ message)
   | Ok before -> (
       match pass text with
       | Error message -> Error (path ^ ": " ^ message)
       | Ok (fresh, count) -> (
-          match parsed ~current:true fresh with
+          match parsed fresh with
           | Ok (after, _) when after = fst before ->
               if fresh <> text then write path fresh;
               Ok count
@@ -479,13 +432,8 @@ let convert ~before pass path =
 
 let () =
   match Array.to_list Sys.argv with
-  | _ :: (("literals" | "syntax") as pass) :: paths ->
-      let results =
-        List.map
-          (if pass = "literals" then convert ~before:false literals
-           else convert ~before:true syntax)
-          paths
-      in
+  | _ :: ("syntax" as pass) :: paths ->
+      let results = List.map (convert syntax) paths in
       let failures = List.filter_map (function Error m -> Some m | Ok _ -> None) results in
       let count = List.fold_left (fun n -> function Ok c -> n + c | Error _ -> n) 0 results in
       List.iter prerr_endline failures;
@@ -493,10 +441,10 @@ let () =
         (List.length paths - List.length failures) (List.length failures);
       if failures <> [] then exit 1
   | [ _; "check"; before; after ] -> (
-      match (parsed ~current:true (read before), parsed ~current:true (read after)) with
+      match (parsed (read before), parsed (read after)) with
       | Ok (a, _), Ok (b, _) when a = b -> ()
       | Ok _, Ok _ -> prerr_endline (after ^ ": parses to a different tree"); exit 1
       | _, Error message | Error message, _ -> prerr_endline message; exit 1)
   | _ ->
-      prerr_endline "Usage: convert_dialect (literals | syntax) FILE... | check BEFORE AFTER";
+      prerr_endline "Usage: convert_dialect syntax FILE... | check BEFORE AFTER";
       exit 2

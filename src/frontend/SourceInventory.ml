@@ -140,8 +140,8 @@ let attach ~reasons annotations entries =
                    entries)))
     (Ok entries) annotations
 
-let parse ?(interpreterSource = true) ?(annotations = []) ~reasons source =
-  let parsed = Parser.withInterpreterSource interpreterSource (fun () -> Parser.parse source) in
+let parse ?(annotations = []) ~reasons source =
+  let parsed = Parser.parse source in
   match (parsed.ParserSupport.diagnostics, parsed.ParserSupport.parsed) with
   | [], Some (W.SourceFile tree) ->
       let* tokens, _ = Lexer.tokenize source in
