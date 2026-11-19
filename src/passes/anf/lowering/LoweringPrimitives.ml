@@ -406,6 +406,7 @@ let tryCliIntrinsic name args =
         | "Darklang.Stdlib.Cli.__kill" -> Some ANF.Kill
         | "Darklang.Stdlib.Cli.__getpid" -> Some ANF.GetPid
         | "Darklang.Stdlib.Cli.__getuid" -> Some ANF.GetUid
+        | "Darklang.Stdlib.Cli.__exit" -> Some ANF.ProcessExit
         | "Darklang.Stdlib.__Network.__tcp4Socket" -> Some ANF.SocketTcp4
         | "Darklang.Stdlib.__Network.__tcp6Socket" -> Some ANF.SocketTcp6
         | "Darklang.Stdlib.__Network.__udp4Socket" -> Some ANF.SocketUdp4

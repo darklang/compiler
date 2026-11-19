@@ -86,6 +86,7 @@ let cliIntrinsicModule : AST.moduleDef =
         fn "__sleep" [] [ TFloat64 ] TUnit;
         fn "__getpid" [] [] TInt64;
         fn "__getuid" [] [] TInt64;
+        fn "__exit" [] [ TInt64 ] TUnit;
       ];
   }
 

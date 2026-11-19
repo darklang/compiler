@@ -244,6 +244,7 @@ let convertCliOperation (operation : ANF.cliOperation) =
   | ANF.StartupStack -> MIR.StartupStack
   | ANF.ExecutableState -> MIR.ExecutableState
   | ANF.GetUid -> MIR.GetUid
+  | ANF.ProcessExit -> MIR.ProcessExit
   | ANF.SocketTcp4 -> MIR.SocketTcp4
   | ANF.SocketTcp6 -> MIR.SocketTcp6
   | ANF.SocketUdp4 -> MIR.SocketUdp4
@@ -844,6 +845,7 @@ let cliOperationName = function
   | ANF.StartupStack -> "StartupStack"
   | ANF.ExecutableState -> "ExecutableState"
   | ANF.GetUid -> "GetUid"
+  | ANF.ProcessExit -> "ProcessExit"
   | ANF.SocketTcp4 -> "SocketTcp4"
   | ANF.SocketTcp6 -> "SocketTcp6"
   | ANF.SocketUdp4 -> "SocketUdp4"

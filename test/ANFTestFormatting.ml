@@ -406,6 +406,7 @@ and aNF_cliOperation (value : ANF.cliOperation) =
   | ANF.ChildLaunch -> union "CliOperation" "ChildLaunch" []
   | ANF.PosixWait4 -> union "CliOperation" "PosixWait4" []
   | ANF.PosixKeventVnode -> union "CliOperation" "PosixKeventVnode" []
+  | ANF.ProcessExit -> union "CliOperation" "ProcessExit" []
 
 and aNF_recordDescriptor (value : ANF.recordDescriptor) =
   record "RecordDescriptor"

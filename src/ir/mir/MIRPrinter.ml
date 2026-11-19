@@ -92,6 +92,7 @@ let cliOperation = function
   | MIR.StartupStack -> "StartupStack"
   | MIR.ExecutableState -> "ExecutableState"
   | MIR.GetUid -> "GetUid"
+  | MIR.ProcessExit -> "ProcessExit"
   | MIR.SocketTcp4 -> "SocketTcp4"
   | MIR.SocketTcp6 -> "SocketTcp6"
   | MIR.SocketUdp4 -> "SocketUdp4"

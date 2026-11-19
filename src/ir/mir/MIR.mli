@@ -52,6 +52,7 @@ type cliOperation =
   | StartupStack
   | ExecutableState
   | GetUid
+  | ProcessExit
   | SocketTcp4
   | SocketTcp6
   | SocketUdp4

@@ -292,6 +292,7 @@ let inferCExprType ctx expr =
       | A.GetEnv | A.GetArgv ->
           Some (AST.TSum ("Darklang.Stdlib.Option.Option", [ AST.TString ]))
       | A.Kill -> posix AST.TUnit
+      | A.ProcessExit -> Some AST.TUnit
       | A.GetEnvironmentPacked -> Some AST.TString
       | A.StdinState | A.StartupStack | A.ExecutableState | A.ChildState ->
           Some AST.TInternalRawPtr

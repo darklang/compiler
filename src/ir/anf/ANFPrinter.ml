@@ -94,6 +94,7 @@ let cliOperation = function
   | ANF.StartupStack -> "StartupStack"
   | ANF.ExecutableState -> "ExecutableState"
   | ANF.GetUid -> "GetUid"
+  | ANF.ProcessExit -> "ProcessExit"
   | ANF.SocketTcp4 -> "SocketTcp4"
   | ANF.SocketTcp6 -> "SocketTcp6"
   | ANF.SocketUdp4 -> "SocketUdp4"
