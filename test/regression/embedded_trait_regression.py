@@ -9,6 +9,7 @@ import sys
 import tempfile
 import threading
 import urllib.parse
+import darkc_cache
 
 # inc calls the trait's method by the trait's hash: x ^ 3.
 XOR_CALL = dict(originalName=["Stdlib", "BitwiseXor", "bitwiseXor"], resolved={"Ok": [dict(
@@ -82,8 +83,9 @@ def main():
     with http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
         threading.Thread(target=server.serve_forever, daemon=True).start()
         with tempfile.TemporaryDirectory(prefix="embedded-trait-") as temporary:
-            env = dict(os.environ, XDG_DATA_HOME=temporary)
-            result = subprocess.run([compiler, "--package-server",
+            cache = darkc_cache.flags(compiler, temporary)
+            env = dict(os.environ)
+            result = subprocess.run([compiler, *cache, "--package-server",
                 f"http://127.0.0.1:{server.server_port}", "--check", "Darklang.Stdlib.incXor"],
                 env=env, capture_output=True, text=True, timeout=300)
             assert result.stdout.strip() == "Darklang.Stdlib.incXor: compiles", \

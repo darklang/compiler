@@ -9,10 +9,12 @@ import subprocess
 import sys
 import tempfile
 import termios
+import darkc_cache
 
 
 def main():
     compiler = str(pathlib.Path(sys.argv[1]).resolve())
+    cache = darkc_cache.flags(compiler)
     with tempfile.TemporaryDirectory(prefix="dark-terminal-size-") as directory:
         root = pathlib.Path(directory)
         source = root / "size.dark"
@@ -22,7 +24,7 @@ let report = $"{Stdlib.Int64.toString columns}|{Stdlib.Int64.toString rows}" in
 let _ = Stdlib.Cli.Posix.fdWrite 3z (Stdlib.String.toBlob report) in
 0L
 ''', encoding="utf-8")
-        subprocess.run([compiler, "-q", "--leak-check", str(source), "-o", str(binary)],
+        subprocess.run([compiler, *cache, "-q", "--leak-check", str(source), "-o", str(binary)],
                        check=True, timeout=120)
         terminals = [pty.openpty() for _ in range(3)]
         try:

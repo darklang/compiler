@@ -14,20 +14,6 @@ let executableDigest () =
   try Some (Digest.to_hex (Digest.file Sys.executable_name))
   with Sys_error _ -> None
 
-(* An absolute cache directory, or none: a relative path would scatter
-   caches into whatever directory the compiler happens to run in. *)
-let defaultDirectory () =
-  let absolute = function
-    | Some path when path <> "" && not (Filename.is_relative path) -> Some path
-    | _ -> None
-  in
-  match absolute (Sys.getenv_opt "XDG_CACHE_HOME") with
-  | Some path -> Some (Filename.concat path "dark-compiler")
-  | None ->
-      Option.map
-        (fun home -> Filename.concat home ".cache/dark-compiler")
-        (absolute (Sys.getenv_opt "HOME"))
-
 let cachePath directory target digest =
   Filename.concat directory
     ("stdlib-" ^ targetName target ^ "-" ^ digest ^ ".bin")
@@ -170,10 +156,8 @@ let withLock directory report operation =
         ~finally:(fun () -> Unix.close lock)
         (fun () -> if acquire lock report None then Some (operation lock) else None)
 
-let buildStdlib ?directory ?(progress = fun _ -> ()) target =
-  let directory =
-    match directory with Some _ -> directory | None -> defaultDirectory ()
-  in
+(* With no directory nothing is cached: the stdlib is prepared in memory. *)
+let buildStdlib ~directory ?(progress = fun _ -> ()) target =
   let cached stdlib =
     progress (Ready { cached = true });
     Ok stdlib

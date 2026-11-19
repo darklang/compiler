@@ -8,10 +8,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import darkc_cache
 
 
 def main():
     compiler = Path(sys.argv[1]).resolve()
+    cache = darkc_cache.flags(compiler)
     version = subprocess.check_output([str(compiler), "--version"], text=True)
     build_hash = next(line.removeprefix("Build: ") for line in version.splitlines()
                       if line.startswith("Build: "))
@@ -35,7 +37,7 @@ def main():
                           'Stdlib.Int64.toString length + "|" + Builtin.getBuildHash ()\n', encoding="utf-8")
         output = directory / "program"
         result = subprocess.run(
-            [str(binary), "-q", "--emit-result", str(source), "-o", str(output)],
+            [str(binary), *cache, "-q", "--emit-result", str(source), "-o", str(output)],
             cwd=directory, env=environment, capture_output=True, text=True, timeout=120, check=False)
         assert result.returncode == 0, result.stdout + result.stderr
         execution = subprocess.run([str(output)], cwd=directory, env=environment,

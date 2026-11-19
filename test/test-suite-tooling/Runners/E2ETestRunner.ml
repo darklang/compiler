@@ -1572,7 +1572,7 @@ let packageManagerFixture =
        (fun (path, status, body) ->
          PackageIO.cacheWrite cachePath (server ^ path) status body)
        responses;
-     { PackageManager.server; cachePath })
+     { PackageManager.server; cachePath = Some cachePath })
 
 let packageManagerForFile path =
   if String.ends_with ~suffix:"/package_manager.e2e" path then

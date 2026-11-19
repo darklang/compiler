@@ -9,6 +9,7 @@ import sys
 import tempfile
 import threading
 import urllib.parse
+import darkc_cache
 
 
 def location(name):
@@ -112,11 +113,12 @@ def main():
         thread.start()
         with tempfile.TemporaryDirectory(prefix="trait-packages-") as temporary:
             directory = Path(temporary)
-            env = dict(os.environ, XDG_DATA_HOME=temporary)
+            cache = darkc_cache.flags(compiler, temporary)
+            env = dict(os.environ)
             source = directory / "input.dark"
             source.write_text('Hosted.describe 42L + "|" + Hosted.describePipe 42L + "|" + Hosted.stdlibDescribe 42L\n')
             program = directory / "program"
-            result = subprocess.run([compiler, "-q", "--emit-result", "--package-server",
+            result = subprocess.run([compiler, *cache, "-q", "--emit-result", "--package-server",
                 f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                 env=env, capture_output=True, text=True, timeout=120)
             assert result.returncode == 0, result.stdout + result.stderr + repr(requests)
@@ -125,13 +127,13 @@ def main():
             assert "/Hosted" in requests and "/Hosted.Int64" in requests, requests
             assert not any("stdlib-trait-hash" in request for request in requests), requests
             source.write_text('Hosted.CeilingText.toText 42L\n')
-            ceiling = subprocess.run([compiler, "-q", "--emit-result", "--package-server",
+            ceiling = subprocess.run([compiler, *cache, "-q", "--emit-result", "--package-server",
                 f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                 env=env, capture_output=True, text=True, timeout=120)
             assert ceiling.returncode != 0, ceiling.stdout + ceiling.stderr
             assert "No implementation of trait" in ceiling.stdout + ceiling.stderr, ceiling.stdout + ceiling.stderr
             source.write_text('Hosted.ToText.toText 42L\n')
-            direct = subprocess.run([compiler, "-q", "--emit-result", "--package-server",
+            direct = subprocess.run([compiler, *cache, "-q", "--emit-result", "--package-server",
                 f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                 env=env, capture_output=True, text=True, timeout=120)
             assert direct.returncode == 0, direct.stdout + direct.stderr
@@ -141,27 +143,27 @@ def main():
             rival = dict(entities[("impl", "impl-hash")][1])
             rival["hash"] = {"Hash": ["rival-hash"]}
             entities[key] = ("Hosted.Rival", rival)
-            ambiguous = subprocess.run([compiler, "-q", "--emit-result", "--package-server",
+            ambiguous = subprocess.run([compiler, *cache, "-q", "--emit-result", "--package-server",
                 f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                 env=env, capture_output=True, text=True, timeout=120)
             assert ambiguous.returncode != 0, ambiguous.stdout + ambiguous.stderr
             assert "Ambiguous implementation" in ambiguous.stdout + ambiguous.stderr, ambiguous.stdout + ambiguous.stderr
             del entities[key]
             original_impl = entities.pop(("impl", "impl-hash"))
-            missing = subprocess.run([compiler, "-q", "--emit-result", "--package-server",
+            missing = subprocess.run([compiler, *cache, "-q", "--emit-result", "--package-server",
                 f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                 env=env, capture_output=True, text=True, timeout=120)
             assert missing.returncode != 0, missing.stdout + missing.stderr
             assert "No implementation of trait" in missing.stdout + missing.stderr, missing.stdout + missing.stderr
             entities[("impl", "impl-hash")] = original_impl
             # Refresh the mutable inventory, then prove it is reusable offline.
-            refreshed = subprocess.run([compiler, "-q", "--emit-result", "--package-server",
+            refreshed = subprocess.run([compiler, *cache, "-q", "--emit-result", "--package-server",
                 f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                 env=env, capture_output=True, text=True, timeout=120)
             assert refreshed.returncode == 0, refreshed.stdout + refreshed.stderr
             server.shutdown()
             server.server_close()
-            offline = subprocess.run([compiler, "-q", "--emit-result", "--package-server",
+            offline = subprocess.run([compiler, *cache, "-q", "--emit-result", "--package-server",
                 f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                 env=env, capture_output=True, text=True, timeout=120)
             assert offline.returncode == 0, offline.stdout + offline.stderr

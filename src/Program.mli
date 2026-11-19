@@ -19,6 +19,7 @@ type batchCliOptions = {
   leakCheck : bool;
   allowInternal : bool;
   packageServer : string option;
+  cacheDir : string option;
   input : batchInput;
   keepGoing : bool;
   reportPath : string option;
@@ -38,15 +39,19 @@ type batchReportItem = {
 type cliOptions = {
   run : bool;
   isExpression : bool;
+  check : bool;
+  json : bool;
   outputFile : string option;
   verbosity : verbosityLevel;
   help : bool;
   version : bool;
-  argument : string option;
+  inputs : string list;
   leakCheck : bool;
   target : targetSelection;
   emitResult : bool;
   packageServer : string option;
+  cacheDir : string option;
+  entry : string option;
   allowInternal : bool;
   disableFreeList : bool;
   disableANFOpt : bool;
@@ -81,6 +86,7 @@ type cliOptions = {
 type checkCliOptions = {
   checkTarget : targetSelection;
   checkPackageServer : string option;
+  checkCacheDir : string option;
   checkJson : bool;
   checkNames : string list;
 }

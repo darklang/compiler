@@ -5,10 +5,12 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+import darkc_cache
 
 
 def main():
     compiler = str(pathlib.Path(sys.argv[1]).resolve())
+    cache = darkc_cache.flags(compiler)
     with tempfile.TemporaryDirectory(prefix="dark-current-uid-") as directory:
         root = pathlib.Path(directory)
         source = root / "uid.dark"
@@ -18,7 +20,7 @@ let report = $"{Stdlib.Int64.toString (Builtin.syscallGetuid ())}|{Stdlib.Bool.t
 let _ = Builtin.print report in
 0L
 ''', encoding="utf-8")
-        subprocess.run([compiler, "-q", "--leak-check", str(source), "-o", str(binary)],
+        subprocess.run([compiler, *cache, "-q", "--leak-check", str(source), "-o", str(binary)],
                        check=True, timeout=120)
         expected = f"{os.getuid()}|{str(os.getuid() == 0).lower()}|{str(os.getuid() == 0).lower()}".encode()
         for user in ["root", "definitely-not-the-current-user"]:

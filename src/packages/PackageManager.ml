@@ -3,7 +3,7 @@
    package-manager HTTP API and renders them as compiler package source units. *)
 [@@@warning "-4-30"]
 
-type config = { server : string; cachePath : string }
+type config = { server : string; cachePath : string option }
 type resolvedSource = { name : string; source : string }
 
 type itemKind =
@@ -77,21 +77,15 @@ let parse source =
   validate json;
   json
 
-let defaultServer = "https://matter.darklang.com/"
-
-let defaultCachePath () =
-  let directory =
-    match Sys.getenv_opt "XDG_DATA_HOME" with
-    | Some path when path <> "" && not (Filename.is_relative path) -> path
-    | _ -> (
-        match Sys.getenv_opt "HOME" with
-        | Some path when path <> "" -> Filename.concat path ".local/share"
-        | _ -> "")
-  in
-  Filename.concat (Filename.concat directory "dark-compiler") "packages.sqlite3"
-
-let defaultConfig () =
-  { server = defaultServer; cachePath = defaultCachePath () }
+(* Package answers persist in [cacheDirectory]/packages.sqlite3; with no
+   directory they last only as long as the process. *)
+let config ~server ~cacheDirectory =
+  {
+    server;
+    cachePath =
+      Option.map (fun directory -> Filename.concat directory "packages.sqlite3")
+        cacheDirectory;
+  }
 
 let kindPath = function
   | PackageType -> "type"
@@ -110,17 +104,20 @@ let rec createDirectory path =
     try Unix.mkdir path 0o777
     with Unix.Unix_error (Unix.EEXIST, _, _) when Sys.is_directory path -> ())
 
-let withCache (config : config) action =
-  try
-    let directory = Filename.dirname config.cachePath in
-    if directory <> "" then createDirectory directory;
-    action ()
-  with ex ->
-    Error ("Package cache '" ^ config.cachePath ^ "' failed: " ^ message ex)
+let withCache (config : config) none action =
+  match config.cachePath with
+  | None -> Ok none
+  | Some cachePath -> (
+      try
+        let directory = Filename.dirname cachePath in
+        if directory <> "" then createDirectory directory;
+        action cachePath
+      with ex ->
+        Error ("Package cache '" ^ cachePath ^ "' failed: " ^ message ex))
 
 let cacheRead config key =
-  withCache config (fun () ->
-      match PackageIO.cacheRead config.cachePath key with
+  withCache config None (fun cachePath ->
+      match PackageIO.cacheRead cachePath key with
       | None -> Ok None
       | Some (200, body) -> Ok (Some (Found body))
       | Some (404, _) -> Ok (Some Missing)
@@ -130,11 +127,11 @@ let cacheRead config key =
            ^ string_of_int status ^ " for " ^ key))
 
 let cacheWrite config key result =
-  withCache config (fun () ->
+  withCache config () (fun cachePath ->
       let status, body =
         match result with Found body -> (200, body) | Missing -> (404, "")
       in
-      PackageIO.cacheWrite config.cachePath key status body;
+      PackageIO.cacheWrite cachePath key status body;
       Ok ())
 
 (* Answers already read from the package server in this process, by URL. One
@@ -2014,3 +2011,116 @@ let resolveNames config resolutionEnv knownTraits names =
 let resolveWritten ?(knownTraits = []) config resolutionEnv units =
   let* names = WrittenSource.qualifiedNames units in
   resolveNames config resolutionEnv knownTraits names
+
+let withClient f =
+  let client = PackageIO.create () in
+  Fun.protect ~finally:(fun () -> PackageIO.dispose client) (fun () -> f client)
+
+let locatedByHash client config kind hash =
+  let path = "/" ^ kindPath kind ^ "/get/with-location/" ^ escapeDataString hash in
+  let* result = fetchByHash client config path in
+  match result with
+  | Missing -> Ok None
+  | Found json -> Result.map Option.some (parseLocatedEntity kind hash json)
+
+(* The fn [hash] names, as an executable's entry calls it, with its
+   parameter and return types as written. *)
+let entryFunction config hash =
+  withClient (fun client ->
+      let* entity = locatedByHash client config PackageFunction hash in
+      match entity with
+      | None -> Ok None
+      | Some entity -> (
+          try
+            match tryField "entity" (parse entity.json) with
+            | None -> Error ("Package server returned no fn for " ^ hash)
+            | Some fn ->
+                let parameterType parameter =
+                  match tryField "typ" parameter with
+                  | Some typ -> renderType typ
+                  | None -> Error ("Invalid fn parameter for " ^ hash)
+                in
+                let* parameters =
+                  ResultList.mapResults parameterType
+                    (Option.fold ~none:[] ~some:arrayItems
+                       (tryField "parameters" fn))
+                in
+                let* returnType =
+                  match tryField "returnType" fn with
+                  | Some typ -> renderType typ
+                  | None -> Error ("Invalid fn return type for " ^ hash)
+                in
+                Ok (Some (publicName entity.location, parameters, returnType))
+          with ex -> Error ("Invalid package fn " ^ hash ^ ": " ^ message ex)))
+
+type root = Hash of string | Name of string
+
+(* Spelled as the checker spells an item, with `Stdlib.` under its owner. *)
+let canonicalName name =
+  let name = publicName name in
+  if String.starts_with ~prefix:"Stdlib." name then "Darklang." ^ name
+  else name
+
+(* The items from [root] to [target], with their hashes, following package
+   references breadth first. Like resolution, it skips what the compiler defines itself, so it
+   reads only answers the compile already fetched. *)
+let callPath config resolutionEnv root target =
+  let known name =
+    (not (hasInternalSegment name))
+    && List.exists
+         (fun context ->
+           Result.is_ok (NameResolution.resolve context name resolutionEnv))
+         [ NameResolution.Type; NameResolution.Callable; NameResolution.Value ]
+  in
+  let target = canonicalName target in
+  withClient (fun client ->
+      let located hash =
+        List.find_map
+          (fun kind ->
+            match locatedByHash client config kind hash with
+            | Ok entity -> entity
+            | Error _ -> None)
+          [ PackageFunction; PackageValue; PackageType; PackageImpl; PackageTrait ]
+      in
+      let rootHash =
+        match root with
+        | Hash hash -> Some hash
+        | Name name ->
+            List.find_map
+              (fun (kind, name) ->
+                match
+                  findByName client config
+                    ("/" ^ kindPath kind ^ "/find/" ^ escapeDataString name)
+                with
+                | Ok (Found json) -> Result.to_option (parseHashJson json)
+                | _ -> None)
+              (List.concat_map
+                 (fun kind -> [ (kind, interpreterName name); (kind, canonicalName (interpreterName name)) ])
+                 [ PackageFunction; PackageValue ])
+      in
+      let rec walk budget visited = function
+        | [] -> None
+        | _ when budget = 0 -> None
+        | (hash, _) :: rest when StringOrder.Set.mem hash visited ->
+            walk budget visited rest
+        | (hash, reversed) :: rest -> (
+            let visited = StringOrder.Set.add hash visited in
+            match located hash with
+            | None -> walk (budget - 1) visited rest
+            | Some entity ->
+                let reversed = (publicName entity.location, hash) :: reversed in
+                if canonicalName entity.location = target then
+                  Some (List.rev reversed)
+                else
+                  let next =
+                    match dependencyRefs entity.json with
+                    | Ok refs ->
+                        List.filter_map
+                          (fun (hash, name) ->
+                            if known name then None else Some (hash, reversed))
+                          refs
+                    | Error _ -> []
+                  in
+                  walk (budget - 1) visited (rest @ next))
+      in
+      Option.bind rootHash (fun hash -> walk 2000 StringOrder.Set.empty [ (hash, []) ]))

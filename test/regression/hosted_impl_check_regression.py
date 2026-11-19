@@ -9,6 +9,7 @@ import sys
 import tempfile
 import threading
 import urllib.parse
+import darkc_cache
 
 
 def location(name):
@@ -75,8 +76,9 @@ def main():
     with http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
         threading.Thread(target=server.serve_forever, daemon=True).start()
         with tempfile.TemporaryDirectory(prefix="hosted-impl-check-") as temporary:
-            env = dict(os.environ, XDG_DATA_HOME=temporary)
-            result = subprocess.run([compiler, "--package-server", f"http://127.0.0.1:{server.server_port}",
+            cache = darkc_cache.flags(compiler, temporary)
+            env = dict(os.environ)
+            result = subprocess.run([compiler, *cache, "--package-server", f"http://127.0.0.1:{server.server_port}",
                                      "--check", method], env=env, capture_output=True, text=True, timeout=600)
             assert result.stdout.splitlines() == [method + ": compiles"], result.stdout + result.stderr
         server.shutdown()

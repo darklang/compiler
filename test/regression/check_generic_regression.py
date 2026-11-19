@@ -5,13 +5,15 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import darkc_cache
 
 
 def main():
     compiler = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix="check-generic-") as temporary:
-        env = dict(os.environ, XDG_DATA_HOME=temporary)
-        result = subprocess.run([compiler, "--check", "Stdlib.List.map", "Stdlib.List.sort",
+        cache = darkc_cache.flags(compiler, temporary)
+        env = dict(os.environ)
+        result = subprocess.run([compiler, *cache, "--check", "Stdlib.List.map", "Stdlib.List.sort",
                                  "Stdlib.min", "Stdlib.String.length"],
                                 env=env, capture_output=True, text=True, timeout=600)
         assert result.stdout.splitlines() == [

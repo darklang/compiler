@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """A script reads as the current interpreter reads it, and results print as `dark eval` prints them."""
-import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import darkc_cache
 
 
 def main():
     compiler = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix="current-syntax-") as temporary:
         program = Path(temporary) / "program"
+        cache = darkc_cache.flags(compiler, temporary)
 
         def compile_(expression, *flags):
-            return subprocess.run([compiler, *flags, "-q", "--emit-result", "-e", expression,
-                "-o", str(program)], capture_output=True, text=True, timeout=300,
-                env=dict(os.environ, XDG_DATA_HOME=temporary))
+            return subprocess.run([compiler, *cache, *flags, "-q", "--emit-result", "-e", expression,
+                "-o", str(program)], capture_output=True, text=True, timeout=300)
 
         def run(expression, *flags):
             result = compile_(expression, *flags)

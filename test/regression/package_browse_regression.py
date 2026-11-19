@@ -9,6 +9,7 @@ import sys
 import tempfile
 import threading
 import urllib.parse
+import darkc_cache
 
 # Big.Unrelated0..19, each with five submodules, beside the one module in use.
 UNRELATED = [f"Big.Unrelated{i}" for i in range(20)]
@@ -101,12 +102,13 @@ def main():
         threading.Thread(target=server.serve_forever, daemon=True).start()
         with tempfile.TemporaryDirectory(prefix="package-browse-") as temporary:
             directory = Path(temporary)
-            env = dict(os.environ, XDG_DATA_HOME=temporary)
+            cache = darkc_cache.flags(compiler, temporary)
+            env = dict(os.environ)
             source, program = directory / "input.dark", directory / "program"
             for text, succeeds in (("Big.App.Math.inc 41L\n", True), ("Big.App.Math.nope 41L\n", False)):
                 requests.clear()
                 source.write_text(text)
-                result = subprocess.run([compiler, "-q", "--emit-result", "--package-server",
+                result = subprocess.run([compiler, *cache, "-q", "--emit-result", "--package-server",
                     f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                     env=env, capture_output=True, text=True, timeout=300)
                 assert (result.returncode == 0) == succeeds, text + result.stdout + result.stderr
@@ -118,7 +120,7 @@ def main():
                 assert unrelated == [], (text, len(unrelated), unrelated[:5])
             # A --check over several names in one module reads each answer once.
             requests.clear()
-            result = subprocess.run([compiler, "--package-server",
+            result = subprocess.run([compiler, *cache, "--package-server",
                 f"http://127.0.0.1:{server.server_port}", "--check", "Big.App.Math.inc",
                 "Big.App.Math.inc"],
                 env=env, capture_output=True, text=True, timeout=300)
@@ -128,7 +130,7 @@ def main():
             # A dependency found by hash alone is asked for as a function first, and
             # the other kinds are not asked once it is found.
             requests.clear()
-            result = subprocess.run([compiler, "--package-server",
+            result = subprocess.run([compiler, *cache, "--package-server",
                 f"http://127.0.0.1:{server.server_port}", "--check", "Big.App.Math.twice"],
                 env=env, capture_output=True, text=True, timeout=300)
             assert result.stdout.strip() == "Big.App.Math.twice: compiles", result.stdout + result.stderr
