@@ -229,7 +229,6 @@ fragments use `__` even where the interpreter also has private helpers.
 | `packages/darklang/stdlib/httpclient.dark` | `Darklang.Stdlib.HttpClient`  | `packages/darklang/stdlib/httpclient.dark` |
 | `packages/darklang/stdlib/httpClient/contentType.dark` | `Darklang.Stdlib.HttpClient.ContentType`  | `packages/darklang/stdlib/httpclient.dark` |
 | `packages/darklang/stdlib/httpClient/sse.dark` | `Darklang.Stdlib.HttpClient.Sse`  | `packages/darklang/stdlib/httpclient.dark` |
-| `packages/darklang/stdlib/httpServer/config.dark` | `Darklang.Stdlib.HttpServer.Config`  | `packages/darklang/stdlib/httpserver.dark` |
 | `packages/darklang/stdlib/httpserver.dark` | `Darklang.Stdlib.HttpServer`  | `packages/darklang/stdlib/httpserver.dark` |
 | `packages/darklang/stdlib/__http1Server.dark` | `Darklang.Stdlib.__Http1Server` | Compiler support: bounded persistent HTTP/1.1 server owners and fair plaintext I/O |
 | `packages/darklang/stdlib/__network.dark` | `Darklang.Stdlib.__Network`  | Compiler support: Owned native TCP/UDP sockets, listeners, deadlines, and scoped shutdown signals |

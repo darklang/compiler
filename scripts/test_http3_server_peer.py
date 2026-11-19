@@ -33,7 +33,7 @@ let run () : Unit =
   match identity with
   | Error message -> Stdlib.printLine message
   | Ok identity ->
-    let config = Stdlib.HttpServer.Config.Config { address = "127.0.0.1", port = Stdlib.Net.Port { __port = port }, maxBodyBytes = 80000L, injectStandardHeaders = false, canonicalizeFromForwardedProto = false, logRequests = false } in
+    let config = Stdlib.HttpServer.Config.Config { address = "127.0.0.1", port = Stdlib.Net.Port { __port = port }, maxBodyBytes = 80000L, middleware = [] } in
     match Stdlib.HttpServer.Quic.serve config identity handler (fun _unit -> Stdlib.printLine "LISTENING") with
     | Error message -> Stdlib.printLine message
     | Ok () -> Stdlib.printLine "STOPPED"

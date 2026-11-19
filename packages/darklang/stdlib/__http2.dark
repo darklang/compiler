@@ -469,7 +469,7 @@ let __sendResponse (transport: Stdlib.__HttpTransport.Transport) (state: Stdlib.
   | Some status ->
     if status < 200L || status > 599L then Error "Invalid HTTP response status"
     else
-      let headers = Stdlib.List.filter (Stdlib.HttpServer.__standardHeaders config.injectStandardHeaders response.headers)         (fun pair -> let (name, _) = pair in           let lower = Stdlib.String.toLowercase name in
+      let headers = Stdlib.List.filter (Stdlib.HttpServer.__standardHeaders response.headers)         (fun pair -> let (name, _) = pair in           let lower = Stdlib.String.toLowercase name in
           Stdlib.Bool.not (Stdlib.__Http2Fields.__connectionSpecific lower) && lower != "content-length") in
       match Stdlib.__Http2Fields.__outgoing headers with
       | Error message -> Error message

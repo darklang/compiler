@@ -167,7 +167,6 @@ packages/darklang/stdlib/httpclient.dark
 packages/darklang/stdlib/httpClient/contentType.dark
 packages/darklang/stdlib/httpClient/sse.dark
 packages/darklang/stdlib/__builtin/__httpClient.dark
-packages/darklang/stdlib/httpServer/config.dark
 packages/darklang/stdlib/httpserver.dark
 packages/darklang/stdlib/__http1Server.dark
 packages/darklang/stdlib/__network.dark

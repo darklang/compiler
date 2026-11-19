@@ -107,7 +107,6 @@ let __echoHandler(req: Stdlib.Http.Request): Stdlib.Http.Response =
   Stdlib.Http.responseWithHeaders(200, req.headers, Stdlib.Utf8.encode(req.url))
 
 
-// @compiler blocked: upstream-dependency diagnostic="__run: Unknown type 'Stdlib.HttpServer.Middleware'"
 let __run(
   middlewares: List<Stdlib.HttpServer.Middleware>,
   req: Stdlib.Http.Request)
@@ -115,7 +114,6 @@ let __run(
   Stdlib.HttpServer.Middleware.__handle(middlewares, __echoHandler, req)
 
 
-// @compiler blocked: upstream-dependency diagnostic="serverStackRunsFirstListedOutermost: Unknown type 'Stdlib.HttpServer.Middleware'"
 test serverStackRunsFirstListedOutermost =
   let tag = fun name ->
     Stdlib.HttpServer.Middleware.onResponse(fun r ->
@@ -125,13 +123,11 @@ test serverStackRunsFirstListedOutermost =
   |> Stdlib.Test.equal([ ("x-seen", "inner"), ("x-seen", "outer") ])
 
 
-// @compiler xfail compile: "Unknown function or value '__run'" class=missing-support reason=upstream-dependency
 test serverEmptyStackIsTheHandler =
   (__run([], __req("http://a.test/x", []))).body
   |> Stdlib.Test.equal(Stdlib.Utf8.encode("http://a.test/x"))
 
 
-// @compiler blocked: upstream-dependency diagnostic="standardHeadersUnlessSet: Unknown type 'Stdlib.HttpServer.Middleware'"
 test standardHeadersUnlessSet =
   Stdlib.Test.all(
     [ (__run(
@@ -150,7 +146,6 @@ test standardHeadersUnlessSet =
       |> Stdlib.Test.equal([ ("strict-transport-security", "max-age=1") ]) ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="forwardedProtoRewritesTheUrl: Unknown type 'Stdlib.HttpServer.Middleware'"
 test forwardedProtoRewritesTheUrl =
   let urlFor = fun headers ->
     Stdlib.Utf8.decodeWithReplacement(
@@ -171,7 +166,6 @@ test forwardedProtoRewritesTheUrl =
       urlFor([]) |> Stdlib.Test.equal("http://a.test:8080/p?q=1") ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="logRequestsPassesTheResponseThrough: Unknown type 'Stdlib.HttpServer.Middleware'"
 test logRequestsPassesTheResponseThrough =
   let r =
     __run(
@@ -181,7 +175,6 @@ test logRequestsPassesTheResponseThrough =
   (r.statusCode, r.headers) |> Stdlib.Test.equal((200, [ ("A", "1") ]))
 
 
-// @compiler blocked: upstream-dependency diagnostic="onRequestRewritesForTheHandler: Unknown type 'Stdlib.HttpServer.Middleware'"
 test onRequestRewritesForTheHandler =
   (__run(
      [ Stdlib.HttpServer.Middleware.onRequest(fun req ->
@@ -190,14 +183,12 @@ test onRequestRewritesForTheHandler =
   |> Stdlib.Test.equal(Stdlib.Utf8.encode("http://a.test/#seen"))
 
 
-// @compiler xfail compile: "Unknown field 'middleware' on Darklang.Stdlib.HttpServer.Config.Config" class=missing-support reason=compiler-gap
 test configDefaultsCarryTheStack =
   Stdlib.List.length(
     (Stdlib.HttpServer.Config.defaults(Stdlib.Net.Port.httpAlt)).middleware)
   |> Stdlib.Test.equal(2)
 
 
-// @compiler blocked: upstream-dependency diagnostic="corsAllowsListedOrigins: Unknown type 'Stdlib.HttpServer.Middleware'"
 test corsAllowsListedOrigins =
   let cors = Stdlib.HttpServer.Middleware.cors([ "https://app.test" ])
   let preflight =
@@ -241,7 +232,6 @@ test corsAllowsListedOrigins =
           ("Access-Control-Allow-Origin", "*") ]) ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="requestIdKeepsOrMakesOne: Unknown type 'Stdlib.HttpServer.Middleware'"
 test requestIdKeepsOrMakesOne =
   let run = fun headers ->
     __run(

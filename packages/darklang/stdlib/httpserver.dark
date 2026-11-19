@@ -194,13 +194,10 @@ let getPathParam (req: Http.Request) (routePattern: String) (paramName: String) 
 let __hasHeader (headers: List<(String * String)>) (name: String) : Bool =
     Stdlib.List.any headers (fun pair -> let (key, _) = pair in Stdlib.String.toLowercase key == name)
 
-let __standardHeaders (inject: Bool) (headers: List<(String * String)>) : List<(String * String)> =
-    if Stdlib.Bool.not inject then headers
-    else
-        let server = if Stdlib.HttpServer.__hasHeader headers "server" then [] else [("Server", "darklang")] in
-        let hsts = if Stdlib.HttpServer.__hasHeader headers "strict-transport-security" then []
-                   else [("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")] in
-        Stdlib.List.concat headers (Stdlib.List.concat server hsts)
+// `Server: darklang` is on every response; HSTS is Middleware.standardHeaders'.
+let __standardHeaders (headers: List<(String * String)>) : List<(String * String)> =
+    if Stdlib.HttpServer.__hasHeader headers "server" then headers
+    else Stdlib.List.concat headers [("Server", "darklang")]
 
 let __request (config: Stdlib.HttpServer.Config.Config) (parsed: Stdlib.__HttpWire.ParsedRequest)
     : Stdlib.Result.Result<Stdlib.Http.Request, String> =
@@ -210,17 +207,12 @@ let __request (config: Stdlib.HttpServer.Config.Config) (parsed: Stdlib.__HttpWi
         |> Stdlib.Option.withDefault ("localhost:" + Stdlib.Int64.toString (Stdlib.Net.Port.toInt64 config.port)) in
     match Stdlib.__HttpWire.parseUrl ("http://" + authority + "/") with
     | Error message -> Error message
-    | Ok url ->
-        let forwarded = config.canonicalizeFromForwardedProto &&
-            Stdlib.List.any headers (fun pair -> let (key, value) = pair in
-                Stdlib.String.toLowercase key == "x-forwarded-proto" && Stdlib.String.toLowercase value == "https") in
-        let host = if Stdlib.String.__containsBytes url.host ":" then "[" + url.host + "]" else url.host in
-        let prefix = if forwarded then "https://" + host else "http://" + authority in
-        Ok (Stdlib.Http.Request { method = parsed.method, url = prefix + parsed.target, headers = headers, body = parsed.body })
+    | Ok _ ->
+        Ok (Stdlib.Http.Request { method = parsed.method, url = "http://" + authority + parsed.target, headers = headers, body = parsed.body })
 
 let __responseBytesFor (method: String) (config: Stdlib.HttpServer.Config.Config) (response: Stdlib.Http.Response) (persistent: Bool)
     : Stdlib.Result.Result<Blob, String> =
-    let headers = Stdlib.List.filter (Stdlib.HttpServer.__standardHeaders config.injectStandardHeaders response.headers) (fun pair -> let (name, _) = pair in
+    let headers = Stdlib.List.filter (Stdlib.HttpServer.__standardHeaders response.headers) (fun pair -> let (name, _) = pair in
             let lower = Stdlib.String.toLowercase name in
             lower != "content-length" && lower != "transfer-encoding" && lower != "connection") in
     match Stdlib.Option.Option.Some response.statusCode with
@@ -241,29 +233,13 @@ let __responseBytes (method: String) (config: Stdlib.HttpServer.Config.Config) (
     : Stdlib.Result.Result<Blob, String> =
     Stdlib.HttpServer.__responseBytesFor method config response false
 
-let __http2Handler (config: Stdlib.HttpServer.Config.Config)
-    (handler: Stdlib.Http.Request -> Stdlib.Http.Response) (request: Stdlib.Http.Request) : Stdlib.Http.Response =
+let __http2Handler (handler: Stdlib.Http.Request -> Stdlib.Http.Response) (request: Stdlib.Http.Request) : Stdlib.Http.Response =
     match Stdlib.__HttpWire.parseUrl request.url with
     | Error _ -> Stdlib.Http.badRequest "Invalid HTTP request URL"
     | Ok url ->
         let headers = if Stdlib.HttpServer.__hasHeader request.headers "host" then request.headers
                       else Stdlib.List.concat request.headers [("host", url.authority)] in
-        let forwarded = config.canonicalizeFromForwardedProto &&
-            Stdlib.List.any headers (fun pair -> let (key, value) = pair in
-                key == "x-forwarded-proto" && Stdlib.String.toLowercase value == "https") in
-        let host = if Stdlib.String.__containsBytes url.host ":" then "[" + url.host + "]" else url.host in
-        let requestUrl = if forwarded then "https://" + host + url.target else request.url in
-        let req = Stdlib.Http.Request { method = request.method, url = requestUrl, headers = headers, body = request.body } in
-        let started = Stdlib.__Network.monotonicMillis () in
-        let response = handler req in
-        let _ =
-            if config.logRequests then
-                match started, Stdlib.__Network.monotonicMillis () with
-                | Ok begin_, Ok end_ -> Stdlib.printLine ("[HttpServer] " + Stdlib.HttpServer.getMethod req + " " + url.target + " " +
-                    Stdlib.Int64.toString response.statusCode + " " + Stdlib.Int64.toString (end_ - begin_) + "ms")
-                | _, _ -> ()
-            else () in
-        response
+        handler (Stdlib.Http.Request { method = request.method, url = request.url, headers = headers, body = request.body })
 
 type __ReadError =
     | Status of (Int * Stdlib.Option.Option<String>)
@@ -356,6 +332,7 @@ let __handleHttp1Transport (config: Stdlib.HttpServer.Config.Config) (handler: S
                     method |> Stdlib.Option.withDefault "(unknown)"
                 | Error _ -> "(unknown)" in
             let target = match parsed with | Ok request -> request.target | Error _ -> "(invalid request)" in
+            let serverWritten = match parsed with | Ok _ -> false | Error _ -> true in
             let response =
                 match parsed with
                 | Error (Status details) ->
@@ -376,11 +353,12 @@ let __handleHttp1Transport (config: Stdlib.HttpServer.Config.Config) (handler: S
                     let message = if method == "HEAD" then head else head + "Internal server error" in
                     (Stdlib.String.toBlob message, 500L) in
             let _ = transport.write bytes in
+            // A response the server writes itself is logged whatever the middleware.
             let _ =
-                if config.logRequests then
+                if serverWritten || status == 500L && response.statusCode != 500L then
                     match Stdlib.__Network.monotonicMillis () with
                     | Error _ -> ()
-                    | Ok finished -> Stdlib.printLine ("[HttpServer] " + method + " " + target + " " +
+                    | Ok finished -> Stdlib.printErrorLine ("[HttpServer] " + method + " " + target + " " +
                         Stdlib.Int64.toString status + " " + Stdlib.Int64.toString (finished - started) + "ms")
                 else () in
             Ok false
@@ -420,7 +398,7 @@ let __dispatchPrelude (config: Stdlib.HttpServer.Config.Config) (handler: Stdlib
         Stdlib.HttpServer.__handleHttp1 config handler signals connection limit pending
     else if Stdlib.Blob.__byteLength pending >= 24L then
         let transport = Stdlib.__HttpTransport.plainWithShutdown connection signals in
-        let served = Stdlib.__Http2.serve transport pending config (fun request -> Stdlib.HttpServer.__http2Handler config handler request) in
+        let served = Stdlib.__Http2.serve transport pending config (fun request -> Stdlib.HttpServer.__http2Handler handler request) in
         let stopped =
             match served, Stdlib.__Network.monotonicMillis () with
             | Ok (), Ok now -> Stdlib.HttpServer.__drainHttp2 connection signals (now + 10000L) 131072L
@@ -469,6 +447,7 @@ let serveOn (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (ha
     (onListening: Unit -> Unit) : Stdlib.Result.Result<Unit, String> =
     let port = Stdlib.Net.Port.toInt64 config.port in
     let limit = config.maxBodyBytes in
+    let handler = Stdlib.HttpServer.Middleware.wrap config.middleware handler in
     if port <= 0L || port > 65535L || limit < 0L || limit > 104857600L then Error "Invalid HTTP server configuration"
     else
         match Stdlib.__Network.monotonicMillis () with
