@@ -26,14 +26,15 @@ module NoInternet =
 // Tests that try to make requests to the internet
 
 // ... but first, some helpers
-let get (url: String) (headers: List<String * String>): Stdlib.Result.Result<Stdlib.HttpClient.Response, Stdlib.HttpClient.RequestError> =
+let get (url: String) (headers: List<String * String>): Stdlib.Result.Result<Stdlib.HttpClient.Response<Blob>, Stdlib.HttpClient.RequestError> =
   Stdlib.HttpClient.get url headers
 
 val errInvalidHost = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadUrl(Stdlib.HttpClient.BadUrlDetails.InvalidHost))
 val errInvalidUri = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadUrl(Stdlib.HttpClient.BadUrlDetails.InvalidUri))
+val errLoopback = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadUrl(Stdlib.HttpClient.BadUrlDetails.Loopback))
+val errPrivateNetwork = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadUrl(Stdlib.HttpClient.BadUrlDetails.PrivateNetwork))
 val errInvalidRequest = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadUrl(Stdlib.HttpClient.BadUrlDetails.InvalidRequest))
 
-val errNetworkError = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.NetworkError)
 
 val errBadHeaderEmptyKey = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadHeader(Stdlib.HttpClient.BadHeader.EmptyKey))
 val errBadMethod = Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadMethod)
@@ -79,16 +80,16 @@ module Disallowed =
   // invalid host
   (get "http://0.0.0.0" []) = errInvalidHost
   (get "http://0" []) = errInvalidHost
-  (get "http://localhost" []) = errInvalidHost
-  (get "http://127.0.0.1" []) = errInvalidHost
-  (get "http://[::1]" []) = errInvalidHost
-  (get "http://[0:0:0:0:0:0:0:1]" []) = errInvalidHost
-  (get "http://[0000:0000:0000:0000:0000:0000:0000:0001]" []) = errInvalidHost
-  (get "http://127.0.0.17" []) = errInvalidHost
-  (get "http://[::ffff:7f00:11]" []) = errInvalidHost
-  (get "http://[0:0:0:0:0:ffff:7f00:0011]" []) = errInvalidHost
-  (get "http://[0000:0000:0000:0000:0000:ffff:7f00:0011]" []) = errInvalidHost
-  (get "http://127.255.174.17" []) = errInvalidHost
+  (get "http://localhost" []) = errLoopback
+  (get "http://127.0.0.1" []) = errLoopback
+  (get "http://[::1]" []) = errLoopback
+  (get "http://[0:0:0:0:0:0:0:1]" []) = errLoopback
+  (get "http://[0000:0000:0000:0000:0000:0000:0000:0001]" []) = errLoopback
+  (get "http://127.0.0.17" []) = errLoopback
+  (get "http://[::ffff:7f00:11]" []) = errLoopback
+  (get "http://[0:0:0:0:0:ffff:7f00:0011]" []) = errLoopback
+  (get "http://[0000:0000:0000:0000:0000:ffff:7f00:0011]" []) = errLoopback
+  (get "http://127.255.174.17" []) = errLoopback
   (get "http://metadata.google.internal" []) = errInvalidHost
   (get "http://metadata" []) = errInvalidHost
   (get "http://169.254.169.254" []) = errInvalidHost
@@ -96,14 +97,14 @@ module Disallowed =
   (get "http://[0:0:0:0:0:ffff:a9fe:a9fe]" []) = errInvalidHost
   (get "http://[0000:0000:0000:0000:0000:ffff:a9fe:a9fe]" []) = errInvalidHost
   (get "http://169.254.0.0" []) = errInvalidHost
-  (get "http://172.16.0.1" []) = errInvalidHost
-  (get "http://[::ffff:ac10:1]" []) = errInvalidHost
-  (get "http://[0:0:0:0:0:ffff:ac10:0001]" []) = errInvalidHost
-  (get "http://[0000:0000:0000:0000:0000:ffff:ac10:0001]" []) = errInvalidHost
-  (get "http://192.168.1.1" []) = errInvalidHost
-  (get "http://[::ffff:c0a8:101]" []) = errInvalidHost
-  (get "http://[0:0:0:0:0:ffff:c0a8:0101]" []) = errInvalidHost
-  (get "http://[0000:0000:0000:0000:0000:ffff:c0a8:0101]" []) = errInvalidHost
+  (get "http://172.16.0.1" []) = errPrivateNetwork
+  (get "http://[::ffff:ac10:1]" []) = errPrivateNetwork
+  (get "http://[0:0:0:0:0:ffff:ac10:0001]" []) = errPrivateNetwork
+  (get "http://[0000:0000:0000:0000:0000:ffff:ac10:0001]" []) = errPrivateNetwork
+  (get "http://192.168.1.1" []) = errPrivateNetwork
+  (get "http://[::ffff:c0a8:101]" []) = errPrivateNetwork
+  (get "http://[0:0:0:0:0:ffff:c0a8:0101]" []) = errPrivateNetwork
+  (get "http://[0000:0000:0000:0000:0000:ffff:c0a8:0101]" []) = errPrivateNetwork
 
   // invalid uri
   // @compiler blocked: compiler-gap
@@ -111,7 +112,7 @@ module Disallowed =
 
   // network error
   // @compiler blocked: compiler-gap
-  (get "http://[0:0:0:0:0:0:0:0]" []) = errNetworkError
+  (get "http://[0:0:0:0:0:0:0:0]" []) = errInvalidHost
 
   // Sneaky banned urls: a hostname that looks fine but resolves somewhere banned.
   // Blocked in the connect callback, after resolution, rather than by the URL
@@ -125,9 +126,9 @@ module Disallowed =
   // those /etc/hosts entries these three pass without testing anything. That was
   // true of the third-party version too. Nothing in the public API distinguishes
   // "blocked at connect" from "never resolved".
-  (get "http://banned-loopback.dark.test" []) = errNetworkError // 127.0.0.1
-  (get "http://banned-zero.dark.test" []) = errNetworkError // 0.0.0.0
-  (get "http://banned-private.dark.test" []) = errNetworkError // 10.0.0.1
+  (match get "http://banned-loopback.dark.test" [] with | Error (NetworkError _) -> true | _ -> false) = true // 127.0.0.1
+  (match get "http://banned-zero.dark.test" [] with | Error (NetworkError _) -> true | _ -> false) = true // 0.0.0.0
+  (match get "http://banned-private.dark.test" [] with | Error (NetworkError _) -> true | _ -> false) = true // 10.0.0.1
 
   // invalid headers
   // (we just happen to know that google will fail this way if we provide these headers..)
@@ -145,7 +146,7 @@ module NetworkFailures =
   // `.test` cannot resolve publicly. Depending on the DNS environment, that is
   // reported immediately as NetworkError or when the request times out.
   (match get "http://no-such-host.dark.test" [] with
-   | Error NetworkError -> true
+   | Error (NetworkError _) -> true
    | Error Timeout -> true
    | _ -> false) = true
 

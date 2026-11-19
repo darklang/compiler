@@ -396,7 +396,7 @@ let sendRequest (transport: Stdlib.__HttpTransport.Transport) (state: Stdlib.__H
     | Ok next -> Stdlib.__Http2.__uploadBody transport next body 0L 0L
 
 let __responseHead (transport: Stdlib.__HttpTransport.Transport) (reply: Stdlib.__Http2.Reply)
-  (method: String) : Stdlib.Result.Result<Stdlib.HttpClient.StreamResponse, String> =
+  (method: String) : Stdlib.Result.Result<Stdlib.HttpClient.__StreamReceived, String> =
   let response = reply.head in
   match Stdlib.__Http2Fields.length response.headers with
   | Error message -> Error message
@@ -406,12 +406,12 @@ let __responseHead (transport: Stdlib.__HttpTransport.Transport) (reply: Stdlib.
       bytes = Stdlib.Blob.empty, position = 0L, total = 0L, ended = reply.ended,
       expected = expected, noBody = noBody } in
     let body = Stdlib.Stream.__fromProducer initial Stdlib.__Http2.__bodyStep (fun current -> Stdlib.__HttpTransport.close current.transport) in
-    Ok (Stdlib.HttpClient.StreamResponse { statusCode = response.status,
+    Ok (Stdlib.HttpClient.__StreamReceived { statusCode = response.status,
       headers = response.headers, body = body })
 
 let stream (transport: Stdlib.__HttpTransport.Transport) (method: String) (url: Stdlib.__HttpWire.Url)
   (headers: List<(String * String)>) (body: Blob)
-  : Stdlib.Result.Result<Stdlib.HttpClient.StreamResponse, String> =
+  : Stdlib.Result.Result<Stdlib.HttpClient.__StreamReceived, String> =
   match Stdlib.__Http2Fields.requestFields method url headers body with
   | Error message -> Error message
   | Ok fields ->
@@ -436,7 +436,7 @@ let __bufferBody (transport: Stdlib.__HttpTransport.Transport) (state: Stdlib.__
 
 let request (transport: Stdlib.__HttpTransport.Transport) (method: String) (url: Stdlib.__HttpWire.Url)
   (headers: List<(String * String)>) (body: Blob)
-  : Stdlib.Result.Result<Stdlib.HttpClient.Response, String> =
+  : Stdlib.Result.Result<Stdlib.HttpClient.__Received, String> =
   match Stdlib.__Http2Fields.requestFields method url headers body with
   | Error message -> Error message
   | Ok fields ->
@@ -458,7 +458,7 @@ let request (transport: Stdlib.__HttpTransport.Transport) (method: String) (url:
                         | None -> true
                         | Some size -> noBody || size == Stdlib.Blob.__byteLength received.bytes in
             if Stdlib.Bool.not valid then Error "HTTP/2 Content-Length mismatch"
-            else Ok (Stdlib.HttpClient.Response { statusCode = reply.head.status,
+            else Ok (Stdlib.HttpClient.__Received { statusCode = reply.head.status,
               headers = reply.head.headers, body = received.bytes })
 
 let __sendResponse (transport: Stdlib.__HttpTransport.Transport) (state: Stdlib.__Http2.State)

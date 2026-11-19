@@ -101,7 +101,7 @@ let __start (ready: Stdlib.__QuicClient.Ready) (method: String) (url: Stdlib.__H
 
 let stream (ready: Stdlib.__QuicClient.Ready) (method: String) (url: Stdlib.__HttpWire.Url)
   (headers: List<(String * String)>) (body: Blob) (timeout: Int64)
-  : Stdlib.Result.Result<Stdlib.HttpClient.StreamResponse, String> =
+  : Stdlib.Result.Result<Stdlib.HttpClient.__StreamReceived, String> =
   match Stdlib.__Http3Client.__start ready method url headers body timeout with
   | Error message -> let _ = Stdlib.__QuicClient.close ready in Error message
   | Ok reply ->
@@ -109,7 +109,7 @@ let stream (ready: Stdlib.__QuicClient.Ready) (method: String) (url: Stdlib.__Ht
       bytes = Stdlib.Blob.empty, position = 0L, finished = reply.finished } in
     let cell = Stdlib.Stream.__cellNew initial in
     let body = Stdlib.Stream.__new (fun _unit -> Stdlib.__Http3Client.__bodyNext cell) (fun _unit -> Stdlib.__Http3Client.__bodyClose cell) in
-    Ok (Stdlib.HttpClient.StreamResponse { statusCode = reply.head.status, headers = reply.head.headers, body = body })
+    Ok (Stdlib.HttpClient.__StreamReceived { statusCode = reply.head.status, headers = reply.head.headers, body = body })
 
 let __buffer (state: Stdlib.__Http3.State) (events: List<Stdlib.__Http3Message.Event>) (finished: Bool) (pieces: List<Blob>)
   : Stdlib.Result.Result<(Blob * Stdlib.__Http3.State), String> =
@@ -120,11 +120,11 @@ let __buffer (state: Stdlib.__Http3.State) (events: List<Stdlib.__Http3Message.E
 
 let request (ready: Stdlib.__QuicClient.Ready) (method: String) (url: Stdlib.__HttpWire.Url)
   (headers: List<(String * String)>) (body: Blob) (timeout: Int64)
-  : Stdlib.Result.Result<Stdlib.HttpClient.Response, String> =
+  : Stdlib.Result.Result<Stdlib.HttpClient.__Received, String> =
   let result = Stdlib.__Http3Client.__start ready method url headers body timeout |> Stdlib.Result.andThen (fun reply ->
     Stdlib.__Http3Client.__buffer reply.state reply.events reply.finished [] |> Stdlib.Result.map (fun pair ->
       let (bytes, final) = pair in
       let _ = Stdlib.__QuicConnection.finishClient final.connection in
-      Stdlib.HttpClient.Response { statusCode = reply.head.status, headers = reply.head.headers, body = bytes })) in
+      Stdlib.HttpClient.__Received { statusCode = reply.head.status, headers = reply.head.headers, body = bytes })) in
   let _ = Stdlib.__QuicClient.close ready in
   result

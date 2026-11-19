@@ -31,6 +31,11 @@ let stringSlugify (value: String) : String =
     let trimmed = Stdlib.String.__trimEndCodepoints (Stdlib.String.__trimStartCodepoints filtered) in
     Builtin.__slugifySeparators trimmed false []
 
+// Native code has no reads in flight: every value is ready where it is computed.
+let runtimeForce (value: 'a) : 'a = value
+
+let runtimeWhenReady (value: 'a) (fn: 'a -> 'b) : 'b = fn value
+
 let runtimeEnvironmentGet (name: String) : Stdlib.Option.Option<String> =
     Stdlib.Cli.__getenv name
 

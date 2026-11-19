@@ -355,7 +355,7 @@ files:
     negate_v0: present
     notEquals_v0: unassessed
     power_v0: missing
-    runtimeForce_v0: missing
+    runtimeForce_v0: present
     shiftLeft_v0: missing
     shiftRight_v0: missing
     subtract_v0: missing

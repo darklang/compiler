@@ -13,4 +13,4 @@ Stdlib.__Http3Discovery.allowedAddress true [127L] = false
 Stdlib.__Http3Discovery.connect [] "example.com" [] false |> Stdlib.Option.isNone = true
 Stdlib.__DnsWire.query 1L "_8443._https.example.com" 1L |> Stdlib.Result.map Stdlib.Blob.toHex = Ok "000101000001000000000000055F38343433065F6874747073076578616D706C6503636F6D0000010001"
 Stdlib.Blob.fromHex "000181800001000100000000055F38343433065F6874747073076578616D706C6503636F6D0000010001C00C000100010000001E000401020304" |> Stdlib.Result.andThen (fun wire -> Stdlib.__DnsWire.answers wire 1L "_8443._https.example.com" 1L) = Ok [[1L,2L,3L,4L]]
-Stdlib.HttpClient.request "GET" "https://127.0.0.1/" [] Stdlib.Blob.empty = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.InvalidHost)
+Stdlib.HttpClient.request "GET" "https://127.0.0.1/" [] Stdlib.Blob.empty = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.Loopback)
