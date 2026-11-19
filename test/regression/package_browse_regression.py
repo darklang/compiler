@@ -28,10 +28,10 @@ SHOW_DECIMAL = dict(hash={"Hash": ["show-decimal-hash"]}, typeParams=[], bounds=
                     body={"EString": [1, [{"StringText": ["decimal"]}]]})
 SHOW_REF = dict(originalName=["Big", "App", "Math", "Show"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["show-hash"]}]},
-    location={"Some": [dict(owner="Big", modules=["App", "Math"], name="Show")]})]})
+    location=dict(owner="Big", modules=["App", "Math"], name="Show"))]})
 DECIMAL_REF = dict(originalName=["Big", "App", "Math", "showDecimal"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["show-decimal-hash"]}]},
-    location={"Some": [dict(owner="Big", modules=["App", "Math"], name="showDecimal")]})]})
+    location=dict(owner="Big", modules=["App", "Math"], name="showDecimal"))]})
 IMPL = dict(hash={"Hash": ["impl-hash"]}, trait_=SHOW_REF, traitTypeArgs=[], self={"TDecimal": []},
             typeParams=[], bounds=[], methods=[["show", DECIMAL_REF]])
 
@@ -42,7 +42,7 @@ HELPER = dict(FN, hash={"Hash": ["helper-hash"]})
 HELPER_LOCATION = dict(owner="Big", modules=["Lib"], name="helper")
 TWICE = dict(FN, hash={"Hash": ["twice-hash"]}, body={"EApply": [1, {"EFnName": [2, dict(
     originalName=["Big", "Lib", "helper"], resolved={"Ok": [dict(
-        name={"Package": [{"Hash": ["helper-hash"]}]}, location={"Some": [HELPER_LOCATION]})]}), []]},
+        name={"Package": [{"Hash": ["helper-hash"]}]}, location=HELPER_LOCATION)]}), []]},
     [], [{"EArg": [3, 0]}]]})
 
 

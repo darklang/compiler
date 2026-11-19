@@ -53,10 +53,10 @@ let listHeadsInTuple (xs: List<String>) (n: String) : Int64 =
 let listHeadsAtTop (xs: List<String>) : Int =
   match xs with
   | "Stdlib" :: rest -> Stdlib.Int.fromInt64 (Stdlib.List.length rest)
-  | ["PACKAGE", x] -> 20
-  | [] -> 2
-  | _ -> 3
-[listHeadsAtTop ["Stdlib", "a", "b"], listHeadsAtTop ["hello"], listHeadsAtTop [], listHeadsAtTop ["PACKAGE", "q"], listHeadsAtTop ["PACKAGE"]] = [2, 3, 2, 20, 3]
+  | ["PACKAGE", x] -> 20z
+  | [] -> 2z
+  | _ -> 3z
+[listHeadsAtTop ["Stdlib", "a", "b"], listHeadsAtTop ["hello"], listHeadsAtTop [], listHeadsAtTop ["PACKAGE", "q"], listHeadsAtTop ["PACKAGE"]] = [2z, 3z, 2z, 20z, 3z]
 
 // `Ctor x :: rest` is `(Ctor x) :: rest`.
 let consHeadConstructor (xs: List<Stdlib.AltJson.Json>) : Int64 =

@@ -18,7 +18,7 @@
  let signature = Stdlib.Blob.fromHex "304502210086AD2C7062EB3951FA71FD2EF71BE9D3B9C2E052471943D8B7CED0A5BEE226DB022074031B662437F1E0B0CF9A4F8761DC539F5036BAD624070CC39E5EE200E73963"
  match (key, signature) with
  | (Ok k, Ok s) ->
-   let changed = Stdlib.Blob.concat [Stdlib.Blob.slice k 0 90, Stdlib.String.toBlob "x"] in
+   let changed = Stdlib.Blob.concat [Stdlib.Blob.slice k 0z 90z, Stdlib.String.toBlob "x"] in
    Stdlib.__P256.verifySha256 changed (Stdlib.String.toBlob "Dark TLS P-256 verification fixture") s
  | _ -> Error "fixture")
   = Error "P-256 public point is not on curve"

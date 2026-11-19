@@ -1,8 +1,8 @@
-match Builtin.syscallClockGettime (-1) with | Error e -> e == (if Stdlib.Cli.Posix.__abiMac () then 78 else 22) | Ok _ -> false = true
-Stdlib.DateTime.__monotonicMilliseconds () > 0 = true
-Stdlib.DateTime.__sleepNanoseconds 0 0 = Ok ()
-Stdlib.DateTime.__sleepNanoseconds 0 (-1) = Error 22
-Stdlib.DateTime.__realtimeNanoseconds () |> Stdlib.Result.map (fun pair -> let (seconds, nanos) = pair in seconds > 1700000000 && nanos >= 0 && nanos < 1000000000) = Ok true
+match Builtin.syscallClockGettime (-1z) with | Error e -> e == (if Stdlib.Cli.Posix.__abiMac () then 78z else 22z) | Ok _ -> false = true
+Stdlib.DateTime.__monotonicMilliseconds () > 0z = true
+Stdlib.DateTime.__sleepNanoseconds 0z 0z = Ok ()
+Stdlib.DateTime.__sleepNanoseconds 0z (-1z) = Error 22z
+Stdlib.DateTime.__realtimeNanoseconds () |> Stdlib.Result.map (fun pair -> let (seconds, nanos) = pair in seconds > 1700000000z && nanos >= 0z && nanos < 1000000000z) = Ok true
 Builtin.timeNowMs () = compileerror="Unknown function"
 Builtin.timeSleep 1.0 = compileerror="Unknown function"
-Stdlib.DateTime.__sleepWith (fun seconds _ -> if seconds == 1 then (-4, Stdlib.Blob.fromList [0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy]) else (0, Stdlib.Blob.empty)) 1 0 = Ok ()
+Stdlib.DateTime.__sleepWith (fun seconds _ -> if seconds == 1z then (-4z, Stdlib.Blob.fromList [0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy, 0uy]) else (0z, Stdlib.Blob.empty)) 1z 0z = Ok ()

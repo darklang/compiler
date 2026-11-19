@@ -25,7 +25,7 @@ Stdlib.Decimal.toString (-7.5dec % 2dec) = "0.5"
 Stdlib.Decimal.toString (0.5dec * 0.5dec) = "0.25"
 Stdlib.Decimal.toString (1.10dec - 3dec) = "-1.90"
 Stdlib.Decimal.toString (-0.05dec) = "-0.05"
-Stdlib.Decimal.toParts 1.10dec = (110, 2L)
+Stdlib.Decimal.toParts 1.10dec = (110z, 2L)
 1.10dec == 1.1dec = true
 [1.10dec] == [1.1dec] = true
 1.5dec < 2dec = true

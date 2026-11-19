@@ -368,7 +368,9 @@ let rec typeReference (env : env) typ =
   | AST.TSum ("Uuid", []) -> nullary "TUuid"
   | AST.TDateTime -> nullary "TDateTime"
   | AST.TList typ -> unary "TList" (typeReference env typ)
-  | AST.TDict (AST.TString, typ) -> unary "TDict" (typeReference env typ)
+  | AST.TDict (key, value) ->
+      constructor env owner "TDict"
+        (tuplePayload [ typeReference env key; typeReference env value ])
   | AST.TTuple (first :: second :: rest) ->
       constructor env owner "TTuple"
         (tuplePayload
@@ -390,7 +392,7 @@ let rec typeReference (env : env) typ =
       unary "TVariable" (StringLiteral name)
   | AST.TTuple []
   | AST.TTuple [ _ ]
-  | AST.TInternalRawPtr | AST.TNever | AST.TDict _ ->
+  | AST.TInternalRawPtr | AST.TNever ->
       unary "TVariable" (StringLiteral (CheckingDiagnostics.typeToString typ))
 
 let cantMatch (env : env) typ raw path =

@@ -17,7 +17,7 @@ def main():
         binary = root / "facts"
         source.write_text('''let facts = Stdlib.Cli.Tui.TerminalSupport.currentFacts () in
 let report = $"{Stdlib.Bool.toString facts.inputIsTerminal}|{Stdlib.Bool.toString facts.outputIsTerminal}|{facts.terminalName}" in
-let _ = Stdlib.Cli.Posix.fdWrite 2 (Stdlib.String.toBlob report) in
+let _ = Stdlib.Cli.Posix.fdWrite 2z (Stdlib.String.toBlob report) in
 0L
 ''', encoding="utf-8")
         subprocess.run([compiler, "-q", "--leak-check", str(source), "-o", str(binary)], check=True, timeout=120)
@@ -25,7 +25,7 @@ let _ = Stdlib.Cli.Posix.fdWrite 2 (Stdlib.String.toBlob report) in
         color_binary = root / "color"
         color_source.write_text('''let initial = Darklang.Cli.Terminal.colorEnabled () in
 let report = Stdlib.Bool.toString initial in
-let _ = Stdlib.Cli.Posix.fdWrite 2 (Stdlib.String.toBlob report) in
+let _ = Stdlib.Cli.Posix.fdWrite 2z (Stdlib.String.toBlob report) in
 0L
 ''', encoding="utf-8")
         subprocess.run([compiler, "-q", "--leak-check", str(color_source), "-o", str(color_binary)], check=True, timeout=120)
@@ -34,7 +34,7 @@ let _ = Stdlib.Cli.Posix.fdWrite 2 (Stdlib.String.toBlob report) in
         interactive_source.write_text('''let raw = Builtin.stdinIsInteractive () in
 let public = Stdlib.Cli.Stdin.isInteractive () in
 let report = $"{Stdlib.Bool.toString raw}|{Stdlib.Bool.toString public}" in
-let _ = Stdlib.Cli.Posix.fdWrite 2 (Stdlib.String.toBlob report) in
+let _ = Stdlib.Cli.Posix.fdWrite 2z (Stdlib.String.toBlob report) in
 0L
 ''', encoding="utf-8")
         subprocess.run([compiler, "-q", "--leak-check", str(interactive_source), "-o", str(interactive_binary)], check=True, timeout=120)

@@ -8,4 +8,4 @@ let duplicateDictKey () : Dict<Dict<String, Int64>, String> = Dict { (computedKe
 duplicateStringKey () = exit=1 stderr="Uncaught exception: Cannot add two dictionary entries with the same key \"key\"\n"
 duplicateIntKey () = exit=1 stderr="Uncaught exception: Cannot add two dictionary entries with the same key 7\n"
 duplicateRecordKey () = exit=1 stderr="Uncaught exception: Cannot add two dictionary entries with the same key RenderedKey { keyText: \"x\" }\n"
-duplicateDictKey () = exit=1 stderr="Uncaught exception: Cannot add two dictionary entries with the same key Dict { nested = 7 }\n"
+duplicateDictKey () = exit=1 stderr="Uncaught exception: Cannot add two dictionary entries with the same key { \"nested\": 7 }\n"

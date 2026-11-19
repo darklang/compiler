@@ -61,7 +61,7 @@
  | Error _ -> "fixture"
  | Ok bytes ->
    let input = Stdlib.__Tls13Certificate.certificateVerifyInput384 bytes in
-   let hash = Stdlib.Blob.slice input 98 48 in
+   let hash = Stdlib.Blob.slice input 98z 48z in
    Stdlib.Blob.toHex hash)
   = "7210AF19145EC2A8E250A7FE8E9EEEAC1301E524DAAB82366C36BE614DC35402A289101E48CAD61C45337F2F32C14FDC"
 
@@ -75,7 +75,7 @@
    | Ok flight -> Ok ((flight.cipherSuite, Stdlib.Blob.length flight.serverKeys.key,
                        Stdlib.Blob.length flight.serverHandshakeSecret))
  | _ -> Error "Invalid fixture")
-  = Ok ((4866L, 32, 48))
+  = Ok ((4866L, 32z, 48z))
 
 (let shared = Stdlib.Blob.fromHex "000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F"
  let client = Stdlib.Blob.fromHex "01000000"

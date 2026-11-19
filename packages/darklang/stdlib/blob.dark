@@ -349,7 +349,7 @@ let __previewPairs (blob: Blob) (index: Int64) (stop: Int64) : String =
         let rest = Stdlib.Blob.__previewPairs blob (index + 1L) stop in
         if rest == "" then pair else pair + " " + rest
 
-// How the current interpreter prints unsaved Bytes, for --syntax=current:
+// How the current interpreter prints unsaved Bytes:
 // the length, then the first 16 bytes in lower-case hex pairs.
 let __evalDisplay (blob: Blob) : String =
     let n = Stdlib.Blob.__byteLength blob in

@@ -41,7 +41,7 @@ Stdlib.Int64.remainder 20L 8L = Stdlib.Result.Result.Ok 4L
 Stdlib.Int64.remainder -20L 8L = Stdlib.Result.Result.Ok -4L
 Stdlib.Int64.remainder -20L -8L = Stdlib.Result.Result.Ok -4L
 Stdlib.Int64.remainder -15L 6L = Stdlib.Result.Result.Ok -3L
-Stdlib.Int64.remainder 5L 0L = error="Cannot divide by 0"
+Stdlib.Int64.remainder 5L 0L = Stdlib.Result.Result.Error "Cannot divide by 0"
 (Stdlib.List.map
   (Stdlib.List.range -5L 5L)
   (fun v -> Stdlib.Int64.remainder (v) -4L)
@@ -292,10 +292,10 @@ Stdlib.Int64.fromUInt8 0uy = 0L
 Stdlib.Int64.fromUInt8 1uy = 1L
 Stdlib.Int64.fromUInt8 255uy = 255L
 
-Stdlib.Int64.fromInt16 0s = 0L
-Stdlib.Int64.fromInt16 1s = 1L
-Stdlib.Int64.fromInt16 32767s = 32767L
-Stdlib.Int64.fromInt16 -32768s = -32768L
+Stdlib.Int64.fromInt16 0s16 = 0L
+Stdlib.Int64.fromInt16 1s16 = 1L
+Stdlib.Int64.fromInt16 32767s16 = 32767L
+Stdlib.Int64.fromInt16 -32768s16 = -32768L
 
 Stdlib.Int64.fromUInt16 0us = 0L
 Stdlib.Int64.fromUInt16 1us = 1L

@@ -1,8 +1,5 @@
 (* ValueRendering.mli - Interpreter-compatible result rendering.
    Builds monomorphic Dark functions for native eval and diagnostic boundaries. *)
-(* `--syntax=current` sets this: render as `dark eval` prints. *)
-val evalDisplay : bool ref
-
 val rewriteProgram :
   Types.indexedTypeRegistry ->
   Types.indexedSumTypeRegistry ->

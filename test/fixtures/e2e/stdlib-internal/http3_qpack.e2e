@@ -15,7 +15,7 @@ let data = Stdlib.Blob.fromHex "00" |> Stdlib.Result.withDefault Stdlib.Blob.emp
 let data = Stdlib.Blob.fromHex "00005104FF" |> Stdlib.Result.withDefault Stdlib.Blob.empty in Stdlib.__Qpack.decode data |> Stdlib.Result.isError = true
 let data = Stdlib.Blob.fromHex "00002000" |> Stdlib.Result.withDefault Stdlib.Blob.empty in Stdlib.__Qpack.decode data = Error "Empty HTTP header name"
 let data = Stdlib.Blob.fromHex "0000FF23" |> Stdlib.Result.withDefault Stdlib.Blob.empty in Stdlib.__Qpack.decode data = Ok [("x-frame-options", "sameorigin")]
-Stdlib.__Qpack.encode (Stdlib.List.repeatUnsafe 257 ("a", "b")) = Error "QPACK header list too large"
+Stdlib.__Qpack.encode (Stdlib.List.repeatUnsafe 257z ("a", "b")) = Error "QPACK header list too large"
 let data = Stdlib.Blob.fromHex "2020" |> Stdlib.Result.withDefault Stdlib.Blob.empty in Stdlib.__Qpack.encoderInstructions data 0L = Ok 2L
 let data = Stdlib.Blob.fromHex "3F" |> Stdlib.Result.withDefault Stdlib.Blob.empty in Stdlib.__Qpack.encoderInstructions data 0L = Error "QPACK capacity exceeds advertised limit"
 let data = Stdlib.Blob.fromHex "21" |> Stdlib.Result.withDefault Stdlib.Blob.empty in Stdlib.__Qpack.encoderInstructions data 0L = Error "QPACK capacity exceeds advertised limit"

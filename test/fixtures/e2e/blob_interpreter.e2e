@@ -6,5 +6,5 @@ Stdlib.Blob.indexOf (Stdlib.Blob.fromString "abc") 98uy 5L = None
 Stdlib.Blob.indexOfSegment (Stdlib.Blob.fromString "abcbc") (Stdlib.Blob.fromString "bc") 2L = Some 3L
 Stdlib.Blob.indexOfSegment (Stdlib.Blob.fromString "abc") (Stdlib.Blob.fromString "") 1L = Some 1L
 Stdlib.Blob.indexOfSegment (Stdlib.Blob.fromString "abc") (Stdlib.Blob.fromString "cd") 0L = None
-Stdlib.Blob.length Stdlib.Blob.empty = 0
+Stdlib.Blob.length Stdlib.Blob.empty = 0z
 Stdlib.DateTime.toUnixTicks (Stdlib.DateTime.fromUnixTicks 10000L) = 10000L

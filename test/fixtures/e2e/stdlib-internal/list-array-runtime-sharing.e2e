@@ -25,7 +25,7 @@ let mutateShared (count: Int) : Int64 =
     original * 1000L + changed
 
 let mutateWithThreeOwners () : Int64 =
-    let source = Stdlib.List.__arrayRepeat 3 1L in
+    let source = Stdlib.List.__arrayRepeat 3z 1L in
     let _ = Stdlib.List.__arrayRetain source in
     let _ = Stdlib.List.__arrayRetain source in
     let first = Stdlib.List.__arrayPrepareMutation source in
@@ -38,8 +38,8 @@ let mutateWithThreeOwners () : Int64 =
     let _ = Stdlib.List.__arrayRelease second in
     result
 
-mutateUnique 3 = 6L
-mutateShared 3 = 3006L
-mutateUnique 32 = 64L
-mutateShared 32 = 32064L
+mutateUnique 3z = 6L
+mutateShared 3z = 3006L
+mutateUnique 32z = 64L
+mutateShared 32z = 32064L
 mutateWithThreeOwners () = 3006009L

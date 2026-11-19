@@ -12,5 +12,5 @@ let assertionMessage (result: Stdlib.Test.Result) : String = match result with |
 (Stdlib.Test.equal Stdlib.Option.Option.None Stdlib.Option.Option.None == Stdlib.Test.Result.Pass) = true
 (Stdlib.Test.equal (Stdlib.Result.Result.Ok 1L) (Stdlib.Result.Result.Ok 1L) == Stdlib.Test.Result.Pass) = true
 (Stdlib.Test.equal (Stdlib.Result.Result.Error "x") (Stdlib.Result.Result.Error "x") == Stdlib.Test.Result.Pass) = true
-(Stdlib.Test.equal (Stdlib.Result.Result.Ok 1L) (Stdlib.Result.Result.Ok 2L) |> assertionMessage |> Stdlib.String.endsWith ".Ok(1)") = true
-(Stdlib.Test.notEqual Stdlib.Option.Option.None Stdlib.Option.Option.None |> assertionMessage |> Stdlib.String.endsWith ".None") = true
+(Stdlib.Test.equal (Stdlib.Result.Result.Ok 1L) (Stdlib.Result.Result.Ok 2L) |> assertionMessage |> Stdlib.String.endsWith "Ok(1)") = true
+(Stdlib.Test.notEqual Stdlib.Option.Option.None Stdlib.Option.Option.None |> assertionMessage |> Stdlib.String.endsWith "None") = true

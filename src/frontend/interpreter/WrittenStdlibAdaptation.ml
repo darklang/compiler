@@ -1,7 +1,7 @@
 (* WrittenStdlibAdaptation.ml - Interpreter-syntax stdlib calls with the interpreter's meaning. *)
 [@@@warning "-4-40"]
 
-(* Under --syntax=current a script is written against the interpreter's
+(* A script is written against the interpreter's
    stdlib, but `Stdlib.String.slice` names the compiler's, which takes an Int
    where the interpreter takes an Int64. Each call to a fn the two disagree on
    converts its arguments and its result as a hosted call does (see

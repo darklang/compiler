@@ -4,13 +4,13 @@
 
 // Blob bridge preserves UTF-8 bytes and the public empty module value.
 Stdlib.Blob.toList (Stdlib.String.toBlob "Aé😀") = [65uy, 195uy, 169uy, 240uy, 159uy, 152uy, 128uy]
-Stdlib.Blob.length Stdlib.Blob.empty = 0
+Stdlib.Blob.length Stdlib.Blob.empty = 0z
 
 // Canonical record and recursive sum constructors are public. Constructor calls
 // throughout this file also exercise the alias-typed Attributes parameters.
 Stdlib.Html.nodeToString (Stdlib.Html.Node.HtmlTag (Stdlib.Html.HtmlTag { name = "x", attrs = [], children = [] })) = "<x></x>"
 Stdlib.Html.nodeToString (Stdlib.Html.Node.String "raw") = "raw"
-type HtmlNodeAlias = Stdlib.Html.Node let htmlAliasNode (value: String): HtmlNodeAlias = Stdlib.Html.stringNode value let aliasNode = htmlAliasNode "alias" in Stdlib.Html.nodeToString aliasNode = stdout="\"alias\"\n" stderr=""
+type HtmlNodeAlias = Stdlib.Html.Node let htmlAliasNode (value: String): HtmlNodeAlias = Stdlib.Html.stringNode value let aliasNode = htmlAliasNode "alias" in Stdlib.Html.nodeToString aliasNode = stdout="alias\n" stderr=""
 
 // Serialization boundaries: fixed escape order, escaped attribute values and safe comments,
 // boolean attributes, void behavior, case sensitivity, and documents.
@@ -49,11 +49,11 @@ let r = Stdlib.Http.success (Stdlib.String.toBlob "yes") in (r.statusCode, Stdli
 let r = Stdlib.Http.responseWithHtml 203L "<b>x</b>" in (r.statusCode, r.headers, Stdlib.Blob.toString r.body) = (203L, [("Content-Type", "text/html; charset=utf-8")], Ok "<b>x</b>")
 let r = Stdlib.Http.responseWithText 204L "hello" in (r.statusCode, r.headers, Stdlib.Blob.toString r.body) = (204L, [("Content-Type", "text/plain; charset=utf-8")], Ok "hello")
 let r = Stdlib.Http.responseWithJson 205L "{\"already\":true}" in (r.statusCode, r.headers, Stdlib.Blob.toString r.body) = (205L, [("Content-Type", "application/json")], Ok "{\"already\":true}")
-let r = Stdlib.Http.redirectTo "bad url" in (r.statusCode, r.headers, Stdlib.Blob.length r.body) = (302L, [("Location", "bad url")], 0)
+let r = Stdlib.Http.redirectTo "bad url" in (r.statusCode, r.headers, Stdlib.Blob.length r.body) = (302L, [("Location", "bad url")], 0z)
 let r = Stdlib.Http.badRequest "bad" in (r.statusCode, Stdlib.Blob.toString r.body) = (400L, Ok "bad")
-let r = Stdlib.Http.notFound () in (r.statusCode, r.headers, Stdlib.Blob.length r.body) = (404L, [], 0)
-let r = Stdlib.Http.unauthorized () in (r.statusCode, Stdlib.Blob.length r.body) = (401L, 0)
-let r = Stdlib.Http.forbidden () in (r.statusCode, Stdlib.Blob.length r.body) = (403L, 0)
+let r = Stdlib.Http.notFound () in (r.statusCode, r.headers, Stdlib.Blob.length r.body) = (404L, [], 0z)
+let r = Stdlib.Http.unauthorized () in (r.statusCode, Stdlib.Blob.length r.body) = (401L, 0z)
+let r = Stdlib.Http.forbidden () in (r.statusCode, Stdlib.Blob.length r.body) = (403L, 0z)
 let r = Stdlib.Http.serverError "boom" in (r.statusCode, Stdlib.Blob.toString r.body) = (500L, Ok "boom")
 
 // Cookie is a structural value only at the pinned revision.

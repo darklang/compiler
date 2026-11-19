@@ -25,11 +25,11 @@ Stdlib.Float64.negate (-3.14) = 3.14
 Stdlib.Float64.negate 0.0 = -0.0
 
 // toInt (truncates toward zero)
-Stdlib.Float64.toInt 3.2 = 3
-Stdlib.Float64.toInt (-3.7) = -3
-Stdlib.Float64.toInt (-3.2) = -3
-Stdlib.Float64.toInt 0.0 = 0
-Stdlib.Float64.toInt 100.99 = 100
+Stdlib.Float64.toInt 3.2 = 3z
+Stdlib.Float64.toInt (-3.7) = -3z
+Stdlib.Float64.toInt (-3.2) = -3z
+Stdlib.Float64.toInt 0.0 = 0z
+Stdlib.Float64.toInt 100.99 = 100z
 
 // The shared interpreter API returns None for non-finite or out-of-range inputs.
 Stdlib.Int64.fromFloat64 3.9 = Some 3L
@@ -47,7 +47,7 @@ Stdlib.Int64.toFloat64 (-100L) = -100.0
 // Combined operations
 Stdlib.Float64.sqrt (Stdlib.Float64.absoluteValue (-16.0)) = 4.0
 Stdlib.Float64.absoluteValue (Stdlib.Float64.negate 5.0) = 5.0
-Stdlib.Float64.toInt (Stdlib.Float64.sqrt 100.0) = 10
+Stdlib.Float64.toInt (Stdlib.Float64.sqrt 100.0) = 10z
 Stdlib.Int.toFloat64 (Stdlib.Float64.toInt 9.99) = 9.0
 
 // Float comparisons (already work, but good to test with new functions)
@@ -75,7 +75,7 @@ Stdlib.Float64.round 2.5 = 2L
 Stdlib.Float64.round 3.5 = 4L
 Stdlib.Float64.roundTowardsZero (-1.75) = -1L
 Stdlib.Float64.truncate (-1.75) = -1L
-Stdlib.Float64.toInt 100000000000000000000.0 = 100000000000000000000
+Stdlib.Float64.toInt 100000000000000000000.0 = 100000000000000000000z
 Stdlib.Float64.ceiling (1.0 / 0.0) = error="Encountered an out-of-range integer value"
 
 // IEEE classification and clamp deliberately reject only NaN limits
@@ -96,8 +96,8 @@ Stdlib.Float64.parse "1.8e308" = Ok (1.0 / 0.0)
 Stdlib.Float64.parse "1.00000000000000011102230246251565404236316680908203125" = Ok 1.0
 Stdlib.Float64.parse "2e-324" = Ok 0.0
 Stdlib.Float64.isNaN (Stdlib.Result.withDefault (Stdlib.Float64.parse "NaN") 0.0) = true
-Stdlib.Float64.parse "1.25" = stdout="Darklang.Stdlib.Result.Result<Float, Darklang.Stdlib.Float64.ParseError>.Ok(1.25)\n"
-Stdlib.Float64.parse "bad" = stdout="Darklang.Stdlib.Result.Result<Float, Darklang.Stdlib.Float64.ParseError>.Error(Darklang.Stdlib.Float64.ParseError.BadFormat)\n"
+Stdlib.Float64.parse "1.25" = stdout="Ok(1.25)\n"
+Stdlib.Float64.parse "bad" = stdout="Error(BadFormat)\n"
 
 // Shortest round-trip formatting is shared by public and aggregate rendering
 Stdlib.Float64.toString 0.1 = "0.1"

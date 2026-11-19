@@ -81,8 +81,8 @@ module Equals =
   (5uy == 5uy) = true
   (5uy != 6uy) = true
 
-  (5s == 5s) = true
-  (5s != 6s) = true
+  (5s16 == 5s16) = true
+  (5s16 != 6s16) = true
 
   (5us == 5us) = true
   (5us != 6us) = true
@@ -106,8 +106,8 @@ module Equals =
   ([ 1l, 2l, 3l ] != [ 3l, 2l, 1l ]) = true
   ([ 1ul, 2ul, 3ul ] == [ 1ul, 2ul, 3ul ]) = true
   ([ 1ul, 2ul, 3ul ] != [ 3ul, 2ul, 1ul ]) = true
-  ([ 1s, 2s, 3s ] == [ 1s, 2s, 3s ]) = true
-  ([ 1s, 2s, 3s ] != [ 3s, 2s, 1s ]) = true
+  ([ 1s16, 2s16, 3s16 ] == [ 1s16, 2s16, 3s16 ]) = true
+  ([ 1s16, 2s16, 3s16 ] != [ 3s16, 2s16, 1s16 ]) = true
   ([ 1us, 2us, 3us ] == [ 1us, 2us, 3us ]) = true
   ([ 1us, 2us, 3us ] != [ 3us, 2us, 1us ]) = true
   ([ 1y, 2y, 3y ] == [ 1y, 2y, 3y ]) = true
@@ -190,10 +190,10 @@ module Equals =
   (ERecUInt32 { x = 6ul, y = 7ul } != ERecUInt32 { x = 7ul, y = 6ul }) = true
   (ERecUInt32 { x = 6ul, y = 7ul } == ERec2UInt32 { y = 7ul, x = 6ul }) = true
 
-  (ERecInt16 { x = 6s, y = 7s } == ERecInt16 { x = 6s, y = 7s }) = true
-  (ERecInt16 { x = 6s, y = 7s } == ERecInt16 { y = 7s, x = 6s }) = true
-  (ERecInt16 { x = 6s, y = 7s } != ERecInt16 { x = 7s, y = 6s }) = true
-  (ERecInt16 { x = 6s, y = 7s } == ERec2Int16 { y = 7s, x = 6s }) = true
+  (ERecInt16 { x = 6s16, y = 7s16 } == ERecInt16 { x = 6s16, y = 7s16 }) = true
+  (ERecInt16 { x = 6s16, y = 7s16 } == ERecInt16 { y = 7s16, x = 6s16 }) = true
+  (ERecInt16 { x = 6s16, y = 7s16 } != ERecInt16 { x = 7s16, y = 6s16 }) = true
+  (ERecInt16 { x = 6s16, y = 7s16 } == ERec2Int16 { y = 7s16, x = 6s16 }) = true
 
   (ERecUInt16 { x = 6us, y = 7us } == ERecUInt16 { x = 6us, y = 7us }) = true
   (ERecUInt16 { x = 6us, y = 7us } == ERecUInt16 { y = 7us, x = 6us }) = true
@@ -238,8 +238,8 @@ module Equals =
 
   (EEnumInt16.E1 == EEnumInt16.E1) = true
   (EEnumInt16.E1 != EEnumInt16.E2) = true
-  (EEnumInt16.E3 5s == EEnumInt16.E3 5s) = true
-  (EEnumInt16.E3 5s != EEnumInt16.E3 6s) = true
+  (EEnumInt16.E3 5s16 == EEnumInt16.E3 5s16) = true
+  (EEnumInt16.E3 5s16 != EEnumInt16.E3 6s16) = true
 
   (EEnumUInt16.E1 == EEnumUInt16.E1) = true
   (EEnumUInt16.E1 != EEnumUInt16.E2) = true
@@ -298,13 +298,13 @@ module Equals =
 #compileerror="Operator is unavailable for this type"
     (5.7 != 5L) = error="Cannot perform equality check on Float and Int64"
 #compileerror="Operator is unavailable for this type"
-    (5us == 5s) = error="Cannot perform equality check on UInt16 and Int16"
+    (5us == 5s16) = error="Cannot perform equality check on UInt16 and Int16"
 #compileerror="Operator is unavailable for this type"
     (5y == 5l) = error="Cannot perform equality check on Int8 and Int32"
 #compileerror="Operator is unavailable for this type"
     (5L == 5l) = error="Cannot perform equality check on Int64 and Int32"
 #compileerror="Operator is unavailable for this type"
-    (5us != 6s) = error="Cannot perform equality check on UInt16 and Int16"
+    (5us != 6s16) = error="Cannot perform equality check on UInt16 and Int16"
     // @compiler blocked: compiler-gap
     (Builtin.testRuntimeError "test" != Builtin.testRuntimeError "different msg") = error="Uncaught exception: test"
 
@@ -339,9 +339,9 @@ module Equals =
   (==) 1ul 1ul = true
   1ul == 1ul = true
 
-  Stdlib.equals 1s 1s = true
-  (==) 1s 1s = true
-  1s == 1s = true
+  Stdlib.equals 1s16 1s16 = true
+  (==) 1s16 1s16 = true
+  1s16 == 1s16 = true
 
   Stdlib.equals 1us 1us = true
   (==) 1us 1us = true
@@ -362,7 +362,7 @@ module NotEquals =
   Stdlib.notEquals 1L 1L = false
   Stdlib.notEquals 1l 1l = false
   Stdlib.notEquals 1ul 1ul = false
-  Stdlib.notEquals 1s 1s = false
+  Stdlib.notEquals 1s16 1s16 = false
   Stdlib.notEquals 1us 1us = false
   Stdlib.notEquals 1y 1y = false
   Stdlib.notEquals 1uy 1uy = false
@@ -378,7 +378,7 @@ module NotEquals =
   (!=) 1L 1L = false
   (!=) 1l 1l = false
   (!=) 1ul 1ul = false
-  (!=) 1s 1s = false
+  (!=) 1s16 1s16 = false
   (!=) 1us 1us = false
   (!=) 1y 1y = false
   (!=) 1uy 1uy = false
@@ -394,7 +394,7 @@ module NotEquals =
   1L != 1L = false
   1l != 1l = false
   1ul != 1ul = false
-  1s != 1s = false
+  1s16 != 1s16 = false
   1us != 1us = false
   1y != 1y = false
   1uy != 1uy = false
@@ -429,4 +429,4 @@ module Unwrap =
 #compileerror="Can only unwrap Options and Results, yet got TBool"
   (true |> Builtin.unwrap) = error="Can only unwrap Options and Results, yet got true"
 #compileerror="Builtin.unwrap expects 1 argument, got 2"
-  (Builtin.unwrap 1 2) = error="Builtin.unwrap expects 1 argument, but got 2 arguments"
+  (Builtin.unwrap 1z 2z) = error="Builtin.unwrap expects 1 argument, but got 2 arguments"

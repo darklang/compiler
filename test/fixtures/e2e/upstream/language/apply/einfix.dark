@@ -50,8 +50,7 @@ Stdlib.Int64.add 5L 3L = 8L
 2y ** 3y = 8y
 3uy ** 3uy = 27uy
 2l ** 10l = 1024l
-#compileerror="Cannot perform numeric operation on Int128 and Int128"
-2Q ** 3Q = error="Cannot perform numeric operation on Int128 and Int128"
+2Q ** 3Q = 8Q
 // unary `-` works on every signed integer type and Float
 -(Stdlib.Int8.add 2y 3y) = -5y
 -(Stdlib.Float64.add 1.0 1.5) = -2.5
@@ -72,39 +71,39 @@ Stdlib.Int64.add 5L 3L = 8L
 12L ^ 10L = 6L
 12y & 10y = 8y
 12uy | 10uy = 14uy
-12s ^ 10s = 6s
+12s16 ^ 10s16 = 6s16
 12us & 10us = 8us
 12l | 10l = 14l
 12ul ^ 10ul = 6ul
 12UL & 10UL = 8UL
 12Q | 10Q = 14Q
 12Z ^ 10Z = 6Z
-12 & 10 = 8
-12 | 10 = 14
-12 ^ 10 = 6
+12z & 10z = 8z
+12z | 10z = 14z
+12z ^ 10z = 6z
 
 // the shift COUNT is the same type as the value
 1L << 4L = 16L
 64L >> 3L = 8L
 1y << 2y = 4y
 128uy >> 7uy = 1uy
-1 << 100 = 1267650600228229401496703205376
-(1 << 100) >> 99 = 2
+1z << 100z = 1267650600228229401496703205376z
+(1z << 100z) >> 99z = 2z
 
 // fixed-width shifts wrap; `Int` grows instead
 1L << 64L = 1L
 1uy << 8uy = 1uy
 
 // `Int` has no width to mask a count against, so an unusable one raises
-1 << -1 = error="Encountered an out-of-range integer value"
-1 >> -1 = error="Encountered an out-of-range integer value"
+1z << -1z = error="Encountered an out-of-range integer value"
+1z >> -1z = error="Encountered an out-of-range integer value"
 
 // unary `~` is two's complement on every integer type
 ~0L = -1L
 ~5L = -6L
 ~0uy = 255uy
-~0 = -1
-~(-1) = 0
+~0z = -1z
+~(-1z) = 0z
 ~(Stdlib.Int64.add 2L 3L) = -6L
 
 // bitwise operators reject Float
@@ -119,7 +118,7 @@ Stdlib.Int64.add 5L 3L = 8L
 #compileerror="Expected TInt64, got TInt8"
 1L & 2y = error="Cannot perform numeric operation on Int64 and Int8"
 #compileerror="Expected TInt64, got TInt"
-1L << 2 = error="Cannot perform numeric operation on Int64 and Int"
+1L << 2z = error="Cannot perform numeric operation on Int64 and Int"
 
 // precedence: bitwise binds TIGHTER than the comparisons (Python's order, not
 // C's), and looser than the arithmetic operators
@@ -133,12 +132,12 @@ Stdlib.Int64.add 5L 3L = 8L
 
 // left-associative, unlike `**`
 8L >> 1L >> 1L = 2L
-2 ** 3 ** 2 = 512
+2z ** 3z ** 2z = 512z
 
 // operator sections
 12L |> (&) 10L = 8L
 12L |> (|) 10L = 14L
-2 |> (**) 10 = 1024
+2z |> (**) 10z = 1024z
 
 // ---------------------------------------------------------------------------
 // unary `!` is boolean not

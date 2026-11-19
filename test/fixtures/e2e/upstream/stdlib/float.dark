@@ -241,20 +241,20 @@ Stdlib.Float64.toString 1.2345678901234568e17 = "1.2345678901234568e+17"
 
 
 // toInt truncates toward zero.
-Stdlib.Float64.toInt 3.0 = 3
-Stdlib.Float64.toInt 0.0 = 0
-Stdlib.Float64.toInt -0.0 = 0
-Stdlib.Float64.toInt 1.5 = 1
-Stdlib.Float64.toInt 1.9 = 1
-Stdlib.Float64.toInt -1.5 = -1
-Stdlib.Float64.toInt -1.9 = -1
-Stdlib.Float64.toInt -3.0 = -3
-Stdlib.Float64.toInt 0.1 = 0
-Stdlib.Float64.toInt 2147483648.7 = 2147483648
+Stdlib.Float64.toInt 3.0 = 3z
+Stdlib.Float64.toInt 0.0 = 0z
+Stdlib.Float64.toInt -0.0 = 0z
+Stdlib.Float64.toInt 1.5 = 1z
+Stdlib.Float64.toInt 1.9 = 1z
+Stdlib.Float64.toInt -1.5 = -1z
+Stdlib.Float64.toInt -1.9 = -1z
+Stdlib.Float64.toInt -3.0 = -3z
+Stdlib.Float64.toInt 0.1 = 0z
+Stdlib.Float64.toInt 2147483648.7 = 2147483648z
 Stdlib.Float64.toInt 2.5 = Stdlib.Int.fromInt64 (Stdlib.Float64.roundTowardsZero 2.5)
 Stdlib.Float64.toInt -2.5 = Stdlib.Int.fromInt64 (Stdlib.Float64.roundTowardsZero -2.5)
 // Truncation and floor differ for negative values.
-Stdlib.Float64.toInt -1.5 = -1
+Stdlib.Float64.toInt -1.5 = -1z
 Stdlib.Float64.floor -1.5 = -2L
 // NaN and infinities cannot become Ints.
 Stdlib.Float64.toInt Builtin.testNan =

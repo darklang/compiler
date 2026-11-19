@@ -1,7 +1,7 @@
 module Darklang.Stdlib.Cli.Dir.Tests
 
 // A recursive listing reads permitted link targets and handles dangling links as errors.
-// @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<Darklang.Stdlib.Result.Result<(Int64, Bool), Darklang.Stdlib.Cli.Posix.Error>, Darklang.Stdlib.Cli.Posix.Error>.Ok(Darkla" class=missing-support reason=compiler-gap
+// @compiler xfail runtime: "expected Ok(Ok((3, true))), got Ok(Ok((3, false)))" class=missing-support reason=compiler-gap
 test recursiveListingCanBeReadWithSymlinks =
   Stdlib.Cli.Dir.withTemp(fun root ->
     let file = $"{root}/file"

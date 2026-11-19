@@ -43,14 +43,14 @@ ENTITIES = {
         infix("ArithmeticMultiply", ARG0, {"EBigInt": [3, 2]})),
     "float-hash": fn("Hosted.isHalf", [("x", {"TFloat64": []})], {"TBool": []},
         {"EMatch": [1, ARG0, [
-            dict(pat={"MPFloat64": [2, {"Positive": []}, "0", "5"]}, whenCondition={"None": []},
+            dict(pat={"MPFloat64": [2, {"Positive": []}, "0", "5"]}, whenCondition=None,
                  rhs={"EBool": [3, True]}),
-            dict(pat={"MPVariable": [4, "_other"]}, whenCondition={"None": []},
+            dict(pat={"MPVariable": [4, "_other"]}, whenCondition=None,
                  rhs={"EBool": [5, False]})]]}),
     "bytes-hash": fn("Hosted.sameBytes", [("b", {"TBytes": []})], {"TBytes": []}, ARG0),
     "record-hash": fn("Hosted.recordPattern", [("x", INT64)], INT64,
         {"EMatch": [1, ARG0, [dict(pat={"MPRecord": [2, [["a", {"MPVariable": [3, "a"]}]]]},
-                                   whenCondition={"None": []}, rhs={"EInt64": [4, 1]})]]}),
+                                   whenCondition=None, rhs={"EInt64": [4, 1]})]]}),
     "decimal-hash": fn("Hosted.price", [("x", INT64)], {"TDecimal": []}, {"EDecimal": [1, 19.99]}),
 }
 
@@ -68,7 +68,7 @@ def nested_adds(count):
 
 def builtin(name, *args):
     callee = {"EFnName": [1, dict(originalName=["Builtin", name], resolved={"Ok": [dict(
-        name={"Builtin": [dict(name=name, version=0)]}, location={"None": []})]}), []]}
+        name={"Builtin": [dict(name=name, version=0)]}, location=None)]}), []]}
     return {"EApply": [2, callee, [], list(args)]}
 
 
@@ -87,9 +87,9 @@ ENTITIES["builtin-poly-hash"] = fn("Hosted.builtinPoly", [("x", INT64)], {"TBool
 # A `Builtin.negate` the interpreter saved resolved to the Negate trait's method,
 # and (x & 12) | (x ^ 3) << 1 >> 1 through the polymorphic bitwise builtins.
 NEGATE_AS_TRAIT = {"EFnName": [1, dict(originalName=["Builtin", "negate"],
-    resolved={"Ok": [dict(location={"Some": [dict(owner="Darklang", modules=["Stdlib"], name="Negate")]},
+    resolved={"Ok": [dict(location=dict(owner="Darklang", modules=["Stdlib"], name="Negate"),
         name={"TraitMethod": [dict(method_="negate", trait_={"Hash": ["negate-trait-hash"]},
-                                   implFn={"Chosen": [dict(location={"None": []},
+                                   implFn={"Chosen": [dict(location=None,
                                                            name={"Hash": ["builtin-bitwise-hash"]})]})]})]}), []]}
 ENTITIES["builtin-bitwise-hash"] = fn("Hosted.builtinBitwise", [("x", INT64)], {"TInt64": []},
     {"EApply": [2, NEGATE_AS_TRAIT, [], [builtin("bitwiseOr", builtin("bitwiseAnd", ARG0, {"EInt64": [3, 12]}),
@@ -105,7 +105,7 @@ ENTITIES["builtin-more-hash"] = fn("Hosted.builtinMore", [("x", INT64)], {"TStri
 
 # A trait call saved by the interpreter resolves to the trait's location.
 TO_STRING = {"EFnName": [1, dict(originalName=["Darklang", "Stdlib", "Display", "display"],
-    resolved={"Ok": [dict(location={"Some": [dict(owner="Darklang", modules=["Stdlib"], name="Display")]},
+    resolved={"Ok": [dict(location=dict(owner="Darklang", modules=["Stdlib"], name="Display"),
         name={"TraitMethod": [dict(method_="display", trait_={"Hash": ["display-hash"]},
                                    implFn={"Unknown": []})]})]}), []]}
 ENTITIES["trait-call-hash"] = fn("Hosted.describeNumber", [("x", INT64)], {"TString": []},
@@ -127,11 +127,11 @@ ENTITIES["module-builtins-hash"] = fn("Hosted.moduleBuiltins", [("x", INT64)], {
 # user code may not reach directly.
 HELPER_NAME = dict(originalName=["Hosted", "__helper"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["helper-hash"]}]},
-    location={"Some": [dict(owner="Hosted", modules=[], name="__helper")]})]})
+    location=dict(owner="Hosted", modules=[], name="__helper"))]})
 # An internal record type, `__Box`, built and read by a hosted fn.
 BOX_NAME = dict(originalName=["Hosted", "__Box"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["box-type-hash"]}]},
-    location={"Some": [dict(owner="Hosted", modules=[], name="__Box")]})]})
+    location=dict(owner="Hosted", modules=[], name="__Box"))]})
 TYPES["box-type-hash"] = ("Hosted.__Box", dict(hash={"Hash": ["box-type-hash"]}, description="",
     deprecated={"NotDeprecated": []}, declaration=dict(typeParams=[], definition={"Record": [[
         dict(name="value", typ=INT64, description="")]]})))
@@ -141,9 +141,9 @@ ENTITIES["box-hash"] = fn("Hosted.boxed", [("x", INT64)], INT64,
 # if x <= 0 then 1 else self(x - 1) + 1.
 ENTITIES["helper-hash"] = fn("Hosted.__helper", [("x", INT64)], INT64,
     {"EIf": [6, infix("ComparisonLessThanOrEqual", ARG0, {"EInt64": [3, 0]}), {"EInt64": [4, 1]},
-             {"Some": [infix("ArithmeticPlus",
+             infix("ArithmeticPlus",
                              {"EApply": [7, {"ESelf": [8]}, [], [infix("ArithmeticMinus", ARG0, {"EInt64": [9, 1]})]]},
-                             {"EInt64": [5, 1]})]}]})
+                             {"EInt64": [5, 1]})]})
 ENTITIES["uses-helper-hash"] = fn("Hosted.usesHelper", [("x", INT64)], INT64,
     {"EApply": [2, {"EFnName": [1, HELPER_NAME, []]}, [], [ARG0]]})
 ENTITIES["braces-hash"] = fn("Hosted.braces", [("x", INT64)], {"TString": []},
@@ -160,7 +160,7 @@ ENTITIES["fn-value-hash"] = fn("Hosted.mapWithValue", [("x", INT64)], {"TList": 
 # A hosted List.length call answers an Int64, as the compiler's List.length does.
 LENGTH = dict(originalName=["Stdlib", "List", "length"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["length-hash"]}]},
-    location={"Some": [dict(owner="Darklang", modules=["Stdlib", "List"], name="length")]})]})
+    location=dict(owner="Darklang", modules=["Stdlib", "List"], name="length"))]})
 ENTITIES["counts-hash"] = fn("Hosted.counts", [("x", INT64)], INT64,
     infix("ArithmeticPlus",
           {"EApply": [1, {"EFnName": [2, LENGTH, [], []]}, [], [{"EList": [3, [ARG0, ARG0]]}]]},
@@ -168,7 +168,7 @@ ENTITIES["counts-hash"] = fn("Hosted.counts", [("x", INT64)], INT64,
 # A hosted String.slice call passes Int64 indexes, as the compiler's String.slice takes.
 SLICE = dict(originalName=["Stdlib", "String", "slice"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["slice-hash"]}]},
-    location={"Some": [dict(owner="Darklang", modules=["Stdlib", "String"], name="slice")]})]})
+    location=dict(owner="Darklang", modules=["Stdlib", "String"], name="slice"))]})
 ENTITIES["slices-hash"] = fn("Hosted.slices", [("x", INT64)], {"TString": []},
     {"EPipe": [1, {"EApply": [2, {"EFnName": [3, SLICE, [], []]}, [],
         [{"EString": [4, [{"StringText": ["abcdef"]}]]}, {"EInt64": [5, 1]}, {"EInt64": [6, 5]}]]},
@@ -179,7 +179,7 @@ ENTITIES["slices-hash"] = fn("Hosted.slices", [("x", INT64)], {"TString": []},
 def stdlib(modules, name, hash_):
     return dict(originalName=["Stdlib"] + modules + [name], resolved={"Ok": [dict(
         name={"Package": [{"Hash": [hash_]}]},
-        location={"Some": [dict(owner="Darklang", modules=["Stdlib"] + modules, name=name)]})]})
+        location=dict(owner="Darklang", modules=["Stdlib"] + modules, name=name))]})
 INDEX_OF = stdlib(["String"], "indexOf", "index-of-hash")
 WITH_DEFAULT = stdlib(["Option"], "withDefault", "with-default-hash")
 FROM_SECONDS = stdlib(["DateTime"], "fromSeconds", "from-seconds-hash")
@@ -203,7 +203,7 @@ ENTITIES["dict-last-hash"] = fn("Hosted.dictLast", [("x", INT64)], INT64,
 # A record field named by a keyword: (Tagged { type = x }).type.
 TAGGED_NAME = dict(originalName=["Hosted", "Tagged"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["tagged-type-hash"]}]},
-    location={"Some": [dict(owner="Hosted", modules=[], name="Tagged")]})]})
+    location=dict(owner="Hosted", modules=[], name="Tagged"))]})
 TYPES["tagged-type-hash"] = ("Hosted.Tagged", dict(hash={"Hash": ["tagged-type-hash"]}, description="",
     deprecated={"NotDeprecated": []}, declaration=dict(typeParams=[], definition={"Record": [[
         dict(name="type", typ=INT64, description="")]]})))
@@ -213,7 +213,7 @@ ENTITIES["tagged-hash"] = fn("Hosted.tagged", [("x", INT64)], INT64,
 # match (x, 1) with | (5 as five, n) -> five * 10 + n
 #                   | ((a as b), _) when b > 5 -> a + b | _ -> 0
 def case(pat, rhs, guard=None):
-    return dict(pat=pat, rhs=rhs, whenCondition={"Some": [guard]} if guard else {"None": []})
+    return dict(pat=pat, rhs=rhs, whenCondition=guard if guard else None)
 VAR = lambda name: {"EVariable": [1, name]}
 ENTITIES["as-hash"] = fn("Hosted.asPatterns", [("x", INT64)], INT64,
     {"EMatch": [1, {"ETuple": [2, ARG0, {"EInt64": [3, 1]}, []]}, [
@@ -227,7 +227,7 @@ ENTITIES["as-hash"] = fn("Hosted.asPatterns", [("x", INT64)], INT64,
 # Hosted.First, while this fn names it Hosted.Second.
 SECOND_NAME = dict(originalName=["Hosted", "Second"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["shared-type-hash"]}]},
-    location={"Some": [dict(owner="Hosted", modules=[], name="Second")]})]})
+    location=dict(owner="Hosted", modules=[], name="Second"))]})
 TYPES["shared-type-hash"] = ("Hosted.First", dict(hash={"Hash": ["shared-type-hash"]}, description="",
     deprecated={"NotDeprecated": []}, declaration=dict(typeParams=[], definition={"Record": [[
         dict(name="width", typ=INT64, description="")]]})))
@@ -244,12 +244,12 @@ ENTITIES["bytes-length-hash"] = fn("Hosted.bytesLen", [("b", {"TBytes": []})], I
 # An uncalled builtin, as in `val empty = Builtin.bytesEmpty`, is the same
 # library item as a call: Builtin.bytesLength(Builtin.bytesEmpty).
 BYTES_EMPTY = {"EValue": [1, dict(originalName=["Builtin", "bytesEmpty"], resolved={"Ok": [dict(
-    name={"Builtin": [dict(name="bytesEmpty", version=0)]}, location={"None": []})]})]}
+    name={"Builtin": [dict(name="bytesEmpty", version=0)]}, location=None)]})]}
 ENTITIES["bytes-empty-hash"] = fn("Hosted.emptyBytesLen", [("x", INT64)], INT64,
     builtin("bytesLength", BYTES_EMPTY))
 # `val keywords = Builtin.parserKeywords` is the interpreter lexer's reserved words.
 KEYWORDS = {"EValue": [1, dict(originalName=["Builtin", "parserKeywords"], resolved={"Ok": [dict(
-    name={"Builtin": [dict(name="parserKeywords", version=0)]}, location={"None": []})]})]}
+    name={"Builtin": [dict(name="parserKeywords", version=0)]}, location=None)]})]}
 ENTITIES["keywords-hash"] = fn("Hosted.keywords", [("x", INT64)], {"TList": [{"TString": []}]}, KEYWORDS)
 # A capitalized type parameter, as in `impl Display for Result<'Ok, 'Err>`.
 ENTITIES["capital-param-hash"] = ("Hosted.firstOk", dict(typeParams=["Ok"], bounds=[],
@@ -258,32 +258,32 @@ ENTITIES["capital-param-hash"] = ("Hosted.firstOk", dict(typeParams=["Ok"], boun
 # Int16 literals stay Int16 where a bare integer is an Int64.
 ENTITIES["int16-hash"] = fn("Hosted.int16Zero", [("x", INT64)], {"TInt16": []},
     {"EMatch": [1, {"EInt16": [2, 0]}, [
-        dict(pat={"MPInt16": [3, 0]}, whenCondition={"None": []}, rhs={"EInt16": [4, -7]}),
-        dict(pat={"MPVariable": [5, "_other"]}, whenCondition={"None": []}, rhs={"EInt16": [6, 1]})]]})
+        dict(pat={"MPInt16": [3, 0]}, whenCondition=None, rhs={"EInt16": [4, -7]}),
+        dict(pat={"MPVariable": [5, "_other"]}, whenCondition=None, rhs={"EInt16": [6, 1]})]]})
 # Equal fns share a hash: the entity arrives as Hosted.A.first, and a caller
 # names it Hosted.B.second.
 ENTITIES["shared-fn-hash"] = fn("Hosted.A.first", [("x", INT64)], INT64, ARG0)
 ENTITIES["calls-shared-hash"] = fn("Hosted.callsShared", [("x", INT64)], INT64,
     {"EApply": [2, {"EFnName": [1, dict(originalName=["Hosted", "B", "second"], resolved={"Ok": [dict(
         name={"Package": [{"Hash": ["shared-fn-hash"]}]},
-        location={"Some": [dict(owner="Hosted", modules=["B"], name="second")]})]}), []]}, [], [ARG0]]})
+        location=dict(owner="Hosted", modules=["B"], name="second"))]}), []]}, [], [ARG0]]})
 # The server finds Hosted.B.second by name, and answers with the fn at Hosted.A.first.
 FIND_ALSO = {"Hosted.B.second": "shared-fn-hash"}
 # The compiler's Tui.Text.clipToWidth takes an Int64 width, as the interpreter's does.
 CLIP = {"EFnName": [1, dict(originalName=["Stdlib", "Cli", "Tui", "Text", "clipToWidth"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["clip-hash"]}]},
-    location={"Some": [dict(owner="Darklang", modules=["Stdlib", "Cli", "Tui", "Text"], name="clipToWidth")]})]}), []]}
+    location=dict(owner="Darklang", modules=["Stdlib", "Cli", "Tui", "Text"], name="clipToWidth"))]}), []]}
 ENTITIES["clip-caller-hash"] = fn("Hosted.clipped", [("x", INT64)], {"TString": []},
     {"EApply": [2, CLIP, [], [{"EString": [3, [{"StringText": ["abcdef"]}]]}, ARG0]]})
 # The compiler's syscallClose answers an Int errno; the interpreter's, an Int64.
 ENTITIES["close-bad-hash"] = fn("Hosted.closeBad", [("x", INT64)], INT64,
     {"EMatch": [1, builtin("syscallClose", {"EBigInt": [2, -1]}), [
-        dict(pat={"MPEnum": [3, "Error", [{"MPVariable": [4, "e"]}]]}, whenCondition={"None": []},
+        dict(pat={"MPEnum": [3, "Error", [{"MPVariable": [4, "e"]}]]}, whenCondition=None,
              rhs={"EVariable": [5, "e"]}),
-        dict(pat={"MPVariable": [6, "_other"]}, whenCondition={"None": []}, rhs={"EInt64": [7, 0]})]]})
+        dict(pat={"MPVariable": [6, "_other"]}, whenCondition=None, rhs={"EInt64": [7, 0]})]]})
 # A builtin whose arguments convert, passed as a value: it converts as a call would.
 NANOSLEEP = {"EFnName": [1, dict(originalName=["Builtin", "syscallNanosleep"], resolved={"Ok": [dict(
-    name={"Builtin": [dict(name="syscallNanosleep", version=0)]}, location={"None": []})]}), [], []]}
+    name={"Builtin": [dict(name="syscallNanosleep", version=0)]}, location=None)]}), [], []]}
 ENTITIES["sleep-value-hash"] = fn("Hosted.sleepZero", [("x", INT64)], INT64,
     {"EApply": [2, {"ELambda": [3, [{"LPVariable": [4, "f"]}],
         {"ELet": [5, {"LPTuple": [6, {"LPVariable": [7, "rc"]}, {"LPWildcard": [8]}, []]},
@@ -303,7 +303,7 @@ def else_if_chain(count):
     body = {"EInt64": [1, -1]}
     for index in reversed(range(count)):
         body = {"EIf": [2, infix("ComparisonEquals", ARG0, {"EInt64": [3, index]}),
-                        {"EInt64": [4, index * 10]}, {"Some": [body]}]}
+                        {"EInt64": [4, index * 10]}, body]}
     return body
 
 
@@ -315,10 +315,10 @@ OVERFLOW_TYPE = dict(hash={"Hash": ["overflow-type-hash"]}, description="", depr
     declaration=dict(typeParams=[], definition={"Enum": [[dict(name="Overflow", fields=[], description="")]]}))
 OVERFLOW_NAME = dict(originalName=["Hosted", "Overflow"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["overflow-type-hash"]}]},
-    location={"Some": [dict(owner="Hosted", modules=[], name="Overflow")]})]})
+    location=dict(owner="Hosted", modules=[], name="Overflow"))]})
 ENTITIES["overflow-fn-hash"] = fn("Hosted.overflowName", [("u", {"TUnit": []})], {"TString": []},
     {"EMatch": [1, {"EEnum": [2, OVERFLOW_NAME, [], "Overflow", []]}, [
-        dict(pat={"MPEnum": [3, "Overflow", []]}, whenCondition={"None": []},
+        dict(pat={"MPEnum": [3, "Overflow", []]}, whenCondition=None,
              rhs={"EString": [4, [{"StringText": ["overflow"]}]]})]]})
 TYPES["overflow-type-hash"] = ("Hosted.Overflow", OVERFLOW_TYPE)
 
@@ -373,15 +373,19 @@ def main():
             def run(text):
                 result = compile_(text)
                 assert result.returncode == 0, text + result.stdout + result.stderr
-                return json.loads(subprocess.check_output([str(program)], text=True, timeout=10))
+                printed = subprocess.check_output([str(program)], text=True, timeout=10).rstrip("\n")
+                try:
+                    return json.loads(printed)
+                except json.JSONDecodeError:
+                    return printed
 
             assert run("Hosted.operators 10L\n") == 1036
             assert run("Hosted.pipePlus 41L\n") == 42
             assert run("Hosted.deepAdds 1L\n") == 181
             assert [run(f"Hosted.elseIfChain {x}L\n") for x in (0, 149, 150)] == [0, 1490, -1]
-            assert run("Hosted.builtinOps 50\n") is True
+            assert run("Hosted.builtinOps 50z\n") is True
             assert run("Hosted.overflowName ()\n") == "overflow"
-            assert run("Hosted.describeNumber 42L\n") == "42"
+            assert run("Hosted.describeNumber 42L\n") == 42
             assert run("Hosted.renamedBuiltins 1L\n") is True
             assert run("Hosted.moduleBuiltins 1L\n") == "AB"
             assert run("Hosted.usesHelper 41L\n") == 42
@@ -400,7 +404,7 @@ def main():
             assert run("Hosted.closeBad 1L\n") == 9
             assert run("Hosted.sleepZero 1L\n") == 0
             assert run("Hosted.B.second 7L\n") == 7
-            current = compile_with(["--syntax=current"], "Hosted.int16Zero(1)\n")
+            current = compile_with([], "Hosted.int16Zero(1)\n")
             assert current.returncode == 0, current.stdout + current.stderr
             assert subprocess.check_output([str(program)], text=True, timeout=10) == "-7s16\n"
             assert run("Hosted.dictLast 5L\n") == 1
@@ -409,13 +413,13 @@ def main():
             assert run("Hosted.secondName 4L\n") == 4
             assert [run(f"Hosted.asPatterns {x}L\n") for x in (5, 7, 1)] == [51, 14, 0]
             assert run("Hosted.braces 1L\n") == "a{b}c"
-            assert str(run("Hosted.int128Power 2Q\n")) == "8"
-            assert run("Hosted.builtinMore 7L\n") == "1"
-            assert run("Hosted.builtinOps 52\n") is False
+            assert run("Hosted.int128Power 2Q\n") == "8s128"
+            assert run("Hosted.builtinMore 7L\n") == 1
+            assert run("Hosted.builtinOps 52z\n") is False
             assert run("Hosted.builtinPoly 2L\n") is True
             assert run("Hosted.builtinPoly 0L\n") is False
             assert run("Hosted.builtinBitwise 13L\n") == -14
-            assert str(run("Hosted.doubleBig 12345678901234567890\n")) == "24691357802469135780"
+            assert run("Hosted.doubleBig 12345678901234567890z\n") == "24691357802469135780z"
             assert run("Hosted.isHalf 0.5\n") is True
             assert run("Hosted.isHalf 0.25\n") is False
             assert str(run('Stdlib.Blob.length (Hosted.sameBytes (Stdlib.Blob.fromString "abc"))\n')) == "3"
@@ -453,9 +457,9 @@ def main():
                 "Hosted.recordPattern: can't compile: uses a record pattern, which this compiler does not support",
                 "Hosted.__helper: compiles",
             ], checked.stdout + checked.stderr
-            # Under --syntax=current a rendered package unit, which converts its own
-            # stdlib calls, is not converted a second time as the script is.
-            current = subprocess.run([compiler, "--syntax=current", "--package-server",
+            # A rendered package unit, which converts its own stdlib calls, is not
+            # converted a second time as the script is.
+            current = subprocess.run([compiler, "--package-server",
                 f"http://127.0.0.1:{server.server_port}", "--check", "Hosted.bytesLen",
                 "Hosted.conversions", "Hosted.recordKey"], env=env, capture_output=True, text=True, timeout=300)
             assert current.stdout.splitlines() == ["Hosted.bytesLen: compiles",

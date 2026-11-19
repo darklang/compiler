@@ -23,8 +23,8 @@ Stdlib.Uuid.parse "{0x100000000,0x7a46,0x4ff4,{0x81,0xd3,0x45,0xaf,0xb0,0x3f,0x6
 Stdlib.Uuid.parse "{0x3700adbc,0x7a46,0x4ff4,{0x100,0xd3,0x45,0xaf,0xb0,0x3f,0x6e,0x2d}}" = Error Stdlib.Uuid.ParseError.BadFormat
 
 // The UUID wrapper is distinct from String and compares structurally.
-let left = Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") in let right = Builtin.unwrap (Stdlib.Uuid.parse "3700adbc-7a46-4ff4-81d3-45afb03f6e2d") in if left == right then 0 else 1 = stdout="0\n"
-let left = Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") in let right = Builtin.unwrap (Stdlib.Uuid.parse "3700adbc-7a46-4ff4-81d3-45afb03f6e2e") in if left != right then 0 else 1 = stdout="0\n"
+let left = Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") in let right = Builtin.unwrap (Stdlib.Uuid.parse "3700adbc-7a46-4ff4-81d3-45afb03f6e2d") in if left == right then 0z else 1z = stdout="0z\n"
+let left = Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") in let right = Builtin.unwrap (Stdlib.Uuid.parse "3700adbc-7a46-4ff4-81d3-45afb03f6e2e") in if left != right then 0z else 1z = stdout="0z\n"
 let uuid = Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") in [uuid] == [uuid] = true
 type UuidRecord = { uuid: Uuid }
 let uuid = Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") in let record = UuidRecord { uuid = uuid } in record.uuid == uuid = true
@@ -33,8 +33,8 @@ let uuid = Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E
 // JSON and visible result rendering share the canonical formatter.
 Stdlib.Json.serialize<Uuid> (Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D")) = "\"3700adbc-7a46-4ff4-81d3-45afb03f6e2d\""
 let uuid = Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") in Stdlib.Json.parse<Uuid> "\"3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D\"" == Ok uuid = true
-Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") = stdout="3700adbc-7a46-4ff4-81d3-45afb03f6e2d\n"
-let uuid = Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") in (uuid, [uuid]) = stdout="(3700adbc-7a46-4ff4-81d3-45afb03f6e2d, [3700adbc-7a46-4ff4-81d3-45afb03f6e2d])\n"
+Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") = stdout="<Uuid: 3700adbc-7a46-4ff4-81d3-45afb03f6e2d>\n"
+let uuid = Builtin.unwrap (Stdlib.Uuid.parse "3700ADBC-7A46-4FF4-81D3-45AFB03F6E2D") in (uuid, [uuid]) = stdout="(\n  <Uuid: 3700adbc-7a46-4ff4-81d3-45afb03f6e2d>,\n  [<Uuid: 3700adbc-7a46-4ff4-81d3-45afb03f6e2d>]\n)\n"
 
 // v4 output is a UUID value whose canonical spelling has RFC-4122 bits.
 Stdlib.String.getByteAt (Stdlib.Uuid.toString (Stdlib.Uuid.generate ())) 14L == Some 52uy = true

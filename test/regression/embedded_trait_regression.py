@@ -13,7 +13,7 @@ import urllib.parse
 # inc calls the trait's method by the trait's hash: x ^ 3.
 XOR_CALL = dict(originalName=["Stdlib", "BitwiseXor", "bitwiseXor"], resolved={"Ok": [dict(
     name={"TraitMethod": [dict(method_="bitwiseXor", trait_={"Hash": ["xor-hash"]})]},
-    location={"Some": [dict(owner="Darklang", modules=["Stdlib"], name="BitwiseXor")]})]})
+    location=dict(owner="Darklang", modules=["Stdlib"], name="BitwiseXor"))]})
 FN = dict(hash={"Hash": ["inc-hash"]}, typeParams=[], bounds=[], returnType={"TInt64": []},
           parameters=[dict(name="x", typ={"TInt64": []})],
           body={"EApply": [1, {"EFnName": [2, XOR_CALL, []]}, [], [{"EArg": [3, 0]}, {"EInt64": [4, 3]}]]})
@@ -33,10 +33,10 @@ METHOD = dict(hash={"Hash": ["xor-method-hash"]}, typeParams=[], bounds=[], retu
 METHOD_LOCATION = dict(owner="Darklang", modules=["Stdlib", "Int64", "BitwiseXor"], name="bitwiseXor")
 IMPL = dict(hash={"Hash": ["xor-impl-hash"]}, trait_=dict(originalName=["Stdlib", "BitwiseXor"], resolved={"Ok": [dict(
     name={"Package": [{"Hash": ["xor-hash"]}]},
-    location={"Some": [dict(owner="Darklang", modules=["Stdlib"], name="BitwiseXor")]})]}),
+    location=dict(owner="Darklang", modules=["Stdlib"], name="BitwiseXor"))]}),
     traitTypeArgs=[], self={"TInt64": []}, typeParams=[], bounds=[],
     methods=[["bitwiseXor", dict(originalName=["Stdlib", "Int64", "BitwiseXor", "bitwiseXor"], resolved={"Ok": [dict(
-        name={"Package": [{"Hash": ["xor-method-hash"]}]}, location={"Some": [METHOD_LOCATION]})]})]])
+        name={"Package": [{"Hash": ["xor-method-hash"]}]}, location=METHOD_LOCATION)]})]])
 
 
 def inventory(module):

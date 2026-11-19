@@ -143,7 +143,7 @@ let insertRootWordProbeInEntry functionNames entryName tupleWords functions =
     | Return _ -> (expr, gen)
     | Let (id, Call (callee, [ value ]), body)
       when Option.fold ~none:false
-             ~some:(String.starts_with ~prefix:"__dark_render_value_")
+             ~some:(String.starts_with ~prefix:"__dark_render_eval_")
              (FunctionIdMap.tryFind callee functionNames) ->
         if tupleWords then
           let field0, gen = freshVar gen in

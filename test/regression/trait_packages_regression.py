@@ -18,7 +18,7 @@ def location(name):
 
 def reference(name, hash_):
     return dict(originalName=name.split("."), resolved={"Ok": [dict(
-        name={"Package": [{"Hash": [hash_]}]}, location={"Some": [location(name)]})]})
+        name={"Package": [{"Hash": [hash_]}]}, location=location(name))]})
 
 
 def main():
@@ -53,7 +53,7 @@ def main():
         body={"EApply": [1, {"EFnName": [2, dict(originalName=["Darklang", "Stdlib", "Display", "display"],
             resolved={"Error": ["unresolved"]}), []]}, [], [{"EArg": [3, 0]}]]}))
     # Ceilings affect content identity even though trait ceiling checking is deferred.
-    ceiling_signature = dict(signature, permissionCeiling={"Some": [[]]})
+    ceiling_signature = dict(signature, permissionCeiling=[])
     entities[("trait", "ceiling-trait-hash")] = ("Hosted.CeilingText", dict(
         typeParams=["a"], bounds=[], methods=[ceiling_signature]))
     requests = []
@@ -121,7 +121,7 @@ def main():
                 env=env, capture_output=True, text=True, timeout=120)
             assert result.returncode == 0, result.stdout + result.stderr + repr(requests)
             output = subprocess.check_output([str(program)], text=True, timeout=10)
-            assert json.loads(output) == "hosted|hosted|42", output
+            assert output == "hosted|hosted|42\n", output
             assert "/Hosted" in requests and "/Hosted.Int64" in requests, requests
             assert not any("stdlib-trait-hash" in request for request in requests), requests
             source.write_text('Hosted.CeilingText.toText 42L\n')
@@ -135,7 +135,7 @@ def main():
                 f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                 env=env, capture_output=True, text=True, timeout=120)
             assert direct.returncode == 0, direct.stdout + direct.stderr
-            assert json.loads(subprocess.check_output([str(program)], text=True, timeout=10)) == "hosted"
+            assert subprocess.check_output([str(program)], text=True, timeout=10) == "hosted\n"
             # Imported equal candidates must be diagnosed, never newest-wins.
             key = ("impl", "rival-hash")
             rival = dict(entities[("impl", "impl-hash")][1])
@@ -165,7 +165,7 @@ def main():
                 f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                 env=env, capture_output=True, text=True, timeout=120)
             assert offline.returncode == 0, offline.stdout + offline.stderr
-            assert json.loads(subprocess.check_output([str(program)], text=True, timeout=10)) == "hosted"
+            assert subprocess.check_output([str(program)], text=True, timeout=10) == "hosted\n"
 
         server.shutdown()
     print("Hosted traits, implementations, dependencies and bounded functions execute natively")

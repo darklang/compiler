@@ -1,6 +1,6 @@
 // http_transport_poll.e2e - Buffered TLS polling authenticates control records without a blocking read.
 let pollTls (update: Bool) (eof: Bool) : Stdlib.Result.Result<String, String> =
-  let secret = Stdlib.Blob.__fromInt64List (Stdlib.List.repeatUnsafe 32 0L) in
+  let secret = Stdlib.Blob.__fromInt64List (Stdlib.List.repeatUnsafe 32z 0L) in
   Stdlib.__Tls13.trafficKeys secret |> Stdlib.Result.andThen (fun keys ->
     let prefix = if update then Stdlib.__Tls13.sealRecord keys 22L (Stdlib.Blob.__fromInt64List [24L, 0L, 0L, 1L, 0L]) |> Stdlib.Result.map (fun sealed -> sealed.bytes) else Ok Stdlib.Blob.empty in
     let nextKeys = if update then Stdlib.__Tls13KeyUpdate.__next secret keys.cipherSuite |> Stdlib.Result.map (fun pair -> let (_secret, keys) = pair in keys) else Ok keys in
@@ -17,7 +17,7 @@ pollTls true false = Ok "ready"
 pollTls false true = Ok "EOF"
 pollTls true true = Ok "EOF"
 let pollServer (update: Bool) (eof: Bool) : Stdlib.Result.Result<String, String> =
-  let secret = Stdlib.Blob.__fromInt64List (Stdlib.List.repeatUnsafe 32 0L) in
+  let secret = Stdlib.Blob.__fromInt64List (Stdlib.List.repeatUnsafe 32z 0L) in
   Stdlib.__Tls13.trafficKeys secret |> Stdlib.Result.andThen (fun keys ->
     let prefix = if update then Stdlib.__Tls13.sealRecord keys 22L (Stdlib.Blob.__fromInt64List [24L, 0L, 0L, 1L, 0L]) |> Stdlib.Result.map (fun sealed -> sealed.bytes) else Ok Stdlib.Blob.empty in
     let nextKeys = if update then Stdlib.__Tls13KeyUpdate.__next secret keys.cipherSuite |> Stdlib.Result.map (fun pair -> let (_secret, keys) = pair in keys) else Ok keys in

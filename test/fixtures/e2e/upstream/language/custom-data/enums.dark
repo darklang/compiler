@@ -16,10 +16,10 @@ Stdlib.Result.Result.Error(Builtin.testRuntimeError "err") = error="Uncaught exc
 module Errors =
   module Builtins =
     #compileerror="Constructor 'Darklang.Stdlib.Option.Option.None' expects 0 fields"
-    Stdlib.Option.Option.None 5 = error="Expected 0 fields in Darklang.Stdlib.Option.Option.`None`, but got 1"
+    Stdlib.Option.Option.None 5z = error="Expected 0 fields in Darklang.Stdlib.Option.Option.`None`, but got 1"
 
     #compileerror="Constructor 'Darklang.Stdlib.Option.Option.Some' expects 1 fields"
-    Stdlib.Option.Option.Some(5, 6) = error="Expected 1 fields in Darklang.Stdlib.Option.Option.`Some`, but got 2"
+    Stdlib.Option.Option.Some(5z, 6z) = error="Expected 1 fields in Darklang.Stdlib.Option.Option.`Some`, but got 2"
 
   module User =
     type MyEnum = | A | B | C of String
@@ -28,9 +28,9 @@ module Errors =
     MyEnum.C = compileerror="Constructor 'Errors.User.MyEnum.C' expects 1 fields"
     MyEnum.B 5L = compileerror="Constructor 'Errors.User.MyEnum.B' expects 0 fields"
     (match MyEnum.C "test" with | C v -> v | _ -> "unmatched") = "test"
-    (match MyEnum.C "test" with | 5 -> "unmatched because it's not an int" | C v -> v) = compileerror="Expected TInt, got TSum (\"Errors.User.MyEnum\", [])"
+    (match MyEnum.C "test" with | 5z -> "unmatched because it's not an int" | C v -> v) = compileerror="Expected TInt, got TSum (\"Errors.User.MyEnum\", [])"
     (match MyEnum.C "test" with | C -> "unmatched because we didn't provide a space for the field") = compileerror="Constructor pattern 'Errors.User.MyEnum.C' has wrong field count"
-    (match MyEnum.C "test" with | D -> "unmatched because case name does not exist" | C _ -> 2) = compileerror="Unknown constructor 'Errors.User.MyEnum.D' in pattern"
+    (match MyEnum.C "test" with | D -> "unmatched because case name does not exist" | C _ -> 2z) = compileerror="Unknown constructor 'Errors.User.MyEnum.D' in pattern"
 
     (MyEnum.C 5L) = compileerror="Expected TString, got TInt64"
 module Simple =

@@ -49,4 +49,4 @@ Stdlib.Dict.iter (Dict { "b": 2L, "a": 1L }) (fun key value -> let ignored = Bui
 Stdlib.Dict.setOverridingDuplicates (Stdlib.Dict.singleton "b" 2L) "a" 1L == Dict { "a": 1L, "b": 2L } = true
 Stdlib.Dict.fromList ([("b", 2L), ("a", 1L)]) == (Dict { "a": 1L, "b": 2L }) = true
 Dict { "b": 2L, "a": 1L } != Dict { "a": 1L, "b": 2L } = false
-Dict { "nested": Dict { "b": 2L, "a": 1L }, "not an identifier": Dict { } } = stdout="Dict { nested = Dict { a = 1, b = 2 }, ``not an identifier`` = Dict { } }\n" stderr=""
+Dict { "nested": Dict { "b": 2L, "a": 1L }, "not an identifier": Dict { } } = stdout="{ \"nested\": { \"a\": 1, \"b\": 2 }, \"not an identifier\": {} }\n" stderr=""

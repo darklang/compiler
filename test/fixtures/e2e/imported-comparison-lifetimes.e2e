@@ -6,5 +6,5 @@ Stdlib.List.length (Darklang.Stdlib.Cli.UI.Canvas.compose 1L 2L [Darklang.Stdlib
 
 module GroupingLifetimeChecks =
   type Row = { key: Int, text: String }
-let rows = [GroupingLifetimeChecks.Row { key = 0, text = "a" }, GroupingLifetimeChecks.Row { key = 1, text = "b" }] in let grouped = Stdlib.List.fold rows Stdlib.Dict.empty (fun acc row -> Stdlib.Dict.setOverridingDuplicates acc row.key [row]) in Stdlib.Dict.size grouped = 2L
-let rows = [GroupingLifetimeChecks.Row { key = 0, text = "a" }, GroupingLifetimeChecks.Row { key = 1, text = "b" }] in let grouped = Stdlib.List.fold rows Stdlib.Dict.empty (fun acc row -> let existing = match Stdlib.Dict.get acc row.key with | Some xs -> xs | None -> [] in Stdlib.Dict.setOverridingDuplicates acc row.key (Stdlib.List.concat existing [row])) in Stdlib.Dict.size grouped = 2L
+let rows = [GroupingLifetimeChecks.Row { key = 0z, text = "a" }, GroupingLifetimeChecks.Row { key = 1z, text = "b" }] in let grouped = Stdlib.List.fold rows Stdlib.Dict.empty (fun acc row -> Stdlib.Dict.setOverridingDuplicates acc row.key [row]) in Stdlib.Dict.size grouped = 2L
+let rows = [GroupingLifetimeChecks.Row { key = 0z, text = "a" }, GroupingLifetimeChecks.Row { key = 1z, text = "b" }] in let grouped = Stdlib.List.fold rows Stdlib.Dict.empty (fun acc row -> let existing = match Stdlib.Dict.get acc row.key with | Some xs -> xs | None -> [] in Stdlib.Dict.setOverridingDuplicates acc row.key (Stdlib.List.concat existing [row])) in Stdlib.Dict.size grouped = 2L

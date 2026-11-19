@@ -36,7 +36,7 @@ Stdlib.Int8.remainder 20y 8y = Stdlib.Result.Result.Ok 4y
 Stdlib.Int8.remainder -20y 8y = Stdlib.Result.Result.Ok -4y
 Stdlib.Int8.remainder -20y -8y = Stdlib.Result.Result.Ok -4y
 Stdlib.Int8.remainder -15y 6y = Stdlib.Result.Result.Ok -3y
-Stdlib.Int8.remainder 5y 0y = error="Cannot divide by 0"
+Stdlib.Int8.remainder 5y 0y = Stdlib.Result.Result.Error "Cannot divide by 0"
 Stdlib.Int8.add 10y 9y = 19y
 Stdlib.Int8.add 10y 0y = 10y
 Stdlib.Int8.add 88y 9y = 97y
@@ -197,13 +197,13 @@ Stdlib.Int8.fromUInt8 127uy = Stdlib.Option.Option.Some 127y
 Stdlib.Int8.fromUInt8 128uy = Stdlib.Option.Option.None
 Stdlib.Int8.fromUInt8 255uy = Stdlib.Option.Option.None
 
-Stdlib.Int8.fromInt16 0s = Stdlib.Option.Option.Some 0y
-Stdlib.Int8.fromInt16 1s = Stdlib.Option.Option.Some 1y
-Stdlib.Int8.fromInt16 127s = Stdlib.Option.Option.Some 127y
-Stdlib.Int8.fromInt16 128s = Stdlib.Option.Option.None
-Stdlib.Int8.fromInt16 (-1s) = Stdlib.Option.Option.Some -1y
-Stdlib.Int8.fromInt16 (-128s) = Stdlib.Option.Option.Some -128y
-Stdlib.Int8.fromInt16 (-129s) = Stdlib.Option.Option.None
+Stdlib.Int8.fromInt16 0s16 = Stdlib.Option.Option.Some 0y
+Stdlib.Int8.fromInt16 1s16 = Stdlib.Option.Option.Some 1y
+Stdlib.Int8.fromInt16 127s16 = Stdlib.Option.Option.Some 127y
+Stdlib.Int8.fromInt16 128s16 = Stdlib.Option.Option.None
+Stdlib.Int8.fromInt16 (-1s16) = Stdlib.Option.Option.Some -1y
+Stdlib.Int8.fromInt16 (-128s16) = Stdlib.Option.Option.Some -128y
+Stdlib.Int8.fromInt16 (-129s16) = Stdlib.Option.Option.None
 
 Stdlib.Int8.fromUInt16 0us = Stdlib.Option.Option.Some 0y
 Stdlib.Int8.fromUInt16 1us = Stdlib.Option.Option.Some 1y

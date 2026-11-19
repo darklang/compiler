@@ -8,8 +8,8 @@ Stdlib.Option.isNone (identityChar None) = true // leak_check
 match identityChar (Some 'a') with | Some value -> value | None -> 'b' = 'a' // leak_check
 Stdlib.String.head "a" = Some 'a' // leak_check
 Stdlib.String.head "😂" = Some '😂' // leak_check
-identityChar None = stdout="Darklang.Stdlib.Option.Option<Char>.None\n" stderr="" // leak_check
-Some 'a' = stdout="Darklang.Stdlib.Option.Option<Char>.Some('a')\n" stderr="" // leak_check
+identityChar None = stdout="None\n" stderr="" // leak_check
+Some 'a' = stdout="Some('a')\n" stderr="" // leak_check
 let identityInt128 (value: Stdlib.Option.Option<Int128>): Stdlib.Option.Option<Int128> = value
 match identityInt128 (Some 123Q) with | Some value -> value == 123Q | None -> false = true // leak_check
 let identityUInt128 (value: Stdlib.Option.Option<UInt128>): Stdlib.Option.Option<UInt128> = value

@@ -30,7 +30,7 @@ module Shapes =
 
   // The impl's method is an ordinary fn under <Type>.<Trait>
   test implMethodIsFn =
-    Shapes.Point.Show.show (Shapes.Point { x = 1, y = 2 })
+    Shapes.Point.Show.show (Shapes.Point { x = 1z, y = 2z })
     |> Stdlib.Test.equal "(1, 2)"
 
   // The impl is its own item, named `Shapes.Point.Show`; its methods are the fns
@@ -39,43 +39,43 @@ module Shapes =
   // Dispatch by the argument's type
   test dispatchByArgType =
     Stdlib.Test.all
-      [ Shapes.Show.show (Shapes.Point { x = 5, y = 6 })
+      [ Shapes.Show.show (Shapes.Point { x = 5z, y = 6z })
         |> Stdlib.Test.equal "(5, 6)"
-        Shapes.Show.show 7 |> Stdlib.Test.equal "7"
+        Shapes.Show.show 7z |> Stdlib.Test.equal "7"
         Shapes.Show.show true |> Stdlib.Test.equal "yes" ]
 
   // Inside a bounded generic fn
   test boundedGenericFn =
     Stdlib.Test.all
-      [ Shapes.display (Shapes.Point { x = 1, y = 2 })
+      [ Shapes.display (Shapes.Point { x = 1z, y = 2z })
         |> Stdlib.Test.equal "value: (1, 2)"
-        Shapes.display 5 |> Stdlib.Test.equal "value: 5" ]
+        Shapes.display 5z |> Stdlib.Test.equal "value: 5" ]
 
   // Conditional impls dispatch on the head, then on the elements lazily
   test conditionalImpls =
     Stdlib.Test.all
-      [ Shapes.display [ 1, 2, 3 ] |> Stdlib.Test.equal "value: [1, 2, 3]"
+      [ Shapes.display [ 1z, 2z, 3z ] |> Stdlib.Test.equal "value: [1, 2, 3]"
         Shapes.Show.show [ [ true ], [] ] |> Stdlib.Test.equal "[[yes], []]"
-        Shapes.display [ Shapes.Point { x = 1, y = 2 } ]
+        Shapes.display [ Shapes.Point { x = 1z, y = 2z } ]
         |> Stdlib.Test.equal "value: [(1, 2)]" ]
 
   // As a function value, and piped
   test functionValueAndPipe =
     Stdlib.Test.all
-      [ ([ 1, 2 ] |> Stdlib.List.map Shapes.Show.show)
+      [ ([ 1z, 2z ] |> Stdlib.List.map Shapes.Show.show)
         |> Stdlib.Test.equal [ "1", "2" ]
-        ((Shapes.Point { x = 7, y = 8 }) |> Shapes.Show.show)
+        ((Shapes.Point { x = 7z, y = 8z }) |> Shapes.Show.show)
         |> Stdlib.Test.equal "(7, 8)" ]
 
   // Receiver calls: `x.method` is the whole call for a one-argument method
   test receiverCalls =
     Stdlib.Test.all
-      [ (Shapes.Point { x = 1, y = 2 }).show |> Stdlib.Test.equal "(1, 2)"
-        (9).show |> Stdlib.Test.equal "9" ]
+      [ (Shapes.Point { x = 1z, y = 2z }).show |> Stdlib.Test.equal "(1, 2)"
+        (9z).show |> Stdlib.Test.equal "9" ]
 
   // A real field always wins over a method of the same name
   test fieldBeatsMethod =
-    (Shapes.Point { x = 1, y = 2 }).x |> Stdlib.Test.equal 1
+    (Shapes.Point { x = 1z, y = 2z }).x |> Stdlib.Test.equal 1z
 
   // A direct call reports the missing implementation at the method call.
   #compileerror="No implementation of trait"
@@ -86,7 +86,7 @@ module Shapes =
 
   // No impl: at the CALL of a bounded fn, before its body runs
   test boundedCallWithImpl =
-    Shapes.neverCalls 5 |> Stdlib.Test.equal "never"
+    Shapes.neverCalls 5z |> Stdlib.Test.equal "never"
 
   #compileerror="No implementation of trait"
   test noImplForBoundedCallRaises =
@@ -106,19 +106,19 @@ module Multi =
 
   test operatorTraits =
     Stdlib.Test.all
-      [ (Multi.Vec { dx = 1, dy = 2 } + Multi.Vec { dx = 10, dy = 20 })
-        |> Stdlib.Test.equal (Multi.Vec { dx = 11, dy = 22 })
+      [ (Multi.Vec { dx = 1z, dy = 2z } + Multi.Vec { dx = 10z, dy = 20z })
+        |> Stdlib.Test.equal (Multi.Vec { dx = 11z, dy = 22z })
         Stdlib.Add.add
-          (Multi.Vec { dx = 1, dy = 2 })
-          (Multi.Vec { dx = 10, dy = 20 })
-        |> Stdlib.Test.equal (Multi.Vec { dx = 11, dy = 22 })
-        Multi.sum 1 2 3 |> Stdlib.Test.equal 6
+          (Multi.Vec { dx = 1z, dy = 2z })
+          (Multi.Vec { dx = 10z, dy = 20z })
+        |> Stdlib.Test.equal (Multi.Vec { dx = 11z, dy = 22z })
+        Multi.sum 1z 2z 3z |> Stdlib.Test.equal 6z
         Multi.sum 1.5 2.5 3.0 |> Stdlib.Test.equal 7.0
         Multi.sum
-          (Multi.Vec { dx = 1, dy = 1 })
-          (Multi.Vec { dx = 2, dy = 2 })
-          (Multi.Vec { dx = 3, dy = 3 })
-        |> Stdlib.Test.equal (Multi.Vec { dx = 6, dy = 6 })
+          (Multi.Vec { dx = 1z, dy = 1z })
+          (Multi.Vec { dx = 2z, dy = 2z })
+          (Multi.Vec { dx = 3z, dy = 3z })
+        |> Stdlib.Test.equal (Multi.Vec { dx = 6z, dy = 6z })
         Multi.sum "a" "b" "c" |> Stdlib.Test.equal "abc" ]
 
   #compileerror="No implementation of trait"
@@ -134,10 +134,10 @@ module Multi =
   // Receiver call on a two-argument method is a partial application
   test receiverPartialApplication =
     Stdlib.Test.all
-      [ ((Multi.Vec { dx = 1, dy = 2 }).add (Multi.Vec { dx = 1, dy = 1 }))
-        |> Stdlib.Test.equal (Multi.Vec { dx = 2, dy = 3 })
-        (Multi.Vec { dx = 1, dy = 2 }).add (Multi.Vec { dx = 1, dy = 1 })
-        |> Stdlib.Test.equal (Multi.Vec { dx = 2, dy = 3 }) ]
+      [ ((Multi.Vec { dx = 1z, dy = 2z }).add (Multi.Vec { dx = 1z, dy = 1z }))
+        |> Stdlib.Test.equal (Multi.Vec { dx = 2z, dy = 3z })
+        (Multi.Vec { dx = 1z, dy = 2z }).add (Multi.Vec { dx = 1z, dy = 1z })
+        |> Stdlib.Test.equal (Multi.Vec { dx = 2z, dy = 3z }) ]
 
 module Ambiguity =
   // Two traits with the same method name. Their SHAPES differ (Describe has a
@@ -160,13 +160,13 @@ module Ambiguity =
   // Naming the trait disambiguates
   test namedTraitDisambiguates =
     Stdlib.Test.all
-      [ Ambiguity.Describe.describe 1 |> Stdlib.Test.equal "described"
-        Ambiguity.Label.describe 1 |> Stdlib.Test.equal "labelled" ]
+      [ Ambiguity.Describe.describe 1z |> Stdlib.Test.equal "described"
+        Ambiguity.Label.describe 1z |> Stdlib.Test.equal "labelled" ]
 
   // A receiver call cannot pick between two traits with the same method name
   #compileerror="Ambiguous receiver method"
   test ambiguousReceiverRaises =
-    (1).describe
+    (1z).describe
     => raises
       "Int has more than one `describe`: 2 traits declare it. Say which one you mean, as `SomeTrait.describe value`"
 
@@ -276,16 +276,16 @@ module Equality =
         (Equality.User { id = 1L, name = "a" }
          != Equality.User { id = 1L, name = "b" })
         |> Stdlib.Test.equal true
-        (1 == 1) |> Stdlib.Test.equal true
-        1 != 1 |> Stdlib.Test.equal false
+        (1z == 1z) |> Stdlib.Test.equal true
+        1z != 1z |> Stdlib.Test.equal false
         ("a" == "a") |> Stdlib.Test.equal true
-        ([ 1, 2 ] == [ 1, 2 ]) |> Stdlib.Test.equal true
-        (Stdlib.Option.Option.Some 1 == Stdlib.Option.Option.Some 1)
+        ([ 1z, 2z ] == [ 1z, 2z ]) |> Stdlib.Test.equal true
+        (Stdlib.Option.Option.Some 1z == Stdlib.Option.Option.Some 1z)
         |> Stdlib.Test.equal true ]
 
   #compileerror="Operator is unavailable for this type"
   test intVsStringEqualityRaises =
-    (1 == "a")
+    (1z == "a")
     => raises "Cannot perform equality check on Int and String"
 
   // Containers compare element by element, structurally, and agree with the
@@ -367,11 +367,11 @@ module Identities =
     Stdlib.Test.all
       [ Stdlib.sum 0L [ 1L, 2L, 3L ] |> Stdlib.Test.equal 6L
         Stdlib.sum 0.0 [] |> Stdlib.Test.equal 0.0
-        Stdlib.product 1 [ 2, 3, 4 ] |> Stdlib.Test.equal 24
-        Stdlib.sum (Multi.Vec { dx = 0, dy = 0 })
-          [ Multi.Vec { dx = 1, dy = 2 }
-            Multi.Vec { dx = 3, dy = 4 } ]
-        |> Stdlib.Test.equal (Multi.Vec { dx = 4, dy = 6 }) ]
+        Stdlib.product 1z [ 2z, 3z, 4z ] |> Stdlib.Test.equal 24z
+        Stdlib.sum (Multi.Vec { dx = 0z, dy = 0z })
+          [ Multi.Vec { dx = 1z, dy = 2z }
+            Multi.Vec { dx = 3z, dy = 4z } ]
+        |> Stdlib.Test.equal (Multi.Vec { dx = 4z, dy = 6z }) ]
 
 module Rendering =
   // `Display` is the trait behind every builtin type's `display`
@@ -389,7 +389,7 @@ module Rendering =
         Stdlib.display 42L |> Stdlib.Test.equal "42"
         Stdlib.display true |> Stdlib.Test.equal "true"
         Stdlib.display 2.5 |> Stdlib.Test.equal "2.5"
-        (7).display |> Stdlib.Test.equal "7"
+        (7z).display |> Stdlib.Test.equal "7"
         Stdlib.max 3L 9L |> Stdlib.Test.equal 9L ]
 
   // String, Char and DateTime implement Compare, so the generics cover them too
@@ -400,7 +400,7 @@ module Rendering =
 
   // A type with no Compare implementation is what the bound refuses
   test clamp =
-    Stdlib.clamp 15 20 10 |> Stdlib.Test.equal 15
+    Stdlib.clamp 15z 20z 10z |> Stdlib.Test.equal 15z
 
   #compileerror="No implementation of trait"
   test minOnBoolRaises =
@@ -413,7 +413,7 @@ module Rendering =
     Stdlib.Test.all
       [ Stdlib.abs -5L |> Stdlib.Test.equal 5L
         Stdlib.abs 2.5 |> Stdlib.Test.equal 2.5
-        Stdlib.abs 0 |> Stdlib.Test.equal 0 ]
+        Stdlib.abs 0z |> Stdlib.Test.equal 0z ]
 
   // an unsigned type has no Negate implementation, so it has no abs either
   #compileerror="No implementation of trait"

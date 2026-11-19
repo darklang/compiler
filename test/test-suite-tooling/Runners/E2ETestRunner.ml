@@ -1473,7 +1473,16 @@ let tryParseBatchBoolResults expectedCount stdout =
   in
   match last with
   | raw :: _ when expectedCount > 0 && expectedCount <= maxSupportedBatchSize ->
-      let line = Text.trim raw in
+      (* A tuple of masks too wide for one line prints one mask per line. *)
+      let line =
+        match String.rindex_opt stdout '(' with
+        | Some start when expectedChunks > 1 ->
+            Text.trim
+              (String.map
+                 (fun c -> if c = '\n' then ' ' else c)
+                 (String.sub stdout start (String.length stdout - start)))
+        | _ -> Text.trim raw
+      in
       let parts =
         if expectedChunks = 1 then [ line ]
         else if Text.startsWith line "(" && Text.endsWith line ")" then
@@ -1551,7 +1560,7 @@ let packageManagerFixture =
          );
          ( "function/get/with-location/0f116690f2572bcfff9e18effd2589ad4fc7672fc46088c219229a7821a122f4",
            200,
-           {|{"entity":{"body":{"EInt":[5376903518395640452,5]},"description":"","hash":{"Hash":["0f116690f2572bcfff9e18effd2589ad4fc7672fc46088c219229a7821a122f4"]},"parameters":[{"description":"","name":"_","typ":{"TUnit":[]}}],"permissionCeiling":{"None":[]},"returnType":{"TInt":[]},"typeParams":[]},"location":{"modules":["Test"],"name":"returnsInt","owner":"Darklang"}}|}
+           {|{"entity":{"body":{"EInt":[5376903518395640452,5]},"description":"","hash":{"Hash":["0f116690f2572bcfff9e18effd2589ad4fc7672fc46088c219229a7821a122f4"]},"parameters":[{"description":"","name":"_","typ":{"TUnit":[]}}],"permissionCeiling":null,"returnType":{"TInt":[]},"typeParams":[]},"location":{"modules":["Test"],"name":"returnsInt","owner":"Darklang"}}|}
          );
          ("type/find/Darklang.Test", 404, "");
          ("type/find/Darklang.Test.returnsInt", 404, "");

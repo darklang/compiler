@@ -1,7 +1,7 @@
 // dns_wire.e2e - DNS packets are encoded and validated in Dark.
 
 Stdlib.__DnsWire.query 4660L "example.com" 1L |> Stdlib.Result.map Stdlib.Blob.toHex = Ok "123401000001000000000000076578616D706C6503636F6D0000010001"
-Stdlib.Blob.fromHex "123481800001000100000000076578616D706C6503636F6D0000010001C00C000100010000003C00045DB8D822" |> Stdlib.Result.map (fun wire -> Stdlib.Blob.toHex (Stdlib.Blob.slice wire 41 4)) = Ok "5DB8D822"
+Stdlib.Blob.fromHex "123481800001000100000000076578616D706C6503636F6D0000010001C00C000100010000003C00045DB8D822" |> Stdlib.Result.map (fun wire -> Stdlib.Blob.toHex (Stdlib.Blob.slice wire 41z 4z)) = Ok "5DB8D822"
 Stdlib.Blob.fromHex "123481800001000100000000076578616D706C6503636F6D0000010001C00C000100010000003C00045DB8D822" |> Stdlib.Result.andThen (fun wire -> Stdlib.__DnsWire.answers wire 4660L "example.com" 1L) = Ok [[93L, 184L, 216L, 34L]]
 Stdlib.__DnsWire.hosts "# hosts\n127.0.0.1 localhost\n192.0.2.4 example.test alias.test # local\n" "ALIAS.test" 1L = [[192L, 0L, 2L, 4L]]
 Stdlib.__DnsWire.hosts "::1 localhost ip6-loopback\n" "localhost" 28L = [[0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 1L]]

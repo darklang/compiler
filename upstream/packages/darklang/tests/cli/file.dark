@@ -93,7 +93,7 @@ module WriteErrors =
 
 
   // Parent creation succeeds, but opening a directory as a file fails.
-  // @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<Unit, Darklang.Stdlib.Cli.FileSystem.FileError>.Error(Darklang.Stdlib.Cli.FileSystem.FileError.Other(\"Is a directory\")), " class=missing-support reason=compiler-gap
+  // @compiler xfail runtime: "expected Error(Stdlib.Cli.FileSystem.FileError.Other(\"Is a directory\")), got Error(Stdlib.Cli.FileSystem.FileError.OsAcc" class=missing-support reason=compiler-gap
   test targetIsDirectory =
     Stdlib.Cli.File.withTemp(fun filename ->
       let directory = filename + "-dir"
@@ -110,7 +110,7 @@ module WriteErrors =
 
 module ReadErrors =
   // a directory is not a permission problem
-  // @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<String, String>.Error(\"Is a directory\"), got Darklang.Stdlib.Result.Result<String, String>.Error(\"Permission denied\")" class=missing-support reason=compiler-gap
+  // @compiler xfail runtime: "expected Error(\"Is a directory\"), got Error(\"Permission denied\")" class=missing-support reason=compiler-gap
   test readingADirectory =
     Stdlib.Cli.Dir.withTemp(fun dir ->
       Stdlib.Cli.FileSystem.readFileAsString(dir)

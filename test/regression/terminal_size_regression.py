@@ -19,7 +19,7 @@ def main():
         binary = root / "size"
         source.write_text('''let (columns, rows) = Darklang.Cli.Terminal.getSize () in
 let report = $"{Stdlib.Int64.toString columns}|{Stdlib.Int64.toString rows}" in
-let _ = Stdlib.Cli.Posix.fdWrite 3 (Stdlib.String.toBlob report) in
+let _ = Stdlib.Cli.Posix.fdWrite 3z (Stdlib.String.toBlob report) in
 0L
 ''', encoding="utf-8")
         subprocess.run([compiler, "-q", "--leak-check", str(source), "-o", str(binary)],

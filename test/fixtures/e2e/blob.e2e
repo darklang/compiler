@@ -1,9 +1,9 @@
 // Blob parity tests: immutable binary values and interpreter-compatible codecs.
 
-Stdlib.Blob.length Stdlib.Blob.empty = 0
+Stdlib.Blob.length Stdlib.Blob.empty = 0z
 Stdlib.Blob.toHex (Stdlib.Blob.fromList ([0uy, 15uy, 255uy])) = "000FFF"
-Stdlib.Blob.length (Stdlib.Blob.slice (Stdlib.Blob.fromString "abcdef") (-2) 99) = 6
-Stdlib.Blob.length (Stdlib.Blob.slice (Stdlib.Blob.fromString "abcdef") 99 3) = 0
+Stdlib.Blob.length (Stdlib.Blob.slice (Stdlib.Blob.fromString "abcdef") (-2z) 99z) = 6z
+Stdlib.Blob.length (Stdlib.Blob.slice (Stdlib.Blob.fromString "abcdef") 99z 3z) = 0z
 Stdlib.Blob.fromString "same" == Stdlib.Blob.fromString "same" = true
 Stdlib.Blob.fromString "same" != Stdlib.Blob.fromString "sane" = true
 [Stdlib.Blob.fromString "hi"] == [Stdlib.Blob.fromList [104uy, 105uy]] = true
@@ -19,7 +19,7 @@ let b = Stdlib.Blob.fromString "nested" in ([b], b) == ([b], b) = true
 
 Stdlib.Blob.concat ([]) == Stdlib.Blob.empty = true
 
-Stdlib.Blob.fromString "rendered" = stdout="<Blob: ephemeral>" stderr=""
+Stdlib.Blob.fromString "rendered" = stdout="<Bytes: 8 bytes 72 65 6e 64 65 72 65 64>\n" stderr=""
 
 Stdlib.Blob.fromHex "0" = Error "Invalid hex string: it has 1 digits, and each byte takes two"
 
