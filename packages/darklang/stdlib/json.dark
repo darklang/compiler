@@ -536,7 +536,7 @@ let __padNumber (value: String) (goalLength: Int64) : String =
     | Error _ -> Builtin.crash "JSON numeric padding failed"
 
 let __floatRatio (value: Float) : (Int * Int) =
-    let bits = Stdlib.Float.__toBits value in
+    let bits = Stdlib.Float64.__toBits value in
     let rawExponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
     let mantissa = Stdlib.UInt64.bitwiseAnd bits 4503599627370495UL in
     let significand =
@@ -544,7 +544,7 @@ let __floatRatio (value: Float) : (Int * Int) =
         else Stdlib.Int.add (Stdlib.Int.fromUInt64 mantissa) (Stdlib.Int.shiftLeft 1 52) in
     let binaryExponent =
         if rawExponent == 0UL then -1074L
-        else Stdlib.Float.__smallUInt64ToInt64 rawExponent - (1023L) - 52L in
+        else Stdlib.Float64.__smallUInt64ToInt64 rawExponent - (1023L) - 52L in
     if binaryExponent >= 0L then
         (Stdlib.Int.shiftLeft significand (Stdlib.Int.fromInt64 binaryExponent), 1)
     else
@@ -562,14 +562,14 @@ let __formatFloatPrecision (numerator: Int) (denominator: Int) (precision: Int64
     let scaledText = Stdlib.Json.__padNumber scaledText0 (fractionDigits + 1L) in
     let split = Stdlib.String.__byteLength scaledText - fractionDigits in
     let whole = Stdlib.String.__byteSlice scaledText 0L split in
-    let fraction = Stdlib.Float.__stripDecimalTrailingZeros (Stdlib.String.__byteDrop scaledText split) in
+    let fraction = Stdlib.Float64.__stripDecimalTrailingZeros (Stdlib.String.__byteDrop scaledText split) in
     whole + "." + fraction
 
 let __shortestFloat (numerator: Int) (denominator: Int) (targetBits: UInt64) (precision: Int64) : String =
     let candidate = Stdlib.Json.__formatFloatPrecision numerator denominator precision in
     match Stdlib.AltJson.__numberToFloat candidate with
     | Some parsed ->
-        if Stdlib.Float.__toBits parsed == targetBits || precision >= 17L then candidate
+        if Stdlib.Float64.__toBits parsed == targetBits || precision >= 17L then candidate
         else Stdlib.Json.__shortestFloat numerator denominator targetBits (precision + 1L)
     | None ->
         if precision >= 17L then candidate
@@ -611,7 +611,7 @@ let __formatScientificPrecision (numerator: Int) (denominator: Int) (precision: 
     let digits0 =
         if carried then Stdlib.String.__byteSlice roundedText 0L (Stdlib.String.__byteLength roundedText - (1L))
         else roundedText in
-    let digits = Stdlib.Float.__stripDecimalTrailingZeros digits0 in
+    let digits = Stdlib.Float64.__stripDecimalTrailingZeros digits0 in
     let mantissa =
         if Stdlib.String.__byteLength digits == 1L then digits
         else Stdlib.String.__byteTake digits 1L + "." + Stdlib.String.__byteDrop digits 1L in
@@ -622,7 +622,7 @@ let __shortestScientificFloat (numerator: Int) (denominator: Int) (targetBits: U
     let candidate = Stdlib.Json.__formatScientificPrecision numerator denominator precision in
     match Stdlib.AltJson.__numberToFloat candidate with
     | Some parsed ->
-        if Stdlib.Float.__toBits parsed == targetBits || precision >= 17L then candidate
+        if Stdlib.Float64.__toBits parsed == targetBits || precision >= 17L then candidate
         else Stdlib.Json.__shortestScientificFloat numerator denominator targetBits (precision + 1L)
     | None ->
         if precision >= 17L then candidate
@@ -631,14 +631,14 @@ let __shortestScientificFloat (numerator: Int) (denominator: Int) (targetBits: U
 // A Float32 writes as its own shortest text, as Float32.toString prints it;
 // NaN and the infinities write as Float's do.
 let __serializeFloat32 (value: Float32) : String =
-    let wide = Stdlib.Float32.toFloat value in
-    let bits = Stdlib.Float.__toBits wide in
+    let wide = Stdlib.Float32.toFloat64 value in
+    let bits = Stdlib.Float64.__toBits wide in
     if Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL == 2047UL then
         Stdlib.Json.__serializeFloat wide
     else Stdlib.Float32.toString value
 
 let __serializeFloat (value: Float) : String =
-    let bits = Stdlib.Float.__toBits value in
+    let bits = Stdlib.Float64.__toBits value in
     let exponent = Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight bits 52UL) 2047UL in
     let fraction = Stdlib.UInt64.bitwiseAnd bits 4503599627370495UL in
     if exponent == 2047UL then
@@ -646,15 +646,15 @@ let __serializeFloat (value: Float) : String =
         else if Stdlib.UInt64.shiftRight bits 63UL == 1UL then "\"-Infinity\""
         else "\"Infinity\""
     else
-        let absolute = Stdlib.Float.absoluteValue value in
+        let absolute = Stdlib.Float64.absoluteValue value in
         if absolute == 0.0 then if Stdlib.UInt64.shiftRight bits 63UL == 1UL then "-0.0" else "0.0"
         else
             let (numerator, denominator) = Stdlib.Json.__floatRatio absolute in
             let rendered =
                 if absolute >= 10000000000000000.0 || absolute < 0.0001 then
-                    Stdlib.Json.__shortestScientificFloat numerator denominator (Stdlib.Float.__toBits absolute) 1L
+                    Stdlib.Json.__shortestScientificFloat numerator denominator (Stdlib.Float64.__toBits absolute) 1L
                 else
-                    Stdlib.Json.__shortestFloat numerator denominator (Stdlib.Float.__toBits absolute) 1L in
+                    Stdlib.Json.__shortestFloat numerator denominator (Stdlib.Float64.__toBits absolute) 1L in
             if Stdlib.UInt64.shiftRight bits 63UL == 1UL then "-" + rendered else rendered
 
 let __allZero (text: String) (index: Int64) (endIndex: Int64) : Bool =
@@ -801,15 +801,15 @@ let __viewFloat (source: String) (value: Stdlib.Json.__InternalValueView) : Stdl
     else
         match Stdlib.Json.__stringValue source value with
         | Some text ->
-            if text == "NaN" then Stdlib.Option.Option.Some (Stdlib.Float.__nan ())
-            else if text == "Infinity" then Stdlib.Option.Option.Some (Stdlib.Float.__infinity ())
-            else if text == "-Infinity" then Stdlib.Option.Option.Some (Stdlib.Float.__negativeInfinity ())
+            if text == "NaN" then Stdlib.Option.Option.Some (Stdlib.Float64.__nan ())
+            else if text == "Infinity" then Stdlib.Option.Option.Some (Stdlib.Float64.__infinity ())
+            else if text == "-Infinity" then Stdlib.Option.Option.Some (Stdlib.Float64.__negativeInfinity ())
             else Stdlib.Option.Option.None
         | None -> Stdlib.Option.Option.None
 
 let __viewFloat32 (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Float32> =
     match Stdlib.Json.__viewFloat source value with
-    | Some wide -> Stdlib.Option.Option.Some (Stdlib.Float32.fromFloat wide)
+    | Some wide -> Stdlib.Option.Option.Some (Stdlib.Float32.fromFloat64 wide)
     | None -> Stdlib.Option.Option.None
 
 let __viewDecimal (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<Decimal> =

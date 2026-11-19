@@ -376,11 +376,11 @@ let tryPresentationIntrinsic name args =
 *)
 let tryFloatIntrinsic name args =
   match (name, args) with
-  | "Darklang.Stdlib.Float.sqrt", [ xAtom ] -> Some (ANF.FloatSqrt xAtom)
-  | "Darklang.Stdlib.Float.negate", [ xAtom ] -> Some (ANF.FloatNeg xAtom)
-  | "Darklang.Stdlib.Int64.toFloat", [ xAtom ] -> Some (ANF.Int64ToFloat xAtom)
-  | "Darklang.Stdlib.Float.__toBits", [ xAtom ] -> Some (ANF.FloatToBits xAtom)
-  | "Darklang.Stdlib.Float.__toInt64Unchecked", [ xAtom ] ->
+  | "Darklang.Stdlib.Float64.sqrt", [ xAtom ] -> Some (ANF.FloatSqrt xAtom)
+  | "Darklang.Stdlib.Float64.negate", [ xAtom ] -> Some (ANF.FloatNeg xAtom)
+  | "Darklang.Stdlib.Int64.toFloat64", [ xAtom ] -> Some (ANF.Int64ToFloat xAtom)
+  | "Darklang.Stdlib.Float64.__toBits", [ xAtom ] -> Some (ANF.FloatToBits xAtom)
+  | "Darklang.Stdlib.Float64.__toInt64Unchecked", [ xAtom ] ->
       Some (ANF.FloatToInt64 xAtom)
   | _ -> None
 

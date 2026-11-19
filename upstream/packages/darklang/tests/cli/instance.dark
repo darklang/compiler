@@ -19,7 +19,7 @@ type T =
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.root: Unknown function or value 'Stdlib.LocalStore.path'"
 let root(): String =
   let store = LanguageTools.LocalStore.path()
-  (Stdlib.Cli.Path.parent(store)) + "/test-instances"
+  Stdlib.Cli.Path.parent(store) + "/test-instances"
 
 
 /// The store a new instance starts from.
@@ -43,22 +43,39 @@ let seedFrom(): String =
 let cliBinary(): String =
   match Stdlib.Env.get("DARK_CLI_UNDER_TEST") with
   | Some(path) -> path
-  | None -> "backend/Build/out/Cli/Debug/net10.0/Cli"
+  | None -> "backend/Build/out/Cli/Debug/net11.0/Cli"
+
+
+/// A new `<home>/.darklang`. `mkdtemp` rather than a random suffix: under a seeded test two
+/// runs draw the same suffix, and one's dispose would delete the other's instance.
+// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.makeDir: Unknown function or value 'root'"
+let makeDir(): Stdlib.Result.Result<String, String> =
+  let r = root()
+  match Stdlib.Cli.Unix.ensureDirectoryExists(r) with
+  | Error(e) -> Stdlib.Result.Result.Error($"could not create {r}: {e}")
+  | Ok(_) ->
+    match Stdlib.Cli.Posix.mkdtemp($"{r}/") with
+    | Error(e) -> Stdlib.Result.Result.Error($"could not create a dir in {r}: {e.message}")
+    | Ok(instanceHome) ->
+      let dir = instanceHome + "/.darklang"
+      match Stdlib.Cli.Unix.ensureDirectoryExists(dir) with
+      | Error(e) -> Stdlib.Result.Result.Error($"could not create {dir}: {e}")
+      | Ok(_) -> Stdlib.Result.Result.Ok(dir)
 
 
 /// A fresh instance. Fails with a message rather than half-existing.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.create: Unknown function or value 'root'"
 let create(): Stdlib.Result.Result<T, String> =
-  let suffix = Stdlib.display(Stdlib.Int64.random(100000, 999999))
-  let dir = $"{root()}/{suffix}/.darklang"
   let src = seedFrom()
-
   if Stdlib.Cli.Unix.fileExists(src) then
-    match Stdlib.Cli.Unix.ensureDirectoryExists(dir) with
-    | Error(e) -> Stdlib.Result.Result.Error($"could not create {dir}: {e}")
-    | Ok(_) ->
-      // `.backup` rather than `cp`, and a read lock rather than a write one, so this is
-      // safe against a dev store something else is using.
+    match makeDir() with
+    | Error(e) -> Stdlib.Result.Result.Error(e)
+    | Ok(dir) ->
+      // `.backup` while the store has writes in its WAL, and a read lock rather than a
+      // write one, so this is safe against a dev store something else is using. With
+      // nothing in the WAL the file is the whole store, and `cp` costs a third of the
+      // CPU of a page-by-page backup. A run's shared snapshot is read-only, hence the
+      // `chmod`.
       //
       // Then clear the copy's config. It would otherwise inherit the dev store's current
       // branch and identity, so if the dev store is on a branch, every test instance
@@ -66,10 +83,11 @@ let create(): Stdlib.Result.Result<T, String> =
       let copy =
         Stdlib.Cli.Unix.executeInDirectoryWithOutput(
           ".",
-          $"sqlite3 -cmd '.timeout 10000' {src} '.backup {dir}/data.db' && sqlite3 {dir}/data.db 'DELETE FROM config_v0;'")
+          $"if [ -s {src}-wal ]; then sqlite3 -cmd '.timeout 10000' {src} '.backup {dir}/data.db'; else cp {src} {dir}/data.db && chmod u+w {dir}/data.db; fi && sqlite3 {dir}/data.db 'DELETE FROM config_v0;'")
 
       if copy.exitCode != 0 then
-        Stdlib.Result.Result.Error($"could not seed {dir} from {src}: {copy.stderr}")
+        Stdlib.Result.Result.Error(
+          $"could not seed {dir} from {src}: {copy.stderr}")
       else
         Stdlib.Result.Result.Ok(T { dir = dir, cli = cliBinary() })
   else
@@ -77,7 +95,8 @@ let create(): Stdlib.Result.Result<T, String> =
       $"no store to seed an instance from at {src}; build first")
 
 
-let home(i: T): String = Stdlib.Cli.Path.parent(i.dir)
+let home(i: T): String =
+  Stdlib.Cli.Path.parent(i.dir)
 
 
 /// Remove an instance and everything in it. Safe to call twice.
@@ -108,8 +127,15 @@ val commandTimeoutMs = 120000
 /// rather than leaving the whole suite to stop answering. `env` sets the environment, as in
 /// `Process.runWithEnv`, which has no timeout.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.run: Expected TInt, got TInt64"
-let run(i: T, args: List<String>): Stdlib.Result.Result<Stdlib.Cli.Process.Output, String> =
-  let envArgs = env(i) |> Stdlib.List.map(fun pair -> let (k, v) = pair in $"{k}={v}")
+let run(
+  i: T,
+  args: List<String>)
+  : Stdlib.Result.Result<Stdlib.Cli.Process.Output, String> =
+  let envArgs =
+    env(i)
+    |> Stdlib.List.map(fun pair ->
+      let (k, v) = pair
+      $"{k}={v}")
 
   Stdlib.Cli.Process.runWithTimeout(
     commandTimeoutMs,
@@ -135,7 +161,8 @@ let output(i: T, args: List<String>): String =
   | Error(e) -> $"ERROR: {e}"
   | Ok(out) ->
     let stdout = Stdlib.String.trim(out.stdout)
-    if stdout != "" then stdout
+    if stdout != "" then
+      stdout
     else
       let stderr = Stdlib.String.trim(out.stderr)
       if stderr == "" then "" else $"ERROR: {stderr}"
@@ -157,7 +184,11 @@ let withInstance(f: T -> Stdlib.Test.Result): Stdlib.Test.Result =
 
 /// Asserts a command's output contains `needle`.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.expectContains: Unknown function or value 'output'"
-let expectContains(i: T, args: List<String>, needle: String): Stdlib.Test.Result =
+let expectContains(
+  i: T,
+  args: List<String>,
+  needle: String)
+  : Stdlib.Test.Result =
   let out = output(i, args)
   if Stdlib.String.contains(out, needle) then
     Stdlib.Test.Result.Pass
@@ -170,7 +201,6 @@ let expectContains(i: T, args: List<String>, needle: String): Stdlib.Test.Result
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.expectExit: Unknown function or value 'run'"
 let expectExit(i: T, args: List<String>, expected: Int64): Stdlib.Test.Result =
   let cmd = Stdlib.String.join(args, " ")
-
   match run(i, args) with
   | Error(e) -> Stdlib.Test.fail($"`{cmd}` could not run: {e}")
   | Ok(out) ->
@@ -196,7 +226,8 @@ let ran(i: T, args: List<String>): (Int64 * String) =
 
 /// Everything a command printed, both streams. See `ran`.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.said: Unknown function or value 'ran'"
-let said(i: T, args: List<String>): String = Stdlib.Tuple2.second(ran(i, args))
+let said(i: T, args: List<String>): String =
+  Stdlib.Tuple2.second(ran(i, args))
 
 
 /// `out` mentions `needle`; `why` says what that means when it does not.

@@ -2,5 +2,5 @@
 Stdlib.Test.pass () = Stdlib.Test.Result.Pass
 Stdlib.Test.equal 42L 42L = Stdlib.Test.Result.Pass
 Stdlib.Test.equal 1L 2L = Stdlib.Test.Result.Fail ["expected 2, got 1"]
-Stdlib.Test.all [Stdlib.Test.pass (), Stdlib.Test.fail "problem"] = Stdlib.Test.Result.Fail ["assertion 2: problem"]
+Stdlib.Test.all [Stdlib.Test.pass (), Stdlib.Test.fail "problem"] = Stdlib.Test.Result.FailedChecks [(2L, Stdlib.Test.Result.Fail ["problem"])]
 Stdlib.Test.raiseRuntimeError "native test error" = error="native test error"

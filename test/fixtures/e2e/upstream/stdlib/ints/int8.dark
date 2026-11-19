@@ -108,10 +108,10 @@ Stdlib.Int8.toString -1y = "-1"
 Stdlib.Int8.toString -128y = "-128" // Int8 lower limit
 Stdlib.Int8.toString 127y = "127" // Int8 upper limit
 
-Stdlib.Int8.toFloat 2y = 2.0
-Stdlib.Int8.toFloat 127y = 127.0
-Stdlib.Int8.toFloat -128y = -128.0
-Stdlib.Int8.toFloat -10y = -10.0
+Stdlib.Int8.toFloat64 2y = 2.0
+Stdlib.Int8.toFloat64 127y = 127.0
+Stdlib.Int8.toFloat64 -128y = -128.0
+Stdlib.Int8.toFloat64 -10y = -10.0
 
 Stdlib.Int8.sqrt 4y = 2.0
 Stdlib.Int8.sqrt 100y = 10.0

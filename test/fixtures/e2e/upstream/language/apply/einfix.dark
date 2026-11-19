@@ -54,7 +54,7 @@ Stdlib.Int64.add 5L 3L = 8L
 2Q ** 3Q = error="Cannot perform numeric operation on Int128 and Int128"
 // unary `-` works on every signed integer type and Float
 -(Stdlib.Int8.add 2y 3y) = -5y
--(Stdlib.Float.add 1.0 1.5) = -2.5
+-(Stdlib.Float64.add 1.0 1.5) = -2.5
 // @compiler blocked: compiler-gap
 5L + (Builtin.testRuntimeError "error") = error="Uncaught exception: error"
 // @compiler blocked: compiler-gap

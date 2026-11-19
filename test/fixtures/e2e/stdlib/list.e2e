@@ -114,11 +114,11 @@ let index = 3L in Stdlib.Option.isNone (Stdlib.List.getAt ([10L, 20L, 30L]) inde
 let index = 1L in match Stdlib.List.getAt (["a" + "b", "c" + "d"]) index with | Some value -> value | None -> "missing" = "cd"
 let index = 1L in match Stdlib.List.getAt ([(1L, 1.5), (2L, 2.5)]) index with | Some ((first, _)) -> first | None -> 0L = 2L
 Stdlib.Option.withDefault (Stdlib.List.getAt ([10L, 20L, 30L]) 3L) 99L = 99L
-let selected = Stdlib.Option.withDefault (Stdlib.List.getAt ([-0.0]) 0L) 1.0 in Stdlib.Float.toBits selected = 9223372036854775808UL
-let fallback = Stdlib.Option.withDefault (Stdlib.List.getAt ([1.0]) 1L) (-0.0) in Stdlib.Float.toBits fallback = 9223372036854775808UL
+let selected = Stdlib.Option.withDefault (Stdlib.List.getAt ([-0.0]) 0L) 1.0 in Stdlib.Float64.toBits selected = 9223372036854775808UL
+let fallback = Stdlib.Option.withDefault (Stdlib.List.getAt ([1.0]) 1L) (-0.0) in Stdlib.Float64.toBits fallback = 9223372036854775808UL
 
 // Float results cross the generic Option boundary without losing their type.
-let floats = [1.0, 2.0, 3.0] in match Stdlib.List.getAt floats 1L with | Some x -> Stdlib.Float.toInt (x * 1000.0) | None -> -1 = 2000
+let floats = [1.0, 2.0, 3.0] in match Stdlib.List.getAt floats 1L with | Some x -> Stdlib.Float64.toInt (x * 1000.0) | None -> -1 = 2000
 
 // ===================================================================
 // Stdlib.List.findFirst - Find first element matching predicate

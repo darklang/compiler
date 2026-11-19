@@ -395,7 +395,7 @@ let selectRandom (table: List<(Int64 * Float)>) (r: Float) (idx: Int64) : Int64 
         else if idx + 1L >= Stdlib.List.length table then c
         else selectRandom table r (idx + 1L)
 
-let table = [(97L, 0.27), (99L, 0.12), (103L, 0.12), (116L, 0.27)] in let cumulative = makeCumulative table 0.0 in let newSeed = (1L * 3877L + 29573L) % 139968L in let r = Stdlib.Int64.toFloat newSeed / 139968.0 in selectRandom cumulative r 0L = stdout="97\n" stderr=""
+let table = [(97L, 0.27), (99L, 0.12), (103L, 0.12), (116L, 0.27)] in let cumulative = makeCumulative table 0.0 in let newSeed = (1L * 3877L + 29573L) % 139968L in let r = Stdlib.Int64.toFloat64 newSeed / 139968.0 in selectRandom cumulative r 0L = stdout="97\n" stderr=""
 // =====================================================
 // Lists of Strings
 // =====================================================
@@ -729,13 +729,13 @@ let sumFloatList (xs: List<Float>) : Float =
     | [] -> 0.0
     | head :: tail -> head + sumFloatList tail
 
-Stdlib.Float.toInt (sumFloatList ([1.5, 2.25]) * 100.0) = 375
+Stdlib.Float64.toInt (sumFloatList ([1.5, 2.25]) * 100.0) = 375
 // Exercise the exact-list and nested-pattern lowering paths, which unwrap the
 // same leaf representation independently from list-cons lowering.
-match [1.5] with | [value] -> Stdlib.Float.toInt (value * 100.0) | _ -> 0 = 150
+match [1.5] with | [value] -> Stdlib.Float64.toInt (value * 100.0) | _ -> 0 = 150
 
 type WrappedFloatList = WrappedFloatList of List<Float>
-match WrappedFloatList ([1.5]) with | WrappedFloatList ([value]) -> Stdlib.Float.toInt (value * 100.0) | _ -> 0 = 150
+match WrappedFloatList ([1.5]) with | WrappedFloatList ([value]) -> Stdlib.Float64.toInt (value * 100.0) | _ -> 0 = 150
 // =====================================================
 // List head type tracking test (kills mutation #167)
 // =====================================================

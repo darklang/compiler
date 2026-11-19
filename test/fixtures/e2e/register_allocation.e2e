@@ -587,7 +587,7 @@ let floatLiveTest (x: Float) : Float = let f1 = 1.0 in let f2 = 2.0 in let f3 = 
 floatLiveTest 10.0 = 16.0
 
 // Mixed int and float liveness across the same call site
-let mixedHelper (f: Float) : Float = f + 1.0 let mixInt1 = 100L in let mixInt2 = 200L in let mixFloat = mixedHelper 5.0 in Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.Float.toInt mixFloat)) + mixInt1 + mixInt2 = 306L
+let mixedHelper (f: Float) : Float = f + 1.0 let mixInt1 = 100L in let mixInt2 = 200L in let mixFloat = mixedHelper 5.0 in Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.Float64.toInt mixFloat)) + mixInt1 + mixInt2 = 306L
 
 // ===================================================================
 // Callee-Saved Register Save Offset Tests (Mutation #256)

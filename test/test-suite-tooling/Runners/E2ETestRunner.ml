@@ -249,7 +249,7 @@ let sourceToExecute _allowInternal (test : e2eTest) =
                   modules =
                     [
                       ({ WT.range; name = "Stdlib" }, range);
-                      ({ WT.range; name = "Float" }, range);
+                      ({ WT.range; name = "Float64" }, range);
                     ];
                   fn = { WT.range; name = "absoluteValue" };
                 }

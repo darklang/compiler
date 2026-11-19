@@ -24,7 +24,7 @@ read, an HTTP GET or HEAD). Anything else runs in order.
   let h = Stdlib.Exec.spawn(fun () -> Stdlib.Cli.File.writeText(log, "done"))  // in the background
   Stdlib.Exec.await(h)                                   // wait for it
   Stdlib.Exec.awaitWithin(500, h)                       // ... or give up after 500 ms: None
-  Stdlib.Exec.select([ h1; h2 ])                         // the first to finish
+  Stdlib.Exec.select([ h1, h2 ])                         // the first to finish
   Stdlib.Exec.cancel(h)                                  // stop it, and its children
   Stdlib.List.parallelMap(urls, post)                    // writes at once, results in order
 
@@ -162,6 +162,8 @@ other commands, such as `status` and `ls`, are never recorded.
 
   config set trace.record on|off       keep a record of every trace (default: off)
   config set exec.workers <n>          worker threads (default: one per core)
+  config set exec.spread on|off        spread list work across idle cores (on);
+                                       `dark --no-spread <command>` for one command
   config set http.requestTimeoutMs <n> a server cancels a handler past this: 504 (30 s)
   config set trace.keep <n>            traces kept (200); trace.maxMb, MB of log kept (256)
   config set exec.maxInstructions <n>  expert: stop a process past this many instructions

@@ -1,7 +1,7 @@
 // Which name a runtime error prints for a type.
 //
 // Types are content addressed, so one hash can be bound to several names:
-// `Stdlib.Int.ParseError`, `Stdlib.Float.ParseError` and `Stdlib.Uuid.ParseError`
+// `Stdlib.Int.ParseError`, `Stdlib.Float64.ParseError` and `Stdlib.Uuid.ParseError`
 // are all `| BadFormat`, which makes them one type with three names. Choosing
 // between them from the hash alone is a guess, and it guessed wrong often enough
 // to report an `Int.parse` failure as a `Uuid.ParseError`.

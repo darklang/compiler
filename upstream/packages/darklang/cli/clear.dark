@@ -1,6 +1,5 @@
 module Darklang.Cli.Clear
 
-
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   // Erase the screen, then move the cursor to the top left
@@ -15,7 +14,4 @@ let complete(_state: AppState, _args: List<String>): List<Completion.CompletionI
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
-  [
-    "Usage: clear"
-    "Clear the terminal screen."
-  ] |> Stdlib.String.join("\n")
+  [ "Usage: clear", "Clear the terminal screen." ] |> Stdlib.String.join("\n")

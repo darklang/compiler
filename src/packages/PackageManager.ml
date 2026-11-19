@@ -402,7 +402,7 @@ let rec renderType element =
      revision; the compiler's written syntax keeps the pinned spellings. *)
   | "TBigInt", [] -> Ok "Int"
   | "TBytes", [] -> Ok "Blob"
-  | "TFloat", [] -> Ok "Float"
+  | "TFloat64", [] -> Ok "Float"
   | "TFloat32", [] -> Ok "Float32"
   | "TDecimal", [] -> Ok "Decimal"
   | "TStream", _ -> unary "Stream"
@@ -473,7 +473,7 @@ let rec renderMatchPattern element =
   | "MPUInt128", [ _; value ] -> scalar "Z" value
   (* `z` keeps a BigInt a BigInt under either reading of a bare integer. *)
   | "MPInt", [ _; value ] | "MPBigInt", [ _; value ] -> scalar "z" value
-  | "MPFloat", [ _; sign; whole; part ] -> floatText sign whole part
+  | "MPFloat64", [ _; sign; whole; part ] -> floatText sign whole part
   | "MPFloat32", _ -> unsupportedFeature "a Float32 pattern"
   | "MPDecimal", _ -> unsupportedFeature "a Decimal pattern"
   | "MPAs", _ -> unsupportedFeature "an `as` pattern"
@@ -601,8 +601,8 @@ let builtinOperator name =
           "fromInt8"; "fromUInt8"; "fromInt16"; "fromUInt16"; "fromInt32";
           "fromUInt32"; "fromInt64"; "fromUInt64"; "fromInt128"; "fromUInt128";
           "toInt8"; "toUInt8"; "toInt16"; "toUInt16"; "toInt32"; "toUInt32";
-          "toInt64"; "toUInt64"; "toInt128"; "toUInt128"; "toFloat";
-          "fromFloat"; "sqrt"; "absoluteValue";
+          "toInt64"; "toUInt64"; "toInt128"; "toUInt128"; "toFloat64";
+          "fromFloat64"; "sqrt"; "absoluteValue";
         ]
   in
   (* Otherwise `Builtin.<module><Fn>` is the module's `fn`, as the
@@ -617,7 +617,7 @@ let builtinOperator name =
       ("int8", "Int8"); ("uint8", "UInt8"); ("int16", "Int16");
       ("uint16", "UInt16"); ("int32", "Int32"); ("uint32", "UInt32");
       ("int64", "Int64"); ("uint64", "UInt64"); ("int128", "Int128");
-      ("uint128", "UInt128"); ("float", "Float"); ("bigInt", "Int");
+      ("uint128", "UInt128"); ("float64", "Float64"); ("bigInt", "Int");
     ]
   in
   let byModule fn =
@@ -771,7 +771,7 @@ let rec renderExpr parameters selfName element =
   | "EInt128", [ _; value ] -> scalar "Q" value
   | "EUInt128", [ _; value ] -> scalar "Z" value
   | "EInt", [ _; value ] | "EBigInt", [ _; value ] -> scalar "z" value
-  | "EFloat", [ _; sign; whole; part ] -> floatText sign whole part
+  | "EFloat64", [ _; sign; whole; part ] -> floatText sign whole part
   | "EFloat32", [ _; sign; whole; part ] ->
       let+ text = floatText sign whole part in
       "(" ^ text ^ "f32)"

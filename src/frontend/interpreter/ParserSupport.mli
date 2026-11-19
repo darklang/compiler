@@ -63,6 +63,7 @@ val isRecoveryBarrier : Tokenizer.token -> bool
 val maxDepth : int
 val tok : parserState -> int -> Tokenizer.token
 val rng : parserState -> int -> Tokenizer.tokenRange
+val fieldTok : parserState -> int -> Tokenizer.token
 val txt : parserState -> int -> string
 val docOf : parserState -> int -> string
 val zeroWidthAtEnd : Tokenizer.tokenRange -> Tokenizer.tokenRange

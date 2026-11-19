@@ -37,7 +37,7 @@ type Dval =
   | DInt128 of Int128
   | DUInt128 of UInt128
   | DBigInt of Int
-  | DFloat of Float
+  | DFloat64 of Float64
   | DChar of Char
   | DString of String
   | DDateTime of DateTime

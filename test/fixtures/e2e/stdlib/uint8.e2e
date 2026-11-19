@@ -158,8 +158,8 @@ Stdlib.UInt8.sum ([10uy, 20uy, 30uy]) = 60uy
 // Stdlib.UInt8.sqrt - not implemented
 // Stdlib.UInt8.sqrt(4) = 2.0
 
-// Stdlib.UInt8.toFloat - not implemented
-// Stdlib.UInt8.toFloat(2) = 2.0
+// Stdlib.UInt8.toFloat64 - not implemented
+// Stdlib.UInt8.toFloat64(2) = 2.0
 
 // Stdlib.UInt8.parse - needs Result type (blocked by type checker bug)
 // Stdlib.UInt8.parse("1") = Ok(1)

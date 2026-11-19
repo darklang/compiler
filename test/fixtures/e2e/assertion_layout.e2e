@@ -11,7 +11,7 @@ r 80 (g (Stdlib.Pretty.concat
           (t "x")
           (t "y"))) = "xy"
 
-Stdlib.Float.absoluteValue
+Stdlib.Float64.absoluteValue
   (-1.25) = 1.25
 
 "first

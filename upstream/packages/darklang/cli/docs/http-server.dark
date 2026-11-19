@@ -45,12 +45,12 @@ Handlers are values; `routeRequest` dispatches to them by method and path.
   type Stdlib.Http.Request =
     { method: String, url: String, headers: List<String * String>, body: Bytes }
 
-  req.method                            # "GET", "POST", ...
+  req.method                            // "GET", "POST", ...
 
 The path is not a field - it's derived from the url:
 
-  Stdlib.HttpServer.getPath(req)        # "/users/42"
-  Stdlib.Http.parseQueryString(req.url)  # query string -> Dict
+  Stdlib.HttpServer.getPath(req)        // "/users/42"
+  Stdlib.Http.parseQueryString(req.url)  // query string -> Dict
 
 `body` is a Bytes. For text or JSON, convert first:
 
@@ -64,7 +64,7 @@ Status first, then the body. Headers, when you give them, go in between.
   Stdlib.Http.responseWithHtml(200, "<h1>Hi</h1>")
   Stdlib.Http.responseWithJson(200, jsonString)
   Stdlib.Http.responseWithHeaders(200, [ ("x-thing", "value") ], bodyBytes)
-  Stdlib.Http.response(200, bodyBytes)  # the raw one; body is a Bytes
+  Stdlib.Http.response(200, bodyBytes)  // the raw one; body is a Bytes
   Stdlib.Http.notFound()
 
 A status is a plain number here. `Stdlib.Http.Status` names the common ones and
@@ -73,13 +73,63 @@ checks the rest: `Status.toInt64(Status.tooManyRequests)` is 429, and
 
 ## Route params
 
-  # given route "/user/:id" and a request for "/user/42"
+  // given route "/user/:id" and a request for "/user/42"
   match Stdlib.HttpServer.getPathParam(req, "/user/:id", "id") with
   | Some(id) -> Stdlib.Http.responseWithText(200, $"user {id}")
   | None -> Stdlib.Http.notFound()
 
 `matchRoute pattern path` is the lower-level form. It returns a record, not an
 Option: `{ matched: Bool, vars: List<String * String> }`.
+
+## Middleware
+
+A handler is `Stdlib.Http.Request -> Stdlib.Http.Response`, so middleware is a
+function from a handler to a handler:
+
+  type Stdlib.HttpServer.Middleware =
+    (Http.Request -> Http.Response) -> (Http.Request -> Http.Response)
+
+`serve` runs every request through `config.middleware`, first listed
+outermost. `Config.defaults(port)` gives `Middleware.defaults()`:
+
+  Stdlib.HttpServer.Middleware.logRequests()      // [HttpServer] GET /a 200 3ms, on stderr
+  Stdlib.HttpServer.Middleware.standardHeaders()  // HSTS
+
+The log line, and the server's own line and telemetry, leave the query out,
+since it may carry a token. Not in the defaults:
+
+  Stdlib.HttpServer.Middleware.cors([ "https://app.example.com" ])  // or [ "*" ]
+  Stdlib.HttpServer.Middleware.requestId()        // X-Request-Id, the client's or a new one
+
+`cors` answers a browser's preflight from a listed origin with 204, and adds
+`Access-Control-Allow-Origin` to everything else it sends one.
+
+`Server: darklang` is on every response whatever the list. Behind a proxy that
+sets `X-Forwarded-Proto`, add `Middleware.trustForwardedProto()` so the handler
+sees the `https://` url the client used; it is not a default, since any client
+can send that header.
+
+Change the list with a record update:
+
+  let config =
+    { Stdlib.HttpServer.Config.defaults(port) with
+        middleware =
+          [ Stdlib.HttpServer.Middleware.logRequests()
+            Stdlib.HttpServer.Middleware.onResponse(fun r ->
+              { r with headers = Stdlib.List.append(r.headers, ("X-Frame-Options", "DENY")) }) ] }
+
+`Middleware.onRequest(f)` and `Middleware.onResponse(f)` build the common two;
+`Middleware.wrap(ms, handler)` is the composition, if you want it yourself.
+The router reaches the server bare and is wrapped per request, so its
+approvals and its traces stay its own. The middleware runs under the server's
+grants, and `serve` checks what it can reach before it binds: a log line needs
+`clock` and `stdout`.
+
+Compression, the body limit and the handler timeout are not middleware, and
+neither are the responses the server writes itself (a 413, a handler that
+failed or timed out). Each gets a log line whatever the list holds, and HSTS
+when `standardHeaders` is in it, as every other response does. A handler that
+fails prints its error.
 
 ## A worked example
 

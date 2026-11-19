@@ -2,15 +2,21 @@
 module Darklang.Cli.Tests.FnSaveIssues
 
 // @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
-test theRootIssueComesFirst =
-  Instance.withInstance(fun i ->
-    let (_, out) =
-      Instance.ran(
-        i,
-        [ "fn"
-          "Me.RootFirst.topBy"
-          "(xs: List<(String * Int64)>): List<(String * Int64)> = xs |> Stdlib.List.sortBy(fun (_, c) -> -c)" ])
+test theRootIssueComesFirst = Instance.withInstance(fun i ->
+  let (_, out) =
+    Instance.ran(
+      i,
+      [ "fn"
+        "Me.RootFirst.topBy"
+        "(xs: List<(String * Int64)>): List<(String * Int64)> = xs |> Stdlib.List.sortBy(fun (_, c) -> -c)" ])
 
-    Stdlib.Test.all(
-      [ Instance.says(out, "type error: [TypeMismatch]", "the mismatch is the issue shown")
-        Instance.doesNotSay(out, "type error: [AmbiguousType]", "not the knock-on ambiguity") ]))
+  Stdlib.Test.all(
+    [ Instance.says(
+        out,
+        "type error: [TypeMismatch]",
+        "the mismatch is the issue shown")
+
+      Instance.doesNotSay(
+        out,
+        "type error: [AmbiguousType]",
+        "not the knock-on ambiguity") ]))

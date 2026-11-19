@@ -22,7 +22,7 @@ let scale (value: Vec3) (factor: Float) : Vec3 =
 let dot (left: Vec3) (right: Vec3) : Float =
     left.x * right.x + left.y * right.y + left.z * right.z
 
-let length (value: Vec3) : Float = Stdlib.Float.sqrt (dot value value)
+let length (value: Vec3) : Float = Stdlib.Float64.sqrt (dot value value)
 let normalize (value: Vec3) : Vec3 = scale value (1.0 / length value)
 
 let raySphere (ray: Ray) (sphere: Sphere) : Stdlib.Option.Option<Float> =
@@ -32,7 +32,7 @@ let raySphere (ray: Ray) (sphere: Sphere) : Stdlib.Option.Option<Float> =
     let discriminant = halfB * halfB - c in
     if discriminant < 0.0 then None
     else
-        let root = Stdlib.Float.sqrt discriminant in
+        let root = Stdlib.Float64.sqrt discriminant in
         let near = -halfB - root in
         let far = -halfB + root in
         if near > 0.001 then Some near
@@ -61,7 +61,7 @@ let shade (spheres: List<Sphere>) (ray: Ray) (hit: Hit) (light: Vec3) : Color =
     let normal = normalize (subtract point hit.sphere.center) in
     let surface = add point (scale normal 0.001) in
     let lightDirection = normalize (subtract light surface) in
-    let diffuse = Stdlib.Float.max 0.0 (dot normal lightDirection) in
+    let diffuse = Stdlib.Float64.max 0.0 (dot normal lightDirection) in
     let intensity = if isShadowed spheres surface light then 0.12 else 0.12 + 0.88 * diffuse in
     color (hit.sphere.color.red * intensity) (hit.sphere.color.green * intensity) (hit.sphere.color.blue * intensity)
 
@@ -73,17 +73,17 @@ let trace (spheres: List<Sphere>) (ray: Ray) (light: Vec3) : Color =
     | Some hit -> shade spheres ray hit light
 
 let pixelColor (spheres: List<Sphere>) (light: Vec3) (size: Int64) (x: Int64) (y: Int64) : Color =
-    let denominator = Stdlib.Int64.toFloat (size - 1L) in
-    let screenX = 2.0 * Stdlib.Int64.toFloat x / denominator - 1.0 in
-    let screenY = 1.0 - 2.0 * Stdlib.Int64.toFloat y / denominator in
+    let denominator = Stdlib.Int64.toFloat64 (size - 1L) in
+    let screenX = 2.0 * Stdlib.Int64.toFloat64 x / denominator - 1.0 in
+    let screenY = 1.0 - 2.0 * Stdlib.Int64.toFloat64 y / denominator in
     let camera = vector 0.0 0.0 (-5.0) in
     let direction = normalize (vector screenX screenY 1.5) in
     trace spheres (Ray { origin = camera, direction = direction }) light
 
 let addPixel (result: Int64) (index: Int64) (pixel: Color) : Int64 =
-    let red = Builtin.unwrap (Stdlib.Int64.fromFloat (pixel.red * 1000000.0)) in
-    let green = Builtin.unwrap (Stdlib.Int64.fromFloat (pixel.green * 1000000.0)) in
-    let blue = Builtin.unwrap (Stdlib.Int64.fromFloat (pixel.blue * 1000000.0)) in
+    let red = Builtin.unwrap (Stdlib.Int64.fromFloat64 (pixel.red * 1000000.0)) in
+    let green = Builtin.unwrap (Stdlib.Int64.fromFloat64 (pixel.green * 1000000.0)) in
+    let blue = Builtin.unwrap (Stdlib.Int64.fromFloat64 (pixel.blue * 1000000.0)) in
     (result + (red * 3L + green * 5L + blue * 7L) * (index + 1L)) % 1000000007L
 
 let renderRow (spheres: List<Sphere>) (light: Vec3) (size: Int64) (y: Int64) (x: Int64) (result: Int64) : Int64 =

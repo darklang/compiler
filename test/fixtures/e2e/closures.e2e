@@ -234,7 +234,7 @@ let a = 1L in let b = 2L in let c = 3L in let d = 4L in let e = 5L in let f = 6L
 // =====================================================
 
 // Capture int and float
-let i = 10L in let f = 2.5 in (fun x -> Stdlib.Int64.toFloat (i + x) + f) 5L = 17.5
+let i = 10L in let f = 2.5 in (fun x -> Stdlib.Int64.toFloat64 (i + x) + f) 5L = 17.5
 
 // Capture bool and int
 let flag = true in let n = 42L in (fun x -> if flag then n + x else 0L) 8L = 50L
@@ -434,7 +434,7 @@ let h = fun x -> x + 100L in if 1L > 2L then 0L else h 42L = 142L
 // incorrectly inferred as Int64 instead of Float64, causing wrong output.
 
 // Closure that returns a Float, then add a float literal to the result
-let toFloat = fun x -> Stdlib.Int64.toFloat x in let result = toFloat 5L + 1.0 in result = 6.0
+let toFloat64 = fun x -> Stdlib.Int64.toFloat64 x in let result = toFloat64 5L + 1.0 in result = 6.0
 
 // =====================================================
 // Closure Call with Multiple Float Literal Arguments (Mutation #182)

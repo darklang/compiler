@@ -11,9 +11,9 @@ module Darklang.Stdlib.Exec
 /// when one is free (`docs/processes.md`).
 ///
 /// The process table `dark ps` renders, and the scheduling policies, are `LanguageTools.Exec`.
-
 /// A process started with `spawn`. `'a` is what `await` gives back for it.
-type Handle<'a> = { id: Uuid }
+type Handle<'a> =
+  { id: Uuid }
 
 
 /// Start `f ()` as a process of its own, beside this one, on another core when one is free.
@@ -34,7 +34,7 @@ let await(handle: Handle<'a>): 'a =
 /// `await`, giving up after `ms` milliseconds: `None` then, and the process keeps running
 /// (`cancel` it if that is not wanted).
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Exec.awaitWithin: Unknown function or value 'Builtin.execAwaitWithin'"
-let awaitWithin(ms: Int64, handle: Handle<'a>): Stdlib.Option.Option<'a> =
+let awaitWithin(ms: Int64, handle: Handle<'a>): Option<'a> =
   Builtin.execAwaitWithin(ms, handle)
 
 

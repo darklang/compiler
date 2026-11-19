@@ -5,7 +5,8 @@ module GroupedByModule =
   // @compiler blocked: compiler-leak diagnostic="Native execution returns true but reports leaks: 5; the runner rejects leaked allocations."
   test groupedByModule =
     Stdlib.Test.all(
-      [ Darklang.Cli.Listing.groupedByModule([ "B.y.f", "A.g", "B.y.e", "A.h", "top" ])
+      [ Cli.Listing.groupedByModule([ "B.y.f", "A.g", "B.y.e", "A.h", "top" ])
         |> Stdlib.Test.equal(
           [ ("", [ "top" ]), ("A", [ "g", "h" ]), ("B.y", [ "f", "e" ]) ])
-        Darklang.Cli.Listing.groupedByModule([]) |> Stdlib.Test.equal([]) ])
+
+        Cli.Listing.groupedByModule([]) |> Stdlib.Test.equal([]) ])

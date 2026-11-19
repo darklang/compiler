@@ -715,6 +715,23 @@ let tokenize text =
         push
           (TIdent (substring source (index + 2) (stop - index - 2)))
           stop (Some "unterminated backtick identifier")
+    else if is source index '`' then
+      let close =
+        scanWhile
+          (fun scan ->
+            scan < length
+            && (not (is source scan '`'))
+            && not (is source scan '\n'))
+          (index + 1)
+      in
+      if close < length && is source close '`' then
+        push
+          (TIdent (substring source (index + 1) (close - index - 1)))
+          (close + 1) None
+      else
+        push
+          (TIdent (substring source (index + 1) (close - index - 1)))
+          close (Some "unterminated backtick identifier")
     else if letter source.(index) || is source index '_' then
       let stop = scanWhile continue (index + 1) in
       push (keyword (substring source index (stop - index))) stop None

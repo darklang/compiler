@@ -1,6 +1,6 @@
 // Selected unchanged named tests from darklang/dark a9d93efc853486244630dad693fe79f6f4882cf6
-// packages/darklang/tests/stdlib/float.dark
-module Darklang.Stdlib.Float.Tests
+// packages/darklang/tests/stdlib/float64.dark
+module Darklang.Stdlib.Float64.Tests
 
 let nan () : Float = 0.0 / 0.0
 let infinity () : Float = 1.0 / 0.0
@@ -11,7 +11,7 @@ test absoluteValue =
     [ Stdlib.abs (negativeInfinity ())
       |> Stdlib.Test.equal (infinity ())
       // NaN never equals itself; check it with isNaN.
-      Stdlib.abs (nan ()) |> Stdlib.Float.isNaN
+      Stdlib.abs (nan ()) |> Stdlib.Float64.isNaN
       |> Stdlib.Test.equal true
       Stdlib.abs -5.6 |> Stdlib.Test.equal 5.6
       Stdlib.abs -0.0 |> Stdlib.Test.equal 0.0 ]
@@ -22,7 +22,7 @@ test max =
       Stdlib.max (negativeInfinity ()) 1.0 |> Stdlib.Test.equal 1.0
       Stdlib.max -10.0 1.0 |> Stdlib.Test.equal 1.0
       // NaN never equals itself; check it with isNaN.
-      Stdlib.max 10.0 (nan ()) |> Stdlib.Float.isNaN |> Stdlib.Test.equal true
+      Stdlib.max 10.0 (nan ()) |> Stdlib.Float64.isNaN |> Stdlib.Test.equal true
       Stdlib.max 10.0 1.0 |> Stdlib.Test.equal 10.0
       Stdlib.max 0.0 0.00 |> Stdlib.Test.equal 0.0
       Stdlib.max -2147483647.8 -00000000.000 |> Stdlib.Test.equal 0.0
@@ -36,7 +36,7 @@ test min =
       |> Stdlib.Test.equal (negativeInfinity ())
       Stdlib.min -10.0 1.0 |> Stdlib.Test.equal -10.0
       // NaN never equals itself; check it with isNaN.
-      Stdlib.min 10.0 (nan ()) |> Stdlib.Float.isNaN |> Stdlib.Test.equal true
+      Stdlib.min 10.0 (nan ()) |> Stdlib.Float64.isNaN |> Stdlib.Test.equal true
       Stdlib.min 10.0 1.0 |> Stdlib.Test.equal 1.0
       Stdlib.min 0.0 0.00 |> Stdlib.Test.equal 0.0
       Stdlib.min -2147483647.8 -00000000.000
@@ -62,7 +62,7 @@ test toString =
       |> Stdlib.Test.equal "1.0000000000000002"
       // Fixed notation from 1e-4 up to 1e16, scientific outside, no zero
       // padding, and no `.0` on scientific (it used to print `1e+17.0`, which
-      // Float.parse refuses). Same layout as the compiler's Float.toString.
+      // Float64.parse refuses). Same layout as the compiler's Float64.toString.
       Stdlib.display 0.0001 |> Stdlib.Test.equal "0.0001"
       Stdlib.display 0.00001 |> Stdlib.Test.equal "1e-5"
       Stdlib.display -0.00001 |> Stdlib.Test.equal "-1e-5"
@@ -76,13 +76,13 @@ test toString =
 
 test toStringRoundTrips =
   Stdlib.Test.all
-    [ Stdlib.Float.parse (Stdlib.display (1.0 / 3.0))
+    [ Stdlib.Float64.parse (Stdlib.display (1.0 / 3.0))
       |> Stdlib.Test.equal (Ok (1.0 / 3.0))
-      Stdlib.Float.parse (Stdlib.display 1.2345678901234568e17)
+      Stdlib.Float64.parse (Stdlib.display 1.2345678901234568e17)
       |> Stdlib.Test.equal (Ok 1.2345678901234568e17)
-      Stdlib.Float.parse (Stdlib.display -0.00001)
+      Stdlib.Float64.parse (Stdlib.display -0.00001)
       |> Stdlib.Test.equal (Ok -0.00001)
-      Stdlib.Float.parse "5e-324"
+      Stdlib.Float64.parse "5e-324"
       |> Stdlib.Result.map (fun f -> Stdlib.display f)
       |> Stdlib.Test.equal (Ok "5e-324") ]
 

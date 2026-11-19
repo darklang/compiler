@@ -76,8 +76,8 @@ Stdlib.UInt8.toString 1uy = "1"
 Stdlib.UInt8.toString 0uy = "0" // UInt8 lower limit
 Stdlib.UInt8.toString 255uy = "255" // UInt8 upper limit
 
-Stdlib.UInt8.toFloat 2uy = 2.0
-Stdlib.UInt8.toFloat 0uy = 0.0
+Stdlib.UInt8.toFloat64 2uy = 2.0
+Stdlib.UInt8.toFloat64 0uy = 0.0
 
 Stdlib.UInt8.sqrt 4uy = 2.0
 Stdlib.UInt8.sqrt 100uy = 10.0

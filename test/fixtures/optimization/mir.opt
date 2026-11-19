@@ -6,7 +6,7 @@ counted_loop_unroll_by_two_mir
 ---INPUT---
 let loop (i: Int64) (limit: Int64) (sum: Float) (sign: Float) : Float =
     if i >= limit then sum
-    else loop (i + 1L) (limit) (sum + sign) (Stdlib.Float.negate (sign))
+    else loop (i + 1L) (limit) (sum + sign) (Stdlib.Float64.negate (sign))
 ---EXPECTED---
 Function loop:
   loop_entry:

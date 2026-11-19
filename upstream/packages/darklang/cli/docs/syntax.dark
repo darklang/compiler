@@ -13,13 +13,14 @@ let content(): String =
 ## Numbers
   1, 1s, 1s64   Int64          1u, 1u64   UInt64
   1s8 1s16 1s32 1s128          1u8 1u16 1u32 1u128
-  1z            BigInt         1.5, 1e5, 1.5f64   Float
+  1z            BigInt         1.5, 1e5, 1.5f64   Float64
   1.5f32        Float32        19.99dec   Decimal (no exponent)
 
 `z` is for ℤ, the integers: `1z` is a BigInt, with no size limit. The suffix
 decides the type, and both operands of `+` must have the same one: `1 + 1s32` is
 an error, so write `1s32 + 1s32`. Values print with their suffix except Int64 and
-Float, so output pastes back as the same value.
+Float64, so output pastes back as the same value. A type written `Int` is Int64 and
+`Float` is Float64; Float32 is always written out.
 
 ## Statements
   Stdlib.printLine("start")        // a line before the last must return Unit
@@ -49,7 +50,7 @@ API. Listings, search and completion hide it unless given `--include-internal`;
 it is still called, viewed and depended on by its full name.
 
 ## Constructors
-  type Shape = | Dot | Circle(Float) | Rect(Float, Float)
+  type Shape = | Dot | Circle(Float64) | Rect(Float64, Float64)
   Shape.Circle(1.0)     // fields in parentheses, like a call's arguments
   Shape.Rect(1.0, 2.0) // several fields
   Shape.Dot            // no fields
@@ -121,8 +122,8 @@ by the type checker (`dark typecheck`).
   Unit   // type
 
 ## Traits (docs traits)
-  trait Area<'a> = let area(s: 'a): Float
-  impl Area for Circle = let area(c: Circle): Float = ...
+  trait Area<'a> = let area(s: 'a): Float64
+  impl Area for Circle = let area(c: Circle): Float64 = ...
   impl Display for Point = let display(p: Point): String = ...
   let f<'a: Display>(v: 'a): String = v.display
 
@@ -138,9 +139,12 @@ by the type checker (`dark typecheck`).
   + Stdlib.String.join(LanguageTools.Parser.keywords, " ")
   + """
 
-These can't be names. To use one anyway, put it in double backticks:
-  let ``type`` = "json"
-  metadata.``type``
+These can't be names. To use one anyway, put it in backticks:
+  let `type` = "json"
+Where only a name can go, a keyword needs no backticks:
+  metadata.type
+  Metadata { type = "json" }
+A name can't hold spaces: write hello_world or helloWorld, not `hello world`.
 A few more words are special only in one place, and free everywhere else:
 `module` and `test` at the start of a declaration, `for` in `impl X for T`,
 `as` in a pattern, `Dict` and `List` before `<`. `def` is not reserved."""

@@ -16,7 +16,7 @@ type TypeReference =
     | TInt128
     | TUInt128
     | TBigInt
-    | TFloat
+    | TFloat64
     | TChar
     | TString
     | TUuid

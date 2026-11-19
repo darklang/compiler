@@ -3,7 +3,7 @@
 let matA (i: Int64) (j: Int64) : Float =
     let ij = i + j in
     let div = ij * (ij + 1L) / 2L + i + 1L in
-    1.0 / Stdlib.Int64.toFloat div
+    1.0 / Stdlib.Int64.toFloat64 div
 
 // All callers prove the index is within the fixed vector length.
 let getAt (v: List<Float>) (i: Int64) : Float =
@@ -54,11 +54,11 @@ let dot (i: Int64) (n: Int64) (a: List<Float>) (b: List<Float>) (acc: Float) : F
 
 let spectralNorm (n: Int64) (iterations: Int64) : Float =
     let (u, v) = iterate iterations n (repeat 1.0 n) (repeat 0.0 n) in
-    Stdlib.Float.sqrt (dot 0L n u v 0.0 / dot 0L n v v 0.0)
+    Stdlib.Float64.sqrt (dot 0L n u v 0.0 / dot 0L n v v 0.0)
 
 let benchmarkArg (index: Int) : Int64 =
     match Stdlib.Cli.__Args.int64 index with
     | Ok value -> value
     | Error message -> Builtin.crash message
 
-Builtin.printLine (Stdlib.Int64.toString (Builtin.unwrap (Stdlib.Int64.fromFloat (spectralNorm (benchmarkArg 0) (benchmarkArg 1) * 1000000000.0))))
+Builtin.printLine (Stdlib.Int64.toString (Builtin.unwrap (Stdlib.Int64.fromFloat64 (spectralNorm (benchmarkArg 0) (benchmarkArg 1) * 1000000000.0))))

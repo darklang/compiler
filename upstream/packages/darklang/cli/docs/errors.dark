@@ -5,11 +5,6 @@ let content(): String =
 
 ## Parse errors -> CHECK INDENTATION FIRST
 
-## "Unsupported expression"
-  - Nested function definition
-  - Bad indentation
-  - { left of type name in record
-
 ## Type mismatch
   - Wrong literal suffix (5 vs 5.0)
   - Param order wrong
@@ -25,7 +20,7 @@ let content(): String =
 ## Operator errors
   - Numeric operators require matching numeric operand types
   - Integer / and ** can raise out-of-range runtime errors
-  - Bitwise operators (& | ^ << >> ~) are traits; a Float operand says no implementation
+  - Bitwise operators (& | ^ << >> ~) are traits; a Float64 operand says no implementation
   - Inside a match arm, `|` is the arm separator: write `| A -> (a | b)`
   - List concat: use Stdlib.List.concat
 
@@ -41,4 +36,4 @@ let content(): String =
 ## Debug
   1. Simplify expression
   2. Use eval to test pieces
-  3. Check packages.log"""
+  3. Check ~/.darklang/logs/cli.log"""

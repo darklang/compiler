@@ -178,7 +178,7 @@ module Int64 =
 
 
   module Errors =
-    // TODO: review Float.tests for more values to test against
+    // TODO: review Float64.tests for more values to test against
 
     // not ints
     (Stdlib.Json.parse<Int64> " ") |> err = Result.Error "Not JSON at line 1, column 2"
@@ -688,7 +688,7 @@ module UInt128 =
 module Float =
   // TODO: test the upper/lower bounds
   // TODO: test highly-precise numbers
-  // TODO: review Float.tests for more values to test against
+  // TODO: review Float64.tests for more values to test against
 
   Stdlib.Json.serialize<Float> 0.0 = "0.0"
   Stdlib.Json.serialize<Float> 1.0 = "1.0"
@@ -771,18 +771,18 @@ module Float =
     (Stdlib.Json.parse<Float> "4a") |> err = Result.Error "Not JSON at line 1, column 2"
     (Stdlib.Json.parse<Float> "- 42.0") |> err = Result.Error "Not JSON at line 1, column 2"
     (Stdlib.Json.parse<Float> "-141s") |> err = Result.Error "Not JSON at line 1, column 5"
-    (Stdlib.Json.parse<Float> "null") |> err = Result.Error "Can't parse JSON `null` as type `Float` at path: `root`"
-    (Stdlib.Json.parse<Float> "true") |> err = Result.Error "Can't parse JSON `true` as type `Float` at path: `root`"
-    (Stdlib.Json.parse<Float> "false") |> err = Result.Error "Can't parse JSON `false` as type `Float` at path: `root`"
-    (Stdlib.Json.parse<Float> "\"42\"") |> err = Result.Error "Can't parse JSON `\"42\"` as type `Float` at path: `root`"
-    (Stdlib.Json.parse<Float> "[42]") |> err = Result.Error "Can't parse JSON `[42]` as type `Float` at path: `root`"
-    (Stdlib.Json.parse<Float> "{ \"key\": 42 }") |> err = Result.Error "Can't parse JSON `{ \"key\": 42 }` as type `Float` at path: `root`"
+    (Stdlib.Json.parse<Float> "null") |> err = Result.Error "Can't parse JSON `null` as type `Float64` at path: `root`"
+    (Stdlib.Json.parse<Float> "true") |> err = Result.Error "Can't parse JSON `true` as type `Float64` at path: `root`"
+    (Stdlib.Json.parse<Float> "false") |> err = Result.Error "Can't parse JSON `false` as type `Float64` at path: `root`"
+    (Stdlib.Json.parse<Float> "\"42\"") |> err = Result.Error "Can't parse JSON `\"42\"` as type `Float64` at path: `root`"
+    (Stdlib.Json.parse<Float> "[42]") |> err = Result.Error "Can't parse JSON `[42]` as type `Float64` at path: `root`"
+    (Stdlib.Json.parse<Float> "{ \"key\": 42 }") |> err = Result.Error "Can't parse JSON `{ \"key\": 42 }` as type `Float64` at path: `root`"
     (Stdlib.Json.parse<Float> "\"42\n\"") |> err = Result.Error "Not JSON at line 1, column 4"
     (Stdlib.Json.parse<Float> "000000.9") |> err = Result.Error "Not JSON at line 1, column 2"
     (Stdlib.Json.parse<Float> "-000000.9") |> err = Result.Error "Not JSON at line 1, column 3"
     (Stdlib.Json.parse<Float> "-00000000.000") |> err = Result.Error "Not JSON at line 1, column 3"
     (Stdlib.Json.parse<Float> "00000000.000") |> err = Result.Error "Not JSON at line 1, column 2"
-    (Stdlib.Json.parse<Float> "\"65.0\"") |> err = Result.Error "Can't parse JSON `\"65.0\"` as type `Float` at path: `root`"
+    (Stdlib.Json.parse<Float> "\"65.0\"") |> err = Result.Error "Can't parse JSON `\"65.0\"` as type `Float64` at path: `root`"
 
 
 

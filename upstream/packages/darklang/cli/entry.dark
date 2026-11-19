@@ -7,7 +7,6 @@ module Darklang.Cli
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.executeCliCommand: Unknown function or value 'initState'"
 let executeCliCommand(args: List<String>): Int64 =
   let initialState = initState()
-
   match args with
   | [] ->
     if initialState.telemetryEnabled then

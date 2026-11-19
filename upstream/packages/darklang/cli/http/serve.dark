@@ -13,7 +13,8 @@ type Args =
     /// moves. OFF unless asked for: a server that changes under you while you edit is a thing
     /// to opt into, not something to discover.
     live: Bool
-    error: Stdlib.Option.Option<String> }
+    error: Option<String> }
+
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Http.Serve.defaultArgs: Expected TInt64, got TInt"
 let defaultArgs(): Args =
@@ -23,7 +24,8 @@ let defaultArgs(): Args =
       port = Stdlib.Net.Port.httpAlt
       maxBodyBytes = Stdlib.HttpServer.Config.defaultMaxBodyBytes
       live = false
-      error = Stdlib.Option.Option.None }
+      error = Option.None }
+
 
 /// Parse a list of args left-to-right. Recognized: a single positional
 /// (the router path), `--bind ADDRESS`, `--port N`, `--max-body-bytes N`, `--live`. Unknown flags or a duplicate
@@ -35,43 +37,35 @@ let parseArgs(rest: List<String>, acc: Args): Args =
   | ["--bind", value, ...tail] ->
     match LanguageTools.Permissions.serverAddress(value) with
     | Some(address) -> parseArgs(tail, { acc with address = address })
-    | None ->
-      { acc with error = Some("Invalid --bind: use an IPv4 address or localhost") }
+    | None -> { acc with error = Option.Some("Invalid --bind: use an IPv4 address or localhost") }
   | ["--port", value, ...tail] ->
     match Stdlib.Int64.parse(value) with
-    | Error(_) ->
-      { acc with error = Stdlib.Option.Option.Some($"Invalid --port: {value}") }
+    | Error(_) -> { acc with error = Option.Some($"Invalid --port: {value}") }
     | Ok(n) ->
       match Stdlib.Net.Port.fromInt64(n) with
-      | Error(e) -> { acc with error = Stdlib.Option.Option.Some($"Invalid --port: {e}") }
+      | Error(e) -> { acc with error = Option.Some($"Invalid --port: {e}") }
       | Ok(p) -> parseArgs(tail, { acc with port = p })
   | ["--max-body-bytes", value, ...tail] ->
     match Stdlib.Int64.parse(value) with
-    | Error(_) ->
-      { acc with
-          error = Stdlib.Option.Option.Some($"Invalid --max-body-bytes: {value}") }
+    | Error(_) -> { acc with error = Option.Some($"Invalid --max-body-bytes: {value}") }
     | Ok(n) -> parseArgs(tail, { acc with maxBodyBytes = n })
   | ["--live", ...tail] -> parseArgs(tail, { acc with live = true })
   | ["--no-live", ...] ->
     { acc with
         error =
-          Stdlib.Option.Option.Some(
+          Option.Some(
             "--no-live is what happens anyway: a server follows edits only with --live.") }
   | ["--dev", ...] ->
-    { acc with
-        error =
-          Stdlib.Option.Option.Some(
-            "--dev is --live: it follows edits and reloads an open page.") }
+    { acc with error = Option.Some("--dev is --live: it follows edits and reloads an open page.") }
   | [flag, ...] when Stdlib.String.startsWith(flag, "--") ->
-    { acc with
-        error = Stdlib.Option.Option.Some($"Unknown or incomplete flag: {flag}") }
+    { acc with error = Option.Some($"Unknown or incomplete flag: {flag}") }
   | [positional, ...tail] ->
     if acc.routerPath == "" then
       parseArgs(tail, { acc with routerPath = positional })
     else
       { acc with
           error =
-            Stdlib.Option.Option.Some(
+            Option.Some(
               $"Unexpected extra argument: {positional} (router path already given as {acc.routerPath})") }
 
 
@@ -99,35 +93,33 @@ let usageLines(): List<String> =
     "  serve My.Service.app --port 80 --max-body-bytes 5242880"
     "  serve My.Site.router --port 9095 --live      # follows your edits while you work" ]
 
-let printUsage(): Unit = (usageLines()) |> Cli.Stderr.lines
+
+let printUsage(): Unit =
+  usageLines() |> Stderr.lines
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
+let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [] ->
     printUsage()
     { state with exitCode = 1 }
-
   | _ ->
     let parsed = parseArgs(args, defaultArgs())
-
     match parsed.error with
     | Some(err) ->
-      Cli.printErr(err)
+      printErr(err)
       printUsage()
       { state with exitCode = 1 }
     | None ->
       if parsed.routerPath == "" then
-        Cli.printErr("Missing router path.")
+        printErr("Missing router path.")
         printUsage()
         { state with exitCode = 1 }
       else
         let portStr = Stdlib.display(parsed.port)
         let maxBytesStr = Stdlib.display(parsed.maxBodyBytes)
-
         let baseConfig = Stdlib.HttpServer.Config.defaults(parsed.port)
-
         let config =
           { baseConfig with address = parsed.address, maxBodyBytes = parsed.maxBodyBytes }
 
@@ -138,8 +130,8 @@ let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
         match LanguageTools.Live.applicableByName(state.currentBranchId, parsed.routerPath) with
         | Ok(router) ->
           // Announce only once the port is actually bound (via onListening), so a taken port never prints a
-          // "Listening" that then turns out to be false. Requests are logged (Config.defaults sets
-          // logRequests), but nothing ever said so — leaving you to wonder whether a request arrived at all.
+          // "Listening" that then turns out to be false. Requests are logged (Config.defaults puts
+          // Middleware.logRequests in the stack), but nothing ever said so — leaving you to wonder whether a request arrived at all.
           // In the dev container the host reaches this port on a per-clone offset, set as
           // DARK_HOST_PORT_BASE at startup. Unset outside it, so there's nothing to add.
           let hostPort =
@@ -147,17 +139,19 @@ let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
             | Some(baseStr) ->
               match Stdlib.Int64.parse(baseStr) with
               | Ok(hostBase) ->
-                let offset = (Stdlib.Net.Port.toInt64(parsed.port)) - 9090
-                if (offset < 0) || (offset > 9) then Stdlib.Option.Option.None
-                else Stdlib.Option.Option.Some(hostBase + offset)
-              | Error(_) -> Stdlib.Option.Option.None
-            | None -> Stdlib.Option.Option.None
+                let offset = Stdlib.Net.Port.toInt64(parsed.port) - 9090
+                if offset < 0 || offset > 9 then Option.None else Option.Some(hostBase + offset)
+              | Error(_) -> Option.None
+            | None -> Option.None
+
           let hostLines =
             match hostPort with
             | Some(hostPort) when parsed.address == "0.0.0.0" ->
-              if hostPort == Stdlib.Net.Port.toInt64(parsed.port) then []
+              if hostPort == Stdlib.Net.Port.toInt64(parsed.port) then
+                []
               else
-                [ Stdlib.Cli.UI.Colors.hint($"  From the host: http://localhost:{Stdlib.display(hostPort)}") ]
+                [ Stdlib.Cli.UI.Colors.hint(
+                    $"  From the host: http://localhost:{Stdlib.display(hostPort)}") ]
             | Some(hostPort) when Stdlib.String.startsWith(parsed.address, "127.") ->
               [ Stdlib.Cli.UI.Colors.hint(
                   $"  From the host: serve with --bind 0.0.0.0, then http://localhost:{Stdlib.display(hostPort)}") ]
@@ -175,24 +169,22 @@ let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
                 $"Max body bytes: {maxBytesStr}"
                 following
                 ""
-                Stdlib.Cli.UI.Colors.success(
-                  $"Listening on http://{parsed.address}:{portStr}") ]
+                Stdlib.Cli.UI.Colors.success($"Listening on http://{parsed.address}:{portStr}") ]
 
             let scope =
-              if parsed.address == "0.0.0.0" then "All IPv4 interfaces."
+              if parsed.address == "0.0.0.0" then
+                "All IPv4 interfaces."
               else if Stdlib.String.startsWith(parsed.address, "127.") then
                 "Local connections only."
-              else $"Connections on {parsed.address} only."
-            let tail =
-              [ Stdlib.Cli.UI.Colors.hint("  " + scope)
-                "Press Ctrl+C to stop"
-                "" ]
+              else
+                $"Connections on {parsed.address} only."
 
+            let tail = [ Stdlib.Cli.UI.Colors.hint("  " + scope), "Press Ctrl+C to stop", "" ]
             Stdlib.printLines(Stdlib.List.concat(head, Stdlib.List.concat(hostLines, tail)))
 
           let served =
-            match (parsed.live, LanguageTools.Live.locationOfName(parsed.routerPath)) with
-            | (true, Some(location)) ->
+            match parsed.live, LanguageTools.Live.locationOfName(parsed.routerPath) with
+            | true, Some(location) ->
               Stdlib.HttpServer.serveLive(
                 config,
                 LanguageTools.Live.Router.start(state.currentBranchId, location),
@@ -208,25 +200,20 @@ let execute(state: Cli.AppState, args: List<String>): Cli.AppState =
           match served with
           | Ok(_) -> state
           | Error(msg) ->
-            Cli.printErr(msg)
+            printErr(msg)
             { state with exitCode = 1 }
         | Error(msg) ->
-          Cli.printErr($"{msg} -- is it defined and committed on this branch?")
-
+          printErr($"{msg} -- is it defined and committed on this branch?")
           { state with exitCode = 1 }
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let help(_state: Cli.AppState): String =
-  [ "Start an HTTP server backed by a Darklang router."
-    "" ]
+let help(_state: AppState): String =
+  [ "Start an HTTP server backed by a Darklang router.", "" ]
   |> Stdlib.List.concat(usageLines())
   |> Stdlib.String.join("\n")
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
-let complete(
-  state: Cli.AppState,
-  args: List<String>)
-  : List<Cli.Completion.CompletionItem> =
+let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   []

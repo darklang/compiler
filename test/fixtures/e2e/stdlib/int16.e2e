@@ -154,8 +154,8 @@ Stdlib.Int16.sum ([10s, 20s, 30s]) = 60s
 // Stdlib.Int16.sqrt - not implemented
 // Stdlib.Int16.sqrt(4) = 2.0
 
-// Stdlib.Int16.toFloat - not implemented
-// Stdlib.Int16.toFloat(2) = 2.0
+// Stdlib.Int16.toFloat64 - not implemented
+// Stdlib.Int16.toFloat64(2) = 2.0
 
 // Stdlib.Int16.parse - needs Result type (blocked by type checker bug)
 // Stdlib.Int16.parse("1") = Ok(1)

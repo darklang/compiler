@@ -290,7 +290,7 @@ let printingTests =
                @ X64Printing.genPrintInt64 X.RAX false
                @ [
                    X.JMP doneLabel;
-                   X.Label "Darklang.Stdlib.Float.toString";
+                   X.Label "Darklang.Stdlib.Float64.toString";
                    X.LEA (X.RAX, X.RSP, 24l);
                    X.RET;
                    X.Label doneLabel;

@@ -65,7 +65,7 @@ let rec wrapReturnWithPrint resolveFunction programType gen expr =
           format (displayHelper elemType)
       | AST.TFloat64 ->
           (* For Float64, call Float.toString first, then print the string *)
-          format "Darklang.Stdlib.Float.toString"
+          format "Darklang.Stdlib.Float64.toString"
       | AST.TDateTime ->
           (* DateTime is an opaque immediate; display it through its public formatter. *)
           format "Darklang.Stdlib.DateTime.toString"

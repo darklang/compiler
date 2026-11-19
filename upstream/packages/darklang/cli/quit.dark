@@ -1,6 +1,5 @@
 module Darklang.Cli.Quit
 
-
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, _args: List<String>): AppState =
   match state.pageStack with
@@ -13,6 +12,7 @@ let execute(state: AppState, _args: List<String>): AppState =
       match returnTo with
       | SubApp(app) -> Page.SubApp(app.onResume())
       | other -> other
+
     { cleared with currentPage = resumed, pageStack = rest }
   | [] ->
     Stdlib.printErrorLine("Goodbye!")
@@ -26,8 +26,4 @@ let complete(_state: AppState, _args: List<String>): List<Completion.CompletionI
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
-  [
-    "Usage: quit"
-    "Exit the CLI immediately."
-  ] |> Stdlib.String.join("\n")
-
+  [ "Usage: quit", "Exit the CLI immediately." ] |> Stdlib.String.join("\n")

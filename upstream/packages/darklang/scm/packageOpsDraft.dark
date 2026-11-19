@@ -10,15 +10,15 @@ module Darklang.SCM.PackageOps
 //
 // Same module as `packageOps.dark`; see the note there.
 
-
 /// How many ops are in the draft.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftOpCountFor: Unknown function or value 'countOf'"
-let draftOpCountFor(branchId: Uuid): Int64 = countOf(OpFilter.Draft(branchId))
+let draftOpCountFor(branchId: Uuid): Int64 =
+  countOf(OpFilter.Draft(branchId))
 
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftOpCount: Unknown function or value 'draftOpCountFor'"
-let draftOpCount(): Int64 = draftOpCountFor(currentBranch())
-
+let draftOpCount(): Int64 =
+  draftOpCountFor(currentBranch())
 
 
 /// The ids of the ops the draft holds, sorted, so a commit can be hashed over WHAT it commits.
@@ -26,7 +26,8 @@ let draftOpCount(): Int64 = draftOpCountFor(currentBranch())
 /// Sorted rather than in log order: two machines that authored the same ops in a different order committed
 /// the same thing, and an id that says otherwise would be lying about the contents it claims to name.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftOpIdsFor: Unknown function or value 'idsOf'"
-let draftOpIdsFor(branchId: Uuid): List<String> = idsOf(OpFilter.DraftIds(branchId))
+let draftOpIdsFor(branchId: Uuid): List<String> =
+  idsOf(OpFilter.DraftIds(branchId))
 
 
 /// What the draft BINDS: one entry per name, latest edit wins. Five edits to one fn collapse to one entry
@@ -41,7 +42,8 @@ let draftBindingsFor(branchId: Uuid): List<Conflicts.Binding> =
 /// The draft's op rows for <param branchId>, oldest first -- the one query behind
 /// <fn draftBindingsFor>, <fn draftRemovalsFor> and <fn draftEntriesFor>.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpRow'"
-let draftOpRowsFor(branchId: Uuid): List<OpRow> = rowsOf(OpFilter.Draft(branchId))
+let draftOpRowsFor(branchId: Uuid): List<OpRow> =
+  rowsOf(OpFilter.Draft(branchId))
 
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftBindings: Unknown function or value 'draftBindingsFor'"
@@ -57,12 +59,13 @@ let draftRemovalsFor(branchId: Uuid): List<String> =
   bindingEntriesFromOpRows(draftOpRowsFor(branchId))
   |> Stdlib.List.filterMap(fun w ->
     match w.binding with
-    | Some(_) -> Stdlib.Option.Option.None
-    | None -> Stdlib.Option.Option.Some(Conflicts.fqn(w.owner, w.modules, w.name)))
+    | Some(_) -> Option.None
+    | None -> Option.Some(Conflicts.fqn(w.owner, w.modules, w.name)))
 
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftRemovals: Unknown function or value 'draftRemovalsFor'"
-let draftRemovals(): List<String> = draftRemovalsFor(currentBranch())
+let draftRemovals(): List<String> =
+  draftRemovalsFor(currentBranch())
 
 
 /// Draft items that still reference a name which does not resolve, as (item, the names it cannot find).
@@ -78,22 +81,22 @@ let unresolvedInDraft(branchId: Uuid): List<(String * List<String>)> =
   // What the draft's named versions reference. An earlier version's references don't count: saving a
   // fix leaves the broken version in the draft, and it still references the old versions around it.
   let referenced =
-    SCM.Deps.query(SCM.Deps.DepQuery.Closure(bindings |> Stdlib.List.map(fun b -> b.hash)))
+    Deps.query(Deps.DepQuery.Closure(bindings |> Stdlib.List.map(fun b -> b.hash)))
     |> Stdlib.List.map(fun e -> e.dependsOnHash)
 
   LanguageTools.UnresolvedNames.inOps(ops)
   |> Stdlib.List.filterMap(fun((hash, names)) ->
     // The draft binds the hash it just authored, so the name is usually right there.
     match bindings |> Stdlib.List.findFirst(fun b -> b.hash == hash) with
-    | Some(b) -> Stdlib.Option.Option.Some((Conflicts.fqn(b.owner, b.modules, b.name), names))
+    | Some(b) -> Option.Some((Conflicts.fqn(b.owner, b.modules, b.name), names))
     | None ->
       // An Add with NO surviving SetName is content nothing names: an earlier version, or
       // `dark discard <name>` dropped the binding and kept the content on purpose (see `Draft.collapse`).
       if Stdlib.List.contains(referenced, hash) then
         // Reachable but unnamed: still a real problem, and the short hash is the only honest label.
-        Stdlib.Option.Option.Some((Stdlib.String.first(hash, 8), names))
+        Option.Some((Stdlib.String.first(hash, 8), names))
       else
-        Stdlib.Option.Option.None)
+        Option.None)
 
 
 /// The names whose CURRENT binding was written by PROPAGATION rather than by a person.
@@ -103,7 +106,7 @@ let unresolvedInDraft(branchId: Uuid): List<(String * List<String>)> =
 /// caller can intersect with what it is about to display rather than asking per item.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.propagatedNames: Unknown function or value 'SCM.Bindings.query'"
 let propagatedNames(): List<String> =
-  SCM.Bindings.query(SCM.Bindings.BindingFilter.Propagated(currentBranch()))
+  Bindings.query(Bindings.BindingFilter.Propagated(currentBranch()))
   |> Stdlib.List.map(fun b -> Conflicts.fqn(b.owner, b.modules, b.name))
 
 
@@ -116,13 +119,14 @@ let draftEntriesFor(branchId: Uuid): List<DraftEntry> =
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'DraftEntry'"
-let draftEntries(): List<DraftEntry> = draftEntriesFor(currentBranch())
+let draftEntries(): List<DraftEntry> =
+  draftEntriesFor(currentBranch())
 
 
 /// The per-location key the two decision folds below group on. A string built here rather than through
 /// `Constraints.fqnOf`: this silo owns the op log and must not depend on the one that reports findings.
 let decisionKey(loc: LanguageTools.ProgramTypes.PackageLocation): String =
-  loc.owner + "|" + (Stdlib.String.join(loc.modules, ".")) + "|" + loc.name
+  loc.owner + "|" + Stdlib.String.join(loc.modules, ".") + "|" + loc.name
 
 
 /// Where a human's OVERRIDE was later undone by an ordinary edit.
@@ -138,30 +142,28 @@ let decisionKey(loc: LanguageTools.ProgramTypes.PackageLocation): String =
 /// op-log decode below costs nothing on the common path.
 /// A failed read of the op log is reported rather than mistaken for no findings.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.supersededOverrides: Unknown function or value 'SCM.Conflicts.query'"
-let supersededOverrides(
-  )
-  : Stdlib.Result.Result<List<(LanguageTools.ProgramTypes.PackageLocation * String * String)>, String> =
-  match SCM.Conflicts.query(SCM.Conflicts.ConflictFilter.AnyOverridden) with
-  | [] -> Stdlib.Result.Result.Ok([])
+let supersededOverrides()
+  : Result<List<(LanguageTools.ProgramTypes.PackageLocation * String * String)>, String> =
+  match Conflicts.query(Conflicts.ConflictFilter.AnyOverridden) with
+  | [] -> Result.Ok([])
   | _ ->
     // Fold the log in order, remembering per location: the hash the last LOCAL override chose, and
     // the hash bound now. Order is the fold's own (origin_ts, rowid), so "later" means what the fold
     // means. Only YOUR override can be superseded
     // (a peer's is theirs to watch), and a later edit of YOURS is a change of mind, which closes the
     // record rather than reporting you to yourself.
-    let hashOf =
-      (fun target ->
-        LanguageTools.ProgramTypes.hashToString(
-          LanguageTools.ProgramTypes.Reference.hash(target)))
+    let hashOf = fun target ->
+      LanguageTools.ProgramTypes.hashToString(LanguageTools.ProgramTypes.Reference.hash(target))
 
-    rowsOf(OpFilter.Main)
-    |> Stdlib.List.fold(Stdlib.Dict.empty, fun(acc, row) ->
-      match row.op with
-      | None -> acc
-      | Some(Decision(_, loc, _, Override(target))) ->
+    // Only main's binding and decision ops: decoding every fn body in the log took seconds.
+    historyOps(Branch.mainBranchId, Edits.Own, Option.None)
+    |> Stdlib.List.fold(Stdlib.Dict.empty, fun(acc, revision) ->
+      let (_, _, op) = revision
+      match op with
+      | Decision(_, loc, _, Override(target)) ->
         let h = hashOf(target)
         Stdlib.Dict.set(acc, decisionKey(loc), (loc, h, h))
-      | Some(SetName(loc, _target, _)) ->
+      | SetName(loc, _target, _) ->
         match Stdlib.Dict.get(acc, decisionKey(loc)) with
         | None -> acc
         | Some(_entry) -> Stdlib.Dict.remove(acc, decisionKey(loc))
@@ -170,7 +172,7 @@ let supersededOverrides(
     |> Stdlib.List.filter(fun entry ->
       let (_loc, chosen, live) = entry
       chosen != live)
-    |> Stdlib.Result.Result.Ok
+    |> Result.Ok
 
 
 /// The at-rest check over any set of ops, with the same live-items rule the draft gate uses:
@@ -183,8 +185,10 @@ let supersededOverrides(
 let typeCheckOps(
   ops: List<LanguageTools.ProgramTypes.PackageOp>)
   : LanguageTools.AtRestTypeChecker.Report =
-
-  let effects = ops |> Stdlib.List.map(LanguageTools.ProgramTypes.PackageOp.bindingOps) |> Stdlib.List.flatten
+  let effects =
+    ops
+    |> Stdlib.List.map(LanguageTools.ProgramTypes.PackageOp.bindingOps)
+    |> Stdlib.List.flatten
 
   // Work out what each name points to after these operations.
   // Later bindings replace earlier ones, and Unbind removes the name.
@@ -197,9 +201,14 @@ let typeCheckOps(
         Stdlib.Dict.set(
           acc,
           decisionKey(loc),
-          LanguageTools.ProgramTypes.hashToString(LanguageTools.ProgramTypes.Reference.hash(target)))
+          LanguageTools.ProgramTypes.hashToString(
+            LanguageTools.ProgramTypes.Reference.hash(target)))
       | Decision(_, loc, _, Override(target)) ->
-        Stdlib.Dict.set(acc, decisionKey(loc), LanguageTools.ProgramTypes.hashToString(LanguageTools.ProgramTypes.Reference.hash(target)))
+        Stdlib.Dict.set(
+          acc,
+          decisionKey(loc),
+          LanguageTools.ProgramTypes.hashToString(
+            LanguageTools.ProgramTypes.Reference.hash(target)))
       | Unbind(loc, _) -> Stdlib.Dict.remove(acc, decisionKey(loc))
       | _ -> acc)
 
@@ -216,11 +225,12 @@ let typeCheckOps(
     |> Stdlib.List.filterMap(fun op ->
       match op with
       | SetName(_, target, _) ->
-        Stdlib.Option.Option.Some(
-          (LanguageTools.ProgramTypes.hashToString(LanguageTools.ProgramTypes.Reference.hash(target)),
-           true)
-        )
-      | _ -> Stdlib.Option.Option.None)
+        Option.Some(
+          (
+            LanguageTools.ProgramTypes.hashToString(
+              LanguageTools.ProgramTypes.Reference.hash(target)),
+            true))
+      | _ -> Option.None)
     |> Stdlib.Dict.fromEntries
 
   let liveOps =
@@ -231,28 +241,28 @@ let typeCheckOps(
         let h = LanguageTools.ProgramTypes.hashToString(f.hash)
         // Content some binding targets, or content no draft SetName ever named (don't silently
         // skip a shape this filter does not understand).
-        (Stdlib.Dict.containsKey(liveTargets, h))
-        || (Stdlib.Bool.not(Stdlib.Dict.containsKey(namedHashes, h)))
+        Stdlib.Dict.containsKey(liveTargets, h)
+        || Stdlib.Bool.not(Stdlib.Dict.containsKey(namedHashes, h))
       | AddType(t) ->
         let h = LanguageTools.ProgramTypes.hashToString(t.hash)
-        (Stdlib.Dict.containsKey(liveTargets, h))
-        || (Stdlib.Bool.not(Stdlib.Dict.containsKey(namedHashes, h)))
+        Stdlib.Dict.containsKey(liveTargets, h)
+        || Stdlib.Bool.not(Stdlib.Dict.containsKey(namedHashes, h))
       | AddValue(v) ->
         let h = LanguageTools.ProgramTypes.hashToString(v.hash)
-        (Stdlib.Dict.containsKey(liveTargets, h))
-        || (Stdlib.Bool.not(Stdlib.Dict.containsKey(namedHashes, h)))
+        Stdlib.Dict.containsKey(liveTargets, h)
+        || Stdlib.Bool.not(Stdlib.Dict.containsKey(namedHashes, h))
       | AddTrait(t) ->
         let h = LanguageTools.ProgramTypes.hashToString(t.hash)
-        (Stdlib.Dict.containsKey(liveTargets, h))
-        || (Stdlib.Bool.not(Stdlib.Dict.containsKey(namedHashes, h)))
+        Stdlib.Dict.containsKey(liveTargets, h)
+        || Stdlib.Bool.not(Stdlib.Dict.containsKey(namedHashes, h))
       | AddTraitImpl(i) ->
         let h = LanguageTools.ProgramTypes.hashToString(i.hash)
-        (Stdlib.Dict.containsKey(liveTargets, h))
-        || (Stdlib.Bool.not(Stdlib.Dict.containsKey(namedHashes, h)))
+        Stdlib.Dict.containsKey(liveTargets, h)
+        || Stdlib.Bool.not(Stdlib.Dict.containsKey(namedHashes, h))
       | AddTest(test) ->
         let h = LanguageTools.ProgramTypes.hashToString(test.hash)
-        (Stdlib.Dict.containsKey(liveTargets, h))
-        || (Stdlib.Bool.not(Stdlib.Dict.containsKey(namedHashes, h)))
+        Stdlib.Dict.containsKey(liveTargets, h)
+        || Stdlib.Bool.not(Stdlib.Dict.containsKey(namedHashes, h))
       | _ -> true)
 
   match liveOps with
@@ -271,16 +281,13 @@ let typeCheckOps(
 /// content ships as history), and must not be checked, or a broken-then-fixed edit would refuse every
 /// commit. Unreachable history is not what the gate protects; what other machines will RESOLVE is.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
-let typeCheckDraft(
-  branchId: Uuid)
-  : LanguageTools.AtRestTypeChecker.Report =
+let typeCheckDraft(branchId: Uuid): LanguageTools.AtRestTypeChecker.Report =
   typeCheckOps(draftEntriesFor(branchId) |> Stdlib.List.map(fun e -> e.op))
 
 
 // Dropping part of a draft. Each is one action in F# (`SCM.Actions.discard`), which decides what
 // survives, whether the rows a dropped op wrote can be removed surgically or the draft has to be
 // rebuilt, and never deletes an op this build cannot decode.
-
 
 /// A draft op, with the two things a selection needs that a decoded op alone doesn't carry: which row it is,
 /// and when it was authored.
@@ -293,16 +300,13 @@ type DraftEntry =
 
 /// Drop <param what> from <param branchId>'s draft. Returns how many ops went.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.discardOn: Unknown function or value 'SCM.Actions.discard'"
-let discardOn(
-  branchId: Uuid,
-  what: SCM.Actions.DiscardWhat)
-  : Stdlib.Result.Result<Int64, String> =
-  match SCM.Actions.discard(branchId, what) with
-  | Ok(n) -> Stdlib.Result.Result.Ok(n)
+let discardOn(branchId: Uuid, what: Actions.DiscardWhat): Result<Int64, String> =
+  match Actions.discard(branchId, what) with
+  | Ok(n) -> Result.Ok(n)
   | Error(Refused(Moved)) ->
-    Stdlib.Result.Result.Error(
+    Result.Error(
       "the draft kept changing while it was being rewritten (10 tries), usually another save, a pull, or your own editor, so nothing was changed. Run it again.")
-  | Error(e) -> Stdlib.Result.Result.Error(SCM.Actions.failureMessage(e))
+  | Error(e) -> Result.Error(Actions.failureMessage(e))
 
 
 /// Drop one name's uncommitted bindings from the current scope's draft.
@@ -314,30 +318,22 @@ let discardOn(
 /// Only the NAME's bindings go -- `SetName`s, and the overrides an `undo` writes. That reverts the name to
 /// its last committed binding, or to not existing at all if it never had one. Its content stays.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.discardDraftName: Unknown function or value 'discardOn'"
-let discardDraftName(
-  owner: String,
-  modules: List<String>,
-  name: String)
-  : Stdlib.Result.Result<Int64, String> =
+let discardDraftName(owner: String, modules: List<String>, name: String): Result<Int64, String> =
   discardOn(
     currentBranch(),
-    SCM.Actions.DiscardWhat.Name(
-      LanguageTools.ProgramTypes.PackageLocation
-        { owner = owner
-          modules = modules
-          name = name }
-    ))
+    Actions.DiscardWhat.Name(
+      LanguageTools.ProgramTypes.PackageLocation { owner = owner, modules = modules, name = name }))
 
 
 /// Drop these ops from <param branchId>'s draft. Returns how many went.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.dropBranchOps: Unknown function or value 'discardOn'"
-let dropBranchOps(branchId: Uuid, ids: List<String>): Stdlib.Result.Result<Int64, String> =
+let dropBranchOps(branchId: Uuid, ids: List<String>): Result<Int64, String> =
   match ids with
-  | [] -> Stdlib.Result.Result.Ok(0)
-  | ids -> discardOn(branchId, SCM.Actions.DiscardWhat.Ops(ids))
+  | [] -> Result.Ok(0)
+  | ids -> discardOn(branchId, Actions.DiscardWhat.Ops(ids))
 
 
 /// Drop the current scope's draft, whichever it is.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.discardDraft: Unknown function or value 'discardOn'"
-let discardDraft(): Stdlib.Result.Result<Int64, String> =
-  discardOn(currentBranch(), SCM.Actions.DiscardWhat.All)
+let discardDraft(): Result<Int64, String> =
+  discardOn(currentBranch(), Actions.DiscardWhat.All)

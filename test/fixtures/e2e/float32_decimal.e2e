@@ -6,13 +6,13 @@ Stdlib.Float32.toString (0.1f32 + 0.2f32) = "0.3"
 Stdlib.Float32.toString (1.0f32 / 3.0f32) = "0.33333334"
 Stdlib.Float32.toString 1e30f32 = "1e+30"
 Stdlib.Float32.toString 100000000.0f32 = "100000000.0"
-Stdlib.Float32.toString (Stdlib.Float32.fromFloat 3.14159) = "3.14159"
+Stdlib.Float32.toString (Stdlib.Float32.fromFloat64 3.14159) = "3.14159"
 Stdlib.Float32.toString (Stdlib.Float32.fromInt64 16777217L) = "16777216.0"
-Stdlib.Float32.toString (Stdlib.Float32.fromFloat 1e-45) = "1e-45"
+Stdlib.Float32.toString (Stdlib.Float32.fromFloat64 1e-45) = "1e-45"
 Stdlib.Float32.toString (-2.5f32) = "-2.5"
 Stdlib.Float32.toBits 0.1f32 = 1036831949ul
 Stdlib.Float32.toBits (Stdlib.Float32.fromBits 1065353216ul) = 1065353216ul
-Stdlib.Float32.toFloat 0.1f32 = 0.10000000149011612
+Stdlib.Float32.toFloat64 0.1f32 = 0.10000000149011612
 0.0f32 == -0.0f32 = true
 1.5f32 < 2.5f32 = true
 1.5f32 = stdout="1.5f32\n" stderr=""

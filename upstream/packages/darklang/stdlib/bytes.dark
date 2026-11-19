@@ -2,12 +2,10 @@ module Darklang.Stdlib.Bytes
 
 // Immutable binary data. Equal contents compare equal, whether in memory or saved.
 // Saving values handles persistence automatically; there is only one Bytes type.
-
 // TODO no Bytes literal syntax — embedding small binary data in source
 // today requires `Base16.decode "..."` or `Utf8.encode "..."`. A
 // `b"\x00\x01..."` form would be the natural fix, plus tokenizer +
 // parser + runtime literal handling. Cross-cutting language change.
-
 
 /// The empty Bytes.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.empty: Unknown function or value 'Builtin.bytesEmpty'"
@@ -16,36 +14,34 @@ val empty = Builtin.bytesEmpty
 
 /// Returns the length of <param bytes> in bytes.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.length: Unknown function or value 'Builtin.bytesLength'"
-let length(bytes: Bytes): Int64 = Builtin.bytesLength(bytes)
+let length(bytes: Bytes): Int64 =
+  Builtin.bytesLength(bytes)
 
 
 /// Returns {{true}} if <param bytes> has no bytes in it.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.isEmpty: Unknown function or value 'length'"
-let isEmpty(bytes: Bytes): Bool = (length(bytes)) == 0
+let isEmpty(bytes: Bytes): Bool =
+  length(bytes) == 0
 
 
 /// Returns {{Some byte}} at <param index> in <param bytes> if <param index> is
 /// less than the length, otherwise returns {{None}}.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.getAt: Unknown function or value 'Builtin.bytesGetAt'"
-let getAt(bytes: Bytes, index: Int64): Stdlib.Option.Option<UInt8> =
+let getAt(bytes: Bytes, index: Int64): Option<UInt8> =
   Builtin.bytesGetAt(bytes, index)
 
 
 /// Returns {{Some index}} of the first <param byte> in <param bytes> at or
 /// after <param start>, or {{None}} if there is none.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.indexOfFrom: Unknown function or value 'Builtin.bytesIndexOf'"
-let indexOfFrom(
-  bytes: Bytes,
-  byte: UInt8,
-  start: Int64)
-  : Stdlib.Option.Option<Int64> =
+let indexOfFrom(bytes: Bytes, byte: UInt8, start: Int64): Option<Int64> =
   Builtin.bytesIndexOf(bytes, byte, start)
 
 
 /// Returns {{Some index}} of the first <param byte> in <param bytes>, or
 /// {{None}} if it isn't there.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.indexOf: Unknown function or value 'indexOfFrom'"
-let indexOf(bytes: Bytes, byte: UInt8): Stdlib.Option.Option<Int64> =
+let indexOf(bytes: Bytes, byte: UInt8): Option<Int64> =
   indexOfFrom(bytes, byte, 0)
 
 
@@ -53,35 +49,33 @@ let indexOf(bytes: Bytes, byte: UInt8): Stdlib.Option.Option<Int64> =
 /// before <param start>, or {{None}} if there is none or <param start> is
 /// out of range.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.lastIndexOfFrom: Unknown function or value 'getAt'"
-let lastIndexOfFrom(
-  bytes: Bytes,
-  byte: UInt8,
-  start: Int64)
-  : Stdlib.Option.Option<Int64> =
+let lastIndexOfFrom(bytes: Bytes, byte: UInt8, start: Int64): Option<Int64> =
   Builtin.bytesLastIndexOf(bytes, byte, start)
 
 
 /// Returns {{Some index}} of the last <param byte> in <param bytes>, or
 /// {{None}} if it isn't there.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.lastIndexOf: Unknown function or value 'lastIndexOfFrom'"
-let lastIndexOf(bytes: Bytes, byte: UInt8): Stdlib.Option.Option<Int64> =
+let lastIndexOf(bytes: Bytes, byte: UInt8): Option<Int64> =
   lastIndexOfFrom(bytes, byte, length(bytes) - 1)
 
 
 /// Concatenates a list of Bytes into a single Bytes.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.concatAll: Unknown function or value 'Builtin.bytesConcat'"
-let concatAll(values: List<Bytes>): Bytes = Builtin.bytesConcat(values)
+let concatAll(values: List<Bytes>): Bytes =
+  Builtin.bytesConcat(values)
 
 
 /// Returns <param a> followed by <param b>.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.concat: Unknown function or value 'concatAll'"
-let concat(a: Bytes, b: Bytes): Bytes = concatAll([ a, b ])
+let concat(a: Bytes, b: Bytes): Bytes =
+  concatAll([ a, b ])
 
 
 /// Returns <param bytes> with <param fn> applied to each byte.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.map: Unknown function or value 'fromList'"
 let map(bytes: Bytes, fn: UInt8 -> UInt8): Bytes =
-  fromList(Stdlib.List.map(toList(bytes), fn))
+  fromList(List.map(toList(bytes), fn))
 
 
 type IndexError =
@@ -93,15 +87,11 @@ type IndexError =
 /// including, <param end>. Returns {{Error IndexOutOfBounds}} unless
 /// {{0 <= start <= end <= length}}.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.slice: Unknown function or value 'length'"
-let slice(
-  bytes: Bytes,
-  start: Int64,
-  end: Int64)
-  : Stdlib.Result.Result<Bytes, IndexError> =
+let slice(bytes: Bytes, start: Int64, end: Int64): Result<Bytes, IndexError> =
   if start < 0 || start > end || end > length(bytes) then
-    Stdlib.Result.Result.Error(IndexError.IndexOutOfBounds)
+    Result.Error(IndexError.IndexOutOfBounds)
   else
-    Stdlib.Result.Result.Ok(Builtin.bytesSlice(bytes, start, end - start))
+    Result.Ok(Builtin.bytesSlice(bytes, start, end - start))
 
 
 /// Returns the first <param count> bytes of <param bytes>, or all of them if
@@ -109,9 +99,16 @@ let slice(
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.take: Unknown function or value 'length'"
 let take(bytes: Bytes, count: Int64): Bytes =
   let total = length(bytes)
-  let end = if count < 0 then 0 else if count > total then total else count
+  let end =
+    if count < 0 then
+      0
+    else if count > total then
+      total
+    else
+      count
+
   // Never out of range: `end` is within the Bytes.
-  Stdlib.Result.withDefault(slice(bytes, 0, end), empty)
+  Result.withDefault(slice(bytes, 0, end), empty)
 
 
 /// Returns <param bytes> without its first <param count> bytes, or the empty
@@ -119,26 +116,27 @@ let take(bytes: Bytes, count: Int64): Bytes =
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.drop: Unknown function or value 'length'"
 let drop(bytes: Bytes, count: Int64): Bytes =
   let total = length(bytes)
-  let start = if count < 0 then 0 else if count > total then total else count
+  let start =
+    if count < 0 then
+      0
+    else if count > total then
+      total
+    else
+      count
+
   // Never out of range: `start` is within the Bytes.
-  Stdlib.Result.withDefault(slice(bytes, start, total), empty)
+  Result.withDefault(slice(bytes, start, total), empty)
 
 
 /// Returns {{Ok}} <param bytes> with the byte at <param index> replaced by
 /// <param byte>. Returns {{Error IndexOutOfBounds}} unless
 /// {{0 <= index < length}}.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.setAt: Unknown function or value 'length'"
-let setAt(
-  bytes: Bytes,
-  index: Int64,
-  byte: UInt8)
-  : Stdlib.Result.Result<Bytes, IndexError> =
+let setAt(bytes: Bytes, index: Int64, byte: UInt8): Result<Bytes, IndexError> =
   if index < 0 || index >= length(bytes) then
-    Stdlib.Result.Result.Error(IndexError.IndexOutOfBounds)
+    Result.Error(IndexError.IndexOutOfBounds)
   else
-    Stdlib.Result.Result.Ok(
-      concatAll([ take(bytes, index), fromList([ byte ]), drop(bytes, index + 1) ])
-    )
+    Result.Ok(concatAll([ take(bytes, index), fromList([ byte ]), drop(bytes, index + 1) ]))
 
 
 /// Returns {{true}} if <param bytes> begins with <param prefix>. Every Bytes
@@ -152,8 +150,7 @@ let startsWith(bytes: Bytes, prefix: Bytes): Bool =
 /// ends with the empty Bytes.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.endsWith: Unknown function or value 'length'"
 let endsWith(bytes: Bytes, suffix: Bytes): Bool =
-  length(suffix) <= length(bytes)
-  && drop(bytes, length(bytes) - length(suffix)) == suffix
+  length(suffix) <= length(bytes) && drop(bytes, length(bytes) - length(suffix)) == suffix
 
 
 /// Returns <param bytes> without any <param byte> at its start or end:
@@ -189,18 +186,14 @@ let __skipFrom(bytes: Bytes, byte: UInt8, index: Int64, step: Int64): Int64 =
 /// <param start> is out of range. An empty <param segment> is found at
 /// <param start>.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.indexOfSegmentFrom: Unknown function or value 'Builtin.bytesIndexOfSegment'"
-let indexOfSegmentFrom(
-  bytes: Bytes,
-  segment: Bytes,
-  start: Int64)
-  : Stdlib.Option.Option<Int64> =
+let indexOfSegmentFrom(bytes: Bytes, segment: Bytes, start: Int64): Option<Int64> =
   Builtin.bytesIndexOfSegment(bytes, segment, start)
 
 
 /// Returns {{Some index}} of the first <param segment> in <param bytes>, or
 /// {{None}} if it isn't there. An empty <param segment> is found at 0.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.indexOfSegment: Unknown function or value 'indexOfSegmentFrom'"
-let indexOfSegment(bytes: Bytes, segment: Bytes): Stdlib.Option.Option<Int64> =
+let indexOfSegment(bytes: Bytes, segment: Bytes): Option<Int64> =
   indexOfSegmentFrom(bytes, segment, 0)
 
 
@@ -208,7 +201,7 @@ let indexOfSegment(bytes: Bytes, segment: Bytes): Stdlib.Option.Option<Int64> =
 /// look for one byte, use <fn Stdlib.Bytes.indexOf>.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.contains: Unknown function or value 'indexOfSegment'"
 let contains(bytes: Bytes, segment: Bytes): Bool =
-  Stdlib.Option.isSome(indexOfSegment(bytes, segment))
+  Option.isSome(indexOfSegment(bytes, segment))
 
 
 /// Returns <param bytes> with every <param segment> replaced by
@@ -219,8 +212,8 @@ let contains(bytes: Bytes, segment: Bytes): Bool =
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.replaceAll: Unknown function or value 'isEmpty'"
 let replaceAll(bytes: Bytes, segment: Bytes, replacement: Bytes): Bytes =
   if isEmpty(segment) then
-    let singles = Stdlib.List.map(toList(bytes), fun b -> fromList([ b ]))
-    concatAll(Stdlib.List.interpose([ empty, ...singles, empty ], replacement))
+    let singles = List.map(toList(bytes), fun b -> fromList([ b ]))
+    concatAll(List.interpose([ empty, ...singles, empty ], replacement))
   else
     __replaceAllFrom(bytes, segment, replacement, 0, [])
 
@@ -237,10 +230,10 @@ let __replaceAllFrom(
   pieces: List<Bytes>)
   : Bytes =
   match indexOfSegmentFrom(bytes, segment, start) with
-  | None -> concatAll(Stdlib.List.reverse([ drop(bytes, start), ...pieces ]))
+  | None -> concatAll(List.reverse([ drop(bytes, start), ...pieces ]))
   | Some(found) ->
     // Never out of range: `start <= found`, and both are within the Bytes.
-    let before = Stdlib.Result.withDefault(slice(bytes, start, found), empty)
+    let before = Result.withDefault(slice(bytes, start, found), empty)
     __replaceAllFrom(
       bytes,
       segment,
@@ -255,16 +248,18 @@ let __replaceAllFrom(
 /// <fn Stdlib.Bytes.concat> or <fn Stdlib.Bytes.slice>. Use it for parsing
 /// that walks every byte.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.toList: Unknown function or value 'Builtin.bytesToList'"
-let toList(bytes: Bytes): List<UInt8> = Builtin.bytesToList(bytes)
+let toList(bytes: Bytes): List<UInt8> =
+  Builtin.bytesToList(bytes)
 
 
 /// Collects a list of bytes into a Bytes. Copies every byte; to join Bytes
 /// use <fn Stdlib.Bytes.concat> instead of going through a list.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.fromList: Unknown function or value 'Builtin.bytesFromList'"
-let fromList(bytes: List<UInt8>): Bytes = Builtin.bytesFromList(bytes)
+let fromList(bytes: List<UInt8>): Bytes =
+  Builtin.bytesFromList(bytes)
 
 
 /// Returns <param bytes> with its bytes in the opposite order.
 // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.reverse: Unknown function or value 'fromList'"
 let reverse(bytes: Bytes): Bytes =
-  fromList(Stdlib.List.reverse(toList(bytes)))
+  fromList(List.reverse(toList(bytes)))

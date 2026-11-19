@@ -14,10 +14,13 @@ module Darklang.LanguageTools.Parser.Parse.Tests
 
 // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Parse.Tests.shape: Unknown function or value 'Darklang.LanguageTools.Parser.Parse.toWrittenTypes'"
 let shape(source: String): (Int64 * Int64) =
-  match Darklang.LanguageTools.Parser.Parse.toWrittenTypes(source) with
+  match LanguageTools.Parser.Parse.toWrittenTypes(source) with
   | Some(SourceFile(file)) ->
-    (Stdlib.List.length(file.declarations), Stdlib.List.length(file.exprsToEval))
+    (
+      Stdlib.List.length(file.declarations),
+      Stdlib.List.length(file.exprsToEval))
   | None -> (-1, -1)
+
 
 // The ordinary cases are untouched: one declaration, no trailing expressions.
 // @compiler xfail compile: "Unknown function or value 'shape'" class=missing-support reason=upstream-dependency
@@ -27,6 +30,7 @@ test realDeclarations =
       shape("let f(x: Int64): Int64 = x") |> Stdlib.Test.equal((1, 0))
       shape("type T = Unit") |> Stdlib.Test.equal((1, 0))
       shape("module M =\n  val v = 1") |> Stdlib.Test.equal((1, 0)) ])
+
 
 // @compiler xfail compile: "Unknown function or value 'shape'" class=missing-support reason=upstream-dependency
 test notDeclarations =
@@ -45,6 +49,7 @@ test notDeclarations =
       // just an expression, as above).
       shape("someCall () = error \"nope\"") |> Stdlib.Test.equal((0, 1)) ])
 
+
 // The path that actually matters, and the one the top-level fix missed. A
 // `module` header wraps the rest of the file into a DModule, which is the shape
 // of every package file on disk, and the serializer for a module's declarations
@@ -54,11 +59,14 @@ test notDeclarations =
 test moduleHeadedFiles =
   Stdlib.Test.all(
     [ shape("module Darklang.Foo\n\nvaloops = 1") |> Stdlib.Test.equal((1, 0))
+
       shape("module Darklang.Foo\n\nlet f(x: Int64): Int64 = x")
       |> Stdlib.Test.equal((1, 0))
+
       // a type under an attribute the parser does not know still lands
       shape("module Darklang.Foo\n\n[<Nonsense>] type Counter = Int64")
       |> Stdlib.Test.equal((1, 0)) ])
+
 
 // A real declaration alongside an assignment-shaped line: the declaration
 // survives, the assertion's two sides join exprsToEval.

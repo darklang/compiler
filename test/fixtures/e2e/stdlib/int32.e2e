@@ -154,8 +154,8 @@ Stdlib.Int32.sum ([10l, 20l, 30l]) = 60l
 // Stdlib.Int32.sqrt - not implemented
 // Stdlib.Int32.sqrt(4) = 2.0
 
-// Stdlib.Int32.toFloat - not implemented
-// Stdlib.Int32.toFloat(2) = 2.0
+// Stdlib.Int32.toFloat64 - not implemented
+// Stdlib.Int32.toFloat64(2) = 2.0
 
 // Stdlib.Int32.parse - needs Result type (blocked by type checker bug)
 // Stdlib.Int32.parse("1") = Ok(1)

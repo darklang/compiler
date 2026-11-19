@@ -117,8 +117,8 @@ let __fromIntUnchecked (value: Int) : Int64 =
     | Some result -> result
     | None -> Builtin.crash "Internal Int64 conversion invariant failed"
 let random (start: Int64) (finish: Int64) : Int64 = Stdlib.Int64.__fromIntUnchecked (Stdlib.Int.random (Stdlib.Int.fromInt64 start) (Stdlib.Int.fromInt64 finish))
-let toFloat (value: Int64) : Float = Stdlib.Int.toFloat (Stdlib.Int.fromInt64 value)
-let sqrt (value: Int64) : Float = Stdlib.Float.sqrt (Stdlib.Int64.toFloat value)
+let toFloat64 (value: Int64) : Float = Stdlib.Int.toFloat64 (Stdlib.Int.fromInt64 value)
+let sqrt (value: Int64) : Float = Stdlib.Float64.sqrt (Stdlib.Int64.toFloat64 value)
 let parse (value: String) : Stdlib.Result.Result<Int64, Stdlib.Int64.ParseError> =
     match Stdlib.Int.parse value with
     | Error _ -> Error Stdlib.Int64.ParseError.BadFormat
@@ -126,9 +126,9 @@ let parse (value: String) : Stdlib.Result.Result<Int64, Stdlib.Int64.ParseError>
         match Stdlib.Int.toInt64 parsed with
         | None -> Error Stdlib.Int64.ParseError.OutOfRange
         | Some result -> Ok result
-let fromFloat (a: Float) : Stdlib.Option.Option<Int64> =
-  if Float.isFinite a then
-    a |> Stdlib.Int.fromFloat |> Stdlib.Int.toInt64
+let fromFloat64 (a: Float) : Stdlib.Option.Option<Int64> =
+  if Float64.isFinite a then
+    a |> Stdlib.Int.fromFloat64 |> Stdlib.Int.toInt64
   else
     Stdlib.Option.Option.None
 let fromInt8 (value: Int8) : Int64 = Stdlib.Int64.__fromIntUnchecked (Stdlib.Int.fromInt8 value)
@@ -198,7 +198,7 @@ impl Stdlib.One for Int64 =
   let one () : Int64 = 1L
 
 let fromFloatRounded (a: Float) : Stdlib.Option.Option<Int64> =
-  if Float.isFinite a then
-    a |> Float.__roundInt |> Stdlib.Int.toInt64
+  if Float64.isFinite a then
+    a |> Float64.__roundInt |> Stdlib.Int.toInt64
   else
     Stdlib.Option.Option.None

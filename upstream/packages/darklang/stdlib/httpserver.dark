@@ -15,6 +15,7 @@ type Handler =
 let get(route: String, fn: Http.Request -> Http.Response): Handler =
   Handler { route = route, method = "GET", handler = fn }
 
+
 /// A POST route. See <fn Stdlib.HttpServer.get>.
 // @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.post reason=compiler-implementation
 let post(route: String, fn: Http.Request -> Http.Response): Handler =
@@ -25,7 +26,7 @@ let post(route: String, fn: Http.Request -> Http.Response): Handler =
 // @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.RouteMatch reason=compiler-implementation
 type RouteMatch =
   { matched: Bool
-    vars: List<String * String> }
+    vars: List<(String * String)> }
 
 
 /// Segment type for route parsing
@@ -39,17 +40,16 @@ type RouteSegment =
 /// Parse a route pattern into segments
 let __parseRouteSegments(route: String): List<RouteSegment> =
   let segments = String.split(route, "/")
-
   segments
   |> List.filterMap(fun seg ->
     if String.isEmpty(seg) then
-      Option.Option.None
+      Option.None
     else if String.startsWith(seg, ":") then
-      Option.Option.Some(RouteSegment.Variable(String.dropFirst(seg, 1)))
+      Option.Some(RouteSegment.Variable(String.dropFirst(seg, 1)))
     else if String.startsWith(seg, "*") then
-      Option.Option.Some(RouteSegment.Wildcard(String.dropFirst(seg, 1)))
+      Option.Some(RouteSegment.Wildcard(String.dropFirst(seg, 1)))
     else
-      Option.Option.Some(RouteSegment.Literal(seg)))
+      Option.Some(RouteSegment.Literal(seg)))
 
 
 /// Match a single route segment against a path segment
@@ -57,25 +57,20 @@ let __matchSegment(
   routeSeg: RouteSegment,
   pathSeg: String,
   remainingPath: List<String>)
-  : Option.Option<List<String * String>> =
+  : Option<List<(String * String)>> =
   match routeSeg with
-  | Literal(expected) ->
-    if expected == pathSeg then
-      Option.Option.Some([])
-    else
-      Option.Option.None
-  | Variable(name) -> Option.Option.Some([ (name, pathSeg) ])
+  | Literal(expected) -> if expected == pathSeg then Option.Some([]) else Option.None
+  | Variable(name) -> Option.Some([ (name, pathSeg) ])
   | Wildcard(name) ->
     let fullPath = String.join(List.prepend(remainingPath, pathSeg), "/")
-    Option.Option.Some([ (name, fullPath) ])
+    Option.Some([ (name, fullPath) ])
 
 
 /// Match a request path against a route pattern
 /// Split a request path into non-empty segments.
 // @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.splitPath reason=compiler-implementation
 let splitPath(requestPath: String): List<String> =
-  (String.split(requestPath, "/"))
-  |> List.filter(fun s -> Bool.not(String.isEmpty(s)))
+  String.split(requestPath, "/") |> List.filter(fun s -> Bool.not(String.isEmpty(s)))
 
 
 /// `matchRoute` against segments that have already been parsed and split.
@@ -85,28 +80,23 @@ let splitPath(requestPath: String): List<String> =
 let __matchRouteSegments(routeSegs: List<RouteSegment>, pathSegs: List<String>): RouteMatch =
   let routeLen = List.length(routeSegs)
   let pathLen = List.length(pathSegs)
-
-  if (routeLen == 0) && (pathLen == 0) then
+  if routeLen == 0 && pathLen == 0 then
     RouteMatch { matched = true, vars = [] }
   else if routeLen != pathLen then
     RouteMatch { matched = false, vars = [] }
   else
     // Use zipShortest since we already checked lengths are equal
     let zipped = List.zipShortest(routeSegs, pathSegs)
-
     let result =
       zipped
-      |> List.fold(
-        Option.Option.Some([]),
-        fun(acc, pair) ->
-          match acc with
-          | None -> Option.Option.None
-          | Some(vars) ->
-            let (routeSeg, pathSeg) = pair
-            match __matchSegment(routeSeg, pathSeg, []) with
-            | Some(newVars) ->
-              Option.Option.Some(List.concat(vars, newVars))
-            | None -> Option.Option.None)
+      |> List.fold(Option.Some([]), fun(acc, pair) ->
+        match acc with
+        | None -> Option.None
+        | Some(vars) ->
+          let (routeSeg, pathSeg) = pair
+          match __matchSegment(routeSeg, pathSeg, []) with
+          | Some(newVars) -> Option.Some(List.concat(vars, newVars))
+          | None -> Option.None)
 
     match result with
     | Some(vars) -> RouteMatch { matched = true, vars = vars }
@@ -123,17 +113,16 @@ let __findHandler(
   handlers: List<Handler>,
   method: String,
   path: String)
-  : Option.Option<Handler * RouteMatch> =
+  : Option<(Handler * RouteMatch)> =
   // Split once here rather than inside `matchRoute`, which runs per handler: the result is the
   // same every time, so splitting there scales the work with handlers tested.
   let pathSegs = splitPath(path)
-
   let matchingHandler =
     handlers
     |> List.findFirst(fun h ->
       // Method first. The route match is the expensive half, and a handler whose method cannot
       // match never needs it -- the previous order computed it regardless.
-      if (h.method == method) || (h.method == "*") then
+      if h.method == method || h.method == "*" then
         let routeMatch = __matchRouteSegments(__parseRouteSegments(h.route), pathSegs)
         routeMatch.matched
       else
@@ -142,8 +131,8 @@ let __findHandler(
   match matchingHandler with
   | Some(h) ->
     let routeMatch = __matchRouteSegments(__parseRouteSegments(h.route), pathSegs)
-    Option.Option.Some((h, routeMatch))
-  | None -> Option.Option.None
+    Option.Some((h, routeMatch))
+  | None -> Option.None
 
 
 /// The path of a request's url, as written (not decoded), always starting with
@@ -158,12 +147,8 @@ let getPath(req: Http.Request): String =
 /// Route a request through a list of handlers
 /// Returns the response from the first matching handler, or 404
 // @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.routeRequest reason=compiler-implementation
-let routeRequest(
-  handlers: List<Handler>,
-  req: Http.Request)
-  : Http.Response =
+let routeRequest(handlers: List<Handler>, req: Http.Request): Http.Response =
   let path = getPath(req)
-
   match __findHandler(handlers, req.method, path) with
   | Some((handler, _routeMatch)) -> handler.handler(req)
   | None -> Http.notFound()
@@ -172,12 +157,10 @@ let routeRequest(
 /// Extract a path parameter from a request given a route pattern
 /// Example: getPathParam req "/user/:id" "id" returns Some "123" for path "/user/123"
 // @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.getPathParam reason=compiler-implementation
-let getPathParam(req: Http.Request, routePattern: String, paramName: String): Option.Option<String> =
+let getPathParam(req: Http.Request, routePattern: String, paramName: String): Option<String> =
   let path = getPath(req)
   let routeSegs = __parseRouteSegments(routePattern)
-  let pathSegs =
-    (String.split(path, "/"))
-    |> List.filter(fun s -> Bool.not(String.isEmpty(s)))
+  let pathSegs = String.split(path, "/") |> List.filter(fun s -> Bool.not(String.isEmpty(s)))
 
   // Zip and find the matching variable
   let zipped = List.zipShortest(routeSegs, pathSegs)
@@ -187,63 +170,226 @@ let getPathParam(req: Http.Request, routePattern: String, paramName: String): Op
     match routeSeg with
     | Variable(name) -> name == paramName
     | _ -> false)
-  |> fun result ->
-    match result with
-    | Some((_, pathValue)) -> Option.Option.Some(pathValue)
-    | None -> Option.Option.None
+  |> (fun result ->
+        match result with
+        | Some((_, pathValue)) -> Option.Some(pathValue)
+        | None -> Option.None)
+
+
+/// A function wrapping a handler: it may change the request before handing it on, change the
+/// response on its way back, or answer itself. The server's counterpart of
+/// <type Stdlib.HttpClient.Middleware>.
+// @compiler blocked: upstream-dependency diagnostic="Middleware: Unknown type 'Middleware'"
+type Middleware = (Http.Request -> Http.Response) -> (Http.Request -> Http.Response)
+
+
+module Middleware =
+  /// <param handler> wrapped in <param middlewares>. The first listed is the outermost: it sees
+  /// the request first and the response last.
+  // @compiler blocked: upstream-dependency diagnostic="Middleware / let wrap: Unknown type 'Middleware'"
+  let wrap(
+    middlewares: List<Middleware>,
+    handler: Http.Request -> Http.Response)
+    : Http.Request -> Http.Response =
+    List.fold(List.reverse(middlewares), handler, fun(inner, m) -> m(inner))
+
+
+  /// What the server runs per request: <param handler> through <param middlewares>, on
+  /// <param request>. The handler reaches the server bare, so its approvals and its trace are
+  /// its own, and is wrapped here.
+  // @compiler blocked: upstream-dependency diagnostic="Middleware / let __handle: Unknown type 'Middleware'"
+  let __handle(
+    middlewares: List<Middleware>,
+    handler: Http.Request -> Http.Response,
+    request: Http.Request)
+    : Http.Response =
+    let wrapped = wrap(middlewares, handler)
+    wrapped(request)
+
+
+  /// A middleware that rewrites every request with <param f> before the handler sees it.
+  // @compiler blocked: upstream-dependency diagnostic="Middleware / let onRequest: Unknown type 'Middleware'"
+  let onRequest(f: Http.Request -> Http.Request): Middleware =
+    (fun next -> (fun req -> next(f(req))))
+
+
+  /// A middleware that rewrites every response with <param f>.
+  // @compiler blocked: upstream-dependency diagnostic="Middleware / let onResponse: Unknown type 'Middleware'"
+  let onResponse(f: Http.Response -> Http.Response): Middleware =
+    (fun next -> (fun req -> f(next(req))))
+
+
+  /// HSTS ({{Strict-Transport-Security}}) on every response that does not set it, and on the
+  /// responses the server writes itself (a 413, a failed or timed-out handler). In
+  /// <fn defaults>. {{Server: darklang}} is on every response whatever the middleware.
+  // @compiler blocked: upstream-dependency diagnostic="Middleware / let standardHeaders: Unknown type 'Middleware'"
+  let standardHeaders(): Middleware =
+    onResponse(fun response ->
+      let has =
+        List.any(response.headers, fun h ->
+          String.toLowercase(Tuple2.first(h)) == "strict-transport-security")
+
+      if has then
+        response
+      else
+        { response with
+            headers =
+              List.append(
+                response.headers,
+                ("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")) })
+
+
+  /// A request that came through a proxy speaking https ({{X-Forwarded-Proto: https}}) has its
+  /// url rewritten to {{https://}} on port 443, so the handler sees the url the client used.
+  /// Not in <fn defaults>: any client can send that header, so list it only when a proxy in
+  /// front of the server sets it.
+  // @compiler blocked: upstream-dependency diagnostic="Middleware / let trustForwardedProto: Unknown type 'Middleware'"
+  let trustForwardedProto(): Middleware =
+    onRequest(fun req ->
+      let https =
+        List.any(req.headers, fun h ->
+          String.toLowercase(Tuple2.first(h)) == "x-forwarded-proto"
+          && String.toLowercase(String.trim(Tuple2.second(h))) == "https")
+
+      if https then
+        match Url.parse(req.url) with
+        | Ok(u) ->
+          { req with
+              url = Url.toString({ u with scheme = Option.Some("https"), port = Option.None }) }
+        | Error(_) -> req
+      else
+        req)
+
+
+  /// A line on stderr per request the handler answers: method, path, status and how long it
+  /// took, as {{[HttpServer] GET /a 200 3ms}}. The query is left out, since it may carry a
+  /// token. In <fn defaults>. A response the server writes itself (a body over the limit, a
+  /// handler that failed or timed out) is logged by the server either way.
+  // @compiler blocked: upstream-dependency diagnostic="Middleware / let logRequests: Unknown type 'Middleware'"
+  let logRequests(): Middleware =
+    (fun next ->
+       (fun req ->
+          let started = DateTime.now()
+          let response = next(req)
+          let ms = DateTime.subtractMs(DateTime.now(), started)
+          let path = getPath(req)
+          printErrorLine(
+            $"[HttpServer] {req.method} {path} {display(response.statusCode)} {display(ms)}ms")
+
+          response))
+
+
+  let __withHeader(response: Http.Response, name: String, value: String): Http.Response =
+    { response with headers = List.append(response.headers, (name, value)) }
+
+
+  /// CORS for browsers on <param origins>, or on any with {{"*"}}. A preflight from one (an
+  /// {{OPTIONS}} with {{Access-Control-Request-Method}}) is answered 204 without reaching the
+  /// handler, allowing the method and headers it asks for; any other response to one carries
+  /// {{Access-Control-Allow-Origin}}. A request from another origin goes through as it came,
+  /// and the browser keeps its answer from the page. Not in <fn defaults>.
+  // @compiler blocked: upstream-dependency diagnostic="Middleware / let cors: Unknown type 'Middleware'"
+  let cors(origins: List<String>): Middleware =
+    let any = List.contains(origins, "*")
+    (fun next ->
+       (fun req ->
+          match Http.Request.header(req, "Origin") with
+          | Some(origin) ->
+            if any || List.contains(origins, origin) then
+              let allow = fun response ->
+                if any then
+                  __withHeader(response, "Access-Control-Allow-Origin", "*")
+                else
+                  __withHeader(
+                    __withHeader(response, "Access-Control-Allow-Origin", origin),
+                    "Vary",
+                    "Origin")
+
+              match req.method, Http.Request.header(req, "Access-Control-Request-Method") with
+              | "OPTIONS", Some(method) ->
+                let allowed =
+                  [ ("Access-Control-Allow-Methods", method), ("Access-Control-Max-Age", "600") ]
+
+                let headers =
+                  match Http.Request.header(req, "Access-Control-Request-Headers") with
+                  | Some(h) -> List.append(allowed, ("Access-Control-Allow-Headers", h))
+                  | None -> allowed
+
+                allow(Http.responseWithHeaders(204, headers, Bytes.empty))
+              | _ -> allow(next(req))
+            else
+              next(req)
+          | None -> next(req)))
+
+
+  /// An {{X-Request-Id}} on every request and its response: the one the client sent, or else a
+  /// new UUID, so a log line and a client's report can name the same request. Not in
+  /// <fn defaults>.
+  // @compiler blocked: upstream-dependency diagnostic="Middleware / let requestId: Unknown type 'Middleware'"
+  let requestId(): Middleware =
+    (fun next ->
+       (fun req ->
+          match Http.Request.header(req, "X-Request-Id") with
+          | Some(id) -> __withHeader(next(req), "X-Request-Id", id)
+          | None ->
+            let id = display(Uuid.generate())
+            let req = { req with headers = List.append(req.headers, ("X-Request-Id", id)) }
+            __withHeader(next(req), "X-Request-Id", id)))
+
+
+  /// What <fn Config.defaults> wraps a handler in: a log line per request, and HSTS on the way
+  /// out.
+  // @compiler blocked: upstream-dependency diagnostic="Middleware / let defaults: Unknown type 'Middleware'"
+  let defaults(): List<Middleware> =
+    [ logRequests(), standardHeaders() ]
 
 
 /// Configuration for `serve`. Build defaults with `Config.defaults port`, then override any field with
-/// record-update, e.g. `{ HttpServer.Config.defaults(Net.Port.httpAlt) with logRequests = false }`.
+/// record-update, e.g. `{ HttpServer.Config.defaults(Net.Port.httpAlt) with middleware = [] }`.
 module Config =
-  // @compiler replace: packages/darklang/stdlib/httpServer/config.dark#Darklang.Stdlib.HttpServer.Config.Config reason=compiler-implementation
+  // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch for Darklang.Stdlib.HttpServer.Config.Config"
   type Config =
     { address: String
-      port: Stdlib.Net.Port
+      port: Net.Port
       /// Maximum request body size in bytes (over-limit → 413).
       maxBodyBytes: Int64
-      /// Auto-add `Server: darklang` + HSTS unless the handler set them.
-      injectStandardHeaders: Bool
-      /// Rewrite request.url to https:// when X-Forwarded-Proto: https is present.
-      canonicalizeFromForwardedProto: Bool
-      /// Emit a per-request stdout line + telemetry event.
-      logRequests: Bool }
+      /// Wraps every handler, first listed outermost (<type Stdlib.HttpServer.Middleware>).
+      middleware: List<Middleware> }
+
 
   /// Default max request body size: 30 MB.
   // @compiler replace: packages/darklang/stdlib/httpServer/config.dark#Darklang.Stdlib.HttpServer.Config.defaultMaxBodyBytes reason=compiler-implementation
   val defaultMaxBodyBytes = 31457280
 
-  /// Sensible serve defaults for `port`: 30 MB max body, standard headers, proto canonicalization, logging.
+
+  /// Sensible serve defaults for `port`: 30 MB max body, and <fn Middleware.defaults>.
   // @compiler replace: packages/darklang/stdlib/httpServer/config.dark#Darklang.Stdlib.HttpServer.Config.defaults reason=compiler-implementation
-  let defaults(port: Stdlib.Net.Port): Config =
+  let defaults(port: Net.Port): Config =
     Config
       { address = "127.0.0.1"
         port = port
         maxBodyBytes = defaultMaxBodyBytes
-        injectStandardHeaders = true
-        canonicalizeFromForwardedProto = true
-        logRequests = true }
+        middleware = Middleware.defaults() }
+
 
 /// Start an HTTP server: bind `handler` per `config`, run `onListening` once the port is bound (announce
 /// there, so a banner is never a lie), and serve until SIGTERM (blocks). Returns Error with a plain message
-/// if the port can't be bound.
+/// if the port can't be bound. Every request runs through `config.middleware`.
 // @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.serve reason=compiler-implementation
 let serve(
   config: Config.Config,
   handler: Http.Request -> Http.Response,
   onListening: Unit -> Unit)
-  : Stdlib.Result.Result<Unit, String> =
+  : Result<Unit, String> =
   if config.maxBodyBytes < 0 then
-    Stdlib.Result.Result.Error("maxBodyBytes must not be negative")
+    Result.Error("maxBodyBytes must not be negative")
   else
     Builtin.httpServerServe(
       config.address,
-      Stdlib.Net.Port.toInt64(config.port),
+      Net.Port.toInt64(config.port),
       handler,
       config.maxBodyBytes,
-      config.injectStandardHeaders,
-      config.canonicalizeFromForwardedProto,
-      config.logRequests,
+      config.middleware,
       onListening)
 
 
@@ -256,6 +402,7 @@ type Reload =
   /// Pages are served as they are, with no script and no `/__live`.
   | Off
 
+
 /// `serve` for a server that follows edits: the handler is not fixed at start. Per request the server
 /// runs <param step> over a state it keeps between requests, and <param step> answers with the handler
 /// to use this time. <param first> is the handler as resolved at start, for the bind-time approval
@@ -265,28 +412,26 @@ type Reload =
 let serveLive(
   config: Config.Config,
   init: 's,
-  step: 's -> ('s * Stdlib.Result.Result<Http.Request -> Http.Response, String>),
+  step: 's -> ('s * Result<Http.Request -> Http.Response, String>),
   first: Http.Request -> Http.Response,
   reload: Reload,
   onListening: Unit -> Unit)
-  : Stdlib.Result.Result<Unit, String> =
+  : Result<Unit, String> =
   let dev =
     match reload with
     | OnSave -> true
     | Off -> false
 
   if config.maxBodyBytes < 0 then
-    Stdlib.Result.Result.Error("maxBodyBytes must not be negative")
+    Result.Error("maxBodyBytes must not be negative")
   else
     Builtin.httpServerServeLive(
       config.address,
-      Stdlib.Net.Port.toInt64(config.port),
+      Net.Port.toInt64(config.port),
       init,
       step,
       first,
       dev,
       config.maxBodyBytes,
-      config.injectStandardHeaders,
-      config.canonicalizeFromForwardedProto,
-      config.logRequests,
+      config.middleware,
       onListening)

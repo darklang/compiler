@@ -2,37 +2,89 @@
 module Darklang.Cli.Tests.ModuleSaveLines
 
 // @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
-test eachOccurrenceHasItsLine =
-  Instance.withInstance(fun i ->
-    let path = Instance.home(i) + "/lines.dark"
-    let source =
-      [ "let count(xs: List<String>): Int64 ="
-        "  match xs with"
-        "  | Ok(names) -> 1"
-        "  | Error(_) -> 0"
-        ""
-        "let add(n: Int64): Int64 ="
-        "  n + \"x\"" ]
-      |> Stdlib.String.join("\n")
-    let _ = Stdlib.Cli.File.writeAtomic(path, source) |> Builtin.unwrap
-    let (_, out) = Instance.ran(i, [ "module", "/Me.Lines", path ])
+test eachOccurrenceHasItsLine = Instance.withInstance(fun i ->
+  let path = Instance.home(i) + "/lines.dark"
+  let source =
+    [ "let count(xs: List<String>): Int64 ="
+      "  match xs with"
+      "  | Ok(names) -> 1"
+      "  | Error(_) -> 0"
+      ""
+      "let add(n: Int64): Int64 ="
+      "  n + \"x\"" ]
+    |> Stdlib.String.join("\n")
 
-    Stdlib.Test.all(
-      [ Instance.says(out, "(line 3, column 5; line 4, column 5)", "both patterns, each with its line")
-        Instance.says(out, "(line 7, column 7)", "the operand") ]))
+  let _ = Stdlib.Cli.File.writeAtomic(path, source) |> Builtin.unwrap
+  let (_, out) = Instance.ran(i, [ "module", "/Me.Lines", path ])
+  Stdlib.Test.all(
+    [ Instance.says(
+        out,
+        "(line 3, column 5; line 4, column 5)",
+        "both patterns, each with its line")
+
+      Instance.says(out, "(line 7, column 7)", "the operand") ]))
+
+
+/// A value that doesn't match its declared type is a type error at the value.
+// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
+test annotatedValueHasItsLine = Instance.withInstance(fun i ->
+  let path = Instance.home(i) + "/annotated.dark"
+  let source = "val ok: String = \"a\"\nval limit: Int64 = \"six\""
+  let _ = Stdlib.Cli.File.writeAtomic(path, source) |> Builtin.unwrap
+  let (code, out) = Instance.ran(i, [ "module", "/Me.Annotated", path ])
+  Stdlib.Test.all(
+    [ Instance.exitedWith(code, 1, "a definite type error")
+      Instance.says(out, "(line 2, column 20)", "the value's location") ]))
+
 
 /// A value called as a function names the value and the source location.
 // @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
-test calledValueHasNameAndLine =
-  Instance.withInstance(fun i ->
-    let path = Instance.home(i) + "/called-value.dark"
-    let source = "let f(): Bytes = Stdlib.Bytes.empty()"
-    let _ = Stdlib.Cli.File.writeAtomic(path, source) |> Builtin.unwrap
-    let (_, out) = Instance.ran(i, [ "module", "/Me.CalledValue", path ])
-    Stdlib.Test.all(
-      [ Instance.says(out, "[NotCallable]", "the diagnostic code")
-        Instance.says(
-          out,
-          "Stdlib.Bytes.empty is a value, not a function",
-          "the called value")
-        Instance.says(out, "(line 1, column 18)", "the call's location") ]))
+test calledValueHasNameAndLine = Instance.withInstance(fun i ->
+  let path = Instance.home(i) + "/called-value.dark"
+  let source = "let f(): Bytes = Stdlib.Bytes.empty()"
+  let _ = Stdlib.Cli.File.writeAtomic(path, source) |> Builtin.unwrap
+  let (_, out) = Instance.ran(i, [ "module", "/Me.CalledValue", path ])
+  Stdlib.Test.all(
+    [ Instance.says(out, "[NotCallable]", "the diagnostic code")
+
+      Instance.says(
+        out,
+        "Stdlib.Bytes.empty is a value, not a function",
+        "the called value")
+
+      Instance.says(out, "(line 1, column 18)", "the call's location") ]))
+
+
+/// A `val` of a type declared in the same save is fully checked, here and from another module.
+// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
+test valOfSiblingTypeIsChecked = Instance.withInstance(fun i ->
+  let path = Instance.home(i) + "/store.dark"
+  let source =
+    [ "type Store = { items: List<String>, n: Int64 }"
+      "val empty: Store = Store { items = [], n = 0 }" ]
+    |> Stdlib.String.join("\n")
+
+  let _ = Stdlib.Cli.File.writeAtomic(path, source) |> Builtin.unwrap
+  let (_, out) = Instance.ran(i, [ "module", "/Me.Store", path ])
+  let user = Instance.home(i) + "/user.dark"
+  let _ =
+    Stdlib.Cli.File.writeAtomic(user, "let count(): Int64 = Me.Store.empty.n")
+    |> Builtin.unwrap
+
+  let (_, userOut) = Instance.ran(i, [ "module", "/Me.StoreUser", user ])
+  Stdlib.Test.all(
+    [ Instance.doesNotSay(out, "incomplete", "the value's type is known")
+      Instance.doesNotSay(userOut, "incomplete", "a use from another module too") ]))
+
+
+/// A `val`'s declared type is something it uses, so the type has a live dependent.
+// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
+test valTypeIsADependency = Instance.withInstance(fun i ->
+  let path = Instance.home(i) + "/names.dark"
+  let source = "type Names = List<String>\nval none: Names = []\n"
+  let _ = Stdlib.Cli.File.writeAtomic(path, source) |> Builtin.unwrap
+  let _ = Instance.ran(i, [ "module", "/Me.Names", path ])
+  let (code, out) = Instance.ran(i, [ "delete", "type", "Me.Names.Names", "--dry-run" ])
+  Stdlib.Test.all(
+    [ Instance.exitedWith(code, 1, "refused")
+      Instance.says(out, "1 live dependent", "the val depends on its type") ]))

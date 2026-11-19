@@ -173,7 +173,7 @@ let parsePrimary grammar state index =
         NameSyntax.isUpperIdentifier final.WT.name
         && tok state next = TLBrace
         &&
-        match (tok state (next + 1), tok state (next + 2)) with
+        match (fieldTok state (next + 1), tok state (next + 2)) with
         | TRBrace, _ | TIdent _, TEquals -> true
         | _ -> false
       in

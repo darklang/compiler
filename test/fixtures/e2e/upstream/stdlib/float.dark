@@ -1,121 +1,121 @@
-Stdlib.Float.add 1.2 1.3 = 2.5
+Stdlib.Float64.add 1.2 1.3 = 2.5
 
-Stdlib.Float.ceiling 1.3 = 2L
-Stdlib.Float.ceiling 1.0000001 = 2L
-Stdlib.Float.ceiling -2147483647.8 = -2147483647L
-Stdlib.Float.ceiling 2147483647.0 = 2147483647L
-Stdlib.Float.ceiling 0000000.1 = 1L
-Stdlib.Float.ceiling 0.0 = 0L
-Stdlib.Float.ceiling 17.55042081 = 18L
+Stdlib.Float64.ceiling 1.3 = 2L
+Stdlib.Float64.ceiling 1.0000001 = 2L
+Stdlib.Float64.ceiling -2147483647.8 = -2147483647L
+Stdlib.Float64.ceiling 2147483647.0 = 2147483647L
+Stdlib.Float64.ceiling 0000000.1 = 1L
+Stdlib.Float64.ceiling 0.0 = 0L
+Stdlib.Float64.ceiling 17.55042081 = 18L
 
-Stdlib.Float.roundUp 1.3 = 2L
-Stdlib.Float.roundUp 1.0000001 = 2L
-Stdlib.Float.roundUp -2147483647.8 = -2147483647L
-Stdlib.Float.roundUp 2147483647.0 = 2147483647L
-Stdlib.Float.roundUp 0000000.1 = 1L
-Stdlib.Float.roundUp 0.0 = 0L
+Stdlib.Float64.roundUp 1.3 = 2L
+Stdlib.Float64.roundUp 1.0000001 = 2L
+Stdlib.Float64.roundUp -2147483647.8 = -2147483647L
+Stdlib.Float64.roundUp 2147483647.0 = 2147483647L
+Stdlib.Float64.roundUp 0000000.1 = 1L
+Stdlib.Float64.roundUp 0.0 = 0L
 
-Stdlib.Float.floor 1.8 = 1L
-Stdlib.Float.floor -1.0000001 = -2L
-Stdlib.Float.floor -2147483647.8 = -2147483648L
-Stdlib.Float.floor 2147483647.0 = 2147483647L
-Stdlib.Float.floor 0000000.1 = 0L
-Stdlib.Float.floor 0.0 = 0L
+Stdlib.Float64.floor 1.8 = 1L
+Stdlib.Float64.floor -1.0000001 = -2L
+Stdlib.Float64.floor -2147483647.8 = -2147483648L
+Stdlib.Float64.floor 2147483647.0 = 2147483647L
+Stdlib.Float64.floor 0000000.1 = 0L
+Stdlib.Float64.floor 0.0 = 0L
 
-Stdlib.Float.roundDown 1.8 = 1L
-Stdlib.Float.roundDown -1.0000001 = -2L
-Stdlib.Float.roundDown -2147483647.8 = -2147483648L
-Stdlib.Float.roundDown 2147483647.0 = 2147483647L
-Stdlib.Float.roundDown 0000000.1 = 0L
-Stdlib.Float.roundDown 0.0 = 0L
+Stdlib.Float64.roundDown 1.8 = 1L
+Stdlib.Float64.roundDown -1.0000001 = -2L
+Stdlib.Float64.roundDown -2147483647.8 = -2147483648L
+Stdlib.Float64.roundDown 2147483647.0 = 2147483647L
+Stdlib.Float64.roundDown 0000000.1 = 0L
+Stdlib.Float64.roundDown 0.0 = 0L
 
-Stdlib.Float.round -2147483647.8 = -2147483648L
-Stdlib.Float.round 0000000.1 = 0L
-Stdlib.Float.round 2147483647.000009 = 2147483647L
+Stdlib.Float64.round -2147483647.8 = -2147483648L
+Stdlib.Float64.round 0000000.1 = 0L
+Stdlib.Float64.round 2147483647.000009 = 2147483647L
 
-Stdlib.Float.truncate -2367.9267 = -2367L
-Stdlib.Float.truncate 000000.9 = 0L
-Stdlib.Float.truncate -000000.9 = 0L
-Stdlib.Float.truncate 0.0 = 0L
-Stdlib.Float.truncate 2147483647.000009 = 2147483647L
+Stdlib.Float64.truncate -2367.9267 = -2367L
+Stdlib.Float64.truncate 000000.9 = 0L
+Stdlib.Float64.truncate -000000.9 = 0L
+Stdlib.Float64.truncate 0.0 = 0L
+Stdlib.Float64.truncate 2147483647.000009 = 2147483647L
 
 // NaN / Infinity have no Int representation -> Dark error, not a host crash
-Stdlib.Float.ceiling Builtin.testNan =
+Stdlib.Float64.ceiling Builtin.testNan =
   error="Encountered an out-of-range integer value"
-Stdlib.Float.roundUp Builtin.testInfinity =
-  error="Encountered an out-of-range integer value"
-// @compiler blocked: compiler-gap
-Stdlib.Float.floor Builtin.testNegativeInfinity =
-  error="Encountered an out-of-range integer value"
-Stdlib.Float.roundDown Builtin.testNan =
-  error="Encountered an out-of-range integer value"
-Stdlib.Float.round Builtin.testInfinity =
-  error="Encountered an out-of-range integer value"
-Stdlib.Float.truncate Builtin.testNan =
+Stdlib.Float64.roundUp Builtin.testInfinity =
   error="Encountered an out-of-range integer value"
 // @compiler blocked: compiler-gap
-Stdlib.Float.roundTowardsZero Builtin.testNegativeInfinity =
+Stdlib.Float64.floor Builtin.testNegativeInfinity =
+  error="Encountered an out-of-range integer value"
+Stdlib.Float64.roundDown Builtin.testNan =
+  error="Encountered an out-of-range integer value"
+Stdlib.Float64.round Builtin.testInfinity =
+  error="Encountered an out-of-range integer value"
+Stdlib.Float64.truncate Builtin.testNan =
+  error="Encountered an out-of-range integer value"
+// @compiler blocked: compiler-gap
+Stdlib.Float64.roundTowardsZero Builtin.testNegativeInfinity =
   error="Encountered an out-of-range integer value"
 
 // @compiler blocked: compiler-gap
-Stdlib.Float.absoluteValue Builtin.testNegativeInfinity = Builtin.testInfinity
+Stdlib.Float64.absoluteValue Builtin.testNegativeInfinity = Builtin.testInfinity
 // @compiler blocked: compiler-gap
-Stdlib.Float.absoluteValue Builtin.testNan = Builtin.testNan
-Stdlib.Float.absoluteValue -5.6 = 5.6
-Stdlib.Float.absoluteValue -0.0 = 0.0
-Stdlib.Float.absoluteValue -0.0 = 0.0
+Stdlib.Float64.absoluteValue Builtin.testNan = Builtin.testNan
+Stdlib.Float64.absoluteValue -5.6 = 5.6
+Stdlib.Float64.absoluteValue -0.0 = 0.0
+Stdlib.Float64.absoluteValue -0.0 = 0.0
 
 // @compiler blocked: compiler-gap
-Stdlib.Float.negate Builtin.testNan = Builtin.testNan
+Stdlib.Float64.negate Builtin.testNan = Builtin.testNan
 // @compiler blocked: compiler-gap
-Stdlib.Float.negate Builtin.testInfinity = Builtin.testNegativeInfinity
-Stdlib.Float.negate -5.6 = 5.6
-Stdlib.Float.negate 5.6 = -5.6
-Stdlib.Float.negate 0.0 = -0.0
-Stdlib.Float.negate -0.0 = 0.0
+Stdlib.Float64.negate Builtin.testInfinity = Builtin.testNegativeInfinity
+Stdlib.Float64.negate -5.6 = 5.6
+Stdlib.Float64.negate 5.6 = -5.6
+Stdlib.Float64.negate 0.0 = -0.0
+Stdlib.Float64.negate -0.0 = 0.0
 
-Stdlib.Float.clampRefusingNaN Builtin.testInfinity -1.0 0.5 = Stdlib.Result.Result.Ok 0.5
+Stdlib.Float64.clampRefusingNaN Builtin.testInfinity -1.0 0.5 = Stdlib.Result.Result.Ok 0.5
 
 // @compiler blocked: compiler-gap
-Stdlib.Float.clampRefusingNaN Builtin.testNegativeInfinity -1.0 0.5 = Stdlib.Result.Result.Ok
+Stdlib.Float64.clampRefusingNaN Builtin.testNegativeInfinity -1.0 0.5 = Stdlib.Result.Result.Ok
   -1.0
 
 // @compiler blocked: compiler-gap
-Stdlib.Float.clampRefusingNaN Builtin.testNan -1.0 1.0 = Stdlib.Result.Result.Ok
+Stdlib.Float64.clampRefusingNaN Builtin.testNan -1.0 1.0 = Stdlib.Result.Result.Ok
   Builtin.testNan
 
-Stdlib.Float.clampRefusingNaN 0.5 Builtin.testInfinity 1.0 = Stdlib.Result.Result.Ok 1.0
+Stdlib.Float64.clampRefusingNaN 0.5 Builtin.testInfinity 1.0 = Stdlib.Result.Result.Ok 1.0
 
 // @compiler blocked: compiler-gap
-Stdlib.Float.clampRefusingNaN 0.5 Builtin.testNegativeInfinity 1.0 = Stdlib.Result.Result.Ok
+Stdlib.Float64.clampRefusingNaN 0.5 Builtin.testNegativeInfinity 1.0 = Stdlib.Result.Result.Ok
   0.5
 
-Stdlib.Float.clampRefusingNaN 0.5 Builtin.testNan 1.0 = Stdlib.Result.Result.Error
+Stdlib.Float64.clampRefusingNaN 0.5 Builtin.testNan 1.0 = Stdlib.Result.Result.Error
   "clampRefusingNaN requires limits that are numbers"
 
-Stdlib.Float.clampRefusingNaN -1.0 0.5 Builtin.testInfinity = Stdlib.Result.Result.Ok 0.5
+Stdlib.Float64.clampRefusingNaN -1.0 0.5 Builtin.testInfinity = Stdlib.Result.Result.Ok 0.5
 
 // @compiler blocked: compiler-gap
-Stdlib.Float.clampRefusingNaN -1.0 0.5 Builtin.testNegativeInfinity = Stdlib.Result.Result.Ok
+Stdlib.Float64.clampRefusingNaN -1.0 0.5 Builtin.testNegativeInfinity = Stdlib.Result.Result.Ok
   -1.0
 
-Stdlib.Float.clampRefusingNaN 0.5 1.0 Builtin.testNan = Stdlib.Result.Result.Error
+Stdlib.Float64.clampRefusingNaN 0.5 1.0 Builtin.testNan = Stdlib.Result.Result.Error
   "clampRefusingNaN requires limits that are numbers"
 
-Stdlib.Float.clampRefusingNaN -2.0 -5.0 5.0 = Stdlib.Result.Result.Ok -2.0
+Stdlib.Float64.clampRefusingNaN -2.0 -5.0 5.0 = Stdlib.Result.Result.Ok -2.0
 
-Stdlib.Float.clampRefusingNaN -3.0 -2.0 1.0 = Stdlib.Result.Result.Ok -2.0
+Stdlib.Float64.clampRefusingNaN -3.0 -2.0 1.0 = Stdlib.Result.Result.Ok -2.0
 
-Stdlib.Float.clampRefusingNaN -5.0 1.0 1.0 = Stdlib.Result.Result.Ok 1.0
+Stdlib.Float64.clampRefusingNaN -5.0 1.0 1.0 = Stdlib.Result.Result.Ok 1.0
 
-Stdlib.Float.clampRefusingNaN 1.0 2.0 1.0 = Stdlib.Result.Result.Ok 1.0
+Stdlib.Float64.clampRefusingNaN 1.0 2.0 1.0 = Stdlib.Result.Result.Ok 1.0
 
-Stdlib.Float.clampRefusingNaN 3.0 0.0 2.0 = Stdlib.Result.Result.Ok 2.0
+Stdlib.Float64.clampRefusingNaN 3.0 0.0 2.0 = Stdlib.Result.Result.Ok 2.0
 
-Stdlib.Float.divide 9.0 2.0 = 4.5
-Stdlib.Float.divide 9.0 0.0 = Builtin.testInfinity
+Stdlib.Float64.divide 9.0 2.0 = 4.5
+Stdlib.Float64.divide 9.0 0.0 = Builtin.testInfinity
 // @compiler blocked: compiler-gap
-Stdlib.Float.divide 9.0 -0.0 = Builtin.testNegativeInfinity
+Stdlib.Float64.divide 9.0 -0.0 = Builtin.testNegativeInfinity
 
 9.0 / 2.0 = 4.5
 // @compiler blocked: compiler-gap
@@ -126,155 +126,155 @@ Stdlib.Float.divide 9.0 -0.0 = Builtin.testNegativeInfinity
 1.0 / 0.0 = Builtin.testInfinity
 
 
-Stdlib.Float.greaterThanOrEqualTo 0.1 0.1 = true
+Stdlib.Float64.greaterThanOrEqualTo 0.1 0.1 = true
 
-Stdlib.Float.greaterThan 0.2 0.1 = true
+Stdlib.Float64.greaterThan 0.2 0.1 = true
 
-Stdlib.Float.lessThanOrEqualTo 0.1 0.1 = true
+Stdlib.Float64.lessThanOrEqualTo 0.1 0.1 = true
 
-Stdlib.Float.lessThan 0.2 0.1 = false
+Stdlib.Float64.lessThan 0.2 0.1 = false
 
-Stdlib.Float.max Builtin.testInfinity 1.0 = Builtin.testInfinity
+Stdlib.Float64.max Builtin.testInfinity 1.0 = Builtin.testInfinity
 // @compiler blocked: compiler-gap
-Stdlib.Float.max Builtin.testNegativeInfinity 1.0 = 1.0
-Stdlib.Float.max -10.0 1.0 = 1.0
+Stdlib.Float64.max Builtin.testNegativeInfinity 1.0 = 1.0
+Stdlib.Float64.max -10.0 1.0 = 1.0
 // @compiler blocked: compiler-gap
-Stdlib.Float.max 10.0 Builtin.testNan = Builtin.testNan
-Stdlib.Float.max 10.0 1.0 = 10.0
-Stdlib.Float.max 0.0 0.00 = 0.0
-Stdlib.Float.max -2147483647.8 -00000000.000 = 0.0
-Stdlib.Float.max 2147483647.0 00000000.000 = 2147483647.0
+Stdlib.Float64.max 10.0 Builtin.testNan = Builtin.testNan
+Stdlib.Float64.max 10.0 1.0 = 10.0
+Stdlib.Float64.max 0.0 0.00 = 0.0
+Stdlib.Float64.max -2147483647.8 -00000000.000 = 0.0
+Stdlib.Float64.max 2147483647.0 00000000.000 = 2147483647.0
 
-Stdlib.Float.min Builtin.testInfinity 1.0 = 1.0
+Stdlib.Float64.min Builtin.testInfinity 1.0 = 1.0
 // @compiler blocked: compiler-gap
-Stdlib.Float.min Builtin.testNegativeInfinity 1.0 = Builtin.testNegativeInfinity
-Stdlib.Float.min -10.0 1.0 = -10.0
+Stdlib.Float64.min Builtin.testNegativeInfinity 1.0 = Builtin.testNegativeInfinity
+Stdlib.Float64.min -10.0 1.0 = -10.0
 // @compiler blocked: compiler-gap
-Stdlib.Float.min 10.0 Builtin.testNan = Builtin.testNan
-Stdlib.Float.min 10.0 1.0 = 1.0
-Stdlib.Float.min 0.0 0.00 = 0.0
-Stdlib.Float.min -2147483647.8 -00000000.000 = -2147483647.8
-Stdlib.Float.min 2147483647.0 00000000.000 = 0.0
+Stdlib.Float64.min 10.0 Builtin.testNan = Builtin.testNan
+Stdlib.Float64.min 10.0 1.0 = 1.0
+Stdlib.Float64.min 0.0 0.00 = 0.0
+Stdlib.Float64.min -2147483647.8 -00000000.000 = -2147483647.8
+Stdlib.Float64.min 2147483647.0 00000000.000 = 0.0
 
-Stdlib.Float.multiply 26.0 0.5 = 13.0
+Stdlib.Float64.multiply 26.0 0.5 = 13.0
 
-Stdlib.Float.parse "1.5" = Stdlib.Result.Result.Ok 1.5
+Stdlib.Float64.parse "1.5" = Stdlib.Result.Result.Ok 1.5
 
-Stdlib.Float.parse "0.0" = Stdlib.Result.Result.Ok 0.0
+Stdlib.Float64.parse "0.0" = Stdlib.Result.Result.Ok 0.0
 
-Stdlib.Float.parse "-0.5" = Stdlib.Result.Result.Ok -0.5
+Stdlib.Float64.parse "-0.5" = Stdlib.Result.Result.Ok -0.5
 
-Stdlib.Float.parse "+0.5" = Stdlib.Result.Result.Ok 0.5
+Stdlib.Float64.parse "+0.5" = Stdlib.Result.Result.Ok 0.5
 
-Stdlib.Float.parse ".5" = Stdlib.Result.Result.Ok 0.5
+Stdlib.Float64.parse ".5" = Stdlib.Result.Result.Ok 0.5
 
-Stdlib.Float.parse "0.6999999999999999555910790149937383830547332763671875" = Stdlib.Result.Result.Ok
+Stdlib.Float64.parse "0.6999999999999999555910790149937383830547332763671875" = Stdlib.Result.Result.Ok
   0.7
 
-Stdlib.Float.parse "-0.6999999999999999555910790149937383830547332763671875" = Stdlib.Result.Result.Ok
+Stdlib.Float64.parse "-0.6999999999999999555910790149937383830547332763671875" = Stdlib.Result.Result.Ok
   -0.7
 
 // @compiler blocked: compiler-gap
-Stdlib.Float.parse "0.7999999999" = Stdlib.Result.Result.Ok 0.8
+Stdlib.Float64.parse "0.7999999999" = Stdlib.Result.Result.Ok 0.8
 
-Stdlib.Float.parse "0.79999" = Stdlib.Result.Result.Ok 0.79999
+Stdlib.Float64.parse "0.79999" = Stdlib.Result.Result.Ok 0.79999
 
-Stdlib.Float.parse "-55555555555555555555555555555.5" = Stdlib.Result.Result.Ok
+Stdlib.Float64.parse "-55555555555555555555555555555.5" = Stdlib.Result.Result.Ok
   -5.555555555555555e28
 
-Stdlib.Float.parse "-141s" = Stdlib.Result.Result.Error
-  Stdlib.Float.ParseError.BadFormat
+Stdlib.Float64.parse "-141s" = Stdlib.Result.Result.Error
+  Stdlib.Float64.ParseError.BadFormat
 
-Stdlib.Float.parse "" = Stdlib.Result.Result.Error
-  Stdlib.Float.ParseError.BadFormat
-
-// @compiler blocked: compiler-gap
-Stdlib.Float.parse "-5.55555555556e+28" = Stdlib.Result.Result.Ok -5.555555555555555e28
-//Stdlib.Float.parse "0xffffffffffffffff" = Stdlib.Result.Result.Ok 1.844674407e+19 // TODO review this.
+Stdlib.Float64.parse "" = Stdlib.Result.Result.Error
+  Stdlib.Float64.ParseError.BadFormat
 
 // @compiler blocked: compiler-gap
-Stdlib.Float.parse "-1.8E+308" = Stdlib.Result.Result.Ok
+Stdlib.Float64.parse "-5.55555555556e+28" = Stdlib.Result.Result.Ok -5.555555555555555e28
+//Stdlib.Float64.parse "0xffffffffffffffff" = Stdlib.Result.Result.Ok 1.844674407e+19 // TODO review this.
+
+// @compiler blocked: compiler-gap
+Stdlib.Float64.parse "-1.8E+308" = Stdlib.Result.Result.Ok
   Builtin.testNegativeInfinity
 
-Stdlib.Float.parse "1.8E+308" = Stdlib.Result.Result.Ok Builtin.testInfinity
+Stdlib.Float64.parse "1.8E+308" = Stdlib.Result.Result.Ok Builtin.testInfinity
 
-Stdlib.Float.power 4.0 -0.5 = 0.5
-Stdlib.Float.power 4.0 0.5 = 2.0
+Stdlib.Float64.power 4.0 -0.5 = 0.5
+Stdlib.Float64.power 4.0 0.5 = 2.0
 
-Stdlib.Float.roundTowardsZero -2367.9267 = -2367L
-Stdlib.Float.roundTowardsZero 000000.9 = 0L
-Stdlib.Float.roundTowardsZero -000000.9 = 0L
-Stdlib.Float.roundTowardsZero 0.0 = 0L
-Stdlib.Float.roundTowardsZero 2147483647.000009 = 2147483647L
+Stdlib.Float64.roundTowardsZero -2367.9267 = -2367L
+Stdlib.Float64.roundTowardsZero 000000.9 = 0L
+Stdlib.Float64.roundTowardsZero -000000.9 = 0L
+Stdlib.Float64.roundTowardsZero 0.0 = 0L
+Stdlib.Float64.roundTowardsZero 2147483647.000009 = 2147483647L
 
-Stdlib.Float.sqrt 25.0 = 5.0
-Stdlib.Float.sqrt 0.0 = 0.0
+Stdlib.Float64.sqrt 25.0 = 5.0
+Stdlib.Float64.sqrt 0.0 = 0.0
 
-Stdlib.Float.subtract 1.0 0.2 = 0.8
+Stdlib.Float64.subtract 1.0 0.2 = 0.8
 
-Stdlib.Float.sum [ 1.0, 0.2 ] = 1.2
+Stdlib.Float64.sum [ 1.0, 0.2 ] = 1.2
 
 Builtin.testNan == Builtin.testNan = false
 
-Stdlib.Float.toString 1.5 = "1.5"
-Stdlib.Float.toString 0.0 = "0.0"
-Stdlib.Float.toString -0.5 = "-0.5"
-Stdlib.Float.toString 0.5 = "0.5"
-Stdlib.Float.toString -5.555555555555555e28 = "-5.555555555555555e+28"
+Stdlib.Float64.toString 1.5 = "1.5"
+Stdlib.Float64.toString 0.0 = "0.0"
+Stdlib.Float64.toString -0.5 = "-0.5"
+Stdlib.Float64.toString 0.5 = "0.5"
+Stdlib.Float64.toString -5.555555555555555e28 = "-5.555555555555555e+28"
 // Shortest round-trip: what prints is the number, not a twelve-digit rounding of it.
-Stdlib.Float.toString (0.1 + 0.2) = "0.30000000000000004"
-Stdlib.Float.toString (1.0 / 3.0) = "0.3333333333333333"
-Stdlib.Float.toString 1.0000000000000002 = "1.0000000000000002"
-(Stdlib.Float.toString (1.0 / 3.0) |> Stdlib.Float.parse) = Stdlib.Result.Result.Ok (1.0 / 3.0)
+Stdlib.Float64.toString (0.1 + 0.2) = "0.30000000000000004"
+Stdlib.Float64.toString (1.0 / 3.0) = "0.3333333333333333"
+Stdlib.Float64.toString 1.0000000000000002 = "1.0000000000000002"
+(Stdlib.Float64.toString (1.0 / 3.0) |> Stdlib.Float64.parse) = Stdlib.Result.Result.Ok (1.0 / 3.0)
 // Fixed notation from 1e-4 up to 1e16, scientific outside, no zero padding, and no `.0` on scientific
-// (it used to print `1e+17.0`, which Float.parse refuses). Same layout as the compiler's Float.toString.
-Stdlib.Float.toString 0.0001 = "0.0001"
-Stdlib.Float.toString 0.00001 = "1e-5"
-Stdlib.Float.toString -0.00001 = "-1e-5"
-Stdlib.Float.toString 123456789012345.0 = "123456789012345.0"
-Stdlib.Float.toString 9007199254740992.0 = "9007199254740992.0"
-Stdlib.Float.toString 10000000000000000.0 = "1e+16"
-Stdlib.Float.toString 1.2345678901234568e17 = "1.2345678901234568e+17"
-(Stdlib.Float.toString 1.2345678901234568e17 |> Stdlib.Float.parse) = Stdlib.Result.Result.Ok 1.2345678901234568e17
-(Stdlib.Float.toString -0.00001 |> Stdlib.Float.parse) = Stdlib.Result.Result.Ok -0.00001
-(Stdlib.Float.parse "5e-324" |> Stdlib.Result.map (fun f -> Stdlib.Float.toString f)) = Stdlib.Result.Result.Ok "5e-324"
+// (it used to print `1e+17.0`, which Float64.parse refuses). Same layout as the compiler's Float64.toString.
+Stdlib.Float64.toString 0.0001 = "0.0001"
+Stdlib.Float64.toString 0.00001 = "1e-5"
+Stdlib.Float64.toString -0.00001 = "-1e-5"
+Stdlib.Float64.toString 123456789012345.0 = "123456789012345.0"
+Stdlib.Float64.toString 9007199254740992.0 = "9007199254740992.0"
+Stdlib.Float64.toString 10000000000000000.0 = "1e+16"
+Stdlib.Float64.toString 1.2345678901234568e17 = "1.2345678901234568e+17"
+(Stdlib.Float64.toString 1.2345678901234568e17 |> Stdlib.Float64.parse) = Stdlib.Result.Result.Ok 1.2345678901234568e17
+(Stdlib.Float64.toString -0.00001 |> Stdlib.Float64.parse) = Stdlib.Result.Result.Ok -0.00001
+(Stdlib.Float64.parse "5e-324" |> Stdlib.Result.map (fun f -> Stdlib.Float64.toString f)) = Stdlib.Result.Result.Ok "5e-324"
 
 
 // toInt truncates toward zero.
-Stdlib.Float.toInt 3.0 = 3
-Stdlib.Float.toInt 0.0 = 0
-Stdlib.Float.toInt -0.0 = 0
-Stdlib.Float.toInt 1.5 = 1
-Stdlib.Float.toInt 1.9 = 1
-Stdlib.Float.toInt -1.5 = -1
-Stdlib.Float.toInt -1.9 = -1
-Stdlib.Float.toInt -3.0 = -3
-Stdlib.Float.toInt 0.1 = 0
-Stdlib.Float.toInt 2147483648.7 = 2147483648
-Stdlib.Float.toInt 2.5 = Stdlib.Int.fromInt64 (Stdlib.Float.roundTowardsZero 2.5)
-Stdlib.Float.toInt -2.5 = Stdlib.Int.fromInt64 (Stdlib.Float.roundTowardsZero -2.5)
+Stdlib.Float64.toInt 3.0 = 3
+Stdlib.Float64.toInt 0.0 = 0
+Stdlib.Float64.toInt -0.0 = 0
+Stdlib.Float64.toInt 1.5 = 1
+Stdlib.Float64.toInt 1.9 = 1
+Stdlib.Float64.toInt -1.5 = -1
+Stdlib.Float64.toInt -1.9 = -1
+Stdlib.Float64.toInt -3.0 = -3
+Stdlib.Float64.toInt 0.1 = 0
+Stdlib.Float64.toInt 2147483648.7 = 2147483648
+Stdlib.Float64.toInt 2.5 = Stdlib.Int.fromInt64 (Stdlib.Float64.roundTowardsZero 2.5)
+Stdlib.Float64.toInt -2.5 = Stdlib.Int.fromInt64 (Stdlib.Float64.roundTowardsZero -2.5)
 // Truncation and floor differ for negative values.
-Stdlib.Float.toInt -1.5 = -1
-Stdlib.Float.floor -1.5 = -2L
+Stdlib.Float64.toInt -1.5 = -1
+Stdlib.Float64.floor -1.5 = -2L
 // NaN and infinities cannot become Ints.
-Stdlib.Float.toInt Builtin.testNan =
+Stdlib.Float64.toInt Builtin.testNan =
   error="Encountered an out-of-range integer value"
-Stdlib.Float.toInt Builtin.testInfinity =
+Stdlib.Float64.toInt Builtin.testInfinity =
   error="Encountered an out-of-range integer value"
 // @compiler blocked: compiler-gap
-Stdlib.Float.toInt Builtin.testNegativeInfinity =
+Stdlib.Float64.toInt Builtin.testNegativeInfinity =
   error="Encountered an out-of-range integer value"
 
 
 // IEEE 754 binary64 representations.
-Stdlib.Float.toBits 0.0 = 0UL
-Stdlib.Float.toBits 0.5 = 4602678819172646912UL
-Stdlib.Float.toBits 1.0 = 4607182418800017408UL
-Stdlib.Float.toBits 2.0 = 4611686018427387904UL
-Stdlib.Float.toBits Builtin.testInfinity = 9218868437227405312UL
+Stdlib.Float64.toBits 0.0 = 0UL
+Stdlib.Float64.toBits 0.5 = 4602678819172646912UL
+Stdlib.Float64.toBits 1.0 = 4607182418800017408UL
+Stdlib.Float64.toBits 2.0 = 4611686018427387904UL
+Stdlib.Float64.toBits Builtin.testInfinity = 9218868437227405312UL
 // Bit equality distinguishes signed zero and is reflexive for a fixed NaN.
-Stdlib.Float.toBits -0.0 = 9223372036854775808UL
-(Stdlib.Float.toBits -0.0 == Stdlib.Float.toBits 0.0) = false
+Stdlib.Float64.toBits -0.0 = 9223372036854775808UL
+(Stdlib.Float64.toBits -0.0 == Stdlib.Float64.toBits 0.0) = false
 (-0.0 == 0.0) = true
-(Stdlib.Float.toBits (Builtin.testNan)
- == Stdlib.Float.toBits (Builtin.testNan)) = true
+(Stdlib.Float64.toBits (Builtin.testNan)
+ == Stdlib.Float64.toBits (Builtin.testNan)) = true

@@ -28,8 +28,9 @@ and body fragment remains valid:
   let double(n: Int64): Int64 = n * 2
   EOF
 
-At module scope values use `val name = value`; `let` declares functions. Inside
-a function, local values use `let`. Nested helpers annotate every parameter
+At module scope values use `val name = value` or `val name: Type = value` (the
+type is checked); `let` declares functions. Inside a function, local values use
+`let`. Nested helpers annotate every parameter
 (the return type is optional; neither is checked): `let helper(x: Int64): Int64 = ...`.
 
 `fn`, `type`, `val` and `module` run the at-rest type checker on what they save
@@ -55,13 +56,56 @@ line of it:
                                     # ...edit /tmp/f.dark...
   edit Some.fn /tmp/f.dark          # applies it; no editor, no terminal needed
 
-`--raw` prints exactly what `edit` and `module` accept, so this is a pipe rather
-than a screen-scrape. Plain `view` is for a person to read and carries a
-capabilities line you would have to strip. `edit <name>` with no file opens
-$EDITOR instead, which is the shape for a human, not for you. And `--raw` is
-the stored NORMAL FORM, not your keystrokes: formatting, redundant parens and
-annotated nested lets come back normalized, so diff against a fresh `--raw`,
-never against what you typed.
+First create a function to edit:
+
+  dark fn /Tools.RenameDemo.greeting - <<'EOF'
+  let greeting(name: String): String =
+    "Welcome, " + name
+  EOF
+
+Then replace its declaration directly from stdin, with no temporary file:
+
+  dark edit Tools.RenameDemo.greeting - <<'EOF'
+  let greeting(name: String): String =
+    "Hello, " + name
+  EOF
+
+For a small edit, first read the current stored declaration:
+
+  dark view Tools.RenameDemo.greeting --raw
+
+Copy the unchanged and removed lines from that output. Dark may print `Error`
+as `Result.Error`, or change spacing and line breaks. Use the text from `--raw`
+even if you just saved the code.
+
+Send the changes as patch blocks in the apply_patch format:
+
+  dark edit Tools.RenameDemo.greeting --patch - <<'PATCH'
+  @@
+   let greeting(name: String): String =
+  -  "Hello, " + name
+  +  "Hi, " + name
+  PATCH
+
+Start each block with `@@`. Use a space for unchanged lines, `-` for removed
+lines, and `+` for added lines. Blank lines need a prefix too. Leave out filenames
+and line numbers. Each block needs at least one unchanged or removed line.
+
+Each block must match exactly once, including spaces. Blocks match in order
+against the original code, so a later block cannot match an earlier addition.
+All blocks must match before anything is saved.
+
+If a block has no match or more than one match, nothing changes. The error
+explains the problem on stderr and returns the current declaration on stdout.
+Use that text to rebuild the patch, then try again.
+
+Once every block matches, the result follows the usual edit rules: syntax errors
+stop the save; type errors can be saved as drafts with a nonzero exit code.
+Errors return the current declaration on stdout, including any draft that was saved.
+
+`view --raw` prints code you can pass to `edit` or `module`. Plain `view` adds
+information for a person reading the code. `edit <name>` with no file opens
+$EDITOR; the file and stdin forms work without a terminal.
 
 ## A command-line tool
 
@@ -83,16 +127,25 @@ the number it returns is the exit code:
   run Me.Greet.main Ada               # Hello, Ada; exits 0
   run Me.Greet.main                   # the usage line on stderr; exits 2
 
-Printing needs no approval. Files, the network and the environment do:
-`permissions approve Me.Greet.main --yes` remembers access for this version.
-After an edit, `run` runs the edited code, which is denied that access until
-`permissions update Me.Greet.main --yes`.
+Printing and stdin need no approval. Files, the network and the environment
+need permission. If the program already has permission, you don't need `--allow`.
+The greeting above needs no permission. For a program that reads files,
+`run --allow "file read $PWD" Me.Report.main data.csv` lets it read files in
+the current directory and its subdirectories for one run, even if you edit
+the code during the run. File rules need full paths, such as `/home/me/data`;
+the shell replaces `$PWD` with the full path to the current directory.
+
+For a saved function-specific grant, supply explicit rules:
+`permissions approve --for Me.Client.fetch 'http GET https://api.example.com' --yes`.
+Omitting rules saves nothing. After an edit, `run` uses the edited code; use
+`permissions update Me.Client.fetch --yes` to review carrying its grants forward.
 
 Numbers arrive as strings too: parse them with `Stdlib.Int64.parse`. Only a
 `List<String>` parameter, or none, runs this way. A function with typed
 parameters, such as `add(a: Int64, b: Int64)`, goes through `eval`:
 `eval 'Me.Math.add(1, 2)'`.
 """
+
 
 /// `docs for-ai tests`: package tests in full.
 let tests(): String =
@@ -112,6 +165,17 @@ functions. They must return `Stdlib.Test.Result`:
 One test at a time, quoting the body so the shell leaves `|>` alone:
 
   test add Me.Example.Tests.doubles 'Me.Example.double(4) |> Stdlib.Test.equal(8)'
+
+To group tests inside a module, wrap a body in `Stdlib.Test.group("parsing", ...)`;
+`test run` shows it as `Me.Example.Tests › parsing › doubles`, and the filter
+`Tests.parsing` runs the group.
+
+For many cases of one check, use a table; each row is its own test, named by
+its arguments, as in `Me.Example.Tests.doubles(4, 8)`:
+
+  test doubles =
+    [ (4, 8), (0, 0) ]
+    |> Stdlib.Test.table(fun((n, expected)) -> Me.Example.double(n) |> Stdlib.Test.equal(expected))
 
 Run all tests with `test run`, or filter by name/module with `test run Example`.
 `search` leaves tests and `Tests` modules out; add `--include-tests`, or `--test`
@@ -154,6 +218,7 @@ matches exactly:
     => raises "Cannot divide by 0"
 """
 
+
 /// `docs for-ai permissions`: the instance policy and package approvals.
 let permissions(): String =
   """# Darklang AI: permissions
@@ -171,6 +236,9 @@ rules allow (or deny) additional effects and resources:
   permissions allow clock
   permissions allow http GET https://api.stripe.com/v1/*
   permissions allow file write /home/me/project/data   # absolute; ~ not expanded
+  permissions allow process /usr/bin/git status     # this exact command only
+  permissions allow process /usr/bin/git            # this program, any arguments
+  permissions allow process                         # any program
   permissions deny http POST https://api.stripe.com/v1
   permissions allow native             # raw fds, process handles: cannot be scoped,
                                        # so it is granted whole or not at all
@@ -200,7 +268,17 @@ Interactive `run` asks: Allow this run / Remember for this code version / Cancel
 Access Dark can see before execution is reviewed in one prompt; other access
 pauses before its operation with a prompt of its own, so a run can ask more
 than once. Approval continues without restarting earlier work.
-Unattended runs fail with guidance; use `run --allow` for temporary access.
+Without a prompt, a run fails if it needs permission and tells you how to allow it.
+`run --allow "file read $PWD" Me.Report.main data.csv` lets the program read
+files in the current directory and its subdirectories for this run, even if
+you edit the code during the run. This is like choosing Allow this run at the
+permission prompt. The permission isn't remembered, and rules that block access
+still apply. If the program already has permission, you don't need `--allow`.
+File rules need full paths, such as `/home/me/data`; the shell replaces `$PWD`
+with the full path to the current directory. For HTTP, give a method and URL:
+`run --allow 'http GET https://api.example.com/*' Me.Client.main`.
+A server started by the run takes `http-server 127.0.0.1 8080`, and the run's rules
+reach its request handlers too.
 Remembered script approvals appear as `script:/absolute/path` in `permissions approved`.
 Use that name with `permissions show` or `unapprove`.
 
@@ -209,20 +287,38 @@ with one approved version per logical function name. The
 normal workflow uses the logical function name; immutable hashes stay behind
 the approval:
 
-  permissions approve Vendor.Package.function --yes
+  permissions approve --for Vendor.Package.function 'env read GITHUB_TOKEN' --yes
   permissions update Vendor.Package.function --yes
   permissions approved                  # each name and its approved version
-  permissions unapprove Vendor.Package.function
+  permissions remove --for Vendor.Package.function 'env read GITHUB_TOKEN'
+  permissions remove --for Vendor.Package.function --all
 
-Approval computes the function's inferred transitive needs; changing the code
-changes its hash and requires a new decision, without changing the user's
+Approval shows the function's requirements and saves the rules you supply.
+Changing the code changes its hash and requires a new decision, without changing the user's
 logical name. Running a name uses its current code on the selected branch.
 Edits to the function or its dependencies do not inherit the old approval.
 Use `permissions update` or `approve` to review access for the new code.
+For the same code version, `approve --for <fn> <rules>` adds rules and keeps existing
+grants and explicit denies. Omitting rules saves nothing, even with --yes, and never
+prompts. Effect-free functions need no approval. Unchanged approvals return
+"Already approved; no changes" without a prompt or write. New code or outdated
+analysis still needs review.
+`update` shows all changes before one confirmation (`--yes` skips it).
+It reviews carrying explicit rules to the current version; any supplied
+rules add to them. Changed code's inferred effects are recomputed.
+`remove --for <name> <rules>` removes exact rules from a saved approval; other
+grants and denies stay. If any requested rule is absent, nothing is removed.
+This edits the stored approval without approving newer code or changing instance
+rules, and works for saved script names too. Rules present in both allow and deny
+lists are removed from both.
+`remove --for <name> --all` forgets all saved access for that name. Do not combine
+--all with rules. Plain `all` removes just that rule, keeping other saved rules.
 Instance defaults and temporary run permissions still apply.
-`unapprove` removes that name's remembered access without changing its code.
+`unapprove <name>` remains an alias for `remove --for <name> --all`.
+The positional `approve <fn> <rules>` spelling remains accepted for existing scripts.
 `revoke-package <hash>` removes all named approvals for that version.
 """
+
 
 /// `docs for-ai traces`: reading a run back, and things that run at once.
 let traces(): String =
@@ -303,6 +399,7 @@ run back up, `traces fork` branches one. `docs processes` and `docs live` have t
 short versions; `docs/processes.md` and `docs/live.md` in the repo have the design.
 """
 
+
 /// `docs for-ai scm`: drafts, commits, branches and deprecation.
 let scm(): String =
   """# Darklang AI: scm
@@ -371,6 +468,7 @@ committed can be rewritten, only superseded.
   (see: docs deprecation)
 """
 
+
 /// `docs for-ai syntax`: the full syntax notes and name resolution.
 let syntax(): String =
   """# Darklang AI: syntax
@@ -392,18 +490,21 @@ let syntax(): String =
   method is called through the trait, not the type: `Stdlib.Add.add(1, 2)`, or
   receiver first, `x.display`.
   `view Stdlib.Int64` lists the type's impls with where each method is called.
-- A bare integer is an `Int64` and a bare `1.5` a `Float`; numeric operands must
+- A bare integer is an `Int64` and a bare `1.5` a `Float64`; numeric operands must
   have one type. Other number types take a suffix (table in Critical Syntax).
-- Local values use `let max = 6` without annotations; package values use `val`.
-- A keyword (`type`, `match`, `in`, ...; `docs syntax` lists them) is a name only
-  in double backticks: `let ``type`` = "json"`, `r.``type```.
+  As a type, `Int` means `Int64` and `Float` means `Float64`.
+- Local values use `let max = 6` without annotations; package values use `val`,
+  optionally typed: `val max: Int64 = 6`.
+- A keyword (type, match, in, ...; `docs syntax` lists them) is a name in
+  backticks: let `type` = "json". After a `.` and as a record field name it
+  needs none: r.type, Metadata { type = "json" }.
 - Record construction is `State { count = 0 }`; update is `{ state with count = 1 }`.
 - `f(x)?` extracts Ok/Some or immediately returns Error/None from the
   nearest function/lambda. Return Result/Option and still write Ok/Some on
   success; Result error types must agree.
 - Option/Result cases work bare: `Some(x)`, `None`, `Ok(x)`, `Error(e)`.
 - A constructor's fields go in parentheses, as a call's arguments do:
-  `Pair(1, 2)`, `| Ok(x) ->`. `Ok x` is a parse error.
+  `Shape.Seg(a, b)`, `| Ok(x) ->`. `Ok x` is a parse error.
 - User enum construction uses `TypeName.Case`; match cases may be bare or
   qualified (`| Result.Ok(x)`).
 - A tuple payload needs double parentheses: `Some((a, b))`.
@@ -427,8 +528,8 @@ let syntax(): String =
 - NO binding modules to variables (`let c = Darklang.Cli.Colors` is invalid --
   modules are not first-class values. Use the full path each time.)
 - Pipe |> feeds the left value as the FIRST argument of the right fn; any
-  args in its parentheses come after it: `[1, 2] |> Stdlib.List.map(toString)`
-  is `Stdlib.List.map([1, 2], toString)`, and `x |> f()` is `f(x)`. You can't
+  args in its parentheses come after it: `[1, 2] |> Stdlib.List.map(fun n -> n + 1)`
+  is `Stdlib.List.map([1, 2], fun n -> n + 1)`, and `x |> f()` is `f(x)`. You can't
   pipe straight into an operator (`n |> + 1` won't parse), so write `n + 1`, or
   use a lambda mid-pipe: `|> (fun v -> v + 1)`. If the left side is an `if` or
   `match`, wrap it in parentheses: `(if c then a else b) |> fn`.
@@ -448,8 +549,8 @@ let syntax(): String =
 - Tuple elements by position, counting from 1: `pair.1`, `triple.3`,
   `nested.1.2`. `.0` and past-the-end are errors.
 - String concat: +
-- String interpolation: $"x = {expr}; total = {a + b}" -- requires `ToString`;
-  its implementation is resolved and recorded when saved.
+- String interpolation: $"x = {expr}; total = {a + b}" -- uses `Display`,
+  as above; the implementation is resolved and recorded when saved.
 - Most operators are traits: `+ - * / % **` and `-x` are Add Subtract Multiply Divide Modulo
   Power Negate; `< <= > >=` are Compare; `& | ^ << >>` and `~x` are BitwiseAnd BitwiseOr
   BitwiseXor ShiftLeft ShiftRight BitwiseNot. `==` and `!=` are NOT traits: structural on
@@ -462,35 +563,35 @@ let syntax(): String =
 - Number literals. The suffix decides the type; nothing infers it:
     1, 1s, 1s64   Int64          1u, 1u64   UInt64
     1s8 1s16 1s32 1s128          1u8 1u16 1u32 1u128
-    1z            BigInt         1.5, 1e5, 1.5f64   Float
+    1z            BigInt         1.5, 1e5, 1.5f64   Float64
     1.5f32        Float32        19.99dec   Decimal (no exponent)
   `z` is for ℤ, the integers: `1z` is a BigInt, with no size limit.
-  Values print with their suffix except Int64 and Float, so output pastes back as itself.
+  Values print with their suffix except Int64 and Float64, so output pastes back as itself.
 - Traits: `impl Add for Vec = let add(a: Vec, b: Vec): Vec = ...` gives Vec
   a `+`; `impl Display for Point = let display(p: Point): String = ...`
-  gives `p.display`; your own with `trait Area<'a> = let area(s: 'a): Float`.
+  gives `p.display`; your own with `trait Area<'a> = let area(s: 'a): Float64`.
   A bound is `let f<'a: Display>(v: 'a) = ...`. Author with `dark trait` /
   `dark impl`; `dark impls <Trait> --json` lists implementations with the status a
   call sees (active, shadowed, unordered); `dark constraints --json` has the rival
   pairs; `docs traits`.
 - Bitwise operators have implementations for every integer type and none for
-  Float or Float32; both operands (the shift count included) must be the same type.
+  Float64 or Float32; both operands (the shift count included) must be the same type.
   The count is taken modulo the bit width, as in Rust: `1u8 << 9u8` is `2u8`.
 - `!x` is boolean not. Inside a `match`, `|` is the arm separator, so bitwise-or
   there needs parens: `| A -> (a | b)`.
 
 ## Records
   MyRecord { a = 1, b = 2 }
-  # { must not be left of type name
 
 ## Enums
-  type Shape = | Dot | Seg(Point, Point)   # declare: fields in parentheses, like a call
-  Option.Some(5)     # construct: TypeName.Case, fields in parentheses
-  | Some(x) -> ...           # match: Case, or Type.Case
-  | (Ok(x), Ok(y)) -> ...    # tuple of constructors
-  | Some(Ok(v)) -> ...       # constructor of a constructor
-  | Some((a, b)) -> ...      # constructor wrapping a tuple NEEDS its inner parens
-  | [x, ...rest] -> ...      # head and rest of a list; `...rest` goes last
+  type Shape = | Dot | Seg(Point, Point)   // declare: fields in parentheses, like a call
+  Option.Some(5)     // construct: TypeName.Case, fields in parentheses
+  match x with
+  | Some(x) -> ...           // match: Case, or Type.Case
+  | (Ok(x), Ok(y)) -> ...    // tuple of constructors
+  | Some(Ok(v)) -> ...       // constructor of a constructor
+  | Some((a, b)) -> ...      // constructor wrapping a tuple NEEDS its inner parens
+  | [x, ...rest] -> ...      // head and rest of a list; `...rest` goes last
 
 ## Name Resolution
 Names resolve relative to the current module, searching from

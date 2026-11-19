@@ -16,7 +16,7 @@ let runtimeMonotonicCounter () : (Int * Int) =
     else (Stdlib.Int.fromInt64 seconds * 1000000000 + Stdlib.Int.fromInt64 nanos, 1000000000)
 
 let runtimeDelayTicks (ticks: Int) : Unit =
-    Stdlib.Cli.__sleep (Stdlib.Int.toFloat ticks / 10000.0)
+    Stdlib.Cli.__sleep (Stdlib.Int.toFloat64 ticks / 10000.0)
 
 let dateTimeFromUnixTicks (ticks: Int) : DateTime =
     Stdlib.DateTime.__checkedTicks (Builtin.__posixInt64 ticks)

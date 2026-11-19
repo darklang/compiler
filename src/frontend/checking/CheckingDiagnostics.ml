@@ -190,7 +190,7 @@ let interpolationTypeMismatchMessage expr actualType =
     | TInt128 -> Some "Int128"
     | TUInt128 -> Some "UInt128"
     | TInt -> Some "Int"
-    | TFloat64 -> Some "Float"
+    | TFloat64 -> Some "Float64"
     | TBool -> Some "Bool"
     | TChar -> Some "Char"
     | TDateTime -> Some "DateTime"

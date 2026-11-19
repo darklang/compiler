@@ -15,6 +15,7 @@ let parse(source: String): List<Stdlib.HttpClient.Sse.Event> =
   |> Stdlib.HttpClient.Sse.parse
   |> Stdlib.Stream.toList
 
+
 // single event with just a data field
 // @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
 test singleDataEvent =
@@ -22,10 +23,11 @@ test singleDataEvent =
   |> Stdlib.Test.equal(
     [ Stdlib.HttpClient.Sse.Event { data = "hello", eventType = "", id = "" } ])
 
+
 // empty body yields no events
 // @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
-test emptyBody =
-  parse("") |> Stdlib.Test.equal([])
+test emptyBody = parse("") |> Stdlib.Test.equal([])
+
 
 // multiple events separated by blank lines
 // @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
@@ -36,6 +38,7 @@ test multipleEvents =
       Stdlib.HttpClient.Sse.Event { data = "second", eventType = "", id = "" }
       Stdlib.HttpClient.Sse.Event { data = "third", eventType = "", id = "" } ])
 
+
 // event type and id are parsed
 // @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
 test eventTypeAndId =
@@ -43,6 +46,7 @@ test eventTypeAndId =
   |> Stdlib.Test.equal(
     [ Stdlib.HttpClient.Sse.Event
         { data = "payload", eventType = "update", id = "42" } ])
+
 
 // id persists across events per the SSE spec
 // @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
@@ -52,13 +56,16 @@ test idPersists =
     [ Stdlib.HttpClient.Sse.Event { data = "one", eventType = "", id = "42" }
       Stdlib.HttpClient.Sse.Event { data = "two", eventType = "", id = "42" } ])
 
+
 // comment lines (starting with `:`) are ignored
 // @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
 test commentLinesIgnored =
-  parse(": this is a comment\ndata: hello\n\n: another comment\ndata: world\n\n")
+  parse(
+    ": this is a comment\ndata: hello\n\n: another comment\ndata: world\n\n")
   |> Stdlib.Test.equal(
     [ Stdlib.HttpClient.Sse.Event { data = "hello", eventType = "", id = "" }
       Stdlib.HttpClient.Sse.Event { data = "world", eventType = "", id = "" } ])
+
 
 // multi-line `data:` fields are joined with a newline
 // @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap
@@ -67,6 +74,7 @@ test multiLineData =
   |> Stdlib.Test.equal(
     [ Stdlib.HttpClient.Sse.Event
         { data = "line one\nline two", eventType = "", id = "" } ])
+
 
 // blocks without a data field are not dispatched (spec: empty data = skip)
 // @compiler xfail compile: "Expected TStream TUInt8, got TString" class=missing-support reason=compiler-gap

@@ -135,7 +135,7 @@ let printFloat ctx freg newline =
           [ X.PUSH X.R12; X.PUSH X.R13 ]
           @ (if xmm <> X.XMM0 then [ X.MOVSD_reg (X.XMM0, xmm) ] else [])
           @ [
-              X.CALL "Darklang.Stdlib.Float.toString";
+              X.CALL "Darklang.Stdlib.Float64.toString";
               X.MOV_reg (X.R12, X.RAX);
               X.MOV_load (X.RDX, X.R12, 8l);
               X.LEA (X.RSI, X.R12, 16l);

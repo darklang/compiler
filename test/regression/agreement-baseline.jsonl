@@ -30,7 +30,7 @@
 {"id": "stdlib/decimal.dark:Darklang.Stdlib.Decimal.Tests.parts#1", "expr": "Darklang.Stdlib.Decimal.toParts(1.10dec)", "eval": "(110z, 2)"}
 {"id": "stdlib/decimal.dark:Darklang.Stdlib.Decimal.Tests.parse#2", "expr": "Darklang.Stdlib.Decimal.parse(\"-1.10\")\n|> Darklang.Stdlib.Result.map(Darklang.Stdlib.display)", "eval": "Ok(\"-1.10\")"}
 {"id": "stdlib/decimal.dark:Darklang.Stdlib.Decimal.Tests.roundRefusesBadPlaces#3", "expr": "Darklang.Stdlib.Decimal.truncate(1dec, 29)", "eval": "Error(Stdlib.Decimal.RoundError.PlacesOutOfRange)"}
-{"id": "stdlib/decimal.dark:Darklang.Stdlib.Decimal.Tests.conversions#4", "expr": "Darklang.Stdlib.Decimal.toFloat(0.5dec)", "eval": "0.5"}
+{"id": "stdlib/decimal.dark:Darklang.Stdlib.Decimal.Tests.conversions#4", "expr": "Darklang.Stdlib.Decimal.toFloat64(0.5dec)", "eval": "0.5"}
 {"id": "stdlib/decimal.dark:Darklang.Stdlib.Decimal.Tests.json#1", "expr": "Darklang.Stdlib.Json.serialize<Decimal>(19.90dec)", "eval": "19.90"}
 {"id": "stdlib/decimal.dark:Darklang.Stdlib.Decimal.Tests.floorAndCeiling#3", "expr": "Darklang.Stdlib.Decimal.ceiling(2.1dec)", "eval": "3dec"}
 {"id": "stdlib/decimal.dark:Darklang.Stdlib.Decimal.Tests.power#2", "expr": "Darklang.Stdlib.display(Darklang.Stdlib.Decimal.power(1.10dec, 2))", "eval": "1.2100"}
@@ -46,14 +46,14 @@
 {"id": "stdlib/diff.dark:Darklang.Stdlib.Diff.Tests.lines#1", "expr": "Darklang.Stdlib.Diff.lines(\"a\\nb\\nc\", \"a\\nb\\nc\")", "eval": "[\n  Stdlib.Diff.DiffLine.Same(\"a\"),\n  Stdlib.Diff.DiffLine.Same(\"b\"),\n  Stdlib.Diff.DiffLine.Same(\"c\")\n]"}
 {"id": "stdlib/duration.dark:Darklang.Stdlib.Duration.Tests.displayParsesBack#1", "expr": "[ 0, 1, 59, 60, 61, 3600, 5400, 86400, 90000, -60, -86400 ]\n|> Darklang.Stdlib.List.map(fun n ->\n  Darklang.Stdlib.Duration.parse(Darklang.Stdlib.display(Darklang.Stdlib.Duration.fromSeconds(n)))\n  |> Darklang.Stdlib.Result.map(Darklang.Stdlib.Duration.toSeconds))", "eval": "[\n  Ok(0),\n  Ok(1),\n  Ok(59),\n  Ok(60),\n  Ok(61),\n  Ok(3600),\n  Ok(5400),\n  Ok(86400),\n  Ok(90000),\n  Ok(-60),\n  Ok(-86400)\n]"}
 {"id": "stdlib/english.dark:Darklang.Stdlib.English.Tests.pluralize#1", "expr": "Darklang.Stdlib.English.pluralize(\"instance\")", "eval": "instances"}
-{"id": "stdlib/float.dark:Darklang.Stdlib.Float.Tests.roundUp#1", "expr": "Darklang.Stdlib.Float.roundUp(1.3)", "eval": "2"}
-{"id": "stdlib/float.dark:Darklang.Stdlib.Float.Tests.round#1", "expr": "Darklang.Stdlib.Float.round(-2147483647.8)", "eval": "-2147483648"}
-{"id": "stdlib/float.dark:Darklang.Stdlib.Float.Tests.clamp#10", "expr": "Darklang.Stdlib.Float.clampRefusingNaN(-2.0, -5.0, 5.0)", "eval": "Ok(-2.0)"}
-{"id": "stdlib/float.dark:Darklang.Stdlib.Float.Tests.roundTowardsZero#1", "expr": "Darklang.Stdlib.Float.roundTowardsZero(-2367.9267)", "eval": "-2367"}
-{"id": "stdlib/float.dark:Darklang.Stdlib.Float.Tests.toInt64#1", "expr": "Darklang.Stdlib.Float.toInt64(3.0)", "eval": "3"}
-{"id": "stdlib/float.dark:Darklang.Stdlib.Float.Tests.checkedArithmetic#1", "expr": "Darklang.Stdlib.Float.checkedAdd(1.5, 2.0)", "eval": "Ok(3.5)"}
-{"id": "stdlib/float.dark:Darklang.Stdlib.Float.Tests.checkedArithmetic#5", "expr": "Darklang.Stdlib.Float.checkedMultiply(3.0, -2.0)", "eval": "Ok(-6.0)"}
-{"id": "stdlib/float.dark:Darklang.Stdlib.Float.Tests.checkedSqrt#1", "expr": "Darklang.Stdlib.Float.checkedSqrt(9.0)", "eval": "Ok(3.0)"}
+{"id": "stdlib/float64.dark:Darklang.Stdlib.Float64.Tests.roundUp#1", "expr": "Darklang.Stdlib.Float64.roundUp(1.3)", "eval": "2"}
+{"id": "stdlib/float64.dark:Darklang.Stdlib.Float64.Tests.round#1", "expr": "Darklang.Stdlib.Float64.round(-2147483647.8)", "eval": "-2147483648"}
+{"id": "stdlib/float64.dark:Darklang.Stdlib.Float64.Tests.clamp#10", "expr": "Darklang.Stdlib.Float64.clampRefusingNaN(-2.0, -5.0, 5.0)", "eval": "Ok(-2.0)"}
+{"id": "stdlib/float64.dark:Darklang.Stdlib.Float64.Tests.roundTowardsZero#1", "expr": "Darklang.Stdlib.Float64.roundTowardsZero(-2367.9267)", "eval": "-2367"}
+{"id": "stdlib/float64.dark:Darklang.Stdlib.Float64.Tests.toInt64#1", "expr": "Darklang.Stdlib.Float64.toInt64(3.0)", "eval": "3"}
+{"id": "stdlib/float64.dark:Darklang.Stdlib.Float64.Tests.checkedArithmetic#1", "expr": "Darklang.Stdlib.Float64.checkedAdd(1.5, 2.0)", "eval": "Ok(3.5)"}
+{"id": "stdlib/float64.dark:Darklang.Stdlib.Float64.Tests.checkedArithmetic#5", "expr": "Darklang.Stdlib.Float64.checkedMultiply(3.0, -2.0)", "eval": "Ok(-6.0)"}
+{"id": "stdlib/float64.dark:Darklang.Stdlib.Float64.Tests.checkedSqrt#1", "expr": "Darklang.Stdlib.Float64.checkedSqrt(9.0)", "eval": "Ok(3.0)"}
 {"id": "stdlib/float32.dark:Darklang.Stdlib.Float32.Tests.literals#5", "expr": "3.4028235e38f32 |> Darklang.Stdlib.Float32.toBits", "eval": "2139095039u32"}
 {"id": "stdlib/float32.dark:Darklang.Stdlib.Float32.Tests.rounding#2", "expr": "Darklang.Stdlib.Float32.roundUp(1.3f32)", "eval": "2"}
 {"id": "stdlib/float32.dark:Darklang.Stdlib.Float32.Tests.rounding#4", "expr": "Darklang.Stdlib.Float32.roundDown(-1.5f32)", "eval": "-2"}
@@ -63,17 +63,17 @@
 {"id": "stdlib/float32.dark:Darklang.Stdlib.Float32.Tests.bits#8", "expr": "Darklang.Stdlib.Float32.isNaN(Darklang.Stdlib.Float32.fromBits(2143289344u32))", "eval": "true"}
 {"id": "stdlib/float32.dark:Darklang.Stdlib.Float32.Tests.fromInt64#5", "expr": "Darklang.Stdlib.Float32.toBits(Darklang.Stdlib.Float32.fromInt64(9223372036854775807))", "eval": "1593835520u32"}
 {"id": "stdlib/float32.dark:Darklang.Stdlib.Float32.Tests.nanAndInfinities#5", "expr": "Darklang.Stdlib.Float32.isNaN(Darklang.Stdlib.Float32.sqrt(-1.0f32))", "eval": "true"}
-{"id": "stdlib/float32.dark:Darklang.Stdlib.Float32.Tests.nanAndInfinities#13", "expr": "Darklang.Stdlib.Float32.fromFloat(0.0 / 0.0) |> Darklang.Stdlib.Float32.isNaN", "eval": "true"}
+{"id": "stdlib/float32.dark:Darklang.Stdlib.Float32.Tests.nanAndInfinities#13", "expr": "Darklang.Stdlib.Float32.fromFloat64(0.0 / 0.0) |> Darklang.Stdlib.Float32.isNaN", "eval": "true"}
 {"id": "stdlib/float32.dark:Darklang.Stdlib.Float32.Tests.checkedArithmetic#5", "expr": "Darklang.Stdlib.Float32.checkedMultiply(3.0f32, -2.0f32)", "eval": "Ok(-6.0f32)"}
 {"id": "stdlib/float32.dark:Darklang.Stdlib.Float32.Tests.checkedSqrt#1", "expr": "Darklang.Stdlib.Float32.checkedSqrt(9.0f32)", "eval": "Ok(3.0f32)"}
-{"id": "stdlib/float32.dark:Darklang.Stdlib.Float32.Tests.checkedFromFloat#1", "expr": "Darklang.Stdlib.Float32.checkedFromFloat(1.5)", "eval": "Ok(1.5f32)"}
+{"id": "stdlib/float32.dark:Darklang.Stdlib.Float32.Tests.checkedFromFloat64#1", "expr": "Darklang.Stdlib.Float32.checkedFromFloat64(1.5)", "eval": "Ok(1.5f32)"}
 {"id": "stdlib/html.dark:Darklang.Stdlib.Html.Tests.attributeHelpers#2", "expr": "Darklang.Stdlib.Html.style([ (\"color\", \"red\"), (\"font-size\", \"14px\") ])", "eval": "(\"style\", Some(\"color: red; font-size: 14px\"))"}
 {"id": "stdlib/ints/bigInt.dark:Darklang.Stdlib.BigInt.Tests.toStringAndParse#5", "expr": "Darklang.Stdlib.BigInt.parse(\"9223372036854775808\")", "eval": "Ok(9223372036854775808z)"}
 {"id": "stdlib/ints/bigInt.dark:Darklang.Stdlib.BigInt.Tests.fromFixedWidth#1", "expr": "Darklang.Stdlib.BigInt.fromInt8(127s8)", "eval": "127z"}
 {"id": "stdlib/ints/bigInt.dark:Darklang.Stdlib.BigInt.Tests.fromFixedWidth#3", "expr": "Darklang.Stdlib.BigInt.fromInt16(32767s16)", "eval": "32767z"}
 {"id": "stdlib/ints/bigInt.dark:Darklang.Stdlib.BigInt.Tests.fromFixedWidth#6", "expr": "Darklang.Stdlib.BigInt.fromUInt128(340282366920938463463374607431768211455u128)", "eval": "340282366920938463463374607431768211455z"}
 {"id": "stdlib/ints/bigInt.dark:Darklang.Stdlib.BigInt.Tests.toFixedWidth#4", "expr": "Darklang.Stdlib.BigInt.toInt32(2z ** 40z)", "eval": "None"}
-{"id": "stdlib/ints/bigInt.dark:Darklang.Stdlib.BigInt.Tests.fromFloatTruncatesTowardZero#1", "expr": "Darklang.Stdlib.BigInt.fromFloat(3.9)", "eval": "3z"}
+{"id": "stdlib/ints/bigInt.dark:Darklang.Stdlib.BigInt.Tests.fromFloatTruncatesTowardZero#1", "expr": "Darklang.Stdlib.BigInt.fromFloat64(3.9)", "eval": "3z"}
 {"id": "stdlib/ints/bigInt.dark:Darklang.Stdlib.BigInt.Tests.randomSmallRange#1", "expr": "(Darklang.Stdlib.List.range(1, 100)\n |> Darklang.Stdlib.List.map(fun _ -> Darklang.Stdlib.BigInt.random(2z, 0z))\n |> Darklang.Stdlib.List.unique\n |> Darklang.Stdlib.List.sort)", "eval": "[0z, 1z, 2z]"}
 {"id": "stdlib/ints/bigInt.dark:Darklang.Stdlib.BigInt.Tests.checkedSqrt#1", "expr": "Darklang.Stdlib.BigInt.checkedSqrt(Darklang.Stdlib.BigInt.fromInt64(4))", "eval": "Ok(2.0)"}
 {"id": "stdlib/ints/int128.dark:Darklang.Stdlib.Int128.Tests.remainder#1", "expr": "Darklang.Stdlib.Int128.checkedRemainder(15s128, 6s128)", "eval": "Ok(3s128)"}
@@ -84,7 +84,7 @@
 {"id": "stdlib/ints/int128.dark:Darklang.Stdlib.Int128.Tests.checkedSubtract#1", "expr": "Darklang.Stdlib.Int128.checkedSubtract(-170141183460469231731687303715884105728s128, 1s128)", "eval": "Error(Stdlib.Math.Overflow.Overflow)"}
 {"id": "stdlib/ints/int128.dark:Darklang.Stdlib.Int128.Tests.checkedAbsoluteValue#1", "expr": "Darklang.Stdlib.Int128.checkedAbsoluteValue(-170141183460469231731687303715884105728s128)", "eval": "Error(Stdlib.Math.Overflow.Overflow)"}
 {"id": "stdlib/ints/int128.dark:Darklang.Stdlib.Int128.Tests.checkedSqrt#1", "expr": "Darklang.Stdlib.Int128.checkedSqrt(4s128)", "eval": "Ok(2.0)"}
-{"id": "stdlib/ints/int16.dark:Darklang.Stdlib.Int16.Tests.toFloat#1", "expr": "Darklang.Stdlib.Int16.toFloat(2s16)", "eval": "2.0"}
+{"id": "stdlib/ints/int16.dark:Darklang.Stdlib.Int16.Tests.toFloat64#1", "expr": "Darklang.Stdlib.Int16.toFloat64(2s16)", "eval": "2.0"}
 {"id": "stdlib/ints/int16.dark:Darklang.Stdlib.Int16.Tests.fromUInt8#1", "expr": "Darklang.Stdlib.Int16.fromUInt8(0u8)", "eval": "0s16"}
 {"id": "stdlib/ints/int16.dark:Darklang.Stdlib.Int16.Tests.fromUInt32#1", "expr": "Darklang.Stdlib.Int16.fromUInt32(0u32)", "eval": "Some(0s16)"}
 {"id": "stdlib/ints/int16.dark:Darklang.Stdlib.Int16.Tests.fromInt128#1", "expr": "Darklang.Stdlib.Int16.fromInt128(0s128)", "eval": "Some(0s16)"}
@@ -92,7 +92,7 @@
 {"id": "stdlib/ints/int16.dark:Darklang.Stdlib.Int16.Tests.checkedNegate#1", "expr": "Darklang.Stdlib.Int16.checkedNegate(-32768s16)", "eval": "Error(Stdlib.Math.Overflow.Overflow)"}
 {"id": "stdlib/ints/int16.dark:Darklang.Stdlib.Int16.Tests.divisionResults#1", "expr": "Darklang.Stdlib.Int16.checkedDivide(17s16, 3s16)", "eval": "Ok(5s16)"}
 {"id": "stdlib/ints/int16.dark:Darklang.Stdlib.Int16.Tests.checkedSqrt#1", "expr": "Darklang.Stdlib.Int16.checkedSqrt(4s16)", "eval": "Ok(2.0)"}
-{"id": "stdlib/ints/int32.dark:Darklang.Stdlib.Int32.Tests.toFloat#1", "expr": "Darklang.Stdlib.Int32.toFloat(2s32)", "eval": "2.0"}
+{"id": "stdlib/ints/int32.dark:Darklang.Stdlib.Int32.Tests.toFloat64#1", "expr": "Darklang.Stdlib.Int32.toFloat64(2s32)", "eval": "2.0"}
 {"id": "stdlib/ints/int32.dark:Darklang.Stdlib.Int32.Tests.fromUInt8#1", "expr": "Darklang.Stdlib.Int32.fromUInt8(0u8)", "eval": "0s32"}
 {"id": "stdlib/ints/int32.dark:Darklang.Stdlib.Int32.Tests.fromUInt32#1", "expr": "Darklang.Stdlib.Int32.fromUInt32(0u32)", "eval": "Some(0s32)"}
 {"id": "stdlib/ints/int32.dark:Darklang.Stdlib.Int32.Tests.fromUInt64#1", "expr": "Darklang.Stdlib.Int32.fromUInt64(0u64)", "eval": "Some(0s32)"}
@@ -101,7 +101,7 @@
 {"id": "stdlib/ints/int32.dark:Darklang.Stdlib.Int32.Tests.divisionResults#1", "expr": "Darklang.Stdlib.Int32.checkedDivide(17s32, 3s32)", "eval": "Ok(5s32)"}
 {"id": "stdlib/ints/int32.dark:Darklang.Stdlib.Int32.Tests.checkedSqrt#1", "expr": "Darklang.Stdlib.Int32.checkedSqrt(4s32)", "eval": "Ok(2.0)"}
 {"id": "stdlib/ints/int64.dark:Darklang.Stdlib.Int64.Tests.modulo#7", "expr": "(Darklang.Stdlib.List.map(Darklang.Stdlib.List.range(-5, 5), fun v -> (v % 4)))", "eval": "[3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1]"}
-{"id": "stdlib/ints/int64.dark:Darklang.Stdlib.Int64.Tests.fromFloat#1", "expr": "Darklang.Stdlib.Int64.fromFloat(3.9)", "eval": "Some(3)"}
+{"id": "stdlib/ints/int64.dark:Darklang.Stdlib.Int64.Tests.fromFloat64#1", "expr": "Darklang.Stdlib.Int64.fromFloat64(3.9)", "eval": "Some(3)"}
 {"id": "stdlib/ints/int64.dark:Darklang.Stdlib.Int64.Tests.parse#1", "expr": "Darklang.Stdlib.Int64.parse(\"0\")", "eval": "Ok(0)"}
 {"id": "stdlib/ints/int64.dark:Darklang.Stdlib.Int64.Tests.fromInt16#1", "expr": "Darklang.Stdlib.Int64.fromInt16(0s16)", "eval": "0"}
 {"id": "stdlib/ints/int64.dark:Darklang.Stdlib.Int64.Tests.fromUInt32#1", "expr": "Darklang.Stdlib.Int64.fromUInt32(0u32)", "eval": "0"}
@@ -117,12 +117,12 @@
 {"id": "stdlib/ints/int8.dark:Darklang.Stdlib.Int8.Tests.checkedSubtract#1", "expr": "Darklang.Stdlib.Int8.checkedSubtract(-128s8, 1s8)", "eval": "Error(Stdlib.Math.Overflow.Overflow)"}
 {"id": "stdlib/ints/int8.dark:Darklang.Stdlib.Int8.Tests.checkedAbsoluteValue#1", "expr": "Darklang.Stdlib.Int8.checkedAbsoluteValue(-128s8)", "eval": "Error(Stdlib.Math.Overflow.Overflow)"}
 {"id": "stdlib/ints/int8.dark:Darklang.Stdlib.Int8.Tests.divisionResults#1", "expr": "Darklang.Stdlib.Int8.checkedDivide(17s8, 3s8)", "eval": "Ok(5s8)"}
-{"id": "stdlib/ints/uint128.dark:Darklang.Stdlib.UInt128.Tests.toFloat#1", "expr": "Darklang.Stdlib.UInt128.toFloat(2u128)", "eval": "2.0"}
+{"id": "stdlib/ints/uint128.dark:Darklang.Stdlib.UInt128.Tests.toFloat64#1", "expr": "Darklang.Stdlib.UInt128.toFloat64(2u128)", "eval": "2.0"}
 {"id": "stdlib/ints/uint128.dark:Darklang.Stdlib.UInt128.Tests.fromUInt8#1", "expr": "Darklang.Stdlib.UInt128.fromUInt8(0u8)", "eval": "0u128"}
 {"id": "stdlib/ints/uint128.dark:Darklang.Stdlib.UInt128.Tests.fromUInt64#1", "expr": "Darklang.Stdlib.UInt128.fromUInt64(0u64)", "eval": "0u128"}
 {"id": "stdlib/ints/uint128.dark:Darklang.Stdlib.UInt128.Tests.checkedSubtract#1", "expr": "Darklang.Stdlib.UInt128.checkedSubtract(0u128, 1u128)", "eval": "Error(Stdlib.Math.Overflow.Overflow)"}
 {"id": "stdlib/ints/uint128.dark:Darklang.Stdlib.UInt128.Tests.checkedAbsoluteValue#1", "expr": "Darklang.Stdlib.UInt128.checkedAbsoluteValue(340282366920938463463374607431768211455u128)", "eval": "Ok(340282366920938463463374607431768211455u128)"}
-{"id": "stdlib/ints/uint16.dark:Darklang.Stdlib.UInt16.Tests.toFloat#1", "expr": "Darklang.Stdlib.UInt16.toFloat(2u16)", "eval": "2.0"}
+{"id": "stdlib/ints/uint16.dark:Darklang.Stdlib.UInt16.Tests.toFloat64#1", "expr": "Darklang.Stdlib.UInt16.toFloat64(2u16)", "eval": "2.0"}
 {"id": "stdlib/ints/uint16.dark:Darklang.Stdlib.UInt16.Tests.fromInt8#1", "expr": "Darklang.Stdlib.UInt16.fromInt8(0s8)", "eval": "Some(0u16)"}
 {"id": "stdlib/ints/uint16.dark:Darklang.Stdlib.UInt16.Tests.fromInt16#1", "expr": "Darklang.Stdlib.UInt16.fromInt16(0s16)", "eval": "Some(0u16)"}
 {"id": "stdlib/ints/uint16.dark:Darklang.Stdlib.UInt16.Tests.fromInt64#1", "expr": "Darklang.Stdlib.UInt16.fromInt64(0)", "eval": "Some(0u16)"}
@@ -137,7 +137,7 @@
 {"id": "stdlib/ints/uint32.dark:Darklang.Stdlib.UInt32.Tests.checkedAdd#1", "expr": "Darklang.Stdlib.UInt32.checkedAdd(4294967295u32, 1u32)", "eval": "Error(Stdlib.Math.Overflow.Overflow)"}
 {"id": "stdlib/ints/uint32.dark:Darklang.Stdlib.UInt32.Tests.checkedNegate#1", "expr": "Darklang.Stdlib.UInt32.checkedNegate(1u32)", "eval": "Error(Stdlib.Math.Overflow.Overflow)"}
 {"id": "stdlib/ints/uint32.dark:Darklang.Stdlib.UInt32.Tests.divisionResults#1", "expr": "Darklang.Stdlib.UInt32.checkedDivide(17u32, 3u32)", "eval": "Ok(5u32)"}
-{"id": "stdlib/ints/uint64.dark:Darklang.Stdlib.UInt64.Tests.toFloat#1", "expr": "Darklang.Stdlib.UInt64.toFloat(2u64)", "eval": "2.0"}
+{"id": "stdlib/ints/uint64.dark:Darklang.Stdlib.UInt64.Tests.toFloat64#1", "expr": "Darklang.Stdlib.UInt64.toFloat64(2u64)", "eval": "2.0"}
 {"id": "stdlib/ints/uint64.dark:Darklang.Stdlib.UInt64.Tests.fromFloatRounded#1", "expr": "Darklang.Stdlib.UInt64.fromFloatRounded(3.9)", "eval": "Some(4u64)"}
 {"id": "stdlib/ints/uint64.dark:Darklang.Stdlib.UInt64.Tests.fromUInt8#1", "expr": "Darklang.Stdlib.UInt64.fromUInt8(0u8)", "eval": "0u64"}
 {"id": "stdlib/ints/uint64.dark:Darklang.Stdlib.UInt64.Tests.fromInt32#1", "expr": "Darklang.Stdlib.UInt64.fromInt32(0s32)", "eval": "Some(0u64)"}
@@ -145,7 +145,7 @@
 {"id": "stdlib/ints/uint64.dark:Darklang.Stdlib.UInt64.Tests.checkedAdd#1", "expr": "Darklang.Stdlib.UInt64.checkedAdd(18446744073709551615u64, 1u64)", "eval": "Error(Stdlib.Math.Overflow.Overflow)"}
 {"id": "stdlib/ints/uint64.dark:Darklang.Stdlib.UInt64.Tests.checkedNegate#1", "expr": "Darklang.Stdlib.UInt64.checkedNegate(1u64)", "eval": "Error(Stdlib.Math.Overflow.Overflow)"}
 {"id": "stdlib/ints/uint64.dark:Darklang.Stdlib.UInt64.Tests.divisionResults#1", "expr": "Darklang.Stdlib.UInt64.checkedDivide(17u64, 3u64)", "eval": "Ok(5u64)"}
-{"id": "stdlib/ints/uint8.dark:Darklang.Stdlib.UInt8.Tests.toFloat#1", "expr": "Darklang.Stdlib.UInt8.toFloat(2u8)", "eval": "2.0"}
+{"id": "stdlib/ints/uint8.dark:Darklang.Stdlib.UInt8.Tests.toFloat64#1", "expr": "Darklang.Stdlib.UInt8.toFloat64(2u8)", "eval": "2.0"}
 {"id": "stdlib/ints/uint8.dark:Darklang.Stdlib.UInt8.Tests.fromInt8#1", "expr": "Darklang.Stdlib.UInt8.fromInt8(0s8)", "eval": "Some(0u8)"}
 {"id": "stdlib/ints/uint8.dark:Darklang.Stdlib.UInt8.Tests.fromInt32#1", "expr": "Darklang.Stdlib.UInt8.fromInt32(0s32)", "eval": "Some(0u8)"}
 {"id": "stdlib/ints/uint8.dark:Darklang.Stdlib.UInt8.Tests.fromUInt64#1", "expr": "Darklang.Stdlib.UInt8.fromUInt64(0u64)", "eval": "Some(0u8)"}
@@ -153,7 +153,7 @@
 {"id": "stdlib/ints/uint8.dark:Darklang.Stdlib.UInt8.Tests.checkedMultiply#1", "expr": "Darklang.Stdlib.UInt8.checkedMultiply(255u8, 2u8)", "eval": "Error(Stdlib.Math.Overflow.Overflow)"}
 {"id": "stdlib/ints/uint8.dark:Darklang.Stdlib.UInt8.Tests.checkedPower#1", "expr": "Darklang.Stdlib.UInt8.checkedPower(2u8, 7u8)", "eval": "Ok(128u8)"}
 {"id": "stdlib/ints/uint8.dark:Darklang.Stdlib.UInt8.Tests.divisionResults#3", "expr": "Darklang.Stdlib.UInt8.checkedMod(15u8, 6u8)", "eval": "Ok(3u8)"}
-{"id": "stdlib/json.dark:Darklang.Stdlib.Json.Tests.Float.Values.parse#3", "expr": "(Darklang.Stdlib.Json.parse<Float>(\"\\\"NaN\\\"\")) |> Darklang.Stdlib.Result.map(Darklang.Stdlib.Float.isNaN)", "eval": "Ok(true)"}
+{"id": "stdlib/json.dark:Darklang.Stdlib.Json.Tests.Float.Values.parse#3", "expr": "(Darklang.Stdlib.Json.parse<Float>(\"\\\"NaN\\\"\")) |> Darklang.Stdlib.Result.map(Darklang.Stdlib.Float64.isNaN)", "eval": "Ok(true)"}
 {"id": "stdlib/json.dark:Darklang.Stdlib.Json.Tests.Dict.serialize#1", "expr": "Darklang.Stdlib.Json.serialize<Dict<String, String>>(Darklang.Stdlib.Dict.singleton(\"a\", \"b\"))", "eval": "{\"a\":\"b\"}"}
 {"id": "stdlib/list.dark:Darklang.Stdlib.List.Tests.isEmpty#1", "expr": "Darklang.Stdlib.List.isEmpty([ 1 ])", "eval": "false"}
 {"id": "stdlib/list.dark:Darklang.Stdlib.List.Tests.concat#1", "expr": "Darklang.Stdlib.List.concat([ 1, 2, 3 ], [ 4, 5, 6 ])", "eval": "[1, 2, 3, 4, 5, 6]"}
@@ -229,7 +229,7 @@
 {"id": "stdlib/tuple.dark:Darklang.Stdlib.Tuple.Tests.tuple3#5", "expr": "Darklang.Stdlib.Tuple3.second((1, \"two\", 3.14))", "eval": "two"}
 {"id": "stdlib/tuple.dark:Darklang.Stdlib.Tuple.Tests.tuple3#10", "expr": "Darklang.Stdlib.Tuple3.mapFirst((1, \"two\", 3.14), fun x -> x - 2)", "eval": "(-1, \"two\", 3.14)"}
 {"id": "stdlib/tuple.dark:Darklang.Stdlib.Tuple.Tests.tuple3#13", "expr": "Darklang.Stdlib.Tuple3.mapThird((\"one\", 2, \"pi\"), fun x -> Darklang.Stdlib.String.toUppercase(x))", "eval": "(\"one\", 2, \"PI\")"}
-{"id": "stdlib/tuple.dark:Darklang.Stdlib.Tuple.Tests.tuple3MapsAllThree#2", "expr": "Darklang.Stdlib.Tuple3.mapAllThree(\n  (1, \"two\", 3.14),\n  (fun x -> x - 2),\n  (fun x -> Darklang.Stdlib.String.toUppercase(x)),\n  fun x -> Darklang.Stdlib.Float.roundDown(x))", "eval": "(-1, \"TWO\", 3)"}
+{"id": "stdlib/tuple.dark:Darklang.Stdlib.Tuple.Tests.tuple3MapsAllThree#2", "expr": "Darklang.Stdlib.Tuple3.mapAllThree(\n  (1, \"two\", 3.14),\n  (fun x -> x - 2),\n  (fun x -> Darklang.Stdlib.String.toUppercase(x)),\n  fun x -> Darklang.Stdlib.Float64.roundDown(x))", "eval": "(-1, \"TWO\", 3)"}
 {"id": "stdlib/url.dark:Darklang.Stdlib.Url.Tests.parseWithoutAuthority#8", "expr": "Darklang.Stdlib.Url.parse(\"localhost:8080\")\n|> Darklang.Stdlib.Result.map(fun u -> (u.scheme, u.host, u.path))", "eval": "Ok((Some(\"localhost\"), None, \"8080\"))"}
 {"id": "stdlib/url.dark:Darklang.Stdlib.Url.Tests.parseReference#1", "expr": "Darklang.Stdlib.Url.parseReference(\"../a/b?q#f\")", "eval": "Ok(\n  Stdlib.Url.Url {\n    scheme: None,\n    userinfo: None,\n    host: None,\n    port: None,\n    path: \"../a/b\",\n    query: Some(\"q\"),\n    fragment: Some(\"f\")\n  }\n)"}
 {"id": "stdlib/url.dark:Darklang.Stdlib.Url.Tests.parseLenient#3", "expr": "Darklang.Stdlib.Url.parseLenient(\"http://x:port/\")", "eval": "Error(Stdlib.Url.ParseError.InvalidPort(\"port\"))"}

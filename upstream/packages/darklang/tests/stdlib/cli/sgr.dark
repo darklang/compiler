@@ -4,6 +4,7 @@ module Darklang.Stdlib.Cli.Tui.Text.Tests.Sgr
 let colored(text: String): String =
   Stdlib.Cli.UI.Colors.colorize(Stdlib.Cli.UI.Colors.pink, text)
 
+
 test styledWidth =
   Stdlib.Test.all(
     [ Stdlib.Cli.Tui.Text.styledWidth("hello") |> Stdlib.Test.equal(5)
@@ -12,9 +13,11 @@ test styledWidth =
       // width.
       Stdlib.Cli.Tui.Text.styledWidth("\u001b[2Ka") |> Stdlib.Test.equal(1) ])
 
+
 // @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.Tui.Text.stripSgr'" class=missing-support reason=upstream-dependency
 test stripSgr =
   Stdlib.Cli.Tui.Text.stripSgr(colored("abc")) |> Stdlib.Test.equal("abc")
+
 
 // @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.Tui.Text.stripSgr'" class=missing-support reason=upstream-dependency
 test clipToWidth =
@@ -22,8 +25,24 @@ test clipToWidth =
   |> Stdlib.Cli.Tui.Text.stripSgr
   |> Stdlib.Test.equal("abc")
 
+
 // @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.Tui.Text.wrapAtColumn'" class=missing-support reason=upstream-dependency
 test wrapAtColumn =
   Stdlib.Cli.Tui.Text.wrapAtColumn(colored("abcdef"), 3)
   |> Stdlib.List.length
   |> Stdlib.Test.equal(2)
+
+
+// No row is wider than Int32's limit, so a wider width clips and wraps as that limit does.
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.Tui.Text.wrapAtColumn'" class=missing-support reason=upstream-dependency
+test widthsPastInt32 =
+  Stdlib.Test.all(
+    [ Stdlib.Cli.Tui.Text.clipToWidth("abc", 9999999999) |> Stdlib.Test.equal("abc")
+
+      Stdlib.Cli.Tui.Text.clipToWidth("abc", -9999999999) |> Stdlib.Test.equal("")
+
+      Stdlib.Cli.Tui.Text.wrapAtColumn("abc def", 9999999999)
+      |> Stdlib.Test.equal([ "abc def" ])
+
+      Stdlib.Cli.Tui.Text.wrapWithCursor("ab", "c", 9999999999)
+      |> Stdlib.Test.equal(([ "abc" ], 0, 2)) ])

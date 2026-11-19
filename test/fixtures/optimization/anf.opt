@@ -212,7 +212,7 @@ return -3.5
 ---NAME---
 const_fold_float_sqrt
 ---INPUT---
-let x = 9.0 in Stdlib.Float.sqrt (x)
+let x = 9.0 in Stdlib.Float64.sqrt (x)
 ---EXPECTED---
 Function _start(): TFloat64 [entry block0]
 block0():
@@ -221,7 +221,7 @@ return 3
 ---NAME---
 const_fold_int64_to_float
 ---INPUT---
-let x = 42L in Stdlib.Int64.toFloat (x)
+let x = 42L in Stdlib.Int64.toFloat64 (x)
 ---EXPECTED---
 Function _start(): TFloat64 [entry block0]
 block0():
@@ -230,7 +230,7 @@ return 42
 ---NAME---
 const_fold_float_to_bits
 ---INPUT---
-let x = 1.0 in Stdlib.Float.__toBits (x)
+let x = 1.0 in Stdlib.Float64.__toBits (x)
 ---EXPECTED---
 Function _start(): TUInt64 [entry block0]
 block0():
@@ -2240,8 +2240,8 @@ return t5
 cse_reuses_duplicate_float_to_int64
 ---INPUT---
 let f (x: Float) : (Int64 * Int64) =
-  let first = Stdlib.Float.__toInt64Unchecked x in
-  let second = Stdlib.Float.__toInt64Unchecked x in
+  let first = Stdlib.Float64.__toInt64Unchecked x in
+  let second = Stdlib.Float64.__toInt64Unchecked x in
   (first, second)
 ---EXPECTED---
 Function f(t0: TFloat64): TTuple [TInt64; TInt64] [entry block0]
@@ -2419,8 +2419,8 @@ return t5
 cse_reuses_duplicate_int64_to_float
 ---INPUT---
 let f (x: Int64) : Float =
-  let a = Stdlib.Int64.toFloat (x) in
-  let b = Stdlib.Int64.toFloat (x) in
+  let a = Stdlib.Int64.toFloat64 (x) in
+  let b = Stdlib.Int64.toFloat64 (x) in
   a + b
 ---EXPECTED---
 Function f(t0: TInt64): TFloat64 [entry block0]
@@ -2433,8 +2433,8 @@ return t5
 cse_reuses_duplicate_float_to_bits
 ---INPUT---
 let f (x: Float) : (UInt64 * UInt64) =
-  let a = Stdlib.Float.__toBits (x) in
-  let b = Stdlib.Float.__toBits (x) in
+  let a = Stdlib.Float64.__toBits (x) in
+  let b = Stdlib.Float64.__toBits (x) in
   (a, b)
 f (1.5)
 ---EXPECTED---
@@ -2453,8 +2453,8 @@ return t5
 cse_reuses_duplicate_float_sqrt
 ---INPUT---
 let f (x: Float) : Float =
-  let y = Stdlib.Float.sqrt (x) in
-  let z = Stdlib.Float.sqrt (x) in
+  let y = Stdlib.Float64.sqrt (x) in
+  let z = Stdlib.Float64.sqrt (x) in
   y + z
 f (9.0)
 ---EXPECTED---

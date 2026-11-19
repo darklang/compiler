@@ -41,9 +41,9 @@ ENTITIES = {
                                              {"EInt64": [3, 1]}, {"Unknown": []}]}]]}),
     "bigint-hash": fn("Hosted.doubleBig", [("x", {"TBigInt": []})], {"TBigInt": []},
         infix("ArithmeticMultiply", ARG0, {"EBigInt": [3, 2]})),
-    "float-hash": fn("Hosted.isHalf", [("x", {"TFloat": []})], {"TBool": []},
+    "float-hash": fn("Hosted.isHalf", [("x", {"TFloat64": []})], {"TBool": []},
         {"EMatch": [1, ARG0, [
-            dict(pat={"MPFloat": [2, {"Positive": []}, "0", "5"]}, whenCondition={"None": []},
+            dict(pat={"MPFloat64": [2, {"Positive": []}, "0", "5"]}, whenCondition={"None": []},
                  rhs={"EBool": [3, True]}),
             dict(pat={"MPVariable": [4, "_other"]}, whenCondition={"None": []},
                  rhs={"EBool": [5, False]})]]}),

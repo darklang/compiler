@@ -1,48 +1,83 @@
 /// Eval command - evaluate Dark expressions
 module Darklang.Cli.Eval
 
+/// Whether code marked harmful (deprecated as harmful) may run, or halts with an error.
+type Harmful =
+  | Allow
+  | Halt
+
 
 /// Evaluate an expression and hand back the value it produced, not its printed text. A fn's name
 /// evaluates to the fn.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError.ExecutionError'"
 let evaluateValue(
-  accountID: Stdlib.Option.Option<Uuid>,
+  accountID: Option<Uuid>,
   branchId: Uuid,
   expr: String,
-  allowHarmful: Bool)
-  : Stdlib.Result.Result<'a, ExecutionError.ExecutionError> =
-  Builtin.cliEvaluateExpression(accountID, branchId, expr, allowHarmful)
+  harmful: Harmful)
+  : Result<'a, ExecutionError.ExecutionError> =
+  evaluateValueUnder(accountID, branchId, expr, harmful, noGrants())
+
+
+/// <fn evaluateValue> with <param grants> allowed for this evaluation only (`eval --allow`).
+// @compiler blocked: upstream-dependency diagnostic="evaluateValueUnder: Unknown type 'ExecutionError.ExecutionError'"
+let evaluateValueUnder(
+  accountID: Option<Uuid>,
+  branchId: Uuid,
+  expr: String,
+  harmful: Harmful,
+  grants: LanguageTools.Permissions.Policy)
+  : Result<'a, ExecutionError.ExecutionError> =
+  let allowHarmful =
+    match harmful with
+    | Allow -> true
+    | Halt -> false
+
+  Builtin.cliEvaluateExpression(accountID, branchId, expr, allowHarmful, grants)
+
+
+let noGrants(): LanguageTools.Permissions.Policy =
+  LanguageTools.Permissions.Policy { allow = [], deny = [] }
 
 
 /// Evaluate an expression, keeping errors structured for the caller.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError.ExecutionError'"
 let evaluateRaw(
-  accountID: Stdlib.Option.Option<Uuid>,
+  accountID: Option<Uuid>,
   branchId: Uuid,
   expr: String,
   currentModule: List<String>,
-  allowHarmful: Bool)
-  : Stdlib.Result.Result<
-      Stdlib.Option.Option<String>,
-      ExecutionError.ExecutionError> =
-  match evaluateValue(accountID, branchId, expr, allowHarmful) with
+  harmful: Harmful)
+  : Result<Option<String>, ExecutionError.ExecutionError> =
+  evaluateRawUnder(accountID, branchId, expr, currentModule, harmful, noGrants())
+
+
+/// <fn evaluateRaw> with <param grants> allowed for this evaluation only.
+// @compiler blocked: upstream-dependency diagnostic="evaluateRawUnder: Unknown type 'ExecutionError.ExecutionError'"
+let evaluateRawUnder(
+  accountID: Option<Uuid>,
+  branchId: Uuid,
+  expr: String,
+  currentModule: List<String>,
+  harmful: Harmful,
+  grants: LanguageTools.Permissions.Policy)
+  : Result<Option<String>, ExecutionError.ExecutionError> =
+  match evaluateValueUnder(accountID, branchId, expr, harmful, grants) with
   | Ok(value) ->
     // Unit has no output, and a string prints without its quotes.
     match LanguageTools.RuntimeTypes.reflect(value) with
-    | DUnit -> Stdlib.Result.Result.Ok(Stdlib.Option.Option.None)
-    | DString(text) -> Stdlib.Result.Result.Ok(Stdlib.Option.Option.Some(text))
+    | DUnit -> Result.Ok(Option.None)
+    | DString(text) -> Result.Ok(Option.Some(text))
     | dv ->
       let (width, _rows) = Terminal.getSize()
       let color = Stdlib.Cli.Sys.isTerminal(1)
-
-      Stdlib.Result.Result.Ok(
-        Stdlib.Option.Option.Some(
-          Terminal.renderValue(branchId, width, color, currentModule, dv)))
+      Result.Ok(Option.Some(Terminal.renderValue(branchId, width, color, currentModule, dv)))
   | Error(error) ->
     match error with
-    | Runtime(_, _) -> ExecutionError.printCallStack(branchId, "expression", error)
+    | Runtime(_, _, _) -> ExecutionError.printCallStack(branchId, "expression", error)
     | _ -> ()
-    Stdlib.Result.Result.Error(error)
+
+    Result.Error(error)
 
 
 /// Evaluate `expr` and hand back what it produced: `Ok (Some printed)` for a value, `Ok None` for something
@@ -50,35 +85,68 @@ let evaluateRaw(
 /// what this returns, and the workbench REPL keeps it as state. Takes the whole expression as one string,
 /// so a multi-line let-chain survives.
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
-let evaluate(
+let evaluate(state: AppState, expr: String, harmful: Harmful): Result<Option<String>, String> =
+  evaluateUnder(state, expr, harmful, noGrants())
+
+
+// @compiler blocked: upstream-dependency diagnostic="evaluateUnder: Unknown type 'AppState'"
+let evaluateUnder(
   state: AppState,
   expr: String,
-  allowHarmful: Bool)
-  : Stdlib.Result.Result<Stdlib.Option.Option<String>, String> =
+  harmful: Harmful,
+  grants: LanguageTools.Permissions.Policy)
+  : Result<Option<String>, String> =
   // Where the user is standing, so the printed value spells names the way they would.
-  let currentModule =
-    Packages.Traversal.getCurrentModulePath(state.packageData.currentLocation)
-
-  match
-    evaluateRaw(state.accountID, state.currentBranchId, expr, currentModule, allowHarmful)
-  with
-  | Ok(result) -> Stdlib.Result.Result.Ok(result)
+  let currentModule = Packages.Traversal.getCurrentModulePath(state.packageData.currentLocation)
+  match evaluateRawUnder(
+          state.accountID,
+          state.currentBranchId,
+          expr,
+          currentModule,
+          harmful,
+          grants) with
+  | Ok(result) -> Result.Ok(result)
   | Error(err) ->
-    Stdlib.Result.Result.Error(
-      ExecutionError.formatForTerminal(state.accountID, state.currentBranchId, err))
+    Result.Error(ExecutionError.formatForTerminal(state.accountID, state.currentBranchId, err))
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
-  let allowHarmful =
-    Stdlib.List.contains(args, "--allow-harmful")
-  // What the expression cost, net of the measuring harness itself: see Perf.floor.
-  let wantStats =
-    Stdlib.List.contains(args, "--stats")
-  let args =
-    args
-    |> Stdlib.List.filter(fun a -> (a != "--allow-harmful") && (a != "--stats"))
+  let harmful =
+    if Stdlib.List.contains(args, "--allow-harmful") then
+      Harmful.Allow
+    else
+      Harmful.Halt
 
+  // What the expression cost, net of the measuring harness itself: see Perf.floor.
+  let wantStats = Stdlib.List.contains(args, "--stats")
+  let args = args |> Stdlib.List.filter(fun a -> a != "--allow-harmful" && a != "--stats")
+  let (rules, args) = allowRules([], args)
+  match Permissions.Command.replacePolicy([ Stdlib.String.join(rules, ";") ]) with
+  | Error(message) ->
+    printErr(message)
+    failed(state)
+  | Ok(grants) when Stdlib.Bool.not(Stdlib.List.isEmpty(grants.deny)) ->
+    printErr("--allow takes allow rules only")
+    failed(state)
+  | Ok(grants) -> executeUnder(state, args, harmful, wantStats, grants)
+
+
+/// The `--allow <rules>` at the front of <param args>, and what follows them.
+let allowRules(rules: List<String>, args: List<String>): (List<String> * List<String>) =
+  match args with
+  | ["--allow", rule, ...rest] -> allowRules(Stdlib.List.append(rules, rule), rest)
+  | _ -> (rules, args)
+
+
+// @compiler blocked: upstream-dependency diagnostic="executeUnder: Unknown type 'AppState'"
+let executeUnder(
+  state: AppState,
+  args: List<String>,
+  harmful: Harmful,
+  wantStats: Bool,
+  grants: LanguageTools.Permissions.Policy)
+  : AppState =
   match args with
   | [] ->
     Stdlib.printLine(help(state))
@@ -88,49 +156,49 @@ let execute(state: AppState, args: List<String>): AppState =
     // callers can pipe multi-line expressions via heredoc without quoting.
     let expr =
       match args with
-      | [ "-" ] -> Stdlib.Cli.Stdin.readAll()
-      | parts -> Stdlib.Result.Result.Ok(Stdlib.String.join(parts, " "))
+      | ["-"] -> Stdlib.Cli.Stdin.readAll()
+      | parts -> Result.Ok(Stdlib.String.join(parts, " "))
 
     match expr with
     | Error(message) ->
-      Cli.printErr(message)
-      Cli.failed(state)
+      printErr(message)
+      failed(state)
     | Ok(expr) ->
+      let (stats, outcome) =
+        if wantStats then
+          let harness = LanguageTools.Perf.floor()
+          let (raw, result) =
+            LanguageTools.Perf.measure(fun () -> evaluateUnder(state, expr, harmful, grants))
 
-    let (stats, outcome) =
-      if wantStats then
-        let harness = LanguageTools.Perf.floor()
+          (Option.Some(LanguageTools.Perf.minus(raw, harness)), result)
+        else
+          (Option.None, evaluateUnder(state, expr, harmful, grants))
 
-        let (raw, result) =
-          LanguageTools.Perf.measure(fun () -> evaluate(state, expr, allowHarmful))
+      let newState =
+        match outcome with
+        | Ok(Some(s)) ->
+          Stdlib.printLine(s)
+          state
+        | Ok(None) -> state
+        | Error(message) ->
+          Stdlib.printErrorLine($"Error: {message}")
+          { state with exitCode = 1 }
 
-        (Stdlib.Option.Option.Some(LanguageTools.Perf.minus(raw, harness)), result)
-      else
-        (Stdlib.Option.Option.None, evaluate(state, expr, allowHarmful))
+      match stats with
+      | Some(m) ->
+        let _ = Stdlib.printLine("")
 
-    let newState =
-      match outcome with
-      | Ok(Some(s)) ->
-        Stdlib.printLine(s)
-        state
-      | Ok(None) -> state
-      | Error(message) ->
-        Stdlib.printErrorLine($"Error: {message}")
-        { state with exitCode = 1 }
+        let _ = Stdlib.printLine(LanguageTools.Perf.render(m))
 
-    match stats with
-    | Some(m) ->
-      let _ = Stdlib.printLine("")
-      let _ = Stdlib.printLine(LanguageTools.Perf.render(m))
-      // TODO: report the phases instead of warning about them. `cliEvaluateExpression` already
-      // splits `parseCliExpr` from `execute`, so bracketing each would turn this line into two
-      // rows. F# on the eval path, so it wants its own change and its own measurement.
-      let _ =
-        Stdlib.printLine(
-          "  (includes parsing and name resolution; Perf.measure in a script brackets execution alone)")
+        // TODO: report the phases instead of warning about them. `cliEvaluateExpression` already
+        // splits `parseCliExpr` from `execute`, so bracketing each would turn this line into two
+        // rows. F# on the eval path, so it wants its own change and its own measurement.
+        let _ =
+          Stdlib.printLine(
+            "  (includes parsing and name resolution; Perf.measure in a script brackets execution alone)")
 
-      newState
-    | None -> newState
+        newState
+      | None -> newState
 
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
@@ -140,11 +208,11 @@ let complete(_state: AppState, _args: List<String>): List<Completion.CompletionI
 
 // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
-  [
-    "Usage: eval <expression>"
+  [ "Usage: eval [--allow <rules>] <expression>"
     "       eval -    (read expression from stdin, for multi-line input)"
     "Evaluate a Dark expression and display the result."
     ""
+    "  --allow   allow resources for this evaluation only, as `run --allow` does"
     "  --stats   also report what it cost: allocation, time, instructions, calls and"
     "            frame pushes, net of the measuring harness, tagged with the build they"
     "            came from. Inside a script, call Perf.measure instead: it measures the"
@@ -157,8 +225,8 @@ let help(_state: AppState): String =
     "  eval Stdlib.String.length(\"test\") - Function calls"
     ""
     "  # Multi-line expression via stdin (run from shell, not the REPL):"
-    "  ./scripts/run-cli eval - <<'EOF'"
+    "  dark eval - <<'EOF'"
     "  let xs = [1, 2, 3]"
     "  Stdlib.List.length(xs)"
-    "  EOF"
-  ] |> Stdlib.String.join("\n")
+    "  EOF" ]
+  |> Stdlib.String.join("\n")

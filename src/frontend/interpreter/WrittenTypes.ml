@@ -682,6 +682,7 @@ let primTypes =
     ("Int128", fun range -> TInt128 range);
     ("UInt128", fun range -> TUInt128 range);
     ("Float", fun range -> TFloat range);
+    ("Float64", fun range -> TFloat range);
     ("Char", fun range -> TChar range);
     ("String", fun range -> TString range);
     ("DateTime", fun range -> TDateTime range);

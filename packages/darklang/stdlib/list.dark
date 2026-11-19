@@ -674,7 +674,7 @@ let __floatsDisplayItems (list: List<Float>) (first: Bool) : String =
         match Stdlib.List.__head list with
         | None -> ""
         | Some h ->
-            let item = Stdlib.Float.toString h in
+            let item = Stdlib.Float64.toString h in
             let tail = Stdlib.List.__tail list in
             let rest = Stdlib.List.__floatsDisplayItems tail false in
             if first then item + rest else ", " + item + rest

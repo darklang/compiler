@@ -174,14 +174,14 @@ tak 7L 4L 2L = 4L
 let leibnizLoop (i: Int64) (n: Int64) (sum: Float) (sign: Float) : Float =
     if i >= n then sum * 4.0
     else
-        let term = sign / Stdlib.Int64.toFloat (2L * i + 1L) in
-        leibnizLoop (i + 1L) n (sum + term) (Stdlib.Float.negate sign)
+        let term = sign / Stdlib.Int64.toFloat64 (2L * i + 1L) in
+        leibnizLoop (i + 1L) n (sum + term) (Stdlib.Float64.negate sign)
 
 let leibnizPi (n: Int64) : Float =
     leibnizLoop 0L n 0.0 1.0
 
-Stdlib.Float.toInt (leibnizPi 100L * 100.0) = 313
-Stdlib.Float.toInt (leibnizPi 1000L * 1000.0) = 3140
+Stdlib.Float64.toInt (leibnizPi 100L * 100.0) = 313
+Stdlib.Float64.toInt (leibnizPi 1000L * 1000.0) = 3140
 
 // ===================================================================
 // Pi Sum (pisum) - partial sum of 1/k^2 series
@@ -190,14 +190,14 @@ Stdlib.Float.toInt (leibnizPi 1000L * 1000.0) = 3140
 let innerSum (k: Int64) (n: Int64) (acc: Float) : Float =
     if k > n then acc
     else
-        let kf = Stdlib.Int64.toFloat k in
+        let kf = Stdlib.Int64.toFloat64 k in
         innerSum (k + 1L) n (acc + 1.0 / (kf * kf))
 
 let pisum (rounds: Int64) (n: Int64) (lastResult: Float) : Float =
     if rounds <= 0L then lastResult
     else pisum (rounds - 1L) n (innerSum 1L n 0.0)
 
-Stdlib.Float.toInt (pisum 1L 10L 0.0 * 1000000.0) = 1549767
+Stdlib.Float64.toInt (pisum 1L 10L 0.0 * 1000000.0) = 1549767
 
 // ===================================================================
 // N-Queens (nqueen) - count solutions using bit manipulation
@@ -350,7 +350,7 @@ let makeRandomFasta (n: Int64) (table: List<(Int64 * Float)>) (seed: Int64) (i: 
     if i >= n then (checksum, seed)
     else
         let newSeed = (seed * 3877L + 29573L) % 139968L in
-        let r = Stdlib.Int64.toFloat newSeed / 139968.0 in
+        let r = Stdlib.Int64.toFloat64 newSeed / 139968.0 in
         let c = selectRandom table r 0L in
         let newChecksum = (checksum + c * (i + 1L)) % 1000000007L in
         makeRandomFasta n table newSeed (i + 1L) newChecksum
@@ -381,7 +381,7 @@ fastaChecksum 100L = 19053841L
 let spectralMatA (i: Int64) (j: Int64) : Float =
     let ij = i + j in
     let div = ij * (ij + 1L) / 2L + i + 1L in
-    1.0 / Stdlib.Int64.toFloat div
+    1.0 / Stdlib.Int64.toFloat64 div
 
 let spectralGet3 (v: (Float * Float * Float)) (i: Int64) : Float =
     let (first, second, third) = v in
@@ -411,7 +411,7 @@ let spectralDot3 (a: (Float * Float * Float)) (b: (Float * Float * Float)) : Flo
     let (b0, b1, b2) = b in
     a0 * b0 + a1 * b1 + a2 * b2
 
-let spectralV = spectralAtav3 ((1.0, 1.0, 1.0)) in let spectralU = spectralAtav3 spectralV in Stdlib.Float.toInt (Stdlib.Float.sqrt (spectralDot3 spectralU spectralV / spectralDot3 spectralV spectralV) * 1000000000.0) = 1233643706
+let spectralV = spectralAtav3 ((1.0, 1.0, 1.0)) in let spectralU = spectralAtav3 spectralV in Stdlib.Float64.toInt (Stdlib.Float64.sqrt (spectralDot3 spectralU spectralV / spectralDot3 spectralV spectralV) * 1000000000.0) = 1233643706
 
 // ===================================================================
 // Hello World (helloworld) - simplest benchmark

@@ -2,7 +2,9 @@ module Darklang.Cli.Tests.File
 
 // withTemp removes each temporary file after the check.
 module WriteReadRoundtrip =
-  let testContents(): String = "Test conrents"
+  let testContents(): String =
+    "Test conrents"
+
 
   // Check the write result as well as the bytes read back.
   test roundtrip =
@@ -12,9 +14,11 @@ module WriteReadRoundtrip =
       let readBack = Stdlib.Cli.FileSystem.readFile(filename) |> Builtin.unwrap
       Stdlib.Test.all(
         [ written |> Stdlib.Test.equal(Stdlib.Result.Result.Ok())
+
           Stdlib.Utf8.decode(readBack)
           |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(testContents())) ]))
     |> Builtin.unwrap
+
 
 module MissingFile =
   // A missing file is `NotFound`, not `Other`: on Linux the open fails inside
@@ -27,13 +31,33 @@ module MissingFile =
         Stdlib.Result.Result.Error(Stdlib.Cli.FileSystem.FileError.NotFound)))
     |> Builtin.unwrap
 
+
+  // An empty path names no file, as for the OS; it is not a permission problem.
+  test emptyPathIsNotFound =
+    Stdlib.Test.all(
+      [ Stdlib.Cli.FileSystem.readFile("")
+        |> Stdlib.Test.equal(
+          Stdlib.Result.Result.Error(Stdlib.Cli.FileSystem.FileError.NotFound))
+
+        Stdlib.Cli.FileSystem.writeFile("", Stdlib.Utf8.encode("x"))
+        |> Stdlib.Test.equal(
+          Stdlib.Result.Result.Error(Stdlib.Cli.FileSystem.FileError.NotFound))
+
+        Stdlib.Cli.FileSystem.deleteFile("")
+        |> Stdlib.Test.equal(
+          Stdlib.Result.Result.Error(Stdlib.Cli.FileSystem.FileError.NotFound)) ])
+
+
   // `Stdlib.display` takes the error as it comes out of a failed read.
+  // @compiler blocked: upstream-dependency diagnostic="MissingFile / test fileErrorHasToString: Unknown type 'File'"
   test fileErrorHasToString =
     Stdlib.Test.all(
       [ Stdlib.display(Stdlib.Cli.FileSystem.FileError.NotFound)
         |> Stdlib.Test.equal("File not found")
+
         Stdlib.display(Stdlib.Cli.FileSystem.FileError.Other("disk full"))
         |> Stdlib.Test.equal("disk full") ])
+
 
 module AreIdentical =
   // Each file is read separately, so the two Bytes are separate values and
@@ -47,8 +71,10 @@ module AreIdentical =
       |> Builtin.unwrap)
     |> Builtin.unwrap
 
+
   test sameContents =
     compareWith("same contents", "same contents") |> Stdlib.Test.equal(true)
+
 
   test differentContents =
     compareWith("same contents", "same contentz") |> Stdlib.Test.equal(false)
@@ -58,27 +84,47 @@ module WriteErrors =
   // An existing file cannot be a parent directory. Keep mkdir's structured error.
   test parentIsFile =
     Stdlib.Cli.File.withTemp(fun filename ->
-      Stdlib.Cli.FileSystem.writeFile(filename + "/child/file", Stdlib.Utf8.encode("x"))
+      Stdlib.Cli.FileSystem.writeFile(
+        filename + "/child/file",
+        Stdlib.Utf8.encode("x"))
       |> Stdlib.Test.equal(
         Stdlib.Result.Result.Error(Stdlib.Cli.FileSystem.FileError.NotFound)))
     |> Builtin.unwrap
 
+
   // Parent creation succeeds, but opening a directory as a file fails.
+  // @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<Unit, Darklang.Stdlib.Cli.FileSystem.FileError>.Error(Darklang.Stdlib.Cli.FileSystem.FileError.Other(\"Is a directory\")), " class=missing-support reason=compiler-gap
   test targetIsDirectory =
     Stdlib.Cli.File.withTemp(fun filename ->
       let directory = filename + "-dir"
       let _ = Stdlib.Cli.Dir.create(directory) |> Builtin.unwrap
-      let result = Stdlib.Cli.FileSystem.writeFile(directory, Stdlib.Utf8.encode("x"))
+      let result =
+        Stdlib.Cli.FileSystem.writeFile(directory, Stdlib.Utf8.encode("x"))
+
       let _ = Stdlib.Cli.Dir.delete(directory) |> Builtin.unwrap
-      result |> Stdlib.Test.equal(
-        Stdlib.Result.Result.Error(Stdlib.Cli.FileSystem.FileError.OsAccessDenied)))
+      result
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(Stdlib.Cli.FileSystem.FileError.Other("Is a directory"))))
+    |> Builtin.unwrap
+
+
+module ReadErrors =
+  // a directory is not a permission problem
+  // @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<String, String>.Error(\"Is a directory\"), got Darklang.Stdlib.Result.Result<String, String>.Error(\"Permission denied\")" class=missing-support reason=compiler-gap
+  test readingADirectory =
+    Stdlib.Cli.Dir.withTemp(fun dir ->
+      Stdlib.Cli.FileSystem.readFileAsString(dir)
+      |> Stdlib.Result.mapError(Stdlib.Cli.FileSystem.FileError.toString)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Error("Is a directory")))
     |> Builtin.unwrap
 
 
 module ListErrors =
   test missingDirectory =
     Stdlib.Cli.FileSystem.listDirectory("/nonexistent-dark-test-dir")
-    |> Stdlib.Test.equal(Stdlib.Result.Result.Error(Stdlib.Cli.FileSystem.FileError.NotFound))
+    |> Stdlib.Test.equal(
+      Stdlib.Result.Result.Error(Stdlib.Cli.FileSystem.FileError.NotFound))
+
 
   test existingDirectory =
     Stdlib.Cli.Dir.withTemp(fun dir ->

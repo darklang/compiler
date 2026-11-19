@@ -76,7 +76,7 @@ let greaterThan (a: Int128) (b: Int128) : Bool = Stdlib.Int128.lessThan b a
 let greaterThanOrEqualTo (a: Int128) (b: Int128) : Bool = Stdlib.Int128.lessThanOrEqualTo b a
 
 let sqrt (value: Int128) : Float = Stdlib.Int.__sqrt (Stdlib.Int128.__toInt value)
-let toFloat (value: Int128) : Float = Stdlib.Int.__toFloat (Stdlib.Int128.__toInt value)
+let toFloat64 (value: Int128) : Float = Stdlib.Int.__toFloat (Stdlib.Int128.__toInt value)
 let sum (values: List<Int128>) : Int128 = Stdlib.List.fold values (0Q) (fun acc value -> Stdlib.Int128.add acc value)
 let max (a: Int128) (b: Int128) : Int128 = if Stdlib.Int128.greaterThan a b then a else b
 let min (a: Int128) (b: Int128) : Int128 = if Stdlib.Int128.lessThan a b then a else b

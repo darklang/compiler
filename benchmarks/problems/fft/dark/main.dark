@@ -27,7 +27,7 @@ let combine (evens: List<Complex>) (odds: List<Complex>) (index: Int64) (size: I
     | ([], []) ->
         Stdlib.List.concat (Stdlib.List.reverse lower) (Stdlib.List.reverse upper)
     | (even :: evenRest, odd :: oddRest) ->
-        let angle = -6.283185307179586 * Stdlib.Int64.toFloat index / Stdlib.Int64.toFloat size in
+        let angle = -6.283185307179586 * Stdlib.Int64.toFloat64 index / Stdlib.Int64.toFloat64 size in
         let twiddle = Complex { real = Stdlib.Math.cos angle, imaginary = Stdlib.Math.sin angle } in
         let product = multiply twiddle odd in
         combine evenRest oddRest (index + 1L) size (Stdlib.List.push lower (add even product)) (Stdlib.List.push upper (subtract even product))
@@ -44,7 +44,7 @@ let fft (values: List<Complex>) (size: Int64) : List<Complex> =
 let generateInput (remaining: Int64) (index: Int64) (reversed: List<Complex>) : List<Complex> =
     if remaining <= 0L then Stdlib.List.reverse reversed
     else
-        let x = Stdlib.Int64.toFloat index in
+        let x = Stdlib.Int64.toFloat64 index in
         let value = Complex {
             real = Stdlib.Math.sin (x * 0.017) + Stdlib.Math.cos (x * 0.031),
             imaginary = Stdlib.Math.cos (x * 0.013) - Stdlib.Math.sin (x * 0.007)
@@ -55,7 +55,7 @@ let checksum (values: List<Complex>) (index: Int64) (result: Int64) : Int64 =
     match values with
     | [] -> result
     | value :: rest ->
-        let quantized = Builtin.unwrap (Stdlib.Int64.fromFloat ((value.real * 3.0 + value.imaginary * 5.0) * 1000000.0)) in
+        let quantized = Builtin.unwrap (Stdlib.Int64.fromFloat64 ((value.real * 3.0 + value.imaginary * 5.0) * 1000000.0)) in
         checksum rest (index + 1L) ((result + quantized * (index + 1L)) % 1000000007L)
 
 let run (remaining: Int64) (input: List<Complex>) (size: Int64) (result: Int64) : Int64 =

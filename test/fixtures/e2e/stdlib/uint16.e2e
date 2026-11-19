@@ -175,8 +175,8 @@ Stdlib.UInt16.sum ([10us, 20us, 30us]) = 60us
 // Stdlib.UInt16.sqrt - not implemented
 // Stdlib.UInt16.sqrt(4) = 2.0
 
-// Stdlib.UInt16.toFloat - not implemented
-// Stdlib.UInt16.toFloat(2) = 2.0
+// Stdlib.UInt16.toFloat64 - not implemented
+// Stdlib.UInt16.toFloat64(2) = 2.0
 
 // Stdlib.UInt16.parse - needs Result type (blocked by type checker bug)
 // Stdlib.UInt16.parse("1") = Ok(1)

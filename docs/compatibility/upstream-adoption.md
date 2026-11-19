@@ -35,7 +35,7 @@ coverage when changing optimizer rules or sharing library code.
 | Char | `toAsciiCode` accepts only a single ASCII scalar. `isAlphanumeric` follows letters or decimal digits, excluding superscript digits and Roman numerals. See [text](stdlib/text.md). |
 | Float | `toBits` returns `UInt64` (negative zero: `9223372036854775808UL`); `clampRefusingNaN` replaces `clamp`; `isFinite` rejects NaN/infinity. See [Float/Math](stdlib/floats-and-math.md). |
 | Math | `tanh` computes hyperbolic tangent, superseding the old interpreter `Sinh` bug. |
-| Float-to-integer conversion | `Int64.fromFloat`/`UInt64.fromFloat` and rounded variants return `Some` only for finite in-range inputs. |
+| Float-to-integer conversion | `Int64.fromFloat64`/`UInt64.fromFloat64` and rounded variants return `Some` only for finite in-range inputs. |
 | String comparison | Ordinal UTF-16 comparison; only the result sign is significant. |
 | List | `contains` replaces `member`; `setAt` supports negative indices and returns `IndexOutOfBounds` outside the list. |
 | List key semantics | Canonical comparison equality includes nested NaNs; reject Function, Blob and Stream keys. The ordered scan remains quadratic in distinct keys. `dedup` preserves first occurrence; `uniqueBy` keeps the first value per key, then sorts survivors. Ordinary equality is unchanged. |

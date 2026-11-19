@@ -58,7 +58,7 @@ class DiagnosticReferenceTests(unittest.TestCase):
 
     def test_float_conversion_retains_failure_on_out_of_range_values(self) -> None:
         transformed = adapt_interpreter_source(
-            "Stdlib.Int64.fromFloat (1.5)\nStdlib.Cli.Args.int64 0", ("4",))
+            "Stdlib.Int64.fromFloat64 (1.5)\nStdlib.Cli.Args.int64 0", ("4",))
         self.assertIn("interpreterInt64FromFloat (1.5)", transformed)
         self.assertIn("| Some number -> number", transformed)
         self.assertIn('| None -> Builtin.testRuntimeError "float is outside Int64 range"', transformed)

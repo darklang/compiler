@@ -176,9 +176,9 @@ Stdlib.Int64.sum ([10L, 20L, 30L]) = 60L
 // Stdlib.Int64.sqrt(4) = 2.0
 // Stdlib.Int64.sqrt(100) = 10.0
 
-// Stdlib.Int64.toFloat - implemented and covered in float.e2e
-// Stdlib.Int64.toFloat(2) = 2.0
-// Stdlib.Int64.toFloat(-5) = -5.0
+// Stdlib.Int64.toFloat64 - implemented and covered in float.e2e
+// Stdlib.Int64.toFloat64(2) = 2.0
+// Stdlib.Int64.toFloat64(-5) = -5.0
 
 // Stdlib.Int64.parse - needs Result type (blocked by type checker bug)
 // Stdlib.Int64.parse("1") = Ok(1)
