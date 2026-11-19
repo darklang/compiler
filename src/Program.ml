@@ -144,6 +144,7 @@ type cliCommand =
   | SingleCommand of cliOptions
   | BatchCommand of batchCliOptions
   | CheckCommand of checkCliOptions
+  | PrepareCommand of targetSelection * string
 
 module X = CompilationContexts
 
@@ -692,8 +693,29 @@ let parseBatchArgs argv =
   in
   flags HostTarget Normal false None None None false None args
 
+(* `prepare --cache-dir DIR [--target T]`: only the stdlib, into DIR. *)
+let parsePrepareArgs args =
+  let rec flags target cacheDir = function
+    | [] -> (
+        match cacheDir with
+        | Some directory -> Ok (PrepareCommand (target, directory))
+        | None -> Error "prepare requires --cache-dir")
+    | "--cache-dir" :: value :: rest ->
+        let* directory = parseCacheDirValue value in
+        flags target (Some directory) rest
+    | flag :: rest when String.starts_with ~prefix:"--cache-dir=" flag ->
+        flags target cacheDir
+          ("--cache-dir" :: String.sub flag 12 (String.length flag - 12) :: rest)
+    | "--target" :: value :: rest ->
+        let* target = parseTargetValue value in
+        flags target cacheDir rest
+    | argument :: _ -> Error ("Unexpected prepare argument: " ^ argument)
+  in
+  flags HostTarget None args
+
 let parseCommand argv =
   match Array.to_list argv with
+  | "prepare" :: rest -> parsePrepareArgs rest
   | "--batch" :: rest ->
       Result.map
         (fun value -> BatchCommand value)
@@ -1115,6 +1137,15 @@ let checkReportJson name specialized (diagnostic : Diagnostic.t option) =
          ("status", `String status);
          ( "typeArguments",
            match specialized with None -> `Null | Some args -> `String args );
+         ( "reason",
+           `String
+             (Option.fold ~none:""
+                ~some:(fun d -> Diagnostic.kind d.Diagnostic.reason)
+                diagnostic) );
+         ( "error",
+           `String
+             (Option.fold ~none:"" ~some:(fun d -> d.Diagnostic.message) diagnostic)
+         );
          ( "diagnostic",
            match diagnostic with
            | None -> `Null
@@ -1297,6 +1328,7 @@ let usageLines =
     "                                       Compile and run";
     "  darkc --check [--json] --package-server URL NAME...";
     "                                       Report whether each package fn or value compiles, and why not";
+    "  darkc prepare --cache-dir DIR        Prepare the stdlib in DIR and nothing else";
     "  darkc --batch [OPTIONS] -- SOURCE OUTPUT [SOURCE OUTPUT ...]";
     "  darkc --batch [OPTIONS] --manifest FILE";
     "";
@@ -1468,6 +1500,16 @@ let main argv =
         0
     | Ok (BatchCommand options) -> compileBatch ?progress options
     | Ok (CheckCommand options) -> checkItems ?progress options
+    | Ok (PrepareCommand (target, directory)) -> (
+        let prepared =
+          let* target = selectedTarget target in
+          StdlibCache.buildStdlib ~directory:(Some directory) ?progress target
+        in
+        match prepared with
+        | Ok _ -> 0
+        | Error message ->
+            prerr_endline ("Error: " ^ message);
+            1)
     | Ok (SingleCommand options) -> (
         let source =
           match options.entry with

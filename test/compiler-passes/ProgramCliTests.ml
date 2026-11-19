@@ -122,6 +122,8 @@ let batchValue (value : P.batchCliOptions) =
     ]
 
 let formatCommand = function
+  | P.PrepareCommand (target, directory) ->
+      V.format (V.Union ("PrepareCommand", [ targetValue target; V.Text directory ]))
   | P.SingleCommand value ->
       V.format (V.Union ("SingleCommand", [ optionsValue value ]))
   | P.BatchCommand value ->
@@ -472,8 +474,16 @@ let testDiagnosticReadsPackageUnitPosition () =
         ("Unexpected location: "
         ^ Yojson.Basic.to_string (Diagnostic.toJson diagnostic))
 
+let testPrepareNeedsACacheDir () =
+  match (P.parseCommand [| "prepare" |], P.parseCommand [| "prepare"; "--cache-dir"; "/tmp/c" |]) with
+  | Error error, Ok (P.PrepareCommand (P.HostTarget, "/tmp/c"))
+    when Text.contains error "--cache-dir" ->
+      Ok ()
+  | _ -> Error "Expected prepare to need, and take, --cache-dir"
+
 let tests =
   [
+    ("prepare takes --cache-dir", testPrepareNeedsACacheDir);
     ("parse --check after shared flags", testCheckAfterSharedFlags);
     ("reject compile flags with --check", testCheckRejectsCompileFlags);
     ("parse an entry compile", testEntryParses);

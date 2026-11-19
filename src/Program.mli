@@ -95,6 +95,7 @@ type cliCommand =
   | SingleCommand of cliOptions
   | BatchCommand of batchCliOptions
   | CheckCommand of checkCliOptions
+  | PrepareCommand of targetSelection * string
 
 val verbosityToInt : verbosityLevel -> int
 val shouldShowNormal : verbosityLevel -> bool

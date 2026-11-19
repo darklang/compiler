@@ -16,7 +16,9 @@ darkc --entry HASH --package-server URL --cache-dir DIR -q -o OUTPUT [--json]
   it from `URL/function/get/with-location/HASH`.
 - The fn takes `List<String>` (the command-line words after the program name)
   or nothing (`()`), and returns `Unit` (the executable exits 0) or `Int64` (the
-  executable exits with that code). These are `dark run`'s rules. Any other
+  executable exits with that code). These are `dark run`'s rules, including
+  its range: a result outside 0-255 prints
+  `Script returned N, but an exit code must be 0-255.` on stderr and exits 1. Any other
   signature is refused with a `not-an-entry` diagnostic before compiling.
 - darkc writes the argv and exit wiring itself; Dark sends no source text.
 - `-r` instead of `-o OUTPUT` compiles to a temporary file and runs it.
@@ -41,12 +43,14 @@ Darklang.Me.Tools.report: can't compile: uses function or value Builtin.pmLocati
 `--json`, one object per line:
 
 ```json
-{"name":"Darklang.Me.Tools.report","status":"failed","typeArguments":null,"diagnostic":{...}}
+{"name":"Darklang.Me.Tools.report","status":"failed","typeArguments":null,"reason":"missing-builtin","error":"Compilation failed: ...","diagnostic":{...}}
 ```
 
 `status` is `compiles`, `failed`, or `undetermined` (a generic fn that no
 probed type arguments settled). `typeArguments` names the type arguments a
-generic fn compiled at, or is null. `diagnostic` is null when it compiles.
+generic fn compiled at, or is null. `reason` is the diagnostic's
+`reason.kind` and `error` its `message`, both empty when it compiles.
+`diagnostic` is null when it compiles.
 
 ## Diagnostics
 
@@ -86,8 +90,21 @@ Without `--json`, darkc prints `message` (or `Error: …` for a bad command line
 `--cache-dir DIR` is where darkc keeps the prepared stdlib
 (`stdlib-<target>-<darkc digest>.bin`, about 150 MB) and the package answers
 (`packages.sqlite3`). A relative `DIR` is taken from the current directory.
-Without `--cache-dir`, darkc keeps nothing between runs and prepares the stdlib
+One process at a time prepares into a directory (`stdlib.lock`); the others
+wait for its result. A preparation that was killed leaves a
+`stdlib-*.partial`, which the next one removes. Without `--cache-dir`, darkc
+keeps nothing between runs and prepares the stdlib
 in memory each time (about 80 s).
+
+## Preparing the stdlib ahead of time
+
+```bash
+darkc prepare --cache-dir DIR [--target linux-x86_64]
+```
+
+Prepares the stdlib into `DIR` and exits: 0 on success, 1 with the error on
+stderr. It prints nothing else. A compile that finds the prepared stdlib in
+the same `--cache-dir` starts in seconds.
 
 ## Exit codes
 

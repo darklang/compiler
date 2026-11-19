@@ -196,41 +196,34 @@ let reasonText diagnostic =
 
 let optional f = function None -> `Null | Some value -> f value
 
-let reasonJson = function
+let kind = function
   | MissingFunction name ->
-      `Assoc
+      if String.starts_with ~prefix:"Builtin." name then "missing-builtin"
+      else "missing-function"
+  | MissingType _ -> "missing-type"
+  | UnsupportedFeature _ -> "unsupported-feature"
+  | NeedsTypeArguments _ -> "needs-type-arguments"
+  | NotAnEntry _ -> "not-an-entry"
+  | EntryNotFound _ -> "entry-not-found"
+  | Usage -> "usage"
+  | CompilerError _ -> "compiler-error"
+
+let reasonJson reason =
+  let details =
+    match reason with
+    | MissingFunction name | MissingType name -> [ ("name", `String name) ]
+    | UnsupportedFeature feature -> [ ("feature", `String feature) ]
+    | NeedsTypeArguments name ->
+        [ ("name", optional (fun name -> `String name) name) ]
+    | NotAnEntry { parameters; returnType } ->
         [
-          ( "kind",
-            `String
-              (if String.starts_with ~prefix:"Builtin." name then
-                 "missing-builtin"
-               else "missing-function") );
-          ("name", `String name);
-        ]
-  | MissingType name ->
-      `Assoc [ ("kind", `String "missing-type"); ("name", `String name) ]
-  | UnsupportedFeature feature ->
-      `Assoc
-        [
-          ("kind", `String "unsupported-feature"); ("feature", `String feature);
-        ]
-  | NeedsTypeArguments name ->
-      `Assoc
-        [
-          ("kind", `String "needs-type-arguments");
-          ("name", optional (fun name -> `String name) name);
-        ]
-  | NotAnEntry { parameters; returnType } ->
-      `Assoc
-        [
-          ("kind", `String "not-an-entry");
           ("parameters", `List (List.map (fun p -> `String p) parameters));
           ("returnType", `String returnType);
         ]
-  | EntryNotFound hash ->
-      `Assoc [ ("kind", `String "entry-not-found"); ("hash", `String hash) ]
-  | Usage -> `Assoc [ ("kind", `String "usage") ]
-  | CompilerError _ -> `Assoc [ ("kind", `String "compiler-error") ]
+    | EntryNotFound hash -> [ ("hash", `String hash) ]
+    | Usage | CompilerError _ -> []
+  in
+  `Assoc (("kind", `String (kind reason)) :: details)
 
 let toJson diagnostic : Yojson.Basic.t =
   let int = optional (fun value -> `Int value) in

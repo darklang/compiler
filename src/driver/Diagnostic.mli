@@ -33,4 +33,7 @@ val usage : string -> t
 val missing : t -> string option
 val undetermined : t -> bool
 val reasonText : t -> string
+
+(* The reason's tag, such as "missing-builtin". *)
+val kind : reason -> string
 val toJson : t -> Yojson.Basic.t
