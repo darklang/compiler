@@ -10,7 +10,7 @@ let serialize(value: 'a): String =
 
 
 /// Serializes a Dark value to a JSON string, as <param options> say.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Json.serializeWith: Type arguments require a named function"
+// @compiler replace: packages/darklang/stdlib/json.dark#Darklang.Stdlib.Json.serializeWith reason=compiler-implementation
 let serializeWith(options: Options.Options, value: 'a): String =
   Builtin.jsonSerialize<'a>(options, value)
 
@@ -23,7 +23,7 @@ let checkedSerialize(value: 'a): Result<String, SerializeError.SerializeError> =
 
 
 /// <fn checkedSerialize>, as <param options> say.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Json.checkedSerializeWith: Type arguments require a named function"
+// @compiler replace: packages/darklang/stdlib/json.dark#Darklang.Stdlib.Json.checkedSerializeWith reason=compiler-implementation
 let checkedSerializeWith(
   options: Options.Options,
   value: 'a)

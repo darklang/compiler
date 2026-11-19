@@ -2403,7 +2403,6 @@ module Option =
       { noneFields = Stdlib.Json.Options.NoneFields.Null }
 
 
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test serialize =
     Stdlib.Test.all(
       [ Stdlib.Json.serialize<Option<Int64>>(Option.None)
@@ -2430,7 +2429,6 @@ module Option =
 
 
   /// Where the `Some` can itself be `null`, the outer `Option` keeps the tagged form.
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test serializeNested =
     Stdlib.Test.all(
       [ Stdlib.Json.serialize<Option<Option<Int64>>>(Option.None)
@@ -2462,7 +2460,7 @@ module Option =
         |> Stdlib.Test.equal("{\"Some\":[null]}") ])
 
 
-  // @compiler xfail compile: "Type arguments require a named function" class=missing-support reason=compiler-gap
+  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test serializeFields =
     Stdlib.Test.all(
       [ Stdlib.Json.serialize<Reading>(
@@ -2502,7 +2500,6 @@ module Option =
         |> Stdlib.Test.equal("{\"t\":{\"Some\":[null]}}") ])
 
 
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test parse =
     Stdlib.Test.all(
       [ Stdlib.Json.parse<Option<Int64>>("null")
@@ -2536,7 +2533,6 @@ module Option =
 
   /// The tagged form still reads, but only where the type is an `Option`, and only where the
   /// value doesn't read as the `Some` first.
-  // @compiler blocked: compiler-crash diagnostic="runtime exit code 139 (SIGSEGV)"
   test parseTagged =
     Stdlib.Test.all(
       [ Stdlib.Json.parse<Option<Int64>>("{\"None\":[]}")
@@ -2565,7 +2561,7 @@ module Option =
 
 
   /// `parse<T>(serialize<T>(x))` is `Ok(x)`, with either `NoneFields`.
-  // @compiler xfail compile: "Type arguments require a named function" class=missing-support reason=compiler-gap
+  // @compiler xfail runtime: "Json.parse was not specialized" class=missing-support reason=compiler-gap
   test roundTrips =
     Stdlib.Test.all(
       [ [ Option.None, Option.Some(Option.None), Option.Some(Option.Some(1)) ]
@@ -2636,7 +2632,6 @@ module Option =
 
 
   module Errors =
-    // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
     test parseErrors =
       Stdlib.Test.all(
         [ Stdlib.Json.parse<Option<List<String>>>("[1,2,3]")
@@ -2678,7 +2673,6 @@ module ParseErrorToString =
 
 
 module Result =
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test serialize =
     Stdlib.Test.all(
       [ Stdlib.Json.serialize<Result<Int64, String>>(Result.Ok(1))
@@ -3008,7 +3002,6 @@ module UserDefinedRecords =
 
 
   module OptionalFields =
-    // @compiler xfail runtime: "expected Ok(Stdlib.Json.Tests.UserDefinedRecords.Profile {" class=missing-support reason=compiler-gap
     test missingOptionFieldsAreNone =
       Stdlib.Json.parse<Profile>("""{ "Name": "Bob" }""")
       |> Stdlib.Test.equal(
@@ -3025,7 +3018,6 @@ module UserDefinedRecords =
             { Name = "Bob", Nickname = Option.Some("B"), Age = Option.None }))
 
 
-    // @compiler xfail runtime: "expected Ok(Stdlib.Json.Tests.UserDefinedRecords.Profile {" class=missing-support reason=compiler-gap
     test plainValuesAreSome =
       Stdlib.Json.parse<Profile>(
         """{ "Name": "Bob", "Nickname": "B", "Age": 42 }""")
@@ -3037,7 +3029,6 @@ module UserDefinedRecords =
               Age = Option.Some(42) }))
 
 
-    // @compiler xfail runtime: "expected Ok(Stdlib.Json.Tests.UserDefinedRecords.Profile {" class=missing-support reason=compiler-gap
     test nullIsNone =
       Stdlib.Json.parse<Profile>(
         """{ "Name": "Bob", "Nickname": null, "Age": null }""")
@@ -3054,7 +3045,6 @@ module UserDefinedRecords =
       |> Stdlib.Test.equal(Result.Ok(p))
 
 
-    // @compiler xfail runtime: "as type `Int64` at path: `root.Age`" class=missing-support reason=compiler-gap
     test plainValueOfWrongTypeIsAnError =
       Stdlib.Json.parse<Profile>("""{ "Name": "Bob", "Age": "old" }""")
       |> err
@@ -3063,7 +3053,6 @@ module UserDefinedRecords =
           "Can't parse JSON `\"old\"` as type `Int64` at path: `root.Age`"))
 
 
-    // @compiler xfail runtime: "expected Ok(Stdlib.Json.Tests.UserDefinedRecords.Combo<Int64, Darklang.Stdlib.Option.Option<Int64>> {" class=missing-support reason=compiler-gap
     test missingTypeArgOptionIsNone =
       Stdlib.Json.parse<Combo<Int64, Option<Int64>>>("""{ "e1": 1 }""")
       |> Stdlib.Test.equal(Result.Ok(Combo { e1 = 1, e2 = Option.None }))
@@ -3183,7 +3172,6 @@ module UserDefinedAliases =
 
 
 module Package =
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test serialize =
     Stdlib.Test.all(
       [ Stdlib.Json.serialize<Option<Int64>>(Option.None)

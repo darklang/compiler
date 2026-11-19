@@ -11,8 +11,8 @@ A run disposition means selected, not a passing execution receipt. Replacement c
 | Area | Source dispositions |
 | --- | --- |
 | packages | 2,479 blocked, 5 excluded, 35 replace, 1,988 run |
-| stdlib | 763 blocked, 908 replace, 835 run |
-| tests | 66 blocked, 1,742 run, 1,345 xfail |
+| stdlib | 761 blocked, 910 replace, 835 run |
+| tests | 65 blocked, 1,754 run, 1,334 xfail |
 
 ## Expected test failures
 
@@ -24,7 +24,7 @@ Upstream bugs record interpreter behavior or test expectations that the compiler
 | Class | Compile | Runtime | Total |
 | --- | ---: | ---: | ---: |
 | `aot-rejection` | 225 | 0 | 225 |
-| `missing-support` | 1,030 | 90 | 1,120 |
+| `missing-support` | 1,028 | 81 | 1,109 |
 
 | Class | Reason | Tests |
 | --- | --- | ---: |
@@ -35,7 +35,7 @@ Upstream bugs record interpreter behavior or test expectations that the compiler
 | `aot-rejection` | `aot-name-error` | 11 |
 | `aot-rejection` | `aot-type-error` | 154 |
 | `missing-support` | `compiler-contract` | 3 |
-| `missing-support` | `compiler-gap` | 166 |
+| `missing-support` | `compiler-gap` | 155 |
 | `missing-support` | `compiler-resource` | 2 |
 | `missing-support` | `interpreter-fixture` | 1 |
 | `missing-support` | `test-counter` | 7 |
@@ -175,7 +175,7 @@ Each row links to the authoritative per-test annotations. A named test remains o
 | [packages/darklang/tests/stdlib/ints/int64.dark](../../../upstream/packages/darklang/tests/stdlib/ints/int64.dark) | 2 |
 | [packages/darklang/tests/stdlib/ints/uint128.dark](../../../upstream/packages/darklang/tests/stdlib/ints/uint128.dark) | 1 |
 | [packages/darklang/tests/stdlib/ints/uint8.dark](../../../upstream/packages/darklang/tests/stdlib/ints/uint8.dark) | 1 |
-| [packages/darklang/tests/stdlib/json.dark](../../../upstream/packages/darklang/tests/stdlib/json.dark) | 29 |
+| [packages/darklang/tests/stdlib/json.dark](../../../upstream/packages/darklang/tests/stdlib/json.dark) | 18 |
 | [packages/darklang/tests/stdlib/list.dark](../../../upstream/packages/darklang/tests/stdlib/list.dark) | 19 |
 | [packages/darklang/tests/stdlib/net.dark](../../../upstream/packages/darklang/tests/stdlib/net.dark) | 2 |
 | [packages/darklang/tests/stdlib/regex.dark](../../../upstream/packages/darklang/tests/stdlib/regex.dark) | 6 |
@@ -214,14 +214,14 @@ Tags are defined in [the glossary](../../../porting/compiler-reasons.json).
 | packages | `test-diagnostics` | 1 |
 | packages | `upstream-dependency` | 2,414 |
 | stdlib | `compiler-contract` | 114 |
-| stdlib | `compiler-implementation` | 905 |
+| stdlib | `compiler-implementation` | 907 |
 | stdlib | `compiler-timeout` | 1 |
 | stdlib | `constructor-identity` | 2 |
 | stdlib | `container-adaptation` | 490 |
 | stdlib | `interpreter-intrinsic` | 1 |
 | stdlib | `test-counter` | 2 |
 | stdlib | `test-diagnostics` | 2 |
-| stdlib | `upstream-dependency` | 154 |
+| stdlib | `upstream-dependency` | 152 |
 | tests | `aot-arity-error` | 12 |
 | tests | `aot-invalid-field` | 16 |
 | tests | `aot-invalid-key` | 6 |
@@ -229,8 +229,8 @@ Tags are defined in [the glossary](../../../porting/compiler-reasons.json).
 | tests | `aot-name-error` | 11 |
 | tests | `aot-type-error` | 154 |
 | tests | `compiler-contract` | 3 |
-| tests | `compiler-crash` | 3 |
-| tests | `compiler-gap` | 171 |
+| tests | `compiler-crash` | 2 |
+| tests | `compiler-gap` | 160 |
 | tests | `compiler-leak` | 2 |
 | tests | `compiler-resource` | 2 |
 | tests | `compiler-timeout` | 2 |

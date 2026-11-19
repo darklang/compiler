@@ -71,6 +71,8 @@ type env = {
   sums : sumInfo M.t;
   aliases : Types.aliasRegistry;
   symbols : CheckedAST.symbols;
+  (* serializers write a None record field as null instead of leaving it out *)
+  noneAsNull : bool;
 }
 
 type state = {
@@ -95,6 +97,13 @@ let freshBindings names (state : state) =
       state names
   in
   (M.of_list bindings, next)
+
+(* A let-bound match is lowered with the rest of the function copied into
+   each arm, so a chain of them grows exponentially. A return scope gives
+   the arms one join to meet at instead. *)
+let joined typ expr (state : state) =
+  let target, state = freshBinding "__join" state in
+  (ReturnScope (target, checkedType typ, expr), state)
 
 let local name bindings =
   match M.find_opt name bindings with
@@ -190,10 +199,15 @@ let rec structuralTypeKey typ =
 let namedPlan prefix typ =
   Printf.sprintf "%s%016Lx" prefix (stableHash (structuralTypeKey typ))
 
-let serializeName typ = namedPlan "__dark_json_serialize_" typ
-let listName typ = namedPlan "__dark_json_serialize_list_" typ
-let dictName typ = namedPlan "__dark_json_serialize_dict_" typ
+let serializePrefix (env : env) =
+  if env.noneAsNull then "__dark_json_serialize_nulls_"
+  else "__dark_json_serialize_"
+
+let serializeName env typ = namedPlan (serializePrefix env) typ
+let listName env typ = namedPlan (serializePrefix env ^ "list_") typ
+let dictName env typ = namedPlan (serializePrefix env ^ "dict_") typ
 let decoderName typ = namedPlan "__dark_json_decode_" typ
+let decodeFieldName typ = namedPlan "__dark_json_decode_field_" typ
 let decodeListName typ = namedPlan "__dark_json_decode_list_" typ
 let decodeDictName typ = namedPlan "__dark_json_decode_dict_" typ
 
@@ -477,6 +491,46 @@ let resolveJsonType (env : env) typ =
   in
   resolve typ
 
+let optionTypeName = "Darklang.Stdlib.Option.Option"
+
+(* What typ holds when it is Option, directly or through aliases. *)
+let optionOf (env : env) typ =
+  match resolveJsonType env typ with
+  | AST.TSum (name, [ inner ]) when owned env name = optionTypeName ->
+      Some inner
+  | _ -> None
+
+(* Whether a value of typ can be written as null: Unit, or an Option that
+   writes None as null. An Option of such a type keeps the tagged
+   {"Some":[..]} form so that Some(None) and None stay apart. *)
+let rec writesNull (env : env) typ =
+  match resolveJsonType env typ with
+  | AST.TUnit -> true
+  | typ -> (
+      match optionOf env typ with
+      | Some inner -> not (writesNull env inner)
+      | None -> false)
+
+let optionValue (env : env) inner caseName values =
+  match
+    tryFindConstructorId (owned env optionTypeName) caseName env.symbols
+  with
+  | Some constructorId ->
+      Constructor
+        ( {
+            typeId = typeId env optionTypeName;
+            constructorId;
+            typeArgs = checkedTypeArgs [ inner ];
+          },
+          values )
+  | None ->
+      Crash.crash ("JSON constructor was not interned: Option." ^ caseName)
+
+let somePattern (env : env) valueId =
+  constructorPattern env optionTypeName "Some" [ PVariable valueId ]
+
+let nonePattern (env : env) = constructorPattern env optionTypeName "None" []
+
 let canonicalCodecTypeKey (env : env) rootType =
   (* Include only declarations reachable from the requested type. This is
     deliberately narrower than fingerprinting the complete type-checking
@@ -552,7 +606,7 @@ let canonicalCodecTypeKey (env : env) rootType =
 
 let rec ensureSerializer (env : env) typ (state : state) =
   let typ = resolveJsonType env typ in
-  let name = serializeName typ in
+  let name = serializeName env typ in
   match M.find_opt name state.functions with
   | Some _ -> Ok (name, state)
   | None ->
@@ -616,7 +670,7 @@ and serializeItems (env : env) items writer (state : state) =
 and ensureListSerializer (env : env) elemType (state : state) =
   let elemType = resolveJsonType env elemType in
   let typ = AST.TList elemType in
-  let name = listName typ in
+  let name = listName env typ in
   match M.find_opt name state.functions with
   | Some _ -> Ok (name, state)
   | None ->
@@ -691,7 +745,7 @@ and ensureDictSerializer (env : env) valueType (state : state) =
   let dictType = AST.TDict (AST.TString, valueType) in
   let entryType = AST.TTuple [ AST.TString; valueType ] in
   let listType = AST.TList entryType in
-  let name = dictName dictType in
+  let name = dictName env dictType in
   match M.find_opt name state.functions with
   | Some _ -> Ok (name, state)
   | None ->
@@ -855,29 +909,113 @@ and serializeBody (env : env) typ value writer (state : state) =
             ("Unsupported type in JSON: " ^ CheckingDiagnostics.typeToString typ)
       | Some recordInfo ->
           let* subst = substitution recordInfo.Types.typeParams typeArgs in
-          let rec loop remaining index currentWriter (currentState : state) =
+          (* written says whether a field is already in the object: a None
+             field can be left out, so after one this is a run-time Bool. *)
+          let separated written writer =
+            match written with
+            | `Yes -> writerSeparator env writer
+            | `No -> writer
+            | `Local id -> If (Local id, writerSeparator env writer, writer)
+          in
+          let rec loop remaining written currentWriter (currentState : state) =
             match remaining with
-            | [] -> Ok (currentWriter, currentState)
-            | (fieldIndex, fieldName, fieldType) :: rest ->
+            | [] -> Ok (writerEndObject env currentWriter, currentState)
+            | (fieldIndex, fieldName, fieldType) :: rest -> (
                 let concrete =
                   resolveJsonType env (applySubstitution subst fieldType)
                 in
-                let separated =
-                  if index = 0 then currentWriter
-                  else writerSeparator env currentWriter
-                in
-                let named =
-                  writerFieldName env separated (StringLiteral fieldName)
+                let named written writer =
+                  writerFieldName env
+                    (separated written writer)
+                    (StringLiteral fieldName)
                 in
                 let fieldId, symbols =
                   internField typeName fieldName fieldIndex currentState.symbols
                 in
-                let* encoded, nextState =
-                  serializeCall env concrete named
-                    (RecordAccess (value, fieldId))
-                    { currentState with symbols }
-                in
-                loop rest (index + 1) encoded nextState
+                let field = RecordAccess (value, fieldId) in
+                let currentState = { currentState with symbols } in
+                match optionOf env concrete with
+                | None ->
+                    let* encoded, nextState =
+                      serializeCall env concrete
+                        (named written currentWriter)
+                        field currentState
+                    in
+                    loop rest `Yes encoded nextState
+                | Some inner ->
+                    let inner = resolveJsonType env inner in
+                    let leaveOut =
+                      (not env.noneAsNull) || writesNull env inner
+                    in
+                    let writerId, currentState =
+                      freshBinding "__field_writer" currentState
+                    in
+                    let someId, currentState =
+                      freshBinding "__field_some" currentState
+                    in
+                    let nextId, currentState =
+                      freshBinding "__field_written" currentState
+                    in
+                    let writer = Local writerId in
+                    let* some, currentState =
+                      serializeCall env inner (named written writer)
+                        (Local someId) currentState
+                    in
+                    let none =
+                      if leaveOut then writer
+                      else
+                        writerRaw env (named written writer)
+                          (StringLiteral "null")
+                    in
+                    let encoded, currentState =
+                      joined writerType
+                        (matchExpr
+                           ( field,
+                             [
+                               makeCase (somePattern env someId) some;
+                               makeCase (nonePattern env) none;
+                             ] ))
+                        currentState
+                    in
+                    let nextWritten, wrap, currentState =
+                      match written with
+                      | `Yes -> (`Yes, Fun.id, currentState)
+                      | _ when (not leaveOut) || rest = [] ->
+                          (`Yes, Fun.id, currentState)
+                      | _ ->
+                          let flagId, currentState =
+                            freshBinding "__field_any" currentState
+                          in
+                          let present =
+                            matchExpr
+                              ( field,
+                                [
+                                  makeCase (nonePattern env)
+                                    (BoolLiteral false);
+                                  makeCase PWildcard (BoolLiteral true);
+                                ] )
+                          in
+                          let flag, currentState =
+                            joined AST.TBool
+                              (match written with
+                              | `Local id ->
+                                  If (Local id, BoolLiteral true, present)
+                              | _ -> present)
+                              currentState
+                          in
+                          ( `Local flagId,
+                            (fun body -> Let (LPVariable flagId, flag, body)),
+                            currentState )
+                    in
+                    let* tail, nextState =
+                      loop rest nextWritten (Local nextId) currentState
+                    in
+                    Ok
+                      ( Let
+                          ( LPVariable writerId,
+                            currentWriter,
+                            Let (LPVariable nextId, encoded, wrap tail) ),
+                        nextState ))
           in
           let fields =
             List.mapi
@@ -886,10 +1024,22 @@ and serializeBody (env : env) typ value writer (state : state) =
             |> List.stable_sort (fun (_, a, _) (_, b, _) ->
                 StringOrder.compare a b)
           in
-          let* encoded, nextState =
-            loop fields 0 (writerBeginObject env writer) state
-          in
-          Ok (writerEndObject env encoded, nextState))
+          loop fields `No (writerBeginObject env writer) state)
+  | AST.TSum (_, [ inner ])
+    when Option.is_some (optionOf env typ) && not (writesNull env inner) ->
+      let someId, state = freshBinding "__some" state in
+      let* some, nextState =
+        serializeCall env inner writer (Local someId) state
+      in
+      Ok
+        ( matchExpr
+            ( value,
+              [
+                makeCase (somePattern env someId) some;
+                makeCase (nonePattern env)
+                  (writerRaw env writer (StringLiteral "null"));
+              ] ),
+          nextState )
   | AST.TSum (typeName, typeArgs) -> (
       match M.find_opt typeName env.sums with
       | None ->
@@ -1021,7 +1171,14 @@ let optionDecoder (env : env) typ functionName source view path (state : state)
 
 let rec ensureDecoder (env : env) typ (state : state) =
   let typ = resolveJsonType env typ in
-  let name = decoderName typ in
+  ensureDecoderWith env (decoderName typ) decodeBody typ state
+
+(* A present record field of Option type: see decodeOptionField. *)
+and ensureFieldDecoder (env : env) typ (state : state) =
+  let typ = resolveJsonType env typ in
+  ensureDecoderWith env (decodeFieldName typ) decodeOptionField typ state
+
+and ensureDecoderWith (env : env) name decode typ (state : state) =
   match M.find_opt name state.functions with
   | Some _ -> Ok (name, state)
   | None ->
@@ -1058,7 +1215,7 @@ let rec ensureDecoder (env : env) typ (state : state) =
         { state with functions = M.add name placeholder state.functions }
       in
       let* body, nextState =
-        decodeBody env typ
+        decode env typ
           (local "__source" bindings)
           (local "__view" bindings) (local "__path" bindings) reserved
       in
@@ -1637,9 +1794,21 @@ and decodeBody (env : env) typ source view path (state : state) =
                        "Darklang.Stdlib.Json.ParseError.JsonPath.Part.Part"
                        "Field" (Some (StringLiteral fieldName)))
                 in
+                let optionArg = optionOf env concrete in
                 let* decoded, next =
-                  decodeCall env concrete source (Local fieldRawId) fieldPath
-                    current
+                  match optionArg with
+                  | Some _ ->
+                      let* name, next =
+                        ensureFieldDecoder env concrete current
+                      in
+                      let currentEnv = { env with symbols = next.symbols } in
+                      Ok
+                        ( call currentEnv name
+                            [ source; Local fieldRawId; fieldPath ],
+                          next )
+                  | None ->
+                      decodeCall env concrete source (Local fieldRawId)
+                        fieldPath current
                 in
                 let id = fieldId env typeName fieldName in
                 let* tail, finalState =
@@ -1659,30 +1828,34 @@ and decodeBody (env : env) typ source view path (state : state) =
                        "RecordDuplicateField"
                        (tuplePayload [ StringLiteral fieldName; path ]))
                 in
-                let one =
+                let continue decoded =
                   matchExpr
                     (decoded, resultCases env fieldValueId tail fieldErrorId)
                 in
-                Ok
-                  ( matchExpr
-                      ( matches,
-                        [
-                          makeCase
-                            (constructorPattern env
-                               "Darklang.Stdlib.Option.Option" "None" [])
-                            missing;
-                          makeCase
-                            (constructorPattern env
-                               "Darklang.Stdlib.Option.Option" "Some"
-                               [ PVariable fieldRawId ])
-                            (If
-                               ( call env
-                                   "Darklang.Stdlib.Json.__viewIsDuplicate"
-                                   [ Local fieldRawId ],
-                                 duplicate,
-                                 one ));
-                        ] ),
-                    finalState )
+                let lookup missing present =
+                  matchExpr
+                    ( matches,
+                      [
+                        makeCase (nonePattern env) missing;
+                        makeCase (somePattern env fieldRawId)
+                          (If
+                             ( call env "Darklang.Stdlib.Json.__viewIsDuplicate"
+                                 [ Local fieldRawId ],
+                               duplicate,
+                               present ));
+                      ] )
+                in
+                (* a missing Option field is None; the lookup is bound
+                   before the rest so the rest is not written twice *)
+                match optionArg with
+                | Some inner ->
+                    let absent = ok env (optionValue env inner "None" []) in
+                    let field, finalState =
+                      joined (resultType concrete) (lookup absent decoded)
+                        finalState
+                    in
+                    Ok (continue field, finalState)
+                | None -> Ok (lookup missing (continue decoded), finalState)
           in
           let* decoded, nextState = build fields state [] in
           Ok
@@ -1720,78 +1893,19 @@ and decodeBody (env : env) typ source view path (state : state) =
                 makeCase PWildcard failure;
               ] ),
           nextState )
-  | AST.TSum (typeName, typeArgs) -> (
-      match M.find_opt typeName env.sums with
-      | None ->
-          Error
-            ("Unsupported type in JSON: " ^ CheckingDiagnostics.typeToString typ)
-      | Some sumInfo ->
-          let* subst = substitution sumInfo.Types.typeParams typeArgs in
-          let caseNameId, state = freshBinding "__case_name" state in
-          let caseRawId, state = freshBinding "__case_raw" state in
-          let caseNamesId, state = freshBinding "__case_names" state in
-          let rec buildCases remaining current acc =
-            match remaining with
-            | [] -> Ok (List.rev acc, current)
-            | (variant : sumVariant) :: rest ->
-                let* body, next =
-                  decodeEnumCase env typ typeName subst source path
-                    (Local caseRawId) variant current
-                in
-                buildCases rest next
-                  (makeCase (PString variant.Types.name) body :: acc)
-          in
-          let* caseMatches, nextState =
-            buildCases
-              (List.stable_sort
-                 (fun (a : sumVariant) b -> compare a.Types.tag b.Types.tag)
-                 sumInfo.Types.variants)
-              state []
-          in
-          let invalidCase =
-            error env
-              (constructor env "Darklang.Stdlib.Json.ParseError.ParseError"
-                 "EnumInvalidCasename"
-                 (tuplePayload
-                    [ typeReference env typ; Local caseNameId; path ]))
-          in
-          let oneField =
-            matchExpr
-              ( Local caseNameId,
-                caseMatches @ [ makeCase PWildcard invalidCase ] )
-          in
-          let tooMany =
-            error env
-              (constructor env "Darklang.Stdlib.Json.ParseError.ParseError"
-                 "EnumTooManyCases"
-                 (tuplePayload
-                    [ typeReference env typ; Local caseNamesId; path ]))
-          in
-          let checkedOneField = oneField in
-          let objectBody =
-            matchExpr
-              ( call env "Darklang.Stdlib.Json.__enumCandidate" [ source; view ],
-                [
-                  makeCase
-                    (constructorPattern env
-                       "Darklang.Stdlib.Json.__InternalEnumObject"
-                       "EnumNoFields" [])
-                    failure;
-                  makeCase
-                    (constructorPattern env
-                       "Darklang.Stdlib.Json.__InternalEnumObject"
-                       "EnumOneField"
-                       [ PVariable caseNameId; PVariable caseRawId ])
-                    checkedOneField;
-                  makeCase
-                    (constructorPattern env
-                       "Darklang.Stdlib.Json.__InternalEnumObject"
-                       "EnumManyFields" [ PVariable caseNamesId ])
-                    tooMany;
-                  makeCase PWildcard failure;
-                ] )
-          in
-          Ok (objectBody, nextState))
+  | AST.TSum (_, [ inner ])
+    when Option.is_some (optionOf env typ) && not (writesNull env inner) ->
+      let* some, nextState =
+        someOrTagged env typ inner source view path state
+      in
+      Ok
+        ( If
+            ( call env "Darklang.Stdlib.Json.__isNull" [ source; view ],
+              ok env (optionValue env inner "None" []),
+              some ),
+          nextState )
+  | AST.TSum (typeName, typeArgs) ->
+      decodeTaggedSum env typ typeName typeArgs source view path state
   | AST.TFunction _ ->
       Error
         ("Cannot parse JSON into function type "
@@ -1803,6 +1917,142 @@ and decodeBody (env : env) typ source view path (state : state) =
         ("Unsupported type in JSON: "
         ^ CheckingDiagnostics.typeToString typ
         ^ ". Some types are not supported in Json serialization")
+
+(* An Option's tagged form, {"Some":[..]} or {"None":[]}, and every other
+   enum's only form. *)
+and decodeTaggedSum (env : env) typ typeName typeArgs source view path
+    (state : state) =
+  let failure = cantMatch env typ (rawSource env source view) path in
+  match M.find_opt typeName env.sums with
+  | None ->
+      Error
+        ("Unsupported type in JSON: " ^ CheckingDiagnostics.typeToString typ)
+  | Some sumInfo ->
+      let* subst = substitution sumInfo.Types.typeParams typeArgs in
+      let caseNameId, state = freshBinding "__case_name" state in
+      let caseRawId, state = freshBinding "__case_raw" state in
+      let caseNamesId, state = freshBinding "__case_names" state in
+      let rec buildCases remaining current acc =
+        match remaining with
+        | [] -> Ok (List.rev acc, current)
+        | (variant : sumVariant) :: rest ->
+            let* body, next =
+              decodeEnumCase env typ typeName subst source path
+                (Local caseRawId) variant current
+            in
+            buildCases rest next
+              (makeCase (PString variant.Types.name) body :: acc)
+      in
+      let* caseMatches, nextState =
+        buildCases
+          (List.stable_sort
+             (fun (a : sumVariant) b -> compare a.Types.tag b.Types.tag)
+             sumInfo.Types.variants)
+          state []
+      in
+      let invalidCase =
+        error env
+          (constructor env "Darklang.Stdlib.Json.ParseError.ParseError"
+             "EnumInvalidCasename"
+             (tuplePayload
+                [ typeReference env typ; Local caseNameId; path ]))
+      in
+      let oneField =
+        matchExpr
+          ( Local caseNameId,
+            caseMatches @ [ makeCase PWildcard invalidCase ] )
+      in
+      let tooMany =
+        error env
+          (constructor env "Darklang.Stdlib.Json.ParseError.ParseError"
+             "EnumTooManyCases"
+             (tuplePayload
+                [ typeReference env typ; Local caseNamesId; path ]))
+      in
+      let checkedOneField = oneField in
+      let objectBody =
+        matchExpr
+          ( call env "Darklang.Stdlib.Json.__enumCandidate" [ source; view ],
+            [
+              makeCase
+                (constructorPattern env
+                   "Darklang.Stdlib.Json.__InternalEnumObject"
+                   "EnumNoFields" [])
+                failure;
+              makeCase
+                (constructorPattern env
+                   "Darklang.Stdlib.Json.__InternalEnumObject"
+                   "EnumOneField"
+                   [ PVariable caseNameId; PVariable caseRawId ])
+                checkedOneField;
+              makeCase
+                (constructorPattern env
+                   "Darklang.Stdlib.Json.__InternalEnumObject"
+                   "EnumManyFields" [ PVariable caseNamesId ])
+                tooMany;
+              makeCase PWildcard failure;
+            ] )
+      in
+      Ok (objectBody, nextState)
+
+(* The value as the Some, or else the tagged form. The Some is tried first,
+   so a record with a field named Some reads as that record. *)
+and someOrTagged (env : env) typ inner source view path (state : state) =
+  let* decoded, state = decodeCall env inner source view path state in
+  let valueId, state = freshBinding "__some" state in
+  let errorId, state = freshBinding "__some_error" state in
+  let* tagged, state =
+    match typ with
+    | AST.TSum (typeName, typeArgs) ->
+        decodeTaggedSum env typ typeName typeArgs source view path state
+    | _ -> Crash.crash "JSON Option decoder received a non-sum type"
+  in
+  Ok
+    ( matchExpr
+        ( decoded,
+          [
+            makeCase
+              (constructorPattern env "Darklang.Stdlib.Result.Result" "Ok"
+                 [ PVariable valueId ])
+              (ok env (optionValue env inner "Some" [ Local valueId ]));
+            makeCase
+              (constructorPattern env "Darklang.Stdlib.Result.Result" "Error"
+                 [ PVariable errorId ])
+              (If
+                 ( call env "Darklang.Stdlib.Json.__isTaggedOption"
+                     [ source; view ],
+                   tagged,
+                   error env (Local errorId) ));
+          ] ),
+      state )
+
+(* A present Option record field: null is None, or Some of the inner type's
+   null where it has one, and any other value is the Some. *)
+and decodeOptionField (env : env) typ source view path (state : state) =
+  let inner =
+    match optionOf env typ with
+    | Some inner -> resolveJsonType env inner
+    | None -> Crash.crash "JSON Option field decoder received a non-Option type"
+  in
+  let* some, state = someOrTagged env typ inner source view path state in
+  let* null, state =
+    if writesNull env inner then
+      let* decoded, state = decodeCall env inner source view path state in
+      let valueId, state = freshBinding "__null" state in
+      let errorId, state = freshBinding "__null_error" state in
+      Ok
+        ( matchExpr
+            ( decoded,
+              resultCases env valueId
+                (ok env (optionValue env inner "Some" [ Local valueId ]))
+                errorId ),
+          state )
+    else Ok (ok env (optionValue env inner "None" []), state)
+  in
+  Ok
+    ( If
+        (call env "Darklang.Stdlib.Json.__isNull" [ source; view ], null, some),
+      state )
 
 let rec mapExpr rewrite symbols expr =
   let mapList values state =
@@ -1945,22 +2195,35 @@ let rec mapExpr rewrite symbols expr =
   in
   rewrite symbols mapped
 
-(* checkedSerialize<T> v is Ok (serialize<T> v): a type with no JSON form is
-   refused when serialize<T> is planned, so nothing is left to check at run time. *)
+(* checkedSerialize<T> v is Ok (serialize<T> v), and likewise for the With
+   forms: a type with no JSON form is refused when serialize<T> is planned, so
+   nothing is left to check at run time. *)
 let checkedSerializeAsSerialize program =
   let symbols, topLevels = viewProgram program in
+  let pair checked plain =
+    match
+      ( tryFindFunctionId ("Darklang.Stdlib.Json." ^ checked) symbols,
+        tryFindFunctionId ("Darklang.Stdlib.Json." ^ plain) symbols )
+    with
+    | Some checkedId, Some plainId -> [ (checkedId, plainId) ]
+    | _ -> []
+  in
   match
-    ( tryFindFunctionId "Darklang.Stdlib.Json.checkedSerialize" symbols,
-      tryFindFunctionId "Darklang.Stdlib.Json.serialize" symbols )
+    pair "checkedSerialize" "serialize"
+    @ pair "checkedSerializeWith" "serializeWith"
   with
-  | Some checkedId, Some serializeId ->
+  | [] -> program
+  | pairs ->
       let rewrite current expr =
         match expr with
-        | TypeApp (id, typeArgs, values) when id = checkedId ->
+        | TypeApp (id, typeArgs, values) when List.mem_assoc id pairs ->
             let okId, current =
               internFunction "Darklang.Stdlib.Json.__serialized" current
             in
-            ( Call (okId, N.singleton (TypeApp (serializeId, typeArgs, values))),
+            ( Call
+                ( okId,
+                  N.singleton
+                    (TypeApp (List.assoc id pairs, typeArgs, values)) ),
               current )
         | _ -> (expr, current)
       in
@@ -1978,7 +2241,6 @@ let checkedSerializeAsSerialize program =
           symbols topLevels
       in
       programFromCheckedParts (symbols, topLevels)
-  | _ -> program
 
 let rewriteProgramWithSession (session : planningSession option)
     (env : Types.typeCheckEnv) program =
@@ -1987,6 +2249,9 @@ let rewriteProgramWithSession (session : planningSession option)
     tryFindFunctionId "Darklang.Stdlib.Json.serialize" symbols
   in
   let parseId = tryFindFunctionId "Darklang.Stdlib.Json.parse" symbols in
+  let serializeWithId =
+    tryFindFunctionId "Darklang.Stdlib.Json.serializeWith" symbols
+  in
   let collect expr acc =
     let initialResult = acc in
     (* mapExpr provides a compact complete traversal; the fold result is
@@ -1995,9 +2260,16 @@ let rewriteProgramWithSession (session : planningSession option)
       let collected =
         match current with
         | TypeApp (id, [ typ ], _) when Some id = serializeId ->
-            (semanticType typ :: fst collected, snd collected)
+            let serializers, withNulls, parsers = collected in
+            (semanticType typ :: serializers, withNulls, parsers)
+        | TypeApp (id, [ typ ], _) when Some id = serializeWithId ->
+            let serializers, withNulls, parsers = collected in
+            ( semanticType typ :: serializers,
+              semanticType typ :: withNulls,
+              parsers )
         | TypeApp (id, [ typ ], _) when Some id = parseId ->
-            (fst collected, semanticType typ :: snd collected)
+            let serializers, withNulls, parsers = collected in
+            (serializers, withNulls, semanticType typ :: parsers)
         | _ -> collected
       in
       let capture child = walk child in
@@ -2071,7 +2343,7 @@ let rewriteProgramWithSession (session : planningSession option)
     in
     walk expr initialResult
   in
-  let serializers, parsers =
+  let serializers, withNulls, parsers =
     List.fold_left
       (fun acc topLevel ->
         match topLevel with
@@ -2079,7 +2351,7 @@ let rewriteProgramWithSession (session : planningSession option)
         | ValueDef value -> collect (valueDefBody value) acc
         | Expression expr -> collect expr acc
         | TypeDef _ -> acc)
-      ([], []) topLevels
+      ([], [], []) topLevels
   in
   let distinct values =
     List.fold_left
@@ -2088,7 +2360,9 @@ let rewriteProgramWithSession (session : planningSession option)
       [] values
     |> List.rev
   in
-  let serializerTypes, parserTypes = (distinct serializers, distinct parsers) in
+  let serializerTypes, withNullsTypes, parserTypes =
+    (distinct serializers, distinct withNulls, distinct parsers)
+  in
   let hasJsonCalls = not (serializerTypes = [] && parserTypes = []) in
   let symbols =
     if hasJsonCalls then
@@ -2113,6 +2387,7 @@ let rewriteProgramWithSession (session : planningSession option)
           "Darklang.Stdlib.Json.__copyRaw";
           "Darklang.Stdlib.Json.__enumCandidate";
           "Darklang.Stdlib.Json.__isNull";
+          "Darklang.Stdlib.Json.__isTaggedOption";
           "Darklang.Stdlib.Json.__objectFieldMap";
           "Darklang.Stdlib.Json.__objectFields";
           "Darklang.Stdlib.Json.__parseRoot";
@@ -2175,8 +2450,10 @@ let rewriteProgramWithSession (session : planningSession option)
       sums = (if hasJsonCalls then env.Types.indexedSumTypeReg else M.empty);
       aliases = env.Types.aliasReg;
       symbols = planningSymbols;
+      noneAsNull = false;
     }
   in
+  let nullsEnv = { planningEnv with noneAsNull = true } in
   let _mergeArtifact (state : state) functions =
     List.fold_left
       (fun result (fn : CheckedAST.functionDef) ->
@@ -2190,7 +2467,7 @@ let rewriteProgramWithSession (session : planningSession option)
             Ok { current with functions = M.add fn.name fn current.functions })
       (Ok state) functions
   in
-  let planCached direction ensure typ state =
+  let planCached direction ensure (planningEnv : env) typ state =
     let concrete = resolveJsonType planningEnv typ in
     let key = direction ^ "|" ^ canonicalCodecTypeKey planningEnv concrete in
     match Option.bind session (fun current -> current#tryFind key) with
@@ -2213,13 +2490,17 @@ let rewriteProgramWithSession (session : planningSession option)
     | None ->
         (* A one-shot caller can share dependencies directly in one state
      without paying for cache keys or artifact merging. *)
-        let serializersPlanned =
+        let plan env types initial =
           List.fold_left
             (fun result typ ->
               let* state = result in
-              Result.map snd (ensureSerializer planningEnv typ state))
+              Result.map snd (ensureSerializer env typ state))
+            initial types
+        in
+        let serializersPlanned =
+          plan planningEnv serializerTypes
             (Ok { functions = M.empty; symbols = planningSymbols })
-            serializerTypes
+          |> plan nullsEnv withNullsTypes
         in
         List.fold_left
           (fun result typ ->
@@ -2227,18 +2508,22 @@ let rewriteProgramWithSession (session : planningSession option)
             Result.map snd (ensureDecoder planningEnv typ state))
           serializersPlanned parserTypes
     | Some _ ->
-        let serializersPlanned =
+        let plan direction env types initial =
           List.fold_left
             (fun result typ ->
               let* state = result in
-              planCached "serialize" ensureSerializer typ state)
+              planCached direction ensureSerializer env typ state)
+            initial types
+        in
+        let serializersPlanned =
+          plan "serialize" planningEnv serializerTypes
             (Ok { functions = M.empty; symbols = planningSymbols })
-            serializerTypes
+          |> plan "serialize-nulls" nullsEnv withNullsTypes
         in
         List.fold_left
           (fun result typ ->
             let* state = result in
-            planCached "parse" ensureDecoder typ state)
+            planCached "parse" ensureDecoder planningEnv typ state)
           serializersPlanned parserTypes
   in
   if not hasJsonCalls then Ok (programFromCheckedParts (symbols, topLevels))
@@ -2247,16 +2532,57 @@ let rewriteProgramWithSession (session : planningSession option)
     | Error error -> Error error
     | Ok state ->
         let finalPlanningEnv = { planningEnv with symbols = state.symbols } in
+        let serialized env typ value =
+          writerFinish env
+            (call env
+               (serializeName env (resolveJsonType env (semanticType typ)))
+               [ writerEmpty env; value ])
+        in
         let rewrite currentSymbols expr =
           match expr with
           | TypeApp (id, [ typ ], values) when Some id = serializeId ->
-              let written =
-                call finalPlanningEnv
-                  (serializeName
-                     (resolveJsonType finalPlanningEnv (semanticType typ)))
-                  (writerEmpty finalPlanningEnv :: N.toList values)
-              in
-              (writerFinish finalPlanningEnv written, currentSymbols)
+              (serialized finalPlanningEnv typ (N.head values), currentSymbols)
+          | TypeApp (id, [ typ ], values) when Some id = serializeWithId -> (
+              match N.toList values with
+              | [ options; value ] ->
+                  let optionsId, symbols1 =
+                    allocateBinding "__json_options" currentSymbols
+                  in
+                  let valueId, symbols2 =
+                    allocateBinding "__json_value" symbols1
+                  in
+                  let noneFields =
+                    RecordAccess
+                      ( Local optionsId,
+                        fieldId finalPlanningEnv
+                          "Darklang.Stdlib.Json.Options.Options" "noneFields" )
+                  in
+                  let written =
+                    matchExpr
+                      ( noneFields,
+                        [
+                          makeCase
+                            (constructorPattern finalPlanningEnv
+                               "Darklang.Stdlib.Json.Options.NoneFields" "Null"
+                               [])
+                            (serialized
+                               { finalPlanningEnv with noneAsNull = true }
+                               typ (Local valueId));
+                          makeCase PWildcard
+                            (serialized finalPlanningEnv typ (Local valueId));
+                        ] )
+                  in
+                  let target, symbols3 = allocateBinding "__join" symbols2 in
+                  ( Let
+                      ( LPVariable optionsId,
+                        options,
+                        Let
+                          ( LPVariable valueId,
+                            value,
+                            ReturnScope
+                              (target, checkedType writerType, written) ) ),
+                    symbols3 )
+              | _ -> Crash.crash "Json.serializeWith takes options and a value")
           | TypeApp (id, [ typ ], values) when Some id = parseId ->
               let concrete =
                 resolveJsonType finalPlanningEnv (semanticType typ)
