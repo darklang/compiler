@@ -177,10 +177,11 @@ and parseApp grammar state index =
         true
     (* The interpreter's call syntax since darklang/dark@74dca94: a paren list
        written against the callee, `f(a, b)`, passes each element as its own
-       argument, and `f()` passes unit. A spaced `f (a, b)` still passes one
+       argument, and `f()` passes unit, with or without explicit type
+       arguments (`f<T>(a, b)`). A spaced `f (a, b)` still passes one
        tuple, and juxtaposed arguments still apply, so sources in the earlier
        syntax keep their meaning. *)
-    | WT.EVariable _ | WT.EFnName _
+    | (WT.EVariable _ | WT.EFnName _ | WT.EApply (_, _, _ :: _, []))
       when tok state next = TLParen
            && (rng state next).start = (WT.exprRange callee).end_ ->
         stop := parseCtorParenFields grammar state next args;

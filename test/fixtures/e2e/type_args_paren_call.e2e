@@ -1,0 +1,10 @@
+// A paren list written directly against a call with explicit type arguments
+// passes each element as its own argument, as it does without them:
+// `f<T>(a, b)` is `f<T> a b`, while a spaced `f<T> (a, b)` still passes a tuple.
+
+let typeArgsPair<'a> (x: a) (y: a) : List<a> = [x, y]
+let typeArgsFirst<'a, 'b> (pair: (a * b)) : a = Stdlib.Tuple2.first pair
+
+typeArgsPair<Int64>(1L, 2L) = [1L, 2L]
+typeArgsPair<String>("a", "b") = ["a", "b"]
+typeArgsFirst<Int64, String> (1L, "one") = 1L
