@@ -1,0 +1,42 @@
+// Typed JSON writes an Option as its value or null, keeping the tagged
+// {"Some":[..]} form only where the Some can itself be null.
+
+type JsonOptionReading = { host: String, cpu: Option<Float>, note: Option<String> }
+type JsonOptionLate = { a: Option<Int64>, b: Option<Int64>, c: Int64 }
+type JsonOptionTwice = { x: Option<Option<Int64>> }
+type JsonOptionUnit = { u: Option<Unit> }
+
+let jsonOptionNulls () : Stdlib.Json.Options.Options =
+    Stdlib.Json.Options.Options { noneFields = Stdlib.Json.Options.NoneFields.Null }
+
+let jsonOptionError<'a> (result: Result<a, Stdlib.Json.ParseError.ParseError>): String =
+    match result with
+    | Ok _ -> "unexpected success"
+    | Error error -> Stdlib.Json.ParseError.toString Darklang.SCM.Branch.mainBranchId error
+
+Stdlib.Json.serialize<Option<Int64>> None = "null"
+Stdlib.Json.serialize<List<Option<Int64>>> [Some 1L, None] = "[1,null]"
+Stdlib.Json.serialize<Option<Option<Int64>>> (Some None) = "{\"Some\":[null]}"
+Stdlib.Json.serialize<Option<Option<Int64>>> None = "{\"None\":[]}"
+Stdlib.Json.serialize<Option<Unit>> (Some ()) = "{\"Some\":[null]}"
+Stdlib.Json.serialize<Option<Option<Option<Int64>>>> None = "null"
+Stdlib.Json.serialize<JsonOptionReading> (JsonOptionReading { host = "a1", cpu = Some 38.5, note = None }) = "{\"cpu\":38.5,\"host\":\"a1\"}"
+Stdlib.Json.serializeWith<JsonOptionReading> (jsonOptionNulls ()) (JsonOptionReading { host = "a1", cpu = None, note = None }) = "{\"cpu\":null,\"host\":\"a1\",\"note\":null}"
+Stdlib.Json.checkedSerializeWith<JsonOptionReading> (jsonOptionNulls ()) (JsonOptionReading { host = "a1", cpu = None, note = Some "hot" }) = Ok "{\"cpu\":null,\"host\":\"a1\",\"note\":\"hot\"}"
+Stdlib.Json.serialize<JsonOptionLate> (JsonOptionLate { a = None, b = None, c = 3L }) = "{\"c\":3}"
+Stdlib.Json.serialize<JsonOptionLate> (JsonOptionLate { a = None, b = Some 2L, c = 3L }) = "{\"b\":2,\"c\":3}"
+Stdlib.Json.serialize<JsonOptionTwice> (JsonOptionTwice { x = Some None }) = "{\"x\":null}"
+Stdlib.Json.serializeWith<JsonOptionTwice> (jsonOptionNulls ()) (JsonOptionTwice { x = None }) = "{}"
+Stdlib.Json.serialize<JsonOptionUnit> (JsonOptionUnit { u = Some () }) = "{\"u\":null}"
+
+Stdlib.Json.parse<Option<Int64>> "null" = Ok None
+Stdlib.Json.parse<List<Option<Int64>>> "[1,null,{\"Some\":[2]},{\"None\":[]}]" = Ok [Some 1L, None, Some 2L, None]
+Stdlib.Json.parse<Option<Dict<String, List<Int64>>>> "{\"Some\":[1]}" = Ok (Some (Stdlib.Dict.singleton "Some" [1L]))
+Stdlib.Json.parse<JsonOptionReading> "{\"host\":\"a1\"}" = Ok (JsonOptionReading { host = "a1", cpu = None, note = None })
+Stdlib.Json.parse<JsonOptionReading> "{\"host\":\"a1\",\"cpu\":null,\"note\":\"hot\"}" = Ok (JsonOptionReading { host = "a1", cpu = None, note = Some "hot" })
+Stdlib.Json.parse<JsonOptionTwice> "{\"x\":null}" = Ok (JsonOptionTwice { x = Some None })
+Stdlib.Json.parse<JsonOptionTwice> "{\"x\":{\"Some\":[null]}}" = Ok (JsonOptionTwice { x = Some None })
+Stdlib.Json.parse<JsonOptionUnit> "{\"u\":null}" = Ok (JsonOptionUnit { u = Some () })
+jsonOptionError<JsonOptionReading> (Stdlib.Json.parse<JsonOptionReading> "{\"cpu\":1}") = "Can't parse JSON because `host` field is not provided at path: `root`"
+jsonOptionError<Option<String>> (Stdlib.Json.parse<Option<String>> "{\"Some\":\"x\"}") = "Can't parse JSON `\"x\"` as type `Darklang.Stdlib.Option.Option<String>` at path: `root.Some`"
+jsonOptionError<Option<Option<Int64>>> (Stdlib.Json.parse<Option<Option<Int64>>> "null") = "Can't parse JSON `null` as type `Darklang.Stdlib.Option.Option<Darklang.Stdlib.Option.Option<Int64>>` at path: `root`"

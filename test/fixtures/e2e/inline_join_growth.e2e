@@ -77,7 +77,7 @@ type InlineJsonRecord =
     h: Option<String>
     i: Option<Int64>
     j: Option<String> }
-Stdlib.Json.serialize<InlineJsonRecord> (InlineJsonRecord { a = Some "a", b = None, c = Some 3L, d = None, e = None, f = Some "f", g = None, h = None, i = Some 9L, j = None }) = "{\"a\":{\"Some\":[\"a\"]},\"b\":{\"None\":[]},\"c\":{\"Some\":[3]},\"d\":{\"None\":[]},\"e\":{\"None\":[]},\"f\":{\"Some\":[\"f\"]},\"g\":{\"None\":[]},\"h\":{\"None\":[]},\"i\":{\"Some\":[9]},\"j\":{\"None\":[]}}"
+Stdlib.Json.serialize<InlineJsonRecord> (InlineJsonRecord { a = Some "a", b = None, c = Some 3L, d = None, e = None, f = Some "f", g = None, h = None, i = Some 9L, j = None }) = "{\"a\":\"a\",\"c\":3,\"f\":\"f\",\"i\":9}"
 
 // A lambda whose body is `a != b`: the parser spells it Not (a == b), and
 // inference had no case for a unary operator (32 fns of darklang/dark's

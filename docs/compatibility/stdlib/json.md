@@ -70,6 +70,7 @@ merged with each program's small fresh summary.
 | `List<a>` | array |
 | `Dict<a>` | object with String keys in ordinal order |
 | record | object with fields in ordinal name order |
+| `Option<a>` | `null` for `None`, the value for `Some`; tagged like an enum where `a` can write `null` (`Unit`, or an `Option` that writes `null`) |
 | enum | one-field object; case name maps to an argument array |
 | alias | its resolved wire shape |
 
@@ -78,8 +79,17 @@ integral and in range. Every integer width and `Int` read the exact lexeme,
 never through a double, as the pinned interpreter does. Character parsing requires one
 extended grapheme cluster. UUID and DateTime strings use their public parsers.
 Tuple arity is exact. Lists, Dict values, record fields, and enum arguments add
-their index/field to the error path. Records require every declared field,
-reject duplicate declared fields, and ignore extra fields. Enum decoding
+their index/field to the error path. Records require every declared field
+except `Option` ones, reject duplicate declared fields, and ignore extra fields.
+
+A `None` record field is left out, or written as `null` by `serializeWith`
+with `Options.NoneFields.Null`; a field whose `Some` can be `null` always
+leaves `None` out and writes `Some(v)` as `v`. Reading an `Option`, `null` is
+`None` and any other value is the `Some`; when that fails, an object that is
+exactly `{"Some":..}` or `{"None":..}` reads in the tagged form. Where the inner
+type can write `null`, only the tagged form is read, except in a record field,
+where `null` is `Some` of the inner type's `null` and a missing field is
+`None`. Enum decoding
 requires exactly one known case and the exact argument count, after converting
 the common prefix so an earlier nested mismatch wins over a later arity error.
 

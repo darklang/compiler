@@ -73,7 +73,6 @@ let polyFn(a: X<'a>): X<'a> = a
 let strFn(a: X<String>): X<String> = a
 let definedPolyFn<'a>(a: X<'a>): X<'a> = a
 
-// @compiler xfail compile: "Expected TInt64, got TTuple [TInt64; TString]" class=missing-support reason=compiler-gap
 test userFunctions =
   Stdlib.Test.all(
     [ stringFn("string") |> Stdlib.Test.equal("string appended string")
@@ -244,13 +243,11 @@ module GenericTypeArgsAreOK =
 
   let inner<'x, 'y>(x: 'x, _y: 'y): 'x = x
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Language.Tests.Apply.GenericTypeArgsAreOK.outer: Expected TString, got TTuple [TString; TBool]"
   let outer<'x, 'y>(x: 'x, _y: 'y): 'x =
     // tst: [x: Bool]
     let ignored = inner<String, Bool>("hi", true)
     x
 
-  // @compiler xfail compile: "Expected TBool, got TTuple [TBool; TString]" class=missing-support reason=compiler-gap
   test innerAndOuter =
     Stdlib.Test.all(
       [ (inner<Bool, String>(true, "ignored")) |> Stdlib.Test.equal(true)

@@ -499,6 +499,12 @@ let __enumObject (source: String) (view: Stdlib.Json.__InternalValueView) : Stdl
             Stdlib.Json.__InternalEnumObject.EnumManyFields (
                 Stdlib.Json.__fieldNames fields)
 
+// {"Some":[..]} or {"None":[..]}, the tagged form of an Option.
+let __isTaggedOption (source: String) (view: Stdlib.Json.__InternalValueView) : Bool =
+    match Stdlib.Json.__enumObject source view with
+    | EnumOneField (name, _) -> name == "Some" || name == "None"
+    | _ -> false
+
 // Encoders append fragments through a shared writer. Generated codecs only
 // choose typed values and framing operations; escaping, punctuation, and final
 // assembly stay in this shared writer implementation.
@@ -845,7 +851,7 @@ let __viewDateTime (source: String) (value: Stdlib.Json.__InternalValueView) : S
     | None -> Stdlib.Option.Option.None
 
 // These declarations establish the public generic signatures. JsonPlanning
-// replaces every concrete use before ANF lowering; reaching either body means
+// replaces every concrete use before ANF lowering; reaching any body means
 // specialization failed and is therefore a compiler defect.
 let serialize<'a> (value: a) : String =
     Builtin.crash "Json.serialize was not specialized"
@@ -855,6 +861,12 @@ let parse<'a> (json: String) : Stdlib.Result.Result<a, Stdlib.Json.ParseError.Pa
 
 let checkedSerialize<'a> (value: a) : Stdlib.Result.Result<String, Stdlib.Json.SerializeError.SerializeError> =
     Builtin.crash "Json.checkedSerialize was not specialized"
+
+let serializeWith<'a> (options: Stdlib.Json.Options.Options) (value: a) : String =
+    Builtin.crash "Json.serializeWith was not specialized"
+
+let checkedSerializeWith<'a> (options: Stdlib.Json.Options.Options) (value: a) : Stdlib.Result.Result<String, Stdlib.Json.SerializeError.SerializeError> =
+    Builtin.crash "Json.checkedSerializeWith was not specialized"
 
 let __serialized (json: String) : Stdlib.Result.Result<String, Stdlib.Json.SerializeError.SerializeError> =
     Ok json
