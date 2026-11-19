@@ -118,7 +118,6 @@ let toFloat64(a: Int64): Float64 =
 /// Converts a <type Float64> to an <type Int64>, truncating toward zero like
 /// <fn BigInt.fromFloat64>. Returns {{Error NotANumber}} for NaN, or {{Error Overflow}} for
 /// an infinity or a result that doesn't fit.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch for Darklang.Stdlib.Int64.fromFloat64: upstream Float -> Darklang.Stdlib.Result.Result<Int64, Darklang.Stdlib.Math.NonFinite>, replacement Float -> Darklang.Stdlib.Option.Option<Int64>"
 let fromFloat64(a: Float64): Result<Int64, Math.NonFinite> =
   __inRange(a) |> Result.map(Float64.truncate)
 
@@ -126,7 +125,6 @@ let fromFloat64(a: Float64): Result<Int64, Math.NonFinite> =
 /// Converts a <type Float64> to an <type Int64>, rounding to the nearest integer
 /// (ties to even). Returns {{Error NotANumber}} for NaN, or {{Error Overflow}} for an
 /// infinity or a result that doesn't fit.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch for Darklang.Stdlib.Int64.fromFloatRounded: upstream Float -> Darklang.Stdlib.Result.Result<Int64, Darklang.Stdlib.Math.NonFinite>, replacement Float -> Darklang.Stdlib.Option.Option<Int64>"
 let fromFloatRounded(a: Float64): Result<Int64, Math.NonFinite> =
   __inRange(a) |> Result.map(Float64.round)
 

@@ -32,12 +32,12 @@ Stdlib.Float64.toInt 0.0 = 0z
 Stdlib.Float64.toInt 100.99 = 100z
 
 // The shared interpreter API returns None for non-finite or out-of-range inputs.
-Stdlib.Int64.fromFloat64 3.9 = Some 3L
-Stdlib.Int64.fromFloat64 (-3.9) = Some -3L
-Stdlib.Int64.fromFloat64 (-9223372036854775808.0) = Some -9223372036854775808L
-Stdlib.Int64.fromFloat64 9223372036854775808.0 = None
-Stdlib.Int64.fromFloat64 Builtin.testNan = None
-Stdlib.Int64.fromFloat64 Builtin.testInfinity = None
+Stdlib.Int64.fromFloat64 3.9 = Ok 3L
+Stdlib.Int64.fromFloat64 (-3.9) = Ok -3L
+Stdlib.Int64.fromFloat64 (-9223372036854775808.0) = Ok -9223372036854775808L
+Stdlib.Int64.fromFloat64 9223372036854775808.0 = Error Stdlib.Math.NonFinite.Overflow
+Stdlib.Int64.fromFloat64 Builtin.testNan = Error Stdlib.Math.NonFinite.NotANumber
+Stdlib.Int64.fromFloat64 Builtin.testInfinity = Error Stdlib.Math.NonFinite.Overflow
 
 // Stdlib.Int64.toFloat64
 Stdlib.Int64.toFloat64 42L = 42.0

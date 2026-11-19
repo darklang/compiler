@@ -209,7 +209,6 @@ test toFloat64 =
       Stdlib.Int64.toFloat64(-10) |> Stdlib.Test.equal(-10.0) ])
 
 
-// @compiler xfail compile: "Expected TSum (\"Darklang.Stdlib.Option.Option\", [TInt64]), got TSum" class=missing-support reason=compiler-gap
 test fromFloat64 =
   Stdlib.Test.all(
     [ // fromFloat64 truncates toward zero, like BigInt.fromFloat64; fromFloatRounded rounds
@@ -243,7 +242,6 @@ test fromFloat64 =
         Stdlib.Result.Result.Error(Stdlib.Math.NonFinite.Overflow)) ])
 
 
-// @compiler xfail compile: "Expected TSum (\"Darklang.Stdlib.Option.Option\", [TInt64]), got TSum" class=missing-support reason=compiler-gap
 test fromFloatRounded =
   Stdlib.Test.all(
     [ Stdlib.Int64.fromFloatRounded(3.9)

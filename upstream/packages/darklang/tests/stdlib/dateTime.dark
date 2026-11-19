@@ -1118,7 +1118,6 @@ test subtract =
       |> Stdlib.Test.equal(Stdlib.Duration.Duration { seconds = 3155760000 }) ])
 
 
-// @compiler xfail runtime: "Cannot unwrap Error" class=missing-support reason=compiler-gap
 test daysBetween =
   let days(first: String, second: String): Int64 =
     Stdlib.DateTime.daysBetween(d(first), d(second))
