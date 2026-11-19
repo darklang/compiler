@@ -10,214 +10,203 @@ type __HttpPolicy = { deadline: Stdlib.Option.Option<Int64>, redirects: Int64, r
 // The longest a retry waits, whatever a Retry-After asks.
 val __httpLongestWaitMs = 60000
 
-let __httpNow () : Int64 =
-  match Stdlib.__Network.monotonicMillis () with
-  | Ok now -> now
-  | Error _ -> Builtin.crash "The monotonic clock is unavailable"
+let __httpNow(): Int64 =
+  match Stdlib.__Network.monotonicMillis() with
+  | Ok(now) -> now
+  | Error(_) -> Builtin.crash("The monotonic clock is unavailable")
 
-let __httpHeader (name: String) (headers: List<(String * String)>) : Stdlib.Option.Option<String> =
+let __httpHeader(name: String, headers: List<(String * String)>): Stdlib.Option.Option<String> =
   match headers with
   | [] -> None
   | (key, value) :: rest ->
-    if Stdlib.String.toLowercase key == name then Some value else Builtin.__httpHeader name rest
+    if Stdlib.String.toLowercase(key) == name then Some(value) else Builtin.__httpHeader(name, rest)
 
-let __httpWithout (names: List<String>) (headers: List<(String * String)>) : List<(String * String)> =
-  Stdlib.List.filter headers (fun header ->
+let __httpWithout(names: List<String>, headers: List<(String * String)>): List<(String * String)> =
+  Stdlib.List.filter(headers, fun header ->
     let (key, _) = header in
-    Stdlib.Bool.not (Stdlib.List.contains names (Stdlib.String.toLowercase key)))
+    Stdlib.Bool.not(Stdlib.List.contains(names, Stdlib.String.toLowercase(key))))
 
 // The next send after a redirect with a Location, resolved against where this
 // one went. As fetch and curl -L do, a POST after a 301 or 302, and anything
 // but a GET or HEAD after a 303, becomes a GET with no body. Credentials and
 // cookies stay behind when it leaves the origin.
-let __httpRedirect (hop: Builtin.__HttpHop) (status: Int64) (headers: List<(String * String)>)
-  : Stdlib.Option.Option<Builtin.__HttpHop> =
+let __httpRedirect(hop: Builtin.__HttpHop, status: Int64, headers: List<(String * String)>): Stdlib.Option.Option<Builtin.__HttpHop> =
   if status != 301 && status != 302 && status != 303 && status != 307 && status != 308 then None
   else
-    match Builtin.__httpHeader "location" headers with
+    match Builtin.__httpHeader("location", headers) with
     | None -> None
-    | Some location ->
-      match Stdlib.Url.parse hop.url, Stdlib.Url.parseReference location with
-      | Ok from, Ok reference ->
-        let next = Stdlib.Url.toString (Stdlib.Url.resolve from reference) in
-        let method = Stdlib.String.toUppercase hop.method in
+    | Some(location) ->
+      match Stdlib.Url.parse(hop.url), Stdlib.Url.parseReference(location) with
+      | Ok(from), Ok(reference) ->
+        let next = Stdlib.Url.toString(Stdlib.Url.resolve(from, reference)) in
+        let method = Stdlib.String.toUppercase(hop.method) in
         let asGet =
           if status == 301 || status == 302 then method == "POST"
           else if status == 303 then method != "GET" && method != "HEAD"
           else false in
         let kept =
           if asGet then
-            Builtin.__httpWithout ["content-type", "content-length", "content-encoding", "content-language", "content-location"] hop.headers
+            Builtin.__httpWithout(["content-type", "content-length", "content-encoding", "content-language", "content-location"], hop.headers)
           else hop.headers in
         let kept =
-          if Stdlib.HttpClient.Middleware.__origin hop.url == Stdlib.HttpClient.Middleware.__origin next then kept
-          else Builtin.__httpWithout ["authorization", "cookie", "proxy-authorization"] kept in
-        Some (Builtin.__HttpHop {
+          if Stdlib.HttpClient.Middleware.__origin(hop.url) == Stdlib.HttpClient.Middleware.__origin(next) then kept
+          else Builtin.__httpWithout(["authorization", "cookie", "proxy-authorization"], kept) in
+        Some(Builtin.__HttpHop {
           method = if asGet then "GET" else hop.method,
           url = next,
           headers = kept,
           body = if asGet then Stdlib.Blob.empty else hop.body })
       | _ -> None
 
-let __httpIdempotent (method: String) : Bool =
-  Stdlib.List.contains ["GET", "HEAD", "PUT", "DELETE", "OPTIONS", "TRACE"] (Stdlib.String.toUppercase method)
+let __httpIdempotent(method: String): Bool =
+  Stdlib.List.contains(["GET", "HEAD", "PUT", "DELETE", "OPTIONS", "TRACE"], Stdlib.String.toUppercase(method))
 
-let __httpRetryable (error: Stdlib.HttpClient.RequestError) : Bool =
+let __httpRetryable(error: Stdlib.HttpClient.RequestError): Bool =
   match error with
   | Timeout -> true
-  | NetworkError _ -> true
+  | NetworkError(_) -> true
   | _ -> false
 
 // A Retry-After in seconds. The HTTP-date form is not read; the backoff applies.
-let __httpRetryAfter (headers: List<(String * String)>) : Stdlib.Option.Option<Int64> =
-  match Builtin.__httpHeader "retry-after" headers with
+let __httpRetryAfter(headers: List<(String * String)>): Stdlib.Option.Option<Int64> =
+  match Builtin.__httpHeader("retry-after", headers) with
   | None -> None
-  | Some value ->
-    match Stdlib.Int64.parse (Stdlib.String.trim value) with
-    | Ok seconds ->
+  | Some(value) ->
+    match Stdlib.Int64.parse(Stdlib.String.trim(value)) with
+    | Ok(seconds) ->
       if seconds < 0 then None
-      else if seconds > Builtin.__httpLongestWaitMs / 1000 then Some Builtin.__httpLongestWaitMs
-      else Some (seconds * 1000)
-    | Error _ -> None
+      else if seconds > Builtin.__httpLongestWaitMs / 1000 then Some(Builtin.__httpLongestWaitMs)
+      else Some(seconds * 1000)
+    | Error(_) -> None
 
 // The wait before retry `n` (0 for the first): `delayMs` doubled `n` times, up
 // to the longest wait, then a random point in its upper half, so clients that
 // failed together do not all come back together.
-let __httpBackoff (delayMs: Int64) (n: Int64) : Int64 =
+let __httpBackoff(delayMs: Int64, n: Int64): Int64 =
   let base = if delayMs > Builtin.__httpLongestWaitMs then Builtin.__httpLongestWaitMs else delayMs in
-  let full = Stdlib.List.fold (Stdlib.List.range 1 (if n > 16 then 16 else n)) base (fun wait _ ->
+  let full = Stdlib.List.fold(Stdlib.List.range(1, if n > 16 then 16 else n), base, fun(wait, _) ->
     if wait * 2 > Builtin.__httpLongestWaitMs then Builtin.__httpLongestWaitMs else wait * 2) in
   let half = full / 2 in
   let random =
-    match Stdlib.Crypto.__secureRandomBytes 2 with
-    | Ok bytes -> Stdlib.Blob.__getByte bytes 0 * 256 + Stdlib.Blob.__getByte bytes 1
-    | Error _ -> 0 in
+    match Stdlib.Crypto.__secureRandomBytes(2) with
+    | Ok(bytes) -> Stdlib.Blob.__getByte(bytes, 0) * 256 + Stdlib.Blob.__getByte(bytes, 1)
+    | Error(_) -> 0 in
   half + (random * (half + 1)) / 65536
 
-let __httpFits (policy: Builtin.__HttpPolicy) (waitMs: Int64) : Bool =
+let __httpFits(policy: Builtin.__HttpPolicy, waitMs: Int64): Bool =
   match policy.deadline with
-  | Some at -> waitMs < at - Builtin.__httpNow ()
+  | Some(at) -> waitMs < at - Builtin.__httpNow()
   | None -> true
 
-let __httpSleep (ms: Int64) : Unit =
-  if ms <= 0 then () else Stdlib.DateTime.__sleepMilliseconds (Stdlib.Int64.toFloat64 ms)
+let __httpSleep(ms: Int64): Unit =
+  if ms <= 0 then () else Stdlib.DateTime.__sleepMilliseconds(Stdlib.Int64.toFloat64(ms))
 
 // One send, refused once the deadline has passed and answered Timeout when
 // the response arrives after it.
-let __httpSend (policy: Builtin.__HttpPolicy) (send: Builtin.__HttpHop -> Stdlib.Result.Result<'r, Stdlib.HttpClient.RequestError>)
-  (drop: 'r -> Unit) (hop: Builtin.__HttpHop) : Stdlib.Result.Result<'r, Stdlib.HttpClient.RequestError> =
+let __httpSend(policy: Builtin.__HttpPolicy, send: Builtin.__HttpHop -> Stdlib.Result.Result<'r, Stdlib.HttpClient.RequestError>, drop: 'r -> Unit, hop: Builtin.__HttpHop): Stdlib.Result.Result<'r, Stdlib.HttpClient.RequestError> =
   match policy.deadline with
-  | Some at ->
-    if Builtin.__httpNow () >= at then Error Stdlib.HttpClient.RequestError.Timeout
+  | Some(at) ->
+    if Builtin.__httpNow() >= at then Error(Stdlib.HttpClient.RequestError.Timeout)
     else
-      match send hop with
-      | Ok received ->
-        if Builtin.__httpNow () > at then
-          let _ = drop received in
-          Error Stdlib.HttpClient.RequestError.Timeout
-        else Ok received
-      | Error error -> Error error
-  | None -> send hop
+      match send(hop) with
+      | Ok(received) ->
+        if Builtin.__httpNow() > at then
+          let _ = drop(received) in
+          Error(Stdlib.HttpClient.RequestError.Timeout)
+        else Ok(received)
+      | Error(error) -> Error(error)
+  | None -> send(hop)
 
-let __httpSettle (policy: Builtin.__HttpPolicy) (send: Builtin.__HttpHop -> Stdlib.Result.Result<'r, Stdlib.HttpClient.RequestError>)
-  (head: 'r -> (Int64 * List<(String * String)>)) (drop: 'r -> Unit)
-  (hop: Builtin.__HttpHop) (redirects: Int64) (retries: Int64)
-  (answer: Stdlib.Result.Result<'r, Stdlib.HttpClient.RequestError>)
-  : Stdlib.Result.Result<(Builtin.__HttpHop * 'r), Stdlib.HttpClient.RequestError> =
-  let again = retries > 0 && Builtin.__httpIdempotent hop.method in
+let __httpSettle(policy: Builtin.__HttpPolicy, send: Builtin.__HttpHop -> Stdlib.Result.Result<'r, Stdlib.HttpClient.RequestError>, head: 'r -> (Int64 * List<(String * String)>), drop: 'r -> Unit, hop: Builtin.__HttpHop, redirects: Int64, retries: Int64, answer: Stdlib.Result.Result<'r, Stdlib.HttpClient.RequestError>): Stdlib.Result.Result<(Builtin.__HttpHop * 'r), Stdlib.HttpClient.RequestError> =
+  let again = retries > 0 && Builtin.__httpIdempotent(hop.method) in
   let attempt = policy.retries - retries in
   match answer with
-  | Error error ->
-    if again && Builtin.__httpRetryable error then
-      let wait = Builtin.__httpBackoff policy.retryDelayMs attempt in
-      if Builtin.__httpFits policy wait then
-        let _ = Builtin.__httpSleep wait in
-        Builtin.__httpSettle policy send head drop hop redirects (retries - 1) (Builtin.__httpSend policy send drop hop)
-      else Error error
-    else Error error
-  | Ok received ->
-    let (status, headers) = head received in
-    let next = if policy.redirects > 0 then Builtin.__httpRedirect hop status headers else None in
+  | Error(error) ->
+    if again && Builtin.__httpRetryable(error) then
+      let wait = Builtin.__httpBackoff(policy.retryDelayMs, attempt) in
+      if Builtin.__httpFits(policy, wait) then
+        let _ = Builtin.__httpSleep(wait) in
+        Builtin.__httpSettle(policy, send, head, drop, hop, redirects, retries - 1, Builtin.__httpSend(policy, send, drop, hop))
+      else Error(error)
+    else Error(error)
+  | Ok(received) ->
+    let (status, headers) = head(received) in
+    let next = if policy.redirects > 0 then Builtin.__httpRedirect(hop, status, headers) else None in
     match next with
-    | Some next ->
-      let _ = drop received in
-      if redirects == 0 then Error Stdlib.HttpClient.RequestError.TooManyRedirects
-      else Builtin.__httpSettle policy send head drop next (redirects - 1) retries (Builtin.__httpSend policy send drop next)
+    | Some(next) ->
+      let _ = drop(received) in
+      if redirects == 0 then Error(Stdlib.HttpClient.RequestError.TooManyRedirects)
+      else Builtin.__httpSettle(policy, send, head, drop, next, redirects - 1, retries, Builtin.__httpSend(policy, send, drop, next))
     | None ->
       if again && (status == 429 || status == 502 || status == 503 || status == 504) then
-        let wait = match Builtin.__httpRetryAfter headers with
-                   | Some ms -> ms
-                   | None -> Builtin.__httpBackoff policy.retryDelayMs attempt in
-        if Builtin.__httpFits policy wait then
-          let _ = drop received in
-          let _ = Builtin.__httpSleep wait in
-          Builtin.__httpSettle policy send head drop hop redirects (retries - 1) (Builtin.__httpSend policy send drop hop)
-        else Ok ((hop, received))
-      else Ok ((hop, received))
+        let wait = match Builtin.__httpRetryAfter(headers) with
+                   | Some(ms) -> ms
+                   | None -> Builtin.__httpBackoff(policy.retryDelayMs, attempt) in
+        if Builtin.__httpFits(policy, wait) then
+          let _ = drop(received) in
+          let _ = Builtin.__httpSleep(wait) in
+          Builtin.__httpSettle(policy, send, head, drop, hop, redirects, retries - 1, Builtin.__httpSend(policy, send, drop, hop))
+        else Ok((hop, received))
+      else Ok((hop, received))
 
 // The interpreter's builtin defaults: None is 30 seconds and 0 no limit; no
 // redirects or retries unless the request asks for them.
-let __httpPolicy (req: Stdlib.HttpClient.Request) : Builtin.__HttpPolicy =
-  let overall = match req.timeoutMs with | Some ms -> ms | None -> 30000 in
-  let redirects = match req.redirects with | Some count -> count | None -> 0 in
-  let (retries, retryDelayMs) = Stdlib.HttpClient.__retryArgs req in
+let __httpPolicy(req: Stdlib.HttpClient.Request): Builtin.__HttpPolicy =
+  let overall = match req.timeoutMs with | Some(ms) -> ms | None -> 30000 in
+  let redirects = match req.redirects with | Some(count) -> count | None -> 0 in
+  let (retries, retryDelayMs) = Stdlib.HttpClient.__retryArgs(req) in
   Builtin.__HttpPolicy {
-    deadline = if overall > 0 then Some (Builtin.__httpNow () + overall) else None,
+    deadline = if overall > 0 then Some(Builtin.__httpNow() + overall) else None,
     redirects = if redirects > 0 then redirects else 0,
     retries = if retries > 0 then retries else 0,
     retryDelayMs = if retryDelayMs > 0 then retryDelayMs else 0 }
 
 // This host decodes no Content-Encoding, so a request that asks for a decoded
 // body is sent asking for none.
-let __httpHop (req: Stdlib.HttpClient.Request) : Builtin.__HttpHop =
+let __httpHop(req: Stdlib.HttpClient.Request): Builtin.__HttpHop =
   let headers =
-    if req.decompress then Builtin.__httpWithout ["accept-encoding"] req.headers @ [("Accept-Encoding", "identity")]
+    if req.decompress then Builtin.__httpWithout(["accept-encoding"], req.headers) @ [("Accept-Encoding", "identity")]
     else req.headers in
   Builtin.__HttpHop { method = req.method, url = req.url, headers = headers, body = req.body }
 
-let __httpDecoded (decompress: Bool) (headers: List<(String * String)>) : Stdlib.Result.Result<Unit, Stdlib.HttpClient.RequestError> =
-  match Builtin.__httpHeader "content-encoding" headers with
-  | Some coding ->
-    if decompress && Stdlib.String.toLowercase (Stdlib.String.trim coding) != "identity" then
-      Error (Stdlib.HttpClient.RequestError.Decode ("The response's Content-Encoding " + coding + " can't be decoded"))
-    else Ok ()
-  | None -> Ok ()
+let __httpDecoded(decompress: Bool, headers: List<(String * String)>): Stdlib.Result.Result<Unit, Stdlib.HttpClient.RequestError> =
+  match Builtin.__httpHeader("content-encoding", headers) with
+  | Some(coding) ->
+    if decompress && Stdlib.String.toLowercase(Stdlib.String.trim(coding)) != "identity" then
+      Error(Stdlib.HttpClient.RequestError.Decode("The response's Content-Encoding " + coding + " can't be decoded"))
+    else Ok()
+  | None -> Ok()
 
-let __httpExchange (req: Stdlib.HttpClient.Request)
-  (send: Builtin.__HttpHop -> Stdlib.Result.Result<'r, Stdlib.HttpClient.RequestError>)
-  (head: 'r -> (Int64 * List<(String * String)>)) (drop: 'r -> Unit)
-  : Stdlib.Result.Result<(Builtin.__HttpHop * 'r), Stdlib.HttpClient.RequestError> =
-  let req = Stdlib.HttpClient.Request.__final req in
-  let policy = Builtin.__httpPolicy req in
-  let first = Builtin.__httpHop req in
-  Builtin.__httpSettle policy send head drop first policy.redirects policy.retries (Builtin.__httpSend policy send drop first)
-  |> Stdlib.Result.andThen (fun answered ->
+let __httpExchange(req: Stdlib.HttpClient.Request, send: Builtin.__HttpHop -> Stdlib.Result.Result<'r, Stdlib.HttpClient.RequestError>, head: 'r -> (Int64 * List<(String * String)>), drop: 'r -> Unit): Stdlib.Result.Result<(Builtin.__HttpHop * 'r), Stdlib.HttpClient.RequestError> =
+  let req = Stdlib.HttpClient.Request.__final(req) in
+  let policy = Builtin.__httpPolicy(req) in
+  let first = Builtin.__httpHop(req) in
+  Builtin.__httpSettle(policy, send, head, drop, first, policy.redirects, policy.retries, Builtin.__httpSend(policy, send, drop, first))
+  |> Stdlib.Result.andThen(fun answered ->
     let (_, received) = answered in
-    let (_, receivedHeaders) = head received in
-    match Builtin.__httpDecoded req.decompress receivedHeaders with
-    | Ok () -> Ok answered
-    | Error error -> let _ = drop received in Error error)
+    let (_, receivedHeaders) = head(received) in
+    match Builtin.__httpDecoded(req.decompress, receivedHeaders) with
+    | Ok() -> Ok(answered)
+    | Error(error) -> let _ = drop(received) in Error(error))
 
 // Builtin.httpClientRequest, taking the request whole: its nine arguments are
 // more than a native call passes in registers.
-let __httpClientRequest (req: Stdlib.HttpClient.Request)
-  : Stdlib.Result.Result<Stdlib.HttpClient.Response<Blob>, Stdlib.HttpClient.RequestError> =
-  Builtin.__httpExchange req
-    (fun hop -> Stdlib.HttpClient.__request false None hop.method hop.url hop.headers hop.body)
-    (fun received -> (received.statusCode, received.headers))
-    (fun _received -> ())
-  |> Stdlib.Result.map (fun answered ->
+let __httpClientRequest(req: Stdlib.HttpClient.Request): Stdlib.Result.Result<Stdlib.HttpClient.Response<Blob>, Stdlib.HttpClient.RequestError> =
+  Builtin.__httpExchange(req,
+    (fun hop -> Stdlib.HttpClient.__request(false, None, hop.method, hop.url, hop.headers, hop.body)),
+    (fun received -> (received.statusCode, received.headers)),
+    fun _received -> ())
+  |> Stdlib.Result.map(fun answered ->
     let (hop, received) = answered in
     Stdlib.HttpClient.Response {
       statusCode = received.statusCode, headers = received.headers, body = received.body, url = hop.url })
 
-let __httpClientStream (req: Stdlib.HttpClient.Request)
-  : Stdlib.Result.Result<Stdlib.HttpClient.Response<Stream<UInt8>>, Stdlib.HttpClient.RequestError> =
-  Builtin.__httpExchange req
-    (fun hop -> Stdlib.HttpClient.__stream false None hop.method hop.url hop.headers hop.body)
-    (fun received -> (received.statusCode, received.headers))
-    (fun received -> Stdlib.Stream.close received.body)
-  |> Stdlib.Result.map (fun answered ->
+let __httpClientStream(req: Stdlib.HttpClient.Request): Stdlib.Result.Result<Stdlib.HttpClient.Response<Stream<UInt8>>, Stdlib.HttpClient.RequestError> =
+  Builtin.__httpExchange(req,
+    (fun hop -> Stdlib.HttpClient.__stream(false, None, hop.method, hop.url, hop.headers, hop.body)),
+    (fun received -> (received.statusCode, received.headers)),
+    fun received -> Stdlib.Stream.close(received.body))
+  |> Stdlib.Result.map(fun answered ->
     let (hop, received) = answered in
     Stdlib.HttpClient.Response {
       statusCode = received.statusCode, headers = received.headers, body = received.body, url = hop.url })

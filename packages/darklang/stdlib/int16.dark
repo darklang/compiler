@@ -10,73 +10,73 @@ type ParseError =
 
 // Stdlib.Int16 - Integer operations
 
-let add (a: Int16) (b: Int16) : Int16 = a + b
+let add(a: Int16, b: Int16): Int16 = a + b
 
-let subtract (a: Int16) (b: Int16) : Int16 = a - b
+let subtract(a: Int16, b: Int16): Int16 = a - b
 
-let multiply (a: Int16) (b: Int16) : Int16 = a * b
+let multiply(a: Int16, b: Int16): Int16 = a * b
 
-let divide (a: Int16) (b: Int16) : Int16 =
-    if b == 0s16 then Builtin.crash "Cannot divide by 0"
+let divide(a: Int16, b: Int16): Int16 =
+    if b == 0s16 then Builtin.crash("Cannot divide by 0")
     else if a == -32768s16 && b == -1s16 then -32768s16
     else a / b
 
-let max (a: Int16) (b: Int16) : Int16 = if a > b then a else b
+let max(a: Int16, b: Int16): Int16 = if a > b then a else b
 
-let min (a: Int16) (b: Int16) : Int16 = if a < b then a else b
+let min(a: Int16, b: Int16): Int16 = if a < b then a else b
 
-let mod (a: Int16) (b: Int16) : Int16 =
-    if b == 0s16 then Builtin.crash "Cannot evaluate modulus against 0"
-    else if b < 0s16 then Builtin.crash "Cannot evaluate modulus against a negative number"
+let mod(a: Int16, b: Int16): Int16 =
+    if b == 0s16 then Builtin.crash("Cannot evaluate modulus against 0")
+    else if b < 0s16 then Builtin.crash("Cannot evaluate modulus against a negative number")
     else a % b
 
-let remainder (a: Int16) (b: Int16) : Stdlib.Result.Result<Int16, String> =
-    if b == 0s16 then Error "Cannot divide by 0"
-    else if b == -1s16 then Ok 0s16
-    else Ok (a - ((a / b) * b))
+let remainder(a: Int16, b: Int16): Stdlib.Result.Result<Int16, String> =
+    if b == 0s16 then Error("Cannot divide by 0")
+    else if b == -1s16 then Ok(0s16)
+    else Ok(a - ((a / b) * b))
 
-let absoluteValue (a: Int16) : Int16 = if a < 0s16 then 0s16 - a else a
+let absoluteValue(a: Int16): Int16 = if a < 0s16 then 0s16 - a else a
 
-let negate (a: Int16) : Int16 = 0s16 - a
+let negate(a: Int16): Int16 = 0s16 - a
 
-let __powerLoop (base: Int16) (exponent: Int16) (result: Int16) : Int16 =
+let __powerLoop(base: Int16, exponent: Int16, result: Int16): Int16 =
     if exponent == 0s16 then result
     else
         let next = if (exponent % 2s16) == 1s16 then result * base else result in
-        Stdlib.Int16.__powerLoop (base * base) (exponent / 2s16) next
+        Stdlib.Int16.__powerLoop(base * base, exponent / 2s16, next)
 
-let power (base: Int16) (exponent: Int16) : Int16 =
-    if exponent < 0s16 then Builtin.crash "Cannot raise integer to a negative exponent"
-    else Stdlib.Int16.__powerLoop base exponent 1s16
+let power(base: Int16, exponent: Int16): Int16 =
+    if exponent < 0s16 then Builtin.crash("Cannot raise integer to a negative exponent")
+    else Stdlib.Int16.__powerLoop(base, exponent, 1s16)
 
-let clamp (value: Int16) (limitA: Int16) (limitB: Int16) : Int16 =
-    let lower = Stdlib.Int16.min limitA limitB in
-    let upper = Stdlib.Int16.max limitA limitB in
-    Stdlib.Int16.max lower (Stdlib.Int16.min upper value)
+let clamp(value: Int16, limitA: Int16, limitB: Int16): Int16 =
+    let lower = Stdlib.Int16.min(limitA, limitB) in
+    let upper = Stdlib.Int16.max(limitA, limitB) in
+    Stdlib.Int16.max(lower, Stdlib.Int16.min(upper, value))
 
-let greaterThan (a: Int16) (b: Int16) : Bool = a > b
+let greaterThan(a: Int16, b: Int16): Bool = a > b
 
-let greaterThanOrEqualTo (a: Int16) (b: Int16) : Bool = a >= b
+let greaterThanOrEqualTo(a: Int16, b: Int16): Bool = a >= b
 
-let lessThan (a: Int16) (b: Int16) : Bool = a < b
+let lessThan(a: Int16, b: Int16): Bool = a < b
 
-let lessThanOrEqualTo (a: Int16) (b: Int16) : Bool = a <= b
+let lessThanOrEqualTo(a: Int16, b: Int16): Bool = a <= b
 
 // Count number of set bits (population count)
 // Uses parallel bit counting algorithm (SWAR)
-let __popcount (x: Int16) : Int16 =
+let __popcount(x: Int16): Int16 =
     let mask1 = 21845s16 in
     let mask2 = 13107s16 in
     let mask3 = 3855s16 in
     let mask4 = 31s16 in
-    let x = x - Stdlib.Int16.bitwiseAnd (Stdlib.Int16.shiftRight x 1s16) mask1 in
-    let x = Stdlib.Int16.bitwiseAnd x mask2 + Stdlib.Int16.bitwiseAnd (Stdlib.Int16.shiftRight x 2s16) mask2 in
-    let x = Stdlib.Int16.bitwiseAnd (x + Stdlib.Int16.shiftRight x 4s16) mask3 in
-    let x = x + Stdlib.Int16.shiftRight x 8s16 in
-    Stdlib.Int16.bitwiseAnd x mask4
+    let x = x - Stdlib.Int16.bitwiseAnd(Stdlib.Int16.shiftRight(x, 1s16), mask1) in
+    let x = Stdlib.Int16.bitwiseAnd(x, mask2) + Stdlib.Int16.bitwiseAnd(Stdlib.Int16.shiftRight(x, 2s16), mask2) in
+    let x = Stdlib.Int16.bitwiseAnd(x + Stdlib.Int16.shiftRight(x, 4s16), mask3) in
+    let x = x + Stdlib.Int16.shiftRight(x, 8s16) in
+    Stdlib.Int16.bitwiseAnd(x, mask4)
 
 // Convert a single digit (0s-9s) to its string representation
-let __digitToString (n: Int16) : String =
+let __digitToString(n: Int16): String =
     match n with
     | 0s16 -> "0"
     | 1s16 -> "1"
@@ -91,42 +91,42 @@ let __digitToString (n: Int16) : String =
     | _ -> "?"
 
 // Convert an integer to its string representation
-let toString (n: Int16) : String =
+let toString(n: Int16): String =
     if n < 0s16 then
         if n < -9s16 then
             let quotient = n / 10s16 in
-            Stdlib.Int16.toString quotient + Stdlib.Int16.__digitToString (0s16 - (n - (quotient * 10s16)))
-        else "-" + Stdlib.Int16.__digitToString (0s16 - n)
-    else if n < 10s16 then Stdlib.Int16.__digitToString n
-    else Stdlib.Int16.toString (n / 10s16) + Stdlib.Int16.__digitToString (n % 10s16)
+            Stdlib.Int16.toString(quotient) + Stdlib.Int16.__digitToString(0s16 - (n - (quotient * 10s16)))
+        else "-" + Stdlib.Int16.__digitToString(0s16 - n)
+    else if n < 10s16 then Stdlib.Int16.__digitToString(n)
+    else Stdlib.Int16.toString(n / 10s16) + Stdlib.Int16.__digitToString(n % 10s16)
 
 // Sum all integers in a list
-let sum (list: List<Int16>) : Int16 =
-    Stdlib.List.fold list 0s16 (fun acc x -> acc + x)
+let sum(list: List<Int16>): Int16 =
+    Stdlib.List.fold(list, 0s16, fun(acc, x) -> acc + x)
 
-let __fromIntUnchecked (value: Int) : Int16 =
-    match Stdlib.Int.toInt16 value with
-    | Some result -> result
-    | None -> Builtin.crash "Internal Int16 conversion invariant failed"
-let random (start: Int16) (finish: Int16) : Int16 = Stdlib.Int16.__fromIntUnchecked (Stdlib.Int.random (Stdlib.Int.fromInt16 start) (Stdlib.Int.fromInt16 finish))
-let toFloat64 (value: Int16) : Float = Stdlib.Int.toFloat64 (Stdlib.Int.fromInt16 value)
-let sqrt (value: Int16) : Float = Stdlib.Float64.sqrt (Stdlib.Int16.toFloat64 value)
-let parse (value: String) : Stdlib.Result.Result<Int16, Stdlib.Int16.ParseError> =
-    match Stdlib.Int.parse value with
-    | Error _ -> Error Stdlib.Int16.ParseError.BadFormat
-    | Ok parsed ->
-        match Stdlib.Int.toInt16 parsed with
-        | None -> Error Stdlib.Int16.ParseError.OutOfRange
-        | Some result -> Ok result
-let fromInt8 (value: Int8) : Int16 = Stdlib.Int16.__fromIntUnchecked (Stdlib.Int.fromInt8 value)
-let fromUInt8 (value: UInt8) : Int16 = Stdlib.Int16.__fromIntUnchecked (Stdlib.Int.fromUInt8 value)
-let fromUInt16 (value: UInt16) : Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16 (Stdlib.Int.fromUInt16 value)
-let fromInt32 (value: Int32) : Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16 (Stdlib.Int.fromInt32 value)
-let fromUInt32 (value: UInt32) : Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16 (Stdlib.Int.fromUInt32 value)
-let fromInt64 (value: Int64) : Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16 (Stdlib.Int.fromInt64 value)
-let fromUInt64 (value: UInt64) : Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16 (Stdlib.Int.fromUInt64 value)
-let fromInt128 (value: Int128) : Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16 (Stdlib.Int.fromInt128 value)
-let fromUInt128 (value: UInt128) : Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16 (Stdlib.Int.fromUInt128 value)
+let __fromIntUnchecked(value: Int): Int16 =
+    match Stdlib.Int.toInt16(value) with
+    | Some(result) -> result
+    | None -> Builtin.crash("Internal Int16 conversion invariant failed")
+let random(start: Int16, finish: Int16): Int16 = Stdlib.Int16.__fromIntUnchecked(Stdlib.Int.random(Stdlib.Int.fromInt16(start), Stdlib.Int.fromInt16(finish)))
+let toFloat64(value: Int16): Float = Stdlib.Int.toFloat64(Stdlib.Int.fromInt16(value))
+let sqrt(value: Int16): Float = Stdlib.Float64.sqrt(Stdlib.Int16.toFloat64(value))
+let parse(value: String): Stdlib.Result.Result<Int16, Stdlib.Int16.ParseError> =
+    match Stdlib.Int.parse(value) with
+    | Error(_) -> Error(Stdlib.Int16.ParseError.BadFormat)
+    | Ok(parsed) ->
+        match Stdlib.Int.toInt16(parsed) with
+        | None -> Error(Stdlib.Int16.ParseError.OutOfRange)
+        | Some(result) -> Ok(result)
+let fromInt8(value: Int8): Int16 = Stdlib.Int16.__fromIntUnchecked(Stdlib.Int.fromInt8(value))
+let fromUInt8(value: UInt8): Int16 = Stdlib.Int16.__fromIntUnchecked(Stdlib.Int.fromUInt8(value))
+let fromUInt16(value: UInt16): Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16(Stdlib.Int.fromUInt16(value))
+let fromInt32(value: Int32): Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16(Stdlib.Int.fromInt32(value))
+let fromUInt32(value: UInt32): Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16(Stdlib.Int.fromUInt32(value))
+let fromInt64(value: Int64): Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16(Stdlib.Int.fromInt64(value))
+let fromUInt64(value: UInt64): Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16(Stdlib.Int.fromUInt64(value))
+let fromInt128(value: Int128): Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16(Stdlib.Int.fromInt128(value))
+let fromUInt128(value: UInt128): Stdlib.Option.Option<Int16> = Stdlib.Int.toInt16(Stdlib.Int.fromUInt128(value))
 
 // Trait implementations reuse the compiler's existing native operations.
 
@@ -179,7 +179,7 @@ impl Stdlib.Compare for Int16 =
   let greaterThanOrEqualTo = Stdlib.Int16.greaterThanOrEqualTo
 
 impl Stdlib.Zero for Int16 =
-  let zero () : Int16 = 0s16
+  let zero(): Int16 = 0s16
 
 impl Stdlib.One for Int16 =
-  let one () : Int16 = 1s16
+  let one(): Int16 = 1s16

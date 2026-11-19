@@ -4,10 +4,10 @@ type OS =
   | Linux
   | MacOS
 
-let getOS () : Stdlib.Result.Result<OS, String> =
-  match Builtin.runtimeTargetOS () with
-  | "linux" -> Ok OS.OS.Linux
-  | "darwin" -> Ok OS.OS.MacOS
+let getOS(): Stdlib.Result.Result<OS, String> =
+  match Builtin.runtimeTargetOS() with
+  | "linux" -> Ok(OS.OS.Linux)
+  | "darwin" -> Ok(OS.OS.MacOS)
   | "windows" ->
-    Error "Dark does not support Windows. Linux and macOS only, including WSL."
-  | _ -> Error "Unsupported operating system"
+    Error("Dark does not support Windows. Linux and macOS only, including WSL.")
+  | _ -> Error("Unsupported operating system")

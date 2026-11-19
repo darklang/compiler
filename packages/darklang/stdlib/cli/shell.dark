@@ -7,33 +7,33 @@ type Shell =
 
 /// Determines the default shell used by the current user.
 /// Returns  {{Ok <Shell>}} if successful, or {{Error}} with a message if the shell is unsupported or an error occurs.
-let getDefaultShell () : Stdlib.Result.Result<Shell, String> =
-  match OS.getOS () with
-  | Ok Linux ->
-    (Stdlib.Result.Result.Ok (Stdlib.Option.withDefault (Stdlib.Cli.Env.get "SHELL") "/bin/bash"))
-    |> Stdlib.Result.andThen (fun shell ->
-      match Stdlib.String.trim shell with
-      | "/bin/bash" -> Stdlib.Result.Result.Ok Shell.Shell.Bash
-      | "/bin/zsh" -> Stdlib.Result.Result.Ok Shell.Shell.Zsh
-      | shell when shell |> Stdlib.String.__containsBytes "/fish" ->
-        Stdlib.Result.Result.Ok Shell.Shell.Fish
+let getDefaultShell(): Stdlib.Result.Result<Shell, String> =
+  match OS.getOS() with
+  | Ok(Linux) ->
+    (Stdlib.Result.Result.Ok(Stdlib.Option.withDefault(Stdlib.Cli.Env.get("SHELL"), "/bin/bash")))
+    |> Stdlib.Result.andThen(fun shell ->
+      match Stdlib.String.trim(shell) with
+      | "/bin/bash" -> Stdlib.Result.Result.Ok(Shell.Shell.Bash)
+      | "/bin/zsh" -> Stdlib.Result.Result.Ok(Shell.Shell.Zsh)
+      | shell when shell |> Stdlib.String.__containsBytes("/fish") ->
+        Stdlib.Result.Result.Ok(Shell.Shell.Fish)
       | _ ->
-        Stdlib.Result.Result.Error
-          "Unsupported shell, if you are on Linux please use Bash, Zsh, or Fish")
+        Stdlib.Result.Result.Error(
+          "Unsupported shell, if you are on Linux please use Bash, Zsh, or Fish"))
 
-  | Ok MacOS ->
-    (Stdlib.Result.Result.Ok (Stdlib.Option.withDefault (Stdlib.Cli.Env.get "SHELL") "/bin/bash"))
-    |> Stdlib.Result.andThen (fun shell ->
-      match Stdlib.String.trim shell with
-      | "/bin/zsh" -> Stdlib.Result.Result.Ok Shell.Shell.Zsh
-      | shell when shell |> Stdlib.String.__containsBytes "/bin/bash" ->
-        Stdlib.Result.Result.Ok Shell.Shell.Bash
-      | shell when shell |> Stdlib.String.__containsBytes "/fish" ->
-        Stdlib.Result.Result.Ok Shell.Shell.Fish
+  | Ok(MacOS) ->
+    (Stdlib.Result.Result.Ok(Stdlib.Option.withDefault(Stdlib.Cli.Env.get("SHELL"), "/bin/bash")))
+    |> Stdlib.Result.andThen(fun shell ->
+      match Stdlib.String.trim(shell) with
+      | "/bin/zsh" -> Stdlib.Result.Result.Ok(Shell.Shell.Zsh)
+      | shell when shell |> Stdlib.String.__containsBytes("/bin/bash") ->
+        Stdlib.Result.Result.Ok(Shell.Shell.Bash)
+      | shell when shell |> Stdlib.String.__containsBytes("/fish") ->
+        Stdlib.Result.Result.Ok(Shell.Shell.Fish)
       | _ ->
-        Stdlib.Result.Result.Error
-          "Unsupported shell, if you are on MacOS please use Bash, Zsh, or Fish")
+        Stdlib.Result.Result.Error(
+          "Unsupported shell, if you are on MacOS please use Bash, Zsh, or Fish"))
 
-  | Error _ ->
-    Stdlib.Result.Result.Error
-      "Unsupported OS, couldn't determine default shell"
+  | Error(_) ->
+    Stdlib.Result.Result.Error(
+      "Unsupported OS, couldn't determine default shell")

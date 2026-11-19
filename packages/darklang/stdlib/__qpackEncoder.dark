@@ -8,145 +8,142 @@ type Encoded = { state: Stdlib.__QpackEncoder.State, bytes: Blob, instructions: 
 type Field = Literal of Blob | Reference of Int64
 type Selected = { state: Stdlib.__QpackEncoder.State, fields: List<Stdlib.__QpackEncoder.Field>, references: List<Int64>, instructions: List<Blob>, budget: Int64 }
 
-let create (maximum: Int64) (blocked: Int64) : Stdlib.Result.Result<Stdlib.__QpackEncoder.State, String> =
-  if maximum < 0 || maximum > 4611686018427387903 || blocked < 0 || blocked > 4611686018427387903 then Error "Invalid QPACK encoder settings"
+let create(maximum: Int64, blocked: Int64): Stdlib.Result.Result<Stdlib.__QpackEncoder.State, String> =
+  if maximum < 0 || maximum > 4611686018427387903 || blocked < 0 || blocked > 4611686018427387903 then Error("Invalid QPACK encoder settings")
   else
     let capacity = if maximum > 4096 then 4096 else maximum in
-    let instructions = if capacity == 0 then Stdlib.Blob.empty else Stdlib.__Hpack.encodeInteger 5 32 capacity in
-    Ok (Stdlib.__QpackEncoder.State { maximum = maximum, capacity = capacity, blocked = blocked, known = 0, inserted = 0, entries = [], sections = [], pending = Stdlib.Blob.empty, instructions = instructions })
+    let instructions = if capacity == 0 then Stdlib.Blob.empty else Stdlib.__Hpack.encodeInteger(5, 32, capacity) in
+    Ok(Stdlib.__QpackEncoder.State { maximum = maximum, capacity = capacity, blocked = blocked, known = 0, inserted = 0, entries = [], sections = [], pending = Stdlib.Blob.empty, instructions = instructions })
 
-let __pinned (state: Stdlib.__QpackEncoder.State) (current: List<Int64>) (index: Int64) : Bool =
-  index >= state.known || Stdlib.List.any current (fun value -> value == index) || Stdlib.List.any state.sections (fun section -> Stdlib.List.any section.references (fun value -> value == index))
+let __pinned(state: Stdlib.__QpackEncoder.State, current: List<Int64>, index: Int64): Bool =
+  index >= state.known || Stdlib.List.any(current, fun value -> value == index) || Stdlib.List.any(state.sections, fun section -> Stdlib.List.any(section.references, fun value -> value == index))
 
 // Eviction is oldest-first, not a filter: a pinned oldest entry prevents eviction
 // of later entries, even if dropping a newer entry would create enough room.
-let __room (state: Stdlib.__QpackEncoder.State) (current: List<Int64>) (oldest: List<Stdlib.__QpackDecoder.Entry>) (size: Int64)
-  : Stdlib.Option.Option<List<Stdlib.__QpackDecoder.Entry>> =
-  if size <= state.capacity then Some (Stdlib.List.reverse oldest)
+let __room(state: Stdlib.__QpackEncoder.State, current: List<Int64>, oldest: List<Stdlib.__QpackDecoder.Entry>, size: Int64): Stdlib.Option.Option<List<Stdlib.__QpackDecoder.Entry>> =
+  if size <= state.capacity then Some(Stdlib.List.reverse(oldest))
   else match oldest with
   | [] -> None
   | entry :: rest ->
-    if Stdlib.__QpackEncoder.__pinned state current entry.index then None
-    else Stdlib.__QpackEncoder.__room state current rest (size - Stdlib.__Hpack.__entrySize entry.field)
+    if Stdlib.__QpackEncoder.__pinned(state, current, entry.index) then None
+    else Stdlib.__QpackEncoder.__room(state, current, rest, size - Stdlib.__Hpack.__entrySize(entry.field))
 
-let __blockedStreams (sections: List<Stdlib.__QpackEncoder.Section>) (known: Int64) (seen: List<Int64>) : Int64 =
+let __blockedStreams(sections: List<Stdlib.__QpackEncoder.Section>, known: Int64, seen: List<Int64>): Int64 =
   match sections with
-  | [] -> Stdlib.List.fold seen 0 (fun count _stream -> count + 1)
+  | [] -> Stdlib.List.fold(seen, 0, fun(count, _stream) -> count + 1)
   | section :: rest ->
     let next =
-      if section.required > known && Stdlib.Bool.not (Stdlib.List.any seen (fun stream -> stream == section.stream)) then Stdlib.List.push seen section.stream
+      if section.required > known && Stdlib.Bool.not(Stdlib.List.any(seen, fun stream -> stream == section.stream)) then Stdlib.List.push(seen, section.stream)
       else seen in
-    Stdlib.__QpackEncoder.__blockedStreams rest known next
+    Stdlib.__QpackEncoder.__blockedStreams(rest, known, next)
 
-let __canReference (state: Stdlib.__QpackEncoder.State) (stream: Int64) (index: Int64) : Bool =
+let __canReference(state: Stdlib.__QpackEncoder.State, stream: Int64, index: Int64): Bool =
   index < state.known ||
     (index - state.known < state.maximum / 32 &&
-      (Stdlib.List.any state.sections (fun section -> section.stream == stream && section.required > state.known) ||
-        Stdlib.__QpackEncoder.__blockedStreams state.sections state.known [] < state.blocked))
+      (Stdlib.List.any(state.sections, fun section -> section.stream == stream && section.required > state.known) ||
+        Stdlib.__QpackEncoder.__blockedStreams(state.sections, state.known, []) < state.blocked))
 
-let __literal (field: (String * String)) : Blob =
+let __literal(field: (String * String)): Blob =
   // The stateless encoder validates and preserves the never-indexed policy.
-  match Stdlib.__Qpack.encode [field] with
-  | Error _ -> Builtin.crash "Validated QPACK field rejected"
-  | Ok bytes -> Stdlib.__Http2Wire.__slice bytes 2 (Stdlib.Blob.__byteLength bytes - 2)
+  match Stdlib.__Qpack.encode([field]) with
+  | Error(_) -> Builtin.crash("Validated QPACK field rejected")
+  | Ok(bytes) -> Stdlib.__Http2Wire.__slice(bytes, 2, Stdlib.Blob.__byteLength(bytes) - 2)
 
-let __insertBytes (field: (String * String)) : Blob =
+let __insertBytes(field: (String * String)): Blob =
   let (name, value) = field in
-  let reference = match Stdlib.__Qpack.__staticIndex name value false 0 with
-  | Some index -> Stdlib.__Hpack.encodeInteger 6 192 index
+  let reference = match Stdlib.__Qpack.__staticIndex(name, value, false, 0) with
+  | Some(index) -> Stdlib.__Hpack.encodeInteger(6, 192, index)
   | None ->
-    let raw = Stdlib.String.toBlob name in
-    let compressed = Stdlib.__Hpack.__encodeHuffman raw 0 0 0 [] in
-    let huffman = Stdlib.Blob.__byteLength compressed < Stdlib.Blob.__byteLength raw in
+    let raw = Stdlib.String.toBlob(name) in
+    let compressed = Stdlib.__Hpack.__encodeHuffman(raw, 0, 0, 0, []) in
+    let huffman = Stdlib.Blob.__byteLength(compressed) < Stdlib.Blob.__byteLength(raw) in
     let bytes = if huffman then compressed else raw in
-    Stdlib.Blob.concat [Stdlib.__Hpack.encodeInteger 5 (if huffman then 96 else 64) (Stdlib.Blob.__byteLength bytes), bytes] in
-  Stdlib.Blob.concat [reference, Stdlib.__Hpack.encodeText value]
+    Stdlib.Blob.concat([Stdlib.__Hpack.encodeInteger(5, (if huffman then 96 else 64), Stdlib.Blob.__byteLength(bytes)), bytes]) in
+  Stdlib.Blob.concat([reference, Stdlib.__Hpack.encodeText(value)])
 
-let __select (selected: Stdlib.__QpackEncoder.Selected) (stream: Int64) (fields: List<(String * String)>) : Stdlib.__QpackEncoder.Selected =
+let __select(selected: Stdlib.__QpackEncoder.Selected, stream: Int64, fields: List<(String * String)>): Stdlib.__QpackEncoder.Selected =
   match fields with
   | [] -> selected
   | field :: rest ->
     let (name, value) = field in
-    let static = Stdlib.__Qpack.__staticIndex name value true 0 in
-    let sensitive = Stdlib.__Hpack.__sensitive name in
-    let found = Stdlib.List.findFirst selected.state.entries (fun entry -> entry.field == field) in
+    let static = Stdlib.__Qpack.__staticIndex(name, value, true, 0) in
+    let sensitive = Stdlib.__Hpack.__sensitive(name) in
+    let found = Stdlib.List.findFirst(selected.state.entries, fun entry -> entry.field == field) in
     let chosen =
-      if sensitive || Stdlib.Option.isSome static then None
+      if sensitive || Stdlib.Option.isSome(static) then None
       else match found with
-      | Some entry -> Some ((selected.state, entry.index, Stdlib.Blob.empty))
+      | Some(entry) -> Some((selected.state, entry.index, Stdlib.Blob.empty))
       | None ->
-        let instruction = Stdlib.__QpackEncoder.__insertBytes field in
-        let entrySize = Stdlib.__Hpack.__entrySize field in
-        let size = Stdlib.List.fold selected.state.entries entrySize (fun total entry -> total + Stdlib.__Hpack.__entrySize entry.field) in
-        if entrySize > selected.state.capacity || Stdlib.Blob.__byteLength instruction > selected.budget ||
+        let instruction = Stdlib.__QpackEncoder.__insertBytes(field) in
+        let entrySize = Stdlib.__Hpack.__entrySize(field) in
+        let size = Stdlib.List.fold(selected.state.entries, entrySize, fun(total, entry) -> total + Stdlib.__Hpack.__entrySize(entry.field)) in
+        if entrySize > selected.state.capacity || Stdlib.Blob.__byteLength(instruction) > selected.budget ||
           selected.state.inserted - selected.state.known >= selected.state.maximum / 32 || selected.state.inserted >= 4611686018427385855 then None
-        else match Stdlib.__QpackEncoder.__room selected.state selected.references (Stdlib.List.reverse selected.state.entries) size with
+        else match Stdlib.__QpackEncoder.__room(selected.state, selected.references, Stdlib.List.reverse(selected.state.entries), size) with
         | None -> None
-        | Some entries ->
+        | Some(entries) ->
           let entry = Stdlib.__QpackDecoder.Entry { index = selected.state.inserted, field = field } in
-          Some (({ selected.state with inserted = selected.state.inserted + 1, entries = Stdlib.List.push entries entry }, entry.index, instruction)) in
+          Some(({ selected.state with inserted = selected.state.inserted + 1, entries = Stdlib.List.push(entries, entry) }, entry.index, instruction)) in
     let next = match chosen with
-    | None -> { selected with fields = Stdlib.List.push selected.fields (Literal (Stdlib.__QpackEncoder.__literal field)) }
-    | Some ((state, index, instruction)) ->
-      let reference = Stdlib.__QpackEncoder.__canReference state stream index in
-      let encoded = if reference then Reference index else Literal (Stdlib.__QpackEncoder.__literal field) in
-      { selected with state = state, fields = Stdlib.List.push selected.fields encoded,
-        references = if reference then Stdlib.List.push selected.references index else selected.references,
-        instructions = Stdlib.List.push selected.instructions instruction, budget = selected.budget - Stdlib.Blob.__byteLength instruction } in
-    Stdlib.__QpackEncoder.__select next stream rest
+    | None -> { selected with fields = Stdlib.List.push(selected.fields, Literal(Stdlib.__QpackEncoder.__literal(field))) }
+    | Some((state, index, instruction)) ->
+      let reference = Stdlib.__QpackEncoder.__canReference(state, stream, index) in
+      let encoded = if reference then Reference(index) else Literal(Stdlib.__QpackEncoder.__literal(field)) in
+      { selected with state = state, fields = Stdlib.List.push(selected.fields, encoded),
+        references = if reference then Stdlib.List.push(selected.references, index) else selected.references,
+        instructions = Stdlib.List.push(selected.instructions, instruction), budget = selected.budget - Stdlib.Blob.__byteLength(instruction) } in
+    Stdlib.__QpackEncoder.__select(next, stream, rest)
 
-let encode (state: Stdlib.__QpackEncoder.State) (stream: Int64) (fields: List<(String * String)>) (budget: Int64)
-  : Stdlib.Result.Result<Stdlib.__QpackEncoder.Encoded, String> =
-  if stream < 0 || stream > 4611686018427387903 || stream % 4 != 0 || budget < 0 || budget > 65536 then Error "Invalid QPACK encoder budget or stream"
-  else Stdlib.__Qpack.encode fields |> Stdlib.Result.map (fun fallback ->
-    if Stdlib.List.__lengthInt state.sections >= 1024z || Stdlib.Blob.__byteLength state.instructions > budget then
+let encode(state: Stdlib.__QpackEncoder.State, stream: Int64, fields: List<(String * String)>, budget: Int64): Stdlib.Result.Result<Stdlib.__QpackEncoder.Encoded, String> =
+  if stream < 0 || stream > 4611686018427387903 || stream % 4 != 0 || budget < 0 || budget > 65536 then Error("Invalid QPACK encoder budget or stream")
+  else Stdlib.__Qpack.encode(fields) |> Stdlib.Result.map(fun fallback ->
+    if Stdlib.List.__lengthInt(state.sections) >= 1024z || Stdlib.Blob.__byteLength(state.instructions) > budget then
       Stdlib.__QpackEncoder.Encoded { state = state, bytes = fallback, instructions = Stdlib.Blob.empty }
     else
-      let initial = Stdlib.__QpackEncoder.Selected { state = { state with instructions = Stdlib.Blob.empty }, fields = [], references = [], instructions = [state.instructions], budget = budget - Stdlib.Blob.__byteLength state.instructions } in
-      let selected = Stdlib.__QpackEncoder.__select initial stream fields in
-      let required = Stdlib.List.fold selected.references 0 (fun highest index -> if index + 1 > highest then index + 1 else highest) in
+      let initial = Stdlib.__QpackEncoder.Selected { state = { state with instructions = Stdlib.Blob.empty }, fields = [], references = [], instructions = [state.instructions], budget = budget - Stdlib.Blob.__byteLength(state.instructions) } in
+      let selected = Stdlib.__QpackEncoder.__select(initial, stream, fields) in
+      let required = Stdlib.List.fold(selected.references, 0, fun(highest, index) -> if index + 1 > highest then index + 1 else highest) in
       let count = if required == 0 then 0 else required % (2 * (state.maximum / 32)) + 1 in
-      let blocks = Stdlib.List.map (Stdlib.List.reverse selected.fields) (fun field -> match field with
-        | Literal bytes -> bytes
-        | Reference index -> Stdlib.__Hpack.encodeInteger 6 128 (required - index - 1)) in
+      let blocks = Stdlib.List.map(Stdlib.List.reverse(selected.fields), fun field -> match field with
+        | Literal(bytes) -> bytes
+        | Reference(index) -> Stdlib.__Hpack.encodeInteger(6, 128, required - index - 1)) in
       let section = Stdlib.__QpackEncoder.Section { stream = stream, required = required, references = selected.references } in
-      let sections = if required == 0 then selected.state.sections else Stdlib.List.concat selected.state.sections [section] in
+      let sections = if required == 0 then selected.state.sections else Stdlib.List.concat(selected.state.sections, [section]) in
       Stdlib.__QpackEncoder.Encoded { state = { selected.state with sections = sections },
-        bytes = Stdlib.Blob.concat (Stdlib.List.push blocks (Stdlib.Blob.concat [Stdlib.__Hpack.encodeInteger 8 0 count, Stdlib.__Hpack.encodeInteger 7 0 0])),
-        instructions = Stdlib.Blob.concat (Stdlib.List.reverse selected.instructions) })
+        bytes = Stdlib.Blob.concat(Stdlib.List.push(blocks, Stdlib.Blob.concat([Stdlib.__Hpack.encodeInteger(8, 0, count), Stdlib.__Hpack.encodeInteger(7, 0, 0)]))),
+        instructions = Stdlib.Blob.concat(Stdlib.List.reverse(selected.instructions)) })
 
 // Only the transport owner can establish that no stream byte was sent. The
 // encoder instructions remain committed; dropping a section cannot acknowledge
 // their insertions or make unconfirmed entries safe to evict.
-let discardUnsent (state: Stdlib.__QpackEncoder.State) (stream: Int64) : Stdlib.__QpackEncoder.State =
-  { state with sections = Stdlib.List.filter state.sections (fun section -> section.stream != stream) }
+let discardUnsent(state: Stdlib.__QpackEncoder.State, stream: Int64): Stdlib.__QpackEncoder.State =
+  { state with sections = Stdlib.List.filter(state.sections, fun section -> section.stream != stream) }
 
-let __ack (sections: List<Stdlib.__QpackEncoder.Section>) (stream: Int64)
-  : Stdlib.Result.Result<(List<Stdlib.__QpackEncoder.Section> * Int64), String> =
+let __ack(sections: List<Stdlib.__QpackEncoder.Section>, stream: Int64): Stdlib.Result.Result<(List<Stdlib.__QpackEncoder.Section> * Int64), String> =
   match sections with
-  | [] -> Error "Unexpected QPACK section acknowledgment"
+  | [] -> Error("Unexpected QPACK section acknowledgment")
   | section :: rest ->
-    if section.stream == stream then Ok ((rest, section.required))
-    else Stdlib.__QpackEncoder.__ack rest stream |> Stdlib.Result.map (fun result -> let (remaining, required) = result in (Stdlib.List.push remaining section, required))
+    if section.stream == stream then Ok((rest, section.required))
+    else Stdlib.__QpackEncoder.__ack(rest, stream) |> Stdlib.Result.map(fun result -> let (remaining, required) = result in (Stdlib.List.push(remaining, section), required))
 
-let __apply (state: Stdlib.__QpackEncoder.State) (first: Int64) (value: Int64) : Stdlib.Result.Result<Stdlib.__QpackEncoder.State, String> =
+let __apply(state: Stdlib.__QpackEncoder.State, first: Int64, value: Int64): Stdlib.Result.Result<Stdlib.__QpackEncoder.State, String> =
   if first >= 128 then
-    Stdlib.__QpackEncoder.__ack state.sections value |> Stdlib.Result.map (fun result ->
+    Stdlib.__QpackEncoder.__ack(state.sections, value) |> Stdlib.Result.map(fun result ->
       let (sections, required) = result in
       { state with sections = sections, known = if required > state.known then required else state.known })
-  else if first >= 64 then Ok { state with sections = Stdlib.List.filter state.sections (fun section -> section.stream != value) }
-  else if value == 0 || value > state.inserted - state.known then Error "Invalid QPACK insert count increment"
-  else Ok { state with known = state.known + value }
+  else if first >= 64 then Ok({ state with sections = Stdlib.List.filter(state.sections, fun section -> section.stream != value) })
+  else if value == 0 || value > state.inserted - state.known then Error("Invalid QPACK insert count increment")
+  else Ok({ state with known = state.known + value })
 
-let __feed (state: Stdlib.__QpackEncoder.State) (data: Blob) (position: Int64) : Stdlib.Result.Result<Stdlib.__QpackEncoder.State, String> =
-  if position == Stdlib.Blob.__byteLength data then Ok { state with pending = Stdlib.Blob.empty }
+let __feed(state: Stdlib.__QpackEncoder.State, data: Blob, position: Int64): Stdlib.Result.Result<Stdlib.__QpackEncoder.State, String> =
+  if position == Stdlib.Blob.__byteLength(data) then Ok({ state with pending = Stdlib.Blob.empty })
   else
-    let first = Stdlib.Blob.__getByte data position in
-    match Stdlib.__QpackDecoder.__integer data position (if first >= 128 then 7 else 6) with
-    | Error Incomplete -> Ok { state with pending = Stdlib.__Http2Wire.__slice data position (Stdlib.Blob.__byteLength data - position) }
-    | Error (Invalid message) -> Error message
-    | Ok number -> Stdlib.__QpackEncoder.__apply state first number.value |> Stdlib.Result.andThen (fun next -> Stdlib.__QpackEncoder.__feed next data number.next)
+    let first = Stdlib.Blob.__getByte(data, position) in
+    match Stdlib.__QpackDecoder.__integer(data, position, if first >= 128 then 7 else 6) with
+    | Error(Incomplete) -> Ok({ state with pending = Stdlib.__Http2Wire.__slice(data, position, Stdlib.Blob.__byteLength(data) - position) })
+    | Error(Invalid(message)) -> Error(message)
+    | Ok(number) -> Stdlib.__QpackEncoder.__apply(state, first, number.value) |> Stdlib.Result.andThen(fun next -> Stdlib.__QpackEncoder.__feed(next, data, number.next))
 
-let feed (state: Stdlib.__QpackEncoder.State) (data: Blob) : Stdlib.Result.Result<Stdlib.__QpackEncoder.State, String> =
-  if Stdlib.Blob.__byteLength data > 65536 || Stdlib.Blob.__byteLength state.pending + Stdlib.Blob.__byteLength data > 65552 then Error "QPACK decoder feedback exceeds limit"
-  else Stdlib.__QpackEncoder.__feed state (Stdlib.Blob.concat [state.pending, data]) 0
+let feed(state: Stdlib.__QpackEncoder.State, data: Blob): Stdlib.Result.Result<Stdlib.__QpackEncoder.State, String> =
+  if Stdlib.Blob.__byteLength(data) > 65536 || Stdlib.Blob.__byteLength(state.pending) + Stdlib.Blob.__byteLength(data) > 65552 then Error("QPACK decoder feedback exceeds limit")
+  else Stdlib.__QpackEncoder.__feed(state, Stdlib.Blob.concat([state.pending, data]), 0)

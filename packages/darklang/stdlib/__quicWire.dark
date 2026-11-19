@@ -8,45 +8,45 @@ type TransportError = { code: Int64, message: String }
 type Failure = TransportViolation of Stdlib.__QuicWire.TransportError | LocalFailure of String
 type FrameFailure = { kind: Stdlib.Option.Option<Int64>, failure: Stdlib.__QuicWire.Failure }
 
-let localFailure (message: String) : Stdlib.__QuicWire.Failure = LocalFailure message
+let localFailure(message: String): Stdlib.__QuicWire.Failure = LocalFailure(message)
 
-let protocol (code: Int64) (message: String) : Stdlib.__QuicWire.Failure =
-  TransportViolation (Stdlib.__QuicWire.TransportError { code = code, message = message })
+let protocol(code: Int64, message: String): Stdlib.__QuicWire.Failure =
+  TransportViolation(Stdlib.__QuicWire.TransportError { code = code, message = message })
 
-let message (failure: Stdlib.__QuicWire.Failure) : String =
-  match failure with | TransportViolation error -> error.message | LocalFailure message -> message
+let message(failure: Stdlib.__QuicWire.Failure): String =
+  match failure with | TransportViolation(error) -> error.message | LocalFailure(message) -> message
 
-let frameMessage (error: Stdlib.__QuicWire.FrameFailure) : String =
-  Stdlib.__QuicWire.message error.failure
+let frameMessage(error: Stdlib.__QuicWire.FrameFailure): String =
+  Stdlib.__QuicWire.message(error.failure)
 
 // Width of an already validated QUIC variable-length integer.
-let width (value: Int64) : Int64 =
+let width(value: Int64): Int64 =
   if value < 64 then 1 else if value < 16384 then 2 else if value < 1073741824 then 4 else 8
 
-let __bytes (value: Int64) (remaining: Int64) (bytes: List<Int64>) : List<Int64> =
+let __bytes(value: Int64, remaining: Int64, bytes: List<Int64>): List<Int64> =
   if remaining == 0 then bytes
-  else Stdlib.__QuicWire.__bytes (value / 256) (remaining - 1) (Stdlib.List.push bytes (value % 256))
+  else Stdlib.__QuicWire.__bytes(value / 256, remaining - 1, Stdlib.List.push(bytes, value % 256))
 
-let integer (value: Int64) : Stdlib.Result.Result<Blob, String> =
-  if value < 0 || value > 4611686018427387903 then Error "QUIC integer out of range"
+let integer(value: Int64): Stdlib.Result.Result<Blob, String> =
+  if value < 0 || value > 4611686018427387903 then Error("QUIC integer out of range")
   else
     let (size, tag) = if value < 64 then (1, 0)
                       else if value < 16384 then (2, 64)
                       else if value < 1073741824 then (4, 128) else (8, 192) in
-    match Stdlib.__QuicWire.__bytes value size [] with
-    | [] -> Builtin.crash "Empty QUIC integer"
-    | first :: rest -> Ok (Stdlib.Blob.__fromInt64List (Stdlib.List.push rest (first + tag)))
+    match Stdlib.__QuicWire.__bytes(value, size, []) with
+    | [] -> Builtin.crash("Empty QUIC integer")
+    | first :: rest -> Ok(Stdlib.Blob.__fromInt64List(Stdlib.List.push(rest, first + tag)))
 
-let __read (data: Blob) (position: Int64) (remaining: Int64) (value: Int64) : Int64 =
+let __read(data: Blob, position: Int64, remaining: Int64, value: Int64): Int64 =
   if remaining == 0 then value
-  else Stdlib.__QuicWire.__read data (position + 1) (remaining - 1) (value * 256 + Stdlib.Blob.__getByte data position)
+  else Stdlib.__QuicWire.__read(data, position + 1, remaining - 1, value * 256 + Stdlib.Blob.__getByte(data, position))
 
-let parseInteger (data: Blob) (position: Int64) : Stdlib.Result.Result<Stdlib.__QuicWire.Number, Stdlib.__QuicWire.ParseError> =
-  if position < 0 then Error (Invalid "Invalid QUIC integer offset")
-  else if position >= Stdlib.Blob.__byteLength data then Error Incomplete
+let parseInteger(data: Blob, position: Int64): Stdlib.Result.Result<Stdlib.__QuicWire.Number, Stdlib.__QuicWire.ParseError> =
+  if position < 0 then Error(Invalid("Invalid QUIC integer offset"))
+  else if position >= Stdlib.Blob.__byteLength(data) then Error(Incomplete)
   else
-    let first = Stdlib.Blob.__getByte data position in
+    let first = Stdlib.Blob.__getByte(data, position) in
     let tag = first / 64 in
     let size = if tag == 0 then 1 else if tag == 1 then 2 else if tag == 2 then 4 else 8 in
-    if size > Stdlib.Blob.__byteLength data - position then Error Incomplete
-    else Ok (Stdlib.__QuicWire.Number { value = Stdlib.__QuicWire.__read data (position + 1) (size - 1) (first % 64), next = position + size })
+    if size > Stdlib.Blob.__byteLength(data) - position then Error(Incomplete)
+    else Ok(Stdlib.__QuicWire.Number { value = Stdlib.__QuicWire.__read(data, position + 1, size - 1, first % 64), next = position + size })

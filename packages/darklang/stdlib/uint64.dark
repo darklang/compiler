@@ -10,56 +10,56 @@ type ParseError =
 
 // Stdlib.UInt64 - Integer operations
 
-let add (a: UInt64) (b: UInt64) : UInt64 = a + b
+let add(a: UInt64, b: UInt64): UInt64 = a + b
 
-let subtract (a: UInt64) (b: UInt64) : UInt64 = a - b
+let subtract(a: UInt64, b: UInt64): UInt64 = a - b
 
-let multiply (a: UInt64) (b: UInt64) : UInt64 = a * b
+let multiply(a: UInt64, b: UInt64): UInt64 = a * b
 
-let divide (a: UInt64) (b: UInt64) : UInt64 = if b == 0u64 then Builtin.crash "Cannot divide by 0" else a / b
+let divide(a: UInt64, b: UInt64): UInt64 = if b == 0u64 then Builtin.crash("Cannot divide by 0") else a / b
 
-let max (a: UInt64) (b: UInt64) : UInt64 = if a > b then a else b
+let max(a: UInt64, b: UInt64): UInt64 = if a > b then a else b
 
-let min (a: UInt64) (b: UInt64) : UInt64 = if a < b then a else b
+let min(a: UInt64, b: UInt64): UInt64 = if a < b then a else b
 
-let mod (a: UInt64) (b: UInt64) : UInt64 = if b == 0u64 then Builtin.crash "Cannot evaluate modulus against 0" else a % b
+let mod(a: UInt64, b: UInt64): UInt64 = if b == 0u64 then Builtin.crash("Cannot evaluate modulus against 0") else a % b
 
 
 
-let __powerLoop (base: UInt64) (exponent: UInt64) (result: UInt64) : UInt64 =
+let __powerLoop(base: UInt64, exponent: UInt64, result: UInt64): UInt64 =
     if exponent == 0u64 then result
     else
         let next = if (exponent % 2u64) == 1u64 then result * base else result in
-        Stdlib.UInt64.__powerLoop (base * base) (exponent / 2u64) next
-let power (base: UInt64) (exponent: UInt64) : UInt64 = Stdlib.UInt64.__powerLoop base exponent 1u64
+        Stdlib.UInt64.__powerLoop(base * base, exponent / 2u64, next)
+let power(base: UInt64, exponent: UInt64): UInt64 = Stdlib.UInt64.__powerLoop(base, exponent, 1u64)
 
-let clamp (value: UInt64) (limitA: UInt64) (limitB: UInt64) : UInt64 =
-    let lower = Stdlib.UInt64.min limitA limitB in
-    let upper = Stdlib.UInt64.max limitA limitB in
-    Stdlib.UInt64.max lower (Stdlib.UInt64.min upper value)
+let clamp(value: UInt64, limitA: UInt64, limitB: UInt64): UInt64 =
+    let lower = Stdlib.UInt64.min(limitA, limitB) in
+    let upper = Stdlib.UInt64.max(limitA, limitB) in
+    Stdlib.UInt64.max(lower, Stdlib.UInt64.min(upper, value))
 
-let greaterThan (a: UInt64) (b: UInt64) : Bool = a > b
+let greaterThan(a: UInt64, b: UInt64): Bool = a > b
 
-let greaterThanOrEqualTo (a: UInt64) (b: UInt64) : Bool = a >= b
+let greaterThanOrEqualTo(a: UInt64, b: UInt64): Bool = a >= b
 
-let lessThan (a: UInt64) (b: UInt64) : Bool = a < b
+let lessThan(a: UInt64, b: UInt64): Bool = a < b
 
-let lessThanOrEqualTo (a: UInt64) (b: UInt64) : Bool = a <= b
+let lessThanOrEqualTo(a: UInt64, b: UInt64): Bool = a <= b
 
 // Count number of set bits (population count)
 // Uses parallel bit counting algorithm (SWAR)
-let __popcount (x: UInt64) : UInt64 =
+let __popcount(x: UInt64): UInt64 =
     let mask1 = 6148914691236517205u64 in
     let mask2 = 3689348814741910323u64 in
     let mask3 = 1085102592571150095u64 in
     let mult = 72340172838076673u64 in
-    let x = x - Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight x 1u64) mask1 in
-    let x = Stdlib.UInt64.bitwiseAnd x mask2 + Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight x 2u64) mask2 in
-    let x = Stdlib.UInt64.bitwiseAnd (x + Stdlib.UInt64.shiftRight x 4u64) mask3 in
-    Stdlib.UInt64.shiftRight (x * mult) 56u64
+    let x = x - Stdlib.UInt64.bitwiseAnd(Stdlib.UInt64.shiftRight(x, 1u64), mask1) in
+    let x = Stdlib.UInt64.bitwiseAnd(x, mask2) + Stdlib.UInt64.bitwiseAnd(Stdlib.UInt64.shiftRight(x, 2u64), mask2) in
+    let x = Stdlib.UInt64.bitwiseAnd(x + Stdlib.UInt64.shiftRight(x, 4u64), mask3) in
+    Stdlib.UInt64.shiftRight(x * mult, 56u64)
 
 // Convert a single digit (0UL-9UL) to its string representation
-let __digitToString (n: UInt64) : String =
+let __digitToString(n: UInt64): String =
     match n with
     | 0u64 -> "0"
     | 1u64 -> "1"
@@ -74,47 +74,47 @@ let __digitToString (n: UInt64) : String =
     | _ -> "?"
 
 // Convert an integer to its string representation
-let toString (n: UInt64) : String =
-    if Stdlib.UInt64.shiftRight n 63u64 == 1u64 then
-        let quotient = Stdlib.UInt64.shiftRight n 1u64 / 5u64 in
+let toString(n: UInt64): String =
+    if Stdlib.UInt64.shiftRight(n, 63u64) == 1u64 then
+        let quotient = Stdlib.UInt64.shiftRight(n, 1u64) / 5u64 in
         let remainder = n - (quotient * 10u64) in
         // Decimal fragments are ASCII and therefore already closed under NFC.
-        __string_concat_raw (Stdlib.UInt64.toString quotient) (Stdlib.UInt64.__digitToString remainder)
-    else if n < 10u64 then Stdlib.UInt64.__digitToString n
-    else __string_concat_raw (Stdlib.UInt64.toString (n / 10u64)) (Stdlib.UInt64.__digitToString (n % 10u64))
+        __string_concat_raw(Stdlib.UInt64.toString(quotient), Stdlib.UInt64.__digitToString(remainder))
+    else if n < 10u64 then Stdlib.UInt64.__digitToString(n)
+    else __string_concat_raw(Stdlib.UInt64.toString(n / 10u64), Stdlib.UInt64.__digitToString(n % 10u64))
 
 // Sum all integers in a list
-let sum (list: List<UInt64>) : UInt64 =
-    Stdlib.List.fold list 0u64 (fun acc x -> acc + x)
+let sum(list: List<UInt64>): UInt64 =
+    Stdlib.List.fold(list, 0u64, fun(acc, x) -> acc + x)
 
-let __fromIntUnchecked (value: Int) : UInt64 =
-    match Stdlib.Int.toUInt64 value with
-    | Some result -> result
-    | None -> Builtin.crash "Internal UInt64 conversion invariant failed"
-let random (start: UInt64) (finish: UInt64) : UInt64 = Stdlib.UInt64.__fromIntUnchecked (Stdlib.Int.random (Stdlib.Int.fromUInt64 start) (Stdlib.Int.fromUInt64 finish))
-let toFloat64 (value: UInt64) : Float = Stdlib.Int.toFloat64 (Stdlib.Int.fromUInt64 value)
-let sqrt (value: UInt64) : Float = Stdlib.Float64.sqrt (Stdlib.UInt64.toFloat64 value)
-let fromFloat64 (a: Float) : Stdlib.Option.Option<UInt64> =
-  if Float64.isFinite a then
+let __fromIntUnchecked(value: Int): UInt64 =
+    match Stdlib.Int.toUInt64(value) with
+    | Some(result) -> result
+    | None -> Builtin.crash("Internal UInt64 conversion invariant failed")
+let random(start: UInt64, finish: UInt64): UInt64 = Stdlib.UInt64.__fromIntUnchecked(Stdlib.Int.random(Stdlib.Int.fromUInt64(start), Stdlib.Int.fromUInt64(finish)))
+let toFloat64(value: UInt64): Float = Stdlib.Int.toFloat64(Stdlib.Int.fromUInt64(value))
+let sqrt(value: UInt64): Float = Stdlib.Float64.sqrt(Stdlib.UInt64.toFloat64(value))
+let fromFloat64(a: Float): Stdlib.Option.Option<UInt64> =
+  if Float64.isFinite(a) then
     a |> Stdlib.Int.fromFloat64 |> Stdlib.Int.toUInt64
   else
     Stdlib.Option.Option.None
-let parse (value: String) : Stdlib.Result.Result<UInt64, Stdlib.UInt64.ParseError> =
-    match Stdlib.Int.parse value with
-    | Error _ -> Error Stdlib.UInt64.ParseError.BadFormat
-    | Ok parsed ->
-        match Stdlib.Int.toUInt64 parsed with
-        | None -> Error Stdlib.UInt64.ParseError.OutOfRange
-        | Some result -> Ok result
-let fromInt8 (value: Int8) : Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64 (Stdlib.Int.fromInt8 value)
-let fromUInt8 (value: UInt8) : UInt64 = Stdlib.UInt64.__fromIntUnchecked (Stdlib.Int.fromUInt8 value)
-let fromInt16 (value: Int16) : Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64 (Stdlib.Int.fromInt16 value)
-let fromUInt16 (value: UInt16) : UInt64 = Stdlib.UInt64.__fromIntUnchecked (Stdlib.Int.fromUInt16 value)
-let fromInt32 (value: Int32) : Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64 (Stdlib.Int.fromInt32 value)
-let fromUInt32 (value: UInt32) : UInt64 = Stdlib.UInt64.__fromIntUnchecked (Stdlib.Int.fromUInt32 value)
-let fromInt64 (value: Int64) : Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64 (Stdlib.Int.fromInt64 value)
-let fromInt128 (value: Int128) : Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64 (Stdlib.Int.fromInt128 value)
-let fromUInt128 (value: UInt128) : Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64 (Stdlib.Int.fromUInt128 value)
+let parse(value: String): Stdlib.Result.Result<UInt64, Stdlib.UInt64.ParseError> =
+    match Stdlib.Int.parse(value) with
+    | Error(_) -> Error(Stdlib.UInt64.ParseError.BadFormat)
+    | Ok(parsed) ->
+        match Stdlib.Int.toUInt64(parsed) with
+        | None -> Error(Stdlib.UInt64.ParseError.OutOfRange)
+        | Some(result) -> Ok(result)
+let fromInt8(value: Int8): Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64(Stdlib.Int.fromInt8(value))
+let fromUInt8(value: UInt8): UInt64 = Stdlib.UInt64.__fromIntUnchecked(Stdlib.Int.fromUInt8(value))
+let fromInt16(value: Int16): Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64(Stdlib.Int.fromInt16(value))
+let fromUInt16(value: UInt16): UInt64 = Stdlib.UInt64.__fromIntUnchecked(Stdlib.Int.fromUInt16(value))
+let fromInt32(value: Int32): Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64(Stdlib.Int.fromInt32(value))
+let fromUInt32(value: UInt32): UInt64 = Stdlib.UInt64.__fromIntUnchecked(Stdlib.Int.fromUInt32(value))
+let fromInt64(value: Int64): Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64(Stdlib.Int.fromInt64(value))
+let fromInt128(value: Int128): Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64(Stdlib.Int.fromInt128(value))
+let fromUInt128(value: UInt128): Stdlib.Option.Option<UInt64> = Stdlib.Int.toUInt64(Stdlib.Int.fromUInt128(value))
 
 // Trait implementations reuse the compiler's existing native operations.
 
@@ -164,13 +164,13 @@ impl Stdlib.Compare for UInt64 =
   let greaterThanOrEqualTo = Stdlib.UInt64.greaterThanOrEqualTo
 
 impl Stdlib.Zero for UInt64 =
-  let zero () : UInt64 = 0u64
+  let zero(): UInt64 = 0u64
 
 impl Stdlib.One for UInt64 =
-  let one () : UInt64 = 1u64
+  let one(): UInt64 = 1u64
 
-let fromFloatRounded (a: Float) : Stdlib.Option.Option<UInt64> =
-  if Float64.isFinite a then
+let fromFloatRounded(a: Float): Stdlib.Option.Option<UInt64> =
+  if Float64.isFinite(a) then
     a |> Float64.__roundInt |> Stdlib.Int.toUInt64
   else
     Stdlib.Option.Option.None

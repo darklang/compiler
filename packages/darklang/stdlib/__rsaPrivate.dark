@@ -4,91 +4,91 @@ module Darklang.Stdlib.__RsaPrivate
 
 type Key = { modulus: Blob, exponent: Blob, privateExponent: Blob }
 
-let __integers (data: Blob) (position: Int64) (limit: Int64) (remaining: Int64) (values: List<Blob>) : Stdlib.Option.Option<List<Blob>> =
-  if remaining == 0 then if position == limit then Some (Stdlib.List.reverse values) else None
-  else match Stdlib.__RsaSpki.__positiveInteger data position limit with
+let __integers(data: Blob, position: Int64, limit: Int64, remaining: Int64, values: List<Blob>): Stdlib.Option.Option<List<Blob>> =
+  if remaining == 0 then if position == limit then Some(Stdlib.List.reverse(values)) else None
+  else match Stdlib.__RsaSpki.__positiveInteger(data, position, limit) with
   | None -> None
-  | Some ((value, next)) -> Stdlib.__RsaPrivate.__integers data next limit (remaining - 1) (Stdlib.List.push values value)
+  | Some((value, next)) -> Stdlib.__RsaPrivate.__integers(data, next, limit, remaining - 1, Stdlib.List.push(values, value))
 
-let __version (data: Blob) (position: Int64) (limit: Int64) : Stdlib.Option.Option<Int64> =
-  match Stdlib.__RsaSpki.__tlv data position limit 2 with
-  | Some ((start, finish)) -> if finish == start + 1 && Stdlib.Blob.__getByte data start == 0 then Some finish else None
+let __version(data: Blob, position: Int64, limit: Int64): Stdlib.Option.Option<Int64> =
+  match Stdlib.__RsaSpki.__tlv(data, position, limit, 2) with
+  | Some((start, finish)) -> if finish == start + 1 && Stdlib.Blob.__getByte(data, start) == 0 then Some(finish) else None
   | None -> None
 
-let __validate (values: List<Blob>) : Stdlib.Result.Result<Stdlib.__RsaPrivate.Key, String> =
+let __validate(values: List<Blob>): Stdlib.Result.Result<Stdlib.__RsaPrivate.Key, String> =
   match values with
   | [modulus, exponent, privateExponent, prime1, prime2, reduced1, reduced2, coefficient] ->
-    let exponentLength = Stdlib.Blob.__byteLength exponent in
-    if Stdlib.Blob.__byteLength modulus != 256 || Stdlib.Blob.__getByte modulus 0 < 128 ||
-      Stdlib.Blob.__getByte modulus 255 % 2 == 0 || exponentLength < 1 || exponentLength > 4 ||
-      Stdlib.Blob.__byteLength privateExponent > 256 || Stdlib.Blob.__byteLength prime1 != 128 || Stdlib.Blob.__byteLength prime2 != 128 ||
-      Stdlib.Blob.__byteLength reduced1 > 128 || Stdlib.Blob.__byteLength reduced2 > 128 || Stdlib.Blob.__byteLength coefficient > 128 then Error "Invalid RSA private key"
+    let exponentLength = Stdlib.Blob.__byteLength(exponent) in
+    if Stdlib.Blob.__byteLength(modulus) != 256 || Stdlib.Blob.__getByte(modulus, 0) < 128 ||
+      Stdlib.Blob.__getByte(modulus, 255) % 2 == 0 || exponentLength < 1 || exponentLength > 4 ||
+      Stdlib.Blob.__byteLength(privateExponent) > 256 || Stdlib.Blob.__byteLength(prime1) != 128 || Stdlib.Blob.__byteLength(prime2) != 128 ||
+      Stdlib.Blob.__byteLength(reduced1) > 128 || Stdlib.Blob.__byteLength(reduced2) > 128 || Stdlib.Blob.__byteLength(coefficient) > 128 then Error("Invalid RSA private key")
     else
-      let n = Stdlib.__RsaPss.__fromBytes modulus 0 0z in
-      let e = Stdlib.__RsaPss.__fromBytes exponent 0 0z in
-      let d = Stdlib.__RsaPss.__fromBytes privateExponent 0 0z in
-      let p = Stdlib.__RsaPss.__fromBytes prime1 0 0z in
-      let q = Stdlib.__RsaPss.__fromBytes prime2 0 0z in
-      let dp = Stdlib.__RsaPss.__fromBytes reduced1 0 0z in
-      let dq = Stdlib.__RsaPss.__fromBytes reduced2 0 0z in
-      let inverse = Stdlib.__RsaPss.__fromBytes coefficient 0 0z in
+      let n = Stdlib.__RsaPss.__fromBytes(modulus, 0, 0z) in
+      let e = Stdlib.__RsaPss.__fromBytes(exponent, 0, 0z) in
+      let d = Stdlib.__RsaPss.__fromBytes(privateExponent, 0, 0z) in
+      let p = Stdlib.__RsaPss.__fromBytes(prime1, 0, 0z) in
+      let q = Stdlib.__RsaPss.__fromBytes(prime2, 0, 0z) in
+      let dp = Stdlib.__RsaPss.__fromBytes(reduced1, 0, 0z) in
+      let dq = Stdlib.__RsaPss.__fromBytes(reduced2, 0, 0z) in
+      let inverse = Stdlib.__RsaPss.__fromBytes(coefficient, 0, 0z) in
       if p <= 2z || q <= 2z || p == q || p % 2z != 1z || q % 2z != 1z || p * q != n ||
         e < 3z || e >= n || e % 2z != 1z || d <= 1z || d >= n ||
         d % (p - 1z) != dp || d % (q - 1z) != dq || d * e % (p - 1z) != 1z || d * e % (q - 1z) != 1z ||
-        inverse <= 0z || inverse >= p || q * inverse % p != 1z then Error "Inconsistent RSA private key"
+        inverse <= 0z || inverse >= p || q * inverse % p != 1z then Error("Inconsistent RSA private key")
       else
-        let padding = Stdlib.Blob.__fromInt64List (Stdlib.List.repeatUnsafe (Stdlib.Int.fromInt64 (256 - Stdlib.Blob.__byteLength privateExponent)) 0) in
-        Ok (Stdlib.__RsaPrivate.Key { modulus = modulus, exponent = exponent, privateExponent = Stdlib.Blob.concat [padding, privateExponent] })
-  | _ -> Error "Invalid RSA private key"
+        let padding = Stdlib.Blob.__fromInt64List(Stdlib.List.repeatUnsafe(Stdlib.Int.fromInt64(256 - Stdlib.Blob.__byteLength(privateExponent)), 0)) in
+        Ok(Stdlib.__RsaPrivate.Key { modulus = modulus, exponent = exponent, privateExponent = Stdlib.Blob.concat([padding, privateExponent]) })
+  | _ -> Error("Invalid RSA private key")
 
 // Initial server signing profile: two-prime RSA-2048 with a 32-bit public exponent.
-let parsePkcs1 (data: Blob) : Stdlib.Result.Result<Stdlib.__RsaPrivate.Key, String> =
-  let length = Stdlib.Blob.__byteLength data in
-  if length > 2048 then Error "Invalid RSA private key"
-  else match Stdlib.__RsaSpki.__tlv data 0 length 48 with
-  | None -> Error "Invalid RSA private key"
-  | Some ((start, finish)) ->
-    if finish != length then Error "Invalid RSA private key"
-    else match Stdlib.__RsaPrivate.__version data start finish with
-    | None -> Error "Unsupported RSA private key version"
-    | Some position ->
-      match Stdlib.__RsaPrivate.__integers data position finish 8 [] with
-      | None -> Error "Invalid RSA private key"
-      | Some values -> Stdlib.__RsaPrivate.__validate values
+let parsePkcs1(data: Blob): Stdlib.Result.Result<Stdlib.__RsaPrivate.Key, String> =
+  let length = Stdlib.Blob.__byteLength(data) in
+  if length > 2048 then Error("Invalid RSA private key")
+  else match Stdlib.__RsaSpki.__tlv(data, 0, length, 48) with
+  | None -> Error("Invalid RSA private key")
+  | Some((start, finish)) ->
+    if finish != length then Error("Invalid RSA private key")
+    else match Stdlib.__RsaPrivate.__version(data, start, finish) with
+    | None -> Error("Unsupported RSA private key version")
+    | Some(position) ->
+      match Stdlib.__RsaPrivate.__integers(data, position, finish, 8, []) with
+      | None -> Error("Invalid RSA private key")
+      | Some(values) -> Stdlib.__RsaPrivate.__validate(values)
 
-let parsePkcs8 (data: Blob) : Stdlib.Result.Result<Stdlib.__RsaPrivate.Key, String> =
-  let length = Stdlib.Blob.__byteLength data in
-  if length > 2100 then Error "Invalid PKCS8 private key"
-  else match Stdlib.__RsaSpki.__tlv data 0 length 48 with
-  | None -> Error "Invalid PKCS8 private key"
-  | Some ((start, finish)) ->
-    if finish != length then Error "Invalid PKCS8 private key"
-    else match Stdlib.__RsaPrivate.__version data start finish with
-    | None -> Error "Unsupported PKCS8 private key version"
-    | Some position ->
-      match Stdlib.__RsaSpki.__tlv data position finish 48 with
-      | None -> Error "Invalid PKCS8 private key algorithm"
-      | Some ((algorithmStart, algorithmEnd)) ->
-        if Stdlib.Bool.not (Stdlib.__RsaSpki.__algorithm data algorithmStart algorithmEnd) then Error "Unsupported PKCS8 private key algorithm"
-        else match Stdlib.__RsaSpki.__tlv data algorithmEnd finish 4 with
-        | None -> Error "Invalid PKCS8 private key"
-        | Some ((keyStart, keyEnd)) ->
-          if keyEnd != finish then Error "Unsupported PKCS8 private key attributes"
-          else Stdlib.__RsaPrivate.parsePkcs1 (Stdlib.Blob.slice data (Stdlib.Int.fromInt64 keyStart) (Stdlib.Int.fromInt64 (keyEnd - keyStart)))
+let parsePkcs8(data: Blob): Stdlib.Result.Result<Stdlib.__RsaPrivate.Key, String> =
+  let length = Stdlib.Blob.__byteLength(data) in
+  if length > 2100 then Error("Invalid PKCS8 private key")
+  else match Stdlib.__RsaSpki.__tlv(data, 0, length, 48) with
+  | None -> Error("Invalid PKCS8 private key")
+  | Some((start, finish)) ->
+    if finish != length then Error("Invalid PKCS8 private key")
+    else match Stdlib.__RsaPrivate.__version(data, start, finish) with
+    | None -> Error("Unsupported PKCS8 private key version")
+    | Some(position) ->
+      match Stdlib.__RsaSpki.__tlv(data, position, finish, 48) with
+      | None -> Error("Invalid PKCS8 private key algorithm")
+      | Some((algorithmStart, algorithmEnd)) ->
+        if Stdlib.Bool.not(Stdlib.__RsaSpki.__algorithm(data, algorithmStart, algorithmEnd)) then Error("Unsupported PKCS8 private key algorithm")
+        else match Stdlib.__RsaSpki.__tlv(data, algorithmEnd, finish, 4) with
+        | None -> Error("Invalid PKCS8 private key")
+        | Some((keyStart, keyEnd)) ->
+          if keyEnd != finish then Error("Unsupported PKCS8 private key attributes")
+          else Stdlib.__RsaPrivate.parsePkcs1(Stdlib.Blob.slice(data, Stdlib.Int.fromInt64(keyStart), Stdlib.Int.fromInt64(keyEnd - keyStart)))
 
-let __pem (text: String) (label: String) (pkcs8: Bool) : Stdlib.Result.Result<Stdlib.__RsaPrivate.Key, String> =
+let __pem(text: String, label: String, pkcs8: Bool): Stdlib.Result.Result<Stdlib.__RsaPrivate.Key, String> =
   let begin = "-----BEGIN " + label + "-----" in
   let endMarker = "-----END " + label + "-----" in
-  if Stdlib.Bool.not (Stdlib.String.startsWith text begin) || Stdlib.Bool.not (Stdlib.String.endsWith text endMarker) then Error "Invalid PEM private key"
+  if Stdlib.Bool.not(Stdlib.String.startsWith(text, begin)) || Stdlib.Bool.not(Stdlib.String.endsWith(text, endMarker)) then Error("Invalid PEM private key")
   else
-    let encoded = Stdlib.String.__byteSlice text (Stdlib.String.__byteLength begin) (Stdlib.String.__byteLength text - Stdlib.String.__byteLength endMarker) in
-    Stdlib.Base64.decode (Stdlib.Blob.__removeBase64Whitespace encoded) |> Stdlib.Result.mapError (fun _error -> "Invalid PEM private key") |> Stdlib.Result.andThen (fun der ->
-      if pkcs8 then Stdlib.__RsaPrivate.parsePkcs8 der else Stdlib.__RsaPrivate.parsePkcs1 der)
+    let encoded = Stdlib.String.__byteSlice(text, Stdlib.String.__byteLength(begin), Stdlib.String.__byteLength(text) - Stdlib.String.__byteLength(endMarker)) in
+    Stdlib.Base64.decode(Stdlib.Blob.__removeBase64Whitespace(encoded)) |> Stdlib.Result.mapError(fun _error -> "Invalid PEM private key") |> Stdlib.Result.andThen(fun der ->
+      if pkcs8 then Stdlib.__RsaPrivate.parsePkcs8(der) else Stdlib.__RsaPrivate.parsePkcs1(der))
 
-let parsePem (contents: Blob) : Stdlib.Result.Result<Stdlib.__RsaPrivate.Key, String> =
-  if Stdlib.Blob.__byteLength contents > 8192 then Error "PEM private key exceeds size limit"
-  else Stdlib.Blob.toString contents |> Stdlib.Result.andThen (fun text ->
-    let text = Stdlib.String.trim text in
-    if Stdlib.String.startsWith text "-----BEGIN RSA PRIVATE KEY-----" then Stdlib.__RsaPrivate.__pem text "RSA PRIVATE KEY" false
-    else if Stdlib.String.startsWith text "-----BEGIN PRIVATE KEY-----" then Stdlib.__RsaPrivate.__pem text "PRIVATE KEY" true
-    else Error "Unsupported PEM private key type")
+let parsePem(contents: Blob): Stdlib.Result.Result<Stdlib.__RsaPrivate.Key, String> =
+  if Stdlib.Blob.__byteLength(contents) > 8192 then Error("PEM private key exceeds size limit")
+  else Stdlib.Blob.toString(contents) |> Stdlib.Result.andThen(fun text ->
+    let text = Stdlib.String.trim(text) in
+    if Stdlib.String.startsWith(text, "-----BEGIN RSA PRIVATE KEY-----") then Stdlib.__RsaPrivate.__pem(text, "RSA PRIVATE KEY", false)
+    else if Stdlib.String.startsWith(text, "-----BEGIN PRIVATE KEY-----") then Stdlib.__RsaPrivate.__pem(text, "PRIVATE KEY", true)
+    else Error("Unsupported PEM private key type"))

@@ -9,142 +9,142 @@ type ParseError =
   | BadFormat
   | OutOfRange
 
-let __low (value: Int128) : UInt64 = __raw_get<UInt64> (__int128_to_rawptr value) 0
-let __high (value: Int128) : UInt64 = __raw_get<UInt64> (__int128_to_rawptr value) 8
-let __fromWords (low: UInt64) (high: UInt64) : Int128 =
-    let ptr = __raw_alloc 24 in
-    let _ = __raw_slot_init<UInt64> ptr 0 low in
-    let _ = __raw_slot_init<UInt64> ptr 8 high in
-    let _ = __raw_write_word ptr 16 1 in
-    __rawptr_to_int128 ptr
+let __low(value: Int128): UInt64 = __raw_get<UInt64>(__int128_to_rawptr(value), 0)
+let __high(value: Int128): UInt64 = __raw_get<UInt64>(__int128_to_rawptr(value), 8)
+let __fromWords(low: UInt64, high: UInt64): Int128 =
+    let ptr = __raw_alloc(24) in
+    let _ = __raw_slot_init<UInt64>(ptr, 0, low) in
+    let _ = __raw_slot_init<UInt64>(ptr, 8, high) in
+    let _ = __raw_write_word(ptr, 16, 1) in
+    __rawptr_to_int128(ptr)
 
-let __unsignedInt (value: Int128) : Int =
-    Stdlib.Int.__add (Stdlib.Int.__multiply (Stdlib.Int.__fromUInt64 (Stdlib.Int128.__high value)) (Stdlib.Int.__value "18446744073709551616")) (Stdlib.Int.__fromUInt64 (Stdlib.Int128.__low value))
+let __unsignedInt(value: Int128): Int =
+    Stdlib.Int.__add(Stdlib.Int.__multiply(Stdlib.Int.__fromUInt64(Stdlib.Int128.__high(value)), Stdlib.Int.__value("18446744073709551616")), Stdlib.Int.__fromUInt64(Stdlib.Int128.__low(value)))
 
-let __toInt (value: Int128) : Int =
-    let unsigned = Stdlib.Int128.__unsignedInt value in
-    if Stdlib.UInt64.shiftRight (Stdlib.Int128.__high value) 63u64 == 1u64 then
-        Stdlib.Int.__subtract unsigned (Stdlib.Int.__value "340282366920938463463374607431768211456")
+let __toInt(value: Int128): Int =
+    let unsigned = Stdlib.Int128.__unsignedInt(value) in
+    if Stdlib.UInt64.shiftRight(Stdlib.Int128.__high(value), 63u64) == 1u64 then
+        Stdlib.Int.__subtract(unsigned, Stdlib.Int.__value("340282366920938463463374607431768211456"))
     else unsigned
 
-let __fromInt (value: Int) : Int128 =
-    let unsigned = Stdlib.UInt128.__fromInt value in
-    Stdlib.Int128.__fromWords (Stdlib.UInt128.__low unsigned) (Stdlib.UInt128.__high unsigned)
+let __fromInt(value: Int): Int128 =
+    let unsigned = Stdlib.UInt128.__fromInt(value) in
+    Stdlib.Int128.__fromWords(Stdlib.UInt128.__low(unsigned), Stdlib.UInt128.__high(unsigned))
 
-let __equalsWords (value: Int128) (low: UInt64) (high: UInt64) : Bool =
-    Stdlib.Int128.__low value == low && Stdlib.Int128.__high value == high
+let __equalsWords(value: Int128, low: UInt64, high: UInt64): Bool =
+    Stdlib.Int128.__low(value) == low && Stdlib.Int128.__high(value) == high
 
-let add (a: Int128) (b: Int128) : Int128 =
-    let aLow = Stdlib.Int128.__low a in
-    let bLow = Stdlib.Int128.__low b in
+let add(a: Int128, b: Int128): Int128 =
+    let aLow = Stdlib.Int128.__low(a) in
+    let bLow = Stdlib.Int128.__low(b) in
     let low = aLow + bLow in
     let carry = if low < aLow then 1u64 else 0u64 in
-    Stdlib.Int128.__fromWords low (Stdlib.Int128.__high a + Stdlib.Int128.__high b + carry)
+    Stdlib.Int128.__fromWords(low, Stdlib.Int128.__high(a) + Stdlib.Int128.__high(b) + carry)
 
-let subtract (a: Int128) (b: Int128) : Int128 =
-    let aLow = Stdlib.Int128.__low a in
-    let bLow = Stdlib.Int128.__low b in
+let subtract(a: Int128, b: Int128): Int128 =
+    let aLow = Stdlib.Int128.__low(a) in
+    let bLow = Stdlib.Int128.__low(b) in
     let low = aLow - bLow in
     let borrow = if aLow < bLow then 1u64 else 0u64 in
-    Stdlib.Int128.__fromWords low (Stdlib.Int128.__high a - Stdlib.Int128.__high b - borrow)
+    Stdlib.Int128.__fromWords(low, Stdlib.Int128.__high(a) - Stdlib.Int128.__high(b) - borrow)
 
-let multiply (a: Int128) (b: Int128) : Int128 =
-    let aLow = Stdlib.Int128.__low a in
-    let bLow = Stdlib.Int128.__low b in
-    let high = Stdlib.UInt128.__multiplyHigh64 aLow bLow + Stdlib.Int128.__high a * bLow + aLow * Stdlib.Int128.__high b in
-    Stdlib.Int128.__fromWords (aLow * bLow) high
+let multiply(a: Int128, b: Int128): Int128 =
+    let aLow = Stdlib.Int128.__low(a) in
+    let bLow = Stdlib.Int128.__low(b) in
+    let high = Stdlib.UInt128.__multiplyHigh64(aLow, bLow) + Stdlib.Int128.__high(a) * bLow + aLow * Stdlib.Int128.__high(b) in
+    Stdlib.Int128.__fromWords(aLow * bLow, high)
 
-let divide (a: Int128) (b: Int128) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__divide (Stdlib.Int128.__toInt a) (Stdlib.Int128.__toInt b))
-let remainder (value: Int128) (divisor: Int128) : Stdlib.Result.Result<Int128, String> =
-    match Stdlib.Int.__remainder (Stdlib.Int128.__toInt value) (Stdlib.Int128.__toInt divisor) with
-    | Error message -> Error message
-    | Ok result -> Ok (Stdlib.Int128.__fromInt result)
-let mod (value: Int128) (modulus: Int128) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__mod (Stdlib.Int128.__toInt value) (Stdlib.Int128.__toInt modulus))
-let negate (value: Int128) : Int128 = Stdlib.Int128.subtract (Stdlib.Int128.__fromWords 0u64 0u64) value
-let absoluteValue (value: Int128) : Int128 = if Stdlib.UInt64.shiftRight (Stdlib.Int128.__high value) 63u64 == 1u64 then Stdlib.Int128.negate value else value
+let divide(a: Int128, b: Int128): Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__divide(Stdlib.Int128.__toInt(a), Stdlib.Int128.__toInt(b)))
+let remainder(value: Int128, divisor: Int128): Stdlib.Result.Result<Int128, String> =
+    match Stdlib.Int.__remainder(Stdlib.Int128.__toInt(value), Stdlib.Int128.__toInt(divisor)) with
+    | Error(message) -> Error(message)
+    | Ok(result) -> Ok(Stdlib.Int128.__fromInt(result))
+let mod(value: Int128, modulus: Int128): Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__mod(Stdlib.Int128.__toInt(value), Stdlib.Int128.__toInt(modulus)))
+let negate(value: Int128): Int128 = Stdlib.Int128.subtract(Stdlib.Int128.__fromWords(0u64, 0u64), value)
+let absoluteValue(value: Int128): Int128 = if Stdlib.UInt64.shiftRight(Stdlib.Int128.__high(value), 63u64) == 1u64 then Stdlib.Int128.negate(value) else value
 
-let lessThan (a: Int128) (b: Int128) : Bool =
-    let aHigh = Stdlib.Int128.__high a in
-    let bHigh = Stdlib.Int128.__high b in
-    let aNegative = Stdlib.UInt64.shiftRight aHigh 63u64 == 1u64 in
-    let bNegative = Stdlib.UInt64.shiftRight bHigh 63u64 == 1u64 in
+let lessThan(a: Int128, b: Int128): Bool =
+    let aHigh = Stdlib.Int128.__high(a) in
+    let bHigh = Stdlib.Int128.__high(b) in
+    let aNegative = Stdlib.UInt64.shiftRight(aHigh, 63u64) == 1u64 in
+    let bNegative = Stdlib.UInt64.shiftRight(bHigh, 63u64) == 1u64 in
     if aNegative != bNegative then aNegative
-    else aHigh < bHigh || (aHigh == bHigh && Stdlib.Int128.__low a < Stdlib.Int128.__low b)
-let __equals (a: Int128) (b: Int128) : Bool = Stdlib.Int128.__equalsWords a (Stdlib.Int128.__low b) (Stdlib.Int128.__high b)
-let lessThanOrEqualTo (a: Int128) (b: Int128) : Bool = Stdlib.Int128.lessThan a b || Stdlib.Int128.__equals a b
-let greaterThan (a: Int128) (b: Int128) : Bool = Stdlib.Int128.lessThan b a
-let greaterThanOrEqualTo (a: Int128) (b: Int128) : Bool = Stdlib.Int128.lessThanOrEqualTo b a
+    else aHigh < bHigh || (aHigh == bHigh && Stdlib.Int128.__low(a) < Stdlib.Int128.__low(b))
+let __equals(a: Int128, b: Int128): Bool = Stdlib.Int128.__equalsWords(a, Stdlib.Int128.__low(b), Stdlib.Int128.__high(b))
+let lessThanOrEqualTo(a: Int128, b: Int128): Bool = Stdlib.Int128.lessThan(a, b) || Stdlib.Int128.__equals(a, b)
+let greaterThan(a: Int128, b: Int128): Bool = Stdlib.Int128.lessThan(b, a)
+let greaterThanOrEqualTo(a: Int128, b: Int128): Bool = Stdlib.Int128.lessThanOrEqualTo(b, a)
 
-let sqrt (value: Int128) : Float = Stdlib.Int.__sqrt (Stdlib.Int128.__toInt value)
-let toFloat64 (value: Int128) : Float = Stdlib.Int.__toFloat (Stdlib.Int128.__toInt value)
-let sum (values: List<Int128>) : Int128 = Stdlib.List.fold values (0s128) (fun acc value -> Stdlib.Int128.add acc value)
-let max (a: Int128) (b: Int128) : Int128 = if Stdlib.Int128.greaterThan a b then a else b
-let min (a: Int128) (b: Int128) : Int128 = if Stdlib.Int128.lessThan a b then a else b
-let clamp (value: Int128) (limitA: Int128) (limitB: Int128) : Int128 =
-    let lower = Stdlib.Int128.min limitA limitB in
-    let upper = Stdlib.Int128.max limitA limitB in
-    Stdlib.Int128.max lower (Stdlib.Int128.min upper value)
+let sqrt(value: Int128): Float = Stdlib.Int.__sqrt(Stdlib.Int128.__toInt(value))
+let toFloat64(value: Int128): Float = Stdlib.Int.__toFloat(Stdlib.Int128.__toInt(value))
+let sum(values: List<Int128>): Int128 = Stdlib.List.fold(values, 0s128, fun(acc, value) -> Stdlib.Int128.add(acc, value))
+let max(a: Int128, b: Int128): Int128 = if Stdlib.Int128.greaterThan(a, b) then a else b
+let min(a: Int128, b: Int128): Int128 = if Stdlib.Int128.lessThan(a, b) then a else b
+let clamp(value: Int128, limitA: Int128, limitB: Int128): Int128 =
+    let lower = Stdlib.Int128.min(limitA, limitB) in
+    let upper = Stdlib.Int128.max(limitA, limitB) in
+    Stdlib.Int128.max(lower, Stdlib.Int128.min(upper, value))
 
-let toString (value: Int128) : String =
-    let low = Stdlib.Int128.__low value in
-    let high = Stdlib.Int128.__high value in
-    if Stdlib.UInt64.shiftRight high 63u64 == 0u64 then Stdlib.UInt128.__toStringWords low high
+let toString(value: Int128): String =
+    let low = Stdlib.Int128.__low(value) in
+    let high = Stdlib.Int128.__high(value) in
+    if Stdlib.UInt64.shiftRight(high, 63u64) == 0u64 then Stdlib.UInt128.__toStringWords(low, high)
     else
         let magnitudeLow = 0u64 - low in
         let magnitudeHigh = 18446744073709551615u64 - high + (if magnitudeLow == 0u64 then 1u64 else 0u64) in
-        __string_concat_raw "-" (Stdlib.UInt128.__toStringWords magnitudeLow magnitudeHigh)
+        __string_concat_raw("-", Stdlib.UInt128.__toStringWords(magnitudeLow, magnitudeHigh))
 
-let parse (value: String) : Stdlib.Result.Result<Int128, Stdlib.Int128.ParseError> =
-    let trimmed = Stdlib.String.trim value in
-    let length = Stdlib.String.__byteLength trimmed in
-    if length == 0 then Error Stdlib.Int128.ParseError.BadFormat
+let parse(value: String): Stdlib.Result.Result<Int128, Stdlib.Int128.ParseError> =
+    let trimmed = Stdlib.String.trim(value) in
+    let length = Stdlib.String.__byteLength(trimmed) in
+    if length == 0 then Error(Stdlib.Int128.ParseError.BadFormat)
     else
-        let first = Stdlib.String.__byteAtUnchecked trimmed 0 in
+        let first = Stdlib.String.__byteAtUnchecked(trimmed, 0) in
         let negative = first == 45 in
         let start = if negative || first == 43 then 1 else 0 in
-        if start == length then Error Stdlib.Int128.ParseError.BadFormat
+        if start == length then Error(Stdlib.Int128.ParseError.BadFormat)
         else
-            match Stdlib.UInt128.__parseDigits trimmed start length 0u64 0u64 with
-            | Error error ->
-                if error == Stdlib.UInt128.ParseError.BadFormat then Error Stdlib.Int128.ParseError.BadFormat
-                else Error Stdlib.Int128.ParseError.OutOfRange
-            | Ok magnitude ->
-                let low = Stdlib.UInt128.__low magnitude in
-                let high = Stdlib.UInt128.__high magnitude in
+            match Stdlib.UInt128.__parseDigits(trimmed, start, length, 0u64, 0u64) with
+            | Error(error) ->
+                if error == Stdlib.UInt128.ParseError.BadFormat then Error(Stdlib.Int128.ParseError.BadFormat)
+                else Error(Stdlib.Int128.ParseError.OutOfRange)
+            | Ok(magnitude) ->
+                let low = Stdlib.UInt128.__low(magnitude) in
+                let high = Stdlib.UInt128.__high(magnitude) in
                 let beyondSignedRange = high > 9223372036854775808u64 || (high == 9223372036854775808u64 && (negative == false || low != 0u64)) in
-                if beyondSignedRange then Error Stdlib.Int128.ParseError.OutOfRange
+                if beyondSignedRange then Error(Stdlib.Int128.ParseError.OutOfRange)
                 else if negative then
                     let resultLow = 0u64 - low in
                     let resultHigh = 18446744073709551615u64 - high + (if resultLow == 0u64 then 1u64 else 0u64) in
-                    Ok (Stdlib.Int128.__fromWords resultLow resultHigh)
-                else Ok (Stdlib.Int128.__fromWords low high)
+                    Ok(Stdlib.Int128.__fromWords(resultLow, resultHigh))
+                else Ok(Stdlib.Int128.__fromWords(low, high))
 
-let fromInt8 (value: Int8) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__fromInt8 value)
-let fromUInt8 (value: UInt8) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__fromUInt8 value)
-let fromInt16 (value: Int16) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__fromInt16 value)
-let fromUInt16 (value: UInt16) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__fromUInt16 value)
-let fromInt32 (value: Int32) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__fromInt32 value)
-let fromUInt32 (value: UInt32) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__fromUInt32 value)
-let fromInt64 (value: Int64) : Int128 = Stdlib.Int128.__fromInt (Stdlib.Int.__fromInt64 value)
-let fromUInt64 (value: UInt64) : Int128 = Stdlib.Int128.__fromWords value 0u64
-let bitwiseAnd (a: Int128) (b: Int128) : Int128 = Stdlib.Int128.__fromWords (Stdlib.UInt64.bitwiseAnd (Stdlib.Int128.__low a) (Stdlib.Int128.__low b)) (Stdlib.UInt64.bitwiseAnd (Stdlib.Int128.__high a) (Stdlib.Int128.__high b))
-let bitwiseOr (a: Int128) (b: Int128) : Int128 = Stdlib.Int128.__fromWords (Stdlib.UInt64.bitwiseOr (Stdlib.Int128.__low a) (Stdlib.Int128.__low b)) (Stdlib.UInt64.bitwiseOr (Stdlib.Int128.__high a) (Stdlib.Int128.__high b))
-let bitwiseXor (a: Int128) (b: Int128) : Int128 = Stdlib.Int128.__fromWords (Stdlib.UInt64.bitwiseXor (Stdlib.Int128.__low a) (Stdlib.Int128.__low b)) (Stdlib.UInt64.bitwiseXor (Stdlib.Int128.__high a) (Stdlib.Int128.__high b))
-let bitwiseNot (value: Int128) : Int128 = Stdlib.Int128.__fromWords (18446744073709551615u64 - Stdlib.Int128.__low value) (18446744073709551615u64 - Stdlib.Int128.__high value)
+let fromInt8(value: Int8): Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromInt8(value))
+let fromUInt8(value: UInt8): Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromUInt8(value))
+let fromInt16(value: Int16): Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromInt16(value))
+let fromUInt16(value: UInt16): Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromUInt16(value))
+let fromInt32(value: Int32): Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromInt32(value))
+let fromUInt32(value: UInt32): Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromUInt32(value))
+let fromInt64(value: Int64): Int128 = Stdlib.Int128.__fromInt(Stdlib.Int.__fromInt64(value))
+let fromUInt64(value: UInt64): Int128 = Stdlib.Int128.__fromWords(value, 0u64)
+let bitwiseAnd(a: Int128, b: Int128): Int128 = Stdlib.Int128.__fromWords(Stdlib.UInt64.bitwiseAnd(Stdlib.Int128.__low(a), Stdlib.Int128.__low(b)), Stdlib.UInt64.bitwiseAnd(Stdlib.Int128.__high(a), Stdlib.Int128.__high(b)))
+let bitwiseOr(a: Int128, b: Int128): Int128 = Stdlib.Int128.__fromWords(Stdlib.UInt64.bitwiseOr(Stdlib.Int128.__low(a), Stdlib.Int128.__low(b)), Stdlib.UInt64.bitwiseOr(Stdlib.Int128.__high(a), Stdlib.Int128.__high(b)))
+let bitwiseXor(a: Int128, b: Int128): Int128 = Stdlib.Int128.__fromWords(Stdlib.UInt64.bitwiseXor(Stdlib.Int128.__low(a), Stdlib.Int128.__low(b)), Stdlib.UInt64.bitwiseXor(Stdlib.Int128.__high(a), Stdlib.Int128.__high(b)))
+let bitwiseNot(value: Int128): Int128 = Stdlib.Int128.__fromWords(18446744073709551615u64 - Stdlib.Int128.__low(value), 18446744073709551615u64 - Stdlib.Int128.__high(value))
 
-let shiftLeft (value: Int128) (count: Int128) : Int128 =
-    let shifted = Stdlib.UInt128.shiftLeft (Stdlib.UInt128.__fromWords (Stdlib.Int128.__low value) (Stdlib.Int128.__high value)) (Stdlib.UInt128.__fromWords (Stdlib.Int128.__low count) (Stdlib.Int128.__high count)) in
-    Stdlib.Int128.__fromWords (Stdlib.UInt128.__low shifted) (Stdlib.UInt128.__high shifted)
+let shiftLeft(value: Int128, count: Int128): Int128 =
+    let shifted = Stdlib.UInt128.shiftLeft(Stdlib.UInt128.__fromWords(Stdlib.Int128.__low(value), Stdlib.Int128.__high(value)), Stdlib.UInt128.__fromWords(Stdlib.Int128.__low(count), Stdlib.Int128.__high(count))) in
+    Stdlib.Int128.__fromWords(Stdlib.UInt128.__low(shifted), Stdlib.UInt128.__high(shifted))
 
-let shiftRight (value: Int128) (count: Int128) : Int128 =
-    let amount = Stdlib.UInt64.bitwiseAnd (Stdlib.Int128.__low count) 127u64 in
-    let low = Stdlib.Int128.__low value in
-    let high = Stdlib.Int128.__high value in
-    let negative = Stdlib.UInt64.shiftRight high 63u64 == 1u64 in
+let shiftRight(value: Int128, count: Int128): Int128 =
+    let amount = Stdlib.UInt64.bitwiseAnd(Stdlib.Int128.__low(count), 127u64) in
+    let low = Stdlib.Int128.__low(value) in
+    let high = Stdlib.Int128.__high(value) in
+    let negative = Stdlib.UInt64.shiftRight(high, 63u64) == 1u64 in
     let fill = if negative then 18446744073709551615u64 else 0u64 in
     if amount == 0u64 then value
-    else if amount < 64u64 then Stdlib.Int128.__fromWords (Stdlib.UInt64.bitwiseOr (Stdlib.UInt64.shiftRight low amount) (Stdlib.UInt64.shiftLeft high (64u64 - amount))) (Stdlib.UInt64.bitwiseOr (Stdlib.UInt64.shiftRight high amount) (Stdlib.UInt64.shiftLeft fill (64u64 - amount)))
-    else Stdlib.Int128.__fromWords (Stdlib.UInt64.bitwiseOr (Stdlib.UInt64.shiftRight high (amount - 64u64)) (Stdlib.UInt64.shiftLeft fill (128u64 - amount))) fill
+    else if amount < 64u64 then Stdlib.Int128.__fromWords(Stdlib.UInt64.bitwiseOr(Stdlib.UInt64.shiftRight(low, amount), Stdlib.UInt64.shiftLeft(high, 64u64 - amount)), Stdlib.UInt64.bitwiseOr(Stdlib.UInt64.shiftRight(high, amount), Stdlib.UInt64.shiftLeft(fill, 64u64 - amount)))
+    else Stdlib.Int128.__fromWords(Stdlib.UInt64.bitwiseOr(Stdlib.UInt64.shiftRight(high, amount - 64u64), Stdlib.UInt64.shiftLeft(fill, 128u64 - amount)), fill)
 
 // Trait implementations reuse the compiler's existing native operations.
 
@@ -163,16 +163,16 @@ impl Stdlib.Divide for Int128 =
 impl Stdlib.Modulo for Int128 =
   let modulo = Stdlib.Int128.mod
 
-let __powerLoop (base: Int128) (exponent: Int128) (result: Int128) : Int128 =
+let __powerLoop(base: Int128, exponent: Int128, result: Int128): Int128 =
   if exponent == 0s128 then result
   else
-    let next = if Stdlib.Int128.mod exponent 2s128 == 1s128 then Stdlib.Int128.multiply result base else result
-    Stdlib.Int128.__powerLoop (Stdlib.Int128.multiply base base) (Stdlib.Int128.divide exponent 2s128) next
+    let next = if Stdlib.Int128.mod(exponent, 2s128) == 1s128 then Stdlib.Int128.multiply(result, base) else result
+    Stdlib.Int128.__powerLoop(Stdlib.Int128.multiply(base, base), Stdlib.Int128.divide(exponent, 2s128), next)
 
 impl Stdlib.Power for Int128 =
-  let power (base: Int128) (exponent: Int128) : Int128 =
-    if exponent < 0s128 then Builtin.crash "Cannot raise integer to a negative exponent"
-    else Stdlib.Int128.__powerLoop base exponent 1s128
+  let power(base: Int128, exponent: Int128): Int128 =
+    if exponent < 0s128 then Builtin.crash("Cannot raise integer to a negative exponent")
+    else Stdlib.Int128.__powerLoop(base, exponent, 1s128)
 
 impl Stdlib.Negate for Int128 =
   let negate = Stdlib.Int128.negate
@@ -205,7 +205,7 @@ impl Stdlib.Compare for Int128 =
   let greaterThanOrEqualTo = Stdlib.Int128.greaterThanOrEqualTo
 
 impl Stdlib.Zero for Int128 =
-  let zero () : Int128 = 0s128
+  let zero(): Int128 = 0s128
 
 impl Stdlib.One for Int128 =
-  let one () : Int128 = 1s128
+  let one(): Int128 = 1s128

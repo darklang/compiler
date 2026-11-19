@@ -6,103 +6,103 @@ module Darklang.Stdlib.List
 
 // Source fusion uses this identity as a typed marker. List-region extraction
 // removes it before ANF; a conservative fallback retains ordinary List values.
-let __arrayOwnershipBoundary_i64 (value: List<Int64>) : List<Int64> = value
+let __arrayOwnershipBoundary_i64(value: List<Int64>): List<Int64> = value
 
 // The mapping's private prefix and the common array layout cost 40 bytes.
 // Check before narrowing Int or multiplying a machine-sized length by eight.
-let __arrayRepeatLength (count: Int) : Int64 =
+let __arrayRepeatLength(count: Int): Int64 =
     if count <= 0z then 0
-    else if count > 1152921504606846970z then Builtin.crash "Out of heap memory"
-    else Stdlib.Int.__toInt64Unchecked count
+    else if count > 1152921504606846970z then Builtin.crash("Out of heap memory")
+    else Stdlib.Int.__toInt64Unchecked(count)
 
-let __arrayAllocate (length: Int64) : RawPtr =
-    if length < 0 || length > 1152921504606846970 then Builtin.crash "Out of heap memory"
+let __arrayAllocate(length: Int64): RawPtr =
+    if length < 0 || length > 1152921504606846970 then Builtin.crash("Out of heap memory")
     else
         let capacity = if length <= 28 then 28 else length in
         let rcOffset = 24 + capacity * 8 in
-        let buffer = if length <= 28 then __raw_alloc 256 else __mapped_alloc (rcOffset + 8) in
-        let _ = __raw_write_word buffer 0 length in
-        let _ = __raw_write_word buffer 8 capacity in
-        let _ = __raw_write_word buffer 16 0 in
-        let _ = __raw_write_word buffer rcOffset 1 in
+        let buffer = if length <= 28 then __raw_alloc(256) else __mapped_alloc(rcOffset + 8) in
+        let _ = __raw_write_word(buffer, 0, length) in
+        let _ = __raw_write_word(buffer, 8, capacity) in
+        let _ = __raw_write_word(buffer, 16, 0) in
+        let _ = __raw_write_word(buffer, rcOffset, 1) in
         buffer
 
-let __arrayRetain (buffer: RawPtr) : Unit =
-    let capacity = __raw_get<Int64> buffer 8 in
+let __arrayRetain(buffer: RawPtr): Unit =
+    let capacity = __raw_get<Int64>(buffer, 8) in
     let rcOffset = 24 + capacity * 8 in
-    let rc = __raw_get<Int64> buffer rcOffset in
-    __raw_write_word buffer rcOffset (rc + 1)
+    let rc = __raw_get<Int64>(buffer, rcOffset) in
+    __raw_write_word(buffer, rcOffset, rc + 1)
 
 // This boundary keeps conditional cleanup out of each region continuation.
 // ListHIR's intrinsic supplies the exact fixed-block RC release metadata.
-let __arrayRelease (buffer: RawPtr) : Unit =
-    let length = __raw_get<Int64> buffer 0 in
-    let capacity = __raw_get<Int64> buffer 8 in
+let __arrayRelease(buffer: RawPtr): Unit =
+    let length = __raw_get<Int64>(buffer, 0) in
+    let capacity = __raw_get<Int64>(buffer, 8) in
     let rcOffset = 24 + capacity * 8 in
-    let rc = __raw_get<Int64> buffer rcOffset in
-    if rc > 1 then __raw_write_word buffer rcOffset (rc - 1)
-    else if length <= 28 then __list_array_release_small buffer
-    else __mapped_free buffer
+    let rc = __raw_get<Int64>(buffer, rcOffset) in
+    if rc > 1 then __raw_write_word(buffer, rcOffset, rc - 1)
+    else if length <= 28 then __list_array_release_small(buffer)
+    else __mapped_free(buffer)
 
-let __arrayFill (buffer: RawPtr) (index: Int64) (length: Int64) (value: Int64) : Unit =
+let __arrayFill(buffer: RawPtr, index: Int64, length: Int64, value: Int64): Unit =
     if index >= length then ()
     else
-        let _ = __raw_write_word buffer (24 + index * 8) value in
-        Stdlib.List.__arrayFill buffer (index + 1) length value
+        let _ = __raw_write_word(buffer, 24 + index * 8, value) in
+        Stdlib.List.__arrayFill(buffer, index + 1, length, value)
 
-let __arrayRepeat (count: Int) (value: Int64) : RawPtr =
-    let length = Stdlib.List.__arrayRepeatLength count in
-    let buffer = Stdlib.List.__arrayAllocate length in
-    let _ = Stdlib.List.__arrayFill buffer 0 length value in
-    let _ = __raw_write_word buffer 16 length in
+let __arrayRepeat(count: Int, value: Int64): RawPtr =
+    let length = Stdlib.List.__arrayRepeatLength(count) in
+    let buffer = Stdlib.List.__arrayAllocate(length) in
+    let _ = Stdlib.List.__arrayFill(buffer, 0, length, value) in
+    let _ = __raw_write_word(buffer, 16, length) in
     buffer
 
-let __arrayMap (buffer: RawPtr) (index: Int64) (length: Int64) (fn: Int64 -> Int64) : Unit =
+let __arrayMap(buffer: RawPtr, index: Int64, length: Int64, fn: Int64 -> Int64): Unit =
     if index >= length then ()
     else
         let offset = 24 + index * 8 in
-        let value = __raw_get<Int64> buffer offset in
-        let mapped = fn value in
-        let _ = __raw_write_word buffer offset mapped in
-        Stdlib.List.__arrayMap buffer (index + 1) length fn
+        let value = __raw_get<Int64>(buffer, offset) in
+        let mapped = fn(value) in
+        let _ = __raw_write_word(buffer, offset, mapped) in
+        Stdlib.List.__arrayMap(buffer, index + 1, length, fn)
 
-let __arrayReverse (buffer: RawPtr) (left: Int64) (right: Int64) : Unit =
+let __arrayReverse(buffer: RawPtr, left: Int64, right: Int64): Unit =
     if left >= right then ()
     else
         let leftOffset = 24 + left * 8 in
         let rightOffset = 24 + right * 8 in
-        let a = __raw_get<Int64> buffer leftOffset in
-        let b = __raw_get<Int64> buffer rightOffset in
-        let _ = __raw_write_word buffer leftOffset b in
-        let _ = __raw_write_word buffer rightOffset a in
-        Stdlib.List.__arrayReverse buffer (left + 1) (right - 1)
+        let a = __raw_get<Int64>(buffer, leftOffset) in
+        let b = __raw_get<Int64>(buffer, rightOffset) in
+        let _ = __raw_write_word(buffer, leftOffset, b) in
+        let _ = __raw_write_word(buffer, rightOffset, a) in
+        Stdlib.List.__arrayReverse(buffer, left + 1, right - 1)
 
-let __arrayCopy (source: RawPtr) (destination: RawPtr) (index: Int64) (length: Int64) : Unit =
+let __arrayCopy(source: RawPtr, destination: RawPtr, index: Int64, length: Int64): Unit =
     if index >= length then ()
     else
         let offset = 24 + index * 8 in
-        let value = __raw_get<Int64> source offset in
-        let _ = __raw_write_word destination offset value in
-        Stdlib.List.__arrayCopy source destination (index + 1) length
+        let value = __raw_get<Int64>(source, offset) in
+        let _ = __raw_write_word(destination, offset, value) in
+        Stdlib.List.__arrayCopy(source, destination, index + 1, length)
 
 // Consume one ownership unit. Exclusive storage is returned directly; shared
 // storage is copied before the consumed unit is removed from the source.
-let __arrayPrepareMutation (source: RawPtr) : RawPtr =
-    let length = __raw_get<Int64> source 0 in
-    let capacity = __raw_get<Int64> source 8 in
+let __arrayPrepareMutation(source: RawPtr): RawPtr =
+    let length = __raw_get<Int64>(source, 0) in
+    let capacity = __raw_get<Int64>(source, 8) in
     let rcOffset = 24 + capacity * 8 in
-    let rc = __raw_get<Int64> source rcOffset in
+    let rc = __raw_get<Int64>(source, rcOffset) in
     if rc == 1 then source
     else
-        let destination = Stdlib.List.__arrayAllocate length in
-        let _ = Stdlib.List.__arrayCopy source destination 0 length in
-        let _ = __raw_write_word destination 16 length in
-        let _ = __raw_write_word source rcOffset (rc - 1) in
+        let destination = Stdlib.List.__arrayAllocate(length) in
+        let _ = Stdlib.List.__arrayCopy(source, destination, 0, length) in
+        let _ = __raw_write_word(destination, 16, length) in
+        let _ = __raw_write_word(source, rcOffset, rc - 1) in
         destination
 
-let __arrayFold (buffer: RawPtr) (index: Int64) (length: Int64) (acc: Int64) (fn: Int64 -> Int64 -> Int64) : Int64 =
+let __arrayFold(buffer: RawPtr, index: Int64, length: Int64, acc: Int64, fn: Int64 -> Int64 -> Int64): Int64 =
     if index >= length then acc
     else
-        let value = __raw_get<Int64> buffer (24 + index * 8) in
-        let next = fn acc value in
-        Stdlib.List.__arrayFold buffer (index + 1) length next fn
+        let value = __raw_get<Int64>(buffer, 24 + index * 8) in
+        let next = fn(acc, value) in
+        Stdlib.List.__arrayFold(buffer, index + 1, length, next, fn)

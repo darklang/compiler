@@ -2,14 +2,14 @@
 
 module Darklang.Stdlib
 
-let print (str: String) : Unit =
-    let _ = Builtin.print (Stdlib.__Console.forFd 1 str) in
+let print(str: String): Unit =
+    let _ = Builtin.print(Stdlib.__Console.forFd(1, str)) in
     ()
 
-let printLine (str: String) : Unit =
-    let _ = Builtin.printLine (Stdlib.__Console.forFd 1 str) in
+let printLine(str: String): Unit =
+    let _ = Builtin.printLine(Stdlib.__Console.forFd(1, str)) in
     ()
 
-let printLines (lines: List<String>) : Unit =
-    let _ = Stdlib.List.iter lines Stdlib.printLine in
+let printLines(lines: List<String>): Unit =
+    let _ = Stdlib.List.iter(lines, Stdlib.printLine) in
     ()

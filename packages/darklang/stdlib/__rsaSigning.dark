@@ -3,82 +3,82 @@ module Darklang.Stdlib.__RsaSigning
 
 // Every one of the 2048 exponent bits performs both products. Masked selection
 // uses public limb indices; the exponent never controls a branch or address.
-let __power (modulus: Stdlib.__RsaMontgomery.Modulus) (base: RawPtr) (accumulator: RawPtr) (product: RawPtr) (temporary: RawPtr) (exponent: Blob) (position: Int64) : Unit =
+let __power(modulus: Stdlib.__RsaMontgomery.Modulus, base: RawPtr, accumulator: RawPtr, product: RawPtr, temporary: RawPtr, exponent: Blob, position: Int64): Unit =
   if position == 2048 then ()
   else
-    let bit = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight (Stdlib.Blob.__getByte exponent (position / 8)) (7 - position % 8)) 1 in
-    let _ = Stdlib.__RsaMontgomery.__multiply modulus accumulator accumulator accumulator temporary in
-    let _ = Stdlib.__RsaMontgomery.__multiply modulus accumulator base product temporary in
-    let _ = Stdlib.__RsaMontgomery.__select product accumulator (0 - bit) 0 128 in
-    Stdlib.__RsaSigning.__power modulus base accumulator product temporary exponent (position + 1)
+    let bit = Stdlib.Int64.bitwiseAnd(Stdlib.Int64.shiftRight(Stdlib.Blob.__getByte(exponent, position / 8), 7 - position % 8), 1) in
+    let _ = Stdlib.__RsaMontgomery.__multiply(modulus, accumulator, accumulator, accumulator, temporary) in
+    let _ = Stdlib.__RsaMontgomery.__multiply(modulus, accumulator, base, product, temporary) in
+    let _ = Stdlib.__RsaMontgomery.__select(product, accumulator, 0 - bit, 0, 128) in
+    Stdlib.__RsaSigning.__power(modulus, base, accumulator, product, temporary, exponent, position + 1)
 
-let __private (key: Stdlib.__RsaPrivate.Key) (blinded: Blob) : Blob =
-  let words = __raw_alloc 1024 in
-  let _ = Stdlib.__RsaMontgomery.__load words key.modulus 0 128 in
-  let modulus = Stdlib.__RsaMontgomery.Modulus { words = words, count = 128, inverse = Stdlib.__RsaMontgomery.__inverse (__raw_get<Int64> words 0) 1 6 } in
-  let base = __raw_alloc 1024 in
-  let accumulator = __raw_alloc 1024 in
-  let product = __raw_alloc 1024 in
-  let one = __raw_alloc 1024 in
-  let radix = __raw_alloc 1024 in
-  let temporary = __raw_alloc 1040 in
-  let n = Stdlib.__RsaPss.__fromBytes key.modulus 0 0z in
-  let r2 = Stdlib.Int.mod (Stdlib.Int.shiftLeft 1z 4096z) n in
-  let _ = Stdlib.__RsaMontgomery.__load radix (Stdlib.__RsaPss.__toBytes r2 256 []) 0 128 in
-  let _ = Stdlib.__RsaMontgomery.__load base blinded 0 128 in
-  let _ = Stdlib.__RsaMontgomery.__zero one 0 128 in
-  let _ = __raw_write_word one 0 1 in
-  let _ = Stdlib.__RsaMontgomery.__multiply modulus base radix base temporary in
-  let _ = Stdlib.__RsaMontgomery.__multiply modulus one radix accumulator temporary in
-  let _ = Stdlib.__RsaSigning.__power modulus base accumulator product temporary key.privateExponent 0 in
-  let _ = Stdlib.__RsaMontgomery.__multiply modulus accumulator one accumulator temporary in
-  let result = Stdlib.__RsaMontgomery.__output accumulator 255 [] in
-  let _ = Stdlib.__RsaMontgomery.__dispose words 128 in
-  let _ = Stdlib.__RsaMontgomery.__dispose base 128 in
-  let _ = Stdlib.__RsaMontgomery.__dispose accumulator 128 in
-  let _ = Stdlib.__RsaMontgomery.__dispose product 128 in
-  let _ = Stdlib.__RsaMontgomery.__dispose one 128 in
-  let _ = Stdlib.__RsaMontgomery.__dispose radix 128 in
-  let _ = Stdlib.__RsaMontgomery.__dispose temporary 130 in
+let __private(key: Stdlib.__RsaPrivate.Key, blinded: Blob): Blob =
+  let words = __raw_alloc(1024) in
+  let _ = Stdlib.__RsaMontgomery.__load(words, key.modulus, 0, 128) in
+  let modulus = Stdlib.__RsaMontgomery.Modulus { words = words, count = 128, inverse = Stdlib.__RsaMontgomery.__inverse(__raw_get<Int64>(words, 0), 1, 6) } in
+  let base = __raw_alloc(1024) in
+  let accumulator = __raw_alloc(1024) in
+  let product = __raw_alloc(1024) in
+  let one = __raw_alloc(1024) in
+  let radix = __raw_alloc(1024) in
+  let temporary = __raw_alloc(1040) in
+  let n = Stdlib.__RsaPss.__fromBytes(key.modulus, 0, 0z) in
+  let r2 = Stdlib.Int.mod(Stdlib.Int.shiftLeft(1z, 4096z), n) in
+  let _ = Stdlib.__RsaMontgomery.__load(radix, Stdlib.__RsaPss.__toBytes(r2, 256, []), 0, 128) in
+  let _ = Stdlib.__RsaMontgomery.__load(base, blinded, 0, 128) in
+  let _ = Stdlib.__RsaMontgomery.__zero(one, 0, 128) in
+  let _ = __raw_write_word(one, 0, 1) in
+  let _ = Stdlib.__RsaMontgomery.__multiply(modulus, base, radix, base, temporary) in
+  let _ = Stdlib.__RsaMontgomery.__multiply(modulus, one, radix, accumulator, temporary) in
+  let _ = Stdlib.__RsaSigning.__power(modulus, base, accumulator, product, temporary, key.privateExponent, 0) in
+  let _ = Stdlib.__RsaMontgomery.__multiply(modulus, accumulator, one, accumulator, temporary) in
+  let result = Stdlib.__RsaMontgomery.__output(accumulator, 255, []) in
+  let _ = Stdlib.__RsaMontgomery.__dispose(words, 128) in
+  let _ = Stdlib.__RsaMontgomery.__dispose(base, 128) in
+  let _ = Stdlib.__RsaMontgomery.__dispose(accumulator, 128) in
+  let _ = Stdlib.__RsaMontgomery.__dispose(product, 128) in
+  let _ = Stdlib.__RsaMontgomery.__dispose(one, 128) in
+  let _ = Stdlib.__RsaMontgomery.__dispose(radix, 128) in
+  let _ = Stdlib.__RsaMontgomery.__dispose(temporary, 130) in
   result
 
 // This inverse operates on a fresh random blinding factor and public modulus,
 // never on private RSA exponents or primes. Noninvertible factors are retried.
-let __inverse (a: Int) (b: Int) (x: Int) (y: Int) (remaining: Int64) : Stdlib.Option.Option<Int> =
+let __inverse(a: Int, b: Int, x: Int, y: Int, remaining: Int64): Stdlib.Option.Option<Int> =
   if remaining == 0 then None
-  else if b == 0z then if a == 1z then Some x else None
+  else if b == 0z then if a == 1z then Some(x) else None
   else
     let quotient = a / b in
-    Stdlib.__RsaSigning.__inverse b (a % b) y (x - quotient * y) (remaining - 1)
+    Stdlib.__RsaSigning.__inverse(b, a % b, y, x - quotient * y, remaining - 1)
 
-let __blinded (key: Stdlib.__RsaPrivate.Key) (encoded: Blob) (remaining: Int64) : Stdlib.Result.Result<Blob, String> =
-  if remaining == 0 then Error "RSA blinding failed"
-  else Stdlib.Crypto.__secureRandomBytes 256 |> Stdlib.Result.andThen (fun random ->
-    let n = Stdlib.__RsaPss.__fromBytes key.modulus 0 0z in
-    let r = Stdlib.__RsaPss.__fromBytes random 0 0z % n in
-    if r <= 1z then Stdlib.__RsaSigning.__blinded key encoded (remaining - 1)
-    else match Stdlib.__RsaSigning.__inverse n r 0z 1z 4096 with
-    | None -> Stdlib.__RsaSigning.__blinded key encoded (remaining - 1)
-    | Some inverse ->
+let __blinded(key: Stdlib.__RsaPrivate.Key, encoded: Blob, remaining: Int64): Stdlib.Result.Result<Blob, String> =
+  if remaining == 0 then Error("RSA blinding failed")
+  else Stdlib.Crypto.__secureRandomBytes(256) |> Stdlib.Result.andThen(fun random ->
+    let n = Stdlib.__RsaPss.__fromBytes(key.modulus, 0, 0z) in
+    let r = Stdlib.__RsaPss.__fromBytes(random, 0, 0z) % n in
+    if r <= 1z then Stdlib.__RsaSigning.__blinded(key, encoded, remaining - 1)
+    else match Stdlib.__RsaSigning.__inverse(n, r, 0z, 1z, 4096) with
+    | None -> Stdlib.__RsaSigning.__blinded(key, encoded, remaining - 1)
+    | Some(inverse) ->
       let inverse = (inverse % n + n) % n in
-      Stdlib.__RsaMontgomery.publicPow (Stdlib.__RsaPss.__toBytes r 256 []) key.exponent key.modulus |> Stdlib.Result.andThen (fun re ->
-        let blinded = Stdlib.__RsaPss.__fromBytes encoded 0 0z * Stdlib.__RsaPss.__fromBytes re 0 0z % n in
-        let computed = Stdlib.__RsaSigning.__private key (Stdlib.__RsaPss.__toBytes blinded 256 []) in
-        let signature = Stdlib.__RsaPss.__toBytes (Stdlib.__RsaPss.__fromBytes computed 0 0z * inverse % n) 256 [] in
+      Stdlib.__RsaMontgomery.publicPow(Stdlib.__RsaPss.__toBytes(r, 256, []), key.exponent, key.modulus) |> Stdlib.Result.andThen(fun re ->
+        let blinded = Stdlib.__RsaPss.__fromBytes(encoded, 0, 0z) * Stdlib.__RsaPss.__fromBytes(re, 0, 0z) % n in
+        let computed = Stdlib.__RsaSigning.__private(key, Stdlib.__RsaPss.__toBytes(blinded, 256, [])) in
+        let signature = Stdlib.__RsaPss.__toBytes(Stdlib.__RsaPss.__fromBytes(computed, 0, 0z) * inverse % n, 256, []) in
         // Verify before releasing the signature, including on every fault path.
-        Stdlib.__RsaMontgomery.publicPow signature key.exponent key.modulus |> Stdlib.Result.andThen (fun checked ->
-          if Stdlib.__RsaPss.__equalBytes checked encoded 0 0 then Ok signature else Error "RSA private operation failed")))
+        Stdlib.__RsaMontgomery.publicPow(signature, key.exponent, key.modulus) |> Stdlib.Result.andThen(fun checked ->
+          if Stdlib.__RsaPss.__equalBytes(checked, encoded, 0, 0) then Ok(signature) else Error("RSA private operation failed"))))
 
-let __encoded (message: Blob) (salt: Blob) : Blob =
-  let digest = Stdlib.Crypto.sha256 (Stdlib.Blob.concat [Stdlib.Blob.__fromInt64List [0,0,0,0,0,0,0,0], Stdlib.Crypto.sha256 message, salt]) in
-  let db = Stdlib.Blob.concat [Stdlib.Blob.__fromInt64List (Stdlib.List.repeatUnsafe 190z 0), Stdlib.Blob.__fromInt64List [1], salt] in
-  let masked = Stdlib.__RsaPss.__unmask db (Stdlib.__RsaPss.__mgf1 digest 223 0 []) 0 [] in
-  Stdlib.Blob.concat [Stdlib.Blob.__fromInt64List [Stdlib.Int64.bitwiseAnd (Stdlib.Blob.__getByte masked 0) 127], Stdlib.Blob.slice masked 1z 222z, digest, Stdlib.Blob.__fromInt64List [188]]
+let __encoded(message: Blob, salt: Blob): Blob =
+  let digest = Stdlib.Crypto.sha256(Stdlib.Blob.concat([Stdlib.Blob.__fromInt64List([0,0,0,0,0,0,0,0]), Stdlib.Crypto.sha256(message), salt])) in
+  let db = Stdlib.Blob.concat([Stdlib.Blob.__fromInt64List(Stdlib.List.repeatUnsafe(190z, 0)), Stdlib.Blob.__fromInt64List([1]), salt]) in
+  let masked = Stdlib.__RsaPss.__unmask(db, Stdlib.__RsaPss.__mgf1(digest, 223, 0, []), 0, []) in
+  Stdlib.Blob.concat([Stdlib.Blob.__fromInt64List([Stdlib.Int64.bitwiseAnd(Stdlib.Blob.__getByte(masked, 0), 127)]), Stdlib.Blob.slice(masked, 1z, 222z), digest, Stdlib.Blob.__fromInt64List([188])])
 
-let signSha256 (key: Stdlib.__RsaPrivate.Key) (message: Blob) : Stdlib.Result.Result<Blob, String> =
-  let exponentLength = Stdlib.Blob.__byteLength key.exponent in
-  if Stdlib.Blob.__byteLength key.modulus != 256 || Stdlib.Blob.__byteLength key.privateExponent != 256 ||
-    Stdlib.Blob.__getByte key.modulus 0 < 128 || Stdlib.Blob.__getByte key.modulus 255 % 2 == 0 ||
-    exponentLength < 1 || exponentLength > 4 || Stdlib.Blob.__getByte key.exponent (exponentLength - 1) % 2 == 0 ||
-    (exponentLength == 1 && Stdlib.Blob.__getByte key.exponent 0 < 3) then Error "Invalid RSA signing key"
-  else Stdlib.Crypto.__secureRandomBytes 32 |> Stdlib.Result.andThen (fun salt -> Stdlib.__RsaSigning.__blinded key (Stdlib.__RsaSigning.__encoded message salt) 4)
+let signSha256(key: Stdlib.__RsaPrivate.Key, message: Blob): Stdlib.Result.Result<Blob, String> =
+  let exponentLength = Stdlib.Blob.__byteLength(key.exponent) in
+  if Stdlib.Blob.__byteLength(key.modulus) != 256 || Stdlib.Blob.__byteLength(key.privateExponent) != 256 ||
+    Stdlib.Blob.__getByte(key.modulus, 0) < 128 || Stdlib.Blob.__getByte(key.modulus, 255) % 2 == 0 ||
+    exponentLength < 1 || exponentLength > 4 || Stdlib.Blob.__getByte(key.exponent, exponentLength - 1) % 2 == 0 ||
+    (exponentLength == 1 && Stdlib.Blob.__getByte(key.exponent, 0) < 3) then Error("Invalid RSA signing key")
+  else Stdlib.Crypto.__secureRandomBytes(32) |> Stdlib.Result.andThen(fun salt -> Stdlib.__RsaSigning.__blinded(key, Stdlib.__RsaSigning.__encoded(message, salt), 4))

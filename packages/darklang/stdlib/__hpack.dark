@@ -9,562 +9,557 @@ type Text = { value: String, next: Int64 }
 type Encoder = { table: Stdlib.__Hpack.State, minimum: Stdlib.Option.Option<Int64> }
 type Encoded = { bytes: Blob, state: Stdlib.__Hpack.Encoder }
 
-let initial () : Stdlib.__Hpack.State = Stdlib.__Hpack.State { entries = [], limit = 4096 }
+let initial(): Stdlib.__Hpack.State = Stdlib.__Hpack.State { entries = [], limit = 4096 }
 
-let __static (index: Int64) : Stdlib.Option.Option<(String * String)> =
+let __static(index: Int64): Stdlib.Option.Option<(String * String)> =
   match index with
-  | 1 -> Some ((":authority", ""))
-  | 2 -> Some ((":method", "GET"))
-  | 3 -> Some ((":method", "POST"))
-  | 4 -> Some ((":path", "/"))
-  | 5 -> Some ((":path", "/index.html"))
-  | 6 -> Some ((":scheme", "http"))
-  | 7 -> Some ((":scheme", "https"))
-  | 8 -> Some ((":status", "200"))
-  | 9 -> Some ((":status", "204"))
-  | 10 -> Some ((":status", "206"))
-  | 11 -> Some ((":status", "304"))
-  | 12 -> Some ((":status", "400"))
-  | 13 -> Some ((":status", "404"))
-  | 14 -> Some ((":status", "500"))
-  | 15 -> Some (("accept-charset", ""))
-  | 16 -> Some (("accept-encoding", "gzip, deflate"))
-  | 17 -> Some (("accept-language", ""))
-  | 18 -> Some (("accept-ranges", ""))
-  | 19 -> Some (("accept", ""))
-  | 20 -> Some (("access-control-allow-origin", ""))
-  | 21 -> Some (("age", ""))
-  | 22 -> Some (("allow", ""))
-  | 23 -> Some (("authorization", ""))
-  | 24 -> Some (("cache-control", ""))
-  | 25 -> Some (("content-disposition", ""))
-  | 26 -> Some (("content-encoding", ""))
-  | 27 -> Some (("content-language", ""))
-  | 28 -> Some (("content-length", ""))
-  | 29 -> Some (("content-location", ""))
-  | 30 -> Some (("content-range", ""))
-  | 31 -> Some (("content-type", ""))
-  | 32 -> Some (("cookie", ""))
-  | 33 -> Some (("date", ""))
-  | 34 -> Some (("etag", ""))
-  | 35 -> Some (("expect", ""))
-  | 36 -> Some (("expires", ""))
-  | 37 -> Some (("from", ""))
-  | 38 -> Some (("host", ""))
-  | 39 -> Some (("if-match", ""))
-  | 40 -> Some (("if-modified-since", ""))
-  | 41 -> Some (("if-none-match", ""))
-  | 42 -> Some (("if-range", ""))
-  | 43 -> Some (("if-unmodified-since", ""))
-  | 44 -> Some (("last-modified", ""))
-  | 45 -> Some (("link", ""))
-  | 46 -> Some (("location", ""))
-  | 47 -> Some (("max-forwards", ""))
-  | 48 -> Some (("proxy-authenticate", ""))
-  | 49 -> Some (("proxy-authorization", ""))
-  | 50 -> Some (("range", ""))
-  | 51 -> Some (("referer", ""))
-  | 52 -> Some (("refresh", ""))
-  | 53 -> Some (("retry-after", ""))
-  | 54 -> Some (("server", ""))
-  | 55 -> Some (("set-cookie", ""))
-  | 56 -> Some (("strict-transport-security", ""))
-  | 57 -> Some (("transfer-encoding", ""))
-  | 58 -> Some (("user-agent", ""))
-  | 59 -> Some (("vary", ""))
-  | 60 -> Some (("via", ""))
-  | 61 -> Some (("www-authenticate", ""))
+  | 1 -> Some((":authority", ""))
+  | 2 -> Some((":method", "GET"))
+  | 3 -> Some((":method", "POST"))
+  | 4 -> Some((":path", "/"))
+  | 5 -> Some((":path", "/index.html"))
+  | 6 -> Some((":scheme", "http"))
+  | 7 -> Some((":scheme", "https"))
+  | 8 -> Some((":status", "200"))
+  | 9 -> Some((":status", "204"))
+  | 10 -> Some((":status", "206"))
+  | 11 -> Some((":status", "304"))
+  | 12 -> Some((":status", "400"))
+  | 13 -> Some((":status", "404"))
+  | 14 -> Some((":status", "500"))
+  | 15 -> Some(("accept-charset", ""))
+  | 16 -> Some(("accept-encoding", "gzip, deflate"))
+  | 17 -> Some(("accept-language", ""))
+  | 18 -> Some(("accept-ranges", ""))
+  | 19 -> Some(("accept", ""))
+  | 20 -> Some(("access-control-allow-origin", ""))
+  | 21 -> Some(("age", ""))
+  | 22 -> Some(("allow", ""))
+  | 23 -> Some(("authorization", ""))
+  | 24 -> Some(("cache-control", ""))
+  | 25 -> Some(("content-disposition", ""))
+  | 26 -> Some(("content-encoding", ""))
+  | 27 -> Some(("content-language", ""))
+  | 28 -> Some(("content-length", ""))
+  | 29 -> Some(("content-location", ""))
+  | 30 -> Some(("content-range", ""))
+  | 31 -> Some(("content-type", ""))
+  | 32 -> Some(("cookie", ""))
+  | 33 -> Some(("date", ""))
+  | 34 -> Some(("etag", ""))
+  | 35 -> Some(("expect", ""))
+  | 36 -> Some(("expires", ""))
+  | 37 -> Some(("from", ""))
+  | 38 -> Some(("host", ""))
+  | 39 -> Some(("if-match", ""))
+  | 40 -> Some(("if-modified-since", ""))
+  | 41 -> Some(("if-none-match", ""))
+  | 42 -> Some(("if-range", ""))
+  | 43 -> Some(("if-unmodified-since", ""))
+  | 44 -> Some(("last-modified", ""))
+  | 45 -> Some(("link", ""))
+  | 46 -> Some(("location", ""))
+  | 47 -> Some(("max-forwards", ""))
+  | 48 -> Some(("proxy-authenticate", ""))
+  | 49 -> Some(("proxy-authorization", ""))
+  | 50 -> Some(("range", ""))
+  | 51 -> Some(("referer", ""))
+  | 52 -> Some(("refresh", ""))
+  | 53 -> Some(("retry-after", ""))
+  | 54 -> Some(("server", ""))
+  | 55 -> Some(("set-cookie", ""))
+  | 56 -> Some(("strict-transport-security", ""))
+  | 57 -> Some(("transfer-encoding", ""))
+  | 58 -> Some(("user-agent", ""))
+  | 59 -> Some(("vary", ""))
+  | 60 -> Some(("via", ""))
+  | 61 -> Some(("www-authenticate", ""))
   | _ -> None
 
-let __dynamic (entries: List<(String * String)>) (index: Int64) : Stdlib.Option.Option<(String * String)> =
+let __dynamic(entries: List<(String * String)>, index: Int64): Stdlib.Option.Option<(String * String)> =
   match entries with
   | [] -> None
-  | entry :: rest -> if index == 0 then Some entry else Stdlib.__Hpack.__dynamic rest (index - 1)
+  | entry :: rest -> if index == 0 then Some(entry) else Stdlib.__Hpack.__dynamic(rest, index - 1)
 
-let __lookup (state: Stdlib.__Hpack.State) (index: Int64) : Stdlib.Option.Option<(String * String)> =
+let __lookup(state: Stdlib.__Hpack.State, index: Int64): Stdlib.Option.Option<(String * String)> =
   if index <= 0 then None
-  else if index <= 61 then Stdlib.__Hpack.__static index
-  else Stdlib.__Hpack.__dynamic state.entries (index - 62)
+  else if index <= 61 then Stdlib.__Hpack.__static(index)
+  else Stdlib.__Hpack.__dynamic(state.entries, index - 62)
 
-let __pow2 (exponent: Int64) : Int64 =
-  if exponent == 0 then 1 else 2 * Stdlib.__Hpack.__pow2 (exponent - 1)
+let __pow2(exponent: Int64): Int64 =
+  if exponent == 0 then 1 else 2 * Stdlib.__Hpack.__pow2(exponent - 1)
 
-let __integerRest (data: Blob) (position: Int64) (value: Int64) (factor: Int64)
-  : Stdlib.Result.Result<Stdlib.__Hpack.Number, String> =
-  if position >= Stdlib.Blob.__byteLength data then Error "Truncated HPACK integer"
-  else if factor > 268435456 then Error "HPACK integer overflow"
+let __integerRest(data: Blob, position: Int64, value: Int64, factor: Int64): Stdlib.Result.Result<Stdlib.__Hpack.Number, String> =
+  if position >= Stdlib.Blob.__byteLength(data) then Error("Truncated HPACK integer")
+  else if factor > 268435456 then Error("HPACK integer overflow")
   else
-    let byte = Stdlib.Blob.__getByte data position in
+    let byte = Stdlib.Blob.__getByte(data, position) in
     let nextValue = value + (byte % 128) * factor in
-    if nextValue > 2147483647 then Error "HPACK integer overflow"
-    else if byte < 128 then Ok (Stdlib.__Hpack.Number { value = nextValue, next = position + 1 })
-    else Stdlib.__Hpack.__integerRest data (position + 1) nextValue (factor * 128)
+    if nextValue > 2147483647 then Error("HPACK integer overflow")
+    else if byte < 128 then Ok(Stdlib.__Hpack.Number { value = nextValue, next = position + 1 })
+    else Stdlib.__Hpack.__integerRest(data, position + 1, nextValue, factor * 128)
 
-let integer (data: Blob) (position: Int64) (prefix: Int64)
-  : Stdlib.Result.Result<Stdlib.__Hpack.Number, String> =
-  if prefix < 1 || prefix > 8 then Error "Invalid HPACK integer prefix"
-  else if position < 0 || position >= Stdlib.Blob.__byteLength data then Error "Truncated HPACK integer"
+let integer(data: Blob, position: Int64, prefix: Int64): Stdlib.Result.Result<Stdlib.__Hpack.Number, String> =
+  if prefix < 1 || prefix > 8 then Error("Invalid HPACK integer prefix")
+  else if position < 0 || position >= Stdlib.Blob.__byteLength(data) then Error("Truncated HPACK integer")
   else
-    let mask = Stdlib.__Hpack.__pow2 prefix - 1 in
-    let value = Stdlib.Int64.bitwiseAnd (Stdlib.Blob.__getByte data position) mask in
-    if value < mask then Ok (Stdlib.__Hpack.Number { value = value, next = position + 1 })
-    else Stdlib.__Hpack.__integerRest data (position + 1) value 1
+    let mask = Stdlib.__Hpack.__pow2(prefix) - 1 in
+    let value = Stdlib.Int64.bitwiseAnd(Stdlib.Blob.__getByte(data, position), mask) in
+    if value < mask then Ok(Stdlib.__Hpack.Number { value = value, next = position + 1 })
+    else Stdlib.__Hpack.__integerRest(data, position + 1, value, 1)
 
-let __huffmanSymbol (length: Int64) (code: Int64) : Stdlib.Option.Option<Int64> =
+let __huffmanSymbol(length: Int64, code: Int64): Stdlib.Option.Option<Int64> =
   match length with
   | 5 ->
     match code with
-    | 0 -> Some 48
-    | 1 -> Some 49
-    | 2 -> Some 50
-    | 3 -> Some 97
-    | 4 -> Some 99
-    | 5 -> Some 101
-    | 6 -> Some 105
-    | 7 -> Some 111
-    | 8 -> Some 115
-    | 9 -> Some 116
+    | 0 -> Some(48)
+    | 1 -> Some(49)
+    | 2 -> Some(50)
+    | 3 -> Some(97)
+    | 4 -> Some(99)
+    | 5 -> Some(101)
+    | 6 -> Some(105)
+    | 7 -> Some(111)
+    | 8 -> Some(115)
+    | 9 -> Some(116)
     | _ -> None
   | 6 ->
     match code with
-    | 20 -> Some 32
-    | 21 -> Some 37
-    | 22 -> Some 45
-    | 23 -> Some 46
-    | 24 -> Some 47
-    | 25 -> Some 51
-    | 26 -> Some 52
-    | 27 -> Some 53
-    | 28 -> Some 54
-    | 29 -> Some 55
-    | 30 -> Some 56
-    | 31 -> Some 57
-    | 32 -> Some 61
-    | 33 -> Some 65
-    | 34 -> Some 95
-    | 35 -> Some 98
-    | 36 -> Some 100
-    | 37 -> Some 102
-    | 38 -> Some 103
-    | 39 -> Some 104
-    | 40 -> Some 108
-    | 41 -> Some 109
-    | 42 -> Some 110
-    | 43 -> Some 112
-    | 44 -> Some 114
-    | 45 -> Some 117
+    | 20 -> Some(32)
+    | 21 -> Some(37)
+    | 22 -> Some(45)
+    | 23 -> Some(46)
+    | 24 -> Some(47)
+    | 25 -> Some(51)
+    | 26 -> Some(52)
+    | 27 -> Some(53)
+    | 28 -> Some(54)
+    | 29 -> Some(55)
+    | 30 -> Some(56)
+    | 31 -> Some(57)
+    | 32 -> Some(61)
+    | 33 -> Some(65)
+    | 34 -> Some(95)
+    | 35 -> Some(98)
+    | 36 -> Some(100)
+    | 37 -> Some(102)
+    | 38 -> Some(103)
+    | 39 -> Some(104)
+    | 40 -> Some(108)
+    | 41 -> Some(109)
+    | 42 -> Some(110)
+    | 43 -> Some(112)
+    | 44 -> Some(114)
+    | 45 -> Some(117)
     | _ -> None
   | 7 ->
     match code with
-    | 92 -> Some 58
-    | 93 -> Some 66
-    | 94 -> Some 67
-    | 95 -> Some 68
-    | 96 -> Some 69
-    | 97 -> Some 70
-    | 98 -> Some 71
-    | 99 -> Some 72
-    | 100 -> Some 73
-    | 101 -> Some 74
-    | 102 -> Some 75
-    | 103 -> Some 76
-    | 104 -> Some 77
-    | 105 -> Some 78
-    | 106 -> Some 79
-    | 107 -> Some 80
-    | 108 -> Some 81
-    | 109 -> Some 82
-    | 110 -> Some 83
-    | 111 -> Some 84
-    | 112 -> Some 85
-    | 113 -> Some 86
-    | 114 -> Some 87
-    | 115 -> Some 89
-    | 116 -> Some 106
-    | 117 -> Some 107
-    | 118 -> Some 113
-    | 119 -> Some 118
-    | 120 -> Some 119
-    | 121 -> Some 120
-    | 122 -> Some 121
-    | 123 -> Some 122
+    | 92 -> Some(58)
+    | 93 -> Some(66)
+    | 94 -> Some(67)
+    | 95 -> Some(68)
+    | 96 -> Some(69)
+    | 97 -> Some(70)
+    | 98 -> Some(71)
+    | 99 -> Some(72)
+    | 100 -> Some(73)
+    | 101 -> Some(74)
+    | 102 -> Some(75)
+    | 103 -> Some(76)
+    | 104 -> Some(77)
+    | 105 -> Some(78)
+    | 106 -> Some(79)
+    | 107 -> Some(80)
+    | 108 -> Some(81)
+    | 109 -> Some(82)
+    | 110 -> Some(83)
+    | 111 -> Some(84)
+    | 112 -> Some(85)
+    | 113 -> Some(86)
+    | 114 -> Some(87)
+    | 115 -> Some(89)
+    | 116 -> Some(106)
+    | 117 -> Some(107)
+    | 118 -> Some(113)
+    | 119 -> Some(118)
+    | 120 -> Some(119)
+    | 121 -> Some(120)
+    | 122 -> Some(121)
+    | 123 -> Some(122)
     | _ -> None
   | 8 ->
     match code with
-    | 248 -> Some 38
-    | 249 -> Some 42
-    | 250 -> Some 44
-    | 251 -> Some 59
-    | 252 -> Some 88
-    | 253 -> Some 90
+    | 248 -> Some(38)
+    | 249 -> Some(42)
+    | 250 -> Some(44)
+    | 251 -> Some(59)
+    | 252 -> Some(88)
+    | 253 -> Some(90)
     | _ -> None
   | 10 ->
     match code with
-    | 1016 -> Some 33
-    | 1017 -> Some 34
-    | 1018 -> Some 40
-    | 1019 -> Some 41
-    | 1020 -> Some 63
+    | 1016 -> Some(33)
+    | 1017 -> Some(34)
+    | 1018 -> Some(40)
+    | 1019 -> Some(41)
+    | 1020 -> Some(63)
     | _ -> None
   | 11 ->
     match code with
-    | 2042 -> Some 39
-    | 2043 -> Some 43
-    | 2044 -> Some 124
+    | 2042 -> Some(39)
+    | 2043 -> Some(43)
+    | 2044 -> Some(124)
     | _ -> None
   | 12 ->
     match code with
-    | 4090 -> Some 35
-    | 4091 -> Some 62
+    | 4090 -> Some(35)
+    | 4091 -> Some(62)
     | _ -> None
   | 13 ->
     match code with
-    | 8184 -> Some 0
-    | 8185 -> Some 36
-    | 8186 -> Some 64
-    | 8187 -> Some 91
-    | 8188 -> Some 93
-    | 8189 -> Some 126
+    | 8184 -> Some(0)
+    | 8185 -> Some(36)
+    | 8186 -> Some(64)
+    | 8187 -> Some(91)
+    | 8188 -> Some(93)
+    | 8189 -> Some(126)
     | _ -> None
   | 14 ->
     match code with
-    | 16380 -> Some 94
-    | 16381 -> Some 125
+    | 16380 -> Some(94)
+    | 16381 -> Some(125)
     | _ -> None
   | 15 ->
     match code with
-    | 32764 -> Some 60
-    | 32765 -> Some 96
-    | 32766 -> Some 123
+    | 32764 -> Some(60)
+    | 32765 -> Some(96)
+    | 32766 -> Some(123)
     | _ -> None
   | 19 ->
     match code with
-    | 524272 -> Some 92
-    | 524273 -> Some 195
-    | 524274 -> Some 208
+    | 524272 -> Some(92)
+    | 524273 -> Some(195)
+    | 524274 -> Some(208)
     | _ -> None
   | 20 ->
     match code with
-    | 1048550 -> Some 128
-    | 1048551 -> Some 130
-    | 1048552 -> Some 131
-    | 1048553 -> Some 162
-    | 1048554 -> Some 184
-    | 1048555 -> Some 194
-    | 1048556 -> Some 224
-    | 1048557 -> Some 226
+    | 1048550 -> Some(128)
+    | 1048551 -> Some(130)
+    | 1048552 -> Some(131)
+    | 1048553 -> Some(162)
+    | 1048554 -> Some(184)
+    | 1048555 -> Some(194)
+    | 1048556 -> Some(224)
+    | 1048557 -> Some(226)
     | _ -> None
   | 21 ->
     match code with
-    | 2097116 -> Some 153
-    | 2097117 -> Some 161
-    | 2097118 -> Some 167
-    | 2097119 -> Some 172
-    | 2097120 -> Some 176
-    | 2097121 -> Some 177
-    | 2097122 -> Some 179
-    | 2097123 -> Some 209
-    | 2097124 -> Some 216
-    | 2097125 -> Some 217
-    | 2097126 -> Some 227
-    | 2097127 -> Some 229
-    | 2097128 -> Some 230
+    | 2097116 -> Some(153)
+    | 2097117 -> Some(161)
+    | 2097118 -> Some(167)
+    | 2097119 -> Some(172)
+    | 2097120 -> Some(176)
+    | 2097121 -> Some(177)
+    | 2097122 -> Some(179)
+    | 2097123 -> Some(209)
+    | 2097124 -> Some(216)
+    | 2097125 -> Some(217)
+    | 2097126 -> Some(227)
+    | 2097127 -> Some(229)
+    | 2097128 -> Some(230)
     | _ -> None
   | 22 ->
     match code with
-    | 4194258 -> Some 129
-    | 4194259 -> Some 132
-    | 4194260 -> Some 133
-    | 4194261 -> Some 134
-    | 4194262 -> Some 136
-    | 4194263 -> Some 146
-    | 4194264 -> Some 154
-    | 4194265 -> Some 156
-    | 4194266 -> Some 160
-    | 4194267 -> Some 163
-    | 4194268 -> Some 164
-    | 4194269 -> Some 169
-    | 4194270 -> Some 170
-    | 4194271 -> Some 173
-    | 4194272 -> Some 178
-    | 4194273 -> Some 181
-    | 4194274 -> Some 185
-    | 4194275 -> Some 186
-    | 4194276 -> Some 187
-    | 4194277 -> Some 189
-    | 4194278 -> Some 190
-    | 4194279 -> Some 196
-    | 4194280 -> Some 198
-    | 4194281 -> Some 228
-    | 4194282 -> Some 232
-    | 4194283 -> Some 233
+    | 4194258 -> Some(129)
+    | 4194259 -> Some(132)
+    | 4194260 -> Some(133)
+    | 4194261 -> Some(134)
+    | 4194262 -> Some(136)
+    | 4194263 -> Some(146)
+    | 4194264 -> Some(154)
+    | 4194265 -> Some(156)
+    | 4194266 -> Some(160)
+    | 4194267 -> Some(163)
+    | 4194268 -> Some(164)
+    | 4194269 -> Some(169)
+    | 4194270 -> Some(170)
+    | 4194271 -> Some(173)
+    | 4194272 -> Some(178)
+    | 4194273 -> Some(181)
+    | 4194274 -> Some(185)
+    | 4194275 -> Some(186)
+    | 4194276 -> Some(187)
+    | 4194277 -> Some(189)
+    | 4194278 -> Some(190)
+    | 4194279 -> Some(196)
+    | 4194280 -> Some(198)
+    | 4194281 -> Some(228)
+    | 4194282 -> Some(232)
+    | 4194283 -> Some(233)
     | _ -> None
   | 23 ->
     match code with
-    | 8388568 -> Some 1
-    | 8388569 -> Some 135
-    | 8388570 -> Some 137
-    | 8388571 -> Some 138
-    | 8388572 -> Some 139
-    | 8388573 -> Some 140
-    | 8388574 -> Some 141
-    | 8388575 -> Some 143
-    | 8388576 -> Some 147
-    | 8388577 -> Some 149
-    | 8388578 -> Some 150
-    | 8388579 -> Some 151
-    | 8388580 -> Some 152
-    | 8388581 -> Some 155
-    | 8388582 -> Some 157
-    | 8388583 -> Some 158
-    | 8388584 -> Some 165
-    | 8388585 -> Some 166
-    | 8388586 -> Some 168
-    | 8388587 -> Some 174
-    | 8388588 -> Some 175
-    | 8388589 -> Some 180
-    | 8388590 -> Some 182
-    | 8388591 -> Some 183
-    | 8388592 -> Some 188
-    | 8388593 -> Some 191
-    | 8388594 -> Some 197
-    | 8388595 -> Some 231
-    | 8388596 -> Some 239
+    | 8388568 -> Some(1)
+    | 8388569 -> Some(135)
+    | 8388570 -> Some(137)
+    | 8388571 -> Some(138)
+    | 8388572 -> Some(139)
+    | 8388573 -> Some(140)
+    | 8388574 -> Some(141)
+    | 8388575 -> Some(143)
+    | 8388576 -> Some(147)
+    | 8388577 -> Some(149)
+    | 8388578 -> Some(150)
+    | 8388579 -> Some(151)
+    | 8388580 -> Some(152)
+    | 8388581 -> Some(155)
+    | 8388582 -> Some(157)
+    | 8388583 -> Some(158)
+    | 8388584 -> Some(165)
+    | 8388585 -> Some(166)
+    | 8388586 -> Some(168)
+    | 8388587 -> Some(174)
+    | 8388588 -> Some(175)
+    | 8388589 -> Some(180)
+    | 8388590 -> Some(182)
+    | 8388591 -> Some(183)
+    | 8388592 -> Some(188)
+    | 8388593 -> Some(191)
+    | 8388594 -> Some(197)
+    | 8388595 -> Some(231)
+    | 8388596 -> Some(239)
     | _ -> None
   | 24 ->
     match code with
-    | 16777194 -> Some 9
-    | 16777195 -> Some 142
-    | 16777196 -> Some 144
-    | 16777197 -> Some 145
-    | 16777198 -> Some 148
-    | 16777199 -> Some 159
-    | 16777200 -> Some 171
-    | 16777201 -> Some 206
-    | 16777202 -> Some 215
-    | 16777203 -> Some 225
-    | 16777204 -> Some 236
-    | 16777205 -> Some 237
+    | 16777194 -> Some(9)
+    | 16777195 -> Some(142)
+    | 16777196 -> Some(144)
+    | 16777197 -> Some(145)
+    | 16777198 -> Some(148)
+    | 16777199 -> Some(159)
+    | 16777200 -> Some(171)
+    | 16777201 -> Some(206)
+    | 16777202 -> Some(215)
+    | 16777203 -> Some(225)
+    | 16777204 -> Some(236)
+    | 16777205 -> Some(237)
     | _ -> None
   | 25 ->
     match code with
-    | 33554412 -> Some 199
-    | 33554413 -> Some 207
-    | 33554414 -> Some 234
-    | 33554415 -> Some 235
+    | 33554412 -> Some(199)
+    | 33554413 -> Some(207)
+    | 33554414 -> Some(234)
+    | 33554415 -> Some(235)
     | _ -> None
   | 26 ->
     match code with
-    | 67108832 -> Some 192
-    | 67108833 -> Some 193
-    | 67108834 -> Some 200
-    | 67108835 -> Some 201
-    | 67108836 -> Some 202
-    | 67108837 -> Some 205
-    | 67108838 -> Some 210
-    | 67108839 -> Some 213
-    | 67108840 -> Some 218
-    | 67108841 -> Some 219
-    | 67108842 -> Some 238
-    | 67108843 -> Some 240
-    | 67108844 -> Some 242
-    | 67108845 -> Some 243
-    | 67108846 -> Some 255
+    | 67108832 -> Some(192)
+    | 67108833 -> Some(193)
+    | 67108834 -> Some(200)
+    | 67108835 -> Some(201)
+    | 67108836 -> Some(202)
+    | 67108837 -> Some(205)
+    | 67108838 -> Some(210)
+    | 67108839 -> Some(213)
+    | 67108840 -> Some(218)
+    | 67108841 -> Some(219)
+    | 67108842 -> Some(238)
+    | 67108843 -> Some(240)
+    | 67108844 -> Some(242)
+    | 67108845 -> Some(243)
+    | 67108846 -> Some(255)
     | _ -> None
   | 27 ->
     match code with
-    | 134217694 -> Some 203
-    | 134217695 -> Some 204
-    | 134217696 -> Some 211
-    | 134217697 -> Some 212
-    | 134217698 -> Some 214
-    | 134217699 -> Some 221
-    | 134217700 -> Some 222
-    | 134217701 -> Some 223
-    | 134217702 -> Some 241
-    | 134217703 -> Some 244
-    | 134217704 -> Some 245
-    | 134217705 -> Some 246
-    | 134217706 -> Some 247
-    | 134217707 -> Some 248
-    | 134217708 -> Some 250
-    | 134217709 -> Some 251
-    | 134217710 -> Some 252
-    | 134217711 -> Some 253
-    | 134217712 -> Some 254
+    | 134217694 -> Some(203)
+    | 134217695 -> Some(204)
+    | 134217696 -> Some(211)
+    | 134217697 -> Some(212)
+    | 134217698 -> Some(214)
+    | 134217699 -> Some(221)
+    | 134217700 -> Some(222)
+    | 134217701 -> Some(223)
+    | 134217702 -> Some(241)
+    | 134217703 -> Some(244)
+    | 134217704 -> Some(245)
+    | 134217705 -> Some(246)
+    | 134217706 -> Some(247)
+    | 134217707 -> Some(248)
+    | 134217708 -> Some(250)
+    | 134217709 -> Some(251)
+    | 134217710 -> Some(252)
+    | 134217711 -> Some(253)
+    | 134217712 -> Some(254)
     | _ -> None
   | 28 ->
     match code with
-    | 268435426 -> Some 2
-    | 268435427 -> Some 3
-    | 268435428 -> Some 4
-    | 268435429 -> Some 5
-    | 268435430 -> Some 6
-    | 268435431 -> Some 7
-    | 268435432 -> Some 8
-    | 268435433 -> Some 11
-    | 268435434 -> Some 12
-    | 268435435 -> Some 14
-    | 268435436 -> Some 15
-    | 268435437 -> Some 16
-    | 268435438 -> Some 17
-    | 268435439 -> Some 18
-    | 268435440 -> Some 19
-    | 268435441 -> Some 20
-    | 268435442 -> Some 21
-    | 268435443 -> Some 23
-    | 268435444 -> Some 24
-    | 268435445 -> Some 25
-    | 268435446 -> Some 26
-    | 268435447 -> Some 27
-    | 268435448 -> Some 28
-    | 268435449 -> Some 29
-    | 268435450 -> Some 30
-    | 268435451 -> Some 31
-    | 268435452 -> Some 127
-    | 268435453 -> Some 220
-    | 268435454 -> Some 249
+    | 268435426 -> Some(2)
+    | 268435427 -> Some(3)
+    | 268435428 -> Some(4)
+    | 268435429 -> Some(5)
+    | 268435430 -> Some(6)
+    | 268435431 -> Some(7)
+    | 268435432 -> Some(8)
+    | 268435433 -> Some(11)
+    | 268435434 -> Some(12)
+    | 268435435 -> Some(14)
+    | 268435436 -> Some(15)
+    | 268435437 -> Some(16)
+    | 268435438 -> Some(17)
+    | 268435439 -> Some(18)
+    | 268435440 -> Some(19)
+    | 268435441 -> Some(20)
+    | 268435442 -> Some(21)
+    | 268435443 -> Some(23)
+    | 268435444 -> Some(24)
+    | 268435445 -> Some(25)
+    | 268435446 -> Some(26)
+    | 268435447 -> Some(27)
+    | 268435448 -> Some(28)
+    | 268435449 -> Some(29)
+    | 268435450 -> Some(30)
+    | 268435451 -> Some(31)
+    | 268435452 -> Some(127)
+    | 268435453 -> Some(220)
+    | 268435454 -> Some(249)
     | _ -> None
   | 30 ->
     match code with
-    | 1073741820 -> Some 10
-    | 1073741821 -> Some 13
-    | 1073741822 -> Some 22
-    | 1073741823 -> Some 256
+    | 1073741820 -> Some(10)
+    | 1073741821 -> Some(13)
+    | 1073741822 -> Some(22)
+    | 1073741823 -> Some(256)
     | _ -> None
   | _ -> None
 
-let __huffman (data: Blob) (bit: Int64) (code: Int64) (length: Int64)
-  (bytes: List<Int64>) (count: Int64) : Stdlib.Result.Result<Blob, String> =
-  if bit == Stdlib.Blob.__byteLength data * 8 then
-    if length == 0 || (length <= 7 && code == Stdlib.__Hpack.__pow2 length - 1) then
-      Ok (Stdlib.Blob.__fromInt64List (Stdlib.List.reverse bytes))
-    else Error "Invalid HPACK Huffman padding"
-  else if length >= 30 then Error "Invalid HPACK Huffman code"
+let __huffman(data: Blob, bit: Int64, code: Int64, length: Int64, bytes: List<Int64>, count: Int64): Stdlib.Result.Result<Blob, String> =
+  if bit == Stdlib.Blob.__byteLength(data) * 8 then
+    if length == 0 || (length <= 7 && code == Stdlib.__Hpack.__pow2(length) - 1) then
+      Ok(Stdlib.Blob.__fromInt64List(Stdlib.List.reverse(bytes)))
+    else Error("Invalid HPACK Huffman padding")
+  else if length >= 30 then Error("Invalid HPACK Huffman code")
   else
-    let byte = Stdlib.Blob.__getByte data (bit / 8) in
-    let nextCode = code * 2 + (byte / Stdlib.__Hpack.__pow2 (7 - bit % 8)) % 2 in
+    let byte = Stdlib.Blob.__getByte(data, bit / 8) in
+    let nextCode = code * 2 + (byte / Stdlib.__Hpack.__pow2(7 - bit % 8)) % 2 in
     let nextLength = length + 1 in
-    match Stdlib.__Hpack.__huffmanSymbol nextLength nextCode with
-    | None -> Stdlib.__Hpack.__huffman data (bit + 1) nextCode nextLength bytes count
-    | Some symbol ->
-      if symbol == 256 then Error "HPACK Huffman EOS in string"
-      else if count >= 65536 then Error "HPACK string too large"
-      else Stdlib.__Hpack.__huffman data (bit + 1) 0 0 (Stdlib.List.push bytes symbol) (count + 1)
+    match Stdlib.__Hpack.__huffmanSymbol(nextLength, nextCode) with
+    | None -> Stdlib.__Hpack.__huffman(data, bit + 1, nextCode, nextLength, bytes, count)
+    | Some(symbol) ->
+      if symbol == 256 then Error("HPACK Huffman EOS in string")
+      else if count >= 65536 then Error("HPACK string too large")
+      else Stdlib.__Hpack.__huffman(data, bit + 1, 0, 0, Stdlib.List.push(bytes, symbol), count + 1)
 
-let text (data: Blob) (position: Int64) : Stdlib.Result.Result<Stdlib.__Hpack.Text, String> =
-  match Stdlib.__Hpack.integer data position 7 with
-  | Error message -> Error message
-  | Ok number ->
-    if number.value > 65536 then Error "HPACK string too large"
-    else if number.next + number.value > Stdlib.Blob.__byteLength data then Error "Truncated HPACK string"
+let text(data: Blob, position: Int64): Stdlib.Result.Result<Stdlib.__Hpack.Text, String> =
+  match Stdlib.__Hpack.integer(data, position, 7) with
+  | Error(message) -> Error(message)
+  | Ok(number) ->
+    if number.value > 65536 then Error("HPACK string too large")
+    else if number.next + number.value > Stdlib.Blob.__byteLength(data) then Error("Truncated HPACK string")
     else
-      let encoded = Stdlib.__Http2Wire.__slice data number.next number.value in
-      let bytes = if Stdlib.Blob.__getByte data position >= 128 then
-                    Stdlib.__Hpack.__huffman encoded 0 0 0 [] 0
-                  else Ok encoded in
+      let encoded = Stdlib.__Http2Wire.__slice(data, number.next, number.value) in
+      let bytes = if Stdlib.Blob.__getByte(data, position) >= 128 then
+                    Stdlib.__Hpack.__huffman(encoded, 0, 0, 0, [], 0)
+                  else Ok(encoded) in
       match bytes with
-      | Error message -> Error message
-      | Ok decoded ->
-        match Stdlib.Blob.toString decoded with
-        | Error _ -> Error "Invalid UTF-8 in HTTP header"
-        | Ok value -> Ok (Stdlib.__Hpack.Text { value = value, next = number.next + number.value })
+      | Error(message) -> Error(message)
+      | Ok(decoded) ->
+        match Stdlib.Blob.toString(decoded) with
+        | Error(_) -> Error("Invalid UTF-8 in HTTP header")
+        | Ok(value) -> Ok(Stdlib.__Hpack.Text { value = value, next = number.next + number.value })
 
-let __entrySize (entry: (String * String)) : Int64 =
+let __entrySize(entry: (String * String)): Int64 =
   let (name, value) = entry in
-  32 + Stdlib.String.__byteLength name + Stdlib.String.__byteLength value
+  32 + Stdlib.String.__byteLength(name) + Stdlib.String.__byteLength(value)
 
-let checkFieldBudget (fields: List<(String * String)>) (remaining: Int64) : Stdlib.Result.Result<Unit, String> =
+let checkFieldBudget(fields: List<(String * String)>, remaining: Int64): Stdlib.Result.Result<Unit, String> =
   match fields with
-  | [] -> Ok ()
+  | [] -> Ok()
   | field :: rest ->
-    let size = Stdlib.__Hpack.__entrySize field in
-    if size > remaining then Error "Header field-section limit exceeded"
-    else Stdlib.__Hpack.checkFieldBudget rest (remaining - size)
+    let size = Stdlib.__Hpack.__entrySize(field) in
+    if size > remaining then Error("Header field-section limit exceeded")
+    else Stdlib.__Hpack.checkFieldBudget(rest, remaining - size)
 
-let __retain (entries: List<(String * String)>) (remaining: Int64) : List<(String * String)> =
+let __retain(entries: List<(String * String)>, remaining: Int64): List<(String * String)> =
   match entries with
   | [] -> []
   | entry :: rest ->
-    let size = Stdlib.__Hpack.__entrySize entry in
+    let size = Stdlib.__Hpack.__entrySize(entry) in
     if size > remaining then []
-    else Stdlib.List.push (Stdlib.__Hpack.__retain rest (remaining - size)) entry
+    else Stdlib.List.push(Stdlib.__Hpack.__retain(rest, remaining - size), entry)
 
-let __add (state: Stdlib.__Hpack.State) (entry: (String * String)) : Stdlib.__Hpack.State =
-  Stdlib.__Hpack.State { entries = Stdlib.__Hpack.__retain (Stdlib.List.push state.entries entry) state.limit, limit = state.limit }
+let __add(state: Stdlib.__Hpack.State, entry: (String * String)): Stdlib.__Hpack.State =
+  Stdlib.__Hpack.State { entries = Stdlib.__Hpack.__retain(Stdlib.List.push(state.entries, entry), state.limit), limit = state.limit }
 
-let __decode (state: Stdlib.__Hpack.State) (data: Blob) (position: Int64)
-  (headers: List<(String * String)>) (size: Int64) (count: Int64)
-  : Stdlib.Result.Result<Stdlib.__Hpack.Decoded, String> =
-  if position == Stdlib.Blob.__byteLength data then
-    Ok (Stdlib.__Hpack.Decoded { headers = Stdlib.List.reverse headers, state = state })
-  else if count >= 256 || size > 65536 then Error "HPACK header list too large"
+let __decode(state: Stdlib.__Hpack.State, data: Blob, position: Int64, headers: List<(String * String)>, size: Int64, count: Int64): Stdlib.Result.Result<Stdlib.__Hpack.Decoded, String> =
+  if position == Stdlib.Blob.__byteLength(data) then
+    Ok(Stdlib.__Hpack.Decoded { headers = Stdlib.List.reverse(headers), state = state })
+  else if count >= 256 || size > 65536 then Error("HPACK header list too large")
   else
-    let first = Stdlib.Blob.__getByte data position in
+    let first = Stdlib.Blob.__getByte(data, position) in
     if first >= 128 then
-      match Stdlib.__Hpack.integer data position 7 with
-      | Error message -> Error message
-      | Ok number ->
-        match Stdlib.__Hpack.__lookup state number.value with
-        | None -> Error "Invalid HPACK index"
-        | Some entry ->
-          let nextSize = size + Stdlib.__Hpack.__entrySize entry in
-          if nextSize > 65536 then Error "HPACK header list too large"
-          else Stdlib.__Hpack.__decode state data number.next (Stdlib.List.push headers entry) nextSize (count + 1)
+      match Stdlib.__Hpack.integer(data, position, 7) with
+      | Error(message) -> Error(message)
+      | Ok(number) ->
+        match Stdlib.__Hpack.__lookup(state, number.value) with
+        | None -> Error("Invalid HPACK index")
+        | Some(entry) ->
+          let nextSize = size + Stdlib.__Hpack.__entrySize(entry) in
+          if nextSize > 65536 then Error("HPACK header list too large")
+          else Stdlib.__Hpack.__decode(state, data, number.next, Stdlib.List.push(headers, entry), nextSize, count + 1)
     else if first >= 32 && first < 64 then
-      if count != 0 then Error "HPACK table update after a header"
+      if count != 0 then Error("HPACK table update after a header")
       else
-        match Stdlib.__Hpack.integer data position 5 with
-        | Error message -> Error message
-        | Ok number ->
-          if number.value > 4096 then Error "HPACK table exceeds advertised limit"
+        match Stdlib.__Hpack.integer(data, position, 5) with
+        | Error(message) -> Error(message)
+        | Ok(number) ->
+          if number.value > 4096 then Error("HPACK table exceeds advertised limit")
           else
             let nextState = Stdlib.__Hpack.State {
-              entries = Stdlib.__Hpack.__retain state.entries number.value, limit = number.value } in
-            Stdlib.__Hpack.__decode nextState data number.next headers size count
+              entries = Stdlib.__Hpack.__retain(state.entries, number.value), limit = number.value } in
+            Stdlib.__Hpack.__decode(nextState, data, number.next, headers, size, count)
     else
       let indexed = first >= 64 in
       let prefix = if indexed then 6 else 4 in
-      match Stdlib.__Hpack.integer data position prefix with
-      | Error message -> Error message
-      | Ok number ->
+      match Stdlib.__Hpack.integer(data, position, prefix) with
+      | Error(message) -> Error(message)
+      | Ok(number) ->
         let name =
-          if number.value == 0 then Stdlib.__Hpack.text data number.next
+          if number.value == 0 then Stdlib.__Hpack.text(data, number.next)
           else
-            match Stdlib.__Hpack.__lookup state number.value with
-            | None -> Error "Invalid HPACK index"
-            | Some entry ->
+            match Stdlib.__Hpack.__lookup(state, number.value) with
+            | None -> Error("Invalid HPACK index")
+            | Some(entry) ->
               let (name, _) = entry in
-              Ok (Stdlib.__Hpack.Text { value = name, next = number.next }) in
+              Ok(Stdlib.__Hpack.Text { value = name, next = number.next }) in
         match name with
-        | Error message -> Error message
-        | Ok name ->
-          match Stdlib.__Hpack.text data name.next with
-          | Error message -> Error message
-          | Ok value ->
+        | Error(message) -> Error(message)
+        | Ok(name) ->
+          match Stdlib.__Hpack.text(data, name.next) with
+          | Error(message) -> Error(message)
+          | Ok(value) ->
             let entry = (name.value, value.value) in
-            let nextSize = size + Stdlib.__Hpack.__entrySize entry in
-            if nextSize > 65536 then Error "HPACK header list too large"
+            let nextSize = size + Stdlib.__Hpack.__entrySize(entry) in
+            if nextSize > 65536 then Error("HPACK header list too large")
             else
-              let nextState = if indexed then Stdlib.__Hpack.__add state entry else state in
-              Stdlib.__Hpack.__decode nextState data value.next (Stdlib.List.push headers entry) nextSize (count + 1)
+              let nextState = if indexed then Stdlib.__Hpack.__add(state, entry) else state in
+              Stdlib.__Hpack.__decode(nextState, data, value.next, Stdlib.List.push(headers, entry), nextSize, count + 1)
 
-let decode (state: Stdlib.__Hpack.State) (data: Blob) : Stdlib.Result.Result<Stdlib.__Hpack.Decoded, String> =
-  if state.limit < 0 || state.limit > 4096 || Stdlib.Blob.__byteLength data > 65536 then
-    Error "Invalid HPACK decoder bounds"
-  else Stdlib.__Hpack.__decode state data 0 [] 0 0
+let decode(state: Stdlib.__Hpack.State, data: Blob): Stdlib.Result.Result<Stdlib.__Hpack.Decoded, String> =
+  if state.limit < 0 || state.limit > 4096 || Stdlib.Blob.__byteLength(data) > 65536 then
+    Error("Invalid HPACK decoder bounds")
+  else Stdlib.__Hpack.__decode(state, data, 0, [], 0, 0)
 
-let __encodeRest (value: Int64) : List<Int64> =
+let __encodeRest(value: Int64): List<Int64> =
   if value < 128 then [value]
-  else Stdlib.List.push (Stdlib.__Hpack.__encodeRest (value / 128)) (128 + value % 128)
+  else Stdlib.List.push(Stdlib.__Hpack.__encodeRest(value / 128), 128 + value % 128)
 
-let encodeInteger (prefix: Int64) (flags: Int64) (value: Int64) : Blob =
-  let mask = Stdlib.__Hpack.__pow2 prefix - 1 in
-  if value < mask then Stdlib.Blob.__fromInt64List [flags + value]
-  else Stdlib.Blob.__fromInt64List (Stdlib.List.push (Stdlib.__Hpack.__encodeRest (value - mask)) (flags + mask))
+let encodeInteger(prefix: Int64, flags: Int64, value: Int64): Blob =
+  let mask = Stdlib.__Hpack.__pow2(prefix) - 1 in
+  if value < mask then Stdlib.Blob.__fromInt64List([flags + value])
+  else Stdlib.Blob.__fromInt64List(Stdlib.List.push(Stdlib.__Hpack.__encodeRest(value - mask), flags + mask))
 
 // RFC 7541 Appendix B, inverse of the decoding table above.
-let __huffmanCode (byte: Int64) : (Int64 * Int64) =
+let __huffmanCode(byte: Int64): (Int64 * Int64) =
   match byte with
   | 0 -> (8184, 13)
   | 1 -> (8388568, 23)
@@ -822,123 +817,122 @@ let __huffmanCode (byte: Int64) : (Int64 * Int64) =
   | 253 -> (134217711, 27)
   | 254 -> (134217712, 27)
   | 255 -> (67108846, 26)
-  | _ -> Builtin.crash "Invalid byte in HTTP Huffman encoder"
+  | _ -> Builtin.crash("Invalid byte in HTTP Huffman encoder")
 
-let __emitHuffman (bits: Int64) (length: Int64) (output: List<Int64>) : (Int64 * Int64 * List<Int64>) =
+let __emitHuffman(bits: Int64, length: Int64, output: List<Int64>): (Int64 * Int64 * List<Int64>) =
   if length < 8 then (bits, length, output)
   else
-    let factor = Stdlib.__Hpack.__pow2 (length - 8) in
-    Stdlib.__Hpack.__emitHuffman (bits % factor) (length - 8) (Stdlib.List.push output (bits / factor))
+    let factor = Stdlib.__Hpack.__pow2(length - 8) in
+    Stdlib.__Hpack.__emitHuffman(bits % factor, length - 8, Stdlib.List.push(output, bits / factor))
 
-let __encodeHuffman (bytes: Blob) (position: Int64) (bits: Int64) (length: Int64) (output: List<Int64>) : Blob =
-  if position == Stdlib.Blob.__byteLength bytes then
+let __encodeHuffman(bytes: Blob, position: Int64, bits: Int64, length: Int64, output: List<Int64>): Blob =
+  if position == Stdlib.Blob.__byteLength(bytes) then
     let output = if length == 0 then output else
-      let padding = Stdlib.__Hpack.__pow2 (8 - length) in
-      Stdlib.List.push output (bits * padding + padding - 1) in
-    Stdlib.Blob.__fromInt64List (Stdlib.List.reverse output)
+      let padding = Stdlib.__Hpack.__pow2(8 - length) in
+      Stdlib.List.push(output, bits * padding + padding - 1) in
+    Stdlib.Blob.__fromInt64List(Stdlib.List.reverse(output))
   else
-    let (code, width) = Stdlib.__Hpack.__huffmanCode (Stdlib.Blob.__getByte bytes position) in
-    let (nextBits, nextLength, nextOutput) = Stdlib.__Hpack.__emitHuffman (bits * Stdlib.__Hpack.__pow2 width + code) (length + width) output in
-    Stdlib.__Hpack.__encodeHuffman bytes (position + 1) nextBits nextLength nextOutput
+    let (code, width) = Stdlib.__Hpack.__huffmanCode(Stdlib.Blob.__getByte(bytes, position)) in
+    let (nextBits, nextLength, nextOutput) = Stdlib.__Hpack.__emitHuffman(bits * Stdlib.__Hpack.__pow2(width) + code, length + width, output) in
+    Stdlib.__Hpack.__encodeHuffman(bytes, position + 1, nextBits, nextLength, nextOutput)
 
-let __sensitive (name: String) : Bool =
+let __sensitive(name: String): Bool =
   name == "authorization" || name == "proxy-authorization" || name == "cookie" || name == "set-cookie"
 
-let __staticIndex (name: String) (value: String) (exact: Bool) (index: Int64) : Stdlib.Option.Option<Int64> =
-  match Stdlib.__Hpack.__static index with
+let __staticIndex(name: String, value: String, exact: Bool, index: Int64): Stdlib.Option.Option<Int64> =
+  match Stdlib.__Hpack.__static(index) with
   | None -> None
-  | Some entry ->
+  | Some(entry) ->
     let (entryName, entryValue) = entry in
-    if entryName == name && (Stdlib.Bool.not exact || entryValue == value) then Some index
-    else Stdlib.__Hpack.__staticIndex name value exact (index + 1)
+    if entryName == name && (Stdlib.Bool.not(exact) || entryValue == value) then Some(index)
+    else Stdlib.__Hpack.__staticIndex(name, value, exact, index + 1)
 
-let encodeText (value: String) : Blob =
-  let raw = Stdlib.String.toBlob value in
-  let compressed = Stdlib.__Hpack.__encodeHuffman raw 0 0 0 [] in
-  let huffman = Stdlib.Blob.__byteLength compressed < Stdlib.Blob.__byteLength raw in
+let encodeText(value: String): Blob =
+  let raw = Stdlib.String.toBlob(value) in
+  let compressed = Stdlib.__Hpack.__encodeHuffman(raw, 0, 0, 0, []) in
+  let huffman = Stdlib.Blob.__byteLength(compressed) < Stdlib.Blob.__byteLength(raw) in
   let bytes = if huffman then compressed else raw in
-  Stdlib.Blob.concat [Stdlib.__Hpack.encodeInteger 7 (if huffman then 128 else 0) (Stdlib.Blob.__byteLength bytes), bytes]
+  Stdlib.Blob.concat([Stdlib.__Hpack.encodeInteger(7, (if huffman then 128 else 0), Stdlib.Blob.__byteLength(bytes)), bytes])
 
-let __encode (headers: List<(String * String)>) (size: Int64) (count: Int64)
-  (blocks: List<Blob>) : Stdlib.Result.Result<Blob, String> =
+let __encode(headers: List<(String * String)>, size: Int64, count: Int64, blocks: List<Blob>): Stdlib.Result.Result<Blob, String> =
   match headers with
-  | [] -> Ok (Stdlib.Blob.concat (Stdlib.List.reverse blocks))
+  | [] -> Ok(Stdlib.Blob.concat(Stdlib.List.reverse(blocks)))
   | entry :: rest ->
     let (name, value) = entry in
-    let nextSize = size + Stdlib.__Hpack.__entrySize entry in
-    if count >= 256 || nextSize > 65536 then Error "HPACK header list too large"
-    else if name == "" then Error "Empty HTTP header name"
+    let nextSize = size + Stdlib.__Hpack.__entrySize(entry) in
+    if count >= 256 || nextSize > 65536 then Error("HPACK header list too large")
+    else if name == "" then Error("Empty HTTP header name")
     else
-      let exact = if Stdlib.__Hpack.__sensitive name then None else Stdlib.__Hpack.__staticIndex name value true 1 in
+      let exact = if Stdlib.__Hpack.__sensitive(name) then None else Stdlib.__Hpack.__staticIndex(name, value, true, 1) in
       let encoded = match exact with
-      | Some index -> Stdlib.__Hpack.encodeInteger 7 128 index
+      | Some(index) -> Stdlib.__Hpack.encodeInteger(7, 128, index)
       | None ->
         // Name references still carry never-indexed values for sensitive fields.
-        let reference = match Stdlib.__Hpack.__staticIndex name value false 1 with
-        | Some index -> Stdlib.__Hpack.encodeInteger 4 16 index
-        | None -> Stdlib.Blob.concat [Stdlib.Blob.__fromInt64List [16], Stdlib.__Hpack.encodeText name] in
-        Stdlib.Blob.concat [reference, Stdlib.__Hpack.encodeText value] in
-      Stdlib.__Hpack.__encode rest nextSize (count + 1) (Stdlib.List.push blocks encoded)
+        let reference = match Stdlib.__Hpack.__staticIndex(name, value, false, 1) with
+        | Some(index) -> Stdlib.__Hpack.encodeInteger(4, 16, index)
+        | None -> Stdlib.Blob.concat([Stdlib.Blob.__fromInt64List([16]), Stdlib.__Hpack.encodeText(name)]) in
+        Stdlib.Blob.concat([reference, Stdlib.__Hpack.encodeText(value)]) in
+      Stdlib.__Hpack.__encode(rest, nextSize, count + 1, Stdlib.List.push(blocks, encoded))
 
-let encode (headers: List<(String * String)>) : Stdlib.Result.Result<Blob, String> =
-  Stdlib.__Hpack.__encode headers 0 0 []
+let encode(headers: List<(String * String)>): Stdlib.Result.Result<Blob, String> =
+  Stdlib.__Hpack.__encode(headers, 0, 0, [])
 
-let encoder () : Stdlib.__Hpack.Encoder =
-  Stdlib.__Hpack.Encoder { table = Stdlib.__Hpack.initial (), minimum = None }
+let encoder(): Stdlib.__Hpack.Encoder =
+  Stdlib.__Hpack.Encoder { table = Stdlib.__Hpack.initial(), minimum = None }
 
 // A bounded encoder may choose less capacity than the peer permits. Preserve
 // the smallest intermediate capacity so a shrink/grow cannot hide evictions.
-let resizeEncoder (state: Stdlib.__Hpack.Encoder) (maximum: Int64) : Stdlib.Result.Result<Stdlib.__Hpack.Encoder, String> =
-  if maximum < 0 || maximum > 4294967295 then Error "Invalid HPACK encoder capacity"
+let resizeEncoder(state: Stdlib.__Hpack.Encoder, maximum: Int64): Stdlib.Result.Result<Stdlib.__Hpack.Encoder, String> =
+  if maximum < 0 || maximum > 4294967295 then Error("Invalid HPACK encoder capacity")
   else
     let limit = if maximum > 4096 then 4096 else maximum in
-    if limit == state.table.limit then Ok state
+    if limit == state.table.limit then Ok(state)
     else
-      let minimum = match state.minimum with | Some value -> if value < limit then value else limit | None -> limit in
-      Ok (Stdlib.__Hpack.Encoder { table = Stdlib.__Hpack.State { entries = Stdlib.__Hpack.__retain state.table.entries limit, limit = limit }, minimum = Some minimum })
+      let minimum = match state.minimum with | Some(value) -> if value < limit then value else limit | None -> limit in
+      Ok(Stdlib.__Hpack.Encoder { table = Stdlib.__Hpack.State { entries = Stdlib.__Hpack.__retain(state.table.entries, limit), limit = limit }, minimum = Some(minimum) })
 
-let __dynamicIndex (entries: List<(String * String)>) (name: String) (value: String) (exact: Bool) (index: Int64) : Stdlib.Option.Option<Int64> =
+let __dynamicIndex(entries: List<(String * String)>, name: String, value: String, exact: Bool, index: Int64): Stdlib.Option.Option<Int64> =
   match entries with
   | [] -> None
   | entry :: rest ->
     let (entryName, entryValue) = entry in
-    if entryName == name && (Stdlib.Bool.not exact || entryValue == value) then Some index
-    else Stdlib.__Hpack.__dynamicIndex rest name value exact (index + 1)
+    if entryName == name && (Stdlib.Bool.not(exact) || entryValue == value) then Some(index)
+    else Stdlib.__Hpack.__dynamicIndex(rest, name, value, exact, index + 1)
 
-let __encoderIndex (table: Stdlib.__Hpack.State) (name: String) (value: String) (exact: Bool) : Stdlib.Option.Option<Int64> =
-  match Stdlib.__Hpack.__staticIndex name value exact 1 with
-  | Some index -> Some index
-  | None -> Stdlib.__Hpack.__dynamicIndex table.entries name value exact 62
+let __encoderIndex(table: Stdlib.__Hpack.State, name: String, value: String, exact: Bool): Stdlib.Option.Option<Int64> =
+  match Stdlib.__Hpack.__staticIndex(name, value, exact, 1) with
+  | Some(index) -> Some(index)
+  | None -> Stdlib.__Hpack.__dynamicIndex(table.entries, name, value, exact, 62)
 
-let __encodeDynamic (state: Stdlib.__Hpack.Encoder) (headers: List<(String * String)>) (size: Int64) (count: Int64) (blocks: List<Blob>) : Stdlib.Result.Result<Stdlib.__Hpack.Encoded, String> =
+let __encodeDynamic(state: Stdlib.__Hpack.Encoder, headers: List<(String * String)>, size: Int64, count: Int64, blocks: List<Blob>): Stdlib.Result.Result<Stdlib.__Hpack.Encoded, String> =
   match headers with
-  | [] -> Ok (Stdlib.__Hpack.Encoded { bytes = Stdlib.Blob.concat (Stdlib.List.reverse blocks), state = state })
+  | [] -> Ok(Stdlib.__Hpack.Encoded { bytes = Stdlib.Blob.concat(Stdlib.List.reverse(blocks)), state = state })
   | entry :: rest ->
     let (name, value) = entry in
-    let nextSize = size + Stdlib.__Hpack.__entrySize entry in
-    if name == "" then Error "Empty HTTP header name"
-    else if count >= 256 || nextSize > 65536 then Error "HPACK header list too large"
+    let nextSize = size + Stdlib.__Hpack.__entrySize(entry) in
+    if name == "" then Error("Empty HTTP header name")
+    else if count >= 256 || nextSize > 65536 then Error("HPACK header list too large")
     else
-      let sensitive = Stdlib.__Hpack.__sensitive name in
-      let exact = if sensitive then None else Stdlib.__Hpack.__encoderIndex state.table name value true in
-      let indexed = Stdlib.Bool.not sensitive && Stdlib.__Hpack.__entrySize entry <= state.table.limit in
+      let sensitive = Stdlib.__Hpack.__sensitive(name) in
+      let exact = if sensitive then None else Stdlib.__Hpack.__encoderIndex(state.table, name, value, true) in
+      let indexed = Stdlib.Bool.not(sensitive) && Stdlib.__Hpack.__entrySize(entry) <= state.table.limit in
       let bytes = match exact with
-      | Some index -> Stdlib.__Hpack.encodeInteger 7 128 index
+      | Some(index) -> Stdlib.__Hpack.encodeInteger(7, 128, index)
       | None ->
         let prefix = if indexed then 6 else 4 in
         let flags = if indexed then 64 else 16 in
-        let reference = match Stdlib.__Hpack.__encoderIndex state.table name value false with
-        | Some index -> Stdlib.__Hpack.encodeInteger prefix flags index
-        | None -> Stdlib.Blob.concat [Stdlib.__Hpack.encodeInteger prefix flags 0, Stdlib.__Hpack.encodeText name] in
-        Stdlib.Blob.concat [reference, Stdlib.__Hpack.encodeText value] in
-      let table = if indexed && Stdlib.Option.isNone exact then Stdlib.__Hpack.__add state.table entry else state.table in
-      Stdlib.__Hpack.__encodeDynamic { state with table = table } rest nextSize (count + 1) (Stdlib.List.push blocks bytes)
+        let reference = match Stdlib.__Hpack.__encoderIndex(state.table, name, value, false) with
+        | Some(index) -> Stdlib.__Hpack.encodeInteger(prefix, flags, index)
+        | None -> Stdlib.Blob.concat([Stdlib.__Hpack.encodeInteger(prefix, flags, 0), Stdlib.__Hpack.encodeText(name)]) in
+        Stdlib.Blob.concat([reference, Stdlib.__Hpack.encodeText(value)]) in
+      let table = if indexed && Stdlib.Option.isNone(exact) then Stdlib.__Hpack.__add(state.table, entry) else state.table in
+      Stdlib.__Hpack.__encodeDynamic({ state with table = table }, rest, nextSize, count + 1, Stdlib.List.push(blocks, bytes))
 
-let encodeDynamic (state: Stdlib.__Hpack.Encoder) (headers: List<(String * String)>) : Stdlib.Result.Result<Stdlib.__Hpack.Encoded, String> =
+let encodeDynamic(state: Stdlib.__Hpack.Encoder, headers: List<(String * String)>): Stdlib.Result.Result<Stdlib.__Hpack.Encoded, String> =
   let updates = match state.minimum with
   | None -> []
-  | Some minimum ->
-    if minimum == state.table.limit then [Stdlib.__Hpack.encodeInteger 5 32 minimum]
-    else [Stdlib.__Hpack.encodeInteger 5 32 state.table.limit, Stdlib.__Hpack.encodeInteger 5 32 minimum] in
-  Stdlib.__Hpack.__encodeDynamic { state with minimum = None } headers 0 0 updates
+  | Some(minimum) ->
+    if minimum == state.table.limit then [Stdlib.__Hpack.encodeInteger(5, 32, minimum)]
+    else [Stdlib.__Hpack.encodeInteger(5, 32, state.table.limit), Stdlib.__Hpack.encodeInteger(5, 32, minimum)] in
+  Stdlib.__Hpack.__encodeDynamic({ state with minimum = None }, headers, 0, 0, updates)
 

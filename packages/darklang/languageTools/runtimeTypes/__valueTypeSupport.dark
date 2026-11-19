@@ -4,14 +4,14 @@ module Darklang.LanguageTools.RuntimeTypes
 
 // ValueSearch constructs only an empty-argument custom-type query. Keep that
 // boundary explicit so a parameterized catalog type cannot match by hash alone.
-let __isCustomTypeWithNoTypeArguments (valueType: Darklang.LanguageTools.RuntimeTypes.ValueType) (expectedHash: String) : Bool =
+let __isCustomTypeWithNoTypeArguments(valueType: Darklang.LanguageTools.RuntimeTypes.ValueType, expectedHash: String): Bool =
     match valueType with
-    | Known knownType ->
+    | Known(knownType) ->
         match knownType with
-        | KTCustomType (fqTypeName, typeArguments) ->
+        | KTCustomType(fqTypeName, typeArguments) ->
             match fqTypeName with
-            | Package runtimeHash ->
-                Stdlib.List.__lengthInt typeArguments == 0z &&
-                Darklang.LanguageTools.RuntimeTypes.hashToString runtimeHash == expectedHash
+            | Package(runtimeHash) ->
+                Stdlib.List.__lengthInt(typeArguments) == 0z &&
+                Darklang.LanguageTools.RuntimeTypes.hashToString(runtimeHash) == expectedHash
         | _ -> false
     | _ -> false

@@ -14,236 +14,220 @@ type LadderState = {
   swap: Int64
 }
 
-let __at (limbs: List<Int64>) (index: Int64) : Int64 =
-  match Stdlib.List.__getAtInt limbs (Stdlib.Int.fromInt64 index) with
-  | Some limb -> limb
-  | None -> Builtin.crash "Invalid X25519 field shape"
+let __at(limbs: List<Int64>, index: Int64): Int64 =
+  match Stdlib.List.__getAtInt(limbs, Stdlib.Int.fromInt64(index)) with
+  | Some(limb) -> limb
+  | None -> Builtin.crash("Invalid X25519 field shape")
 
-let __field (limbs: List<Int64>) : Stdlib.__X25519.Field =
+let __field(limbs: List<Int64>): Stdlib.__X25519.Field =
   Stdlib.__X25519.Field { limbs = limbs }
 
-let __constant (value: Int64) : Stdlib.__X25519.Field =
-  Stdlib.__X25519.__field (Stdlib.List.push (Stdlib.List.repeatUnsafe 15z 0) value)
+let __constant(value: Int64): Stdlib.__X25519.Field =
+  Stdlib.__X25519.__field(Stdlib.List.push(Stdlib.List.repeatUnsafe(15z, 0), value))
 
-let __combine (left: Stdlib.__X25519.Field) (right: Stdlib.__X25519.Field)
-  (subtract: Bool) : Stdlib.__X25519.Field =
-  Stdlib.__X25519.__field
-    (Stdlib.List.map2Shortest left.limbs right.limbs
-      (fun a b -> if subtract then a - b else a + b))
+let __combine(left: Stdlib.__X25519.Field, right: Stdlib.__X25519.Field, subtract: Bool): Stdlib.__X25519.Field =
+  Stdlib.__X25519.__field(
+    Stdlib.List.map2Shortest(left.limbs, right.limbs,
+      fun(a, b) -> if subtract then a - b else a + b))
 
-let __add (left: Stdlib.__X25519.Field) (right: Stdlib.__X25519.Field)
-  : Stdlib.__X25519.Field =
-  Stdlib.__X25519.__combine left right false
+let __add(left: Stdlib.__X25519.Field, right: Stdlib.__X25519.Field): Stdlib.__X25519.Field =
+  Stdlib.__X25519.__combine(left, right, false)
 
-let __subtract (left: Stdlib.__X25519.Field) (right: Stdlib.__X25519.Field)
-  : Stdlib.__X25519.Field =
-  Stdlib.__X25519.__combine left right true
+let __subtract(left: Stdlib.__X25519.Field, right: Stdlib.__X25519.Field): Stdlib.__X25519.Field =
+  Stdlib.__X25519.__combine(left, right, true)
 
-let __convolution (left: List<Int64>) (right: List<Int64>)
-  (position: Int64) (index: Int64) (sum: Int64) : Int64 =
+let __convolution(left: List<Int64>, right: List<Int64>, position: Int64, index: Int64, sum: Int64): Int64 =
   if index == 16 then sum
   else
     let other = position - index in
     let next =
       if other < 0 || other >= 16 then sum
-      else sum + Stdlib.__X25519.__at left index * Stdlib.__X25519.__at right other in
-    Stdlib.__X25519.__convolution left right position (index + 1) next
+      else sum + Stdlib.__X25519.__at(left, index) * Stdlib.__X25519.__at(right, other) in
+    Stdlib.__X25519.__convolution(left, right, position, index + 1, next)
 
-let __productLimbs (left: List<Int64>) (right: List<Int64>)
-  (index: Int64) (acc: List<Int64>) : List<Int64> =
-  if index == 16 then Stdlib.List.reverse acc
+let __productLimbs(left: List<Int64>, right: List<Int64>, index: Int64, acc: List<Int64>): List<Int64> =
+  if index == 16 then Stdlib.List.reverse(acc)
   else
-    let low = Stdlib.__X25519.__convolution left right index 0 0 in
+    let low = Stdlib.__X25519.__convolution(left, right, index, 0, 0) in
     let high =
       if index == 15 then 0
-      else 38 * Stdlib.__X25519.__convolution left right (index + 16) 0 0 in
-    Stdlib.__X25519.__productLimbs left right (index + 1)
-      (Stdlib.List.push acc (low + high))
+      else 38 * Stdlib.__X25519.__convolution(left, right, index + 16, 0, 0) in
+    Stdlib.__X25519.__productLimbs(left, right, index + 1,
+      Stdlib.List.push(acc, low + high))
 
-let __carryLimbs (source: List<Int64>) (incoming: Int64)
-  (acc: List<Int64>) : List<Int64> =
+let __carryLimbs(source: List<Int64>, incoming: Int64, acc: List<Int64>): List<Int64> =
   match source with
   | [] ->
-      match Stdlib.List.reverse acc with
-      | [] -> Builtin.crash "Invalid X25519 field shape"
-      | head :: tail -> Stdlib.List.push tail (head + 38 * incoming)
+      match Stdlib.List.reverse(acc) with
+      | [] -> Builtin.crash("Invalid X25519 field shape")
+      | head :: tail -> Stdlib.List.push(tail, head + 38 * incoming)
   | limb :: rest ->
       let value = limb + incoming + 65536 in
-      let carry = (Stdlib.Int64.shiftRight value 16) - 1 in
-      let normalized = Stdlib.Int64.bitwiseAnd value 65535 in
-      Stdlib.__X25519.__carryLimbs rest carry (Stdlib.List.push acc normalized)
+      let carry = (Stdlib.Int64.shiftRight(value, 16)) - 1 in
+      let normalized = Stdlib.Int64.bitwiseAnd(value, 65535) in
+      Stdlib.__X25519.__carryLimbs(rest, carry, Stdlib.List.push(acc, normalized))
 
-let __carry (value: Stdlib.__X25519.Field) : Stdlib.__X25519.Field =
-  Stdlib.__X25519.__field (Stdlib.__X25519.__carryLimbs value.limbs 0 [])
+let __carry(value: Stdlib.__X25519.Field): Stdlib.__X25519.Field =
+  Stdlib.__X25519.__field(Stdlib.__X25519.__carryLimbs(value.limbs, 0, []))
 
-let __multiply (left: Stdlib.__X25519.Field) (right: Stdlib.__X25519.Field)
-  : Stdlib.__X25519.Field =
-  let product = Stdlib.__X25519.__field
-                  (Stdlib.__X25519.__productLimbs left.limbs right.limbs 0 []) in
-  Stdlib.__X25519.__carry (Stdlib.__X25519.__carry product)
+let __multiply(left: Stdlib.__X25519.Field, right: Stdlib.__X25519.Field): Stdlib.__X25519.Field =
+  let product = Stdlib.__X25519.__field(
+                  Stdlib.__X25519.__productLimbs(left.limbs, right.limbs, 0, [])) in
+  Stdlib.__X25519.__carry(Stdlib.__X25519.__carry(product))
 
-let __square (value: Stdlib.__X25519.Field) : Stdlib.__X25519.Field =
-  Stdlib.__X25519.__multiply value value
+let __square(value: Stdlib.__X25519.Field): Stdlib.__X25519.Field =
+  Stdlib.__X25519.__multiply(value, value)
 
-let __swapLimbs (left: List<Int64>) (right: List<Int64>)
-  (bit: Int64) (leftAcc: List<Int64>) (rightAcc: List<Int64>)
-  : (List<Int64> * List<Int64>) =
+let __swapLimbs(left: List<Int64>, right: List<Int64>, bit: Int64, leftAcc: List<Int64>, rightAcc: List<Int64>): (List<Int64> * List<Int64>) =
   match (left, right) with
-  | ([], []) -> (Stdlib.List.reverse leftAcc, Stdlib.List.reverse rightAcc)
+  | ([], []) -> (Stdlib.List.reverse(leftAcc), Stdlib.List.reverse(rightAcc))
   | (a :: restA, b :: restB) ->
       let mask = 0 - bit in
-      let difference = Stdlib.Int64.bitwiseAnd mask (Stdlib.Int64.bitwiseXor a b) in
-      Stdlib.__X25519.__swapLimbs restA restB bit
-        (Stdlib.List.push leftAcc (Stdlib.Int64.bitwiseXor a difference))
-        (Stdlib.List.push rightAcc (Stdlib.Int64.bitwiseXor b difference))
-  | _ -> Builtin.crash "Invalid X25519 field shape"
+      let difference = Stdlib.Int64.bitwiseAnd(mask, Stdlib.Int64.bitwiseXor(a, b)) in
+      Stdlib.__X25519.__swapLimbs(restA, restB, bit,
+        Stdlib.List.push(leftAcc, Stdlib.Int64.bitwiseXor(a, difference)),
+        Stdlib.List.push(rightAcc, Stdlib.Int64.bitwiseXor(b, difference)))
+  | _ -> Builtin.crash("Invalid X25519 field shape")
 
-let __swap (left: Stdlib.__X25519.Field) (right: Stdlib.__X25519.Field)
-  (bit: Int64) : (Stdlib.__X25519.Field * Stdlib.__X25519.Field) =
-  let (a, b) = Stdlib.__X25519.__swapLimbs left.limbs right.limbs bit [] [] in
-  (Stdlib.__X25519.__field a, Stdlib.__X25519.__field b)
+let __swap(left: Stdlib.__X25519.Field, right: Stdlib.__X25519.Field, bit: Int64): (Stdlib.__X25519.Field * Stdlib.__X25519.Field) =
+  let (a, b) = Stdlib.__X25519.__swapLimbs(left.limbs, right.limbs, bit, [], []) in
+  (Stdlib.__X25519.__field(a), Stdlib.__X25519.__field(b))
 
-let __scalarByte (scalar: Blob) (index: Int64) : Int64 =
-  let byte = Stdlib.Blob.__getByte scalar index in
-  if index == 0 then Stdlib.Int64.bitwiseAnd byte 248
+let __scalarByte(scalar: Blob, index: Int64): Int64 =
+  let byte = Stdlib.Blob.__getByte(scalar, index) in
+  if index == 0 then Stdlib.Int64.bitwiseAnd(byte, 248)
   else if index == 31 then
-    Stdlib.Int64.bitwiseOr (Stdlib.Int64.bitwiseAnd byte 127) 64
+    Stdlib.Int64.bitwiseOr(Stdlib.Int64.bitwiseAnd(byte, 127), 64)
   else byte
 
-let __scalarBit (scalar: Blob) (bit: Int64) : Int64 =
-  Stdlib.Int64.bitwiseAnd
-    (Stdlib.Int64.shiftRight
-      (Stdlib.__X25519.__scalarByte scalar (bit / 8)) (bit % 8)) 1
+let __scalarBit(scalar: Blob, bit: Int64): Int64 =
+  Stdlib.Int64.bitwiseAnd(
+    Stdlib.Int64.shiftRight(
+      Stdlib.__X25519.__scalarByte(scalar, bit / 8), bit % 8), 1)
 
-let __unpack (coordinate: Blob) (index: Int64)
-  (acc: List<Int64>) : Stdlib.__X25519.Field =
-  if index == 16 then Stdlib.__X25519.__field (Stdlib.List.reverse acc)
+let __unpack(coordinate: Blob, index: Int64, acc: List<Int64>): Stdlib.__X25519.Field =
+  if index == 16 then Stdlib.__X25519.__field(Stdlib.List.reverse(acc))
   else
-    let value = Stdlib.Blob.__getByte coordinate (index * 2) +
-                256 * Stdlib.Blob.__getByte coordinate (index * 2 + 1) in
-    let limb = if index == 15 then Stdlib.Int64.bitwiseAnd value 32767 else value in
-    Stdlib.__X25519.__unpack coordinate (index + 1) (Stdlib.List.push acc limb)
+    let value = Stdlib.Blob.__getByte(coordinate, index * 2) +
+                256 * Stdlib.Blob.__getByte(coordinate, index * 2 + 1) in
+    let limb = if index == 15 then Stdlib.Int64.bitwiseAnd(value, 32767) else value in
+    Stdlib.__X25519.__unpack(coordinate, index + 1, Stdlib.List.push(acc, limb))
 
-let __ladder (scalar: Blob) (coordinate: Stdlib.__X25519.Field)
-  (bit: Int64) (state: Stdlib.__X25519.LadderState) : Stdlib.__X25519.LadderState =
+let __ladder(scalar: Blob, coordinate: Stdlib.__X25519.Field, bit: Int64, state: Stdlib.__X25519.LadderState): Stdlib.__X25519.LadderState =
   if bit < 0 then
-    let (x2, x3) = Stdlib.__X25519.__swap state.x2 state.x3 state.swap in
-    let (z2, z3) = Stdlib.__X25519.__swap state.z2 state.z3 state.swap in
+    let (x2, x3) = Stdlib.__X25519.__swap(state.x2, state.x3, state.swap) in
+    let (z2, z3) = Stdlib.__X25519.__swap(state.z2, state.z3, state.swap) in
     Stdlib.__X25519.LadderState { x2 = x2, z2 = z2, x3 = x3, z3 = z3, swap = 0 }
   else
-    let scalarBit = Stdlib.__X25519.__scalarBit scalar bit in
-    let swapBit = Stdlib.Int64.bitwiseXor state.swap scalarBit in
-    let (x2, x3) = Stdlib.__X25519.__swap state.x2 state.x3 swapBit in
-    let (z2, z3) = Stdlib.__X25519.__swap state.z2 state.z3 swapBit in
-    let a = Stdlib.__X25519.__add x2 z2 in
-    let aa = Stdlib.__X25519.__square a in
-    let b = Stdlib.__X25519.__subtract x2 z2 in
-    let bb = Stdlib.__X25519.__square b in
-    let e = Stdlib.__X25519.__subtract aa bb in
-    let c = Stdlib.__X25519.__add x3 z3 in
-    let d = Stdlib.__X25519.__subtract x3 z3 in
-    let da = Stdlib.__X25519.__multiply d a in
-    let cb = Stdlib.__X25519.__multiply c b in
-    let sum = Stdlib.__X25519.__add da cb in
-    let difference = Stdlib.__X25519.__subtract da cb in
+    let scalarBit = Stdlib.__X25519.__scalarBit(scalar, bit) in
+    let swapBit = Stdlib.Int64.bitwiseXor(state.swap, scalarBit) in
+    let (x2, x3) = Stdlib.__X25519.__swap(state.x2, state.x3, swapBit) in
+    let (z2, z3) = Stdlib.__X25519.__swap(state.z2, state.z3, swapBit) in
+    let a = Stdlib.__X25519.__add(x2, z2) in
+    let aa = Stdlib.__X25519.__square(a) in
+    let b = Stdlib.__X25519.__subtract(x2, z2) in
+    let bb = Stdlib.__X25519.__square(b) in
+    let e = Stdlib.__X25519.__subtract(aa, bb) in
+    let c = Stdlib.__X25519.__add(x3, z3) in
+    let d = Stdlib.__X25519.__subtract(x3, z3) in
+    let da = Stdlib.__X25519.__multiply(d, a) in
+    let cb = Stdlib.__X25519.__multiply(c, b) in
+    let sum = Stdlib.__X25519.__add(da, cb) in
+    let difference = Stdlib.__X25519.__subtract(da, cb) in
     let next = Stdlib.__X25519.LadderState {
-      x2 = Stdlib.__X25519.__multiply aa bb,
-      z2 = Stdlib.__X25519.__multiply e
-             (Stdlib.__X25519.__add aa
-               (Stdlib.__X25519.__multiply (Stdlib.__X25519.__constant 121665) e)),
-      x3 = Stdlib.__X25519.__square sum,
-      z3 = Stdlib.__X25519.__multiply coordinate (Stdlib.__X25519.__square difference),
+      x2 = Stdlib.__X25519.__multiply(aa, bb),
+      z2 = Stdlib.__X25519.__multiply(e,
+             Stdlib.__X25519.__add(aa,
+               Stdlib.__X25519.__multiply(Stdlib.__X25519.__constant(121665), e))),
+      x3 = Stdlib.__X25519.__square(sum),
+      z3 = Stdlib.__X25519.__multiply(coordinate, Stdlib.__X25519.__square(difference)),
       swap = scalarBit } in
-    Stdlib.__X25519.__ladder scalar coordinate (bit - 1) next
+    Stdlib.__X25519.__ladder(scalar, coordinate, bit - 1, next)
 
-let __invert (value: Stdlib.__X25519.Field) (bit: Int64)
-  (acc: Stdlib.__X25519.Field) : Stdlib.__X25519.Field =
+let __invert(value: Stdlib.__X25519.Field, bit: Int64, acc: Stdlib.__X25519.Field): Stdlib.__X25519.Field =
   if bit < 0 then acc
   else
-    let squared = Stdlib.__X25519.__square acc in
+    let squared = Stdlib.__X25519.__square(acc) in
     let next =
       if bit == 2 || bit == 4 then squared
-      else Stdlib.__X25519.__multiply squared value in
-    Stdlib.__X25519.__invert value (bit - 1) next
+      else Stdlib.__X25519.__multiply(squared, value) in
+    Stdlib.__X25519.__invert(value, bit - 1, next)
 
-let __subtractPrime (source: List<Int64>) (index: Int64)
-  (borrow: Int64) (acc: List<Int64>) : (List<Int64> * Int64) =
+let __subtractPrime(source: List<Int64>, index: Int64, borrow: Int64, acc: List<Int64>): (List<Int64> * Int64) =
   match source with
-  | [] -> (Stdlib.List.reverse acc, borrow)
+  | [] -> (Stdlib.List.reverse(acc), borrow)
   | limb :: rest ->
       let primeLimb =
         if index == 0 then 65517
         else if index == 15 then 32767
         else 65535 in
       let difference = limb - primeLimb - borrow in
-      let nextBorrow = Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight difference 63) 1 in
-      Stdlib.__X25519.__subtractPrime rest (index + 1) nextBorrow
-        (Stdlib.List.push acc (Stdlib.Int64.bitwiseAnd difference 65535))
+      let nextBorrow = Stdlib.Int64.bitwiseAnd(Stdlib.Int64.shiftRight(difference, 63), 1) in
+      Stdlib.__X25519.__subtractPrime(rest, index + 1, nextBorrow,
+        Stdlib.List.push(acc, Stdlib.Int64.bitwiseAnd(difference, 65535)))
 
-let __choose (original: List<Int64>) (candidate: List<Int64>)
-  (chooseCandidate: Int64) : List<Int64> =
-  Stdlib.List.map2Shortest original candidate (fun old replacement ->
+let __choose(original: List<Int64>, candidate: List<Int64>, chooseCandidate: Int64): List<Int64> =
+  Stdlib.List.map2Shortest(original, candidate, fun(old, replacement) ->
     let mask = 0 - chooseCandidate in
-    Stdlib.Int64.bitwiseXor old
-      (Stdlib.Int64.bitwiseAnd mask (Stdlib.Int64.bitwiseXor old replacement)))
+    Stdlib.Int64.bitwiseXor(old,
+      Stdlib.Int64.bitwiseAnd(mask, Stdlib.Int64.bitwiseXor(old, replacement))))
 
-let __reduce (source: List<Int64>) : List<Int64> =
-  let (candidate, borrow) = Stdlib.__X25519.__subtractPrime source 0 0 [] in
-  Stdlib.__X25519.__choose source candidate (1 - borrow)
+let __reduce(source: List<Int64>): List<Int64> =
+  let (candidate, borrow) = Stdlib.__X25519.__subtractPrime(source, 0, 0, []) in
+  Stdlib.__X25519.__choose(source, candidate, 1 - borrow)
 
-let __packBytes (limbs: List<Int64>) (acc: List<Int64>) : Blob =
+let __packBytes(limbs: List<Int64>, acc: List<Int64>): Blob =
   match limbs with
-  | [] -> Stdlib.Blob.__fromInt64List (Stdlib.List.reverse acc)
+  | [] -> Stdlib.Blob.__fromInt64List(Stdlib.List.reverse(acc))
   | limb :: rest ->
-      Stdlib.__X25519.__packBytes rest
-        (Stdlib.List.push (Stdlib.List.push acc (Stdlib.Int64.bitwiseAnd limb 255))
-          (Stdlib.Int64.bitwiseAnd (Stdlib.Int64.shiftRight limb 8) 255))
+      Stdlib.__X25519.__packBytes(rest,
+        Stdlib.List.push(Stdlib.List.push(acc, Stdlib.Int64.bitwiseAnd(limb, 255)),
+          Stdlib.Int64.bitwiseAnd(Stdlib.Int64.shiftRight(limb, 8), 255)))
 
-let __pack (value: Stdlib.__X25519.Field) : Blob =
-  let carried = Stdlib.__X25519.__carry
-                  (Stdlib.__X25519.__carry (Stdlib.__X25519.__carry value)) in
-  Stdlib.__X25519.__packBytes
-    (Stdlib.__X25519.__reduce (Stdlib.__X25519.__reduce carried.limbs)) []
+let __pack(value: Stdlib.__X25519.Field): Blob =
+  let carried = Stdlib.__X25519.__carry(
+                  Stdlib.__X25519.__carry(Stdlib.__X25519.__carry(value))) in
+  Stdlib.__X25519.__packBytes(
+    Stdlib.__X25519.__reduce(Stdlib.__X25519.__reduce(carried.limbs)), [])
 
-let __orBytes (blob: Blob) (index: Int64) (acc: Int64) : Int64 =
+let __orBytes(blob: Blob, index: Int64, acc: Int64): Int64 =
   if index == 32 then acc
-  else Stdlib.__X25519.__orBytes blob (index + 1)
-         (Stdlib.Int64.bitwiseOr acc (Stdlib.Blob.__getByte blob index))
+  else Stdlib.__X25519.__orBytes(blob, index + 1,
+         Stdlib.Int64.bitwiseOr(acc, Stdlib.Blob.__getByte(blob, index)))
 
-let __multiplyPoint (scalar: Blob) (coordinate: Stdlib.__X25519.Field) : Blob =
+let __multiplyPoint(scalar: Blob, coordinate: Stdlib.__X25519.Field): Blob =
   let initial = Stdlib.__X25519.LadderState {
-    x2 = Stdlib.__X25519.__constant 1,
-    z2 = Stdlib.__X25519.__constant 0,
+    x2 = Stdlib.__X25519.__constant(1),
+    z2 = Stdlib.__X25519.__constant(0),
     x3 = coordinate,
-    z3 = Stdlib.__X25519.__constant 1,
+    z3 = Stdlib.__X25519.__constant(1),
     swap = 0 } in
-  let result = Stdlib.__X25519.__ladder scalar coordinate 254 initial in
-  let inverse = Stdlib.__X25519.__invert result.z2 253 result.z2 in
-  Stdlib.__X25519.__pack (Stdlib.__X25519.__multiply result.x2 inverse)
+  let result = Stdlib.__X25519.__ladder(scalar, coordinate, 254, initial) in
+  let inverse = Stdlib.__X25519.__invert(result.z2, 253, result.z2) in
+  Stdlib.__X25519.__pack(Stdlib.__X25519.__multiply(result.x2, inverse))
 
-let publicKey (privateScalar: Blob) : Stdlib.Result.Result<Blob, String> =
-  if Stdlib.Blob.__byteLength privateScalar != 32 then
-    Error "X25519 scalar must be 32 bytes"
-  else Ok (Stdlib.__X25519.__multiplyPoint privateScalar (Stdlib.__X25519.__constant 9))
+let publicKey(privateScalar: Blob): Stdlib.Result.Result<Blob, String> =
+  if Stdlib.Blob.__byteLength(privateScalar) != 32 then
+    Error("X25519 scalar must be 32 bytes")
+  else Ok(Stdlib.__X25519.__multiplyPoint(privateScalar, Stdlib.__X25519.__constant(9)))
 
-let sharedSecret (privateScalar: Blob) (peerPublicKey: Blob)
-  : Stdlib.Result.Result<Blob, String> =
-  if Stdlib.Blob.__byteLength privateScalar != 32 then
-    Error "X25519 scalar must be 32 bytes"
-  else if Stdlib.Blob.__byteLength peerPublicKey != 32 then
-    Error "X25519 public key must be 32 bytes"
+let sharedSecret(privateScalar: Blob, peerPublicKey: Blob): Stdlib.Result.Result<Blob, String> =
+  if Stdlib.Blob.__byteLength(privateScalar) != 32 then
+    Error("X25519 scalar must be 32 bytes")
+  else if Stdlib.Blob.__byteLength(peerPublicKey) != 32 then
+    Error("X25519 public key must be 32 bytes")
   else
-    let shared = Stdlib.__X25519.__multiplyPoint privateScalar
-                   (Stdlib.__X25519.__unpack peerPublicKey 0 []) in
-    if Stdlib.__X25519.__orBytes shared 0 0 == 0 then
-      Error "X25519 shared secret is zero"
-    else Ok shared
+    let shared = Stdlib.__X25519.__multiplyPoint(privateScalar,
+                   Stdlib.__X25519.__unpack(peerPublicKey, 0, [])) in
+    if Stdlib.__X25519.__orBytes(shared, 0, 0) == 0 then
+      Error("X25519 shared secret is zero")
+    else Ok(shared)
 
-let generateKeyPair () : Stdlib.Result.Result<Stdlib.__X25519.KeyPair, String> =
-  match Stdlib.Crypto.__secureRandomBytes 32 with
-  | Error message -> Error message
-  | Ok privateKey ->
-      match Stdlib.__X25519.publicKey privateKey with
-      | Error message -> Error message
-      | Ok publicKey ->
-          Ok (Stdlib.__X25519.KeyPair { privateKey = privateKey, publicKey = publicKey })
+let generateKeyPair(): Stdlib.Result.Result<Stdlib.__X25519.KeyPair, String> =
+  match Stdlib.Crypto.__secureRandomBytes(32) with
+  | Error(message) -> Error(message)
+  | Ok(privateKey) ->
+      match Stdlib.__X25519.publicKey(privateKey) with
+      | Error(message) -> Error(message)
+      | Ok(publicKey) ->
+          Ok(Stdlib.__X25519.KeyPair { privateKey = privateKey, publicKey = publicKey })

@@ -2,48 +2,41 @@
 
 module Darklang.Stdlib.Cli.Tui.Text
 
-let __isCsiFinal (cluster: Char) : Bool =
-    match Stdlib.Char.__toCodepointInt cluster with
-    | Some codepoint -> codepoint >= 64z && codepoint <= 126z
+let __isCsiFinal(cluster: Char): Bool =
+    match Stdlib.Char.__toCodepointInt(cluster) with
+    | Some(codepoint) -> codepoint >= 64z && codepoint <= 126z
     | None -> false
 
-let __isControl (cluster: Char) : Bool =
-    match Stdlib.Char.__toCodepointInt cluster with
-    | None -> (Stdlib.Char.toString cluster) == "\r\n"
-    | Some codepoint -> codepoint < 32z || (codepoint >= 127z && codepoint <= 159z)
+let __isControl(cluster: Char): Bool =
+    match Stdlib.Char.__toCodepointInt(cluster) with
+    | None -> (Stdlib.Char.toString(cluster)) == "\r\n"
+    | Some(codepoint) -> codepoint < 32z || (codepoint >= 127z && codepoint <= 159z)
 
-let __isEscape (cluster: Char) : Bool =
-    match Stdlib.Char.__toCodepointInt cluster with
-    | Some codepoint -> codepoint == 27z
+let __isEscape(cluster: Char): Bool =
+    match Stdlib.Char.__toCodepointInt(cluster) with
+    | Some(codepoint) -> codepoint == 27z
     | None -> false
 
-let __scanCsi
-    (remaining: List<Char>)
-    (validParams: Bool)
-    (sequence: String)
-    : (List<Char> * Stdlib.Option.Option<String>) =
+let __scanCsi(remaining: List<Char>, validParams: Bool, sequence: String): (List<Char> * Stdlib.Option.Option<String>) =
     match remaining with
     | [] -> ([], None)
     | cluster :: rest ->
-        if Stdlib.Cli.Tui.Text.__isCsiFinal cluster then
+        if Stdlib.Cli.Tui.Text.__isCsiFinal(cluster) then
             let sgr =
-                if cluster == 'm' && validParams then Some (sequence + Stdlib.Char.toString cluster)
+                if cluster == 'm' && validParams then Some(sequence + Stdlib.Char.toString(cluster))
                 else None in
             (rest, sgr)
         else
             let valid =
                 validParams &&
-                (Stdlib.Char.isDigit cluster || cluster == ';' || cluster == ':') in
-            Stdlib.Cli.Tui.Text.__scanCsi rest valid (sequence + Stdlib.Char.toString cluster)
+                (Stdlib.Char.isDigit(cluster) || cluster == ';' || cluster == ':') in
+            Stdlib.Cli.Tui.Text.__scanCsi(rest, valid, sequence + Stdlib.Char.toString(cluster))
 
-let __skipEscape
-    (escape: Char)
-    (remaining: List<Char>)
-    : (List<Char> * Stdlib.Option.Option<String>) =
+let __skipEscape(escape: Char, remaining: List<Char>): (List<Char> * Stdlib.Option.Option<String>) =
     match remaining with
     | [] -> (remaining, None)
     | first :: rest ->
         if first == '[' then
-            Stdlib.Cli.Tui.Text.__scanCsi rest true (Stdlib.Char.toString escape + "[")
+            Stdlib.Cli.Tui.Text.__scanCsi(rest, true, Stdlib.Char.toString(escape) + "[")
         else
             (remaining, None)

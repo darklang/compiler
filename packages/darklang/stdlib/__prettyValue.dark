@@ -4,17 +4,17 @@ module Darklang.Stdlib.Pretty
 
 // A rendered value's container, as the interpreter's value printer builds it:
 // `[a, b]` or `{ a, b }` on one line when it fits, else one item per line.
-let __valueGroup (opening: String) (closing: String) (opener: Stdlib.Pretty.Doc) (parts: List<Stdlib.Pretty.Doc>) : Stdlib.Pretty.Doc =
-    let inner = Stdlib.Pretty.join parts (Stdlib.Pretty.Doc.Concat(Stdlib.Pretty.text ",", Stdlib.Pretty.Doc.Line)) in
+let __valueGroup(opening: String, closing: String, opener: Stdlib.Pretty.Doc, parts: List<Stdlib.Pretty.Doc>): Stdlib.Pretty.Doc =
+    let inner = Stdlib.Pretty.join(parts, Stdlib.Pretty.Doc.Concat(Stdlib.Pretty.text(","), Stdlib.Pretty.Doc.Line)) in
     Stdlib.Pretty.group(
         Stdlib.Pretty.Doc.Concat(
-            Stdlib.Pretty.text opening,
+            Stdlib.Pretty.text(opening),
             Stdlib.Pretty.Doc.Concat(
                 Stdlib.Pretty.Doc.Nest(2, Stdlib.Pretty.Doc.Concat(opener, inner)),
-                Stdlib.Pretty.Doc.Concat(opener, Stdlib.Pretty.text closing))))
+                Stdlib.Pretty.Doc.Concat(opener, Stdlib.Pretty.text(closing)))))
 
-let __valueBracketed (opening: String) (closing: String) (parts: List<Stdlib.Pretty.Doc>) : Stdlib.Pretty.Doc =
-    Stdlib.Pretty.__valueGroup opening closing Stdlib.Pretty.Doc.SoftLine parts
+let __valueBracketed(opening: String, closing: String, parts: List<Stdlib.Pretty.Doc>): Stdlib.Pretty.Doc =
+    Stdlib.Pretty.__valueGroup(opening, closing, Stdlib.Pretty.Doc.SoftLine, parts)
 
-let __valueBraced (opening: String) (closing: String) (parts: List<Stdlib.Pretty.Doc>) : Stdlib.Pretty.Doc =
-    Stdlib.Pretty.__valueGroup opening closing Stdlib.Pretty.Doc.Line parts
+let __valueBraced(opening: String, closing: String, parts: List<Stdlib.Pretty.Doc>): Stdlib.Pretty.Doc =
+    Stdlib.Pretty.__valueGroup(opening, closing, Stdlib.Pretty.Doc.Line, parts)

@@ -4,67 +4,66 @@ module Darklang.Stdlib.__Http3Wire
 type Scope = Stream | Connection
 type Failure = { scope: Stdlib.__Http3Wire.Scope, code: Int64, message: String }
 
-let connectionFailure (code: Int64) (message: String) : Stdlib.__Http3Wire.Failure =
+let connectionFailure(code: Int64, message: String): Stdlib.__Http3Wire.Failure =
   Stdlib.__Http3Wire.Failure { scope = Connection, code = code, message = message }
 
 type Frame = { kind: Int64, payload: Blob, remaining: Blob }
 
-let __forbidden (kind: Int64) : Bool = kind == 2 || kind == 6 || kind == 8 || kind == 9
+let __forbidden(kind: Int64): Bool = kind == 2 || kind == 6 || kind == 8 || kind == 9
 
-let serialize (kind: Int64) (payload: Blob) : Stdlib.Result.Result<Blob, String> =
-  if Stdlib.__Http3Wire.__forbidden kind then Error "Forbidden HTTP/3 frame type"
+let serialize(kind: Int64, payload: Blob): Stdlib.Result.Result<Blob, String> =
+  if Stdlib.__Http3Wire.__forbidden(kind) then Error("Forbidden HTTP/3 frame type")
   else
-    match Stdlib.__QuicWire.integer kind, Stdlib.__QuicWire.integer (Stdlib.Blob.__byteLength payload) with
-    | Ok encodedKind, Ok encodedSize -> Ok (Stdlib.Blob.concat [encodedKind, encodedSize, payload])
-    | _, _ -> Error "HTTP/3 frame integer out of range"
+    match Stdlib.__QuicWire.integer(kind), Stdlib.__QuicWire.integer(Stdlib.Blob.__byteLength(payload)) with
+    | Ok(encodedKind), Ok(encodedSize) -> Ok(Stdlib.Blob.concat([encodedKind, encodedSize, payload]))
+    | _, _ -> Error("HTTP/3 frame integer out of range")
 
-let parse (maximum: Int64) (data: Blob) : Stdlib.Result.Result<Stdlib.__Http3Wire.Frame, Stdlib.__QuicWire.ParseError> =
-  if maximum < 0 || maximum > 104857600 then Error (Invalid "Invalid HTTP/3 frame limit")
+let parse(maximum: Int64, data: Blob): Stdlib.Result.Result<Stdlib.__Http3Wire.Frame, Stdlib.__QuicWire.ParseError> =
+  if maximum < 0 || maximum > 104857600 then Error(Invalid("Invalid HTTP/3 frame limit"))
   else
-    match Stdlib.__QuicWire.parseInteger data 0 with
-    | Error error -> Error error
-    | Ok kind ->
-      if Stdlib.__Http3Wire.__forbidden kind.value then Error (Invalid "Forbidden HTTP/3 frame type")
+    match Stdlib.__QuicWire.parseInteger(data, 0) with
+    | Error(error) -> Error(error)
+    | Ok(kind) ->
+      if Stdlib.__Http3Wire.__forbidden(kind.value) then Error(Invalid("Forbidden HTTP/3 frame type"))
       else
-        match Stdlib.__QuicWire.parseInteger data kind.next with
-        | Error error -> Error error
-        | Ok size ->
-          if size.value > maximum then Error (Invalid "HTTP/3 frame exceeds limit")
-          else if size.value > Stdlib.Blob.__byteLength data - size.next then Error Incomplete
-          else Ok (Stdlib.__Http3Wire.Frame { kind = kind.value,
-            payload = Stdlib.__Http2Wire.__slice data size.next size.value,
-            remaining = Stdlib.__Http2Wire.__slice data (size.next + size.value) (Stdlib.Blob.__byteLength data - size.next - size.value) })
+        match Stdlib.__QuicWire.parseInteger(data, kind.next) with
+        | Error(error) -> Error(error)
+        | Ok(size) ->
+          if size.value > maximum then Error(Invalid("HTTP/3 frame exceeds limit"))
+          else if size.value > Stdlib.Blob.__byteLength(data) - size.next then Error(Incomplete)
+          else Ok(Stdlib.__Http3Wire.Frame { kind = kind.value,
+            payload = Stdlib.__Http2Wire.__slice(data, size.next, size.value),
+            remaining = Stdlib.__Http2Wire.__slice(data, size.next + size.value, Stdlib.Blob.__byteLength(data) - size.next - size.value) })
 
-let __settings (data: Blob) (position: Int64) (seen: List<Int64>) (settings: List<(Int64 * Int64)>)
-  : Stdlib.Result.Result<List<(Int64 * Int64)>, Stdlib.__Http3Wire.Failure> =
-  if position == Stdlib.Blob.__byteLength data then Ok (Stdlib.List.reverse settings)
-  else if Stdlib.List.__lengthInt seen >= 64z then Error (Stdlib.__Http3Wire.connectionFailure 263 "Too many HTTP/3 settings")
+let __settings(data: Blob, position: Int64, seen: List<Int64>, settings: List<(Int64 * Int64)>): Stdlib.Result.Result<List<(Int64 * Int64)>, Stdlib.__Http3Wire.Failure> =
+  if position == Stdlib.Blob.__byteLength(data) then Ok(Stdlib.List.reverse(settings))
+  else if Stdlib.List.__lengthInt(seen) >= 64z then Error(Stdlib.__Http3Wire.connectionFailure(263, "Too many HTTP/3 settings"))
   else
-    match Stdlib.__QuicWire.parseInteger data position with
-    | Error _ -> Error (Stdlib.__Http3Wire.connectionFailure 265 "Truncated HTTP/3 setting")
-    | Ok id ->
-      if Stdlib.List.any seen (fun previous -> previous == id.value) then Error (Stdlib.__Http3Wire.connectionFailure 265 "Duplicate HTTP/3 setting")
-      else if id.value >= 2 && id.value <= 5 then Error (Stdlib.__Http3Wire.connectionFailure 265 "Forbidden HTTP/3 setting")
+    match Stdlib.__QuicWire.parseInteger(data, position) with
+    | Error(_) -> Error(Stdlib.__Http3Wire.connectionFailure(265, "Truncated HTTP/3 setting"))
+    | Ok(id) ->
+      if Stdlib.List.any(seen, fun previous -> previous == id.value) then Error(Stdlib.__Http3Wire.connectionFailure(265, "Duplicate HTTP/3 setting"))
+      else if id.value >= 2 && id.value <= 5 then Error(Stdlib.__Http3Wire.connectionFailure(265, "Forbidden HTTP/3 setting"))
       else
-        match Stdlib.__QuicWire.parseInteger data id.next with
-        | Error _ -> Error (Stdlib.__Http3Wire.connectionFailure 265 "Truncated HTTP/3 setting")
-        | Ok value ->
-          if id.value == 8 && value.value > 1 then Error (Stdlib.__Http3Wire.connectionFailure 265 "Invalid HTTP/3 setting value")
-          else Stdlib.__Http3Wire.__settings data value.next (Stdlib.List.push seen id.value) (Stdlib.List.push settings (id.value, value.value))
+        match Stdlib.__QuicWire.parseInteger(data, id.next) with
+        | Error(_) -> Error(Stdlib.__Http3Wire.connectionFailure(265, "Truncated HTTP/3 setting"))
+        | Ok(value) ->
+          if id.value == 8 && value.value > 1 then Error(Stdlib.__Http3Wire.connectionFailure(265, "Invalid HTTP/3 setting value"))
+          else Stdlib.__Http3Wire.__settings(data, value.next, Stdlib.List.push(seen, id.value), Stdlib.List.push(settings, (id.value, value.value)))
 
-let parseSettings (payload: Blob) : Stdlib.Result.Result<List<(Int64 * Int64)>, Stdlib.__Http3Wire.Failure> =
-  if Stdlib.Blob.__byteLength payload > 4096 then Error (Stdlib.__Http3Wire.connectionFailure 263 "HTTP/3 settings too large")
-  else Stdlib.__Http3Wire.__settings payload 0 [] []
+let parseSettings(payload: Blob): Stdlib.Result.Result<List<(Int64 * Int64)>, Stdlib.__Http3Wire.Failure> =
+  if Stdlib.Blob.__byteLength(payload) > 4096 then Error(Stdlib.__Http3Wire.connectionFailure(263, "HTTP/3 settings too large"))
+  else Stdlib.__Http3Wire.__settings(payload, 0, [], [])
 
 // No dynamic-table references or blocked header streams in the initial profile.
-let settings () : Blob = Stdlib.Blob.__fromInt64List [1, 0, 7, 0, 6, 128, 1, 0, 0]
+let settings(): Blob = Stdlib.Blob.__fromInt64List([1, 0, 7, 0, 6, 128, 1, 0, 0])
 
-let settingsWithQpack (capacity: Int64) (blocked: Int64) : Stdlib.Result.Result<Blob, String> =
-  if capacity < 0 || capacity > 65536 || blocked < 0 || blocked > 256 then Error "Invalid local QPACK settings"
+let settingsWithQpack(capacity: Int64, blocked: Int64): Stdlib.Result.Result<Blob, String> =
+  if capacity < 0 || capacity > 65536 || blocked < 0 || blocked > 256 then Error("Invalid local QPACK settings")
   else
-    Stdlib.List.fold [(1, capacity), (7, blocked), (6, 65536)] (Ok []) (fun result setting ->
+    Stdlib.List.fold([(1, capacity), (7, blocked), (6, 65536)], Ok([]), fun(result, setting) ->
       let (id, value) = setting in
-      result |> Stdlib.Result.andThen (fun blocks ->
-        Stdlib.__QuicWire.integer id |> Stdlib.Result.andThen (fun name ->
-          Stdlib.__QuicWire.integer value |> Stdlib.Result.map (fun bytes -> Stdlib.List.push blocks (Stdlib.Blob.concat [name, bytes])))))
-      |> Stdlib.Result.map (fun blocks -> Stdlib.Blob.concat (Stdlib.List.reverse blocks))
+      result |> Stdlib.Result.andThen(fun blocks ->
+        Stdlib.__QuicWire.integer(id) |> Stdlib.Result.andThen(fun name ->
+          Stdlib.__QuicWire.integer(value) |> Stdlib.Result.map(fun bytes -> Stdlib.List.push(blocks, Stdlib.Blob.concat([name, bytes]))))))
+      |> Stdlib.Result.map(fun blocks -> Stdlib.Blob.concat(Stdlib.List.reverse(blocks)))

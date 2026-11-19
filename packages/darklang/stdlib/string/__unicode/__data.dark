@@ -3,7 +3,7 @@
 
 module Darklang.Stdlib.String.__Unicode.__Data
 
-let __categoryFromCode (value: Int64) : Stdlib.String.__Unicode.__Data.GeneralCategory =
+let __categoryFromCode(value: Int64): Stdlib.String.__Unicode.__Data.GeneralCategory =
     if value == 0 then Stdlib.String.__Unicode.__Data.GeneralCategory.Lu
     else if value == 1 then Stdlib.String.__Unicode.__Data.GeneralCategory.Ll
     else if value == 2 then Stdlib.String.__Unicode.__Data.GeneralCategory.Lt
@@ -35,51 +35,51 @@ let __categoryFromCode (value: Int64) : Stdlib.String.__Unicode.__Data.GeneralCa
     else if value == 28 then Stdlib.String.__Unicode.__Data.GeneralCategory.Co
     else Stdlib.String.__Unicode.__Data.GeneralCategory.Cn
 
-let __generalCategoryLookupGroup0 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Stdlib.String.__Unicode.__Data.__lookupRangeIn (Stdlib.String.__Unicode.__Data.__Table15.__generalCategoryChunk0 ()) 0 codepoint 14 with
-    | Some value -> Some value
+let __generalCategoryLookupGroup0(codepoint: Int64): Stdlib.Option.Option<Int64> =
+    match Stdlib.String.__Unicode.__Data.__lookupRangeIn(Stdlib.String.__Unicode.__Data.__Table15.__generalCategoryChunk0(), 0, codepoint, 14) with
+    | Some(value) -> Some(value)
     | None ->
-        match Stdlib.String.__Unicode.__Data.__lookupRangeIn (Stdlib.String.__Unicode.__Data.__Table16.__generalCategoryChunk1 ()) 0 codepoint 14 with
-        | Some value -> Some value
+        match Stdlib.String.__Unicode.__Data.__lookupRangeIn(Stdlib.String.__Unicode.__Data.__Table16.__generalCategoryChunk1(), 0, codepoint, 14) with
+        | Some(value) -> Some(value)
         | None ->
-            match Stdlib.String.__Unicode.__Data.__lookupRangeIn (Stdlib.String.__Unicode.__Data.__Table17.__generalCategoryChunk2 ()) 0 codepoint 14 with
-            | Some value -> Some value
+            match Stdlib.String.__Unicode.__Data.__lookupRangeIn(Stdlib.String.__Unicode.__Data.__Table17.__generalCategoryChunk2(), 0, codepoint, 14) with
+            | Some(value) -> Some(value)
             | None ->
-                match Stdlib.String.__Unicode.__Data.__lookupRangeIn (Stdlib.String.__Unicode.__Data.__Table18.__generalCategoryChunk3 ()) 0 codepoint 14 with
-                | Some value -> Some value
+                match Stdlib.String.__Unicode.__Data.__lookupRangeIn(Stdlib.String.__Unicode.__Data.__Table18.__generalCategoryChunk3(), 0, codepoint, 14) with
+                | Some(value) -> Some(value)
                 | None ->
                     None
 
-let __lookupMappingValueIn (data: String) (index: Int64) (key: Int64) (keyWidth: Int64) (recordWidth: Int64) (valueIndex: Int64) : Stdlib.Option.Option<Int64> =
-    if index >= Stdlib.String.__byteLength data then None
+let __lookupMappingValueIn(data: String, index: Int64, key: Int64, keyWidth: Int64, recordWidth: Int64, valueIndex: Int64): Stdlib.Option.Option<Int64> =
+    if index >= Stdlib.String.__byteLength(data) then None
     else
-        let found = Stdlib.String.__Unicode.__Data.__hex data index keyWidth 0 in
+        let found = Stdlib.String.__Unicode.__Data.__hex(data, index, keyWidth, 0) in
         if found == key then
-            let length = Stdlib.String.__Unicode.__Data.__hex data (index + keyWidth) 1 0 in
-            if valueIndex < length then Some (Stdlib.String.__Unicode.__Data.__hex data (index + keyWidth + 1 + valueIndex * 6) 6 0) else None
+            let length = Stdlib.String.__Unicode.__Data.__hex(data, index + keyWidth, 1, 0) in
+            if valueIndex < length then Some(Stdlib.String.__Unicode.__Data.__hex(data, index + keyWidth + 1 + valueIndex * 6, 6, 0)) else None
         else if found > key then None
-        else Stdlib.String.__Unicode.__Data.__lookupMappingValueIn data (index + recordWidth) key keyWidth recordWidth valueIndex
+        else Stdlib.String.__Unicode.__Data.__lookupMappingValueIn(data, index + recordWidth, key, keyWidth, recordWidth, valueIndex)
 
-let __casedLookupGroup0 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Stdlib.String.__Unicode.__Data.__lookupRangeIn (Stdlib.String.__Unicode.__Data.__Table48.__casedChunk0 ()) 0 codepoint 14 with
-    | Some value -> Some value
+let __casedLookupGroup0(codepoint: Int64): Stdlib.Option.Option<Int64> =
+    match Stdlib.String.__Unicode.__Data.__lookupRangeIn(Stdlib.String.__Unicode.__Data.__Table48.__casedChunk0(), 0, codepoint, 14) with
+    | Some(value) -> Some(value)
     | None ->
-        match Stdlib.String.__Unicode.__Data.__lookupRangeIn (Stdlib.String.__Unicode.__Data.__Table49.__casedChunk1 ()) 0 codepoint 14 with
-        | Some value -> Some value
+        match Stdlib.String.__Unicode.__Data.__lookupRangeIn(Stdlib.String.__Unicode.__Data.__Table49.__casedChunk1(), 0, codepoint, 14) with
+        | Some(value) -> Some(value)
         | None ->
             None
 
-let __hex (data: String) (index: Int64) (remaining: Int64) (acc: Int64) : Int64 =
+let __hex(data: String, index: Int64, remaining: Int64, acc: Int64): Int64 =
     if remaining == 0 then acc
     else
-        let byte = Stdlib.String.__byteAtUnchecked data index in
-        Stdlib.String.__Unicode.__Data.__hex data (index + 1) (remaining - 1) (acc * 16 + Stdlib.String.__Unicode.__Data.__hexDigit byte)
+        let byte = Stdlib.String.__byteAtUnchecked(data, index) in
+        Stdlib.String.__Unicode.__Data.__hex(data, index + 1, remaining - 1, acc * 16 + Stdlib.String.__Unicode.__Data.__hexDigit(byte))
 
-let __indicConjunctBreakLookup (codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Stdlib.String.__Unicode.__Data.__indicConjunctBreakLookupGroup0 codepoint with
-    | Some value -> Some value
+let __indicConjunctBreakLookup(codepoint: Int64): Stdlib.Option.Option<Int64> =
+    match Stdlib.String.__Unicode.__Data.__indicConjunctBreakLookupGroup0(codepoint) with
+    | Some(value) -> Some(value)
     | None ->
         None
 
-let lookupLowercaseAt (codepoint: Int64) (index: Int64) : Stdlib.Option.Option<Int64> = Stdlib.String.__Unicode.__Data.__lowercaseLookup codepoint index
-let isWhiteSpace (codepoint: Int64) : Bool = Stdlib.Option.isSome (Stdlib.String.__Unicode.__Data.__whiteSpaceLookup codepoint)
+let lookupLowercaseAt(codepoint: Int64, index: Int64): Stdlib.Option.Option<Int64> = Stdlib.String.__Unicode.__Data.__lowercaseLookup(codepoint, index)
+let isWhiteSpace(codepoint: Int64): Bool = Stdlib.Option.isSome(Stdlib.String.__Unicode.__Data.__whiteSpaceLookup(codepoint))

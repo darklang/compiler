@@ -2,5 +2,5 @@
 
 module Darklang.SCM.Branch
 
-val mainBranchId = UUID (1u128)
+val mainBranchId = UUID(1u128)
 val mainBranchName = "main"

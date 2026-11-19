@@ -1,75 +1,70 @@
 // __TlsAlpn.dark - RFC 7301 offers and authenticated EncryptedExtensions ALPN.
 module Darklang.Stdlib.__TlsAlpn
 
-let __u16 (value: Int64) : Blob = Stdlib.Blob.__fromInt64List [value / 256, value % 256]
-let __read16 (data: Blob) (offset: Int64) : Int64 =
-  Stdlib.Blob.__getByte data offset * 256 + Stdlib.Blob.__getByte data (offset + 1)
+let __u16(value: Int64): Blob = Stdlib.Blob.__fromInt64List([value / 256, value % 256])
+let __read16(data: Blob, offset: Int64): Int64 =
+  Stdlib.Blob.__getByte(data, offset) * 256 + Stdlib.Blob.__getByte(data, offset + 1)
 
-let __offer (protocols: List<String>) (count: Int64) (length: Int64) (blocks: List<Blob>)
-  : Stdlib.Result.Result<Blob, String> =
+let __offer(protocols: List<String>, count: Int64, length: Int64, blocks: List<Blob>): Stdlib.Result.Result<Blob, String> =
   match protocols with
-  | [] -> Ok (Stdlib.Blob.concat [Stdlib.__TlsAlpn.__u16 length,
-                                 Stdlib.Blob.concat (Stdlib.List.reverse blocks)])
+  | [] -> Ok(Stdlib.Blob.concat([Stdlib.__TlsAlpn.__u16(length),
+                                 Stdlib.Blob.concat(Stdlib.List.reverse(blocks))]))
   | protocol :: rest ->
-    let size = Stdlib.String.__byteLength protocol in
-    if size == 0 || size > 255 then Error "Invalid ALPN protocol length"
-    else if count >= 16 || length + size + 1 > 4096 then Error "ALPN offer too large"
-    else Stdlib.__TlsAlpn.__offer rest (count + 1) (length + size + 1) (Stdlib.List.push blocks (Stdlib.Blob.concat [Stdlib.Blob.__fromInt64List [size], Stdlib.String.toBlob protocol]))
+    let size = Stdlib.String.__byteLength(protocol) in
+    if size == 0 || size > 255 then Error("Invalid ALPN protocol length")
+    else if count >= 16 || length + size + 1 > 4096 then Error("ALPN offer too large")
+    else Stdlib.__TlsAlpn.__offer(rest, count + 1, length + size + 1, Stdlib.List.push(blocks, Stdlib.Blob.concat([Stdlib.Blob.__fromInt64List([size]), Stdlib.String.toBlob(protocol)])))
 
-let offer (protocols: List<String>) : Stdlib.Result.Result<Blob, String> =
-  Stdlib.__TlsAlpn.__offer protocols 0 0 []
+let offer(protocols: List<String>): Stdlib.Result.Result<Blob, String> =
+  Stdlib.__TlsAlpn.__offer(protocols, 0, 0, [])
 
-let __offered (protocols: List<String>) (selected: String) : Bool =
+let __offered(protocols: List<String>, selected: String): Bool =
   match protocols with
   | [] -> false
-  | protocol :: rest -> protocol == selected || Stdlib.__TlsAlpn.__offered rest selected
+  | protocol :: rest -> protocol == selected || Stdlib.__TlsAlpn.__offered(rest, selected)
 
-let __selected (offered: List<String>) (data: Blob) (position: Int64)
-  (selection: Stdlib.Option.Option<String>)
-  : Stdlib.Result.Result<Stdlib.Option.Option<String>, String> =
-  let length = Stdlib.Blob.__byteLength data in
-  if position == length then Ok selection
-  else if position + 4 > length then Error "Truncated TLS extension"
+let __selected(offered: List<String>, data: Blob, position: Int64, selection: Stdlib.Option.Option<String>): Stdlib.Result.Result<Stdlib.Option.Option<String>, String> =
+  let length = Stdlib.Blob.__byteLength(data) in
+  if position == length then Ok(selection)
+  else if position + 4 > length then Error("Truncated TLS extension")
   else
-    let kind = Stdlib.__TlsAlpn.__read16 data position in
-    let size = Stdlib.__TlsAlpn.__read16 data (position + 2) in
+    let kind = Stdlib.__TlsAlpn.__read16(data, position) in
+    let size = Stdlib.__TlsAlpn.__read16(data, position + 2) in
     let next = position + 4 + size in
-    if next > length then Error "Truncated TLS extension"
-    else if kind != 16 then Stdlib.__TlsAlpn.__selected offered data next selection
+    if next > length then Error("Truncated TLS extension")
+    else if kind != 16 then Stdlib.__TlsAlpn.__selected(offered, data, next, selection)
     else
       match selection with
-      | Some _ -> Error "Duplicate TLS ALPN extension"
+      | Some(_) -> Error("Duplicate TLS ALPN extension")
       | None ->
-        if size < 4 || Stdlib.__TlsAlpn.__read16 data (position + 4) != size - 2 ||
-           Stdlib.Blob.__getByte data (position + 6) != size - 3 then
-          Error "Invalid TLS ALPN selection"
+        if size < 4 || Stdlib.__TlsAlpn.__read16(data, position + 4) != size - 2 ||
+           Stdlib.Blob.__getByte(data, position + 6) != size - 3 then
+          Error("Invalid TLS ALPN selection")
         else
-          match Stdlib.Blob.toString (Stdlib.__Http2Wire.__slice data (position + 7) (size - 3)) with
-          | Error _ -> Error "Invalid TLS ALPN protocol"
-          | Ok protocol ->
-            if Stdlib.Bool.not (Stdlib.__TlsAlpn.__offered offered protocol) then
-              Error "TLS selected an unoffered ALPN protocol"
-            else Stdlib.__TlsAlpn.__selected offered data next (Some protocol)
+          match Stdlib.Blob.toString(Stdlib.__Http2Wire.__slice(data, position + 7, size - 3)) with
+          | Error(_) -> Error("Invalid TLS ALPN protocol")
+          | Ok(protocol) ->
+            if Stdlib.Bool.not(Stdlib.__TlsAlpn.__offered(offered, protocol)) then
+              Error("TLS selected an unoffered ALPN protocol")
+            else Stdlib.__TlsAlpn.__selected(offered, data, next, Some(protocol))
 
-let selected (offered: List<String>) (extensions: Blob)
-  : Stdlib.Result.Result<Stdlib.Option.Option<String>, String> =
-  let length = Stdlib.Blob.__byteLength extensions in
-  if length < 2 || Stdlib.__TlsAlpn.__read16 extensions 0 != length - 2 then
-    Error "Invalid TLS EncryptedExtensions"
-  else Stdlib.__TlsAlpn.__selected offered extensions 2 None
+let selected(offered: List<String>, extensions: Blob): Stdlib.Result.Result<Stdlib.Option.Option<String>, String> =
+  let length = Stdlib.Blob.__byteLength(extensions) in
+  if length < 2 || Stdlib.__TlsAlpn.__read16(extensions, 0) != length - 2 then
+    Error("Invalid TLS EncryptedExtensions")
+  else Stdlib.__TlsAlpn.__selected(offered, extensions, 2, None)
 
 // Call only after authenticating the complete TLS transcript and Finished.
-let fromTranscript (offered: List<String>) (transcript: Blob)
-  : Stdlib.Result.Result<Stdlib.Option.Option<String>, String> =
-  match Stdlib.__Tls13Handshake.parseHandshakeFrame transcript with
-  | Error _ -> Error "Invalid TLS ClientHello transcript"
-  | Ok client ->
-    match Stdlib.__Tls13Handshake.parseHandshakeFrame client.remaining with
-    | Error _ -> Error "Invalid TLS ServerHello transcript"
-    | Ok server ->
-      match Stdlib.__Tls13Handshake.parseHandshakeFrame server.remaining with
-      | Error _ -> Error "Missing TLS EncryptedExtensions"
-      | Ok extensions ->
+let fromTranscript(offered: List<String>, transcript: Blob): Stdlib.Result.Result<Stdlib.Option.Option<String>, String> =
+  match Stdlib.__Tls13Handshake.parseHandshakeFrame(transcript) with
+  | Error(_) -> Error("Invalid TLS ClientHello transcript")
+  | Ok(client) ->
+    match Stdlib.__Tls13Handshake.parseHandshakeFrame(client.remaining) with
+    | Error(_) -> Error("Invalid TLS ServerHello transcript")
+    | Ok(server) ->
+      match Stdlib.__Tls13Handshake.parseHandshakeFrame(server.remaining) with
+      | Error(_) -> Error("Missing TLS EncryptedExtensions")
+      | Ok(extensions) ->
         if client.kind != 1 || server.kind != 2 || extensions.kind != 8 then
-          Error "Invalid TLS negotiation transcript"
-        else Stdlib.__TlsAlpn.selected offered extensions.body
+          Error("Invalid TLS negotiation transcript")
+        else Stdlib.__TlsAlpn.selected(offered, extensions.body)
