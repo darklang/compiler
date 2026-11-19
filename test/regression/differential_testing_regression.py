@@ -13,12 +13,13 @@ def main():
         oracle = root / "oracle"
         source = root / "input.dark"
         artifacts = root / "artifacts"
+        cache = root / "cache"
 
-        def run(*arguments):
-            # Each invocation compiles the complete imported library before the case.
+        def run(*arguments, timeout=300):
             return subprocess.run([str(tester), "--interpreter", str(oracle),
-                                   "--artifacts", str(artifacts), *arguments],
-                                  capture_output=True, text=True, timeout=300, check=False)
+                                   "--artifacts", str(artifacts), "--cache-dir", str(cache),
+                                   *arguments],
+                                  capture_output=True, text=True, timeout=timeout, check=False)
 
         def oracle_output(value):
             oracle.write_text(f"#!/bin/sh\nprintf '%s\\n' '{value}'\n")
@@ -26,7 +27,9 @@ def main():
 
         oracle_output("42")
         source.write_text("6L * 7L\n")
-        replay = run("--replay", str(source))
+        # The first run prepares the stdlib, which takes minutes on a loaded machine;
+        # the others read it from the cache.
+        replay = run("--replay", str(source), timeout=900)
         assert replay.returncode == 0, replay.stdout + replay.stderr
         oracle_output("true")
         source.write_text('let value = "hé🚀" in value == "hé🚀"\n')
