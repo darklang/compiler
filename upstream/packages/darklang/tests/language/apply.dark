@@ -248,7 +248,6 @@ module GenericTypeArgsAreOK =
     let ignored = inner<String, Bool>("hi", true)
     x
 
-  // @compiler xfail compile: "Type arguments require a named function" class=missing-support reason=compiler-gap
   test innerAndOuter =
     Stdlib.Test.all(
       [ (inner<Bool, String>(true, "ignored")) |> Stdlib.Test.equal(true)

@@ -36,8 +36,8 @@ dispositions:
     run: 835
   tests:
     blocked: 65
-    run: 1754
-    xfail: 1334
+    run: 1755
+    xfail: 1333
 reasons:
   packages:
     aot-type-error: 10
@@ -69,7 +69,7 @@ reasons:
     aot-type-error: 154
     compiler-contract: 3
     compiler-crash: 2
-    compiler-gap: 160
+    compiler-gap: 159
     compiler-leak: 2
     compiler-resource: 2
     compiler-timeout: 2
@@ -120,11 +120,11 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/string.dark: 3
   missing-support:
     phases:
-      compile: 1028
+      compile: 1027
       runtime: 81
     reasons:
       compiler-contract: 3
-      compiler-gap: 155
+      compiler-gap: 154
       compiler-resource: 2
       interpreter-fixture: 1
       test-counter: 7
@@ -176,7 +176,7 @@ expected_failures:
       upstream/packages/darklang/tests/cli/workbenchRepl.dark: 1
       upstream/packages/darklang/tests/cli/zshrc.dark: 2
       upstream/packages/darklang/tests/language/aliases.dark: 2
-      upstream/packages/darklang/tests/language/apply.dark: 5
+      upstream/packages/darklang/tests/language/apply.dark: 4
       upstream/packages/darklang/tests/language/archivedSelf.dark: 1
       upstream/packages/darklang/tests/language/basic.dark: 4
       upstream/packages/darklang/tests/language/big.dark: 1
