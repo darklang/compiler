@@ -5,7 +5,6 @@ module Darklang.Cli.Workbench
 
 /// Move focus left: detail → list. It stops there: the nav is above the
 /// body, not beside it, and esc, tab and ` all reach it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let focusLeft(state: State): Step =
   if state.focus == Stdlib.Cli.UI.SplitPane.Focus.Second then
     Step.Continue({ state with focus = Stdlib.Cli.UI.SplitPane.Focus.First })
@@ -14,7 +13,6 @@ let focusLeft(state: State): Step =
 
 
 /// Move focus from the list to an available detail pane.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let focusRight(state: State): Step =
   if hasDetailPane(state) && state.focus == Stdlib.Cli.UI.SplitPane.Focus.First then
     Step.Continue({ state with focus = Stdlib.Cli.UI.SplitPane.Focus.Second })
@@ -29,7 +27,6 @@ val backCap = 50
 
 
 /// Where you are, as something to come back to.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let returnPointOf(state: State): ReturnPoint =
   ReturnPoint
     { view = state.activeView
@@ -42,7 +39,6 @@ let returnPointOf(state: State): ReturnPoint =
 /// The only navigation transition: remember where you were once (unless
 /// <param history> says {{Skip}}), restore all destination coordinates, then
 /// load and clamp its filtered list.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let moveToPoint(state: State, point: ReturnPoint, history: History): State =
   let here = returnPointOf(state)
   let back =
@@ -76,7 +72,6 @@ let moveToPoint(state: State, point: ReturnPoint, history: History): State =
 
 /// What esc will return to, for the footer: the module you were in, or the
 /// view you came from; "" on Home with nowhere left to go.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let backLabel(state: State): String =
   match state.back with
   | [] -> if state.activeView == vHome then "" else "Home"
@@ -95,7 +90,6 @@ let backLabel(state: State): String =
 /// One step back: the most recent place, restored, with its list reloaded and
 /// the cursor where it was. With nothing remembered, Home; on Home, nothing.
 /// Never quits: that is `q`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let goBack(state: State): Step =
   match state.back with
   | [] ->
@@ -110,7 +104,6 @@ let goBack(state: State): Step =
 
 
 /// Enter a tree module, remembering its parent and cursor.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let descend(state: State): Step =
   if state.activeView != vMatter then
     Step.Continue(state)
@@ -133,7 +126,6 @@ let descend(state: State): Step =
 
 
 /// Backspace goes to the parent module; Escape follows navigation history.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let ascend(state: State): Step =
   if state.activeView != vMatter then
     Step.Continue(state)
@@ -183,7 +175,6 @@ let selectableRow(items: List<BodyItem>, from: Int64, dir: Int64): Int64 =
 /// (see `refresh`), so a reload that lands the cursor on a header - a commit
 /// empties the uncommitted section, say - moves it on. Other behaviors pass
 /// through untouched.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let fixSelection(state: State): State =
   if Stdlib.Bool.not(isSectioned(state)) then
     state
@@ -198,7 +189,6 @@ let fixSelection(state: State): State =
 /// both ends clamp for free, section headers are stepped over exactly as they are one at a time,
 /// and a pane that scrolls its document scrolls it. Home and PageUp exist and he does not use
 /// them; this needs no fn key and no letter taken away from something else.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let repeatStep(state: State, step: State -> Step, times: Int64): Step =
   let go(s: State, n: Int64): State =
     if n <= 0 then
@@ -212,7 +202,6 @@ let repeatStep(state: State, step: State -> Step, times: Int64): Step =
 
 
 /// Up: scroll the inspector when it's focused, else move the list selection up.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let navUp(state: State): Step =
   if state.focus == Stdlib.Cli.UI.SplitPane.Focus.Second then
     Step.Continue({ state with detailScroll = Stdlib.max(0, state.detailScroll - 1) })
@@ -231,7 +220,6 @@ let navUp(state: State): Step =
 
 
 /// Down: scroll the inspector when it's focused, else move the list selection down.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let navDown(state: State): Step =
   if state.focus == Stdlib.Cli.UI.SplitPane.Focus.Second then
     // Screen rows, not logical lines: a long line wraps to several, and bounding on the unwrapped count
@@ -252,13 +240,11 @@ let navDown(state: State): Step =
 
 
 /// Jump to the top / bottom of the list (Home / End).
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let navTop(state: State): Step =
   let top = if isSectioned(state) then selectableRow(state.items, 0, 1) else 0
   Step.Continue({ state with selected = top, detailScroll = 0 })
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let navBottom(state: State): Step =
   let maxIdx = Stdlib.max(0, Stdlib.List.length(state.items) - 1)
   Step.Continue({ state with selected = maxIdx, detailScroll = 0 })
@@ -266,7 +252,6 @@ let navBottom(state: State): Step =
 
 /// Open the full-screen reader on `content`, highlighted when <param reader> is {{Reader.Code}}.
 /// Resets scroll.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let openReader(state: State, content: String, reader: Reader): Step =
   Step.Continue(
     { state with
@@ -276,7 +261,6 @@ let openReader(state: State, content: String, reader: Reader): Step =
 
 
 /// Resolve the selected conflict (Conflicts view): keep ours (local), theirs (incoming), or just acknowledge.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let resolveConflict(state: State, which: String): Step =
   match selectedConflict(state) with
   | None ->
@@ -317,7 +301,6 @@ let resolveConflict(state: State, which: String): Step =
 
 
 /// Run a top-level command in-frame (captured) and show its output in the reader.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let runCommandInFrame(state: State, command: String, args: List<String>): Step =
   let out = captureOutput(fun () -> Registry.executeCommand(command, classicState(state), args))
   let shown =
@@ -334,7 +317,6 @@ let runCommandInFrame(state: State, command: String, args: List<String>): Step =
 
 /// Jump from a search result to its home in the Tree: open the containing module, select the leaf, close the
 /// results mode.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let jumpToHit(state: State, hit: SearchHit): Step =
   let newLoc = Packages.PackageLocation.Module(hit.modules)
   let items = loadItems(state.branchId, newLoc)

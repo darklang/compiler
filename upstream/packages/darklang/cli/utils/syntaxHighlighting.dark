@@ -118,7 +118,6 @@ let applyTokenColors(
 
 /// Applies full-parse semantic-token colors to source code — distinguishes
 /// module / type / function / parameter names (not possible from lexing alone).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.SyntaxHighlighting.highlightCode: Unknown function or value 'LanguageTools.Parser.Parse.toWrittenTypes'"
 let highlightCode(sourceCode: String): String =
   // The parser is best-effort: its lexer recovers from malformed input, so it
   // returns `Some` (a partial tree; precise diagnostics are reported separately)

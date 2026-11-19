@@ -25,7 +25,6 @@ let loc(m: String, name: String): LanguageTools.ProgramTypes.PackageLocation =
 
 /// Save <param source> into `<owner>.<m>` on <param branchId> the way every authoring
 /// surface does, but without the cascade, so a test can run it and read what it reports.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Authoring.authorOn: Unknown function or value 'Darklang.LanguageTools.Parser.Parse.packageSourceToOps'"
 let authorOn(
   branchId: Uuid,
   owner: String,
@@ -44,7 +43,6 @@ let authorOn(
     | Error(e) -> Stdlib.Result.Result.Error(e)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Authoring.authorAs: Unknown function or value 'authorOn'"
 let authorAs(
   owner: String,
   m: String,
@@ -53,13 +51,11 @@ let authorAs(
   authorOn(main(), owner, m, source)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Authoring.author: Unknown function or value 'authorAs'"
 let author(m: String, source: String): Stdlib.Result.Result<Unit, String> =
   authorAs("Tests", m, source)
 
 
 /// Author every source in turn, stopping at the first failure.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Authoring.authorAll: Unknown function or value 'author'"
 let authorAll(
   m: String,
   sources: List<String>)
@@ -71,13 +67,11 @@ let authorAll(
 
 
 /// A branch off <param parent>, as `dark switch <name>` makes one.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Authoring.branchOff: Unknown function or value 'Darklang.SCM.PackageOps.ensureBranch'"
 let branchOff(name: String, parent: Uuid): Uuid =
   let (id, _) = SCM.PackageOps.ensureBranch(name, parent) |> Builtin.unwrap
   id
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Authoring.hashIn: Unknown function or value 'Darklang.SCM.Propagation.hashOn'"
 let hashIn(
   kind: LanguageTools.ProgramTypes.ItemKind,
   l: LanguageTools.ProgramTypes.PackageLocation)
@@ -85,7 +79,6 @@ let hashIn(
   SCM.Propagation.hashOn(main(), l, kind)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Authoring.fnHash: Unknown function or value 'hashIn'"
 let fnHash(
   m: String,
   name: String)
@@ -95,7 +88,6 @@ let fnHash(
 
 /// Run the cascade for <param l> moving from <param from> to <param to>; the names it
 /// repointed, sorted.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Authoring.cascadeKind: Unknown function or value 'Darklang.SCM.Propagation.repointDependents'"
 let cascadeKind(
   kind: LanguageTools.ProgramTypes.ItemKind,
   l: LanguageTools.ProgramTypes.PackageLocation,
@@ -115,7 +107,6 @@ let cascadeKind(
   | _ -> Stdlib.Result.Result.Error("a hash to cascade between is not bound")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Authoring.cascade: Unknown function or value 'cascadeKind'"
 let cascade(
   m: String,
   name: String,

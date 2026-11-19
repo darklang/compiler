@@ -17,7 +17,6 @@ module Darklang.Stdlib.Cli.UI.Node
 
 /// What a `Styled` node does to the text under it. Semantic, not a colour: the terminal picks a
 /// colour, the page picks a class.
-// @compiler blocked: constructor-identity diagnostic="Constructor identity collision 1: Darklang.Stdlib.Option.Option.None, Darklang.Stdlib.Result.Result.Error"
 type Style =
   | Bold
   | Dim
@@ -32,7 +31,6 @@ type Style =
 
 
 /// How loud a `Band` is.
-// @compiler blocked: constructor-identity diagnostic="Constructor identity collision 1: Darklang.Stdlib.Option.Option.None, Darklang.Stdlib.Result.Result.Error"
 type Severity =
   | Info
   | Warning
@@ -48,7 +46,6 @@ type InputSpec<'msg> =
     edited: String -> 'msg }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.Node.Node: Unknown type 'Style'"
 type Node<'msg> =
   /// One line of text, clipped to the width it is given.
   | Text(String)
@@ -78,31 +75,23 @@ type Node<'msg> =
 
 // --- building ---
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let text(s: String): Node<'msg> =
   Node.Text(s)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let column(children: List<Node<'msg>>): Node<'msg> = Node.Column(children)
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let row(children: List<Node<'msg>>): Node<'msg> = Node.Row(children)
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Style'"
 let styled(style: Style, child: Node<'msg>): Node<'msg> = Node.Styled(style, child)
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let bold(s: String): Node<'msg> = Node.Styled(Style.Bold, Node.Text(s))
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let dim(s: String): Node<'msg> = Node.Styled(Style.Dim, Node.Text(s))
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Severity'"
 let band(severity: Severity, message: String): Node<'msg> = Node.Band(severity, message)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let table(columns: List<String>, rows: List<List<String>>): Node<'msg> =
   Node.Table(columns, rows)
 
@@ -122,7 +111,6 @@ let tableWidths(columns: List<String>, rows: List<List<String>>): List<Int64> =
 
 
 /// The size a node would take if nothing constrained it: (rows, cols).
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let measure(node: Node<'msg>): (Int64 * Int64) =
   match node with
   | Text(s) -> (1, String.displayWidth(s))
@@ -168,7 +156,6 @@ let measure(node: Node<'msg>): (Int64 * Int64) =
 /// The focusable nodes, in tree order, as their ids: an `Input` by its `id`, a `Button` by its
 /// label. Focus is an index into this list, kept by the host, and it follows the id across frames
 /// so a re-render that adds a row above does not move it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let focusable(node: Node<'msg>): List<String> =
   match node with
   | Input(spec) -> [ spec.id ]
@@ -196,7 +183,6 @@ type Focused<'msg> =
   | OnInput(InputSpec<'msg>)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let findFocused(node: Node<'msg>, id: String): Option<Focused<'msg>> =
   match node with
   | Input(spec) -> if spec.id == id then Option.Some(Focused.OnInput(spec)) else Option.None
@@ -221,7 +207,6 @@ let findFocused(node: Node<'msg>, id: String): Option<Focused<'msg>> =
 // --- the terminal ---
 
 /// The SGR prefix a style paints with.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Style'"
 let styleCode(style: Style): String =
   match style with
   | Bold -> Colors.bold
@@ -236,7 +221,6 @@ let styleCode(style: Style): String =
   | Highlight -> Colors.grayBg + Colors.white
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Severity'"
 let severityCode(severity: Severity): String =
   match severity with
   | Info -> Colors.bgBlue + Colors.white
@@ -288,7 +272,6 @@ let tableRows(columns: List<String>, rows: List<List<String>>): List<String> =
 
 /// Paint <param node> into <param region>. <param focus> is the focused id, "" for none; <param
 /// style> is the SGR prefix inherited from enclosing `Styled` nodes ("" at the top).
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let paint(
   node: Node<'msg>,
   region: Layout.Region,
@@ -387,14 +370,12 @@ let paint(
 
 
 /// Paint <param node> into <param region>. The terminal renderer.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let toSpans(node: Node<'msg>, region: Layout.Region, focus: String): List<Layout.Span> =
   paint(node, region, focus, "")
 
 
 /// Paint <param node> as styled rows at <param width>, as tall as it measures, with <param focus>
 /// marked: what a host windows when the tree is taller than its pane.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let toRows(node: Node<'msg>, width: Int64, focus: String): List<String> =
   let (rows, _) = measure(node)
   let w = max(1, width)
@@ -404,13 +385,11 @@ let toRows(node: Node<'msg>, width: Int64, focus: String): List<String> =
 
 /// Paint <param node> as plain rows at <param width>, as tall as it measures: for printing a tree
 /// to stdout (a one-shot command) rather than into a frame.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let toLines(node: Node<'msg>, width: Int64): List<String> =
   toRows(node, width, "")
 
 
 /// The row a focusable node with <param id> is painted on, so a host can scroll it into view.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Node'"
 let rowOf(node: Node<'msg>, id: String): Option<Int64> =
   let find(n: Node<'msg>, top: Int64): Option<Int64> =
     match n with

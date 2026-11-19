@@ -15,8 +15,12 @@ let check native root =
     CompilerAnnotations.readReasons
       (Filename.concat root "porting/compiler-reasons.json")
   in
+  let* sidecar =
+    CompilerAnnotations.readSidecar
+      (Filename.concat root "porting/upstream-annotations.tsv")
+  in
   let roots =
-    lines (Filename.concat root "upstream/sources.list")
+    lines (Filename.concat root "porting/upstream-sources.list")
     |> List.filter (String.starts_with ~prefix:"packages/")
     |> List.map (( ^ ) "upstream/")
   in
@@ -27,6 +31,7 @@ let check native root =
         let* source =
           SourceInventory.parse
             ~interpreterSource:(String.starts_with ~prefix:"upstream/" file)
+            ~annotations:(CompilerAnnotations.forSource sidecar file)
             ~reasons (read (Filename.concat root file))
         in
         Ok (file, source))

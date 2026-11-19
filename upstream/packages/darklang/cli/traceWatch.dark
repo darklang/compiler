@@ -56,7 +56,6 @@ type Msg =
 ///
 /// Returns the reason in place of the source when there is nothing to show, so the panel always
 /// has something true in it rather than going blank.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceWatch.annotate: Unknown function or value 'Cli.TraceVerbs.whyEmpty'"
 let annotate(
   accountID: Option<Uuid>,
   branchId: Uuid,
@@ -131,7 +130,6 @@ let clockFreeTime(created: String): String =
 
 /// Reload the traces and re-annotate. One function for every reason the panel changes, so a move
 /// and a tick cannot drift apart in what they show.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceWatch.reload: Unknown function or value 'Stdlib.Live.version'"
 let reload(
   accountID: Option<Uuid>,
   branchId: Uuid,
@@ -166,7 +164,6 @@ let reload(
       storeVersion = storeVersion }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceWatch.init: Unknown function or value 'SCM.PackageOps.currentBranch'"
 let init(): Model =
   let accountID = Option.None
   let branchId = SCM.PackageOps.currentBranch()
@@ -176,7 +173,6 @@ let init(): Model =
   reload(accountID, branchId, fn, 0, Option.None)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceWatch.update: Unknown function or value 'Stdlib.Live.version'"
 let update(m: Model, event: LiveView.Host.Event<Msg>): Model =
   match event with
   // A tick reloads BOTH halves: a new trace may have arrived, and the code may have been saved
@@ -198,7 +194,6 @@ let update(m: Model, event: LiveView.Host.Event<Msg>): Model =
     | _ -> m
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Stdlib.Cli.UI.Node.Node'"
 let render(m: Model): Stdlib.Cli.UI.Node.Node<Msg> =
   let traces =
     match m.traceLines with

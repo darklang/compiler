@@ -132,7 +132,6 @@ test lastIndexOf =
 
 
 // lastIndexOf walks back through a large Bytes
-// @compiler xfail runtime: "Out of heap memory" class=missing-support reason=compiler-resource
 test lastIndexOfLarge =
   let bytes =
     Stdlib.Bytes.concat(
@@ -457,7 +456,6 @@ test replaceAll =
 
 
 // replaceAll goes through many matches in a large Bytes
-// @compiler xfail runtime: "Out of heap memory" class=missing-support reason=compiler-resource
 test replaceAllLarge =
   Stdlib.Bytes.replaceAll(
     Stdlib.Utf8.encode(Stdlib.String.repeat("ab", 50000)),
@@ -529,13 +527,11 @@ test collectionsUseContentEquality =
 
 
 // Bytes have no order, so sorting them refuses rather than inventing one.
-// @compiler xfail runtime: "Canonical sorting is not supported for type Blob" class=missing-support reason=compiler-gap
 test sortRefusesBytes =
   Stdlib.List.sort([ Stdlib.Utf8.encode("b"), Stdlib.Utf8.encode("a") ])
   => raises "Cannot sort <Bytes: 1 byte 62>. Bytes, functions and streams have no order; use List.sortBy with a key that has one."
 
 
-// @compiler xfail runtime: "Canonical sorting is not supported for type Blob" class=missing-support reason=compiler-gap
 test sortByRefusesBytesKeys =
   Stdlib.List.sortBy([ "b", "a" ], fun s -> Stdlib.Utf8.encode(s))
   => raises "Cannot sort <Bytes: 1 byte 62>. Bytes, functions and streams have no order; use List.sortBy with a key that has one."
@@ -549,14 +545,12 @@ test sortOfValuesHoldingBytesComparesEarlierFieldsFirst =
   |> Stdlib.Test.equal([ 1, 2 ])
 
 
-// @compiler xfail runtime: "Canonical sorting is not supported for type Blob" class=missing-support reason=compiler-gap
 test sortOfValuesHoldingBytesRefusesOnATie =
   Stdlib.List.sort([ (1, Stdlib.Utf8.encode("x")), (1, Stdlib.Utf8.encode("y")) ])
   => raises "Cannot sort <Bytes: 1 byte 78>. Bytes, functions and streams have no order; use List.sortBy with a key that has one."
 
 
 // Reflection carries an opaque Bytes value, never a storage-specific tag.
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.RuntimeTypes.reflect'" class=missing-support reason=upstream-dependency
 test reflectionUsesContents =
   let reflect = LanguageTools.RuntimeTypes.reflect
   Stdlib.Test.all(
@@ -568,7 +562,6 @@ test reflectionUsesContents =
       |> Stdlib.Test.equal(true) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Dict.fromEntries'" class=missing-support reason=upstream-dependency
 test dictionaryKeysUseContents =
   let first = Stdlib.Utf8.encode("hi")
   let same = Stdlib.Bytes.fromList([ 104u8, 105u8 ])
@@ -598,7 +591,6 @@ test dictionaryKeysUseContents =
 // A test whose error holds unsaved Bytes still reports that error.
 // Equal Bytes are one key: a literal keeps the last value, `fromEntriesUnique`
 // refuses.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Dict.fromEntriesUnique'" class=missing-support reason=upstream-dependency
 test duplicateBytesKeysAreOneKey =
   let a = Stdlib.Utf8.encode("a")
   let alsoA = Stdlib.Bytes.fromList([ 97u8 ])
@@ -615,7 +607,6 @@ let reversed(bytes: Bytes): Bytes =
 
 
 // Unsaved Bytes reach a test worker and come back with their contents readable.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.Process.run'" class=missing-support reason=upstream-dependency
 test workerCarriesUnsavedBytes =
   let input = Stdlib.Utf8.encode("abc")
   match Stdlib.Test.Process.run(
@@ -636,7 +627,6 @@ test workerCarriesUnsavedBytes =
 
 // A slice of more than 64 bytes that is at least an eighth of what it comes from shares
 // that array, and a slice of it shares it too. Each one is still exactly its own bytes.
-// @compiler xfail runtime: "Unsupported dictionary key type" class=missing-support reason=compiler-gap
 test sharedSlices =
   let whole = Stdlib.Utf8.encode(Stdlib.String.repeat("0123456789", 100))
   let middle = Stdlib.Bytes.take(Stdlib.Bytes.drop(whole, 200), 500)
@@ -681,7 +671,6 @@ test sharedSlices =
 
 
 // A shared slice reaches a test worker as its own bytes, not the array it shares.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.Process.run'" class=missing-support reason=upstream-dependency
 test workerCarriesSharedSlice =
   let whole = Stdlib.Utf8.encode(Stdlib.String.repeat("ab", 500))
   let input = Stdlib.Bytes.drop(whole, 600)

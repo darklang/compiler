@@ -14,7 +14,6 @@ module Shapes =
     let show(p: Point): String =
       $"({Stdlib.display(p.x)}, {Stdlib.display(p.y)})"
 
-  // @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
   impl Show for Int64 =
     let show(n: Int64): String = Stdlib.display(n)
 
@@ -38,7 +37,6 @@ module Shapes =
   // beneath it
   //
   // Dispatch by the argument's type
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Language.Tests.Traits.Shapes.Show'" class=missing-support reason=compiler-gap
   test dispatchByArgType =
     Stdlib.Test.all(
       [ Shapes.Show.show(Shapes.Point { x = 5, y = 6 })
@@ -47,7 +45,6 @@ module Shapes =
         Shapes.Show.show(true) |> Stdlib.Test.equal("yes") ])
 
   // Inside a bounded generic fn
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Language.Tests.Traits.Shapes.Show'" class=missing-support reason=compiler-gap
   test boundedGenericFn =
     Stdlib.Test.all(
       [ Shapes.display(Shapes.Point { x = 1, y = 2 })
@@ -55,7 +52,6 @@ module Shapes =
         Shapes.display(5) |> Stdlib.Test.equal("value: 5") ])
 
   // Conditional impls dispatch on the head, then on the elements lazily
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Language.Tests.Traits.Shapes.Show'" class=missing-support reason=compiler-gap
   test conditionalImpls =
     Stdlib.Test.all(
       [ Shapes.display([ 1, 2, 3 ]) |> Stdlib.Test.equal("value: [1, 2, 3]")
@@ -64,7 +60,6 @@ module Shapes =
         |> Stdlib.Test.equal("value: [(1, 2)]") ])
 
   // As a function value, and piped
-  // @compiler xfail compile: "ANF conversion error: No implementation of trait 'Darklang.Language.Tests.Traits.Shapes.Show'" class=missing-support reason=compiler-gap
   test functionValueAndPipe =
     Stdlib.Test.all(
       [ ([ 1, 2 ] |> Stdlib.List.map(Shapes.Show.show))
@@ -73,7 +68,6 @@ module Shapes =
         |> Stdlib.Test.equal("(7, 8)") ])
 
   // Receiver calls: `x.method` is the whole call for a one-argument method
-  // @compiler xfail compile: "Field access requires a record value" class=missing-support reason=compiler-gap
   test receiverCalls =
     Stdlib.Test.all(
       [ (Shapes.Point { x = 1, y = 2 }).show |> Stdlib.Test.equal("(1, 2)")
@@ -84,18 +78,15 @@ module Shapes =
     (Shapes.Point { x = 1, y = 2 }).x |> Stdlib.Test.equal(1)
 
   // A direct call reports the missing implementation at the method call.
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Language.Tests.Traits.Shapes.Show'" class=aot-rejection reason=aot-type-error
   test noImplForDirectCallRaises =
     Shapes.Show.show(3.5)
     => raises
       "Float64 has no implementation of Darklang.Language.Tests.Traits.Shapes.Show. Write `impl Show for Float64 = ...`, or run `dark impls Show` to see which types do"
 
   // No impl: at the CALL of a bounded fn, before its body runs
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Language.Tests.Traits.Shapes.Show'" class=missing-support reason=compiler-gap
   test boundedCallWithImpl =
     Shapes.neverCalls(5) |> Stdlib.Test.equal("never")
 
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Language.Tests.Traits.Shapes.Show'" class=aot-rejection reason=aot-type-error
   test noImplForBoundedCallRaises =
     Shapes.neverCalls(3.5)
     => raises
@@ -128,7 +119,6 @@ module Multi =
         |> Stdlib.Test.equal(Multi.Vec { dx = 6, dy = 6 })
         Multi.sum("a", "b", "c") |> Stdlib.Test.equal("abc") ])
 
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Add'" class=aot-rejection reason=aot-type-error
   test boolHasNoAddRaises =
     Multi.sum(true, false, true)
     => raises
@@ -157,24 +147,20 @@ module Ambiguity =
   trait Label<'a> =
     let describe(v: 'a): String
 
-  // @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
   impl Describe for Int64 =
     let describe(n: Int64): String = "described"
     let short(n: Int64): String = "d"
 
-  // @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
   impl Label for Int64 =
     let describe(n: Int64): String = "labelled"
 
   // Naming the trait disambiguates
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Language.Tests.Traits.Ambiguity.Describe'" class=missing-support reason=compiler-gap
   test namedTraitDisambiguates =
     Stdlib.Test.all(
       [ Ambiguity.Describe.describe(1) |> Stdlib.Test.equal("described")
         Ambiguity.Label.describe(1) |> Stdlib.Test.equal("labelled") ])
 
   // A receiver call cannot pick between two traits with the same method name
-  // @compiler xfail compile: "Field access requires a record value" class=missing-support reason=compiler-gap
   test ambiguousReceiverRaises =
     (1).describe
     => raises
@@ -206,7 +192,6 @@ module MethodBounds =
         MethodBounds.Pair.pair(MethodBounds.Box { n = 1 }, "a", "b")
         |> Stdlib.Test.equal(true) ])
 
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Compare'" class=aot-rejection reason=aot-type-error
   test methodBoundOnBoolRaises =
     MethodBounds.Pair.pair(MethodBounds.Box { n = 1 }, true, true)
     => raises
@@ -293,7 +278,6 @@ module Equality =
         (Stdlib.Option.Option.Some(1) == Stdlib.Option.Option.Some(1))
         |> Stdlib.Test.equal(true) ])
 
-  // @compiler xfail compile: "Operator is unavailable for this type" class=aot-rejection reason=aot-type-error
   test intVsStringEqualityRaises =
     (1 == "a")
     => raises "Cannot perform equality check on Int64 and String"
@@ -318,7 +302,6 @@ module Equality =
 
   // the same one level down: a tuple slot, a dict value, an Option payload, a record
   // field
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Dict.fromEntries'" class=missing-support reason=upstream-dependency
   test nestedEquality =
     Stdlib.Test.all(
       [ ((1, Equality.User { id = 1, name = "a" })
@@ -360,7 +343,6 @@ module Identities =
       [ Stdlib.Zero.zero<Int64>() |> Stdlib.Test.equal(0)
         Stdlib.One.one<Float64>() |> Stdlib.Test.equal(1.0) ])
 
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Zero'" class=aot-rejection reason=aot-type-error
   test zeroWithoutTypeRaises =
     Stdlib.Zero.zero()
     => raises
@@ -417,7 +399,6 @@ module Rendering =
         Stdlib.clamp(5, 10, 20) |> Stdlib.Test.equal(10) ])
 
   // A type with no Compare implementation is what the bound refuses
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Compare'" class=aot-rejection reason=aot-type-error
   test minOnBoolRaises =
     Stdlib.min(true, false)
     => raises
@@ -431,7 +412,6 @@ module Rendering =
         Stdlib.abs(0) |> Stdlib.Test.equal(0) ])
 
   // an unsigned type has no Negate implementation, so it has no abs either
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Negate'" class=aot-rejection reason=aot-type-error
   test absOfUnsignedRaises =
     Stdlib.abs(5u8)
     => raises

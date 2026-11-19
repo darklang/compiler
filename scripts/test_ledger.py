@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regressions for the source-owned ledger and byte-preserving pin verification."""
+"""Regressions for the source-owned ledger and byte-identical pin verification."""
 import importlib.util
 from pathlib import Path
 import tempfile
@@ -84,15 +84,15 @@ class SourceLedger(unittest.TestCase):
             reflection=dict(status='excluded', notes='Intentionally excluded.'))))))
         self.assertEqual(ledger.summarize(self.root, [])['parser'], {'excluded': 1})
 
-    def test_only_lexer_identified_annotation_lines_are_removed(self):
-        original = b'module Example\nval text = """\n// @compiler blocked: literal\n"""\n'
+    def test_imported_sources_must_equal_the_pin(self):
+        original = b'module Example\nval text = 1\n'
         path = self.root / 'upstream/packages/example.dark'
         path.parent.mkdir(parents=True)
-        path.write_bytes(b'// @compiler blocked: missing-implementation\n' + original)
-        rows = [{'source': 'upstream/packages/example.dark', 'annotation_lines': [1]}]
+        path.write_bytes(original)
+        rows = [{'source': 'upstream/packages/example.dark'}]
         with patch.object(ledger.sources, 'checked_files', return_value={'packages/example.dark': original}):
             ledger.verify_pin(self.root, self.root, rows)
-            path.write_bytes(path.read_bytes().replace(b'module Example', b'module Altered'))
+            path.write_bytes(b'// @compiler blocked: missing-implementation\n' + original)
             with self.assertRaisesRegex(ValueError, 'differs from the pin'):
                 ledger.verify_pin(self.root, self.root, rows)
 
@@ -100,7 +100,7 @@ class SourceLedger(unittest.TestCase):
         directory = self.root / 'upstream/packages'
         directory.mkdir(parents=True)
         (directory / 'example.dark').write_text('val example = 1')
-        manifest = self.root / 'upstream/sources.list'
+        manifest = self.root / 'porting/upstream-sources.list'
         manifest.write_text('')
         with self.assertRaisesRegex(ValueError, 'complete source tree'):
             ledger.imported_paths(self.root)

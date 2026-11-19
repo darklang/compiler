@@ -76,7 +76,6 @@ module TypeIdentifier =
 
 module QualifiedTypeIdentifier =
   // Darklang.Stdlib.Option<Int64>
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.QualifiedTypeIdentifier'"
   let tokenize(q: WrittenTypes.QualifiedTypeIdentifier): List<SemanticToken> =
     [ // Darklang.Stdlib.
       q.modules
@@ -123,7 +122,6 @@ module QualifiedFnIdentifier =
 
 module TypeReference =
   module Builtin =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TypeReference.Builtin'"
     let tokenize(t: WrittenTypes.TypeReference.Builtin): List<SemanticToken> =
       match t with
       | TUnit(r)
@@ -198,7 +196,6 @@ module TypeReference =
         |> Stdlib.List.flatten
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TypeReference.TypeReference'"
   let tokenize(t: WrittenTypes.TypeReference.TypeReference): List<SemanticToken> =
     match t with
     | Builtin(b) -> Builtin.tokenize(b)
@@ -206,7 +203,6 @@ module TypeReference =
 
 
 module ModuleDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ModuleDeclaration.Declaration'"
   let tokenizeDeclaration(d: WrittenTypes.ModuleDeclaration.Declaration): List<SemanticToken> =
     match d with
     | Type(t) -> TypeDeclaration.tokenize(t)
@@ -219,7 +215,6 @@ module ModuleDeclaration =
     | Expr(e) -> Expr.tokenize(e)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ModuleDeclaration.ModuleDeclaration'"
   let tokenize(m: WrittenTypes.ModuleDeclaration.ModuleDeclaration): List<SemanticToken> =
     let (nameRange, name) = m.name
     [ [ makeToken(m.keywordModule, TokenType.Keyword) ]
@@ -231,7 +226,6 @@ module ModuleDeclaration =
 
 
 module TypeDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TypeDeclaration.Definition'"
   let tokenizeDefinition(d: WrittenTypes.TypeDeclaration.Definition): List<SemanticToken> =
     match d with
     | Alias(typeRef) -> TypeReference.tokenize(typeRef)
@@ -284,7 +278,6 @@ module TypeDeclaration =
 
 
   // type ID = UInt64
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TypeDeclaration.TypeDeclaration'"
   let tokenize(t: WrittenTypes.TypeDeclaration.TypeDeclaration): List<SemanticToken> =
     [ // type
       [ makeToken(t.keywordType, TokenType.Keyword) ]
@@ -310,7 +303,6 @@ module FnDeclaration =
 
   // `(a: Int64)`
   module NormalParameter =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.FnDeclaration.NormalParameter'"
     let tokenize(p: WrittenTypes.FnDeclaration.NormalParameter): List<SemanticToken> =
       [ // `(`
         [ makeToken(p.symbolLeftParen, TokenType.Symbol) ]
@@ -326,7 +318,6 @@ module FnDeclaration =
 
 
   module Parameter =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.FnDeclaration.Parameter'"
     let tokenize(p: WrittenTypes.FnDeclaration.Parameter): List<SemanticToken> =
       match p with
       | Unit(u) -> UnitParameter.tokenize(u)
@@ -335,7 +326,6 @@ module FnDeclaration =
 
   /// `(a: Int64, b: Int64)`. Neighbouring parameters share the `,` between them (one's
   /// right delimiter, the next one's left), so it is tokenized once.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.FnDeclaration.Parameter'"
   let tokenizeParameters(ps: List<WrittenTypes.FnDeclaration.Parameter>): List<SemanticToken> =
     ps
     |> Stdlib.List.map(fun p -> Parameter.tokenize(p))
@@ -348,7 +338,6 @@ module FnDeclaration =
 
 
   // `let add(a: Int64, b: Int64): Int64 = a + b`
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.FnDeclaration.FnDeclaration'"
   let tokenize(fn: WrittenTypes.FnDeclaration.FnDeclaration): List<SemanticToken> =
     [ // `let`
       [ makeToken(fn.keywordLet, TokenType.Keyword) ]
@@ -373,7 +362,6 @@ module FnDeclaration =
 
 
 module ValueDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ValueDeclaration.ValueDeclaration'"
   let tokenize(v: WrittenTypes.ValueDeclaration.ValueDeclaration): List<SemanticToken> =
     let typ =
       match v.typ with
@@ -395,7 +383,6 @@ module ValueDeclaration =
 
 module TypeParamBound =
   // `'a: Show<Int64>`
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TypeParamBound'"
   let tokenize(b: WrittenTypes.TypeParamBound): List<SemanticToken> =
     [ [ makeToken(b.symbolColon, TokenType.Symbol) ], QualifiedTypeIdentifier.tokenize(b.trait_) ]
     |> Stdlib.List.flatten
@@ -403,7 +390,6 @@ module TypeParamBound =
 
 module TraitDeclaration =
   // `let show (v: 'a) : String`
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TraitDeclaration.Method'"
   let tokenizeMethod(m: WrittenTypes.TraitDeclaration.Method): List<SemanticToken> =
     [ [ makeToken(m.keywordLet, TokenType.Keyword) ]
       FnIdentifier.tokenize(m.name)
@@ -419,7 +405,6 @@ module TraitDeclaration =
 
 
   // `trait Show<'a> = ...`
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TraitDeclaration.TraitDeclaration'"
   let tokenize(t: WrittenTypes.TraitDeclaration.TraitDeclaration): List<SemanticToken> =
     [ [ makeToken(t.keywordTrait, TokenType.Keyword) ]
       TypeIdentifier.tokenize(t.name)
@@ -437,7 +422,6 @@ module TraitDeclaration =
 
 module ImplDeclaration =
   // `impl<'a: Show> Show for List<'a> = ...`
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ImplDeclaration.ImplDeclaration'"
   let tokenize(i: WrittenTypes.ImplDeclaration.ImplDeclaration): List<SemanticToken> =
     [ [ makeToken(i.keywordImpl, TokenType.Keyword) ]
       i.typeParams |> Stdlib.List.map(fun((r, _)) -> makeToken(r, TokenType.TypeParameter))
@@ -459,7 +443,6 @@ module ImplDeclaration =
 
 
 module TestDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TestDeclaration.TestDeclaration'"
   let tokenize(test: WrittenTypes.TestDeclaration.TestDeclaration): List<SemanticToken> =
     [ [ makeToken(test.keywordTest, TokenType.Keyword) ]
       ValueIdentifier.tokenize(test.name)
@@ -671,7 +654,6 @@ module Expr =
 
 
   module PipeExpr =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.PipeExpr'"
     let tokenize(pe: WrittenTypes.PipeExpr): List<SemanticToken> =
       match pe with
       | EPipeLambda(_, pats, body, keywordFun, symbolArrow) ->
@@ -725,7 +707,6 @@ module Expr =
       | EPipeVariableOrFnCall(range, _varName) -> [ makeToken(range, TokenType.VariableName) ]
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.Expr'"
   let tokenize(e: WrittenTypes.Expr): List<SemanticToken> =
     match e with
     // ()
@@ -1143,7 +1124,6 @@ module Expr =
 
 
 module ParsedFile =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ParsedFile'"
   let tokenize(wt: WrittenTypes.ParsedFile): List<SemanticToken> =
     match wt with
     | SourceFile(sourceFile) ->

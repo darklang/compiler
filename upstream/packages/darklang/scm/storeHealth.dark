@@ -19,7 +19,6 @@ type Counts =
 
 
 /// Count everything <fn problems> reports on, straight from the store.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.StoreHealth.counts: Unknown function or value 'Builtin.scmHealth'"
 let counts(): Counts =
   Builtin.scmHealth()
 
@@ -52,7 +51,6 @@ let countedProblem(n: Int64, damage: Damage, what: String): List<Problem> =
 /// Everything wrong with the store right now. Empty when it's healthy.
 ///
 /// main-scoped, on purpose: health is a property of the store's log and main's projections of it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.StoreHealth.problems: Unknown function or value 'counts'"
 let problems(): List<Problem> =
   let c = counts()
   Stdlib.List.flatten(

@@ -2,7 +2,6 @@ module Darklang.LanguageTools.Parser.Parse
 
 /// The parser's tree for <param code> and its diagnostics, as (range, message) pairs. The tree is
 /// best-effort, {{None}} only if the tokenizer failed outright.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ParsedFile'"
 let parse(
   kind: FileKind,
   code: String)
@@ -12,13 +11,11 @@ let parse(
 
 /// The written-types tree for <param code>, or {{None}} if the tokenizer failed outright. Syntax errors
 /// short of that come back as a tree plus `diagnostics`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ParsedFile'"
 let toWrittenTypes(code: String): Option<WrittenTypes.ParsedFile> =
   parse(FileKind.Script, code) |> Stdlib.Tuple2.first
 
 
 /// The parser's syntax diagnostics for <param code>, as (range, message) pairs. Empty on a clean parse.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Parse.diagnostics: Unknown function or value 'parse'"
 let diagnostics(code: String): List<(Range * String)> =
   parse(FileKind.Script, code) |> Stdlib.Tuple2.second
 
@@ -58,14 +55,12 @@ module ParseError =
 /// A source with any syntax diagnostic is an `Error`, even though the parser recovered a tree:
 /// lowering turns the recovery holes into `()`, so passing that tree on would run something
 /// other than what was written.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ParsedFile'"
 let initialParse(code: String): Result<WrittenTypes.ParsedFile, ParseError> =
   initialParseAs(FileKind.Script, code)
 
 
 /// `initialParse` for a <param kind> other than a script, such as a package file, where named
 /// tests are allowed.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ParsedFile'"
 let initialParseAs(kind: FileKind, code: String): Result<WrittenTypes.ParsedFile, ParseError> =
   match parse(kind, code) with
   | Some(parsedFile), [] -> Result.Ok(parsedFile)
@@ -73,7 +68,6 @@ let initialParseAs(kind: FileKind, code: String): Result<WrittenTypes.ParsedFile
   | _, diagnostics -> Result.Error(ParseError.Syntax(diagnostics))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.Expr'"
 let parsePTExpr(code: String): Result<ProgramTypes.Expr, ParseError> =
   // context-free lowering is just the in-context lowering with an empty context, against main
   parsePTExprInContext(SCM.Branch.mainBranchId, "", [], [], [], code)
@@ -87,7 +81,6 @@ let parsePTExpr(code: String): Result<ProgramTypes.Expr, ParseError> =
 ///
 /// The branch is a PARAMETER, not the process's: the same source must lower the same way whichever
 /// branch a long-lived process (the LSP) happens to sit on.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.Expr'"
 let parsePTExprInContext(
   branchId: Uuid,
   owner: String,
@@ -137,7 +130,6 @@ let parsePTExprInContext(
   | Error(e) -> Stdlib.Result.Result.Error(e)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.SourceFile.SourceFile'"
 let parsePTSourceFileWithOps(
   branchId: Uuid,
   code: String)
@@ -152,7 +144,6 @@ let parsePTSourceFileWithOps(
 
 
 /// Parse package declarations into written types, or return syntax diagnostics.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ParsedFile'"
 let packageToWrittenTypes(source: String): Result<WrittenTypes.ParsedFile, List<(Range * String)>> =
   match parse(FileKind.Package, source) with
   | Some(parsedFile), [] -> Result.Ok(parsedFile)
@@ -160,7 +151,6 @@ let packageToWrittenTypes(source: String): Result<WrittenTypes.ParsedFile, List<
 
 
 /// Convert a top-level declaration to a module member for shared lowering.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.SourceFile.SourceFileDeclaration'"
 let toModuleDeclaration(
   declaration: WrittenTypes.SourceFile.SourceFileDeclaration)
   : WrittenTypes.ModuleDeclaration.Declaration =
@@ -179,7 +169,6 @@ let toModuleDeclaration(
 
 /// Lower a module to package operations without storing them. Resolve references
 /// within the module and against <param context>, then stabilize recursive hashes.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
 let moduleToPackageOps(
   context: NameResolver.NRContext,
   rootModule: WrittenTypes.ModuleDeclaration.ModuleDeclaration)
@@ -199,7 +188,6 @@ let moduleToPackageOps(
 /// Parse package source under <param owner> and <param modules>, resolving against
 /// <param branchId> and the other declarations in the source. Return stabilized
 /// operations, or an error for invalid syntax or unresolved names.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PackageOp'"
 let packageSourceToOps(
   branchId: Uuid,
   owner: String,

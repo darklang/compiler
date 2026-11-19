@@ -1,11 +1,9 @@
 module Darklang.Stdlib.Cli.File.Bytes.Tests
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.File.Bytes.Tests.events: Unknown function or value 'Stdlib.Bytes.fromList'"
 let events(bytes: List<UInt8>): Stdlib.Result.Result<(Bool * Bool), Int64> =
   Stdlib.Cli.File.__watchEvents(Stdlib.Bytes.fromList(bytes), 0, false, false)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.File.Bytes.Tests.vnodeEvents: Unknown function or value 'Stdlib.Bytes.fromList'"
 let vnodeEvents(
   bytes: List<UInt8>)
   : Stdlib.Result.Result<(Bool * Bool), Int64> =
@@ -41,7 +39,6 @@ let kevent(
 
 
 // __watchEvents (inotify)
-// @compiler xfail compile: "Unknown function or value 'events'" class=missing-support reason=upstream-dependency
 test watchEvents =
   Stdlib.Test.all(
     [ events([]) |> Stdlib.Test.equal(Stdlib.Result.Result.Ok((false, false)))
@@ -64,7 +61,6 @@ test watchEvents =
 
 
 // Each event is read from where the previous one ended, including its name.
-// @compiler xfail compile: "Unknown function or value 'events'" class=missing-support reason=upstream-dependency
 test watchEventsWalksSeveralEvents =
   let named =
     Stdlib.List.flatten(
@@ -85,7 +81,6 @@ test watchEventsWalksSeveralEvents =
 
 
 // __watchVnodeEvents (kqueue)
-// @compiler xfail compile: "Unknown function or value 'vnodeEvents'" class=missing-support reason=upstream-dependency
 test watchVnodeEvents =
   let noData = zeros(8)
   Stdlib.Test.all(
@@ -101,7 +96,6 @@ test watchVnodeEvents =
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok((true, true))) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'vnodeEvents'" class=missing-support reason=upstream-dependency
 test watchVnodeEventsWalksSeveralEvents =
   let noData = zeros(8)
   let changed = kevent([ 0u8, 0u8 ], [ 2u8, 0u8, 0u8, 0u8 ], noData)
@@ -165,7 +159,6 @@ test dropThroughFirstNewline =
 
 
 // __copyWriteAt: a write must make exact progress; errors pass through
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test copyWriteAt =
   let abc = Stdlib.Utf8.encode("abc")
   Stdlib.Test.all(
@@ -195,7 +188,6 @@ test copyWriteAt =
 
 
 // __copyBuffered reads 64 KiB chunks from the offset until an empty read
-// @compiler xfail compile: "Operator is unavailable for this type" class=missing-support reason=compiler-gap
 test copyBuffered =
   Stdlib.Cli.File.__copyBuffered(
     (fun(count, offset) ->
@@ -217,7 +209,6 @@ test copyBuffered =
 
 
 // Which errnos fall back to a buffered copy, and which error wins on close
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test copyFallbackAndFinish =
   let posixError = fun(errno, message) ->
     Stdlib.Cli.Posix.Error { errno = errno, message = message }
@@ -250,7 +241,6 @@ test copyDirectoryRefused =
 
 
 // Watching a missing path returns at once; a zero interval is still valid
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test watchEdges =
   let immediate = Stdlib.Cli.Dir.withTemp(fun dir ->
     let path = $"{dir}/watch"

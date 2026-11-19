@@ -3,7 +3,6 @@
 /// The helpers are in `helpers.dark`.
 module Darklang.SCM.Tests.Cli
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aBranchSeesMainsCommitsButNotMainsDraft =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.a", "1")
@@ -35,7 +34,6 @@ test aBranchSeesMainsCommitsButNotMainsDraft =
       evals(dark, "Tests.App.draftOnly()", "3", "and the new name") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aBranchOffABranchSeesItsParentsCommits =
   scenario(fun dark ->
     [ switch(dark, "feat")
@@ -71,7 +69,6 @@ test aBranchOffABranchSeesItsParentsCommits =
       notFoundOn(dark, "main", "Tests.App.onFeat()", "and main sees neither") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test switchStaysButBranchFlagAndEnvVarAreForOneCommand =
   scenario(fun dark ->
     [ switch(dark, "feat")
@@ -102,7 +99,6 @@ test switchStaysButBranchFlagAndEnvVarAreForOneCommand =
 
 // Odd, but today's behaviour: `switch new` starts the branch off where you stand, while
 // `--branch new` starts it off main.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aNewBranchStartsOffMainWithBranchFlagButOffHereWithSwitch =
   scenario(fun dark ->
     [ switch(dark, "feat")
@@ -114,7 +110,6 @@ test aNewBranchStartsOffMainWithBranchFlagButOffHereWithSwitch =
         "--branch started off main, switch started off feat") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test renamingABranchKeepsItsWork =
   scenario(fun dark ->
     [ switch(dark, "feat")
@@ -134,7 +129,6 @@ test renamingABranchKeepsItsWork =
       evals(dark, "Tests.App.a()", "1", "and it merges under the new name") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test archivingABranchThrowsAwayItsUnmergedWork =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.keep", "1")
@@ -188,7 +182,6 @@ test archivingABranchThrowsAwayItsUnmergedWork =
 
 // Odd, but today's behaviour: switching to the name of a merged branch starts a fresh branch
 // with the same name.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test switchingToAMergedBranchsNameStartsAFreshBranch =
   scenario(fun dark ->
     [ switch(dark, "feat")

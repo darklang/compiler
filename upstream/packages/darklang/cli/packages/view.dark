@@ -2,7 +2,6 @@ module Darklang.Cli.Packages.View
 
 /// Resolve a replacement Reference to a human-readable location name for the
 /// current branch, falling back to a short hash if no location is bound.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.View.resolveReplacementName: Unknown function or value 'LanguageTools.PackageManager.Function.locations'"
 let resolveReplacementName(branchId: Uuid, ref: LanguageTools.ProgramTypes.Reference): String =
   let ctx = PrettyPrinter.ProgramTypes.Context.forBranch(branchId)
   let hash = LanguageTools.ProgramTypes.Reference.hash(ref)
@@ -28,7 +27,6 @@ let resolveReplacementName(branchId: Uuid, ref: LanguageTools.ProgramTypes.Refer
 ///
 /// Reading an item and writing it back should be a pipe. Stripping a trailer and a
 /// prefix with `sed` is a screen-scrape: it works until the display changes.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let rawSource(branchId: Uuid, location: PackageLocation): Result<String, String> =
   let sourceOf(loc: LanguageTools.ProgramTypes.PackageLocation): Result<String, String> =
     let modulePath = Stdlib.List.prepend(loc.modules, loc.owner)
@@ -63,7 +61,6 @@ let rawSource(branchId: Uuid, location: PackageLocation): Result<String, String>
 
 
 /// The <param kind> named <param name> in the module at <param path>, printed for `dark module`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.View.moduleDecl: Unknown function or value 'Query.searchExactMatch'"
 let moduleDecl(
   branchId: Uuid,
   path: List<String>,
@@ -119,7 +116,6 @@ let moduleDecl(
 /// Every declaration directly in the module at <param path>, as one file `dark module` reads
 /// back: types, traits, values, fns, impls, then tests. Submodules are left out; an impl
 /// for one of the module's types is kept, since `dark module` puts it under the type's name.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.View.moduleSource: Unknown function or value 'Query.loadDeprecationSets'"
 let moduleSource(branchId: Uuid, path: List<String>): Result<String, String> =
   let depSets = Query.loadDeprecationSets(branchId)
   let decls(
@@ -160,7 +156,6 @@ let moduleSource(branchId: Uuid, path: List<String>): Result<String, String> =
 
 
 /// Print `rawSource`, or say why there is none.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let printRaw(branchId: Uuid, location: PackageLocation): Unit =
   match rawSource(branchId, location) with
   | Ok(src) -> Stdlib.printLine(src)
@@ -168,7 +163,6 @@ let printRaw(branchId: Uuid, location: PackageLocation): Unit =
 
 
 /// Build a deprecation header for the item at a name, if any.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.View.deprecationHeaderRowsFor: Unknown function or value 'LanguageTools.PackageManager.currentDeprecation'"
 let deprecationHeaderRowsFor(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,
@@ -206,7 +200,6 @@ let sourceRows(source: String): List<String> =
 
 /// Build the complete textual representation of an entity without printing it.
 /// A printer context for `modulePath`, laid out for the terminal's width rather than a fixed 80.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.View.terminalContext: Unknown type 'LanguageTools.Formatter.LocalFn'"
 let terminalContext(branchId: Uuid, modulePath: List<String>): PrettyPrinter.ProgramTypes.Context =
   let (width, _rows) = Terminal.getSize()
   { PrettyPrinter.ProgramTypes.Context.forModule(branchId, modulePath) with width = width }
@@ -219,7 +212,6 @@ let terminalContext(branchId: Uuid, modulePath: List<String>): PrettyPrinter.Pro
 ///
 /// <param cmdPrefix> is how the reader runs a command where these rows are
 /// shown: "dark " in a shell, ":" in the workbench's command bar.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.View.testRows: Unknown function or value 'Query.loadDeprecationSets'"
 let testRows(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,
@@ -235,7 +227,6 @@ let testRows(
 
 
 /// <fn testRows>, from the item's dependents the caller already read.
-// @compiler blocked: upstream-dependency diagnostic="testRowsFrom: Unknown type 'Packages.PackageLocation'"
 let testRowsFrom(
   branchId: Uuid,
   dependents:
@@ -310,7 +301,6 @@ module Tests =
     if asked then Cli.Packages.View.Tests.Show else Cli.Packages.View.Tests.Hide
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let entityRows(branchId: Uuid, location: PackageLocation, tests: Tests): List<String> =
   match location with
   | Module(path) ->
@@ -571,14 +561,12 @@ let entityRows(branchId: Uuid, location: PackageLocation, tests: Tests): List<St
           sourceRows(highlighted) ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let viewEntity(branchId: Uuid, location: PackageLocation, tests: Tests): Unit =
   entityRows(branchId, location, tests) |> Stdlib.printLines
 
 
 /// What `view` shows. Source is the default and the only one that works for every kind of item; the
 /// other two are compiler views of a function.
-// @compiler blocked: constructor-identity diagnostic="Constructor identity collision 2776: Darklang.Cli.Packages.View.ViewMode.Source, Darklang.Stdlib.Float64.ParseError.BadFormat"
 type ViewMode =
   | Source
   /// The declaration alone: no highlighting, no deprecation header, no capabilities
@@ -592,7 +580,6 @@ type ViewMode =
   | Instructions
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ViewMode'"
 let modeName(mode: ViewMode): String =
   match mode with
   | Source -> "source"
@@ -620,7 +607,6 @@ let modeName(mode: ViewMode): String =
 /// Flags are accepted in any position, so `view --ast List.last` and `view List.last --ast` both work.
 /// Returns the paths given (none means the current location), the mode, and whether
 /// `--include-tests` was passed, or an error naming the bad flag.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ViewMode'"
 let parseArgs(args: List<String>): Result<(List<String> * ViewMode * Bool), String> =
   let isFlag(a: String): Bool = Stdlib.String.startsWith(a, "-")
   let includeTests = Stdlib.List.contains(args, "--include-tests")
@@ -650,7 +636,6 @@ let parseArgs(args: List<String>): Result<(List<String> * ViewMode * Bool), Stri
 
 /// The function at a location, if the location names one. `--ast` and `--instructions` are function-only
 /// views, and saying which kind of thing you actually pointed at beats a bare "not found".
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let fnAt(
   branchId: Uuid,
   location: PackageLocation)
@@ -675,7 +660,6 @@ let fnAt(
 
 /// The ProgramTypes tree, indented by depth. Node kinds are colored and payloads dimmed, so the shape
 /// reads at a glance and the detail is there when you look for it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 let astRows(
   branchId: Uuid,
   name: String,
@@ -696,7 +680,6 @@ let astRows(
 
 /// The disassembly, plus any lambdas defined inside it. Lambdas get their own section rather than being
 /// inlined, because `CreateLambda` is otherwise a dead end in the listing.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.RuntimeTypes.Instructions'"
 let instructionRows(branchId: Uuid, instrs: LanguageTools.RuntimeTypes.Instructions): List<String> =
   let renderBody(is: LanguageTools.RuntimeTypes.Instructions): List<String> =
     let opcodeWidth =
@@ -739,7 +722,6 @@ let instructionRows(branchId: Uuid, instrs: LanguageTools.RuntimeTypes.Instructi
 
 
 /// Render one of the compiler views of the function at <param location>.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let viewCompiled(branchId: Uuid, location: PackageLocation, mode: ViewMode): Unit =
   match fnAt(branchId, location) with
   | Error(e) -> printErr($"Cannot {modeName(mode)}: {e}")
@@ -781,7 +763,6 @@ let isItemHash(s: String): Bool =
 /// Resolve an item hash (see `isItemHash`) to the location main binds it to, wrapped by
 /// the KIND the store records for it, so the viewer renders it as itself. Errors when no
 /// live name binds the hash.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let resolveHashArg(hash: String): Result<PackageLocation, String> =
   match SCM.Deps.mainLocationOf(hash) with
   | Some(loc) ->
@@ -808,7 +789,6 @@ let resolveHashArg(hash: String): Result<PackageLocation, String> =
 /// line saying nothing has run is noise on every function you ever look at, and silent for a type
 /// or a value, which do not run. <param after> ends the line: what `traces show` does for the
 /// reader at this moment.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let printTraceHintWith(branchId: Uuid, location: PackageLocation, after: String): Unit =
   match location with
   | Module(_) -> ()
@@ -830,14 +810,12 @@ let printTraceHintWith(branchId: Uuid, location: PackageLocation, after: String)
         Stdlib.Cli.UI.Colors.dimText($"{count} went through this: dark traces show {name}{after}"))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let printTraceHint(branchId: Uuid, location: PackageLocation): Unit =
   printTraceHintWith(branchId, location, "")
 
 
 /// View one item: <param pathArg>, or the current location when there is none. <param failure>
 /// starts the line that says it is not there.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.View.viewOne: Unknown function or value 'resolveHashArg'"
 let viewOne(
   state: AppState,
   pathArg: Option<String>,
@@ -881,7 +859,6 @@ let viewOne(
       state
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match parseArgs(args) with
   | Error(e) ->
@@ -911,7 +888,6 @@ let execute(state: AppState, args: List<String>): AppState =
         viewNamed(acc, p))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   let branchId = state.currentBranchId
   // Complete the path as before, and offer the view flags once something is typed. Flags are filtered
@@ -930,7 +906,6 @@ let complete(state: AppState, args: List<String>): List<Completion.CompletionIte
   | None -> Traversal.completePartialPath(branchId, state.packageData.currentLocation, "")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ "Usage: view [path...] [--include-tests] [--raw | --ast | --instructions]"
     "View a function, type, value, trait, implementation, test or module."

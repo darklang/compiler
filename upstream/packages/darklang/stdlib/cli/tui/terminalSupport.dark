@@ -2,7 +2,6 @@
 module Darklang.Stdlib.Cli.Tui.TerminalSupport
 
 /// Terminal facts.
-// @compiler replace: packages/darklang/stdlib/cli/tui/terminalSupport.dark#Darklang.Stdlib.Cli.Tui.TerminalSupport.Facts reason=compiler-implementation
 type Facts =
   { inputIsTerminal: Bool
     outputIsTerminal: Bool
@@ -10,7 +9,6 @@ type Facts =
 
 
 /// Whether an interactive TUI may start.
-// @compiler replace: packages/darklang/stdlib/cli/tui/terminalSupport.dark#Darklang.Stdlib.Cli.Tui.TerminalSupport.Availability reason=compiler-implementation
 type Availability =
   | Available
   | Unavailable(reason: String)
@@ -20,7 +18,6 @@ type Availability =
 ///
 /// Both input and output must be terminals: the UI reads keys from input and
 /// writes terminal control sequences to output.
-// @compiler replace: packages/darklang/stdlib/cli/tui/terminalSupport.dark#Darklang.Stdlib.Cli.Tui.TerminalSupport.evaluate reason=compiler-implementation
 let evaluate(facts: Facts): Availability =
   let terminalName =
     facts.terminalName
@@ -41,7 +38,6 @@ let evaluate(facts: Facts): Availability =
 
 
 /// Read the current terminal facts.
-// @compiler replace: packages/darklang/stdlib/cli/tui/terminalSupport.dark#Darklang.Stdlib.Cli.Tui.TerminalSupport.currentFacts reason=compiler-implementation
 let currentFacts(): Facts =
   Facts
     { inputIsTerminal = Sys.isTerminal(0)
@@ -51,7 +47,6 @@ let currentFacts(): Facts =
 
 /// Check whether an interactive TUI may start in the current terminal. Not refused under `CI`:
 /// tests drive a TUI on CI's pty with scripted keys.
-// @compiler replace: packages/darklang/stdlib/cli/tui/terminalSupport.dark#Darklang.Stdlib.Cli.Tui.TerminalSupport.current reason=compiler-implementation
 let current(): Availability =
   if Env.isOn("DARK_NO_INPUT") then
     Availability.Unavailable("nobody is at the keyboard (DARK_NO_INPUT or --no-input is set)")
@@ -60,6 +55,5 @@ let current(): Availability =
 
 
 /// Format an error without terminal control sequences.
-// @compiler replace: packages/darklang/stdlib/cli/tui/terminalSupport.dark#Darklang.Stdlib.Cli.Tui.TerminalSupport.unavailableMessage reason=compiler-implementation
 let unavailableMessage(reason: String): String =
   $"Interactive terminal UI unavailable: {reason}."

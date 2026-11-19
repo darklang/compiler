@@ -2,3 +2,4 @@
 val sources : (string * string) list
 val upstreamSources : (string * string) list
 val compilerReasons : string
+val upstreamAnnotations : string

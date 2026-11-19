@@ -1,12 +1,10 @@
 /// At-rest checker reporting for package commands.
 module Darklang.Cli.Packages.AtRestCheck
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 let checkBranch(branchId: Uuid): LanguageTools.AtRestTypeChecker.Report =
   LanguageTools.AtRestTypeChecker.checkBranch(branchId)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 let checkModule(branchId: Uuid, modules: List<String>): LanguageTools.AtRestTypeChecker.Report =
   LanguageTools.AtRestTypeChecker.checkModule(branchId, modules)
 
@@ -14,7 +12,6 @@ let checkModule(branchId: Uuid, modules: List<String>): LanguageTools.AtRestType
 /// The name behind a hash in a diagnostic. Types and traits both appear in them -- "no
 /// implementation of X for Y" names a trait and a type -- and a hash in a message a person reads
 /// is no help, so both are looked up.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.AtRestCheck.customTypeName: Unknown function or value 'LanguageTools.PackageManager.Type.locations'"
 let customTypeName(branchId: Uuid, hash: LanguageTools.ProgramTypes.Hash): Option<String> =
   let nameAt(locations: List<LanguageTools.ProgramTypes.PackageLocation>) =
     LanguageTools.PackageManager.pickLocation(
@@ -27,14 +24,12 @@ let customTypeName(branchId: Uuid, hash: LanguageTools.ProgramTypes.Hash): Optio
   | None -> nameAt(LanguageTools.PackageManager.Trait.locations(branchId, hash))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.StaticType'"
 let staticType(branchId: Uuid, typ: LanguageTools.AtRestTypeChecker.StaticType): String =
   LanguageTools.AtRestTypeChecker.staticTypeToStringWith(
     (fun hash -> customTypeName(branchId, hash)),
     typ)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Issue'"
 let issueLine(branchId: Uuid, issue: LanguageTools.AtRestTypeChecker.Issue): String =
   let code = LanguageTools.AtRestTypeChecker.issueCodeToString(issue.code)
   let message =
@@ -56,7 +51,6 @@ let issueLine(branchId: Uuid, issue: LanguageTools.AtRestTypeChecker.Issue): Str
 /// the type's own `toString` when its module has one (`Stdlib.HttpClient.RequestError` gets
 /// "Try `Stdlib.HttpClient.toString`"), else `Stdlib.inspect`. <param render> writes that name
 /// the way the rest of the message writes names.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.AtRestCheck.withDisplayHint: Unknown function or value 'LanguageTools.PackageManager.Trait.locations'"
 let withDisplayHint(
   branchId: Uuid,
   issue: LanguageTools.AtRestTypeChecker.Issue,
@@ -100,7 +94,6 @@ let withDisplayHint(
       message
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Issue'"
 let sameOrMirrored(
   first: LanguageTools.AtRestTypeChecker.Issue,
   second: LanguageTools.AtRestTypeChecker.Issue)
@@ -118,7 +111,6 @@ let sameOrMirrored(
   same || mirrored
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Issue'"
 let deduplicate(
   issues: List<LanguageTools.AtRestTypeChecker.Issue>)
   : List<LanguageTools.AtRestTypeChecker.Issue> =
@@ -196,7 +188,6 @@ let printUnresolvedTraitCalls(
   if text == "" then () else Stdlib.printErrorLine(text)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Issue'"
 let issueLines(branchId: Uuid, issues: List<LanguageTools.AtRestTypeChecker.Issue>): List<String> =
   issues
   |> deduplicate
@@ -219,7 +210,6 @@ let issueLines(branchId: Uuid, issues: List<LanguageTools.AtRestTypeChecker.Issu
     | many -> line + " (" + Stdlib.String.join(many, "; ") + ")")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 let summary(report: LanguageTools.AtRestTypeChecker.Report): Option<String> =
   match report.verdict with
   | Checked -> Option.None
@@ -229,7 +219,6 @@ let summary(report: LanguageTools.AtRestTypeChecker.Report): Option<String> =
 
 /// Return a failing exit code for type errors and names that cannot be found.
 /// An unfinished check alone does not mean the code is broken.
-// @compiler blocked: upstream-dependency diagnostic="saveHasErrors: Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 let saveHasErrors(report: LanguageTools.AtRestTypeChecker.Report): Bool =
   report.verdict == LanguageTools.AtRestTypeChecker.Verdict.Failed
   || (Stdlib.List.concat(report.diagnostics, report.warnings)
@@ -242,7 +231,6 @@ let saveHasErrors(report: LanguageTools.AtRestTypeChecker.Report): Bool =
 
 /// Report a saved WIP batch. Findings do not stop the save; `commit` enforces
 /// definite errors.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 let printSaveReport(branchId: Uuid, report: LanguageTools.AtRestTypeChecker.Report): Unit =
   match report.verdict with
   | Checked -> ()
@@ -264,7 +252,6 @@ let printSaveReport(branchId: Uuid, report: LanguageTools.AtRestTypeChecker.Repo
 /// The issues under the declaration each one is in, as `commit` and `typecheck` print them, so
 /// a module save names the functions to open. The report's own lists are the union of the
 /// items' and stand alone only when the checker produced no items.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 let saveReportDetails(
   branchId: Uuid,
   report: LanguageTools.AtRestTypeChecker.Report)
@@ -292,7 +279,6 @@ let saveReportDetails(
 
 /// Script errors name local declarations without exposing their parser-only owner, and say
 /// where in the source each issue is when <param positions> knows its node.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 let scriptReport(
   branchId: Uuid,
   report: LanguageTools.AtRestTypeChecker.Report,

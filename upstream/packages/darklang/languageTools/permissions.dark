@@ -309,7 +309,6 @@ let serverAddress(address: String): Option<String> =
 
 
 /// Use the runtime's URI normalization for every literal rule component.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Permissions.normalizeHttpRule: Unknown function or value 'Builtin.permissionNormalizeHttpRule'"
 let normalizeHttpRule(rule: HttpRule): Option<Rule> =
   Builtin.permissionNormalizeHttpRule(rule) |> Stdlib.Option.map(fun rule -> Rule.Http(rule))
 
@@ -319,7 +318,6 @@ let normalizeHttpRule(rule: HttpRule): Option<Rule> =
 /// none (the scheme's default for a named host, any for `*`); an exact path,
 /// a subtree ending in `/*`, or no path (any); a query or none (any). Every rendered rule parses back to
 /// itself. Malformed URLs are rejected rather than widened.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Permissions.httpRule: Unknown function or value 'Permissions.normalizeHttpRule'"
 let httpRule(method: String, url: String): Option<Rule> =
   let method = scope(Stdlib.String.toUppercase(method))
   if url == "*" then
@@ -384,7 +382,6 @@ let httpRule(method: String, url: String): Option<Rule> =
 
 /// Parse one CLI rule. This only constructs the typed Policy value; runtime
 /// authorization remains in `Permissions.Policy`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Permissions.parseRule: Unknown function or value 'Permissions.httpRule'"
 let parseRule(args: List<String>): Option<List<Rule>> =
   match args with
   | ["all"] -> Option.Some([ Rule.All ])
@@ -437,7 +434,6 @@ let parseRule(args: List<String>): Option<List<Rule>> =
 /// or escape. Rendered rules single-quote every guest-controlled field, so
 /// spaces and metacharacters remain one token and a displayed
 /// `permissions allow ...` command is safe to paste into a shell.
-// @compiler blocked: compiler-gap diagnostic="Darklang.LanguageTools.Permissions.tokens: Expected TList TString, got TList TChar"
 let tokens(text: String): Option<List<String>> =
   let finish(current: List<Char>, soFar: List<String>, active: Bool): List<String> =
     if active then
@@ -494,14 +490,12 @@ let tokens(text: String): Option<List<String>> =
 /// Parse one rule's text (as `permissions allow` would receive it, or as a
 /// denial's `To allow:` hint prints it). Rendered rules round-trip through
 /// this.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Permissions.parseRuleText: Unknown function or value 'Permissions.tokens'"
 let parseRuleText(text: String): Option<List<Rule>> =
   tokens(text) |> Stdlib.Option.andThen(parseRule)
 
 
 /// Parse a whole policy from rule texts; `deny <rule>` goes to the deny list.
 /// Error carries the first spec that did not parse.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Permissions.parse: Unknown function or value 'Permissions.tokens'"
 let parse(specs: List<String>): Result<Policy, String> =
   Stdlib.List.fold(specs, Result.Ok(empty()), fun(result, spec) ->
     match result with

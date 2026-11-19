@@ -3,7 +3,6 @@ module Darklang.LanguageTools.Parser.RoundTrip.Tests
 // Parse-then-print round trips: exprs. Moved from
 // backend/tests/Tests/LibParser.RoundTrip.Tests.fs; helpers are in roundTrip.dark.
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsUnwrapOfVariable =
   Stdlib.Test.all(
     [ roundTrip(
@@ -38,7 +37,6 @@ test exprsUnwrapOfVariable =
       roundTrip("parens, basic", "(true)", "true") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsIntLiterals =
   Stdlib.Test.all(
     [ // int literals
@@ -94,7 +92,6 @@ test exprsIntLiterals =
         "-9223372036854775808") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsFloat32AndDecimalLiterals =
   Stdlib.Test.all(
     [ roundTrip("float literal 1.5f64", "1.5f64", "1.5")
@@ -133,7 +130,6 @@ test exprsFloat32AndDecimalLiterals =
         "match 19.99dec with\n| 19.99dec -> true") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsFloatLiterals =
   Stdlib.Test.all(
     [ // float literals
@@ -148,7 +144,6 @@ test exprsFloatLiterals =
       roundTrip("hello tab world", "\"hello\\tworld\"", "\"hello\\tworld\"") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsStringEscapeRound =
   Stdlib.Test.all(
     [ // string-escape round-trips: parser decodes, pretty-printer re-encodes.
@@ -184,7 +179,6 @@ test exprsStringEscapeRound =
         "\"'\"") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'decodesToString'" class=missing-support reason=upstream-dependency
 test exprsDecodedValueAssertions =
   Stdlib.Test.all(
     [ // Decoded-value assertions: prove the byte/char actually decoded, not
@@ -215,7 +209,6 @@ test exprsDecodedValueAssertions =
         "😀") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'decodesToString'" class=missing-support reason=upstream-dependency
 test exprsNulBraceAndHighHexEscapes =
   Stdlib.Test.all(
     [ // `\0`, `\{`, `\}` and `\x` above 7F: what each decodes to and how it prints back.
@@ -240,7 +233,6 @@ test exprsNulBraceAndHighHexEscapes =
       decodesToString("decoded \\xFF is ÿ", "\"\\xFF\"", "ÿ") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'decodesToString'" class=missing-support reason=upstream-dependency
 test exprsInterpolationTextSegments =
   Stdlib.Test.all(
     [ // Interpolation text segments decode escapes too.
@@ -279,7 +271,6 @@ test exprsInterpolationTextSegments =
         "$\"a\\nb {name}\"") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'rejected'" class=missing-support reason=upstream-dependency
 test exprsInvalidEscapeSequences =
   Stdlib.Test.all(
     [ // Invalid escape sequences are rejected instead of dropped.
@@ -312,7 +303,6 @@ test exprsInvalidEscapeSequences =
         "a constructor pattern's fields go in parentheses, separated by commas") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'exprRejected'" class=missing-support reason=upstream-dependency
 test exprEntryPointsRejectSyntaxErrors =
   Stdlib.Test.all(
     [ exprRejected("garbage tokens", "@@@")
@@ -331,7 +321,6 @@ test exprEntryPointsRejectSyntaxErrors =
 
 
 // The line and column in the message count from 1, as the position in the parser message does.
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.Parser.Parse.parsePTExpr'" class=missing-support reason=upstream-dependency
 test parseErrorMessageCountsFromOne =
   match LanguageTools.Parser.Parse.parsePTExpr("Stdlib.Int64.add(1, 2") with
   | Error(e) ->
@@ -341,7 +330,6 @@ test parseErrorMessageCountsFromOne =
   | Ok(_) -> Stdlib.Test.fail("parsed, but should have been rejected")
 
 
-// @compiler xfail compile: "Unknown function or value 'rejected'" class=missing-support reason=upstream-dependency
 test exprsWellFormedEscapes =
   Stdlib.Test.all(
     [ // Well-formed escapes that are not valid Unicode scalars are rejected:
@@ -370,7 +358,6 @@ test exprsWellFormedEscapes =
         "$\"test {\"1\"}\" == \"test 1\"") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsCharLiterals =
   Stdlib.Test.all(
     [ // char literals
@@ -412,7 +399,6 @@ test exprsCharLiterals =
         "[ Stdlib.Tuple2.second((4, 5))\n  Stdlib.Int64.remainder(1, 2)\n  Stdlib.List.head([ 1, 2 ]) ]") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsDictLiteral =
   Stdlib.Test.all(
     [ // dict literal
@@ -455,7 +441,6 @@ test exprsDictLiteral =
         "Dict { Stdlib.display(1): 1 }") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsTupleLiterals =
   Stdlib.Test.all(
     [ // tuple literals
@@ -489,7 +474,6 @@ test exprsTupleLiterals =
         "Person2 { name = \"John\", age = 30 }") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTripWith'" class=missing-support reason=upstream-dependency
 test exprsRecordWithType =
   Stdlib.Test.all(
     [ // record with type args
@@ -541,7 +525,6 @@ test exprsRecordWithType =
         "Result.Error(Stdlib.List.ChunkBySizeError.SizeMustBeGreaterThanZero)") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsQualifiedValue =
   Stdlib.Test.all(
     [ // qualified value
@@ -585,7 +568,6 @@ test exprsQualifiedValue =
 
 
 // A fn named with type args and not called keeps them, and stays uncalled.
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsTypedFnValue =
   Stdlib.Test.all(
     [ roundTrip(
@@ -609,7 +591,6 @@ test exprsTypedFnValue =
         "Stdlib.List.map<Int64, Int64>([ 1 ], fun x -> x)") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsPreserveBothAccesses =
   Stdlib.Test.all(
     [ // Preserve both accesses despite the lexer reading `1.2` as a float.
@@ -655,7 +636,6 @@ test exprsPreserveBothAccesses =
         "(fun((str1, str2)) -> str1 + str2)") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsIfExpressions =
   Stdlib.Test.all(
     [ // if expressions
@@ -713,7 +693,6 @@ test exprsIfExpressions =
         "if a > b then\n  a\nelse if c > d then\n  c\nelse if e > f then\n  e\nelse if g > h then\n  g\nelse\n  h") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsMatchExpressions =
   Stdlib.Test.all(
     [ // match expressions
@@ -818,7 +797,6 @@ test exprsMatchExpressions =
         "match [ 1, 2, 3 ] with\n| [head, ...tail] -> \"pass\"") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsMatchAsAndOr =
   Stdlib.Test.all(
     [ roundTrip(
@@ -852,7 +830,6 @@ test exprsMatchAsAndOr =
         "match x with\n| Ok((a, _) as pair) -> pair\n| _ -> (0, 0)") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsMatchRecord =
   Stdlib.Test.all(
     [ roundTrip(
@@ -882,7 +859,6 @@ test exprsMatchRecord =
         "match x with\n| Some({ name }), { age = 3 } -> name") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsMatchIntTuple =
   Stdlib.Test.all(
     [ roundTrip(
@@ -936,7 +912,6 @@ test exprsMatchIntTuple =
         "match 1, 2 with\n| (1, 2) | (2, 1) -> true\n| _ -> false") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsPipeExpression =
   Stdlib.Test.all(
     [ // pipe expression
@@ -976,7 +951,6 @@ test exprsPipeExpression =
       roundTrip("shifts bind tighter than +", "1 << 2 + 3", "1 << 2 + 3") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsThePrefixOperators =
   Stdlib.Test.all(
     [ // `!` desugars to its builtin and prints back as `!`. `~` and unary `-` desugar to the
@@ -1064,7 +1038,6 @@ test exprsThePrefixOperators =
         "[ 1, 2 ]\n|> Stdlib.List.last\n|> Builtin.unwrap") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsInfixCallsPretty =
   Stdlib.Test.all(
     [ // Infix calls pretty-print with explicit operand parentheses.
@@ -1127,7 +1100,6 @@ test exprsInfixCallsPretty =
         "Stdlib.Tuple3.mapAllThree(\n  (\"one\", 2, \"pi\"),\n  (fun x -> Stdlib.String.toUppercase(x)),\n  (fun x -> x - 2),\n  fun x -> Stdlib.String.toUppercase(x))") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test exprsKeywordNames =
   Stdlib.Test.all(
     [ roundTrip(
@@ -1163,7 +1135,6 @@ test exprsKeywordNames =
 
 // Every word the lexer reserves prints back escaped. `_` is left out: it is the
 // wildcard, printed bare on purpose.
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.Parser.keywords'" class=missing-support reason=upstream-dependency
 test exprsEveryKeywordAsName =
   LanguageTools.Parser.keywords
   |> Stdlib.List.filter(fun word -> word != "_")

@@ -5,13 +5,11 @@ let errnoOr(linux: Int64): Int64 =
   if Stdlib.Cli.Posix.__abiMac() then 78 else linux
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Posix.Tests.posixError: Expected TInt, got TInt64"
 let posixError(errno: Int64, message: String): Stdlib.Cli.Posix.Error =
   Stdlib.Cli.Posix.Error { errno = errno, message = message }
 
 
 // Raw syscalls refuse bad descriptors and arguments with their errno
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test syscallErrnos =
   Stdlib.Test.all(
     [ Builtin.syscallRead(-1z, 1)
@@ -46,7 +44,6 @@ test syscallErrnos =
 
 
 // unlinkat with the remove-directory flag removes a directory
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test unlinkAtRemovesDirectory =
   Stdlib.Cli.Dir.withTemp(fun dir ->
     let path = Stdlib.String.append(dir, "/child")
@@ -61,7 +58,6 @@ test unlinkAtRemovesDirectory =
 
 
 // flock takes the exclusive lock and lets it go; withLock runs its fn holding it
-// @compiler xfail compile: "Expected TBool, got TSum (\"Darklang.Stdlib.Cli.Posix.Lock\", [])" class=missing-support reason=compiler-gap
 test flockLocksAndUnlocks =
   Stdlib.Cli.Dir.withTemp(fun dir ->
     let path = Stdlib.Cli.Path.join([ dir, "lock" ])
@@ -91,7 +87,6 @@ test flockLocksAndUnlocks =
 
 
 // readlinkat truncates to the buffer it is given
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test readlinkAtTruncates =
   Stdlib.Cli.Dir.withTemp(fun dir ->
     let link = Stdlib.Cli.Path.join([ dir, "link" ])
@@ -103,7 +98,6 @@ test readlinkAtTruncates =
 
 
 // The cwd and readlink wrappers grow their buffer until the result fits
-// @compiler xfail compile: "Operator is unavailable for this type" class=missing-support reason=compiler-gap
 test bufferGrowth =
   Stdlib.Test.all(
     [ Stdlib.Cli.Posix.__pathCwdWith(
@@ -136,7 +130,6 @@ test bufferGrowth =
 
 // Account parsing handles missing users and malformed rows
 // Kernel records are little-endian; an 8-byte field covers all of Int64.
-// @compiler xfail compile: "Expected TList TUInt8, got TBlob" class=missing-support reason=compiler-gap
 test kernelSignedField =
   let field(bytes: List<UInt8>, width: Int64): Stdlib.Result.Result<Int64, Int64> =
     Stdlib.Cli.Posix.__kernelSignedField(Stdlib.Bytes.fromList(bytes), 0, width)
@@ -157,7 +150,6 @@ test kernelSignedField =
       field([ 1u8, 2u8, 3u8 ], 8) |> Stdlib.Test.equal(Stdlib.Result.Result.Error(5)) ])
 
 
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test accountFieldFromPasswd =
   let alice = "alice:x:1000:1000::/home/alice:/bin/sh"
   Stdlib.Test.all(
@@ -181,7 +173,6 @@ test accountFieldFromPasswd =
 
 
 // Errno messages and decimal formatting
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test errorMessages =
   Stdlib.Test.all(
     [ Stdlib.Cli.Posix.__macMessage(35)
@@ -208,7 +199,6 @@ test errorMessages =
 
 
 // A name collision retries until it succeeds; any other error stops at once
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test tempRetry =
   Stdlib.Test.all(
     [ Stdlib.Cli.Posix.__tempRetry(
@@ -236,7 +226,6 @@ test tempRetry =
 
 
 // Partial writes complete, zero-progress writes fail, and errors propagate
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-contract
 test writeAll =
   Stdlib.Test.all(
     [ Stdlib.Cli.Posix.__writeAll(
@@ -274,7 +263,6 @@ test writeAll =
 
 
 // The public wrappers reach the host and format their results
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test publicWrappers =
   Stdlib.Test.all(
     [ Stdlib.Test.expect(
@@ -291,7 +279,6 @@ test publicWrappers =
 
 
 // Setting a file's times through the platform syscall shows up in stat
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test setFileTimes =
   let missing = "/definitely/missing/dark-time"
   let setTimes = fun(path, atime, mtime) ->
@@ -342,7 +329,6 @@ test pidFromInt64 =
       |> Stdlib.Test.equal(true) ])
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test pidAndExitCodeInspect =
   Stdlib.Test.all(
     [ Stdlib.Cli.Posix.Pid.fromInt64(4242)

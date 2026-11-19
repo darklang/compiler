@@ -17,7 +17,6 @@ module Darklang.SCM.Branches
 ///
 /// Lives in this silo, the lowest branch-aware module, so both `SCM.PackageOps` and `SCM.Conflicts` can ask
 /// without either depending on the other. `SCM.PackageOps.currentBranch` is the name most callers use.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.current: Unknown function or value 'Builtin.scmCurrentBranch'"
 let current(): Uuid =
   Builtin.scmCurrentBranch()
 
@@ -53,7 +52,6 @@ type BranchInfo =
 
 
 /// The branches <param f> asks for.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.query: Unknown function or value 'Builtin.scmBranches'"
 let query(f: BranchFilter): List<BranchInfo> =
   Builtin.scmBranches(f)
 
@@ -89,7 +87,6 @@ let refusalMessage(r: MergeRefusal): String =
 ///
 /// The merge action asks the same three questions itself, in F#, and refuses with the same cases; this is
 /// for the callers that want the answer before asking for a merge (the confirmation, `--dry-run`).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.canMerge: Unknown function or value 'SCM.PackageOps.countOf'"
 let canMerge(branchId: Uuid): Result<Unit, MergeRefusal> =
   if Branch.isMain(branchId) then
     Result.Error(MergeRefusal.IsMain)
@@ -110,7 +107,6 @@ let canMerge(branchId: Uuid): Result<Unit, MergeRefusal> =
 ///
 /// `canMerge` asks the same question; this is the shape a caller needs when it has to NAME them. A
 /// branch with no name goes by its id.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.activeChildNames: Unknown function or value 'query'"
 let activeChildNames(branchId: Uuid): List<String> =
   query(BranchFilter.ChildrenOf(branchId))
   |> Stdlib.List.map(fun b -> if b.name == "" then b.id else b.name)
@@ -131,7 +127,6 @@ type BranchRow =
 
 
 /// Every active branch, oldest first.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.list: Unknown function or value 'query'"
 let list(): List<BranchRow> =
   query(BranchFilter.All)
   |> Stdlib.List.filterMap(fun b ->
@@ -151,7 +146,6 @@ let list(): List<BranchRow> =
 
 /// How many branches are already merged. The `dark branches` footer needs the count of what it
 /// hid, and asking for it separately keeps `listLines` returning only what it will print.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.mergedCount: Unknown function or value 'list'"
 let mergedCount(): Int64 =
   list()
   |> Stdlib.List.filter(fun b -> b.merged)
@@ -160,7 +154,6 @@ let mergedCount(): Int64 =
 
 /// The branch list, one line each. <param includeMerged> false drops the ones already merged -- the
 /// default, because merged branches accumulate forever and nothing removes them.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.listLines: Unknown function or value 'list'"
 let listLines(includeMerged: Bool): List<String> =
   // Fetched ONCE: `parentLabel` reads its parent out of this list, so rendering n branches is one query
   // rather than n+1.
@@ -188,13 +181,11 @@ let listLines(includeMerged: Bool): List<String> =
 
 
 /// The names a branch has recorded a base for -- i.e. every name it has touched.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.touchedNames: Unknown function or value 'baseRecords'"
 let touchedNames(branchId: Uuid): List<String> =
   baseRecords(branchId) |> Stdlib.List.map(fun b -> b.name)
 
 
 /// The bases <param branchId> recorded, one per name it touched.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.baseRecords: Unknown function or value 'query'"
 let baseRecords(branchId: Uuid): List<Conflicts.NameBase> =
   query(BranchFilter.NameBasesOf(branchId))
   |> Stdlib.List.map(fun b -> b.nameBases)
@@ -216,7 +207,6 @@ let fqnOf(owner: String, modules: String, name: String): String =
 
 /// A branch's recorded bases: the parent's hash per name AT THE FORK, which is what a later comparison is
 /// against. `(owner, modules, name, base_hash)` rows, unformatted.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.nameBases: Unknown function or value 'baseRecords'"
 let nameBases(branchId: Uuid): List<(String * String * String * String)> =
   baseRecords(branchId) |> Stdlib.List.map(fun b -> (b.owner, b.modules, b.name, b.baseHash))
 
@@ -226,7 +216,6 @@ let nameBases(branchId: Uuid): List<(String * String * String * String)> =
 /// parent removed, or never had, reads "".
 ///
 /// Committed only: rebasing onto a parent's draft would pull its uncommitted work into the branch.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.parentHashesForBases: Unknown function or value 'Stdlib.Dict.fromEntries'"
 let parentHashesForBases(_parentId: Uuid, branchId: Uuid): Dict<String, String> =
   Bindings.query(Bindings.BindingFilter.AboveBases(branchId))
   |> Stdlib.List.map(fun b -> (nameKey(b.owner, b.modules, b.name), b.hash))
@@ -255,7 +244,6 @@ let divergedIn(
 
 /// Names the PARENT has moved since this branch forked. This is the merge GATE, not a view --
 /// `SCM.Conflicts` presents conflicts, this decides whether there are any.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.nameConflicts: Unknown function or value 'SCM.PackageOps.branchParentOf'"
 let nameConflicts(branchId: Uuid): List<String> =
   let parent = PackageOps.branchParentOf(branchId)
   divergedIn(nameBases(branchId), parentHashesForBases(parent, branchId))
@@ -275,7 +263,6 @@ type Rebased =
 /// REBASE: accept the parent's current state as this branch's new base. Returns the names the parent had
 /// changed since the fork; where both changed a name the newer edit (by origin_ts) now stands on the
 /// branch, and merge is unblocked. The union of both halves of <fn rebaseDetailed>, for callers that want one list.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.rebase: Unknown function or value 'rebaseDetailed'"
 let rebase(branchId: Uuid): Result<List<String>, String> =
   match rebaseDetailed(branchId) with
   | Ok(r) -> Result.Ok(Stdlib.List.unique(Stdlib.List.concat(r.diverged, r.repointed)))
@@ -285,7 +272,6 @@ let rebase(branchId: Uuid): Result<List<String>, String> =
 /// The branch's own callers that still reference a version of something the parent has since moved,
 /// each as the repoint that brings it to the parent's version. Rebase and merge both apply them first,
 /// so a caller written on a branch calls what the parent runs once the two meet.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.outdatedRepoints: Unknown function or value 'SCM.Constraints.detectOutdatedUsagesOn'"
 let outdatedRepoints(branchId: Uuid): Result<List<Actions.Repoint>, String> =
   Constraints.detectOutdatedUsagesOn(branchId)
   |> Stdlib.Result.map(fun findings ->
@@ -311,7 +297,6 @@ let outdatedRepoints(branchId: Uuid): Result<List<Actions.Repoint>, String> =
 /// the branch's own callers of it still reference the old version by hash. The action repoints each of
 /// those the way an edit on the parent would have, then moves every base and records the conflicts in
 /// one transaction.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.rebaseDetailed: Unknown function or value 'SCM.Actions.merge'"
 let rebaseDetailed(branchId: Uuid): Result<Actions.Reconciled, String> =
   match outdatedRepoints(branchId) with
   | Error(e) -> Result.Error(e)
@@ -345,14 +330,12 @@ let parseFqn(fqn: String): Option<(String * String * String)> =
 /// Ordered, because callers take the LAST one as the branch's current word on a name; unordered, that is
 /// whatever the query happened to return. Skips an op this build cannot decode rather than raising: a
 /// peer's op on a newer format is stored here on purpose.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let ownFrontierOps(branchId: Uuid): List<(Uuid * LanguageTools.ProgramTypes.PackageOp)> =
   ownFrontierOpsWithSource(branchId) |> Stdlib.List.map(fun((id, op, _)) -> (id, op))
 
 
 /// <fn ownFrontierOps>, with what put each op on the branch: 'op', 'propagation' or 'resolution' (see
 /// `package_ops.source`). What lets a branch tell an edit you typed from a repoint that followed one.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let ownFrontierOpsWithSource(
   branchId: Uuid)
   : List<(Uuid * LanguageTools.ProgramTypes.PackageOp * String)> =
@@ -365,14 +348,12 @@ let ownFrontierOpsWithSource(
 
 /// A branch's own op rows, oldest first, each with its `source`. The one query
 /// behind <fn ownFrontierOpsWithSource>, `branchBindings` and `branchOps`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'SCM.PackageOps.OpRow'"
 let ownOpRows(branchId: Uuid): List<PackageOps.OpRow> =
   PackageOps.rowsOf(PackageOps.OpFilter.Own(branchId))
 
 
 /// Does this op bind <param key>? True for a SetName and for a Decision that overrides the binding, since
 /// both are the branch saying what that name points at.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let opBindsKey(
   op: LanguageTools.ProgramTypes.PackageOp,
   key: (String * String * String))
@@ -402,7 +383,6 @@ type Keep =
 /// RESOLVE take-theirs: drop the branch's binding for <param fqn> -- every op that binds it, a `SetName`
 /// or the override a `resolve mine` wrote -- so the branch's view falls back to the parent's version, and move
 /// the name's base to the parent's current. One action.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.resolveTakeTheirs: Unknown function or value 'resolveName'"
 let resolveTakeTheirs(branchId: Uuid, fqn: String): Result<Unit, String> =
   resolveName(branchId, fqn, Keep.Theirs)
 
@@ -414,13 +394,11 @@ let resolveTakeTheirs(branchId: Uuid, fqn: String): Result<Unit, String> =
 /// point: `origin_ts` is a PORTABLE stamp, byte-identical on every machine holding that op, because it is
 /// what LWW compares. Rewriting it locally on an op that has already travelled makes two peers resolve
 /// the same pair of bindings differently, forever.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.resolveKeepMine: Unknown function or value 'resolveName'"
 let resolveKeepMine(branchId: Uuid, fqn: String): Result<Unit, String> =
   resolveName(branchId, fqn, Keep.Mine)
 
 
 /// Parse <param fqn>, keep the version <param keep> names, and word what went wrong.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branches.resolveName: Unknown function or value 'SCM.Actions.resolve'"
 let resolveName(branchId: Uuid, fqn: String, keep: Keep): Result<Unit, String> =
   match parseFqn(fqn) with
   | None -> Result.Error($"can't parse a name from \"{fqn}\"")

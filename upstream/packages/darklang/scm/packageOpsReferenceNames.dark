@@ -2,7 +2,6 @@ module Darklang.SCM.PackageOps
 
 /// Read reference names for several declarations at once.
 /// Keep them in code order, with a separate entry for each use of a name.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.referenceSnapshots: Unknown function or value 'referenceSnapshotsAt'"
 let referenceSnapshots(
   branch: Uuid,
   sources:
@@ -18,7 +17,6 @@ type ReferenceNamesBySource =
 
 
 /// Read this branch's saved reference names using the same rules as F# branch reads.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.referenceNameOverrides: Unknown function or value 'Builtin.pmReferenceNameOverrides'"
 let referenceNameOverrides(
   branch: Uuid,
   targets: List<LanguageTools.ProgramTypes.Reference>,
@@ -27,7 +25,6 @@ let referenceNameOverrides(
   Builtin.pmReferenceNameOverrides(branch, targets, before)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.indexReferenceSnapshots: Unknown function or value 'Stdlib.Dict.fromEntries'"
 let indexReferenceSnapshots(
   snapshots: List<LanguageTools.ProgramTypes.ReferenceNamesSnapshot>)
   : ReferenceNamesBySource =
@@ -61,7 +58,6 @@ let withSavedReferenceNames(
 
 /// Read reference names at the requested timestamp, or current names when none is given. A source
 /// whose content is not stored has no names to read, and is left out.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.referenceSnapshotsAt: Unknown function or value 'indexReferenceSnapshots'"
 let referenceSnapshotsAt(
   branch: Uuid,
   sources:
@@ -83,7 +79,6 @@ let referenceSnapshotsAt(
 
 
 /// Prepare one operation that moves the item and updates its callers' reference names.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let prepareRename(
   branch: Uuid,
   oldLocation: LanguageTools.ProgramTypes.PackageLocation,
@@ -131,7 +126,6 @@ let prepareRename(
 
 
 /// Restore a whole revision in one operation, so partial commits cannot split it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.restoreRevision: Unknown function or value 'add'"
 let restoreRevision(
   branch: Uuid,
   revision: Uuid,

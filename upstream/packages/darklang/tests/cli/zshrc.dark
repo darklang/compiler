@@ -4,7 +4,6 @@ module Darklang.Cli.Tests.Zshrc
 
 /// What editing `.zshrc` needs, and no more. No process grant: running
 /// `source ~/.zshrc` in a child shell, which changed nothing, is refused here.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Zshrc.grant: Unknown function or value 'Instance.ran'"
 let grant(i: Instance.T): Unit =
   let rc = Instance.home(i) + "/.zshrc"
   [ [ "env", "read", "HOME" ]
@@ -31,7 +30,6 @@ let count(haystack: String, needle: String): Int64 =
 
 // A PATH entry is added once, however often it is asked for, and each edit ends with
 // the line the user has to run.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test addToPathEditsOnceAndSaysToSource = Instance.withInstance(fun i ->
   let _ = grant(i)
   let call = [ "eval", "Stdlib.Cli.Zsh.addToPath(\"/opt/demo/bin\")" ]
@@ -46,7 +44,6 @@ test addToPathEditsOnceAndSaysToSource = Instance.withInstance(fun i ->
       |> Stdlib.Test.equal(1) ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test addAliasEditsAndSaysToSource = Instance.withInstance(fun i ->
   let _ = grant(i)
   let _ =

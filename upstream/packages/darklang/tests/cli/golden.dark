@@ -3,7 +3,6 @@
 /// by the test.
 module Darklang.Cli.Tests.Golden
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Golden.compare: Unknown function or value 'Stdlib.Test.Process.run'"
 let compare(
   render: Unit -> Unit,
   expectedRows: List<String>)
@@ -35,7 +34,6 @@ let compare(
 // fixedHome supplies stable Home rows, independent of branches and commit ages.
 // The child runs with COLUMNS=80, LINES=24 and detached stdin.
 // Expected rows come from goldenview.expected.
-// @compiler blocked: compiler-gap diagnostic="Darklang.Cli.Tests.Golden.goldenviewRender: Field access requires a record value"
 let goldenviewRender(): Unit =
   // Fixed view inputs: these screenshots test layout and key handling, not the
   // developer's branches or how long ago the store was reloaded.
@@ -181,14 +179,12 @@ val goldenviewExpected =
     "" ]
 
 
-// @compiler xfail compile: "Unknown function or value 'compare'" class=missing-support reason=upstream-dependency
 test goldenview = compare(goldenviewRender, goldenviewExpected)
 
 
 // fixedHome supplies stable Home rows after each key press, independent of branches
 // and commit ages. The child runs with COLUMNS=80, LINES=24 and detached stdin.
 // Expected rows come from goldenkeys.expected.
-// @compiler blocked: compiler-gap diagnostic="Darklang.Cli.Tests.Golden.goldenkeysRender: Field access requires a record value"
 let goldenkeysRender(): Unit =
   // Fixed view inputs: these screenshots test layout and key handling, not the
   // developer's branches or how long ago the store was reloaded.
@@ -720,5 +716,4 @@ val goldenkeysExpected =
     "" ]
 
 
-// @compiler xfail compile: "Unknown function or value 'compare'" class=missing-support reason=upstream-dependency
 test goldenkeys = compare(goldenkeysRender, goldenkeysExpected)

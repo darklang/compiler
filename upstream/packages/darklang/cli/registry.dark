@@ -4,7 +4,6 @@
 module Darklang.Cli
 
 module Registry =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Registry.CommandHandler: Unknown type 'AppState'"
   type CommandHandler =
     { name: String
       description: String
@@ -116,7 +115,6 @@ module Registry =
       Accepts.nothing())
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Registry.acceptsDeps: Unknown function or value 'Accepts.everywhere'"
   let acceptsDeps(): Accepts.Accepts =
     Accepts.everywhere(
       [ "--json", "--deep", "--all" ],
@@ -313,7 +311,6 @@ module Registry =
     Accepts.between(1, 1, [])
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Registry.acceptsTraces: Unknown function or value 'Accepts.everywhere'"
   let acceptsTraces(): Accepts.Accepts =
     Accepts.everywhere(
       [ "-y", "--yes", "--json", "--inspect", "--full" ],
@@ -353,7 +350,6 @@ module Registry =
         Accepts.nothing()))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Registry.acceptsConflicts: Unknown function or value 'Accepts.everywhere'"
   let acceptsConflicts(): Accepts.Accepts =
     Accepts.everywhere(
       [ "--json" ],
@@ -398,7 +394,6 @@ module Registry =
       Accepts.upTo(1, []))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Registry.acceptsPs: Unknown function or value 'Accepts.everywhere'"
   let acceptsPs(): Accepts.Accepts =
     Accepts.everywhere(
       [ "--json" ],
@@ -414,7 +409,6 @@ module Registry =
     Accepts.flagsOnly([ "--live" ])
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'CommandHandler'"
   let allCommands(): List<CommandHandler> =
     [ ("quit", "Exit the CLI", [ "exit", "q" ], acceptsQuit, Quit.execute, Quit.help, Quit.complete)
       ("help", "Show help for commands", [ "commands", "?", "--help", "-h" ], acceptsHelp, Help.execute, Help.help, Help.complete)
@@ -496,7 +490,6 @@ module Registry =
       ))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'CommandHandler'"
   let findCommandIn(commands: List<CommandHandler>, name: String): CommandHandler =
     let allMatches =
       let nameMatches = commands |> Stdlib.List.filter(fun cmd -> cmd.name == name)
@@ -526,7 +519,6 @@ module Registry =
           complete = (fun(_state, _args) -> []) }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
   let executeCommand(name: String, state: AppState, args: List<String>): AppState =
     let handler = findCommandIn(state.allCommandsCache, name)
 
@@ -563,7 +555,6 @@ module Registry =
         ex(state, args)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
   let executeCommandHelp(name: String, state: AppState): AppState =
     let handler = findCommandIn(state.allCommandsCache, name)
     let helpFn = handler.help
@@ -657,7 +648,6 @@ module Registry =
           "config" ]) ]
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'CommandHandler'"
   let formatCommandGroup(
     groupName: String,
     commandNames: List<String>,
@@ -680,7 +670,6 @@ module Registry =
 
 
   // Detailed command list for help command (no logo, full details)
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Registry.getDetailedCommandList: Unknown function or value 'allCommands'"
   let getDetailedCommandList(): String =
     let commands = allCommands()
     let groups = commandGroups()
@@ -754,7 +743,6 @@ module Registry =
   /// that means a package DB query, which is far too expensive to repeat per keystroke -- and a cache keyed
   /// on the whole prompt text misses on every character of a word. The partial token filters this result
   /// afterwards, and filtering a list is cheap.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
   let getCompletionsForContext(state: AppState, input: String): List<Completion.CompletionItem> =
     let parsed = Completion.parseInput(input)
     if parsed.isCompletingCommand then
@@ -769,7 +757,6 @@ module Registry =
       handler.complete(state, completedArgs)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
   let getCompletions(state: AppState, input: String): List<Completion.CompletionItem> =
     let parsed = Completion.parseInput(input)
     if parsed.isCompletingCommand then
@@ -836,7 +823,6 @@ module Registry =
   ///
   /// Parses `input` once and does both halves rather than composing a context lookup with
   /// `hintFromCompletions`, which each re-parse; this runs on every keystroke.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
   let getCompletionHintFromContext(
     state: AppState,
     input: String,
@@ -895,7 +881,6 @@ module Registry =
         (hintOf(fallback), "", [])
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
   let getCompletionHint(state: AppState, input: String): String =
     hintFromCompletions(input, getCompletions(state, input))
 
@@ -930,7 +915,6 @@ module Registry =
 
   /// Should the workbench run this command line on the real terminal instead of captured?
   /// `-y`/`--yes` is the universal "don't ask", so a line carrying it never needs the handoff.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'CommandHandler'"
   let needsTerminal(commands: List<CommandHandler>, cmd: String, args: List<String>): Bool =
     if Stdlib.List.contains(args, "-y") || Stdlib.List.contains(args, "--yes") then
       false
@@ -946,14 +930,12 @@ module Registry =
 
 
   /// Does this command line own the whole screen (a full-screen TUI)?
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'CommandHandler'"
   let takesScreen(commands: List<CommandHandler>, cmd: String, args: List<String>): Bool =
     let canonical = (findCommandIn(commands, cmd)).name
     Stdlib.List.contains(screenCommands, canonical)
 
 
 module Commands =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
   let parseAndExecute(state: AppState, input: String): AppState =
     let trimmed = Stdlib.String.trim(input)
     let parts = Stdlib.String.split(trimmed, " ") |> Stdlib.List.filter(fun s -> s != "")

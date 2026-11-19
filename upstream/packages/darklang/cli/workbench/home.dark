@@ -6,7 +6,6 @@
 module Darklang.Cli.Workbench
 
 /// A compact description of how long ago `d` occurred.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.ago: Function 'toSeconds' expects 1 arguments"
 let ago(d: DateTime): String =
   let secs = Stdlib.DateTime.subtract(Stdlib.DateTime.now(), d) |> Stdlib.Duration.toSeconds
   if secs < 60 then
@@ -35,7 +34,6 @@ let homeHeader(label: String): BodyItem =
 /// The same, for a stamp stored as text. A commit's `origin_ts` is a portable authoring stamp rather than
 /// a clock reading, so it arrives as a string; raw, it puts an ISO timestamp in the middle of a
 /// sentence.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.agoText: Unknown function or value 'ago'"
 let agoText(ts: String): String =
   match Stdlib.DateTime.parse(ts) with
   | Ok(d) -> ago(d)
@@ -75,13 +73,11 @@ val homeBranchCap = 8
 /// What needs you, then the branch you are on, then recent work, then where
 /// else you could be. Load only on transitions; rendering Home does not
 /// query the store.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.loadHomeItems: Unknown function or value 'loadHomeItemsFrom'"
 let loadHomeItems(branchId: Uuid): List<BodyItem> =
   loadHomeItemsFrom(branchId, SCM.Draft.read())
 
 
 /// `loadHomeItems` over a draft already read, so opening the workbench reads it once.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.loadHomeItemsFrom: Unknown function or value 'SCM.PackageOps.commitsOnBranch'"
 let loadHomeItemsFrom(branchId: Uuid, draft: SCM.Draft.Picture): List<BodyItem> =
   let row(name: String, kind: String, desc: String): BodyItem =
     BodyItem { name = name, kind = kind, isModule = false, desc = desc }
@@ -199,7 +195,6 @@ let loadHomeItemsFrom(branchId: Uuid, draft: SCM.Draft.Picture): List<BodyItem> 
 
 /// The selected row's position among the rows of its own kind - the index the
 /// SCM detail helpers take.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let homeKindIndex(state: State): Int64 =
   match Stdlib.List.getAt(state.items, state.selected) with
   | None -> 0
@@ -212,7 +207,6 @@ let homeKindIndex(state: State): Int64 =
 
 /// Is the cursor on the row of the branch you're on? Main included, which
 /// `selectedBranch` cannot name.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let homeRowIsCurrentBranch(state: State): Bool =
   if cursorOnMainRow(state) then
     SCM.Branch.isMain(state.branchId)
@@ -227,7 +221,6 @@ let homeRowIsCurrentBranch(state: State): Bool =
 /// at its top); a commit opens its ops in the reader, and the "more" rows
 /// open the full lists there; another branch switches to it. A "start here"
 /// row opens the view it names.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let openHomeRow(state: State): Step =
   match Stdlib.List.getAt(state.items, state.selected) with
   | None -> Step.Continue(state)
@@ -266,7 +259,6 @@ let openHomeRow(state: State): Step =
 
 
 /// Home uses the whole frame, one column, no inspector.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let renderHome(state: State, region: Stdlib.Cli.UI.Layout.Region): List<Stdlib.Cli.UI.Layout.Span> =
   Stdlib.List.flatten(
     [ frameWithTitles(region, "", "", 0 - 1), renderTreeList(state, paneContent(region)) ])

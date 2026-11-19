@@ -13,7 +13,6 @@ module Darklang.Cli.Tests.Traces
 // ─── setup ──────────────────────────────────────────────────────────────────
 
 /// Run for the effect, and fail with what it said when it did not exit 0.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Traces.step: Unknown function or value 'Instance.ran'"
 let step(i: Instance.T, args: List<String>): Stdlib.Test.Result =
   let (code, out) = Instance.ran(i, args)
   let cmd = Stdlib.String.join(args, " ")
@@ -25,7 +24,6 @@ let step(i: Instance.T, args: List<String>): Stdlib.Test.Result =
 /// The store an instance starts from is a copy of the dev store, so it may hold
 /// traces and a stored `trace.record` of its own. Setting it here makes the test
 /// mean the same thing whatever the environment's default is.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Traces.withTraces: Unknown function or value 'Instance.withInstance'"
 let withTraces(f: Instance.T -> Stdlib.Test.Result): Stdlib.Test.Result =
   Instance.withInstance(fun i ->
     let setup =
@@ -39,7 +37,6 @@ let withTraces(f: Instance.T -> Stdlib.Test.Result): Stdlib.Test.Result =
 
 
 /// The rows `traces list <n> --json` answers, newest first.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Traces.listed: Unknown function or value 'Instance.run'"
 let listed(i: Instance.T, n: Int64): List<Stdlib.AltJson.Json> =
   match Instance.run(i, [ "traces", "list", Stdlib.display(n), "--json" ]) with
   | Error(_) -> []
@@ -50,7 +47,6 @@ let listed(i: Instance.T, n: Int64): List<Stdlib.AltJson.Json> =
 
 
 /// The newest trace's whole id, or "" when there is none.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Traces.latestId: Unknown function or value 'listed'"
 let latestId(i: Instance.T): String =
   match Stdlib.List.head(listed(i, 1)) with
   | Some(Object(fields)) ->
@@ -67,7 +63,6 @@ let short(id: String): String =
 
 // ─── the listing and its housekeeping ───────────────────────────────────────
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test helpListsTheVerbs = Instance.withInstance(fun i ->
   let out = Instance.said(i, [ "traces", "help" ])
   [ "list"
@@ -87,7 +82,6 @@ test helpListsTheVerbs = Instance.withInstance(fun i ->
   |> Stdlib.Test.all)
 
 
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test tailShowsTheLastEval = withTraces(fun i ->
   let ran = step(i, [ "eval", "let x = 7\nx" ])
   let out = Instance.said(i, [ "traces", "tail" ])
@@ -99,7 +93,6 @@ test tailShowsTheLastEval = withTraces(fun i ->
       Instance.says(out, "let x = 7", "the recorded input") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test deleteAllEmptiesTheList = withTraces(fun i ->
   let ran = step(i, [ "eval", "1 + 2" ])
   let before = Instance.said(i, [ "traces", "list" ])
@@ -112,7 +105,6 @@ test deleteAllEmptiesTheList = withTraces(fun i ->
       Instance.says(after, "nothing has run yet", "and is empty after it") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test statsCountsRuns = withTraces(fun i ->
   let ran =
     Stdlib.Test.all([ step(i, [ "eval", "1" ]), step(i, [ "eval", "2" ]) ])
@@ -127,7 +119,6 @@ test statsCountsRuns = withTraces(fun i ->
 
 /// Statistics are per entry, and an eval has no route, so the hint about drilling
 /// into one would point at nothing.
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test statsHidesTheRouteHintForEvalOnly = withTraces(fun i ->
   let ran =
     Stdlib.Test.all(
@@ -144,7 +135,6 @@ test statsHidesTheRouteHintForEvalOnly = withTraces(fun i ->
         "no route hint for eval-only") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test findSearchesContentAndAnswers = withTraces(fun i ->
   let ran =
     Stdlib.Test.all(
@@ -171,7 +161,6 @@ test findSearchesContentAndAnswers = withTraces(fun i ->
 
 /// `%` and `_` are LIKE wildcards in the query underneath; typed, they are just
 /// characters.
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test findTakesWildcardsLiterally = withTraces(fun i ->
   let ran = step(i, [ "eval", "1 + 1" ])
   Stdlib.Test.all(
@@ -192,7 +181,6 @@ test findTakesWildcardsLiterally = withTraces(fun i ->
         "literal z_") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test deleteOneKeepsTheOthers = withTraces(fun i ->
   let ran =
     Stdlib.Test.all(
@@ -216,7 +204,6 @@ test deleteOneKeepsTheOthers = withTraces(fun i ->
       Instance.says(after, "1 + 1", "and the other one is still there") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test pruneKeepsTheNewest = withTraces(fun i ->
   let ran =
     Stdlib.Test.all(
@@ -234,7 +221,6 @@ test pruneKeepsTheNewest = withTraces(fun i ->
       Instance.says(after, short(id), "the newest trace is kept") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test pruneIsIdempotent = withTraces(fun i ->
   let ran =
     [ 1, 2, 3, 4, 5 ]
@@ -251,7 +237,6 @@ test pruneIsIdempotent = withTraces(fun i ->
     [ ran, pruned, Stdlib.List.length(listed(i, 10)) |> Stdlib.Test.equal(2) ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test deleteSaysOneOrMany = withTraces(fun i ->
   let _ = step(i, [ "eval", "1 + 1" ])
   let clearOne = Instance.said(i, [ "traces", "delete", "--all", "--yes" ])
@@ -276,7 +261,6 @@ test deleteSaysOneOrMany = withTraces(fun i ->
 
 
 /// `pin` and `unpin` write the store; nothing else here runs either verb.
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test pinRoundTrips = withTraces(fun i ->
   let ran = step(i, [ "eval", "1 + 2" ])
   let id = short(latestId(i))
@@ -298,7 +282,6 @@ test pinRoundTrips = withTraces(fun i ->
         "an id nothing matches is refused by name") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test rerunEvaluatesTheRecordedInputAgain = withTraces(fun i ->
   let ran = step(i, [ "eval", "1 + 2" ])
   let id = latestId(i)
@@ -319,7 +302,6 @@ test rerunEvaluatesTheRecordedInputAgain = withTraces(fun i ->
 
 // ─── how arguments are read ─────────────────────────────────────────────────
 
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test argumentOrderDoesNotMatter = withTraces(fun i ->
   let ran = step(i, [ "eval", "1 + 1" ])
   Stdlib.Test.all(
@@ -340,7 +322,6 @@ test argumentOrderDoesNotMatter = withTraces(fun i ->
         "list --json --fn fn N") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test routeFilterIgnoresCase = withTraces(fun i ->
   let ran = step(i, [ "eval", "1 + 1" ])
   let lower = Instance.said(i, [ "traces", "list", "--route", "eval" ])
@@ -356,7 +337,6 @@ test routeFilterIgnoresCase = withTraces(fun i ->
 
 /// A negative count reads as a flag where a count goes, and is refused as one.
 /// `find` takes free text, so there the command reads the value and refuses it.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test negativeCountsAreRefused = Instance.withInstance(fun i ->
   [ ([ "traces", "list", "-1" ], "does not take `-1`")
     ([ "traces", "stats", "-1" ], "does not take `-1`")
@@ -372,7 +352,6 @@ test negativeCountsAreRefused = Instance.withInstance(fun i ->
 
 
 /// Empty and blank filters, and the old spellings of `--inspect`, refused by name.
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test emptyPatternsAreRefused = withTraces(fun i ->
   let ran = step(i, [ "eval", "1 + 1" ])
 
@@ -413,7 +392,6 @@ test emptyPatternsAreRefused = withTraces(fun i ->
   Stdlib.Test.all([ ran, refused ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test unknownSubcommandsAreNamed = Instance.withInstance(fun i ->
   let bare = Instance.said(i, [ "traces" ])
   let help = Instance.said(i, [ "traces", "help" ])
@@ -441,7 +419,6 @@ test unknownSubcommandsAreNamed = Instance.withInstance(fun i ->
 
 /// A flag where an id goes, or after one, is named as a flag the command does not
 /// take.
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test flagsWhereAnIdGoesAreRefused = withTraces(fun i ->
   let ran = step(i, [ "eval", "1 + 1" ])
   let id = latestId(i)
@@ -458,7 +435,6 @@ test flagsWhereAnIdGoesAreRefused = withTraces(fun i ->
         "a flag after the id") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test inspectRefusesOldAndNegativeOptions = withTraces(fun i ->
   let ran = step(i, [ "eval", "1 + 1" ])
   let id = latestId(i)
@@ -479,7 +455,6 @@ test inspectRefusesOldAndNegativeOptions = withTraces(fun i ->
 
 /// There are two doors onto one stored key, `dark traces record on` and
 /// `dark config set trace.record on`, and neither may be a second source of truth.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test recordingIsOneKeyWithTwoDoors = Instance.withInstance(fun i ->
   let bad = Instance.said(i, [ "traces", "record", "loud" ])
   let on = step(i, [ "traces", "record", "on" ])
@@ -515,7 +490,6 @@ test recordingIsOneKeyWithTwoDoors = Instance.withInstance(fun i ->
 /// "Nothing here" has more than one cause, and the advice under each is different:
 /// one vague line used to tell someone with recording OFF to go and run the thing
 /// again, which is the one piece of advice that cannot work.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test anEmptyAnswerSaysWhyItIsEmpty = Instance.withInstance(fun i ->
   let _ = step(i, [ "traces", "record", "on" ])
   let onCase =
@@ -557,7 +531,6 @@ test anEmptyAnswerSaysWhyItIsEmpty = Instance.withInstance(fun i ->
 
 /// A builtin that is `Impure` with no declared effect is still logged. `currentPid`
 /// is one; if somebody gives it an effect, pick another that still has none.
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test anImpureBuiltinWithoutEffectsIsLogged = withTraces(fun i ->
   let defined =
     step(
@@ -585,7 +558,6 @@ test anImpureBuiltinWithoutEffectsIsLogged = withTraces(fun i ->
 /// `dark view Stdlib.List.map` works, so these have to as well. The index stores the
 /// owner-first name, so the short form once came back as an empty ANSWER, which
 /// looks like a fact.
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test theShortNameFormWorks = withTraces(fun i ->
   let ran = step(i, [ "eval", "Stdlib.List.length([1, 2])" ])
   let full =
@@ -614,7 +586,6 @@ test theShortNameFormWorks = withTraces(fun i ->
 
 /// What `--json` answers on `inspect`, `calls` and `show`, in the shape a program
 /// reads.
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test inspectCallsAndShowAnswerInJson = withTraces(fun i ->
   let ran = step(i, [ "eval", "Stdlib.printLine(\"j\")" ])
   let id = latestId(i)
@@ -654,7 +625,6 @@ test inspectCallsAndShowAnswerInJson = withTraces(fun i ->
 /// A replay stops for two reasons that need opposite next actions: the code is
 /// wrong, or the store moved under a recording of code that ran fine. Both halves,
 /// and `show <fn> <trace>`, `show <trace>` and `--json` agreeing.
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test aReplayTellsDriftFromARaise = withTraces(fun i ->
   let authored =
     Stdlib.Test.all(
@@ -755,7 +725,6 @@ test aReplayTellsDriftFromARaise = withTraces(fun i ->
 /// `configSet` is a `package-write`, which a fresh instance's policy refuses, so the
 /// test allows it and approves the function first: what is under test is the show,
 /// not the policy.
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test showDoesNotPerformAWrite = withTraces(fun i ->
   let ran =
     Stdlib.Test.all(
@@ -806,7 +775,6 @@ test showDoesNotPerformAWrite = withTraces(fun i ->
 /// The same, with the write inside a lambda handed to `List.map`. A callback-taking
 /// builtin is never logged itself, so the preview runs `listMap` live; the lambda's
 /// own effectful call must still be answered from the log rather than performed.
-// @compiler xfail compile: "Unknown function or value 'withTraces'" class=missing-support reason=upstream-dependency
 test showDoesNotPerformAWriteInsideMap = withTraces(fun i ->
   let allowed = step(i, [ "permissions", "allow", "package-write" ])
 
@@ -877,7 +845,6 @@ test showDoesNotPerformAWriteInsideMap = withTraces(fun i ->
 ///
 /// `dark run` once printed a reason and exited 0 for a script that raised, a script
 /// that was not there, and a script that ended non-zero itself.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test exitCodesSayWhetherItWorked = Instance.withInstance(fun i ->
   let dir = Instance.home(i)
   let good = $"{dir}/exit-ok.dark"

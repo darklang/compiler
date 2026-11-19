@@ -38,7 +38,6 @@ test portNamed =
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(Stdlib.Net.Port.https)) ])
 
 
-// @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Compare'" class=missing-support reason=compiler-gap
 test portToStringAndCompare =
   Stdlib.Test.all(
     [ Stdlib.display(Stdlib.Net.Port.httpAlt) |> Stdlib.Test.equal("8080")
@@ -51,7 +50,6 @@ test portToStringAndCompare =
       |> Stdlib.Test.equal(Stdlib.Net.Port.httpAlt) ])
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test portInspect =
   Stdlib.Test.all(
     [ Stdlib.inspect(Stdlib.Net.Port.httpAlt) |> Stdlib.Test.equal("Port(8080)")

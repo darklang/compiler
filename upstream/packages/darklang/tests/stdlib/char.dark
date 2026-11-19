@@ -39,7 +39,6 @@ let flag(): Char =
   |> Builtin.unwrap
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test toLowercase =
   Stdlib.Test.all(
     [ Stdlib.Char.toLowercase('A') |> Stdlib.Test.equal('a')
@@ -266,7 +265,6 @@ test toAsciiCode =
       |> Stdlib.Test.equal(Stdlib.Option.Option.Some(9u8)) ])
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test isLessThan =
   Stdlib.Test.all(
     [ Stdlib.Char.isLessThan('a', 'b') |> Stdlib.Test.equal(true)

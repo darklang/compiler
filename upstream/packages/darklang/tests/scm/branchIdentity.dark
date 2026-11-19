@@ -3,12 +3,10 @@ module Darklang.SCM.Tests.BranchIdentity
 // The main-branch constant must match the branch ID a process reports on main.
 // A mismatch silently sends SCM operations down the branch path. Run the process
 // with an explicit main branch so the caller cannot change the answer.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.BranchIdentity.currentIsMain: Unknown function or value 'Darklang.SCM.PackageOps.currentBranch'"
 let currentIsMain(): Bool =
   SCM.PackageOps.currentBranch() == SCM.Branch.mainBranchId
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.Process.run'" class=missing-support reason=upstream-dependency
 test mainIdIsCurrentBranch =
   let defaults = Stdlib.Test.Process.defaults()
   let options =
@@ -36,7 +34,6 @@ test idIsUuid =
 
 
 // Main is not a row in `branches`: it needs no registration, so `get` finds nothing for it.
-// @compiler xfail compile: "Unknown function or value 'SCM.Branch.get'" class=missing-support reason=upstream-dependency
 test mainHasNoRow =
   SCM.Branch.get(SCM.Branch.mainBranchId)
   |> Stdlib.Test.equal(Stdlib.Option.Option.None)
@@ -44,7 +41,6 @@ test mainHasNoRow =
 
 // Main still DISPLAYS as "main". It has no `branches` row, so the name lookup has to know about it
 // specially or it falls back to showing the id.
-// @compiler xfail compile: "Unknown function or value 'SCM.PackageOps.branchName'" class=missing-support reason=upstream-dependency
 test mainDisplaysAsMain =
   SCM.PackageOps.branchName(SCM.Branch.mainBranchId)
   |> Stdlib.Test.equal("main")
@@ -52,7 +48,6 @@ test mainDisplaysAsMain =
 
 // And it resolves by name, from both boundaries, since neither the `branches` table nor an id-prefix
 // search can find a branch that has no row.
-// @compiler xfail compile: "Unknown function or value 'Cli.Branch.lookupRef'" class=missing-support reason=upstream-dependency
 test mainResolvesByName =
   Stdlib.Test.all(
     [ Cli.Branch.lookupRef("main")

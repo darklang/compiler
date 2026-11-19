@@ -43,7 +43,6 @@ let leafNameOf(src: String): String =
 /// core without the stdout/AppState coupling).
 /// The last name <param ops> bind, its kind and its placeholder hash: for an implementation that is
 /// the implementation itself, after its method fns.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let boundBy(
   ops: List<LanguageTools.ProgramTypes.PackageOp>)
   : Option<
@@ -72,7 +71,6 @@ let unresolvedMessage(
   "unresolved names: " + Packages.Errors.unresolvedNamesText(unresolved)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let saveEditing(state: State, es: EditingState): Step =
   let keepErr(msg: String): Step =
     Step.Continue({ state with editing = Stdlib.Option.Option.Some({ es with err = msg }) })
@@ -286,7 +284,6 @@ let stripDocComments(src: String): String =
 /// authored in the box. The placeholder name is qualified to the current tree location so it always resolves
 /// to a full name: a bare leaf under an owner or module, else enough placeholder segments to be valid.
 /// Open the spacious editor to author a new `kind` into `targetModule`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let openNewEditor(state: State, kind: String, targetModule: List<String>): Step =
   let (titleBase, template, nameCol) =
     if kind == "type" then
@@ -322,7 +319,6 @@ let openNewEditor(state: State, kind: String, targetModule: List<String>): Step 
 /// Author a new item. The declaration is a BARE name (a qualified `let Owner.Mod.name` is a parse error), so the
 /// target module has to come from somewhere: use the current tree location if it has an owner, otherwise ask
 /// for it - so you can author from the root too.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let startNew(state: State, kind: String): Step =
   let modPath = Packages.modulePathOf(state.location)
   if Stdlib.Bool.not(Stdlib.List.isEmpty(modPath)) then
@@ -339,7 +335,6 @@ let startNew(state: State, kind: String): Step =
 
 
 /// Open the editor on an existing fn, prefilled with its full current declaration (doc comments dropped).
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let openEditExisting(state: State, item: BodyItem): Step =
   let modules = Packages.modulePathOf(state.location)
   let fullName = Stdlib.String.join(Stdlib.List.append(modules, item.name), ".")

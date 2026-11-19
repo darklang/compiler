@@ -11,7 +11,6 @@ module Darklang.Cli.TraceVerbs
 /// `Darklang.Stdlib.List.map`. Without this, `traces calls Stdlib.List.map` would answer
 /// "no recorded trace went through Stdlib.List.map" about a function with plenty of
 /// traces. `dark view` takes the short form, so these should too.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.canonicalFnName: Unknown function or value 'LanguageTools.PackageManager.Function.find'"
 let canonicalFnName(branchId: Uuid, typed: String): String =
   let resolves(name: String): Bool =
     LanguageTools.PackageManager.Function.find(
@@ -37,7 +36,6 @@ let canonicalFnName(branchId: Uuid, typed: String): String =
 ///
 /// <param doing> is what they would do about it, in the imperative: "run something
 /// that calls it", "run something".
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.whyEmpty: Unknown function or value 'Darklang.Tracing.Store.enabled'"
 let whyEmpty(doing: String): List<String> =
   if Tracing.Store.enabled() then
     [ $"  recording is on, so {doing} and look again" ]
@@ -69,7 +67,6 @@ let statusText(status: Tracing.Status): String =
 
 
 /// The trace whose id starts with `prefix`, when exactly one does.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.find: Unknown function or value 'Darklang.Tracing.Store.resolveID'"
 let find(prefix: String): Result<Tracing.Trace, String> =
   match Tracing.Store.resolveID(prefix) with
   | Error(e) -> Result.Error(e)
@@ -223,7 +220,6 @@ type ProblemJson =
 
 /// The ONE place a stopped replay becomes words, for both readers. `show` prints the message and
 /// the advice; `--json` sends the same three fields, so the two cannot disagree.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.problemJson: Unknown function or value 'Darklang.Tracing.Format.replayStop'"
 let problemJson(
   branchId: Uuid,
   traceId: String,
@@ -301,7 +297,6 @@ let callJson(branchId: Uuid, call: Darklang.Tracing.FnCall): CallJson =
 
 
 /// A list of traces, as JSON. Every listing verb prints through this.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.printTracesJson: Type arguments require a named function"
 let printTracesJson(branchId: Uuid, traces: List<Tracing.Trace>): Bool =
   printJson(
     Stdlib.Json.checkedSerialize<List<TraceJson>>(
@@ -309,7 +304,6 @@ let printTracesJson(branchId: Uuid, traces: List<Tracing.Trace>): Bool =
 
 
 /// One run and its log, as JSON.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.printInspectJson: Unknown function or value 'find'"
 let printInspectJson(branchId: Uuid, prefix: String): Bool =
   match find(prefix) with
   | Error(e) ->
@@ -346,7 +340,6 @@ let printInspectJson(branchId: Uuid, prefix: String): Bool =
 /// store time. A package hash is STRUCTURAL, so two functions with identical bodies share one and
 /// the name you get is whichever of them the store resolves it to. The comparison is still sound
 /// -- that name is bound to that hash -- but the name printed can be a sibling's.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.movedSince: Unknown function or value 'Darklang.Tracing.Store.fnsWithHashes'"
 let movedSince(branchId: Uuid, traceID: String): List<String> =
   Tracing.Store.fnsWithHashes(traceID)
   |> Stdlib.List.filterMap(fun pair ->
@@ -362,7 +355,6 @@ let movedSince(branchId: Uuid, traceID: String): List<String> =
 
 
 /// Run saved CLI input. Resume uses recorded results; rerun performs effects again.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeScriptOrEval(state: AppState, input: Tracing.ScriptOrEvalInput): AppState =
   match input with
   | Eval(source, allowHarmful) ->
@@ -379,7 +371,6 @@ let executeScriptOrEval(state: AppState, input: Tracing.ScriptOrEvalInput): AppS
     Run.runScript(state, filename, source, args, options, Run.Approval.Skip)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let resume(state: AppState, prefix: String): AppState =
   match find(prefix) with
   | Error(e) ->
@@ -420,7 +411,6 @@ let resume(state: AppState, prefix: String): AppState =
         { state with exitCode = 1 }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.fork: Unknown function or value 'find'"
 let fork(prefix: String, at: Option<Int64>): Bool =
   match find(prefix) with
   | Error(e) ->
@@ -444,7 +434,6 @@ type Pinning =
   | Unpin
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.pin: Unknown function or value 'find'"
 let pin(prefix: String, pinning: Pinning): Bool =
   match find(prefix) with
   | Error(e) ->
@@ -484,7 +473,6 @@ let pin(prefix: String, pinning: Pinning): Bool =
 /// ANSWER, not a refusal. A command that was asked a question and answered it truthfully
 /// succeeded, however empty the answer. Naming something that does not exist is the other
 /// thing, and that is what exits non-zero.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.printCalls: Unknown function or value 'canonicalFnName'"
 let printCalls(branchId: Uuid, typed: String): Unit =
   let fnName = canonicalFnName(branchId, typed)
   match Tracing.Store.wentThroughNamed(branchId, fnName, 25) with
@@ -556,7 +544,6 @@ type TraceInFnJson =
 
 
 /// `traces calls <fn> --json`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.printCallsJson: Unknown function or value 'Darklang.Tracing.Store.timeInNamed'"
 let printCallsJson(branchId: Uuid, fnName: String): Bool =
   let costs = Tracing.Store.timeInNamed(branchId, fnName, 25)
   let rows =
@@ -574,7 +561,6 @@ let printCallsJson(branchId: Uuid, fnName: String): Bool =
 
 /// The values `traces show` would print beside the code, as JSON: the ids and the values,
 /// with no source. What an agent wants, since it can read the code already.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.showCodeJson: Unknown function or value 'canonicalFnName'"
 let showCodeJson(
   accountID: Option<Uuid>,
   branchId: Uuid,
@@ -1006,7 +992,6 @@ let iterationsToFetch(
 /// Laid over the flat values rather than replacing them, so every line OUTSIDE the loop keeps
 /// what it did. Without that, choosing one would blank the function around it, which is the
 /// context that makes the iteration mean anything.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.TraceVerbs.valuesOfFrame: Unknown function or value 'Stdlib.Dict.fromEntries'"
 let valuesOfFrame(
   branchId: Uuid,
   base': Dict<String, String>,
@@ -1064,7 +1049,6 @@ let valuesOfFrame(
 ///
 /// Named for the verb. It was `printValues` when the verb was `traces values`, and a stranger
 /// looking for what `show` does did not find it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let showCode(
   state: AppState,
   typed: String,

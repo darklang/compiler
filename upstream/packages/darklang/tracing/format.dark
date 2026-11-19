@@ -98,7 +98,6 @@ let compactDval(branchId: Uuid, dv: LanguageTools.RuntimeTypes.Dval): String =
 ///
 /// What to DO about it is left to the caller, because the answer names a command and this module
 /// is not CLI-specific.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Tracing.Format.replayStop: Unknown function or value 'PrettyPrinter.RuntimeTypes.RuntimeError.toString'"
 let replayStop(branchId: Uuid, stop: ReplayStop): (String * Option<String>) =
   match stop with
   | InvalidId -> ("not an id", Option.None)

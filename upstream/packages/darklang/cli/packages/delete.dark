@@ -45,7 +45,6 @@ let parseArgs(args: List<String>): ParsedArgs =
 /// Count live (non-deprecated) dependents on `targetLoc`. 0 means no gate
 /// would be triggered by `delete`. Uses FQN-keyed lookup so a content
 /// collision at another FQN doesn't falsely block deletion.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Delete.countLiveDependents: Unknown function or value 'SCM.Deps.dependentsFor'"
 let countLiveDependents(
   branchId: Uuid,
   targetLoc: LanguageTools.ProgramTypes.PackageLocation,
@@ -71,7 +70,6 @@ let toDeprecateArgs(parsed: ParsedArgs, itemTypeStr: String, target: String): Li
   Stdlib.List.flatten([ baseArgs, messageArgs, confirmArgs, dryRunArgs, jsonArgs ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let parsed = parseArgs(args)
   let branchId = state.currentBranchId
@@ -156,7 +154,6 @@ let execute(state: AppState, args: List<String>): AppState =
 
 /// The live items in the module <param path> (owner first) and every module under it, as
 /// (kind, full name).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Delete.moduleItems: Unknown function or value 'Query.allDirectDescendantNamesAndHashes'"
 let moduleItems(
   branchId: Uuid,
   path: List<String>)
@@ -187,14 +184,12 @@ let moduleItems(
 
 
 /// <param name> as a module path, owner first.
-// @compiler blocked: upstream-dependency diagnostic="modulePath: Unknown type 'AppState'"
 let modulePath(state: AppState, name: String): Option<List<String>> =
   match Location.parseRelativeTo(state.packageData.currentLocation, name + ".__module__") with
   | Ok(location) -> Option.Some(Stdlib.List.prepend(location.modules, location.owner))
   | Error(_) -> Option.None
 
 
-// @compiler blocked: upstream-dependency diagnostic="moduleHasItems: Unknown type 'AppState'"
 let moduleHasItems(state: AppState, name: String): Bool =
   match modulePath(state, name) with
   | Some(path) ->
@@ -204,7 +199,6 @@ let moduleHasItems(state: AppState, name: String): Bool =
 
 /// `delete <module>`: every live item in it, in one batch, so their order does not matter and
 /// only dependents outside the module hold it back.
-// @compiler blocked: upstream-dependency diagnostic="deleteModule: Unknown type 'AppState'"
 let deleteModule(state: AppState, name: String, parsed: ParsedArgs): AppState =
   let branchId = state.currentBranchId
   let currentLoc = state.packageData.currentLocation
@@ -229,7 +223,6 @@ let deleteModule(state: AppState, name: String, parsed: ParsedArgs): AppState =
       deleteModuleItems(state, path, items, parsed)
 
 
-// @compiler blocked: upstream-dependency diagnostic="deleteModuleItems: Unknown type 'AppState'"
 let deleteModuleItems(
   state: AppState,
   path: List<String>,
@@ -302,7 +295,6 @@ let deleteModuleItems(
       failed(state)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Take a fn/type/value/trait/impl/test off the shelf (sugar for deprecate --kind obsolete)."
     ""
@@ -330,6 +322,5 @@ let help(_state: AppState): String =
 
 
 // `delete` IS `deprecate --kind obsolete` with a dependents check, so it completes the same way.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   Deprecate.complete(state, args)

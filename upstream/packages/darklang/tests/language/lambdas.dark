@@ -32,7 +32,6 @@ test mapRaisesFirstCallbackError =
    Stdlib.List.map([ "1", "2", "3", "4" ], y))
   => raises "Uncaught exception: 1"
 
-// @compiler xfail compile: "Expected TFunction ([TInt64; TInt64], TInt64), got TInt64" class=aot-rejection reason=aot-type-error
 test foldRaisesCallbackArgError =
   (Stdlib.List.fold([ 4 ], 1, Stdlib.Test.raiseRuntimeError("test")))
   => raises "Uncaught exception: test"
@@ -114,7 +113,6 @@ test tuplePatterns =
        Stdlib.List.map(triplets, transformer))
       |> Stdlib.Test.equal([ "1:one:TRUE", "2:two:FALSE" ]) ])
 
-// @compiler xfail compile: "Tuple pattern does not match the value type" class=aot-rejection reason=aot-match-error
 test tuplePatternArityRaises =
   (let triplets = [ (1, "one", true), (2, "two", false) ]
    let transformer = fun((num, str)) -> $"{Stdlib.display(num)}:{str}"
@@ -155,7 +153,6 @@ let nestedMapError(): Int64 =
   let _ = ys
   0
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.Process.run'" class=missing-support reason=upstream-dependency
 test nestedMapErrorKeepsBothLambdaFrames =
   match Stdlib.Test.Process.run(Stdlib.Test.Process.defaults(), nestedMapError, ()) with
   | Error(message) -> Stdlib.Test.fail(message)
@@ -180,7 +177,6 @@ test nestedMapErrorKeepsBothLambdaFrames =
 // expects an Int64 back, so returning a String is an error.
 let applyTwice(f: 'a -> 'a, x: 'a): 'a = f(f(x))
 
-// @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
 test lambdaResultCheckedAgainstParameter =
   applyTwice((fun _ -> "not an Int64"), 1)
   => raises "Darklang.Language.Tests.Lambdas.applyTwice's 1st parameter `f` returned String (\"not an Int64\"), but should return Int64"
@@ -191,7 +187,6 @@ let keepFn(f: 'a -> 'a, x: 'a): ('a -> 'a) =
   let _ = f(x)
   f
 
-// @compiler xfail compile: "Expected TInt64, got TString" class=missing-support reason=compiler-gap
 test lambdaOutlivingItsFnIsNotHeldToItsTypes =
   (let identity = keepFn((fun x -> x), 1)
    identity("a"))
@@ -199,12 +194,10 @@ test lambdaOutlivingItsFnIsNotHeldToItsTypes =
 
 // The call stack shows which fn each lambda was written in. Here there are two:
 // the one we wrote in `filterMapBadCallback`, and one `Dict.filterMap` uses inside.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Language.Tests.Lambdas.filterMapBadCallback: Expected TSum (\"Darklang.Stdlib.Option.Option\", [TVar \"t$constraint_-31926_2\"]), got TBool"
 let filterMapBadCallback(): Int64 =
   let _ = Stdlib.Dict.filterMap(Dict { "a": 1 }, fun(_, _) -> false)
   0
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.Process.run'" class=missing-support reason=upstream-dependency
 test callStackNamesWhereEachLambdaWasWritten =
   match Stdlib.Test.Process.run(Stdlib.Test.Process.defaults(), filterMapBadCallback, ()) with
   | Error(message) -> Stdlib.Test.fail(message)
@@ -228,7 +221,6 @@ let requireIntOption(f: Int64 -> Stdlib.Option.Option<Int64>): Int64 =
 
 let passAlong(f: 'a -> Stdlib.Option.Option<'b>, x: 'a): Int64 = requireIntOption(f)
 
-// @compiler blocked: compiler-gap diagnostic="Expected compilation error but compilation succeeded"
 test innerHelpersStricterTypeIsChecked =
   passAlong((fun _ -> Stdlib.Option.Option.Some("wrong")), 1)
   => raises "Darklang.Language.Tests.Lambdas.passAlong's 1st parameter `f` returned Darklang.Stdlib.Option.Option<String> (Some(\"wrong\")), but should return Darklang.Stdlib.Option.Option<Int64>"
@@ -238,7 +230,6 @@ type Check = Int64 -> Bool
 
 let countIf(p: Check, x: Int64): Int64 = if p(x) then 1 else 0
 
-// @compiler xfail compile: "Expected TBool, got TInt64" class=aot-rejection reason=aot-type-error
 test aliasedCallbackParameterIsChecked =
   countIf((fun _ -> 2), 1)
   => raises "Darklang.Language.Tests.Lambdas.countIf's 1st parameter `p` returned Int64 (2), but should return Bool"
@@ -250,7 +241,6 @@ let countMatching(xs: List<Int64>, p: Int64 -> Bool): Int64 =
   | [] -> 0
   | [x, ...rest] -> (if p(x) then 1 else 0) + countMatching(rest, p)
 
-// @compiler xfail compile: "Expected TBool, got TInt64" class=aot-rejection reason=aot-type-error
 test recursiveFnKeepsCheckingItsCallback =
   countMatching([ 1, 2, 3 ], fun x -> if x == 3 then 3 else true)
   => raises "Darklang.Language.Tests.Lambdas.countMatching's 2nd parameter `p` returned Int64 (3), but should return Bool"
@@ -274,14 +264,12 @@ let mapOptions(
   : List<Stdlib.Option.Option<'b>> =
   Stdlib.List.map(xs, f)
 
-// @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
 test callbackPassedOnToMapIsChecked =
   mapInts([ 1, 2, 3 ], fun x -> if x == 3 then "three" else x)
   => raises "Darklang.Language.Tests.Lambdas.mapInts's 2nd parameter `f` returned String (\"three\"), but should return Int64"
 
 // The fold starts with an empty dict. The first step returns a dict of Int64s, so
 // every later step must too. Returning a dict of Strings is an error.
-// @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
 test foldAccumulatorKeepsItsType =
   Stdlib.List.fold([ 1, 2 ], Dict { }, fun(acc, x) ->
     if x == 1 then Stdlib.Dict.set(acc, "a", 1) else Dict { "b": "text" })
@@ -289,12 +277,10 @@ test foldAccumulatorKeepsItsType =
 
 // A fold's accumulator bound to a tuple or an enum with a type argument is still checked
 // part by part on every step.
-// @compiler xfail compile: "Darklang.Language.Tests.Lambdas.<entry>: Expected TString, got TInt64" class=missing-support reason=compiler-gap
 test foldTupleAccumulatorKeepsItsShape =
   Stdlib.List.fold([ 1, 2 ], (0, ""), fun(acc, x) -> (x, x))
   => raises "Darklang.Stdlib.List.fold's 3rd parameter `fn` returned (Int64 * Int64) ((1, 1)), but should return (Int64 * String)"
 
-// @compiler xfail compile: "Darklang.Language.Tests.Lambdas.<entry>: Expected TInt64, got TString" class=missing-support reason=compiler-gap
 test foldEnumAccumulatorKeepsItsTypeArg =
   Stdlib.List.fold([ 1, 2 ], Stdlib.Option.Option.Some(0), fun(acc, x) ->
     Stdlib.Option.Option.Some("a"))

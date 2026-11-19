@@ -34,7 +34,6 @@ test nextPullsHeadLeavesRest =
 
 
 // toBytes drains a Stream<UInt8> into a Bytes
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Stream.toBytes'" class=missing-support reason=upstream-dependency
 test toBytesDrainsBytes =
   let s = Stdlib.Stream.fromList([ 104u8, 105u8 ])
   let b = Stdlib.Stream.toBytes(s)
@@ -203,7 +202,6 @@ test blobsRoundTripThroughStream =
 
 
 // take over a source that never ends stops after n, pulling the source n times
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.incrementCounter'" class=missing-support reason=upstream-dependency
 test takeOverUnboundedSourcePullsOnlyN =
   let counter =
     Stdlib.Stream.unfold(0, fun n ->

@@ -21,7 +21,6 @@ type TypeIdentifier =
     name: String }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.QualifiedTypeIdentifier: Unknown type 'TypeReference.TypeReference'"
 type QualifiedTypeIdentifier =
   { range: Range
     /// the Range corresponds to the `.` after the module name
@@ -59,7 +58,6 @@ type Name =
 // Types
 module TypeReference =
   // The first range corresponds to the whole type
-  // @compiler blocked: constructor-identity diagnostic="Constructor identity collision 1324: Darklang.LanguageTools.RuntimeTypes.TypeReference.TFloat, Darklang.LanguageTools.RuntimeTypes.TypeReference.TStream"
   type Builtin =
     | TUnit(Range)
     | TBool(Range)
@@ -129,7 +127,6 @@ module TypeReference =
       name: Range * String)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.TypeReference.TypeReference: Unknown type 'Builtin'"
   type TypeReference =
     | Builtin(Builtin)
     | QualifiedName(QualifiedTypeIdentifier)
@@ -228,7 +225,6 @@ type MatchPattern =
   | MPError(Range)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.MatchCase: Unknown type 'Expr'"
 type MatchCase =
   { pat:
       /// the Range corresponds to the `|` symbol
@@ -246,7 +242,6 @@ type BinaryOperation =
   | BinOpOr
 
 
-// @compiler blocked: constructor-identity diagnostic="Constructor identity collision 3240: Darklang.Language.Tests.Equality.EEnumUInt8.E3, Darklang.LanguageTools.WrittenTypes.InfixFnName.ArithmeticDivide"
 type InfixFnName =
   | ArithmeticPlus
   | ArithmeticMinus
@@ -267,19 +262,16 @@ type InfixFnName =
   | ComparisonNotEquals
 
 
-// @compiler blocked: constructor-identity diagnostic="Constructor identity collision 2846: Darklang.LanguageTools.WrittenTypes.Infix.InfixFnCall, Darklang.Stdlib.Cli.UI.Node.Severity.Error"
 type Infix =
   | InfixFnCall(InfixFnName)
   | BinOp(BinaryOperation)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.StringSegment: Unknown type 'Expr'"
 type StringSegment =
   | StringText(Range, String)
   | StringInterpolation(Range, Expr, symbolOpenBrace: Range, symbolCloseBrace: Range)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.Expr: Unknown type 'QualifiedTypeIdentifier'"
 type Expr =
   | EUnit(Range)
   | EBool(Range, Bool)
@@ -423,7 +415,6 @@ type Expr =
   | EError(Range)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.PipeExpr: Unknown type 'Expr'"
 type PipeExpr =
   | EPipeLambda(
     Range,
@@ -448,7 +439,6 @@ type PipeExpr =
 
 module Expr =
   /// Source range covering a whole expression node.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Expr'"
   let range(expr: Expr): Range =
     match expr with
     | EUnit(range) -> range
@@ -492,7 +482,6 @@ module Expr =
 
 // Module declarations
 module ModuleDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.ModuleDeclaration.Declaration: Unknown type 'Expr'"
   type Declaration =
     | Type(TypeDeclaration.TypeDeclaration)
     | Function(FnDeclaration.FnDeclaration)
@@ -505,7 +494,6 @@ module ModuleDeclaration =
     | Expr(Expr)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.ModuleDeclaration.ModuleDeclaration: Unknown type 'Declaration'"
   type ModuleDeclaration =
     { range: Range
       name: (Range * String)
@@ -515,7 +503,6 @@ module ModuleDeclaration =
 
 // Type declaration
 /// `'a: Show<Int64>` in a type-param list: the trait is a type name
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.TypeParamBound: Unknown type 'QualifiedTypeIdentifier'"
 type TypeParamBound =
   { range: Range
     param: String
@@ -524,7 +511,6 @@ type TypeParamBound =
 
 
 module TypeDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.TypeDeclaration.RecordField: Unknown type 'TypeReference.TypeReference'"
   type RecordField =
     { range: Range
       name: (Range * String)
@@ -533,7 +519,6 @@ module TypeDeclaration =
       symbolColon: Range }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.TypeDeclaration.EnumField: Unknown type 'TypeReference.TypeReference'"
   type EnumField =
     { range: Range
       typ: TypeReference.TypeReference
@@ -542,7 +527,6 @@ module TypeDeclaration =
       symbolColon: Option<Range> }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.TypeDeclaration.EnumCase: Unknown type 'EnumField'"
   type EnumCase =
     { range: Range
       name: (Range * String)
@@ -550,7 +534,6 @@ module TypeDeclaration =
       description: String }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.TypeDeclaration.Definition: Unknown type 'TypeReference.TypeReference'"
   type Definition =
     | Alias(TypeReference.TypeReference)
     /// the Range corresponds to the `,` symbol
@@ -559,7 +542,6 @@ module TypeDeclaration =
     | Enum(List<(Range * EnumCase)>)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.TypeDeclaration.TypeDeclaration: Unknown type 'TypeParamBound'"
   type TypeDeclaration =
     { range: Range
       name: TypeIdentifier
@@ -574,7 +556,6 @@ module TypeDeclaration =
 
 // Value declarations
 module ValueDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.ValueDeclaration.ValueDeclaration: Unknown type 'Expr'"
   type ValueDeclaration =
     { range: Range
       name: ValueIdentifier
@@ -591,7 +572,6 @@ module TestDeclaration =
     | RuntimeError(String)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.TestDeclaration.TestDeclaration: Unknown type 'Expr'"
   type TestDeclaration =
     { range: Range
       name: ValueIdentifier
@@ -610,7 +590,6 @@ module FnDeclaration =
     { range: Range }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.FnDeclaration.NormalParameter: Unknown type 'TypeReference.TypeReference'"
   type NormalParameter =
     { range: Range
       name: VariableIdentifier
@@ -622,13 +601,11 @@ module FnDeclaration =
       symbolRightParen: Range }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.FnDeclaration.Parameter: Unknown type 'NormalParameter'"
   type Parameter =
     | Unit(UnitParameter)
     | Normal(NormalParameter)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.FnDeclaration.FnDeclaration: Unknown type 'TypeParamBound'"
   type FnDeclaration =
     { range: Range
       name: FnIdentifier
@@ -648,7 +625,6 @@ module FnDeclaration =
 
 /// `trait Show<'a> = <method signatures>`
 module TraitDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.TraitDeclaration.Method: Unknown type 'TypeParamBound'"
   type Method =
     { range: Range
       name: FnIdentifier
@@ -662,7 +638,6 @@ module TraitDeclaration =
       symbolColon: Range }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.TraitDeclaration.TraitDeclaration: Unknown type 'TypeParamBound'"
   type TraitDeclaration =
     { range: Range
       name: TypeIdentifier
@@ -676,7 +651,6 @@ module TraitDeclaration =
 
 /// `impl[<'a: B>] Trait<Args> for Type = <method fns or aliases>`
 module ImplDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.ImplDeclaration.Member: Unknown type 'FnDeclaration.FnDeclaration'"
   type Member =
     /// A full fn declaration in the block
     | Method(FnDeclaration.FnDeclaration)
@@ -684,7 +658,6 @@ module ImplDeclaration =
     | Alias(ValueDeclaration.ValueDeclaration)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.ImplDeclaration.ImplDeclaration: Unknown type 'TypeParamBound'"
   type ImplDeclaration =
     { range: Range
       typeParams: List<(Range * String)>
@@ -699,7 +672,6 @@ module ImplDeclaration =
 
 
 module SourceFile =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.SourceFile.SourceFileDeclaration: Unknown type 'TypeDeclaration.TypeDeclaration'"
   type SourceFileDeclaration =
     | Type(TypeDeclaration.TypeDeclaration)
     | Function(FnDeclaration.FnDeclaration)
@@ -710,13 +682,11 @@ module SourceFile =
     | Module(ModuleDeclaration.ModuleDeclaration)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.SourceFile.SourceFile: Unknown type 'SourceFile.SourceFileDeclaration'"
   type SourceFile =
     { range: Range
       declarations: List<SourceFileDeclaration>
       exprsToEval: List<Expr> }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypes.ParsedFile: Unknown type 'SourceFile.SourceFile'"
 type ParsedFile =
   | SourceFile(SourceFile.SourceFile)

@@ -16,7 +16,8 @@ def main():
             json.dumps({"missing-implementation": "Unvalidated test declaration",
                         "compiler-gap": "Previously inspected limitation",
                         "compiler-implementation": "Existing compiler substitute"}))
-        (root / "upstream/sources.list").write_text("packages/recursive.dark\n")
+        (root / "porting/upstream-sources.list").write_text("packages/recursive.dark\n")
+        (root / "porting/upstream-annotations.tsv").write_text("")
         (root / "library-sources.list").write_text("")
         (root / "upstream/packages/recursive.dark").write_text("""module Probe
 // @compiler blocked: missing-implementation

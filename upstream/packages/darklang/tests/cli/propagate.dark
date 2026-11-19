@@ -1,7 +1,6 @@
 module Darklang.Cli.Tests.Propagate
 
 module DictionarySignatures =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.LanguageTools.ProgramTypes.TypeReference'"
   let same(
     key: LanguageTools.ProgramTypes.TypeReference,
     value: LanguageTools.ProgramTypes.TypeReference)
@@ -14,7 +13,6 @@ module DictionarySignatures =
       LanguageTools.ProgramTypes.TypeReference.TDict(key, value))
 
 
-// @compiler xfail compile: "Unknown function or value 'DictionarySignatures.same'" class=missing-support reason=upstream-dependency
 test dictionarySignatures =
   Stdlib.Test.all(
     [ DictionarySignatures.same(

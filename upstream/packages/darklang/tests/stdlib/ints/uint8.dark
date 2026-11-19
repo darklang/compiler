@@ -141,7 +141,6 @@ test moduloRejectsZero =
   => raises "Cannot evaluate modulus against 0"
 
 
-// @compiler xfail compile: "Unknown function or value 'Builtin.modulo'" class=missing-support reason=upstream-dependency
 test builtinModuloRejectsZero =
   Builtin.modulo(5u8, 0u8)
   => raises "Cannot evaluate modulus against 0"

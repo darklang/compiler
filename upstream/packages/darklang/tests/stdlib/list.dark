@@ -32,7 +32,6 @@ test map =
 
 
 // A run nobody scheduled (this harness) spawns onto the shared scheduler.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.List.parallelMap'" class=missing-support reason=upstream-dependency
 test parallelMap =
   Stdlib.Test.all(
     [ Stdlib.List.parallelMap([ 1, 2, 3 ], fun x -> x * 2)
@@ -43,7 +42,6 @@ test parallelMap =
 
 // Create more children than Scheduler.keepFinished retains. Their answers must
 // outlive their process rows so late awaits still succeed.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.List.parallelMap'" class=missing-support reason=upstream-dependency
 test parallelMapOutlivesProcessTable =
   Stdlib.List.parallelMap(Stdlib.List.range(1, 500), fun x -> x * 2)
   |> Stdlib.Test.equal(
@@ -56,7 +54,6 @@ test parallelMapOutlivesProcessTable =
 // concurrency rather than wall clock, so a loaded machine cannot fail it. Measured
 // both ways: against `List.map` every item reports exactly 2, and against
 // `parallelMap` the counts run 3 to 10.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.List.parallelMap'" class=missing-support reason=upstream-dependency
 test parallelMapRunsConcurrently =
   Stdlib.List.contains(
     Stdlib.List.parallelMap(Stdlib.List.range(1, 8), fun i ->
@@ -190,7 +187,6 @@ test dropWhile =
       |> Stdlib.Test.equal([]) ])
 
 
-// @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
 test filter =
   Stdlib.Test.all(
     [ Stdlib.List.filter([ 1, 2, 3 ], fun item ->
@@ -208,7 +204,6 @@ test filter =
       Stdlib.List.filter([], fun _ -> "a") |> Stdlib.Test.equal([]) ])
 
 
-// @compiler xfail compile: "Expected TSum" class=aot-rejection reason=aot-type-error
 test filterMap =
   Stdlib.Test.all(
     [ Stdlib.List.filterMap([ 1, 2, 3 ], fun item ->
@@ -332,7 +327,6 @@ test flatten =
       Stdlib.List.flatten([]) |> Stdlib.Test.equal([]) ])
 
 
-// @compiler xfail compile: "got TInt64" class=aot-rejection reason=aot-type-error
 test fold =
   Stdlib.Test.all(
     [ Stdlib.List.fold([], [], fun(_, _) -> 5) |> Stdlib.Test.equal([])
@@ -516,7 +510,6 @@ test interpose =
       Stdlib.List.interpose([], 5) |> Stdlib.Test.equal([]) ])
 
 
-// @compiler xfail compile: "Lambda lifting could not infer return type for lambda body: BinOp" class=missing-support reason=compiler-gap
 test map2 =
   Stdlib.Test.all(
     [ Stdlib.List.map2([ 10, 20, 30 ], [ 1, 2, 3 ], fun(a, b) -> a - b)
@@ -558,7 +551,6 @@ test contains =
       Stdlib.List.contains([], 1) |> Stdlib.Test.equal(false) ])
 
 
-// @compiler xfail compile: "Expected TBool, got TString" class=aot-rejection reason=aot-type-error
 test partition =
   Stdlib.Test.all(
     [ Stdlib.List.partition([ -20, 5, 9 ], fun x -> x > 0)
@@ -603,7 +595,6 @@ test append =
       |> Stdlib.Test.equal([ 1, 2 ]) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.List.shuffle'" class=missing-support reason=upstream-dependency
 test shuffle =
   Stdlib.Test.all(
     [ Stdlib.List.shuffle([]) |> Stdlib.Test.equal([])
@@ -783,7 +774,6 @@ test minBy =
       |> Stdlib.Test.equal(Stdlib.Option.Option.Some("a")) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.incrementCounter'" class=missing-support reason=upstream-dependency
 test maxByEvaluatesKeysOnce =
   let result =
     Stdlib.List.maxBy([ 3, 1, 2 ], fun x -> Stdlib.Test.incrementCounter(x))
@@ -793,7 +783,6 @@ test maxByEvaluatesKeysOnce =
       Stdlib.Test.counterValue() |> Stdlib.Test.equal(3) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.incrementCounter'" class=missing-support reason=upstream-dependency
 test minByEvaluatesKeysOnce =
   let result =
     Stdlib.List.minBy([ 1, 3, 2 ], fun x -> Stdlib.Test.incrementCounter(x))
@@ -821,7 +810,6 @@ test sort =
       Stdlib.List.sort([]) |> Stdlib.Test.equal([]) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.List.sortWith'" class=missing-support reason=upstream-dependency
 test sortWith =
   let ascending = fun(a, b) ->
     if a < b then
@@ -992,7 +980,6 @@ test uniqueUsesEqualityNotDictKeys =
 
 
 // `uniqueBy` keys a Dict instead, and a Dict refuses a NaN key.
-// @compiler blocked: compiler-gap diagnostic="Expected compilation error but compilation succeeded"
 test uniqueByRaisesOnNaN =
   Stdlib.List.uniqueBy([ 0.0 / 0.0, 0.0 / 0.0 ], fun x -> x)
   => raises "Cannot use NaN as a dict key. NaN is not equal to itself, so a key holding it could never be found."
@@ -1052,7 +1039,6 @@ test zip =
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok([])) ])
 
 
-// @compiler blocked: compiler-leak diagnostic="Native execution passes its assertions but reports leaks: 10; the runner rejects leaked allocations."
 test groupBy =
   Stdlib.Test.all(
     [ Stdlib.List.groupBy([ 1, 2, 3, 4, 5 ], fun x -> x % 2)
@@ -1143,31 +1129,26 @@ test splitLast =
       |> Stdlib.Test.equal(Stdlib.Option.Option.Some(([ 1, 2 ], 3))) ])
 
 
-// @compiler xfail compile: "Expected TInt32, got TFloat64" class=aot-rejection reason=aot-type-error
 test rejectsMixedListElements =
   [ 1s32, 2.3 ]
   => raises "Cannot add a Float64 (2.3) to a list of Int32. Failed at index 1."
 
 
-// @compiler xfail compile: "Expected TTuple [TInt32; TInt32], got TInt32" class=aot-rejection reason=aot-type-error
 test rejectsMixedTupleAndScalar =
   [ (1s32, 10s32), 10s32, (3s32, 30s32) ]
   => raises "Cannot add an Int32 (10s32) to a list of (Int32 * Int32). Failed at index 1."
 
 
-// @compiler xfail compile: "Expected TTuple [TInt32; TInt32], got TTuple [TInt32; TInt32; TInt32]" class=aot-rejection reason=aot-type-error
 test rejectsTuplesWithDifferentArity =
   [ (1s32, 10s32), (2s32, 20s32), (3s32, 30s32, 40s32) ]
   => raises "Cannot add an (Int32 * Int32 * Int32) ((3s32, 30s32, 40s32)) to a list of (Int32 * Int32). Failed at index 2."
 
 
-// @compiler xfail compile: "Expected TBool, got TInt64" class=aot-rejection reason=aot-type-error
 test dropWhileRejectsNonBoolCondition =
   Stdlib.List.dropWhile([ 1, 2, 3, 4 ], fun _ -> 0 - 1)
   => raises "Darklang.Stdlib.List.dropWhile's 2nd parameter `fn` returned Int64 (-1), but should return Bool"
 
 
-// @compiler xfail compile: "Expected TBool, got TSum" class=aot-rejection reason=aot-type-error
 test filterRejectsOptionCondition =
   Stdlib.List.filter([ 1, 2, 3 ], fun item ->
     match item with
@@ -1177,37 +1158,31 @@ test filterRejectsOptionCondition =
   => raises "Darklang.Stdlib.List.filter's 2nd parameter `f` returned Darklang.Stdlib.Option.Option<_> (None), but should return Bool"
 
 
-// @compiler xfail compile: "Expected TBool, got TString" class=aot-rejection reason=aot-type-error
 test filterRejectsStringCondition =
   Stdlib.List.filter([ true, false, true ], fun _ -> "a")
   => raises "Darklang.Stdlib.List.filter's 2nd parameter `f` returned String (\"a\"), but should return Bool"
 
 
-// @compiler xfail compile: "got TList TInt32" class=aot-rejection reason=aot-type-error
 test flattenRejectsScalarElements =
   Stdlib.List.flatten([ 1s32, 2s32, 3s32 ])
   => raises "Darklang.Stdlib.List.flatten's 1st parameter `list` expects List<List<_>>, but got List<Int32> ([1s32, 2s32, 3s32])"
 
 
-// @compiler xfail compile: "Expected TInt64, got TList TInt64" class=aot-rejection reason=aot-type-error
 test flattenRejectsDifferentNestingDepths =
   Stdlib.List.flatten([ [ 1 ], [ [ 2, 3 ] ] ])
   => raises "Cannot add a List<List<Int64>> ([[2, 3]]) to a list of List<Int64>. Failed at index 1."
 
 
-// @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
 test setAtRejectsWrongValueType =
   Stdlib.List.setAt([ 1, 2 ], 0, "x")
   => raises "Darklang.Stdlib.List.setAt's 3rd parameter `value` expects Int64, but got String (\"x\")"
 
 
-// @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
 test interleaveRejectsMixedElementTypes =
   Stdlib.List.interleave([ "a", "b", "c" ], [ 0 ])
   => raises "Darklang.Stdlib.List.interleave's 2nd parameter `lB` expects List<String>, but got List<Int64> ([0])"
 
 
-// @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
 test interposeRejectsWrongSeparatorType =
   Stdlib.List.interpose([ "a", "b", "c" ], 0)
   => raises "Darklang.Stdlib.List.interpose's 2nd parameter `sep` expects String, but got Int64 (0). Try wrapping it with `Stdlib.display`."
@@ -1228,7 +1203,6 @@ test findFirstStopsAtTheFirstMatch =
   |> Stdlib.Test.equal(Stdlib.Option.Option.Some(1))
 
 
-// @compiler xfail compile: "Expected TBool, got TString" class=aot-rejection reason=aot-type-error
 test allRejectsStringCondition =
   Stdlib.List.all([ 1, 2 ], fun _ -> "a")
   => raises "Darklang.Stdlib.List.all's 2nd parameter `fn` returned String (\"a\"), but should return Bool"
@@ -1244,19 +1218,16 @@ test partitionKeepsOrderOverALongList =
         |> Stdlib.Test.equal((3333, [ 3, 6 ], [ 1, 2, 4 ])))
 
 
-// @compiler xfail compile: "Expected TBool, got TString" class=aot-rejection reason=aot-type-error
 test partitionRejectsALaterStringCondition =
   Stdlib.List.partition([ 1, 2 ], fun x -> if x == 2 then "s" else true)
   => raises "Darklang.Stdlib.List.partition's 2nd parameter `f` returned String (\"s\"), but should return Bool"
 
 
-// @compiler xfail compile: "Expected TBool, got TString" class=aot-rejection reason=aot-type-error
 test partitionRejectsStringCondition =
   Stdlib.List.partition([ true, false, true ], fun _ -> "a")
   => raises "Darklang.Stdlib.List.partition's 2nd parameter `f` returned String (\"a\"), but should return Bool"
 
 
-// @compiler xfail compile: "Expected TBool, got TSum" class=aot-rejection reason=aot-type-error
 test partitionRejectsOptionCondition =
   Stdlib.List.partition([ 1, 2, 3 ], fun item ->
     match item with
@@ -1266,38 +1237,32 @@ test partitionRejectsOptionCondition =
   => raises "Darklang.Stdlib.List.partition's 2nd parameter `f` returned Darklang.Stdlib.Option.Option<_> (None), but should return Bool"
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.List.sortWith'" class=missing-support reason=upstream-dependency
 test comparatorRejectsIntResult =
   Stdlib.List.sortWith([ 3, 1, 2 ], fun(_, _) -> 0)
   => raises "Darklang.Stdlib.List.sortWith's 2nd parameter `fn` returned Int64 (0), but should return Darklang.Stdlib.Ordering"
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.List.sortWith'" class=missing-support reason=upstream-dependency
 test comparatorRejectsStringResult =
   Stdlib.List.sortWith([ 1, 2, 3 ], fun(_, _) -> "㧑༷釺")
   => raises "Darklang.Stdlib.List.sortWith's 2nd parameter `fn` returned String (\"㧑༷釺\"), but should return Darklang.Stdlib.Ordering"
 
 
-// @compiler xfail compile: "ANF conversion error: Sort ordering remained polymorphic after monomorphization" class=missing-support reason=compiler-gap
 test sortRefusesFunctions =
   Stdlib.List.sort([ (fun x -> x), (fun y -> y) ])
   => raises "Cannot sort (lambda). Bytes, functions and streams have no order; use List.sortBy with a key that has one."
 
 
-// @compiler xfail compile: "Expected TBool, got TInt64" class=aot-rejection reason=aot-type-error
 test takeWhileRejectsNonBoolCondition =
   Stdlib.List.takeWhile([ 1, 2, 3, 4 ], fun _ -> 0 - 1)
   => raises "Darklang.Stdlib.List.takeWhile's 2nd parameter `fn` returned Int64 (-1), but should return Bool"
 
 
-// @compiler xfail compile: "Expected TInt64, got TFloat64" class=aot-rejection reason=aot-type-error
 test uniqueByRejectsMixedElementTypes =
   Stdlib.List.uniqueBy([ 6, 2.0 ], fun x -> x)
   => raises "Cannot add a Float64 (2.0) to a list of Int64. Failed at index 1."
 
 
 // A key type a Dict cannot hold raises, rather than being compared by identity.
-// @compiler xfail compile: "Type TFunction" class=aot-rejection reason=aot-invalid-key
 test uniqueByRejectsFunctionKeys =
   Stdlib.List.uniqueBy([ 1 ], fun _ -> (fun value -> value))
   => raises "Cannot use (lambda) as a dict key. Functions, streams, and values containing them cannot be keys."
@@ -1309,7 +1274,6 @@ test uniqueKeepsFunctions =
   |> Stdlib.Test.equal(1)
 
 
-// @compiler xfail compile: "Type TFunction" class=missing-support reason=compiler-gap
 test uniqueByRejectsFunctionElementsAsKeys =
   Stdlib.List.uniqueBy([ (fun value -> value) ], fun f -> f)
   => raises "Cannot use (lambda) as a dict key. Functions, streams, and values containing them cannot be keys."
@@ -1339,7 +1303,6 @@ test zipEvaluatesElements =
 
 // The counter records callback calls within this test.
 module IterEffects =
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Test.incrementCounter'" class=missing-support reason=test-counter
   test invokesCallbackForEachElement =
     let _ =
       Stdlib.List.iter([ 1, 2, 3 ], fun _ -> Stdlib.Test.incrementCounter())
@@ -1347,7 +1310,6 @@ module IterEffects =
     Stdlib.Test.counterValue() |> Stdlib.Test.equal(3)
 
 
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Test.incrementCounter'" class=missing-support reason=test-counter
   test runsConditionalEffects =
     let _ =
       Stdlib.List.iter([ 1, 2, 3, 4, 5 ], fun x ->
@@ -1356,13 +1318,11 @@ module IterEffects =
     Stdlib.Test.counterValue() |> Stdlib.Test.equal(2)
 
 
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Test.incrementCounter'" class=missing-support reason=test-counter
   test doesNotInvokeCallbackForEmptyList =
     let _ = Stdlib.List.iter([], fun _ -> Stdlib.Test.incrementCounter())
     Stdlib.Test.counterValue() |> Stdlib.Test.equal(0)
 
 
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Test.incrementCounter'" class=missing-support reason=test-counter
   test runsMultipleEffectsPerElement =
     let _ = Stdlib.List.iter([ 10, 20, 30 ], fun _ ->
       let _ = Stdlib.Test.incrementCounter()
@@ -1371,7 +1331,6 @@ module IterEffects =
     Stdlib.Test.counterValue() |> Stdlib.Test.equal(6)
 
 
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Test.incrementCounter'" class=missing-support reason=test-counter
   test visitsLastElement =
     let _ =
       Stdlib.List.iter([ 1, 2, 3 ], fun x ->
@@ -1380,7 +1339,6 @@ module IterEffects =
     Stdlib.Test.counterValue() |> Stdlib.Test.equal(1)
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.List.sortWith'" class=missing-support reason=upstream-dependency
 test comparatorRejectsWrongArity =
   Stdlib.List.sortWith([ 6.0, 2.0 ], fun x -> x)
   => raises "Lambda expects 1 argument, but got 2 arguments"
@@ -1419,7 +1377,6 @@ test randomElementReachesEveryElement =
 
 // Every order of three is reachable (600 shuffles miss one with probability about 1e-47), and a
 // longer list keeps every element.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.List.shuffle'" class=missing-support reason=upstream-dependency
 test shuffleReachesEveryOrder =
   let orders =
     Stdlib.List.map(Stdlib.List.range(1, 600), fun _i ->

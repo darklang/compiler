@@ -3,7 +3,6 @@
 // `Stdlib.Base16.encode` to render the digest.
 module Darklang.Stdlib.Crypto.Tests
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test digests =
   let empty = Stdlib.Utf8.encode("")
   let longer = Stdlib.Utf8.encode("a longer string that's more interesting")
@@ -44,7 +43,6 @@ test digests =
 
 
 // sha256hmac
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test sha256hmac =
   let secret =
     Stdlib.Utf8.encode("AWS4wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY")
@@ -57,7 +55,6 @@ test sha256hmac =
 
 
 // sha1hmac
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test sha1hmac =
   let secret =
     Stdlib.Utf8.encode("AWS4wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY")
@@ -69,7 +66,6 @@ test sha1hmac =
 
 
 // aws
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test awsSigningChain =
   let scope = "20150830/us-east-1/iam/aws4_request"
   let content =
@@ -141,7 +137,6 @@ test digestText =
 
 // Preserve the original two-call comparison independently of the sample test.
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Crypto.Tests.hex: Unknown function or value 'Stdlib.Base16.decode'"
 let hex(s: String): Bytes =
   s
   |> Stdlib.Base16.decode
@@ -150,7 +145,6 @@ let hex(s: String): Bytes =
 
 // Published vectors (FIPS 180, RFC 1321) for every algorithm, through the shared builtin and through
 // each named wrapper.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test digestKnownVectors =
   let abc = Stdlib.Utf8.encode("abc")
   let empty = Stdlib.Utf8.encode("")
@@ -191,7 +185,6 @@ test digestKnownVectors =
 
 
 // Every HMAC-SHA1 test case in RFC 2202 (case 5 compares the full digest the RFC also publishes).
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test sha1hmacRfc2202 =
   Stdlib.Test.all(
     [ Stdlib.Crypto.sha1hmac(
@@ -244,7 +237,6 @@ test sha1hmacRfc2202 =
 
 
 // Every HMAC-SHA256 test case in RFC 4231 (case 5 compares the full digest; the RFC prints its first 16 bytes).
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test sha256hmacRfc4231 =
   Stdlib.Test.all(
     [ Stdlib.Crypto.sha256hmac(
@@ -304,7 +296,6 @@ test sha256hmacRfc4231 =
 
 
 // Every HMAC-MD5 test case in RFC 2202.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test hmacMd5Rfc2202 =
   Stdlib.Test.all(
     [ Stdlib.Crypto.hmac(
@@ -364,7 +355,6 @@ test hmacMd5Rfc2202 =
 
 
 // Every HMAC-SHA384 test case in RFC 4231 (case 5 in full).
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test hmacSha384Rfc4231 =
   Stdlib.Test.all(
     [ Stdlib.Crypto.hmac(
@@ -432,7 +422,6 @@ test hmacSha384Rfc4231 =
 
 // Keys at the edges of the padding: empty, exactly one block, one byte over (hashed first), and
 // SHA-384's 128-byte block. Expected values from Python's `hmac`.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test hmacKeyLengths =
   Stdlib.Test.all(
     [ Stdlib.Crypto.hmac(

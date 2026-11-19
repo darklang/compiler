@@ -1,6 +1,5 @@
 module Darklang.Stdlib.Diff
 
-// @compiler replace: packages/darklang/stdlib/diff.dark#Darklang.Stdlib.Diff.DiffLine reason=compiler-implementation
 type DiffLine =
   | Same(String)
   | Added(String)
@@ -105,7 +104,6 @@ let __trace(
 
 
 /// Compute a line-based diff between two strings.
-// @compiler replace: packages/darklang/stdlib/diff.dark#Darklang.Stdlib.Diff.lines reason=compiler-implementation
 let lines(oldText: String, newText: String): List<DiffLine> =
   let oldLines = String.split(oldText, "\n")
   let newLines = String.split(newText, "\n")

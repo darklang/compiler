@@ -1,6 +1,5 @@
 module Darklang.Stdlib.Result
 
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.Result reason=compiler-implementation
 type Result<'Ok, 'Err> =
   | Ok('Ok)
   | Error('Err)
@@ -19,7 +18,6 @@ impl Display for Result<'Ok, 'Err> =
 /// The lambda <param fn> is applied to <var value> and the result is wrapped in
 /// {{Ok}}. If <param result> is {{Error <var msg>}}, returns <param result>
 /// unchanged.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.map reason=compiler-implementation
 let map(result: Result<'t, 'e>, fn: 't -> 'u): Result<'u, 'e> =
   match result with
   | Ok(value) -> Result.Ok(fn(value))
@@ -31,7 +29,6 @@ let map(result: Result<'t, 'e>, fn: 't -> 'u): Result<'u, 'e> =
 /// applied to <var v1> and <var v2>, and the result is wrapped in {{Ok}}.
 /// Otherwise, returns the first of <param result1> and <param result2> that is
 /// an error.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.map2 reason=compiler-implementation
 let map2(result1: Result<'a, 'e>, result2: Result<'b, 'e>, fn: ('a, 'b) -> 'c): Result<'c, 'e> =
   match result1, result2 with
   | Ok(v1), Ok(v2) -> Result.Ok(fn(v1, v2))
@@ -45,7 +42,6 @@ let map2(result1: Result<'a, 'e>, result2: Result<'b, 'e>, fn: ('a, 'b) -> 'c): 
 /// to <var v1>, <var v2>, and <var v3>, and the result is wrapped in {{Ok}}.
 /// Otherwise, returns the first of <param result1>, <param result2>, and
 /// <param result3> that is an error.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.map3 reason=compiler-implementation
 let map3(
   result1: Result<'a, 'e>,
   result2: Result<'b, 'e>,
@@ -66,7 +62,6 @@ let map3(
 /// and the result is wrapped in {{Ok}}. Otherwise, returns the first of <param
 /// result1>, <param result2>, <param result3>, and <param result4> that is an
 /// error.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.map4 reason=compiler-implementation
 let map4(
   result1: Result<'a, 'e>,
   result2: Result<'b, 'e>,
@@ -89,7 +84,6 @@ let map4(
 /// <var v1>, <var v2>, <var v3>, <var v4>, and <var v5>, and the result is
 /// wrapped in {{Ok}}. Otherwise, returns the first of <param result1>, <param
 /// result2>, <param result3>, <param result4>, and <param result5> that is an error.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.map5 reason=compiler-implementation
 let map5(
   result1: Result<'a, 'e>,
   result2: Result<'b, 'e>,
@@ -109,7 +103,6 @@ let map5(
 
 /// Applies the function <param fn> to the value inside the {{Ok <var value>}} variant of <param result>
 /// if it exists. If <param result> is an {{Error _}}, returns the provided <param default_>.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.mapWithDefault reason=compiler-implementation
 let mapWithDefault(result: Result<'t, 'e>, default_: 'u, fn: 't -> 'u): 'u =
   match result with
   | Ok(value) -> fn(value)
@@ -120,7 +113,6 @@ let mapWithDefault(result: Result<'t, 'e>, default_: 'u, fn: 't -> 'u): 'u =
 /// The lambda <param fn> is applied to <var msg> and the result is wrapped in
 /// {{Error}}. If <param result> is {{Ok <var value>}}, returns <param result>
 /// unchanged.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.mapError reason=compiler-implementation
 let mapError(result: Result<'t, 'e>, fn: 'e -> 'u): Result<'t, 'u> =
   match result with
   | Ok(value) -> Result.Ok(value)
@@ -131,7 +123,6 @@ let mapError(result: Result<'t, 'e>, fn: 'e -> 'u): Result<'t, 'u> =
 /// lambda <param fn> is applied to <var value> and must return {{Error <var
 /// msg>}} or {{Ok <var newValue>}}. If <param result> is {{Error <var msg>}},
 /// returns <param result> unchanged."
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.andThen reason=compiler-implementation
 let andThen(result: Result<'t, 'e>, fn: 't -> Result<'u, 'e>): Result<'u, 'e> =
   match result with
   | Ok(value) -> fn(value)
@@ -140,7 +131,6 @@ let andThen(result: Result<'t, 'e>, fn: 't -> Result<'u, 'e>): Result<'u, 'e> =
 
 /// If <param result> is {{Ok <var value>}}, returns <var value>. If <param
 /// result> is {{Error <var msg>}}, returns <param default>.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.withDefault reason=compiler-implementation
 let withDefault(result: Result<'t, 'e>, default_: 't): 't =
   match result with
   | Ok(value) -> value
@@ -148,7 +138,6 @@ let withDefault(result: Result<'t, 'e>, default_: 't): 't =
 
 
 /// Turn an option into a result, using <param error> as the error message for Error. Specifically, if <param option> is {{Some <var value>}}, returns {{Ok <var value>}}. Returns {{Error <var error>}} otherwise.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.fromOption reason=compiler-implementation
 let fromOption(option: Option<'t>, error: 'e): Result<'t, 'e> =
   match option with
   | Some(value) -> Result.Ok(value)
@@ -156,7 +145,6 @@ let fromOption(option: Option<'t>, error: 'e): Result<'t, 'e> =
 
 
 /// Turn a <type Result> into an <type Option>
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.toOption reason=compiler-implementation
 let toOption(result: Result<'t, 'e>): Option<'t> =
   match result with
   | Ok(value) -> Option.Some(value)
@@ -166,7 +154,6 @@ let toOption(result: Result<'t, 'e>): Option<'t> =
 /// Collect a list of results into a single result. If any of the results
 /// are an error, return the first error. Otherwise, return a list of all
 /// the Ok values.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.collect reason=compiler-implementation
 let collect(results: List<Result<'t, 'e>>): Result<List<'t>, 'e> =
   // Built back to front with `prepend` and reversed once. `append` copies the accumulator, so this
   // was quadratic in the list length: collecting 1,000 results did ~500,000 element copies.
@@ -184,7 +171,6 @@ let collect(results: List<Result<'t, 'e>>): Result<List<'t>, 'e> =
 
 
 /// If <param result> is {{Ok <var value>}}, returns true. Otherwise, returns false.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.isOk reason=compiler-implementation
 let isOk(result: Result<'t, 'e>): Bool =
   match result with
   | Ok(_) -> true
@@ -192,7 +178,6 @@ let isOk(result: Result<'t, 'e>): Bool =
 
 
 /// If <param result> is {{Error <var msg>}}, returns true. Otherwise, returns false.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.isError reason=compiler-implementation
 let isError(result: Result<'t, 'e>): Bool =
   match result with
   | Ok(_) -> false
@@ -200,7 +185,6 @@ let isError(result: Result<'t, 'e>): Bool =
 
 
 /// Returns <param result2> if <param result1> is {{Ok <var value>}}. Otherwise, returns <param result1>.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.and reason=compiler-implementation
 let and(result1: Result<'t, 'e>, result2: Result<'t, 'e>): Result<'t, 'e> =
   match result1 with
   | Ok(_) -> result2
@@ -208,7 +192,6 @@ let and(result1: Result<'t, 'e>, result2: Result<'t, 'e>): Result<'t, 'e> =
 
 
 /// Returns <param result1> if it is {{Ok _}}. Otherwise, returns <param result2>.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.or reason=compiler-implementation
 let or(result1: Result<'t, 'e>, result2: Result<'t, 'e>): Result<'t, 'e> =
   match result1 with
   | Ok(_) -> result1
@@ -216,7 +199,6 @@ let or(result1: Result<'t, 'e>, result2: Result<'t, 'e>): Result<'t, 'e> =
 
 
 /// Returns a list containing <param value> if <param result> is {{Ok <var value>}}. Otherwise, returns an empty list.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.toList reason=compiler-implementation
 let toList(result: Result<'t, 'e>): List<'t> =
   match result with
   | Ok(value) -> [ value ]
@@ -226,7 +208,6 @@ let toList(result: Result<'t, 'e>): List<'t> =
 /// Flattens a nested result. If <param result> is {{Ok (Ok <var value>)}},
 /// returns {{Ok <var value>}}. If <param result> is {{Ok (Error <var msg>)}}, returns {{Error <var msg>}}.
 /// If <param result> is {{Error <var msg>}}, returns {{Error <var msg>}}.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.join reason=compiler-implementation
 let join(result: Result<Result<'t, 'e>, 'e>): Result<'t, 'e> =
   match result with
   | Ok(value) -> value
@@ -236,7 +217,6 @@ let join(result: Result<Result<'t, 'e>, 'e>): Result<'t, 'e> =
 /// Combines a list of results into a single list of unwrapped values.
 /// If all of the results are {{Ok <var value>}}, returns {{Ok <list of unwrapped values>}}.
 /// If any of the results are {{Error <var msg>}}, returns {{Error <var msg>}}.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.combine reason=compiler-implementation
 let combine(results: List<Result<'t, 'e>>): Result<List<'t>, 'e> =
   // Built back to front and reversed once, as `Option.combine` is: `append` copies the
   // accumulator every element, so this was quadratic in the list length.
@@ -253,7 +233,6 @@ let combine(results: List<Result<'t, 'e>>): Result<List<'t>, 'e> =
 
 
 /// Returns a list of all the values that are {{Ok <var value>}}, and ignores any values that are {{Error <var msg>}}.
-// @compiler replace: packages/darklang/stdlib/result.dark#Darklang.Stdlib.Result.values reason=compiler-implementation
 let values(results: List<Result<'t, 'e>>): Result<List<'t>, 'e> =
   let folded =
     results

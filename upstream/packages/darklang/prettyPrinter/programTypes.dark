@@ -82,7 +82,6 @@ let bindingKey(
 
 
 /// <param names>' bindings on <param branchId>, read from the store at once.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.knownBindings: Unknown function or value 'LanguageTools.PackageManager.bindingsNamed'"
 let knownBindings(branchId: Uuid, names: List<String>): KnownBindings =
   KnownBindings
     { names =
@@ -100,7 +99,6 @@ let knownBindings(branchId: Uuid, names: List<String>): KnownBindings =
 
 // Context for relative name resolution - when we know what module we're currently in,
 // we can shorten names that share the same prefix
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.Context: Unknown type 'LanguageTools.Formatter.LocalFn'"
 type Context =
   { branchId: Uuid
     /// The module we're printing from, owner-first (`["Darklang", "Stdlib", "Option"]`), or empty for
@@ -165,7 +163,6 @@ type Context =
 
 
 module Context =
-  // @compiler blocked: upstream-dependency diagnostic="Context / let forBranch: Unknown type 'Context'"
   let forBranch(branchId: Uuid): Context =
     Context
       { branchId = branchId
@@ -189,7 +186,6 @@ module Context =
         knownBindings = Option.None }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Context / val forMain: Darklang.PrettyPrinter.ProgramTypes.Context.forMain: Unknown function or value 'forBranch'"
   val forMain = forBranch(SCM.Branch.mainBranchId)
 
 
@@ -198,7 +194,6 @@ module Context =
   /// References inside a printed definition are then spelled the way someone standing in that module
   /// would say them. Anything that knows which module it is showing should use this rather than
   /// `forBranch`, whose `currentModule` is None and so forces every name to its full path.
-  // @compiler blocked: upstream-dependency diagnostic="Context / let forModule: Unknown type 'Context'"
   let forModule(branchId: Uuid, path: List<String>): Context =
     Context
       { branchId = branchId
@@ -222,13 +217,11 @@ module Context =
         knownBindings = Option.None }
 
 
-  // @compiler blocked: compiler-contract diagnostic="Darklang.PrettyPrinter.ProgramTypes.Context.toPickContext: Unknown field 'preferredLocation' on Darklang.LanguageTools.PackageManager.PickContext"
   let toPickContext(ctx: Context): LanguageTools.PackageManager.PickContext =
     LanguageTools.PackageManager.PickContext
       { currentModule = ctx.currentModule, preferredLocation = ctx.preferredLocation }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.packageNameWithContext: Unknown function or value 'PrettyPrinter.formatName'"
 let packageNameWithContext(
   ctx: Context,
   owner: String,
@@ -242,7 +235,6 @@ let packageNameWithContext(
 
 module FQTypeName =
   module Package =
-    // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.FQTypeName.Package.atDefinition: Unknown function or value 'Context.toPickContext'"
     let atDefinition(ctx: Context, hash: LanguageTools.ProgramTypes.FQTypeName.Package): String =
       match LanguageTools.PackageManager.pickLocation(
               Context.toPickContext(ctx),
@@ -251,7 +243,6 @@ module FQTypeName =
       | None -> shortHash(hash)
 
 
-    // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.FQTypeName.Package.fullForReference: Unknown function or value 'Context.toPickContext'"
     let fullForReference(
       ctx: Context,
       hash: LanguageTools.ProgramTypes.FQTypeName.Package)
@@ -263,7 +254,6 @@ module FQTypeName =
       | None -> shortHash(hash)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.FQTypeName.fullForReference: Unknown function or value 'FQTypeName.Package.fullForReference'"
   let fullForReference(ctx: Context, t: LanguageTools.ProgramTypes.FQTypeName.FQTypeName): String =
     match t with
     | Package(p) -> Package.fullForReference(ctx, p)
@@ -271,7 +261,6 @@ module FQTypeName =
 
 module FQTraitName =
   module Package =
-    // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.FQTraitName.Package.atDefinition: Unknown function or value 'Context.toPickContext'"
     let atDefinition(ctx: Context, hash: LanguageTools.ProgramTypes.FQTraitName.Package): String =
       match LanguageTools.PackageManager.pickLocation(
               Context.toPickContext(ctx),
@@ -280,7 +269,6 @@ module FQTraitName =
       | None -> shortHash(hash)
 
 
-    // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.FQTraitName.Package.fullForReference: Unknown function or value 'Context.toPickContext'"
     let fullForReference(
       ctx: Context,
       hash: LanguageTools.ProgramTypes.FQTraitName.Package)
@@ -301,7 +289,6 @@ module FQValueName =
 
 
   module Package =
-    // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.FQValueName.Package.atDefinition: Unknown function or value 'Context.toPickContext'"
     let atDefinition(ctx: Context, hash: LanguageTools.ProgramTypes.FQValueName.Package): String =
       match LanguageTools.PackageManager.pickLocation(
               Context.toPickContext(ctx),
@@ -310,7 +297,6 @@ module FQValueName =
       | None -> shortHash(hash)
 
 
-    // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.FQValueName.Package.fullForReference: Unknown function or value 'Context.toPickContext'"
     let fullForReference(
       ctx: Context,
       hash: LanguageTools.ProgramTypes.FQValueName.Package)
@@ -322,7 +308,6 @@ module FQValueName =
       | None -> shortHash(hash)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.FQValueName.FQValueName'"
   let fullForReference(
     ctx: Context,
     t: LanguageTools.ProgramTypes.FQValueName.FQValueName)
@@ -341,7 +326,6 @@ module FQFnName =
 
 
   module Package =
-    // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.FQFnName.Package.atDefinition: Unknown function or value 'Context.toPickContext'"
     let atDefinition(ctx: Context, hash: LanguageTools.ProgramTypes.FQFnName.Package): String =
       match LanguageTools.PackageManager.pickLocation(
               Context.toPickContext(ctx),
@@ -350,7 +334,6 @@ module FQFnName =
       | None -> shortHash(hash)
 
 
-    // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.FQFnName.Package.fullForReference: Unknown function or value 'Context.toPickContext'"
     let fullForReference(ctx: Context, hash: LanguageTools.ProgramTypes.FQFnName.Package): String =
       match LanguageTools.PackageManager.pickLocation(
               Context.toPickContext(ctx),
@@ -359,7 +342,6 @@ module FQFnName =
       | None -> shortHash(hash)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.FQFnName.FQFnName'"
   let fullForReference(ctx: Context, t: LanguageTools.ProgramTypes.FQFnName.FQFnName): String =
     match t with
     | Builtin(b) -> Builtin.fullForReference(b)
@@ -371,7 +353,6 @@ module FQFnName =
 
 
 /// Whether anything of <param kind> is bound at <param location>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.isBound: Unknown function or value 'Stdlib.Dict.containsKey'"
 let isBound(
   branchId: Uuid,
   known: Option<KnownBindings>,
@@ -393,7 +374,6 @@ let isBound(
 /// owner, the bare `Option` and `Result`. A nearer binding of the same name shadows it: a
 /// deeper module's for the first kind, any module's for a fallback. Fns and values share bare
 /// names, and `Zero.zero` is read as trait `Zero`'s method before it is read as a fn.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.referenceSegments: Unknown function or value 'referenceSegmentsWorkedOut'"
 let referenceSegments(
   branchId: Uuid,
   known: Option<KnownBindings>,
@@ -431,7 +411,6 @@ let segmentsKey(
 
 
 /// <fn referenceSegments>, worked out rather than looked up.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.referenceSegmentsWorkedOut: Non-exhaustive match expression"
 let referenceSegmentsWorkedOut(
   branchId: Uuid,
   known: Option<KnownBindings>,
@@ -527,7 +506,6 @@ let referenceSegmentsWorkedOut(
 /// What a reference to <param location> (a <param kind>) is written as from `ctx.currentModule`:
 /// the shortest name that resolves back to it there, which `referenceSegments`
 /// works out. A fn or value is not written bare when the declaration binds that name locally.
-// @compiler blocked: upstream-dependency diagnostic="resolvableName: Unknown type 'Context'"
 let resolvableName(
   ctx: Context,
   kind: LanguageTools.ProgramTypes.ItemKind,
@@ -587,7 +565,6 @@ let leastSegments(currentModule: List<String>, written: List<String>): Int64 =
 
 /// `KnownBindings.segments` for the references in <param modules>, each a module path and the
 /// references printed from there.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.segmentsFor: Unknown function or value 'Stdlib.Dict.containsKey'"
 let segmentsFor(
   branchId: Uuid,
   known: KnownBindings,
@@ -630,7 +607,6 @@ module References =
     | Error(_) -> []
 
 
-  // @compiler blocked: upstream-dependency diagnostic="References / let inFnName: Unknown type 'LanguageTools.ProgramTypes.FQFnName.FQFnName'"
   let inFnName(
     nr: LanguageTools.ProgramTypes.NameResolution<LanguageTools.ProgramTypes.FQFnName.FQFnName>)
     : List<Reference> =
@@ -649,7 +625,6 @@ module References =
     | Error(_) -> []
 
 
-  // @compiler blocked: upstream-dependency diagnostic="References / let inTypeRef: Unknown type 'LanguageTools.ProgramTypes.TypeReference'"
   let inTypeRef(t: LanguageTools.ProgramTypes.TypeReference): List<Reference> =
     match t with
     | TStream(inner) -> inTypeRef(inner)
@@ -665,14 +640,12 @@ module References =
     | _ -> []
 
 
-  // @compiler blocked: upstream-dependency diagnostic="References / let inTypeRefs: Unknown type 'LanguageTools.ProgramTypes.TypeReference'"
   let inTypeRefs(ts: List<LanguageTools.ProgramTypes.TypeReference>): List<Reference> =
     match ts with
     | [] -> []
     | [t, ...rest] -> Stdlib.List.concat(inTypeRef(t), inTypeRefs(rest))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="References / let inExpr: Unknown type 'LanguageTools.ProgramTypes.Expr'"
   let inExpr(e: LanguageTools.ProgramTypes.Expr): List<Reference> =
     match e with
     | EString(_, segments) -> inSegments(segments)
@@ -716,21 +689,18 @@ module References =
     | _ -> []
 
 
-  // @compiler blocked: upstream-dependency diagnostic="References / let inOptionalExpr: Unknown type 'LanguageTools.ProgramTypes.Expr'"
   let inOptionalExpr(e: Option<LanguageTools.ProgramTypes.Expr>): List<Reference> =
     match e with
     | Some(e) -> inExpr(e)
     | None -> []
 
 
-  // @compiler blocked: upstream-dependency diagnostic="References / let inExprs: Unknown type 'LanguageTools.ProgramTypes.Expr'"
   let inExprs(es: List<LanguageTools.ProgramTypes.Expr>): List<Reference> =
     match es with
     | [] -> []
     | [e, ...rest] -> Stdlib.List.concat(inExpr(e), inExprs(rest))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="References / let inSegments: Unknown type 'LanguageTools.ProgramTypes.StringSegment'"
   let inSegments(segments: List<LanguageTools.ProgramTypes.StringSegment>): List<Reference> =
     match segments with
     | [] -> []
@@ -738,7 +708,6 @@ module References =
     | [StringInterpolation(e), ...rest] -> Stdlib.List.concat(inExpr(e), inSegments(rest))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="References / let inMatchCases: Unknown type 'LanguageTools.ProgramTypes.MatchCase'"
   let inMatchCases(cases: List<LanguageTools.ProgramTypes.MatchCase>): List<Reference> =
     match cases with
     | [] -> []
@@ -746,7 +715,6 @@ module References =
       Stdlib.List.flatten([ inOptionalExpr(c.whenCondition), inExpr(c.rhs), inMatchCases(rest) ])
 
 
-  // @compiler blocked: upstream-dependency diagnostic="References / let inPipeExprs: Unknown type 'LanguageTools.ProgramTypes.PipeExpr'"
   let inPipeExprs(parts: List<LanguageTools.ProgramTypes.PipeExpr>): List<Reference> =
     match parts with
     | [] -> []
@@ -778,7 +746,6 @@ let letPatternNames(p: LanguageTools.ProgramTypes.LetPattern): List<String> =
 
 
 /// The names <param p> binds.
-// @compiler blocked: upstream-dependency diagnostic="matchPatternNames: Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let matchPatternNames(p: LanguageTools.ProgramTypes.MatchPattern): List<String> =
   match p with
   | MPVariable(_, name) -> [ name ]
@@ -809,7 +776,6 @@ let matchPatternNames(p: LanguageTools.ProgramTypes.MatchPattern): List<String> 
 
 
 /// Every name bound anywhere in <param e>: by a `let`, a lambda, or a pattern.
-// @compiler blocked: upstream-dependency diagnostic="boundNames: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let boundNames(e: LanguageTools.ProgramTypes.Expr): List<String> =
   let all(es: List<LanguageTools.ProgramTypes.Expr>): List<String> =
     es
@@ -892,7 +858,6 @@ let nameSet(names: List<String>): Dict<String, Unit> =
 /// The name a reference to <param hash> prints as: the location it is bound at that suits
 /// `ctx` best, so the same item prints the same way whichever alias the source used, written the
 /// shortest way that resolves back to it.
-// @compiler blocked: upstream-dependency diagnostic="referenceName: Unknown type 'Context'"
 let referenceName(
   ctx: Context,
   kind: LanguageTools.ProgramTypes.ItemKind,
@@ -916,7 +881,6 @@ let referenceName(
 
 
 module NameResolution =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.NameResolution.typeName: Unknown function or value 'packageNameWithContext'"
   let typeName(
     ctx: Context,
     nr: LanguageTools.ProgramTypes.NameResolution<LanguageTools.ProgramTypes.FQTypeName.FQTypeName>)
@@ -934,7 +898,6 @@ module NameResolution =
     | Error(_) -> NameResolutionError.source(nr.originalName)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.NameResolution.traitName: Unknown function or value 'packageNameWithContext'"
   let traitName(
     ctx: Context,
     nr:
@@ -953,7 +916,6 @@ module NameResolution =
     | Error(_) -> NameResolutionError.source(nr.originalName)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.FQFnName.FQFnName'"
   let fnName(
     ctx: Context,
     nr: LanguageTools.ProgramTypes.NameResolution<LanguageTools.ProgramTypes.FQFnName.FQFnName>)
@@ -979,7 +941,6 @@ module NameResolution =
     | Error(_) -> NameResolutionError.source(nr.originalName)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.FQValueName.FQValueName'"
   let valueName(
     ctx: Context,
     nr:
@@ -1006,7 +967,6 @@ type FnParens =
 
 
 /// Render a type reference, parenthesizing function types when required.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeReference'"
 let typeReferenceDocWithFnParens(
   ctx: Context,
   fnParens: FnParens,
@@ -1069,12 +1029,10 @@ let typeReferenceDocWithFnParens(
   | other -> txt(typeReferenceFlat(ctx, other))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeReference'"
 let typeReferenceDoc(ctx: Context, t: LanguageTools.ProgramTypes.TypeReference): Stdlib.Pretty.Doc =
   typeReferenceDocWithFnParens(ctx, FnParens.Bare, t)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeReference'"
 let typeReferenceFlatAtPrecedence(
   ctx: Context,
   fnParens: FnParens,
@@ -1143,17 +1101,14 @@ let typeReferenceFlatAtPrecedence(
     | Bare -> rendered
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeReference'"
 let typeReferenceFlat(ctx: Context, t: LanguageTools.ProgramTypes.TypeReference): String =
   typeReferenceFlatAtPrecedence(ctx, FnParens.Bare, t)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeReference'"
 let typeReference(ctx: Context, t: LanguageTools.ProgramTypes.TypeReference): String =
   typeReferenceFlat(ctx, t)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeReference'"
 let typeArgumentsDoc(
   ctx: Context,
   args: List<LanguageTools.ProgramTypes.TypeReference>)
@@ -1165,7 +1120,6 @@ let typeArgumentsDoc(
     wrapExprs("<", ">", ",", docs)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.letPattern: Unknown function or value 'PrettyPrinter.formatName'"
 let letPattern(lp: LanguageTools.ProgramTypes.LetPattern): String =
   match lp with
   | LPUnit(_id) -> "()"
@@ -1180,7 +1134,6 @@ let letPattern(lp: LanguageTools.ProgramTypes.LetPattern): String =
 
 /// A lambda's parameters as they follow `fun`: ` x` for one plain parameter,
 /// `(acc, x)` for several, and `((a, b))` for one tuple.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.lambdaParams: Unknown function or value 'letPattern'"
 let lambdaParams(pats: List<LanguageTools.ProgramTypes.LetPattern>): String =
   match pats with
   | [only] ->
@@ -1230,7 +1183,6 @@ let floatDigits(whole: String, remainder: String): String =
 
 /// Walks the cons chain of `[a, b, ...rest]`: the pattern it ends in, then its
 /// heads last to first.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let matchPatternConsChain(
   revHeads: List<LanguageTools.ProgramTypes.MatchPattern>,
   tail: LanguageTools.ProgramTypes.MatchPattern)
@@ -1240,7 +1192,6 @@ let matchPatternConsChain(
   | _ -> Stdlib.List.prepend(revHeads, tail)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let matchPattern(mp: LanguageTools.ProgramTypes.MatchPattern): String =
   match mp with
   | MPVariable(_id, name) -> formatName(name)
@@ -1322,7 +1273,6 @@ let matchPattern(mp: LanguageTools.ProgramTypes.MatchPattern): String =
 
 
 /// A match arm's pattern: `| Some(a), None ->`, a tuple without parentheses of its own.
-// @compiler blocked: upstream-dependency diagnostic="armPattern: Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let armPattern(mp: LanguageTools.ProgramTypes.MatchPattern): String =
   match mp with
   | MPTuple(_, first, second, theRest) ->
@@ -1334,7 +1284,6 @@ let armPattern(mp: LanguageTools.ProgramTypes.MatchPattern): String =
 
 /// A match pattern where it sits among commas, wrapped when it is an or-pattern
 /// or an `as`, which would otherwise take in the commas around it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let matchPatternGrouped(mp: LanguageTools.ProgramTypes.MatchPattern): String =
   match mp with
   | MPOr(_, _) | MPAs(_, _, _) -> "(" + matchPattern(mp) + ")"
@@ -1380,7 +1329,6 @@ let infix(i: LanguageTools.ProgramTypes.Infix): String =
 /// <param segments> between triple quotes, `"""…"""` or `$"""…"""`, if they can be: the text is
 /// written raw there, so it can't hold `"""` or end in a `"`, and any character but a backslash,
 /// a quote or a line break that an escaped literal would escape keeps it escaped.
-// @compiler blocked: upstream-dependency diagnostic="tripleQuotedString: Unknown type 'LanguageTools.ProgramTypes.StringSegment'"
 let tripleQuotedString(
   ctx: Context,
   segments: List<LanguageTools.ProgramTypes.StringSegment>)
@@ -1428,7 +1376,6 @@ let tripleQuotedString(
       Option.Some("$\"\"\"" + inner + "\"\"\"")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.StringSegment'"
 let stringSegment(ctx: Context, s: LanguageTools.ProgramTypes.StringSegment): String =
   match s with
   // Inside `$"..."` a brace opens an interpolation, so a literal one is written doubled.
@@ -1462,7 +1409,6 @@ let flat(d: Stdlib.Pretty.Doc): String =
 
 
 /// <param e> on one line, for where code can't break: a `when` guard, an interpolation.
-// @compiler blocked: upstream-dependency diagnostic="flatExpr: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let flatExpr(ctx: Context, e: LanguageTools.ProgramTypes.Expr): String =
   flat(exprDoc({ ctx with oneLine = true }, e))
 
@@ -1523,7 +1469,6 @@ let wrapExprsClosingBelow(
 /// `[ a, b ]` on one line when it fits; broken, one part per line under the first, without
 /// commas, and the closing delimiter on the last line: `[ a` then `  b ]`. Lists, records and
 /// dicts. Empty is `opening` and `closing` together: `[]`.
-// @compiler blocked: upstream-dependency diagnostic="spacedParts: Unknown type 'Context'"
 let spacedParts(
   ctx: Context,
   opening: String,
@@ -1550,7 +1495,6 @@ let spacedParts(
 
 /// A list literal: `spacedParts`, with its items as paragraphs (`Stdlib.Pretty.Doc.Paragraphs`)
 /// when it breaks.
-// @compiler blocked: upstream-dependency diagnostic="listDoc: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let listDoc(ctx: Context, items: List<LanguageTools.ProgramTypes.Expr>): Stdlib.Pretty.Doc =
   match items with
   | [] -> Stdlib.Pretty.text("[]")
@@ -1587,7 +1531,6 @@ let listDoc(ctx: Context, items: List<LanguageTools.ProgramTypes.Expr>): Stdlib.
 
 /// One item of a list. A `let` or a statement keeps its parentheses: bare, the items after it
 /// would read as lines of its block.
-// @compiler blocked: upstream-dependency diagnostic="listItemDoc: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let listItemDoc(ctx: Context, item: LanguageTools.ProgramTypes.Expr): Stdlib.Pretty.Doc =
   match item with
   | ELet(_, _, _, _) | EStatement(_, _, _) -> parens(blockDocSpaced(ctx, item, false))
@@ -1596,7 +1539,6 @@ let listItemDoc(ctx: Context, item: LanguageTools.ProgramTypes.Expr): Stdlib.Pre
 
 /// Whether <param e> is a lambda, which as a call's last argument hugs the call:
 /// `List.map(xs, fun x ->` with the body below.
-// @compiler blocked: upstream-dependency diagnostic="isLambda: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let isLambda(e: LanguageTools.ProgramTypes.Expr): Bool =
   match e with
   | ELambda(_, _, _) -> true
@@ -1604,7 +1546,6 @@ let isLambda(e: LanguageTools.ProgramTypes.Expr): Bool =
 
 
 /// Whether the last of <param args> is a lambda.
-// @compiler blocked: upstream-dependency diagnostic="lastIsLambda: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let lastIsLambda(args: List<LanguageTools.ProgramTypes.Expr>): Bool =
   match Stdlib.List.last(args) with
   | Some(a) -> isLambda(a)
@@ -1614,7 +1555,6 @@ let lastIsLambda(args: List<LanguageTools.ProgramTypes.Expr>): Bool =
 /// One argument in a call's comma list. A lambda that is the last argument drops its
 /// own parentheses (`List.map(xs, fun x -> x)`); one before a comma keeps them, as do
 /// constructs that read on past a comma.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let callArg(ctx: Context, arg: LanguageTools.ProgramTypes.Expr, isLast: Bool): Stdlib.Pretty.Doc =
   match arg with
   | ELambda(_id, pats, body) ->
@@ -1640,7 +1580,6 @@ type CallSite =
 ///       acc + x)
 ///
 /// and otherwise every argument goes on its own line.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let callArgs(
   ctx: Context,
   args: List<LanguageTools.ProgramTypes.Expr>,
@@ -1697,7 +1636,6 @@ let callArgs(
 
 
 /// `fun x ->` with the body on the lines below, two past the line it starts on.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.lambdaBrokenDoc: Unknown function or value 'lambdaParams'"
 let lambdaBrokenDoc(
   pats: List<LanguageTools.ProgramTypes.LetPattern>,
   body: Stdlib.Pretty.Doc)
@@ -1708,7 +1646,6 @@ let lambdaBrokenDoc(
 
 
 /// `fun x -> body` on one line when it fits, the body below when not; <param body> already built.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.lambdaFlatDoc: Unknown function or value 'lambdaParams'"
 let lambdaFlatDoc(
   pats: List<LanguageTools.ProgramTypes.LetPattern>,
   body: Stdlib.Pretty.Doc)
@@ -1722,7 +1659,6 @@ let lambdaFlatDoc(
 /// `(fun(x, y) -> body)`, or without its parentheses when `wrapped` is false and the
 /// call around it supplies them. On one line when it fits; otherwise the body goes on the lines
 /// below, two past the line the lambda starts on.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let lambdaDoc(
   ctx: Context,
   pats: List<LanguageTools.ProgramTypes.LetPattern>,
@@ -1739,7 +1675,6 @@ let lambdaDoc(
 /// The ` // = value` a live value adds after an expression, or nothing at all.
 ///
 /// Zero columns wide for layout, so adding one never moves the code it sits after.
-// @compiler blocked: upstream-dependency diagnostic="valueSuffix: Unknown type 'Context'"
 let valueSuffix(ctx: Context, id: Int64): Stdlib.Pretty.Doc =
   match Stdlib.Dict.get(ctx.liveValues, Stdlib.display(id)) with
   // A line suffix, not inline text: a `)` or `,` the enclosing expression prints after this
@@ -1751,7 +1686,6 @@ let valueSuffix(ctx: Context, id: Int64): Stdlib.Pretty.Doc =
 /// A pipe stage's own expression id, which is what its value is keyed by. Every
 /// stage carries one through the desugaring (`EPipeFnCall(id, ...)` becomes
 /// `EApply(id, ...)`), which is why the values are already there to print.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PipeExpr'"
 let pipeExprId(p: LanguageTools.ProgramTypes.PipeExpr): Int64 =
   match p with
   | EPipeVariable(id, _, _) -> id
@@ -1761,7 +1695,6 @@ let pipeExprId(p: LanguageTools.ProgramTypes.PipeExpr): Int64 =
   | EPipeEnum(id, _, _, _) -> id
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PipeExpr'"
 let pipeExprDoc(ctx: Context, p: LanguageTools.ProgramTypes.PipeExpr): Stdlib.Pretty.Doc =
   let txt(s: String): Stdlib.Pretty.Doc = Stdlib.Pretty.text(s)
   let applied(
@@ -1857,7 +1790,6 @@ let infixPower(i: LanguageTools.ProgramTypes.Infix): (Int64 * Bool) =
 /// literal, a variable, a record, an application. Application binds tighter than any operator, so
 /// `factorial n * 2` needs no parens around the call, which is the main thing the old printer got
 /// wrong by bracketing every operand unconditionally.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let exprPower(e: LanguageTools.ProgramTypes.Expr): Int64 =
   match e with
   | EInfix(_, op, _, _, _) ->
@@ -1877,7 +1809,6 @@ let exprPower(e: LanguageTools.ProgramTypes.Expr): Int64 =
 /// Looser than its parent always does. At equal power it depends on the side: `a - b - c` groups left,
 /// so a right operand of the same power needs parens to mean anything else; `2 ** 3 ** 2` groups right,
 /// so the left one does.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let infixOperandNeedsParens(
   operand: LanguageTools.ProgramTypes.Expr,
   parentPower: Int64,
@@ -1894,7 +1825,6 @@ let infixOperandNeedsParens(
 
 
 /// Does printing `e` leave a bitwise-or bare in a match-arm body?
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let hasBareBitwiseOr(e: LanguageTools.ProgramTypes.Expr): Bool =
   match e with
   | EInfix(_, InfixFnCall(BitwiseOr), _, _, _) -> true
@@ -1935,7 +1865,6 @@ val shortIfWidth = 80
 /// `if a then if b then c else d` is ambiguous on one line: the parser attaches `else d` to the
 /// inner `if`, even if it was written for the outer one. Breaking the outer `if` puts `else` on
 /// its own line at the outer `if`'s indentation, which the parser reads correctly.
-// @compiler blocked: upstream-dependency diagnostic="ifDoc: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let ifDoc(
   ctx: Context,
   cond: LanguageTools.ProgramTypes.Expr,
@@ -2026,7 +1955,6 @@ let ifDoc(
 
 
 /// The operands of a chain of one left-associative operator, `a && b && c`, left to right.
-// @compiler blocked: upstream-dependency diagnostic="infixChain: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let infixChain(
   op: LanguageTools.ProgramTypes.Infix,
   e: LanguageTools.ProgramTypes.Expr)
@@ -2045,7 +1973,6 @@ let infixChain(
 ///
 ///     let total = List.fold(xs, 0, fun(acc, x) ->
 ///       acc + x)
-// @compiler blocked: upstream-dependency diagnostic="letBindingDoc: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let letBindingDoc(
   ctx: Context,
   head: String,
@@ -2072,7 +1999,6 @@ let letBindingDoc(
 
 
 /// The statements of a block, in order: what `let`s and statement sequences nest into.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.BlockItem: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 type BlockItem =
   /// The ids of the nodes starting here (the `let`, and any sequence it opens), its pattern and
   /// its right-hand side.
@@ -2082,14 +2008,12 @@ type BlockItem =
 
 
 /// <param e> as the statements of one block, the last being the block's value.
-// @compiler blocked: upstream-dependency diagnostic="blockItems: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let blockItems(e: LanguageTools.ProgramTypes.Expr): List<BlockItem> =
   blockItemsUnder(e, [])
 
 
 /// <fn blockItems>, with <param wrappers> the ids of the statement sequences that start where
 /// <param e> does: a comment above the line is theirs as much as the statement's.
-// @compiler blocked: upstream-dependency diagnostic="blockItemsUnder: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let blockItemsUnder(e: LanguageTools.ProgramTypes.Expr, wrappers: List<Int64>): List<BlockItem> =
   match e with
   | ELet(id, pattern, rhs, body) ->
@@ -2109,7 +2033,6 @@ let blockItemsUnder(e: LanguageTools.ProgramTypes.Expr, wrappers: List<Int64>): 
 /// The prefix operator a call was written as: `!` for `Builtin.boolNot`, and `-` or `~` for
 /// the trait method one of those lowers to, when the source wrote it that way (`dark format`
 /// knows; `dark view` shows the call).
-// @compiler blocked: upstream-dependency diagnostic="prefixOperator: Unknown type 'LanguageTools.ProgramTypes.FQFnName.FQFnName'"
 let prefixOperator(
   ctx: Context,
   callId: Int64,
@@ -2134,7 +2057,6 @@ let prefixOperator(
 
 
 /// A pattern's own node id.
-// @compiler blocked: upstream-dependency diagnostic="patternId: Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let patternId(p: LanguageTools.ProgramTypes.MatchPattern): Int64 =
   match p with
   | MPVariable(id, _) -> id
@@ -2167,7 +2089,6 @@ let patternId(p: LanguageTools.ProgramTypes.MatchPattern): Int64 =
 
 /// The comments that belong with the line node <param id> started on, if it is the first
 /// node there to ask.
-// @compiler blocked: upstream-dependency diagnostic="commentsAt: Unknown type 'Context'"
 let commentsAt(ctx: Context, id: Int64): Option<(String * List<LanguageTools.Formatter.Comment>)> =
   if Stdlib.Dict.isEmpty(ctx.comments) then
     Option.None
@@ -2177,7 +2098,6 @@ let commentsAt(ctx: Context, id: Int64): Option<(String * List<LanguageTools.For
 
 
 /// Whether a comment the source set off with a blank line goes above node <param id>.
-// @compiler blocked: upstream-dependency diagnostic="blankBeforeComments: Unknown type 'Context'"
 let blankBeforeComments(ctx: Context, id: Int64): Bool =
   match commentsAt(ctx, id) with
   | Some((_, cs)) -> Stdlib.List.any(cs, fun c -> c.blankBefore && Stdlib.Bool.not(c.trailing))
@@ -2190,7 +2110,6 @@ let blankBeforeComments(ctx: Context, id: Int64): Bool =
 /// The outermost node starting on a line takes the comments above it, and what it holds is built
 /// without them, so no comment prints twice. A comment no node takes is left out, and `dark format`,
 /// which checks for that, prints the declaration as written instead.
-// @compiler blocked: upstream-dependency diagnostic="commented: Unknown type 'Context'"
 let commented(ctx: Context, id: Int64, build: Context -> Stdlib.Pretty.Doc): Stdlib.Pretty.Doc =
   if ctx.hasComments then
     let key = Stdlib.display(id)
@@ -2207,7 +2126,6 @@ let commented(ctx: Context, id: Int64, build: Context -> Stdlib.Pretty.Doc): Std
 
 /// `commented`, for the nodes <param ids>, which all start where one piece of code does: a
 /// statement and the sequence it opens, say.
-// @compiler blocked: upstream-dependency diagnostic="commentedAt: Unknown type 'Context'"
 let commentedAt(
   ctx: Context,
   ids: List<Int64>,
@@ -2218,7 +2136,6 @@ let commentedAt(
 
 
 /// <fn commentedAt>'s pieces: the comments above, the code, and the comments after it.
-// @compiler blocked: upstream-dependency diagnostic="commentedParts: Unknown type 'Context'"
 let commentedParts(
   ctx: Context,
   ids: List<Int64>,
@@ -2274,7 +2191,6 @@ let commentedParts(
 
 
 /// An expression as a Doc, with the comments that belong with it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let exprDoc(ctx: Context, e: LanguageTools.ProgramTypes.Expr): Stdlib.Pretty.Doc =
   // Most printing has no comments to place; that case skips the lookups.
   if ctx.hasComments then
@@ -2284,7 +2200,6 @@ let exprDoc(ctx: Context, e: LanguageTools.ProgramTypes.Expr): Stdlib.Pretty.Doc
 
 
 /// Whether <param e> was written alone after a `...` in its brackets, `[...xs]`.
-// @compiler blocked: upstream-dependency diagnostic="spreadAlone: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let spreadAlone(ctx: Context, e: LanguageTools.ProgramTypes.Expr): Bool =
   if Stdlib.Dict.isEmpty(ctx.spreads) then
     false
@@ -2294,7 +2209,6 @@ let spreadAlone(ctx: Context, e: LanguageTools.ProgramTypes.Expr): Bool =
 
 
 /// Whether call <param id> is what a list written with `...` lowered to.
-// @compiler blocked: upstream-dependency diagnostic="spreadCall: Unknown type 'Context'"
 let spreadCall(ctx: Context, id: Int64): Bool =
   if Stdlib.Dict.isEmpty(ctx.spreads) then
     false
@@ -2303,7 +2217,6 @@ let spreadCall(ctx: Context, id: Int64): Bool =
 
 
 /// How the literal <param id> was written, when the source is known.
-// @compiler blocked: upstream-dependency diagnostic="spelling: Unknown type 'Context'"
 let spelling(ctx: Context, id: Int64): Option<String> =
   if Stdlib.Dict.isEmpty(ctx.spellings) then
     Option.None
@@ -2312,7 +2225,6 @@ let spelling(ctx: Context, id: Int64): Option<String> =
 
 
 /// An expression as a Doc: the layouts it could take, for the caller to choose between.
-// @compiler blocked: upstream-dependency diagnostic="exprDocBare: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let exprDocBare(ctx: Context, e: LanguageTools.ProgramTypes.Expr): Stdlib.Pretty.Doc =
   match e with
   // `[...xs]` lowers to `xs` itself; it prints back in its brackets.
@@ -2624,7 +2536,6 @@ let exprDocBare(ctx: Context, e: LanguageTools.ProgramTypes.Expr): Stdlib.Pretty
 /// What kind of line <param e> makes, for spacing a run of them alike: a call, or a pipe whose
 /// last step is a call, by the fn's name as written; an `if`; a `match`. Anything else is "",
 /// a run of its own.
-// @compiler blocked: upstream-dependency diagnostic="lineShape: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let lineShape(e: LanguageTools.ProgramTypes.Expr): String =
   match e with
   | EApply(_, EFnName(_, name, _, _), _, _) -> "call " + Stdlib.String.join(name.originalName, ".")
@@ -2641,14 +2552,12 @@ let lineShape(e: LanguageTools.ProgramTypes.Expr): String =
 ///
 /// A block reads as paragraphs (`Stdlib.Pretty.Doc.Paragraphs`): a blank line follows a line that
 /// takes several, and a run of lines of one shape (`lineShape`) is spaced alike.
-// @compiler blocked: upstream-dependency diagnostic="blockDoc: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let blockDoc(ctx: Context, e: LanguageTools.ProgramTypes.Expr): Stdlib.Pretty.Doc =
   blockDocSpaced(ctx, e, true)
 
 
 /// <param e> in parentheses. A block there keeps its lines together: a blank line inside
 /// `( … )` reads as the end of it.
-// @compiler blocked: upstream-dependency diagnostic="parenthesized: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let parenthesized(ctx: Context, e: LanguageTools.ProgramTypes.Expr): Stdlib.Pretty.Doc =
   match e with
   | ELet(_, _, _, _) | EStatement(_, _, _) ->
@@ -2661,7 +2570,6 @@ let parenthesized(ctx: Context, e: LanguageTools.ProgramTypes.Expr): Stdlib.Pret
 
 
 /// <param blankLines>: whether lines may be set off as paragraphs, as `blockDoc` describes.
-// @compiler blocked: upstream-dependency diagnostic="blockDocSpaced: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let blockDocSpaced(
   ctx: Context,
   e: LanguageTools.ProgramTypes.Expr,
@@ -2716,7 +2624,6 @@ let blockDocSpaced(
 
 /// `let pattern = rhs`, or, for a local fn whose signature the file gave, `let f(x: T): R =`
 /// and its body.
-// @compiler blocked: upstream-dependency diagnostic="bindingDoc: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let bindingDoc(
   ctx: Context,
   pattern: LanguageTools.ProgramTypes.LetPattern,
@@ -2775,7 +2682,6 @@ let bindingDoc(
 /// interpolated string would land in the middle of the code, and the comment would eat the rest
 /// of the line (`if c then f x // = 1 else g` loses its `else`). A call anywhere else is printed
 /// bare.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let lineDoc(ctx: Context, e: LanguageTools.ProgramTypes.Expr): Stdlib.Pretty.Doc =
   let doc = exprDoc(ctx, e)
   match e with
@@ -2787,20 +2693,17 @@ let lineDoc(ctx: Context, e: LanguageTools.ProgramTypes.Expr): Stdlib.Pretty.Doc
   | _ -> doc
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let expr(ctx: Context, e: LanguageTools.ProgramTypes.Expr): String =
   Stdlib.Pretty.render(ctx.width, exprDoc(ctx, e))
 
 
 /// `expr`, for a function's whole body: the body's last expression ends a line, so a live value
 /// for it is shown.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let bodyExpr(ctx: Context, e: LanguageTools.ProgramTypes.Expr): String =
   Stdlib.Pretty.render(ctx.width, lineDoc(ctx, e))
 
 
 /// The original string-building printer, still handling every construct the Doc layer hasn't taken over.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let exprString(ctx: Context, e: LanguageTools.ProgramTypes.Expr): String =
   match e with
   // The commonest nodes first: a match tries its arms in order.
@@ -2964,7 +2867,6 @@ let exprString(ctx: Context, e: LanguageTools.ProgramTypes.Expr): String =
 
 
 module TypeDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeDeclaration.RecordField'"
   let recordFieldDoc(
     ctx: Context,
     d: LanguageTools.ProgramTypes.TypeDeclaration.RecordField)
@@ -2976,12 +2878,10 @@ module TypeDeclaration =
         typeReferenceDoc(ctx, d.typ)))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeDeclaration.RecordField'"
   let recordField(ctx: Context, d: LanguageTools.ProgramTypes.TypeDeclaration.RecordField): String =
     Stdlib.Pretty.render(ctx.width, recordFieldDoc(ctx, d))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeDeclaration.EnumField'"
   let enumFieldDoc(
     ctx: Context,
     d: LanguageTools.ProgramTypes.TypeDeclaration.EnumField)
@@ -3003,12 +2903,10 @@ module TypeDeclaration =
     | Some(label) -> Stdlib.Pretty.Doc.Concat(Stdlib.Pretty.text($"{formatName(label)}: "), typ)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeDeclaration.EnumField'"
   let enumField(ctx: Context, d: LanguageTools.ProgramTypes.TypeDeclaration.EnumField): String =
     Stdlib.Pretty.render(ctx.width, enumFieldDoc(ctx, d))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeDeclaration.EnumCase'"
   let enumCaseDoc(
     ctx: Context,
     c: LanguageTools.ProgramTypes.TypeDeclaration.EnumCase)
@@ -3024,12 +2922,10 @@ module TypeDeclaration =
           wrapExprs("(", ")", ",", parts)))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeDeclaration.EnumCase'"
   let enumCase(ctx: Context, c: LanguageTools.ProgramTypes.TypeDeclaration.EnumCase): String =
     Stdlib.Pretty.render(ctx.width, enumCaseDoc(ctx, c))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeDeclaration.TypeDeclaration'"
 let customTypeDoc(
   ctx: Context,
   d: LanguageTools.ProgramTypes.TypeDeclaration.TypeDeclaration)
@@ -3051,7 +2947,6 @@ let customTypeDoc(
     |> (fun docs -> Stdlib.Pretty.join(docs, Stdlib.Pretty.Doc.HardLine))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeDeclaration.TypeDeclaration'"
 let customType(
   ctx: Context,
   d: LanguageTools.ProgramTypes.TypeDeclaration.TypeDeclaration)
@@ -3060,7 +2955,6 @@ let customType(
 
 
 /// `<'a: Show + Compare, 'b>`: each type param followed by its bounds, if any.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Bound'"
 let typeParamsWithBounds(
   ctx: Context,
   typeParams: List<String>,
@@ -3093,13 +2987,11 @@ let typeParamsWithBounds(
     |> (fun parts -> $"<{parts}>")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageType.PackageType'"
 let packageType(ctx: Context, p: LanguageTools.ProgramTypes.PackageType.PackageType): String =
   packageTypeNamed(ctx, FQTypeName.Package.atDefinition(ctx, p.hash), p)
 
 
 /// `packageType`, under <param namePart>; see `packageFnNamed`.
-// @compiler blocked: upstream-dependency diagnostic="packageTypeNamed: Unknown type 'LanguageTools.ProgramTypes.PackageType.PackageType'"
 let packageTypeNamed(
   ctx: Context,
   namePart: String,
@@ -3124,13 +3016,11 @@ let packageTypeNamed(
     $"{docComment}{head}\n{defPart}"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageValue.PackageValue'"
 let packageValue(ctx: Context, p: LanguageTools.ProgramTypes.PackageValue.PackageValue): String =
   packageValueNamed(ctx, FQValueName.Package.atDefinition(ctx, p.hash), p)
 
 
 /// `packageValue`, under <param namePart>; see `packageFnNamed`.
-// @compiler blocked: upstream-dependency diagnostic="packageValueNamed: Unknown type 'LanguageTools.ProgramTypes.PackageValue.PackageValue'"
 let packageValueNamed(
   ctx: Context,
   namePart: String,
@@ -3169,7 +3059,6 @@ module PackageLocation =
     $"{loc.owner}.{modulesPart}{loc.name}"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let packageTest(ctx: Context, test: LanguageTools.ProgramTypes.PackageTest.PackageTest): String =
   let name =
     match LanguageTools.PackageManager.pickLocation(
@@ -3182,7 +3071,6 @@ let packageTest(ctx: Context, test: LanguageTools.ProgramTypes.PackageTest.Packa
 
 
 /// `packageTest`, under <param name>; see `packageFnNamed`.
-// @compiler blocked: upstream-dependency diagnostic="packageTestNamed: Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let packageTestNamed(
   ctx: Context,
   name: String,
@@ -3205,14 +3093,12 @@ let packageTestNamed(
 
 module PackageFn =
   /// `()` in a declaration parses as one parameter named `_` of type Unit.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.Parameter'"
   let isUnitPlaceholder(p: LanguageTools.ProgramTypes.PackageFn.Parameter): Bool =
     match p.typ with
     | TUnit -> p.name == "_"
     | _ -> false
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.Parameter'"
   let parameter(ctx: Context, p: LanguageTools.ProgramTypes.PackageFn.Parameter): String =
     // No `///` here: this is the one-line form (a signature in a listing), and a doc comment runs to
     // the end of the line, so writing one would comment out the rest of the signature.
@@ -3230,7 +3116,6 @@ module PackageFn =
 
 
   /// Render a function parameter with a breakable type.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.Parameter'"
   let parameterDoc(
     ctx: Context,
     p: LanguageTools.ProgramTypes.PackageFn.Parameter)
@@ -3247,7 +3132,6 @@ module PackageFn =
 
 
   /// A fn's parameter list: `(a: T, b: U)`, or `()` for the one unit parameter.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.Parameter'"
   let parametersDoc(
     ctx: Context,
     ps: List<LanguageTools.ProgramTypes.PackageFn.Parameter>)
@@ -3269,7 +3153,6 @@ module PackageFn =
           Stdlib.Pretty.text(")") ])
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
   let signature(ctx: Context, f: LanguageTools.ProgramTypes.PackageFn.PackageFn): String =
     let params =
       f.parameters
@@ -3281,7 +3164,6 @@ module PackageFn =
 
 
 /// The type variables in <param t>, first seen first, after <param acc>.
-// @compiler blocked: upstream-dependency diagnostic="typeVariables: Unknown type 'LanguageTools.ProgramTypes.TypeReference'"
 let typeVariables(acc: List<String>, t: LanguageTools.ProgramTypes.TypeReference): List<String> =
   match t with
   | TVariable(name) ->
@@ -3296,14 +3178,12 @@ let typeVariables(acc: List<String>, t: LanguageTools.ProgramTypes.TypeReference
   | _ -> acc
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 let packageFn(ctx: Context, p: LanguageTools.ProgramTypes.PackageFn.PackageFn): String =
   packageFnNamed(ctx, FQFnName.Package.atDefinition(ctx, p.hash), p)
 
 
 /// `packageFn`, under <param namePart> rather than the name its hash is bound to: for a file being
 /// formatted, whose declarations aren't in the store under the hashes they lower to.
-// @compiler blocked: upstream-dependency diagnostic="packageFnNamed: Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 let packageFnNamed(
   ctx: Context,
   namePart: String,
@@ -3375,13 +3255,11 @@ let packageFnNamed(
 
 
 /// `trait Show<'a> =` then one method signature per line.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Trait.Trait'"
 let packageTrait(ctx: Context, t: LanguageTools.ProgramTypes.Trait.Trait): String =
   packageTraitNamed(ctx, FQTraitName.Package.atDefinition(ctx, t.hash), t)
 
 
 /// `packageTrait`, under <param namePart>; see `packageFnNamed`.
-// @compiler blocked: upstream-dependency diagnostic="packageTraitNamed: Unknown type 'LanguageTools.ProgramTypes.Trait.Trait'"
 let packageTraitNamed(
   ctx: Context,
   namePart: String,
@@ -3414,7 +3292,6 @@ let packageTraitNamed(
 /// `impl<'a: Show> Show<Args> for List<'a> =`, then each method: the declaration itself when the
 /// method's fn was written in the block, and `let m = Some.Fn` when it names one that already
 /// existed. Both round-trip.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
 let packageImpl(ctx: Context, i: LanguageTools.ProgramTypes.TraitImpl.TraitImpl): String =
   let typeParamPart = typeParamsWithBounds(ctx, i.typeParams, i.bounds)
   let traitPart =
@@ -3476,7 +3353,6 @@ let packageImpl(ctx: Context, i: LanguageTools.ProgramTypes.TraitImpl.TraitImpl)
 /// Every screen that shows an item used to ask this for itself, five copies of fetch-by-kind and
 /// print-with-the-matching-printer. Three of the five had three arms, so the LSP refused to open a
 /// trait's file, `v` on a trait row in `dark propagate` raised, and the package server answered 500.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.ProgramTypes.sourceOf: Unknown function or value 'LanguageTools.PackageManager.Type.get'"
 let sourceOf(
   ctx: Context,
   kind: LanguageTools.ProgramTypes.ItemKind,
@@ -3512,7 +3388,6 @@ module BuiltinFn =
 
 
 module PackageOp =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
   let packageOp(branchId: Uuid, op: LanguageTools.ProgramTypes.PackageOp): String =
     let ctx = Context.forBranch(branchId)
     match op with

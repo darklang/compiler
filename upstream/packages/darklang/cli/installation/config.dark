@@ -17,7 +17,6 @@ let darklangHomeIn(home: String): Result<String, String> =
 /// The Darklang home directory, or why it can't be found.
 ///
 /// Takes a host it doesn't read; every caller already has one.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Installation.Config.getDarklangHomeDir: Unknown function or value 'Stdlib.Cli.Unix.getHomeDirectory'"
 let getDarklangHomeDir(_host: Stdlib.Cli.Host.Host): Result<String, String> =
   match Stdlib.Cli.Unix.getHomeDirectory() with
   | Ok(home) -> darklangHomeIn(home)

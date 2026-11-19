@@ -1,7 +1,6 @@
 module Darklang.Cli.Terminal
 
 /// Samples terminal width and height in one native call.
-// @compiler replace: packages/darklang/cli/terminal/size.dark#Darklang.Cli.Terminal.getSize reason=compiler-implementation
 let getSize(): (Int64 * Int64) =
   Builtin.cliTerminalSize()
 
@@ -32,7 +31,6 @@ let palette(): PrettyPrinter.Palette =
 
 
 /// A value rendered for this terminal: laid out for `width`, painted with the CLI's palette.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Terminal.renderValue: Unknown function or value 'PrettyPrinter.RuntimeTypes.dvalWith'"
 let renderValue(
   branchId: Uuid,
   width: Int64,

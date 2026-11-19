@@ -4,7 +4,6 @@ module Darklang.LanguageTools.AtRestTypeChecker.Impls
 
 /// What checking an implementation needs loaded first: its method fns, the types its self type
 /// and type args name, and the types its trait's methods name.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Trait.Trait'"
 let refsOf(
   batchTraits: Dict<ProgramTypes.Hash, ProgramTypes.Trait.Trait>,
   implementation: ProgramTypes.TraitImpl.TraitImpl)
@@ -39,7 +38,6 @@ let refsOf(
 
 /// The trait an implementation names: one <param inBatch> answers for (a trait saved in the
 /// same batch), else the store's.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Trait.Trait'"
 let traitOf(
   inBatch: ProgramTypes.Hash -> Option<ProgramTypes.Trait.Trait>,
   implementation: ProgramTypes.TraitImpl.TraitImpl)
@@ -58,7 +56,6 @@ let traitOf(
 
 
 /// The type variables a written type names.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeReference'"
 let variablesIn(typ: ProgramTypes.TypeReference): List<String> =
   match typ with
   | TVariable(name) -> [ name ]
@@ -75,7 +72,6 @@ let variablesIn(typ: ProgramTypes.TypeReference): List<String> =
 
 /// The implementation's params: the ones it declares, and the ones its self type and type args
 /// name without declaring. `impl Zero for Dict<'k, 'v>` declares none and has two.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
 let implParamsOf(implementation: ProgramTypes.TraitImpl.TraitImpl): List<String> =
   Stdlib.List.flatten(
     [ implementation.typeParams
@@ -86,7 +82,6 @@ let implParamsOf(implementation: ProgramTypes.TraitImpl.TraitImpl): List<String>
 
 /// The trait method's signature at the implementation's type, as one fn type. The method's and
 /// the implementation's own params stay rigid: the method fn may not pick a type for them.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
 let expectedType(
   implementation: ProgramTypes.TraitImpl.TraitImpl,
   trait_: ProgramTypes.Trait.Trait,
@@ -117,7 +112,6 @@ let expectedType(
 
 
 /// The method fn's signature, its type params fresh. None when no signature is available.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Solve.State'"
 let actualType(
   s: Solve.State,
   batchFns: Dict<LanguageTools.ProgramTypes.Hash, LanguageTools.ProgramTypes.PackageFn.PackageFn>,
@@ -171,7 +165,6 @@ let actualType(
 
 
 /// Which part differs; the expected and actual types follow it in the message.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let signatureDetail(expected: Model.Ty, actual: Model.Ty): String =
   match expected, actual with
   | TFn(expectedParams, expectedRet), TFn(actualParams, actualRet) ->
@@ -188,7 +181,6 @@ let signatureDetail(expected: Model.Ty, actual: Model.Ty): String =
 
 /// Failed when a method is missing, extra, or has the wrong signature; Incomplete, saying why,
 /// when something could not be compared.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let check(
   env: Model.Environment,
   batchFns: Dict<ProgramTypes.Hash, ProgramTypes.PackageFn.PackageFn>,

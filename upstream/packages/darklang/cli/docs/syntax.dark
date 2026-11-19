@@ -1,6 +1,5 @@
 module Darklang.Cli.Docs.Syntax
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Docs.Syntax.content: Unknown function or value 'LanguageTools.Parser.keywords'"
 let content(): String =
   """# Syntax
 

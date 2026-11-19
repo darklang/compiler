@@ -12,23 +12,19 @@ module AmbiguousHash =
   // one survived rather than each of them.
   let takesIntParseError(e: Darklang.Stdlib.BigInt.ParseError): Int64 = 1
   let takesUuidParseError(e: Darklang.Stdlib.Uuid.ParseError): Int64 = 2
-  // @compiler blocked: aot-type-error diagnostic="Darklang.Language.Tests.ErrorTypeNames.AmbiguousHash.returnsIntParseError: Expected TSum (\"Darklang.Stdlib.Int.ParseError\", []), got TInt"
   let returnsIntParseError(n: Int64): Darklang.Stdlib.BigInt.ParseError = n
 
   // One hash, three declarations, three names printed.
-  // @compiler xfail compile: "Expected TSum (\"Darklang.Stdlib.BigInt.ParseError\", []), got TInt64" class=missing-support reason=compiler-gap
   test intParamRaises =
     (takesIntParseError(5))
     => raises
       "Darklang.Language.Tests.ErrorTypeNames.AmbiguousHash.takesIntParseError's 1st parameter `e` expects Darklang.Stdlib.BigInt.ParseError, but got Int64 (5)"
 
-  // @compiler xfail compile: "Expected TSum (\"Darklang.Stdlib.Uuid.ParseError\", []), got TInt" class=aot-rejection reason=aot-type-error
   test uuidParamRaises =
     (takesUuidParseError(5))
     => raises
       "Darklang.Language.Tests.ErrorTypeNames.AmbiguousHash.takesUuidParseError's 1st parameter `e` expects Darklang.Stdlib.Uuid.ParseError, but got Int64 (5)"
 
-  // @compiler xfail compile: "Unknown function or value 'returnsIntParseError'" class=missing-support reason=upstream-dependency
   test intReturnRaises =
     (returnsIntParseError(5))
     => raises
@@ -48,25 +44,21 @@ module NestedInTypeArguments =
     : Int64 =
     4
 
-  // @compiler xfail compile: "Expected TList (TSum (\"Darklang.Stdlib.BigInt.ParseError\", [])), got TInt64" class=missing-support reason=compiler-gap
   test listOfIntRaises =
     (takesListOfBigInt(5))
     => raises
       "Darklang.Language.Tests.ErrorTypeNames.NestedInTypeArguments.takesListOfBigInt's 1st parameter `x` expects List<Darklang.Stdlib.BigInt.ParseError>, but got Int64 (5)"
 
-  // @compiler xfail compile: "Expected TList (TSum (\"Darklang.Stdlib.Uuid.ParseError\", [])), got TInt" class=aot-rejection reason=aot-type-error
   test listOfUuidRaises =
     (takesListOfUuid(5))
     => raises
       "Darklang.Language.Tests.ErrorTypeNames.NestedInTypeArguments.takesListOfUuid's 1st parameter `x` expects List<Darklang.Stdlib.Uuid.ParseError>, but got Int64 (5)"
 
-  // @compiler xfail compile: "Expected TDict (TString, TList (TSum (\"Darklang.Stdlib.Uuid.ParseError\", []))), got TInt" class=aot-rejection reason=aot-type-error
   test deepRaises =
     (takesDeep(5))
     => raises
       "Darklang.Language.Tests.ErrorTypeNames.NestedInTypeArguments.takesDeep's 1st parameter `x` expects Dict<String, List<Darklang.Stdlib.Uuid.ParseError>>, but got Int64 (5)"
 
-  // @compiler xfail compile: "Expected TTuple" class=aot-rejection reason=aot-type-error
   test pairRaises =
     (takesPair(5))
     => raises
@@ -78,39 +70,31 @@ module RecordAndEnumFields =
   type HasUuidParseErrors = { es: List<Darklang.Stdlib.Uuid.ParseError> }
   type WrapsUuidParseError = | Wrap(Darklang.Stdlib.Uuid.ParseError)
 
-  // @compiler blocked: aot-type-error diagnostic="Darklang.Language.Tests.ErrorTypeNames.RecordAndEnumFields.makeIntRecord: Expected TSum (\"Darklang.Stdlib.Int.ParseError\", []), got TInt"
   let makeIntRecord(): HasIntParseError = HasIntParseError { e = 5 }
-  // @compiler blocked: aot-type-error diagnostic="Darklang.Language.Tests.ErrorTypeNames.RecordAndEnumFields.makeUuidRecord: Expected TList (TSum (\"Darklang.Stdlib.Uuid.ParseError\", [])), got TInt"
   let makeUuidRecord(): HasUuidParseErrors = HasUuidParseErrors { es = 5 }
-  // @compiler blocked: aot-type-error diagnostic="Darklang.Language.Tests.ErrorTypeNames.RecordAndEnumFields.makeEnum: Expected TSum (\"Darklang.Stdlib.Uuid.ParseError\", []), got TInt"
   let makeEnum(): WrapsUuidParseError = WrapsUuidParseError.Wrap(5)
 
-  // @compiler blocked: aot-type-error diagnostic="Darklang.Language.Tests.ErrorTypeNames.RecordAndEnumFields.updateIntRecord: Expected TSum (\"Darklang.Stdlib.Int.ParseError\", []), got TInt"
   let updateIntRecord(): HasIntParseError =
     let start =
       HasIntParseError { e = Darklang.Stdlib.BigInt.ParseError.BadFormat }
 
     { start with e = 5 }
 
-  // @compiler xfail compile: "Unknown function or value 'makeIntRecord'" class=missing-support reason=upstream-dependency
   test intRecordRaises =
     (makeIntRecord())
     => raises
       "Failed to create record. Expected Darklang.Stdlib.BigInt.ParseError for field `e`, but got 5 (an Int64)"
 
-  // @compiler xfail compile: "Unknown function or value 'makeUuidRecord'" class=missing-support reason=upstream-dependency
   test uuidRecordRaises =
     (makeUuidRecord())
     => raises
       "Failed to create record. Expected List<Darklang.Stdlib.Uuid.ParseError> for field `es`, but got 5 (an Int64)"
 
-  // @compiler xfail compile: "Unknown function or value 'makeEnum'" class=missing-support reason=upstream-dependency
   test enumRaises =
     (makeEnum())
     => raises
       "Failed to create enum. Expected Darklang.Stdlib.Uuid.ParseError for field 0 in `Wrap`, but got Int64 (5)"
 
-  // @compiler xfail compile: "Unknown function or value 'updateIntRecord'" class=missing-support reason=upstream-dependency
   test updateRaises =
     (updateIntRecord())
     => raises
@@ -121,7 +105,6 @@ module UnambiguousHash =
   // is printed however the author spelled it. Type arguments survive either way.
   let takesOption(o: Darklang.Stdlib.Option.Option<Int64>): Int64 = 1
 
-  // @compiler xfail compile: "Expected TSum (\"Darklang.Stdlib.Option.Option\", [TInt64]), got TInt64" class=missing-support reason=compiler-gap
   test optionRaises =
     (takesOption(5))
     => raises
@@ -134,7 +117,6 @@ module LocallyDeclared =
 
   let describe(t: Celsius): String = "ok"
 
-  // @compiler xfail compile: "Expected TRecord (\"Darklang.Language.Tests.ErrorTypeNames.LocallyDeclared.Celsius\", []), got TInt" class=aot-rejection reason=aot-type-error
   test localTypeRaises =
     (describe(5))
     => raises

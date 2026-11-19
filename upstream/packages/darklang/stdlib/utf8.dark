@@ -1,7 +1,6 @@
 module Darklang.Stdlib.Utf8
 
 /// Encodes <param s> as UTF-8.
-// @compiler replace: packages/darklang/stdlib/utf8.dark#Darklang.Stdlib.Utf8.encode reason=compiler-implementation
 let encode(s: String): Bytes =
   Builtin.utf8Encode(s)
 
@@ -10,7 +9,6 @@ let encode(s: String): Bytes =
 /// bytes aren't valid UTF-8, naming the offset of the first bad bytes:
 /// {{Error "Invalid UTF-8 at byte 1: E2 82"}}. Like every String, the result is
 /// normalized (NFC); keep the Bytes when the exact bytes matter.
-// @compiler replace: packages/darklang/stdlib/utf8.dark#Darklang.Stdlib.Utf8.decode reason=compiler-implementation
 let decode(bytes: Bytes): Result<String, String> =
   Builtin.utf8Decode(bytes)
 
@@ -18,6 +16,5 @@ let decode(bytes: Bytes): Result<String, String> =
 /// Decodes <param bytes> as UTF-8, replacing invalid sequences with
 /// {{U+FFFD}}. Like every String, the result is normalized (NFC);
 /// keep the Bytes when the exact bytes matter.
-// @compiler replace: packages/darklang/stdlib/utf8.dark#Darklang.Stdlib.Utf8.decodeWithReplacement reason=compiler-implementation
 let decodeWithReplacement(bytes: Bytes): String =
   Builtin.utf8DecodeWithReplacement(bytes)

@@ -1,7 +1,6 @@
 /// `delete <module>` takes out everything in it, whatever uses what inside it.
 module Darklang.Cli.Tests.DeleteModule
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test deleteModuleTakesEverything = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/scratch.dark"
   let source =
@@ -21,7 +20,6 @@ test deleteModuleTakesEverything = Instance.withInstance(fun i ->
       Instance.doesNotSay(listed, "make", "make is gone") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test deleteModuleKeepsWhatOthersUse = Instance.withInstance(fun i ->
   let lib = Instance.home(i) + "/lib.dark"
   let user = Instance.home(i) + "/user.dark"
@@ -38,7 +36,6 @@ test deleteModuleKeepsWhatOthersUse = Instance.withInstance(fun i ->
       Instance.says(out, "Used from outside Me.Lib: Me.User.two", "names the user") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test deleteModuleTakesImpls = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/impl.dark"
   let source =
@@ -55,7 +52,6 @@ test deleteModuleTakesImpls = Instance.withInstance(fun i ->
       Instance.doesNotSay(after, "implementation of trait", "the impl is gone too") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test deleteModuleRefusesWhenNothingResolves = Instance.withInstance(fun i ->
   let (code, out) = Instance.ran(i, [ "delete", "Stdlib.List", "--yes" ])
   Stdlib.Test.all(
@@ -64,7 +60,6 @@ test deleteModuleRefusesWhenNothingResolves = Instance.withInstance(fun i ->
       Instance.doesNotSay(out, "Deleted", "claims no delete") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test deleteModuleRefusesAnOwner = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/scratch.dark"
   let _ = Stdlib.Cli.File.writeAtomic(path, "let one(): Int64 = 1\n") |> Builtin.unwrap
@@ -80,7 +75,6 @@ test deleteModuleRefusesAnOwner = Instance.withInstance(fun i ->
       Instance.says(listed, "one", "Me.Scratch is still there") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test deleteModuleListsTheFirstTen = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/big.dark"
   let source =
@@ -103,7 +97,6 @@ test deleteModuleListsTheFirstTen = Instance.withInstance(fun i ->
       Instance.says(out, "\n    and 2 more", "the rest counted") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test deleteModuleTakesSubmodulesAndHonoursDryRun = Instance.withInstance(fun i ->
   let outer = Instance.home(i) + "/outer.dark"
   let inner = Instance.home(i) + "/inner.dark"

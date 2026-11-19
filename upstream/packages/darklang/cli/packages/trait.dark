@@ -5,7 +5,6 @@ module Darklang.Cli.Packages.TraitCommand
 // (`<'a> = let show (v: 'a) : String`); a complete `trait Name<'a> = ...`
 // declaration is accepted too, doc comment included.
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [] ->
@@ -45,7 +44,6 @@ let traitSource(name: String, definition: String): String =
     $"trait {name}{definition}"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.PackageLocation'"
 let createTraitInline(state: AppState, locationStr: String, definition: String): AppState =
   let hint =
     [ Stdlib.Cli.UI.Colors.error("Expected exactly one trait declaration")
@@ -85,7 +83,6 @@ let createTraitInline(state: AppState, locationStr: String, definition: String):
       | _ -> Option.None)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Create or update a trait"
     ""
@@ -112,6 +109,5 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []

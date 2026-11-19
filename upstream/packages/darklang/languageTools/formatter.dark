@@ -42,13 +42,11 @@ type RawComment =
 
 
 /// A local fn as written, `let f(x: T): R =`. Lowering keeps only the lambda.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Formatter.LocalFn: Unknown type 'ProgramTypes.TypeReference'"
 type LocalFn =
   { parameters: List<(String * ProgramTypes.TypeReference)>
     returnType: Option<ProgramTypes.TypeReference> }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Formatter.Item: Unknown type 'ProgramTypes.PackageFn.PackageFn'"
 type Item =
   /// `module Name =` and what it holds, or, with <field header>, the `module A.B` that
   /// opens a file and holds the rest of it.
@@ -69,7 +67,6 @@ type Item =
 
 
 /// One method of an impl block, as written.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Formatter.ImplMember: Unknown type 'ProgramTypes.PackageFn.PackageFn'"
 type ImplMember =
   /// `let show(p: Point): String = ...`, declared in the block.
   | Declared(name: String, fn: ProgramTypes.PackageFn.PackageFn)
@@ -77,7 +74,6 @@ type ImplMember =
   | Named(name: String)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Formatter.Declaration: Unknown type 'Item'"
 type Declaration =
   { item: Item
     /// Its content hash, which leaves out ids, positions and comments; empty for a module and for
@@ -93,7 +89,6 @@ type Declaration =
     endOffset: Int64 }
 
 
-// @compiler blocked: upstream-dependency diagnostic="File: Unknown type 'Declaration'"
 type File =
   { declarations: List<Declaration>
     /// The source, as read.
@@ -126,7 +121,6 @@ type Formatted =
 
 /// <param d>'s lines of <param file>, less its own indentation and any trailing spaces: what is
 /// printed when the item can't be, or when printing it would lose a comment.
-// @compiler blocked: upstream-dependency diagnostic="sourceOf: Unknown type 'Declaration'"
 let sourceOf(file: File, d: Declaration): String =
   linesOf(file, d)
   |> Stdlib.List.map(fun line -> unindented(d, line))
@@ -134,13 +128,11 @@ let sourceOf(file: File, d: Declaration): String =
 
 
 /// <param d>'s lines of <param file>, exactly as written.
-// @compiler blocked: upstream-dependency diagnostic="linesOf: Unknown type 'Declaration'"
 let linesOf(file: File, d: Declaration): List<String> =
   Stdlib.String.slice(file.text, d.startOffset, d.endOffset) |> Stdlib.String.split("\n")
 
 
 /// <param line> of <param d> less <param d>'s own indentation and any trailing spaces.
-// @compiler blocked: upstream-dependency diagnostic="unindented: Unknown type 'Declaration'"
 let unindented(d: Declaration, line: String): String =
   let trimmed = Stdlib.String.trimEnd(line)
   let lead = Stdlib.String.length(trimmed) - Stdlib.String.length(Stdlib.String.trimStart(trimmed))
@@ -167,7 +159,6 @@ val opensLine =
 /// last node that ends there, and prints after it. Otherwise -- on a line of its own, or after
 /// code that opens something (`[ // ...`) -- it belongs with the next line of code, and prints
 /// above it.
-// @compiler blocked: upstream-dependency diagnostic="placeComments: Unknown type 'File'"
 let placeComments(file: File): List<Comment> =
   match file.rawComments with
   | [] -> []
@@ -272,7 +263,6 @@ let docLinesOf(lines: List<String>): List<String> =
 
 
 /// What <param d> is called, for saying it was printed as written.
-// @compiler blocked: upstream-dependency diagnostic="declarationName: Unknown type 'Declaration'"
 let declarationName(file: File, d: Declaration): String =
   match d.item with
   | Module(name, _, _) -> name
@@ -311,13 +301,11 @@ let byKey(cs: List<Comment>, key: Comment -> String): Dict<String, List<Comment>
 
 
 /// The line <param d>'s code starts on, after its `///` lines.
-// @compiler blocked: upstream-dependency diagnostic="codeRow: Unknown type 'Declaration'"
 let codeRow(file: File, d: Declaration): Int64 =
   codeRowIn(d, linesOf(file, d))
 
 
 /// <fn codeRow>, given <param d>'s lines.
-// @compiler blocked: upstream-dependency diagnostic="codeRowIn: Unknown type 'Declaration'"
 let codeRowIn(d: Declaration, lines: List<String>): Int64 =
   let docLines =
     lines
@@ -330,7 +318,6 @@ let codeRowIn(d: Declaration, lines: List<String>): Int64 =
 
 
 /// `impl Show for Point =` and its methods, each as the block wrote it.
-// @compiler blocked: upstream-dependency diagnostic="implBlock: Unknown type 'ProgramTypes.TraitImpl.TraitImpl'"
 let implBlock(
   ctx: PrettyPrinter.ProgramTypes.Context,
   memberPath: List<String>,
@@ -384,7 +371,6 @@ type FnLayout =
 
 /// One declaration, printed at <param path> (owner first) for a page <param width> wide: the
 /// comments above it, its text, and the names of what in it was printed as written.
-// @compiler blocked: upstream-dependency diagnostic="declaration: Unknown type 'Declaration'"
 let declaration(
   branchId: Uuid,
   known: PrettyPrinter.ProgramTypes.KnownBindings,
@@ -490,7 +476,6 @@ val testNarrowing = 20
 
 /// The width <param d>, at <param path>, is printed for: narrower for a test, and for anything in a
 /// `Tests` module, than for other code. A module passes the width on to what is in it.
-// @compiler blocked: upstream-dependency diagnostic="widthFor: Unknown type 'Declaration'"
 let widthFor(width: Int64, path: List<String>, d: Declaration): Int64 =
   match d.item with
   | Module(_, _, _) -> width
@@ -501,7 +486,6 @@ let widthFor(width: Int64, path: List<String>, d: Declaration): Int64 =
 /// Declarations in order, with the blank lines between them: one between two that each fit on
 /// a line (comments above them aside), so a run of short ones reads as a list, and two
 /// otherwise.
-// @compiler blocked: upstream-dependency diagnostic="declarations: Unknown type 'Declaration'"
 let declarations(
   branchId: Uuid,
   known: PrettyPrinter.ProgramTypes.KnownBindings,
@@ -632,7 +616,6 @@ let declarations(
 
 /// The package references printed in <param ds>, declared at <param path>, by the module
 /// path they are printed from.
-// @compiler blocked: upstream-dependency diagnostic="referencesIn: Unknown type 'Declaration'"
 let referencesIn(
   path: List<String>,
   ds: List<Declaration>)
@@ -676,21 +659,18 @@ val nonWord = Stdlib.Regex.ofPattern("[^A-Za-z0-9_]+")
 
 
 /// The text of every `//` comment in <param source>, in order and trimmed.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Formatter.commentTexts: Unknown function or value 'Builtin.formatterComments'"
 let commentTexts(source: String): List<String> =
   Builtin.formatterComments(source)
 
 
 /// <param source>, a package `.dark` file, parsed and lowered for formatting, or the parser's
 /// complaint.
-// @compiler blocked: upstream-dependency diagnostic="parse: Unknown type 'File'"
 let parse(source: String): Result<File, String> =
   Builtin.formatterParse(source)
 
 
 /// <param source>, a package `.dark` file, formatted for a page <param width> wide, or the
 /// parser's complaint.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Formatter.source: Unknown function or value 'parse'"
 let source(branchId: Uuid, width: Int64, source: String): Result<Formatted, String> =
   match parse(source) with
   | Error(e) -> Result.Error(e)
@@ -745,7 +725,6 @@ let source(branchId: Uuid, width: Int64, source: String): Result<Formatted, Stri
 
 
 /// Each declaration in <param ds> with what it means, a module's by what is in it.
-// @compiler blocked: upstream-dependency diagnostic="meanings: Unknown type 'Declaration'"
 let meanings(file: File, path: String, ds: List<Declaration>): List<(String * String)> =
   ds
   |> Stdlib.List.map(fun d ->
@@ -758,7 +737,6 @@ let meanings(file: File, path: String, ds: List<Declaration>): List<(String * St
 
 /// Why <param formatted> can't replace <param file>: the first declaration it would change the
 /// meaning of, or that it doesn't parse. None when every declaration means what it did.
-// @compiler blocked: upstream-dependency diagnostic="meaningChange: Unknown type 'File'"
 let meaningChange(file: File, formatted: String): Option<String> =
   if formatted == file.text then
     Option.None

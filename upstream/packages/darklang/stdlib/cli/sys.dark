@@ -2,7 +2,6 @@ module Darklang.Stdlib.Cli.Sys
 
 /// Get the current user's login name.
 /// Checks $LOGNAME, then $USER, then falls back to the passwd database.
-// @compiler replace: packages/darklang/stdlib/cli/sys.dark#Darklang.Stdlib.Cli.Sys.currentUser reason=compiler-implementation
 let currentUser(): Option<String> =
   match Env.get("LOGNAME") with
   | Some(u) -> Option.Some(u)
@@ -13,37 +12,31 @@ let currentUser(): Option<String> =
 
 
 /// Get the system hostname.
-// @compiler replace: packages/darklang/stdlib/cli/sys.dark#Darklang.Stdlib.Cli.Sys.hostname reason=compiler-implementation
 let hostname(): Result<String, Posix.Error> =
   Posix.uname() |> Result.map(fun result -> Tuple3.second(result))
 
 
 /// Get the operating system name (e.g. "Linux", "Darwin").
-// @compiler replace: packages/darklang/stdlib/cli/sys.dark#Darklang.Stdlib.Cli.Sys.os reason=compiler-implementation
 let os(): Result<String, Posix.Error> =
   Posix.uname() |> Result.map(fun result -> Tuple3.first(result))
 
 
 /// Get the CPU architecture (e.g. "x86_64", "aarch64").
-// @compiler replace: packages/darklang/stdlib/cli/sys.dark#Darklang.Stdlib.Cli.Sys.arch reason=compiler-implementation
 let arch(): Result<String, Posix.Error> =
   Posix.uname() |> Result.map(fun result -> Tuple3.third(result))
 
 
 /// The path of the running executable.
-// @compiler replace: packages/darklang/stdlib/cli/sys.dark#Darklang.Stdlib.Cli.Sys.currentExecutablePath reason=compiler-implementation
 let currentExecutablePath(): String =
   Builtin.runtimeExecutablePath()
 
 
 /// Get the number of available CPUs.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Unit -> Int64, replacement Unit -> Int"
 let cpuCount(): Int64 =
   __cpuCount() |> Builtin.unwrap
 
 
 /// Get the current process ID.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Unit -> Int64, replacement Unit -> Int"
 let currentPid(): Int64 =
   Builtin.syscallGetpid()
 
@@ -54,13 +47,11 @@ let isTerminal(fd: Int64): Bool =
 
 
 /// Check if the current user is root (uid 0).
-// @compiler replace: packages/darklang/stdlib/cli/sys.dark#Darklang.Stdlib.Cli.Sys.isRoot reason=compiler-implementation
 let isRoot(): Bool =
   Builtin.syscallGetuid() == 0
 
 
 /// Host record selection, buffer growth and decoding shared by both engines.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Blob -> Int64 -> Int64 -> String, replacement Blob -> Int -> Int -> String"
 let __text(buffer: Bytes, offset: Int64, length: Int64): String =
   let field = Bytes.take(Bytes.drop(buffer, offset), length)
   let text =
@@ -71,7 +62,6 @@ let __text(buffer: Bytes, offset: Int64, length: Int64): String =
   Utf8.decodeWithReplacement(text)
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream List<Int64> -> Int64 -> Darklang.Stdlib.Result.Result<Blob, Int64>, replacement List<Int> -> Int -> Darklang.Stdlib.Result.Result<Blob, Int>"
 let __sysctlWith(mib: List<Int64>, count: Int64): Result<Bytes, Int64> =
   match Builtin.syscallSysctl(mib, count) with
   | Error(e) ->
@@ -84,12 +74,10 @@ let __sysctlWith(mib: List<Int64>, count: Int64): Result<Bytes, Int64> =
   | Ok(bytes) -> Result.Ok(bytes)
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream List<Int64> -> Darklang.Stdlib.Result.Result<String, Int64>, replacement List<Int> -> Darklang.Stdlib.Result.Result<String, Int>"
 let __sysctlText(mib: List<Int64>): Result<String, Int64> =
   __sysctlWith(mib, 256) |> Result.map(fun bytes -> __text(bytes, 0, Bytes.length(bytes)))
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int64 -> Int64, replacement Int -> Int"
 let __countBits(value: Int64): Int64 =
   if value == 0 then
     0
@@ -98,7 +86,6 @@ let __countBits(value: Int64): Int64 =
     + __countBits(Int64.checkedDivide(value, 2) |> Result.withDefault(0))
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int64 -> Darklang.Stdlib.Result.Result<Blob, Int64>, replacement Int -> Darklang.Stdlib.Result.Result<Blob, Int>"
 let __affinityWith(count: Int64): Result<Bytes, Int64> =
   match Builtin.syscallSchedGetaffinity(0, count) with
   | Error(e) ->
@@ -113,7 +100,6 @@ let __affinityWith(count: Int64): Result<Bytes, Int64> =
 
 /// Available CPUs means the calling process's affinity on Linux, hw.ncpu on
 /// Darwin, and one on the interpreter's single-threaded browser runtime.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Unit -> Darklang.Stdlib.Result.Result<Int64, Int64>, replacement Unit -> Darklang.Stdlib.Result.Result<Int, Int>"
 let __cpuCount(): Result<Int64, Int64> =
   let result =
     if Builtin.runtimeTargetOS() == "browser" then

@@ -60,34 +60,22 @@ let entry (item : SourceInventory.entry) =
       ("compiler", disposition item.SourceInventory.disposition);
     ]
 
-let check reasons directory path =
+let check reasons sidecar directory path =
   let source =
     In_channel.with_open_bin
       (Filename.concat directory path)
       In_channel.input_all
   in
   let items, diagnostics =
-    match SourceInventory.parse ~interpreterSource:true ~reasons source with
+    match SourceInventory.parse ~interpreterSource:true
+        ~annotations:
+          (CompilerAnnotations.forSource sidecar
+             (if String.starts_with ~prefix:"upstream/" path then path
+              else "upstream/" ^ path))
+        ~reasons source
+    with
     | Ok result -> (List.map entry result.SourceInventory.entries, [])
     | Error message -> ([], [ `String message ])
-  in
-  let annotationLines =
-    match Lexer.tokenize source with
-    | Error _ -> []
-    | Ok (tokens, _) ->
-        List.concat_map
-          (fun (token : Lexer.spannedToken) ->
-            token.Lexer.leadingTrivia
-            |> List.filter_map (fun (comment : Lexer.trivia) ->
-                if
-                  comment.Lexer.kind = Lexer.LineComment
-                  && String.starts_with ~prefix:"// @compiler"
-                       (String.trim comment.Lexer.text)
-                then
-                  Some
-                    (`Int (comment.Lexer.range.Tokenizer.start.Tokenizer.row + 1))
-                else None))
-          tokens
   in
   `Assoc
     [
@@ -95,12 +83,11 @@ let check reasons directory path =
       ("parsed", `Bool (diagnostics = []));
       ("diagnostics", `List diagnostics);
       ("items", `List items);
-      ("annotation_lines", `List annotationLines);
     ]
 
 let () =
   match Array.to_list Sys.argv with
-  | [ _; directory; manifest; glossary; report ] ->
+  | [ _; directory; manifest; glossary; annotations; report ] ->
       let paths =
         Yojson.Basic.Util.(
           Yojson.Basic.from_file manifest |> to_list |> List.map to_string)
@@ -112,10 +99,17 @@ let () =
             prerr_endline message;
             exit 1
       in
-      let rows = List.map (check reasons directory) paths in
+      let sidecar =
+        match CompilerAnnotations.readSidecar annotations with
+        | Ok sidecar -> sidecar
+        | Error message ->
+            prerr_endline message;
+            exit 1
+      in
+      let rows = List.map (check reasons sidecar directory) paths in
       Yojson.Basic.to_file report
         (`Assoc [ ("schema", `Int 1); ("sources", `List rows) ])
   | _ ->
       prerr_endline
-        "Usage: parse_sources SOURCE_DIRECTORY MANIFEST GLOSSARY REPORT";
+        "Usage: parse_sources SOURCE_DIRECTORY MANIFEST GLOSSARY ANNOTATIONS REPORT";
       exit 1

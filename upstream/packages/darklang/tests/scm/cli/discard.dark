@@ -2,7 +2,6 @@
 /// The helpers are in `helpers.dark`.
 module Darklang.SCM.Tests.Cli
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test discardThrowsAwayTheWholeDraft =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.a", "1")
@@ -26,7 +25,6 @@ test discardThrowsAwayTheWholeDraft =
       same(commits(dark), [ "base" ], "history is untouched") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test discardOnABranchLeavesMainsDraftAlone =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.onMain", "1")
@@ -43,7 +41,6 @@ test discardOnABranchLeavesMainsDraftAlone =
 
 // Odd, but today's behaviour: discarding a name leaves its caller's follow in the draft, so the
 // caller keeps running the version that was just thrown away. If that changes, update this test.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test discardingANameLeavesItsCallerOnTheDiscardedVersion =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.helper", "1")
@@ -90,7 +87,6 @@ test discardingANameLeavesItsCallerOnTheDiscardedVersion =
 
 // The same on a branch, followed by archiving the branch: archiving throws the stale follow
 // away with everything else, and main's caller is untouched.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test discardOnABranchThenArchiveLeavesMainUntouched =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.helper", "1")
@@ -144,7 +140,6 @@ test discardOnABranchThenArchiveLeavesMainUntouched =
 
 // An undo's restore is draft work like any other edit: discarding the whole draft takes it away with
 // the edits it stepped back through, and the name is on its committed version again.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test discardAfterAnUndoAndARenameGoesBackToTheCommittedVersion =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.f", "1")

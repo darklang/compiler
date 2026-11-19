@@ -16,7 +16,6 @@ type T =
 
 /// Keep nested instances beside the active store, inside the enclosing fixture.
 /// LanguageTools.LocalStore.path is absolute; child process configuration requires that.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.root: Unknown function or value 'Stdlib.LocalStore.path'"
 let root(): String =
   let store = LanguageTools.LocalStore.path()
   Stdlib.Cli.Path.parent(store) + "/test-instances"
@@ -31,7 +30,6 @@ let root(): String =
 /// No environment variable for this. A guest gets no env by default and an ungranted read
 /// is an error rather than a `None`, so every knob spelled as an env var is a grant every
 /// caller has to remember.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.seedFrom: Unknown function or value 'Stdlib.LocalStore.path'"
 let seedFrom(): String =
   LanguageTools.LocalStore.path()
 
@@ -48,7 +46,6 @@ let cliBinary(): String =
 
 /// A new `<home>/.darklang`. `mkdtemp` rather than a random suffix: under a seeded test two
 /// runs draw the same suffix, and one's dispose would delete the other's instance.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.makeDir: Unknown function or value 'root'"
 let makeDir(): Stdlib.Result.Result<String, String> =
   let r = root()
   match Stdlib.Cli.Unix.ensureDirectoryExists(r) with
@@ -64,7 +61,6 @@ let makeDir(): Stdlib.Result.Result<String, String> =
 
 
 /// A fresh instance. Fails with a message rather than half-existing.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.create: Unknown function or value 'root'"
 let create(): Stdlib.Result.Result<T, String> =
   let src = seedFrom()
   if Stdlib.Cli.Unix.fileExists(src) then
@@ -126,7 +122,6 @@ val commandTimeoutMs = 120000
 /// Under a timeout, so a command that waits forever (on input, on a lock) fails as itself
 /// rather than leaving the whole suite to stop answering. `env` sets the environment, as in
 /// `Process.runWithEnv`, which has no timeout.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.run: Expected TInt, got TInt64"
 let run(
   i: T,
   args: List<String>)
@@ -155,7 +150,6 @@ let run(
 /// Same rule as `TestSuite.callOutput`, because the reason is the same: a refused command
 /// exits nonzero and explains itself on stdout, so dropping stdout on a failure hides
 /// exactly the text a test wants to read.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.output: Unknown function or value 'run'"
 let output(i: T, args: List<String>): String =
   match run(i, args) with
   | Error(e) -> $"ERROR: {e}"
@@ -172,7 +166,6 @@ let output(i: T, args: List<String>): String =
 ///
 /// Ordinary results dispose immediately. A runtime error escapes to the enclosing
 /// isolation worker, whose host also removes these nested instance directories.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.withInstance: Unknown function or value 'create'"
 let withInstance(f: T -> Stdlib.Test.Result): Stdlib.Test.Result =
   match create() with
   | Error(e) -> Stdlib.Test.fail(e)
@@ -183,7 +176,6 @@ let withInstance(f: T -> Stdlib.Test.Result): Stdlib.Test.Result =
 
 
 /// Asserts a command's output contains `needle`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.expectContains: Unknown function or value 'output'"
 let expectContains(
   i: T,
   args: List<String>,
@@ -198,7 +190,6 @@ let expectContains(
 
 
 /// Asserts a command's exit code.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.expectExit: Unknown function or value 'run'"
 let expectExit(i: T, args: List<String>, expected: Int64): Stdlib.Test.Result =
   let cmd = Stdlib.String.join(args, " ")
   match run(i, args) with
@@ -217,7 +208,6 @@ let expectExit(i: T, args: List<String>, expected: Int64): Stdlib.Test.Result =
 /// Both streams because a refusal and its advice can land on either, and a test
 /// about what a person sees should not depend on which. `-1` when the command could
 /// not start at all.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.ran: Unknown function or value 'run'"
 let ran(i: T, args: List<String>): (Int64 * String) =
   match run(i, args) with
   | Error(e) -> (-1, $"could not run: {e}")
@@ -225,7 +215,6 @@ let ran(i: T, args: List<String>): (Int64 * String) =
 
 
 /// Everything a command printed, both streams. See `ran`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Instance.said: Unknown function or value 'ran'"
 let said(i: T, args: List<String>): String =
   Stdlib.Tuple2.second(ran(i, args))
 

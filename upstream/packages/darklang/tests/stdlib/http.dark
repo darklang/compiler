@@ -130,7 +130,6 @@ test redirectTo =
 
 
 // parseQueryString: ports the old _middleware.dark fixture.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Dict.fromEntries'" class=missing-support reason=upstream-dependency
 test parseQueryString =
   Stdlib.Test.all(
     [ Stdlib.Http.parseQueryString("https://darklang.com?x=6&x=7&myString=todo")
@@ -197,7 +196,6 @@ test urlDecode =
       Stdlib.Http.urlDecode("") |> Stdlib.Test.equal("") ])
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test queryParams =
   Stdlib.Test.all(
     [ Stdlib.Http.Request.queryParams(request("/s?q=List+map&n=A%2FB", []))
@@ -271,7 +269,6 @@ test requestHeader =
       |> Stdlib.Test.equal(Stdlib.Option.Option.Some("one")) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Dict.fromEntries'" class=missing-support reason=upstream-dependency
 test parseHeaders =
   Stdlib.Test.all(
     [ Stdlib.Http.parseHeaders("x: y")
@@ -340,7 +337,6 @@ test statusNamed =
       Stdlib.display(Stdlib.Http.Status.notFound) |> Stdlib.Test.equal("404") ])
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test statusInspect =
   Stdlib.Test.all(
     [ Stdlib.inspect(Stdlib.Http.Status.notFound)

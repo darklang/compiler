@@ -1,4 +1,4 @@
-(* CompilerAnnotations.mli - Per-item compiler decisions kept in imported source comments. *)
+(* CompilerAnnotations.mli - Per-item compiler decisions, kept beside imported sources or in fixture comments. *)
 type phase = Compile | Runtime
 type failureClass = AotRejection | MissingSupport | UpstreamBug
 
@@ -27,3 +27,12 @@ val read :
 val at : annotation list -> Tokenizer.pos -> disposition
 val parseReasons : string -> (string list, string) result
 val readReasons : string -> (string list, string) result
+val parse : string list -> string -> (disposition, string) result
+val check : isTest:bool -> disposition -> (disposition, string) result
+
+type sidecar
+
+val parseSidecar : string -> (sidecar, string) result
+val readSidecar : string -> (sidecar, string) result
+val sidecarPaths : sidecar -> string list
+val forSource : sidecar -> string -> (string * string) list

@@ -50,7 +50,6 @@ let executeInDirectoryWithOutput(directory: String, command: String): ExecutionO
 
 
 /// Same as `executeInDirectoryWithOutput`, with stdout and stderr kept as bytes.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Unix.executeInDirectoryWithBytes: Unknown function or value 'Cli.executeBytes'"
 let executeInDirectoryWithBytes(directory: String, command: String): ExecutionBytes =
   executeBytes($"cd -- {quote(directory)} && {command}")
 
@@ -127,7 +126,6 @@ let addToPath(shell: Shell.Shell, dir: String): Result<Unit, String> =
 
 
 /// Gets the home directory of the current user using $HOME environment variable.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Unix.getHomeDirectory: Operator is unavailable for this type"
 let getHomeDirectory(): Result<String, String> =
   let dir = execute("echo $HOME")
   if dir.exitCode == 0 then

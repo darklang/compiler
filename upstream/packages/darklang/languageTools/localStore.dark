@@ -8,7 +8,6 @@ module Darklang.LanguageTools.LocalStore
 /// The store itself is read and changed only through the typed package and SCM functions.
 ///
 /// The store moves per instance (its HOME, a test's copy), so nothing may cache this.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.path: Unknown function or value 'Builtin.localDbPath'"
 let path(): String =
   Builtin.localDbPath()
 
@@ -18,7 +17,6 @@ let path(): String =
 ///
 /// Keys are namespaced by whoever owns them (`sync.*`, `current_branch`, `exec.*`), and the
 /// namespace is the contract. `Seed.export` strips this table wholesale, so nothing here travels.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.configGet: Unknown function or value 'Builtin.configGet'"
 let configGet(key: String): Option<String> =
   Builtin.configGet(key)
 
@@ -30,26 +28,22 @@ let configGet(key: String): Option<String> =
 /// take, and the keys it writes itself (`current_branch` moves with `SCM.PackageOps.selectBranch`,
 /// `instance.id` is made once). The Error says why, ready to print. Keys under `test.` are free
 /// for tests.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.__configWrite: Unknown function or value 'Builtin.configSet'"
 let __configWrite(key: String, value: Option<String>): Result<Unit, String> =
   Builtin.configSet(key, value)
 
 
 /// Write a setting. See `__configWrite` for what is refused.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.configSet: Unknown function or value '__configWrite'"
 let configSet(key: String, value: String): Result<Unit, String> =
   __configWrite(key, Option.Some(value))
 
 
 /// Unset a setting, so its reader falls back to the default. Unsetting a key that is not set is
 /// fine; the keys only the runtime writes are refused.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.configUnset: Unknown function or value '__configWrite'"
 let configUnset(key: String): Result<Unit, String> =
   __configWrite(key, Option.None)
 
 
 /// The keys `config get` reads: every setting a person sets, and `instance.id`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.configKeys: Unknown function or value 'Builtin.configKeys'"
 let configKeys(): List<String> =
   Builtin.configKeys()
 
@@ -86,12 +80,10 @@ type BackupAction =
 /// backups, so this never builds a path. Every copy goes through SQLite's online-backup API rather
 /// than a file copy: the store path is guarded (a guest must not read or replace the host's store),
 /// and a copy of `data.db` alone would miss whatever is still in the WAL.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.backups: Unknown function or value 'Builtin.storeBackup'"
 let backups(action: BackupAction): Result<List<Backup>, String> =
   Builtin.storeBackup(action)
 
 
 /// Write a copy of this instance's store to <param path>, WAL included.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.LocalStore.snapshotTo: Unknown function or value 'backups'"
 let snapshotTo(path: String): Result<Unit, String> =
   backups(BackupAction.SnapshotTo(path)) |> Stdlib.Result.map(fun _ -> ())

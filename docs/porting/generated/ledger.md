@@ -4,7 +4,7 @@
 
 Interpreter revision: `84aaabc91929ecb4bb0dd83afaecd45c9d9e0238`.
 
-The complete corpus contains 510 source files. Items are counted directly from parsed source annotations.
+The complete corpus contains 510 source files. Items are counted from the parsed sources and [their annotations](../../../porting/upstream-annotations.tsv).
 
 A run disposition means selected, not a passing execution receipt. Replacement contracts are checked independently.
 
@@ -43,7 +43,7 @@ Upstream bugs record interpreter behavior or test expectations that the compiler
 
 ### Remaining support by source
 
-Each row links to the authoritative per-test annotations. A named test remains one case even when it contains several assertions.
+A named test remains one case even when it contains several assertions.
 
 | Source | Tests |
 | --- | ---: |

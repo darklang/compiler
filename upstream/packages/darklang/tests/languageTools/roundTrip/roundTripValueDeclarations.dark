@@ -3,7 +3,6 @@ module Darklang.LanguageTools.Parser.RoundTrip.Tests
 // Parse-then-print round trips: valueDeclarations. Moved from
 // backend/tests/Tests/LibParser.RoundTrip.Tests.fs; helpers are in roundTrip.dark.
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test valueDeclarationsUnit =
   Stdlib.Test.all(
     [ roundTrip("unit", "val unitVal = ()", "val unitVal = ()")
@@ -66,7 +65,6 @@ test valueDeclarationsUnit =
         "val maxUInt128 = 340282366920938463463374607431768211455u128") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test valueDeclarationsBools =
   Stdlib.Test.all(
     [ // bools
@@ -99,7 +97,6 @@ test valueDeclarationsBools =
         "val dict = Dict { \"a\": \"hello\", \"b\": \"test\" }") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test valueDeclarationsTuples =
   Stdlib.Test.all(
     [ // tuples

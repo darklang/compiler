@@ -4,7 +4,6 @@ let d(datestr: String): DateTime =
   Stdlib.DateTime.parse(datestr) |> Builtin.unwrap
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.DateTime.Tests.p: Expected TSum"
 let p(
   datestr: String)
   : Stdlib.Result.Result<String, Stdlib.DateTime.ParseError> =
@@ -40,7 +39,6 @@ let sMs(first: String, second: String): Int64 =
   Stdlib.DateTime.subtractMs(d(first), d(second))
 
 
-// @compiler xfail compile: "Unknown function or value 'p'" class=missing-support reason=upstream-dependency
 test parse =
   Stdlib.Test.all(
     [ p("2019-07-28T22:42:36Z")
@@ -51,7 +49,6 @@ test parse =
         Stdlib.Result.Result.Error(Stdlib.DateTime.ParseError.InvalidFormat)) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'p'" class=missing-support reason=upstream-dependency
 test parseDistinguishesInvalidDatesFromFormats =
   let invalidDate =
     Stdlib.Result.Result.Error(Stdlib.DateTime.ParseError.InvalidDate)
@@ -87,14 +84,12 @@ test parseErrorDisplay =
 
 
 // Parse in both
-// @compiler xfail compile: "Unknown function or value 'p'" class=missing-support reason=upstream-dependency
 test parseInBoth =
   p("2018-09-24T18:01:24Z")
   |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("2018-09-24T18:01:24Z"))
 
 
 // Lowercase `z` aren't allowed
-// @compiler xfail compile: "Unknown function or value 'p'" class=missing-support reason=upstream-dependency
 test parseRejectsLowercaseZ =
   p("2023-09-23T18:01:24z")
   |> Stdlib.Test.equal(
@@ -102,7 +97,6 @@ test parseRejectsLowercaseZ =
 
 
 // An offset from UTC is taken off, so the result is the same instant in UTC
-// @compiler xfail compile: "Unknown function or value 'p'" class=missing-support reason=upstream-dependency
 test parseOffsets =
   let ok = fun s -> Stdlib.Result.Result.Ok(s)
   let bad = Stdlib.Result.Result.Error(Stdlib.DateTime.ParseError.InvalidFormat)
@@ -185,7 +179,6 @@ test parseOffsets =
 
 
 // Time zones aren't allowed
-// @compiler xfail compile: "Unknown function or value 'p'" class=missing-support reason=upstream-dependency
 test parseRejectsTimeZones =
   Stdlib.Test.all(
     [ // special cased in F#
@@ -208,7 +201,6 @@ test parseRejectsTimeZones =
 
 
 // Fail in both
-// @compiler xfail compile: "Unknown function or value 'p'" class=missing-support reason=upstream-dependency
 test parseFailInBoth =
   Stdlib.Test.all(
     [ p("2000-11-22 09:10:15")
@@ -614,7 +606,6 @@ test parseFailInBoth =
 
 
 // a plain date is midnight UTC
-// @compiler xfail compile: "Unknown function or value 'p'" class=missing-support reason=upstream-dependency
 test parseDateOnly =
   Stdlib.Test.all(
     [ p("2026-12-25")
@@ -675,7 +666,6 @@ test parseDateOnly =
 
 
 // while space isn't allowed
-// @compiler xfail compile: "Unknown function or value 'p'" class=missing-support reason=upstream-dependency
 test parseRejectsSurroundingWhitespace =
   Stdlib.Test.all(
     [ p(" 2006-06-09T10:20:30.040+02:00")
@@ -928,7 +918,6 @@ test toSeconds =
 
 // Every field padded, milliseconds only when there are some and truncated, never rounded, and the
 // ends of the range.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.DateTime.__fromTicks'" class=missing-support reason=upstream-dependency
 test toStringEdges =
   let t(ticks: Int64): DateTime = Stdlib.DateTime.__fromTicks(ticks)
   Stdlib.Test.all(
@@ -971,7 +960,6 @@ test toStringEdges =
 
 
 // Before year 1 the year is signed, as `format` writes it.
-// @compiler xfail compile: "Unknown function or value 'civil'" class=missing-support reason=upstream-dependency
 test basicFormatsBeforeYearOne =
   Stdlib.Test.all(
     [ Stdlib.DateTime.toStringISO8601BasicDateTime(civil(0, 1, 1))
@@ -1014,7 +1002,6 @@ test secondsRoundTrip =
 
 
 // seconds whose ticks are past Int64 can't be represented; surface a Dark error
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test fromSecondsPastInt64Raises =
   2 ** 62 |> Stdlib.DateTime.fromSeconds
   => raises "Seconds out of DateTime range (-9998-01-01 to 9999-12-31): 4611686018427387904"
@@ -1022,25 +1009,21 @@ test fromSecondsPastInt64Raises =
 
 // Int64.MaxValue fits int64 but is past NodaTime's instant range; the host
 // exception is turned into a Dark error rather than escaping
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test fromSecondsPastInstantRangeRaises =
   9223372036854775807 |> Stdlib.DateTime.fromSeconds
   => raises "Seconds out of DateTime range (-9998-01-01 to 9999-12-31): 9223372036854775807"
 
 
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test addSecondsPastInstantRangeRaises =
   Stdlib.DateTime.addSeconds(Stdlib.DateTime.fromSeconds(0), 9223372036854775807)
   => raises "Seconds out of DateTime range (-9998-01-01 to 9999-12-31): 9223372036854775807"
 
 
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test fromMillisecondsPastInstantRangeRaises =
   Stdlib.DateTime.fromMilliseconds(-9223372036854775807)
   => raises "Milliseconds out of DateTime range (-9998-01-01 to 9999-12-31): -9223372036854775807"
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.DateTime.__fromTicks'" class=missing-support reason=upstream-dependency
 test fromTicksPastInstantRangeRaises =
   Stdlib.DateTime.__fromTicks(9223372036854775807)
   => raises "Ticks out of DateTime range (-9998-01-01 to 9999-12-31): 9223372036854775807"
@@ -1163,7 +1146,6 @@ test daysBetween =
       |> Stdlib.Test.equal(0) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.DateTime.__fromTicks'" class=missing-support reason=upstream-dependency
 test daysBetweenAtMidnight =
   // Ticks are 100ns since 1970-01-01: check both sides of UTC midnight, including before 1970.
   let day = 864000000000
@@ -1183,7 +1165,6 @@ test daysBetweenAtMidnight =
 
 
 // Fractional seconds are now accepted
-// @compiler xfail compile: "Unknown function or value 'p'" class=missing-support reason=upstream-dependency
 test parseMilliseconds =
   Stdlib.Test.all(
     [ p("2019-07-28T22:42:36.123Z")
@@ -1306,7 +1287,6 @@ test subtractMilliseconds =
       |> Stdlib.Test.equal("2020-11-26T04:37:46.500Z") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.DateTime.__fromTicks'" class=missing-support reason=upstream-dependency
 test subtractMs =
   Stdlib.Test.all(
     [ sMs("2020-11-26T04:37:46Z", "2020-11-26T04:37:46Z")
@@ -1341,7 +1321,6 @@ let f(date: DateTime): String =
   Stdlib.DateTime.format(date, "%Y-%m-%d %H:%M:%S.%f") |> Builtin.unwrap
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.DateTime.Tests.civil: Unknown function or value 'Stdlib.DateTime.__fromTicks'"
 let civil(year: Int64, month: Int64, day: Int64): DateTime =
   Stdlib.DateTime.__fromTicks(
     Stdlib.DateTime.__daysFromCivil(year, month, day)
@@ -1371,7 +1350,6 @@ test format =
           "`HH:mm:ss` has no % directive, so it would print as written; the directives are %Y %m %d %H %M %S %f %%")) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'civil'" class=missing-support reason=upstream-dependency
 test formatPadsEveryField =
   Stdlib.Test.all(
     [ f(d("0001-02-03T04:05:06.007Z"))
@@ -1445,7 +1423,6 @@ test formatRejectsUnknownDirectives =
 
 
 // The clock and sleep syscalls behind now, monotonic time and sleep
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-contract
 test clockSyscalls =
   let interruptedOnce = fun(seconds, _) ->
     if seconds == 1 then

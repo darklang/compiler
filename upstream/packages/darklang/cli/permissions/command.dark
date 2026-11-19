@@ -15,26 +15,22 @@ type AccessReportFacts =
 // Builtin wrappers.
 // The policy builtins are called only from these wrappers (tests/builtin).
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.currentPolicy: Unknown function or value 'Builtin.pmPolicyGetInstance'"
 let currentPolicy(): LanguageTools.Permissions.Policy =
   Builtin.pmPolicyGetInstance()
 
 
 /// Read the instance rules and a token used to detect changes before saving.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.instanceSnapshot: Unknown function or value 'Builtin.pmPolicyReviewToken'"
 let instanceSnapshot(): (String * LanguageTools.Permissions.Policy) =
   Builtin.pmPolicyReviewToken()
 
 
 /// Save only if permissions have not changed since this token was read.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.commitInstancePolicy: Unknown function or value 'Builtin.pmPolicyEditInstance'"
 let commitInstancePolicy(expected: String, policy: LanguageTools.Permissions.Policy): Unit =
   Builtin.pmPolicyEditInstance(expected, policy)
 
 
 /// Normalize file paths before comparing rules, including relative paths and `~`.
 /// Use the same host normalization as saving a rule.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.canonicalRule: Unknown function or value 'Builtin.pmPolicyNormalizeRule'"
 let canonicalRule(rule: LanguageTools.Permissions.Rule): LanguageTools.Permissions.Rule =
   match rule with
   | FileRead(_) | FileWrite(_) -> Builtin.pmPolicyNormalizeRule(rule)
@@ -57,7 +53,6 @@ let applyInstanceEdit(
 
 
 /// Read the instance rules, apply the edit, and save if permissions are still unchanged.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.editInstancePolicy: Unknown function or value 'Command.changePolicy'"
 let editInstancePolicy(
   allow: List<LanguageTools.Permissions.Rule>,
   deny: List<LanguageTools.Permissions.Rule>,
@@ -78,14 +73,12 @@ let permissionEffects(
 /// The transitive permission requirements and whether analysis was complete.
 /// Incomplete analysis returns the effects found with `false`; fetch once and
 /// pass the result around because this walks the function's closure.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.permissionRequirementsForHash: Unknown function or value 'Builtin.pmFnPermissionRequirements'"
 let permissionRequirementsForHash(hash: String): (List<LanguageTools.Permissions.Effect> * Bool) =
   let (effects, complete) = Builtin.pmFnPermissionRequirements(hash)
   (permissionEffects(effects), complete)
 
 
 /// Remove named approvals or commit the saved policy calculated by this command.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.removeSavedAccess: Unknown function or value 'Builtin.pmPolicyRemove'"
 let removeSavedAccess(
   accountID: Option<Uuid>,
   target: LanguageTools.Permissions.ApprovalTarget)
@@ -94,7 +87,6 @@ let removeSavedAccess(
 
 
 /// Read this account's approvals and a token used to detect changes before saving.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approvalSnapshot: Unknown function or value 'Builtin.pmPolicyApprovals'"
 let approvalSnapshot(accountID: Option<Uuid>): (String * List<LanguageTools.Permissions.Approval>) =
   Builtin.pmPolicyApprovals(accountID)
 
@@ -134,7 +126,6 @@ let approvalsMatching(
 
 
 /// Remove every approval for this hash together, if permissions are still unchanged.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.revokeHash: Unknown function or value 'Command.withdraw'"
 let revokeHash(accountID: Option<Uuid>, hash: String): Bool =
   let (expected, approvals) = approvalSnapshot(accountID)
   let names = approvalNamesForHash(approvals, hash)
@@ -147,7 +138,6 @@ let revokeHash(accountID: Option<Uuid>, hash: String): Bool =
     true
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approvedHashes: Unknown function or value 'Builtin.pmPolicyListPackages'"
 let approvedHashes(accountID: Option<Uuid>): List<String> =
   let (_, approvals) = approvalSnapshot(accountID)
   versionsFromApprovals(approvals)
@@ -155,7 +145,6 @@ let approvedHashes(accountID: Option<Uuid>): List<String> =
   |> Stdlib.List.unique
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.packageAccessFor: Unknown function or value 'Builtin.pmFnIsBundled'"
 let packageAccessFor(
   named: List<LanguageTools.Permissions.Approval>,
   hash: String)
@@ -171,7 +160,6 @@ let packageAccessFor(
 
 
 /// Return whether code is bundled, plus the named approvals for its hash.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.packageAccess: Unknown function or value 'Command.approvalsOf'"
 let packageAccess(
   accountID: Option<Uuid>,
   hash: String)
@@ -182,7 +170,6 @@ let packageAccess(
 
 /// The rules the consumer wrote when approving <param hash> as a root; None
 /// for a derived approval.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.explicitApprovalFor: Unknown function or value 'Command.approvalsOf'"
 let explicitApprovalFor(
   accountID: Option<Uuid>,
   name: String)
@@ -196,13 +183,11 @@ let explicitApprovalFor(
 /// Whether existing approvals were recorded under different approval-analysis
 /// semantics than this host's — a re-review signal (enforcement stays
 /// fail-closed regardless).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approvalsStale: Unknown function or value 'Builtin.pmPolicyApprovalsStale'"
 let approvalsStale(): Bool =
   Builtin.pmPolicyApprovalsStale()
 
 
 /// Every (logical name, approved version) pair for this account.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approvedVersions: Unknown function or value 'Command.approvalsOf'"
 let approvedVersions(accountID: Option<Uuid>): List<(String * String)> =
   let (_, approvals) = approvalSnapshot(accountID)
   versionsFromApprovals(approvals)
@@ -210,7 +195,6 @@ let approvedVersions(accountID: Option<Uuid>): List<(String * String)> =
 
 /// Approvals as this account sees them, one per (hash, name). With <param hash>, the entries for
 /// that hash (one with no name when no name points at it); with None, one per approved name.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approvalsOf: Unknown function or value 'Builtin.pmPolicyApprovals'"
 let approvalsOf(
   accountID: Option<Uuid>,
   hash: Option<String>)
@@ -221,7 +205,6 @@ let approvalsOf(
 
 /// Each named approval, including separate names with identical code, marking
 /// the ones whose function has changed since.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.namedApprovals: Unknown function or value 'Command.approvedVersions'"
 let namedApprovals(accountID: Option<Uuid>, branchId: Uuid): List<String> =
   approvedVersions(accountID)
   |> Stdlib.List.map(fun((name, hash)) ->
@@ -234,7 +217,6 @@ let namedApprovals(accountID: Option<Uuid>, branchId: Uuid): List<String> =
 
 
 /// Capture before showing a review; mutations compare it atomically when saving.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.reviewToken: Unknown function or value 'Builtin.pmPolicyReviewToken'"
 let reviewToken(): String =
   let (expected, _) = instanceSnapshot()
   expected
@@ -256,7 +238,6 @@ type ContractChange =
 /// Remember access for an immutable closure under its logical name, atomically. The builtin
 /// compares the contract before storing approval; a changed contract returns diffs for explicit
 /// review. `rules` optionally narrows the consumer's policy; None approves the analyzed effect set.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approveVersionFor: Unknown function or value 'Builtin.pmPolicyApproveVersion'"
 let approveVersionFor(
   accountID: Option<Uuid>,
   name: String,
@@ -277,7 +258,6 @@ let approveVersionFor(
 
 
 /// Check the proposed update without saving, so all changes are visible before confirmation.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.reviewVersionFor: Unknown function or value 'Builtin.pmPolicyReviewVersion'"
 let reviewVersionFor(
   accountID: Option<Uuid>,
   name: String,
@@ -296,7 +276,6 @@ let reviewVersionFor(
 
 
 /// Remove a name's remembered access; name resolution is unchanged.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.removeNamedApprovalFor: Unknown function or value 'removeSavedAccess'"
 let removeNamedApprovalFor(accountID: Option<Uuid>, expected: String, name: String): Unit =
   removeSavedAccess(accountID, LanguageTools.Permissions.ApprovalTarget.Names(expected, [ name ]))
 
@@ -325,20 +304,17 @@ let describeRequirements(requirements: (List<LanguageTools.Permissions.Effect> *
   | effects, false -> requirementSummary(effects) + ", possibly more"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.requirementDisplay: Unknown function or value 'Command.permissionRequirementsForHash'"
 let requirementDisplay(hash: String): String =
   describeRequirements(permissionRequirementsForHash(hash))
 
 
 /// The bracketed requirements badge listings show next to a function,
 /// e.g. `[file-read]`; callers colour it for their view.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.requirementBadge: Unknown function or value 'Command.requirementDisplay'"
 let requirementBadge(hash: LanguageTools.ProgramTypes.Hash): String =
   "[" + requirementDisplay(LanguageTools.ProgramTypes.hashToString(hash)) + "]"
 
 
 /// Effects describe the body; runtime permissions check the actual resources.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.policyLinesForHash: Unknown function or value 'Command.permissionRequirementsForHash'"
 let policyLinesForHash(hash: String): List<String> =
   let requirementsLine = "permission requirements: " + requirementDisplay(hash)
   let (_, reasons) = Effects.reasons(hash)
@@ -363,7 +339,6 @@ let policyLines(policy: LanguageTools.Permissions.Policy): List<String> =
 
 
 /// The instance policy as `permissions list` prints it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.instancePolicyLines: Unknown function or value 'Command.currentPolicy'"
 let instancePolicyLines(): List<String> =
   Stdlib.List.flatten(
     [ [ "Instance defaults:" ]
@@ -412,7 +387,6 @@ let renderAccessReport(name: String, facts: AccessReportFacts): List<String> =
 
 
 /// Facts shared by the function report and workbench detail pane.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.accessFacts: Unknown function or value 'Command.permissionRequirementsForHash'"
 let accessFacts(accountID: Option<Uuid>, hash: String): AccessReportFacts =
   let (effects, complete) = permissionRequirementsForHash(hash)
   let (_, named) = approvalSnapshot(accountID)
@@ -447,7 +421,6 @@ let invalidRuleText(text: String): String =
 /// interactive CLI's general command splitter leaves quote fragments in the
 /// list. Re-tokenize only the latter; direct argv remains lossless for an
 /// argument that itself contains spaces.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.parseRuleArgs: Unknown function or value 'LanguageTools.Permissions.parseRuleText'"
 let parseRuleArgs(args: List<String>): Option<List<LanguageTools.Permissions.Rule>> =
   let hasQuotedFragment =
     args
@@ -462,7 +435,6 @@ let parseRuleArgs(args: List<String>): Option<List<LanguageTools.Permissions.Rul
 
 /// Read-modify-write the instance policy and report. <param edit> returns the
 /// next policy, or the message for input that did not parse.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.editPolicy: Unknown function or value 'Command.currentPolicy'"
 let editPolicy(
   edit: LanguageTools.Permissions.Policy -> Result<LanguageTools.Permissions.Policy, String>,
   success: String)
@@ -479,7 +451,6 @@ let editPolicy(
 
 
 /// One rule, or several separated by `;` like `set`. Error is the first rule that did not parse.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.parseRuleList: Unknown function or value 'LanguageTools.Permissions.parseRuleText'"
 let parseRuleList(args: List<String>): Result<List<LanguageTools.Permissions.Rule>, String> =
   if Stdlib.List.any(args, fun arg -> Stdlib.String.contains(arg, ";")) then
     Stdlib.String.split(Stdlib.String.join(args, " "), ";")
@@ -505,7 +476,6 @@ let parseRuleList(args: List<String>): Result<List<LanguageTools.Permissions.Rul
 
 /// Parse rule arguments and pass them to <param edit>, or report invalid input. One rule that does
 /// not parse saves none of them.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.editRules: Unknown function or value 'Command.parseRuleArgs'"
 let editRules(
   args: List<String>,
   edit: List<LanguageTools.Permissions.Rule> -> Unit,
@@ -522,7 +492,6 @@ let editRules(
 
 
 /// `set a; deny b; c` replaces the whole policy.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.replacePolicy: Unknown function or value 'LanguageTools.Permissions.parse'"
 let replacePolicy(specs: List<String>): Result<LanguageTools.Permissions.Policy, String> =
   let specs =
     Stdlib.String.split(Stdlib.String.join(specs, " "), ";")
@@ -540,7 +509,6 @@ let replacePolicy(specs: List<String>): Result<LanguageTools.Permissions.Policy,
 // identifiers only.
 
 /// Resolve a logical name to its latest published version on this branch.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.latestVersion: Unknown function or value 'LanguageTools.PackageManager.Function.find'"
 let latestVersion(branchId: Uuid, name: String): Option<String> =
   let location = LanguageTools.ProgramTypes.parsePackageLocation(name)
   match LanguageTools.PackageManager.Function.find(branchId, location) with
@@ -549,7 +517,6 @@ let latestVersion(branchId: Uuid, name: String): Option<String> =
 
 
 /// The version this account has APPROVED for <param name>, if any.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.approvedVersionOf: Unknown function or value 'Command.approvedVersions'"
 let approvedVersionOf(accountID: Option<Uuid>, name: String): Option<String> =
   approvedVersions(accountID)
   |> Stdlib.List.findFirst(fun pair ->
@@ -562,7 +529,6 @@ let approvedVersionOf(accountID: Option<Uuid>, name: String): Option<String> =
 
 /// `requirements`/`show` accept a logical name (resolved to its latest version)
 /// or a raw hash for diagnostics.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let resolveVersionArg(state: AppState, arg: String): Option<String> =
   if Stdlib.String.contains(arg, ".") then
     latestVersion(state.currentBranchId, arg)
@@ -591,7 +557,6 @@ let approvalMetadataLines(
 
 
 /// Print the review heading and return the requirements already read for it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.showVersionRequirements: Unknown function or value 'Command.permissionRequirementsForHash'"
 let showVersionRequirements(
   name: String,
   previousVersion: Option<String>,
@@ -625,7 +590,6 @@ let takeYesFlag(args: List<String>): (Bool * List<String>) =
 
 /// Show the full replacement before any write. Previewing never prompts or
 /// edits policy; --yes uses the same host-only writer as `permissions set`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.profile: Unknown function or value 'Command.writePolicy'"
 let profile(args: List<String>): Bool =
   match args with
   | [] ->
@@ -656,7 +620,6 @@ let profile(args: List<String>): Bool =
 
 /// The rules given after a name on `approve`/`update`, `;`-separated like
 /// `set`. Ok None when there are none.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.parseApprovalRules: Unknown function or value 'Command.replacePolicy'"
 let parseApprovalRules(
   specs: List<String>)
   : Result<Option<LanguageTools.Permissions.Policy>, String> =
@@ -807,7 +770,6 @@ let approvalFailureText(failure: LanguageTools.Permissions.ApprovalFailure): Str
 
 
 /// Ask only when the saved version, rules, or approval metadata would change.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Permissions.Command.reviewAndApprove: Unknown function or value 'reviewVersionFor'"
 let reviewAndApprove(
   accountID: Option<Uuid>,
   name: String,
@@ -864,7 +826,6 @@ let reviewAndApprove(
 
 
 /// Add only the rules the user supplied. Missing rules never save or ask for confirmation.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let approveNamed(
   state: AppState,
   acceptWithoutPrompt: Bool,
@@ -928,7 +889,6 @@ let approveNamed(
 
 /// Show the complete update, then ask once. Declining keeps the saved approval.
 /// `--yes` accepts the review without a prompt and is required without a terminal.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let updateNamed(
   state: AppState,
   acceptWithoutPrompt: Bool,
@@ -985,7 +945,6 @@ let updateNamed(
 
 /// Run <param show> against the version <param target> names, or report an
 /// unknown function.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let withVersion(state: AppState, target: String, show: String -> List<String>): Bool =
   match resolveVersionArg(state, target) with
   | None ->
@@ -1062,7 +1021,6 @@ let permissionTarget(parsed: FlagParser.Parsed): Result<Option<String>, String> 
 
 
 /// Remove all saved rules for a name, including approvals of older code or scripts.
-// @compiler blocked: upstream-dependency diagnostic="removeNamedApproval: Unknown type 'AppState'"
 let removeNamedApproval(state: AppState, name: String): AppState =
   let (expected, approvals) = approvalSnapshot(state.accountID)
   if Stdlib.List.any(approvals, fun approval -> approval.name == Option.Some(name)) then
@@ -1100,7 +1058,6 @@ let removeApprovalRules(
 
 
 /// Read the saved rules, remove the requested ones, and save if permissions are unchanged.
-// @compiler blocked: upstream-dependency diagnostic="removeNamedRules: Unknown type 'AppState'"
 let removeNamedRules(
   state: AppState,
   name: String,
@@ -1135,7 +1092,6 @@ let removeNamedRules(
 
 
 /// Remove exact saved rules, or every saved rule for one named approval.
-// @compiler blocked: upstream-dependency diagnostic="removeRules: Unknown type 'AppState'"
 let removeRules(state: AppState, args: List<String>): AppState =
   let parsed = permissionArgs(args)
   let all = FlagParser.hasFlag(parsed, "--all")
@@ -1171,7 +1127,6 @@ let removeRules(state: AppState, args: List<String>): AppState =
         | Some(name) -> removeNamedRules(state, name, rules)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [] | ["list"] ->
@@ -1282,7 +1237,6 @@ let execute(state: AppState, args: List<String>): AppState =
     failed(state)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(_state: AppState, args: List<String>): List<Completion.CompletionItem> =
   match args with
   | ["profile"] -> Profiles.all |> Stdlib.List.map(fun profile -> Completion.simple(profile.name))
@@ -1296,7 +1250,6 @@ let complete(_state: AppState, args: List<String>): List<Completion.CompletionIt
   | _ -> subcommands |> Stdlib.List.map(fun((name, _usage)) -> Completion.simple(name))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Usage: permissions [list] | allow <rule>;… | deny <rule>;… | remove <rule>;…"
     "                   | set <rule>;… | clear"

@@ -105,7 +105,6 @@ let locationOf(b: SCM.Conflicts.Binding): LanguageTools.ProgramTypes.PackageLoca
 /// On a branch this is the UNION of two histories, and it needs both: the branch's own op history (a
 /// branch-only name has no `locations` rows, so that's all there is) and main's (a branch editing a main
 /// name must still repoint the main dependents into branch-local copies).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Commit.previousHashesOf: Unknown function or value 'previousHashesOfAll'"
 let previousHashesOf(
   branchId: Uuid,
   b: SCM.Conflicts.Binding)
@@ -117,7 +116,6 @@ let previousHashesOf(
 
 /// <fn previousHashesOf> for every name in <param bindings>, in order: main's history in one query and the
 /// branch chain decoded once, where asking per name paid a query for each and decoded the chain twice.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Commit.previousHashesOfAll: Unknown function or value 'SCM.Propagation.everBoundHashesFor'"
 let previousHashesOfAll(
   branchId: Uuid,
   bindings: List<SCM.Conflicts.Binding>)
@@ -199,7 +197,6 @@ let changedLine(width: Int64, item: ScmJson.ChangedItem): String =
 
 /// Run propagation for one changed name, repointing everything that still references an older version.
 /// Returns how many dependents moved.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Commit.propagateOne: Unknown function or value 'SCM.Propagation.repointDependents'"
 let propagateOne(
   branchId: Uuid,
   b: SCM.Conflicts.Binding,
@@ -242,7 +239,6 @@ type Review =
     branch: String }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let review(state: AppState): Review =
   let p = SCM.Draft.read()
   let withPrevious = previousHashesOfAll(state.currentBranchId, p.bindings)
@@ -259,7 +255,6 @@ let review(state: AppState): Review =
 
 /// Show the versions this selection will commit. A rename can need an earlier
 /// caller version while the caller's newest edit stays in the draft.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let selectedReview(state: AppState, all: Review, names: List<String>): Review =
   if Stdlib.List.isEmpty(names) then
     all
@@ -289,7 +284,6 @@ let selectedReview(state: AppState, all: Review, names: List<String>): Review =
 
 /// Validate the versions selected for this commit, including historical callers
 /// captured by a rename. Later fixes left in the draft cannot validate those versions.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 let typeCheckSelection(names: List<String>): LanguageTools.AtRestTypeChecker.Report =
   let branch = SCM.PackageOps.currentBranch()
   if Stdlib.List.isEmpty(names) then
@@ -306,7 +300,6 @@ let typeCheckSelection(names: List<String>): LanguageTools.AtRestTypeChecker.Rep
 
 /// Repoint every dependent of every name the draft changed, and count what moved. Both commit paths run
 /// it: a repoint is a consequence of the EDIT, not of which ops you chose to stamp.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let propagateAll(state: AppState, r: Review): Int64 =
   r.withPrevious
   |> Stdlib.List.map(fun entry ->
@@ -322,7 +315,6 @@ let propagateAll(state: AppState, r: Review): Int64 =
 ///     belonging to items you chose to leave behind.
 ///   - Propagation still runs over everything, because a repoint is a consequence of the edit and not of the
 ///     commit. What changes is only which ops get stamped.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let commitSelected(
   state: AppState,
   r: Review,
@@ -369,7 +361,6 @@ let commitSelected(
 
 /// Commit the whole draft. Propagate FIRST, so the repoint ops land in this commit rather than dangling as
 /// a fresh draft the moment you finished committing.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let commit(state: AppState, r: Review, message: String): Result<(String * Int64 * Int64), String> =
   let moved = propagateAll(state, r)
 
@@ -386,7 +377,6 @@ let commit(state: AppState, r: Review, message: String): Result<(String * Int64 
   | Error(e) -> Result.Error(SCM.Actions.failureMessage(e))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeJson(state: AppState, args: List<String>): AppState =
   let parsed = parseArgs(ScmJson.stripJson(args))
   let r = selectedReview(state, review(state), parsed.include)
@@ -470,7 +460,6 @@ let executeJson(state: AppState, args: List<String>): AppState =
 /// is what other machines pull: an item that never resolves fails when somebody else calls it, with no
 /// sign of where it came from. `--allow-unresolved` is the way past, and has to be TYPED: `-y` does not
 /// wave it through.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Commit.refuseUnresolved: Unknown function or value 'SCM.PackageOps.unresolvedInDraft'"
 let refuseUnresolved(parsed: Args): Bool =
   if parsed.allowUnresolved then
     false
@@ -501,7 +490,6 @@ let refuseUnresolved(parsed: Args): Bool =
 /// code is wrong.
 ///
 /// `--allow-type-errors` is the way past, and has to be TYPED: `-y` does not wave it through.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Commit.refuseTypeErrors: Unknown function or value 'typeCheckSelection'"
 let refuseTypeErrors(parsed: Args): Bool =
   if parsed.allowTypeErrors then
     false
@@ -545,7 +533,6 @@ let refuseTypeErrors(parsed: Args): Bool =
       true
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executePretty(state: AppState, args: List<String>): AppState =
   let parsed = parseArgs(args)
   let r = selectedReview(state, review(state), parsed.include)
@@ -672,7 +659,6 @@ let executePretty(state: AppState, args: List<String>): AppState =
         state
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   // Before anything: a flag we don't understand means we don't know what was asked for, and this command
   // commits history.
@@ -684,7 +670,6 @@ let execute(state: AppState, args: List<String>): AppState =
     executePretty(state, args)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ ""
     "Usage: dark commit [message] [--include=names] [-y]"
@@ -720,6 +705,5 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []

@@ -10,7 +10,6 @@ module Darklang.Cli
 ///
 /// Presentation only. It's added on the render path and not by `releasePromptRegion`, so it disappears rather
 /// than piling up in scrollback behind every command you run.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let withModeHint(state: AppState, view: Stdlib.Cli.Tui.View): Stdlib.Cli.Tui.View =
   if Stdlib.List.isEmpty(state.pageStack) then
     view
@@ -28,7 +27,6 @@ let withModeHint(state: AppState, view: Stdlib.Cli.Tui.View): Stdlib.Cli.Tui.Vie
 ///
 /// The region shrinks to the prompt rows alone, so the submitted command stays in scrollback while the
 /// completion hint does not.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let releasePromptRegion(state: AppState): AppState =
   match state.promptTerminal with
   | None -> state
@@ -48,7 +46,6 @@ let releasePromptRegion(state: AppState): AppState =
 ///
 /// Used on Ctrl-C and programmatic exit, where nothing from the region should
 /// remain in scrollback and the shell prompt should reappear in its place.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let clearPromptRegion(state: AppState): AppState =
   match state.promptTerminal with
   | None -> state
@@ -61,7 +58,6 @@ let clearPromptRegion(state: AppState): AppState =
     { state with promptTerminal = Option.None }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let handleKeyInput(
   state: AppState,
   key: Stdlib.Cli.Stdin.Key.Key,
@@ -260,7 +256,6 @@ val maxKeyRepeat = 64
 
 
 module Update =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
   let updateAppState(state: AppState, msg: Msg): AppState =
     match msg with
     | ProcessInput(input) -> Commands.parseAndExecute(state, input)
@@ -268,7 +263,6 @@ module Update =
     | Exit -> { clearPromptRegion(state) with isExiting = true }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
   let processInput(state: AppState, input: String): AppState =
     let trimmedInput = Stdlib.String.trim(input)
     if Stdlib.String.isEmpty(trimmedInput) then
@@ -281,7 +275,6 @@ module Update =
 /// The completion hint for this pass, served from the state's caches when they still apply.
 /// Returns (hint, contextKey, contextItems, filterPartial, filterItems); the loop writes the
 /// last four back into the cache fields for the next pass.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let computeCompletionHint(
   state: AppState,
   location: String)
@@ -336,7 +329,6 @@ let computeCompletionHint(
 /// Render the main prompt's inline region for this pass: build the prompt view and present it on
 /// the retained terminal, starting one on the first pass. A failure to start reports why and marks
 /// the state exiting.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let renderMainPrompt(
   state: AppState,
   location: String,
@@ -363,7 +355,6 @@ let renderMainPrompt(
 
 
 /// The page's name, for telemetry.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Page'"
 let pageName(page: Page): String =
   match page with
   | MainPrompt -> "MainPrompt"
@@ -373,7 +364,6 @@ let pageName(page: Page): String =
 
 
 /// How many times one read's key should be applied.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.burstTimes: Expected TInt64, got TInt"
 let burstTimes(keyInput: Stdlib.Cli.Stdin.KeyRead.KeyRead): Int64 =
   // Only movement repeats. A burst of Enter or Escape is coalesced too, but acting on it twenty times
   // would turn a stray wheel-click-on-the-wrong-key into twenty actions; movement is the case where
@@ -394,7 +384,6 @@ let burstTimes(keyInput: Stdlib.Cli.Stdin.KeyRead.KeyRead): Int64 =
 
 /// Apply one read's worth of input to the state: a paste with embedded newlines runs line by
 /// line, and anything else is applied `times` times (see `burstTimes`).
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let applyKeyRead(
   state: AppState,
   keyInput: Stdlib.Cli.Stdin.KeyRead.KeyRead,
@@ -453,7 +442,6 @@ let applyKeyRead(
         Update.updateAppState(st, keyPressedMsg))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let runInteractiveLoop(state: AppState): Int64 =
   if state.isExiting then
     // Clear any retained prompt region so the shell prompt takes its place.

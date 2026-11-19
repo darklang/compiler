@@ -23,7 +23,6 @@ module RuntimeError =
   /// ---------------
   /// Segments allow us to build error messages where the UI and CLI can both
   /// decorate/link to the sources in a native way
-  // @compiler blocked: compiler-contract diagnostic="Already selected from packages/darklang/prettyPrinter/runtimeTypes/runtimeError.dark; importing another declaration of Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.ErrorSegment requires an explicit replacement contract"
   type ErrorSegment =
     // -- Basic types
     | String(String)
@@ -74,10 +73,8 @@ module RuntimeError =
     | LetPattern(LetPattern)
 
 
-  // @compiler replace: packages/darklang/prettyPrinter/runtimeTypes/runtimeError.dark#Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.ES reason=compiler-implementation
   type ES = ErrorSegment
 
-  // @compiler replace: packages/darklang/prettyPrinter/runtimeTypes/runtimeError.dark#Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.ErrorSegments reason=compiler-implementation
   type ErrorSegments = List<ErrorSegment>
 
 
@@ -93,14 +90,12 @@ module RuntimeError =
 
 
   /// <param value> as JSON, or why it has none.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.__json: Type arguments require a named function"
   let __json(value: 'a): String =
     match Stdlib.Json.checkedSerialize<'a>(value) with
     | Ok(json) -> json
     | Error(e) -> Stdlib.display(e)
 
 
-  // @compiler replace: packages/darklang/prettyPrinter/runtimeTypes/runtimeError.dark#Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.segmentsToString reason=compiler-implementation
   let segmentsToString(branchId: Uuid, segments: ErrorSegments): String =
     let reversed = Stdlib.List.reverse(segments)
     let parts = Stdlib.List.fold(reversed, [], fun(prevSegments, segment) ->
@@ -167,7 +162,6 @@ module RuntimeError =
   /// For a value type that has a Display impl in stdlib, return a hint
   /// suffix pointing the user at the right conversion function. Empty
   /// string otherwise (Unknown, Unit, String, collection/custom types).
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.displayHint: Unknown constructor 'Darklang.LanguageTools.RuntimeTypes.KnownType.KTBigInt' in pattern"
   let displayHint(vt: LanguageTools.RuntimeTypes.ValueType): String =
     // One hint for the types that have a Display impl; `Stdlib.display` is the fn to
     // reach for whichever it is. Collections and custom types have none, so no hint.
@@ -195,7 +189,6 @@ module RuntimeError =
 
 
   /// <fn displayHint> for a value that went where a String was expected, and nothing otherwise.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.stringExpectedHint: Unknown function or value 'toStringHint'"
   let stringExpectedHint(expected: ValueType, actual: ValueType): String =
     match expected with
     | Known(KTString) -> displayHint(actual)
@@ -204,7 +197,6 @@ module RuntimeError =
 
   /// `"total: " + 5` is the usual way a newcomer meets this error, so when one side is a String
   /// and the other has a Display impl, say how to join them.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.joinWithStringHint: Unknown function or value 'toStringHint'"
   let joinWithStringHint(left: ValueType, right: ValueType): ErrorSegments =
     let other =
       match left, right with
@@ -223,7 +215,6 @@ module RuntimeError =
 
   /// ". Both sides must be the same type." and how to convert, for an integer and a Float64
   /// (<fn LanguageTools.AtRestTypeChecker.mixedNumbersHint>, which the check before a run uses).
-  // @compiler blocked: compiler-gap diagnostic="Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.mixedNumbersHint: Constructor pattern requires an enum scrutinee"
   let mixedNumbersHint(left: ValueType, right: ValueType): ErrorSegments =
     let name = fun vt ->
       match vt with
@@ -284,7 +275,6 @@ module RuntimeError =
 
   // The only exhaustive match over RuntimeError on the Dark side. A new RuntimeError case needs an
   // arm here, and Dark says nothing at build time: the first error of that kind raises right here.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.toSegments: Unknown function or value 'toStringHint'"
   let toSegments(
     e: LanguageTools.RuntimeTypes.RuntimeError.Error)
     : ErrorSegments =
@@ -807,7 +797,6 @@ module RuntimeError =
       [ ES.String($"A runtime error with no message written for it yet: {serialized}") ]
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.toString: Unknown function or value 'toSegments'"
   let toString(branchId: Uuid, e: LanguageTools.RuntimeTypes.RuntimeError.Error): String =
     let s = e |> toSegments
     segmentsToString(branchId, s)
@@ -817,7 +806,6 @@ module RuntimeError =
     | ErrorString(String)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.toErrorMessage: Unknown function or value 'toString'"
   let toErrorMessage(
     branchId: Uuid,
     e: LanguageTools.RuntimeTypes.RuntimeError.Error)

@@ -49,7 +49,7 @@ def main():
                 content = content.replace(marker, build_hash.encode("ascii"))
             target.write(f"  ({ocaml_string(name.encode())}, {ocaml_string(content)});\n")
         target.write("]\n")
-        imported = root / "upstream/sources.list"
+        imported = root / "porting/upstream-sources.list"
         target.write("let upstreamSources = [\n")
         if imported.exists():
             paths = [line.strip() for line in imported.read_text().splitlines()
@@ -64,6 +64,8 @@ def main():
         target.write("]\n")
         reasons = (root / "porting/compiler-reasons.json").read_bytes()
         target.write(f"let compilerReasons = {ocaml_string(reasons)}\n")
+        annotations = (root / "porting/upstream-annotations.tsv").read_bytes()
+        target.write(f"let upstreamAnnotations = {ocaml_string(annotations)}\n")
     build_info.write_text(
         "(* BuildInfo.ml - Build-time compiler revision, shared with Builtin.getBuildHash. *)\n"
         f"let hash = {ocaml_string(build_hash.encode('ascii'))}\n", encoding="utf-8")

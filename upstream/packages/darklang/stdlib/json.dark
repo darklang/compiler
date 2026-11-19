@@ -4,26 +4,22 @@ module Darklang.Stdlib.Json
 /// <fn Options.defaults>. An `Option` is its value, or `null` for `None`, and a `None`
 /// record field is left out: `{"host":"a1","cpu":38.5}`.
 /// Record fields are written in the order the type declares them; dict keys are sorted.
-// @compiler replace: packages/darklang/stdlib/json.dark#Darklang.Stdlib.Json.serialize reason=compiler-implementation
 let serialize(value: 'a): String =
   serializeWith<'a>(Options.defaults(), value)
 
 
 /// Serializes a Dark value to a JSON string, as <param options> say.
-// @compiler replace: packages/darklang/stdlib/json.dark#Darklang.Stdlib.Json.serializeWith reason=compiler-implementation
 let serializeWith(options: Options.Options, value: 'a): String =
   Builtin.jsonSerialize<'a>(options, value)
 
 
 /// Serializes a Dark value to a JSON string, or {{Error}} where <fn serialize> raises: a value
 /// with no JSON form, such as a function, bytes, or a dict whose keys are not Strings.
-// @compiler replace: packages/darklang/stdlib/json.dark#Darklang.Stdlib.Json.checkedSerialize reason=compiler-implementation
 let checkedSerialize(value: 'a): Result<String, SerializeError.SerializeError> =
   checkedSerializeWith<'a>(Options.defaults(), value)
 
 
 /// <fn checkedSerialize>, as <param options> say.
-// @compiler replace: packages/darklang/stdlib/json.dark#Darklang.Stdlib.Json.checkedSerializeWith reason=compiler-implementation
 let checkedSerializeWith(
   options: Options.Options,
   value: 'a)
@@ -36,7 +32,6 @@ let checkedSerializeWith(
 /// <fn serialize> writes, with either <type Options.NoneFields>, and the tagged
 /// `{"Some":[1]}` form of an `Option` too. A record field of type `Option` may be missing.
 /// Show an error with `$"{e}"` or `Stdlib.display(e)`.
-// @compiler replace: packages/darklang/stdlib/json.dark#Darklang.Stdlib.Json.parse reason=compiler-implementation
 let parse(json: String): Result<'a, ParseError.ParseError> =
   Builtin.jsonParse<'a>(json)
 
@@ -64,14 +59,12 @@ module Options =
 module ParseError =
   module JsonPath =
     module Part =
-      // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch"
       type Part =
         | Root
         | Index(Int64)
         | Field(String)
 
 
-      // @compiler replace: packages/darklang/stdlib/json/parseError/jsonPath/part.dark#Darklang.Stdlib.Json.ParseError.JsonPath.Part.toString reason=compiler-implementation
       let toString(part: Part): String =
         match part with
         | Root -> "root"
@@ -79,11 +72,9 @@ module ParseError =
         | Index(index) -> "[" + display(index) + "]"
 
 
-    // @compiler replace: packages/darklang/stdlib/json/parseError/jsonPath.dark#Darklang.Stdlib.Json.ParseError.JsonPath.JsonPath reason=compiler-implementation
     type JsonPath = List<Part.Part>
 
 
-    // @compiler replace: packages/darklang/stdlib/json/parseError/jsonPath.dark#Darklang.Stdlib.Json.ParseError.JsonPath.toString reason=compiler-implementation
     let toString(path: JsonPath): String =
       path
       |> List.reverse
@@ -91,7 +82,6 @@ module ParseError =
       |> String.join("")
 
 
-  // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch"
   type ParseError =
     /// The json string can't be parsed as the given type.
     | CantMatchWithType(LanguageTools.RuntimeTypes.TypeReference, String, JsonPath.JsonPath)
@@ -116,7 +106,6 @@ module ParseError =
     | UnsupportedType(LanguageTools.RuntimeTypes.TypeReference)
 
 
-  // @compiler replace: packages/darklang/stdlib/json/parseError.dark#Darklang.Stdlib.Json.ParseError.toString reason=compiler-implementation
   let toString(branchId: Uuid, e: ParseError): String =
     match e with
     | CantMatchWithType(typ, json, path) ->
@@ -190,11 +179,9 @@ module ParseError =
       + "`, which has no JSON form"
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Json.ParseError.display: Unknown function or value 'Darklang.SCM.Branches.current'"
   impl Display for ParseError =
     /// What went wrong, with types named as the current branch sees them:
     /// {{Can't parse JSON `"x"` as type `Int64` at path: `root.age`}}
-    // @compiler blocked: upstream-dependency diagnostic="Containing implementation Darklang.Stdlib.Json.ParseError.impl Display for ParseError: Darklang.Stdlib.Json.ParseError.display: Unknown function or value 'Darklang.SCM.Branches.current'"
     let display(e: ParseError): String =
       toString(SCM.Branches.current(), e)
 
@@ -205,10 +192,8 @@ module SerializeError =
     | CannotSerialize(LanguageTools.RuntimeTypes.Dval)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Json.SerializeError.display: Unknown function or value Darklang.SCM.Branches.current"
   impl Display for SerializeError =
     /// What has no JSON form: {{Cannot serialize a function into JSON}}
-    // @compiler blocked: upstream-dependency diagnostic="Containing implementation Darklang.Stdlib.Json.SerializeError.impl Display for SerializeError: Darklang.Stdlib.Json.SerializeError.display: Unknown function or value Darklang.SCM.Branches.current"
     let display(e: SerializeError): String =
       match e with
       | CannotSerialize(dv) ->

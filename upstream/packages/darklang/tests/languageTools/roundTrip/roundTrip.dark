@@ -17,7 +17,6 @@ module Darklang.LanguageTools.Parser.RoundTrip.Tests
 // That lookup is by content hash on any branch, so a declaration whose content the store already
 // holds under a shorter name prints under that name; such cases stay in F#.
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.Parsed: Unknown type 'LanguageTools.ProgramTypes.SourceFile.SourceFile'"
 type Parsed =
   { /// The tree with the real content hashes in place of the parser's placeholders
     tree: LanguageTools.ProgramTypes.SourceFile.SourceFile
@@ -29,14 +28,12 @@ type Parsed =
       (List<String> * LanguageTools.ProgramTypes.NameResolutionError)> }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let exprName(i: Int64): String =
   $"roundTripExpr{Stdlib.display(i)}"
 
 
 /// Each top-level expression as the body of a value, so it is hashed, and its references to the
 /// file's own declarations remapped, along with those declarations.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let exprsAsValues(
   exprs: List<LanguageTools.ProgramTypes.Expr>)
   : List<LanguageTools.ProgramTypes.PackageOp> =
@@ -59,7 +56,6 @@ let exprsAsValues(
 
 
 /// The hash an Add op adds.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let addedHash(
   op: LanguageTools.ProgramTypes.PackageOp)
   : Stdlib.Option.Option<String> =
@@ -80,7 +76,6 @@ let addedHash(
 
 
 /// Swap each parsed item for its stabilized self, found by its placeholder hash.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let restabilize(
   stable: Dict<String, LanguageTools.ProgramTypes.PackageOp>,
   decl: LanguageTools.ProgramTypes.SourceFile.Declaration)
@@ -169,7 +164,6 @@ let restabilize(
 /// Real content hashes for <param ops> and the file's expressions, and the tree rewritten to use
 /// them. The parser hands out placeholder hashes named after locations, which the store does not
 /// index, so a tree printed with them would show hashes where its names should be.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.SourceFile.SourceFile'"
 let stabilize(
   tree: LanguageTools.ProgramTypes.SourceFile.SourceFile,
   ops: List<LanguageTools.ProgramTypes.PackageOp>)
@@ -210,7 +204,6 @@ let stabilize(
 
 /// A new branch off main holding <param prelude>'s declarations, which the parser puts under the
 /// owner `Tests`, so a case can refer to `Tests.Person` or, from a declaration, `Person`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.branchWith: Unknown function or value 'SCM.PackageOps.ensureBranch'"
 let branchWith(prelude: String): Uuid =
   let name = "round-trip-" + Stdlib.display(Stdlib.Uuid.generate())
   let (branchId, _) =
@@ -233,7 +226,6 @@ let branchWith(prelude: String): Uuid =
 
 
 /// `Parse.parsePTSourceFileWithOps`, keeping the unresolved names it drops, with real hashes.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Parsed'"
 let parseOn(
   branchId: Uuid,
   source: String)
@@ -242,7 +234,6 @@ let parseOn(
 
 
 /// `parseOn`, parsing <param source> as a <param kind> file.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Parsed'"
 let parseOnAs(
   kind: LanguageTools.Parser.FileKind,
   branchId: Uuid,
@@ -269,14 +260,12 @@ let parseOnAs(
             |> Stdlib.List.map(fun((_, names, error)) -> (names, error)) })
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Parsed'"
 let printAt(branchId: Uuid, width: Int64, parsed: Parsed): String =
   PrettyPrinter.ProgramTypes.sourceFileAtWidth(branchId, width, parsed.tree)
 
 
 /// Content hashes and name bindings, in source order: equal lists mean the same declarations
 /// under the same names. Ids, descriptions and source positions are not part of a hash.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let bindings(ops: List<LanguageTools.ProgramTypes.PackageOp>): List<String> =
   ops
   |> Stdlib.List.filterMap(fun op ->
@@ -308,7 +297,6 @@ let problemUnless(same: Bool, label: String, what: String): List<String> =
 
 
 /// The same program: same declarations, bindings, expressions and unresolved names.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Parsed'"
 let sameProgram(label: String, actual: Parsed, expected: Parsed): List<String> =
   Stdlib.List.flatten(
     [ problemUnless(
@@ -328,7 +316,6 @@ let sameProgram(label: String, actual: Parsed, expected: Parsed): List<String> =
 
 
 /// <param name>'s round trip, with <param prelude> declared under `Tests` first.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.roundTripWith: Unknown function or value 'roundTripAs'"
 let roundTripWith(
   prelude: String,
   name: String,
@@ -344,7 +331,6 @@ let roundTripWith(
 
 
 /// `roundTripWith`, parsing as a <param kind> file.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.roundTripAs: Unknown function or value 'branchWith'"
 let roundTripAs(
   kind: LanguageTools.Parser.FileKind,
   prelude: String,
@@ -406,7 +392,6 @@ let roundTripAs(
             problems |> Stdlib.List.map(fun p -> $"{name}: {p}"))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.roundTrip: Unknown function or value 'roundTripWith'"
 let roundTrip(
   name: String,
   source: String,
@@ -416,7 +401,6 @@ let roundTrip(
 
 
 /// `roundTrip` for source only a package file may hold, such as a named test.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.roundTripPackage: Unknown function or value 'roundTripAs'"
 let roundTripPackage(
   name: String,
   source: String,
@@ -439,7 +423,6 @@ val myEnum =
 
 /// The text a string or char literal decoded to, with interpolated literals inlined. Proves an
 /// escape decoded, not just that it survived a symmetric parse and print.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let decoded(e: LanguageTools.ProgramTypes.Expr): String =
   match e with
   | EString(_, segments) ->
@@ -460,7 +443,6 @@ let decoded(e: LanguageTools.ProgramTypes.Expr): String =
   | _ -> "<not a literal>"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.decodesToString: Unknown function or value 'LanguageTools.Parser.Parse.parsePTExpr'"
 let decodesToString(
   name: String,
   source: String,
@@ -476,7 +458,6 @@ let decodesToString(
       $"{name}: parse error: {LanguageTools.Parser.Parse.ParseError.toString(e)}")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.decodesToChar: Unknown function or value 'LanguageTools.Parser.Parse.parsePTExpr'"
 let decodesToChar(
   name: String,
   source: String,
@@ -494,7 +475,6 @@ let decodesToChar(
 
 /// <param source> as an expression is refused. The parser recovers a tree from most syntax errors,
 /// and `parsePTExpr` used to lower that tree, holes and all, and return `Ok`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.exprRejected: Unknown function or value 'LanguageTools.Parser.Parse.parsePTExpr'"
 let exprRejected(name: String, source: String): Stdlib.Test.Result =
   match LanguageTools.Parser.Parse.parsePTExpr(source) with
   | Error(_) -> Stdlib.Test.pass()
@@ -502,7 +482,6 @@ let exprRejected(name: String, source: String): Stdlib.Test.Result =
 
 
 /// <param source> as a source file is refused with its syntax diagnostics.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.sourceFileRejected: Unknown function or value 'LanguageTools.Parser.Parse.parsePTSourceFileWithOps'"
 let sourceFileRejected(name: String, source: String): Stdlib.Test.Result =
   match LanguageTools.Parser.Parse.parsePTSourceFileWithOps(
           SCM.Branch.mainBranchId,
@@ -515,7 +494,6 @@ let sourceFileRejected(name: String, source: String): Stdlib.Test.Result =
 
 
 /// The CLI's parse path.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.Parser.CliScript.PTCliScriptModule'"
 let cliParse(
   source: String)
   : Stdlib.Result.Result<
@@ -530,7 +508,6 @@ let cliParse(
     source)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.rejected: Unknown function or value 'cliParse'"
 let rejected(name: String, source: String): Stdlib.Test.Result =
   match cliParse(source) with
   | Error(_) -> Stdlib.Test.pass()
@@ -538,7 +515,6 @@ let rejected(name: String, source: String): Stdlib.Test.Result =
 
 
 /// Rejected, with a message that contains <param note>. The message starts with the position.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.rejectedWithNote: Unknown function or value 'cliParse'"
 let rejectedWithNote(
   name: String,
   source: String,
@@ -553,7 +529,6 @@ let rejectedWithNote(
   | Ok(_) -> Stdlib.Test.fail($"{name}: parsed, but should have been rejected")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.parsesOk: Unknown function or value 'cliParse'"
 let parsesOk(name: String, source: String): Stdlib.Test.Result =
   match cliParse(source) with
   | Ok(_) -> Stdlib.Test.pass()
@@ -567,7 +542,6 @@ let callWith(f: List<Int64> -> List<Int64>, arg: List<Int64>): List<Int64> =
 /// Parse a source file declaring one fn, store it as the CLI would, then run it by the name it was
 /// stored under. A resolution bug inside the body, such as a nested recursive fn not finding itself,
 /// shows up here and can hide in a print.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.RoundTrip.Tests.runsDeclaredFn: Unknown function or value 'branchWith'"
 let runsDeclaredFn(
   name: String,
   source: String,

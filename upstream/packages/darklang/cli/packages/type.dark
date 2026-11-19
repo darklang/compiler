@@ -1,6 +1,5 @@
 module Darklang.Cli.Packages.Type
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [] ->
@@ -30,7 +29,6 @@ let execute(state: AppState, args: List<String>): AppState =
         createTypeInline(state, location, inlineDefinition)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.PackageLocation'"
 let createTypeInline(state: AppState, locationStr: String, definition: String): AppState =
   let hint =
     [ Stdlib.Cli.UI.Colors.error("Failed to parse type definition")
@@ -72,7 +70,6 @@ let createTypeInline(state: AppState, locationStr: String, definition: String): 
       | _ -> Option.None)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Create or update a type"
     ""
@@ -108,6 +105,5 @@ let help(_state: AppState): String =
 
 /// CLEANUP could offer useful completions: nav-style help on the LHS of the `=`;
 /// probably nothing on the RHS.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []

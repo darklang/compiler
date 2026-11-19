@@ -1,13 +1,11 @@
 module Darklang.LanguageTools
 
 // TODO: should this be UInt64?
-// @compiler replace: packages/darklang/languageTools/common.dark#Darklang.LanguageTools.ID reason=compiler-implementation
 type ID = Int64
 
 type TLID = UInt64
 
 
-// @compiler replace: packages/darklang/languageTools/common.dark#Darklang.LanguageTools.Sign reason=compiler-implementation
 type Sign =
   | Positive
   | Negative
@@ -40,14 +38,12 @@ type BuiltinFunction =
 
 /// Every builtin fn this runtime has. The list is built fresh on each call,
 /// so hold onto it if you're looking up more than one name.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.allBuiltinFns: Unknown function or value 'Builtin.getAllBuiltinFns'"
 let allBuiltinFns(): List<BuiltinFunction> =
   Builtin.getAllBuiltinFns()
 
 
 /// Look up a builtin function's metadata by name and version.
 /// Fetch only that builtin's metadata; return None if it does not exist.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.findBuiltinFn: Unknown function or value 'Builtin.getBuiltinFn'"
 let findBuiltinFn(name: String, version: Int32): Option<BuiltinFunction> =
   Builtin.getBuiltinFn(name, version)
 
@@ -60,13 +56,11 @@ type BuiltinValue =
 
 
 /// Every builtin value this runtime has. Built fresh on each call.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.allBuiltinValues: Unknown function or value 'Builtin.getAllBuiltinValues'"
 let allBuiltinValues(): List<BuiltinValue> =
   Builtin.getAllBuiltinValues()
 
 
 /// Look up a builtin value's metadata by name and version; None if it does not exist.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.findBuiltinValue: Unknown function or value 'Builtin.getBuiltinValue'"
 let findBuiltinValue(name: String, version: Int32): Option<BuiltinValue> =
   allBuiltinValues()
   |> Stdlib.List.findFirst(fun v -> v.name.name == name && v.name.version == version)

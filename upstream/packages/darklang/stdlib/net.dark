@@ -42,7 +42,6 @@ impl Inspect for Port =
     $"Port({port.__port})"
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Compare for Port =
   let lessThan(a: Port, b: Port): Bool =
     a.__port < b.__port

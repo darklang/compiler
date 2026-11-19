@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Count compiler dispositions directly from imported Dark source annotations."""
+"""Count compiler dispositions of the imported Dark sources from porting/upstream-annotations.tsv."""
 from __future__ import annotations
 import argparse
 from collections import Counter, defaultdict
@@ -17,7 +17,7 @@ TEST_KINDS = {'named-test', 'assertion'}
 
 
 def imported_paths(root):
-    paths = [line.strip() for line in (root / 'upstream/sources.list').read_text().splitlines()
+    paths = [line.strip() for line in (root / 'porting/upstream-sources.list').read_text().splitlines()
              if line.strip() and not line.startswith('#')]
     if paths != sorted(set(paths)):
         raise ValueError('Imported paths must be unique and sorted')
@@ -40,7 +40,8 @@ def inventory(root, build_dir):
         manifest, report = (Path(temporary) / name for name in ('manifest.json', 'inventory.json'))
         manifest.write_text(json.dumps(['upstream/' + p for p in paths]))
         subprocess.run([str(adapter), str(root), str(manifest),
-                        str(root / 'porting/compiler-reasons.json'), str(report)], check=True, cwd=root)
+                        str(root / 'porting/compiler-reasons.json'),
+                        str(root / 'porting/upstream-annotations.tsv'), str(report)], check=True, cwd=root)
         rows = json.loads(report.read_text())['sources']
     if [r['source'] for r in rows] != ['upstream/' + p for p in paths]:
         raise ValueError('Native inventory did not account for every imported source')
@@ -59,12 +60,8 @@ def verify_pin(root, upstream, rows):
         raise ValueError('Imported inventory does not contain the complete pinned corpus')
     for row in rows:
         path = row['source']
-        # Real lexer comment positions exclude annotation-like text in literals.
-        annotations = set(row['annotation_lines'])
-        original = b''.join(line for number, line in enumerate((root / path).read_bytes().splitlines(keepends=True), 1)
-                            if number not in annotations)
-        if original != blobs[path.removeprefix('upstream/')]:
-            raise ValueError('Imported source body differs from the pin: ' + path)
+        if (root / path).read_bytes() != blobs[path.removeprefix('upstream/')]:
+            raise ValueError('Imported source differs from the pin: ' + path)
 
 
 def capabilities(root, filename):
@@ -129,7 +126,7 @@ def summarize(root, rows):
 def markdown(summary):
     lines = ['# Current compiler port status', '', '[How to read and update this ledger](../README.md).', '',
              'Interpreter revision: `' + summary['upstream']['upstream_revision'] + '`.', '',
-             f"The complete corpus contains {summary['source_files']:,} source files. Items are counted directly from parsed source annotations.", '',
+             f"The complete corpus contains {summary['source_files']:,} source files. Items are counted from the parsed sources and [their annotations](../../../porting/upstream-annotations.tsv).", '',
              'A run disposition means selected, not a passing execution receipt. Replacement contracts are checked independently.', '',
              '| Area | Source dispositions |', '| --- | --- |']
     for area, counts in summary['dispositions'].items():
@@ -147,7 +144,7 @@ def markdown(summary):
               for classification, values in summary['expected_failures'].items()
               for reason, n in values['reasons'].items()]
     lines += ['', '### Remaining support by source', '',
-              'Each row links to the authoritative per-test annotations. A named test remains one case even when it contains several assertions.', '',
+              'A named test remains one case even when it contains several assertions.', '',
               '| Source | Tests |', '| --- | ---: |']
     lines += [f'| [{path.removeprefix("upstream/")}](../../../{path}) | {n:,} |'
               for path, n in summary['expected_failures'].get('missing-support', {}).get('sources', {}).items()]

@@ -112,7 +112,6 @@ let kindArgChecked(args: List<String>): Result<Unit, String> =
           $"\"{wanted}\" isn't a kind -- stale-usage, kind-changed, decision-superseded, or rival-implementations.")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeJson(state: AppState, args: List<String>): AppState =
   let detected = SCM.Constraints.pending()
   let findings = selectKind(detected.findings, args)
@@ -129,7 +128,6 @@ let executeJson(state: AppState, args: List<String>): AppState =
   exitWith(state, printJson(answer))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeList(state: AppState, args: List<String>): AppState =
   let detected = SCM.Constraints.pending()
 
@@ -164,7 +162,6 @@ let executeList(state: AppState, args: List<String>): AppState =
 ///
 /// Unknown ids are REPORTED and skipped rather than aborting the batch. An agent that has to bisect a failed
 /// batch to find the one bad target is worse off than one that made N calls in the first place.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ConstraintsCmd.selectTargets: Unknown function or value 'SCM.Constraints.pending'"
 let selectTargets(ids: List<String>): (List<SCM.Constraints.Finding> * List<String>) =
   // `detectAll` re-runs detection so a prefix can match a finding that has never been listed; `pending`
   // is enough for `--all`, which means "everything currently outstanding".
@@ -229,12 +226,10 @@ let whyFrom(args: List<String>): String =
 /// Propagation choices are different: they genuinely differ per branch (a branch may want a different
 /// pin), so they're scoped by `branch_id`. An ack isn't like that -- if the finding is real it's real
 /// everywhere, and one answer is the right number of answers.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ConstraintsCmd.onBranch: Unknown function or value 'SCM.PackageOps.currentBranch'"
 let onBranch(): Bool =
   Stdlib.Bool.not(SCM.Branch.isMain(SCM.PackageOps.currentBranch()))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeAck(state: AppState, args: List<String>): AppState =
   if onBranch() then
     printErr("constraints are a property of the store, not of a branch -- switch to main to ack.")
@@ -353,7 +348,6 @@ let resolutionFor(
 /// Gated on main like `ack`, for the same reason: detection runs over MAIN's bindings, so a resolution
 /// authored from a branch would repoint main's caller onto the branch's layers, where main cannot see it,
 /// while the finding it answers stays open on main.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeResolve(state: AppState, args: List<String>): AppState =
   if onBranch() then
     printErr(
@@ -401,7 +395,6 @@ let executeResolve(state: AppState, args: List<String>): AppState =
         exitWith(state, Stdlib.List.isEmpty(missing) && Stdlib.List.all(results, fun ok -> ok))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ ""
     "  Checks you RUN, not warnings at commit. Four kinds today:"
@@ -441,7 +434,6 @@ let help(_state: AppState): String =
 
 /// `dark ack` -- the bulk verb at the root, because acking is the boring high-volume case and burying it
 /// under a noun makes an agent type a subcommand to say "seen it".
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeAckCmd(state: AppState, args: List<String>): AppState =
   match args with
   | [] ->
@@ -465,7 +457,6 @@ let listingUnderstands(args: List<String>): Bool =
   understands(args)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | ["resolve", ...rest] -> executeResolve(state, rest)
@@ -487,6 +478,5 @@ let execute(state: AppState, args: List<String>): AppState =
           executeList(state, args)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []

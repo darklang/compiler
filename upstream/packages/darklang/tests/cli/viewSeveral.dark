@@ -3,12 +3,10 @@
 module Darklang.Cli.Tests.ViewSeveral
 
 // The default view is highlighted.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.ViewSeveral.plain: Unknown function or value 'Stdlib.Cli.Tui.Text.stripSgr'"
 let plain(out: String): String =
   Stdlib.Cli.Tui.Text.stripSgr(out)
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test severalNamesAreEachShown = Instance.withInstance(fun i ->
   let (code, styled) =
     Instance.ran(i, [ "view", "Stdlib.List.head", "Stdlib.List.last" ])
@@ -23,7 +21,6 @@ test severalNamesAreEachShown = Instance.withInstance(fun i ->
 
 
 // Under --raw each name is a comment, so the output is still source.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test rawNamesAreComments = Instance.withInstance(fun i ->
   let (code, out) =
     Instance.ran(i, [ "view", "Stdlib.List.head", "Stdlib.List.last", "--raw" ])
@@ -42,7 +39,6 @@ test rawNamesAreComments = Instance.withInstance(fun i ->
 
 
 // A name that is not there is reported, and the others are still shown.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test anUnknownNameIsReported = Instance.withInstance(fun i ->
   let (code, styled) =
     Instance.ran(i, [ "view", "Stdlib.List.head", "Zzz.Nope.f" ])

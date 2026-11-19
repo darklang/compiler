@@ -7,7 +7,6 @@ module Darklang.Cli.Packages.FindValues
 /// Resolved with `Traversal.traverse`, the walk `view` and `ls` use, rather than split on dots here.
 /// Splitting read the FIRST segment as the owner, so `find-values Stdlib.Option.Option` looked for an
 /// owner named Stdlib and answered "Type not found" about a type `view` prints happily.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.PackageLocation'"
 let resolveTypeHash(
   branchId: Uuid,
   currentLocation: PackageLocation,
@@ -22,7 +21,6 @@ let resolveTypeHash(
   | Ok(_) -> Result.Error($"{typePath} is not a type. find-values looks for values OF a type.")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [] ->
@@ -64,7 +62,6 @@ let execute(state: AppState, args: List<String>): AppState =
     state
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Find all package values of a given type."
     ""
@@ -76,7 +73,6 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   // For now, just return empty - could add type path completion later
   []

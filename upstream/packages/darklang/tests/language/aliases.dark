@@ -10,7 +10,6 @@ test simpleAlias =
   |> Stdlib.Test.equal(Something { ID = "2", Data = "test" })
 
 // CELANUP: would be better if this noted that `Id` is an alias for `String`
-// @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
 test simpleAliasWrongTypeRaises =
   Something { ID = 2, Data = "test" }
   => raises
@@ -50,14 +49,12 @@ module ReflectedTypeNames =
     Darklang.LanguageTools.RuntimeTypes.FQTypeName.FQTypeName.Package(
       Darklang.LanguageTools.RuntimeTypes.Hash.Hash(""))
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Language.Tests.Aliases.ReflectedTypeNames.typeNames: Unknown function or value 'Darklang.LanguageTools.RuntimeTypes.reflect'"
   let typeNames(value: 'a): (Name * Name) =
     match Darklang.LanguageTools.RuntimeTypes.reflect(value) with
     | DRecord(sourceTypeName, runtimeTypeName, _, _) -> (sourceTypeName, runtimeTypeName)
     | DEnum(sourceTypeName, runtimeTypeName, _, _, _) -> (sourceTypeName, runtimeTypeName)
     | _ -> (unknown(), unknown())
 
-  // @compiler xfail compile: "Unknown function or value 'typeNames'" class=missing-support reason=upstream-dependency
   test recordSourceIsTheAlias =
     let (aliasSource, aliasRuntime) =
       typeNames(SimpleRecordAlias.MyPerson { name = "test" })
@@ -68,7 +65,6 @@ module ReflectedTypeNames =
         (aliasRuntime == personRuntime) |> Stdlib.Test.equal(true)
         (aliasSource == personSource) |> Stdlib.Test.equal(false) ])
 
-  // @compiler xfail compile: "Unknown function or value 'typeNames'" class=missing-support reason=upstream-dependency
   test enumSourceIsTheAlias =
     let (aliasSource, aliasRuntime) = typeNames(SimpleEnumAlias.AdminRole.Admin)
     let (roleSource, roleRuntime) = typeNames(SimpleEnumAlias.UserRole.Admin)
@@ -101,7 +97,6 @@ module NestedAlias =
         )))
         |> Stdlib.Test.equal("Alice") ])
 
-  // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
   test wrongTupleTypeRaises =
     getUserID(("Alice", 123))
     => raises
@@ -151,19 +146,16 @@ module RecordWithTypeArgs =
     Inner<String, Int64> { a = "test", b = 5 }
     |> Stdlib.Test.equal(Inner { a = "test", b = 5 })
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test explicitTypeArgMismatchRaises =
     Inner<String, Int64> { a = "test", b = "five" }
     => raises
       "Failed to create record. Expected Int64 for field `b`, but got \"five\" (a String)"
 
-  // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
   test outer2WrongFieldRaises =
     Outer2 { a = 5, b = 6 }
     => raises
       "Failed to create record. Expected String for field `a`, but got 5 (an Int64)"
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test outer1WrongFieldRaises =
     Outer1 { a = "a", b = "b" }
     => raises
@@ -180,13 +172,11 @@ module RecordWithTypeArgsDifferentName =
     MostOutest { a = 5, b = "string" }
     |> Stdlib.Test.equal(Inner { a = 5, b = "string" })
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test wrongFieldARaises =
     MostOutest { a = "not allowed", b = "string" }
     => raises
       "Failed to create record. Expected Int64 for field `a`, but got \"not allowed\" (a String)"
 
-  // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
   test wrongFieldBRaises =
     MostOutest { a = 5, b = 6 }
     => raises
@@ -261,13 +251,11 @@ module EnumWithTypeArgs =
         Outer2.A("str") |> Stdlib.Test.equal(Outer1.A("str"))
         Outer2.B(5) |> Stdlib.Test.equal(Outer1.B(5)) ])
 
-  // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
   test outer2WrongPayloadRaises =
     Outer2.A(5)
     => raises
       "Failed to create enum. Expected String for field 0 in `A`, but got Int64 (5)"
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test outer1WrongPayloadRaises =
     Outer1.B("b")
     => raises
@@ -288,13 +276,11 @@ module EnumWithTypeArgsDifferentName =
       [ MostOutest.A(5) |> Stdlib.Test.equal(Inner.A(5))
         MostOutest.B("test") |> Stdlib.Test.equal(Inner.B("test")) ])
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test wrongPayloadARaises =
     MostOutest.A("not allowed")
     => raises
       "Failed to create enum. Expected Int64 for field 0 in `A`, but got String (\"not allowed\")"
 
-  // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
   test wrongPayloadBRaises =
     MostOutest.B(6)
     => raises

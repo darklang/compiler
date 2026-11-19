@@ -4,7 +4,6 @@ module Darklang.Cli.Tests.SignaturesTraitCalls
 // `a % b` or `Stdlib.display(v)`, not as a module at the impl's own path (`Int64.Modulo`), which
 // no call can use.
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
 let int64ImplItems(
   trait_: String)
   : List<
@@ -16,14 +15,12 @@ let int64ImplItems(
      trait_)).impls
 
 
-// @compiler blocked: upstream-dependency diagnostic="ctx: Unknown type 'PrettyPrinter.ProgramTypes.Context'"
 let ctx(): PrettyPrinter.ProgramTypes.Context =
   Cli.Packages.Signatures.rootContext(
     SCM.Branch.mainBranchId,
     [ "Darklang", "Stdlib" ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.SignaturesTraitCalls.calls: Unknown function or value 'int64ImplItems'"
 let calls(trait_: String): List<String> =
   match int64ImplItems(trait_) with
   | [i, ...] ->
@@ -37,7 +34,6 @@ let stdlibTrait(name: String): LanguageTools.ProgramTypes.PackageLocation =
 
 
 // An operator trait's method is its operator; a call trait's is the fn beside the trait.
-// @compiler xfail compile: "Unknown function or value 'calls'" class=missing-support reason=upstream-dependency
 test callsAreWrittenAsPeopleWriteThem =
   Stdlib.Test.all(
     [ calls("Modulo") |> Stdlib.Test.equal([ "a % b" ])
@@ -69,7 +65,6 @@ test operatorsOnlyForStdlibTraits =
 
 
 // The section lines: the call, padded, then the trait.
-// @compiler xfail compile: "Unknown function or value 'Cli.Packages.Signatures.implLines'" class=missing-support reason=upstream-dependency
 test implLinesNameTheTrait =
   Cli.Packages.Signatures.implLines(
     ctx(),

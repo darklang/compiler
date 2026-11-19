@@ -26,7 +26,6 @@ let nameTheDefinition(name: String, hash: String, rendered: String): String =
 /// Render the actual source of one candidate, so `show` compares CODE rather than two hex strings.
 /// A hash we don't hold locally is normal (a peer's version can arrive as a name binding before its content),
 /// so say so plainly instead of failing.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Conflicts.renderItem: Unknown function or value 'LanguageTools.PackageManager.Function.get'"
 let renderItem(branchId: Uuid, itemType: String, hash: String, name: String): String =
   let ctx = PrettyPrinter.ProgramTypes.Context.forBranch(branchId)
   let h = LanguageTools.ProgramTypes.Hash.Hash(hash)
@@ -81,7 +80,6 @@ let renderItem(branchId: Uuid, itemType: String, hash: String, name: String): St
 
 
 /// A candidate's whole definition flattened onto one line, clipped, for the inline preview.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Conflicts.previewLine: Unknown function or value 'renderItem'"
 let previewLine(branchId: Uuid, itemType: String, hash: String, name: String): String =
   let flattened =
     renderItem(branchId, itemType, hash, name)
@@ -98,7 +96,6 @@ let previewLine(branchId: Uuid, itemType: String, hash: String, name: String): S
 
 /// The same flattening as <fn previewLine>, unclipped, so a caller comparing two candidates can find
 /// where they split before deciding what to clip.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Conflicts.previewFlat: Unknown function or value 'renderItem'"
 let previewFlat(branchId: Uuid, itemType: String, hash: String, name: String): String =
   renderItem(branchId, itemType, hash, name)
   |> Stdlib.String.splitOnNewline
@@ -171,7 +168,6 @@ let indentBlock(s: String): String =
 
 
 /// The pending list: one line each, plus how to act on them.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeList(state: AppState): AppState =
   match SCM.Conflicts.pending() with
   | [] ->
@@ -263,7 +259,6 @@ let executeList(state: AppState): AppState =
 
 
 /// One conflict in full: both versions as CODE, which side the fold kept, and why.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeShow(state: AppState, idPrefix: String): AppState =
   match SCM.Conflicts.getByIdPrefix(idPrefix) with
   | None ->
@@ -316,7 +311,6 @@ let executeShow(state: AppState, idPrefix: String): AppState =
 
 /// ACK: the auto-pick stands. Closes the conflict without touching any binding -- the fold already did the
 /// only thing that changes state, and agreeing with it is not itself an edit.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeAck(state: AppState, idPrefix: String): AppState =
   match SCM.Conflicts.getByIdPrefix(idPrefix) with
   | None ->
@@ -349,7 +343,6 @@ let pickCandidate(c: SCM.Conflicts.Conflict, choice: String): Option<SCM.Conflic
 /// The override authors a `Resolve` op, so the choice is data in the log rather than a local opinion: it
 /// syncs, a peer folding it lands on the same binding, `discard` skips it (source='resolution'), and
 /// re-folding the ops that caused the conflict can't quietly undo it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeOverride(state: AppState, idPrefix: String, choice: String): AppState =
   match SCM.Conflicts.getByIdPrefix(idPrefix) with
   | None ->
@@ -439,7 +432,6 @@ let executeOverride(state: AppState, idPrefix: String, choice: String): AppState
 
 /// PREVIEW a branch: what a merge WOULD reconcile. Nothing is recorded by looking; a conflict is only written
 /// when a reconciliation actually happens.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeBranchPreview(state: AppState, branchRef: String): AppState =
   // "would merge cleanly" for a branch that doesn't exist is the sentence a real, clean branch gets, so a
   // typo has to be refused rather than answered.
@@ -460,7 +452,6 @@ let executeBranchPreview(state: AppState, branchRef: String): AppState =
       state
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ ""
     "A conflict is recorded when a merge or rebase finds that BOTH"
@@ -491,14 +482,12 @@ let help(_state: AppState): String =
 
 /// "That didn't work", on the --json path the same as every other: stdout stays empty, the reason
 /// goes to stderr, and the exit code says it failed. Stdout under --json is the answer or nothing.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let jsonFailure(state: AppState, msg: String): AppState =
   printErr(msg)
   failed(state)
 
 
 /// Its "that worked" twin.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Conflicts.jsonSuccess: Unknown function or value 'ScmJson.conflictActionJson'"
 let jsonSuccess(id: String, status: String, resolvedTo: String): Bool =
   printJson(
     ScmJson.conflictActionJson(
@@ -507,7 +496,6 @@ let jsonSuccess(id: String, status: String, resolvedTo: String): Bool =
 
 
 /// The typed conflict list, as both listing arms print it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Conflicts.printConflictList: Unknown function or value 'ScmJson.conflictListJson'"
 let printConflictList(cs: List<SCM.Conflicts.Conflict>): Bool =
   printJson(
     ScmJson.conflictListJson(
@@ -516,13 +504,11 @@ let printConflictList(cs: List<SCM.Conflicts.Conflict>): Bool =
           conflicts = cs |> Stdlib.List.map(ScmJson.conflictWithFqn) }))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let failureUnknown(state: AppState): AppState =
   jsonFailure(state, "unknown `dark conflicts` subcommand")
 
 
 /// The --json half. Same data the pretty view formats, never re-derived.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeJson(state: AppState, args: List<String>): AppState =
   match args with
   | [] | ["list"] -> exitWith(state, printConflictList(SCM.Conflicts.pending()))
@@ -561,7 +547,6 @@ let executeJson(state: AppState, args: List<String>): AppState =
 ///
 /// Returns whether to keep going: quitting part-way is a normal thing to want, and the ones you have
 /// already settled stay settled.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let walkOne(state: AppState, c: SCM.Conflicts.Conflict, n: Int64, total: Int64): Bool =
   let dotted = SCM.Conflicts.fqn(c.owner, c.modules, c.name)
   let pos = $"{Stdlib.display(n)}/{Stdlib.display(total)}"
@@ -640,7 +625,6 @@ let walkOne(state: AppState, c: SCM.Conflicts.Conflict, n: Int64, total: Int64):
 ///
 /// The list is a report; this is the thing that gets them to zero. It exists because the alternative is
 /// reading a list, copying an id, running `show`, then running `override`, per conflict.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeWalk(state: AppState): AppState =
   match SCM.Conflicts.pending() with
   | [] ->
@@ -666,7 +650,6 @@ let executeWalk(state: AppState): AppState =
     state
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executePretty(state: AppState, args: List<String>): AppState =
   match args with
   // Bare `dark conflicts` steps through them when there is someone to answer; piped or scripted, it
@@ -711,7 +694,6 @@ let executePretty(state: AppState, args: List<String>): AppState =
     failed(state)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let stripped = ScmJson.stripJson(args)
   if ScmJson.wantsJson(args) then
@@ -721,7 +703,6 @@ let execute(state: AppState, args: List<String>): AppState =
 
 
 /// Ids are offered at the width they're printed at, since that's what people copy off the list.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(_state: AppState, args: List<String>): List<Completion.CompletionItem> =
   let subcommands = [ "list", "show", "ack", "override", "branch" ]
   let matching(options: List<String>, partial: String): List<Completion.CompletionItem> =

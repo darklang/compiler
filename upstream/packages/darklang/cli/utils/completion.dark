@@ -12,7 +12,6 @@ let simple(text: String): CompletionItem =
 
 
 /// Create a completion item with an icon based on entity type
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.EntityType'"
 let withIcon(entityType: Packages.EntityType, text: String): CompletionItem =
   let icon = Packages.Display.getIcon(entityType)
   CompletionItem { display = icon + "  " + text, value = text }
@@ -110,7 +109,6 @@ let getHintFromCompletions(partial: String, completions: List<String>): String =
 // (right now, just `help`)
 // Uses `state.commandOptionsCache` rather than rebuilding from `Registry.allCommands ()`: this runs on the
 // completion path, mid-keystroke, and the cache is the same list, built once at startup.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let commandNamesCompletion(state: AppState, args: List<String>): List<CompletionItem> =
   match args with
   | [] -> state.commandOptionsCache |> Stdlib.List.map(simple)

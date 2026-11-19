@@ -67,7 +67,6 @@ let resolvePackageHashWithOriginalName(
 
 
 /// A type's name for value output, spelled relative to `opts.currentModule`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.typeNameWith: Unknown function or value 'Darklang.LanguageTools.PackageManager.Type.locations'"
 let typeNameWith(
   branchId: Uuid,
   opts: DisplayOptions,
@@ -90,7 +89,6 @@ let typeNameWith(
 /// type in front of them is pure noise: `Some(Some([1, 2, 3]))` says everything
 /// `Option.Some(Option.Some([1, 2, 3]))` does. Every other enum keeps its type name, because `Red` on
 /// its own doesn't tell you it came from `Color`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.caseNameStandsAlone: Unknown function or value 'Darklang.LanguageTools.PackageManager.Type.locations'"
 let caseNameStandsAlone(
   branchId: Uuid,
   currentModule: List<String>,
@@ -134,7 +132,6 @@ let caseNameStandsAlone(
 
 
 module FQTypeName =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.FQTypeName.package: Unknown function or value 'LanguageTools.PackageManager.Type.locations'"
   let package(branchId: Uuid, hash: LanguageTools.RuntimeTypes.FQTypeName.Package): String =
     resolvePackageHash(
       LanguageTools.PackageManager.PickContext.empty,
@@ -143,14 +140,12 @@ module FQTypeName =
 
 
 // TODO rename to fqtypeName?
-// @compiler replace: packages/darklang/prettyPrinter/runtimeTypes.dark#Darklang.PrettyPrinter.RuntimeTypes.typeName reason=compiler-implementation
 let typeName(branchId: Uuid, t: LanguageTools.RuntimeTypes.FQTypeName.FQTypeName): String =
   match t with
   | Package(p) -> FQTypeName.package(branchId, p)
 
 
 /// A trait's full name, by the name its hash is bound to on the branch.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.traitName: Unknown function or value 'LanguageTools.PackageManager.Trait.locations'"
 let traitName(branchId: Uuid, t: LanguageTools.RuntimeTypes.FQTraitName.FQTraitName): String =
   match t with
   | Package(hash) ->
@@ -161,7 +156,6 @@ let traitName(branchId: Uuid, t: LanguageTools.RuntimeTypes.FQTraitName.FQTraitN
 
 
 /// Just the trait's own name.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.shortTraitName: Unknown function or value 'Darklang.LanguageTools.PackageManager.Trait.locations'"
 let shortTraitName(branchId: Uuid, t: LanguageTools.RuntimeTypes.FQTraitName.FQTraitName): String =
   match t with
   | Package(hash) ->
@@ -178,7 +172,6 @@ let shortTraitName(branchId: Uuid, t: LanguageTools.RuntimeTypes.FQTraitName.FQT
 /// For error messages, where the surrounding sentence already says what kind of thing is being talked
 /// about and the full path is noise: "expects Option, but got Result" reads better than the same line
 /// with two forty-character paths in it. Falls back to the full name when the type has no location.
-// @compiler replace: packages/darklang/prettyPrinter/runtimeTypes.dark#Darklang.PrettyPrinter.RuntimeTypes.shortTypeName reason=compiler-implementation
 let shortTypeName(branchId: Uuid, t: LanguageTools.RuntimeTypes.FQTypeName.FQTypeName): String =
   match t with
   | Package(hash) ->
@@ -197,7 +190,6 @@ module FQValueName =
     $"{namePart}{versionPart}"
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.FQValueName.package: Unknown function or value 'LanguageTools.PackageManager.Value.locations'"
   let package(branchId: Uuid, hash: LanguageTools.RuntimeTypes.FQValueName.Package): String =
     resolvePackageHash(
       LanguageTools.PackageManager.PickContext.empty,
@@ -206,7 +198,6 @@ module FQValueName =
 
 
 // TODO rename to fqvalueName?
-// @compiler replace: packages/darklang/prettyPrinter/runtimeTypes.dark#Darklang.PrettyPrinter.RuntimeTypes.valueName reason=compiler-implementation
 let valueName(branchId: Uuid, t: LanguageTools.RuntimeTypes.FQValueName.FQValueName): String =
   match t with
   | Builtin(b) -> FQValueName.builtIn(b)
@@ -220,7 +211,6 @@ module FQFnName =
     $"Builtin.{namePart}{versionPart}"
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.FQFnName.package: Unknown function or value 'LanguageTools.PackageManager.Function.locations'"
   let package(branchId: Uuid, hash: LanguageTools.RuntimeTypes.FQFnName.Package): String =
     resolvePackageHash(
       LanguageTools.PackageManager.PickContext.empty,
@@ -229,7 +219,6 @@ module FQFnName =
 
 
 // TODO rename to fqfnName?
-// @compiler replace: packages/darklang/prettyPrinter/runtimeTypes.dark#Darklang.PrettyPrinter.RuntimeTypes.fnName reason=compiler-implementation
 let fnName(branchId: Uuid, t: LanguageTools.RuntimeTypes.FQFnName.FQFnName): String =
   match t with
   | Builtin(b) -> FQFnName.builtIn(b)
@@ -250,14 +239,12 @@ let fnName(branchId: Uuid, t: LanguageTools.RuntimeTypes.FQFnName.FQFnName): Str
 
 
 /// A call frame, using the function's name when it is available.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.executionPoint: Unknown constructor 'Darklang.LanguageTools.RuntimeTypes.FQFnName.FQFnName.TraitMethod' in pattern"
 let executionPoint(branchId: Uuid, point: LanguageTools.RuntimeTypes.ExecutionPoint): String =
   executionPointAt(branchId, point, [])
 
 
 /// <fn executionPoint>, with a lambda labelled by the line it starts on when <param lambdaLines>
 /// (node id, line) has it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.executionPointAt: Unknown constructor 'Darklang.LanguageTools.RuntimeTypes.FQFnName.FQFnName.TraitMethod' in pattern"
 let executionPointAt(
   branchId: Uuid,
   point: LanguageTools.RuntimeTypes.ExecutionPoint,
@@ -285,13 +272,11 @@ let executionPointAt(
 
 
 /// Show the stack in call order, grouping consecutive identical frames.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.callStack: No implementation of trait 'Darklang.Stdlib.ToString'"
 let callStack(branchId: Uuid, frames: List<LanguageTools.RuntimeTypes.ExecutionPoint>): String =
   callStackAt(branchId, frames, [])
 
 
 /// <fn callStack>, with lambdas labelled by line (see <fn executionPointAt>).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.callStackAt: No implementation of trait 'Darklang.Stdlib.Display'"
 let callStackAt(
   branchId: Uuid,
   frames: List<LanguageTools.RuntimeTypes.ExecutionPoint>,
@@ -323,7 +308,6 @@ let callStackAt(
     $"{text}\n- {line}")
 
 
-// @compiler replace: packages/darklang/prettyPrinter/runtimeTypes.dark#Darklang.PrettyPrinter.RuntimeTypes.typeReference reason=compiler-implementation
 let typeReference(branchId: Uuid, t: LanguageTools.RuntimeTypes.TypeReference): String =
   match t with
   | TUnit -> "Unit"
@@ -390,7 +374,6 @@ let typeReference(branchId: Uuid, t: LanguageTools.RuntimeTypes.TypeReference): 
   | TVariable(varName) -> "'" + varName
 
 
-// @compiler replace: packages/darklang/prettyPrinter/runtimeTypes.dark#Darklang.PrettyPrinter.RuntimeTypes.knownType reason=compiler-implementation
 let knownType(branchId: Uuid, t: LanguageTools.RuntimeTypes.KnownType): String =
   match t with
   | KTUnit -> "Unit"
@@ -450,7 +433,6 @@ let fnTypeText(args: List<String>, ret: String): String =
   | args -> "(" + Stdlib.String.join(args, ", ") + ") -> " + grouped(ret)
 
 
-// @compiler replace: packages/darklang/prettyPrinter/runtimeTypes.dark#Darklang.PrettyPrinter.RuntimeTypes.valueType reason=compiler-implementation
 let valueType(branchId: Uuid, vt: LanguageTools.RuntimeTypes.ValueType): String =
   match vt with
   | Known(kt) -> knownType(branchId, kt)
@@ -476,7 +458,6 @@ let valueType(branchId: Uuid, vt: LanguageTools.RuntimeTypes.ValueType): String 
 /// declaration at all. Wherever that happens the declaration is dropped for that
 /// subtree and the rest is named canonically, which is the answer <fn valueType>
 /// gives on its own.
-// @compiler replace: packages/darklang/prettyPrinter/runtimeTypes.dark#Darklang.PrettyPrinter.RuntimeTypes.declaredValueType reason=compiler-implementation
 let declaredValueType(
   branchId: Uuid,
   declared: Option<LanguageTools.RuntimeTypes.TypeReference>,
@@ -487,7 +468,6 @@ let declaredValueType(
   | Known(kt) -> declaredKnownType(branchId, declared, kt)
 
 
-// @compiler replace: packages/darklang/prettyPrinter/runtimeTypes.dark#Darklang.PrettyPrinter.RuntimeTypes.declaredKnownType reason=compiler-implementation
 let declaredKnownType(
   branchId: Uuid,
   declared: Option<LanguageTools.RuntimeTypes.TypeReference>,
@@ -555,7 +535,6 @@ let declaredKnownType(
   | _, _ -> knownType(branchId, kt)
 
 
-// @compiler replace: packages/darklang/prettyPrinter/runtimeTypes.dark#Darklang.PrettyPrinter.RuntimeTypes.letPattern reason=compiler-implementation
 let letPattern(pat: LanguageTools.RuntimeTypes.LetPattern): String =
   match pat with
   | LPVariable(_reg, name) -> name
@@ -571,7 +550,6 @@ let letPattern(pat: LanguageTools.RuntimeTypes.LetPattern): String =
 /// The first <param count> bytes of <param bytes> as spaced hex ("68 69"), or
 /// None for saved Bytes. It reads only bytes already in memory, never the
 /// store, so printing stays cheap.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.bytesPreview: Unknown function or value 'Builtin.bytesPeek'"
 let bytesPreview(bytes: Bytes, count: Int64): Option<String> =
   Builtin.bytesPeek(bytes, count)
   |> Stdlib.Option.map(fun prefix ->
@@ -589,7 +567,6 @@ let bytesPreview(bytes: Bytes, count: Int64): Option<String> =
 
 
 module Dval =
-  // @compiler replace: packages/darklang/prettyPrinter/runtimeTypes.dark#Darklang.PrettyPrinter.RuntimeTypes.Dval.valueTypeName reason=compiler-implementation
   let valueTypeName(branchId: Uuid, dv: LanguageTools.RuntimeTypes.Dval): String =
     // mirrors DvalReprDeveloper.toTypeName
     match dv with
@@ -655,7 +632,6 @@ module Dval =
   /// The field names of a record type, in the order they were declared.
   ///
   /// Empty when the type isn't resolvable or isn't a record, which callers treat as "no opinion".
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.Dval.declaredFieldOrder: Unknown function or value 'Darklang.LanguageTools.PackageManager.Type.get'"
   let declaredFieldOrder(typeName: LanguageTools.RuntimeTypes.FQTypeName.FQTypeName): List<String> =
     match typeName with
     | Package(hash) ->
@@ -705,7 +681,6 @@ module Dval =
   /// and a 118-column line reported as fitting. Here the name is part of the same document.
   ///
   /// `depth` is compared against `opts.maxDepth`; past it, a value is elided rather than descended into.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.Dval.toDoc: Unknown constructor 'Darklang.LanguageTools.RuntimeTypes.Dval.DBigInt' in pattern"
   let toDoc(
     branchId: Uuid,
     opts: DisplayOptions,
@@ -882,7 +857,6 @@ module Dval =
         | DApplicable(AppLambda(_lambda)) -> txt("(lambda)")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.dvalWith: Unknown function or value 'Dval.toDoc'"
 let dvalWith(branchId: Uuid, opts: DisplayOptions, dv: LanguageTools.RuntimeTypes.Dval): String =
   // The one place a `Doc` is collapsed into text. Everything above builds alternatives; this picks.
   Stdlib.Pretty.render(opts.width, Dval.toDoc(branchId, opts, 0, dv))
@@ -925,7 +899,6 @@ let capForDisplay(
   | _ -> dv
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.dvalOneLine: Unknown function or value 'dvalWith'"
 let dvalOneLine(branchId: Uuid, maxChars: Int64, dv: LanguageTools.RuntimeTypes.Dval): String =
   let dv = capForDisplay(maxChars, dv)
   let text =
@@ -947,6 +920,5 @@ let dvalOneLine(branchId: Uuid, maxChars: Int64, dv: LanguageTools.RuntimeTypes.
 ///
 /// Kept at this exact signature because `Execution.fs` reaches it through `PackageRefs`, which is how
 /// every F#-side value repr is produced. Prefer `dvalWith` in Dark code.
-// @compiler replace: packages/darklang/prettyPrinter/runtimeTypes.dark#Darklang.PrettyPrinter.RuntimeTypes.dval reason=compiler-implementation
 let dval(branchId: Uuid, dv: LanguageTools.RuntimeTypes.Dval): String =
   dvalWith(branchId, DisplayOptions.default, dv)

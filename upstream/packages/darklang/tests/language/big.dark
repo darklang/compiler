@@ -1,6 +1,5 @@
 module Darklang.Language.Tests.Big
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test evaluatesMixedExpressions =
   (let str = "a string to be used as the test case"
    let blob = Stdlib.Utf8.encode(str)

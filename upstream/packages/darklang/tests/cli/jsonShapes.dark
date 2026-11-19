@@ -32,7 +32,6 @@ let rows(json: Stdlib.AltJson.Json): List<Stdlib.AltJson.Json> =
   | _ -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.JsonShapes.int: Unknown constructor 'Darklang.Stdlib.AltJson.Json.Integer' in pattern"
 let int(json: Stdlib.AltJson.Json, name: String): Int64 =
   match field(json, name) with
   | Integer(n) -> n
@@ -102,7 +101,6 @@ let isTrue(claim: Bool, why: String): Stdlib.Test.Result =
 // ─── running a command ──────────────────────────────────────────────────────
 
 /// Prefix each failure with the command, so a report names what was run.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.JsonShapes.about: Non-exhaustive match expression"
 let about(cmd: String, result: Stdlib.Test.Result): Stdlib.Test.Result =
   match result with
   | Pass -> result
@@ -116,7 +114,6 @@ let about(cmd: String, result: Stdlib.Test.Result): Stdlib.Test.Result =
 
 /// Run for the EFFECT. A setup step that fails is reported as itself, not as the confusing
 /// shape the next command then has.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.JsonShapes.step: Unknown function or value 'Instance.expectExit'"
 let step(i: Instance.T, args: List<String>): Stdlib.Test.Result =
   about(Stdlib.String.join(args, " "), Instance.expectExit(i, args, 0))
 
@@ -126,7 +123,6 @@ let step(i: Instance.T, args: List<String>): Stdlib.Test.Result =
 /// The payload is the LAST line of stdout: a regression that reintroduces a heading
 /// should fail on the keys, not here. A parse failure shows everything the command said,
 /// because it is usually prose that leaked onto stdout ahead of the payload.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.JsonShapes.check: Unknown function or value 'Instance.run'"
 let check(
   i: Instance.T,
   args: List<String>,
@@ -152,7 +148,6 @@ let check(
 
 
 /// Refused, saying why, on either stream, and with no payload anywhere.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.JsonShapes.refuses: Unknown function or value 'Instance.run'"
 let refuses(
   i: Instance.T,
   args: List<String>,
@@ -180,7 +175,6 @@ let refuses(
 /// On a store where nothing has happened, every collection is empty and every key still
 /// has to be there. A caller reading `.changed` gets `[]` on a clean tree, not a missing key
 /// it has to guard. `findings: []` means "nothing is wrong" only beside an empty `blocked`.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test emptyAnswersKeepTheirShape = Instance.withInstance(fun i ->
   Stdlib.Test.all(
     [ check(
@@ -263,7 +257,6 @@ test emptyAnswersKeepTheirShape = Instance.withInstance(fun i ->
 ///
 /// `commit --json` with no `-y` is the documented DRY review, so it must not commit and its
 /// answer must be data. `deps` on a leaf with one caller: `dependencies` is the empty ARRAY.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test aDraftThroughCommitKeepsItsShape =
   Instance.withInstance(fun i ->
     Stdlib.Test.all(
@@ -340,7 +333,6 @@ test aDraftThroughCommitKeepsItsShape =
 
 
 /// A name saved twice and never committed is still `new`, not `updated`.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test aNameSavedTwiceIsStillNew = Instance.withInstance(fun i ->
   Stdlib.Test.all(
     [ step(i, [ "fn", "Tests.JsonNew.f", "(): Int64 = 7301" ])
@@ -356,7 +348,6 @@ test aNameSavedTwiceIsStillNew = Instance.withInstance(fun i ->
 
 /// `branches` is a listing of rows; `diff` against a branch that has done nothing is still
 /// a listing, answering `[]`.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test branchListingsAreArrays =
   Instance.withInstance(fun i ->
     Stdlib.Test.all(
@@ -381,7 +372,6 @@ test branchListingsAreArrays =
 
 
 /// Every declaration under a module, counted by the search rather than by the checker.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.JsonShapes.declaredUnder: Unknown function or value 'Darklang.LanguageTools.PackageManager.Search.searchNamesAndHashes'"
 let declaredUnder(path: List<String>): Int64 =
   let (_, types, values, fns, _, impls, tests) =
     LanguageTools.PackageManager.Search.searchNamesAndHashes(
@@ -414,7 +404,6 @@ let distinct(found: List<(String * LanguageTools.ProgramTypes.Hash)>): Int64 =
 /// with a wider one, never with the whole branch. `Darklang.Stdlib` is checked in pieces
 /// across the cores, and every declaration under it comes back whichever piece it was in.
 /// A module nobody defined is refused: "checked 0" about a typo reads as a clean audit.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test typecheckAnswersWithItsCounts = Instance.withInstance(fun i ->
   let wider =
     match Instance.run(i, [ "typecheck", "Darklang.Stdlib", "--json" ]) with
@@ -466,7 +455,6 @@ test typecheckAnswersWithItsCounts = Instance.withInstance(fun i ->
 /// At save, a name that resolves to nothing is "not decided yet": a caller may be written
 /// before its callee. In an audit of what is stored it means the item calls something that
 /// is not there, so the audit FAILS it rather than calling it incomplete, and exits nonzero.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test typecheckFailsACallToNothing =
   Instance.withInstance(fun i ->
     Stdlib.Test.all(
@@ -490,7 +478,6 @@ test typecheckFailsACallToNothing =
 /// `typecheck Tests.TcScope` listed `Tests.TcElsewhere.show` beside `render`, a fn the module
 /// never mentions. A scope that holds both names still lists both, which pins that they really
 /// are one item.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test typecheckNamesOnlyWhatIsInScope = Instance.withInstance(fun i ->
   let names = fun j ->
     rows(field(j, "items")) |> Stdlib.List.map(fun r -> string(r, "name"))
@@ -543,7 +530,6 @@ test typecheckNamesOnlyWhatIsInScope = Instance.withInstance(fun i ->
 /// signatures here name nothing outside the module, and the audit once took that to mean it
 /// had everything, never loaded the callee and reported the fn incomplete. One calls into
 /// Stdlib; the other into a fn in another module that takes a type of that module's own.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test typecheckLoadsWhatAModuleBodyCalls =
   Instance.withInstance(fun i ->
     Stdlib.Test.all(
@@ -588,7 +574,6 @@ test typecheckLoadsWhatAModuleBodyCalls =
 /// An implementation is one result. Its method fn lives one level under it and its path
 /// reads as a module, so without collapsing them `search %` listed every `Modulo`
 /// implementation three times: as an impl, as a fn and as a module.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test searchListsAnImplementationOnce = Instance.withInstance(fun i ->
   check(
     i,
@@ -619,7 +604,6 @@ test searchListsAnImplementationOnce = Instance.withInstance(fun i ->
 
 /// A refusal under `--json`: stdout empty, so a caller parsing it never mistakes the refusal for
 /// a payload; the reason on stderr; exit 1.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.JsonShapes.refusesQuietly: Unknown function or value 'Instance.run'"
 let refusesQuietly(
   i: Instance.T,
   args: List<String>,
@@ -643,7 +627,6 @@ let refusesQuietly(
 /// `deprecate --json` and `delete --json` answer one object. A dry run, and `--json` without
 /// `--yes`, write nothing and say so; `undeprecate` is how the test asks whether anything was
 /// written. A refusal is not a payload.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test deprecateAndDeleteAnswerInJson = Instance.withInstance(fun i ->
   let keys =
     [ "deprecated"

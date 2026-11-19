@@ -171,7 +171,6 @@ let errUnsupportedProtocol(): GetResult =
       Stdlib.HttpClient.BadUrlDetails.UnsupportedProtocol))
 
 
-// @compiler xfail compile: "Expected TTuple [TString; TString], got TInt64" class=aot-rejection reason=aot-type-error
 test rejectsWrongHeaderType =
   Stdlib.HttpClient.request(
     "get",
@@ -369,7 +368,6 @@ test unspecifiedAddressIsRefused =
 //
 // Guard refusals omit details. DNS failures must not satisfy these checks,
 // so missing /etc/hosts entries fail the test.
-// @compiler xfail runtime: "false" class=missing-support reason=interpreter-fixture
 test sneakyBannedHosts =
   Stdlib.Test.all(
     [ // 127.0.0.1
@@ -555,7 +553,6 @@ type User =
     name: String }
 
 
-// @compiler xfail runtime: "Json.parse was not specialized" class=missing-support reason=compiler-gap
 test responseJson =
   let user = fun body ->
     match __response(200, [], body) with
@@ -574,7 +571,6 @@ test responseJson =
           "Can't parse JSON because `name` field is not provided at path: `root`")) ])
 
 
-// @compiler xfail runtime: "Json.parse was not specialized" class=missing-support reason=compiler-gap
 test jsonMiddlewareDecodesEveryResponse =
   let json = Stdlib.HttpClient.Middleware.json<List<Int64>>()
   let send = json(fun _ -> __response(200, [], "[1, 2, 3]"))

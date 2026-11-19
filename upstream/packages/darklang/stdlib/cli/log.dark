@@ -3,30 +3,25 @@
 module Darklang.Stdlib.Cli.Log
 
 /// Log an info message (green prefix)
-// @compiler replace: packages/darklang/stdlib/cli/log.dark#Darklang.Stdlib.Cli.Log.info reason=compiler-implementation
 let info(msg: String): Unit =
   printErrorLine($"{UI.Colors.greenText("[INFO]")} {msg}")
 
 
 /// Log a warning message (yellow prefix)
-// @compiler replace: packages/darklang/stdlib/cli/log.dark#Darklang.Stdlib.Cli.Log.warn reason=compiler-implementation
 let warn(msg: String): Unit =
   printErrorLine($"{UI.Colors.yellowText("[WARN]")} {msg}")
 
 
 /// Log an error message (red prefix)
-// @compiler replace: packages/darklang/stdlib/cli/log.dark#Darklang.Stdlib.Cli.Log.error reason=compiler-implementation
 let error(msg: String): Unit =
   printErrorLine($"{UI.Colors.redText("[ERROR]")} {msg}")
 
 
 /// Log a debug message (gray prefix)
-// @compiler replace: packages/darklang/stdlib/cli/log.dark#Darklang.Stdlib.Cli.Log.debug reason=compiler-implementation
 let debug(msg: String): Unit =
   printErrorLine($"{UI.Colors.grayText("[DEBUG]")} {msg}")
 
 
 /// Log a success message (green prefix with checkmark)
-// @compiler replace: packages/darklang/stdlib/cli/log.dark#Darklang.Stdlib.Cli.Log.success reason=compiler-implementation
 let success(msg: String): Unit =
   printErrorLine($"{UI.Colors.greenText("[OK]")} {msg}")

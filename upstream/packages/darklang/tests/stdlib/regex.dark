@@ -253,7 +253,6 @@ test realWorld =
 
 
 /// The first match of <param pattern> in <param input>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Regex.Tests.firstMatch: Unknown function or value 'Stdlib.Regex.compile'"
 let firstMatch(
   input: String,
   pattern: String)
@@ -277,7 +276,6 @@ let namedText(
   | _ -> Stdlib.Option.Option.None
 
 
-// @compiler xfail compile: "Unknown function or value 'firstMatch'" class=missing-support reason=upstream-dependency
 test groups =
   match firstMatch("on 2026-11 ok", "(\\d{4})-(\\d{2})(x)?") with
   | Ok(Some(m)) ->
@@ -303,7 +301,6 @@ test groups =
   | _ -> Stdlib.Test.fail("expected a match")
 
 
-// @compiler xfail compile: "Unknown function or value 'firstMatch'" class=missing-support reason=upstream-dependency
 test repeatedGroupKeepsItsLastCapture =
   match firstMatch("abc", "(?:(\\w))+") with
   | Ok(Some(m)) ->
@@ -311,7 +308,6 @@ test repeatedGroupKeepsItsLastCapture =
   | _ -> Stdlib.Test.fail("expected a match")
 
 
-// @compiler xfail compile: "Unknown function or value 'firstMatch'" class=missing-support reason=upstream-dependency
 test namedGroups =
   match firstMatch("2026-11", "(?<year>\\d{4})-(\\d{2})(?<day>-\\d{2})?") with
   | Ok(Some(m)) ->
@@ -346,7 +342,6 @@ test findAllMatches =
         [ Stdlib.Option.Option.Some("b"), Stdlib.Option.Option.Some("2") ] ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'firstMatch'" class=missing-support reason=upstream-dependency
 test positionsCountCharacters =
   // An emoji and an e with a combining accent are one character each.
   match firstMatch("😀é ab", "ab") with
@@ -402,7 +397,6 @@ test pathologicalPatternStaysFast =
   |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(false))
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test invalidUnicodeMatch =
   Stdlib.Test.all(
     [ // `.` takes half of the emoji at a time.
@@ -431,7 +425,6 @@ test replacementIsLiteral =
 
 
 /// The text between the digits of <param input> and the digits matched, from a scan.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Regex.Tests.scanDigits: Unknown function or value 'Stdlib.Regex.scan'"
 let scanDigits(
   input: String,
   limit: Stdlib.Regex.Limit,
@@ -445,7 +438,6 @@ let scanDigits(
 
 
 // scan finds the first match or all of them, and builds the matches only when asked
-// @compiler xfail compile: "Unknown function or value 'scanDigits'" class=missing-support reason=upstream-dependency
 test scanLimitAndCollect =
   Stdlib.Test.all(
     [ scanDigits("a1b2c", Stdlib.Regex.Limit.All, Stdlib.Regex.Collect.Matches)

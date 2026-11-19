@@ -41,7 +41,6 @@ type RawEvent =
 
 
 /// What `Host.await` came back with: the first of the requested specs to happen.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.Live.Change'"
 type Event =
   /// One read of the keyboard, as the runtime reads it: a key, a paste, or a coalesced burst with
   /// its repeat count. `Stdlib.Cli.UI.Widget.press` narrows it to a `KeyPress` for a widget.
@@ -63,13 +62,11 @@ type Event =
 /// Dark's question, answered by `LanguageTools.Live.poll` from here. The watch lives in a slot the runtime
 /// keeps for this process (`Builtin.hostWatchGet`), because `await` takes no state and a Dark value
 /// does not outlive the call that made it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Host.remember: Unknown function or value 'Builtin.hostWatchSet'"
 let remember(watch: LanguageTools.Live.Watch): LanguageTools.Live.Watch =
   Builtin.hostWatchSet(watch)
   watch
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Host.currentWatch: Unknown function or value 'Builtin.hostWatchGet'"
 let currentWatch(): LanguageTools.Live.Watch =
   match Builtin.hostWatchGet() with
   | Some(w) -> w
@@ -78,7 +75,6 @@ let currentWatch(): LanguageTools.Live.Watch =
 
 /// What landed since the last look. `None` when the store moved for a reason that is not an op (a
 /// config write, a trace).
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Stdlib.Live.Change'"
 let describeChange(): Option<LanguageTools.Live.Change> =
   let (next, change) = LanguageTools.Live.poll(currentWatch())
   let _ = remember(next)
@@ -88,7 +84,6 @@ let describeChange(): Option<LanguageTools.Live.Change> =
 /// Say that a loop is about to start: the watch starts here, so an edit that lands between now
 /// and the loop's first `await` (while its entries are being resolved, say) is reported by it.
 /// Call it once, before resolving what the loop will show.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Host.begin: Unknown function or value 'currentWatch'"
 let begin(): Unit =
   let _ = currentWatch()
   ()
@@ -98,7 +93,6 @@ let begin(): Unit =
 ///
 /// A store change the runtime reports is described before it is handed back; one that turns out
 /// to carry no op (the counter moves for a config write too) is not an event, and the wait goes on.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Event'"
 let await(specs: List<EventSpec>): Event =
   match Builtin.hostAwait(specs) with
   | Key(k) -> Event.Key(k)

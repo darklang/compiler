@@ -19,7 +19,6 @@ let uninstallFrom(
     deleteAlias() |> Stdlib.Result.andThen(fun _ -> removeDirectory(dir)))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Installation.Uninstall.runUninstall: Unknown function or value 'Stdlib.Cli.Unix.getHomeDirectory'"
 let runUninstall(host: Stdlib.Cli.Host.Host): Result<Unit, String> =
   let result =
     match Stdlib.Cli.Unix.getHomeDirectory() with
@@ -35,7 +34,6 @@ let runUninstall(host: Stdlib.Cli.Host.Host): Result<Unit, String> =
   | Error(err) -> Result.Error($"Error uninstalling dark: {err}")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let host = Stdlib.Cli.Host.getRuntimeHost() |> Builtin.unwrap
   let confirm =
@@ -51,12 +49,10 @@ let execute(state: AppState, args: List<String>): AppState =
     failed(state)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ "Usage: uninstall [--yes|-y]"
     "Uninstall Darklang CLI from your user account."

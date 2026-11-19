@@ -2,7 +2,6 @@
 /// joining them into one phrase found nothing, and said so with a zero exit.
 module Darklang.Cli.Tests.SearchExactSeveral
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test severalExactNamesAreEachLookedUp = Instance.withInstance(fun i ->
   let (code, styled) =
     Instance.ran(

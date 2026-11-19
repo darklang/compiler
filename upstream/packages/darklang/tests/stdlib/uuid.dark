@@ -62,7 +62,6 @@ test generateV7SetsVersionAndVariant =
 
 
 // The first 48 bits are the Unix time in milliseconds, so a later one sorts after.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.decode'" class=missing-support reason=upstream-dependency
 test generateV7StartsWithTheTime =
   let millis(uuid: Uuid): Int64 =
     let text = Stdlib.display(uuid)

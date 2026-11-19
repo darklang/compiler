@@ -50,7 +50,6 @@ let expectedSha256(sums: String, fileName: String): Option<String> =
 
 
 /// Check the file at <param path> is the one <param download>'s release lists, by sha256.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Installation.Download.verifyChecksum: Unknown function or value 'Stdlib.Base16.encode'"
 let verifyChecksum(download: GitHub.Releases.Download, path: String): Result<Unit, String> =
   let sumsPath = $"{path}.sha256sums.txt"
   let sums =
@@ -95,7 +94,6 @@ let verifyChecksum(download: GitHub.Releases.Download, path: String): Result<Uni
 ///
 /// With `HOME` set to the temp directory, the new binary's `~/.darklang` is the copy, so it never
 /// migrates the live store before we know whether we're keeping it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Installation.Download.smokeTest: Unknown function or value 'Stdlib.LocalStore.snapshotTo'"
 let smokeTest(binaryPath: String): Result<Unit, String> =
   match Stdlib.Cli.executeWithStdOutOrStdErr("mktemp -d") with
   | Error(e) -> Result.Error($"Couldn't make a directory to test the new binary in: {e}")
@@ -135,7 +133,6 @@ let smokeTest(binaryPath: String): Result<Unit, String> =
 /// Download <param download>, check it, and put the binary it holds at <param target>.
 ///
 /// Leaves <param target> untouched unless every step succeeded.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Installation.Download.replaceBinary: Unknown function or value 'verifyChecksum'"
 let replaceBinary(download: GitHub.Releases.Download, target: String): Result<Unit, String> =
   let downloadTo = $"{target}.download.gz"
   let fresh = $"{target}.new"
@@ -159,7 +156,6 @@ let replaceBinary(download: GitHub.Releases.Download, target: String): Result<Un
 
 /// Install a release (<param pinned>, or else the latest) to `~/.darklang/bin/dark`, and put it on the
 /// PATH. Returns the tag installed.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Installation.Download.installRelease: Unknown function or value 'Config.getDarklangHomeDir'"
 let installRelease(host: Stdlib.Cli.Host.Host, pinned: Option<String>): Result<String, String> =
   match Config.getDarklangHomeDir(host) with
   | Error(e) -> Result.Error(e)
@@ -184,6 +180,5 @@ let installRelease(host: Stdlib.Cli.Host.Host, pinned: Option<String>): Result<S
 
 
 /// <fn installRelease> for the latest release.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Installation.Download.installOrUpdateLatestRelease: Unknown function or value 'installRelease'"
 let installOrUpdateLatestRelease(host: Stdlib.Cli.Host.Host): Result<String, String> =
   installRelease(host, Option.None)

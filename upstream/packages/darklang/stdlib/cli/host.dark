@@ -1,13 +1,11 @@
 module Darklang.Stdlib.Cli
 
 module OS =
-  // @compiler replace: packages/darklang/stdlib/cli/os.dark#Darklang.Stdlib.Cli.OS.OS reason=compiler-implementation
   type OS =
     | Linux
     | MacOS
 
 
-  // @compiler replace: packages/darklang/stdlib/cli/os.dark#Darklang.Stdlib.Cli.OS.getOS reason=compiler-implementation
   let getOS(): Result<OS, String> =
     match Builtin.runtimeTargetOS() with
     | "linux" -> Result.Ok(OS.Linux)
@@ -18,7 +16,6 @@ module OS =
 
 
 module Architecture =
-  // @compiler replace: packages/darklang/stdlib/cli/architecture.dark#Darklang.Stdlib.Cli.Architecture.Architecture reason=compiler-implementation
   type Architecture =
     | X86_64
     | Aarch64
@@ -26,7 +23,6 @@ module Architecture =
     | Arm64
 
 
-  // @compiler replace: packages/darklang/stdlib/cli/architecture.dark#Darklang.Stdlib.Cli.Architecture.getArchitecture reason=compiler-implementation
   let getArchitecture(): Result<Architecture, String> =
     match Builtin.runtimeTargetArchitecture() with
     | "x64" -> Result.Ok(Architecture.X86_64)
@@ -40,7 +36,6 @@ module Architecture =
 
 
 module Shell =
-  // @compiler replace: packages/darklang/stdlib/cli/shell.dark#Darklang.Stdlib.Cli.Shell.Shell reason=compiler-implementation
   type Shell =
     | Bash
     | Zsh
@@ -49,7 +44,6 @@ module Shell =
 
   /// Determines the default shell used by the current user.
   /// Returns  {{Ok <Shell>}} if successful, or {{Error}} with a message if the shell is unsupported or an error occurs.
-  // @compiler replace: packages/darklang/stdlib/cli/shell.dark#Darklang.Stdlib.Cli.Shell.getDefaultShell reason=compiler-implementation
   let getDefaultShell(): Result<Shell, String> =
     match OS.getOS() with
     | Ok(Linux) ->
@@ -72,7 +66,6 @@ module Shell =
 
 
 module Host =
-  // @compiler replace: packages/darklang/stdlib/cli/host.dark#Darklang.Stdlib.Cli.Host.Host reason=compiler-implementation
   type Host =
     { os: OS.OS
       arch: Architecture.Architecture
@@ -81,7 +74,6 @@ module Host =
 
   /// Identifies and returns the operating system and architecture of the runtime host.
   /// Returns {{Ok <Host>}} on success, or an {{Error}} with combined stderr if it fails
-  // @compiler replace: packages/darklang/stdlib/cli/host.dark#Darklang.Stdlib.Cli.Host.getRuntimeHost reason=compiler-implementation
   let getRuntimeHost(): Result<Host, String> =
     let os = OS.getOS()
     let arch = Architecture.getArchitecture()

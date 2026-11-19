@@ -19,7 +19,6 @@ let short(s: String): String =
 /// The whole point of a log listing is to be readable without a second command per row, and byte
 /// size answers nothing. Same printer `dark ops show` uses, so the two cannot drift; this
 /// takes the head line and `show` takes all of it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'SCM.PackageOps.OpSummary'"
 let describe(branchId: Uuid, width: Int64, s: SCM.PackageOps.OpSummary): String =
   match s.op with
   | None -> "(unreadable by this build)"
@@ -37,13 +36,11 @@ let describe(branchId: Uuid, width: Int64, s: SCM.PackageOps.OpSummary): String 
 
 
 /// One display row for an op summary: [short id; what it does; when].
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'SCM.PackageOps.OpSummary'"
 let summaryRow(branchId: Uuid, s: SCM.PackageOps.OpSummary): List<String> =
   [ short(s.id), describe(branchId, 44, s), s.ts ]
 
 
 /// Show what the op(s) matching an id-prefix actually DO -- pretty-printed content, not just metadata.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeShow(state: AppState, idPrefix: String): AppState =
   // An empty prefix matches EVERY op, so `dark ops show ""` would print whichever came first as though you
   // had asked for it.
@@ -64,7 +61,6 @@ let executeShow(state: AppState, idPrefix: String): AppState =
 
 
 /// The most recent <param limit> ops this branch can see, newest first.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeList(state: AppState, limit: Int64): AppState =
   let branch = SCM.PackageOps.currentBranch()
   // Through `branchName`, so a branch shows its name rather than its raw id.
@@ -88,7 +84,6 @@ let executeList(state: AppState, limit: Int64): AppState =
   state
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ ""
     "  dark ops              the 20 most recent ops on this branch"
@@ -113,7 +108,6 @@ let movedFromOps(verb: String): Option<String> =
   | _ -> Option.None
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   // `ops` takes no flags at all, and every unrecognised argument shape falls through to `help` -- which
   // would answer a flag mistake with the manual and no error.
@@ -159,6 +153,5 @@ let execute(state: AppState, args: List<String>): AppState =
           failed(state)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []

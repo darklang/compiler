@@ -7,7 +7,6 @@ module Darklang.Language.Tests.RuntimeToProgramTypes
 
 // Every case promotes against main, and most of them build a Dval, so both are
 // factored out here - spelled in full these assertions ran to 500 columns.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.LanguageTools.ProgramTypes.Expr'"
 let promote(
   d: Darklang.LanguageTools.RuntimeTypes.Dval)
   : Stdlib.Result.Result<Darklang.LanguageTools.ProgramTypes.Expr, String> =
@@ -29,7 +28,6 @@ let fakeType(): Darklang.LanguageTools.RuntimeTypes.FQTypeName.FQTypeName =
     Darklang.LanguageTools.RuntimeTypes.Hash.Hash("deadbeef"))
 
 // --- literals ---
-// @compiler xfail compile: "Unknown function or value 'promote'" class=missing-support reason=upstream-dependency
 test literals =
   Stdlib.Test.all(
     [ (match promote(Darklang.LanguageTools.RuntimeTypes.Dval.DUnit) with
@@ -79,7 +77,6 @@ test literals =
 // A float with no plain-decimal form has no literal syntax. This matters beyond
 // looking wrong: the REPL stores a captured value as a binding's source, so
 // `NaN.0` / `Infinity.0` / `1e+30.0` would wedge a session.
-// @compiler xfail compile: "Unknown function or value 'promote'" class=missing-support reason=upstream-dependency
 test floatsWithoutLiteralSyntax =
   Stdlib.Test.all(
     [ Stdlib.Result.isError(promote(Darklang.LanguageTools.RuntimeTypes.Dval.DFloat64(0.0 / 0.0)))
@@ -90,7 +87,6 @@ test floatsWithoutLiteralSyntax =
       |> Stdlib.Test.equal(true) ])
 
 // --- collections ---
-// @compiler xfail compile: "Unknown function or value 'promote'" class=missing-support reason=upstream-dependency
 test collections =
   Stdlib.Test.all(
     [ (match
@@ -126,7 +122,6 @@ test collections =
       |> Stdlib.Test.equal(5) ])
 
 // --- records and enums carry their type name across (RT -> PT) ---
-// @compiler xfail compile: "Unknown function or value 'promote'" class=missing-support reason=upstream-dependency
 test recordsAndEnums =
   Stdlib.Test.all(
     [ (match
@@ -170,7 +165,6 @@ test recordsAndEnums =
 
 // The expression names the source type (the alias, if one was used), not the
 // runtime one it resolved to.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.LanguageTools.ProgramTypes.Expr'"
 let sourceHashOf(
   e: Stdlib.Result.Result<Darklang.LanguageTools.ProgramTypes.Expr, String>)
   : String =
@@ -187,7 +181,6 @@ let sourceHashOf(
   | Ok(EEnum(_, typeName, _, _, _)) -> nameHash(typeName)
   | _ -> "FAIL"
 
-// @compiler xfail compile: "Unknown function or value 'sourceHashOf'" class=missing-support reason=upstream-dependency
 test recordsAndEnumsUseTheSourceTypeName =
   let source =
     Darklang.LanguageTools.RuntimeTypes.FQTypeName.FQTypeName.Package(
@@ -212,7 +205,6 @@ test recordsAndEnumsUseTheSourceTypeName =
       |> Stdlib.Test.equal("cafef00d") ])
 
 // --- values with no literal syntax fail (Error), so the caller can fall back ---
-// @compiler xfail compile: "Unknown function or value 'promote'" class=missing-support reason=upstream-dependency
 test valuesWithoutLiteralSyntax =
   Stdlib.Test.all(
     [ Stdlib.Result.isError((

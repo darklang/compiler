@@ -53,7 +53,6 @@ let locationPlaceholderHash(owner: String, modules: List<String>, name: String):
 /// <fn PackageManager.stabilizeHashes>: a parsed item's own `hash` field is still the
 /// parser's placeholder, and only the stabilized `SetName` op carries the
 /// real content hash. None when no op binds that location.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PackageOp'"
 let referenceBoundAt(
   ops: List<ProgramTypes.PackageOp>,
   location: ProgramTypes.PackageLocation)
@@ -67,7 +66,6 @@ let referenceBoundAt(
 
 
 /// The function hash bound at <param location>; see <fn referenceBoundAt>.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PackageOp'"
 let fnHashBoundAt(
   ops: List<ProgramTypes.PackageOp>,
   location: ProgramTypes.PackageLocation)
@@ -78,7 +76,6 @@ let fnHashBoundAt(
 
 
 /// The type hash bound at <param location>; see <fn referenceBoundAt>.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PackageOp'"
 let typeHashBoundAt(
   ops: List<ProgramTypes.PackageOp>,
   location: ProgramTypes.PackageLocation)
@@ -89,7 +86,6 @@ let typeHashBoundAt(
 
 
 /// The value hash bound at <param location>; see <fn referenceBoundAt>.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PackageOp'"
 let valueHashBoundAt(
   ops: List<ProgramTypes.PackageOp>,
   location: ProgramTypes.PackageLocation)
@@ -115,7 +111,6 @@ module Identifiers =
 
 
   module QualifiedType =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
     let toPTWithTypeName(
       ctx: NameResolver.NRContext,
       i: WrittenTypes.QualifiedTypeIdentifier,
@@ -139,7 +134,6 @@ module Identifiers =
       | _ -> (typeName, typeArgs, typeArgsUnresolvedNames |> Stdlib.List.flatten)
 
 
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
     let toPT(
       ctx: NameResolver.NRContext,
       i: WrittenTypes.QualifiedTypeIdentifier)
@@ -155,7 +149,6 @@ module Identifiers =
       toPTWithTypeName(ctx, i, typeName)
 
 
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
     let toPTForEnumCase(
       ctx: NameResolver.NRContext,
       i: WrittenTypes.QualifiedTypeIdentifier,
@@ -190,7 +183,6 @@ module Identifiers =
 
 
   module QualifiedFn =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
     let toPT(
       ctx: NameResolver.NRContext,
       i: WrittenTypes.QualifiedFnIdentifier)
@@ -209,7 +201,6 @@ module Identifiers =
 
 module TypeReference =
   module Builtin =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
     let toPT(
       ctx: NameResolver.NRContext,
       t: WrittenTypes.TypeReference.Builtin)
@@ -275,7 +266,6 @@ module TypeReference =
       | TVariable(_range, _, (_, name)) -> (ProgramTypes.TypeReference.TVariable(name), [])
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
   let toPT(
     ctx: NameResolver.NRContext,
     t: WrittenTypes.TypeReference.TypeReference)
@@ -290,7 +280,6 @@ module TypeReference =
 module TraitRef =
   /// `Show<Int64>` naming a trait: the trait resolves like a type name would, from
   /// the current module, but against the trait bindings.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
   let toPT(
     ctx: NameResolver.NRContext,
     i: WrittenTypes.QualifiedTypeIdentifier)
@@ -319,7 +308,6 @@ module TraitRef =
 
 module Bound =
   /// `'a: Show<Int64>`
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
   let toPT(
     ctx: NameResolver.NRContext,
     b: WrittenTypes.TypeParamBound)
@@ -328,7 +316,6 @@ module Bound =
     (ProgramTypes.Bound { param = b.param, trait_ = traitRef }, unresolvedNames)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
   let listToPT(
     ctx: NameResolver.NRContext,
     bs: List<WrittenTypes.TypeParamBound>)
@@ -342,7 +329,6 @@ module Bound =
 
 
 module InfixFnName =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.InfixFnName'"
   let toPT(infix: WrittenTypes.InfixFnName): ProgramTypes.InfixFnName =
     match infix with
     | ArithmeticPlus -> ProgramTypes.InfixFnName.ArithmeticPlus
@@ -372,7 +358,6 @@ module BinaryOperation =
 
 
 module Infix =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.Infix'"
   let toPT(infix: WrittenTypes.Infix): ProgramTypes.Infix =
     match infix with
     | InfixFnCall(op) -> ProgramTypes.Infix.InfixFnCall(InfixFnName.toPT(op))
@@ -430,7 +415,6 @@ module Expr =
     /// `MPVariable` nodes. Used to add pattern-bound names to the
     /// match arm's `localBindings` so `EVariable` lookups don't try
     /// to resolve them as package references.
-    // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypesToProgramTypes.Expr.MatchPattern.bindings: Unknown function or value 'fieldPattern'"
     let bindings(p: WrittenTypes.MatchPattern): List<String> =
       match p with
       | MPVariable(_, name) -> [ name ]
@@ -466,7 +450,6 @@ module Expr =
 
     /// The pattern a record-pattern field matches with: its own, or for `{ name }`
     /// a variable `name` at the field name.
-    // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.WrittenTypesToProgramTypes.Expr.MatchPattern.fieldPattern: Non-exhaustive match expression"
     let fieldPattern(
       field:
         ((WrittenTypes.Range * String) * Option<(WrittenTypes.Range * WrittenTypes.MatchPattern)>))
@@ -507,7 +490,6 @@ module Expr =
       | MPError(r) -> r
 
 
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.MatchPattern'"
     let toPT(
       onMissing: NameResolver.OnMissing,
       p: WrittenTypes.MatchPattern)
@@ -575,7 +557,6 @@ module Expr =
 
 
   module PipeExpr =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
     let toPT(
       ctx: NameResolver.NRContext,
       context: Context,
@@ -694,7 +675,6 @@ module Expr =
             (ProgramTypes.PipeExpr.EPipeFnCall(gid(), fnName, typeArgs, args, []), unresolvedNames)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
   let toPT(
     ctx: NameResolver.NRContext,
     context: Context,
@@ -1151,7 +1131,6 @@ module Expr =
 
 
 module ModuleDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.Definitions'"
   let combineSubmodules(submodules: List<ProgramTypes.Definitions>): ProgramTypes.Definitions =
     let init =
       ProgramTypes.Definitions
@@ -1170,7 +1149,6 @@ module ModuleDeclaration =
 
 module TypeDeclaration =
   module RecordField =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
     let toPT(
       ctx: NameResolver.NRContext,
       f: WrittenTypes.TypeDeclaration.RecordField)
@@ -1184,7 +1162,6 @@ module TypeDeclaration =
 
 
   module EnumField =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
     let toPT(
       ctx: NameResolver.NRContext,
       f: WrittenTypes.TypeDeclaration.EnumField)
@@ -1197,7 +1174,6 @@ module TypeDeclaration =
 
 
   module EnumCase =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
     let toPT(
       ctx: NameResolver.NRContext,
       c: WrittenTypes.TypeDeclaration.EnumCase)
@@ -1213,7 +1189,6 @@ module TypeDeclaration =
 
 
   module Definition =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
     let toPT(
       ctx: NameResolver.NRContext,
       d: WrittenTypes.TypeDeclaration.Definition)
@@ -1240,7 +1215,6 @@ module TypeDeclaration =
           unresolvedNames |> Stdlib.List.flatten)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
   let toPT(
     ctx: NameResolver.NRContext,
     d: WrittenTypes.TypeDeclaration.TypeDeclaration)
@@ -1255,7 +1229,6 @@ module TypeDeclaration =
       Stdlib.List.concat(unresolvedNames, boundUnresolved))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
   let toPackageTypePT(
     ctx: NameResolver.NRContext,
     d: WrittenTypes.TypeDeclaration.TypeDeclaration)
@@ -1270,7 +1243,6 @@ module TypeDeclaration =
 
 
 module ValueDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
   let toPackageValuePT(
     ctx: NameResolver.NRContext,
     d: WrittenTypes.ValueDeclaration.ValueDeclaration)
@@ -1290,7 +1262,6 @@ module ValueDeclaration =
 
 
 module TestDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
   let toTestPT(
     ctx: NameResolver.NRContext,
     test: WrittenTypes.TestDeclaration.TestDeclaration)
@@ -1312,7 +1283,6 @@ module TestDeclaration =
 
 module FunctionDeclaration =
   module Parameter =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
     let toPackageFnParamPT(
       ctx: NameResolver.NRContext,
       p: WrittenTypes.FnDeclaration.Parameter)
@@ -1337,7 +1307,6 @@ module FunctionDeclaration =
   ///   `let f (x: List<'a>) : Stream<'a> = ...`
   /// may not declare `<'a>` explicitly but still need `'a` registered
   /// as a typeParam for callers that pass an explicit type arg.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.TypeReference'"
   let collectTVarsInTypeRef(acc: List<String>, tr: ProgramTypes.TypeReference): List<String> =
     match tr with
     | TVariable(name) ->
@@ -1379,7 +1348,6 @@ module FunctionDeclaration =
       acc
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
   let toPackageFnPT(
     ctx: NameResolver.NRContext,
     fn: WrittenTypes.FnDeclaration.FnDeclaration)
@@ -1444,7 +1412,6 @@ module FunctionDeclaration =
 /// the F# `WT2PT.Trait.toPT`: methods carry signatures only.
 module TraitDeclaration =
   module Method =
-    // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
     let toPT(
       ctx: NameResolver.NRContext,
       m: WrittenTypes.TraitDeclaration.Method)
@@ -1470,7 +1437,6 @@ module TraitDeclaration =
         unresolvedNames)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
   let toPT(
     ctx: NameResolver.NRContext,
     t: WrittenTypes.TraitDeclaration.TraitDeclaration)
@@ -1501,7 +1467,6 @@ module TraitDeclaration =
 /// beneath it. Mirrors the F# `SourceFile.items` + `WT2PT.TraitImpl.toPT`.
 module ImplDeclaration =
   /// The head name of the self type, for the impl's member path
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TypeReference.TypeReference'"
   let typeReferenceHeadName(t: WrittenTypes.TypeReference.TypeReference): String =
     match t with
     | QualifiedName(qti) -> qti.typ.name
@@ -1556,7 +1521,6 @@ module ImplDeclaration =
   /// segment, which is why the stdlib's 204 impls already carry the short form. These two agree
   /// now; they did not before, and nothing caught it because the two paths are never exercised
   /// against each other.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ImplDeclaration.ImplDeclaration'"
   let memberPath(
     currentModule: List<String>,
     implDecl: WrittenTypes.ImplDeclaration.ImplDeclaration)
@@ -1572,7 +1536,6 @@ module ImplDeclaration =
 
   /// The method fns declared in the block, with the impl's type params and
   /// bounds prepended (a conditional impl's methods are generic over them).
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ImplDeclaration.ImplDeclaration'"
   let methodFns(
     implDecl: WrittenTypes.ImplDeclaration.ImplDeclaration)
     : List<WrittenTypes.FnDeclaration.FnDeclaration> =
@@ -1589,7 +1552,6 @@ module ImplDeclaration =
 
   /// Each member as (method name, the fn name to resolve): a method declared in
   /// the block resolves from the impl's own module; an alias names its target.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ImplDeclaration.ImplDeclaration'"
   let methodTargets(
     implDecl: WrittenTypes.ImplDeclaration.ImplDeclaration)
     : List<(String * List<String>)> =
@@ -1610,7 +1572,6 @@ module ImplDeclaration =
 
   /// Lower the impl item itself. <param ctx> is the impl's OWN module (its member
   /// path), which is where declared methods resolve from.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
   let toPT(
     ctx: NameResolver.NRContext,
     implDecl: WrittenTypes.ImplDeclaration.ImplDeclaration)
@@ -1650,7 +1611,6 @@ module ImplDeclaration =
 
 
 /// A trait declaration's item, ops and unresolved names, at the context's module
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
 let traitWithOps(
   ctx: NameResolver.NRContext,
   t: WrittenTypes.TraitDeclaration.TraitDeclaration)
@@ -1674,7 +1634,6 @@ let traitWithOps(
 
 /// An impl declaration's item, its method fns, their ops and unresolved names.
 /// The fns come first in the ops so the impl's method targets can bind to them.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
 let implWithOps(
   ctx: NameResolver.NRContext,
   implDecl: WrittenTypes.ImplDeclaration.ImplDeclaration)
@@ -1777,7 +1736,6 @@ let implWithOps(
 
 
 // Process a module declaration and generate both the Definitions and PackageOps
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
 let moduleDeclarationWithOpsHelper(
   ctx: NameResolver.NRContext,
   m: WrittenTypes.ModuleDeclaration.ModuleDeclaration)
@@ -1999,7 +1957,6 @@ let moduleDeclarationWithOpsHelper(
   (defs, allOps, allUnresolvedNames)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'NameResolver.NRContext'"
 let declarationsToPT(
   ctx: NameResolver.NRContext,
   d: WrittenTypes.SourceFile.SourceFileDeclaration)
@@ -2090,7 +2047,6 @@ let declarationsToPT(
 /// Lower a whole parsed file against <param branchId>. Branch by parameter, for the same
 /// reason `parsePTExprInContext` takes one: what a name resolves to must not depend on what the process
 /// happened to be doing at the time.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ParsedFile'"
 let parsedFileAsSourceFile(
   branchId: Uuid,
   parsedFile: WrittenTypes.ParsedFile)

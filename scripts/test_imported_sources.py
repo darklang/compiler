@@ -16,13 +16,17 @@ def main():
     ledger = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(ledger)
     paths = ['upstream/' + p for p in ledger.imported_paths(root)]
+    annotated = {line.split('\t')[0] for line in (root / 'porting/upstream-annotations.tsv').read_text().splitlines()
+                 if line and not line.startswith('#')}
+    assert annotated <= set(ledger.imported_paths(root)), sorted(annotated - set(ledger.imported_paths(root)))
     with tempfile.TemporaryDirectory(prefix='imported-inventory-') as temporary:
         manifest = Path(temporary) / 'manifest.json'
         source_report = Path(temporary) / 'source.json'
         test_report = Path(temporary) / 'tests.json'
         manifest.write_text(json.dumps(paths))
         subprocess.run([str(parser), str(root), str(manifest),
-                        str(root / 'porting/compiler-reasons.json'), str(source_report)], check=True, cwd=root)
+                        str(root / 'porting/compiler-reasons.json'),
+                        str(root / 'porting/upstream-annotations.tsv'), str(source_report)], check=True, cwd=root)
         subprocess.run([str(runner), str(manifest), str(test_report)], check=True, cwd=root)
         sources = json.loads(source_report.read_text())['sources']
         tests = json.loads(test_report.read_text())

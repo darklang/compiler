@@ -3,7 +3,6 @@
 module Darklang.Cli.Tests.Flags
 
 // `failed` is exit code 1; `exitWith` still decides it from a computed Bool.
-// @compiler xfail compile: "Unknown function or value 'Cli.initState'" class=missing-support reason=upstream-dependency
 test failedExitsOne =
   let state = Cli.initState()
   Stdlib.Test.all(
@@ -14,7 +13,6 @@ test failedExitsOne =
 
 
 // `-y` assumes the yes, and an assumed yes is a yes with nobody asked.
-// @compiler xfail compile: "Unknown function or value 'Cli.Prompt.confirmExplicit'" class=missing-support reason=upstream-dependency
 test confirm =
   Stdlib.Test.all(
     [ Cli.Confirm.assumeIf(true) |> Stdlib.Test.equal(Cli.Confirm.Assume)
@@ -40,7 +38,6 @@ module Query =
           Stdlib.Dict.fromList([ ("aa", [ "M.old" ]), ("cc", [ "M.gone" ]) ]) }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Flags.Query.shown: Unknown function or value 'Darklang.Cli.Packages.Query.filterHiddenPairs'"
   let shown(
     deprecated: Cli.Packages.Query.Deprecated,
     internal: Cli.Packages.Query.Internal)
@@ -58,7 +55,6 @@ module Query =
 
 
   // Each enum shows or hides its own kind of item, and only that kind.
-  // @compiler xfail compile: "Unknown function or value 'shown'" class=missing-support reason=upstream-dependency
   test filterHiddenPairs =
     Stdlib.Test.all(
       [ shown(

@@ -1,7 +1,6 @@
 /// Structured results from checking serialized ProgramTypes before persistence.
 module Darklang.LanguageTools.AtRestTypeChecker
 
-// @compiler blocked: constructor-identity diagnostic="Constructor identity collision 1324: Darklang.LanguageTools.RuntimeTypes.TypeReference.TFloat, Darklang.LanguageTools.RuntimeTypes.TypeReference.TStream"
 type StaticType =
   | TUnit
   | TBool
@@ -34,7 +33,6 @@ type StaticType =
   | TInferenceVariable(Int64)
 
 
-// @compiler blocked: constructor-identity diagnostic="Constructor identity collision 201: Darklang.LanguageTools.AtRestTypeChecker.Verdict.Incomplete, Darklang.LanguageTools.WrittenTypes.LetPattern.LPVariable"
 type Verdict =
   | Checked
   | Failed
@@ -225,7 +223,6 @@ type Context =
   | CheckerUnavailable(String)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.AtRestTypeChecker.Issue: Unknown type 'StaticType'"
 type Issue =
   { code: IssueCode
     nodeId: Option<UInt64>
@@ -234,7 +231,6 @@ type Issue =
     context: Context }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.AtRestTypeChecker.ItemReport: Unknown type 'Verdict'"
 type ItemReport =
   { item: ProgramTypes.Reference
     verdict: Verdict
@@ -250,7 +246,6 @@ type ItemReport =
     resolutions: List<Model.Resolution> }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.AtRestTypeChecker.Report: Unknown type 'Verdict'"
 type Report =
   { verdict: Verdict
     items: List<ItemReport>
@@ -268,7 +263,6 @@ type CheckFailure =
 
 
 /// The report for nothing: no items, so trivially Checked.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Report'"
 let emptyReport(): Report =
   Report { verdict = Verdict.Checked, items = [], diagnostics = [], warnings = [] }
 
@@ -277,7 +271,6 @@ let emptyReport(): Report =
 ///
 /// Run the checker with error handling around the entire batch.
 /// If a checker error escapes the per-declaration handlers, return Incomplete.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let checkPackageOps(ops: List<ProgramTypes.PackageOp>): Report =
   guarded(Run.checkPackageOps, ops)
 
@@ -287,19 +280,16 @@ let checkPackageOps(ops: List<ProgramTypes.PackageOp>): Report =
 /// What authoring uses, and what save-time resolution reads: a call resolves to the
 /// implementation that is live on the branch being saved to, so the branch is not optional
 /// there the way it is for an editor buffer.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let checkPackageOpsOn(branchId: Uuid, ops: List<ProgramTypes.PackageOp>): Report =
   guarded((fun((b, o)) -> Run.checkPackageOpsOn(b, o)), (branchId, ops))
 
 
 /// Type-check all declarations visible on the selected branch.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Report'"
 let checkBranch(branchId: Uuid): Report =
   guarded(Run.checkBranch, branchId)
 
 
 /// Type-check just the declarations under <param modules>, and everything below them.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Report'"
 let checkModule(branchId: Uuid, modules: List<String>): Report =
   guarded((fun((b, m)) -> Run.checkModule(b, m)), (branchId, modules))
 
@@ -307,7 +297,6 @@ let checkModule(branchId: Uuid, modules: List<String>): Report =
 /// Return an Incomplete report if shared work for the batch fails.
 /// Run and Items catch errors for individual declarations separately, preserving
 /// the results of the other declarations.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Report'"
 let guarded(check: 'a -> Report, input: 'a): Report =
   match guard(check, input) with
   | Ok(report) -> report
@@ -328,13 +317,11 @@ let guarded(check: 'a -> Report, input: 'a): Report =
 
 /// Use an F# builtin to run the check and catch runtime errors.
 /// Return Ok with the check's result, or Error if the checker itself fails.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.AtRestTypeChecker.guard: Unknown function or value 'Builtin.atRestCheckGuarded'"
 let guard(check: 'a -> 'b, input: 'a): Result<'b, CheckFailure> =
   Builtin.atRestCheckGuarded(check, input)
 
 
 /// Turn a checker failure into an Incomplete warning.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Issue'"
 let failureIssue(nodeId: Option<UInt64>, failure: CheckFailure): Issue =
   let context =
     match failure with
@@ -349,7 +336,6 @@ let failureIssue(nodeId: Option<UInt64>, failure: CheckFailure): Issue =
       context = context }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'StaticType'"
 let staticTypeToStringWith(
   customTypeName: ProgramTypes.Hash -> Option<String>,
   typ: StaticType)
@@ -405,7 +391,6 @@ let staticTypeToStringWith(
   | TInferenceVariable(_) -> "_"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'StaticType'"
 let staticTypeToString(typ: StaticType): String =
   staticTypeToStringWith((fun _ -> Option.None), typ)
 
@@ -761,7 +746,6 @@ let mixedNumbersHint(left: String, right: String): String =
 
 /// Points at `Stdlib.display` when a String was expected and the type found
 /// has a Display impl; the same hint a run gives (<fn PrettyPrinter.RuntimeTypes.RuntimeError.displayHint>).
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'StaticType'"
 let stringExpectedHint(expected: StaticType, actual: StaticType): String =
   let convertible =
     match actual with
@@ -793,7 +777,6 @@ let stringExpectedHint(expected: StaticType, actual: StaticType): String =
 
 /// A lambda with one parameter per element does not unpack the tuple a callback receives,
 /// as `fun (k, v) ->` over a list of pairs.
-// @compiler blocked: upstream-dependency diagnostic="tupleParameterHint: Unknown type 'StaticType'"
 let tupleParameterHint(expected: StaticType, actual: StaticType): String =
   match expected, actual with
   | TFn([TTuple(_, _, rest)], _), TFn(parameters, _) ->
@@ -810,7 +793,6 @@ let tupleParameterHint(expected: StaticType, actual: StaticType): String =
 
 /// Says what `append` is for when its second argument is a whole list of the element type,
 /// as `Stdlib.List.append(xs, [x])` written to join two lists.
-// @compiler blocked: upstream-dependency diagnostic="appendListHint: Unknown type 'StaticType'"
 let appendListHint(callee: String, expected: StaticType, actual: StaticType): String =
   let isAppend =
     Stdlib.List.contains(
@@ -825,7 +807,6 @@ let appendListHint(callee: String, expected: StaticType, actual: StaticType): St
   | _ -> ""
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Issue'"
 let issueToStringWith(customTypeName: ProgramTypes.Hash -> Option<String>, issue: Issue): String =
   // Only where a value is handed over: an Int64 where `?` wanted a String error wants `mapError`.
   let hint = fun(expected, actual) ->
@@ -892,6 +873,5 @@ let issueToStringWith(customTypeName: ProgramTypes.Hash -> Option<String>, issue
   | _ -> contextToStringWith(customTypeName, actualName, issue.code, issue.context) + detail
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Issue'"
 let issueToString(issue: Issue): String =
   issueToStringWith((fun _ -> Option.None), issue)

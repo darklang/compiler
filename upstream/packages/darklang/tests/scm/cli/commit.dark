@@ -2,7 +2,6 @@
 /// The helpers are in `helpers.dark`.
 module Darklang.SCM.Tests.Cli
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aSaveIsADraftUntilItIsCommitted =
   scenario(fun dark ->
     [ draftIsEmpty(dark, "a fresh store has an empty draft")
@@ -34,7 +33,6 @@ test aSaveIsADraftUntilItIsCommitted =
       evals(dark, "Tests.App.a()", "1", "the committed version runs") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aCommitOnABranchStaysOnTheBranch =
   scenario(fun dark ->
     [ switch(dark, "feat")
@@ -63,7 +61,6 @@ test aCommitOnABranchStaysOnTheBranch =
         "main cannot run the branch's work") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test savingANameTwiceCommitsOnlyTheLastVersion =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.a", "1")
@@ -96,7 +93,6 @@ test savingANameTwiceCommitsOnlyTheLastVersion =
         "undo skips the version that was never committed") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test commitIncludeTakesWhatTheNameNeedsAndJsonOnlyPreviews =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.helper", "1")
@@ -135,7 +131,6 @@ test commitIncludeTakesWhatTheNameNeedsAndJsonOnlyPreviews =
       same(commits(dark), [ "caller" ], "one commit") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test undoStepsBackOneCommittedVersionAtATime =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.a", "1")
@@ -160,7 +155,6 @@ test undoStepsBackOneCommittedVersionAtATime =
       evals(dark, "Tests.App.a()", "1", "the first version is now committed") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aTypeErrorIsSavedButRefusesToCommit =
   scenario(fun dark ->
     [ says(

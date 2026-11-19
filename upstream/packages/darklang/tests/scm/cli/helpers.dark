@@ -18,7 +18,6 @@ module Darklang.SCM.Tests.Cli
 
 /// Run the steps against a fresh store, which is thrown away afterwards. Every step runs, in
 /// order, and the test fails if any of them did.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.scenario: Unknown function or value 'Darklang.Cli.Tests.Instance.withInstance'"
 let scenario(
   steps: Cli.Tests.Instance.T -> List<Stdlib.Test.Result>)
   : Stdlib.Test.Result =
@@ -31,7 +30,6 @@ let shown(args: List<String>): String =
 
 /// Run `dark <args>` with extra environment variables. Gives the exit code, stdout, and both
 /// streams together.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.runWithEnv: Expected TInt64, got TInt"
 let runWithEnv(
   dark: Cli.Tests.Instance.T,
   env: List<(String * String)>,
@@ -45,7 +43,6 @@ let runWithEnv(
   | Ok(out) -> (out.exitCode, out.stdout, out.stdout + out.stderr)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.exec: Unknown function or value 'runWithEnv'"
 let exec(
   dark: Cli.Tests.Instance.T,
   args: List<String>)
@@ -56,7 +53,6 @@ let exec(
 // ─── setup steps ────────────────────────────────────────────────────────────
 
 /// Run `dark <args>`. It must succeed; if it doesn't, the test fails at this step.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.run: Unknown function or value 'exec'"
 let run(dark: Cli.Tests.Instance.T, args: List<String>): Stdlib.Test.Result =
   let (code, _, said) = exec(dark, args)
   if code == 0 then
@@ -66,7 +62,6 @@ let run(dark: Cli.Tests.Instance.T, args: List<String>): Stdlib.Test.Result =
 
 
 /// `dark fn <name> <body>`: save a function.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.save: Unknown function or value 'run'"
 let save(
   dark: Cli.Tests.Instance.T,
   name: String,
@@ -76,7 +71,6 @@ let save(
 
 
 /// Save a function that takes nothing and returns <param number>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.saveNumber: Unknown function or value 'save'"
 let saveNumber(
   dark: Cli.Tests.Instance.T,
   name: String,
@@ -86,26 +80,22 @@ let saveNumber(
 
 
 /// `dark commit <message> -y`: commit the whole draft without asking.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.commit: Unknown function or value 'run'"
 let commit(dark: Cli.Tests.Instance.T, message: String): Stdlib.Test.Result =
   run(dark, [ "commit", message, "-y" ])
 
 
 /// `dark switch <branch>`: move onto a branch, starting it if it is new.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.switch: Unknown function or value 'run'"
 let switch(dark: Cli.Tests.Instance.T, branch: String): Stdlib.Test.Result =
   run(dark, [ "switch", branch ])
 
 
 /// `dark merge <branch> -y`: merge a branch into its parent without asking.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.merge: Unknown function or value 'run'"
 let merge(dark: Cli.Tests.Instance.T, branch: String): Stdlib.Test.Result =
   run(dark, [ "merge", branch, "-y" ])
 
 
 /// The usual setup for a conflict: branch `feat` changes <param name> and commits, then main
 /// changes it too and commits. Main's edit is the newer one. Leaves you on main.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.featThenMainEdit: Unknown function or value 'switch'"
 let featThenMainEdit(
   dark: Cli.Tests.Instance.T,
   name: String,
@@ -124,7 +114,6 @@ let featThenMainEdit(
 // ─── checks ─────────────────────────────────────────────────────────────────
 
 /// `dark <args>` prints <param needle> (on stdout or stderr).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.says: Unknown function or value 'exec'"
 let says(
   dark: Cli.Tests.Instance.T,
   args: List<String>,
@@ -140,7 +129,6 @@ let says(
 
 
 /// `dark <args>` prints something, and it does not include <param needle>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.doesNotSay: Unknown function or value 'exec'"
 let doesNotSay(
   dark: Cli.Tests.Instance.T,
   args: List<String>,
@@ -159,7 +147,6 @@ let doesNotSay(
 
 
 /// `dark <args>` fails (nonzero exit) and its output includes <param reason>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.refuses: Unknown function or value 'exec'"
 let refuses(
   dark: Cli.Tests.Instance.T,
   args: List<String>,
@@ -178,7 +165,6 @@ let refuses(
 
 
 /// `dark <flags> eval <expr>` prints exactly <param expected>, with extra environment <param env>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.evalsWith: Unknown function or value 'runWithEnv'"
 let evalsWith(
   dark: Cli.Tests.Instance.T,
   env: List<(String * String)>,
@@ -197,7 +183,6 @@ let evalsWith(
 
 
 /// `dark eval <expr>` prints exactly <param expected>, on the branch you are on.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.evals: Unknown function or value 'evalsWith'"
 let evals(
   dark: Cli.Tests.Instance.T,
   expr: String,
@@ -208,7 +193,6 @@ let evals(
 
 
 /// `dark --branch <branch> eval <expr>` prints exactly <param expected>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.evalsOn: Unknown function or value 'evalsWith'"
 let evalsOn(
   dark: Cli.Tests.Instance.T,
   branch: String,
@@ -219,7 +203,6 @@ let evalsOn(
   evalsWith(dark, [], [ "--branch", branch ], expr, expected, why)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.notFoundWith: Unknown function or value 'exec'"
 let notFoundWith(
   dark: Cli.Tests.Instance.T,
   flags: List<String>,
@@ -236,7 +219,6 @@ let notFoundWith(
 
 
 /// `dark eval <expr>` fails because a name in it does not exist on the branch you are on.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.notFound: Unknown function or value 'notFoundWith'"
 let notFound(
   dark: Cli.Tests.Instance.T,
   expr: String,
@@ -246,7 +228,6 @@ let notFound(
 
 
 /// The same, on another branch: `dark --branch <branch> eval <expr>`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.notFoundOn: Unknown function or value 'notFoundWith'"
 let notFoundOn(
   dark: Cli.Tests.Instance.T,
   branch: String,
@@ -279,7 +260,6 @@ let bugToday(bug: String, shouldBe: Stdlib.Test.Result): Stdlib.Test.Result =
 // ─── reading --json ─────────────────────────────────────────────────────────
 
 /// The last line of stdout as JSON, or `Null` when it is not JSON.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.json: Unknown function or value 'exec'"
 let json(dark: Cli.Tests.Instance.T, args: List<String>): Stdlib.AltJson.Json =
   let (_, out, _) = exec(dark, args)
   let line =
@@ -306,7 +286,6 @@ let text(j: Stdlib.AltJson.Json, name: String): String =
   Cli.Tests.JsonShapes.string(j, name)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.number: Unknown function or value 'Darklang.Cli.Tests.JsonShapes.int'"
 let number(j: Stdlib.AltJson.Json, name: String): Int64 =
   Cli.Tests.JsonShapes.int(j, name)
 
@@ -318,7 +297,6 @@ let flag(j: Stdlib.AltJson.Json, name: String): Bool =
 // ─── the draft ──────────────────────────────────────────────────────────────
 
 /// `dark status --json`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.status: Unknown function or value 'json'"
 let status(dark: Cli.Tests.Instance.T): Stdlib.AltJson.Json =
   json(dark, [ "status", "--json" ])
 
@@ -337,25 +315,21 @@ let draftIn(s: Stdlib.AltJson.Json): List<String> =
 
 
 /// What the draft changes on the branch you are on.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.draft: Unknown function or value 'status'"
 let draft(dark: Cli.Tests.Instance.T): List<String> =
   draftIn(status(dark))
 
 
 /// What the draft changes on another branch.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.draftOn: Unknown function or value 'json'"
 let draftOn(dark: Cli.Tests.Instance.T, branch: String): List<String> =
   draftIn(json(dark, [ "--branch", branch, "status", "--json" ]))
 
 
 /// How many draft entries point at a version of a name that the name no longer has.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.staleCallers: Unknown function or value 'number'"
 let staleCallers(dark: Cli.Tests.Instance.T): Int64 =
   number(status(dark), "constraints")
 
 
 /// The draft holds nothing.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.draftIsEmpty: Unknown function or value 'status'"
 let draftIsEmpty(dark: Cli.Tests.Instance.T, why: String): Stdlib.Test.Result =
   let s = status(dark)
   if
@@ -368,7 +342,6 @@ let draftIsEmpty(dark: Cli.Tests.Instance.T, why: String): Stdlib.Test.Result =
 
 
 /// The draft holds something.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.draftIsNotEmpty: Unknown function or value 'status'"
 let draftIsNotEmpty(
   dark: Cli.Tests.Instance.T,
   why: String)
@@ -382,7 +355,6 @@ let draftIsNotEmpty(
 
 
 /// `status` says you are on <param expected>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.onBranch: Unknown function or value 'same'"
 let onBranch(
   dark: Cli.Tests.Instance.T,
   expected: String,
@@ -423,7 +395,6 @@ let conflictLine(c: Stdlib.AltJson.Json): String =
 
 
 /// The conflicts a `--json` command reports, one sentence each, sorted.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.conflictsReportedBy: Unknown function or value 'json'"
 let conflictsReportedBy(
   dark: Cli.Tests.Instance.T,
   args: List<String>)
@@ -434,19 +405,16 @@ let conflictsReportedBy(
 
 
 /// The conflicts recorded and not yet settled, on the branch you are on.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.conflicts: Unknown function or value 'conflictsReportedBy'"
 let conflicts(dark: Cli.Tests.Instance.T): List<String> =
   conflictsReportedBy(dark, [ "conflicts", "--json" ])
 
 
 /// The conflicts merging <param branch> would record, without merging it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.mergePreview: Unknown function or value 'conflictsReportedBy'"
 let mergePreview(dark: Cli.Tests.Instance.T, branch: String): List<String> =
   conflictsReportedBy(dark, [ "conflicts", "branch", branch, "--json" ])
 
 
 /// The conflict ids a `--json` command reports, in order.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.conflictIds: Unknown function or value 'json'"
 let conflictIds(dark: Cli.Tests.Instance.T, args: List<String>): List<String> =
   rows(field(json(dark, args), "conflicts"))
   |> Stdlib.List.map(fun c -> text(c, "id"))
@@ -455,7 +423,6 @@ let conflictIds(dark: Cli.Tests.Instance.T, args: List<String>): List<String> =
 // ─── history and branches ───────────────────────────────────────────────────
 
 /// Commit messages from a `--json` listing, newest first, leaving out the store's own baseline.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.commitMessages: Unknown function or value 'json'"
 let commitMessages(
   dark: Cli.Tests.Instance.T,
   args: List<String>)
@@ -466,19 +433,16 @@ let commitMessages(
 
 
 /// Commit messages on the branch you are on, newest first.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.commits: Unknown function or value 'commitMessages'"
 let commits(dark: Cli.Tests.Instance.T): List<String> =
   commitMessages(dark, [ "commits", "--json" ])
 
 
 /// Commit messages on main, newest first, from wherever you are.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.commitsOnMain: Unknown function or value 'commitMessages'"
 let commitsOnMain(dark: Cli.Tests.Instance.T): List<String> =
   commitMessages(dark, [ "--branch", "main", "commits", "--json" ])
 
 
 /// The newest commit's id.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.newestCommit: Unknown function or value 'json'"
 let newestCommit(dark: Cli.Tests.Instance.T): String =
   rows(json(dark, [ "commits", "--json" ]))
   |> Stdlib.List.head
@@ -487,7 +451,6 @@ let newestCommit(dark: Cli.Tests.Instance.T): String =
 
 
 /// The newest op's id, from the last line of `ops 1` (`ops` has no `--json`).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.newestOp: Unknown function or value 'exec'"
 let newestOp(dark: Cli.Tests.Instance.T): String =
   let (_, out, _) = exec(dark, [ "ops", "1" ])
   out
@@ -501,7 +464,6 @@ let newestOp(dark: Cli.Tests.Instance.T): String =
 
 
 /// How many lines of `show <newest commit>` set <param name>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.timesNewestCommitSets: Unknown function or value 'exec'"
 let timesNewestCommitSets(dark: Cli.Tests.Instance.T, name: String): Int64 =
   let (_, out, _) = exec(dark, [ "show", newestCommit(dark) ])
   out
@@ -512,7 +474,6 @@ let timesNewestCommitSets(dark: Cli.Tests.Instance.T, name: String): Int64 =
 
 
 /// Branches from a `--json` listing as `name <- parent`, sorted, with ` [merged]` on merged ones.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.branchesListedBy: Unknown function or value 'json'"
 let branchesListedBy(
   dark: Cli.Tests.Instance.T,
   args: List<String>)
@@ -537,12 +498,10 @@ let branchesListedBy(
 
 
 /// `dark branches --json`, as `name <- parent` lines.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.branches: Unknown function or value 'branchesListedBy'"
 let branches(dark: Cli.Tests.Instance.T): List<String> =
   branchesListedBy(dark, [ "branches", "--json" ])
 
 
 /// `dark branches --all --json`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Cli.allBranches: Unknown function or value 'branchesListedBy'"
 let allBranches(dark: Cli.Tests.Instance.T): List<String> =
   branchesListedBy(dark, [ "branches", "--all", "--json" ])

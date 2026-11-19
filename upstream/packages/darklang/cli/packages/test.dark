@@ -64,7 +64,6 @@ val usage =
   "Usage: test run [--force] [--jobs <count>] [--seed <n>] [name-or-module ...]\n       test count [--for <item>] [module]\n       test add <location> <body> | <source-file> | -"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let fullPath(
   item: LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageTest.PackageTest>)
   : String =
@@ -74,7 +73,6 @@ let fullPath(
 
 
 /// The test's name with its group, for a filter to match: `Module.group.name`.
-// @compiler blocked: upstream-dependency diagnostic="groupedPath: Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let groupedPath(
   item: LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageTest.PackageTest>)
   : String =
@@ -88,7 +86,6 @@ let groupedPath(
 
 /// How `test run` names the test: `Module.name`, or `Module › group › name` when
 /// it is in a group.
-// @compiler blocked: upstream-dependency diagnostic="shownName: Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let shownName(
   item: LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageTest.PackageTest>)
   : String =
@@ -152,7 +149,6 @@ let rowSelected(filters: List<String>, path: String, name: String): Bool =
 /// runtime compilation. Reflect the function we call, not a possibly pinned
 /// branch binding. An unexpected callable, or a runtime that cannot be hashed,
 /// gets a fresh key so it cannot reuse a persisted result.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Test.cacheRuntime: Unknown function or value 'LanguageTools.RuntimeTypes.reflect'"
 let cacheRuntime(): String =
   let judge =
     match LanguageTools.RuntimeTypes.reflect(LanguageTools.PackageManager.Test.execute) with
@@ -182,7 +178,6 @@ type CacheContext =
     resultType: String }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Test.cacheContext: Unknown function or value 'LanguageTools.PackageManager.Test.resultTypeHash'"
 let cacheContext(branchId: Uuid): Option<CacheContext> =
   LanguageTools.PackageManager.Test.resultTypeHash(branchId)
   |> Stdlib.Option.map(fun resultType ->
@@ -203,14 +198,12 @@ let resultKey(
       resultType = cache.resultType }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Test.storedOutcome: Unknown function or value 'LanguageTools.PackageManager.Test.storedResult'"
 let storedOutcome(cache: CacheContext, testHash: LanguageTools.ProgramTypes.Hash): Option<Outcome> =
   match LanguageTools.PackageManager.Test.storedResult(resultKey(cache, testHash)) with
   | Some(json) -> Stdlib.Json.parse<Outcome>(json) |> Stdlib.Result.toOption
   | None -> Option.None
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Test.storeOutcome: Unknown function or value 'LanguageTools.PackageManager.Test.storeResult'"
 let storeOutcome(
   cache: CacheContext,
   testHash: LanguageTools.ProgramTypes.Hash,
@@ -224,7 +217,6 @@ let storeOutcome(
 
 /// The last result for this test on this branch, read without writing anything.
 /// A failed result is shown in views but is never reused by `dark test run`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Test.lastOutcome: Unknown function or value 'cacheContext'"
 let lastOutcome(branchId: Uuid, testHash: LanguageTools.ProgramTypes.Hash): Option<Outcome> =
   match cacheContext(branchId) with
   | Some(cache) -> storedOutcome(cache, testHash) |> Stdlib.Option.map(summary)
@@ -233,7 +225,6 @@ let lastOutcome(branchId: Uuid, testHash: LanguageTools.ProgramTypes.Hash): Opti
 
 /// <fn lastOutcome> for each of <param testHashes>, in order, for a listing: the cache key is
 /// worked out once (it looks up a type and hashes the runtime) and the results read in one go.
-// @compiler blocked: upstream-dependency diagnostic="lastOutcomes: Darklang.Cli.Packages.Test.lastOutcomes: Unknown function or value 'cacheContext'"
 let lastOutcomes(
   branchId: Uuid,
   testHashes: List<LanguageTools.ProgramTypes.Hash>)
@@ -254,7 +245,6 @@ let lastOutcomes(
 
 
 /// Run <param test> now, ignoring the cache, and say how it went.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let runFresh(
   run: LanguageTools.PackageManager.Test.Run,
   branchId: Uuid,
@@ -285,7 +275,6 @@ let runFresh(
 
 
 /// Expected-error tests always rerun.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let mayCache(test: LanguageTools.ProgramTypes.PackageTest.PackageTest): Bool =
   match test.expectedError with
   | Some(_) -> false
@@ -294,7 +283,6 @@ let mayCache(test: LanguageTools.ProgramTypes.PackageTest.PackageTest): Bool =
 
 /// <param cacheSafe>: the current cache-safety rule's answer for this test, checked
 /// before reusing or storing a result.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let isCacheable(test: LanguageTools.ProgramTypes.PackageTest.PackageTest, cacheSafe: Bool): Bool =
   mayCache(test) && cacheSafe
 
@@ -326,7 +314,6 @@ val addUsage = "Usage: test add <location> <body> | <source-file> | -"
 
 
 /// Print why `test add` saved nothing, with its usage, and fail the command.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let addFailed(state: AppState, message: String): AppState =
   printErr(message)
   Stdlib.printErrorLine(addUsage)
@@ -337,7 +324,6 @@ let addFailed(state: AppState, message: String): AppState =
 /// the body alone (`Foo.double 4 |> Stdlib.Test.equal 8`) or a whole
 /// declaration, `test name = ...` with an optional doc comment, which is what
 /// a file or stdin usually holds.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let addTest(state: AppState, locationStr: String, definition: String): AppState =
   match Location.parseRelativeTo(state.packageData.currentLocation, locationStr) with
   | Error(msg) -> addFailed(state, $"Invalid location: {msg}")
@@ -388,7 +374,6 @@ let addTest(state: AppState, locationStr: String, definition: String): AppState 
         | _ -> addFailed(state, "Expected exactly one test declaration")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | ["add"] -> addFailed(state, "test add needs a location and a body")
@@ -413,7 +398,6 @@ let execute(state: AppState, args: List<String>): AppState =
 /// `dark test run [--force] [--jobs <count>] [--seed <n>] [filters]`: run the matching tests,
 /// from the cache where it allows, print each one, and fail the command if any failed or
 /// nothing matched.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let runTests(state: AppState, args: List<String>): AppState =
   // One test per core, at most 16: every slot owns a process and a store copy.
   // A test process holds about 90 MB (one outlier reaches ~750 MB), so 16 stay
@@ -478,7 +462,6 @@ let parseRunOptions(options: RunOptions, args: List<String>): Result<RunOptions,
 
 /// Only the coordinator checks cache safety, writes the cache and prints results.
 /// Spawned processes run tests and return their outcomes.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Test.FinishedTest: Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 type FinishedTest =
   { name: String
     test: LanguageTools.ProgramTypes.PackageTest.PackageTest
@@ -492,7 +475,6 @@ type FinishedTest =
 
 /// <param filters> pick rows too: one with an argument list, as in
 /// `lengths("a", 1)`, keeps only the row of that name.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'FinishedTest'"
 let finishTest(
   cache: Option<CacheContext>,
   filters: List<String>,
@@ -533,7 +515,6 @@ let finishTest(
 /// Wait for all tests before closing the shared snapshot. A test the analysis
 /// proves pure runs inside this process; the rest get a worker and a store copy.
 /// Each test comes with whether a cached pass of it may be reused.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let runSelected(
   run: LanguageTools.PackageManager.Test.Run,
   branchId: Uuid,
@@ -637,7 +618,6 @@ let printSlowest(timings: List<Timing>): Unit =
 /// unbinding, so a deleted test would otherwise keep running. Not
 /// `Query.filterHidden`: that keeps items with live callers and, on a branch,
 /// anything the branch deprecated.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let liveTests(
   branchId: Uuid,
   currentModule: List<String>,
@@ -666,7 +646,6 @@ let liveTests(
 /// searching for a filter of two or more segments finds every test it selects
 /// without reading the rest. A single segment could be a module, which the search
 /// would only look for in names.
-// @compiler blocked: upstream-dependency diagnostic="selectedTests: Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let selectedTests(
   branchId: Uuid,
   filters: List<String>)
@@ -696,7 +675,6 @@ let selectedTests(
 
 /// The tests in the modules of every test that calls `Stdlib.Test.group`: the search
 /// knows names, not groups, so a filter that names a group finds its tests here.
-// @compiler blocked: upstream-dependency diagnostic="groupedTests: Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let groupedTests(
   branchId: Uuid)
   : List<
@@ -719,13 +697,11 @@ let groupedTests(
 /// The full names, as segments, of the tests under the module path <param prefix>.
 /// The search looks in the module above <param prefix>, whose last segment may name
 /// a test rather than a module.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Test.testsUnder: Unknown function or value 'testItemsUnder'"
 let testsUnder(branchId: Uuid, prefix: List<String>): List<List<String>> =
   testItemsUnder(branchId, prefix) |> Stdlib.List.map(fun((path, _)) -> path)
 
 
 /// <fn testsUnder>, each with its test.
-// @compiler blocked: upstream-dependency diagnostic="testItemsUnder: Unknown type 'LanguageTools.ProgramTypes.PackageTest.PackageTest'"
 let testItemsUnder(
   branchId: Uuid,
   prefix: List<String>)
@@ -748,7 +724,6 @@ let testItemsUnder(
       Option.None)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let runTestsInRun(
   run: LanguageTools.PackageManager.Test.Run,
   state: AppState,
@@ -815,7 +790,6 @@ type CountRow =
 /// <param tests> (full name segments, and how many tests each holds) rolled up one
 /// level below <param prefix>: a row per submodule, plus a row per test directly in
 /// <param prefix> when it has no submodules, or one row for them all when it has.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Test.countRows: Tuple pattern does not match the value type"
 let countRows(prefix: List<String>, tests: List<(List<String> * Int64)>): List<CountRow> =
   let depth = Stdlib.List.length(prefix)
   let (direct, nested) =
@@ -876,7 +850,6 @@ let deepestShared(prefix: List<String>, tests: List<(List<String> * Int64)>): Li
 
 /// Print the total for <param heading>, then a row per entry of `countRows`
 /// below the deepest module all of <param tests> share.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Test.printCounts: Unknown function or value 'countRows'"
 let printCounts(heading: String, prefix: List<String>, tests: List<(List<String> * Int64)>): Unit =
   let shared = deepestShared(prefix, tests)
   let rows = countRows(shared, tests)
@@ -895,7 +868,6 @@ let printCounts(heading: String, prefix: List<String>, tests: List<(List<String>
 /// <param module> (by full dotted name; everything when omitted), rolled up one
 /// level down. With `--for`, only the tests that use <item>, directly or
 /// through anything else they call. Reads definitions only; nothing runs.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let countTests(state: AppState, args: List<String>): AppState =
   let branchId = state.currentBranchId
   let (forItem, rest) =
@@ -968,7 +940,6 @@ let countTests(state: AppState, args: List<String>): AppState =
           state
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Run package tests on the current branch, or add one."
     ""
@@ -1029,7 +1000,6 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(_state: AppState, args: List<String>): List<Completion.CompletionItem> =
   match args with
   | [] -> [ "run", "count", "add" ] |> Stdlib.List.map(Completion.simple)

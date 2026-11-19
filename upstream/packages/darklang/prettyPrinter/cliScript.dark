@@ -1,6 +1,5 @@
 module Darklang.PrettyPrinter.ProgramTypes
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.SourceFile.SourceFile'"
 let sourceFileAtWidth(
   branchId: Uuid,
   width: Int64,
@@ -51,6 +50,5 @@ val sourceWidth = 100
 
 
 /// Print a source file using the standard source width.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.SourceFile.SourceFile'"
 let sourceFile(branchId: Uuid, source: LanguageTools.ProgramTypes.SourceFile.SourceFile): String =
   sourceFileAtWidth(branchId, sourceWidth, source)

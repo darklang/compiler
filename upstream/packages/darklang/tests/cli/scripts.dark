@@ -1,12 +1,10 @@
 module Darklang.Cli.Tests.Scripts
 
-// @compiler xfail compile: "Unknown function or value 'Cli.Run.exitCode'" class=missing-support reason=upstream-dependency
 test unitSucceeds =
   Cli.Run.exitCode(LanguageTools.RuntimeTypes.Dval.DUnit)
   |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(0))
 
 
-// @compiler xfail compile: "Unknown function or value 'Cli.Run.exitCode'" class=missing-support reason=upstream-dependency
 test integerExitCodes =
   Stdlib.Test.all(
     [ Cli.Run.exitCode(LanguageTools.RuntimeTypes.Dval.DBigInt(7z))
@@ -20,7 +18,6 @@ test integerExitCodes =
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(1)) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Cli.Run.exitCode'" class=missing-support reason=upstream-dependency
 test invalidResultKeepsValue =
   let returned = LanguageTools.RuntimeTypes.Dval.DBool(true)
   match Cli.Run.exitCode(returned) with
@@ -31,7 +28,6 @@ test invalidResultKeepsValue =
 
 
 module Eval =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.Cli.ExecutionError.ExecutionError'"
   let evaluate(
     source: String)
     : Stdlib.Result.Result<
@@ -45,20 +41,17 @@ module Eval =
       Cli.Eval.Harmful.Halt)
 
 
-  // @compiler xfail compile: "Unknown function or value 'evaluate'" class=missing-support reason=upstream-dependency
   test unitIsSilent =
     evaluate("()")
     |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(Stdlib.Option.Option.None))
 
 
-  // @compiler xfail compile: "Unknown function or value 'evaluate'" class=missing-support reason=upstream-dependency
   test stringsAreUnquoted =
     evaluate("\"hello\\nworld\"")
     |> Stdlib.Test.equal(
       Stdlib.Result.Result.Ok(Stdlib.Option.Option.Some("hello\nworld")))
 
 
-  // @compiler xfail compile: "Unknown function or value 'evaluate'" class=missing-support reason=upstream-dependency
   test otherValuesArePrinted =
     evaluate("[1, 2]")
     |> Stdlib.Test.equal(
@@ -77,24 +70,20 @@ module CallStack =
           { name = "bigIntDivide", version = 0s32 }))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Scripts.CallStack.render: Unknown function or value 'Darklang.PrettyPrinter.RuntimeTypes.callStack'"
   let render(frames: List<LanguageTools.RuntimeTypes.ExecutionPoint>): String =
     PrettyPrinter.RuntimeTypes.callStack(SCM.Branch.mainBranchId, frames)
 
 
-  // @compiler xfail compile: "Unknown function or value 'render'" class=missing-support reason=upstream-dependency
   test emptyStack =
     render([]) |> Stdlib.Test.equal("Call stack (last call at bottom):")
 
 
-  // @compiler xfail compile: "Unknown function or value 'render'" class=missing-support reason=upstream-dependency
   test groupsOnlyConsecutiveFrames =
     render([ source(), builtin(), builtin(), source() ])
     |> Stdlib.Test.equal(
       "Call stack (last call at bottom):\n- Source\n- Builtin Function bigIntDivide (×2)\n- Source")
 
 
-  // @compiler xfail compile: "Unknown function or value 'PrettyPrinter.RuntimeTypes.executionPoint'" class=missing-support reason=upstream-dependency
   test lambdaLabel =
     PrettyPrinter.RuntimeTypes.executionPoint(
       SCM.Branch.mainBranchId,
@@ -106,7 +95,6 @@ module CallStack =
 
 
   // A lambda is shown with the fn it was written in, when that is known.
-  // @compiler xfail compile: "Unknown function or value 'PrettyPrinter.RuntimeTypes.executionPoint'" class=missing-support reason=upstream-dependency
   test lambdaLabelSaysWhereItWasWritten =
     PrettyPrinter.RuntimeTypes.executionPoint(
       SCM.Branch.mainBranchId,
@@ -118,7 +106,6 @@ module CallStack =
 
 
   // A script's ids change on every parse; its lines do not.
-  // @compiler xfail compile: "Unknown function or value 'PrettyPrinter.RuntimeTypes.executionPointAt'" class=missing-support reason=upstream-dependency
   test lambdaLabelGivesItsLine =
     PrettyPrinter.RuntimeTypes.executionPointAt(
       SCM.Branch.mainBranchId,
@@ -145,7 +132,6 @@ module CallStack =
         |> Stdlib.Test.equal(true) ])
 
 
-  // @compiler xfail compile: "Unknown function or value 'PrettyPrinter.RuntimeTypes.executionPoint'" class=missing-support reason=upstream-dependency
   test processStacksUseTheSharedType =
     let frame =
       LanguageTools.Exec.ExecutionPoint.Lambda(

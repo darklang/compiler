@@ -2,19 +2,16 @@
 /// Run without tracing, as in the original check.
 module Darklang.Language.Tests.FastOps
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Language.Tests.FastOps.d: Unknown function or value 'Stdlib.Dict.fromEntries'"
 val d = Stdlib.Dict.fromEntries([ ("a", 1), ("b", 2) ])
 
 let check(label: String, actual: String, expected: String): Stdlib.Test.Result =
   Stdlib.Test.expect(actual == expected, $"{label}: expected {expected}, got {actual}")
 
-// @compiler xfail compile: "Unbound local variable 'd'" class=missing-support reason=compiler-gap
 test dictGet =
   Stdlib.Test.all(
     [ check("dict get hit", Stdlib.display(Stdlib.Option.withDefault(Stdlib.Dict.get(d, "a"), 0)), "1")
       check("dict get miss", Stdlib.display(Stdlib.Option.withDefault(Stdlib.Dict.get(d, "zz"), -1)), "-1") ])
 
-// @compiler xfail compile: "Unbound local variable 'd'" class=missing-support reason=compiler-gap
 test dictSet =
   Stdlib.Test.all(
     [ check("dict set new key", Stdlib.display(Stdlib.List.length(Stdlib.Dict.keys(Stdlib.Dict.set(d, "c", 3)))), "3")
@@ -86,7 +83,6 @@ test stringDisplayWidth =
 
 // The tests above run at the top level, which never takes the quickened path. Inside a package
 // fn the interpreter answers the same operators from its quickened instructions.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Language.Tests.FastOps.quickened: Unbound local variable 'd'"
 let quickened(unit: Unit): Stdlib.Test.Result =
   Stdlib.Test.all(
     [ check("dict get hit", Stdlib.display(Stdlib.Option.withDefault(Stdlib.Dict.get(d, "a"), 0)), "1")
@@ -106,5 +102,4 @@ let quickened(unit: Unit): Stdlib.Test.Result =
       check("contains half a cluster", (if Stdlib.String.contains("éx", "e") then "y" else "n"), "n")
       check("width wide", Stdlib.display(Stdlib.String.displayWidth("世界")), "4") ])
 
-// @compiler xfail compile: "Unknown function or value 'quickened'" class=missing-support reason=upstream-dependency
 test insideAPackageFn = quickened()

@@ -32,61 +32,49 @@ module WithTypeArgs =
     getC(A { b = B { c = C { v = 5 } } }) |> Stdlib.Test.equal(5)
 
 module InvalidCols =
-  // @compiler xfail compile: "Duplicate record field 'col1'" class=aot-rejection reason=aot-invalid-field
   test duplicateFieldRaises =
     Cols1 { col1 = 1, col1 = 2 } => raises "Duplicate field `col1`"
 
   // Fields are checked as written, so the first bad one in the source is the one named, whatever
   // order the record keeps them in.
-  // @compiler xfail compile: "Duplicate record field 'col2'" class=missing-support reason=compiler-gap
   test duplicateOfALaterNameRaises =
     Cols2 { col2 = 1, col1 = 2, col2 = 3 } => raises "Duplicate field `col2`"
 
-  // @compiler xfail compile: "Unknown field 'zzz' on Darklang.Language.Tests.Records.Cols2" class=missing-support reason=compiler-gap
   test unknownBeforeADuplicateRaises =
     Cols2 { zzz = 1, col1 = 2, col1 = 3 } => raises "No field named `zzz`"
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test firstWrongTypeAsWrittenRaises =
     Cols2 { col2 = "", col1 = "" }
     => raises
       "Failed to create record. Expected Int64 for field `col2`, but got \"\" (a String)"
 
-  // @compiler xfail compile: "Unknown field '' on Darklang.Language.Tests.Records.Cols2" class=aot-rejection reason=aot-invalid-field
   test emptyKeyRaises =
     Cols2 { col1 = 2, ___ = 3 } => raises "Empty key in record creation"
 
-  // @compiler xfail compile: "record literal does not contain exactly the declared field slots" class=aot-rejection reason=aot-invalid-field
   test missingFieldRaises =
     Cols2 { col1 = 2 } => raises "Missing field `col2`"
 
-  // @compiler xfail compile: "Unknown field 'other' on Darklang.Language.Tests.Records.Cols2" class=aot-rejection reason=aot-invalid-field
   test unknownFieldRaises =
     Cols2 { col1 = 2, other = 3 } => raises "No field named `other`"
 
-  // @compiler xfail compile: "Unknown field 'col3' on Darklang.Language.Tests.Records.Cols2" class=aot-rejection reason=aot-invalid-field
   test extraFieldRaises =
     Cols2 { col1 = 2, col2 = 3, col3 = 4 } => raises "No field named `col3`"
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test wrongFieldTypeRaises =
     Cols1 { col1 = "" }
     => raises
       "Failed to create record. Expected Int64 for field `col1`, but got \"\" (a String)"
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test wrongFieldTypeLongStringRaises =
     Cols1 { col1 = "abcdefghijklmnopqrstuvwxyz" }
     => raises
       "Failed to create record. Expected Int64 for field `col1`, but got \"abcdefgh...\" (a String)"
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test wrongFieldTypeEscapeAtCutRaises =
     Cols1 { col1 = "abcdefg\"hij\nklmnop" }
     => raises
       "Failed to create record. Expected Int64 for field `col1`, but got \"abcdefg...\" (a String)"
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test wrongFieldTypeEscapeBeforeCutRaises =
     Cols1 { col1 = "abc\ndefghijklmnop" }
     => raises
@@ -95,7 +83,6 @@ module InvalidCols =
 module InvalidType =
   // Evaluate the unresolved name from source at run time so it does not prevent
   // the package from loading. Check both the error branch and its message.
-  // @compiler xfail compile: "Unknown function or value 'Darklang.SCM.PackageOps.currentBranch'" class=missing-support reason=upstream-dependency
   test unknownTypeRaises =
     let branch = Darklang.SCM.PackageOps.currentBranch()
     let source = "MyNonExistantType { col1 = 2 }"
@@ -106,7 +93,6 @@ module InvalidType =
     | _ -> Stdlib.Test.fail("expected a runtime error for an unknown record type")
 
   // `Int` is read as Int64 and `Float` as Float64
-  // @compiler xfail compile: "Unknown function or value 'Darklang.SCM.PackageOps.currentBranch'" class=missing-support reason=upstream-dependency
   test intAndFloatAreAliases =
     let branch = Darklang.SCM.PackageOps.currentBranch()
     let source = "let f(x: Int, y: Float): Int64 = x + Stdlib.Float64.round(y)\nf(1, 2.0)"
@@ -114,7 +100,6 @@ module InvalidType =
     | Ok(out) -> out |> Stdlib.Test.equal(Stdlib.Option.Option.Some("3"))
     | Error(_) -> Stdlib.Test.fail("expected `Int` and `Float` to parse")
 
-  // @compiler xfail compile: "Expected a record type" class=aot-rejection reason=aot-type-error
   test enumIsNotRecordRaises =
     AnEnum { col1 = 2 }
     => raises
@@ -178,38 +163,32 @@ module Update =
       Stdlib.List.length((viaGeneric([ 1 ])).updItems) |> Stdlib.Test.equal(0)
 
   module Invalid =
-    // @compiler xfail compile: "Record update requires a record value" class=missing-support reason=compiler-gap
     test updateOfNonRecordRaises =
       (let r = 1
        { r with key = false })
       => raises "Cannot apply a record-update to an Int64"
 
-    // @compiler xfail compile: "Unknown field 'p' on Darklang.Language.Tests.Records.Update.RecordForUpdateMultiple" class=aot-rejection reason=aot-invalid-field
     test unknownFieldRaises =
       (let myRec = RecordForUpdateMultiple { x = 4, y = 1, z = 0 }
        { myRec with z = 3, x = 42, y = 11, p = 10 })
       => raises "No field named `p`"
 
-    // @compiler xfail compile: "Unknown field 'other' on Darklang.Language.Tests.Equality.ERec" class=aot-rejection reason=aot-invalid-field
     test otherFieldRaises =
       (let myRec = RecordForUpdate { x = 4, y = 1 }
        { myRec with other = 2 })
       => raises "No field named `other`"
 
-    // @compiler xfail compile: "Duplicate record field 'x'" class=missing-support reason=compiler-gap
     test duplicateFieldRaises =
       (let myRec = RecordForUpdate { x = 4, y = 1 }
        { myRec with x = 2, x = 3 })
       => raises "Duplicate field `x`"
 
     // As in construction, the first bad field as written is the one named.
-    // @compiler xfail compile: "Unknown field 'zzz' on Darklang.Language.Tests.Equality.ERec" class=missing-support reason=compiler-gap
     test unknownBeforeADuplicateRaises =
       (let myRec = RecordForUpdate { x = 4, y = 1 }
        { myRec with x = 2, zzz = 1, x = 3 })
       => raises "No field named `zzz`"
 
-    // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
     test wrongFieldTypeRaises =
       (let myRec = RecordForUpdate { x = 4, y = 1 }
        { myRec with y = "2" })
@@ -223,18 +202,15 @@ module FieldAccess =
     (let x = MyRecord { col1 = 1 } in x.col1) |> Stdlib.Test.equal(1)
 
   module Errors =
-    // @compiler xfail compile: "Unknown field '' on Darklang.Language.Tests.Records.Cols1" class=aot-rejection reason=aot-invalid-field
     test emptyFieldNameRaises =
       (let x = MyRecord { col1 = 1 } in x.___) => raises "Field name is empty"
 
-    // @compiler xfail compile: "Unknown field 'fieldName' on Darklang.Language.Tests.Records.Cols1" class=aot-rejection reason=aot-invalid-field
     test missingFieldRaises =
       (let x = MyRecord { col1 = 1 } in x.fieldName)
       => raises "Tried to access field `fieldName`, but it doesn't exist"
 
     // `(Stdlib.Test.raiseRuntimeError("error")).fieldName` is in errorPropagation.dark.
 
-    // @compiler xfail compile: "Field access requires a record value" class=aot-rejection reason=aot-invalid-field
     test accessOnInt64Raises =
       (let x = 6 in x.fieldName)
       => raises

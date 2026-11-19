@@ -2,7 +2,6 @@ module Darklang.SCM.Deps
 
 /// Read selected callers, or all visible callers when sources is empty.
 /// Read the graph in one batch, keeping each caller's reference names separate.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.namedReferencesFor: Unknown function or value 'Builtin.pmNamedReferences'"
 let namedReferencesFor(
   branchId: Uuid,
   sources: List<PackageOps.ReferenceSource>)
@@ -24,7 +23,6 @@ type DependencyReview =
    List<(LanguageTools.ProgramTypes.PackageLocation * LanguageTools.ProgramTypes.PackageLocation)>)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.review: Unknown function or value 'Builtin.pmDependencyReview'"
 let review(
   branchId: Uuid,
   changed: List<PackageOps.ReferenceSource>)

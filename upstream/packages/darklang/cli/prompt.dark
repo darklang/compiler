@@ -3,7 +3,6 @@ module Darklang.Cli.Prompt
 /// Ask a yes/no question. Only `y` is yes: an empty answer, end of input, an answer that is not
 /// UTF-8, and nobody being able to answer are all no, and every caller exits 1 on a no. {{Confirm.Assume}} (`-y`) skips the
 /// question.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Prompt.confirmExplicit: Unknown function or value 'Stdlib.Cli.UI.Prompt.canAsk'"
 let confirmExplicit(confirm: Confirm, question: String): Bool =
   match confirm with
   | Assume -> true
@@ -175,7 +174,6 @@ module Display =
   /// Build the complete prompt region and Unicode-correct logical cursor.
   ///
   /// The rows and the cursor come from one wrap, so a word that moves down takes the cursor with it.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Prompt.Display.viewAtSize: Unknown function or value 'Stdlib.Cli.Tui.Text.wrapWithCursor'"
   let viewAtSize(
     state: State,
     locationStr: String,

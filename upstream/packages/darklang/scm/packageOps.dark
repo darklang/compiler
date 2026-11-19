@@ -20,13 +20,11 @@ module Darklang.SCM.PackageOps
 
 /// Add a list of package ops to the database (immediately live on the given branch).
 /// Returns the number of inserted ops on success (duplicates are skipped), or an error message on failure.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let add(branchId: Uuid, ops: List<LanguageTools.ProgramTypes.PackageOp>): Result<Int64, String> =
   Builtin.scmAddOps(branchId, Lineage.recordPrevious(branchId, ops))
 
 
 /// The checker report and call details from a successful save.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.Authored: Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 type Authored =
   { report: LanguageTools.AtRestTypeChecker.Report
     unresolvedTraitCalls: List<(String * List<LanguageTools.PackageManager.UnresolvedTraitCall>)> }
@@ -43,7 +41,6 @@ type Authored =
 ///
 /// Every authoring surface goes through here rather than calling `add`: the CLI's fn/type/value/module
 /// commands, the workbench, and the LSP's file provider.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let addAuthored(
   branchId: Uuid,
   ops: List<LanguageTools.ProgramTypes.PackageOp>)
@@ -78,7 +75,6 @@ let addAuthored(
 
 /// Unbind the values a save could not evaluate, and say what that left. A batch (`dark module`,
 /// the editor) can hold good items beside the bad value, and those stay.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let takeBackFailedValues(
   branchId: Uuid,
   ops: List<LanguageTools.ProgramTypes.PackageOp>,
@@ -123,7 +119,6 @@ let takeBackFailedValues(
 /// The values <param ops> binds whose stored form never got a runtime value: what evaluation
 /// failed on. Asked of the store, by the hash each name holds now, because the save restabilizes
 /// and refreshes hashes after the ones in hand.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let unevaluatedValuesBoundBy(
   branchId: Uuid,
   ops: List<LanguageTools.ProgramTypes.PackageOp>)
@@ -144,7 +139,6 @@ let unevaluatedValuesBoundBy(
 
 /// Whether the value at <param hash> has a stored runtime value: false when its evaluation never ran
 /// or failed, and when there is no such value.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.valueEvaluated: Unknown function or value 'Builtin.pmValueEvaluated'"
 let valueEvaluated(hash: String): Bool =
   Builtin.pmValueEvaluated(LanguageTools.ProgramTypes.Hash.Hash(hash))
 
@@ -154,7 +148,6 @@ let valueEvaluated(hash: String): Bool =
 /// them: the commit's type check reads content as well as names, so content left behind with no name
 /// would go on refusing every commit. Anything else this save added that uses one of these values is
 /// left referencing nothing, and is refused as unresolved, which is what it is.
-// @compiler blocked: compiler-gap diagnostic="Darklang.SCM.PackageOps.unbind: Constructor pattern requires an enum scrutinee"
 let unbind(
   branchId: Uuid,
   bindings: List<(LanguageTools.ProgramTypes.PackageLocation * String)>)
@@ -233,7 +226,6 @@ type OpFilter =
 /// One op-log row. `ts` is the authoring stamp (for the `Landed` cases, when the op landed here), ""
 /// where the case does not read it; `sizeBytes` is the blob's size, 0 where the case does not read the
 /// blob; `source` is what put the op on the branch, for `Own` only.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.OpRow: Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 type OpRow =
   { id: String
     ts: String
@@ -245,7 +237,6 @@ type OpRow =
 
 /// What `query` answers with. `total` counts every match when the limit was 0 (and `ops` is then
 /// empty); otherwise it is how many rows came back.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.OpPage: Unknown type 'OpRow'"
 type OpPage =
   { total: Int64
     ops: List<OpRow> }
@@ -253,31 +244,26 @@ type OpPage =
 
 /// The ops <param filter> selects, at most <param limit> of them; a negative limit means all of them,
 /// and 0 asks only for the count.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpPage'"
 let query(filter: OpFilter, limit: Int64): OpPage =
   Builtin.scmOps(filter, limit)
 
 
 /// Every row <param filter> selects.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpRow'"
 let rowsOf(filter: OpFilter): List<OpRow> =
   (query(filter, -1)).ops
 
 
 /// The ids of every op <param filter> selects, in its order.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.idsOf: Unknown function or value 'rowsOf'"
 let idsOf(filter: OpFilter): List<String> =
   rowsOf(filter) |> Stdlib.List.map(fun r -> r.id)
 
 
 /// How many ops <param filter> selects.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.countOf: Unknown function or value 'query'"
 let countOf(filter: OpFilter): Int64 =
   (query(filter, 0)).total
 
 
 /// The `ts` of a one-row stamp case.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.stampOf: Unknown function or value 'rowsOf'"
 let stampOf(filter: OpFilter): String =
   rowsOf(filter)
   |> Stdlib.List.head
@@ -286,7 +272,6 @@ let stampOf(filter: OpFilter): String =
 
 
 /// A lightweight op-log row for display (no op_blob decode): what `dark ops` shows.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.OpSummary: Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 type OpSummary =
   { id: String
     sizeBytes: Int64

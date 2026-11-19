@@ -67,7 +67,6 @@ test fromList =
       |> Stdlib.Test.equal("👩‍👩‍👧‍👦🏳️‍⚧️‍️👱🏾Z̤͔ͧ̑̓") ])
 
 
-// @compiler xfail compile: "Expected TChar, got TString" class=aot-rejection reason=aot-type-error
 test fromListRejectsStrings =
   Stdlib.String.fromList([ "a" ])
   => raises "Darklang.Stdlib.String.fromList's 1st parameter `lst` expects List<Char>, but got List<String> ([\"a\"])"
@@ -243,7 +242,6 @@ test join =
       Stdlib.String.join([ "👍", "🏽" ], "") |> Stdlib.Test.equal("👍🏽") ])
 
 
-// @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
 test joinRejectsNonStrings =
   Stdlib.String.join([ 1, 2 ], ",")
   => raises "Darklang.Stdlib.String.join's 1st parameter `l` expects List<String>, but got List<Int64> ([1, 2])"
@@ -465,7 +463,6 @@ test lengthOfLongStringsReadTwice =
       joined |> Stdlib.Test.equal(repeated) ])
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test splitOnNewline =
   Stdlib.Test.all(
     [ Stdlib.String.splitOnNewline("") |> Stdlib.Test.equal([])
@@ -1082,7 +1079,6 @@ test toLowercaseCombiningMarks =
       |> Stdlib.Test.equal("h̬̤̗̤͝e͜ ̜̥̝̻͍̟́w̕h̖̯͓o̝͙̖͎̱̮ ҉̺̙̞̟͈w̷̼̭a̺̪͍į͈͕̭͙̯̜t̶̼̮s̘͙͖̕ ̠̫̠b̻͍͙͉̳ͅe̵h̵̬͇̫͙i̹͓̳̳̮͎̫̕n͟d̴̪̜̖ ̰͉̩͇͙̲͞ͅt͖̼͓̪͢h͏͓̮̻e̬̝̟ͅ ̤̹̝w͙̞̝͔͇͝ͅa͏͓͔̹̼̣l̴͔̰̤̟͔ḽ̫.͕") ])
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test capitalize =
   Stdlib.Test.all(
     [ Stdlib.String.capitalize("") |> Stdlib.Test.equal("")
@@ -1118,7 +1114,6 @@ test capitalize =
       Stdlib.String.capitalize("🧑🏽‍🦰abc") |> Stdlib.Test.equal("🧑🏽‍🦰abc") ])
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test toUppercase =
   Stdlib.Test.all(
     [ Stdlib.String.toUppercase("") |> Stdlib.Test.equal("")
@@ -1165,7 +1160,6 @@ test toUppercase =
 
 // Full case mapping: one character can become several, the rules are Unicode's defaults
 // on every machine, and no language's own rules apply.
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test toUppercaseFullMapping =
   Stdlib.Test.all(
     [ Stdlib.String.toUppercase("straße") |> Stdlib.Test.equal("STRASSE")
@@ -1197,7 +1191,6 @@ test toUppercaseFullMapping =
       Stdlib.String.toUppercase("👍🏽🇵🇷") |> Stdlib.Test.equal("👍🏽🇵🇷") ])
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test toLowercaseFullMapping =
   Stdlib.Test.all(
     [ Stdlib.String.toLowercase("I") |> Stdlib.Test.equal("i")
@@ -1919,7 +1912,6 @@ test repeat =
       |> Stdlib.Test.equal(80) ])
 
 
-// @compiler xfail runtime: "Out of heap memory" class=missing-support reason=compiler-gap
 test repeatRaisesPastInt32 =
   Stdlib.String.repeat("ab", 9999999999)
   => raises "Repeat count out of range (at most 2147483647): 9999999999"
@@ -2030,7 +2022,6 @@ test getByteAtMatchesToBytes =
   |> Stdlib.Test.equal(Stdlib.Bytes.getAt(Stdlib.Utf8.encode("héllo"), 2))
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test slugify =
   Stdlib.Test.all(
     [ Stdlib.String.slugify(
@@ -2099,7 +2090,6 @@ test randomProducesDifferentStrings =
 
 // Check that map calls its callback once per character.
 module MapEffects =
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Test.incrementCounter'" class=missing-support reason=test-counter
   test invokesCallbackOncePerCharacter =
     let value = Stdlib.String.map("a string", fun _ ->
       let _ = Stdlib.Test.incrementCounter()
@@ -2135,7 +2125,6 @@ test headUsesWholeGraphemes =
       |> Stdlib.Test.equal(Stdlib.Option.Option.Some('👨‍❤️‍💋‍👨')) ])
 
 
-// @compiler xfail compile: "Expected TChar, got TInt64" class=aot-rejection reason=aot-type-error
 test mapRejectsNonCharResult =
   Stdlib.String.map("👨‍❤️‍💋‍👨👩‍👩‍👧‍👦🏳️‍⚧️‍️🇵🇷", fun _ -> 5)
   => raises "Darklang.Stdlib.String.map's 2nd parameter `fn` returned Int64 (5), but should return Char"

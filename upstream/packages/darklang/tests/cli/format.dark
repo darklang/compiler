@@ -11,7 +11,6 @@ val annotated = "module MyApp.Util\n\nval limit: Int64 = 6\n"
 
 /// <param name> in the instance's home, written with <param text>, and what formatting it needs:
 /// reading and writing it, and nothing else.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Format.file: Unknown function or value 'Instance.ran'"
 let file(i: Instance.T, name: String, text: String): String =
   let path = Instance.home(i) + "/" + name
   let _ = Stdlib.Cli.File.writeText(path, text)
@@ -32,7 +31,6 @@ let contents(path: String): String =
   Stdlib.Cli.File.readText(path) |> Stdlib.Result.withDefault("")
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test keepsAValueAnnotation = Instance.withInstance(fun i ->
   let path = file(i, "limit.dark", annotated)
   let (code, _) = Instance.ran(i, [ "format", path ])
@@ -41,7 +39,6 @@ test keepsAValueAnnotation = Instance.withInstance(fun i ->
       contents(path) |> Stdlib.Test.equal(annotated) ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test formatsAFileInPlace = Instance.withInstance(fun i ->
   let path = file(i, "util.dark", unformatted)
   let (code, out) = Instance.ran(i, [ "format", path ])
@@ -51,7 +48,6 @@ test formatsAFileInPlace = Instance.withInstance(fun i ->
       contents(path) |> Stdlib.Test.equal(formatted) ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test checkPassesOnAFormattedFile = Instance.withInstance(fun i ->
   let path = file(i, "util.dark", formatted)
   let (code, out) = Instance.ran(i, [ "format", "--check", path ])
@@ -61,7 +57,6 @@ test checkPassesOnAFormattedFile = Instance.withInstance(fun i ->
       contents(path) |> Stdlib.Test.equal(formatted) ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test checkFailsOnAnUnformattedFileAndChangesNothing =
   Instance.withInstance(fun i ->
     let path = file(i, "util.dark", unformatted)
@@ -72,7 +67,6 @@ test checkFailsOnAnUnformattedFileAndChangesNothing =
         contents(path) |> Stdlib.Test.equal(unformatted) ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test formatsSeveralFiles = Instance.withInstance(fun i ->
   let first = file(i, "a.dark", unformatted)
   let second = file(i, "b.dark", formatted)
@@ -85,7 +79,6 @@ test formatsSeveralFiles = Instance.withInstance(fun i ->
       |> Stdlib.Test.equal([ formatted, formatted, formatted ]) ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test fmtDoesWhatFormatDoes = Instance.withInstance(fun i ->
   let viaFormat = file(i, "a.dark", unformatted)
   let viaFmt = file(i, "b.dark", unformatted)

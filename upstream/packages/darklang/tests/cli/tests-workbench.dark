@@ -3,7 +3,6 @@ module Darklang.Cli.Tests.TestSuite
 
 // A move with History.Record leaves a way back and one with History.Skip (back's own) does
 // not; the reader highlights what it is given only for Reader.Code.
-// @compiler xfail compile: "Unknown function or value 'workbenchState'" class=missing-support reason=upstream-dependency
 test workbenchNavigationEnums =
   let base = workbenchState()
   let point =
@@ -34,7 +33,6 @@ test workbenchNavigationEnums =
       prose |> Stdlib.Test.equal(Stdlib.Option.Option.Some(false)) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'workbenchState'" class=missing-support reason=upstream-dependency
 test workbenchHistoryRoundTrip =
   let base = workbenchState()
   let hit =
@@ -79,7 +77,6 @@ test workbenchHistoryRoundTrip =
     Stdlib.Test.fail("search, modules and lenses must return in one Escape")
 
 
-// @compiler xfail compile: "Unknown function or value 'workbenchState'" class=missing-support reason=upstream-dependency
 test workbenchBranchPicker =
   let base = workbenchState()
   let opened = (wbChar(base, "S")).state
@@ -147,7 +144,6 @@ test workbenchBranchPicker =
 
 // A first run lands on Home. While nothing is in progress, Home ends with where to begin, and
 // each of those rows opens the view it names.
-// @compiler xfail compile: "Unknown function or value 'workbenchState'" class=missing-support reason=upstream-dependency
 test workbenchHomeSaysWhereToBegin =
   let start = Cli.Workbench.homeStartRows(true, 0, 0, 0)
   let kinds = start |> Stdlib.List.map(fun item -> item.kind)

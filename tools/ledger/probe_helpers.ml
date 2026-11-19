@@ -29,6 +29,18 @@ let main includePackages allBlocked root manifest output =
       (Filename.concat root "porting/compiler-reasons.json")
     |> require
   in
+  let sidecar =
+    CompilerAnnotations.readSidecar
+      (Filename.concat root "porting/upstream-annotations.tsv")
+    |> require
+  in
+  let parse file text =
+    I.parse
+      ~interpreterSource:(String.starts_with ~prefix:"upstream/" file)
+      ~annotations:(CompilerAnnotations.forSource sidecar file)
+      ~reasons text
+    |> require
+  in
   let paths =
     Yojson.Basic.from_file manifest |> J.to_list |> List.map J.to_string
   in
@@ -41,7 +53,7 @@ let main includePackages allBlocked root manifest output =
             (Filename.concat root file)
             In_channel.input_all
         in
-        let source = I.parse ~interpreterSource:(String.starts_with ~prefix:"upstream/" file) ~reasons text |> require in
+        let source = parse file text in
         S.nodes file source
         |> List.filter (fun node ->
             match node.S.declaration with
@@ -76,7 +88,7 @@ let main includePackages allBlocked root manifest output =
         line <> "" && not (String.starts_with ~prefix:"#" line))
   in
   let roots =
-    readLines "upstream/sources.list"
+    readLines "porting/upstream-sources.list"
     |> List.filter (String.starts_with ~prefix:"packages/")
     |> List.map (( ^ ) "upstream/")
   in
@@ -89,7 +101,7 @@ let main includePackages allBlocked root manifest output =
             (Filename.concat root file)
             In_channel.input_all
         in
-        (file, I.parse ~interpreterSource:(String.starts_with ~prefix:"upstream/" file) ~reasons text |> require))
+        (file, parse file text))
   in
   let selected =
     S.select ~context:SourceContracts.emptyContext ~roots ~supplements ~sources

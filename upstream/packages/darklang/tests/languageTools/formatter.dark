@@ -28,7 +28,6 @@ let area(s: Shape): Int64 =
 """
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Formatter.Tests.formattedComments: Unknown function or value 'LanguageTools.Formatter.source'"
 let formattedComments(
   source: String)
   : Stdlib.Result.Result<List<String>, String> =
@@ -36,14 +35,12 @@ let formattedComments(
   |> Stdlib.Result.map(fun f -> LanguageTools.Formatter.commentTexts(f.text))
 
 
-// @compiler xfail compile: "Unknown function or value 'formattedComments'" class=missing-support reason=upstream-dependency
 test keepsEveryCommentInOrder =
   formattedComments(commented)
   |> Stdlib.Test.equal(
     Stdlib.Result.Result.Ok(LanguageTools.Formatter.commentTexts(commented)))
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.Formatter.commentTexts'" class=missing-support reason=upstream-dependency
 test findsTheComments =
   LanguageTools.Formatter.commentTexts(commented)
   |> Stdlib.List.length
@@ -68,7 +65,6 @@ let area(s: Shape): Int64 =
 """
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.Formatter.source'" class=missing-support reason=upstream-dependency
 test keepsDocCommentsNothingStores =
   LanguageTools.Formatter.source(SCM.Branch.mainBranchId, 100, unstoredDocs)
   |> Stdlib.Result.map(fun f -> LanguageTools.Formatter.docLines(f.text))
@@ -90,7 +86,6 @@ val big = 6.02e22
 """
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.Formatter.source'" class=missing-support reason=upstream-dependency
 test keepsSpreadsEscapesAndFloats =
   LanguageTools.Formatter.source(SCM.Branch.mainBranchId, 100, keptAsWritten)
   |> Stdlib.Result.map(fun f -> f.text)
@@ -110,14 +105,12 @@ let f(): List<Int64> =
 """
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.Formatter.source'" class=missing-support reason=upstream-dependency
 test keepsParenthesesOnALetInAList =
   LanguageTools.Formatter.source(SCM.Branch.mainBranchId, 100, letInList)
   |> Stdlib.Result.map(fun f -> f.text)
   |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(letInList))
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.Formatter.source'" class=missing-support reason=upstream-dependency
 test formattingTwiceChangesNothing =
   let once =
     LanguageTools.Formatter.source(SCM.Branch.mainBranchId, 100, commented)
@@ -157,7 +150,6 @@ val infixOperators =
 
 /// For each operator, <param context> with a long chain of it in place of `{}`, and what went
 /// wrong formatting it: an error, the chain not broken, or a second format changing the first.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Formatter.Tests.brokenChainProblems: Unknown function or value 'LanguageTools.Formatter.source'"
 let brokenChainProblems(context: String): List<String> =
   infixOperators
   |> Stdlib.List.filterMap(fun op ->
@@ -191,33 +183,27 @@ let brokenChainProblems(context: String): List<String> =
         Option.None)
 
 
-// @compiler xfail compile: "Unknown function or value 'brokenChainProblems'" class=missing-support reason=upstream-dependency
 test keepsABrokenChainInAnArgumentList =
   brokenChainProblems("g(1, {}, 2)") |> Stdlib.Test.equal([])
 
 
-// @compiler xfail compile: "Unknown function or value 'brokenChainProblems'" class=missing-support reason=upstream-dependency
 test keepsABrokenChainInAList =
   brokenChainProblems("[ 1, {}, 2 ]") |> Stdlib.Test.equal([])
 
 
-// @compiler xfail compile: "Unknown function or value 'brokenChainProblems'" class=missing-support reason=upstream-dependency
 test keepsABrokenChainInATuple =
   brokenChainProblems("(1, {}, 2)") |> Stdlib.Test.equal([])
 
 
-// @compiler xfail compile: "Unknown function or value 'brokenChainProblems'" class=missing-support reason=upstream-dependency
 test keepsABrokenChainInARecord =
   brokenChainProblems("R { a = 1, b = {}, c = 2 }") |> Stdlib.Test.equal([])
 
 
-// @compiler xfail compile: "Unknown function or value 'brokenChainProblems'" class=missing-support reason=upstream-dependency
 test keepsABrokenChainInAPipe =
   brokenChainProblems("xs |> Stdlib.List.map(fun x -> {})")
   |> Stdlib.Test.equal([])
 
 
-// @compiler xfail compile: "Unknown function or value 'brokenChainProblems'" class=missing-support reason=upstream-dependency
 test keepsABrokenChainInABody =
   brokenChainProblems("{}") |> Stdlib.Test.equal([])
 
@@ -226,7 +212,6 @@ val subtraction =
   "module Darklang.Tests.FormatSample\n\nlet f(a: Int64, b: Int64): List<Int64> =\n  [ a - b ]\n"
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.Formatter.parse'" class=missing-support reason=upstream-dependency
 test refusesToChangeWhatCodeMeans =
   LanguageTools.Formatter.parse(subtraction)
   |> Stdlib.Result.map(fun file ->
@@ -240,7 +225,6 @@ test refusesToChangeWhatCodeMeans =
         "formatting would change what Darklang.Tests.FormatSample.f means")))
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.Formatter.parse'" class=missing-support reason=upstream-dependency
 test acceptsTheSameMeaningLaidOutAnotherWay =
   LanguageTools.Formatter.parse(subtraction)
   |> Stdlib.Result.map(fun file ->
@@ -250,7 +234,6 @@ test acceptsTheSameMeaningLaidOutAnotherWay =
   |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(Option.None))
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.Formatter.parse'" class=missing-support reason=upstream-dependency
 test refusesWhatDoesNotParse =
   LanguageTools.Formatter.parse(subtraction)
   |> Stdlib.Result.map(fun file ->

@@ -21,7 +21,6 @@ module Darklang.LanguageTools.Tests.Live
 // dangerous one, because a touched name collapsed away is a host that quietly does
 // not reload.
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.Live.dedupeTouched'" class=missing-support reason=upstream-dependency
 test dedupeTouched =
   Stdlib.Test.all(
     [ // Same location, same kind, twice: one thing to reload.
@@ -78,7 +77,6 @@ test dedupeTouched =
       LanguageTools.Live.dedupeTouched([]) |> Stdlib.Test.equal([]) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.Live.dependents'" class=missing-support reason=upstream-dependency
 test dependents =
   Stdlib.Test.all(
     [ // An unknown location: not a raise, not empty, but the seed itself, because
@@ -129,40 +127,34 @@ test dependents =
 // `Live.applicableByName` resolves a name by evaluating it. Only a dotted name of plain
 // identifiers is evaluated, and only a fn comes back.
 module ApplicableByName =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Live.Tests.ApplicableByName.resolve: Unknown function or value 'Stdlib.Live.applicableByName'"
   let resolve(name: String): Stdlib.Result.Result<String -> Int64, String> =
     LanguageTools.Live.applicableByName(SCM.Branch.mainBranchId, name)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Live.Tests.ApplicableByName.errorOf: Unknown function or value 'resolve'"
   let errorOf(name: String): String =
     match resolve(name) with
     | Ok(_) -> "resolved"
     | Error(e) -> e
 
 
-  // @compiler xfail compile: "Unknown function or value 'resolve'" class=missing-support reason=upstream-dependency
   test resolvesAFn =
     match resolve("Darklang.Stdlib.String.length") with
     | Ok(f) -> f("four") |> Stdlib.Test.equal(4)
     | Error(e) -> Stdlib.Test.fail(e)
 
 
-  // @compiler xfail compile: "Unknown function or value 'errorOf'" class=missing-support reason=upstream-dependency
   test missingFn =
     errorOf("Darklang.Stdlib.String.noSuchFn")
     |> Stdlib.Test.equal("No function named Darklang.Stdlib.String.noSuchFn")
 
 
   // A value evaluates fine, but it is not a fn.
-  // @compiler xfail compile: "Unknown function or value 'errorOf'" class=missing-support reason=upstream-dependency
   test valueIsNotAFn =
     errorOf("Darklang.Stdlib.Math.pi")
     |> Stdlib.Test.equal("No function named Darklang.Stdlib.Math.pi")
 
 
   // Anything but a dotted name is refused before eval sees it.
-  // @compiler xfail compile: "Unknown function or value 'errorOf'" class=missing-support reason=upstream-dependency
   test codeIsNotEvaluated =
     Stdlib.Test.all(
       [ errorOf("Darklang.Stdlib.String.length(\"four\")")
@@ -177,7 +169,6 @@ module ApplicableByName =
 
 module IssueText =
   /// Check real source and render its diagnostics as a live host does.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Tests.Live.IssueText.messages: Unknown function or value 'LanguageTools.Parser.Parse.packageSourceToOps'"
   let messages(source: String): List<String> =
     match LanguageTools.Parser.Parse.packageSourceToOps(
             SCM.Branch.mainBranchId,
@@ -190,7 +181,6 @@ module IssueText =
       |> Stdlib.List.map(LanguageTools.Live.issueText)
 
 
-  // @compiler xfail compile: "Unknown function or value 'messages'" class=missing-support reason=upstream-dependency
   test pairCallbackRetainsHint =
     messages(
       "let f(): Unit =\n"
@@ -201,13 +191,11 @@ module IssueText =
         + " (`Stdlib.List.iter`, argument 2)" ])
 
 
-  // @compiler xfail compile: "Unknown function or value 'messages'" class=missing-support reason=upstream-dependency
   test ordinaryMismatchKeepsLayout =
     messages("let f(): String = 1")
     |> Stdlib.Test.equal([ "expected String, got Int64 (return value)" ])
 
 
-  // @compiler xfail compile: "Unknown function or value 'messages'" class=missing-support reason=upstream-dependency
   test otherCallbackArityKeepsLayout =
     messages(
       "let f(): Unit =\n"

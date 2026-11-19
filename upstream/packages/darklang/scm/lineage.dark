@@ -18,7 +18,6 @@ module Darklang.SCM.Lineage
 ///
 /// A branch's binding replaced what its PARENT binds, which is the fact a later merge wants: not the
 /// branch's own previous version.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Lineage.currentlyBound: Unknown function or value 'SCM.PackageOps.liveBindingFor'"
 let currentlyBound(
   parent: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,
@@ -44,7 +43,6 @@ let currentlyBound(
 ///
 /// Runs BEFORE hash stabilization, which is safe because the answer is keyed on the location and the
 /// item kind, and stabilization rewrites neither -- it only replaces provisional target hashes.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let recordPrevious(
   branchId: Uuid,
   ops: List<LanguageTools.ProgramTypes.PackageOp>)

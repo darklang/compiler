@@ -357,7 +357,6 @@ test multiply =
       8 * 8 |> Stdlib.Test.equal(64) ])
 
 
-// @compiler xfail compile: "Expected TInt64, got TFloat64" class=aot-rejection reason=aot-type-error
 test multiplyByFloatRaises =
   1 * 1.0
   => raises "Cannot perform numeric operation on Int64 and Float64. Both sides must be the same type. Write the number with a decimal point, as `5.0`, or convert with `Stdlib.Int64.toFloat64(n)`."
@@ -378,13 +377,11 @@ test divideOfOneRejectsZero =
 
 
 /// The polymorphic builtins behind `/` and `%` raise as the operators do.
-// @compiler xfail compile: "Unknown function or value 'Builtin.divide'" class=missing-support reason=upstream-dependency
 test builtinDivideRejectsZero =
   Builtin.divide(5, 0)
   => raises "Cannot divide by 0"
 
 
-// @compiler xfail compile: "Unknown function or value 'Builtin.modulo'" class=missing-support reason=upstream-dependency
 test builtinModuloRejectsNegativeDivisor =
   Builtin.modulo(5, -1)
   => raises "Cannot evaluate modulus against a negative number"

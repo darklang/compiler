@@ -16,7 +16,6 @@ module PermissionsGrammar =
 
 
   /// True when rendering the rule and parsing that text gives the rule back.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.PermissionsGrammar.PermissionsGrammar.roundTrips: Unknown function or value 'Darklang.LanguageTools.Permissions.parseRuleText'"
   let roundTrips(rule: LanguageTools.Permissions.Rule): Bool =
     LanguageTools.Permissions.parseRuleText(
       LanguageTools.Permissions.renderRule(rule))
@@ -57,7 +56,6 @@ module PermissionsGrammar =
 
 
   // Basic rule forms accepted by `permissions allow`.
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRule'" class=missing-support reason=upstream-dependency
   test basicRules =
     Stdlib.Test.all(
       [ LanguageTools.Permissions.parseRule([ "file", "read", "/tmp/x" ])
@@ -78,7 +76,6 @@ module PermissionsGrammar =
 
 
   // No target means every target.
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRule'" class=missing-support reason=upstream-dependency
   test noTargetMeansAll =
     Stdlib.Test.all(
       [ LanguageTools.Permissions.parseRule([ "file", "read" ])
@@ -99,7 +96,6 @@ module PermissionsGrammar =
 
 
   // The store effects are not resource-scoped: bare effect names only.
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRule'" class=missing-support reason=upstream-dependency
   test storeEffectsBare =
     Stdlib.Test.all(
       [ LanguageTools.Permissions.parseRule([ "package-read" ])
@@ -116,7 +112,6 @@ module PermissionsGrammar =
 
 
   // Unknown access, unknown kind, unknown effect: never a wildcard.
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRule'" class=missing-support reason=upstream-dependency
   test unknownNeverWildcard =
     Stdlib.Test.all(
       [ LanguageTools.Permissions.parseRule([ "file", "execute", "/x" ])
@@ -136,14 +131,12 @@ module PermissionsGrammar =
 
 
   // Representative forms emitted by the F# denial hint (`Request.suggestRule`).
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRuleText'" class=missing-support reason=upstream-dependency
   test denialHintForms =
     LanguageTools.Permissions.parseRuleText("http GET https://h:443/p?q")
     |> Stdlib.Test.equal(Stdlib.Option.Option.Some([ exactHttp() ]))
 
 
   // A query with no path: the host must not swallow the query.
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRuleText'" class=missing-support reason=upstream-dependency
   test queryWithoutPath =
     Stdlib.Test.all(
       [ LanguageTools.Permissions.parseRuleText("http GET https://h?x=1")
@@ -174,7 +167,6 @@ module PermissionsGrammar =
           query = LanguageTools.Permissions.Scope.All })
 
 
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRuleText'" class=missing-support reason=upstream-dependency
   test exactAndSubtreeAreDistinct =
     let exact =
       LanguageTools.Permissions.parseRuleText("http GET https://h/orders")
@@ -198,7 +190,6 @@ module PermissionsGrammar =
         |> Stdlib.Test.equal(true) ])
 
 
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRuleText'" class=missing-support reason=upstream-dependency
   test serverAddressIsRequired =
     Stdlib.Test.all(
       [ LanguageTools.Permissions.parseRuleText("http-server 9090")
@@ -218,7 +209,6 @@ module PermissionsGrammar =
   // A trailing /* explicitly includes the path and its children:
   // `https://api.github.com:443/*` covers `/repos/darklang/dark`, instead of being saved as a
   // literal `/*` that no request matches. A `*` anywhere else is refused.
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRuleText'" class=missing-support reason=upstream-dependency
   test trailingStarIsThePrefix =
     Stdlib.Test.all(
       [ LanguageTools.Permissions.parseRuleText(
@@ -241,7 +231,6 @@ module PermissionsGrammar =
 
   // A relative executable would name a different program per working
   // directory; only `*` or an absolute path is a rule.
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRuleText'" class=missing-support reason=upstream-dependency
   test relativeExecutableRejected =
     Stdlib.Test.all(
       [ LanguageTools.Permissions.parseRuleText("process ./tool")
@@ -286,7 +275,6 @@ module PermissionsGrammar =
 
   // A bare `http`, `http-server` or `process` is the whole effect, never the
   // scoped rule's broad spelling: each text names exactly one Rule.
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRuleText'" class=missing-support reason=upstream-dependency
   test bareEffectNames =
     ([ "http", "http-server", "process" ]
      |> Stdlib.List.all(fun name ->
@@ -298,7 +286,6 @@ module PermissionsGrammar =
 
 
   // `*` is the wildcard executable, not an executable literally named `*`.
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRuleText'" class=missing-support reason=upstream-dependency
   test wildcardExecutable =
     Stdlib.Test.all(
       [ LanguageTools.Permissions.parseRuleText("process *")
@@ -321,7 +308,6 @@ module PermissionsGrammar =
 
 
   // Render/parse round trips.
-  // @compiler xfail compile: "Unknown function or value 'roundTrips'" class=missing-support reason=upstream-dependency
   test exactRuleRoundTrips =
     Stdlib.Test.all(
       [ roundTrips(LanguageTools.Permissions.Rule.All)
@@ -334,7 +320,6 @@ module PermissionsGrammar =
 
 
   // The three effects that also have scoped rule forms.
-  // @compiler xfail compile: "Unknown function or value 'roundTrips'" class=missing-support reason=upstream-dependency
   test scopedEffectRoundTrips =
     Stdlib.Test.all(
       [ roundTrips(
@@ -372,7 +357,6 @@ module PermissionsGrammar =
 
 
   // A query must not be dropped when rendering a broad HTTP rule.
-  // @compiler xfail compile: "Unknown function or value 'roundTrips'" class=missing-support reason=upstream-dependency
   test queryKeptAndRuleRoundTrips =
     Stdlib.Test.all(
       [ Stdlib.String.contains(
@@ -420,7 +404,6 @@ module PermissionsGrammar =
 
   // Rendered guest-controlled fields are quoted: spaces, apostrophes and
   // shell metacharacters survive the round trip as data, never syntax.
-  // @compiler xfail compile: "Unknown function or value 'roundTrips'" class=missing-support reason=upstream-dependency
   test quotedFieldsRoundTrip =
     Stdlib.Test.all(
       [ roundTrips(
@@ -434,7 +417,6 @@ module PermissionsGrammar =
 
 
   // IPv6 hosts use brackets in text but the typed rule stores the host itself.
-  // @compiler xfail compile: "Unknown function or value 'roundTrips'" class=missing-support reason=upstream-dependency
   test ipv6Hosts =
     roundTrips(
       LanguageTools.Permissions.Rule.Http(
@@ -449,7 +431,6 @@ module PermissionsGrammar =
 
 
   // The whole policy renders and parses back, deny rules included.
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parse'" class=missing-support reason=upstream-dependency
   test policyRoundTrip =
     LanguageTools.Permissions.parse(
       LanguageTools.Permissions.render(
@@ -473,7 +454,6 @@ module PermissionsGrammar =
               [ LanguageTools.Permissions.Rule.FileWrite(only("/etc")) ] }))
 
 
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.Permissions.parseRuleText'" class=missing-support reason=upstream-dependency
   test httpNormalization =
     Stdlib.Test.all(
       [ LanguageTools.Permissions.parseRuleText(

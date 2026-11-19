@@ -1,6 +1,5 @@
 module Darklang.Stdlib.AltJson
 
-// @compiler replace: packages/darklang/stdlib/altJson.dark#Darklang.Stdlib.AltJson.Json reason=compiler-implementation
 type Json =
   | Null
   | Bool(Bool)
@@ -14,12 +13,10 @@ type Json =
 
 
 module ParseError =
-  // @compiler replace: packages/darklang/stdlib/altJson/parseError.dark#Darklang.Stdlib.AltJson.ParseError.ParseError reason=compiler-implementation
   type ParseError =
     | NotJson
 
 
-  // @compiler replace: packages/darklang/stdlib/altJson/parseError.dark#Darklang.Stdlib.AltJson.ParseError.toString reason=compiler-implementation
   let toString(e: ParseError): String =
     match e with
     | NotJson -> "Not JSON"
@@ -30,7 +27,6 @@ module ParseError =
 
 
 /// Formats <param j> as JSON text, with no whitespace between tokens.
-// @compiler replace: packages/darklang/stdlib/altJson.dark#Darklang.Stdlib.AltJson.format reason=compiler-implementation
 let format(j: Json): String =
   match j with
   | Null -> "null"
@@ -52,7 +48,6 @@ impl Display for Json =
 /// Parses <param jsonString> as JSON. `//` and `/* */` comments are skipped
 /// wherever whitespace may go. A number with no `.`, `e` or `E` is an
 /// {{Integer}}, otherwise a {{Float64}}.
-// @compiler replace: packages/darklang/stdlib/altJson.dark#Darklang.Stdlib.AltJson.parse reason=compiler-implementation
 let parse(jsonString: String): Result<Json, ParseError.ParseError> =
   match Parse.document(jsonString) with
   | Some(json) -> Result.Ok(json)
@@ -64,7 +59,6 @@ module Format =
   /// and the C0 controls, with the short forms JSON has) and U+2028 and U+2029,
   /// which JavaScript reads as line breaks; everything else is written as
   /// itself.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Format.stringText: Unknown function or value 'controlEscape'"
   let stringText(s: String): String =
     let escaped =
       // The patterns in this module are fixed and valid, and none can stop inside a
@@ -105,7 +99,6 @@ module Format =
 
   /// The `\u` escape of a C0 control. Its UTF-8 is the one byte of its code,
   /// so the escape is that byte in hex after two zeros.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Format.controlEscape: Unknown function or value 'Base16.encode'"
   let controlEscape(c: String): String =
     "\\u00" + String.toUppercase(Base16.encode(Utf8.encode(c)))
 
@@ -188,7 +181,6 @@ module Parse =
 
   /// The whole input is one value, with only whitespace and comments around
   /// it. Text that no token covers is not JSON.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Parse.document: Unknown function or value 'value'"
   let document(text: String): Option<Json> =
     let tokens = Regex.findAll(text, token) |> Result.withDefault([])
     if String.join(tokens, "") != text then
@@ -207,7 +199,6 @@ module Parse =
 
 
   /// One value. <param ts> starts at its first token.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Parse.value: Unknown function or value 'items'"
   let value(ts: List<String>): Option<(Json * List<String>)> =
     match ts with
     | ["null", ...rest] -> Option.Some((Json.Null, rest))
@@ -305,7 +296,6 @@ module Parse =
   val surrogateSpan = hexValue("400")
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Parse.number: Unknown constructor 'Darklang.Stdlib.AltJson.Json.Float'"
   let number(t: String): Option<Json> =
     if Regex.isMatch(t, "[.eE]") |> Result.withDefault(false) then
       Float64.parse(t)
@@ -322,7 +312,6 @@ module Parse =
 
 
   /// The rest of an array, after its `[`.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Parse.items: Unknown function or value 'value'"
   let items(ts: List<String>, acc: List<Json>): Option<(Json * List<String>)> =
     match ts with
     | ["]", ...rest] when List.isEmpty(acc) -> Option.Some((Json.Array([]), rest))
@@ -338,7 +327,6 @@ module Parse =
 
 
   /// The rest of an object, after its `{`.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Parse.fields: Unknown function or value 'value'"
   let fields(ts: List<String>, acc: List<(String * Json)>): Option<(Json * List<String>)> =
     match ts with
     | ["}", ...rest] when List.isEmpty(acc) -> Option.Some((Json.Object([]), rest))
@@ -365,7 +353,6 @@ let toInt64(j: Json): Option<Int64> =
 
 
 /// Read a JSON number as Float64 only when the conversion is exact.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.toFloat64: Expected TSum (\"Darklang.Stdlib.Option.Option\", [TInt64]), got TSum"
 let toFloat64(j: Json): Option<Float64> =
   match j with
   | Float(n) -> Option.Some(n)
@@ -382,7 +369,6 @@ let toFloat64(j: Json): Option<Float64> =
 
 module Helpers =
   /// Get a string value from a JSON object's fields
-  // @compiler replace: packages/darklang/stdlib/altJson/helpers.dark#Darklang.Stdlib.AltJson.Helpers.getString reason=compiler-implementation
   let getString(key: String, fields: List<(String * Json)>): Option<String> =
     let found = List.findFirst(fields, fun((k, _)) -> k == key)
     match found with
@@ -394,7 +380,6 @@ module Helpers =
 
 
   /// Get a boolean value from a JSON object's fields
-  // @compiler replace: packages/darklang/stdlib/altJson/helpers.dark#Darklang.Stdlib.AltJson.Helpers.getBool reason=compiler-implementation
   let getBool(key: String, fields: List<(String * Json)>): Option<Bool> =
     let found = List.findFirst(fields, fun((k, _)) -> k == key)
     match found with
@@ -406,7 +391,6 @@ module Helpers =
 
 
   /// Get a raw JSON value from a JSON object's fields
-  // @compiler replace: packages/darklang/stdlib/altJson/helpers.dark#Darklang.Stdlib.AltJson.Helpers.getValue reason=compiler-implementation
   let getValue(key: String, fields: List<(String * Json)>): Option<Json> =
     let found = List.findFirst(fields, fun((k, _)) -> k == key)
     match found with
@@ -468,7 +452,6 @@ module Helpers =
 
   /// Get a Float64 field. An integer is converted only if Float64 can hold it
   /// exactly; use <fn getInt64Option> for integers.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Helpers.getFloat: Unknown function or value 'toFloat64'"
   let getFloat(key: String, fields: List<(String * Json)>): Option<Float64> =
     let found = List.findFirst(fields, fun((k, _)) -> k == key)
     match found with
@@ -477,7 +460,6 @@ module Helpers =
 
 
   /// Get an array value from a JSON object's fields (returns [] if not found)
-  // @compiler replace: packages/darklang/stdlib/altJson/helpers.dark#Darklang.Stdlib.AltJson.Helpers.getArray reason=compiler-implementation
   let getArray(key: String, fields: List<(String * Json)>): List<Json> =
     let found = List.findFirst(fields, fun((k, _)) -> k == key)
     match found with
@@ -489,7 +471,6 @@ module Helpers =
 
 
   /// Get a nested object's fields from a JSON object (returns [] if not found)
-  // @compiler replace: packages/darklang/stdlib/altJson/helpers.dark#Darklang.Stdlib.AltJson.Helpers.getObject reason=compiler-implementation
   let getObject(key: String, fields: List<(String * Json)>): List<(String * Json)> =
     let found = List.findFirst(fields, fun((k, _)) -> k == key)
     match found with
@@ -507,17 +488,14 @@ module Helpers =
 // ---------------------------------------------------------------------------
 
 module Builder =
-  // @compiler replace: packages/darklang/stdlib/altJson/builder.dark#Darklang.Stdlib.AltJson.Builder.Fields reason=compiler-implementation
   type Fields = List<(String * Json)>
 
 
   /// Start with an empty JSON object
-  // @compiler replace: packages/darklang/stdlib/altJson/builder.dark#Darklang.Stdlib.AltJson.Builder.empty reason=compiler-implementation
   val empty = []
 
 
   /// Add a required string field
-  // @compiler replace: packages/darklang/stdlib/altJson/builder.dark#Darklang.Stdlib.AltJson.Builder.addString reason=compiler-implementation
   let addString(fields: Fields, key: String, value: String): Fields =
     List.append(fields, (key, Json.String(value)))
 
@@ -533,25 +511,21 @@ module Builder =
 
 
   /// Add a required bool field
-  // @compiler replace: packages/darklang/stdlib/altJson/builder.dark#Darklang.Stdlib.AltJson.Builder.addBool reason=compiler-implementation
   let addBool(fields: Fields, key: String, value: Bool): Fields =
     List.append(fields, (key, Json.Bool(value)))
 
 
   /// Add a required JSON value field
-  // @compiler replace: packages/darklang/stdlib/altJson/builder.dark#Darklang.Stdlib.AltJson.Builder.addJson reason=compiler-implementation
   let addJson(fields: Fields, key: String, value: Json): Fields =
     List.append(fields, (key, value))
 
 
   /// Add a required array field
-  // @compiler replace: packages/darklang/stdlib/altJson/builder.dark#Darklang.Stdlib.AltJson.Builder.addArray reason=compiler-implementation
   let addArray(fields: Fields, key: String, value: List<Json>): Fields =
     List.append(fields, (key, Json.Array(value)))
 
 
   /// Add an optional string field (only adds if Some)
-  // @compiler replace: packages/darklang/stdlib/altJson/builder.dark#Darklang.Stdlib.AltJson.Builder.addOptionalString reason=compiler-implementation
   let addOptionalString(fields: Fields, key: String, value: Option<String>): Fields =
     match value with
     | Some(v) -> List.append(fields, (key, Json.String(v)))
@@ -573,7 +547,6 @@ module Builder =
 
 
   /// Add an optional bool field (only adds if Some)
-  // @compiler replace: packages/darklang/stdlib/altJson/builder.dark#Darklang.Stdlib.AltJson.Builder.addOptionalBool reason=compiler-implementation
   let addOptionalBool(fields: Fields, key: String, value: Option<Bool>): Fields =
     match value with
     | Some(v) -> List.append(fields, (key, Json.Bool(v)))
@@ -581,7 +554,6 @@ module Builder =
 
 
   /// Add an optional JSON value field (only adds if Some)
-  // @compiler replace: packages/darklang/stdlib/altJson/builder.dark#Darklang.Stdlib.AltJson.Builder.addOptionalJson reason=compiler-implementation
   let addOptionalJson(fields: Fields, key: String, value: Option<Json>): Fields =
     match value with
     | Some(v) -> List.append(fields, (key, v))
@@ -589,7 +561,6 @@ module Builder =
 
 
   /// Add an optional array field (only adds if Some)
-  // @compiler replace: packages/darklang/stdlib/altJson/builder.dark#Darklang.Stdlib.AltJson.Builder.addOptionalArray reason=compiler-implementation
   let addOptionalArray(fields: Fields, key: String, value: Option<List<Json>>): Fields =
     match value with
     | Some(v) -> List.append(fields, (key, Json.Array(v)))
@@ -597,6 +568,5 @@ module Builder =
 
 
   /// Convert fields to a JSON object
-  // @compiler replace: packages/darklang/stdlib/altJson/builder.dark#Darklang.Stdlib.AltJson.Builder.toJson reason=compiler-implementation
   let toJson(fields: Fields): Json =
     Json.Object(fields)

@@ -15,20 +15,17 @@ type ParseError =
 
 /// Round <param a> to the nearest <type Float32>, ties to even. A value too large
 /// for a Float32 becomes an infinity, and one too small becomes zero.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Float32.fromFloat64: Unknown function or value 'Builtin.float32FromFloat'"
 let fromFloat64(a: Float64): Float32 =
   Builtin.float32FromFloat64(a)
 
 
 /// Widen <param a> to a <type Float64>. Exact: every Float32 is also a Float64.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Float32.toFloat64: Unknown function or value 'Builtin.float32ToFloat'"
 let toFloat64(a: Float32): Float64 =
   Builtin.float32ToFloat64(a)
 
 
 /// The <type Float32> nearest <param a>, ties to even. Past 2^24 not every integer
 /// is a Float32: {{Float32.fromInt64(16777217) == 16777216.0f32}}.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Float32.fromInt64: Unknown function or value 'Builtin.float32FromInt64'"
 let fromInt64(a: Int64): Float32 =
   Builtin.float32FromInt64(a)
 
@@ -70,7 +67,6 @@ let truncate(a: Float32): Int64 =
   Float64.truncate(toFloat64(a))
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Negate for Float32 =
   /// Returns the negation of <param a>, {{-a}}
   let negate(a: Float32): Float32 =
@@ -82,35 +78,30 @@ let sqrt(a: Float32): Float32 =
   fromFloat64(Float64.sqrt(toFloat64(a)))
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Add for Float32 =
   /// Add <type Float32> <param a> to <type Float32> <param b>
   let add(a: Float32, b: Float32): Float32 =
     Builtin.add(a, b)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Subtract for Float32 =
   /// Subtract <type Float32> <param b> from <type Float32> <param a>
   let subtract(a: Float32, b: Float32): Float32 =
     Builtin.subtract(a, b)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Multiply for Float32 =
   /// Multiply <type Float32> <param a> by <type Float32> <param b>
   let multiply(a: Float32, b: Float32): Float32 =
     Builtin.multiply(a, b)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Power for Float32 =
   /// Returns <param base> raised to the power of <param exponent>
   let power(base: Float32, exponent: Float32): Float32 =
     Builtin.power(base, exponent)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Divide for Float32 =
   /// Divide <type Float32> <param a> by <type Float32> <param b>
   let divide(a: Float32, b: Float32): Float32 =
@@ -197,7 +188,6 @@ let checkedFromFloat64(a: Float64): Result<Float32, Math.Overflow> =
   __noOverflow(fromFloat64(a))
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Compare for Float32 =
   /// Returns true if a is less than b
   let lessThan(a: Float32, b: Float32): Bool =
@@ -240,7 +230,6 @@ let clampRefusingNaN(value: Float32, limitA: Float32, limitB: Float32): Result<F
 /// Returns the <type Float32> nearest to the number in <param s>, ties to even,
 /// accepting what <fn Float64.parse> accepts. Rounded once from the decimal, never
 /// through a Float64.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Float32.parse: Unknown function or value 'Builtin.float32Parse'"
 let parse(s: String): Result<Float32, ParseError> =
   match Builtin.float32Parse(s) with
   | Some(f) -> Result.Ok(f)
@@ -266,35 +255,29 @@ let toInt64(a: Float32): Int64 =
 
 
 /// Return <param a>'s IEEE 754 binary32 bits as an unsigned 32-bit value.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Float32.toBits: Unknown function or value 'Builtin.float32ToBits'"
 let toBits(a: Float32): UInt32 =
   Builtin.float32ToBits(a)
 
 
 /// The <type Float32> whose IEEE 754 binary32 bits are <param bits>. Every pattern
 /// round-trips through <fn Float32.toBits>, a NaN's sign and payload included.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Float32.fromBits: Unknown function or value 'Builtin.float32FromBits'"
 let fromBits(bits: UInt32): Float32 =
   Builtin.float32FromBits(bits)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Display for Float32 =
   /// Stringify <param a> as the shortest decimal that parses back to the same
   /// Float32, e.g. `0.1` for `0.1f32` (where the widened Float64 says
   /// `0.10000000149011612`), `1e+16`, `1e-5`.
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Float32.impl Display for Float32: An implementation new at this pin; not yet checked against the compiler trait implementations"
   let display(a: Float32): String =
     Builtin.float32ToString(a)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Zero for Float32 =
   let zero(): Float32 =
     0.0f32
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl One for Float32 =
   let one(): Float32 =
     1.0f32

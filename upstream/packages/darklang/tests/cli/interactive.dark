@@ -109,7 +109,6 @@ let awaitStartup(telemetryLog: String): List<String> =
 
 
 /// Write an expect script to `path` and run it: Ok with its output if it exits 0.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Interactive.runScript: Operator is unavailable for this type"
 let runScript(
   path: String,
   script: String)
@@ -136,7 +135,6 @@ let runScript(
 /// The transcript is everything the child painted, escape sequences and all, which is
 /// what you want in a failure message and what `Stdlib.String.contains` is happy to
 /// search.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Interactive.drive: Unknown function or value 'runScript'"
 let drive(
   i: Instance.T,
   args: List<String>,
@@ -202,7 +200,6 @@ let drive(
 
 
 /// `drive`, as a test result.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Interactive.expectSteps: Unknown function or value 'drive'"
 let expectSteps(
   i: Instance.T,
   args: List<String>,

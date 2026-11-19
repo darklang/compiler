@@ -31,7 +31,6 @@ let parseError(error: ParseError): Stdlib.Result.Result<Json, ParseError> =
 // </helpers>
 
 /// `toInt64` of whatever `text` parses to, and None when it does not parse.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.AltJson.Tests.parseInt: Unknown function or value 'Stdlib.AltJson.toInt64'"
 let parseInt(text: String): Stdlib.Option.Option<Int64> =
   match parse(text) with
   | Ok(json) -> Stdlib.AltJson.toInt64(json)
@@ -121,7 +120,6 @@ test intBuilder =
 
 /// Only an integer-valued JSON number is an Int64: a float form is not, even when
 /// its value is whole.
-// @compiler xfail compile: "Unknown function or value 'parseInt'" class=missing-support reason=upstream-dependency
 test toInt64 =
   Stdlib.Test.all(
     [ Stdlib.AltJson.toInt64(Json.Integer(42))
@@ -157,7 +155,6 @@ test toInt64 =
 
 /// Reading a named field as an Int64 (or a Float64): a missing field, a null, and a
 /// non-integer value each answer differently.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.AltJson.Helpers.getFloat'" class=missing-support reason=upstream-dependency
 test intFieldHelpers =
   Stdlib.Test.all(
     [ Stdlib.AltJson.Helpers.getInt64Option("a", [ ("a", Json.Integer(3)) ])
@@ -447,7 +444,6 @@ test parseErrors =
 // Characters outside what JSON requires escaping are written as themselves.
 // Non-BMP ones used to come out as a `\u` surrogate pair; either form parses
 // back to the same string.
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test nonAsciiIsWrittenAsItself =
   Stdlib.Test.all(
     [ format(Json.String("é中😀")) |> Stdlib.Test.equal("\"é中😀\"")
@@ -460,7 +456,6 @@ test nonAsciiIsWrittenAsItself =
 
 // The short escapes JSON has are used where there is one, both ways, and U+2028
 // is escaped because JavaScript reads it as a line break.
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test escapes =
   Stdlib.Test.all(
     [ format(Json.String("\b\f\x1F\u2028\\\""))
@@ -488,7 +483,6 @@ test loneSurrogatesAreNotJson =
 
 
 // No JSON form, so the strings Json.serialize uses for them.
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test nonFiniteFloats =
   Stdlib.Test.all(
     [ format(Json.Float(0.0 / 0.0)) |> Stdlib.Test.equal("\"NaN\"")
@@ -498,7 +492,6 @@ test nonFiniteFloats =
 
 // The round-trip notation changes over at a leading-digit exponent outside
 // -4..16, whatever the number of digits.
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test floatNotation =
   Stdlib.Test.all(
     [ format(Json.Float(1e16)) |> Stdlib.Test.equal("10000000000000000")
@@ -522,7 +515,6 @@ test floatNotation =
 
 // Comments go wherever whitespace does, except between a key and its colon,
 // and a line comment may not hold a line or paragraph separator.
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test commentPlacement =
   Stdlib.Test.all(
     [ parse("{\"a\":/* c */1 // c\n}")

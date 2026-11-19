@@ -13,7 +13,6 @@ module Darklang.LanguageTools.AtRestTypeChecker.Declarations
 /// round's results for referenced types. Repeat until nothing changes, so passing
 /// a parameter around a recursive cycle alone does not count as storing its value.
 /// If traversal fails, retain that declaration's previous result and save a warning.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let prepareValueTypeParameters(
   env: Model.Environment,
   failures: Dict<ProgramTypes.Hash, Model.Finding>)
@@ -48,7 +47,6 @@ let prepareValueTypeParameters(
 /// Select the supplied type arguments that this declaration requires to be valid
 /// dictionary keys. Use its cached parameter requirements instead of repeatedly
 /// expanding its fields, which could recurse forever or keep growing type arguments.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let customDictKeys(
   env: Model.Environment,
   name: ProgramTypes.Hash,
@@ -64,7 +62,6 @@ let customDictKeys(
 /// Collect types that must be valid dictionary keys, including keys nested inside
 /// other types. For custom types, use cached parameter requirements and inspect
 /// their supplied arguments instead of expanding the declaration again.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let dictKeyTypes(env: Model.Environment, ty: Model.Ty): List<Model.Ty> =
   let many(types: List<Model.Ty>): List<Model.Ty> =
     Stdlib.List.flatten(Stdlib.List.map(types, fun t -> dictKeyTypes(env, t)))
@@ -82,7 +79,6 @@ let dictKeyTypes(env: Model.Environment, ty: Model.Ty): List<Model.Ty> =
 /// Find the declaration's type parameters that must accept only valid dictionary
 /// key types. A parameter needs this restriction if replacing it with a function
 /// type makes an otherwise usable key invalid.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let dictKeyParametersFor(
   env: Model.Environment,
   decl: ProgramTypes.TypeDeclaration.TypeDeclaration)
@@ -113,7 +109,6 @@ let dictKeyParametersFor(
 /// a round makes no changes. There are only finitely many declared parameters to
 /// restrict, so mutually recursive declarations can reach a stable result.
 /// Save traversal failures per declaration and continue analyzing the others.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let prepareDictKeyParameters(
   env: Model.Environment,
   failures: Dict<ProgramTypes.Hash, Model.Finding>)
@@ -146,7 +141,6 @@ let prepareDictKeyParameters(
 /// Add a definite error if this type cannot be used as a dictionary key.
 /// Inference variables and generic parameters pass this check; later inference or uses
 /// of a generic signature can supply more specific types to check.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let checkDictKey(
   env: Model.Environment,
   at: Option<Int64>,
@@ -169,7 +163,6 @@ let checkDictKey(
 /// Walk the supplied type and check that custom types exist, have the required
 /// number of arguments, and satisfy dictionary-key requirements. Return referenced
 /// declarations' hashes so the caller can include their cached problems separately.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let checkTypeStructure(
   env: Model.Environment,
   at: Option<Int64>,
@@ -209,7 +202,6 @@ let checkTypeStructure(
 
 /// `checkTypeStructure` over each of <param tys> in turn. Top-level rather than nested, where it
 /// is a closure built on every call, leaf types included, which never use it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let checkTypeStructures(
   env: Model.Environment,
   at: Option<Int64>,
@@ -229,7 +221,6 @@ let checkTypeStructures(
 /// Collect references to aliases within this type, including its nested arguments.
 /// Do not walk record or enum fields: recursion through those declarations is
 /// allowed and does not itself create an alias-expansion cycle.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let aliasEdges(
   env: Model.Environment,
   found: List<ProgramTypes.Hash>,
@@ -257,7 +248,6 @@ let aliasEdges(
 
 
 /// Collect alias references across a list of types, preserving those already found.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let aliasEdgesIn(
   env: Model.Environment,
   found: List<ProgramTypes.Hash>,
@@ -271,7 +261,6 @@ let aliasEdgesIn(
 /// Determine whether expanding this alias can reach an alias cycle, even if the
 /// alias itself is outside the cycle. known caches completed answers; expanding
 /// contains the current path, so revisiting a name there identifies a cycle.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let reachesAliasCycle(
   env: Model.Environment,
   known: Dict<ProgramTypes.Hash, Bool>,
@@ -299,7 +288,6 @@ let reachesAliasCycle(
 
 /// Follow alias references until one reaches a cycle, sharing cached answers
 /// between visits. Stop at the first cycle because only a yes/no result is needed.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let anyReachesAliasCycle(
   env: Model.Environment,
   known: Dict<ProgramTypes.Hash, Bool>,
@@ -319,7 +307,6 @@ let anyReachesAliasCycle(
 /// Check an alias target, record fields, or enum payloads and record direct type
 /// dependencies. Add an alias-cycle warning when cyclic marks this declaration.
 /// Store findings without source-node IDs so each later use can supply its location.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let declarationFactsOf(
   env: Model.Environment,
   cyclic: Dict<ProgramTypes.Hash, Bool>,
@@ -350,7 +337,6 @@ let declarationFactsOf(
 /// Turn a checker failure into a warning that can be saved with declaration facts.
 /// Distinguish excessive nesting from other checker errors; attach a source node
 /// later when a use of the declaration reports the warning.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Finding'"
 let failureFinding(failure: CheckFailure): Model.Finding =
   let context =
     match failure with
@@ -365,7 +351,6 @@ let failureFinding(failure: CheckFailure): Model.Finding =
 /// then find alias cycles and validate each declaration's own structure.
 /// Finally, combine problems across dependencies, sharing results among groups
 /// of declarations that depend on one another.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let prepareDeclarations(env: Model.Environment): Model.Environment =
   // Rebuild summaries from the current set of declarations. Determine which
   // parameters can hold values before checking dictionary-key requirements.
@@ -433,7 +418,6 @@ type Components =
 
 /// Read a declaration's direct dependencies from its prepared facts.
 /// Return no references when facts are unavailable.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let referencesOf(env: Model.Environment, name: ProgramTypes.Hash): List<ProgramTypes.Hash> =
   match Stdlib.Dict.get(env.declarationFacts, name) with
   | Some(declarationFacts) -> declarationFacts.references
@@ -449,7 +433,6 @@ let indexOrZero(indices: Dict<ProgramTypes.Hash, Int64>, name: ProgramTypes.Hash
 /// Visit a declaration for the first time and explore its dependencies. If it is
 /// the earliest reachable member of its active group, complete that group by
 /// removing its members from the traversal stack.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let strongConnect(
   env: Model.Environment,
   components: Components,
@@ -472,7 +455,6 @@ let strongConnect(
 
 /// Follow each direct dependency and update node's earliest reachable index.
 /// Dependencies already assigned to completed groups cannot join node's group.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let connectSuccessors(
   env: Model.Environment,
   components: Components,
@@ -531,7 +513,6 @@ let popComponent(
 /// Cache each declaration's own problems together with problems in all its
 /// dependencies. Mutually dependent declarations share one combined result;
 /// dependencies outside their group already have results when the group is processed.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let allDeclarationProblems(env: Model.Environment): Dict<ProgramTypes.Hash, List<Model.Finding>> =
   let start =
     Components
@@ -591,7 +572,6 @@ let allDeclarationProblems(env: Model.Environment): Dict<ProgramTypes.Hash, List
 /// Return prepared facts when available. Otherwise inspect the declaration and
 /// its alias-cycle status on demand, without updating the environment's cache.
 /// Return None if the declaration itself is unavailable.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let declarationFactsFor(
   env: Model.Environment,
   name: ProgramTypes.Hash)
@@ -609,7 +589,6 @@ let declarationFactsFor(
 /// Collect problems from this declaration and its dependencies, attaching at as
 /// their reporting location. Reuse walked so previously visited declarations do
 /// not add their findings again.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let visit(
   env: Model.Environment,
   at: Option<Int64>,
@@ -623,7 +602,6 @@ let visit(
 /// Process dependency hashes from an explicit work list, visiting each once.
 /// Direct recursion over this list avoids nesting interpreter callbacks for each
 /// dependency level. Missing declarations are skipped; their uses report them.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let visitAll(
   env: Model.Environment,
   at: Option<Int64>,
@@ -650,7 +628,6 @@ let visitAll(
 
 /// Collect all problems reachable from one declaration without assigning a source
 /// node. The resulting list can be reused at different locations that reference it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let collectDeclarationProblems(
   env: Model.Environment,
   name: ProgramTypes.Hash)
@@ -661,7 +638,6 @@ let collectDeclarationProblems(
 
 /// Return cached problems for a declaration and its dependencies, or collect and
 /// cache them on first use. Keep source locations unset until a caller reports them.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let declarationProblemsFor(
   env: Model.Environment,
   name: ProgramTypes.Hash)
@@ -677,7 +653,6 @@ let declarationProblemsFor(
 /// Validate this use of a type: check its structure and dictionary keys, then add
 /// cached problems from the declarations it references and their dependencies.
 /// Attach at to those findings so they point to this use, and return updated caches.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let validateType(
   env: Model.Environment,
   at: Option<Int64>,

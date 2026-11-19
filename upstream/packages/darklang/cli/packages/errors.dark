@@ -87,7 +87,6 @@ let conversionName(modules: List<String>, name: String): Option<(List<String> * 
 /// `Int64.max` also tries `Stdlib.max`: a deeper one may be the user's own module that does not
 /// exist yet. Last, a name from <fn otherLanguageName> tries its Stdlib one: `Int64.toString` ->
 /// `Stdlib.display`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.stdlibSuggestionCandidates: Unknown function or value 'otherLanguageName'"
 let stdlibSuggestionCandidates(
   originalName: List<String>)
   : List<(String * LanguageTools.ProgramTypes.PackageLocation)> =
@@ -167,7 +166,6 @@ let guessedName(originalName: List<String>): Option<String> =
 
 /// Suggest the standard-library name an unresolved name probably meant, when an item exists there:
 /// a <fn guessedName>, or else the first of <fn stdlibSuggestionCandidates> that is on the branch.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.stdlibSuggestion: Unknown function or value 'LanguageTools.PackageManager.findAny'"
 let stdlibSuggestion(branchId: Uuid, originalName: List<String>): Option<String> =
   match guessedName(originalName) with
   | Some(name) -> Option.Some(name)
@@ -239,7 +237,6 @@ let nearestOnly(sorted: List<(Int64 * String)>): List<(Int64 * String)> =
 /// Up to three existing names in the module <param originalName> names that are spelled close to
 /// it or are Stdlib's word for it, nearest first: `Stdlib.List.lenght` and `Stdlib.List.size` give
 /// `Stdlib.List.length`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.closestNames: Unknown function or value 'Query.allDirectDescendantNames'"
 let closestNames(branchId: Uuid, originalName: List<String>): List<String> =
   match splitLast(originalName) with
   | None -> []
@@ -285,7 +282,6 @@ let operatorOfName(name: String): Option<(String * String * String)> =
 /// The operator an unresolved name was reaching for, written out (`a % b`), when its module is a
 /// type with that operator: `Stdlib.Int64.mod` is `%`, since `Int64` implements `Modulo`. A type
 /// without it gets nothing, so `Stdlib.String.mod` is not sent to `%`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.operatorSuggestion: Unknown function or value 'LanguageTools.PackageManager.findAny'"
 let operatorSuggestion(branchId: Uuid, originalName: List<String>): Option<String> =
   match splitLast(originalName) with
   | None -> Option.None
@@ -310,7 +306,6 @@ let operatorSuggestion(branchId: Uuid, originalName: List<String>): Option<Strin
 
 /// The overflow-checked function next to an operator's name, when its module has one:
 /// `Stdlib.Int64.add` is `+`, which wraps, or `Stdlib.Int64.checkedAdd`, which says so.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.checkedSibling: Unknown function or value 'Query.allDirectDescendantNames'"
 let checkedSibling(branchId: Uuid, originalName: List<String>): List<String> =
   match splitLast(originalName) with
   | None -> []
@@ -330,7 +325,6 @@ let checkedSibling(branchId: Uuid, originalName: List<String>): List<String> =
 
 
 /// The same name one module further down: `Stdlib.Http.header` is `Stdlib.Http.Request.header`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.namesOneModuleDown: Unknown function or value 'Query.allDirectDescendantNames'"
 let namesOneModuleDown(branchId: Uuid, originalName: List<String>): List<String> =
   match splitLast(originalName) with
   | None -> []
@@ -353,7 +347,6 @@ let namesOneModuleDown(branchId: Uuid, originalName: List<String>): List<String>
 /// What an unresolved name probably meant: the standard-library name it moved to
 /// (<fn stdlibSuggestion>), the operator it is (<fn operatorSuggestion>), the same name one module
 /// down (<fn namesOneModuleDown>), or else the names in its module spelled closest to it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.didYouMean: Unknown function or value 'stdlibSuggestion'"
 let didYouMean(branchId: Uuid, originalName: List<String>): List<String> =
   match stdlibSuggestion(branchId, originalName) with
   | Some(name) -> [ name ]
@@ -396,7 +389,6 @@ let reportParseErrors(diagnostics: List<(LanguageTools.Parser.Range * String)>):
 /// The arguments are joined into one source, so a stray extra one parses as a second
 /// declaration or a bare expression. Taking the first declaration and ignoring the rest
 /// saved `dark val Me.A.x 42 zzznope` as `42` and reported success.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.WrittenTypes.SourceFile.SourceFile'"
 let reportTrailing(sourceFile: LanguageTools.WrittenTypes.SourceFile.SourceFile): Bool =
   let decls = Stdlib.List.length(sourceFile.declarations)
   let extra = decls + Stdlib.List.length(sourceFile.exprsToEval) - 1
@@ -429,7 +421,6 @@ let unresolvedNamesText(
 /// Where a name that did not resolve from <param home> (owner first, then modules) is defined
 /// in a module next to it or inside it: `TokKind` saved into `Me.Tiny.Lexer` gives
 /// `Me.Tiny.Types.TokKind`. Up to three, as written in full.
-// @compiler blocked: upstream-dependency diagnostic="nearbyNames: Unknown type 'Packages.PackageLocation'"
 let nearbyNames(branchId: Uuid, home: List<String>, originalName: List<String>): List<String> =
   match splitLast(originalName), home with
   | Some((modules, name)), [owner, ...homeModules] ->
@@ -459,7 +450,6 @@ let nearbyNames(branchId: Uuid, home: List<String>, originalName: List<String>):
   | _ -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Errors.reportUnresolvedNames: Unknown function or value 'didYouMean'"
 let reportUnresolvedNames(
   branchId: Uuid,
   home: List<String>,

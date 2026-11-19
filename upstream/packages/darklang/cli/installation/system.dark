@@ -2,7 +2,6 @@
 module Darklang.Cli.Installation.System
 
 /// Where the installed binary lives, or why there is no home to put it in.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Installation.System.installedBinaryPath: Unknown function or value 'Config.getDarklangHomeDir'"
 let installedBinaryPath(host: Stdlib.Cli.Host.Host): Result<String, String> =
   Config.getDarklangHomeDir(host) |> Stdlib.Result.map(fun home -> $"{home}/bin/dark")
 
@@ -27,7 +26,6 @@ let isLatestBuild(currentVersion: String): Result<Bool, String> =
 
 
 /// Copy the running binary to `~/.darklang/bin/dark` and put it on the PATH.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Installation.System.installFromCurrentBinary: Unknown function or value 'Config.getDarklangHomeDir'"
 let installFromCurrentBinary(host: Stdlib.Cli.Host.Host): Result<String, String> =
   match Config.getDarklangHomeDir(host) with
   | Error(e) -> Result.Error(e)
@@ -81,7 +79,6 @@ let updateIfAvailable(
 
 
 /// Uninstall the CLI with user confirmation, which {{Confirm.Assume}} skips
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Installation.System.uninstallWithConfirmation: Unknown function or value 'Config.getDarklangHomeDir'"
 let uninstallWithConfirmation(
   host: Stdlib.Cli.Host.Host,
   confirm: Confirm)

@@ -2,7 +2,6 @@ module Darklang.Cli.Config
 
 /// Every key `config` answers for. The runtime keeps the list, and checks every value on set:
 /// nothing reads an unknown key, so storing one would only hide a typo.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Config.knownKeys: Unknown function or value 'Stdlib.LocalStore.configKeys'"
 let knownKeys(): List<String> =
   LanguageTools.LocalStore.configKeys()
 
@@ -39,7 +38,6 @@ let editDistance(a: String, b: String): Int64 =
 
 /// The key a typo most likely meant, when one is obvious: the same name in another case, the
 /// part after the dot alone (`record` for `trace.record`), or two edits away at most.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Config.nearestKey: Unknown function or value 'Config.knownKeys'"
 let nearestKey(key: String): Option<String> =
   let lower = Stdlib.String.toLowercase(key)
   let keys = knownKeys()
@@ -149,7 +147,6 @@ let defaultOf(key: String): Option<String> =
   |> Stdlib.Option.map(fun s -> s.byDefault)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Config.unknownKeyMessage: Unknown function or value 'Config.nearestKey'"
 let unknownKeyMessage(key: String): String =
   let hint =
     match nearestKey(key) with
@@ -159,7 +156,6 @@ let unknownKeyMessage(key: String): String =
   $"{key} is not a config key.{hint} `config list` names the keys."
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | ["get", key] when Stdlib.List.contains(knownKeys(), key) ->
@@ -225,7 +221,6 @@ let execute(state: AppState, args: List<String>): AppState =
     { state with exitCode = 1 }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(_state: AppState, args: List<String>): List<Completion.CompletionItem> =
   match args with
   | [] -> [ "get", "set", "unset", "list" ] |> Stdlib.List.map(Completion.simple)
@@ -233,7 +228,6 @@ let complete(_state: AppState, args: List<String>): List<Completion.CompletionIt
   | _ -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Usage:"
     "  config get <key>           - Get a configuration value"

@@ -30,7 +30,6 @@ test encodeLength =
 
 
 // Decoded text is normalized, as every String is: {{e}} + a combining acute decodes to {{é}}.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.decode'" class=missing-support reason=upstream-dependency
 test decodeNormalizes =
   Stdlib.Test.all(
     [ Stdlib.Base16.decode("63616665cc81")

@@ -23,7 +23,6 @@ let inName(n: ProgramTypes.NameResolution<'a>): List<String> =
   | Error(_) -> [ Stdlib.String.join(n.originalName, ".") ]
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.TypeReference'"
 let inTypeRef(t: ProgramTypes.TypeReference): List<String> =
   match t with
   | TStream(inner) -> inTypeRef(inner)
@@ -36,14 +35,12 @@ let inTypeRef(t: ProgramTypes.TypeReference): List<String> =
   | _ -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.TypeReference'"
 let inTypeRefs(ts: List<ProgramTypes.TypeReference>): List<String> =
   match ts with
   | [] -> []
   | [t, ...rest] -> Stdlib.List.concat(inTypeRef(t), inTypeRefs(rest))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.Expr'"
 let inExpr(expr: ProgramTypes.Expr): List<String> =
   match expr with
   | EString(_, segments) -> inSegments(segments)
@@ -79,21 +76,18 @@ let inExpr(expr: ProgramTypes.Expr): List<String> =
   | _ -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.Expr'"
 let inOptionalExpr(expr: Option<ProgramTypes.Expr>): List<String> =
   match expr with
   | Some(e) -> inExpr(e)
   | None -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.Expr'"
 let inExprs(exprs: List<ProgramTypes.Expr>): List<String> =
   match exprs with
   | [] -> []
   | [e, ...rest] -> Stdlib.List.concat(inExpr(e), inExprs(rest))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.StringSegment'"
 let inSegments(segments: List<ProgramTypes.StringSegment>): List<String> =
   match segments with
   | [] -> []
@@ -105,7 +99,6 @@ let inSegments(segments: List<ProgramTypes.StringSegment>): List<String> =
 
 /// The pattern carries no names (`MPEnum` holds a bare case name), so only the guard
 /// and the right-hand side can contribute.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.MatchCase'"
 let inMatchCases(cases: List<ProgramTypes.MatchCase>): List<String> =
   match cases with
   | [] -> []
@@ -113,7 +106,6 @@ let inMatchCases(cases: List<ProgramTypes.MatchCase>): List<String> =
     Stdlib.List.flatten([ inOptionalExpr(c.whenCondition), inExpr(c.rhs), inMatchCases(rest) ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PipeExpr'"
 let inPipeExpr(pe: ProgramTypes.PipeExpr): List<String> =
   match pe with
   | EPipeLambda(_, _, body) -> inExpr(body)
@@ -124,7 +116,6 @@ let inPipeExpr(pe: ProgramTypes.PipeExpr): List<String> =
   | EPipeVariable(_, _, args) -> inExprs(args)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PipeExpr'"
 let inPipeExprs(parts: List<ProgramTypes.PipeExpr>): List<String> =
   match parts with
   | [] -> []
@@ -132,7 +123,6 @@ let inPipeExprs(parts: List<ProgramTypes.PipeExpr>): List<String> =
 
 
 /// A bound's trait, and any types its type args name.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.Bound'"
 let inBounds(bounds: List<ProgramTypes.Bound>): List<String> =
   match bounds with
   | [] -> []
@@ -140,12 +130,10 @@ let inBounds(bounds: List<ProgramTypes.Bound>): List<String> =
     Stdlib.List.flatten([ inName(b.trait_.trait_), inTypeRefs(b.trait_.typeArgs), inBounds(rest) ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PackageFn.Parameter'"
 let inParameters(ps: List<ProgramTypes.PackageFn.Parameter>): List<String> =
   inTypeRefs(Stdlib.List.map(ps, fun p -> p.typ))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.TypeDeclaration.TypeDeclaration'"
 let inTypeDeclaration(d: ProgramTypes.TypeDeclaration.TypeDeclaration): List<String> =
   let inDefinition =
     match d.definition with
@@ -159,7 +147,6 @@ let inTypeDeclaration(d: ProgramTypes.TypeDeclaration.TypeDeclaration): List<Str
   Stdlib.List.concat(inBounds(d.bounds), inDefinition)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.Trait.Method'"
 let inMethods(methods: List<ProgramTypes.Trait.Method>): List<String> =
   match methods with
   | [] -> []
@@ -172,7 +159,6 @@ let inMethods(methods: List<ProgramTypes.Trait.Method>): List<String> =
 /// order first found, or None when it leaves nothing. Only the content-carrying ops
 /// can hold a reference: a `SetName` binds an existing hash, and the decision ops
 /// carry no expressions.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PackageOp'"
 let inOp(op: ProgramTypes.PackageOp): Option<(String * List<String>)> =
   let found =
     match op with
@@ -213,6 +199,5 @@ let inOp(op: ProgramTypes.PackageOp): Option<(String * List<String>)> =
 
 /// For each op still holding unresolved name references, its content hash and those
 /// names.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PackageOp'"
 let inOps(ops: List<ProgramTypes.PackageOp>): List<(String * List<String>)> =
   Stdlib.List.filterMap(ops, fun op -> inOp(op))

@@ -663,7 +663,7 @@ let runTestsWithProgressReporter completedTestReporter args =
     in
     let e2eFiles = getTestFiles "e2e" "e2e" in
     let importedFiles =
-      FileIO.readText (RepositoryTestFiles.scriptPath "upstream/sources.list")
+      FileIO.readText (RepositoryTestFiles.scriptPath "porting/upstream-sources.list")
       |> String.split_on_char '\n'
       |> List.filter (fun line ->
           line <> "" && not (String.starts_with ~prefix:"#" line))

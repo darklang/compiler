@@ -1,6 +1,5 @@
 module Darklang.Cli.Packages.Value
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [] ->
@@ -30,7 +29,6 @@ let execute(state: AppState, args: List<String>): AppState =
         createValueInline(state, location, inlineDefinition)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.PackageLocation'"
 let createValueInline(state: AppState, locationStr: String, expression: String): AppState =
   let hint =
     [ Stdlib.Cli.UI.Colors.error("Failed to parse value expression")
@@ -72,7 +70,6 @@ let createValueInline(state: AppState, locationStr: String, expression: String):
       | _ -> Option.None)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Create or update a value"
     ""
@@ -103,6 +100,5 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []

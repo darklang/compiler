@@ -1,7 +1,6 @@
 module Darklang.Cli.Packages.NavInteractive
 
 // Interactive navigation types
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.NavInteractive.NavItem: Unknown type 'EntityType'"
 type NavItem =
   { name: String
     entityType: EntityType
@@ -20,7 +19,6 @@ type Mode =
   | Search
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.NavInteractive.State: Unknown type 'NavItem'"
 type State =
   { items: List<NavItem>
     selectedIndex: Int64
@@ -39,7 +37,6 @@ type State =
 
 
 /// A running navigation model and its process-local presentation state.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.NavInteractive.Session: Unknown type 'State'"
 type Session =
   { state: State
     terminal: Stdlib.Cli.Tui.TerminalSession.State }
@@ -81,7 +78,6 @@ let helpSections(mode: Mode, display: Display): List<String> =
     [ "Type to search", "↑↓ Select", "Space Hide view", "PgUp/PgDn Preview", "Esc Back" ]
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.NavInteractive.packHelpRows: Unknown function or value 'Darklang.Stdlib.Cli.Tui.Text.wrapAtColumn'"
 let packHelpRows(
   width: Int64,
   sections: List<String>,
@@ -102,7 +98,6 @@ let packHelpRows(
 
 
 /// Fit navigation help into complete rows without truncating an action.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.NavInteractive.helpRowsAtWidth: Unknown function or value 'packHelpRows'"
 let helpRowsAtWidth(mode: Mode, display: Display, width: Int64): List<String> =
   packHelpRows(Stdlib.max(1, width), helpSections(mode, display), "", [])
 
@@ -117,7 +112,6 @@ type Names =
 /// The leaf kinds of a result set as nav items, in `Glyphs.kindOrder`. <param names> is the only
 /// thing a listing of one module and a search across the tree disagree about. The submodule row is
 /// each caller's own, because they ask different questions of `results`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Search.SearchResults'"
 let leafNavItems(
   results: LanguageTools.ProgramTypes.Search.SearchResults,
   names: Names)
@@ -178,7 +172,6 @@ let leafNavItems(
   Stdlib.List.flatten([ types, functions, values, traits, impls, tests ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Search.SearchResults'"
 let buildNavItemsFromResults(
   results: LanguageTools.ProgramTypes.Search.SearchResults,
   modulePath: List<String>)
@@ -196,7 +189,6 @@ let buildNavItemsFromResults(
 
 
 // Create interactive navigation state for a location
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let buildState(branchId: Uuid, location: PackageLocation): State =
   let modulePath = modulePathOf(location)
 
@@ -218,7 +210,6 @@ let buildState(branchId: Uuid, location: PackageLocation): State =
 
 
 // Load truncated focus rows without printing them.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let loadFocusRows(branchId: Uuid, location: PackageLocation): List<String> =
   let maxItemsPerCategory = 3
   let maxTotalLines = 12
@@ -277,7 +268,6 @@ let loadFocusRows(branchId: Uuid, location: PackageLocation): List<String> =
 
 
 /// Refresh derived focus content after a state transition.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let refreshFocusRows(navState: State): State =
   match navState.display with
   | JustName -> { navState with focusRows = [], focusScrollOffset = 0 }
@@ -291,7 +281,6 @@ let refreshFocusRows(navState: State): State =
 
 
 /// Calculate navigation regions for the complete terminal viewport.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let layout(navState: State, size: Stdlib.Cli.Tui.Size): Layout =
   let width = Stdlib.max(1, size.width)
   let contentHeight = Stdlib.max(1, size.height)
@@ -340,7 +329,6 @@ let layout(navState: State, size: Stdlib.Cli.Tui.Size): Layout =
 
 
 /// Build the complete desired navigation view for one terminal-size sample.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let viewAtSize(navState: State, size: Stdlib.Cli.Tui.Size): Stdlib.Cli.Tui.View =
   let regions = layout(navState, size)
   let clip = fun text -> Stdlib.Cli.Tui.Text.clipToWidth(text, regions.width)
@@ -479,7 +467,6 @@ let viewAtSize(navState: State, size: Stdlib.Cli.Tui.Size): Stdlib.Cli.Tui.View 
 
 
 /// Start navigation and present its first complete frame.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let start(navState: State): Result<Session, String> =
   let size = Stdlib.Cli.Tui.TerminalSession.currentSize()
   match Stdlib.Cli.Tui.TerminalSession.startAtSize(size, viewAtSize(navState, size)) with
@@ -488,7 +475,6 @@ let start(navState: State): Result<Session, String> =
 
 
 /// Present the next navigation model using an already sampled terminal size.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Session'"
 let presentAtSize(session: Session, size: Stdlib.Cli.Tui.Size, navState: State): Session =
   let terminal =
     Stdlib.Cli.Tui.TerminalSession.presentAtSize(session.terminal, size, viewAtSize(navState, size))
@@ -497,20 +483,17 @@ let presentAtSize(session: Session, size: Stdlib.Cli.Tui.Size, navState: State):
 
 
 /// Present the next navigation model while retaining renderer history.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Session'"
 let presentState(session: Session, navState: State): Session =
   let size = Stdlib.Cli.Tui.TerminalSession.currentSize()
   presentAtSize(session, size, navState)
 
 
 /// Put a presented navigation model back into the CLI application state.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let show(state: AppState, session: Session, navState: State): AppState =
   { state with currentPage = Page.InteractiveNav(presentState(session, navState)) }
 
 
 /// Put a navigation model presented at an existing size sample into CLI state.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let showAtSize(
   state: AppState,
   session: Session,
@@ -541,14 +524,12 @@ let scrollOffsetForSelection(
     Stdlib.min(maxOffset, Stdlib.max(0, offset))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let withFocusScrollOffset(navState: State, focusContentHeight: Int64, offset: Int64): State =
   let maxOffset = Stdlib.max(0, Stdlib.List.length(navState.focusRows) - focusContentHeight)
   { navState with focusScrollOffset = Stdlib.min(maxOffset, Stdlib.max(0, offset)) }
 
 
 // Navigation helper functions
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let moveUp(navState: State, viewportHeight: Int64): State =
   let totalItems = Stdlib.List.length(navState.items)
   if totalItems > 0 then
@@ -566,7 +547,6 @@ let moveUp(navState: State, viewportHeight: Int64): State =
     navState
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let moveDown(navState: State, viewportHeight: Int64): State =
   let totalItems = Stdlib.List.length(navState.items)
   if totalItems > 0 then
@@ -584,13 +564,11 @@ let moveDown(navState: State, viewportHeight: Int64): State =
     navState
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let exitToMainPrompt(state: AppState, session: Session): AppState =
   let _stoppedTerminal = Stdlib.Cli.Tui.TerminalSession.stop(session.terminal)
   { state with currentPage = Page.MainPrompt, prompt = Prompt.Editing.clear(state.prompt) }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let selectAndExit(state: AppState, session: Session): AppState =
   let navState = session.state
   let totalItems = Stdlib.List.length(navState.items)
@@ -609,7 +587,6 @@ let selectAndExit(state: AppState, session: Session): AppState =
     exitToMainPrompt(state, session)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let navigateIntoModule(state: AppState, session: Session): AppState =
   let navState = session.state
   let totalItems = Stdlib.List.length(navState.items)
@@ -627,7 +604,6 @@ let navigateIntoModule(state: AppState, session: Session): AppState =
     state
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let navigateToParent(state: AppState, session: Session): AppState =
   let navState = session.state
   match Traversal.applySegment(
@@ -642,7 +618,6 @@ let navigateToParent(state: AppState, session: Session): AppState =
 
 
 // Perform search and update items based on query
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let performSearch(navState: State): State =
   if Stdlib.String.isEmpty(navState.searchQuery) then
     // Empty query - restore all items
@@ -679,7 +654,6 @@ let performSearch(navState: State): State =
 
 
 // Common key handlers
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let handleNavKeys(
   navState: State,
   key: Stdlib.Cli.Stdin.Key.Key,
@@ -691,7 +665,6 @@ let handleNavKeys(
   | _ -> Option.None
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let toggleDisplay(navState: State): State =
   let newDisplay =
     match navState.display with
@@ -702,7 +675,6 @@ let toggleDisplay(navState: State): State =
 
 
 // Mode-specific key handlers
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let handleSearchKeys(
   state: AppState,
   key: Stdlib.Cli.Stdin.Key.Key,
@@ -746,7 +718,6 @@ let handleSearchKeys(
     | None -> Option.None
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let handleNavModeKeys(
   state: AppState,
   key: Stdlib.Cli.Stdin.Key.Key,
@@ -771,7 +742,6 @@ let handleNavModeKeys(
 
 
 // Handle key input for interactive navigation.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let handleKey(
   state: AppState,
   key: Stdlib.Cli.Stdin.Key.Key,

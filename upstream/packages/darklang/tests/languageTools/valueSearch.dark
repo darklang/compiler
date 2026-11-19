@@ -1,7 +1,6 @@
 module Darklang.LanguageTools.PackageManager.Value.Tests
 
 // pmFindValuesByValueType returns empty list for unknown type
-// @compiler xfail compile: "Compilation failed: x64 code generation: missing function name for identity" class=missing-support reason=compiler-gap
 test unknownValueTypeFindsNoValues =
   LanguageTools.PackageManager.Value.findByValueType(
     LanguageTools.RuntimeTypes.ValueType.Unknown)

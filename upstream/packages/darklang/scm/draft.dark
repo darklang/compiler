@@ -29,7 +29,6 @@ type Picture =
 
 
 /// Read the whole picture. One call, five reads, and the only place they happen.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Draft.read: Unknown function or value 'SCM.PackageOps.draftBindings'"
 let read(unit: Unit): Picture =
   let bindings = PackageOps.draftBindings()
   let review = PackageOps.dependencyReview(bindings)
@@ -67,7 +66,6 @@ type Counts =
     ops: Int64 }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Draft.counts: Unknown function or value 'SCM.PackageOps.draftBindings'"
 let counts(unit: Unit): Counts =
   let bindings = PackageOps.draftBindings()
   let review = PackageOps.dependencyReview(bindings)
@@ -132,19 +130,16 @@ let needsYouCount(p: Picture): Int64 =
 // cannot decode is never deleted: what is skipped for reading must never be dropped for writing.
 
 /// Drop the in-memory package caches, for a caller that knows the store moved under it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Draft.invalidateCaches: Unknown function or value 'Builtin.scmInvalidateCaches'"
 let invalidateCaches(): Unit =
   Builtin.scmInvalidateCaches()
 
 
 /// Drop main's draft entirely. Returns how many ops went.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Draft.discardAll: Unknown function or value 'SCM.PackageOps.discardOn'"
 let discardAll(): Result<Int64, String> =
   PackageOps.discardOn(Branch.mainBranchId, Actions.DiscardWhat.All)
 
 
 /// Drop ONE name's uncommitted bindings from main's draft, leaving the rest alone. The content stays.
-// @compiler blocked: compiler-gap diagnostic="Darklang.SCM.Draft.discardName: Field access requires a record value"
 let discardName(owner: String, modules: List<String>, name: String): Result<Int64, String> =
   PackageOps.discardOn(
     Branch.mainBranchId,
@@ -154,7 +149,6 @@ let discardName(owner: String, modules: List<String>, name: String): Result<Int6
 
 /// Collapse main's draft's superseded NAMINGS: for each name keep the binding that wrote the row the
 /// name has now, drop the earlier ones. Content stays, so a re-fold produces the same store.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Draft.collapse: Unknown function or value 'SCM.PackageOps.discardOn'"
 let collapse(): Result<Int64, String> =
   PackageOps.discardOn(Branch.mainBranchId, Actions.DiscardWhat.Collapse)
 

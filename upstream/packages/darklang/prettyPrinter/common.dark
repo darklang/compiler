@@ -143,7 +143,6 @@ let escapeLiteral(s: String, quote: String): String =
 
 
 /// The lexer's reserved words, as a set.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.reservedNames: Unknown function or value 'LanguageTools.Parser.keywords'"
 val reservedNames =
   LanguageTools.Parser.keywords
   |> Stdlib.List.map(fun word -> (word, ()))
@@ -183,7 +182,6 @@ let hasBareShape(name: String): Bool =
 /// `_` prints bare, since in a pattern it is the wildcard. The empty name prints as
 /// `___`, the lexer's spelling of it. A name holding a backtick, a space or a newline
 /// can't be written in source.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.formatName: Unknown function or value 'Stdlib.Regex.scan'"
 let formatName(name: String): String =
   if name == "_" then
     name
@@ -198,7 +196,6 @@ let formatName(name: String): String =
 /// Format a name where only a name can go: a record field, or after a `.`. A keyword
 /// needs no backticks there. `_`, `true` and `false` still do, since they read as a
 /// wildcard or a literal.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.formatFieldName: Unknown function or value 'formatName'"
 let formatFieldName(name: String): String =
   if name == "" then
     "___"
@@ -211,7 +208,6 @@ let formatFieldName(name: String): String =
 
 
 /// Print numeric field names without backticks for tuple access such as `t.1`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.formatAccessedFieldName: Unknown function or value 'formatFieldName'"
 let formatAccessedFieldName(name: String): String =
   let isDigits =
     Stdlib.Bool.not(Stdlib.String.isEmpty(name))
@@ -225,7 +221,6 @@ let formatAccessedFieldName(name: String): String =
 /// The fraction of a float literal with its trailing zeros dropped (`1.50` -> `1.5`), by parsing and
 /// reprinting it. Only trusted when that comes back as a plain `0.xxx` decimal: `00001` reprints as
 /// `1e-5`, and cutting two characters off that gave `0.-5`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 let processRemainder(remainder: String): String =
   match $".{remainder}" |> Stdlib.Float64.parse with
   | Ok(floatValue) ->

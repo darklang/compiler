@@ -14,7 +14,6 @@ type OnMissing =
 
 /// Context for name resolution — bundles the 5 parameters that were
 /// previously threaded individually through every function.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.NameResolver.NRContext: Unknown type 'ProgramTypes.PackageManager.PackageManager'"
 type NRContext =
   { onMissing: OnMissing
     pm: ProgramTypes.PackageManager.PackageManager
@@ -88,7 +87,6 @@ let __namesToTryHelper(modulesToPrepend: List<String>, given: GenericName): List
 /// returned `ResolvedName.location` inside the Ok branch, so dep-edge
 /// inserts can populate location columns directly without a post-hoc
 /// lookup.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'NRContext'"
 let resolveGenericName(
   ctx: NRContext,
   name: WrittenTypes.Name,
@@ -186,7 +184,6 @@ let resolveGenericName(
 
 
 module TypeName =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PackageManager.PackageManager'"
   let tryResolve(
     pm: ProgramTypes.PackageManager.PackageManager,
     branchId: ProgramTypes.BranchID,
@@ -204,7 +201,6 @@ module TypeName =
       | None -> Result.Error()
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NRContext'"
   let resolve(
     ctx: NRContext,
     name: WrittenTypes.Name)
@@ -213,7 +209,6 @@ module TypeName =
 
 
 module TraitName =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PackageManager.PackageManager'"
   let tryResolve(
     pm: ProgramTypes.PackageManager.PackageManager,
     branchId: ProgramTypes.BranchID,
@@ -234,7 +229,6 @@ module TraitName =
   /// Like a type name, then, for a bare name, as a stdlib trait: `impl Add for
   /// Point` anywhere means `Stdlib.Add` unless something closer is called Add.
   /// Same rule as the F# `resolveTraitName`.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NRContext'"
   let resolve(
     ctx: NRContext,
     name: WrittenTypes.Name)
@@ -256,7 +250,6 @@ module TraitName =
 
 
 module ValueName =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PackageManager.PackageManager'"
   let tryResolve(
     pm: ProgramTypes.PackageManager.PackageManager,
     branchId: ProgramTypes.BranchID,
@@ -284,7 +277,6 @@ module ValueName =
         | None -> Result.Error()
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NRContext'"
   let resolve(
     ctx: NRContext,
     name: WrittenTypes.Name)
@@ -293,7 +285,6 @@ module ValueName =
 
 
 module FnName =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.PackageManager.PackageManager'"
   let tryResolve(
     pm: ProgramTypes.PackageManager.PackageManager,
     branchId: ProgramTypes.BranchID,
@@ -324,7 +315,6 @@ module FnName =
   /// `Show.show`: the path's last module segment names a trait with a method
   /// `show`; then the name is a trait method, dispatched at runtime.
   /// Mirrors `resolveTraitMethod` in LibParser's NameResolver.fs.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NRContext'"
   let tryResolveTraitMethod(
     ctx: NRContext,
     given: List<String>)
@@ -379,7 +369,6 @@ module FnName =
     | _ -> Option.None
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'NRContext'"
   let resolve(
     ctx: NRContext,
     name: WrittenTypes.Name)

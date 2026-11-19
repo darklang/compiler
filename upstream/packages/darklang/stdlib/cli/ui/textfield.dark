@@ -12,7 +12,6 @@
 /// business, and `Tui.Text` handles it on the way out.
 module Darklang.Stdlib.Cli.UI.TextField
 
-// @compiler replace: packages/darklang/stdlib/cli/ui/textfield.dark#Darklang.Stdlib.Cli.UI.TextField.State reason=compiler-implementation
 type State =
   { text: String
     /// Grapheme index the cursor sits *before*: 0 is the start, `length text` is the end.
@@ -20,7 +19,6 @@ type State =
 
 
 /// What the field tells its parent.
-// @compiler replace: packages/darklang/stdlib/cli/ui/textfield.dark#Darklang.Stdlib.Cli.UI.TextField.Msg reason=compiler-implementation
 type Msg =
   /// Enter, with the text as it stands.
   | Submitted(String)
@@ -28,38 +26,32 @@ type Msg =
   | Cancelled
 
 
-// @compiler replace: packages/darklang/stdlib/cli/ui/textfield.dark#Darklang.Stdlib.Cli.UI.TextField.empty reason=compiler-implementation
 val empty = State { text = "", cursor = 0 }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.fromText: Expected TInt, got TInt64"
 let fromText(text: String): State =
   State { text = text, cursor = String.length(text) }
 
 
 /// Start with the cursor at the beginning rather than the end - for "edit this from the top" cases.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.fromTextAtStart: Expected TInt, got TInt64"
 let fromTextAtStart(text: String): State =
   State { text = text, cursor = 0 }
 
 
 // --- Edits ---
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.clampCursor: Expected TInt, got TInt64"
 let clampCursor(state: State): State =
   let len = String.length(state.text)
   { state with cursor = max(0, min(len, state.cursor)) }
 
 
 /// Insert a string of any length at the cursor, and move past all of it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.insert: Expected TInt64, got TInt"
 let insert(state: State, s: String): State =
   let before = String.slice(state.text, 0, state.cursor)
   let after = String.dropFirst(state.text, state.cursor)
   State { text = before + s + after, cursor = state.cursor + String.length(s) }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.backspace: Operator is unavailable for this type"
 let backspace(state: State): State =
   if state.cursor == 0 then
     state
@@ -70,7 +62,6 @@ let backspace(state: State): State =
 
 
 /// Delete the character to the right of the cursor.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.deleteForward: Expected TInt, got TInt64"
 let deleteForward(state: State): State =
   if state.cursor >= String.length(state.text) then
     state
@@ -81,27 +72,22 @@ let deleteForward(state: State): State =
 
 
 /// Drop everything from the cursor to the end (readline's ^k), so replacing a line is two keys.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.killToEnd: Expected TInt64, got TInt"
 let killToEnd(state: State): State =
   { state with text = String.slice(state.text, 0, state.cursor) }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.moveLeft: Expected TInt, got TInt64"
 let moveLeft(state: State): State =
   { state with cursor = max(0, state.cursor - 1) }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.moveRight: Expected TInt, got TInt64"
 let moveRight(state: State): State =
   { state with cursor = min(String.length(state.text), state.cursor + 1) }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.moveToStart: Expected TInt, got TInt64"
 let moveToStart(state: State): State =
   { state with cursor = 0 }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.moveToEnd: Expected TInt, got TInt64"
 let moveToEnd(state: State): State =
   { state with cursor = String.length(state.text) }
 
@@ -120,7 +106,6 @@ let isTypeable(c: String): Bool =
       cp == 9u32 || cp == 10u32 || cp == 13u32 || cp == 27u32))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.onKey: Unknown function or value 'backspace'"
 let onKey(state: State, kp: Widget.KeyPress): Widget.Outcome<State, Msg> =
   match kp.key with
   | Enter -> Widget.Outcome.Emitted(state, Msg.Submitted(state.text))
@@ -150,7 +135,6 @@ let onKey(state: State, kp: Widget.KeyPress): Widget.Outcome<State, Msg> =
 // --- Rendering ---
 
 /// The first grapheme to show, so that the cursor is inside a window `width` wide.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.windowFor: Expected TInt, got TInt64"
 let windowFor(state: State, width: Int64): Int64 =
   let w = max(1, width)
   let len = String.length(state.text)
@@ -167,7 +151,6 @@ let windowFor(state: State, width: Int64): Int64 =
 ///
 /// Returns a styled string for embedding in a row the caller is already building (an outline item, say).
 /// The cursor is drawn on the character it sits before, or on a trailing space at the end of the line.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.renderInline: Unknown function or value 'windowFor'"
 let renderInline(state: State, width: Int64): String =
   let w = max(1, width)
   let start = windowFor(state, w)
@@ -189,7 +172,6 @@ let renderInline(state: State, width: Int64): String =
 /// Render a field that may not have focus, with a placeholder for when it's empty and unfocused.
 ///
 /// For forms, where several fields are on screen and one has the cursor.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.renderMaybeFocused: Unknown function or value 'renderInline'"
 let renderMaybeFocused(state: State, focus: Focus, placeholder: String, width: Int64): String =
   match focus with
   | Focused -> renderInline(state, width)
@@ -204,7 +186,6 @@ let renderMaybeFocused(state: State, focus: Focus, placeholder: String, width: I
 ///
 /// A narrower door than `onKey` for callers that own Enter and Escape themselves (a form deciding what
 /// "done" means for the whole form, not for one field).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.handleTextKey: Unknown function or value 'backspace'"
 let handleTextKey(state: State, kp: Widget.KeyPress): Option<State> =
   match kp.key with
   | Backspace -> Option.Some(backspace(state))
@@ -223,6 +204,5 @@ let handleTextKey(state: State, kp: Widget.KeyPress): Option<State> =
     | None -> Option.None
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.TextField.view: Unknown function or value 'renderInline'"
 let view(state: State, region: Layout.Region): List<Layout.Span> =
   Layout.at(region, 0, 0, renderInline(state, region.cols))

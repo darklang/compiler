@@ -1,13 +1,11 @@
 module Darklang.Stdlib.Cli.Stdin
 
 /// Read one line from stdin, without its trailing newline; None at EOF.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Stdin.readLineOrEnd: Expected TSum (\"Darklang.Stdlib.Option.Option\", [TString]), got TString"
 let readLineOrEnd(): Option<String> =
   Builtin.stdinReadLine()
 
 
 /// Like <fn readLineOrEnd>, but "" at EOF.
-// @compiler replace: packages/darklang/stdlib/cli/stdin.dark#Darklang.Stdlib.Cli.Stdin.readLine reason=compiler-implementation
 let readLine(): String =
   Option.withDefault(readLineOrEnd(), "")
 
@@ -20,14 +18,12 @@ type ReadLineError =
 
 /// Read one line from stdin, without its trailing newline: {{Ok None}} at EOF, or
 /// {{Error NotUtf8}} where <fn readLineOrEnd> raises.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Stdin.checkedReadLine: Unknown function or value 'Builtin.stdinCheckedReadLine'"
 let checkedReadLine(): Result<Option<String>, ReadLineError> =
   Builtin.stdinCheckedReadLine() |> Result.mapError(fun _ -> ReadLineError.NotUtf8)
 
 
 /// Read all of stdin, until EOF. An Error when it is not valid UTF-8, naming the first bad
 /// bytes: {{Error "stdin is not valid UTF-8: FF"}}.
-// @compiler replace: packages/darklang/stdlib/cli/stdin.dark#Darklang.Stdlib.Cli.Stdin.readAll reason=compiler-implementation
 let readAll(): Result<String, String> =
   Builtin.stdinReadAll()
   |> Result.mapError(fun bad -> $"stdin is not valid UTF-8: {Base16.encode(bad)}")
@@ -41,7 +37,6 @@ let readAll(): Result<String, String> =
 /// Pure Dark over `readKey`: Enter finishes, Backspace edits, control keys are not secret material,
 /// and a coalesced burst (a held key, or a paste delivering one character many times) appends
 /// `keyChar` `repeat` times so a pasted secret arrives whole.
-// @compiler replace: packages/darklang/stdlib/cli/stdin.dark#Darklang.Stdlib.Cli.Stdin.readSecret reason=compiler-implementation
 let readSecret(): String =
   if Bool.not(Sys.isTerminal(0)) then
     readLine()
@@ -77,7 +72,6 @@ let readSecret(): String =
 
 
 module Key =
-  // @compiler replace: packages/darklang/stdlib/cli/stdin/key.dark#Darklang.Stdlib.Cli.Stdin.Key.Key reason=compiler-implementation
   type Key =
     | None
     /// The BACKSPACE key.
@@ -371,7 +365,6 @@ module Key =
 
 
   /// Returns true if the key represents a textual input (letters, numbers, etc.)
-  // @compiler replace: packages/darklang/stdlib/cli/stdin/key.dark#Darklang.Stdlib.Cli.Stdin.Key.isTextual reason=compiler-implementation
   let isTextual(k: Key): Bool =
     match k with
     | A
@@ -428,7 +421,6 @@ module Key =
 
 
   /// Returns true if the key represents a control key (navigation, function keys, etc.)
-  // @compiler replace: packages/darklang/stdlib/cli/stdin/key.dark#Darklang.Stdlib.Cli.Stdin.Key.isControl reason=compiler-implementation
   let isControl(k: Key): Bool =
     match k with
     | Enter
@@ -462,7 +454,6 @@ module Key =
 
 
   /// Display name of the key, e.g. `Enter` or `A`
-  // @compiler replace: packages/darklang/stdlib/cli/stdin/key.dark#Darklang.Stdlib.Cli.Stdin.Key.toString reason=compiler-implementation
   let toString(k: Key): String =
     // inspect prints the fully-qualified case name; keep just the last segment
     inspect(k)
@@ -472,14 +463,12 @@ module Key =
 
 
 module Modifiers =
-  // @compiler replace: packages/darklang/stdlib/cli/stdin/modifiers.dark#Darklang.Stdlib.Cli.Stdin.Modifiers.Modifiers reason=compiler-implementation
   type Modifiers =
     { alt: Bool
       ctrl: Bool
       shift: Bool }
 
 
-  // @compiler replace: packages/darklang/stdlib/cli/stdin/modifiers.dark#Darklang.Stdlib.Cli.Stdin.Modifiers.toString reason=compiler-implementation
   let toString(m: Modifiers): String =
     let altPart =
       match m.alt with
@@ -501,7 +490,6 @@ module Modifiers =
 
 module KeyRead =
   // The result of Stdin.readKey()
-  // @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch"
   type KeyRead =
     { /// The non-modifier key pressed
       key: Key.Key
@@ -517,11 +505,9 @@ module KeyRead =
       repeat: Int64 }
 
 
-  // @compiler replace: packages/darklang/stdlib/cli/stdin/keyRead.dark#Darklang.Stdlib.Cli.Stdin.KeyRead.toString reason=compiler-implementation
   let toString(k: KeyRead): String =
     Modifiers.toString(k.modifiers) + Key.toString(k.key)
 
 
-// @compiler replace: packages/darklang/stdlib/cli/stdin.dark#Darklang.Stdlib.Cli.Stdin.readKey reason=compiler-implementation
 let readKey(): KeyRead.KeyRead =
   Builtin.stdinReadKey()
