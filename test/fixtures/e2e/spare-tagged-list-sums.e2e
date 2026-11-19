@@ -16,6 +16,6 @@ Stdlib.Option.withDefault (identity None) [1L] = [1L] // leak_check
 Stdlib.Option.withDefault (identity (Some [])) [1L] = [] // leak_check
 let values = [identity None, identity (Some []), identity (Some [1L, 2L])] in match values with | [None, Some [], Some [first, second]] -> first + second | _ -> 0L = 3L // leak_check
 Builtin.unwrap (Some [1L, 2L]) = [1L, 2L] // leak_check
-identity None = stdout="Darklang.Stdlib.Option.Option<List<Int64>>.None\n" stderr="" // leak_check
-identity (Some []) = stdout="Darklang.Stdlib.Option.Option<List<Int64>>.Some(List<Int64> [])\n" stderr="" // leak_check
-identity (Some [1L]) = stdout="Darklang.Stdlib.Option.Option<List<Int64>>.Some([1])\n" stderr="" // leak_check
+identity None = stdout="None\n" stderr="" // leak_check
+identity (Some []) = stdout="Some(List<_> [])\n" stderr="" // leak_check
+identity (Some [1L]) = stdout="Some([1])\n" stderr="" // leak_check

@@ -6,7 +6,7 @@ agreement_regression.py COMPILER [BASELINE]          check every call in the bas
 agreement_regression.py COMPILER --select IN OUT     keep the calls of IN that agree now
 
 Each line of the baseline is {"id", "expr", "eval"}: an expression that needs only
-the embedded stdlib, and what `dark eval` printed for it under --syntax=current."""
+the embedded stdlib, and what `dark eval` printed for it."""
 import json
 import os
 from pathlib import Path
@@ -27,7 +27,7 @@ def outcomes(compiler, calls):
         def outcome(indexed):
             index, call = indexed
             program = Path(temporary) / f"{index}.out"
-            built = subprocess.run([compiler, "--syntax=current", "--package-server", OFFLINE, "-q",
+            built = subprocess.run([compiler, "--package-server", OFFLINE, "-q",
                 "--emit-result", "-e", call["expr"], "-o", str(program)],
                 capture_output=True, text=True, timeout=600, env=env, cwd=temporary)
             if built.returncode != 0:

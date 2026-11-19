@@ -146,10 +146,10 @@ let ``val`` = 100L in { PointUpdatePart { x = 1L, y = 2L } with x = ``val`` }.x 
 
 // Canonical validation, generic identity, nesting, ordering, and rendering.
 type PhantomRecord<'unused> = { value: Int64 }
-PhantomRecord<String> { value = 7L } = stdout="PhantomRecord<String> { value: 7 }\n" stderr=""
+PhantomRecord<String> { value = 7L } = stdout="PhantomRecord<_> { value: 7 }\n" stderr=""
 
 type MixedPhantomRecord<'unused, 'value> = { value: 'value }
-MixedPhantomRecord<Int64, String> { value = "managed" } = stdout="MixedPhantomRecord<Int64, String> { value: \"managed\" }\n" stderr=""
+MixedPhantomRecord<Int64, String> { value = "managed" } = stdout="MixedPhantomRecord<_, String> { value: \"managed\" }\n" stderr=""
 
 type GenericInner<'a> = { value: a }
 type GenericOuter<'a> = { inner: GenericInner<a> }
@@ -164,7 +164,7 @@ type AliasRecordView<'a> = AliasRecord<'a>
 AliasRecordView<String> { value = "alias" } == AliasRecord<String> { value = "alias" } = true
 
 type OrderedPresentation = { z: Int64, a: String }
-OrderedPresentation { z = 2L, a = "first" } = stdout="OrderedPresentation { a: \"first\", z: 2 }\n" stderr=""
+OrderedPresentation { z = 2L, a = "first" } = stdout="OrderedPresentation { z: 2, a: \"first\" }\n" stderr=""
 
 type DuplicateConstruction = { value: Int64 }
 DuplicateConstruction { value = 1L, value = 2L } = compileerror="Duplicate record field 'value'"

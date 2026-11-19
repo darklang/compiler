@@ -4,8 +4,8 @@ let nestedFunctionListMatch<'a> (list: List<a -> a -> Int>) : Int =
     match list with
     | [comparator] ->
         match list with
-        | [inner] -> 1
-        | _ -> 2
-    | _ -> 0
+        | [inner] -> 1z
+        | _ -> 2z
+    | _ -> 0z
 
-nestedFunctionListMatch<Int> ([]) = 0
+nestedFunctionListMatch<Int> ([]) = 0z

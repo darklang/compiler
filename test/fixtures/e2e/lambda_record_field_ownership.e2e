@@ -18,5 +18,5 @@ let wrapAliasWords (choose: Bool) : ConcreteWords =
 match wrapFreshWords true with | Ok value -> value.words | Error _ -> [] = ["fresh", "retained", "words"]
 match wrapFreshWords false with | Ok value -> value.words | Error _ -> ["error"] = []
 Stdlib.Blob.toList (wrapFreshBytes true).bytes = Stdlib.Blob.toList (Stdlib.String.toBlob "fresh retained bytes")
-Stdlib.Blob.length (wrapFreshBytes false).bytes = 0
+Stdlib.Blob.length (wrapFreshBytes false).bytes = 0z
 (wrapAliasWords true).words = ["fresh", "retained", "words"]

@@ -27,7 +27,7 @@ module Empty =
 
 module ConstructionErrors =
 #compileerror="Duplicate dictionary key \"a\""
-  Dict { "a": 1, "a": 2 } = error="Cannot add two dictionary entries with the same key \"a\""
+  Dict { "a": 1z, "a": 2z } = error="Cannot add two dictionary entries with the same key \"a\""
 #compileerror="Expected TInt32, got TString"
   Dict { "a": 1l, "b": "two" } = error="Cannot add a String (\"two\") to a dict of Int32. Failed at key \"b\"."
 module FilterMap =
@@ -274,7 +274,7 @@ module NonStringKeys =
 
     Stdlib.Dict.get (Dict { 1y: "i8" }) 1y = Stdlib.Option.Option.Some "i8"
     Stdlib.Dict.get (Dict { 1uy: "u8" }) 1uy = Stdlib.Option.Option.Some "u8"
-    Stdlib.Dict.get (Dict { 1s: "i16" }) 1s = Stdlib.Option.Option.Some "i16"
+    Stdlib.Dict.get (Dict { 1s16: "i16" }) 1s16 = Stdlib.Option.Option.Some "i16"
     Stdlib.Dict.get (Dict { 1us: "u16" }) 1us = Stdlib.Option.Option.Some "u16"
     Stdlib.Dict.get (Dict { 1l: "i32" }) 1l = Stdlib.Option.Option.Some "i32"
     Stdlib.Dict.get (Dict { 1ul: "u32" }) 1ul = Stdlib.Option.Option.Some "u32"
@@ -282,7 +282,7 @@ module NonStringKeys =
     Stdlib.Dict.get (Dict { 1UL: "u64" }) 1UL = Stdlib.Option.Option.Some "u64"
     Stdlib.Dict.get (Dict { 1Q: "i128" }) 1Q = Stdlib.Option.Option.Some "i128"
     Stdlib.Dict.get (Dict { 1Z: "u128" }) 1Z = Stdlib.Option.Option.Some "u128"
-    Stdlib.Dict.get (Dict { 1: "int" }) 1 = Stdlib.Option.Option.Some "int"
+    Stdlib.Dict.get (Dict { 1z: "int" }) 1z = Stdlib.Option.Option.Some "int"
 
     Stdlib.Dict.get (Dict { 1.5: "float" }) 1.5 = Stdlib.Option.Option.Some "float"
     Stdlib.Dict.get (Dict { 'a': "char" }) 'a' = Stdlib.Option.Option.Some "char"
@@ -321,11 +321,11 @@ module NonStringKeys =
     Stdlib.Dict.keys (Dict { 2L: 1L, -3L: 2L, 0L: 3L }) = [ -3L, 0L, 2L ]
 
     Stdlib.Dict.keys
-      (Dict { 9223372036854775808: 1L, 9223372036854775807: 2L, 0: 3L }) =
-      [ 0, 9223372036854775807, 9223372036854775808 ]
+      (Dict { 9223372036854775808z: 1L, 9223372036854775807z: 2L, 0z: 3L }) =
+      [ 0z, 9223372036854775807z, 9223372036854775808z ]
 
-    Stdlib.Dict.keys (Dict { -9223372036854775809: 1L, 0: 2L }) =
-      [ -9223372036854775809, 0 ]
+    Stdlib.Dict.keys (Dict { -9223372036854775809z: 1L, 0z: 2L }) =
+      [ -9223372036854775809z, 0z ]
 
     Stdlib.Dict.keys (Dict { [ 2L ]: 1L, [ 1L, 9L ]: 2L, []: 3L }) =
       [ [], [ 1L, 9L ], [ 2L ] ]

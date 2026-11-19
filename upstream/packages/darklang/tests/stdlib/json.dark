@@ -2661,7 +2661,7 @@ module Option =
 
 
 module ParseErrorToString =
-  // @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<Darklang.Stdlib.Json.Tests.Person, String>.Error(\"Can't parse JSON `\\\"x\\\"` as type `Int64` at path: `root.Age`\"), got Darklang.Stdlib.Result.Result<Darklang.Stdlib.Json.Tests.Person, String>.Error(\"Stdlib.Json.ParseError.ParseError.CantMatchWithType(Darklang.La" class=missing-support reason=compiler-gap
+  // @compiler xfail runtime: "expected Error(\"Can't parse JSON `\\\"x\\\"` as type `Int64` at path: `root.Age`\"), got Error(\"Stdlib.Json.ParseError.ParseE" class=missing-support reason=compiler-gap
   test interpolates =
     Stdlib.Json.parse<Person>("{\"Name\":\"Bob\",\"Age\":\"x\"}")
     |> Stdlib.Result.mapError(fun e -> $"{e}")
@@ -3008,7 +3008,7 @@ module UserDefinedRecords =
 
 
   module OptionalFields =
-    // @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<Darklang.Stdlib.Json.Tests.UserDefinedRecords.Profile, Darklang.Stdlib.Json.ParseError.ParseError>.Ok(Darklang.Stdlib.Json.Tests.UserDefinedRecords.Profile {" class=missing-support reason=compiler-gap
+    // @compiler xfail runtime: "expected Ok(Stdlib.Json.Tests.UserDefinedRecords.Profile {" class=missing-support reason=compiler-gap
     test missingOptionFieldsAreNone =
       Stdlib.Json.parse<Profile>("""{ "Name": "Bob" }""")
       |> Stdlib.Test.equal(
@@ -3025,7 +3025,7 @@ module UserDefinedRecords =
             { Name = "Bob", Nickname = Option.Some("B"), Age = Option.None }))
 
 
-    // @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<Darklang.Stdlib.Json.Tests.UserDefinedRecords.Profile, Darklang.Stdlib.Json.ParseError.ParseError>.Ok(Darklang.Stdlib.Json.Tests.UserDefinedRecords.Profile {" class=missing-support reason=compiler-gap
+    // @compiler xfail runtime: "expected Ok(Stdlib.Json.Tests.UserDefinedRecords.Profile {" class=missing-support reason=compiler-gap
     test plainValuesAreSome =
       Stdlib.Json.parse<Profile>(
         """{ "Name": "Bob", "Nickname": "B", "Age": 42 }""")
@@ -3037,7 +3037,7 @@ module UserDefinedRecords =
               Age = Option.Some(42) }))
 
 
-    // @compiler xfail runtime: "expected Darklang.Stdlib.Result.Result<Darklang.Stdlib.Json.Tests.UserDefinedRecords.Profile, Darklang.Stdlib.Json.ParseError.ParseError>.Ok(Darklang.Stdlib.Json.Tests.UserDefinedRecords.Profile {" class=missing-support reason=compiler-gap
+    // @compiler xfail runtime: "expected Ok(Stdlib.Json.Tests.UserDefinedRecords.Profile {" class=missing-support reason=compiler-gap
     test nullIsNone =
       Stdlib.Json.parse<Profile>(
         """{ "Name": "Bob", "Nickname": null, "Age": null }""")
@@ -3063,7 +3063,7 @@ module UserDefinedRecords =
           "Can't parse JSON `\"old\"` as type `Int64` at path: `root.Age`"))
 
 
-    // @compiler xfail runtime: "got Darklang.Stdlib.Result.Result<Darklang.Stdlib.Json.Tests.UserDefinedRecords.Combo<Int64, Darklang.Stdlib.Option.Option<Int64>>, Darklang.Stdlib.Json.ParseError.ParseError>.Error(Darklang.Stdlib.Json.ParseError.ParseError.RecordMiss" class=missing-support reason=compiler-gap
+    // @compiler xfail runtime: "expected Ok(Stdlib.Json.Tests.UserDefinedRecords.Combo<Int64, Darklang.Stdlib.Option.Option<Int64>> {" class=missing-support reason=compiler-gap
     test missingTypeArgOptionIsNone =
       Stdlib.Json.parse<Combo<Int64, Option<Int64>>>("""{ "e1": 1 }""")
       |> Stdlib.Test.equal(Result.Ok(Combo { e1 = 1, e2 = Option.None }))

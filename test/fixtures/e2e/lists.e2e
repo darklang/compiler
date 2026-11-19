@@ -729,13 +729,13 @@ let sumFloatList (xs: List<Float>) : Float =
     | [] -> 0.0
     | head :: tail -> head + sumFloatList tail
 
-Stdlib.Float64.toInt (sumFloatList ([1.5, 2.25]) * 100.0) = 375
+Stdlib.Float64.toInt (sumFloatList ([1.5, 2.25]) * 100.0) = 375z
 // Exercise the exact-list and nested-pattern lowering paths, which unwrap the
 // same leaf representation independently from list-cons lowering.
-match [1.5] with | [value] -> Stdlib.Float64.toInt (value * 100.0) | _ -> 0 = 150
+match [1.5] with | [value] -> Stdlib.Float64.toInt (value * 100.0) | _ -> 0z = 150z
 
 type WrappedFloatList = WrappedFloatList of List<Float>
-match WrappedFloatList ([1.5]) with | WrappedFloatList ([value]) -> Stdlib.Float64.toInt (value * 100.0) | _ -> 0 = 150
+match WrappedFloatList ([1.5]) with | WrappedFloatList ([value]) -> Stdlib.Float64.toInt (value * 100.0) | _ -> 0z = 150z
 // =====================================================
 // List head type tracking test (kills mutation #167)
 // =====================================================

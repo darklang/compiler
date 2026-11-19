@@ -41,7 +41,7 @@ def main():
         execution = subprocess.run([str(output)], cwd=directory, env=environment,
                                    capture_output=True, text=True, timeout=10, check=False)
         assert execution.returncode == 0, execution.stderr
-        assert json.loads(execution.stdout) == f"3|{build_hash}", execution.stdout
+        assert execution.stdout == f"3|{build_hash}\n", execution.stdout
     print("Copied compiler embeds its library, Unicode data and build identity without Git")
 
 

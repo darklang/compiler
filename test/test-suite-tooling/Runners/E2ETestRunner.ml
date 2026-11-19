@@ -1473,7 +1473,16 @@ let tryParseBatchBoolResults expectedCount stdout =
   in
   match last with
   | raw :: _ when expectedCount > 0 && expectedCount <= maxSupportedBatchSize ->
-      let line = Text.trim raw in
+      (* A tuple of masks too wide for one line prints one mask per line. *)
+      let line =
+        match String.rindex_opt stdout '(' with
+        | Some start when expectedChunks > 1 ->
+            Text.trim
+              (String.map
+                 (fun c -> if c = '\n' then ' ' else c)
+                 (String.sub stdout start (String.length stdout - start)))
+        | _ -> Text.trim raw
+      in
       let parts =
         if expectedChunks = 1 then [ line ]
         else if Text.startsWith line "(" && Text.endsWith line ")" then

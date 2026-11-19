@@ -118,7 +118,7 @@ let selected = Stdlib.Option.withDefault (Stdlib.List.getAt ([-0.0]) 0L) 1.0 in 
 let fallback = Stdlib.Option.withDefault (Stdlib.List.getAt ([1.0]) 1L) (-0.0) in Stdlib.Float64.toBits fallback = 9223372036854775808UL
 
 // Float results cross the generic Option boundary without losing their type.
-let floats = [1.0, 2.0, 3.0] in match Stdlib.List.getAt floats 1L with | Some x -> Stdlib.Float64.toInt (x * 1000.0) | None -> -1 = 2000
+let floats = [1.0, 2.0, 3.0] in match Stdlib.List.getAt floats 1L with | Some x -> Stdlib.Float64.toInt (x * 1000.0) | None -> -1z = 2000z
 
 // ===================================================================
 // Stdlib.List.findFirst - Find first element matching predicate
@@ -173,9 +173,9 @@ match Stdlib.List.range 1L 3L with | [a, b, c] -> a + b + c | _ -> 0L = 6L
 // Stdlib.List.repeat - Repeat value n times
 // ===================================================================
 
-Stdlib.List.length (Stdlib.List.repeatUnsafe 5 42L) = 5L
-Stdlib.List.length (Stdlib.List.repeatUnsafe 0 1L) = 0L
-match Stdlib.List.repeatUnsafe 3 7L with | [a, b, c] -> a + b + c | _ -> 0L = 21L
+Stdlib.List.length (Stdlib.List.repeatUnsafe 5z 42L) = 5L
+Stdlib.List.length (Stdlib.List.repeatUnsafe 0z 1L) = 0L
+match Stdlib.List.repeatUnsafe 3z 7L with | [a, b, c] -> a + b + c | _ -> 0L = 21L
 
 // ===================================================================
 // Stdlib.List.indexedMap - Map with index

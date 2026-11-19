@@ -47,7 +47,7 @@ else Builtin.crash "Executable path results differ"
                                     env=environment, capture_output=True, text=True, timeout=30)
             assert result.returncode == 0, result.stdout + result.stderr
             assert result.stderr == "", result.stderr
-            assert json.loads(result.stdout) == str(path.resolve()), result.stdout
+            assert result.stdout == str(path.resolve()) + "\n", result.stdout
 
         check(binary)
         # Exceed the Linux initial buffer size and exercise UTF-8 path conversion.
@@ -71,7 +71,7 @@ else Builtin.crash "Executable path results differ"
             relative = subprocess.run(command, executable=arguments.runner or executable_path,
                                       cwd=root, env=environment, capture_output=True, text=True, timeout=30)
             assert relative.returncode == 0, (relative.returncode, relative.stdout, relative.stderr)
-            assert json.loads(relative.stdout) == str(expected_path.resolve()), relative.stdout
+            assert relative.stdout == str(expected_path.resolve()) + "\n", relative.stdout
             assert relative.stderr == "", relative.stderr
 
         # Force absent aux-vector input to exercise argv and PATH fallbacks on

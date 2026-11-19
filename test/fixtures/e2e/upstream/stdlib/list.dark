@@ -270,21 +270,21 @@ Stdlib.List.sort [] = []
 
 // CLEANUP: it should be a type error on the function not returning an Int64
 Stdlib.List.sortByComparator [ 3L, 1L, 2L ] (fun a b -> 0.1) = compileerror="Expected TInt, got TFloat64"
-Stdlib.List.sortByComparator [ 3L, 1L, 2L ] (fun a b -> 3) =
+Stdlib.List.sortByComparator [ 3L, 1L, 2L ] (fun a b -> 3z) =
   Stdlib.Result.Result.Error "Expected comparator function to return -1, 0, or 1, but it returned 3"
 
 // CLEANUP: it should be a type error on the function not returning an Int64
 Stdlib.List.sortByComparator [ 1L, 2L, 3L ] (fun a b -> "㧑༷釺") = compileerror="Expected TInt, got TString"
 Stdlib.List.sortByComparator [ 3L, 1L, 2L ] (fun a b ->
-  if Stdlib.Int64.lessThan a b then -1 else 1) = Stdlib.Result.Result.Ok
+  if Stdlib.Int64.lessThan a b then -1z else 1z) = Stdlib.Result.Result.Ok
   [ 1L, 2L, 3L ]
 
 Stdlib.List.sortByComparator [] (fun a b ->
-  if Stdlib.Int64.lessThan a b then -1 else 1) = Stdlib.Result.Result.Ok []
+  if Stdlib.Int64.lessThan a b then -1z else 1z) = Stdlib.Result.Result.Ok []
 
 Stdlib.List.sortByComparator
   [ 3L, 1L, 2L, 67L, 3L, -1L, 6L, 3L, 5L, 6L, 2L, 5L, 63L, 2L, 3L, 5L, -1L, -1L, -1L ]
-  (fun a b -> if Stdlib.Int64.lessThan a b then -1 else 1) =
+  (fun a b -> if Stdlib.Int64.lessThan a b then -1z else 1z) =
   Stdlib.Result.Result.Ok [ -1L, -1L, -1L, -1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 3L, 5L, 5L, 5L, 6L, 6L, 63L, 67L ]
 
 // CLEANUP this error message is not ideal in 2 ways:

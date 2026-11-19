@@ -142,7 +142,7 @@ response "GET" 101L = Ok ((21L, ["21"], "500")) // leak_check
 let draining (credit: Int64) : Stdlib.Result.Result<(Bool * Int64), String> =
   let initial = fixture () in
   let channels = Stdlib.List.map initial.wire.connection.flow.channels (fun channel -> if channel.id != 3L then channel else { channel with send = Stdlib.Option.map channel.send (fun sender -> { sender with credit = sender.offset + credit }) }) in
-  let state = { initial with seen = Stdlib.List.repeatUnsafe 1024 0L, wire = { initial.wire with connection = Stdlib.__QuicConnection.__flow initial.wire.connection { initial.wire.connection.flow with channels = channels } } } in
+  let state = { initial with seen = Stdlib.List.repeatUnsafe 1024z 0L, wire = { initial.wire with connection = Stdlib.__QuicConnection.__flow initial.wire.connection { initial.wire.connection.flow with channels = channels } } } in
   let result = Stdlib.__Http3Server.goAway state |> Stdlib.Result.andThen (fun first -> Stdlib.__Http3Server.goAway first) |> Stdlib.Result.map (fun next -> (next.goAwaySent, next.wire.connection.flow.sent - initial.wire.connection.flow.sent)) in
   Stdlib.__Http3.close initial.wire
   result

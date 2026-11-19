@@ -154,7 +154,7 @@ let testLibraryGenericReachesStdlibSpecialization stdlib () =
         "fullPathOf (Located { entity = 5L, modules = [\"a\", \"b\"] })";
     ]
   |> expectExecution "Generic library program" "generic library"
-       "\"root.a.b\"\n"
+       "root.a.b\n"
 
 let tests stdlib =
   [

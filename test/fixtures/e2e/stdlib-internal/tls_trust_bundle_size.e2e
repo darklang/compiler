@@ -4,7 +4,7 @@
  | Error _ -> false
  | Ok bundle ->
    match Stdlib.__Tls13Client.parsePemBundle bundle with
-   | Ok roots -> Stdlib.Blob.length bundle > 262144 &&
+   | Ok roots -> Stdlib.Blob.length bundle > 262144z &&
                  Stdlib.List.length roots == 1100L
    | Error _ -> false)
   = true

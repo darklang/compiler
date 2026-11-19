@@ -21,11 +21,11 @@ match UnitEnvelope () with | UnitEnvelope value -> value = ()
 match BoolEnvelope false with | BoolEnvelope value -> value = false
 match Int8Envelope 7y with | Int8Envelope value -> value = 7y
 match UInt8Envelope 7uy with | UInt8Envelope value -> value = 7uy
-match Int16Envelope 7s with | Int16Envelope value -> value = 7s
+match Int16Envelope 7s16 with | Int16Envelope value -> value = 7s16
 match UInt16Envelope 7us with | UInt16Envelope value -> value = 7us
 match Int32Envelope 7l with | Int32Envelope value -> value = 7l
 match UInt32Envelope 7ul with | UInt32Envelope value -> value = 7ul
-match IntEnvelope 7 with | IntEnvelope value -> value = 7
+match IntEnvelope 7z with | IntEnvelope value -> value = 7z
 match FloatEnvelope 1.5 with | FloatEnvelope value -> value = 1.5
 FloatEnvelope 1.5 = stdout="FloatEnvelope.FloatEnvelope(1.5)\n" stderr=""
 match DateEnvelope (Stdlib.DateTime.fromMilliseconds 7L) with | DateEnvelope value -> Stdlib.DateTime.toMilliseconds value = 7L

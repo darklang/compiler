@@ -156,11 +156,11 @@ Stdlib.UInt16.fromUInt8 0uy = 0us
 Stdlib.UInt16.fromUInt8 1uy = 1us
 Stdlib.UInt16.fromUInt8 255uy = 255us
 
-Stdlib.UInt16.fromInt16 0s = Stdlib.Option.Option.Some 0us
-Stdlib.UInt16.fromInt16 1s = Stdlib.Option.Option.Some 1us
-Stdlib.UInt16.fromInt16 32767s = Stdlib.Option.Option.Some 32767us
-Stdlib.UInt16.fromInt16 (-1s) = Stdlib.Option.Option.None
-Stdlib.UInt16.fromInt16 (-32768s) = Stdlib.Option.Option.None
+Stdlib.UInt16.fromInt16 0s16 = Stdlib.Option.Option.Some 0us
+Stdlib.UInt16.fromInt16 1s16 = Stdlib.Option.Option.Some 1us
+Stdlib.UInt16.fromInt16 32767s16 = Stdlib.Option.Option.Some 32767us
+Stdlib.UInt16.fromInt16 (-1s16) = Stdlib.Option.Option.None
+Stdlib.UInt16.fromInt16 (-32768s16) = Stdlib.Option.Option.None
 
 Stdlib.UInt16.fromInt32 0l = Stdlib.Option.Option.Some 0us
 Stdlib.UInt16.fromInt32 1l = Stdlib.Option.Option.Some 1us

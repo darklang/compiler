@@ -9,7 +9,7 @@ Stdlib.List.getAt ([1L, 2L, 3L]) 9223372036854775807L = None
 
 Stdlib.List.range (-1L) 2L = [-1L, 0L, 1L, 2L]
 Stdlib.List.range 2L 1L = []
-Stdlib.List.repeatUnsafe 3 "x" = ["x", "x", "x"]
+Stdlib.List.repeatUnsafe 3z "x" = ["x", "x", "x"]
 Stdlib.List.repeat 0L 1L = []
 Stdlib.List.repeat (-4L) "x" = []
 
@@ -44,12 +44,12 @@ Stdlib.List.sortBy ([6L, 2L, 8L, 3L]) (fun x -> 0L - x) = [8L, 6L, 3L, 2L]
 Stdlib.List.unique ([7L, 42L, 7L, 2L, 10L]) = [7L, 42L, 2L, 10L]
 Stdlib.List.uniqueBy ([1L, 2L, 3L, 4L]) (fun x -> x / 2L) = [1L, 2L, 4L]
 
-Stdlib.List.SortByComparatorHelpers.validate 1L 2L (fun a b -> 3) = Error "Expected comparator function to return -1, 0, or 1, but it returned 3"
+Stdlib.List.SortByComparatorHelpers.validate 1L 2L (fun a b -> 3z) = Error "Expected comparator function to return -1, 0, or 1, but it returned 3"
 Stdlib.List.SortByComparatorHelpers.splitList ([1L, 2L, 3L, 4L, 5L]) = ([1L, 3L, 5L], [2L, 4L])
-Stdlib.List.SortByComparatorHelpers.merge ([1L, 3L]) ([2L, 4L]) (fun a b -> if a < b then -1 else if a > b then 1 else 0) = Ok ([1L, 2L, 3L, 4L])
-Stdlib.List.SortByComparatorHelpers.mergeSort ([3L, 1L, 2L]) (fun a b -> if a < b then -1 else if a > b then 1 else 0) = Ok ([1L, 2L, 3L])
-Stdlib.List.sortByComparator ([3L, 1L, 2L]) (fun a b -> if a < b then -1 else if a > b then 1 else 0) = Ok ([1L, 2L, 3L])
-Stdlib.List.sortByComparator ([(1L, "first"), (1L, "second"), (0L, "zero")]) (fun (a, _) (b, _) -> if a < b then -1 else if a > b then 1 else 0) = Ok ([(0L, "zero"), (1L, "first"), (1L, "second")])
-Stdlib.List.sortByComparator ([1L, 2L]) (fun _ _ -> 2) = Error "Expected comparator function to return -1, 0, or 1, but it returned 2"
-Stdlib.List.sortByComparator ([3L, 1L, 2L]) (fun a b -> if a == 3L && b == 2L then 2 else if a < b then -1 else if a > b then 1 else 0) = Error "Expected comparator function to return -1, 0, or 1, but it returned 2"
+Stdlib.List.SortByComparatorHelpers.merge ([1L, 3L]) ([2L, 4L]) (fun a b -> if a < b then -1z else if a > b then 1z else 0z) = Ok ([1L, 2L, 3L, 4L])
+Stdlib.List.SortByComparatorHelpers.mergeSort ([3L, 1L, 2L]) (fun a b -> if a < b then -1z else if a > b then 1z else 0z) = Ok ([1L, 2L, 3L])
+Stdlib.List.sortByComparator ([3L, 1L, 2L]) (fun a b -> if a < b then -1z else if a > b then 1z else 0z) = Ok ([1L, 2L, 3L])
+Stdlib.List.sortByComparator ([(1L, "first"), (1L, "second"), (0L, "zero")]) (fun (a, _) (b, _) -> if a < b then -1z else if a > b then 1z else 0z) = Ok ([(0L, "zero"), (1L, "first"), (1L, "second")])
+Stdlib.List.sortByComparator ([1L, 2L]) (fun _ _ -> 2z) = Error "Expected comparator function to return -1, 0, or 1, but it returned 2"
+Stdlib.List.sortByComparator ([3L, 1L, 2L]) (fun a b -> if a == 3L && b == 2L then 2z else if a < b then -1z else if a > b then 1z else 0z) = Error "Expected comparator function to return -1, 0, or 1, but it returned 2"
 Stdlib.List.sortByComparator ([1L, 2L]) (fun _ _ -> 0L) = compileerror="Expected TInt, got TInt64"

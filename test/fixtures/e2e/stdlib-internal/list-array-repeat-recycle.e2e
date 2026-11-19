@@ -5,5 +5,5 @@ let seedRepeatBlock () : RawPtr = let p = __raw_alloc 256L in let _ = __raw_writ
 let recycledRepeatPipeline (count: Int) : Int64 = let xs = Stdlib.List.repeatUnsafe count 7L in let ys = Stdlib.List.map xs (fun x -> x + 1L) in Stdlib.List.fold ys 0L (fun acc x -> acc + x)
 let inspectRepeatBlock () : Int64 = let p = __raw_alloc 256L in let _ = __raw_write_word p 0L 1L in let _ = __raw_write_word p 8L 240L in let s = __rawptr_to_string p in __raw_get<Int64> (__string_to_rawptr s) 40L
 
-let _ = seedRepeatBlock () in let result = recycledRepeatPipeline 3 in result + inspectRepeatBlock () = stdout="32\n" stderr="" disable_opt_inline=true
-let _ = seedRepeatBlock () in let result = recycledRepeatPipeline 28 in result + inspectRepeatBlock () = stdout="232\n" stderr="" disable_opt_inline=true
+let _ = seedRepeatBlock () in let result = recycledRepeatPipeline 3z in result + inspectRepeatBlock () = stdout="32\n" stderr="" disable_opt_inline=true
+let _ = seedRepeatBlock () in let result = recycledRepeatPipeline 28z in result + inspectRepeatBlock () = stdout="232\n" stderr="" disable_opt_inline=true

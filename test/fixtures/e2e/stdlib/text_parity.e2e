@@ -14,7 +14,7 @@ Stdlib.String.charAt "a👩‍👩‍👧‍👦z" 1L = Some '👩‍👩‍👧
 
 // Search counts whole EGCs, as indexOfEgc does.
 Stdlib.String.indexOf "😀x" "x" = Some 1L
-Stdlib.String.indexOfEgc "😀x" "x" = Some 1
+Stdlib.String.indexOfEgc "😀x" "x" = Some 1z
 
 // Regex returns full matches and advances deterministically after empty matches.
 Stdlib.Regex.find "test123" "\\d+" = Stdlib.Result.Result.Ok (Some "123")

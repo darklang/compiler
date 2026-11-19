@@ -42,7 +42,7 @@ root = tuple(shared_word, shared_word)
 Single-case arbitrary Int wrapper shares its heap root
 ---INPUT---
 type IntEnvelope = IntEnvelope of Int
-let original = 123456789012345678901234567890 in (original, IntEnvelope original)
+let original = 123456789012345678901234567890z in (original, IntEnvelope original)
 ---EXPECTED---
 root = tuple(shared_word, shared_word)
 
@@ -66,7 +66,7 @@ root = word(0)
 Single-case arbitrary Int wrapper keeps its tagged immediate
 ---INPUT---
 type IntEnvelope = IntEnvelope of Int
-IntEnvelope 7
+IntEnvelope 7z
 ---EXPECTED---
 root = word(15)
 

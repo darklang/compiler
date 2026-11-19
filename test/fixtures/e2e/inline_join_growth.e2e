@@ -87,4 +87,4 @@ let inferNotEqualLambda (xs: List<String>): Int =
   |> Stdlib.List.filter (fun s -> Stdlib.String.trim s != "")
   |> Stdlib.List.length
   |> Stdlib.Int.fromInt64
-inferNotEqualLambda ["a", " ", "b"] = 2
+inferNotEqualLambda ["a", " ", "b"] = 2z

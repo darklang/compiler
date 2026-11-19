@@ -11,11 +11,11 @@
 true == true = true
 true != false = true
 1y == 1y = true
-1s == 2s = false
+1s16 == 2s16 = false
 1l != 2l = true
 1L == 1L = true
 1Q == 1Q = true
-1 != 2 = true
+1z != 2z = true
 1uy == 1uy = true
 1us != 2us = true
 1ul == 1ul = true
@@ -36,11 +36,11 @@ Builtin.testNan_v0 != Builtin.testNan_v0 = true
 Stdlib.equals (()) (()) = true
 Stdlib.notEquals true false = true
 Stdlib.equals 1y 1y = true
-Stdlib.notEquals 1s 2s = true
+Stdlib.notEquals 1s16 2s16 = true
 Stdlib.equals 1l 1l = true
 Stdlib.notEquals 1L 2L = true
 Stdlib.equals 1Q 1Q = true
-Stdlib.notEquals<Int> 1 2 = true
+Stdlib.notEquals<Int> 1z 2z = true
 Stdlib.equals 1uy 1uy = true
 Stdlib.notEquals 1us 2us = true
 Stdlib.equals 1ul 1ul = true
@@ -112,13 +112,13 @@ Stdlib.equals (comparisonTraceValue "L" 1L) (comparisonTraceValue "R" 1L) = stdo
 
 // Numeric ordering covers every width; 128-bit values are numeric, not lexical.
 -2y < 1y = true
--2s <= -2s = true
+-2s16 <= -2s16 = true
 -2l < 1l = true
 -2L <= 1L = true
 -10Q < -2Q = true
 10Q > 2Q = true
--10 < -2 = true
-10 >= 2 = true
+-10z < -2z = true
+10z >= 2z = true
 2uy < 10uy = true
 2us <= 10us = true
 2ul < 10ul = true

@@ -100,7 +100,6 @@ test floatOverflowIsInfinity =
   2.0 ** 100000.0 |> Stdlib.Test.equal(1.0 / 0.0)
 
 // `**` (power) works on every numeric type, the 128-bit ints included
-// @compiler xfail compile: "Cannot perform numeric operation on Int128 and Int128" class=missing-support reason=compiler-gap
 test power =
   Stdlib.Test.all(
     [ 2s8 ** 3s8 |> Stdlib.Test.equal(8s8)

@@ -74,11 +74,11 @@ let a = "hello" in let b = "world" in let c = "!" in a + " " + b + c = "hello wo
 
 // A nonconstant ASCII concat tree allocates only its final buffer. The unfused
 // left-associated form exhausts the fixed heap by copying every prefix.
-let concatFusionChunk (n: Int64) (value: String): String = if n == 0L then value else concatFusionChunk (n - 1L) (value + value); let chunk = concatFusionChunk 20L "x" in Stdlib.String.getByteAt (chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk) 34603007L = stdout="Darklang.Stdlib.Option.Option<UInt8>.Some(120)\n" stderr="" isolated=true
+let concatFusionChunk (n: Int64) (value: String): String = if n == 0L then value else concatFusionChunk (n - 1L) (value + value); let chunk = concatFusionChunk 20L "x" in Stdlib.String.getByteAt (chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk + chunk) 34603007L = stdout="Some(120u8)\n" stderr="" isolated=true
 
 // Joining dynamic chunks must allocate the final string once. Repeatedly
 // concatenating the growing prefix exhausts the fixed heap for this workload.
-let chunk = joinFusionChunk 17L "x" in Stdlib.String.getByteAt (Stdlib.String.join (repeatChunk 100L chunk []) "") 13107199L = stdout="Darklang.Stdlib.Option.Option<UInt8>.Some(120)\n" stderr="" isolated=true
+let chunk = joinFusionChunk 17L "x" in Stdlib.String.getByteAt (Stdlib.String.join (repeatChunk 100L chunk []) "") 13107199L = stdout="Some(120u8)\n" stderr="" isolated=true
 Stdlib.String.join (["e", "\u0301"]) "" = "é"
 
 // Character-list construction uses the same one-allocation builder path.
@@ -259,7 +259,7 @@ Stdlib.String.indexOf "hello" "" = Some 0L
 Stdlib.String.indexOf "" "" = Some 0L
 
 // Index conversion must not allocate a prefix string and one list node per codepoint.
-let utf16IndexChunk (remaining: Int64) (value: String): String = if remaining == 0L then value else utf16IndexChunk (remaining - 1L) (value + value); let value = utf16IndexChunk 24L "x" + "y" in Stdlib.String.indexOf value "y" = stdout="Darklang.Stdlib.Option.Option<Int64>.Some(16777216)\n" stderr="" isolated=true
+let utf16IndexChunk (remaining: Int64) (value: String): String = if remaining == 0L then value else utf16IndexChunk (remaining - 1L) (value + value); let value = utf16IndexChunk 24L "x" + "y" in Stdlib.String.indexOf value "y" = stdout="Some(16777216)\n" stderr="" isolated=true
 
 // =============================================================================
 // Stdlib.String.contains Tests

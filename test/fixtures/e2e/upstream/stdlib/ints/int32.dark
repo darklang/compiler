@@ -41,7 +41,7 @@ Stdlib.Int32.remainder 20l 8l = Stdlib.Result.Result.Ok 4l
 Stdlib.Int32.remainder -20l 8l = Stdlib.Result.Result.Ok -4l
 Stdlib.Int32.remainder -20l -8l = Stdlib.Result.Result.Ok -4l
 Stdlib.Int32.remainder -15l 6l = Stdlib.Result.Result.Ok -3l
-Stdlib.Int32.remainder 5l 0l = error="Cannot divide by 0"
+Stdlib.Int32.remainder 5l 0l = Stdlib.Result.Result.Error "Cannot divide by 0"
 Stdlib.Int32.mod 15l 5l = 0l
 Stdlib.Int32.mod 15l 6l = 3l
 Stdlib.Int32.mod 0l 15l = 0l
@@ -209,10 +209,10 @@ Stdlib.Int32.fromUInt8 0uy = 0l
 Stdlib.Int32.fromUInt8 1uy = 1l
 Stdlib.Int32.fromUInt8 255uy = 255l
 
-Stdlib.Int32.fromInt16 0s = 0l
-Stdlib.Int32.fromInt16 1s = 1l
-Stdlib.Int32.fromInt16 32767s = 32767l
-Stdlib.Int32.fromInt16 (-32768s) = -32768l
+Stdlib.Int32.fromInt16 0s16 = 0l
+Stdlib.Int32.fromInt16 1s16 = 1l
+Stdlib.Int32.fromInt16 32767s16 = 32767l
+Stdlib.Int32.fromInt16 (-32768s16) = -32768l
 
 Stdlib.Int32.fromUInt16 0us = 0l
 Stdlib.Int32.fromUInt16 1us = 1l

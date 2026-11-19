@@ -11,7 +11,7 @@ let freshConcatAll<'a> (xss: List<List<'a>>): List<'a> =
 
 let freshRunConcat (): Int =
   Stdlib.Int.fromInt64 (Stdlib.List.length (freshConcatAll [[1L, 2L], [3L]]))
-freshRunConcat () = 3
+freshRunConcat () = 3z
 
 let freshPairUp<'a, 'b> (xs: List<'a>) (ys: List<'b>): List<('a * 'b)> =
   Stdlib.List.zipShortest xs ys
@@ -29,16 +29,16 @@ freshRunFirsts () = 3L
 // return type (Cli.Listing.cut in darklang/dark).
 let freshTakeWithin<'a> (items: List<'a>) (limit: Int) (cost: 'a -> Int): (List<'a> * Int) =
   let (shown, spent) =
-    Stdlib.List.fold items ([], 0) (fun acc item ->
+    Stdlib.List.fold items ([], 0z) (fun acc item ->
       let (taken, spent) = acc
       let next = spent + (cost item)
       if next <= limit then (Stdlib.List.concat taken [item], next) else (taken, spent))
   (shown, spent)
 
 let freshRunTakeWithin (): Int =
-  let (shown, spent) = freshTakeWithin [1L, 2L, 3L] 3 (fun x -> 1)
+  let (shown, spent) = freshTakeWithin [1L, 2L, 3L] 3z (fun x -> 1z)
   Stdlib.Int.fromInt64 (Stdlib.List.length shown) + spent
-freshRunTakeWithin () = 6
+freshRunTakeWithin () = 6z
 
 // An untyped lambda passed before the argument that fixes its parameter: the
 // checker's placeholder for the parameter meets the callee's freshened

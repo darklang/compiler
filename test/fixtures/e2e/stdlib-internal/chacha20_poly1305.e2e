@@ -82,9 +82,9 @@
        | Ok record ->
          let changed = Stdlib.__Tls13.Record {
            contentType = record.contentType,
-           payload = Stdlib.Blob.concat [Stdlib.Blob.slice record.payload 0 1,
+           payload = Stdlib.Blob.concat [Stdlib.Blob.slice record.payload 0z 1z,
                      Stdlib.String.toBlob "x",
-                     Stdlib.Blob.slice record.payload 2 (Stdlib.Blob.length record.payload - 2)],
+                     Stdlib.Blob.slice record.payload 2z (Stdlib.Blob.length record.payload - 2z)],
            remaining = record.remaining } in
          Stdlib.__Tls13.openRecord keys changed
          |> Stdlib.Result.map (fun opened -> Stdlib.Blob.toHex opened.content))

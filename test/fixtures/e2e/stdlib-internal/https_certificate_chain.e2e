@@ -6,7 +6,7 @@
  match (root, leaf, date) with
  | (Ok ca, Ok server, Ok at) ->
    Stdlib.__X509Chain.verifyAt [server] [ca] "localhost" at
-   |> Stdlib.Result.map (fun verified -> Stdlib.Blob.length verified.spki > 250)
+   |> Stdlib.Result.map (fun verified -> Stdlib.Blob.length verified.spki > 250z)
  | _ -> Error "Invalid fixture")
   = Ok true
 

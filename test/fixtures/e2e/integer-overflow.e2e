@@ -15,9 +15,9 @@ let f = fun a b c -> a + b + c in f 60y 60y 120y = -16y // chained Int8 addition
 let x = 120y in x + 120y = -16y // let-bound Int8 literals must not widen to Int64
 
 // Int16: range -32768 to 32767
-32767s + 1s = -32767s - 1s // MAX + 1 wraps to MIN
--32767s - 2s = 32767s // MIN - 1 wraps to MAX (use -32767-2 instead of -32768-1)
-20000s + 20000s = -25536s // 40000 wraps to -25536 (40000 - 65536)
+32767s16 + 1s16 = -32767s16 - 1s16 // MAX + 1 wraps to MIN
+-32767s16 - 2s16 = 32767s16 // MIN - 1 wraps to MAX (use -32767-2 instead of -32768-1)
+20000s16 + 20000s16 = -25536s16 // 40000 wraps to -25536 (40000 - 65536)
 
 // Int32: range -2147483648 to 2147483647
 2147483647l + 1l = -2147483647l - 1l // MAX + 1 wraps to MIN
@@ -51,8 +51,8 @@ let x = 120y in x + 120y = -16y // let-bound Int8 literals must not widen to Int
 10y * 20y = -56y // 200 wraps to -56
 
 // Int16 multiplication overflow
-256s * 256s = 0s // 65536 wraps to 0 (mod 65536)
-200s * 200s = -25536s // 40000 wraps to -25536
+256s16 * 256s16 = 0s16 // 65536 wraps to 0 (mod 65536)
+200s16 * 200s16 = -25536s16 // 40000 wraps to -25536
 
 // UInt8 multiplication overflow
 16uy * 16uy = 0uy // 256 wraps to 0

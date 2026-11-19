@@ -464,7 +464,7 @@ let testDoesNotBatchIsolatedTests () =
 let testBatchesEqualityInsideExplicitResultBinding () =
   oneNamed "ordinary.e2e"
     "let identityInt (value: Int) : Int = value\n\
-     identityInt 9223372036854775808 = 9223372036854775808\n"
+     identityInt 9223372036854775808z = 9223372036854775808z\n"
     "Expected local-declaration fixture to parse" (fun test ->
       require
         (Option.is_some (tryPrepareBatchTest test))

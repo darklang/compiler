@@ -75,8 +75,8 @@
              let prefix = Stdlib.Blob.fromList [20uy, 0uy, 0uy, 32uy] in
              let finished = Stdlib.Blob.concat [prefix, verify] in
              let plaintext = Stdlib.Blob.concat [ee, cert, cv, finished] in
-             let fragment = Stdlib.Blob.slice plaintext 0 3 in
-             let rest = Stdlib.Blob.slice plaintext 3 (Stdlib.Blob.length plaintext - 3) in
+             let fragment = Stdlib.Blob.slice plaintext 0z 3z in
+             let rest = Stdlib.Blob.slice plaintext 3z (Stdlib.Blob.length plaintext - 3z) in
              match Stdlib.__Tls13.sealRecord initial.serverKeys 22L fragment with
              | Error message -> Error message
              | Ok firstSealed ->

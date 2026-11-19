@@ -9,7 +9,7 @@ let operation = Stdlib.Int64.divide in operation 21L 3L = 7L
 let operation = Stdlib.Int64.divide in operation 1L 0L = error="Cannot divide by 0"
 Stdlib.List.map [1L, 2L, 3L] (Stdlib.Int64.add 4L) = [5L, 6L, 7L]
 let operation = Stdlib.Int8.add in operation 120y 10y = 120y + 10y
-let operation = Stdlib.Int16.subtract in operation 9s 4s = 9s - 4s
+let operation = Stdlib.Int16.subtract in operation 9s16 4s16 = 9s16 - 4s16
 let operation = Stdlib.Int32.multiply in operation 6l 7l = 6l * 7l
 let operation = Stdlib.UInt8.add in operation 250uy 10uy = 250uy + 10uy
 let operation = Stdlib.UInt16.subtract in operation 4us 9us = 4us - 9us

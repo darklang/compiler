@@ -373,15 +373,19 @@ def main():
             def run(text):
                 result = compile_(text)
                 assert result.returncode == 0, text + result.stdout + result.stderr
-                return json.loads(subprocess.check_output([str(program)], text=True, timeout=10))
+                printed = subprocess.check_output([str(program)], text=True, timeout=10).rstrip("\n")
+                try:
+                    return json.loads(printed)
+                except json.JSONDecodeError:
+                    return printed
 
             assert run("Hosted.operators 10L\n") == 1036
             assert run("Hosted.pipePlus 41L\n") == 42
             assert run("Hosted.deepAdds 1L\n") == 181
             assert [run(f"Hosted.elseIfChain {x}L\n") for x in (0, 149, 150)] == [0, 1490, -1]
-            assert run("Hosted.builtinOps 50\n") is True
+            assert run("Hosted.builtinOps 50z\n") is True
             assert run("Hosted.overflowName ()\n") == "overflow"
-            assert run("Hosted.describeNumber 42L\n") == "42"
+            assert run("Hosted.describeNumber 42L\n") == 42
             assert run("Hosted.renamedBuiltins 1L\n") is True
             assert run("Hosted.moduleBuiltins 1L\n") == "AB"
             assert run("Hosted.usesHelper 41L\n") == 42
@@ -400,7 +404,7 @@ def main():
             assert run("Hosted.closeBad 1L\n") == 9
             assert run("Hosted.sleepZero 1L\n") == 0
             assert run("Hosted.B.second 7L\n") == 7
-            current = compile_with(["--syntax=current"], "Hosted.int16Zero(1)\n")
+            current = compile_with([], "Hosted.int16Zero(1)\n")
             assert current.returncode == 0, current.stdout + current.stderr
             assert subprocess.check_output([str(program)], text=True, timeout=10) == "-7s16\n"
             assert run("Hosted.dictLast 5L\n") == 1
@@ -409,13 +413,13 @@ def main():
             assert run("Hosted.secondName 4L\n") == 4
             assert [run(f"Hosted.asPatterns {x}L\n") for x in (5, 7, 1)] == [51, 14, 0]
             assert run("Hosted.braces 1L\n") == "a{b}c"
-            assert str(run("Hosted.int128Power 2Q\n")) == "8"
-            assert run("Hosted.builtinMore 7L\n") == "1"
-            assert run("Hosted.builtinOps 52\n") is False
+            assert run("Hosted.int128Power 2Q\n") == "8s128"
+            assert run("Hosted.builtinMore 7L\n") == 1
+            assert run("Hosted.builtinOps 52z\n") is False
             assert run("Hosted.builtinPoly 2L\n") is True
             assert run("Hosted.builtinPoly 0L\n") is False
             assert run("Hosted.builtinBitwise 13L\n") == -14
-            assert str(run("Hosted.doubleBig 12345678901234567890\n")) == "24691357802469135780"
+            assert run("Hosted.doubleBig 12345678901234567890z\n") == "24691357802469135780z"
             assert run("Hosted.isHalf 0.5\n") is True
             assert run("Hosted.isHalf 0.25\n") is False
             assert str(run('Stdlib.Blob.length (Hosted.sameBytes (Stdlib.Blob.fromString "abc"))\n')) == "3"
@@ -453,9 +457,9 @@ def main():
                 "Hosted.recordPattern: can't compile: uses a record pattern, which this compiler does not support",
                 "Hosted.__helper: compiles",
             ], checked.stdout + checked.stderr
-            # Under --syntax=current a rendered package unit, which converts its own
-            # stdlib calls, is not converted a second time as the script is.
-            current = subprocess.run([compiler, "--syntax=current", "--package-server",
+            # A rendered package unit, which converts its own stdlib calls, is not
+            # converted a second time as the script is.
+            current = subprocess.run([compiler, "--package-server",
                 f"http://127.0.0.1:{server.server_port}", "--check", "Hosted.bytesLen",
                 "Hosted.conversions", "Hosted.recordKey"], env=env, capture_output=True, text=True, timeout=300)
             assert current.stdout.splitlines() == ["Hosted.bytesLen: compiles",

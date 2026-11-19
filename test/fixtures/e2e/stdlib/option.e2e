@@ -92,7 +92,7 @@ let x = None in Stdlib.Option.withDefault (x) () = ()
 let x = None in Stdlib.Option.withDefault x 42y = 42y
 
 // Int16
-let x = None in Stdlib.Option.withDefault x 42s = 42s
+let x = None in Stdlib.Option.withDefault x 42s16 = 42s16
 
 // Int32
 let x = None in Stdlib.Option.withDefault x 42l = 42l
@@ -125,7 +125,7 @@ let x = None in Stdlib.Option.isSome (Stdlib.Option.withDefault x (Some 42L)) = 
 let x = None in Stdlib.Result.isOk (Stdlib.Option.withDefault x (Ok 42L)) = true
 
 // Large combines follow the interpreter's stack-safe fold implementation.
-let options = Stdlib.List.repeatUnsafe 100000 (Some 1L) in match Stdlib.Option.combine options with | Some values -> Stdlib.List.length values | None -> 0L = 100000L isolated=true
+let options = Stdlib.List.repeatUnsafe 100000z (Some 1L) in match Stdlib.Option.combine options with | Some values -> Stdlib.List.length values | None -> 0L = 100000L isolated=true
 
 // Large value extraction follows the interpreter's filterMap implementation.
-let options = Stdlib.List.repeatUnsafe 100000 (Some 1L) in Stdlib.List.length (Stdlib.Option.values options) = 100000L isolated=true
+let options = Stdlib.List.repeatUnsafe 100000z (Some 1L) in Stdlib.List.length (Stdlib.Option.values options) = 100000L isolated=true

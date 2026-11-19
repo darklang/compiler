@@ -19,26 +19,26 @@ def main():
         programs = {
             'key': '''let k = Builtin.stdinReadKey () in
 let report = $"{Stdlib.Cli.Stdin.KeyRead.toString k}|{k.keyChar}|{Stdlib.Int.toString k.repeat}" in
-let _ = Stdlib.Cli.Posix.fdWrite 2 (Stdlib.String.toBlob report) in
+let _ = Stdlib.Cli.Posix.fdWrite 2z (Stdlib.String.toBlob report) in
 0L''',
             'keys': '''let a = Stdlib.Cli.Stdin.readKey () in
 let b = Stdlib.Cli.Stdin.readKey () in
 let report = $"{Stdlib.Cli.Stdin.KeyRead.toString a}:{Stdlib.Int.toString a.repeat}|{Stdlib.Cli.Stdin.KeyRead.toString b}:{Stdlib.Int.toString b.repeat}" in
-let _ = Stdlib.Cli.Posix.fdWrite 2 (Stdlib.String.toBlob report) in
+let _ = Stdlib.Cli.Posix.fdWrite 2z (Stdlib.String.toBlob report) in
 0L''',
             'secret': '''let value = Stdlib.Cli.Stdin.readSecret () in
-let _ = Stdlib.Cli.Posix.fdWrite 2 (Stdlib.String.toBlob value) in
+let _ = Stdlib.Cli.Posix.fdWrite 2z (Stdlib.String.toBlob value) in
 0L''',
             'all': '''let value = Stdlib.Cli.Stdin.readAll () |> Stdlib.Result.withDefault "" in
 let _ = Builtin.print value in
 0L''',
-            'split': '''let a = Builtin.stdinReadExactly 1 in
-let b = Builtin.stdinReadExactly 1 in
+            'split': '''let a = Builtin.stdinReadExactly 1z in
+let b = Builtin.stdinReadExactly 1z in
 let c = Builtin.stdinReadAll () in
-let _ = Stdlib.Cli.Posix.fdWrite 1 (Stdlib.String.toBlob (a + "|" + b + "|" + c)) in
+let _ = Stdlib.Cli.Posix.fdWrite 1z (Stdlib.String.toBlob (a + "|" + b + "|" + c)) in
 0L''',
-            'invalid': 'let _ = Builtin.stdinReadExactly -1 in 0L',
-            'overflow': 'let _ = Builtin.stdinReadExactly 2147483648 in 0L',
+            'invalid': 'let _ = Builtin.stdinReadExactly -1z in 0L',
+            'overflow': 'let _ = Builtin.stdinReadExactly 2147483648z in 0L',
         }
         binaries = {}
         batch = [compiler, "--batch", "-q", "--leak-check", "--"]

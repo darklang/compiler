@@ -30,7 +30,7 @@ flightWrite 5L = Ok "output:6" // leak_check
 flightWrite 0L = Error "Invalid TLS handshake write progress" // leak_check
 flightWrite 6L = Error "Invalid TLS handshake write progress" // leak_check
 let finished () : Stdlib.Result.Result<List<String>, String> =
-  let secret = Stdlib.Blob.__fromInt64List (Stdlib.List.repeatUnsafe 32 0L) in
+  let secret = Stdlib.Blob.__fromInt64List (Stdlib.List.repeatUnsafe 32z 0L) in
   Stdlib.__Tls13.trafficKeys secret |> Stdlib.Result.andThen (fun keys ->
     let flight = Stdlib.__Tls13ServerHandshake.Flight { hello = Stdlib.Blob.empty, encrypted = Stdlib.Blob.empty, transcript = Stdlib.Blob.empty,
       handshakeReceive = keys, handshakeSend = keys, clientFinished = secret, applicationReceive = keys, applicationSend = keys,

@@ -14,7 +14,7 @@
 // @compiler blocked: compiler-gap
 (Builtin.testRuntimeError "msg1" && Builtin.testRuntimeError "msg2") = error="Uncaught exception: msg1"
 #compileerror="Expected TInt, got TBool"
-(5 && true) = error="&& only supports Booleans"
+(5z && true) = error="&& only supports Booleans"
 (true |> (&&) true) = true
 (true |> (&&) false) = false
 (false |> (&&) true) = false

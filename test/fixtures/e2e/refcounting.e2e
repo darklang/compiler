@@ -47,9 +47,9 @@ let (a, b, c) = (1L, 2L, 3L) in a + b + c = stdout="6\n" stderr=""
 type Point3 = { x: Int64, y: Int64, z: Int64 } let p = Point3 { x = 1L, y = 2L, z = 3L } in p.x + p.y + p.z = stdout="6\n" stderr=""
 
 // Displaying managed final values should release the printed value after output
-type DisplayRecordLeak = { name: String, age: Int64 } DisplayRecordLeak { name = "record", age = 42L } = stdout="DisplayRecordLeak { age: 42, name: \"record\" }\n" stderr=""
+type DisplayRecordLeak = { name: String, age: Int64 } DisplayRecordLeak { name = "record", age = 42L } = stdout="DisplayRecordLeak { name: \"record\", age: 42 }\n" stderr=""
 type DisplaySumLeak = SumList of List<Int64> | SumString of String let items = [1L, 2L, 3L] in SumList items = stdout="DisplaySumLeak.SumList([1, 2, 3])\n" stderr=""
-Stdlib.Blob.fromList ([65uy, 66uy, 67uy]) = stdout="<Blob: ephemeral>\n" stderr=""
+Stdlib.Blob.fromList ([65uy, 66uy, 67uy]) = stdout="<Bytes: 3 bytes 41 42 43>\n" stderr=""
 
 // ===================================================================
 // Function calls with heap values

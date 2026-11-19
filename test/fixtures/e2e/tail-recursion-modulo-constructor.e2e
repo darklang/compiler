@@ -40,7 +40,7 @@ let trmoInt8 (n: Int64) : Int8 =
     if n <= 0L then 127y else trmoInt8 (n - 1L) + trmoInt8 (n - 1L)
 
 let trmoInt16Subtract (n: Int64) : Int16 =
-    if n <= 0L then 0s else trmoInt16Subtract (n - 1L) - 1s
+    if n <= 0L then 0s16 else trmoInt16Subtract (n - 1L) - 1s16
 
 let trmoInt32 (n: Int64) : Int32 =
     if n <= 0L then 1000l else trmoInt32 (n - 1L) + trmoInt32 (n - 1L)
@@ -69,7 +69,7 @@ let trmoMultipleBranches (n: Int64) (subtractOne: Bool) : Int32 =
     else (trmoMultipleBranches (n - 1L) true) - 2l
 
 trmoInt8 8L = 0y
-trmoInt16Subtract 300000L = 27680s
+trmoInt16Subtract 300000L = 27680s16
 trmoInt32 4L = 16000l
 trmoUInt8Subtract 257L = 255uy
 trmoUInt16Safe 4L = 65520us

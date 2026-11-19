@@ -73,39 +73,39 @@ module Bool =
 
 module Int =
   module Basic =
-    Stdlib.Json.serialize<Int> 0 = "0"
-    Stdlib.Json.serialize<Int> 12345 = "12345"
-    Stdlib.Json.serialize<Int> -12345 = "-12345"
-    Stdlib.Json.parse<Int> "0" = Result.Ok 0
-    Stdlib.Json.parse<Int> "12345" = Result.Ok 12345
-    Stdlib.Json.parse<Int> "-12345" = Result.Ok(-12345)
+    Stdlib.Json.serialize<Int> 0z = "0"
+    Stdlib.Json.serialize<Int> 12345z = "12345"
+    Stdlib.Json.serialize<Int> -12345z = "-12345"
+    Stdlib.Json.parse<Int> "0" = Result.Ok 0z
+    Stdlib.Json.parse<Int> "12345" = Result.Ok 12345z
+    Stdlib.Json.parse<Int> "-12345" = Result.Ok(-12345z)
 
   module Huge =
     // arbitrary precision: well past Int64, exact round-trip
-    Stdlib.Json.serialize<Int> 123456789012345678901234567890 = "123456789012345678901234567890"
-    Stdlib.Json.parse<Int> "123456789012345678901234567890" = Result.Ok 123456789012345678901234567890
-    Stdlib.Json.parse<Int> "-123456789012345678901234567890" = Result.Ok(-123456789012345678901234567890)
-    (Stdlib.Json.parse<Int> (Stdlib.Json.serialize<Int> 99999999999999999999999999999999)) = Result.Ok 99999999999999999999999999999999
+    Stdlib.Json.serialize<Int> 123456789012345678901234567890z = "123456789012345678901234567890"
+    Stdlib.Json.parse<Int> "123456789012345678901234567890" = Result.Ok 123456789012345678901234567890z
+    Stdlib.Json.parse<Int> "-123456789012345678901234567890" = Result.Ok(-123456789012345678901234567890z)
+    (Stdlib.Json.parse<Int> (Stdlib.Json.serialize<Int> 99999999999999999999999999999999z)) = Result.Ok 99999999999999999999999999999999z
 
   module PastInt64 =
     // Int is unbounded: it serializes/parses values that overflow Int64.
     // Compare the Int64Limits module above, which *errors* on these exact values.
-    Stdlib.Json.serialize<Int> 9223372036854775808 = "9223372036854775808"
-    Stdlib.Json.parse<Int> "9223372036854775808" = Result.Ok 9223372036854775808
-    Stdlib.Json.parse<Int> "-9223372036854775809" = Result.Ok(-9223372036854775809)
+    Stdlib.Json.serialize<Int> 9223372036854775808z = "9223372036854775808"
+    Stdlib.Json.parse<Int> "9223372036854775808" = Result.Ok 9223372036854775808z
+    Stdlib.Json.parse<Int> "-9223372036854775809" = Result.Ok(-9223372036854775809z)
     // a float-form just above the Int64 max (Int64 rejects "9.3E18")
-    Stdlib.Json.parse<Int> "9.3E18" = Result.Ok 9300000000000000000
+    Stdlib.Json.parse<Int> "9.3E18" = Result.Ok 9300000000000000000z
 
   module IntegerValuedFloatForms =
     // integer-valued decimal/exponent forms are accepted, parsed EXACTLY
     // (the same forms the fixed-width int parsers accept)
-    Stdlib.Json.parse<Int> "0.0" = Result.Ok 0
-    Stdlib.Json.parse<Int> "-1.0" = Result.Ok(-1)
-    Stdlib.Json.parse<Int> "1.2E2" = Result.Ok 120
-    Stdlib.Json.parse<Int> "1.2E+2" = Result.Ok 120
-    Stdlib.Json.parse<Int> "1200E-1" = Result.Ok 120
+    Stdlib.Json.parse<Int> "0.0" = Result.Ok 0z
+    Stdlib.Json.parse<Int> "-1.0" = Result.Ok(-1z)
+    Stdlib.Json.parse<Int> "1.2E2" = Result.Ok 120z
+    Stdlib.Json.parse<Int> "1.2E+2" = Result.Ok 120z
+    Stdlib.Json.parse<Int> "1200E-1" = Result.Ok 120z
     // exact even past 2^53 — guards the precision-loss regression
-    Stdlib.Json.parse<Int> "9007199254740993.0" = Result.Ok 9007199254740993
+    Stdlib.Json.parse<Int> "9007199254740993.0" = Result.Ok 9007199254740993z
 
   module Errors =
     // genuinely fractional values are rejected, never rounded
@@ -119,7 +119,7 @@ module Int =
     (Stdlib.Json.parse<Int> "1e-2147483647") |> err = Result.Error "Can't parse JSON `1e-2147483647` as type `BigInt` at path: `root`"
     (Stdlib.Json.parse<Int> "1e-2147483648") |> err = Result.Error "Can't parse JSON `1e-2147483648` as type `BigInt` at path: `root`"
     // ...but zero with an extreme negative exponent is still exactly zero
-    Stdlib.Json.parse<Int> "0e-2147483648" = Result.Ok 0
+    Stdlib.Json.parse<Int> "0e-2147483648" = Result.Ok 0z
 
 
 module Int64 =
@@ -346,26 +346,26 @@ module UInt8 =
 
 module Int16 =
   module Basic =
-    Stdlib.Json.serialize<Int16> 0s = "0"
-    Stdlib.Json.serialize<Int16> 123s = "123"
-    Stdlib.Json.serialize<Int16> -123s = "-123"
+    Stdlib.Json.serialize<Int16> 0s16 = "0"
+    Stdlib.Json.serialize<Int16> 123s16 = "123"
+    Stdlib.Json.serialize<Int16> -123s16 = "-123"
 
-    Stdlib.Json.parse<Int16> "0" = Result.Ok 0s
-    Stdlib.Json.parse<Int16> "0.0" = Result.Ok 0s
-    Stdlib.Json.parse<Int16> "-0.0" = Result.Ok 0s
-    Stdlib.Json.parse<Int16> "-1.0" = Result.Ok -1s
-    Stdlib.Json.parse<Int16> "1.2E2" = Result.Ok 120s
-    Stdlib.Json.parse<Int16> "1.2E+2" = Result.Ok 120s
-    Stdlib.Json.parse<Int16> "1200E-1" = Result.Ok 120s
+    Stdlib.Json.parse<Int16> "0" = Result.Ok 0s16
+    Stdlib.Json.parse<Int16> "0.0" = Result.Ok 0s16
+    Stdlib.Json.parse<Int16> "-0.0" = Result.Ok 0s16
+    Stdlib.Json.parse<Int16> "-1.0" = Result.Ok -1s16
+    Stdlib.Json.parse<Int16> "1.2E2" = Result.Ok 120s16
+    Stdlib.Json.parse<Int16> "1.2E+2" = Result.Ok 120s16
+    Stdlib.Json.parse<Int16> "1200E-1" = Result.Ok 120s16
 
 
   module Int16Limits =
-    Stdlib.Json.serialize<Int16> -32768s = "-32768"
-    Stdlib.Json.serialize<Int16> 32767s = "32767"
+    Stdlib.Json.serialize<Int16> -32768s16 = "-32768"
+    Stdlib.Json.serialize<Int16> 32767s16 = "32767"
 
-    Stdlib.Json.parse<Int16> "-32768" = Result.Ok -32768s
+    Stdlib.Json.parse<Int16> "-32768" = Result.Ok -32768s16
 
-    Stdlib.Json.parse<Int16> "32767" = Result.Ok 32767s
+    Stdlib.Json.parse<Int16> "32767" = Result.Ok 32767s16
 
     (Stdlib.Json.parse<Int16> "-32769") |> err = Result.Error
       "Can't parse JSON `-32769` as type `Int16` at path: `root`"
@@ -938,7 +938,7 @@ module BadTypes =
   // @compiler error-message compile: "Cannot parse JSON into function type (Int64) -> Int64: JSON cannot represent executable functions" reason=diagnostic-difference
   Stdlib.Json.parse<Int64 -> Int64> "{}" = error="Unsupported type in JSON: (Int64) -> Int64. Some types are not supported in Json serialization, and cannot be used as arguments to Builtin.jsonParse or Builtin.jsonSerialize"
   #compileerror="Expected TInt64, got TInt"
-  Stdlib.Json.serialize<Int64 -> Int64> (fun i -> 5) = error="Cannot serialize (lambda) into JSON"
+  Stdlib.Json.serialize<Int64 -> Int64> (fun i -> 5z) = error="Cannot serialize (lambda) into JSON"
 module List =
   type MyString = String
 
@@ -1277,7 +1277,7 @@ module UserDefinedRecords =
   )
 
   // can parse even if the JSON has _extra_ fields
-  Stdlib.Json.parse<Person> """{ "Name": "Bob", "Age": 42, "Height": "6 ft" }""" = Result
+  Stdlib.Json.parse<Person> """{ "Name": "Bob", "Age": 42, "Height": "6z ft" }""" = Result
     .Ok(Person { Name = "Bob", Age = 42L })
 
   // @compiler blocked: compiler-gap
@@ -1285,7 +1285,7 @@ module UserDefinedRecords =
 
    match personMaybe with
    | Ok person -> person.Age
-   | Error _ -> 0) = 42L
+   | Error _ -> 0z) = 42L
 
 
   type People =
