@@ -6,7 +6,8 @@ Every `.dark` file under interpreter `packages/` and
 `backend/testfiles/execution/` is included at the revision in
 [`sources.yaml`](../../porting/sources.yaml).
 
-`upstream/` holds those files unchanged. Compiler decisions
+`upstream/` is byte-identical to darklang/dark at that revision, so a re-pin is
+`python3 scripts/sync-upstream.py /path/to/dark REVISION`. Compiler decisions
 live in [`upstream-annotations.tsv`](../../porting/upstream-annotations.tsv), one
 line per item: the path below `upstream/`, the item's qualified name and the
 decision, separated by tabs. Assertions and top-level expressions are named by
@@ -64,8 +65,9 @@ python3 scripts/update-ledger.py
 python3 scripts/update-ledger.py --check
 ```
 
-Use `--build-dir=...` for a separate Dune directory. To compare every imported
-source byte for byte with the pin:
+Use `--build-dir=...` for a separate Dune directory. Every run checks that
+`upstream/packages` has the Git tree id recorded as `upstream_packages_tree` in
+`sources.yaml`. To also compare every imported source byte for byte with the pin:
 
 ```bash
 python3 scripts/update-ledger.py --check --upstream /path/to/interpreter

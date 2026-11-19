@@ -16,6 +16,7 @@ def main():
     ledger = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(ledger)
     paths = ['upstream/' + p for p in ledger.imported_paths(root)]
+    ledger.verify_tree(root)
     annotated = {line.split('\t')[0] for line in (root / 'porting/upstream-annotations.tsv').read_text().splitlines()
                  if line and not line.startswith('#')}
     assert annotated <= set(ledger.imported_paths(root)), sorted(annotated - set(ledger.imported_paths(root)))

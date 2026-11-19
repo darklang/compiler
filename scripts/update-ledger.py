@@ -2,6 +2,7 @@
 """Count compiler dispositions of the imported Dark sources from porting/upstream-annotations.tsv."""
 from __future__ import annotations
 import argparse
+import hashlib
 from collections import Counter, defaultdict
 import json
 from pathlib import Path
@@ -62,6 +63,27 @@ def verify_pin(root, upstream, rows):
         path = row['source']
         if (root / path).read_bytes() != blobs[path.removeprefix('upstream/')]:
             raise ValueError('Imported source differs from the pin: ' + path)
+
+
+def git_tree(directory):
+    """The Git tree id of a directory of regular files, as `git rev-parse REV:packages` prints it."""
+    entries = []
+    for child in directory.iterdir():
+        if child.is_dir():
+            mode, digest = b'40000', git_tree(child)
+        else:
+            body = child.read_bytes()
+            mode, digest = b'100644', hashlib.sha1(b'blob %d\0' % len(body) + body).digest()
+        entries.append((child.name.encode() + (b'/' if child.is_dir() else b''), mode, child.name.encode(), digest))
+    body = b''.join(mode + b' ' + name + b'\0' + digest for _, mode, name, digest in sorted(entries))
+    return hashlib.sha1(b'tree %d\0' % len(body) + body).digest()
+
+
+def verify_tree(root):
+    expected = sources.read_yaml(root / 'porting/sources.yaml')['upstream_packages_tree']
+    if git_tree(root / 'upstream/packages').hex() != expected:
+        raise ValueError('upstream/packages differs from the pinned packages tree; '
+                         'compiler decisions belong in porting/upstream-annotations.tsv')
 
 
 def capabilities(root, filename):
@@ -166,6 +188,7 @@ def main():
     parser.add_argument('--check', action='store_true')
     args = parser.parse_args()
     subprocess.run([str(ROOT / args.build_dir / 'default/tools/ledger/check_sources.exe'), str(ROOT)], check=True, cwd=ROOT)
+    verify_tree(ROOT)
     rows = inventory(ROOT, args.build_dir)
     if args.upstream:
         verify_pin(ROOT, args.upstream.resolve(), rows)
