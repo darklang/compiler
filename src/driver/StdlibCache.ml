@@ -85,11 +85,77 @@ let removePartials directory =
       (Sys.readdir directory)
   with Sys_error _ -> ()
 
+type progress =
+  | Waiting of { pid : int; percent : int }
+  | Stage of { stage : string; percent : int }
+  | Ready of { cached : bool }
+
+(* Where each stage starts, in percent of a cold preparation's time. *)
+let stagePercent = function
+  | "parse" -> 0
+  | "type-check" -> 10
+  | "convert" -> 11
+  | "optimize" -> 39
+  | "lower" -> 83
+  | "write" -> 95
+  | _ -> 0
+
+let jsonLine started event =
+  let fields =
+    match event with
+    | Waiting { pid; percent } ->
+        [ ("stage", `String "waiting"); ("percent", `Int percent); ("pid", `Int pid) ]
+    | Stage { stage; percent } -> [ ("stage", `String stage); ("percent", `Int percent) ]
+    | Ready { cached } ->
+        [ ("stage", `String "ready"); ("percent", `Int 100); ("cached", `Bool cached) ]
+  in
+  Yojson.Safe.to_string
+    (`Assoc
+       ((("type", `String "progress") :: ("task", `String "prepare-stdlib") :: fields)
+       @ [ ("elapsedMs", `Int (int_of_float ((Unix.gettimeofday () -. started) *. 1000.))) ]))
+
+let printJson () =
+  let started = Unix.gettimeofday () in
+  fun event -> prerr_endline (jsonLine started event)
+
+(* The lock file holds "<pid> <percent>" of the process preparing, so a
+   waiting one can show how far it is. *)
+let announce lock percent =
+  try
+    ignore (Unix.lseek lock 0 Unix.SEEK_SET);
+    Unix.ftruncate lock 0;
+    let line = Printf.sprintf "%d %d\n" (Unix.getpid ()) percent in
+    ignore (Unix.write_substring lock line 0 (String.length line))
+  with Unix.Unix_error _ -> ()
+
+let holder lock =
+  try
+    ignore (Unix.lseek lock 0 Unix.SEEK_SET);
+    let buffer = Bytes.create 64 in
+    let count = Unix.read lock buffer 0 64 in
+    ignore (Unix.lseek lock 0 Unix.SEEK_SET);
+    Scanf.sscanf (Bytes.sub_string buffer 0 count) "%d %d" (fun pid percent ->
+        Some (Waiting { pid; percent }))
+  with Unix.Unix_error _ | Scanf.Scan_failure _ | Failure _ | End_of_file -> None
+
+(* lockf locks from the current offset, which [holder] leaves at 0. *)
+let rec acquire lock report last =
+  match Unix.lockf lock Unix.F_TLOCK 0 with
+  | () -> true
+  | exception Unix.Unix_error ((Unix.EAGAIN | Unix.EACCES), _, _) ->
+      let current = holder lock in
+      (match current with
+      | Some event when current <> last -> report event
+      | _ -> ());
+      Unix.sleepf 0.5;
+      acquire lock report current
+  | exception Unix.Unix_error _ -> false
+
 (* One preparation at a time per cache directory: a second process waits for
    the first one's result rather than building its own copy, which would
    double the memory. The kernel drops the lock when its holder exits, however
    it exits. *)
-let withLock directory operation =
+let withLock directory report operation =
   match
     createDirectory directory;
     Unix.openfile (Filename.concat directory "stdlib.lock")
@@ -99,31 +165,48 @@ let withLock directory operation =
   | lock ->
       Fun.protect
         ~finally:(fun () -> Unix.close lock)
-        (fun () ->
-          match Unix.lockf lock Unix.F_LOCK 0 with
-          | exception Unix.Unix_error _ -> None
-          | () -> Some (operation ()))
+        (fun () -> if acquire lock report None then Some (operation lock) else None)
 
-let buildStdlib ?directory target =
+let buildStdlib ?directory ?(progress = fun _ -> ()) target =
   let directory =
     match directory with Some _ -> directory | None -> defaultDirectory ()
   in
+  let cached stdlib =
+    progress (Ready { cached = true });
+    Ok stdlib
+  in
+  let build ?lock ?path () =
+    let stage name =
+      let percent = stagePercent name in
+      Option.iter (fun lock -> announce lock percent) lock;
+      progress (Stage { stage = name; percent })
+    in
+    let built = StdlibCompilation.buildStdlib ~progress:stage target in
+    (match built with
+    | Ok stdlib ->
+        Option.iter
+          (fun path ->
+            stage "write";
+            write path stdlib)
+          path
+    | Error _ -> ());
+    if Result.is_ok built then progress (Ready { cached = false });
+    built
+  in
   match (directory, executableDigest ()) with
-  | None, _ | _, None -> StdlibCompilation.buildStdlib target
+  | None, _ | _, None -> build ()
   | Some directory, Some digest -> (
       let path = cachePath directory target digest in
-      let build () =
+      let underLock lock =
         match read path with
-        | Some stdlib -> Ok stdlib
+        | Some stdlib -> cached stdlib
         | None ->
             removePartials directory;
-            let built = StdlibCompilation.buildStdlib target in
-            (match built with Ok stdlib -> write path stdlib | Error _ -> ());
-            built
+            build ~lock ~path ()
       in
       match read path with
-      | Some stdlib -> Ok stdlib
+      | Some stdlib -> cached stdlib
       | None -> (
-          match withLock directory build with
+          match withLock directory progress underLock with
           | Some built -> built
-          | None -> StdlibCompilation.buildStdlib target))
+          | None -> build ()))

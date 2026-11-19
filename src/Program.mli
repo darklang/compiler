@@ -98,10 +98,18 @@ val parseArgs : string array -> (cliOptions, string) result
 val validateOptions : cliOptions -> (cliOptions, string) result
 val parseBatchArgs : string array -> (batchCliOptions, string) result
 val parseCommand : string array -> (cliCommand, string) result
-val compile : string -> string -> verbosityLevel -> cliOptions -> int
-val compileBatch : batchCliOptions -> int
-val checkItems : checkCliOptions -> int
-val run : string -> verbosityLevel -> cliOptions -> int
+val compile :
+  ?progress:(StdlibCache.progress -> unit) ->
+  string -> string -> verbosityLevel -> cliOptions -> int
+val compileBatch :
+  ?progress:(StdlibCache.progress -> unit) ->
+  batchCliOptions -> int
+val checkItems :
+  ?progress:(StdlibCache.progress -> unit) ->
+  checkCliOptions -> int
+val run :
+  ?progress:(StdlibCache.progress -> unit) ->
+  string -> verbosityLevel -> cliOptions -> int
 val versionLines : unit -> string list
 val printVersion : unit -> unit
 val printUsage : unit -> unit
