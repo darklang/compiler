@@ -46,8 +46,68 @@ jobs:
           command: docker exec dark-ci ./run-tests --ai
           no_output_timeout: 15m
 
+  # A static musl darkc for one architecture, built by tools/static/build.
+  static-darkc:
+    parameters:
+      resource_class:
+        type: string
+    machine:
+      image: ubuntu-2404:current
+    resource_class: << parameters.resource_class >>
+    steps:
+      - checkout
+      - run:
+          name: Build the static darkc
+          command: |
+            mkdir -p release
+            tools/static/build "release/darkc-linux-$(uname -m)"
+          no_output_timeout: 30m
+      - run:
+          name: Check it runs on another distro
+          command: |
+            docker run --rm -v "$PWD/release:/r:ro" debian:12 /r/darkc-linux-$(uname -m) --version
+      - persist_to_workspace:
+          root: release
+          paths:
+            - darkc-linux-*
+
+  # Attach the binaries and their sha256 sums to a release named after the commit.
+  # gh comes with the machine image and reads GITHUB_TOKEN from the github-release context.
+  release-darkc:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    steps:
+      - attach_workspace:
+          at: release
+      - run:
+          name: Publish the release
+          command: |
+            cd release
+            sha256sum darkc-linux-* > SHA256SUMS
+            cat SHA256SUMS
+            tag="darkc-${CIRCLE_SHA1:0:9}"
+            gh release create "$tag" darkc-linux-* SHA256SUMS \
+              --repo "$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME" \
+              --target "$CIRCLE_SHA1" --title "$tag" \
+              --notes "darkc built from $CIRCLE_SHA1"
+
 workflows:
   version: 2
   ci:
     jobs:
       - build-and-test
+      - static-darkc:
+          matrix:
+            parameters:
+              resource_class: [large, arm.large]
+          filters:
+            branches:
+              only: main
+      - release-darkc:
+          context: github-release
+          requires:
+            - static-darkc
+          filters:
+            branches:
+              only: main
