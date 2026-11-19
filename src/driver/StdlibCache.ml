@@ -58,6 +58,9 @@ let write path (stdlib : CompilationContexts.stdlibResult) =
         close_out_noerr channel;
         if Sys.file_exists temporary then Sys.remove temporary)
       (fun () ->
+        (* The passes leave a lot of garbage, and Marshal's tables would
+           otherwise come on top of it. *)
+        Gc.compact ();
         Marshal.to_channel channel stdlib [];
         close_out channel;
         Sys.rename temporary path;
