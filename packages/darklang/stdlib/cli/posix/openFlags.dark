@@ -1,8 +1,8 @@
 module Darklang.Stdlib.Cli.Posix.OpenFlags
 
-let rdonly(): Int = 0z
-let wronly(): Int = 1z
-let rdwr(): Int = 2z
-let creat(): Int = Stdlib.Cli.Posix.__abiOpenCreate()
-let trunc(): Int = Stdlib.Cli.Posix.__abiOpenTruncate()
-let append(): Int = Stdlib.Cli.Posix.__abiOpenAppend()
+let rdonly(): Int64 = 0
+let wronly(): Int64 = 1
+let rdwr(): Int64 = 2
+let creat(): Int64 = Stdlib.Cli.Posix.__abiOpenCreate()
+let trunc(): Int64 = Stdlib.Cli.Posix.__abiOpenTruncate()
+let append(): Int64 = Stdlib.Cli.Posix.__abiOpenAppend()

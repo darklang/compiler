@@ -59,10 +59,10 @@ let __childCandidates(programs: List<String>, args: List<String>, inheritTermina
         let rc = Builtin.__childStartAt(program, args, inheritTerminal, slot) in
         if rc == -2 then Builtin.__childCandidates(rest, args, inheritTerminal, slot) else rc
 
-let runtimeChildStart(program: String, args: List<String>, inheritTerminal: Bool): Stdlib.Result.Result<Int, Int> =
+let runtimeChildStart(program: String, args: List<String>, inheritTerminal: Bool): Stdlib.Result.Result<Int, Int64> =
     let slot = Builtin.__childFree(1) in
-    if slot == 0 || __raw_get<Int64>(Builtin.__childState(), 0) == 9223372036854775807 then Error(24z)
-    else if Stdlib.String.__containsBytes(program, "\0") || Stdlib.List.any(args, fun arg -> Stdlib.String.__containsBytes(arg, "\0")) then Error(22z)
+    if slot == 0 || __raw_get<Int64>(Builtin.__childState(), 0) == 9223372036854775807 then Error(24)
+    else if Stdlib.String.__containsBytes(program, "\0") || Stdlib.List.any(args, fun arg -> Stdlib.String.__containsBytes(arg, "\0")) then Error(22)
     else
         let programs = if Stdlib.String.__containsBytes(program, "/") then [program]
                        else
@@ -71,9 +71,9 @@ let runtimeChildStart(program: String, args: List<String>, inheritTerminal: Bool
                              if directory == "" then program else directory + "/" + program) in
         Builtin.__syscallIntResult(Builtin.__childCandidates(programs, args, inheritTerminal, slot))
 
-let runtimeChildDescriptors(handle: Int): Stdlib.Result.Result<List<Int>, Int> =
+let runtimeChildDescriptors(handle: Int): Stdlib.Result.Result<List<Int>, Int64> =
     let slot = Builtin.__childFind(Builtin.__posixInt64(handle), 1) in
-    if slot == 0 then Error(9z)
+    if slot == 0 then Error(9)
     else
         let record = Builtin.__childAddress(slot) in
         let stdin = __raw_get<Int64>(record, 16) in
@@ -82,28 +82,28 @@ let runtimeChildDescriptors(handle: Int): Stdlib.Result.Result<List<Int>, Int> =
         if stdin == -1 && stdout == -1 && stderr == -1 then Ok([])
         else Ok([Stdlib.Int.fromInt64(stdin), Stdlib.Int.fromInt64(stdout), Stdlib.Int.fromInt64(stderr)])
 
-let runtimeChildPoll(handle: Int): Stdlib.Result.Result<Stdlib.Option.Option<Int>, Int> =
+let runtimeChildPoll(handle: Int): Stdlib.Result.Result<Stdlib.Option.Option<Int64>, Int64> =
     let slot = Builtin.__childFind(Builtin.__posixInt64(handle), 1) in
-    if slot == 0 then Error(9z)
+    if slot == 0 then Error(9)
     else
         let record = Builtin.__childAddress(slot) in
         let cached = __raw_get<Int64>(record, 40) in
-        if cached >= 0 then Ok(Some(Stdlib.Int.fromInt64(cached)))
+        if cached >= 0 then Ok(Some(cached))
         else
             let status = __mapped_alloc(8) in
             let _ = __raw_write_word(status, 0, 0) in
             let rc = Builtin.__childWait4(__raw_get<Int64>(record, 8), status, 1, __word_to_rawptr(0)) in
             let raw = __raw_get<Int64>(status, 0) in
             let _ = __mapped_free(status) in
-            if rc < 0 then Error(Stdlib.Int.fromInt64(0 - rc))
+            if rc < 0 then Error(0 - rc)
             else if rc == 0 then Ok(None)
             else
                 let signal = Stdlib.Int64.bitwiseAnd(raw, 127) in
                 let exitCode = if signal == 0 then Stdlib.Int64.bitwiseAnd(raw / 256, 255) else 128 + signal in
                 let _ = __raw_write_word(record, 40, exitCode) in
-                Ok(Some(Stdlib.Int.fromInt64(exitCode)))
+                Ok(Some(exitCode))
 
-let runtimeChildKill(handle: Int): Stdlib.Result.Result<Unit, Int> =
+let runtimeChildKill(handle: Int): Stdlib.Result.Result<Unit, Int64> =
     match Builtin.runtimeChildPoll(handle) with
     | Error(e) -> Error(e)
     | Ok(Some(_)) -> Ok()
@@ -111,56 +111,56 @@ let runtimeChildKill(handle: Int): Stdlib.Result.Result<Unit, Int> =
         let slot = Builtin.__childFind(Builtin.__posixInt64(handle), 1) in
         match Stdlib.Cli.__kill(__raw_get<Int64>(Builtin.__childAddress(slot), 8), 9) with
         | Ok(_) -> Ok()
-        | Error(e) -> Error(Stdlib.Int.fromInt64(e.errno))
+        | Error(e) -> Error(e.errno)
 
-let runtimeChildWait(handle: Int): Stdlib.Result.Result<Int, Int> =
+let runtimeChildWait(handle: Int): Stdlib.Result.Result<Int64, Int64> =
     let slot = Builtin.__childFind(Builtin.__posixInt64(handle), 1) in
-    if slot == 0 then Error(9z)
+    if slot == 0 then Error(9)
     else
         let record = Builtin.__childAddress(slot) in
         let cached = __raw_get<Int64>(record, 40) in
-        if cached >= 0 then Ok(Stdlib.Int.fromInt64(cached))
+        if cached >= 0 then Ok(cached)
         else
             let status = __mapped_alloc(8) in
             let _ = __raw_write_word(status, 0, 0) in
             let rc = Builtin.__childWait4(__raw_get<Int64>(record, 8), status, 0, __word_to_rawptr(0)) in
             let raw = __raw_get<Int64>(status, 0) in
             let _ = __mapped_free(status) in
-            if rc < 0 then Error(Stdlib.Int.fromInt64(0 - rc))
+            if rc < 0 then Error(0 - rc)
             else
                 let signal = Stdlib.Int64.bitwiseAnd(raw, 127) in
                 let exitCode = if signal == 0 then Stdlib.Int64.bitwiseAnd(raw / 256, 255) else 128 + signal in
                 let _ = __raw_write_word(record, 40, exitCode) in
-                Ok(Stdlib.Int.fromInt64(exitCode))
+                Ok(exitCode)
 
-let runtimeChildClosePort(handle: Int, index: Int): Stdlib.Result.Result<Unit, Int> =
+let runtimeChildClosePort(handle: Int, index: Int64): Stdlib.Result.Result<Unit, Int64> =
     let slot = Builtin.__childFind(Builtin.__posixInt64(handle), 1) in
-    if slot == 0 || index < 0z || index > 2z then Error(9z)
+    if slot == 0 || index < 0 || index > 2 then Error(9)
     else
         let record = Builtin.__childAddress(slot) in
-        let offset = 16 + Builtin.__posixInt64(index) * 8 in
+        let offset = 16 + index * 8 in
         let fd = __raw_get<Int64>(record, offset) in
         if fd < 0 then Ok()
         else
             let _ = __raw_write_word(record, offset, -1) in
             Builtin.__syscallUnitResult(Stdlib.Cli.__Posix.__close(fd))
 
-let runtimeChildBufferGet(handle: Int, index: Int): Stdlib.Result.Result<Blob, Int> =
+let runtimeChildBufferGet(handle: Int, index: Int64): Stdlib.Result.Result<Blob, Int64> =
     let slot = Builtin.__childFind(Builtin.__posixInt64(handle), 1) in
-    if slot == 0 || index < 0z || index > 1z then Error(9z)
+    if slot == 0 || index < 0 || index > 1 then Error(9)
     else
-        let address = __raw_get<Int64>(Builtin.__childAddress(slot), 48 + Builtin.__posixInt64(index) * 8) in
+        let address = __raw_get<Int64>(Builtin.__childAddress(slot), 48 + index * 8) in
         if address == 0 then Ok(Stdlib.Blob.fromList([]))
         else
             let ptr = __word_to_rawptr(address) in
             Ok(Stdlib.Cli.__Posix.__bufferBytes(ptr, 8, 8 + __raw_get<Int64>(ptr, 0), []))
 
-let runtimeChildBufferSet(handle: Int, index: Int, bytes: Blob): Stdlib.Result.Result<Unit, Int> =
+let runtimeChildBufferSet(handle: Int, index: Int64, bytes: Blob): Stdlib.Result.Result<Unit, Int64> =
     let slot = Builtin.__childFind(Builtin.__posixInt64(handle), 1) in
-    if slot == 0 || index < 0z || index > 1z then Error(9z)
+    if slot == 0 || index < 0 || index > 1 then Error(9)
     else
         let record = Builtin.__childAddress(slot) in
-        let offset = 48 + Builtin.__posixInt64(index) * 8 in
+        let offset = 48 + index * 8 in
         let old = __raw_get<Int64>(record, offset) in
         let length = Stdlib.Blob.__byteLength(bytes) in
         let ptr = __mapped_alloc(8 + length) in
@@ -170,14 +170,14 @@ let runtimeChildBufferSet(handle: Int, index: Int, bytes: Blob): Stdlib.Result.R
         let _ = if old == 0 then () else __mapped_free(__word_to_rawptr(old)) in
         Ok()
 
-let runtimeChildClose(handle: Int): Stdlib.Result.Result<Unit, Int> =
+let runtimeChildClose(handle: Int): Stdlib.Result.Result<Unit, Int64> =
     let slot = Builtin.__childFind(Builtin.__posixInt64(handle), 1) in
-    if slot == 0 then Error(9z)
+    if slot == 0 then Error(9)
     else
         let record = Builtin.__childAddress(slot) in
-        let _ = Builtin.runtimeChildClosePort(handle, 0z) in
-        let _ = Builtin.runtimeChildClosePort(handle, 1z) in
-        let _ = Builtin.runtimeChildClosePort(handle, 2z) in
+        let _ = Builtin.runtimeChildClosePort(handle, 0) in
+        let _ = Builtin.runtimeChildClosePort(handle, 1) in
+        let _ = Builtin.runtimeChildClosePort(handle, 2) in
         match Builtin.runtimeChildKill(handle) with
         | Error(e) -> Error(e)
         | Ok(_) ->
@@ -185,7 +185,7 @@ let runtimeChildClose(handle: Int): Stdlib.Result.Result<Unit, Int> =
             let rc = if __raw_get<Int64>(record, 40) >= 0 then 0
                      else Builtin.__childWait4(__raw_get<Int64>(record, 8), status, 0, __word_to_rawptr(0)) in
             let _ = __mapped_free(status) in
-            if rc < 0 && rc != -10 then Error(Stdlib.Int.fromInt64(0 - rc))
+            if rc < 0 && rc != -10 then Error(0 - rc)
             else
                 let first = __raw_get<Int64>(record, 48) in
                 let second = __raw_get<Int64>(record, 56) in

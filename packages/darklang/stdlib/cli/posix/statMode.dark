@@ -1,7 +1,7 @@
 module Darklang.Stdlib.Cli.Posix.StatMode
 
 /// S_IFMT — bitmask for the file type fields
-val ifmt = 61440z
+val ifmt = 61440
 
 /// S_IFDIR — directory
-val ifdir = 16384z
+val ifdir = 16384

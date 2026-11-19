@@ -3,57 +3,55 @@ module Builtin
 
 // Runtime-unit adaptation for the compiler's native host; browser engines
 // obtain these irreducible inputs directly from their event-loop runtime.
-let runtimeRealtimeTicks(): Int =
-    Stdlib.Int.fromInt64(Stdlib.DateTime.__toUnixTimeTicks(Stdlib.DateTime.__now()))
+let runtimeRealtimeTicks(): Int64 =
+    Stdlib.DateTime.__toUnixTimeTicks(Stdlib.DateTime.__now())
 
-let runtimeMonotonicCounter(): (Int * Int) =
+let runtimeMonotonicCounter(): (Int64 * Int64) =
     let ptr = __mapped_alloc(16) in
     let rc = Stdlib.__Network.__monotonic(ptr) in
     let seconds = __raw_get(ptr, 0) in
     let nanos = __raw_get(ptr, 8) in
     let _ = __mapped_free(ptr) in
     if rc < 0 then Builtin.crash("Unable to read monotonic counter")
-    else (Stdlib.Int.fromInt64(seconds) * 1000000000z + Stdlib.Int.fromInt64(nanos), 1000000000z)
+    else (seconds * 1000000000 + nanos, 1000000000)
 
-let runtimeDelayTicks(ticks: Int): Unit =
-    Stdlib.Cli.__sleep(Stdlib.Int.toFloat64(ticks) / 10000.0)
+let runtimeDelayTicks(ticks: Int64): Unit =
+    Stdlib.Cli.__sleep(Stdlib.Int64.toFloat64(ticks) / 10000.0)
 
 let dateTimeFromUnixTicks(ticks: Int): DateTime =
     Stdlib.DateTime.__checkedTicks(Builtin.__posixInt64(ticks))
 
-let __clockRecord(count: Int64, action: RawPtr -> Int64): Stdlib.Result.Result<Blob, Int> =
+let __clockRecord(count: Int64, action: RawPtr -> Int64): Stdlib.Result.Result<Blob, Int64> =
     let buffer = __mapped_alloc(count) in
     let rc = action(buffer) in
-    let result = if rc < 0 then Error(Stdlib.Int.fromInt64(0 - rc))
+    let result = if rc < 0 then Error(0 - rc)
                  else Ok(Stdlib.Cli.__Posix.__bufferBytes(buffer, 0, count, [])) in
     let _ = __mapped_free(buffer) in
     result
 
-let syscallClockGettime(clock: Int): Stdlib.Result.Result<Blob, Int> =
-    let clock = Builtin.__posixInt32(clock) in
+let syscallClockGettime(clock: Int64): Stdlib.Result.Result<Blob, Int64> =
+    let clock = Builtin.__posixWidth32(clock) in
     Builtin.__clockRecord(16, fun ptr -> Stdlib.Cli.__Posix.__clockGettime(clock, ptr))
 
-let syscallGettimeofday(): Stdlib.Result.Result<Blob, Int> =
+let syscallGettimeofday(): Stdlib.Result.Result<Blob, Int64> =
     Builtin.__clockRecord(16, fun ptr -> Stdlib.Cli.__Posix.__gettimeofday(ptr, __word_to_rawptr(0), __word_to_rawptr(0)))
 
-let syscallMachAbsoluteTime(): Stdlib.Result.Result<Blob, Int> =
-    if Stdlib.Cli.__Posix.__mac() == false then Error(38z)
+let syscallMachAbsoluteTime(): Stdlib.Result.Result<Blob, Int64> =
+    if Stdlib.Cli.__Posix.__mac() == false then Error(38)
     else Builtin.__clockRecord(8, fun ptr -> Stdlib.Cli.__Posix.__gettimeofday(__word_to_rawptr(0), __word_to_rawptr(0), ptr))
 
-let syscallMachTimebaseInfo(): Stdlib.Result.Result<Blob, Int> =
+let syscallMachTimebaseInfo(): Stdlib.Result.Result<Blob, Int64> =
     Builtin.__clockRecord(8, fun ptr ->
         let rc = Stdlib.Cli.__Posix.__machTimebaseInfo(ptr) in
         if rc == 0 then 0 else if Stdlib.Cli.__Posix.__mac() then -5 else rc)
 
-let syscallNanosleep(seconds: Int, nanos: Int): (Int * Blob) =
-    let seconds = Builtin.__posixInt64(seconds) in
-    let nanos = Builtin.__posixInt64(nanos) in
+let syscallNanosleep(seconds: Int64, nanos: Int64): (Int64 * Blob) =
     let request = __mapped_alloc(16) in
     let remaining = __mapped_alloc(16) in
     let _ = __raw_write_word(request, 0, seconds) in
     let _ = __raw_write_word(request, 8, nanos) in
     let rc = Stdlib.Cli.__Posix.__nanosleep(request, remaining) in
-    let result = (Stdlib.Int.fromInt64(rc), Stdlib.Cli.__Posix.__bufferBytes(remaining, 0, 16, [])) in
+    let result = (rc, Stdlib.Cli.__Posix.__bufferBytes(remaining, 0, 16, [])) in
     let _ = __mapped_free(remaining) in
     let _ = __mapped_free(request) in
     result

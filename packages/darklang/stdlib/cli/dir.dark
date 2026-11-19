@@ -158,7 +158,7 @@ let __sizeInt(path: String): Result.Result<Int, Posix.Error> =
       match acc with
       | Ok(total) ->
         match Cli.File.size(filePath) with
-        | Ok(fileSize) -> Stdlib.Result.Result.Ok(total + fileSize)
+        | Ok(fileSize) -> Stdlib.Result.Result.Ok(total + Stdlib.Int.fromInt64(fileSize))
         | Error(e) -> Stdlib.Result.Result.Error(e)
       | Error(e) -> Stdlib.Result.Result.Error(e))
   | Error(e) -> Stdlib.Result.Result.Error(e)
