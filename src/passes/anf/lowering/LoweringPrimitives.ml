@@ -588,11 +588,21 @@ let tryParseMangledTypeWithSumTypeNames sumNames mangled =
             | Some value -> [ (value, rest) ]
             | None when String.contains token '$' || firstIsLower token ->
                 [ (AST.TVar token, rest) ]
-            | None ->
-                (named token [], rest)
-                :: List.map
-                     (fun (args, rest) -> (named token args, rest))
-                     (parseTupleElems rest)))
+            | None -> (
+                match rest with
+                | count :: afterCount
+                  when String.starts_with ~prefix:"targs" count
+                       && String.length count > 5 -> (
+                    match
+                      Text.tryParseInt32
+                        (String.sub count 5 (String.length count - 5))
+                    with
+                    | Some arity when arity > 0l ->
+                        List.map
+                          (fun (args, rest) -> (named token args, rest))
+                          (parseExactly (Int32.to_int arity) afterCount)
+                    | _ -> [])
+                | _ -> [ (named token [], rest) ])))
   and parseExactly count tokens =
     if count = 0 then [ ([], tokens) ]
     else

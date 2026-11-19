@@ -214,7 +214,11 @@ let rec typeToMangledName = function
       ^ String.concat "_" (List.map typeToMangledName types)
   | AST.TRecord (name, []) | AST.TSum (name, []) -> mangleNamedTypeName name
   | AST.TRecord (name, args) | AST.TSum (name, args) ->
-      mangleNamedTypeName name ^ "_"
+      (* The argument count keeps a nested generic name unambiguous:
+         Result<Response<Blob>, E> is not Result<Response, Blob, E>. *)
+      mangleNamedTypeName name ^ "_targs"
+      ^ string_of_int (List.length args)
+      ^ "_"
       ^ String.concat "_" (List.map typeToMangledName args)
   | AST.TList typ -> "list_" ^ typeToMangledName typ
   | AST.TStream typ -> "stream_" ^ typeToMangledName typ
