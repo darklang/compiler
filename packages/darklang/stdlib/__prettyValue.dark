@@ -1,4 +1,4 @@
-// Stdlib.Pretty value layout - groups the --syntax=current value printer builds over main's Stdlib.Pretty.
+// Stdlib.Pretty value layout - groups the value printer builds over main's Stdlib.Pretty.
 
 module Darklang.Stdlib.Pretty
 

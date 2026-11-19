@@ -40,14 +40,13 @@ let resolveFunction symbols name =
 
 let call symbols name values = C.Call (resolveFunction symbols name, args values)
 
-(* `--syntax=current`: render as the current interpreter's `dark eval` prints.
+(* Values render as the current interpreter's `dark eval` prints them.
    An Option or Result case is bare (`Some(41)`); a Stdlib type drops the
    `Darklang` owner (`Stdlib.Math.Overflow.Overflow`) and other package types
    keep it; a generic type shows its arguments (`Scope<Int64>.Only(443)`);
    integers other than Int64 keep their suffix (`5u8`, `1z`); DateTimes print
    as `<DateTime: ...>`; records keep declaration order; a top-level String
    prints raw and a top-level Unit prints nothing. *)
-let evalDisplay = ref false
 
 (* The interpreter's PrettyPrinter.shortenName from the root module: only the
    `Darklang` owner in front of `Stdlib` comes off, and the parser's
@@ -111,9 +110,7 @@ let evalTypeArgs typeParams typeArgs fieldTypes =
 
 let displayTypeText typ =
   let text = CheckingDiagnostics.typeToString typ in
-  if not !evalDisplay then text
-  else
-    match typ with
+  match typ with
     | TRecord (name, _) | TSum (name, _) -> (
         match name with
         | "Darklang.Stdlib.Option.Option" | "Darklang.Stdlib.Result.Result" -> ""
@@ -218,8 +215,7 @@ let sharedShapeNames records sums =
    case alone. *)
 let caseTypeText env typ =
   match typ with
-  | TSum (name, _)
-    when !evalDisplay && StringOrder.Set.mem name (Lazy.force env.sharedShapes)
+  | TSum (name, _) when StringOrder.Set.mem name (Lazy.force env.sharedShapes)
     ->
       ""
   | _ -> displayTypeText typ
@@ -245,11 +241,8 @@ let stableHash value =
         1099511628211L)
     0xcbf29ce484222325L value
 
-(* Helpers rendered as `dark eval` prints carry their own names, so a program
-   holding both kinds (inspect beside a diagnostic) keeps them apart. *)
 let hashed prefix typ =
   prefix
-  ^ (if !evalDisplay then "eval_" else "")
   ^ Printf.sprintf "%016Lx"
       (stableHash (CheckingDiagnostics.typeToHelperIdentityString typ))
 
@@ -477,16 +470,9 @@ and ensureDictItemsRenderer env keyType valueType (state : renderState) =
       let entryValue = C.TupleAccess (C.Local entryId, 1) in
       (* `dark eval` shows every key as the value it is: { "a": 1 }. *)
       let renderedKey, withKeyRenderer =
-        match keyType with
-        | TString when not !evalDisplay ->
-            ( call reserved.symbols "Darklang.Stdlib.Dict.__renderKey"
-                [ entryKey ],
-              reserved )
-        | _ -> renderCall env keyType entryKey reserved
+        renderCall env keyType entryKey reserved
       in
-      let separator =
-        if keyType = TString && not !evalDisplay then " = " else ": "
-      in
+      let separator = ": " in
       let renderedValue, withValueRenderer =
         renderCall env valueType entryValue withKeyRenderer
       in
@@ -530,8 +516,7 @@ and ensureDictItemsRenderer env keyType valueType (state : renderState) =
 
 and suffixed state name suffix value =
   let text = call state.symbols name [ value ] in
-  if !evalDisplay then concat state.symbols [ text; C.StringLiteral suffix ]
-  else text
+  concat state.symbols [ text; C.StringLiteral suffix ]
 
 and renderBody env typ value state =
   match typ with
@@ -558,10 +543,8 @@ and renderBody env typ value state =
   | TChar -> (escapedString state.symbols "'" value, state)
   | TDateTime ->
       let text = call state.symbols "Darklang.Stdlib.DateTime.toString" [ value ] in
-      ( (if !evalDisplay then
-           concat state.symbols
-             [ C.StringLiteral "<DateTime: "; text; C.StringLiteral ">" ]
-         else text),
+      ( concat state.symbols
+          [ C.StringLiteral "<DateTime: "; text; C.StringLiteral ">" ],
         state )
   | TTuple elems ->
       let items =
@@ -582,9 +565,7 @@ and renderBody env typ value state =
       let itemsName, next = ensureListItemsRenderer env elem state in
       (* An empty list carries no element type at runtime in the
         interpreter, so `dark eval` prints `List<_> []` for a literal `[]`. *)
-      let typeName =
-        if !evalDisplay then "List<_>" else CheckingDiagnostics.typeToString typ
-      in
+      let typeName = "List<_>" in
       ( C.Match
           ( value,
             args
@@ -600,11 +581,11 @@ and renderBody env typ value state =
               ] ),
         next )
   | TStream _ ->
-      (C.StringLiteral (if !evalDisplay then "<stream: stub>" else "<stream>"), state)
+      (C.StringLiteral "<stream: stub>", state)
   (* An unconstrained Dict value can only be the polymorphic empty literal;
     no value renderer is needed because there are no entries to inspect. *)
   | TDict ((TVar _ | TInferenceVar _), (TVar _ | TInferenceVar _)) ->
-      (C.StringLiteral (if !evalDisplay then "{}" else "Dict { }"), state)
+      (C.StringLiteral "{}", state)
   | TDict (key, valueType) ->
       let itemsName, next = ensureDictItemsRenderer env key valueType state in
       let entriesId, next = freshBinding "__dict_entries" next in
@@ -622,11 +603,11 @@ and renderBody env typ value state =
                 args
                   [
                     makeCase (C.PList [])
-                      (C.StringLiteral (if !evalDisplay then "{}" else "Dict { }"));
+                      (C.StringLiteral "{}");
                     makeCase C.PWildcard
                       (concat next.symbols
                          [
-                           C.StringLiteral (if !evalDisplay then "{ " else "Dict { ");
+                           C.StringLiteral "{ ";
                            call next.symbols itemsName [ C.Local entriesId ];
                            C.StringLiteral " }";
                          ]);
@@ -665,12 +646,6 @@ and renderBody env typ value state =
             List.mapi
               (fun index (name, typ) -> (index, name, typ))
               recordInfo.Types.fields
-            |> fun fields ->
-            if !evalDisplay then fields
-            else
-              List.stable_sort
-                (fun (_, a, _) (_, b, _) -> StringOrder.compare a b)
-                fields
           in
           let rec renderFields remaining current acc =
             match remaining with
@@ -700,11 +675,9 @@ and renderBody env typ value state =
                  renderedFields)
           in
           let typeText =
-            if !evalDisplay then
-              displayTypeText typ
-              ^ evalTypeArgs typeParams typeArgs
-                  (List.map snd recordInfo.Types.fields)
-            else displayTypeText typ
+            displayTypeText typ
+            ^ evalTypeArgs typeParams typeArgs
+                (List.map snd recordInfo.Types.fields)
           in
           let short =
             concat next.symbols
@@ -731,10 +704,8 @@ and renderBody env typ value state =
             next ))
   | TSum ("Uuid", []) ->
       let text = call state.symbols "Darklang.Stdlib.Uuid.toString" [ value ] in
-      ( (if !evalDisplay then
-           concat state.symbols
-             [ C.StringLiteral "<Uuid: "; text; C.StringLiteral ">" ]
-         else text),
+      ( concat state.symbols
+          [ C.StringLiteral "<Uuid: "; text; C.StringLiteral ">" ],
         state )
   (* `dark eval` shows these as they are written: 1.5f32 and 1.10dec. *)
   | TSum ("Float32", []) ->
@@ -749,7 +720,7 @@ and renderBody env typ value state =
           let subst = typeSubstitution sumInfo.Types.typeParams typeArgs in
           let typeText = caseTypeText env typ in
           let casePrefix (variant : Types.sumVariantInfo) =
-            if !evalDisplay && typeText <> "" then
+            if typeText <> "" then
               casePrefix
                 (typeText
                 ^ evalTypeArgs sumInfo.Types.typeParams typeArgs
@@ -827,14 +798,10 @@ and renderBody env typ value state =
           in
           (C.Match (value, args cases), next))
   | TFunction _ -> (C.StringLiteral "(lambda)", state)
-  | TBlob when !evalDisplay ->
+  | TBlob ->
       (* As the current interpreter prints unsaved Bytes: the length and the
      first 16 bytes in hex. *)
       (call state.symbols "Darklang.Stdlib.Blob.__evalDisplay" [ value ], state)
-  | TBlob ->
-      (* The interpreter deliberately does not expose ephemeral Blob payloads
-     or process-local identities through value rendering. *)
-      (C.StringLiteral "<Blob: ephemeral>", state)
   | TInternalRawPtr ->
       (call state.symbols "Darklang.Stdlib.Int64.toString" [ value ], state)
   | TNever -> (C.StringLiteral "()", state)
@@ -844,7 +811,7 @@ and renderBody env typ value state =
       Crash.crash
         ("Unresolved inference variable in value renderer: " ^ displayName)
 
-(* `--syntax=current` lays a result out as `dark eval` does: each tuple, list,
+(* A result is laid out as `dark eval` does: each tuple, list,
    dict, record and case payload is a Stdlib.Pretty group that stays on one
    line when it fits in 80 columns and otherwise puts one item per line,
    indented by two. Scalars are text from the renderers above. *)
@@ -1157,8 +1124,8 @@ and docBody env typ value state =
           (C.Match (value, args cases), next))
   | _ -> leaf ()
 
-(* The boundary renderer under `--syntax=current`: the value's document laid
-   out in 80 columns, as `dark eval` prints it. *)
+(* The boundary renderer: the value's document laid out in 80 columns, as
+   `dark eval` prints it. *)
 let ensureEvalRenderer env typ state =
   let typ = canonicalRenderType env typ in
   generated (evalRendererName typ) typ TString state (fun value state ->
@@ -1207,15 +1174,10 @@ let rewriteProgram recordMetadata sumMetadata programType program =
   let env = renderEnv symbols recordMetadata sumMetadata in
   let existing = existingRenderers topLevels in
   let renderName, state =
-    match programType with
-    | TDateTime when not !evalDisplay -> (None, { functions = existing; symbols })
-    | _ ->
-        let name, state =
-          if !evalDisplay then
-            ensureEvalRenderer env programType { functions = existing; symbols }
-          else ensureRenderer env programType { functions = existing; symbols }
-        in
-        (Some name, state)
+    let name, state =
+      ensureEvalRenderer env programType { functions = existing; symbols }
+    in
+    (Some name, state)
   in
   let rec tryNamedPartialName = function
     | C.Let (C.LPVariable capture, _, body)
@@ -1272,15 +1234,10 @@ let rewriteProgram recordMetadata sumMetadata programType program =
   let rewriteExpression state expr =
     let rendered, next =
       match (programType, expr, tryNamedPartialName expr) with
-      | TString, _, _ when !evalDisplay -> (forStdout state expr, state)
-      | TUnit, _, _ when !evalDisplay ->
+      | TString, _, _ -> (forStdout state expr, state)
+      | TUnit, _, _ ->
           let id, next = freshBinding "__rendered_unit" state in
           (C.Let (C.LPVariable id, expr, C.StringLiteral ""), next)
-      | TDateTime, _, _ when not !evalDisplay ->
-          ( C.BoundaryRender
-              ( resolveFunction state.symbols "Darklang.Stdlib.DateTime.toString",
-                expr ),
-            state )
       | TFunction _, _, Some functionId ->
           let id, next = freshBinding "__rendered_named_partial" state in
           let name =
@@ -1309,7 +1266,7 @@ let rewriteProgram recordMetadata sumMetadata programType program =
             | None -> Crash.crash "Missing boundary value renderer"
           in
           let rendered = C.BoundaryRender (renderer, expr) in
-          ((if !evalDisplay then forStdout state rendered else rendered), state)
+          (forStdout state rendered, state)
     in
     (C.Expression rendered, next)
   in
@@ -1352,13 +1309,7 @@ let inspection env valueType value state =
   match traitCall state "Darklang.Stdlib.Inspect.inspect" valueType value with
   | Some call -> (call, state)
   | None ->
-      (* Stdlib.inspect is the interpreter's developer form, `Some(3)`, in
-         either output mode. *)
-      let previous = !evalDisplay in
-      evalDisplay := true;
-      let rendered = renderCall env valueType value state in
-      evalDisplay := previous;
-      rendered
+      renderCall env valueType value state
 
 (* `$"{value}"` shows a String as it is, a value whose type has a Display
    impl through that impl, and any other value as Stdlib.inspect does. *)

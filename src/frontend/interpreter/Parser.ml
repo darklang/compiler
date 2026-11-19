@@ -260,13 +260,9 @@ let parseUnchecked source =
    Parse for execution: syntax, structural, and file-purpose validation run
    once, and only a validated source file can be returned on success.
 *)
-(* `--syntax=current`: executable sources (scripts and tests, not the
-   embedded library) read literals as the current interpreter does. *)
-let currentSyntax = ref false
-
 let parseForUnchecked ~adaptStdlib mode source =
   withLiterals
-    (!interpreterSource || (!currentSyntax && mode <> Validation.Package))
+    (!interpreterSource || mode <> Validation.Package)
   @@ fun () ->
   let scope =
     match mode with
@@ -279,7 +275,7 @@ let parseForUnchecked ~adaptStdlib mode source =
       (* A script in the interpreter's syntax calls the interpreter's stdlib.
          Rendered package units already convert their own calls. *)
       let file =
-        if adaptStdlib && !currentSyntax && mode <> Validation.Package then
+        if adaptStdlib && mode <> Validation.Package then
           WrittenStdlibAdaptation.sourceFile file
         else file
       in

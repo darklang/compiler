@@ -1286,19 +1286,6 @@ let printUsage () =
    Run mode
    Compile mode (default)
 *)
-(* `--syntax=current` applies anywhere on the command line, to every
-   command: executable sources read literals, and results print, as the
-   current interpreter does (see Parser.currentSyntax and
-   ValueRendering.evalDisplay). *)
-let withoutSyntaxFlag argv =
-  let current = Array.exists (fun arg -> arg = "--syntax=current") argv in
-  if current then begin
-    Parser.currentSyntax := true;
-    ValueRendering.evalDisplay := true
-  end;
-  Array.of_list
-    (List.filter (fun arg -> arg <> "--syntax=current") (Array.to_list argv))
-
 (* `--check` may follow the shared flags: `--package-server URL --check f`. *)
 let checkFirst argv =
   let args = Array.to_list argv in
@@ -1307,7 +1294,7 @@ let checkFirst argv =
   else argv
 
 let main argv =
-  let argv = checkFirst (withoutSyntaxFlag argv) in
+  let argv = checkFirst argv in
   try
     match parseCommand argv with
     | Error message ->
