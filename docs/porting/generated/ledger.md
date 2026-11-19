@@ -12,7 +12,7 @@ A run disposition means selected, not a passing execution receipt. Replacement c
 | --- | --- |
 | packages | 2,510 blocked, 5 excluded, 35 replace, 1,957 run |
 | stdlib | 861 blocked, 905 replace, 740 run |
-| tests | 75 blocked, 1,642 run, 1,436 xfail |
+| tests | 76 blocked, 1,642 run, 1,435 xfail |
 
 ## Expected test failures
 
@@ -24,7 +24,7 @@ Upstream bugs record interpreter behavior or test expectations that the compiler
 | Class | Compile | Runtime | Total |
 | --- | ---: | ---: | ---: |
 | `aot-rejection` | 225 | 0 | 225 |
-| `missing-support` | 1,128 | 83 | 1,211 |
+| `missing-support` | 1,128 | 82 | 1,210 |
 
 | Class | Reason | Tests |
 | --- | --- | ---: |
@@ -35,7 +35,7 @@ Upstream bugs record interpreter behavior or test expectations that the compiler
 | `aot-rejection` | `aot-name-error` | 11 |
 | `aot-rejection` | `aot-type-error` | 154 |
 | `missing-support` | `compiler-contract` | 2 |
-| `missing-support` | `compiler-gap` | 178 |
+| `missing-support` | `compiler-gap` | 177 |
 | `missing-support` | `test-counter` | 7 |
 | `missing-support` | `upstream-dependency` | 1,024 |
 
@@ -182,7 +182,7 @@ Each row links to the authoritative per-test annotations. A named test remains o
 | [packages/darklang/tests/stdlib/sse.dark](../../../upstream/packages/darklang/tests/stdlib/sse.dark) | 8 |
 | [packages/darklang/tests/stdlib/stream.dark](../../../upstream/packages/darklang/tests/stdlib/stream.dark) | 2 |
 | [packages/darklang/tests/stdlib/string.dark](../../../upstream/packages/darklang/tests/stdlib/string.dark) | 20 |
-| [packages/darklang/tests/stdlib/test.dark](../../../upstream/packages/darklang/tests/stdlib/test.dark) | 5 |
+| [packages/darklang/tests/stdlib/test.dark](../../../upstream/packages/darklang/tests/stdlib/test.dark) | 4 |
 | [packages/darklang/tests/stdlib/url.dark](../../../upstream/packages/darklang/tests/stdlib/url.dark) | 13 |
 | [packages/darklang/tests/stdlib/utf8.dark](../../../upstream/packages/darklang/tests/stdlib/utf8.dark) | 3 |
 | [packages/darklang/tests/stdlib/uuid.dark](../../../upstream/packages/darklang/tests/stdlib/uuid.dark) | 1 |
@@ -230,9 +230,9 @@ Tags are defined in [the glossary](../../../porting/compiler-reasons.json).
 | tests | `aot-type-error` | 154 |
 | tests | `compiler-contract` | 2 |
 | tests | `compiler-crash` | 3 |
-| tests | `compiler-gap` | 183 |
+| tests | `compiler-gap` | 182 |
 | tests | `compiler-leak` | 2 |
-| tests | `compiler-timeout` | 1 |
+| tests | `compiler-timeout` | 2 |
 | tests | `diagnostic-difference` | 2 |
 | tests | `interpreter-fixture` | 47 |
 | tests | `test-counter` | 7 |

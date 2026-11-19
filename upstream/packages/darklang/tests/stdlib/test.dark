@@ -107,7 +107,7 @@ test table =
 
 /// A package test runs on a virtual clock: an hour's sleep finishes at once, and
 /// the clock moves by exactly the hour.
-// @compiler xfail runtime: "expected 3600000, got 3600" class=missing-support reason=compiler-gap
+// @compiler blocked: compiler-timeout diagnostic="compiled code has no virtual clock, so the hour's sleep is real"
 test sleepTakesNoRealTime =
   let before = Stdlib.DateTime.now()
   let _ = Stdlib.Cli.Posix.sleep(3600000.0)

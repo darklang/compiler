@@ -35,9 +35,9 @@ dispositions:
     replace: 905
     run: 740
   tests:
-    blocked: 75
+    blocked: 76
     run: 1642
-    xfail: 1436
+    xfail: 1435
 reasons:
   packages:
     aot-type-error: 10
@@ -69,9 +69,9 @@ reasons:
     aot-type-error: 154
     compiler-contract: 2
     compiler-crash: 3
-    compiler-gap: 183
+    compiler-gap: 182
     compiler-leak: 2
-    compiler-timeout: 1
+    compiler-timeout: 2
     diagnostic-difference: 2
     interpreter-fixture: 47
     test-counter: 7
@@ -120,10 +120,10 @@ expected_failures:
   missing-support:
     phases:
       compile: 1128
-      runtime: 83
+      runtime: 82
     reasons:
       compiler-contract: 2
-      compiler-gap: 178
+      compiler-gap: 177
       test-counter: 7
       upstream-dependency: 1024
     sources:
@@ -264,7 +264,7 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/sse.dark: 8
       upstream/packages/darklang/tests/stdlib/stream.dark: 2
       upstream/packages/darklang/tests/stdlib/string.dark: 20
-      upstream/packages/darklang/tests/stdlib/test.dark: 5
+      upstream/packages/darklang/tests/stdlib/test.dark: 4
       upstream/packages/darklang/tests/stdlib/url.dark: 13
       upstream/packages/darklang/tests/stdlib/utf8.dark: 3
       upstream/packages/darklang/tests/stdlib/uuid.dark: 1
