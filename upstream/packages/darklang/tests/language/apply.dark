@@ -1,6 +1,6 @@
 module Darklang.Language.Tests.Apply
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
+// @compiler error-message compile: "Expression is not callable" reason=diagnostic-difference
 test bytesValueIsNotCallable =
   Stdlib.Bytes.empty()
   => raises "Cannot call a Bytes value as a function."

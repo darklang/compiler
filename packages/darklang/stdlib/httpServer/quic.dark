@@ -276,6 +276,7 @@ let __loop (context: Stdlib.HttpServer.Quic.Context) (handler: Stdlib.Http.Reque
 let serveOn (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (identity: Stdlib.TlsServerIdentity.Identity) (handler: Stdlib.Http.Request -> Stdlib.Http.Response) (onListening: Unit -> Unit) : Stdlib.Result.Result<Unit, String> =
   let port = Stdlib.Net.Port.toInt64 config.port in
   let limit = config.maxBodyBytes in
+  let handler = Stdlib.HttpServer.Middleware.wrap config.middleware handler in
   if port <= 0L || port > 65535L || limit < 0L || limit > 104857600L then Error "Invalid HTTP/3 server configuration"
   else match Stdlib.__Network.shutdownSignals () with
   | Error _ -> Error "HTTP/3 shutdown setup failed"

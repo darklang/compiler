@@ -9,8 +9,8 @@ Stdlib.HttpClient.head "" = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.
 Stdlib.HttpClient.post "http://example.com/" [("", "value")] (Stdlib.String.toBlob "payload") = Error (Stdlib.HttpClient.RequestError.BadHeader Stdlib.HttpClient.BadHeader.EmptyKey)
 Stdlib.HttpClient.put "http://example.com/" [("", "value")] (Stdlib.String.toBlob "payload") = Error (Stdlib.HttpClient.RequestError.BadHeader Stdlib.HttpClient.BadHeader.EmptyKey)
 
-Stdlib.HttpClient.post "http://127.0.0.1/" [] Stdlib.Blob.empty = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.InvalidHost)
-Stdlib.HttpClient.put "http://127.0.0.1/" [] Stdlib.Blob.empty = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.InvalidHost)
-Stdlib.HttpClient.options "http://127.0.0.1/" = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.InvalidHost)
-Stdlib.HttpClient.delete "http://127.0.0.1/" = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.InvalidHost)
-Stdlib.HttpClient.head "http://127.0.0.1/" = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.InvalidHost)
+Stdlib.HttpClient.post "http://127.0.0.1/" [] Stdlib.Blob.empty = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.Loopback)
+Stdlib.HttpClient.put "http://127.0.0.1/" [] Stdlib.Blob.empty = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.Loopback)
+Stdlib.HttpClient.options "http://127.0.0.1/" = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.Loopback)
+Stdlib.HttpClient.delete "http://127.0.0.1/" = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.Loopback)
+Stdlib.HttpClient.head "http://127.0.0.1/" = Error (Stdlib.HttpClient.RequestError.BadUrl Stdlib.HttpClient.BadUrlDetails.Loopback)

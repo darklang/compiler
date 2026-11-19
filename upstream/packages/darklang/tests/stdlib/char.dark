@@ -26,7 +26,6 @@ let family(): Char =
 
 
 // `e` and a combining acute accent, decoded rather than written: decoding composes them into `é`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Char.Tests.decomposedE: Unknown function or value 'Stdlib.Bytes.fromList'"
 let decomposedE(): Char =
   Stdlib.Utf8.decodeWithReplacement(
     Stdlib.Bytes.fromList([ 101u8, 204u8, 129u8 ]))
@@ -267,7 +266,7 @@ test toAsciiCode =
       |> Stdlib.Test.equal(Stdlib.Option.Option.Some(9u8)) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'decomposedE'" class=missing-support reason=upstream-dependency
+// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test isLessThan =
   Stdlib.Test.all(
     [ Stdlib.Char.isLessThan('a', 'b') |> Stdlib.Test.equal(true)

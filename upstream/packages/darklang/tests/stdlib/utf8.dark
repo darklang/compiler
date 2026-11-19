@@ -1,7 +1,6 @@
 module Darklang.Stdlib.Utf8.Tests
 
 // encoded length in bytes, not characters
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.length'" class=missing-support reason=upstream-dependency
 test encodeLength =
   Stdlib.Test.all(
     [ Stdlib.Bytes.length(Stdlib.Utf8.encode("🧑🏽‍🦰🧑🏼‍💻🧑🏻‍🍼✋✋🏻✋🏿"))
@@ -82,7 +81,6 @@ test decode =
 
 
 // The Error says where the first bad bytes are, and what they are.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.fromList'" class=missing-support reason=upstream-dependency
 test decodeErrorMessage =
   Stdlib.Test.all(
     [ Stdlib.Bytes.fromList([ 104u8, 226u8, 130u8 ])

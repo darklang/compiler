@@ -28,16 +28,17 @@ let persistent (request: Stdlib.__HttpWire.ParsedRequest) (response: Stdlib.Http
   Stdlib.Bool.not (Stdlib.__Http1Server.__closeToken request.headers) && Stdlib.Bool.not (Stdlib.__Http1Server.__closeToken response.headers)
 
 let __output (context: Stdlib.__Http1Server.Context) (owner: Stdlib.__Http1Server.Owner) (now: Int64) (method: String) (target: String)
-  (response: Stdlib.Http.Response) (after: Stdlib.__Http1Server.After) : Stdlib.__Http1Server.Owner =
+  (response: Stdlib.Http.Response) (after: Stdlib.__Http1Server.After) (serverWritten: Bool) : Stdlib.__Http1Server.Owner =
   let persistent = match after with | Request _ -> true | _ -> false in
   let result = Stdlib.HttpServer.__responseBytesFor method context.config response persistent in
-  let (bytes, status, after) = match result with
-    | Ok bytes -> (bytes, response.statusCode, after)
+  let (bytes, status, after, serverWritten) = match result with
+    | Ok bytes -> (bytes, response.statusCode, after, serverWritten)
     | Error _ ->
       let head = "HTTP/1.1 500 Internal Server Error\r\nConnection: close\r\nContent-Length: 21\r\n\r\n" in
-      (Stdlib.String.toBlob (if method == "HEAD" then head else head + "Internal server error"), 500L, Stdlib.__Http1Server.After.Close) in
-  let log = Stdlib.__Http1Server.Log { method = method, target = target, status = status, started = owner.started } in
-  { owner with phase = Stdlib.__Http1Server.Phase.Output (Stdlib.__Http1Server.Output { bytes = bytes, offset = 0L, after = after, log = Some log }), deadline = now + 30000L }
+      (Stdlib.String.toBlob (if method == "HEAD" then head else head + "Internal server error"), 500L, Stdlib.__Http1Server.After.Close, true) in
+  // A response the server writes itself is logged whatever the middleware.
+  let log = if serverWritten then Some (Stdlib.__Http1Server.Log { method = method, target = target, status = status, started = owner.started }) else None in
+  { owner with phase = Stdlib.__Http1Server.Phase.Output (Stdlib.__Http1Server.Output { bytes = bytes, offset = 0L, after = after, log = log }), deadline = now + 30000L }
 
 let __status (context: Stdlib.__Http1Server.Context) (owner: Stdlib.__Http1Server.Owner) (now: Int64) (status: Int) : Stdlib.__Http1Server.Owner =
   let response = Stdlib.Http.__responseWithTextInt (if status == 413 then "413 Payload Too Large" else "Invalid HTTP request") status in
@@ -45,7 +46,7 @@ let __status (context: Stdlib.__Http1Server.Context) (owner: Stdlib.__Http1Serve
   let method = match Stdlib.HttpServer.__statusError status buffer with
     | Status ((_status, method)) -> Stdlib.Option.withDefault method "(unknown)"
     | _ -> Builtin.crash "HTTP status helper returned a transport error" in
-  Stdlib.__Http1Server.__output context owner now method "(invalid request)" response Stdlib.__Http1Server.After.Close
+  Stdlib.__Http1Server.__output context owner now method "(invalid request)" response Stdlib.__Http1Server.After.Close true
 
 let prepare (context: Stdlib.__Http1Server.Context) (owner: Stdlib.__Http1Server.Owner) (now: Int64) (buffer: Stdlib.__Http1Server.RequestBuffer) : Stdlib.__Http1Server.Owner =
   match Stdlib.__HttpWire.parseRequestWithLimit context.limit buffer.bytes with
@@ -62,7 +63,7 @@ let prepare (context: Stdlib.__Http1Server.Context) (owner: Stdlib.__Http1Server
     let response = match Stdlib.HttpServer.__request context.config request with | Error _ -> Stdlib.Http.badRequest "Invalid HTTP request" | Ok request -> context.handler request in
     let count = owner.requests + 1L in
     let after = if Stdlib.__Http1Server.persistent request response count then Stdlib.__Http1Server.After.Request request.remaining else Stdlib.__Http1Server.After.Close in
-    Stdlib.__Http1Server.__output context { owner with requests = count } now request.method request.target response after
+    Stdlib.__Http1Server.__output context { owner with requests = count } now request.method request.target response after false
 
 let __read (context: Stdlib.__Http1Server.Context) (owner: Stdlib.__Http1Server.Owner) (now: Int64) (buffer: Blob) (continued: Bool) (prelude: Bool)
   : Stdlib.Result.Result<Stdlib.__Http1Server.Step, String> =
@@ -89,7 +90,7 @@ let __read (context: Stdlib.__Http1Server.Context) (owner: Stdlib.__Http1Server.
 
 let __written (context: Stdlib.__Http1Server.Context) (owner: Stdlib.__Http1Server.Owner) (now: Int64) (output: Stdlib.__Http1Server.Output) : Stdlib.__Http1Server.Step =
     let _ = match output.log with
-      | Some log when context.config.logRequests -> Stdlib.printLine ("[HttpServer] " + log.method + " " + log.target + " " + Stdlib.Int64.toString log.status + " " + Stdlib.Int64.toString (now - log.started) + "ms")
+      | Some log -> Stdlib.printErrorLine ("[HttpServer] " + log.method + " " + log.target + " " + Stdlib.Int64.toString log.status + " " + Stdlib.Int64.toString (now - log.started) + "ms")
       | _ -> () in
     match output.after with
     | Close -> Stdlib.__Http1Server.__close owner
@@ -129,7 +130,7 @@ let step (context: Stdlib.__Http1Server.Context) (owner: Stdlib.__Http1Server.Ow
       | AwaitRequest buffer -> Stdlib.__Http1Server.__read context owner now buffer.bytes buffer.continued false
       | Output output -> Ok (Stdlib.__Http1Server.__write context owner now output)
       | Http2 previous ->
-        let http = Stdlib.__Http2Server.Context { config = context.config, limit = context.limit, handler = fun request -> Stdlib.HttpServer.__http2Handler context.config context.handler request } in
+        let http = Stdlib.__Http2Server.Context { config = context.config, limit = context.limit, handler = fun request -> Stdlib.HttpServer.__http2Handler context.handler request } in
         match Stdlib.__Http2Server.poll http owner.transport previous now with
         | Error _ -> Ok (Stdlib.__Http1Server.__close owner)
         | Ok state ->

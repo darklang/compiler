@@ -230,12 +230,8 @@ let fromBase64 (value: String) : Stdlib.Result.Result<Blob, String> =
     | Error _ ->
         Error "Invalid base64 string: The input is not a valid Base-64 string as it contains a non-base 64 character, more than two padding characters, or an illegal character among the padding characters."
 
-let __stringBytes (value: String) (index: Int64) (acc: List<Int64>) : List<Int64> =
-    if index >= Stdlib.String.__byteLength value then Stdlib.List.reverse acc
-    else Stdlib.Blob.__stringBytes value (index + 1L) (Stdlib.List.push acc (Stdlib.String.__byteAtUnchecked value index))
-
 let fromString (value: String) : Blob =
-    Stdlib.Blob.__fromInt64List (Stdlib.Blob.__stringBytes value 0L [])
+    Stdlib.Blob.__fromBuffer (__string_to_rawptr value) 16L (Stdlib.String.__byteLength value)
 
 let __isContinuation (byte: Int64) : Bool =
     byte >= 128L && byte <= 191L

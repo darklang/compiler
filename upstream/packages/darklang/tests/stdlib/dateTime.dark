@@ -1118,7 +1118,6 @@ test subtract =
       |> Stdlib.Test.equal(Stdlib.Duration.Duration { seconds = 3155760000 }) ])
 
 
-// @compiler xfail runtime: "Cannot unwrap Error" class=missing-support reason=compiler-gap
 test daysBetween =
   let days(first: String, second: String): Int64 =
     Stdlib.DateTime.daysBetween(d(first), d(second))
@@ -1446,7 +1445,7 @@ test formatRejectsUnknownDirectives =
 
 
 // The clock and sleep syscalls behind now, monotonic time and sleep
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.fromList'" class=missing-support reason=upstream-dependency
+// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-contract
 test clockSyscalls =
   let interruptedOnce = fun(seconds, _) ->
     if seconds == 1 then

@@ -19,7 +19,7 @@ let __http2 (context: Stdlib.__TlsServer.Context) (owner: Stdlib.__TlsServer.Htt
   if now >= owner.deadline then
     let _ = Stdlib.__HttpTransport.close owner.transport in Stdlib.__TlsServer.Step { owner = None, stopped = false }
   else
-    let http = Stdlib.__Http2Server.Context { config = context.http.config, limit = context.http.limit, handler = fun request -> Stdlib.HttpServer.__http2Handler context.http.config context.http.handler request } in
+    let http = Stdlib.__Http2Server.Context { config = context.http.config, limit = context.http.limit, handler = fun request -> Stdlib.HttpServer.__http2Handler context.http.handler request } in
     match Stdlib.__Http2Server.poll http owner.transport owner.state now with
     | Error _ -> let _ = Stdlib.__HttpTransport.close owner.transport in Stdlib.__TlsServer.Step { owner = None, stopped = false }
     | Ok state ->

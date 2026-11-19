@@ -40,9 +40,9 @@ match Stdlib.Cli.__Args.int64 0, Stdlib.Cli.__Args.get 1 with
         address = "127.0.0.1",
         port = Stdlib.Net.Port { __port = port },
         maxBodyBytes = 16L,
-        injectStandardHeaders = mode != "plain",
-        canonicalizeFromForwardedProto = mode != "plain",
-        logRequests = mode == "logging"
+        middleware =
+            (if mode == "logging" then [Stdlib.HttpServer.Middleware.logRequests ()] else [])
+            @ (if mode == "plain" then [] else [Stdlib.HttpServer.Middleware.standardHeaders (), Stdlib.HttpServer.Middleware.trustForwardedProto ()])
     } in
     match Stdlib.HttpServer.serve config handler (fun _ -> Stdlib.printLine "LISTENING") with
     | Ok () -> Stdlib.printLine "STOPPED"
@@ -93,8 +93,10 @@ def stop(process, shutdown_signal=signal.SIGTERM):
     stdout, stderr = process.communicate(timeout=5)
     assert process.returncode == 0, (process.returncode, stderr)
     assert b"STOPPED\n" in stdout, stdout
-    assert stderr == b"", stderr  # Includes compiled leak accounting.
-    return stdout
+    # Request log lines go to stderr; anything else there (leak accounting included) fails.
+    others = [line for line in stderr.splitlines() if not line.startswith(b"[HttpServer] ")]
+    assert others == [], stderr
+    return stdout + stderr
 
 
 def main() -> None:

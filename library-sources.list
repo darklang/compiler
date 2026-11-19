@@ -158,6 +158,7 @@ packages/darklang/stdlib/valueSearch.dark
 packages/darklang/stdlib/dateTime.dark
 packages/darklang/stdlib/blob.dark
 packages/darklang/stdlib/utf8.dark
+packages/darklang/stdlib/__builtin/__bytes.dark
 packages/darklang/stdlib/stream.dark
 packages/darklang/stdlib/html.dark
 packages/darklang/stdlib/http.dark
@@ -165,7 +166,7 @@ packages/darklang/stdlib/http/request.dark
 packages/darklang/stdlib/httpclient.dark
 packages/darklang/stdlib/httpClient/contentType.dark
 packages/darklang/stdlib/httpClient/sse.dark
-packages/darklang/stdlib/httpServer/config.dark
+packages/darklang/stdlib/__builtin/__httpClient.dark
 packages/darklang/stdlib/httpserver.dark
 packages/darklang/stdlib/__http1Server.dark
 packages/darklang/stdlib/__network.dark

@@ -62,7 +62,6 @@ let expected(
 
 
 // Build a request with an empty body.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Http.Tests.request: Unknown function or value 'Stdlib.Bytes.empty'"
 let request(
   url: String,
   headers: List<(String * String)>)
@@ -198,7 +197,7 @@ test urlDecode =
       Stdlib.Http.urlDecode("") |> Stdlib.Test.equal("") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'request'" class=missing-support reason=upstream-dependency
+// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test queryParams =
   Stdlib.Test.all(
     [ Stdlib.Http.Request.queryParams(request("/s?q=List+map&n=A%2FB", []))
@@ -247,7 +246,6 @@ test queryParams =
       |> Stdlib.Test.equal([ ("y", "1") ]) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'request'" class=missing-support reason=upstream-dependency
 test requestHeader =
   Stdlib.Test.all(
     [ // Case-insensitive, as HTTP requires: one stored casing, three asked-for
@@ -390,7 +388,6 @@ test statusReason =
 
 
 // The fixed-status helpers carry the number their name says.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
 test namedResponses =
   Stdlib.Test.all(
     [ (Stdlib.Http.success(Stdlib.Bytes.empty)).statusCode

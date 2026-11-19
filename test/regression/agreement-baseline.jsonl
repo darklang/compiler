@@ -101,7 +101,7 @@
 {"id": "stdlib/ints/int32.dark:Darklang.Stdlib.Int32.Tests.divisionResults#1", "expr": "Darklang.Stdlib.Int32.checkedDivide(17s32, 3s32)", "eval": "Ok(5s32)"}
 {"id": "stdlib/ints/int32.dark:Darklang.Stdlib.Int32.Tests.checkedSqrt#1", "expr": "Darklang.Stdlib.Int32.checkedSqrt(4s32)", "eval": "Ok(2.0)"}
 {"id": "stdlib/ints/int64.dark:Darklang.Stdlib.Int64.Tests.modulo#7", "expr": "(Darklang.Stdlib.List.map(Darklang.Stdlib.List.range(-5, 5), fun v -> (v % 4)))", "eval": "[3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1]"}
-{"id": "stdlib/ints/int64.dark:Darklang.Stdlib.Int64.Tests.fromFloat64#1", "expr": "Darklang.Stdlib.Int64.fromFloat64(3.9)", "eval": "Some(3)"}
+{"id": "stdlib/ints/int64.dark:Darklang.Stdlib.Int64.Tests.fromFloat64#1", "expr": "Darklang.Stdlib.Int64.fromFloat64(3.9)", "eval": "Ok(3)"}
 {"id": "stdlib/ints/int64.dark:Darklang.Stdlib.Int64.Tests.parse#1", "expr": "Darklang.Stdlib.Int64.parse(\"0\")", "eval": "Ok(0)"}
 {"id": "stdlib/ints/int64.dark:Darklang.Stdlib.Int64.Tests.fromInt16#1", "expr": "Darklang.Stdlib.Int64.fromInt16(0s16)", "eval": "0"}
 {"id": "stdlib/ints/int64.dark:Darklang.Stdlib.Int64.Tests.fromUInt32#1", "expr": "Darklang.Stdlib.Int64.fromUInt32(0u32)", "eval": "0"}

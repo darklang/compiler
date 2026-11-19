@@ -14,6 +14,7 @@ let __loop (config: Stdlib.HttpServer.Config.Config) (identity: Stdlib.TlsServer
 let serveOn (address: List<Int64>) (config: Stdlib.HttpServer.Config.Config) (identity: Stdlib.TlsServerIdentity.Identity) (handler: Stdlib.Http.Request -> Stdlib.Http.Response) (onListening: Unit -> Unit) : Stdlib.Result.Result<Unit, String> =
   let port = Stdlib.Net.Port.toInt64 config.port in
   let limit = config.maxBodyBytes in
+  let handler = Stdlib.HttpServer.Middleware.wrap config.middleware handler in
   if port <= 0L || port > 65535L || limit < 0L || limit > 104857600L then Error "Invalid TLS HTTP server configuration"
   else match Stdlib.__Network.shutdownSignals () with
   | Error _ -> Error "TLS HTTP shutdown setup failed"

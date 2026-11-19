@@ -2,7 +2,6 @@
 module Darklang.Stdlib.HttpClient.Tests
 
 // Tests that don't use the internet
-// @compiler xfail compile: "Constructor 'Darklang.Stdlib.HttpClient.RequestError.NetworkError' expects 0 fields" class=missing-support reason=compiler-contract
 test requestErrorHasToString =
   let network(failure: Stdlib.HttpClient.NetworkFailure): String =
     Stdlib.display(Stdlib.HttpClient.RequestError.NetworkError(failure))
@@ -105,53 +104,45 @@ test basicAuthRejectsHyphenInUsername =
 
 // Tests that try to make requests to the internet
 // ... but first, some helpers
-// @compiler blocked: upstream-dependency diagnostic="GetResult: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 type GetResult =
   Stdlib.Result.Result<
     Stdlib.HttpClient.Response<Bytes>,
     Stdlib.HttpClient.RequestError>
 
 
-// @compiler blocked: upstream-dependency diagnostic="get: Unknown type 'GetResult'"
 let get(url: String, headers: List<(String * String)>): GetResult =
   Stdlib.HttpClient.get(url, headers)
 
 
 // Build custom values in functions so their types stay current across package reloads.
-// @compiler blocked: upstream-dependency diagnostic="errInvalidHost: Unknown type 'GetResult'"
 let errInvalidHost(): GetResult =
   Stdlib.Result.Result.Error(
     Stdlib.HttpClient.RequestError.BadUrl(
       Stdlib.HttpClient.BadUrlDetails.InvalidHost))
 
-// @compiler blocked: upstream-dependency diagnostic="errLoopback: Unknown type 'GetResult'"
 let errLoopback(): GetResult =
   Stdlib.Result.Result.Error(
     Stdlib.HttpClient.RequestError.BadUrl(
       Stdlib.HttpClient.BadUrlDetails.Loopback))
 
-// @compiler blocked: upstream-dependency diagnostic="errPrivateNetwork: Unknown type 'GetResult'"
 let errPrivateNetwork(): GetResult =
   Stdlib.Result.Result.Error(
     Stdlib.HttpClient.RequestError.BadUrl(
       Stdlib.HttpClient.BadUrlDetails.PrivateNetwork))
 
 
-// @compiler blocked: upstream-dependency diagnostic="errInvalidUri: Unknown type 'GetResult'"
 let errInvalidUri(): GetResult =
   Stdlib.Result.Result.Error(
     Stdlib.HttpClient.RequestError.BadUrl(
       Stdlib.HttpClient.BadUrlDetails.InvalidUri))
 
 
-// @compiler blocked: upstream-dependency diagnostic="errInvalidRequest: Unknown type 'GetResult'"
 let errInvalidRequest(): GetResult =
   Stdlib.Result.Result.Error(
     Stdlib.HttpClient.RequestError.BadUrl(
       Stdlib.HttpClient.BadUrlDetails.InvalidRequest))
 
 
-// @compiler blocked: compiler-contract diagnostic="Darklang.Stdlib.HttpClient.Tests.errNetworkError: Constructor 'Darklang.Stdlib.HttpClient.RequestError.NetworkError' expects 0 fields"
 let errNetworkError(host: String): GetResult =
   Stdlib.Result.Result.Error(
     Stdlib.HttpClient.RequestError.NetworkError(
@@ -160,24 +151,20 @@ let errNetworkError(host: String): GetResult =
         Stdlib.Option.Option.None)))
 
 
-// @compiler blocked: upstream-dependency diagnostic="errBadHeaderEmptyKey: Unknown type 'GetResult'"
 let errBadHeaderEmptyKey(): GetResult =
   Stdlib.Result.Result.Error(
     Stdlib.HttpClient.RequestError.BadHeader(
       Stdlib.HttpClient.BadHeader.EmptyKey))
 
 
-// @compiler blocked: upstream-dependency diagnostic="errBadHeader: Unknown type 'GetResult'"
 let errBadHeader(e: Stdlib.HttpClient.BadHeader): GetResult =
   Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadHeader(e))
 
 
-// @compiler blocked: upstream-dependency diagnostic="errBadMethod: Unknown type 'GetResult'"
 let errBadMethod(): GetResult =
   Stdlib.Result.Result.Error(Stdlib.HttpClient.RequestError.BadMethod)
 
 
-// @compiler blocked: upstream-dependency diagnostic="errUnsupportedProtocol: Unknown type 'GetResult'"
 let errUnsupportedProtocol(): GetResult =
   Stdlib.Result.Result.Error(
     Stdlib.HttpClient.RequestError.BadUrl(
@@ -194,13 +181,11 @@ test rejectsWrongHeaderType =
   => raises "Darklang.Stdlib.HttpClient.request's 3rd parameter `headers` expects List<(String * String)>, but got List<Int64> ([1])"
 
 
-// @compiler xfail compile: "Unknown function or value 'errBadHeaderEmptyKey'" class=missing-support reason=upstream-dependency
 test rejectsEmptyHeaderKey =
   get("https://darklang.com", [ ("", "") ])
   |> Stdlib.Test.equal(errBadHeaderEmptyKey())
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
 test streamRejectsAKeyThatTrimsToNothing =
   (match Stdlib.HttpClient.stream(
            "GET",
@@ -213,7 +198,6 @@ test streamRejectsAKeyThatTrimsToNothing =
 
 
 // type errors for bad `method` are OK
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
 test rejectsBadMethods =
   Stdlib.Test.all(
     [ Stdlib.HttpClient.request(
@@ -239,7 +223,6 @@ test rejectsBadMethods =
 
 
 // unsupported protocols
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
 test rejectsUnsupportedProtocols =
   Stdlib.Test.all(
     [ Stdlib.HttpClient.request(
@@ -261,7 +244,6 @@ test rejectsUnsupportedProtocols =
 
 
 // totally bogus URLs
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
 test rejectsBogusUrls =
   Stdlib.Test.all(
     [ Stdlib.HttpClient.request("get", "", [], Stdlib.Bytes.empty)
@@ -289,7 +271,6 @@ test rejectsBogusUrls =
 // SSRF guard tests for the strict HTTP client config
 // (see Builtins.Http.Client.Libs.HttpClient.LocalAccess + strictConfig).
 // invalid host
-// @compiler xfail compile: "Unknown function or value 'errInvalidHost'" class=missing-support reason=upstream-dependency
 test disallowedHosts =
   Stdlib.Test.all(
     [ get("http://0.0.0.0", []) |> Stdlib.Test.equal(errInvalidHost())
@@ -370,12 +351,10 @@ test disallowedHosts =
 
 
 // invalid uri
-// @compiler xfail compile: "Unknown function or value 'errInvalidUri'" class=missing-support reason=upstream-dependency
 test disallowedUri = get("localhost", []) |> Stdlib.Test.equal(errInvalidUri())
 
 
 // `::` reaches the local host on Linux, so it is refused like 0.0.0.0
-// @compiler xfail compile: "Unknown function or value 'errInvalidHost'" class=missing-support reason=upstream-dependency
 test unspecifiedAddressIsRefused =
   get("http://[0:0:0:0:0:0:0:0]", []) |> Stdlib.Test.equal(errInvalidHost())
 
@@ -390,7 +369,7 @@ test unspecifiedAddressIsRefused =
 //
 // Guard refusals omit details. DNS failures must not satisfy these checks,
 // so missing /etc/hosts entries fail the test.
-// @compiler xfail compile: "Unknown function or value 'errNetworkError'" class=missing-support reason=upstream-dependency
+// @compiler xfail runtime: "false" class=missing-support reason=interpreter-fixture
 test sneakyBannedHosts =
   Stdlib.Test.all(
     [ // 127.0.0.1
@@ -408,7 +387,6 @@ test sneakyBannedHosts =
 
 // invalid headers (we just happen to know that google will fail this way if we
 // provide these headers..)
-// @compiler xfail compile: "Unknown function or value 'errInvalidRequest'" class=missing-support reason=upstream-dependency
 test disallowedHeaders =
   Stdlib.Test.all(
     [ get("http://google.com", [ ("Metadata-Flavor", "Google") ])
@@ -428,7 +406,6 @@ test disallowedHeaders =
 
 
 // a header line can't be ended early to add another
-// @compiler xfail compile: "Unknown function or value 'errBadHeader'" class=missing-support reason=upstream-dependency
 test rejectsLineBreaksInHeaders =
   Stdlib.Test.all(
     [ get("http://google.com", [ ("X-A", "a\r\nInjected: yes") ])
@@ -449,7 +426,6 @@ test rejectsLineBreaksInHeaders =
 
 
 // DNS failures may surface as a timeout, depending on the resolver.
-// @compiler xfail compile: "Constructor pattern 'Darklang.Stdlib.HttpClient.RequestError.NetworkError' has wrong field count" class=missing-support reason=compiler-contract
 test missingHostFails =
   (match get("http://no-such-host.dark.test", []) with
    | Error(NetworkError(DnsFailure(Destination(host)))) ->
@@ -464,7 +440,6 @@ test missingHostFails =
 // Middleware, over a send that never reaches the network
 // ---------------------------
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpClient.Tests.__request: Unknown function or value 'Stdlib.Bytes.empty'"
 let __request(
   url: String,
   headers: List<(String * String)>)
@@ -472,7 +447,6 @@ let __request(
   Stdlib.HttpClient.Request.make("GET", url, headers, Stdlib.Bytes.empty)
 
 
-// @compiler blocked: upstream-dependency diagnostic="__response: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let __response(
   status: Int64,
   headers: List<(String * String)>,
@@ -490,7 +464,6 @@ let __response(
 
 /// Answers 200 with the request it was sent: its headers as the response's, and
 /// "METHOD url timeout" as the body.
-// @compiler blocked: upstream-dependency diagnostic="__echo: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let __echo(
   req: Stdlib.HttpClient.Request)
   : Stdlib.Result.Result<
@@ -504,7 +477,6 @@ let __echo(
   __response(200, req.headers, req.method + " " + req.url + " " + timeout)
 
 
-// @compiler blocked: upstream-dependency diagnostic="__body: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let __body(
   result:
     Stdlib.Result.Result<
@@ -516,7 +488,6 @@ let __body(
   | Error(e) -> "error: " + Stdlib.HttpClient.toString(e)
 
 
-// @compiler blocked: upstream-dependency diagnostic="__headers: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let __headers(
   result:
     Stdlib.Result.Result<
@@ -528,7 +499,6 @@ let __headers(
   | Error(_) -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="__through: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let __through(
   middlewares: List<Stdlib.HttpClient.Middleware<Bytes, Bytes>>,
   send: Stdlib.HttpClient.Send<Bytes>,
@@ -540,7 +510,6 @@ let __through(
   s(req)
 
 
-// @compiler blocked: upstream-dependency diagnostic="responseHeaderIsCaseInsensitive: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 test responseHeaderIsCaseInsensitive =
   let r =
     Stdlib.HttpClient.Response
@@ -564,7 +533,6 @@ test responseHeaderIsCaseInsensitive =
       |> Stdlib.Test.equal([ "a=1", "b=2" ]) ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="responseText: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 test responseText =
   Stdlib.Test.all(
     [ (match __response(200, [], "héllo") with
@@ -587,7 +555,7 @@ type User =
     name: String }
 
 
-// @compiler blocked: upstream-dependency diagnostic="responseJson: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
+// @compiler xfail runtime: "Json.parse was not specialized" class=missing-support reason=compiler-gap
 test responseJson =
   let user = fun body ->
     match __response(200, [], body) with
@@ -606,7 +574,7 @@ test responseJson =
           "Can't parse JSON because `name` field is not provided at path: `root`")) ])
 
 
-// @compiler xfail compile: "Type arguments require a named function" class=missing-support reason=compiler-gap
+// @compiler xfail runtime: "Json.parse was not specialized" class=missing-support reason=compiler-gap
 test jsonMiddlewareDecodesEveryResponse =
   let json = Stdlib.HttpClient.Middleware.json<List<Int64>>()
   let send = json(fun _ -> __response(200, [], "[1, 2, 3]"))
@@ -615,7 +583,6 @@ test jsonMiddlewareDecodesEveryResponse =
   |> Stdlib.Test.equal(Stdlib.Result.Result.Ok([ 1, 2, 3 ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.HttpClient.Middleware.onRequest'" class=missing-support reason=upstream-dependency
 test stackRunsFirstListedOutermost =
   let tag = fun name ->
     Stdlib.HttpClient.Middleware.onRequest(fun req ->
@@ -629,14 +596,12 @@ test stackRunsFirstListedOutermost =
   |> Stdlib.Test.equal([ ("x-seen", "outer"), ("x-seen", "inner") ])
 
 
-// @compiler xfail compile: "Unknown function or value '__headers'" class=missing-support reason=upstream-dependency
 test emptyStackIsTheSendItself =
   __through([], __echo, __request("https://a.test/", [ ("A", "1") ]))
   |> __headers
   |> Stdlib.Test.equal([ ("A", "1") ])
 
 
-// @compiler xfail compile: "Unknown function or value '__through'" class=missing-support reason=upstream-dependency
 test onResponseRewritesTheResponse =
   __through(
     [ Stdlib.HttpClient.Middleware.onResponse(fun r ->
@@ -647,7 +612,6 @@ test onResponseRewritesTheResponse =
   |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(299))
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.HttpClient.Middleware.decode'" class=missing-support reason=upstream-dependency
 test decodeChangesTheBodyType =
   let length =
     Stdlib.HttpClient.Middleware.decode(fun body ->
@@ -672,7 +636,6 @@ test decodeChangesTheBodyType =
           Stdlib.HttpClient.RequestError.Decode("not a number"))) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.HttpClient.Middleware.tap'" class=missing-support reason=upstream-dependency
 test tapAnswersAsItCame =
   let seen = Stdlib.HttpClient.Middleware.tap(fun(_req, _result) -> ())
   __through([ seen ], __echo, __request("https://a.test/", []))
@@ -680,7 +643,6 @@ test tapAnswersAsItCame =
   |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(200))
 
 
-// @compiler xfail compile: "Unknown function or value '__headers'" class=missing-support reason=upstream-dependency
 test trimNames =
   __through(
     [ Stdlib.HttpClient.Middleware.trimNames() ],
@@ -690,7 +652,6 @@ test trimNames =
   |> Stdlib.Test.equal([ ("X-A", " v ") ])
 
 
-// @compiler xfail compile: "Unknown function or value '__body'" class=missing-support reason=upstream-dependency
 test refuseEmptyNames =
   Stdlib.Test.all(
     [ __through(
@@ -709,7 +670,6 @@ test refuseEmptyNames =
       |> Stdlib.Test.equal([ (" ", "v") ]) ])
 
 
-// @compiler xfail compile: "Unknown function or value '__headers'" class=missing-support reason=upstream-dependency
 test lowercaseNamesKeepsValues =
   __through(
     [ Stdlib.HttpClient.Middleware.lowercaseNames() ],
@@ -726,7 +686,6 @@ test lowercaseNamesKeepsValues =
     [ ("etag", "\"AbC123\""), ("set-cookie", "a=1"), ("set-cookie", "b=2") ])
 
 
-// @compiler xfail compile: "Unknown function or value '__headers'" class=missing-support reason=upstream-dependency
 test theDefaultStack =
   Stdlib.Test.all(
     [ __through(
@@ -761,7 +720,6 @@ test theDefaultStack =
       |> Stdlib.Test.equal("redirects 10, retry none") ])
 
 
-// @compiler xfail compile: "Unknown function or value '__headers'" class=missing-support reason=upstream-dependency
 test decompressAsksUnlessTheRequestDoes =
   Stdlib.Test.all(
     [ __through(
@@ -786,7 +744,6 @@ test decompressAsksUnlessTheRequestDoes =
       |> Stdlib.Test.equal("true") ])
 
 
-// @compiler xfail compile: "Unknown function or value '__body'" class=missing-support reason=upstream-dependency
 test timeoutSetsTheField =
   Stdlib.Test.all(
     [ __through(
@@ -806,7 +763,6 @@ test timeoutSetsTheField =
       |> Stdlib.Test.equal("GET https://a.test/ 10") ])
 
 
-// @compiler xfail compile: "Expected TBool, got TString" class=missing-support reason=compiler-gap
 test theCallersOwnValuesWin =
   let caller =
     { __request("https://a.test/", []) with
@@ -827,7 +783,6 @@ test theCallersOwnValuesWin =
     (Stdlib.Option.Option.Some(5), Stdlib.Option.Option.Some(0), true))
 
 
-// @compiler xfail compile: "Unknown function or value '__headers'" class=missing-support reason=upstream-dependency
 test headerAddsUnlessPresent =
   Stdlib.Test.all(
     [ __through(
@@ -845,7 +800,6 @@ test headerAddsUnlessPresent =
       |> Stdlib.Test.equal([ ("user-agent", "mine") ]) ])
 
 
-// @compiler xfail compile: "Unknown function or value '__body'" class=missing-support reason=upstream-dependency
 test baseUrlResolves =
   let via = fun url ->
     __through(
@@ -866,7 +820,6 @@ test baseUrlResolves =
 
 
 /// `__echo` of the request as it reaches the host, its origin headers added.
-// @compiler blocked: upstream-dependency diagnostic="__echoFinal: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let __echoFinal(
   req: Stdlib.HttpClient.Request)
   : Stdlib.Result.Result<
@@ -875,7 +828,6 @@ let __echoFinal(
   __echo(Stdlib.HttpClient.Request.__final(req))
 
 
-// @compiler xfail compile: "Unknown function or value '__headers'" class=missing-support reason=upstream-dependency
 test bearerOnlyToItsOrigin =
   let via = fun url ->
     __through(
@@ -898,7 +850,6 @@ test bearerOnlyToItsOrigin =
       via("https://api.example.com:8443/a") |> Stdlib.Test.equal([]) ])
 
 
-// @compiler xfail compile: "Unknown function or value '__headers'" class=missing-support reason=upstream-dependency
 test bearerSeesTheUrlTheRequestIsSentTo =
   let via = fun middlewares ->
     __through(middlewares, __echoFinal, __request("users", [])) |> __headers
@@ -927,7 +878,6 @@ test bearerSeesTheUrlTheRequestIsSentTo =
       |> Stdlib.Test.equal([ ("authorization", "Basic x") ]) ])
 
 
-// @compiler xfail compile: "Unknown function or value '__headers'" class=missing-support reason=upstream-dependency
 test headerForOnlyToItsOrigin =
   let via = fun url ->
     __through(
@@ -947,7 +897,6 @@ test headerForOnlyToItsOrigin =
 
 
 /// Answers 200 with what the request asks of the host beyond one send, as its body.
-// @compiler blocked: upstream-dependency diagnostic="__policy: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let __policy(
   req: Stdlib.HttpClient.Request)
   : Stdlib.Result.Result<
@@ -968,7 +917,6 @@ let __policy(
 
 
 /// `__defaults`, as a send: what `get` does before it sends, beside the stack it stands for.
-// @compiler blocked: upstream-dependency diagnostic="__viaDefaults: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let __viaDefaults(
   send: Stdlib.HttpClient.Send<Bytes>,
   req: Stdlib.HttpClient.Request)
@@ -980,7 +928,6 @@ let __viaDefaults(
   | Error(e) -> Stdlib.Result.Result.Error(e)
 
 
-// @compiler xfail compile: "Unknown function or value '__through'" class=missing-support reason=upstream-dependency
 test defaultsAreTheDefaultStack =
   let both = fun(send, req) ->
     let viaStack = __through(Stdlib.HttpClient.Middleware.defaults(), send, req)
@@ -1014,7 +961,6 @@ test defaultsAreTheDefaultStack =
       |> Stdlib.Test.equal((true, true)) ])
 
 
-// @compiler xfail compile: "Unknown function or value '__body'" class=missing-support reason=upstream-dependency
 test followRedirectsAndRetrySetTheRequest =
   Stdlib.Test.all(
     [ __through(
@@ -1057,7 +1003,6 @@ test followRedirectsAndRetrySetTheRequest =
       |> Stdlib.Test.equal("redirects none, retry none") ])
 
 
-// @compiler xfail compile: "Unknown constructor 'Darklang.Stdlib.HttpClient.RequestError.TooManyRedirects'" class=missing-support reason=compiler-gap
 test newRequestErrorsSayWhat =
   Stdlib.Test.all(
     [ Stdlib.HttpClient.toString(
@@ -1069,6 +1014,5 @@ test newRequestErrorsSayWhat =
       |> Stdlib.Test.equal("not UTF-8") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.__whenReady'" class=missing-support reason=upstream-dependency
 test whenReadyAppliesAValueAtOnce =
   Stdlib.__whenReady(41, fun x -> x + 1) |> Stdlib.Test.equal(42)

@@ -108,7 +108,6 @@ test decodeLongInputs =
 
 
 // These produce strings of bytes which are technically legal it seems
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.fromList'" class=missing-support reason=upstream-dependency
 test decodeRawBytes =
   Stdlib.Test.all(
     [ Stdlib.Base64.decode("-p")
@@ -190,7 +189,6 @@ test encode =
         "8J+RqOKAjeKdpO+4j+KAjfCfkovigI3wn5Go8J+RqeKAjfCfkanigI3wn5Gn4oCN8J+RpvCfj7PvuI/igI3imqfvuI/wn4e18J+Htw==") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
 test urlEncode =
   Stdlib.Test.all(
     [ Stdlib.Base64.urlEncode(Stdlib.Bytes.empty) |> Stdlib.Test.equal("")

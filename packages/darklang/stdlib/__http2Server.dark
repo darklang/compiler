@@ -92,7 +92,7 @@ let __response (config: Stdlib.HttpServer.Config.Config) (method: String) (respo
   | Some status ->
     if status < 200L || status > 599L || Stdlib.Blob.__byteLength response.body > 104857600L then Error "Invalid HTTP response status or body limit"
     else
-      let headers = Stdlib.List.filter (Stdlib.HttpServer.__standardHeaders config.injectStandardHeaders response.headers) (fun pair ->
+      let headers = Stdlib.List.filter (Stdlib.HttpServer.__standardHeaders response.headers) (fun pair ->
         let (name, _value) = pair in let lower = Stdlib.String.toLowercase name in Stdlib.Bool.not (Stdlib.__Http2Fields.__connectionSpecific lower) && lower != "content-length") in
       Stdlib.__Http2Fields.__outgoing headers |> Stdlib.Result.map (fun headers ->
         let length = if status == 204L then [] else [("content-length", Stdlib.Int64.toString (Stdlib.Blob.__byteLength response.body))] in

@@ -11,7 +11,6 @@ type BadHeader =
   | InvalidValue
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch for Darklang.Stdlib.HttpClient.BadUrlDetails"
 type BadUrlDetails =
   /// Occurs when the URI scheme is not allowed. eg. "ftp://darklang.com"
   | UnsupportedProtocol
@@ -43,7 +42,6 @@ type NetworkFailure =
   | IoFailure(String, String)
 
 
-// @compiler blocked: compiler-contract diagnostic="Imported RequestError.NetworkError carries a NetworkFailure; the compiler substitute's NetworkError has no payload."
 type RequestError =
   | BadUrl(BadUrlDetails)
   /// Occurs when the request is cancelled due to a timeout
@@ -158,14 +156,12 @@ module Request =
 
   /// <param req> as it goes to the host: its <type Request> {{originHeaders}} added for the url
   /// it is going to.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpClient.Request.__final: Unknown function or value '__addOriginHeaders'"
   let __final(req: Request): Request =
     match req.originHeaders with
     | [] -> req
     | _ -> __addOriginHeaders(req)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Request / let __addOriginHeaders: Unknown type 'Middleware'"
   let __addOriginHeaders(req: Request): Request =
     let origin = Middleware.__origin(req.url)
     let has = fun name ->
@@ -212,7 +208,6 @@ module Request =
 ///
 /// Header names and values are as the server sent them, and a header sent twice is two pairs.
 /// <fn Response.header> looks one up whatever its case.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch for Darklang.Stdlib.HttpClient.Response"
 type Response<'body> =
   { statusCode: Int64
     headers: List<(String * String)>
@@ -224,7 +219,6 @@ type Response<'body> =
 module Response =
   /// Every value of the response header <param name>, matched case-insensitively, in the order
   /// the server sent them: each {{Set-Cookie}}, say.
-  // @compiler blocked: upstream-dependency diagnostic="Response / let headers: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
   let headers(response: Response<'body>, name: String): List<String> =
     let wanted = String.toLowercase(name)
     response.headers
@@ -236,20 +230,17 @@ module Response =
   /// The value of the response header <param name>, matched case-insensitively, so a lookup of
   /// {{"ETag"}} finds {{etag}} and {{ETAG}} alike. The first one wins when it was sent more than
   /// once; <fn headers> has them all. Twin of <fn Stdlib.Http.Request.header>.
-  // @compiler blocked: upstream-dependency diagnostic="Response / let header: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
   let header(response: Response<'body>, name: String): Option<String> =
     List.head(headers(response, name))
 
 
   /// The body as UTF-8 text, or {{Decode}} saying why it is not.
-  // @compiler blocked: upstream-dependency diagnostic="Response / let text: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
   let text(response: Response<Bytes>): Result<String, RequestError> =
     match Utf8.decode(response.body) with
     | Ok(s) -> Result.Ok(s)
     | Error(e) -> Result.Error(RequestError.Decode(e))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpClient.Response.__json: Unknown constructor 'Darklang.Stdlib.HttpClient.RequestError.BadJson'"
   let __json(body: Bytes): Result<'a, RequestError> =
     match Utf8.decode(body) with
     | Ok(s) -> Json.parse<'a>(s) |> Result.mapError(fun e -> RequestError.BadJson(e))
@@ -258,14 +249,12 @@ module Response =
 
   /// The body as JSON of type <typeParam a>, or {{BadJson}} saying where it is not:
   /// `Response.json<User>(r)` is a {{Result<User, RequestError>}}.
-  // @compiler blocked: upstream-dependency diagnostic="Response / let json: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
   let json(response: Response<Bytes>): Result<'a, RequestError> =
     __json<'a>(response.body)
 
 
 /// Sends a request and answers its response: the raw builtin (<fn sendRaw>), or one wrapped in
 /// middleware (<fn client>).
-// @compiler blocked: upstream-dependency diagnostic="Send: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 type Send<'body> = Request -> Result<Response<'body>, RequestError>
 
 
@@ -275,7 +264,6 @@ type Send<'body> = Request -> Result<Response<'body>, RequestError>
 /// <fn Middleware.onResponse> build the common two. Most keep the body as it is
 /// ({{Middleware<Bytes, Bytes>}}); one that decodes it changes its type, as
 /// <fn Middleware.decode> does, and goes outside a stack rather than in it.
-// @compiler blocked: upstream-dependency diagnostic="Middleware: Unknown type 'Send'"
 type Middleware<'inner, 'outer> = Send<'inner> -> Send<'outer>
 
 
@@ -298,7 +286,7 @@ let __retryArgs(req: Request): (Int64 * Int64) =
 /// waits for the response where it first looks at it, so `List.map get urls` has every request
 /// in flight at once, up to 50 connections to any one host. Any other request is a write and
 /// runs in program order.
-// @compiler blocked: upstream-dependency diagnostic="sendRaw: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
+// @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.sendRaw reason=compiler-implementation
 let sendRaw(req: Request): Result<Response<Bytes>, RequestError> =
   let req = Request.__final(req)
   let (retries, delayMs) = __retryArgs(req)
@@ -317,7 +305,7 @@ let sendRaw(req: Request): Result<Response<Bytes>, RequestError> =
 /// <fn sendRaw>, with the body as a lazy stream: in program order, and the timeout covers the
 /// headers, not the body, so a long-lived stream is not cut off. A stream holds its connection
 /// until it is drained or closed, and counts against the host's 50 until then.
-// @compiler blocked: upstream-dependency diagnostic="streamRaw: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
+// @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.streamRaw reason=compiler-implementation
 let streamRaw(req: Request): Result<Response<Stream<UInt8>>, RequestError> =
   let req = Request.__final(req)
   let (retries, delayMs) = __retryArgs(req)
@@ -336,13 +324,11 @@ let streamRaw(req: Request): Result<Response<Stream<UInt8>>, RequestError> =
 module Middleware =
   /// <param send> wrapped in <param middlewares>. The first listed is the outermost: it sees
   /// the request first and the response last.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let wrap: Unknown type 'Send'"
   let wrap(middlewares: List<Middleware<'body, 'body>>, send: Send<'body>): Send<'body> =
     List.fold(List.reverse(middlewares), send, fun(inner, m) -> m(inner))
 
 
   /// A middleware that rewrites every request with <param f> before sending it.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let onRequest: Unknown type 'Middleware'"
   let onRequest(f: Request -> Request): Middleware<'body, 'body> =
     (fun next -> (fun req -> next(f(req))))
 
@@ -352,7 +338,6 @@ module Middleware =
   /// so `List.map(urls, get)` keeps every request in flight at once. <param f> may only
   /// compute, whatever the method: one that prints or writes fails the request. Take an effect
   /// where you use the response.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let onResponse: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
   let onResponse(f: Response<'body> -> Response<'body>): Middleware<'body, 'body> =
     (fun next -> (fun req -> __whenReady(next(req), fun result -> Result.map(result, f))))
 
@@ -361,7 +346,6 @@ module Middleware =
   /// came. <param f> may take effects, such as a log line: `tap(fun(req, r) -> printLine(req.url))`.
   /// It looks at the answer, so a GET through it is waited for where it is sent rather than
   /// kept in flight.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let tap: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
   let tap(f: (Request, Result<Response<'body>, RequestError>) -> Unit): Middleware<'body, 'body> =
     (fun next ->
        (fun req ->
@@ -370,7 +354,6 @@ module Middleware =
           result))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let __mapBody: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
   let __mapBody(f: 'inner -> Result<'outer, RequestError>): Middleware<'inner, 'outer> =
     (fun next ->
        (fun req ->
@@ -389,14 +372,12 @@ module Middleware =
   /// A middleware that turns every response's body into another type with <param f>, or
   /// answers {{Decode}} with what <param f> says is wrong. Like <fn onResponse>, it does not
   /// wait for the response, and <param f> may only compute.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let decode: Unknown type 'Middleware'"
   let decode(f: 'inner -> Result<'outer, String>): Middleware<'inner, 'outer> =
     __mapBody(fun body -> Result.mapError(f(body), fun e -> RequestError.Decode(e)))
 
 
   /// A middleware that reads every response's body as JSON of type <typeParam a>
   /// (<fn Response.json>): `(Middleware.json<User>())(send)` answers a {{Response<User>}}.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let json: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
   let json(): Middleware<Bytes, 'a> =
     __mapBody(fun body -> Response.__json<'a>(body))
 
@@ -410,7 +391,6 @@ module Middleware =
 
 
   /// Header names with the spaces around them trimmed. In the default stack.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let trimNames: Unknown type 'Middleware'"
   let trimNames(): Middleware<'body, 'body> =
     onRequest(__trimmed)
 
@@ -423,7 +403,6 @@ module Middleware =
 
   /// A request with an empty header name is answered {{BadHeader(EmptyKey)}}, unsent. In the
   /// default stack, after <fn trimNames>, so a name of spaces is refused too.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let refuseEmptyNames: Unknown type 'Middleware'"
   let refuseEmptyNames(): Middleware<'body, 'body> =
     (fun next ->
        (fun req ->
@@ -436,7 +415,6 @@ module Middleware =
   /// Response header names in lowercase, so a plain comparison finds {{etag}} however the
   /// server spelled it. Values are left alone. Not in the default stack: <fn Response.header>
   /// finds a header whatever its case.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let lowercaseNames: Unknown type 'Middleware'"
   let lowercaseNames(): Middleware<'body, 'body> =
     onResponse(fun response ->
       { response with
@@ -448,7 +426,6 @@ module Middleware =
   /// Every request may take at most <param ms> milliseconds, redirects and retries included,
   /// which the host enforces: past it the answer is {{Timeout}}. For a stream it covers the
   /// headers, not the body. 0 is no limit. Listed after another, it wins.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let timeout: Unknown type 'Middleware'"
   let timeout(ms: Int64): Middleware<'body, 'body> =
     onRequest(fun req -> { req with timeoutMs = Option.Some(ms) })
 
@@ -456,7 +433,6 @@ module Middleware =
   /// Adds the header <param name>: <param value> to every request that does not already carry
   /// one of that name, whatever its case: a {{User-Agent}}, say. It follows a redirect to any
   /// host; for a credential, use <fn headerFor>.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let header: Unknown type 'Middleware'"
   let header(name: String, value: String): Middleware<'body, 'body> =
     let wanted = String.toLowercase(name)
     onRequest(fun req ->
@@ -471,7 +447,6 @@ module Middleware =
   /// {{"https://api.example.com/v1/"}} goes to {{https://api.example.com/users}} and
   /// {{"users"}} to {{https://api.example.com/v1/users}} (RFC 3986). An absolute url is sent as
   /// it is, and so is anything that does not parse, for the host to refuse.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let baseUrl: Unknown type 'Middleware'"
   let baseUrl(base: String): Middleware<'body, 'body> =
     onRequest(fun req ->
       match Url.parse(base), Url.parseReference(req.url) with
@@ -502,7 +477,6 @@ module Middleware =
   /// redirect or a typo points at: an {{X-Api-Key}}, say, which <fn header> would send
   /// anywhere. Decided against the url the request is finally sent to, so it can be listed
   /// before or after <fn baseUrl>. One the request already carries is kept.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let headerFor: Unknown type 'Middleware'"
   let headerFor(origin: String, name: String, value: String): Middleware<'body, 'body> =
     match __origin(origin) with
     | Some(wanted) ->
@@ -513,7 +487,6 @@ module Middleware =
 
   /// {{Authorization: Bearer <param token>}} on every request to <param origin>, and on no
   /// other (<fn headerFor>).
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let bearer: Unknown type 'Middleware'"
   let bearer(origin: String, token: String): Middleware<'body, 'body> =
     headerFor(origin, "Authorization", "Bearer " + token)
 
@@ -525,7 +498,6 @@ module Middleware =
   /// dropped when a hop leaves the origin. The host follows them, checking your grants and the
   /// network guard again for each hop, so a GET through it is still in flight. In the default
   /// stack, with 10; listed after it, `followRedirects(0)` turns them off.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let followRedirects: Unknown type 'Middleware'"
   let followRedirects(max: Int64): Middleware<'body, 'body> =
     onRequest(fun req -> { req with redirects = Option.Some(max) })
 
@@ -549,7 +521,6 @@ module Middleware =
   /// its own) and has the host decode one, so the body is what the server meant and the
   /// {{Content-Encoding}} and {{Content-Length}} that described the encoded one are gone. Works
   /// for a stream too. In the default stack; `client([])` leaves the body as it came.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let decompress: Unknown type 'Middleware'"
   let decompress(): Middleware<'body, 'body> =
     onRequest(__decompressed)
 
@@ -565,7 +536,6 @@ module Middleware =
   /// attempt (<fn timeout>). Any other method is sent once: sending a POST twice can do its work
   /// twice. The host makes the retries, so a GET through it is still in flight. Listed after
   /// another, it wins.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let retry: Unknown type 'Middleware'"
   let retry(attempts: Int64, delayMs: Int64): Middleware<'body, 'body> =
     onRequest(fun req ->
       { req with retry = Option.Some(RetryPolicy { attempts = attempts, delayMs = delayMs }) })
@@ -575,7 +545,6 @@ module Middleware =
   /// empty one (<fn refuseEmptyNames>), follow up to 10 redirects, and decode a gzip or brotli
   /// body (<fn decompress>). All four keep a GET in flight. Build your own with <fn client>,
   /// starting from this list or from nothing.
-  // @compiler blocked: upstream-dependency diagnostic="Middleware / let defaults: Unknown type 'Middleware'"
   let defaults(): List<Middleware<'body, 'body>> =
     [ trimNames(), refuseEmptyNames(), followRedirects(defaultRedirects), decompress() ]
 
@@ -583,7 +552,6 @@ module Middleware =
 /// What <fn Middleware.defaults> does to a request, as one function: <fn request> and
 /// <fn stream> call it rather than build the stack, which would cost a few closures on every
 /// call.
-// @compiler blocked: upstream-dependency diagnostic="__defaults: Unknown type 'Middleware'"
 let __defaults(req: Request): Result<Request, RequestError> =
   let req = Middleware.__trimmed(req)
   if Middleware.__hasEmptyName(req) then
@@ -599,7 +567,6 @@ let __defaults(req: Request): Result<Request, RequestError> =
 /// `client(List.append(Middleware.defaults(), Middleware.retry(3, 200)))` retries too, and
 /// `client([])` is the raw builtin, which follows no redirect. A timeout, redirect limit or
 /// retry policy set on the request itself wins over the middleware's.
-// @compiler blocked: upstream-dependency diagnostic="client: Unknown type 'Send'"
 let client(middlewares: List<Middleware<Bytes, Bytes>>): Send<Bytes> =
   let send = Middleware.wrap(middlewares, sendRaw)
   (fun req ->
@@ -611,7 +578,6 @@ let client(middlewares: List<Middleware<Bytes, Bytes>>): Send<Bytes> =
 
 
 /// <fn client>, over <fn streamRaw>: the same middleware, with the body as a lazy stream.
-// @compiler blocked: upstream-dependency diagnostic="streamClient: Unknown type 'Send'"
 let streamClient(middlewares: List<Middleware<Stream<UInt8>, Stream<UInt8>>>): Send<Stream<UInt8>> =
   let send = Middleware.wrap(middlewares, streamRaw)
   (fun req ->
@@ -633,7 +599,6 @@ let streamClient(middlewares: List<Middleware<Stream<UInt8>, Stream<UInt8>>>): S
 /// the response where it first looks at it, so `List.map get urls` has every request in
 /// flight at once. Any other method is a write and runs in program order. <param body> is
 /// sent whatever the method.
-// @compiler blocked: compiler-contract diagnostic="Darklang.Stdlib.HttpClient.request: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let request(
   method: String,
   uri: String,
@@ -645,12 +610,10 @@ let request(
   | Error(e) -> Result.Error(e)
 
 
-// @compiler blocked: compiler-contract diagnostic="Darklang.Stdlib.HttpClient.get: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let get(uri: String, headers: List<(String * String)>): Result<Response<Bytes>, RequestError> =
   request("GET", uri, headers, Bytes.empty)
 
 
-// @compiler blocked: compiler-contract diagnostic="Darklang.Stdlib.HttpClient.post: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let post(
   uri: String,
   headers: List<(String * String)>,
@@ -659,7 +622,6 @@ let post(
   request("POST", uri, headers, body)
 
 
-// @compiler blocked: compiler-contract diagnostic="Darklang.Stdlib.HttpClient.put: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let put(
   uri: String,
   headers: List<(String * String)>,
@@ -668,17 +630,14 @@ let put(
   request("PUT", uri, headers, body)
 
 
-// @compiler blocked: compiler-contract diagnostic="Darklang.Stdlib.HttpClient.options: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let options(uri: String): Result<Response<Bytes>, RequestError> =
   request("OPTIONS", uri, [], Bytes.empty)
 
 
-// @compiler blocked: compiler-contract diagnostic="Darklang.Stdlib.HttpClient.delete: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let delete(uri: String): Result<Response<Bytes>, RequestError> =
   request("DELETE", uri, [], Bytes.empty)
 
 
-// @compiler blocked: compiler-contract diagnostic="Darklang.Stdlib.HttpClient.head: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let head(uri: String): Result<Response<Bytes>, RequestError> =
   request("HEAD", uri, [], Bytes.empty)
 
@@ -691,7 +650,6 @@ let head(uri: String): Result<Response<Bytes>, RequestError> =
 ///
 /// The underlying socket is released when the body stream drains to
 /// completion or is explicitly closed with `Stdlib.Stream.close`.
-// @compiler blocked: compiler-contract diagnostic="Darklang.Stdlib.HttpClient.stream: Type 'Darklang.Stdlib.HttpClient.Response' expects 0 arguments, got 1"
 let stream(
   method: String,
   uri: String,
@@ -841,7 +799,6 @@ module Sse =
   /// Pull bytes from the underlying stream until a complete event
   /// terminator (blank line) arrives, then emit. Returns None once
   /// the stream is exhausted and no buffered data remains.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpClient.Sse.__pullNextEvent: Unknown function or value 'Stdlib.Bytes.fromList'"
   let __pullNextEvent(bytes: Stream<UInt8>, state: ParseState): Option<(Event * ParseState)> =
     match Stream.next<UInt8>(bytes) with
     | None ->

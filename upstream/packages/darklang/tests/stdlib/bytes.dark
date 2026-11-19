@@ -1,7 +1,6 @@
 module Darklang.Stdlib.Bytes.Tests
 
 // length
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.length'" class=missing-support reason=upstream-dependency
 test length =
   Stdlib.Test.all(
     [ Stdlib.Utf8.encode("hi")
@@ -18,7 +17,6 @@ test length =
 
 
 // isEmpty
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.isEmpty'" class=missing-support reason=upstream-dependency
 test isEmpty =
   Stdlib.Test.all(
     [ Stdlib.Bytes.isEmpty(Stdlib.Bytes.empty) |> Stdlib.Test.equal(true)
@@ -28,7 +26,6 @@ test isEmpty =
 
 
 // getAt
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.fromList'" class=missing-support reason=upstream-dependency
 test getAt =
   let bytes = Stdlib.Bytes.fromList([ 10u8, 20u8, 30u8 ])
   Stdlib.Test.all(
@@ -49,7 +46,6 @@ test getAt =
 
 
 // setAt
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.fromList'" class=missing-support reason=upstream-dependency
 test setAt =
   let bytes = Stdlib.Bytes.fromList([ 10u8, 20u8, 30u8 ])
   Stdlib.Test.all(
@@ -75,7 +71,6 @@ test setAt =
 
 
 // indexOf / indexOfFrom
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.indexOf'" class=missing-support reason=upstream-dependency
 test indexOf =
   let bytes = Stdlib.Utf8.encode("ab\nc\n")
   Stdlib.Test.all(
@@ -105,7 +100,6 @@ test indexOf =
 
 
 // lastIndexOf / lastIndexOfFrom
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.lastIndexOf'" class=missing-support reason=upstream-dependency
 test lastIndexOf =
   let bytes = Stdlib.Utf8.encode("ab\nc\n")
   Stdlib.Test.all(
@@ -138,7 +132,7 @@ test lastIndexOf =
 
 
 // lastIndexOf walks back through a large Bytes
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.concat'" class=missing-support reason=upstream-dependency
+// @compiler xfail runtime: "Out of heap memory" class=missing-support reason=compiler-resource
 test lastIndexOfLarge =
   let bytes =
     Stdlib.Bytes.concat(
@@ -150,7 +144,6 @@ test lastIndexOfLarge =
 
 
 // concat
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.concat'" class=missing-support reason=upstream-dependency
 test concat =
   Stdlib.Test.all(
     [ Stdlib.Bytes.concat(Stdlib.Utf8.encode("foo"), Stdlib.Utf8.encode("bar"))
@@ -163,7 +156,6 @@ test concat =
 
 
 // concatAll
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.concatAll'" class=missing-support reason=upstream-dependency
 test concatAll =
   Stdlib.Test.all(
     [ [ Stdlib.Utf8.encode("foo")
@@ -178,7 +170,6 @@ test concatAll =
       |> Stdlib.Test.equal(0) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.take'" class=missing-support reason=upstream-dependency
 test concatAllEdges =
   // 800 bytes, so a slice of 403 or 397 shares this array instead of copying it.
   let parent = Stdlib.Utf8.encode(Stdlib.String.repeat("abcdefgh", 100))
@@ -214,7 +205,6 @@ test concatAllEdges =
 
 
 // map
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.map'" class=missing-support reason=upstream-dependency
 test map =
   Stdlib.Test.all(
     [ Stdlib.Bytes.map(Stdlib.Utf8.encode("abc"), fun b -> b + 1u8)
@@ -228,7 +218,6 @@ test map =
 
 
 // slice: start inclusive, end exclusive, strict
-// @compiler xfail compile: "Constructor pattern requires an enum scrutinee" class=missing-support reason=compiler-gap
 test slice =
   let bytes = Stdlib.Utf8.encode("abcdef")
   let text(
@@ -272,7 +261,6 @@ test slice =
 
 
 // take: the first bytes; never errors, clamps to the Bytes
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.take'" class=missing-support reason=upstream-dependency
 test take =
   let bytes = Stdlib.Utf8.encode("abcdef")
   let text(b: Bytes): Stdlib.Result.Result<String, String> =
@@ -296,7 +284,6 @@ test take =
 
 
 // drop: all but the first bytes; never errors, clamps to the Bytes
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.drop'" class=missing-support reason=upstream-dependency
 test drop =
   let bytes = Stdlib.Utf8.encode("abcdef")
   let text(b: Bytes): Stdlib.Result.Result<String, String> =
@@ -320,7 +307,6 @@ test drop =
 
 
 // startsWith / endsWith
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.startsWith'" class=missing-support reason=upstream-dependency
 test startsAndEndsWith =
   let b(s: String): Bytes = Stdlib.Utf8.encode(s)
   Stdlib.Test.all(
@@ -347,7 +333,6 @@ test startsAndEndsWith =
 
 
 // trim / trimStart / trimEnd
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.trim'" class=missing-support reason=upstream-dependency
 test trim =
   let b(s: String): Bytes = Stdlib.Utf8.encode(s)
   Stdlib.Test.all(
@@ -388,7 +373,6 @@ test trim =
 
 
 // indexOfSegment / indexOfSegmentFrom / contains
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.indexOfSegment'" class=missing-support reason=upstream-dependency
 test indexOfSegment =
   let b(s: String): Bytes = Stdlib.Utf8.encode(s)
   Stdlib.Test.all(
@@ -438,7 +422,6 @@ test indexOfSegment =
 
 
 // replaceAll
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.replaceAll'" class=missing-support reason=upstream-dependency
 test replaceAll =
   let b(s: String): Bytes = Stdlib.Utf8.encode(s)
   Stdlib.Test.all(
@@ -474,7 +457,7 @@ test replaceAll =
 
 
 // replaceAll goes through many matches in a large Bytes
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.replaceAll'" class=missing-support reason=upstream-dependency
+// @compiler xfail runtime: "Out of heap memory" class=missing-support reason=compiler-resource
 test replaceAllLarge =
   Stdlib.Bytes.replaceAll(
     Stdlib.Utf8.encode(Stdlib.String.repeat("ab", 50000)),
@@ -484,7 +467,6 @@ test replaceAllLarge =
 
 
 // toList / fromList
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.toList'" class=missing-support reason=upstream-dependency
 test listConversions =
   Stdlib.Test.all(
     [ Stdlib.Utf8.encode("abc")
@@ -496,7 +478,6 @@ test listConversions =
 
 
 // reverse
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.reverse'" class=missing-support reason=upstream-dependency
 test reverse =
   Stdlib.Test.all(
     [ Stdlib.Bytes.reverse(Stdlib.Utf8.encode("abc"))
@@ -515,7 +496,6 @@ test differentBytesAreNotEqual =
   |> Stdlib.Test.equal(false)
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.empty'" class=missing-support reason=upstream-dependency
 test equalityUsesContents =
   let bytes = Stdlib.Utf8.encode("hi")
   Stdlib.Test.all(
@@ -529,7 +509,6 @@ test equalityUsesContents =
       |> Stdlib.Test.equal(true) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.fromList'" class=missing-support reason=upstream-dependency
 test collectionsUseContentEquality =
   let a = Stdlib.Utf8.encode("hi")
   let b = Stdlib.Bytes.fromList([ 104u8, 105u8 ])
@@ -589,7 +568,7 @@ test reflectionUsesContents =
       |> Stdlib.Test.equal(true) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.fromList'" class=missing-support reason=upstream-dependency
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Dict.fromEntries'" class=missing-support reason=upstream-dependency
 test dictionaryKeysUseContents =
   let first = Stdlib.Utf8.encode("hi")
   let same = Stdlib.Bytes.fromList([ 104u8, 105u8 ])
@@ -619,7 +598,7 @@ test dictionaryKeysUseContents =
 // A test whose error holds unsaved Bytes still reports that error.
 // Equal Bytes are one key: a literal keeps the last value, `fromEntriesUnique`
 // refuses.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.fromList'" class=missing-support reason=upstream-dependency
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Dict.fromEntriesUnique'" class=missing-support reason=upstream-dependency
 test duplicateBytesKeysAreOneKey =
   let a = Stdlib.Utf8.encode("a")
   let alsoA = Stdlib.Bytes.fromList([ 97u8 ])
@@ -631,7 +610,6 @@ test duplicateBytesKeysAreOneKey =
         Stdlib.Result.Result.Error(Stdlib.Dict.DuplicateKey.DuplicateKey(a))) ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Bytes.Tests.reversed: Unknown function or value 'Stdlib.Bytes.fromList'"
 let reversed(bytes: Bytes): Bytes =
   Stdlib.Bytes.fromList(Stdlib.List.reverse(Stdlib.Bytes.toList(bytes)))
 
@@ -658,7 +636,7 @@ test workerCarriesUnsavedBytes =
 
 // A slice of more than 64 bytes that is at least an eighth of what it comes from shares
 // that array, and a slice of it shares it too. Each one is still exactly its own bytes.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.take'" class=missing-support reason=upstream-dependency
+// @compiler xfail runtime: "Unsupported dictionary key type" class=missing-support reason=compiler-gap
 test sharedSlices =
   let whole = Stdlib.Utf8.encode(Stdlib.String.repeat("0123456789", 100))
   let middle = Stdlib.Bytes.take(Stdlib.Bytes.drop(whole, 200), 500)
@@ -703,7 +681,7 @@ test sharedSlices =
 
 
 // A shared slice reaches a test worker as its own bytes, not the array it shares.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.drop'" class=missing-support reason=upstream-dependency
+// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.Process.run'" class=missing-support reason=upstream-dependency
 test workerCarriesSharedSlice =
   let whole = Stdlib.Utf8.encode(Stdlib.String.repeat("ab", 500))
   let input = Stdlib.Bytes.drop(whole, 600)

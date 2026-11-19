@@ -835,9 +835,13 @@ let __viewUuid (source: String) (value: Stdlib.Json.__InternalValueView) : Stdli
 let __viewDateTime (source: String) (value: Stdlib.Json.__InternalValueView) : Stdlib.Option.Option<DateTime> =
     match Stdlib.Json.__stringValue source value with
     | Some text ->
-        match Stdlib.DateTime.parse text with
-        | Ok dateTime -> Stdlib.Option.Option.Some dateTime
-        | Error _ -> Stdlib.Option.Option.None
+        // JSON holds an instant: a UTC timestamp, not a bare date or an offset.
+        let length = Stdlib.String.__byteLength text in
+        if (length == 20L || length == 24L) && Stdlib.String.endsWith text "Z" then
+            match Stdlib.DateTime.parse text with
+            | Ok dateTime -> Stdlib.Option.Option.Some dateTime
+            | Error _ -> Stdlib.Option.Option.None
+        else Stdlib.Option.Option.None
     | None -> Stdlib.Option.Option.None
 
 // These declarations establish the public generic signatures. JsonPlanning

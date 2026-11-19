@@ -4,7 +4,7 @@ module Darklang.Stdlib.__Http3Pool
 type Entry = { origin: Stdlib.__HttpWire.Url, state: Stdlib.__Http3Connection.State, idle: Int64 }
 type State = { entries: List<Stdlib.__Http3Pool.Entry> }
 type Lease = { state: Stdlib.__Http3Pool.State, entry: Stdlib.Option.Option<Stdlib.__Http3Pool.Entry> }
-type Completed = { response: Stdlib.HttpClient.Response, entry: Stdlib.Option.Option<Stdlib.__Http3Pool.Entry> }
+type Completed = { response: Stdlib.HttpClient.__Received, entry: Stdlib.Option.Option<Stdlib.__Http3Pool.Entry> }
 type BodyLease = { entry: Stdlib.__Http3Pool.Entry, cell: RawPtr, lifecycle: Stream<Unit>, returnOwner: Stdlib.__Http3Pool.Entry -> Bool }
 
 val empty = Stdlib.__Http3Pool.State { entries = [] }
@@ -63,12 +63,12 @@ let exchange (entry: Stdlib.__Http3Pool.Entry) (method: String) (url: Stdlib.__H
   | Error message ->
     // Failed I/O may have consumed a send nonce; abort instead of encrypted close or replay.
     let _ = Stdlib.__Http3.close entry.state.wire in
-    Error (if Stdlib.String.__containsBytes message "timed out" then Stdlib.HttpClient.RequestError.Timeout else Stdlib.HttpClient.RequestError.NetworkError)
+    Error (Stdlib.HttpClient.__failure message)
   | Ok batch ->
     match batch.responses with
     | [outcome] ->
       match outcome.response with
-      | Error _ -> let _ = Stdlib.__Http3.close batch.state.wire in Error Stdlib.HttpClient.RequestError.NetworkError
+      | Error message -> let _ = Stdlib.__Http3.close batch.state.wire in Error (Stdlib.HttpClient.__failure message)
       | Ok response ->
         if Stdlib.__Http3Pool.reusable batch.state then Ok (Stdlib.__Http3Pool.Completed { response = response, entry = Some { entry with state = batch.state } })
         else let _ = Stdlib.__Http3.close batch.state.wire in Ok (Stdlib.__Http3Pool.Completed { response = response, entry = None })
@@ -77,7 +77,7 @@ let exchange (entry: Stdlib.__Http3Pool.Entry) (method: String) (url: Stdlib.__H
 let open (ready: Stdlib.__QuicClient.Ready) (method: String) (url: Stdlib.__HttpWire.Url) (headers: List<(String * String)>) (body: Blob)
   : Stdlib.Result.Result<Stdlib.__Http3Pool.Completed, Stdlib.HttpClient.RequestError> =
   match Stdlib.__Http3Connection.open ready with
-  | Error _ -> let _ = Stdlib.__QuicClient.close ready in Error Stdlib.HttpClient.RequestError.NetworkError
+  | Error message -> let _ = Stdlib.__QuicClient.close ready in Error (Stdlib.HttpClient.__failure message)
   | Ok state -> Stdlib.__Http3Pool.exchange (Stdlib.__Http3Pool.Entry { origin = url, state = state, idle = 0L }) method url headers body
 
 // A completed response can precede upload FIN. Reset only the unfinished send
@@ -109,7 +109,7 @@ let __bodyClose (lease: Stdlib.__Http3Pool.BodyLease) : Unit =
 
 let stream (entry: Stdlib.__Http3Pool.Entry) (prepared: Stdlib.HttpClient.__Prepared) (headers: List<(String * String)>) (body: Blob)
   (lifecycle: Stream<Unit>) (returnOwner: Stdlib.__Http3Pool.Entry -> Bool)
-  : Stdlib.Result.Result<Stdlib.HttpClient.StreamResponse, Stdlib.HttpClient.RequestError> =
+  : Stdlib.Result.Result<Stdlib.HttpClient.__StreamReceived, Stdlib.HttpClient.RequestError> =
   let opened =
     if entry.state.next == 0L then
       match Stdlib.__Network.monotonicMillis () with
@@ -124,4 +124,4 @@ let stream (entry: Stdlib.__Http3Pool.Entry) (prepared: Stdlib.HttpClient.__Prep
     let initial = Stdlib.__Http3Client.Body { state = reply.state, events = reply.events, bytes = Stdlib.Blob.empty, position = 0L, finished = reply.finished } in
     let lease = Stdlib.__Http3Pool.BodyLease { entry = entry, cell = Stdlib.Stream.__cellNew initial, lifecycle = lifecycle, returnOwner = returnOwner } in
     let body = Stdlib.Stream.__new (fun _unit -> Stdlib.__Http3Pool.__bodyNext lease) (fun _unit -> Stdlib.__Http3Pool.__bodyClose lease) in
-    Ok (Stdlib.HttpClient.StreamResponse { statusCode = reply.head.status, headers = reply.head.headers, body = body })
+    Ok (Stdlib.HttpClient.__StreamReceived { statusCode = reply.head.status, headers = reply.head.headers, body = body })

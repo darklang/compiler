@@ -1,7 +1,7 @@
 module Darklang.Stdlib.Cli.Sys.Tests
 
 // __text: a fixed-width field, cut at its first NUL
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Bytes.fromList'" class=missing-support reason=upstream-dependency
+// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-contract
 test text =
   let buffer =
     Stdlib.Bytes.fromList(

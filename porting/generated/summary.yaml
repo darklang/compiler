@@ -21,27 +21,27 @@ parser:
   partial: 1
   supported: 30
 builtins:
-  missing: 89
-  present: 37
-  unassessed: 243
+  missing: 88
+  present: 48
+  unassessed: 233
 dispositions:
   packages:
-    blocked: 2510
+    blocked: 2480
     excluded: 5
     replace: 35
-    run: 1957
+    run: 1987
   stdlib:
-    blocked: 861
-    replace: 905
-    run: 740
+    blocked: 763
+    replace: 908
+    run: 835
   tests:
-    blocked: 76
-    run: 1643
-    xfail: 1434
+    blocked: 66
+    run: 1741
+    xfail: 1346
 reasons:
   packages:
     aot-type-error: 10
-    compiler-contract: 16
+    compiler-contract: 15
     compiler-gap: 18
     compiler-implementation: 34
     constructor-identity: 18
@@ -49,17 +49,17 @@ reasons:
     runtime-reflection: 5
     test-counter: 1
     test-diagnostics: 1
-    upstream-dependency: 2444
+    upstream-dependency: 2415
   stdlib:
-    compiler-contract: 129
-    compiler-implementation: 902
+    compiler-contract: 114
+    compiler-implementation: 905
     compiler-timeout: 1
     constructor-identity: 2
     container-adaptation: 490
     interpreter-intrinsic: 1
     test-counter: 2
     test-diagnostics: 2
-    upstream-dependency: 237
+    upstream-dependency: 154
   tests:
     aot-arity-error: 12
     aot-invalid-field: 16
@@ -67,15 +67,16 @@ reasons:
     aot-match-error: 26
     aot-name-error: 11
     aot-type-error: 154
-    compiler-contract: 2
+    compiler-contract: 3
     compiler-crash: 3
-    compiler-gap: 181
+    compiler-gap: 172
     compiler-leak: 2
+    compiler-resource: 2
     compiler-timeout: 2
-    diagnostic-difference: 2
-    interpreter-fixture: 47
+    diagnostic-difference: 3
+    interpreter-fixture: 48
     test-counter: 7
-    upstream-dependency: 1041
+    upstream-dependency: 948
 expected_failures:
   aot-rejection:
     phases:
@@ -119,13 +120,15 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/string.dark: 3
   missing-support:
     phases:
-      compile: 1127
-      runtime: 82
+      compile: 1031
+      runtime: 90
     reasons:
-      compiler-contract: 2
-      compiler-gap: 176
+      compiler-contract: 3
+      compiler-gap: 167
+      compiler-resource: 2
+      interpreter-fixture: 1
       test-counter: 7
-      upstream-dependency: 1024
+      upstream-dependency: 941
     sources:
       upstream/packages/darklang/tests/cli/bashrc.dark: 2
       upstream/packages/darklang/tests/cli/builtinGroups.dark: 4
@@ -173,7 +176,7 @@ expected_failures:
       upstream/packages/darklang/tests/cli/workbenchRepl.dark: 1
       upstream/packages/darklang/tests/cli/zshrc.dark: 2
       upstream/packages/darklang/tests/language/aliases.dark: 2
-      upstream/packages/darklang/tests/language/apply.dark: 7
+      upstream/packages/darklang/tests/language/apply.dark: 6
       upstream/packages/darklang/tests/language/archivedSelf.dark: 1
       upstream/packages/darklang/tests/language/basic.dark: 4
       upstream/packages/darklang/tests/language/big.dark: 1
@@ -231,29 +234,28 @@ expected_failures:
       upstream/packages/darklang/tests/scm/removalConflicts.dark: 5
       upstream/packages/darklang/tests/stdlib/altJson.dark: 7
       upstream/packages/darklang/tests/stdlib/base16.dark: 5
-      upstream/packages/darklang/tests/stdlib/base64.dark: 2
-      upstream/packages/darklang/tests/stdlib/bytes.dark: 32
+      upstream/packages/darklang/tests/stdlib/bytes.dark: 11
       upstream/packages/darklang/tests/stdlib/char.dark: 2
       upstream/packages/darklang/tests/stdlib/cli/dir.dark: 1
-      upstream/packages/darklang/tests/stdlib/cli/file.dark: 10
+      upstream/packages/darklang/tests/stdlib/cli/file.dark: 8
       upstream/packages/darklang/tests/stdlib/cli/posix.dark: 13
       upstream/packages/darklang/tests/stdlib/cli/process.dark: 11
       upstream/packages/darklang/tests/stdlib/cli/sgr.dark: 4
       upstream/packages/darklang/tests/stdlib/cli/sys.dark: 2
       upstream/packages/darklang/tests/stdlib/cli/widgets.dark: 6
       upstream/packages/darklang/tests/stdlib/crypto.dark: 10
-      upstream/packages/darklang/tests/stdlib/dateTime.dark: 22
+      upstream/packages/darklang/tests/stdlib/dateTime.dark: 21
       upstream/packages/darklang/tests/stdlib/decimal.dark: 6
       upstream/packages/darklang/tests/stdlib/dict.dark: 33
       upstream/packages/darklang/tests/stdlib/exec.dark: 3
       upstream/packages/darklang/tests/stdlib/float32.dark: 5
       upstream/packages/darklang/tests/stdlib/float64.dark: 11
-      upstream/packages/darklang/tests/stdlib/http.dark: 6
-      upstream/packages/darklang/tests/stdlib/httpclient.dark: 35
-      upstream/packages/darklang/tests/stdlib/httpserver.dark: 5
+      upstream/packages/darklang/tests/stdlib/http.dark: 4
+      upstream/packages/darklang/tests/stdlib/httpclient.dark: 3
+      upstream/packages/darklang/tests/stdlib/httpserver.dark: 2
       upstream/packages/darklang/tests/stdlib/ints/bigInt.dark: 5
       upstream/packages/darklang/tests/stdlib/ints/int128.dark: 1
-      upstream/packages/darklang/tests/stdlib/ints/int64.dark: 4
+      upstream/packages/darklang/tests/stdlib/ints/int64.dark: 2
       upstream/packages/darklang/tests/stdlib/ints/uint128.dark: 1
       upstream/packages/darklang/tests/stdlib/ints/uint8.dark: 1
       upstream/packages/darklang/tests/stdlib/json.dark: 29
@@ -261,10 +263,9 @@ expected_failures:
       upstream/packages/darklang/tests/stdlib/net.dark: 2
       upstream/packages/darklang/tests/stdlib/regex.dark: 6
       upstream/packages/darklang/tests/stdlib/result.dark: 1
-      upstream/packages/darklang/tests/stdlib/sse.dark: 8
       upstream/packages/darklang/tests/stdlib/stream.dark: 2
-      upstream/packages/darklang/tests/stdlib/string.dark: 20
+      upstream/packages/darklang/tests/stdlib/string.dark: 8
       upstream/packages/darklang/tests/stdlib/test.dark: 4
       upstream/packages/darklang/tests/stdlib/url.dark: 13
-      upstream/packages/darklang/tests/stdlib/utf8.dark: 3
+      upstream/packages/darklang/tests/stdlib/utf8.dark: 1
       upstream/packages/darklang/tests/stdlib/uuid.dark: 1

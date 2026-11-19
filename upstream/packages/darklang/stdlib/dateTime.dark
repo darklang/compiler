@@ -252,7 +252,6 @@ impl Display for ParseError =
 /// where {{Z}} can also be an offset from UTC such as {{+02:00}} or {{-05:30}}, or a plain
 /// {{YYYY-MM-DD}} date as midnight UTC. The result is in UTC. Returns {{Error InvalidDate}}
 /// for an impossible calendar date, or {{Error InvalidFormat}} for other rejected input.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch for Darklang.Stdlib.DateTime.parse: upstream String -> Darklang.Stdlib.Result.Result<DateTime, Darklang.Stdlib.DateTime.ParseError>, replacement String -> Darklang.Stdlib.Result.Result<DateTime, String>"
 let parse(s: String): Result<DateTime, ParseError> =
   Builtin.dateTimeParse(s)
 
