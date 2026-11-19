@@ -1,3 +1,9 @@
 ; Keep benchmark implementations and repository utilities outside the native build graph.
 (dirs bin src test packages tools scripts benchmarks mutation porting upstream)
 (data_only_dirs mutation porting upstream)
+; tools/static/build: a static musl executable, without debug info.
+(env
+ (static
+  (flags (-w -40))
+  (ocamlopt_flags ())
+  (link_flags (-ccopt -static))))

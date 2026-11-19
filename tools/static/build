@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Build a static, stripped musl darkc in Alpine: tools/static/build [output]
+set -euo pipefail
+root=$(cd "$(dirname "$0")/../.." && pwd)
+output=${1:-$root/darkc-linux-$(uname -m)}
+cp "$root/dependencies.lock" "$root/tools/static/"
+trap "rm -f $root/tools/static/dependencies.lock" EXIT
+docker build -t darkc-static-alpine "$root/tools/static"
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/home/agent -v "$root:/work" -w /work darkc-static-alpine \
+  bash -c "dune build --build-dir=_build-static --profile static ./bin/dark.exe &&
+    strip -o /work/.darkc-static _build-static/default/bin/dark.exe"
+mv "$root/.darkc-static" "$output"
+"$output" --version
