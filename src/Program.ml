@@ -789,7 +789,7 @@ let compileWithStdlib stdlib source outputPath verbosity (options : cliOptions)
 (*
    Compile source expression to executable
 *)
-let compile source outputPath verbosity (options : cliOptions) =
+let compile ?progress source outputPath verbosity (options : cliOptions) =
   let result =
     let* target =
       Result.map_error
@@ -799,7 +799,7 @@ let compile source outputPath verbosity (options : cliOptions) =
     let* stdlib =
       Result.map_error
         (fun message -> "Compilation failed: " ^ message)
-        (StdlibCache.buildStdlib target)
+        (StdlibCache.buildStdlib ?progress target)
     in
     compileWithStdlib stdlib source outputPath verbosity options
   in
@@ -910,7 +910,7 @@ let writeBatchReport path reports =
     Error
       ("Failed to write batch report '" ^ path ^ "': " ^ Printexc.to_string exn)
 
-let compileBatch (options : batchCliOptions) =
+let compileBatch ?progress (options : batchCliOptions) =
   let sources =
     let* first, rest =
       match options.input with
@@ -932,7 +932,7 @@ let compileBatch (options : batchCliOptions) =
       prerr_endline message;
       1
   | Ok target, Ok sources -> (
-      match StdlibCache.buildStdlib target with
+      match StdlibCache.buildStdlib ?progress target with
       | Error message ->
           prerr_endline ("Compilation failed: " ^ message);
           1
@@ -1034,13 +1034,13 @@ let checkReportJson name error =
       (List.map (fun (key, value) -> jsonString key ^ ":" ^ value) fields)
   ^ "}"
 
-let checkItems (options : checkCliOptions) =
+let checkItems ?progress (options : checkCliOptions) =
   match selectedTarget options.checkTarget with
   | Error message ->
       prerr_endline ("Target detection failed: " ^ message);
       1
   | Ok target -> (
-      match StdlibCache.buildStdlib target with
+      match StdlibCache.buildStdlib ?progress target with
       | Error message ->
           prerr_endline ("Compilation failed: " ^ message);
           1
@@ -1123,7 +1123,7 @@ let checkItems (options : checkCliOptions) =
    Run an expression (compile to temp and execute)
    Use library for compile and run
 *)
-let run source verbosity (options : cliOptions) =
+let run ?progress source verbosity (options : cliOptions) =
   let show = shouldShowNormal verbosity in
   if show then (
     print_endline ("Compiling and running: " ^ sourceDescription options);
@@ -1134,7 +1134,7 @@ let run source verbosity (options : cliOptions) =
         (fun message -> "Target detection failed: " ^ message)
         (Platform.detectHostTarget ())
     in
-    let* stdlib = StdlibCache.buildStdlib target in
+    let* stdlib = StdlibCache.buildStdlib ?progress target in
     let* report =
       withIRDumpOutput options (fun () ->
           CompilerLibrary.compile (request stdlib source verbosity options))
@@ -1216,6 +1216,8 @@ let printUsage () =
      executed";
   print_endline "  -o, --output FILE    Output file (default: dark.out)";
   print_endline "  -q, --quiet          Suppress compilation output";
+  print_endline
+    "  --progress=json      Report stdlib preparation as JSON lines on stderr";
   print_endline "  -v, --verbose        Show compilation pass names";
   print_endline "  -vv                  Show pass names + timing details";
   print_endline "  -vvv                 Dump all intermediate representations";
@@ -1293,7 +1295,19 @@ let checkFirst argv =
     Array.of_list ("--check" :: List.filter (fun arg -> arg <> "--check") args)
   else argv
 
+(* --progress=json applies to every command, so it comes out before parsing. *)
+let progressFirst argv =
+  let rec split json reversed = function
+    | "--progress=json" :: rest -> split true reversed rest
+    | "--" :: _ as rest -> (json, List.rev_append reversed rest)
+    | arg :: rest -> split json (arg :: reversed) rest
+    | [] -> (json, List.rev reversed)
+  in
+  let json, args = split false [] (Array.to_list argv) in
+  ((if json then Some (StdlibCache.printJson ()) else None), Array.of_list args)
+
 let main argv =
+  let progress, argv = progressFirst argv in
   let argv = checkFirst argv in
   try
     match parseCommand argv with
@@ -1308,8 +1322,8 @@ let main argv =
     | Ok (SingleCommand options) when options.version ->
         printVersion ();
         0
-    | Ok (BatchCommand options) -> compileBatch options
-    | Ok (CheckCommand options) -> checkItems options
+    | Ok (BatchCommand options) -> compileBatch ?progress options
+    | Ok (CheckCommand options) -> checkItems ?progress options
     | Ok (SingleCommand options) -> (
         let source =
           match options.argument with
@@ -1334,9 +1348,9 @@ let main argv =
             print_endline ("Error: " ^ message);
             1
         | Ok source ->
-            if options.run then run source options.verbosity options
+            if options.run then run ?progress source options.verbosity options
             else
-              compile source
+              compile ?progress source
                 (Option.value ~default:"dark.out" options.outputFile)
                 options.verbosity options)
   with exn ->

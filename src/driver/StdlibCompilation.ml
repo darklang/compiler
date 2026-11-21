@@ -42,8 +42,10 @@ let loadStdlib includeTests =
 
 (* Build stdlib in isolation, returning reusable result.
    This can be called once and the result reused for multiple user program compilations. *)
-let buildSourceStdlibWithTrace loadSources target recorder =
-  let measure name operation =
+let buildSourceStdlibWithTrace ?(progress = fun _ -> ()) loadSources target
+    recorder =
+  let measure ?stage name operation =
+    Option.iter progress stage;
     let start = Int64.to_float (Mtime_clock.elapsed_ns ()) /. 1e6 in
     let result = operation () in
     PipelineDiagnostics.recordPassTiming recorder name
@@ -51,11 +53,11 @@ let buildSourceStdlibWithTrace loadSources target recorder =
     result
   in
   let* sources =
-    measure "Stdlib detail: Source loading and parsing" (fun () ->
+    measure ~stage:"parse" "Stdlib detail: Source loading and parsing" (fun () ->
         loadSources ())
   in
   let* _, checked, written =
-    measure "Stdlib detail: Type checking" (fun () ->
+    measure ~stage:"type-check" "Stdlib detail: Type checking" (fun () ->
         WrittenChecking.checkSourceUnitsWithBase None true false sources)
   in
   let env = WrittenChecking.typeCheckEnvironment checked in
@@ -71,7 +73,7 @@ let buildSourceStdlibWithTrace loadSources target recorder =
   (* Build module registry once (reused across all compilations). *)
   let _moduleRegistry = DarkStdlib.buildModuleRegistry () in
   let* conversion =
-    measure "Stdlib detail: Declaration conversion" (fun () ->
+    measure ~stage:"convert" "Stdlib detail: Declaration conversion" (fun () ->
         P.convertTypedDeclarationsWithTrace recorder None (P.Monomorphize None)
           env typed)
   in
@@ -97,6 +99,7 @@ let buildSourceStdlibWithTrace loadSources target recorder =
     }
   in
   let options = CompilerOptions.defaultOptions in
+  progress "optimize";
   let* functions, ssa, typeMap =
     ANFPipeline.buildAnf 0 options elapsed registries
       (CheckedAST.nextFunctionOrdinal conversion.P.symbols)
@@ -113,6 +116,7 @@ let buildSourceStdlibWithTrace loadSources target recorder =
       conversion.P.functions
   in
   let anfGraph = ANFDeadCodeElimination.buildCallGraph functions in
+  progress "lower";
   let* allocated, summaries =
     NativePipeline.lowerToAllocatedLirWithKnown FunctionIdMap.empty target 0
       options elapsed recorder None None "stdlib" ssa typeMap registries None
@@ -147,13 +151,14 @@ let buildSourceStdlibWithTrace loadSources target recorder =
 let buildStdlibFromSources ?recorder target sources =
   buildSourceStdlibWithTrace (fun () -> Ok sources) target recorder
 
-let buildStdlibWithTrace target recorder =
-  buildSourceStdlibWithTrace (fun () -> loadStdlib false) target recorder
+let buildStdlibWithTrace ?progress target recorder =
+  buildSourceStdlibWithTrace ?progress (fun () -> loadStdlib false) target
+    recorder
 
 let buildImportedTestStdlibWithTrace target recorder =
   buildSourceStdlibWithTrace (fun () -> loadStdlib true) target recorder
 
-let buildStdlib target = buildStdlibWithTrace target None
+let buildStdlib ?progress target = buildStdlibWithTrace ?progress target None
 
 (* Build stdlib specializations for a spec set and merge them into the stdlib result. *)
 let buildStdlibSpecializations (stdlib : X.stdlibResult) specs externalTypes

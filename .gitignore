@@ -72,3 +72,5 @@ scripts/.unicode_cache/
 /porting/generated/ledger.json
 /porting/generated/ledger.json.gz
 /porting/generated/inventory.yaml
+/_build-static/
+/darkc-linux-*

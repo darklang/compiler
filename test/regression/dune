@@ -1,4 +1,13 @@
 ; Native equivalence and allocation regression checks.
+
+; Prepare the stdlib cache once, before the tests that compile, so they do not
+; each wait out a cold preparation within their own timeouts. A warm run takes
+; a second or two, and the cache may have been removed since the last run.
+(rule
+ (target stdlib-prepared)
+ (deps (universe))
+ (action (with-stdout-to %{target} (run %{exe:../../bin/dark.exe} -q -r -e 1L))))
+
 (rule
  (alias runtest)
  (deps package_probe_regression.py)
@@ -25,11 +34,11 @@
  (action (run python3 %{dep:../../scripts/test_upstream_parsing.py} %{exe:../../tools/ledger/parse_sources.exe})))
 (rule
  (alias runtest)
- (deps trait_packages_regression.py)
+ (deps stdlib-prepared trait_packages_regression.py)
  (action (run python3 %{dep:trait_packages_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
- (deps hosted_syntax_regression.py)
+ (deps stdlib-prepared hosted_syntax_regression.py)
  (action (run python3 %{dep:hosted_syntax_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
@@ -37,19 +46,19 @@
  (action (run python3 %{dep:stdlib_cache_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
- (deps package_browse_regression.py)
+ (deps stdlib-prepared package_browse_regression.py)
  (action (run python3 %{dep:package_browse_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
- (deps current_syntax_regression.py)
+ (deps stdlib-prepared current_syntax_regression.py)
  (action (run python3 %{dep:current_syntax_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
- (deps home_directory_regression.py)
+ (deps stdlib-prepared home_directory_regression.py)
  (action (run python3 %{dep:home_directory_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
- (deps current_uid_regression.py)
+ (deps stdlib-prepared current_uid_regression.py)
  (action (run python3 %{dep:current_uid_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
@@ -73,7 +82,7 @@
  (action (run python3 %{dep:differential_testing_regression.py} %{exe:../../tools/differential-testing/main.exe})))
 (rule
  (alias runtest)
- (deps standalone_compiler_regression.py)
+ (deps stdlib-prepared standalone_compiler_regression.py)
  (action (run python3 %{dep:standalone_compiler_regression.py} %{exe:../../bin/dark.exe})))
 (include_subdirs no)
 (rule
@@ -82,11 +91,11 @@
  (action (run python3 %{dep:executable_path_regression.py} %{exe:executable_path_compile.exe})))
 (rule
  (alias runtest)
- (deps terminal_session_regression.py)
+ (deps stdlib-prepared terminal_session_regression.py)
  (action (run python3 %{dep:terminal_session_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
- (deps terminal_size_regression.py)
+ (deps stdlib-prepared terminal_size_regression.py)
  (action (run python3 %{dep:terminal_size_regression.py} %{exe:../../bin/dark.exe})))
 (executables
  (names source_selection_regression source_inventory_regression compiler_annotations_regression parser_port_regression named_test_partition_regression named_test_parser_regression host_text_regression cache_regression component_regression literal_regression package_io_regression package_http_regression executable_path_compile)
@@ -111,7 +120,7 @@
 
 (rule
  (alias runtest)
- (deps cli_manifest_regression.py)
+ (deps stdlib-prepared cli_manifest_regression.py)
  (action (run python3 %{dep:cli_manifest_regression.py} %{exe:../../bin/dark.exe})))
 
 (rule
@@ -121,21 +130,21 @@
 
 (rule
  (alias runtest)
- (deps stdin_input_regression.py)
+ (deps stdlib-prepared stdin_input_regression.py)
  (action (run python3 %{dep:stdin_input_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
- (deps hosted_impl_check_regression.py)
+ (deps stdlib-prepared hosted_impl_check_regression.py)
  (action (run python3 %{dep:hosted_impl_check_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
- (deps check_generic_regression.py)
+ (deps stdlib-prepared check_generic_regression.py)
  (action (run python3 %{dep:check_generic_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
- (deps embedded_trait_regression.py)
+ (deps stdlib-prepared embedded_trait_regression.py)
  (action (run python3 %{dep:embedded_trait_regression.py} %{exe:../../bin/dark.exe})))
 (rule
  (alias runtest)
- (deps agreement_regression.py agreement-baseline.jsonl)
+ (deps stdlib-prepared agreement_regression.py agreement-baseline.jsonl)
  (action (run python3 %{dep:agreement_regression.py} %{exe:../../bin/dark.exe} %{dep:agreement-baseline.jsonl})))

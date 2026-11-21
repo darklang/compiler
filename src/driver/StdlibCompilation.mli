@@ -6,7 +6,9 @@ val buildStdlibFromSources :
   Validation.validatedSourceFile list ->
   (CompilationContexts.stdlibResult, string) result
 
+(* [progress] hears each stage's name as it starts. *)
 val buildStdlibWithTrace :
+  ?progress:(string -> unit) ->
   Platform.target ->
   CompilerOptions.passTimingRecorder option ->
   (CompilationContexts.stdlibResult, string) result
@@ -18,7 +20,9 @@ val buildImportedTestStdlibWithTrace :
   (CompilationContexts.stdlibResult, string) result
 
 val buildStdlib :
-  Platform.target -> (CompilationContexts.stdlibResult, string) result
+  ?progress:(string -> unit) ->
+  Platform.target ->
+  (CompilationContexts.stdlibResult, string) result
 
 val buildStdlibSpecializations :
   CompilationContexts.stdlibResult ->

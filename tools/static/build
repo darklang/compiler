@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Build a static, stripped musl darkc in Alpine: tools/static/build [output]
+set -euo pipefail
+root=$(cd "$(dirname "$0")/../.." && pwd)
+output=${1:-$root/darkc-linux-$(uname -m)}
+cp "$root/dependencies.lock" "$root/tools/static/"
+trap "rm -f $root/tools/static/dependencies.lock" EXIT
+docker build -t darkc-static-alpine "$root/tools/static"
+# --version prints the commit, so the container needs the git directory, which a worktree keeps
+# outside the checkout. XDG_CACHE_HOME: the user (from id -u) need not own /home/agent.
+mounts=()
+common=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+[[ -z "$common" || "$common" == "$root/"* ]] || mounts=(-v "$common:$common:ro")
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/home/agent -e XDG_CACHE_HOME=/tmp/cache -v "$root:/work" "${mounts[@]}" -w /work \
+  -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0="*" \
+  darkc-static-alpine \
+  bash -c "dune build --build-dir=_build-static --profile static ./bin/dark.exe &&
+    strip -o /work/.darkc-static _build-static/default/bin/dark.exe"
+mv "$root/.darkc-static" "$output"
+"$output" --version
